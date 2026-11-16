@@ -735,6 +735,23 @@
   .dhm-tl .u { fill: #3fb950; } .dhm-tl .h { fill: #7ee78799; } .dhm-tl .x { fill: #6e7681; }
   .dhm-cap { position: absolute; left: 470px; top: 1036px; font: 500 14px/1 var(--mono); color: #6e7681; }
   .mdt-dev { opacity: .35; transition: opacity .4s; } .mdt-dev.on { opacity: 1; }
+  .hff-bar rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
+  .hff-bar.on rect { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .hff-bar text { fill: #6e7681; font: 500 19px var(--mono); text-anchor: middle; transition: fill .4s; } .hff-bar.on text { fill: #e6edf3; }
+  .hff-sl { fill: #9198a1; font: 500 16px var(--mono); }
+  .hff-cell { fill: #30363d; transition: fill .3s; } .hff-cell.on { fill: #ab7df8; } .hff-cell.core.on { fill: #d2a8ff; }
+  .hff-gate line { stroke: #3d444d; stroke-width: 3; stroke-dasharray: 6 6; transition: stroke .3s; }
+  .hff-gate text { fill: #6e7681; font: 600 17px var(--mono); text-anchor: middle; transition: fill .3s; }
+  .hff-gate.on line { stroke: #d29922; } .hff-gate.on text { fill: #e3b341; } .hff-gate.hit line { filter: drop-shadow(0 0 8px #d29922); }
+  .hff-cand { opacity: 0; transition: opacity .35s; } .hff-cand.on { opacity: 1; }
+  .hff-cand rect { fill: #151b23; stroke: #ab7df8; stroke-width: 2; transition: stroke .3s; }
+  .hff-cand text { fill: #e6edf3; font: 500 17px var(--mono); text-anchor: middle; }
+  .hff-cand .x { fill: #f85149; font: 700 22px var(--mono); opacity: 0; }
+  .hff-cand.dead { opacity: .5; } .hff-cand.dead rect { stroke: #f85149; } .hff-cand.dead text { fill: #ff7b72; } .hff-cand.dead .x { opacity: 1; }
+  .hff-cand.hit rect { stroke: #3fb950; filter: drop-shadow(0 0 12px #3fb950); } .hff-cand.hit text { fill: #7ee787; }
+  .hff-svg .sdd-stamp.hff-noop { fill: #3fb950; text-anchor: middle; }
+  .hff-m { width: 1420px; } .hff-m .dhm-k { gap: 34px; }
+  .hff-tl tspan.u { font-weight: 700; }
   .mdt-frame { fill: #0d1117; stroke: #3d444d; stroke-width: 3; transition: stroke .4s, filter .4s; }
   .mdt-dev.on .mdt-frame { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
   .mdt-dev.ok .mdt-frame { stroke: #3fb950; filter: drop-shadow(0 0 14px #238636aa); }
@@ -6155,6 +6172,299 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic feedback loop"), h("h2", {}, letters("Research · Assign · "), letters("Observe", "l-grad"))), svg),
+    });
+  }
+
+  // Hunt · Falsify · Fix: a deterministic job scopes 40 risk-ranked files a day, a sandboxed agent runs the vulnhunt skill and falsifies every candidate, the survivor becomes one issue that Copilot fixes; the measured strip covers gh-aw's daily VulnHunter scan
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 170,
+      PH = 290,
+      IX = 1476,
+      IW = 330,
+      FX = 1830,
+      FW = 310,
+      CX = 745,
+      CW = 150,
+      CH = 40;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, icon, fill, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="${fill}"/>${ico(icon, x, y + 1, icon === "copilot" ? 38 : 30)}</g>`;
+    };
+    // the deterministic scoping job, top to bottom
+    const FUNNEL = [
+      [640, "repo snapshot · git archive"],
+      [560, "source only · no tests"],
+      [480, "risk-ranked · exec · http · tokens"],
+      [400, "20 core + 20 rotating"],
+    ];
+    // illustrative candidates; GATE[cycle parity][row] = gate that falsifies it (3 = survives)
+    const CAND = ["git argv", "fetch URL", "env token", "zip args", "run expr"];
+    const GATES = [
+      [952, "reachable?"],
+      [1122, "attacker input?"],
+      [1292, "new capability?"],
+    ];
+    const KILL = [
+      [1, 0, 3, 2, 0],
+      [1, 0, 2, 2, 0],
+    ];
+    const CY = i => 200 + i * 54,
+      SURV = 2;
+    const PANELS = [
+      [
+        IX,
+        IW,
+        "[vulnhunter]",
+        "ISSUE",
+        [
+          ["fail", "CWE-88 arg injection"],
+          ["", "imported ref → git argv"],
+          ["pass", "✓ reachable"],
+          ["pass", "✓ attacker input"],
+          ["pass", "✓ new capability"],
+        ],
+      ],
+      [
+        FX,
+        FW,
+        "fix argv injection",
+        "PR",
+        [
+          ["fn", "remote_fetch.go"],
+          ["", "- args = [ref]"],
+          ["add", "+ args = [--, ref]"],
+          ["add", "+ regression test"],
+          ["pass", "✓ merged"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly]
+    const EDGES = [
+      ["hffE0", "M664 502 H690 V106 H908", "p", "40 files in scope", 800, 90],
+      ["hffE1", `M1424 ${CY(SURV) + CH / 2} H${IX - 8}`, "p", "", 0, 0],
+      ["hffE2", `M${IX + IW / 2} ${PY - 8} V106 H${1985 - 83 - 42}`, "p", "assign", 1700, 90],
+      ["hffE3", `M1985 ${PY + PH + 4} V606`, "b", "review", 2050, 556],
+      ["hffE4", "M1886 638 H300 V532", "g", "merged · tomorrow the window rotates", 1100, 624],
+    ];
+    let g = `<defs><clipPath id="hffClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="hffP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="hffB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
+      <marker id="hffG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 720, "SCOPE · DETERMINISTIC"],
+      [720, 1440, "HUNT · FALSIFY · SANDBOXED"],
+      [1440, VW, "FIX · COPILOT"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="hffLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    g += `<g class="rpa-day">${ico("calendar", 40, 106, 26, "#ab7df8")}<text id="hffDay" x="62" y="115">DAY 1</text></g>`;
+    FUNNEL.forEach(([w, t], i) => (g += `<g class="hff-bar" id="hffF${i}"><rect x="${360 - w / 2}" y="${150 + i * 72}" width="${w}" height="56" rx="10"/><text x="360" y="${185 + i * 72}">${t}</text></g>`));
+    // 20 core files, then a ranked tail where a 20-file window rotates daily
+    g += `<text class="hff-sl" x="60" y="470">core</text><text class="hff-sl" x="304" y="470">rotating window →</text>`;
+    for (let i = 0; i < 20; i++) g += `<rect class="hff-cell core" x="${60 + i * 11}" y="482" width="8" height="40" rx="2"/>`;
+    for (let i = 0; i < 40; i++) g += `<rect class="hff-cell tail" data-i="${i}" x="${300 + i * 9}" y="482" width="6" height="40" rx="2"/>`;
+    GATES.forEach(([x, t], i) => (g += `<g class="hff-gate" id="hffG${i}"><line x1="${x}" y1="${i % 2 ? 160 : 186}" x2="${x}" y2="${CY(4) + CH + 14}"/><text x="${x}" y="${i % 2 ? 152 : 178}">${t}</text></g>`));
+    CAND.forEach((t, i) => (g += `<g class="hff-cand" id="hffC${i}"><rect x="0" y="${CY(i)}" width="${CW}" height="${CH}" rx="20"/><text x="${CW / 2}" y="${CY(i) + 27}">${t}</text><text class="x" x="${CW + 22}" y="${CY(i) + 28}">✕</text></g>`));
+    g += `<text class="sdd-stamp hff-noop" id="hffNoop" x="1080" y="540" text-anchor="middle">noop · no candidate survived</text>`;
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([x, w, file, tag, lines], i) => {
+      g += `<g class="sdd-panel" id="hffP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${w}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + w}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 20}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + w - 20}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => (g += `<text class="sdd-ln ${c}" id="hffL${i}_${j}" x="${x + 20}" y="${PY + 88 + j * 42}">${sp(s)}</text>`));
+      g += `</g>`;
+    });
+    for (const [id, d, c, lab, lx, ly] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#hff${c.toUpperCase()})"/>`;
+      if (lab) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab}</text>`;
+    }
+    g += agent("hffHunter", 1080, 106, 290, "VulnHunter", "shieldCheck", "#8957e5") + agent("hffCopilot", 1985, 106, 200, "Copilot", "copilot", "#238636", "g");
+    g += `<g class="fm-task" id="hffDev"><g class="fm-pill b"><rect x="1920" y="613" width="215" height="50" rx="25"/><text x="${1920 + 18 + 107}" y="646">Maintainer</text></g>
+      <circle cx="1920" cy="638" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${1920 - 31}" y="${638 - 31}" width="62" height="62" clip-path="url(#hffClip)"/></g>`;
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg hff-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // falsification: every live candidate walks right; a candidate stops at the gate that falsifies it
+    const HUNT = 5600,
+      WALK = 3600,
+      X1 = 1270;
+    const stopX = k => (k < 3 ? GATES[k][0] - CW - 8 : X1);
+    let cs = 0,
+      cyc = -1,
+      len = 0,
+      ev = [],
+      evI = 0,
+      fly = null,
+      dead = [];
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const off = (id, cls = "on") => $(id).classList.remove(cls);
+    const script = c => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      const kill = KILL[c % 2];
+      at(150, () => (on("hffLane0"), sfx.key(0.6)));
+      FUNNEL.forEach((_, i) => at(400 + i * 380, () => (on(`hffF${i}`), sfx.key(0.7))));
+      at(2000, () => (svg.querySelectorAll(".hff-cell.core").forEach(r => r.classList.add("on")), sfx.pop(2)));
+      at(2300, () => {
+        const w = (c * 10) % 30;
+        svg.querySelectorAll(".hff-cell.tail").forEach(r => r.classList.toggle("on", +r.dataset.i >= w && +r.dataset.i < w + 20));
+        sfx.pop(3);
+      });
+      flight(2700, "hffE0", 1100, "#ab7df8", 4);
+      at(3800, () => (on("hffLane1"), on("hffHunter"), sfx.key(0.8)));
+      CAND.forEach((_, i) => at(4100 + i * 220, () => (on(`hffC${i}`), sfx.key(0.5))));
+      at(HUNT - 100, () => svg.querySelectorAll(".hff-gate").forEach(x => x.classList.add("on")));
+      if (kill[SURV] < 3) {
+        at(HUNT + WALK + 300, () => (on("hffNoop"), sfx.review()));
+        return HUNT + WALK + 3000;
+      }
+      at(HUNT + WALK, () => (on(`hffC${SURV}`, "hit"), sfx.notify()));
+      flight(HUNT + WALK + 200, "hffE1", 300, "#ab7df8", 5);
+      const T = HUNT + WALK + 500;
+      at(T, () => (on("hffLane2"), on("hffP0"), off(`hffC${SURV}`)));
+      PANELS[0][4].forEach((_, j) => at(T + 200 + j * 220, () => (on(`hffL0_${j}`), sfx.key(0.5))));
+      at(T + 1400, () => (on("hffP0", "bad"), sfx.pop(6)));
+      flight(T + 1600, "hffE2", 700, "#ab7df8", 6);
+      at(T + 2300, () => (on("hffCopilot"), on("hffP1"), sfx.key(0.8)));
+      [0, 1, 2, 3].forEach(j => at(T + 2500 + j * 300, () => (on(`hffL1_${j}`), sfx.key(0.5))));
+      at(T + 3200, () => on("hffL1_1", "gone"));
+      flight(T + 3800, "hffE3", 450, "#4493f8", 7);
+      at(T + 4250, () => (on("hffDev"), sfx.review()));
+      at(T + 4800, () => (on("hffL1_4"), on("hffP1", "ok"), off("hffP0", "bad"), on("hffP0", "ok"), sfx.pop(8)));
+      flight(T + 5100, "hffE4", 1600, "#3fb950", 7);
+      return T + 7400;
+    };
+    const reset = c => {
+      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone, .hit, .dead").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone", "hit", "dead"));
+      CAND.forEach((_, i) => $(`hffC${i}`).setAttribute("transform", `translate(${CX},0)`));
+      $("hffDay").textContent = `DAY ${c + 1}`;
+      dot.style.opacity = 0;
+      fly = null;
+      dead = [];
+      len = script(c);
+    };
+    // measured: every "[vulnhunter] " issue by day since 22 Jul 2026; f = closed by a merged fix PR, r = fixed by a related merged PR, s = superseded
+    const REPORTS = [
+      [0, "s"],
+      [3, "f"],
+      [4, "s"],
+      [5, "f"],
+      [10, "f"],
+      [13, "f"],
+      [20, "f"],
+      [40, "f"],
+      [48, "f"],
+      [76, "r"],
+      [104, "f"],
+      [116, "f"],
+    ];
+    const CL = { f: ["u", 50], r: ["h", 40], s: ["x", 16] };
+    const TW = 460,
+      TX = d => 10 + (d * (TW - 20)) / 116;
+    let tl = `<text class="t" x="0" y="16">12 REPORTS · <tspan class="u">10 FIXED</tspan> · 2 SUPERSEDED</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    REPORTS.forEach(([d, s], i) => {
+      const [cls, hh] = CL[s];
+      tl += `<rect class="${cls}" style="--i:${i}" x="${TX(d) - 3}" y="${96 - hh}" width="6" height="${hh}" rx="1"/>`;
+    });
+    [
+      [10, "Aug"],
+      [41, "Sep"],
+      [71, "Oct"],
+      [102, "Nov"],
+    ].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl hff-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const strip = h(
+      "div",
+      { class: "dhm hff-m" },
+      h(
+        "div",
+        { class: "dhm-k" },
+        kpi("12", "findings", "filed as issues"),
+        kpi("10", "fixed by", ["merged PRs", h("br"), h("i", {}, "all by Copilot")], "g"),
+        kpi("9.2 h", "median", "issue → merge"),
+        kpi("6", "CWE-88", "argument injection"),
+        kpi("108/122", "runs", ["succeeded", h("br"), h("i", {}, "56 green in a row")])
+      ),
+      tlSvg
+    );
+    slides.push({
+      group: "process",
+      notes:
+        "Hunt, falsify, fix: gh-aw runs a daily vulnerability hunt on its own code with the vulnhunt skill from Capital One's open-source VulnHunter. A deterministic job, not the agent, picks the scope: it snapshots the repository, keeps only source files without tests, ranks them by risky patterns such as process execution, HTTP, tokens and file access, and hands the agent the 20 riskiest files plus a 20-file window of the ranked tail that rotates every day, so the whole codebase is covered over time. Inside the sandbox the agent hunts for injection-class bugs and then tries to falsify every candidate: is the code reachable, is the input attacker-controlled, and does exploiting it give the attacker a capability they did not already have? Only a survivor becomes a single issue, with its CWE; on most days nothing survives and the run ends with noop. The issue is assigned to Copilot, whose pull request fixes it with a regression test, and a maintainer reviews and merges it. The bottom strip is measured on gh-aw (snapshot 15 November 2026): 12 findings from 22 July to 15 November 2026 (116 days), six of them CWE-88 argument injection. Ten were fixed by merged pull requests, all opened by the Copilot coding agent, with a median of 9.2 hours from issue to merge; the other two were superseded. The workflow ran 122 times since 21 July and 108 succeeded; the early failures were cost caps and runtime issues, and the last 56 runs succeeded in a row. The files, candidates, finding and fix in the animated loop are illustrative and simplified.",
+      enter() {
+        cyc = -1;
+      },
+      tick(t) {
+        if (cyc < 0 || t - cs >= len) {
+          cs = t;
+          reset(++cyc);
+        }
+        const u = t - cs,
+          kill = KILL[cyc % 2];
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (u >= HUNT) {
+          const x = CX + (X1 - CX) * ease(Math.min(1, (u - HUNT) / WALK));
+          CAND.forEach((_, i) => {
+            const s = stopX(kill[i]),
+              cx = Math.min(x, s);
+            $(`hffC${i}`).setAttribute("transform", `translate(${cx},0)`);
+            if (kill[i] < 3 && x >= s && !dead[i]) {
+              dead[i] = 1;
+              on(`hffC${i}`, "dead");
+              on(`hffG${kill[i]}`, "hit");
+              sfx.block(false);
+            }
+          });
+        }
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A daily agent hunts with capitalone/VulnHunter; Copilot fixes what survives"), h("h2", {}, letters("Hunt · Falsify · "), letters("Fix", "l-grad"))),
+        svg,
+        strip,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · findings 22 Jul–15 Nov 2026 (116 d) · runs since 21 Jul · loop illustrative")
+      ),
     });
   }
 
@@ -17445,6 +17755,11 @@
       "daily-doc-updater",
       "Generate an agentic workflow that runs daily and update docs with features from the last 24h",
       "Generate an agentic workflow that runs daily and update docs with features from the last 24h\n\n- scan merged PRs and code changes from the last 24h\n- summarize features added, removed, modified\n- for each missing docs feature, update docs following the documenation instructions (tell LLM to load th instructions file)",
+    ],
+    "Hunt · Falsify · Fix": [
+      "daily-vulnhunter-scan",
+      "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox",
+      "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox",
     ],
     "Speak · Map · Grep": [
       "dictation-prompt",

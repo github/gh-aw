@@ -19,6 +19,7 @@ const slideNo = (heading: string) => {
 const CURRENT = '.dots button.on[aria-label^="Slide "]';
 const at = (n: number) => `Slide ${n}`;
 const SECURITY = slideNo("Security");
+const PROCESS = slideNo("Human agent processes");
 
 test.use({ reducedMotion: "reduce" });
 
@@ -42,8 +43,8 @@ test("presents the slides listed in slides.md in bands without the removed secti
 });
 
 test("preserves navigation, slide links, speaker notes, and sound controls", async ({ page }) => {
-  await page.goto("/gh-aw/cracktro/#16");
-  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(16));
+  await page.goto(`/gh-aw/cracktro/#${PROCESS}`);
+  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(PROCESS));
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
   await expect(page.locator(".notes")).toContainText("LabelOps");
@@ -57,11 +58,11 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#17$/);
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${PROCESS + 1}$`));
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(16));
+  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(PROCESS));
   await page.reload();
-  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(16));
+  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(PROCESS));
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(1));
