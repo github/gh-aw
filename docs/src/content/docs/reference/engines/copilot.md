@@ -160,6 +160,13 @@ Use top-level `max-tool-denials` to stop SDK inference when
 tool requests are repeatedly denied. The default is `5`.
 For Copilot, this requires `engine.copilot-sdk: true`.
 
+When a run produces no safe output, the diagnostic report interprets built-in
+Copilot SDK driver exit code `79` as main-session model verification failure
+and `80` as session failure after a workflow tool permission denial. Code `80`
+alone does not establish that `max-tool-denials` was reached; the report adds
+that detail only when the corresponding guard event is present. These meanings
+apply to the Copilot engine; other engines may reuse the same exit codes.
+
 Use top-level `max-tool-calls` to configure a positive run-wide limit on
 tool dispatches. The built-in Copilot SDK driver's pre-tool hook reserves the
 budget before execution, so failed and permission-denied calls count, concurrent
