@@ -154,7 +154,7 @@ func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []
 	// gated package ecosystems. Chrome's broad Google vendor rules also cover
 	// Gemini's inference API.
 	excludedEcosystems := []string{
-		"chrome", "codex-vendor", "copilot-vendor", "defaults", "dev-tools",
+		"chrome", "codex-vendor", "copilot-vendor", "defaults", "dev-tools", "gemini-vendor",
 		"fonts", "gh-aw", "github", "github-actions", "local", "threat-detection",
 	}
 

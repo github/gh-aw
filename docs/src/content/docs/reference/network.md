@@ -115,7 +115,7 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 | `codex` | Codex gateway/GitHub transport (`172.30.0.1`, GitHub API/web, `host.docker.internal`) |
 | `gemini` | Gemini gateway/GitHub transport (GitHub web, `host.docker.internal`, `raw.githubusercontent.com`) |
 | `pi` | Pi gateway/GitHub transport (GitHub web, `host.docker.internal`, `raw.githubusercontent.com`) |
-| `pi-base` | Pi provider-independent baseline (`github.com`, `host.docker.internal`, `raw.githubusercontent.com`) |
+| `pi-base` | Pi provider-independent gateway baseline (`github.com`, `host.docker.internal`, `raw.githubusercontent.com`) |
 | `threat-detection` | Compatibility alias for Copilot threat-detection network access (`api.githubcopilot.com`, Copilot plan APIs, `api.github.com`, `github.com`, `host.docker.internal`, `registry.npmjs.org`) |
 | `dart` | Dart/Flutter packages (`pub.dev`, `storage.googleapis.com`) |
 | `deno` | Deno runtime (`deno.land`, `jsr.io`, `googleapis.deno.dev`) |
@@ -179,7 +179,7 @@ Engine domain sets are named allowlist bundles for gateway/GitHub transport. The
 | `gemini` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com` |
 | `gemini-vendor` | Direct Gemini API: `generativelanguage.googleapis.com` |
 | `pi` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; provider-scoped models use the gateway but do not grant the provider API host |
-| `pi-base` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; applied as the provider-independent baseline before a provider prefix is resolved |
+| `pi-base` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; applied before a provider prefix selects a gateway route |
 | `threat-detection` | Applied automatically only to Copilot threat-detection runs and available as a compatibility alias: Copilot API hosts, `api.github.com`, `github.com`, `host.docker.internal`, and `registry.npmjs.org` for read-only lockfile validation. Telemetry requires an explicit `copilot-vendor` opt-in. |
 
 Gemini's default upstream remains available to the AWF API proxy without granting the agent direct access to `generativelanguage.googleapis.com`. Add `gemini-vendor` or that hostname to `network.allowed` for direct access. An explicitly configured `GEMINI_API_BASE_URL` retains custom-target egress; it does not automatically allow the default hostname.
