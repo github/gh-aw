@@ -70,7 +70,6 @@ safe-outputs:
     max: 5
     allowed-reasons: [spam]
   noop:
-  threat-detection: false
 checkout: false
 features:
   gh-aw-detection: true

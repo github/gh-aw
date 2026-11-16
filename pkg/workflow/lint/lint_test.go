@@ -24,7 +24,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"permission-scope", "version-check", "conditional-import", "private-to-public",
 		"install-scripts", "allowed-labels", "network-scope", "push-target",
 		"tool-scope", "sandbox-config", "image-argument", "checkout-mode", "fork-association",
-		"pull-request-target-roles", "safe-output-shell-expansion", "firewall-ssl-bump",
+		"pull-request-target-roles", "untrusted-roles-detection", "safe-output-shell-expansion", "firewall-ssl-bump",
 		"custom-job-detection",
 		"grader-file-io",
 		"grader-shell-file-write",

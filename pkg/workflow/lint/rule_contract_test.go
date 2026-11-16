@@ -262,6 +262,13 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:   "on:\n  pull_request_target:\n  roles: [write]\ncheckout: false\n",
 			path:   "on.roles",
 		},
+		"untrusted-roles-detection": {
+			threatRuleID: "CTR-005",
+			targets:      AWAST, strictPolicy: true,
+			unsafe: "on:\n  issues:\n  roles: all\nsafe-outputs:\n  threat-detection: false\n",
+			safe:   "on:\n  issues:\n  roles: all\nsafe-outputs:\n  threat-detection: true\n",
+			path:   "on.roles",
+		},
 		"safe-output-shell-expansion": {
 			threatRuleID: "CTR-009",
 			targets:      AWAST,

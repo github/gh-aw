@@ -516,6 +516,10 @@ on:
 
 Available roles: `admin`, `maintainer`/`maintain`, `write`, `triage`, `read`, `all`. Workflows with unsafe triggers (`push`, `issues`, `pull_request`) automatically enforce permission checks. Failed checks cancel the workflow with a warning.
 
+:::danger[`roles: all` admits untrusted actors]
+With `roles: all`, any GitHub user can reach the agent through triggers such as `issues`, `issue_comment`, or `pull_request`, and can inject prompts through the content they write. Keep [threat detection](/gh-aw/reference/threat-detection/) enabled for these workflows: strict mode rejects `roles: all` combined with `safe-outputs.threat-detection: false`, and `strict: false` reports a warning. See the [`untrusted-roles-detection`](/gh-aw/reference/workflow-linters/) linter. Also consider the [NVX microVM runtime](/gh-aw/reference/sandbox/) (`sandbox.agent.runtime: nvx`). The default container sandbox runs as the runner's user and shares the runner's `/tmp`.
+:::
+
 #### Custom organization repository roles
 
 GitHub organizations can define [custom repository roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/about-custom-repository-roles) with an inherited standard role (for example `write` or `maintain`). Actors whose access comes from a custom role (e.g. `Security Champions`) are authorized against that **inherited standard role** — the custom role name itself cannot appear in `on.roles:`. For example, a user with the custom role `Security Champions` (inherited role: `write`) will be authorized when the required roles include `write`, while a custom role inherited from `maintain` will still be rejected by `roles: [write]`.
