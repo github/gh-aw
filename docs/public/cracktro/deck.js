@@ -6289,7 +6289,9 @@
     for (let i = 0; i < 20; i++) g += `<rect class="hff-cell core" x="${60 + i * 11}" y="482" width="8" height="40" rx="2"/>`;
     for (let i = 0; i < 40; i++) g += `<rect class="hff-cell tail" data-i="${i}" x="${300 + i * 9}" y="482" width="6" height="40" rx="2"/>`;
     GATES.forEach(([x, t], i) => (g += `<g class="hff-gate" id="hffG${i}"><line x1="${x}" y1="${i % 2 ? 160 : 186}" x2="${x}" y2="${CY(4) + CH + 14}"/><text x="${x}" y="${i % 2 ? 152 : 178}">${t}</text></g>`));
-    CAND.forEach((t, i) => (g += `<g class="hff-cand" id="hffC${i}"><rect x="0" y="${CY(i)}" width="${CW}" height="${CH}" rx="20"/><text x="${CW / 2}" y="${CY(i) + 27}">${t}</text><text class="x" x="${CW + 22}" y="${CY(i) + 28}">✕</text></g>`));
+    CAND.forEach(
+      (t, i) => (g += `<g class="hff-cand" id="hffC${i}"><rect x="0" y="${CY(i)}" width="${CW}" height="${CH}" rx="20"/><text x="${CW / 2}" y="${CY(i) + 27}">${t}</text><text class="x" x="${CW + 22}" y="${CY(i) + 28}">✕</text></g>`)
+    );
     g += `<text class="sdd-stamp hff-noop" id="hffNoop" x="1080" y="540" text-anchor="middle">noop · no candidate survived</text>`;
     const sp = s => s.replace(/ /g, "\u00a0");
     PANELS.forEach(([x, w, file, tag, lines], i) => {
@@ -9181,9 +9183,9 @@
     // measured: every "Agent Persona Exploration" report issue by day since 8 Jun 2026 (when the report moved from discussions to issues);
     // g = closed by a merged PR that changed agent guidance, o = merged PR elsewhere, otherwise no merged PR
     const DAYS = [
-      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 60, 61, 62, 63, 64, 66, 67, 68, 69, 71, 72,
-      73, 74, 75, 76, 77, 78, 79, 81, 82, 83, 84, 85, 86, 87, 88, 106, 107, 108, 109, 110, 111, 112, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 148,
-      149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 60, 61, 62, 63, 64,
+      66, 67, 68, 69, 71, 72, 73, 74, 75, 76, 77, 78, 79, 81, 82, 83, 84, 85, 86, 87, 88, 106, 107, 108, 109, 110, 111, 112, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 134, 135, 136, 137, 138, 139, 140,
+      141, 142, 143, 144, 145, 146, 147, 148, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
     ];
     // one class per report, by index (days can repeat)
     const CLS = "gxgxxxxxxxxxxxxxxxxxxggxgxggxxxxxxxxxxxxxxxxgxgxxxgxgxxgxxxxgxxxgxxxxxxxxxxxxxxxxxxxxxxxxxoxxgxxgggxxxxxxxxxxxxxxxxxxxxxxxxxxggggxgxo";
@@ -9212,7 +9214,14 @@
     const ppm = h(
       "div",
       { class: "dhm" },
-      h("div", { class: "dhm-k" }, kpi("133", "daily reports", "filed"), kpi("25", "fixed by", ["merged PRs", h("br"), h("i", {}, "22 by Copilot")]), kpi("23", "guidance", "fixes", "g"), kpi("17,035 B", "agent file", ["probe reads", h("br"), h("i", {}, "first 8,000 B")], "r")),
+      h(
+        "div",
+        { class: "dhm-k" },
+        kpi("133", "daily reports", "filed"),
+        kpi("25", "fixed by", ["merged PRs", h("br"), h("i", {}, "22 by Copilot")]),
+        kpi("23", "guidance", "fixes", "g"),
+        kpi("17,035 B", "agent file", ["probe reads", h("br"), h("i", {}, "first 8,000 B")], "r")
+      ),
       tlSvg
     );
     const reset = () => {
@@ -9255,7 +9264,12 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every day an agent plays your users, grades the workflow agent, and probes what its guidance hides"), h("h2", {}, letters("Personas · Probe · "), letters("Patch", "l-grad"))),
+        h(
+          "div",
+          { class: "slide-head" },
+          h("div", { class: "kicker" }, "Every day an agent plays your users, grades the workflow agent, and probes what its guidance hides"),
+          h("h2", {}, letters("Personas · Probe · "), letters("Patch", "l-grad"))
+        ),
         svg,
         ppm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 8 Jun–15 Nov 2026 (160 d) · loop illustrative")
@@ -18279,11 +18293,7 @@
       "Generate an agentic workflow that runs daily and update docs with features from the last 24h",
       "Generate an agentic workflow that runs daily and update docs with features from the last 24h\n\n- scan merged PRs and code changes from the last 24h\n- summarize features added, removed, modified\n- for each missing docs feature, update docs following the documenation instructions (tell LLM to load th instructions file)",
     ],
-    "Hunt · Falsify · Fix": [
-      "daily-vulnhunter-scan",
-      "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox",
-      "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox",
-    ],
+    "Hunt · Falsify · Fix": ["daily-vulnhunter-scan", "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox", "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox"],
     "Speak · Map · Grep": [
       "dictation-prompt",
       "Create an agentic workflow … generates a dictation prompt … designed to rephrase text generated by text-to-speech recognition",
