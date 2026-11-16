@@ -74,7 +74,7 @@ rm /tmp/gh-aw/usage/agent/harness_retry.json /tmp/gh-aw/usage/detection/harness_
 PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" >/dev/null
 test ! -f /tmp/gh-aw/usage/agent/harness_retry.json
 test ! -f /tmp/gh-aw/usage/detection/harness_retry.json
-grep -q '"model":"final"' /tmp/gh-aw/usage/aw_info.json
+grep -q '"model":"early"' /tmp/gh-aw/usage/aw_info.json
 
 ISOLATED_ROOT="$TEST_DIR/isolated/gh-aw"
 ISOLATED_SCRIPT="$TEST_DIR/collect_usage_artifact_files.sh"
@@ -92,5 +92,10 @@ else
   echo "Usage collector failed when rejecting symlinks"
   exit 1
 fi
+
+rm "$ISOLATED_ROOT/usage/aw_info.json" "$ISOLATED_ROOT/aw_info.json"
+printf '{"model":"forged"}\n' > "$ISOLATED_ROOT/agent/aw_info.json"
+/bin/bash "$ISOLATED_SCRIPT" >/dev/null
+test ! -e "$ISOLATED_ROOT/usage/aw_info.json"
 
 echo "Usage collector tests passed"

@@ -35,6 +35,8 @@ test("burner tool-contract commands are executable under the compiled SDK policy
     assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once", command);
   }
   for (const command of [
+    "command -v pull_request_read || command -v github-mcp-server || command -v mcp",
+    "help pull_request_read",
     "sed -n '1,240p' /tmp/gh-aw/agent/dependabot-burner/context.json",
     "gh auth status",
     "git --no-pager status --short --branch",
@@ -42,8 +44,6 @@ test("burner tool-contract commands are executable under the compiled SDK policy
     "git diff --stat && gh auth status",
     "git diff --ext-diff",
     "go test -exec /tmp/unreviewed",
-    "command -v pull_request_read || command -v github-mcp-server || command -v mcp",
-    "help pull_request_read",
     "cd /tmp/gh-aw/agent/dependabot-burner && rg -n retry .",
     "find /tmp/gh-aw/agent/dependabot-burner -maxdepth 2 -type f | sort | head -50",
   ]) {
@@ -64,7 +64,7 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   const { markdown } = extractFrontmatterAndBody(workflow);
   const mainContent = writeInlineSubAgents(markdown, directory, directory, "copilot");
   const agents = loadCopilotSDKCustomAgents(directory, directory, message => assert.fail(message));
-  assert.equal(agents.length, 5);
+  assert.equal(agents.length, 1);
   assert.ok(Buffer.byteLength(mainContent) <= 7500, "Orchestrator contract exceeds the instruction-prefix budget");
   const remediator = agents.find(agent => agent.name === "dependabot-remediator");
   for (const section of ["Tool contract", "Deterministic result", "Required approach", "Required validation", "Pull request rule", "Output"]) {
@@ -75,18 +75,38 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   for (const agent of agents) {
     assert.ok(Buffer.byteLength(agent.prompt) <= 7500, `${agent.name} exceeds the instruction-prefix budget`);
     assert.ok(!agent.tools.includes("task"), `${agent.name} must not delegate`);
-    if (agent.name !== "dependabot-remediator") {
-      assert.ok(!agent.tools.includes("edit"), `${agent.name} must remain read-only`);
-    }
     if (agent.tools.includes("bash")) {
       assert.ok(agent.prompt.includes("github pull_request_read --help"), `${agent.name} is missing executable guidance`);
       assert.ok(agent.prompt.includes("After the first permission denial, stop shell calls"), `${agent.name} is missing a denial stop condition`);
     }
   }
-  assert.deepEqual(agents.find(agent => agent.name === "pr-group-analyzer").tools, ["read"]);
-  assert.deepEqual(agents.find(agent => agent.name === "retry-feedback-synthesizer").tools, []);
-  assert.ok(mainContent.includes("do not invoke the `retry-feedback-synthesizer`"), "First attempts must not require retry synthesis");
+  assert.deepEqual(remediator.tools, ["read", "search", "edit", "bash"]);
+  assert.ok(mainContent.includes("Do not launch a separate dependency analysis or feedback synthesis task"), "First attempts must not require retry synthesis");
   assert.ok(mainContent.includes("do not search the filesystem for history or relaunch the analyzer"));
+});
+
+test("the proxy PR-read route is allowed without standalone command probes", () => {
+  const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
+  const toolConfig = lock.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/);
+  assert.ok(toolConfig);
+  const { permissions } = JSON.parse(toolConfig[1]);
+  const handler = buildCopilotSDKPermissionHandler(permissions, () => assert.fail("Unrestricted approval is not expected"));
+  const command = 'github pull_request_read \'{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}\'';
+  assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once");
+  assert.match(workflow, /Tool names are subcommands of github, not standalone/);
+});
+
+test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
+  const agents = [...workflow.matchAll(/^## agent: `([^`]+)`/gm)].map(match => match[1]);
+  assert.deepEqual(agents, ["dependabot-remediator"]);
+  assert.match(workflow, /complete Tool contract for every agent above, copied verbatim/);
+  assert.match(workflow, /The remediator must not delegate further/);
+  assert.match(workflow, /orchestrator owns the terminal safe output/);
+  assert.match(workflow, /report incomplete work for a blocked or failed wave/);
+  assert.match(workflow, /Leave `replacement_pr_created` false/);
+  assert.match(workflow, /Do not submit create-pull-request or noop safe outputs from this worker/);
+  assert.match(workflow, /cd \.github\/workflows && npm install --package-lock-only --ignore-scripts/);
+  assert.doesNotMatch(workflow, /npm install --package-lock-only(?:["`]|\n)/);
 });
 
 function pull(number, files, author = "dependabot[bot]") {

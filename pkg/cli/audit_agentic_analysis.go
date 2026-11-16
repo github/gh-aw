@@ -327,12 +327,23 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 
 	assessments := make([]AgenticAssessment, 0, 4)
 	toolTypes := len(toolUsage)
-	frictionEvents := len(processedRun.MissingTools) + len(processedRun.MCPFailures) + len(processedRun.MissingData)
+	reportedControlSignals := len(processedRun.MissingTools) + len(processedRun.MCPFailures) + len(processedRun.MissingData)
+	controlEvents := reportedControlSignals
+	frictionEvidence := fmt.Sprintf("control_events=%d reported_control_signals=%d friction_counted_occurrences=unavailable", controlEvents, reportedControlSignals)
+	if processedRun.Friction != nil {
+		frictionOccurrences := processedRun.Friction.CountedOccurrences
+		// The sources may overlap; max avoids double-counting but can undercount distinct signals.
+		controlEvents = max(controlEvents, frictionOccurrences)
+		frictionEvidence = fmt.Sprintf("control_events=max(reported_control_signals=%d, friction_counted_occurrences=%d)=%d", reportedControlSignals, frictionOccurrences, controlEvents)
+		if processedRun.Friction.Derived {
+			frictionEvidence += " friction_scope=derived_from_logs"
+		}
+	}
 	writeCount := len(createdItems) + processedRun.Run.SafeItemsCount
 
 	assessments = appendResourceHeavyAssessment(assessments, processedRun, metrics, domain, fingerprint, toolTypes, writeCount)
 	assessments = appendOverkillAssessment(assessments, metrics, domain, fingerprint, toolTypes)
-	assessments = appendPoorControlAssessment(assessments, domain, fingerprint, frictionEvents, writeCount)
+	assessments = appendPoorControlAssessment(assessments, domain, fingerprint, controlEvents, frictionEvidence, writeCount)
 	assessments = appendPartiallyReducibleAssessment(assessments, metrics, fingerprint)
 	assessments = appendModelDowngradeAssessment(assessments, domain, fingerprint, processedRun.ModelRouting)
 	assessments = appendDelegatedContextAssessment(assessments, awContext)
@@ -359,6 +370,10 @@ func appendResourceHeavyAssessment(assessments []AgenticAssessment, processedRun
 }
 
 func appendOverkillAssessment(assessments []AgenticAssessment, metrics MetricsData, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, toolTypes int) []AgenticAssessment {
+	if metrics.Turns == 0 {
+		auditAgenticLog.Print("Skipping overkill assessment: no agent turns recorded")
+		return assessments
+	}
 	if (domain.Name == "triage" || domain.Name == "repo_maintenance" || domain.Name == "issue_response") && fingerprint.ResourceProfile == "lean" && fingerprint.ExecutionStyle == "directed" && fingerprint.ToolBreadth == "narrow" {
 		assessments = append(assessments, AgenticAssessment{
 			Kind:           "overkill_for_agentic",
@@ -371,17 +386,17 @@ func appendOverkillAssessment(assessments []AgenticAssessment, metrics MetricsDa
 	return assessments
 }
 
-func appendPoorControlAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, frictionEvents, writeCount int) []AgenticAssessment {
-	if frictionEvents >= 3 || (frictionEvents > 0 && writeCount >= 3) || ((domain.Name == "triage" || domain.Name == "repo_maintenance" || domain.Name == "issue_response") && fingerprint.ExecutionStyle == "exploratory") {
+func appendPoorControlAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, controlEvents int, frictionEvidence string, writeCount int) []AgenticAssessment {
+	if controlEvents >= 3 || (controlEvents > 0 && writeCount >= 3) || ((domain.Name == "triage" || domain.Name == "repo_maintenance" || domain.Name == "issue_response") && fingerprint.ExecutionStyle == "exploratory") {
 		severity := "medium"
-		if frictionEvents >= 4 || (frictionEvents > 0 && fingerprint.ActuationStyle == "write_heavy") {
+		if controlEvents >= 4 || (controlEvents > 0 && fingerprint.ActuationStyle == "write_heavy") {
 			severity = "high"
 		}
 		assessments = append(assessments, AgenticAssessment{
 			Kind:           "poor_agentic_control",
 			Severity:       severity,
 			Summary:        "The run showed signs of broad or weakly controlled agentic behavior.",
-			Evidence:       fmt.Sprintf("friction=%d execution=%s actuation=%s", frictionEvents, fingerprint.ExecutionStyle, fingerprint.ActuationStyle),
+			Evidence:       fmt.Sprintf("%s execution=%s actuation=%s", frictionEvidence, fingerprint.ExecutionStyle, fingerprint.ActuationStyle),
 			Recommendation: "Tighten instructions, reduce unnecessary tools, or delay write actions until the workflow has stronger evidence.",
 		})
 	}

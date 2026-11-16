@@ -21,6 +21,7 @@ checkout:
   fetch-depth: 0
 imports:
   - shared/tla-plus.md
+  - shared/reporting.md
 env:
   PYTHONDONTWRITEBYTECODE: "1"
 steps:

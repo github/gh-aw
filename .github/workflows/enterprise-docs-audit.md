@@ -41,6 +41,8 @@ safe-outputs:
     deduplicate-by-title: true
   noop:
     report-as-issue: false
+imports:
+  - shared/reporting.md
 ---
 
 # Enterprise Documentation Audit

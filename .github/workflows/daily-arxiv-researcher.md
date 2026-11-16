@@ -71,6 +71,7 @@ network:
 
 imports:
   - shared/mcp/kreuzberg.md
+  - shared/reporting.md
 
 safe-outputs:
   allowed-domains: ["arxiv.org", "export.arxiv.org"]

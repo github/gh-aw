@@ -66,7 +66,12 @@ slides carries a "Research prototype" badge.
 Left/Right (or Space, Page Up/Page Down) step through the slides in reading
 order and wrap between bands, and Up/Down jump to the first slide of the band
 above or below. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
-and M to toggle sound. The navigation dots form a map with one row per band and
+and M to toggle sound. The slide map button (or G) opens a full-screen grid of
+every slide grouped by band, with the current slide focused; arrows move between
+tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
+Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
+`slides.md` summaries and slide text; arrows pick a result, Enter opens it, and
+`#N` jumps to slide N. Hovering a dock button shows its keyboard shortcut. The navigation dots form a map with one row per band and
 jump directly to a slide (on narrow screens they become previous/next slide arrows
 flanked by track-style previous/next band buttons); `#N` hashes are shareable slide links. Clicking the left third
 goes back; clicking elsewhere advances. On touch screens, swipe left or right
@@ -76,6 +81,11 @@ workflow show its original `/agentic-workflows` prompt along the top; click it t
 open the full prompt in a phone-style dialog (Escape or Done closes it).
 Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
 1200x630 render of the title slide; regenerate it if the title slide changes.
+The ordered slide list, with a one-sentence summary per slide, lives in
+[`.github/skills/cracktro/slides.md`](../.github/skills/cracktro/slides.md).
+The docs build (and dev server) adds it to the page's JSON-LD as `hasPart`
+entries with `#N` links, so crawlers and agents can find a slide without
+running the deck; `src/lib/cracktro/` holds the parser and Astro integration.
 
 The [daily Cracktro maintainer](../.github/workflows/daily-cracktro-maintainer.md)
 uses `copilot/claude-opus-5.5` to check for missing shipped features and outdated

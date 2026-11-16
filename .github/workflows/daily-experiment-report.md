@@ -40,6 +40,7 @@ imports:
       expires: 3d
 
   - shared/otlp.md
+  - shared/reporting.md
 safe-outputs:
   upload-asset:
     max: 10
