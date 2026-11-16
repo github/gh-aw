@@ -13,8 +13,8 @@ for text in \
     'The first metric supplies top-level `operational-value.value`' \
     'safe_output.outcome' \
     'githubnext/gh-cao' \
-    '`add-operational-value` skill' \
-    'Automatic shell-to-JavaScript translation is not supported' \
+    'add-operational-value OWNER/REPO WORKFLOW-NAME' \
+    'never ignore or translate shell automatically' \
     '256 KiB'
 do
     grep -Fq "$text" "$skill_dir/SKILL.md"

@@ -90,8 +90,10 @@ compile it and include its generated `.lock.yml` in the PR.
 7. Reuse built-in graders. Use restricted `graders.operational-value.script`
    for run-scoped outcome metrics; it returns ordered `{id,value}` metrics.
    Other custom JavaScript returns one value. Both run only in the downstream
-   `graders` job. Deprecated Bash is compatibility-only; never translate it.
-   Do not fetch evidence or write files while grading.
+   `graders` job. `graders.operational-value.run` is rejected, including when
+   disabled or imported; migrate it manually to `script`. Never retain or
+   translate Bash declarations automatically. Do not fetch evidence or write
+   files while grading.
 8. Use deterministic triage before frontier reasoning; bound sub-agent fan-out
    and load context on demand. Do not invent multi-job orchestration or external
    workflow waits; explain the limit; recommend traditional Actions.

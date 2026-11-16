@@ -89,7 +89,7 @@ applies independently of campaign and Value configuration.
 `graders.operational-value.script` remains optional run-scoped evidence, not a
 prerequisite or substitute for CAO longitudinal Value.
 
-For execution-quality diagnostics, follow [Infer Trace Graders](#infer-trace-graders).
+For execution-quality diagnostics, follow [Infer Trace Graders](#infer-trace-graders-from-intent).
 
 <!-- instruction-prefix-end -->
 

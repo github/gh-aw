@@ -77,11 +77,11 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   for (const agent of agents) {
     assert.ok(Buffer.byteLength(agent.prompt) <= 7500, `${agent.name} exceeds the instruction-prefix budget`);
     if (agent.tools.includes("bash")) {
-      assert.ok(agent.prompt.includes("never through Bash"), `${agent.name} is missing GitHub tool guidance`);
+      assert.ok(agent.prompt.includes("You have no GitHub MCP tools"), `${agent.name} is missing GitHub tool guidance`);
       assert.ok(agent.prompt.includes("After the first permission denial, stop shell calls"), `${agent.name} is missing a denial stop condition`);
     }
   }
-  assert.deepEqual(remediator.tools, ["read", "grep", "find", "ls", "edit", "write", "bash"]);
+  assert.deepEqual(remediator.tools, ["read", "ls", "edit", "write", "bash"]);
   assert.ok(mainContent.includes("Do not launch a separate dependency analysis or feedback synthesis task"), "First attempts must not require retry synthesis");
   assert.ok(mainContent.includes("do not search the filesystem for history or relaunch the analyzer"));
 });
@@ -90,7 +90,7 @@ test("safe outputs are executable while GitHub reads stay off the shell", () => 
   const allowed = compiledBashPolicy();
   assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
   assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
-  assert.match(workflow, /GitHub\n {2}tools are not shell commands: never invoke them through Bash/);
+  assert.match(workflow, /Never invoke GitHub tools through Bash/);
 });
 
 test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
@@ -148,12 +148,17 @@ async function select(pulls, trigger = null, fallback = null) {
     { repo: { owner: "example", repo: "repo" }, eventName: trigger ? "issue_comment" : "schedule", payload: trigger ? { issue: { number: trigger, pull_request: {} } } : {} },
     name => {
       if (name === "path") return path;
+      if (name === "crypto") return require("node:crypto");
       assert.equal(name, "fs");
       return {
         mkdirSync() {},
         writeFileSync(filename, data) {
-          assert.equal(filename, "/tmp/gh-aw/agent/dependabot-burner/context.json");
-          payload = JSON.parse(data);
+          if (filename === "/tmp/gh-aw/agent/dependabot-burner/context.json") {
+            payload = JSON.parse(data);
+            return;
+          }
+          assert.match(filename, /^\/tmp\/gh-aw\/agent\/dependabot-burner\/diffs\/\d+\.diff$/);
+          assert.equal(typeof data, "string");
         },
       };
     },

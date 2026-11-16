@@ -393,22 +393,18 @@ worker has its own bounded contract; do not create nested delegations.
   names, versions, and file paths.
 - Inspect local changes with `git status` or `git diff --stat`. Do not add global
   Git flags such as --no-pager or query remotes.
-- Use the configured GitHub MCP tools directly only for PR comments, reviews,
-  and maintainer metadata; for example, call the `pull_request_read` tool with
-  method, owner, repo, and pullNumber. Integrity-filtered results mean the
-  feedback is unavailable, not absent. GitHub tools are not shell commands: never
-  invoke them through Bash. Do not use
-  command discovery probes, gh commands, authentication checks, or credential
-  setup; authentication is workflow-managed.
-- Run only declared validation commands. Do not wrap GitHub reads in shell loops
-  or add undeclared utilities or pipeline stages.
-- After the first tool-permission denial, stop shell calls in that agent and
-  return the concrete blocker to the orchestrator. Do not probe variants or
-  relaunch the denied agent. Continue other independently validated items without
-  changing permissions or the denial budget.
-- The worker cannot delegate and has no GitHub MCP tools; its explicit tool list
-  is narrower than the orchestrator's. Use the read tool for file-only analysis,
-  not Bash.
+- Use configured GitHub MCP tools only for PR comments/reviews and maintainer
+  metadata; provide method, owner, repo, and pullNumber. Integrity-filtered
+  results are unavailable, not absent. Never invoke GitHub tools through Bash or
+  use discovery probes, gh, auth checks, or credential setup; auth is workflow-
+  managed.
+- Run declared validation commands only; do not loop GitHub reads or add
+  utilities/pipeline stages.
+- On the first permission denial, stop shell calls and report the blocker. Do not
+  probe variants or relaunch the agent. Continue independent work without
+  changing permissions or denial budget.
+- The worker cannot delegate, has no GitHub MCP access, and has a narrower tool
+  list; use read for file-only analysis, not Bash.
 
 ## Read first
 

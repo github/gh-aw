@@ -44,8 +44,9 @@ for (const test of cases) {
     source: "operational-value",
     script,
     config: test.config,
-  }]).output.results[0];
+  }]).output.results.find(result => result.id === "operational-value");
   const actual = run();
+  assert.ok(actual, `${test.name}: operational-value result is missing`);
   assert.notEqual(actual.status, "error", `${test.name}: evaluator error: ${actual.error ?? ""}`);
   assert.deepEqual(actual.metrics, test.expected, `${test.name}: metrics differ`);
   assert.deepEqual(run(), actual, `${test.name}: nondeterministic result`);

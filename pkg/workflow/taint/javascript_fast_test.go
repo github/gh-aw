@@ -284,6 +284,7 @@ func TestJavaScriptAuthoredDriverInterpolation(t *testing.T) {
 }
 
 func TestAuthoredOperationalGraderUsesRestrictedJavaScriptProfile(t *testing.T) {
+	options := nativeJavaScriptOptions(t)
 	document, err := aw.Parse(`---
 graders:
   operational-value:
@@ -293,7 +294,13 @@ graders:
 ---
 `)
 	require.NoError(t, err)
-	result, err := AnalyzeAuthoredScripts(t.Context(), document, SecretLeakRule())
+	rule := SecretLeakRule()
+	rule.JavaScript = options
+	result, err := AnalyzeAuthoredScripts(t.Context(), document, rule)
 	require.NoError(t, err)
 	assert.Empty(t, result.Findings)
+	assert.Equal(t, []CoverageGap{{
+		Path:   "graders.operational-value.script",
+		Reason: "grader trace, run, workflow and configuration payload data flow is not modeled",
+	}}, result.Gaps)
 }
