@@ -121,7 +121,7 @@ for live safe-output evidence.`,
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 			repoOverride, _ := cmd.Flags().GetString("repo")
 			outcome, _ := cmd.Flags().GetBool("outcome")
-			return RunExperimentsAnalyze(cmd.Context(), ExperimentsAnalyzeConfig{
+			return runExperimentsAnalyze(cmd.Context(), ExperimentsAnalyzeConfig{
 				ExperimentName: args[0],
 				RepoOverride:   repoOverride,
 				JSONOutput:     jsonOutput,
@@ -183,7 +183,11 @@ func RunExperimentsList(config ExperimentsListConfig) error {
 }
 
 // RunExperimentsAnalyze analyzes a specific experiment branch.
-func RunExperimentsAnalyze(ctx context.Context, config ExperimentsAnalyzeConfig) error {
+func RunExperimentsAnalyze(config ExperimentsAnalyzeConfig) error {
+	return runExperimentsAnalyze(context.Background(), config)
+}
+
+func runExperimentsAnalyze(ctx context.Context, config ExperimentsAnalyzeConfig) error {
 	experimentsLog.Printf("Analyzing experiment: name=%s, repo=%s, json=%v",
 		config.ExperimentName, config.RepoOverride, config.JSONOutput)
 
@@ -310,7 +314,12 @@ func loadMetricObservationSetsForAnalysis(
 			return nil, func() {}, errors.New("outcome-backed experiment metrics require --outcome to enable additional GitHub API requests. Example: gh aw experiments analyze <workflow> --outcome")
 		}
 	}
-	graderSets, graderGuardrails, cleanup, err := loadGraderObservationSetsForAnalysis(ctx, details, frontmatter, repoOverride)
+	graderSets, graderGuardrails, cleanup, err := loadGraderObservationSetsForAnalysis(
+		ctx, details, frontmatter, repoOverride,
+		func(baseDir, repoOverride string) graderRunArtifactSource {
+			return newGitHubGraderRunArtifactSource(baseDir, repoOverride)
+		},
+	)
 	if err != nil {
 		return nil, func() {}, err
 	}
@@ -331,7 +340,12 @@ func loadMetricObservationSetsForAnalysis(
 	if !outcome {
 		return &experimentMetricObservationSets{Primary: graderSets, Guardrails: graderGuardrails}, cleanup, nil
 	}
-	outcomeSets, outcomeSecondary, outcomeGuardrails, outcomeCleanup, err := loadOutcomeObservationSetsForAnalysis(ctx, details, frontmatter, repoOverride)
+	outcomeSets, outcomeSecondary, outcomeGuardrails, outcomeCleanup, err := loadOutcomeObservationSetsForAnalysis(
+		ctx, details, frontmatter, repoOverride,
+		func(baseDir, repoOverride string) outcomeRunSource {
+			return &githubOutcomeRunSource{artifacts: newGitHubGraderRunArtifactSource(baseDir, repoOverride)}
+		},
+	)
 	if err != nil {
 		cleanup()
 		return nil, func() {}, err
@@ -349,6 +363,7 @@ func loadGraderObservationSetsForAnalysis(
 	details *ExperimentDetails,
 	frontmatter experimentFrontmatterResult,
 	repoOverride string,
+	sourceFactory func(baseDir, repoOverride string) graderRunArtifactSource,
 ) (map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, func(), error) {
 	refs, err := resolveGraderMetricReferences(frontmatter.ExperimentConfigs, frontmatter.Graders)
 	if err != nil {
@@ -369,7 +384,7 @@ func loadGraderObservationSetsForAnalysis(
 	cleanup := func() {
 		_ = os.RemoveAll(tempDir)
 	}
-	source := newGitHubGraderRunArtifactSource(tempDir, repoOverride)
+	source := sourceFactory(tempDir, repoOverride)
 	runData := loadGraderRunData(ctx, details.Runs, runRefs, source)
 	sets := buildGraderMetricObservationSets(details.Experiments, details.Runs, refs, runData, frontmatter.Graders)
 	guardrailSets := buildGraderGuardrailObservationSets(details, guardrailRefs, runData, frontmatter.Graders)
