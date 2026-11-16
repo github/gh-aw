@@ -1,50 +1,64 @@
 {
-  "generated_at": "2026-11-16T06:39:19Z",
-  "run_id": "43817907030",
+  "generated_at": "2026-11-16T12:36:07Z",
+  "run_id": "pr-triage-2026-11-16",
   "source": "pr-triage",
-  "eligible_total": 19,
-  "open_copilot_prs": 22,
-  "cooldown_skipped": 3,
+  "eligible_total": 22,
+  "open_copilot_prs": 31,
+  "cooldown_skipped": 9,
   "category_counts": {
-    "bug": 2,
+    "bug": 5,
     "chore": 16,
-    "feature": 1
+    "docs": 0,
+    "feature": 1,
+    "test": 0
   },
   "risk_counts": {
     "low": 16,
-    "medium": 2,
+    "medium": 5,
     "high": 1
   },
   "priority_counts": {
     "low": 16,
-    "medium": 1,
+    "medium": 4,
     "high": 2
   },
   "action_counts": {
     "auto_merge": 1,
-    "fast_track": 3,
-    "batch_review": 15,
+    "fast_track": 4,
+    "batch_review": 17,
     "defer": 0,
     "close": 0
   },
   "selected_candidates": [
     {
-      "number": 76957,
-      "title": "Restrict legacy credential-backed proxy ingress",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 81
-    },
-    {
-      "number": 78246,
-      "title": "fix(cli): thread command context through experiments analyze loaders",
+      "number": 78312,
+      "title": "Treat explicit default --dir as the default workflow directory in compile",
       "category": "bug",
       "risk": "medium",
-      "priority": "high",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 54,
+      "batch": "none"
+    },
+    {
+      "number": 78311,
+      "title": "Pin setup action and built-in containers to compiler version on update",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 55,
+      "batch": "none"
+    },
+    {
+      "number": 78306,
+      "title": "cli-version-checker: route npm to the public registry and fix the OCI digest examples",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
       "action": "fast_track",
-      "score": 71
+      "score": 60,
+      "batch": "none"
     },
     {
       "number": 78256,
@@ -53,7 +67,8 @@
       "risk": "medium",
       "priority": "medium",
       "action": "fast_track",
-      "score": 65
+      "score": 65,
+      "batch": "none"
     },
     {
       "number": 78253,
@@ -62,7 +77,18 @@
       "risk": "low",
       "priority": "low",
       "action": "auto_merge",
-      "score": 42
+      "score": 42,
+      "batch": "none"
+    },
+    {
+      "number": 78246,
+      "title": "fix(cli): thread command context through experiments analyze loaders",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 71,
+      "batch": "none"
     },
     {
       "number": 77544,
@@ -71,34 +97,196 @@
       "risk": "low",
       "priority": "low",
       "action": "batch_review",
-      "score": 23
+      "score": 34,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 77319,
+      "title": "build(deps): bump the pip group across 1 directory with 2 updates",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 30,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76957,
+      "title": "Restrict legacy credential-backed proxy ingress",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 81,
+      "batch": "none"
+    },
+    {
+      "number": 76615,
+      "title": "build(deps-dev): bump fast-xml-parser from 5.8.0 to 5.12.0 in /actions/setup/js in the npm_and_yarn group across 1 directory",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76614,
+      "title": "build(deps): bump fast-xml-parser from 5.7.1 to 5.12.0 in /docs in the npm_and_yarn group across 1 directory",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76492,
+      "title": "build(deps): bump library/alpine from `be26560` to `f59abe6`",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76489,
+      "title": "build(deps): bump @astrojs/markdown-remark from 7.3.5 to 7.3.6 in /docs",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76488,
+      "title": "build(deps-dev): bump vitest from 5.0.5 to 5.1.0 in /actions/setup/js",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76487,
+      "title": "build(deps): bump pytest from 9.1.1 to 9.2.0 in /.github/workflows",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76486,
+      "title": "build(deps): bump astro from 7.4.5 to 7.4.7 in /docs",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76485,
+      "title": "build(deps): bump golang.org/x/sync from 0.24.0 to 0.25.0",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76483,
+      "title": "build(deps-dev): bump @github/copilot-sdk from 1.0.28 to 1.0.29 in /actions/setup/js",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76482,
+      "title": "build(deps): bump github.com/spf13/pflag from 1.0.10 to 1.1.0",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76481,
+      "title": "build(deps-dev): bump @playwright/test from 1.64.1 to 1.65.0 in /docs",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76479,
+      "title": "build(deps): bump multidict from 7.1.0 to 7.2.1 in /.github/workflows",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76477,
+      "title": "build(deps): bump @astrojs/starlight from 0.42.8 to 0.42.10 in /docs",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 28,
+      "batch": "dependency-bumps"
     }
   ],
   "batches": [
     {
-      "id": "deps-2026-11-16",
+      "id": "dependency-bumps",
       "count": 15,
       "numbers": [
-        77544,
-        77319,
-        76615,
-        76614,
-        76492,
-        76489,
-        76488,
-        76487,
-        76486,
-        76485,
-        76483,
-        76482,
-        76481,
+        76477,
         76479,
-        76477
+        76481,
+        76482,
+        76483,
+        76485,
+        76486,
+        76487,
+        76488,
+        76489,
+        76492,
+        76614,
+        76615,
+        77319,
+        77544
       ],
       "category": "chore",
       "risk": "low",
       "action": "batch_review"
+    },
+    {
+      "id": "docs-diagram",
+      "count": 2,
+      "numbers": [
+        78327,
+        78335
+      ],
+      "category": "docs",
+      "risk": "low",
+      "action": "batch_review"
     }
   ],
-  "summary": "19 older-than-1h app/github-copilot PRs were triaged. Dependency bumps dominated the queue and were batched. Three higher-value PRs merit human review: security ingress fix, CLI bugfix, and Safe Outputs conformance update. One low-risk chore is ready for auto-merge."
+  "summary": "29 eligible app/github-copilot PRs were triaged. Dependency bumps dominate the queue; two higher-value security and CLI fixes merit focused review, while the documentation diagram PRs can be batched."
 }
