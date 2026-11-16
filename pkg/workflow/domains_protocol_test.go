@@ -133,7 +133,7 @@ func TestGetClaudeAllowedDomainsWithProtocol(t *testing.T) {
 		t.Error("Expected result to contain https://api.example.com")
 	}
 
-	// The static Claude set excludes Anthropic's API; the engine adds it only for the default target.
+	// The Claude transport set excludes Anthropic's API; direct access is an explicit opt-in.
 	if strings.Contains(result, "api.anthropic.com") {
 		t.Error("Expected static Claude domain set to exclude api.anthropic.com")
 	}

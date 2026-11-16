@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -100,7 +101,19 @@ func TestPiEngineNativeProvidersAndFederation(t *testing.T) {
 	assert.Equal(t, "google", piConfiguredProvider(google))
 	domains, err := getPiDefaultDomains(google.Model)
 	require.NoError(t, err)
-	assert.Contains(t, domains, "generativelanguage.googleapis.com")
+	assert.NotContains(t, domains, "generativelanguage.googleapis.com")
+	for _, tt := range []struct {
+		model, optIn, domain string
+	}{
+		{"copilot/claude-sonnet-4", "copilot-vendor", "api.githubcopilot.com"},
+		{"openai/gpt-4.1", "codex-vendor", "api.openai.com"},
+		{google.Model, "gemini-vendor", "generativelanguage.googleapis.com"},
+	} {
+		directDomains, err := GetAllowedDomainsForEngineWithModel(constants.PiEngine, tt.model,
+			&NetworkPermissions{Allowed: []string{"pi", tt.optIn}}, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, directDomains, tt.domain)
+	}
 	google.EngineConfig.Auth = &EngineAuthConfig{Type: "github-oidc", Provider: "gcp"}
 	google.NetworkPermissions = &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}}
 	assert.NotContains(t, engine.GetRequiredSecretNames(google), "GEMINI_API_KEY")

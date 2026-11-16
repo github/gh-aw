@@ -25,7 +25,6 @@ var domainSetsJSON []byte
 type domainSets struct {
 	Ecosystems           map[string][]string `json:"ecosystems"`
 	EngineDefaults       map[string][]string `json:"engine-defaults"`
-	PiProviderDomains    map[string]string   `json:"pi-provider-domains"`
 	SanitizationDefaults []string            `json:"sanitization-defaults"`
 }
 
@@ -102,44 +101,37 @@ func copyEngineDefaultDomainSet(domains []string) []string {
 	return append([]string(nil), domains...)
 }
 
-// CopilotDefaultDomains are the default domains required for GitHub Copilot CLI authentication and operation.
+// CopilotDefaultDomains are the default domains required for GitHub Copilot CLI transport.
 //
-// This list is limited to the shared gateway/GitHub transport baseline: the MCP/API gateway
-// (host.docker.internal), the GitHub API and web hosts, and the Copilot routing hub used for
-// inference. Plan-specific Copilot API hosts (business/enterprise/individual) and Copilot
-// telemetry are *not* part of the default set: agents route inference through the AWF api-proxy,
-// so those vendor hosts require an explicit `network: { allowed: [copilot-vendor] }` opt-in.
+// This list is limited to the shared gateway/GitHub transport baseline. Agents route inference
+// through the AWF api-proxy, so direct Copilot API hosts require an explicit
+// `network: { allowed: [copilot-vendor] }` opt-in.
 var CopilotDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["copilot"])
 
-// CodexDefaultDomains retain gateway/GitHub transport and the concrete OpenAI API host.
-// Optional authentication/telemetry hosts require an explicit codex-vendor opt-in.
+// CodexDefaultDomains contain the gateway/GitHub transport baseline. Direct OpenAI API and
+// optional authentication/telemetry hosts require an explicit `codex-vendor` opt-in.
 var CodexDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["codex"])
 
 // ClaudeDefaultDomains are the opt-in Claude gateway/GitHub transport baseline.
-// Direct Anthropic API access is added only when Claude's effective target is Anthropic.
+// Direct Anthropic API access must be explicitly added to network.allowed.
 // Claude uses API-key or gateway authentication, not interactive browser login.
 // Do not include anthropic.com: AWF also allows subdomains, which would re-enable
 // statsig.anthropic.com. Infrastructure and downloads belong in ecosystem opt-ins.
 var ClaudeDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["claude"])
 
-// GeminiDefaultDomains retain the concrete model API, not the googleapis.com wildcard
-// that would also grant access to unrelated package and browser download hosts.
+// GeminiDefaultDomains contain the gateway/GitHub transport baseline. Direct Gemini API
+// access requires the explicit `gemini-vendor` opt-in.
 var GeminiDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["gemini"])
 
 var AgyDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["agy"])
 
-// PiBaseDefaultDomains are the base domains required for the Pi CLI to operate,
-// independent of the chosen LLM provider. When a model uses provider/model format,
-// provider-specific API domains are added on top via GetDefaultDomainsForEngine.
+// PiBaseDefaultDomains are the domains required for the Pi CLI to operate,
+// independent of the chosen LLM provider.
 var PiBaseDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["pi-base"])
 
-// piProviderDomains maps provider prefixes to their API domains. It covers the
-// same set of providers that Pi can route through via the AWF LLM gateway.
-var piProviderDomains = getLoadedDomainSets().PiProviderDomains
-
 // PiDefaultDomains are the static default domains for backward compatibility when
-// no model provider prefix is given. When a provider/model format is used, the
-// dynamic path (GetDefaultDomainsForEngine) resolves provider-specific domains instead.
+// no model provider prefix is given. Direct provider APIs require an explicit
+// vendor set or literal-domain opt-in.
 var PiDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["pi"])
 
 // extractProviderFromModel parses "provider/model" format and returns the
@@ -164,28 +156,14 @@ func extractProviderFromModel(model string) (string, error) {
 	return provider, nil
 }
 
-// getPiDefaultDomains returns the default domains for Pi based on the model provider.
-// It starts with PiBaseDefaultDomains and adds the provider-specific API domain when
-// the model uses provider/model format (e.g. "copilot/claude-sonnet-4-20250514").
-// When no provider prefix is present the default Copilot API domain is included for
-// backward compatibility.
+// getPiDefaultDomains returns Pi's gateway/GitHub transport baseline. Provider API
+// domains are not added because model inference uses the AWF LLM gateway.
 // Returns an error if the model string is malformed (e.g. a leading slash).
 func getPiDefaultDomains(model string) ([]string, error) {
-	provider, err := extractProviderFromModel(model)
-	if err != nil {
+	if _, err := extractProviderFromModel(model); err != nil {
 		return nil, err
 	}
-	domains := make([]string, 0, typeutil.SafeAllocationCapacity(len(PiBaseDefaultDomains), 1))
-	domains = append(domains, PiBaseDefaultDomains...)
-
-	if domain, ok := piProviderDomains[provider]; ok {
-		domains = append(domains, domain)
-	} else if provider == "" {
-		// No provider prefix → default to Copilot routing for backward compatibility.
-		domains = append(domains, piProviderDomains["copilot"])
-	}
-
-	return domains, nil
+	return copyEngineDefaultDomainSet(PiBaseDefaultDomains), nil
 }
 
 // compoundEcosystems defines ecosystem identifiers that expand to the union of multiple
@@ -320,8 +298,9 @@ func getDomainsFromRuntimes(runtimes map[string]any) []string {
 //   - "chrome": headless Chrome/Puppeteer browser testing (*.google.com, *.googleapis.com, *.gvt1.com)
 //   - "clojure": Clojure/Clojars
 //   - "containers": container registries (Docker, GHCR, etc.)
-//   - "copilot-vendor": plan-specific Copilot API hosts and Copilot telemetry (opt-in)
-//   - "codex-vendor": optional Codex authentication and telemetry hosts (opt-in)
+//   - "copilot-vendor": direct Copilot API hosts and Copilot telemetry (opt-in)
+//   - "codex-vendor": direct OpenAI API, authentication, and telemetry hosts (opt-in)
+//   - "gemini-vendor": direct Gemini API host (opt-in)
 //   - "dart": Dart/Flutter ecosystem
 //   - "deno": Deno runtime (deno.land, jsr.io, googleapis.deno.dev, fresh.deno.dev)
 //   - "dotnet": .NET and NuGet ecosystem
@@ -394,6 +373,7 @@ var ecosystemPriority = []string{
 	"containers",
 	"copilot-vendor",
 	"codex-vendor",
+	"gemini-vendor",
 	"dart",
 	"defaults",
 	"dev-tools",
