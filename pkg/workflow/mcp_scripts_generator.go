@@ -134,7 +134,7 @@ func mcpScriptEnvBindingName(toolName, envName string) string {
 // A-Z, 0-9 and '_' unchanged. Every other byte is escaped.
 func encodeMCPScriptEnvComponent(name string, isToolName bool) string {
 	var sb strings.Builder
-	for i := 0; i < len(name); i++ {
+	for i := range len(name) {
 		c := name[i]
 		switch {
 		case c >= '0' && c <= '9':
