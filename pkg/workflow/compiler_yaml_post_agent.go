@@ -86,7 +86,9 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Only included when OTLP is configured for this workflow.
 	if isOTLPEnabled(data) {
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
-		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+		if strings.EqualFold(fmt.Sprint(parseEnvYAMLSection(data.Env)["GH_AW_OTEL_METRICS"]), "true") {
+			paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+		}
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
 	}
 

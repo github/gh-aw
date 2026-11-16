@@ -40,15 +40,43 @@ func TestUnifiedSessionAgentArtifactPaths(t *testing.T) {
 	}
 }
 
-func TestUnifiedArtifactIncludesOTLPMetricsMirror(t *testing.T) {
-	compiler := NewCompiler()
-	engine, err := compiler.getAgenticEngine("copilot")
-	require.NoError(t, err)
-	data := &WorkflowData{AI: "copilot", Env: "GH_AW_OTLP_ENDPOINTS=[]"}
+func TestUnifiedArtifactIncludesOTLPMetricsMirrorOnlyWhenEnabled(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		env         string
+		wantMetrics bool
+	}{
+		{
+			name:        "enabled",
+			env:         "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'true'\n",
+			wantMetrics: true,
+		},
+		{
+			name: "disabled",
+			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'false'\n",
+		},
+		{
+			name: "not configured",
+			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			engine, err := compiler.getAgenticEngine("copilot")
+			require.NoError(t, err)
+			data := &WorkflowData{AI: "copilot", Env: tt.env}
 
-	paths := compiler.collectArtifactPaths(data, engine, constants.AgentStdioLogPath, nil)
+			paths := compiler.collectArtifactPaths(data, engine, constants.AgentStdioLogPath, nil)
 
-	assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+			if tt.wantMetrics {
+				assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+			} else {
+				assert.NotContains(t, paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+			}
+			assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
+			assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
+		})
+	}
 }
 
 func TestRuntimeModelMetadataConclusionTransport(t *testing.T) {
