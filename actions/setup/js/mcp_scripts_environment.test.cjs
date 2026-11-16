@@ -12,8 +12,10 @@ afterEach(() => {
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// Mirrors mcpScriptEnvBindingName for lowercase/dash tool names and uppercase variable names only (no escapes).
 function binding(tool, name) {
-  return `GH_AW_MCP_SCRIPTS_ENV_${Buffer.from(tool).toString("hex")}_${Buffer.from(name).toString("hex")}`;
+  const encoded = tool.toUpperCase().replaceAll("-", "_");
+  return `GH_AW_MCP_SCRIPTS_ENV_${encoded.length}_${encoded}_${name}`;
 }
 
 const probes = {
