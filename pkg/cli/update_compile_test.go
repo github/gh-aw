@@ -97,6 +97,30 @@ Say hello.
 	require.NoError(t, err)
 	require.Contains(t, string(lockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`)
 	require.NotContains(t, string(lockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "168"`)
+
+	implicitEntries, err := os.ReadDir(workflowsDir)
+	require.NoError(t, err)
+	implicitFiles := make([]string, len(implicitEntries))
+	for i, entry := range implicitEntries {
+		implicitFiles[i] = entry.Name()
+	}
+
+	// An explicit default directory must compile identically to the implicit one.
+	for _, explicitDir := range []string{".github/workflows", "./.github/workflows/"} {
+		require.NoError(t, recompileAllWorkflows(context.Background(), explicitDir, "", false, false))
+		lockContent, err = os.ReadFile(filepath.Join(workflowsDir, "example.lock.yml"))
+		require.NoError(t, err)
+		require.Contains(t, string(lockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`, "dir=%q", explicitDir)
+		require.NotContains(t, string(lockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "168"`, "dir=%q", explicitDir)
+
+		explicitEntries, err := os.ReadDir(workflowsDir)
+		require.NoError(t, err)
+		explicitFiles := make([]string, len(explicitEntries))
+		for i, entry := range explicitEntries {
+			explicitFiles[i] = entry.Name()
+		}
+		require.Equal(t, implicitFiles, explicitFiles, "generated files with dir=%q", explicitDir)
+	}
 }
 
 func TestUpdateCompilation_RegeneratesGeneratedWorkflowsWithCurrentVersion(t *testing.T) {
