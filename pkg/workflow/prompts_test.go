@@ -852,7 +852,7 @@ func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
 	if model, _ := parsed.Frontmatter["model"].(string); !isCodexCompatibleWorkflowModel(model) {
 		t.Fatalf("Expected daily-go-test-parallelizer workflow to use a Codex-compatible model, got %q", model)
 	}
-	if !strings.Contains(workflow, "Before stopping, call exactly one terminal safe-output tool") {
+	if !strings.Contains(workflow, "Call exactly one terminal safe-output tool") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to require a terminal safe output")
 	}
 }
@@ -891,7 +891,17 @@ func TestDailyGoTestParallelizerProvisionsDisposableGoCaches(t *testing.T) {
 		t.Fatal("Expected a step to provision disposable Go caches")
 	}
 	for _, step := range steps {
-		if step, ok := step.(map[string]any); ok && step["run"] == "mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache" {
+		stepMap, ok := step.(map[string]any)
+		if !ok {
+			continue
+		}
+		run, _ := stepMap["run"].(string)
+		fields := strings.Fields(run)
+		if len(fields) < 2 || fields[0] != "mkdir" || fields[1] != "-p" {
+			continue
+		}
+		dirs := fields[2:]
+		if slices.Contains(dirs, "/tmp/gh-aw/agent/go-build-cache") && slices.Contains(dirs, "/tmp/gh-aw/agent/go-mod-cache") {
 			return
 		}
 	}
