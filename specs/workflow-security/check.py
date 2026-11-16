@@ -236,13 +236,32 @@ DELTAS = {
 
 def check_p1_backlog_modules():
     readme = (ROOT / "README.md").read_text()
-    targets = re.findall(
-        r"^\|[^|]+\|\s*P1\s*\|[^|]*\|\s*`([^`]+\.tla)`",
-        readme,
-        re.MULTILINE,
-    )
-    if not targets:
+    p1_rows = [
+        (line_number, line)
+        for line_number, line in enumerate(readme.splitlines(), start=1)
+        if re.search(r"\|\s*P1\s*\|", line)
+    ]
+    if not p1_rows:
         raise RuntimeError("No P1 refinement backlog module targets found in README.md")
+
+    targets = []
+    for line_number, row in p1_rows:
+        row = row.strip()
+        if not row.startswith("|"):
+            raise RuntimeError(
+                f"P1 refinement backlog row at line {line_number} must be a "
+                "pipe-delimited table row"
+            )
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        target_cell = cells[3] if len(cells) > 3 else ""
+        match = re.fullmatch(r"`([^`/\\]+\.tla)`", target_cell)
+        if not match:
+            raise RuntimeError(
+                f"P1 refinement backlog row at line {line_number} must have a "
+                "backticked .tla module target"
+            )
+        targets.append(match.group(1))
+
     missing = [target for target in targets if not (ROOT / target).is_file()]
     if missing:
         raise RuntimeError(f"P1 refinement backlog references missing TLA+ modules: {', '.join(missing)}")

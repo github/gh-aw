@@ -2789,8 +2789,8 @@ This section records the current mapping of Section 4 configuration fields to th
 | `tools` | Compiler field is `GitHubToolConfig.Allowed` (`allowed`), not `tools` | Naming difference; see Section 4.8 |
 | `allowed-repos`, `repos` | `GitHubToolConfig.AllowedRepos` / `Repos`; parsing and validation in `tools_parser.go` and `tools_validation_github.go` | Present; `repos` is deprecated |
 | `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels` | Corresponding `GitHubToolConfig` fields, parsed in `tools_parser.go` and validated in `tools_validation_github.go` | Present |
-| `roles` | No `tools.github.roles` field in the current `pkg/workflow/` model; `WorkflowData.Roles` is unrelated | Deferred; rejected by `validateGitHubGuardPolicy()`. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
-| `private-repos` | No matching field in the current `pkg/workflow/` model | Deferred; rejected by `validateGitHubGuardPolicy()`. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
+| `roles` | No `tools.github.roles` field in the current `pkg/workflow/` model; `WorkflowData.Roles` is unrelated | Deferred and not enforced. Normal main-workflow frontmatter is rejected by the schema; relaxed imported configurations and direct `NewTools` callers are rejected by `validateGitHubGuardPolicy()`. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
+| `private-repos` | No matching field in the current `pkg/workflow/` model | Deferred and not enforced. Normal main-workflow frontmatter is rejected by the schema; relaxed imported configurations and direct `NewTools` callers are rejected by `validateGitHubGuardPolicy()`. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
 
 Sync procedure:
 1. Update this index and the §4 field definitions when any listed parser, model, or validation path changes.
@@ -2812,7 +2812,7 @@ Cross-reference of `scratchpad/github-mcp-access-control-specification.md` and `
 
 **Heading alignment note**: §4.4.1 names `repos` as the gateway-internal field and `allowed-repos` as the frontmatter key. Consumers SHOULD use `allowed-repos` in workflow frontmatter. Retain `repos` as a deprecated frontmatter alias; no removal version is scheduled.
 
-**2026-11-16 sync note**: GP-01 parsing and validation agree on the accepted `allowed-repos` forms, and GP-11's cross-field requirement matches `validateGitHubGuardPolicy()` and its tests. The local compiler rejects unsupported `roles` and `private-repos` fields.
+**2026-11-16 sync note**: GP-01 parsing and validation agree on the accepted `allowed-repos` forms, and GP-11's cross-field requirement matches `validateGitHubGuardPolicy()` and its tests. The main workflow schema rejects `roles` and `private-repos` before tool validation; explicit guard-policy validation also rejects these fields from relaxed imports and direct `NewTools` callers. The local compiler does not enforce role or private-repository filtering.
 
 ---
 

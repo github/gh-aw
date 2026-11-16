@@ -268,13 +268,13 @@ func TestValidateGitHubGuardPolicy(t *testing.T) {
 			name:        "unsupported GitHub MCP roles field is rejected",
 			toolsMap:    map[string]any{"github": map[string]any{"roles": []any{"write"}}},
 			shouldError: true,
-			errorMsg:    "'tools.github.roles' is not supported by the local compiler",
+			errorMsg:    "'tools.github.roles' is not supported by the local compiler; it is not enforced. Remove this unsupported field.",
 		},
 		{
 			name:        "unsupported GitHub MCP private-repos field is rejected",
 			toolsMap:    map[string]any{"github": map[string]any{"private-repos": false}},
 			shouldError: true,
-			errorMsg:    "'tools.github.private-repos' is not supported by the local compiler",
+			errorMsg:    "'tools.github.private-repos' is not supported by the local compiler; it is not enforced. Remove this unsupported field.",
 		},
 		{
 			name: "unsupported GitHub MCP roles and private-repos fields are both reported",
@@ -283,7 +283,7 @@ func TestValidateGitHubGuardPolicy(t *testing.T) {
 				"private-repos": false,
 			}},
 			shouldError: true,
-			errorMsg:    "'tools.github.roles', 'tools.github.private-repos'",
+			errorMsg:    "'tools.github.roles', 'tools.github.private-repos' are not supported by the local compiler; these settings are not enforced. Remove these unsupported fields.",
 		},
 		{
 			name: "valid guard policy with allowed-repos=all",
@@ -734,6 +734,13 @@ func TestValidateGitHubGuardPolicyLockdownWarning(t *testing.T) {
 			assert.Equal(t, 1, compiler.GetWarningCount())
 		})
 	}
+}
+
+func TestUnsupportedGitHubAccessControlFieldsErrorExample(t *testing.T) {
+	err := unsupportedGitHubAccessControlFieldsError([]string{"roles"})
+	require.ErrorContains(t, err,
+		"Supported repository-scope example (not a substitute for role or visibility filtering):")
+	require.ErrorContains(t, err, "allowed-repos: [\"owner/repo\"]")
 }
 
 func TestValidateGitHubGuardPolicyLockdownWarningWithoutCompiler(t *testing.T) {

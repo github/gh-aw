@@ -604,16 +604,8 @@ func TestFormal_FC_P8_RunSummaryRoundTrip(t *testing.T) {
 // Specification reference: §6.2.2 Duration Derivation
 func TestFormal_FC_P9_TimestampOrdering(t *testing.T) {
 	t.Parallel()
-	fixtures := []string{
-		"run_summary_minimal.json",
-		"run_summary_zero_aic.json",
-		"run_summary_failed.json",
-		"run_summary_high_aic.json",
-		"run_summary_cancelled.json",
-		"run_summary_partial_aic.json",
-	}
 
-	for _, name := range fixtures {
+	for _, name := range documentedForecastFixtures {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			data, err := os.ReadFile(filepath.Join(fixtureDir(t), name))

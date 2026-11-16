@@ -69,7 +69,10 @@ The denial code is selected by the first failing guard in the evaluation order a
 
 The local `pkg/workflow/` compiler has no `tools.github.roles` or
 `private-repos` fields. These controls remain normative in the specification but
-are deferred locally and rejected during validation, so the abstract
+are deferred locally and are not enforced. The main workflow schema rejects
+these keys before tool validation; imported configurations that pass relaxed
+import parsing and direct `NewTools` callers are rejected by
+`validateGitHubGuardPolicy()`. The abstract
 `P3_RoleAllow` and `P4_PrivateRepoAllow` fixtures test the specification model
 only and do not establish local Complete Conformance. The status was verified
 on 2026-11-16 in Section 4.8 of the
