@@ -15,6 +15,72 @@ For CLI-style engines, create a repository-scoped definition in `.github/workflo
 - keep engine-specific adapters and harnesses with the shared definition
 - stop and report the missing declarative capability when the runtime cannot be expressed by the supported schema; do not modify gh-aw internals from the consuming repository
 
+## Choose the declarative mechanism
+
+| Requirement | Mechanism |
+|---|---|
+| Shared provider credentials and environment | `secret-strategy: universal-llm-consumer` and `execution.provider-env-mode: universal-llm-consumer` |
+| Model passed through an environment variable | `execution.model-env-var` |
+| `provider/model` must be rewritten for the CLI | `execution.model-env-provider-prefix`, or a harness for more complex transformations |
+| Static engine configuration | `behaviors.config-file` with the correct path, content, and merge strategy |
+| Gateway MCP output already matches the CLI | `behaviors.mcp.config-path` and an execution MCP config binding |
+| Gateway MCP output needs another schema | `behaviors.mcp.config-adapter` |
+| MCP servers must become CLI flags or a runtime overlay | `execution.mcp-config-env-var` and `behaviors.harness-script` |
+| Runtime endpoint discovery or custom invocation | `behaviors.harness-script` using `awf_reflect.cjs` |
+| No native MCP client | `engine.mcp: false` |
+| CLI emits logs the built-in parsers cannot normalize | `behaviors.log-parser` |
+| Isolated recorder emits a verifiable session stream on stderr | `execution.protected-session-capture: true` and a verifying `behaviors.log-parser` |
+
+Use a `config-adapter` only to transform generated MCP configuration. Use a `harness-script` when endpoint selection, model transformation, prompt delivery, or CLI invocation requires runtime logic.
+
+## Auth and provider rules
+
+For `universal-llm-consumer` execution with a `copilot/` model, the compiler
+supplies the real credential only as `COPILOT_GITHUB_TOKEN`. OpenAI-compatible
+clients receive a non-secret `OPENAI_API_KEY` placeholder inside the AWF sandbox,
+after provider credential discovery. Keep credential aliases out of the
+runner environment: setting `OPENAI_API_KEY` there enables the OpenAI adapter.
+The `OPENAI_BASE_URL` alias still points to the Copilot gateway. Recompile
+existing workflows after upgrading the compiler to adopt this routing.
+
+- prefer `secret-strategy: universal-llm-consumer` when the engine can reuse shared provider/model routing
+- pair that with `execution.provider-env-mode: universal-llm-consumer` when the CLI expects provider env vars
+- use `engine.auth` only for engine-specific secrets that must be injected directly into the CLI runtime
+- keep `supported-env-var-keys` aligned with the env var names the CLI actually accepts
+- do not hard-code credential values in the shared definition or generated configuration
+
+## Validation loop
+
+1. add or update `.github/workflows/shared/<id>.md`
+2. import it from a minimal workflow that exercises the selected provider, model syntax, MCP mode, and prompt delivery
+3. compile that workflow in strict mode with the installed extension
+4. inspect the generated `.lock.yml` and verify the installation, config, MCP adapter, harness, model, and prompt wiring
+5. repeat until compilation succeeds without engine-related warnings:
+
+```bash
+gh aw compile <workflow-name> --strict
+```
+
+## Anti-patterns
+
+- do not require a gh-aw source checkout, Go changes, or repository-internal build commands
+- do not scatter install metadata, CLI args, or config-file templates across consuming workflows
+- do not attempt to create a built-in engine when a shared agentic workflow definition can express the contract
+- do not hard-code LLM proxy ports, container IPs, or a single provider endpoint when `/reflect` can resolve the selected provider
+- do not claim MCP support until the generated gateway configuration matches the CLI's accepted schema and transport
+- do not omit manifest files for engine-owned config that changes runtime behavior
+- do not use a mismatched `runtime-id` unless an existing runtime adapter is intentionally being reused
+
+## Required detail routes
+
+- Before editing files, answer every item in [Gather the engine contract first](#gather-the-engine-contract-first).
+- For endpoint resolution, follow [Resolve LLM endpoints at runtime](#resolve-llm-endpoints-at-runtime); harness requirements are mandatory.
+- For MCP, follow [Generate MCP configuration only when needed](#generate-mcp-configuration-only-when-needed).
+- For field names, copy the [engine definition shape](#engine-definition-shape) and [field guide](#field-guide).
+- Before setting `protected-session-capture`, apply every rule in [Configure protected session capture](#configure-protected-session-capture).
+
+<!-- instruction-prefix-end -->
+
 ## Gather the engine contract first
 
 Do not begin from a generic engine template. Use GitHub access to inspect the CLI's repository, documentation, release notes, package manifests, configuration examples, and pinned release source. Answer every item below before editing files.
@@ -46,24 +112,6 @@ Do not begin from a generic engine template. Use GitHub access to inspect the CL
 6. Identify required secrets and whether they use universal provider routing or engine-specific auth.
 
 Do not implement the engine until each contract is known. If the available GitHub documentation and pinned source disagree, use the pinned release behavior and record the limitation in the shared definition.
-
-## Choose the declarative mechanism
-
-| Requirement | Mechanism |
-|---|---|
-| Shared provider credentials and environment | `secret-strategy: universal-llm-consumer` and `execution.provider-env-mode: universal-llm-consumer` |
-| Model passed through an environment variable | `execution.model-env-var` |
-| `provider/model` must be rewritten for the CLI | `execution.model-env-provider-prefix`, or a harness for more complex transformations |
-| Static engine configuration | `behaviors.config-file` with the correct path, content, and merge strategy |
-| Gateway MCP output already matches the CLI | `behaviors.mcp.config-path` and an execution MCP config binding |
-| Gateway MCP output needs another schema | `behaviors.mcp.config-adapter` |
-| MCP servers must become CLI flags or a runtime overlay | `execution.mcp-config-env-var` and `behaviors.harness-script` |
-| Runtime endpoint discovery or custom invocation | `behaviors.harness-script` using `awf_reflect.cjs` |
-| No native MCP client | `engine.mcp: false` |
-| CLI emits logs the built-in parsers cannot normalize | `behaviors.log-parser` |
-| Isolated recorder emits a verifiable session stream on stderr | `execution.protected-session-capture: true` and a verifying `behaviors.log-parser` |
-
-Use a `config-adapter` only to transform generated MCP configuration. Use a `harness-script` when endpoint selection, model transformation, prompt delivery, or CLI invocation requires runtime logic.
 
 ## Resolve LLM endpoints at runtime
 
@@ -189,41 +237,3 @@ Native AWF capture protects storage, not producer identity. A key prefix or a fi
 Missing, incomplete, undrained, or truncated capture fails publication; the 64 MiB bound covers both streams and all native attempts. Complete capture can have a nonzero command exit, which remains authoritative. Raw streams are not published. Masks from either stream apply to publication copies; a collision with structural fields such as event type, status, IDs, or accounting keys fails publication and removes stale session artifacts. Outer gh-aw startup retries are disabled; AWF owns native attempts.
 
 Compile the consuming workflow with `gh aw compile <workflow-name> --strict`, then review the generated native invocation and parser step. Compilation alone does not establish recorder isolation or signature verification: the engine's acceptance evidence must include a Linux/AWF same-UID descriptor attack and valid, forged, interrupted, replayed, and structurally masked stream cases. See the [protected session reference](https://github.github.com/gh-aw/reference/third-party-agent/#protected-session-capture) and [session ingestion requirements](https://github.github.com/gh-aw/specs/unified-agent-session-specification/#protected-declarative-session-ingestion).
-
-## Auth and provider rules
-
-For `universal-llm-consumer` execution with a `copilot/` model, the compiler
-supplies the real credential only as `COPILOT_GITHUB_TOKEN`. OpenAI-compatible
-clients receive a non-secret `OPENAI_API_KEY` placeholder inside the AWF sandbox,
-after provider credential discovery. Keep credential aliases out of the
-runner environment: setting `OPENAI_API_KEY` there enables the OpenAI adapter.
-The `OPENAI_BASE_URL` alias still points to the Copilot gateway. Recompile
-existing workflows after upgrading the compiler to adopt this routing.
-
-- prefer `secret-strategy: universal-llm-consumer` when the engine can reuse shared provider/model routing
-- pair that with `execution.provider-env-mode: universal-llm-consumer` when the CLI expects provider env vars
-- use `engine.auth` only for engine-specific secrets that must be injected directly into the CLI runtime
-- keep `supported-env-var-keys` aligned with the env var names the CLI actually accepts
-- do not hard-code credential values in the shared definition or generated configuration
-
-## Validation loop
-
-1. add or update `.github/workflows/shared/<id>.md`
-2. import it from a minimal workflow that exercises the selected provider, model syntax, MCP mode, and prompt delivery
-3. compile that workflow in strict mode with the installed extension
-4. inspect the generated `.lock.yml` and verify the installation, config, MCP adapter, harness, model, and prompt wiring
-5. repeat until compilation succeeds without engine-related warnings:
-
-```bash
-gh aw compile <workflow-name> --strict
-```
-
-## Anti-patterns
-
-- do not require a gh-aw source checkout, Go changes, or repository-internal build commands
-- do not scatter install metadata, CLI args, or config-file templates across consuming workflows
-- do not attempt to create a built-in engine when a shared agentic workflow definition can express the contract
-- do not hard-code LLM proxy ports, container IPs, or a single provider endpoint when `/reflect` can resolve the selected provider
-- do not claim MCP support until the generated gateway configuration matches the CLI's accepted schema and transport
-- do not omit manifest files for engine-owned config that changes runtime behavior
-- do not use a mismatched `runtime-id` unless an existing runtime adapter is intentionally being reused
