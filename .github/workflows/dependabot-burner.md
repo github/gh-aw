@@ -22,16 +22,15 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
-
+  copilot-requests: write
 
 concurrency:
   group: dependabot-burner
   cancel-in-progress: false
   job-discriminator: ${{ github.run_id }}
-model: gpt-5
+model: copilot/gpt-5
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: pi
 skip-if-decision:
   - >-
     Does @/tmp/gh-aw/agent/dependabot-burner/context.json conclusively establish
@@ -77,6 +76,9 @@ tools:
   github:
     mode: local
     toolsets: [default, pull_requests]
+    min-integrity: approved
+    trusted-users:
+      - "dependabot[bot]"
   bash:
     - "make dependabot && make build"
     - "./gh-aw compile --dependabot"
@@ -388,7 +390,8 @@ worker has its own bounded contract; do not create nested delegations.
    - the compact maintainer-only feedback summary
    - the complete Tool contract for every agent above, copied verbatim into the task prompt
 8. Do not split the work into multiple remediation attempts or multiple PRs from the burner. The remediator must not delegate further. If it fails, report the failure and affected PRs; do not substitute another analysis agent or silently end without a terminal safe output.
-9. After the remediator returns, read its result file and inspect `git diff --stat`. The orchestrator owns the terminal safe output: submit the single create-pull-request request for a validated `improved` result, use `noop` only for an already-applied or empty batch, and report incomplete work for a blocked or failed wave. A subagent summary or result file alone is not a published PR.
+9. After the remediator returns, read its result file with
+   `cat /tmp/gh-aw/agent/dependabot-burner/results/result.json` and inspect `git diff --stat`. The orchestrator owns the terminal safe output: submit the single create-pull-request request for a validated `improved` result, use `noop` only for an already-applied or empty batch, and report incomplete work for a blocked or failed wave. A subagent summary or result file alone is not a published PR.
 
 ## Final summary
 
@@ -404,8 +407,7 @@ Keep it brief and include:
 ## agent: `dependabot-remediator`
 ---
 description: Executes the single grouped Dependabot remediation wave inside dependabot-burner
-model: inherited
-tools: [read, search, edit, bash]
+tools: [read, grep, find, ls, edit, write, bash]
 ---
 You execute one grouped Dependabot remediation wave inside `dependabot-burner`.
 Use the supplied objective, selected PR numbers, exact dependency batch JSON,
@@ -431,9 +433,9 @@ retry-history summary, and maintainer-only feedback. Do not delegate.
 
 Always write one result JSON file for this wave, even if the work is blocked or no change is applied.
 
-Write the result file to this runtime-resolved path pattern:
+Write the result file to this exact path:
 
-`/tmp/gh-aw/agent/dependabot-burner/results/${{ github.run_id }}-result.json`
+`/tmp/gh-aw/agent/dependabot-burner/results/result.json`
 
 Include `pr_numbers`, `dependencies_processed` (batch summaries),
 `source_files_updated`, `lock_files_updated`, `unaddressed_prs` (PR numbers/reasons),
