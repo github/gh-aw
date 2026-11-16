@@ -49,8 +49,8 @@ type AuditData struct {
 	ToolUsage                  []ToolUsageInfo          `json:"tool_usage,omitempty"`
 	MCPToolUsage               *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`
 	CreatedItems               []CreatedItemReport      `json:"created_items,omitempty"`
-	Outcomes                   []OutcomeReport          `json:"outcomes,omitempty"`
-	OutcomeSummary             *OutcomeSummary          `json:"outcome_summary,omitempty"`
+	Adoptions                  []AdoptionReport         `json:"adoptions,omitempty"`
+	AdoptionSummary            *AdoptionSummary         `json:"adoption_summary,omitempty"`
 	Experiments                *ExperimentData          `json:"experiments,omitempty"`
 	Graders                    *GradersData             `json:"graders,omitempty"`
 	Evals                      *EvalsSummary            `json:"evals,omitempty"`

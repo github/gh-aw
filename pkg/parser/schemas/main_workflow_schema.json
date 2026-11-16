@@ -3616,9 +3616,9 @@
               },
               "metric": {
                 "type": "string",
-                "description": "Primary metric to observe (e.g. 'ai_credits_total', 'outcome:accepted', or 'outcome:zero_touch')."
+                "description": "Primary metric to observe (e.g. 'ai_credits_total', 'adoption:accepted', or 'adoption:zero_touch')."
               },
-              "outcome_window": {
+              "adoption_window": {
                 "type": "string",
                 "minLength": 1,
                 "default": "auto",
@@ -3656,7 +3656,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Additional metrics to collect and report alongside the primary metric (e.g. ['duration_ms', 'outcome:accepted', 'outcome:zero_touch'])."
+                "description": "Additional metrics to collect and report alongside the primary metric (e.g. ['duration_ms', 'adoption:accepted', 'adoption:zero_touch'])."
               },
               "guardrail_metrics": {
                 "type": "array",
@@ -3666,7 +3666,7 @@
                   "properties": {
                     "name": {
                       "type": "string",
-                      "description": "Name of the guardrail metric (e.g. 'success_rate', 'outcome:accepted', or 'outcome:zero_touch')."
+                      "description": "Name of the guardrail metric (e.g. 'success_rate', 'adoption:accepted', or 'adoption:zero_touch')."
                     },
                     "direction": {
                       "type": "string",
@@ -14515,11 +14515,11 @@
       "examples": ["gpt-5.4", "claude-3-5-sonnet-20241022", "gpt-4"]
     },
     "graders": {
-      "description": "Graders over the unified session. Fast built-ins run in conclusion; custom JavaScript and operational-value.run Bash evaluators run only in the separate graders job.",
+      "description": "Graders over the unified session. Fast built-ins run in conclusion; custom JavaScript runs only in the separate restricted graders job.",
       "type": "object",
       "propertyNames": {
         "pattern": "^[a-z][a-z0-9-]{0,63}$",
-        "description": "Built-in ID, custom JavaScript grader ID, or operational-value for a repository Bash evaluator."
+        "description": "Built-in or custom JavaScript grader ID."
       },
       "additionalProperties": {
         "oneOf": [
@@ -14574,11 +14574,6 @@
                 "minLength": 1,
                 "maxLength": 262144,
                 "description": "Synchronous JavaScript body for a custom grader. Receives session, config, and helpers; runs only in the separate restricted graders job. Cannot override a built-in."
-              },
-              "run": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Only for operational-value: a repository-relative .sh evaluator path (./ is relative to the workflow). Frozen at compilation and run only in the separate graders job with the unified-session JSONL file as its first argument."
               }
             }
           }

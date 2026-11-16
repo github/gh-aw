@@ -7,7 +7,7 @@ import { classifySafeOutputResult, computeSafeOutputsStatus } from "./safe_outpu
 import { main as createActionHandler } from "./safe_output_action_handler.cjs";
 import { main as createCallWorkflowHandler } from "./call_workflow.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
-import { buildSafeOutputOutcomes, finalizeBufferedReviewOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
+import { buildSafeOutputDeliveries, finalizeBufferedReviewDeliveries, projectSafeOutputData } from "./safe_output_deliveries.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -147,8 +147,8 @@ describe("safe-output runtime dependencies", () => {
     ["deferred review publication", () => ({ success: true, deferred_manifest: true })],
     ["warning", () => ({ success: true, warning: "Not applied" })],
     ["unconfirmed error", () => ({ error: "Not applied" })],
-  ])("blocks transitive dependents of %s without affecting independent outputs", async (name, outcome) => {
-    const handler = vi.fn(async msg => (msg.output_id === id(1) ? outcome() : { success: true }));
+  ])("blocks transitive dependents of %s without affecting independent outputs", async (name, delivery) => {
+    const handler = vi.fn(async msg => (msg.output_id === id(1) ? delivery() : { success: true }));
     const result = await processMessages(new Map([["add_comment", handler]]), [message(3, id(2)), message(2, id(1)), message(1), message(4)]);
     expect(handler.mock.calls.map(([msg]) => msg.output_id)).toEqual(name === "deferred" ? [id(1), id(4), id(1)] : [id(1), id(4)]);
     for (const index of [0, 1]) {
@@ -239,7 +239,7 @@ describe("safe-output runtime dependencies", () => {
       if (!results.some(result => result.result?.deferred_manifest)) return;
       calls.push("submit");
       expect(check).not.toHaveBeenCalled();
-      finalizeBufferedReviewOutcomes(results, "owner/repo", 42, {
+      finalizeBufferedReviewDeliveries(results, "owner/repo", 42, {
         success: true,
         review_url: "https://github.com/owner/repo/pull/42#pullrequestreview-1",
         comment_count: 1,
@@ -328,7 +328,7 @@ describe("safe-output runtime dependencies", () => {
     const record = { messageIndex: 0, success: true, result: { deferred_manifest: true } };
     expect(classifySafeOutputResult(record)).toBe("deferred");
     expect(computeSafeOutputsStatus([record])).toMatchObject({ itemsApplied: 0, itemsDeferred: 1, status: "deferred" });
-    expect(buildSafeOutputOutcomes([record])[0].status).toBe("deferred");
+    expect(buildSafeOutputDeliveries([record])[0].status).toBe("deferred");
   });
 
   it("only provisionally accepts a valid buffered comment for its own review", () => {
@@ -469,13 +469,13 @@ describe("safe-output runtime dependencies", () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["throw", "failure", "deferred", "staged", "skipped"])("blocks waiting dependents after a retry ends in %s", async outcome => {
+  it.each(["throw", "failure", "deferred", "staged", "skipped"])("blocks waiting dependents after a retry ends in %s", async delivery => {
     let attempts = 0;
     const handler = vi.fn(async () => {
       if (attempts++ === 0) return { deferred: true };
-      if (outcome === "throw") throw new Error("retry failed");
-      if (outcome === "failure") return { success: false };
-      return { success: true, [outcome]: true };
+      if (delivery === "throw") throw new Error("retry failed");
+      if (delivery === "failure") return { success: false };
+      return { success: true, [delivery]: true };
     });
     const result = await processMessages(new Map([["add_comment", handler]]), [message(2, id(1)), message(1)]);
     expect(handler).toHaveBeenCalledTimes(2);
@@ -539,7 +539,7 @@ describe("safe-output runtime dependencies", () => {
     expect(result.results.filter(item => item.errorCode === "safe_output_dependency_failed")).toHaveLength(3);
   });
 
-  it("does not treat dispatch outcomes as confirmed prerequisites", () => {
+  it("does not treat dispatch deliveries as confirmed prerequisites", () => {
     for (const type of ["dispatch_workflow", "dispatch-repository"]) {
       expect(isConfirmedDependencySuccess({ type, claim_handle: "claim-1", success: true, result: { success: true } })).toBe(false);
     }
@@ -555,7 +555,7 @@ describe("safe-output runtime dependencies", () => {
     expect(isConfirmedDependencySuccess({ success: true, result: [{ success: true }] })).toBe(false);
   });
 
-  it("rejects nested fanout outcomes even under an optimistic wrapper", () => {
+  it("rejects nested fanout deliveries even under an optimistic wrapper", () => {
     expect(isConfirmedDependencySuccess({ success: true, result: [{ success: true }, { success: true, staged: true }] })).toBe(false);
     expect(isConfirmedDependencySuccess({ success: true, result: [{ success: false }] })).toBe(false);
   });
@@ -578,27 +578,27 @@ describe("safe-output runtime dependencies", () => {
     expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
   });
 
-  it("preserves server output IDs and dependency error codes in manifest outcomes", async () => {
+  it("preserves server output IDs and dependency error codes in manifest deliveries", async () => {
     const handler = vi.fn(async () => ({ success: false }));
     const result = await processMessages(new Map([["add_comment", handler]]), [message(1), message(2, id(1))]);
-    const outcomes = buildSafeOutputOutcomes(result.results);
-    expect(outcomes).toEqual([expect.objectContaining({ output_id: id(1), status: "failed" }), expect.objectContaining({ output_id: id(2), status: "failed", errorCode: "safe_output_dependency_failed" })]);
-    expect(projectSafeOutputData(outcomes[1])).toMatchObject({ output_id: id(2), errorCode: "safe_output_dependency_failed" });
+    const deliveries = buildSafeOutputDeliveries(result.results);
+    expect(deliveries).toEqual([expect.objectContaining({ output_id: id(1), status: "failed" }), expect.objectContaining({ output_id: id(2), status: "failed", errorCode: "safe_output_dependency_failed" })]);
+    expect(projectSafeOutputData(deliveries[1])).toMatchObject({ output_id: id(2), errorCode: "safe_output_dependency_failed" });
     expect(projectSafeOutputData({ output_id: "PRIVATE_CONTENT" })).not.toHaveProperty("output_id");
     expect(projectSafeOutputData({ output_id: "aw_temporary" })).not.toHaveProperty("output_id");
     const validator = createSessionValidator("unified");
     expect(
       validator.event({
         type: "safe_output.result",
-        data: projectSafeOutputData(outcomes[1]),
-        provenance: { component: "safe_outputs", phase: "safe_outputs", path: "safe-output-outcomes.jsonl", index: 0 },
+        data: projectSafeOutputData(deliveries[1]),
+        provenance: { component: "safe_outputs", phase: "safe_outputs", path: "safe-output-deliveries.jsonl", index: 0 },
       })
     ).toBe(true);
   });
 
-  it("retains one correlation ID across fanout execution outcomes", () => {
-    const outcomes = buildSafeOutputOutcomes([{ output_id: id(1), type: "add_comment", success: true, result: [{ success: true }, { success: false }] }]);
-    expect(outcomes.map(outcome => [outcome.output_id, outcome.status])).toEqual([
+  it("retains one correlation ID across fanout execution deliveries", () => {
+    const deliveries = buildSafeOutputDeliveries([{ output_id: id(1), type: "add_comment", success: true, result: [{ success: true }, { success: false }] }]);
+    expect(deliveries.map(delivery => [delivery.output_id, delivery.status])).toEqual([
       [id(1), "success"],
       [id(1), "failed"],
     ]);

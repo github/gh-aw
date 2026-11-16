@@ -456,6 +456,19 @@ export interface SafeOutputData {
   staged?: boolean;
   /** The operation may have applied even though processing failed to confirm it. */
   operation_outcome?: "indeterminate";
+  deliveryState?: "delivered" | "failed" | "skipped" | "staged" | "deferred" | "unknown";
+  deliverySignal?: string;
+  deliverySource?: "safe_output.result" | "safe_output.delivery";
+  adoptionState?: "accepted" | "rejected" | "pending" | "lifecycle" | "not_applicable" | "unknown";
+  adoptionSignal?: string;
+  adoptionSource?: "adoption-registry" | "delivery-rule" | "delivery-status" | "adoption-evaluator";
+  adoptionRuleVersion?: string;
+  effectClass?: "proposal" | "publication" | "mutation" | "delegation" | "infra";
+  fallbackToDelivery?: boolean;
+  attributionEligible?: boolean;
+  survivalRequired?: boolean;
+  adoptionAt?: string;
+  acceptanceKind?: "fallback_delivery" | "observed_adoption";
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {
@@ -945,7 +958,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;
   "safe_output.result": SafeOutputData;
-  "safe_output.outcome": SafeOutputData;
+  "safe_output.delivery": SafeOutputData;
   "safe_output.error": SafeOutputErrorData;
   "experiment.state": ExperimentStateData;
   "experiment.assignment": ExperimentAssignmentData;

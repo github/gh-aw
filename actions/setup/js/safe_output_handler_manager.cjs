@@ -16,7 +16,7 @@ const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
-const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
+const { finalizeBufferedReviewDeliveries } = require("./safe_output_deliveries.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
@@ -38,7 +38,7 @@ const {
   extractCreatedItemFromResult,
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
-  writeSafeOutputOutcomes,
+  writeSafeOutputDeliveries,
   writeMergePullRequestDecision,
   SAFE_OUTPUT_ERRORS_FILE_PATH,
   CLAIM_DELIVERY_ERRORS_FILE_NAME,
@@ -837,7 +837,7 @@ function rollbackReviewResultsForPR(results, repo, prNumber, errorMessage) {
  * soft-skipped (success:true, skipped:true). Both submit_pull_request_review and
  * create_pull_request_review_comment handlers buffer during message processing, so
  * the skip must be back-propagated here so the Processing Summary reflects the actual
- * outcome (skipped) rather than a misleading success count.
+ * delivery (skipped) rather than a misleading success count.
  *
  * @param {Array<{type: string, success: boolean, skipped?: boolean, skipReason?: string, deferred_manifest?: boolean, result?: {deferred_manifest?: boolean}}>} results - Processing results to mutate
  * @param {string} skipReason - Human-readable reason for the skip
@@ -959,7 +959,7 @@ function recordMergeDecision(type, result, messageIndex) {
 
 /** @param {any} [result] */
 function mergeProcessingError(result) {
-  if (result?.operation_outcome === "indeterminate") return "Merge outcome is indeterminate; inspect the live pull request before any further action. The merge was not retried.";
+  if (result?.operation_outcome === "indeterminate") return "Merge delivery is indeterminate; inspect the live pull request before any further action. The merge was not retried.";
   // Only preserve exact fixed diagnostics; other handler errors can contain private API data.
   switch (result?.error) {
     case "merge_pull_request gate checks failed":
@@ -1323,7 +1323,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       let effectiveMessage = message;
       if (messageType === "add_comment") {
         // If a previous code-push operation fell back to a review issue, prepend a correction note
-        // so the posted comment accurately reflects the outcome.
+        // so the posted comment accurately reflects the delivery.
         if (codePushFallbackInfo) {
           const fallbackNote =
             codePushFallbackInfo.fallbackTargetType === "pull_request"
@@ -2144,13 +2144,13 @@ async function settleClaimDelivery(scope, messages, results, options = {}) {
     }
   }
   const controlProofs = new Map();
-  const outcomes = [...results, ...controls.map((message, index) => ({ messageIndex: messages.length + index, success: true, claim_handle: handle, result: null }))];
+  const deliveries = [...results, ...controls.map((message, index) => ({ messageIndex: messages.length + index, success: true, claim_handle: handle, result: null }))];
   const queueControls = require("./work_queue_control_receipts.cjs");
   const delivery = await inspectClaimDelivery({
     assignment: scope.assignment,
     claim_handle: handle,
     messages: [...messages, ...controls],
-    results: outcomes,
+    results: deliveries,
     effects: options.effects || [],
     effectChannel: closeClaimEffectChannel(),
     authorize: options.authorize,
@@ -2301,8 +2301,8 @@ async function main(options = {}) {
     const states = settlements.map(settlement => finalized?.claims?.[settlement.claim_handle]?.state || settlement.delivery?.verification);
     const settled = states.every(state => state === "result" || state === "cancelled");
     const cancelled = states.filter(state => state === "cancelled").length;
-    const outcome = isStagedMode() ? "staged_preview" : !settled ? "delivery_pending" : cancelled === states.length ? "cancelled" : cancelled ? "completed_with_cancellations" : "completed";
-    core.setOutput("work_queue_outcome", outcome);
+    const delivery = isStagedMode() ? "staged_preview" : !settled ? "delivery_pending" : cancelled === states.length ? "cancelled" : cancelled ? "completed_with_cancellations" : "completed";
+    core.setOutput("work_queue_outcome", delivery);
     if (!isStagedMode()) {
       for (const settlement of settlements) {
         const result = finalized?.claims?.[settlement.claim_handle];
@@ -2467,7 +2467,7 @@ async function main(options = {}) {
             }
             const reviewResult = await reviewBuffer.submitReview(requiredComments.get(`${reviewRepo}#${reviewPrNum}`));
             if (reviewResult.success && !reviewResult.skipped) {
-              finalizeBufferedReviewOutcomes(reviewResults, reviewRepo, reviewPrNum, reviewResult);
+              finalizeBufferedReviewDeliveries(reviewResults, reviewRepo, reviewPrNum, reviewResult);
               logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
               logCreatedItemFromResult(
                 logCreatedItem,
@@ -2706,9 +2706,9 @@ async function main(options = {}) {
     return undefined;
   } finally {
     try {
-      writeSafeOutputOutcomes(outcomeResults, isStaged);
+      writeSafeOutputDeliveries(outcomeResults, isStaged);
     } catch {
-      core.warning("Safe-output application outcomes could not be persisted");
+      core.warning("Safe-output application deliveries could not be persisted");
     }
     // Guarantee the manifest file exists for artifact upload even when the handler fails.
     // This is a no-op if the file was already created by createManifestLogger().

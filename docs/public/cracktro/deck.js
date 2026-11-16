@@ -11652,7 +11652,7 @@
   const xEsc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // Distributed tracing: one run's spans nest parent → child; dispatched workers in other repositories and a rerun
-  // attempt are independent executions joined by episode and hop attributes, and cost and outcomes roll up per episode
+  // attempt are independent executions joined by episode and hop attributes, and cost and adoptions roll up per episode
   const pushTracingSlide = () => {
     resetIndex();
     const X0 = 430,
@@ -11668,7 +11668,7 @@
       [3, "mcp · get_file_contents", 34, 46, "#3fb950", 3],
       [3, "firewall · allowed egress", 52, 56, "#d29922", 3],
       [1, "safe_outputs job", 72, 90, "#79c0ff", 4, "dispatch-workflow ×2", -1],
-      [1, "conclusion · gh-aw.outcome.*", 90, 100, "#f0883e", 5, "", -1],
+      [1, "conclusion · gh-aw.adoption.*", 90, 100, "#f0883e", 5, "", -1],
     ];
     const parentOf = i => {
       for (let j = i - 1; j >= 0; j--) if (ROWS[j][0] < ROWS[i][0]) return j;
@@ -11760,7 +11760,7 @@
     slides.push({
       group: "enterprise",
       notes:
-        "Distributed tracing. The OpenTelemetry slide shows where spans go; this one shows how they connect. Inside one execution spans are direct parent and child: every job of the run shares one trace id, the job setup span parents the job's own spans, the agent span carries gh-aw.aic and token usage, and the MCP gateway and firewall add a span per tool call and per egress request. When the safe-outputs job dispatches workers, possibly in other repositories, each worker is an independent run with its own token and permissions; it inherits the caller's trace id through aw_context, and episode attributes keep the journey together: gh-aw.episode.id stays fixed across hops and gh-aw.hop.parent_id names the immediate caller. A rerun keeps the run id with a new github.run_attempt, and durable execution resumes the agent session. Cost and outcomes then roll up per episode: summed gh-aw.aic, max_ai_credits_exceeded and gh-aw.outcome attributes. One limitation: gh-aw correlates executions with these attributes and the shared trace id; it does not emit native OTLP span links. The trace, repositories and numbers here are synthetic and the timing is illustrative.",
+        "Distributed tracing. The OpenTelemetry slide shows where spans go; this one shows how they connect. Inside one execution spans are direct parent and child: every job of the run shares one trace id, the job setup span parents the job's own spans, the agent span carries gh-aw.aic and token usage, and the MCP gateway and firewall add a span per tool call and per egress request. When the safe-outputs job dispatches workers, possibly in other repositories, each worker is an independent run with its own token and permissions; it inherits the caller's trace id through aw_context, and episode attributes keep the journey together: gh-aw.episode.id stays fixed across hops and gh-aw.hop.parent_id names the immediate caller. A rerun keeps the run id with a new github.run_attempt, and durable execution resumes the agent session. Cost and adoptions then roll up per episode: summed gh-aw.aic, max_ai_credits_exceeded and gh-aw.adoption attributes. One limitation: gh-aw correlates executions with these attributes and the shared trace id; it does not emit native OTLP span links. The trace, repositories and numbers here are synthetic and the timing is illustrative.",
       enter: () => stage.enter(),
       tick: t => stage.tick(t),
       el,
@@ -18124,7 +18124,14 @@
     const ftm = h(
       "div",
       { class: "dhm" },
-      h("div", { class: "dhm-k" }, kpi("583", "findings filed", "by 8 docs auditors"), kpi("273", "fixed by", ["merged PRs", h("br"), h("i", {}, "255 by Copilot")]), kpi("79%", "fixed when", ["assigned to Copilot", h("br"), h("i", {}, "256 of 323")], "g"), kpi("7%", "fixed when", ["left unassigned", h("br"), h("i", {}, "17 of 260")], "r"))
+      h(
+        "div",
+        { class: "dhm-k" },
+        kpi("583", "findings filed", "by 8 docs auditors"),
+        kpi("273", "fixed by", ["merged PRs", h("br"), h("i", {}, "255 by Copilot")]),
+        kpi("79%", "fixed when", ["assigned to Copilot", h("br"), h("i", {}, "256 of 323")], "g"),
+        kpi("7%", "fixed when", ["left unassigned", h("br"), h("i", {}, "17 of 260")], "r")
+      )
     );
     slides.push({
       group: "data",
@@ -18133,12 +18140,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h(
-          "div",
-          { class: "slide-head" },
-          h("div", { class: "kicker" }, "Eight agents audit the docs; the findings handed to Copilot get fixed"),
-          h("h2", {}, letters("Findings "), letters("that land", "l-grad"))
-        ),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Eight agents audit the docs; the findings handed to Copilot get fixed"), h("h2", {}, letters("Findings "), letters("that land", "l-grad"))),
         table,
         cards,
         ftm,

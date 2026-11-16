@@ -176,7 +176,7 @@ func (c *episodeCollector) loadCompactArtifacts(ctx context.Context, run Workflo
 				continue
 			}
 			if run.Attempt > 1 && (run.StartedAt.IsZero() || artifact.CreatedAt.IsZero() || artifact.CreatedAt.Before(run.StartedAt)) {
-				c.issue(episodeCandidate{repository: run.Repository, runID: run.DatabaseID}, "outcome_attempt_unverified",
+				c.issue(episodeCandidate{repository: run.Repository, runID: run.DatabaseID}, "adoption_attempt_unverified",
 					errors.New("safe-output manifest cannot be verified as belonging to the current run attempt"))
 				continue
 			}
@@ -293,7 +293,7 @@ func extractEpisodeArtifact(ctx context.Context, data []byte, dir string) error 
 
 func episodeArtifactKind(name string) string {
 	if artifactMatchesFilter(name, []string{"safe-outputs-items"}) {
-		return "outcomes"
+		return "adoptions"
 	}
 	if artifactMatchesFilter(name, []string{"info"}) {
 		return "info"
@@ -305,12 +305,12 @@ func episodeArtifactKind(name string) string {
 }
 
 func validEpisodeArtifactKind(kind string) bool {
-	return kind == "info" || kind == "usage" || kind == "outcomes" || kind == "enrichment"
+	return kind == "info" || kind == "usage" || kind == "adoptions" || kind == "enrichment"
 }
 
 func episodeArtifactNeedsIdentity(name string) bool {
 	kind := episodeArtifactKind(name)
-	return kind == "outcomes" || kind == "enrichment"
+	return kind == "adoptions" || kind == "enrichment"
 }
 
 func readEpisodeArtifactInfo(dir string, run WorkflowRun) ([]*AwInfo, error) {

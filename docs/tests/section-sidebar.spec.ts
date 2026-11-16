@@ -160,7 +160,7 @@ test("the old Workshop URL redirects to Guides and preserves bookmarks", async (
 for (const guide of [
   { slug: "safe-rollout", title: "Safe Rollout", label: "Safe Rollout in Organizations", anchor: "rollout-ladder" },
   { slug: "sharing-workflows", title: "Sharing Workflows in the Organization", label: "Sharing Workflows in Organizations", anchor: "sharing-layers" },
-  { slug: "measuring-impact", title: "Measuring Impact", label: "Measuring Impact", anchor: "timing-of-cost-and-outcomes" },
+  { slug: "measuring-impact", title: "Measuring Impact", label: "Measuring Impact", anchor: "timing-of-cost-and-adoptions" },
 ]) {
   test(`${guide.title} lives under Guides and redirects its Practices bookmark`, async ({ page }) => {
     const response = await page.goto(`/gh-aw/guides/${guide.slug}/`);

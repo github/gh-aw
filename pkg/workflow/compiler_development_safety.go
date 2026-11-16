@@ -40,14 +40,6 @@ func (c *Compiler) validateDryRunEffects(data *WorkflowData) error {
 		unsupported = append(unsupported, "mcp-scripts")
 	}
 	unsupported = append(unsupported, dryRunResolvedOutputEffects(data)...)
-	if data.Graders != nil {
-		for _, name := range slices.Sorted(maps.Keys(data.Graders.Graders)) {
-			grader := data.Graders.Graders[name]
-			if grader != nil && (grader.Enabled == nil || *grader.Enabled) && grader.Run != "" {
-				unsupported = append(unsupported, "graders."+name+".run")
-			}
-		}
-	}
 	permissions := NewPermissionsParser(data.Permissions).ToPermissions()
 	if level, _ := permissions.Get(PermissionIdToken); level == PermissionWrite {
 		unsupported = append(unsupported, "permissions.id-token")
@@ -191,7 +183,10 @@ func makeDryRunJobInert(job *Job, runsOn string) {
 }
 
 func (c *Compiler) dryRunPlaceholderRunsOn(data *WorkflowData, job *Job) string {
-	requireSelfHosted, _ := compilerenv.ResolveRequireSelfHostedRunners()
+	requireSelfHosted, err := compilerenv.ResolveRequireSelfHostedRunners()
+	if err != nil {
+		compilerDevelopmentLog.Printf("Cannot resolve self-hosted runner requirement for dry-run placeholder: %v", err)
+	}
 	requireSelfHosted = requireSelfHosted || c.requireSelfHosted
 	if config, err := c.loadRepoConfig(); err == nil && config != nil {
 		requireSelfHosted = requireSelfHosted || config.RequireSelfHostedRunners
@@ -252,11 +247,7 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 					paths = append(paths, actionslanguageservice.References(expression)...)
 				}
 			}
-			for _, path := range paths {
-				if len(path) >= 4 && (strings.EqualFold(path[0], "needs") || strings.EqualFold(path[0], "jobs")) && strings.EqualFold(path[2], "outputs") {
-					add(path[1], path[3])
-				}
-			}
+			addDryRunExpressionOutputs(paths, add)
 		case reflect.Map:
 			iter := value.MapRange()
 			for iter.Next() {
@@ -278,4 +269,19 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 		visit(reflect.ValueOf(value), false)
 	}
 	return outputs
+}
+
+func addDryRunExpressionOutputs(paths [][]string, add func(job, output string)) {
+	for _, path := range paths {
+		if len(path) < 4 {
+			continue
+		}
+		root := path[0]     //nolint:uncheckedsliceindex // The preceding guard requires four elements.
+		jobID := path[1]    //nolint:uncheckedsliceindex // The preceding guard requires four elements.
+		segment := path[2]  //nolint:uncheckedsliceindex // The preceding guard requires four elements.
+		outputID := path[3] //nolint:uncheckedsliceindex // The preceding guard requires four elements.
+		if (strings.EqualFold(root, "needs") || strings.EqualFold(root, "jobs")) && strings.EqualFold(segment, "outputs") {
+			add(jobID, outputID)
+		}
+	}
 }

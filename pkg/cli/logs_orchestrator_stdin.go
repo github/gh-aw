@@ -348,9 +348,9 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		message = "Storage limit reached. Results are partial because some input runs were not downloaded."
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	}
-	var outcomeReports []OutcomesData
-	if opts.Outcomes {
-		outcomeReports, err = collectLogsOutcomes(ctx, processedRuns, opts.OutcomesDir, opts.Verbose)
+	var adoptionReports []AdoptionsData
+	if opts.Adoptions {
+		adoptionReports, err = collectLogsAdoptions(ctx, processedRuns, opts.AdoptionsDir, opts.Verbose)
 		if err != nil {
 			return err
 		}
@@ -378,7 +378,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		apiRateLimit:      apiRateLimit,
 		apiRateLimits:     apiRateLimits,
 		cachedJSONLWriter: cachedJSONLWriter,
-		outcomeReports:    outcomeReports,
+		adoptionReports:   adoptionReports,
 	})
 }
 

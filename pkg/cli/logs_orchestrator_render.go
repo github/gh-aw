@@ -40,7 +40,7 @@ func renderLogsOutput(processedRuns []ProcessedRun, opts renderLogsOutputOptions
 				if opts.format == "tsv" || opts.format == "pretty" {
 					out = os.Stderr
 				}
-				err = renderLogsEpisodeOutcomes(out, logsData, opts.episodes)
+				err = renderLogsEpisodeAdoptions(out, logsData, opts.episodes)
 			}
 		}()
 	}
@@ -90,7 +90,7 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 	logsData.Runs = workQueueReportRuns(logsData.Runs, opts.includeWorkQueue || len(opts.artifactFilter) == 0)
 	logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(opts.apiRateLimit)
 	logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(opts.apiRateLimits)
-	if err := attachLogsOutcomes(&logsData, opts.outcomeReports); err != nil {
+	if err := attachLogsAdoptions(&logsData, opts.adoptionReports); err != nil {
 		return LogsData{}, err
 	}
 
@@ -187,9 +187,9 @@ func renderLogsOutputCrossRun(processedRuns []ProcessedRun, logsData LogsData, o
 		report.Episodes = logsData.Episodes
 		report.Edges = logsData.Edges
 	}
-	// These fields are for JSON output; text is rendered separately by renderLogsEpisodeOutcomes.
-	report.Outcomes = logsData.Outcomes
-	report.EpisodeOutcomes = logsData.EpisodeOutcomes
+	// These fields are for JSON output; text is rendered separately by renderLogsEpisodeAdoptions.
+	report.Adoptions = logsData.Adoptions
+	report.EpisodeAdoptions = logsData.EpisodeAdoptions
 	report.FailureClusters = logsData.FailureClusters
 	report.FailureInvestigation = logsData.FailureInvestigation
 	if opts.jsonOutput {
@@ -215,7 +215,7 @@ func renderLogsOutputCrossRun(processedRuns []ProcessedRun, logsData LogsData, o
 				}
 			}()
 			renderCrossRunReportMarkdownToWriter(f, report)
-			return renderLogsEpisodeOutcomes(f, logsData, opts.episodes)
+			return renderLogsEpisodeAdoptions(f, logsData, opts.episodes)
 		}(); err != nil {
 			return fmt.Errorf("failed to write report file: %w", err)
 		}

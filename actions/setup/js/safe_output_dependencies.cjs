@@ -1,6 +1,6 @@
 // @ts-check
 
-const { classifySafeOutputResult, pickOutcomeField } = require("./safe_outputs_status.cjs");
+const { classifySafeOutputResult, pickDeliveryField } = require("./safe_outputs_status.cjs");
 const { getCreatedTemporaryId, extractTemporaryIdReferences } = require("./temporary_id.cjs");
 const { isDependencyDelegatedType } = require("./safe_output_submission.cjs");
 
@@ -126,7 +126,7 @@ function isConfirmedDependencySuccess(record) {
   // @safe-outputs-exempt USE-003: reads the staged flag only to reject unconfirmed success; renders no staged preview
   if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true") return false;
   if (!record || record.success !== true || classifySafeOutputResult(record) !== "success") return false;
-  if (pickOutcomeField(record, "staged") || pickOutcomeField(record, "queued") || pickOutcomeField(record, "buffered")) return false;
+  if (pickDeliveryField(record, "staged") || pickDeliveryField(record, "queued") || pickDeliveryField(record, "buffered")) return false;
   const result = record.result;
   if (Array.isArray(result)) {
     return result.length > 0 && result.every(item => item && typeof item === "object" && isConfirmedDependencySuccess({ success: item.success !== false, result: item }));
@@ -171,14 +171,14 @@ function checkSafeOutputDependencies(plan, index, results, allowWaiting, reviewC
       waiting = true;
       continue;
     }
-    if (record?.type === "ledger_append" && pickOutcomeField(record, "queued")) {
+    if (record?.type === "ledger_append" && pickDeliveryField(record, "queued")) {
       return {
         state: "failed",
         errorCode: "safe_output_dependency_failed",
         error: "Ledger prerequisite is queued, not persisted. Submit related ledger operations sequentially without depends-on; use temporary record IDs for same-batch references. Durability requires push_ledger_changes to succeed.",
       };
     }
-    const skipReason = pickOutcomeField(record, "skipReason") || (pickOutcomeField(record, "skipped") && pickOutcomeField(record, "reason"));
+    const skipReason = pickDeliveryField(record, "skipReason") || (pickDeliveryField(record, "skipped") && pickDeliveryField(record, "reason"));
     return { state: "failed", errorCode: "safe_output_dependency_failed", error: `Safe-output prerequisite did not complete successfully${skipReason ? `: ${skipReason}` : ""}` };
   }
   return { state: waiting ? "waiting" : "ready" };

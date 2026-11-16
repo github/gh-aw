@@ -467,7 +467,7 @@ Compile-time lint is Actions/AW AST-only and does not require a native JavaScrip
 
 **`--no-logo` flag:** Omit the ASCII logo from generated workflow headers without removing metadata or regeneration instructions. To persist this setting for all compiles, including upgrades, set [`"lock_file_logo": false` in `.github/workflows/aw.json`](/gh-aw/reference/compilation-process/#repository-configuration-awjson). Either opt-out disables the logo; `--banner` only controls terminal output.
 
-**`--dry-run` flag:** Compile with strict source validation, staged safe outputs, shellcheck, and model checks. Existing and added medium-or-higher or unclassified scanner findings fail; baseline counts remain available for comparison. Low-severity findings and zizmor's `secrets-outside-env` rule do not fail the gate. Docker-based image validation and scanners are opt-in; native shellcheck provides required run-step linting without Docker. Missing required checks or model inventory block compilation. Compiler-managed GitHub mutations and authored custom jobs are disabled. Custom jobs and custom safe-output jobs become credential-free placeholders, including reusable calls with inherited secrets. Workflow `steps` and `post-steps` are accepted but their code and credentials are omitted from the emitted lock, so they cannot execute when that lock is separately dispatched. Omitted setup and cleanup reduce live-test coverage; dry-run locks still execute the agent and compiler-owned steps when dispatched under separate authorization. `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP servers, `mcp-scripts`, custom safe-output scripts, enabled Bash graders, and authored OIDC permissions are rejected, including imported declarations. Remove unsupported declarations in a separate diagnostic workflow. Emitted locks remove telemetry environment variables and automatic OTLP authentication. Agent shell commands, custom engine execution, custom credentials, and hosted identities still require review; dry-run is not a hosted sandbox. Explicitly disabling a required check is rejected; `--no-emit`, `--watch`, `--approve`, and `--allow-action-refs` are incompatible. This flag does not upload or execute workflows and is distinct from `--action-mode dev`. The compile MCP input is `dry_run`; `validate_images: true` opts into required image validation. See [Development Testing Mode](/gh-aw/reference/compilation-process/#development-testing-mode).
+**`--dry-run` flag:** Compile with strict source validation, staged safe outputs, shellcheck, and model checks. Existing and added medium-or-higher or unclassified scanner findings fail; baseline counts remain available for comparison. Low-severity findings and zizmor's `secrets-outside-env` rule do not fail the gate. Docker-based image validation and scanners are opt-in; native shellcheck provides required run-step linting without Docker. Missing required checks or model inventory block compilation. Compiler-managed GitHub mutations and authored custom jobs are disabled. Custom jobs and custom safe-output jobs become credential-free placeholders, including reusable calls with inherited secrets. Workflow `steps` and `post-steps` are accepted but their code and credentials are omitted from the emitted lock, so they cannot execute when that lock is separately dispatched. Omitted setup and cleanup reduce live-test coverage; dry-run locks still execute the agent and compiler-owned steps when dispatched under separate authorization. `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP servers, `mcp-scripts`, custom safe-output scripts, and authored OIDC permissions are rejected, including imported declarations. Remove unsupported declarations in a separate diagnostic workflow. Emitted locks remove telemetry environment variables and automatic OTLP authentication. Agent shell commands, custom engine execution, custom credentials, and hosted identities still require review; dry-run is not a hosted sandbox. Explicitly disabling a required check is rejected; `--no-emit`, `--watch`, `--approve`, and `--allow-action-refs` are incompatible. This flag does not upload or execute workflows and is distinct from `--action-mode dev`. The compile MCP input is `dry_run`; `validate_images: true` opts into required image validation. See [Development Testing Mode](/gh-aw/reference/compilation-process/#development-testing-mode).
 
 Dry-run locks also omit daily credit accounting, retain existing per-run caps or promote configured/imported daily limits, and add manual dispatch restricted to maintainer/admin actors without bot exemptions. `DEBUG=workflow:compiler_development,cli:compile_development` reports mutations without configuration values.
 
@@ -781,7 +781,7 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--outcomes`, `--outcomes-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--adoptions`, `--adoptions-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
@@ -834,7 +834,7 @@ with workflow-call-prefixed and historical agent artifacts supported.
 | `progress` | `stage`: `started`, `fetching`, `discovered`, `downloaded`, `skipped`, or `failed`. Available context includes `repository`, `workflow`, `run_id`, `cached`, `count` (runs in this discovery batch), and `message`. |
 | `run` | `run`: a processed run in the same shape as an entry in `--json`'s `runs` array, including cache hits. Emitted during collection, before the batch finishes. |
 | `warning` | `message`: a workflow target failed while other targets could still be collected. |
-| `summary` | `data`: the final `--json` report, including runs, aggregates, outcomes, warnings, and continuation cursors. This is the authoritative report; streamed run records do not yet include cross-run analysis or live outcomes. |
+| `summary` | `data`: the final `--json` report, including runs, aggregates, adoptions, warnings, and continuation cursors. This is the authoritative report; streamed run records do not yet include cross-run analysis or live adoptions. |
 | `complete` | Collection and finalization succeeded. The summary can still describe partial collection due to count, timeout, or resource limits. |
 | `error` | `message`: collection or finalization failed; the command exits unsuccessfully. |
 
@@ -964,7 +964,7 @@ The `--timeout` flag sets a duration such as `50s` or `5m` (default: `0`, no add
 
 The `--repo` flag accepts `owner/repo` and is required for a bare numeric run ID.
 
-The `--artifacts` flag selects which artifact sets to download (default: `all`, unlike `gh aw logs`, which defaults to `usage`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, `outcomes`, `usage`, and `work-queue`. The `work-queue` set downloads queue snapshots, worker finish intents, and workflow logs for coordinator operation reporting. The `--experiment` flag filters to runs that include the named experiment; `--variant` restricts to a variant value and requires `--experiment`. The `--output/-o` flag overrides the output directory.
+The `--artifacts` flag selects which artifact sets to download (default: `all`, unlike `gh aw logs`, which defaults to `usage`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, `adoptions`, `usage`, and `work-queue`. The `work-queue` set downloads queue snapshots, worker finish intents, and workflow logs for coordinator operation reporting. The `--experiment` flag filters to runs that include the named experiment; `--variant` restricts to a variant value and requires `--experiment`. The `--output/-o` flag overrides the output directory.
 
 Logs are saved to `.github/aw/logs/run-{id}/` with filenames indicating the extraction level. Pre-agent failures (integrity filtering, missing secrets, binary install) surface the actual error in `failure_analysis.error_summary`. Invalid run IDs return a human-readable error.
 
@@ -1040,21 +1040,16 @@ The command and its output formats may change.
 
 #### `graders`
 
-Run one enabled built-in, custom JavaScript, or operational-value Bash grader against a unified session from a saved run's
+Run one enabled built-in or custom JavaScript grader against a unified session from a saved run's
 `usage` artifact or from standard input. Input accepts unified-session JSONL
 or a JSON event array. The ten fast built-ins are available without explicit
 frontmatter configuration. Custom JavaScript uses a separate restricted worker
-with the same in-memory interface as the downstream graders job. Repository-owned
-`graders.operational-value.run` Bash uses that job's session-file compatibility
-runtime: session JSONL in `$1` / `GH_AW_SESSION_FILE`, config JSON in
-`GH_AW_GRADER_CONFIG`, and legacy metric-array output.
+with the same in-memory interface as the downstream graders job. Operational
+value uses that JavaScript contract.
 
-Pure built-in/JavaScript replay requires Node.js 20+ with the permission model. The CLI picks
+Replay requires Node.js 20+ with the permission model. The CLI picks
 `--permission` or `--experimental-permission` as supported, restricts reads to
 the staged runtime modules, and passes the session in memory to the grader.
-Bash replay requires Node.js and Bash with the same bounded, stripped-environment
-runtime as the separate job. It is trusted code, not a filesystem/network sandbox
-or microVM; compilation and lint reject detected file writes.
 
 ```bash wrap
 gh aw graders run weekly-research loops 123456789
@@ -1074,42 +1069,42 @@ rewriting them, and records the selected definitions, implementation identities,
 and session digests separately from historical scores. It uses only GH-AW logs
 and unified sessions, never Harbor bundles. Missing sessions and grader errors
 are explicit per-run results. Collection mode and `logs --harbor` additional
-grading support only in-memory built-ins and isolated JavaScript, not Bash.
-The existing single-session Bash replay behavior is unchanged.
+grading support only in-memory built-ins and isolated JavaScript. Shell-backed
+graders are unsupported in both single-session and collection replay.
 
 **Options:** `--additional-grader`, `--logs-dir`, `--repo/-r`
 
-#### `logs --outcomes`
+#### `logs --adoptions`
 
 Check what happened to a workflow run's safe outputs (accepted, rejected, ignored, or pending).
 
 ```bash wrap
-gh aw logs weekly-research --outcomes --json
-gh aw logs weekly-research --episodes --outcomes --json
-printf '%s\n' 1234567890 | gh aw logs --stdin --repo owner/repo --outcomes --json
-gh aw logs episode 1234567890 --repo owner/repo --outcomes
-gh aw logs --outcomes --outcomes-dir ./otlp
+gh aw logs weekly-research --adoptions --json
+gh aw logs weekly-research --episodes --adoptions --json
+printf '%s\n' 1234567890 | gh aw logs --stdin --repo owner/repo --adoptions --json
+gh aw logs episode 1234567890 --repo owner/repo --adoptions
+gh aw logs --adoptions --adoptions-dir ./otlp
 ```
 
-**Options:** `--json/-j`, `--repo/-r`, `--output/-o`, `--episodes`, `--outcomes`, `--outcomes-dir`
+**Options:** `--json/-j`, `--repo/-r`, `--output/-o`, `--episodes`, `--adoptions`, `--adoptions-dir`
 
 The flag applies to selected runs in discovery, multi-workflow, stdin, and
-episode collection. JSON includes `.outcomes[]` with per-run observations and
-`.episode_outcomes` with selected-episode summaries. Outcome checks are live
+episode collection. JSON includes `.adoptions[]` with per-run observations and
+`.episode_adoptions` with selected-episode summaries. Adoption checks are live
 and require additional API requests even when execution artifacts are cached.
-`--outcomes-dir` requires `--outcomes` and writes JSONL observations.
-The standalone `gh aw outcomes` command has been removed.
+`--adoptions-dir` requires `--adoptions` and writes JSONL observations.
+The standalone `gh aw adoptions` command has been removed.
 
 `--episodes` adds recorded episode membership and hops to text reports. Combine
-`--episodes --outcomes` to perform the episode-outcome join in the same
+`--episodes --adoptions` to perform the episode-adoption join in the same
 invocation, using collected membership, live observations, and downloaded
 usage. No separate command or JSONL export is needed.
-Standard logs JSON retains episode membership and outcome summaries with or
+Standard logs JSON retains episode membership and adoption summaries with or
 without the explicit `--episodes` flag. Membership is limited to selected runs; this flag
 does not expand discovery to all episode members.
 
-Reports are scoped to selected runs and qualify missing membership, outcomes,
-and cost. See [Episode Outcome Summaries](/gh-aw/reference/outcomes/#episode-outcome-summaries)
+Reports are scoped to selected runs and qualify missing membership, adoptions,
+and cost. See [Episode Adoption Summaries](/gh-aw/reference/adoptions/#episode-adoption-summaries)
 for the JSON contract and unavailable-cost semantics.
 
 #### `models`
@@ -1189,7 +1184,7 @@ When a selected workflow's published default-branch lock file enables work-queue
 
 Health also reads matching `run_summary.json` files from `--logs-dir` (default: `.github/aw/logs`) for failed sub-agent invocations, including workflows whose Actions conclusion is `success`. An affected current revision has status `subagent_failures_observed` and is excluded from `healthy_workflows`; its Actions success/failure counts and success rate remain unchanged. JSON reports include `subagent_failure_count` (invocations), `subagent_failure_runs` (distinct runs), and per-workflow `subagent_failures` with run URLs, agent names, and requested models. Fleet JSON also includes `degraded_workflows`.
 
-Threat-detection failures, warnings, and detected threats also degrade the current revision, with status `detection_failures_observed`. JSON includes `detection_failure_runs` and per-workflow `detection_failures` with run URLs and findings; text reports include `[detection_failures]`. Actions success rates remain unchanged, and a workflow with both detection and sub-agent failures counts only once in `degraded_workflows`. Audit reports expose detection outcomes in findings and error or warning counts. Detection engine errors such as `parse_error` are tooling failures, not security findings. When older usage artifacts omit the outcome, audit and health can recover it from downloaded conclusion-job environment logs.
+Threat-detection failures, warnings, and detected threats also degrade the current revision, with status `detection_failures_observed`. JSON includes `detection_failure_runs` and per-workflow `detection_failures` with run URLs and findings; text reports include `[detection_failures]`. Actions success rates remain unchanged, and a workflow with both detection and sub-agent failures counts only once in `degraded_workflows`. Audit reports expose detection adoptions in findings and error or warning counts. Detection engine errors such as `parse_error` are tooling failures, not security findings. When older usage artifacts omit the outcome, audit and health can recover it from downloaded conclusion-job environment logs.
 
 This check does not download artifacts. Populate the cache with `gh aw logs --artifacts usage` or `gh aw audit <run-id>` before checking health. `collection.cache_evidence` reports per-run `compatible`, `missing`, `unreadable`, `invalid`, `stale`, or `version_mismatch_raw_jobs_only` status, with the cached producer version when readable. A producer-version mismatch permits reuse of raw Jobs API observations only, after checking run identity, repository URL, attempt, head SHA, workflow, status, conclusion, and update time. Derived usage, classification, and sub-agent metrics still require the current CLI version; cached producer metadata is never rewritten. Missing or rejected derived evidence does not establish failure-free delegation. Historical-revision failures do not degrade the current revision.
 

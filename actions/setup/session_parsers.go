@@ -16,7 +16,7 @@ import "embed"
 //go:embed js/unified_session_order.cjs js/unified_session_otel.cjs
 //go:embed js/trace_graders.cjs js/grader_session.cjs js/grader_artifacts.cjs js/trajectory_graders.cjs js/builtin_graders.json js/working_set_metrics.cjs
 //go:embed js/custom_graders.cjs js/custom_grader_worker.cjs
-//go:embed js/operational_value_grader.cjs js/operational_value_worker.cjs
+//go:embed js/safe_output_adoption.cjs js/safe_output_adoption_rules.json
 //go:embed js/workflow_job_durations.cjs
 //go:embed js/mcp_configuration.cjs js/symlink_guard.cjs
 //go:embed js/mcp_rate_limit.cjs
@@ -37,7 +37,7 @@ import "embed"
 //go:embed js/temporary_id.cjs
 //go:embed js/diagnostic_sanitization.cjs js/sanitize_content.cjs js/missing_info_formatter.cjs
 //go:embed js/ephemerals.cjs js/project_timezone.cjs
-//go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/redact_secrets.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs js/safe_output_outcomes.cjs js/safe_outputs_status.cjs
+//go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/redact_secrets.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs js/safe_output_deliveries.cjs js/safe_outputs_status.cjs
 //go:embed js/otlp_header_helpers.cjs js/otlp.cjs js/work_queue_telemetry.cjs
 //go:embed js/work_queue_claim_scope.cjs js/work_queue_codec.cjs js/lock_file_headers.cjs js/work_queue_resource_scope.cjs
 //go:embed js/work_queue_host.cjs

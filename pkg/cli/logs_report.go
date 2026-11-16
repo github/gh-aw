@@ -30,8 +30,8 @@ type LogsData struct {
 	Episodes             []EpisodeData               `json:"episodes" console:"-"`
 	Edges                []EpisodeEdge               `json:"edges" console:"-"`
 	EpisodeRetrieval     *EpisodeRetrieval           `json:"episode_retrieval,omitempty" console:"-"`
-	Outcomes             []OutcomesData              `json:"outcomes,omitempty" console:"-"`
-	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_outcomes,omitempty" console:"-"`
+	Adoptions            []AdoptionsData             `json:"adoptions,omitempty" console:"-"`
+	EpisodeAdoptions     *EpisodeAdoptionsData       `json:"episode_adoptions,omitempty" console:"-"`
 	ToolUsage            []ToolUsageSummary          `json:"tool_usage,omitempty" console:"title:🛠️  Tool Usage Summary,omitempty"`
 	MCPToolUsage         *MCPToolUsageSummary        `json:"mcp_tool_usage,omitempty" console:"title:🔧 MCP Tool Usage,omitempty"`
 	Observability        []ObservabilityInsight      `json:"observability_insights,omitempty" console:"-"`
@@ -156,14 +156,17 @@ type LogsSummary struct {
 	// fleet-level success rates so that deliberate failures do not depress the baseline.
 	IntentionalFailureRuns int `json:"intentional_failure_runs,omitempty" console:"-"`
 
-	// Outcome metrics (populated when outcome evaluation is enabled)
-	OutcomeAccepted       int     `json:"outcome_accepted,omitempty" console:"-"`
-	OutcomeRejected       int     `json:"outcome_rejected,omitempty" console:"-"`
-	OutcomeIgnored        int     `json:"outcome_ignored,omitempty" console:"-"`
-	OutcomePending        int     `json:"outcome_pending,omitempty" console:"-"`
-	OutcomeAcceptanceRate float64 `json:"outcome_acceptance_rate,omitempty" console:"-"`
-	OutcomeWasteRate      float64 `json:"outcome_waste_rate,omitempty" console:"-"`
-	OutcomeZeroTouchRate  float64 `json:"outcome_zero_touch_rate,omitempty" console:"-"`
+	// Adoption metrics (populated when adoption evaluation is enabled)
+	AdoptionTotal          int     `json:"adoption_total,omitempty" console:"-"`
+	AdoptionAccepted       int     `json:"adoption_accepted,omitempty" console:"-"`
+	AdoptionRejected       int     `json:"adoption_rejected,omitempty" console:"-"`
+	AdoptionPending        int     `json:"adoption_pending,omitempty" console:"-"`
+	AdoptionLifecycle      int     `json:"adoption_lifecycle,omitempty" console:"-"`
+	AdoptionNotApplicable  int     `json:"adoption_not_applicable,omitempty" console:"-"`
+	AdoptionUnknown        int     `json:"adoption_unknown,omitempty" console:"-"`
+	AdoptionAcceptanceRate float64 `json:"adoption_acceptance_rate,omitempty" console:"-"`
+	AdoptionWasteRate      float64 `json:"adoption_waste_rate,omitempty" console:"-"`
+	AdoptionZeroTouchRate  float64 `json:"adoption_zero_touch_rate,omitempty" console:"-"`
 }
 
 // RunData contains information about a single workflow run
@@ -701,7 +704,11 @@ func buildLogsDataWithCollectionCoverage(processedRuns []ProcessedRun, outputDir
 	// the slug cannot be determined.
 	var localRepo string
 	if !collection.disableLocalClassification {
-		localRepo, _ = GetCurrentRepoSlug()
+		var err error
+		localRepo, err = GetCurrentRepoSlug()
+		if err != nil {
+			reportLog.Printf("Cannot determine local repository for intentional-failure classification: %v", err)
+		}
 	}
 
 	// Build runs data

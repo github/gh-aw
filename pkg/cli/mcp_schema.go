@@ -77,6 +77,7 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 	}
 	fixCreatedItemIDSchema(schema)
 	makeOutcomeEvidenceCompletenessOptional(schema)
+	constrainAdoptionStatusSchema(schema)
 	constrainSteeringDeliverySchema(schema)
 	return MarshalOutputSchema(schema)
 }
@@ -114,6 +115,43 @@ func makeOutcomeEvidenceCompletenessOptional(schema *jsonschema.Schema) {
 	}
 	for _, child := range schema.AllOf {
 		makeOutcomeEvidenceCompletenessOptional(child)
+	}
+}
+
+func constrainAdoptionStatusSchema(schema *jsonschema.Schema) {
+	if schema == nil {
+		return
+	}
+	if status, ok := schema.Properties["adoption_status"]; ok {
+		status.Enum = []any{
+			string(AdoptionStatusAccepted),
+			string(AdoptionStatusRejected),
+			string(AdoptionStatusPending),
+			string(AdoptionStatusLifecycle),
+			string(AdoptionStatusNotApplicable),
+			string(AdoptionStatusUnknown),
+		}
+	}
+	for _, child := range schema.Properties {
+		constrainAdoptionStatusSchema(child)
+	}
+	if schema.Items != nil {
+		constrainAdoptionStatusSchema(schema.Items)
+	}
+	for _, child := range schema.ItemsArray {
+		constrainAdoptionStatusSchema(child)
+	}
+	if schema.AdditionalProperties != nil {
+		constrainAdoptionStatusSchema(schema.AdditionalProperties)
+	}
+	for _, child := range schema.OneOf {
+		constrainAdoptionStatusSchema(child)
+	}
+	for _, child := range schema.AnyOf {
+		constrainAdoptionStatusSchema(child)
+	}
+	for _, child := range schema.AllOf {
+		constrainAdoptionStatusSchema(child)
 	}
 }
 

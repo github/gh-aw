@@ -74,15 +74,6 @@ func performanceInput(tb testing.TB, contract ruleContract, target ASTTargets, p
 	if contract.javaScript {
 		return graderJavaScriptPerformanceInput(tb, document, jobs)
 	}
-	if contract.safeShell != "" {
-		source := contract.safeShell
-		if positive {
-			source = contract.unsafeShell
-		}
-		// Set up referenced files only once. The integrated rule must reread
-		// them on each run; the I/O-free checker has its own package benchmark.
-		return prepareGraderShellFixture(tb, Input{Document: document}, source)
-	}
 	return Input{Document: document}
 }
 

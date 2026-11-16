@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -18,7 +19,6 @@ import (
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
-	"github.com/github/gh-aw/pkg/workflow/gradershell"
 )
 
 var addPackageOwnershipLog = logger.New("cli:add_package_ownership")
@@ -339,11 +339,18 @@ func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *
 		addPackageOwnershipLog.Printf("Rolling back %d file change(s) for package=%s", len(rollbacks), packageBase)
 		for _, rollback := range slices.Backward(rollbacks) {
 			if rollback.existed {
-				_ = os.MkdirAll(filepath.Dir(rollback.path), constants.DirPermPublic)
-				_ = os.WriteFile(rollback.path, rollback.content, rollback.mode)
+				if err := os.MkdirAll(filepath.Dir(rollback.path), constants.DirPermPublic); err != nil {
+					addPackageOwnershipLog.Printf("Cannot recreate rollback directory for %s: %v", rollback.path, err)
+					continue
+				}
+				if err := os.WriteFile(rollback.path, rollback.content, rollback.mode); err != nil {
+					addPackageOwnershipLog.Printf("Cannot restore package file %s: %v", rollback.path, err)
+				}
 				continue
 			}
-			_ = os.Remove(rollback.path)
+			if err := os.Remove(rollback.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				addPackageOwnershipLog.Printf("Cannot remove package file %s during rollback: %v", rollback.path, err)
+			}
 		}
 	}
 
@@ -516,7 +523,7 @@ func refreshManifestResourceOwnership(gitRoot string, record *packageOwnershipRe
 
 func readExistingPackageOwnershipFiles(gitRoot, recordPath string) ([]packageOwnershipFileEntry, error) {
 	existing, err := readPackageOwnershipRecord(recordPath)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
@@ -592,8 +599,7 @@ func isPackageResourceDestination(destination string) bool {
 	return strings.EqualFold(destination, constants.GithubDir+"CODEOWNERS") ||
 		strings.HasPrefix(destination, constants.GithubDir+"ISSUE_TEMPLATE/") ||
 		strings.HasPrefix(destination, constants.GithubDir+"aw/") ||
-		isSharedWorkflowScriptDestination(destination) ||
-		gradershell.ValidRunPath(destination)
+		isSharedWorkflowScriptDestination(destination)
 }
 
 func isSharedWorkflowScriptDestination(destination string) bool {

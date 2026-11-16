@@ -85,7 +85,7 @@ authorized live test.
 Other host steps (`pre-steps`, `pre-agent-steps`, `on.steps`,
 safe-output/threat-detection/secret-masking steps, and unsafe built-in job
 overrides), custom MCP servers, `mcp-scripts`, custom safe-output scripts/actions,
-enabled Bash graders, and authored OIDC permissions (including safe-output
+and authored OIDC permissions (including safe-output
 permissions) are rejected, including declarations from imports. Compiler-owned
 pull-request stack gates remain enabled. Remove those declarations
 from a separate diagnostic workflow; there is no unsafe dry-run override.

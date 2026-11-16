@@ -2699,6 +2699,7 @@ describe("sendJobConclusionSpan", () => {
     "GH_AW_DEPRECATED_COST",
     "GH_AW_AIC",
     "GH_AW_MAX_AI_CREDITS",
+    "GH_AW_AWF_CONFIG_PATH",
     "GH_AW_AI_CREDITS_RATE_LIMIT_ERROR",
     "GH_AW_INFO_VERSION",
     "GH_AW_INFO_CLI_VERSION",
@@ -2744,6 +2745,7 @@ describe("sendJobConclusionSpan", () => {
       savedEnv[k] = process.env[k];
       delete process.env[k];
     }
+    process.env.GH_AW_AWF_CONFIG_PATH = path.join(os.tmpdir(), `gh-aw-send-otlp-missing-${process.pid}.json`);
     mkdirSpy = vi.spyOn(fs, "mkdirSync").mockImplementation(() => {});
     appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
   });
@@ -3061,10 +3063,14 @@ describe("sendJobConclusionSpan", () => {
     const statSpy = vi.spyOn(fs, "statSync").mockImplementation(() => {
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
     });
+    const readFileSpy = vi.spyOn(fs, "readFileSync").mockImplementation(() => {
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
 
     await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
 
     statSpy.mockRestore();
+    readFileSpy.mockRestore();
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     const agentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
@@ -3093,10 +3099,14 @@ describe("sendJobConclusionSpan", () => {
     const statSpy = vi.spyOn(fs, "statSync").mockImplementation(() => {
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
     });
+    const readFileSpy = vi.spyOn(fs, "readFileSync").mockImplementation(() => {
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
 
     await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
 
     statSpy.mockRestore();
+    readFileSpy.mockRestore();
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     const agentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
@@ -7346,7 +7356,7 @@ describe("selectGraderOutputForJob", () => {
       results: [
         { id: "builtin", source: "builtin", status: "pass" },
         { id: "custom", source: "inline", status: "error" },
-        { id: "operational-value", source: "operational-value", status: "pass", value: 1 },
+        { id: "operational-value", source: "inline", status: "pass", value: 1 },
       ],
     }));
     const output = selectGraderOutputForJob("graders", readJSON);

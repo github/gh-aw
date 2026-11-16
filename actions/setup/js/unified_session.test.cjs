@@ -46,6 +46,23 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  function safeJobDelivery(type, status, url) {
+    const delivered = status === "success";
+    const skipped = status === "skipped";
+    return {
+      type,
+      status,
+      ...(url ? { url } : {}),
+      deliveryState: delivered ? "delivered" : skipped ? "skipped" : "failed",
+      deliverySignal: status,
+      deliverySource: "safe_output.result",
+      adoptionState: "unknown",
+      adoptionSignal: delivered ? "unsupported_safe_output" : "delivery_not_established",
+      adoptionSource: delivered ? "adoption-registry" : "delivery-status",
+      adoptionRuleVersion: "gh-aw-v1.2.3-adoption-v1",
+    };
+  }
+
   it.each(["file_reference_failed", "sensitive_content_blocked"])("publishes typed skip decisions with %s in the agent unified session without model inputs", error => {
     const decision = {
       proposedAttempt: 1,
@@ -172,10 +189,7 @@ describe("Unified conclusion session", () => {
       }),
     });
     const outcomes = events.filter(event => event.type === "safe_output.result");
-    expect(outcomes.map(event => event.data)).toEqual([
-      { type: "archive", status: "success" },
-      { type: "publish", status: "success", url: "https://github.com/owner/repo/issues/42" },
-    ]);
+    expect(outcomes.map(event => event.data)).toEqual([safeJobDelivery("archive", "success"), safeJobDelivery("publish", "success", "https://github.com/owner/repo/issues/42")]);
     expect(outcomes.every(event => event.provenance.component === "safe_output" && event.provenance.phase === "safe_outputs")).toBe(true);
     expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
     expect(JSON.stringify(outcomes)).not.toContain("URL_TOKEN");
@@ -187,7 +201,7 @@ describe("Unified conclusion session", () => {
       safeJobNames: '["publish"]',
       jobResults: JSON.stringify({ publish: { result, outputs: { status: "success", url: "https://example.com/42" } } }),
     });
-    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: result });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual(safeJobDelivery("publish", result));
   });
 
   it("publishes safe job and script outcomes together in the canonical session", () => {
@@ -203,8 +217,8 @@ describe("Unified conclusion session", () => {
       .split("\n")
       .map(line => JSON.parse(line));
     expect(events.filter(event => event.type === "safe_output.result").map(event => event.data)).toEqual([
-      { type: "notify", status: "success", url: "https://github.com/owner/repo/issues/42" },
-      { type: "publish", status: "success", url: "https://github.com/owner/repo/issues/43" },
+      safeJobDelivery("notify", "success", "https://github.com/owner/repo/issues/42"),
+      safeJobDelivery("publish", "success", "https://github.com/owner/repo/issues/43"),
     ]);
     expect(validateSession(fs.readFileSync(outputPath, "utf8"))).toBe(events.length);
     expect(events.filter(event => event.type === "workflow.job_result").map(event => event.data.jobId)).toEqual(["agent", "publish"]);
@@ -213,7 +227,7 @@ describe("Unified conclusion session", () => {
   it.each(["invalid PRIVATE", "[]", "null"])("warns without leaking malformed projected safe job results %s", safeJobResults => {
     const warn = vi.fn();
     const { events } = collectUnifiedSession({ rootDir: root, safeJobNames: '["publish"]', safeJobResults, jobResults: '{"publish":{"result":"success"}}', warn });
-    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "success" });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual(safeJobDelivery("publish", "success"));
     expect(warn).toHaveBeenCalledWith("Unified session: invalid_safe_job_results in usage/aw_session.jsonl");
     expect(JSON.stringify(events)).not.toContain("PRIVATE");
   });
@@ -225,7 +239,7 @@ describe("Unified conclusion session", () => {
       jobResults: '{"publish":{"result":"failure"}}',
       safeJobResults: '{"publish":{"result":"success","outputs":{"status":"success","url":"https://example.com/42"}}}',
     });
-    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "failure" });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual(safeJobDelivery("publish", "failure"));
   });
 
   it("warns without leaking an invalid safe job status", () => {
@@ -236,7 +250,7 @@ describe("Unified conclusion session", () => {
       jobResults: JSON.stringify({ publish: { result: "success", outputs: { status: "PRIVATE_STATUS", url: "https://example.com/not-confirmed" } } }),
       warn,
     });
-    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "success" });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual(safeJobDelivery("publish", "success"));
     expect(warn).toHaveBeenCalledWith("Unified session: invalid_safe_job_status in usage/aw_session.jsonl");
     expect(JSON.stringify(events)).not.toContain("PRIVATE_STATUS");
   });
@@ -247,7 +261,7 @@ describe("Unified conclusion session", () => {
       safeJobNames: '["publish"]',
       jobResults: JSON.stringify({ publish: { result: "success", outputs: { status, url: "https://example.com/42" } } }),
     });
-    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual(safeJobDelivery("publish", status));
   });
 
   it.each(["relative/path", "******example.com/42", "https://example.com/\nsecret", {}])("omits malformed safe job resource URI %j", url => {
@@ -258,7 +272,7 @@ describe("Unified conclusion session", () => {
       jobResults: JSON.stringify({ publish: { result: "success", outputs: { url } } }),
       warn,
     });
-    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "success" });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual(safeJobDelivery("publish", "success"));
     expect(warn).toHaveBeenCalledWith("Unified session: invalid_safe_job_url in usage/aw_session.jsonl");
   });
 

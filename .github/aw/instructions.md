@@ -88,13 +88,14 @@ Reuse `helpers.createSessionLookups(session)` for stats and event/tool lookups.
 Return a finite number, `null` for unavailable evidence, or an object with
 `value`; do not emit legacy metric arrays. The script limit is 256 KiB.
 
-For repository-owned Bash compatibility, use `graders.operational-value.run`
-with a confined `.sh` path. Read session JSONL from `$1` / `GH_AW_SESSION_FILE`
-and JSON config from `GH_AW_GRADER_CONFIG`; retain `[{id,value}, ...]` output.
-Remove file writes and live API/checkout reads; compile/lint rejects detected
-writes. This trusted shell path is not yet microVM-isolated.
+Operational-value metrics use `graders.<distinct-id>.script` and the same
+restricted JavaScript runtime as other custom graders. Shell-backed graders and
+`run` are unsupported.
+Do not add file, module, process, network, clock, or random access. Capture
+required evidence before grading; lint and the restricted worker enforce the
+host-capability boundary.
 
-The compiler owns the isolated downstream `graders` job for both custom forms.
+The compiler owns the isolated downstream `graders` job for custom JavaScript.
 Never override built-in implementations, customize `jobs.graders`, or inject
 user code or steps into `jobs.conclusion`.
 Collect required evidence before session publication; graders cannot fetch it.

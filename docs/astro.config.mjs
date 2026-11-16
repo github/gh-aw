@@ -543,7 +543,7 @@ export default defineConfig({
             { label: "Imports (Copilot Agent Files)", link: "/reference/copilot-custom-agents/" },
             { label: "Imports (Copilot Inline Sub-Agents)", link: "/reference/inline-sub-agents/" },
             { label: "Imports (Dependabot)", link: "/reference/dependabot/" },
-            { label: "Outcomes", link: "/reference/outcomes/" },
+            { label: "Adoptions", link: "/reference/adoptions/" },
             { label: "OpenTelemetry", link: "/reference/open-telemetry/" },
             { label: "OpenTelemetry Attributes", link: "/reference/open-telemetry-attributes/" },
             { label: "Package Manifest", link: "/reference/aw-yml-package-manifest/" },

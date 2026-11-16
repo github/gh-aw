@@ -32,7 +32,7 @@ const require = createRequire(import.meta.url);
 const { COMMENT_PREAMBLE } = require("./issue_body.cjs");
 const { renderReport } = require("./report_ast.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
-const { buildSafeOutputOutcomes } = require("./safe_output_outcomes.cjs");
+const { buildSafeOutputDeliveries } = require("./safe_output_deliveries.cjs");
 const { generateSafeOutputSummary } = require("./safe_output_summary.cjs");
 
 function renderedCommentMessage(message) {
@@ -249,7 +249,7 @@ describe("Safe Output Handler Manager", () => {
         expect(JSON.stringify(global.core.error.mock.calls)).not.toContain("private-repository-context");
       });
 
-      it.each([false, true])("preserves indeterminate merge outcomes without leaking error text (deferred=%s)", async deferred => {
+      it.each([false, true])("preserves indeterminate merge deliveries without leaking error text (deferred=%s)", async deferred => {
         const handler = vi.fn().mockResolvedValue({
           success: false,
           merged: null,
@@ -346,7 +346,7 @@ describe("Safe Output Handler Manager", () => {
         expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
       });
 
-      it("preserves a blocked outcome when its audit cannot be persisted", async () => {
+      it("preserves a blocked delivery when its audit cannot be persisted", async () => {
         const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {
           throw new Error("private-error-details");
         });
@@ -772,7 +772,7 @@ describe("Safe Output Handler Manager", () => {
       });
     });
 
-    it("omits only explicitly delegated skips from outcome counts", () => {
+    it("omits only explicitly delegated skips from delivery counts", () => {
       expect(
         computeSafeOutputsStatus([
           { type: "add_comment", success: false, skipped: true, reason: "Policy skipped this output" },
@@ -1249,7 +1249,7 @@ describe("Safe Output Handler Manager", () => {
   });
 
   describe("processMessages", () => {
-    it.each([false, true])("preserves non-merge indeterminate failures in summaries and persisted outcomes (deferred=%s)", async deferred => {
+    it.each([false, true])("preserves non-merge indeterminate failures in summaries and persisted deliveries (deferred=%s)", async deferred => {
       const handler = vi.fn().mockResolvedValue({
         success: false,
         operation_outcome: "indeterminate",
@@ -1264,8 +1264,8 @@ describe("Safe Output Handler Manager", () => {
         result: { operation_outcome: "indeterminate" },
       });
       expect(computeSafeOutputsStatus(result.results)).toMatchObject({ status: "failure", itemsApplied: 0 });
-      expect(generateSafeOutputSummary({ ...result.results[0], message: { type: "add_comment", body: "Comment" } })).toContain("**Operation outcome: indeterminate.**");
-      expect(buildSafeOutputOutcomes(result.results)).toEqual([expect.objectContaining({ type: "add_comment", status: "failed", operation_outcome: "indeterminate" })]);
+      expect(generateSafeOutputSummary({ ...result.results[0], message: { type: "add_comment", body: "Comment" } })).toContain("**Operation delivery: indeterminate.**");
+      expect(buildSafeOutputDeliveries(result.results)).toEqual([expect.objectContaining({ type: "add_comment", status: "failed", operation_outcome: "indeterminate" })]);
       expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
     });
 

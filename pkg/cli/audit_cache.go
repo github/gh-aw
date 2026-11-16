@@ -49,8 +49,8 @@ func loadCachedAuditData(runOutputDir string, run WorkflowRun, source auditCache
 		auditData.CacheSource != source {
 		return AuditData{}, false
 	}
-	auditData.Outcomes = nil
-	auditData.OutcomeSummary = nil
+	auditData.Adoptions = nil
+	auditData.AdoptionSummary = nil
 	auditData.DurableSession = readDurableSessionReport(runOutputDir, run, auditData.DurableSession != nil)
 	if auditData.Retries == nil {
 		auditData.Retries = readAuditRetrySummary(runOutputDir)

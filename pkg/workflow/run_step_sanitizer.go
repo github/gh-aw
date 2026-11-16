@@ -57,7 +57,7 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/typeutil"
-	"github.com/github/gh-aw/pkg/workflow/gradershell"
+	"github.com/github/gh-aw/pkg/workflow/shellanalysis"
 	"github.com/goccy/go-yaml"
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -151,8 +151,8 @@ func runStepUsesShellCodeEvaluation(run string) bool {
 	}
 
 	expressions := ExpressionPattern.FindAllStringSubmatchIndex(run, -1)
-	return gradershell.HasShellCodeEvaluation(tree, func(word *syntax.Word) bool {
-		if _, literal := gradershell.LiteralWord(word); !literal {
+	return shellanalysis.HasShellCodeEvaluation(tree, func(word *syntax.Word) bool {
+		if _, literal := shellanalysis.LiteralWord(word); !literal {
 			return true
 		}
 		start, end := int(word.Pos().Offset()), int(word.End().Offset())

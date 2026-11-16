@@ -27,7 +27,7 @@ Load these additional files only when relevant:
 - [documentation-workflows.md](documentation-workflows.md) for documentation agents, required docs checks, and post-merge page/index upkeep
 - [agent-runtime-instructions.md](agent-runtime-instructions.md) for changes involving Docker, Cloud Hypervisor, ARC DinD, or self-hosted runners
 - [skills.md](skills.md) when the user asks to add specific skills or agent plugins
-- [operational-value-designer](../skills/operational-value-designer/SKILL.md) when updating graders, their evidence contract, or legacy evaluator syntax
+- [operational-value-designer](../skills/operational-value-designer/SKILL.md) when updating graders or their evidence contract
 
 ## Scope
 
@@ -60,7 +60,7 @@ and tests; configure supporting lifecycle permissions, not just Playwright.
 - require `update-release` for agent-generated release notes or release-description changes; never use direct `gh`, API, or GitHub write-tool mutations from the agent
 - when the user asks for specific skills or agent plugins, add them to the top-level `skills:` / `plugins:` frontmatter fields; never add on-the-fly install steps or prompt instructions to install them at run time (see [skills.md](skills.md))
 - migrate custom graders to `graders.<distinct-id>.script`: synchronous JavaScript over immutable `session`, `config`, and `helpers`; reuse `helpers.createSessionLookups(session)` and return a finite number, `null`, or an object with `value`, not a metric array
-- existing repository-owned Bash may retain `graders.operational-value.run`: replace stdin requests with the unified-session JSONL path in `$1` / `GH_AW_SESSION_FILE`, JSON config in `GH_AW_GRADER_CONFIG`, and preserve metric arrays; remove file writes, live fetches, and checkout scans; shell runs only in the separate job and is not yet microVM-isolated
+- migrate `graders.operational-value.run` to `graders.<distinct-id>.script`, translate the predicate to `session`, `config`, and `helpers`, replace metric arrays with one JavaScript result per grader ID, and delete the external shell evaluator
 - never translate legacy Bash/file evaluators by wrapping them in JavaScript I/O; capture evidence before grading and use the compiler-owned isolated `graders` job, never user steps in conclusion
 
 See [workflow-constraints.md](workflow-constraints.md) for the read-only security posture (keep the agent job read-only, route writes through `safe-outputs:`).

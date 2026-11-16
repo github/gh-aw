@@ -38,7 +38,7 @@ Artifact names and checksums identify selected content, not whether that content
 | `prompt` | — | Legacy/back-compat | Historical standalone prompt artifact (`prompt.txt`); in current compiled workflows `prompt.txt` is included in the `activation` artifact instead |
 | `experiment` | `constants.ExperimentArtifactName` | Multi-file | A/B experiment state (`state.json`) uploaded by the activation job when experiments are declared in the frontmatter |
 | `usage` | `constants.UsageArtifactName` | Multi-file | Compact conclusion-job artifact with workflow-run metadata and token-usage files used by lightweight reporting and forecasting paths |
-| `graders` | `constants.GradersArtifactName` | Conditional | Combined built-in and custom results and data-only manifest from the separate `graders` job, generated when JavaScript or operational-value Bash graders are enabled |
+| `graders` | `constants.GradersArtifactName` | Conditional | Combined built-in and custom results and data-only manifest from the separate `graders` job, generated when custom JavaScript graders are enabled |
 | `evals` | `constants.EvalsArtifactName` | Single-file | BinEval evaluation results (`evals.jsonl`) uploaded by the evals job when `evals` are declared in the workflow frontmatter |
 | `safe-outputs-items` | `constants.SafeOutputItemsArtifactName` | Multi-file | Safe output items manifest (`safe-output-items.jsonl`), temporary ID map (`temporary-id-map.json`), and failure diagnostics (`safe-output-errors.json`, written only when the `Process Safe Outputs` step fails) |
 | `code-scanning-sarif` | `constants.SarifArtifactName` | Single-file | SARIF file for code scanning results |
@@ -69,7 +69,7 @@ The `gh aw logs` and `gh aw audit` commands support `--artifacts` to download on
 | `evals` | `usage` | BinEval evaluation results (only present when `evals` are declared) |
 | `graders` | `usage`, `graders`, legacy agent artifacts | Default built-ins and optional combined custom results |
 | `github-api` | `activation`, `agent` | GitHub API rate limit logs |
-| `outcomes` | `safe-outputs-items`, `agent-output-fallback` | Executed safe-output manifests and compact agent output for recovering references omitted from handler results |
+| `adoptions` | `safe-outputs-items`, `agent-output-fallback` | Executed safe-output manifests and compact agent output for live adoption evaluation |
 | `work-queue` | `activation`, `agent` | Queue snapshots, finish intents, and workflow logs for coordinator operation reporting |
 
 ```bash
@@ -402,7 +402,7 @@ contributes zero answers. Keep `UNKNOWN` separate from both `YES` and `NO`.
 
 The conclusion job computes fast built-in graders by default after collecting
 the redacted unified session. Results live under `graders/` in the `usage`
-artifact, alongside `aw_session.jsonl`. Custom JavaScript and operational-value Bash run only in a separate
+artifact, alongside `aw_session.jsonl`. Custom JavaScript runs only in a separate
 downstream job, publishing a standalone `graders` artifact with combined built-in
 and custom results. Neither kind runs in the agent job. The files are:
 

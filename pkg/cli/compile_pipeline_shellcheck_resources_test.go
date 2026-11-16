@@ -12,8 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Graders must not contribute executable shell resources; MCP scripts still do.
-func TestCompileWorkflows_ShellScriptResourcesExcludeGraders(t *testing.T) {
+func TestCompileWorkflows_ShellScriptResourcesIncludeMCPScripts(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, initTestGitRepo(tmpDir))
 

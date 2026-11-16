@@ -226,21 +226,25 @@ safe-outputs:
   create-issue:
 ```
 
-### Outcome
+### Delivery
 
-The observable repository state that follows a [safe output](#safe-outputs). While safe outputs record what a workflow did, outcomes record what happened afterward — whether a pull request was merged, an issue was resolved, or a comment received follow-up activity. Outcome data is based on visible repository state, not on the workflow's self-assessment. See [Outcomes](/gh-aw/reference/outcomes/).
+Trusted evidence that a safe-output handler applied its declared effect. A staged preview, deferred operation, skipped action, failed handler, or indeterminate result is not delivered. Delivery does not by itself establish adoption or operational value.
 
-### Outcome State
+### Adoption
 
-The classification assigned to an evaluated safe output result. The six states are `accepted`, `rejected`, `pending`, `ignored`, `lifecycle`, and `lifecycle_close`. See [Outcomes](/gh-aw/reference/outcomes/) for the exact criteria for each state.
+The normalized acceptance state derived from a safe output's registry rule, its delivery evidence, and any authoritative later repository observation. Adoption states are `accepted`, `rejected`, `pending`, `lifecycle`, `not_applicable`, and `unknown`. Adoption does not by itself establish operational value. See [Adoptions](/gh-aw/reference/adoptions/).
 
-### Accepted Outcome
+### Adoption State
 
-The simplest useful unit for measuring workflow effectiveness. An outcome is accepted when its result was kept, merged, completed, or acted on — for example, a merged pull request, a resolved issue, or a comment that received a reaction or reply. Different output types use type-specific rules to determine acceptance. See [Outcomes](/gh-aw/reference/outcomes/).
+The classification assigned to an evaluated safe output result. The six states are `accepted`, `rejected`, `pending`, `lifecycle`, `not_applicable`, and `unknown`. See [Adoptions](/gh-aw/reference/adoptions/) for the exact criteria for each state.
 
-### Outcome Efficiency
+### Accepted Adoption
 
-A cost-quality metric computed as AI Credits (AIC) divided by accepted outcomes. Lower values indicate the workflow consumed fewer AI Credits per accepted result. Outcome efficiency makes the difference between cost savings from genuine efficiency gains and cost savings from doing less useful work. See [Measuring Impact](/gh-aw/guides/measuring-impact/).
+An adoption is accepted when the registry's delivery fallback applies or authoritative repository evidence shows that the result was kept, merged, completed, or acted on. Different output types use type-specific rules. See [Adoptions](/gh-aw/reference/adoptions/).
+
+### Adoption Efficiency
+
+A cost-quality diagnostic computed as AI Credits (AIC) divided by accepted adoptions. Lower values indicate the workflow consumed fewer AI Credits per accepted result. Adoption efficiency is not operational value. See [Measuring Impact](/gh-aw/guides/measuring-impact/).
 
 ### Pwn Request
 
@@ -1780,11 +1784,11 @@ An optional field under top-level `metadata:` frontmatter holding an absolute HT
 
 ### Graders (`graders:`)
 
-Non-LLM metrics over the redacted unified session. Ten fast built-ins run as pure computation in conclusion, even when `graders:` is omitted. Frontmatter can override thresholds, disable defaults, or opt into other built-ins. Custom JavaScript and repository-owned operational-value Bash run only in the separate graders job. Built-ins use the `usage` artifact; combined custom results use `graders`. See [Graders Reference](/gh-aw/experimental/trace-graders/).
+Non-LLM metrics over the redacted unified session. Ten fast built-ins run as pure computation in conclusion, even when `graders:` is omitted. Frontmatter can override thresholds, disable defaults, or opt into other built-ins. Custom JavaScript runs only in the separate restricted graders job. Built-ins use the `usage` artifact; combined custom results use `graders`. See [Graders Reference](/gh-aw/experimental/trace-graders/).
 
-### Operational Value Grader (`graders.operational-value`)
+### Operational Value Grader (`graders.<distinct-id>.script`)
 
-A repository-owned Bash evaluator configured with `graders.operational-value.run`. It runs only in the separate graders job, reads session JSONL from `$1` / `GH_AW_SESSION_FILE` and config JSON from `GH_AW_GRADER_CONFIG`, and emits legacy metric arrays. Detected file writes are rejected. Shell is trusted code, not yet microVM-isolated. Execution quality metrics alone do not establish operational value.
+A custom JavaScript grader that measures whether one run attained its intended repository or operational effect from recorded unified-session evidence. Configure it with `graders.<distinct-id>.script`; the script runs only in the separate restricted graders job and cannot access files, processes, credentials, or the network. Execution quality, delivery, and adoption alone do not establish operational value.
 
 ### Recurrence Trapping Time (RQA TT) (`graders.recurrence-trapping-time`)
 

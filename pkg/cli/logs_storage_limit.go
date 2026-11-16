@@ -118,14 +118,14 @@ func effectiveLogsMaxStorageMB(maxStorageMB int, explicitlySet bool) int {
 
 func normalizeLogsDownloadOptions(opts LogsDownloadOptions) LogsDownloadOptions {
 	opts.MaxStorageMB = effectiveLogsMaxStorageMB(opts.MaxStorageMB, opts.MaxStorageMBSet)
-	opts.ArtifactSets = logsOutcomeArtifactSets(opts.ArtifactSets, opts.Outcomes)
+	opts.ArtifactSets = logsAdoptionArtifactSets(opts.ArtifactSets, opts.Adoptions)
 	opts.ArtifactSets = logsHarborArtifactSets(opts.ArtifactSets, opts.Harbor)
 	return opts
 }
 
 func normalizeStdinLogsOptions(opts StdinLogsOptions) StdinLogsOptions {
 	opts.MaxStorageMB = effectiveLogsMaxStorageMB(opts.MaxStorageMB, opts.MaxStorageMBSet)
-	opts.ArtifactSets = logsOutcomeArtifactSets(opts.ArtifactSets, opts.Outcomes)
+	opts.ArtifactSets = logsAdoptionArtifactSets(opts.ArtifactSets, opts.Adoptions)
 	opts.ArtifactSets = logsHarborArtifactSets(opts.ArtifactSets, opts.Harbor)
 	return opts
 }
@@ -141,15 +141,19 @@ func (l *logsStorageLimit) usage() (used, maximum int64) {
 
 func logsDirectorySize(path string) (int64, error) {
 	var total int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, walkErr error) error {
+	err := filepath.WalkDir(path, func(_ string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			if errors.Is(walkErr, fs.ErrNotExist) {
 				return nil
 			}
 			return walkErr
 		}
-		if info == nil || !info.Mode().IsRegular() {
+		if entry == nil || !entry.Type().IsRegular() {
 			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
 		}
 		if info.Size() > math.MaxInt64-total {
 			return errors.New("logs directory size exceeds supported maximum")
@@ -194,15 +198,19 @@ func computeLogsCacheStats(path string, fileLimit int) (int64, []logsFolderSize,
 	var totalSize int64
 	var files []logsFileSize
 	fileCount := 0
-	err = filepath.Walk(path, func(filePath string, info os.FileInfo, walkErr error) error {
+	err = filepath.WalkDir(path, func(filePath string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			if errors.Is(walkErr, fs.ErrNotExist) {
 				return nil
 			}
 			return walkErr
 		}
-		if info == nil || !info.Mode().IsRegular() {
+		if entry == nil || !entry.Type().IsRegular() {
 			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
 		}
 		if info.Size() > math.MaxInt64-totalSize {
 			return errors.New("logs directory size exceeds supported maximum")
@@ -229,18 +237,21 @@ func computeLogsCacheStats(path string, fileLimit int) (int64, []logsFolderSize,
 		return 0, nil, nil, 0, err
 	}
 
+	folders, files := finalizeLogsCacheStats(folderSizes, files, fileLimit)
+	return totalSize, folders, files, fileCount, nil
+}
+
+func finalizeLogsCacheStats(folderSizes map[string]int64, files []logsFileSize, fileLimit int) ([]logsFolderSize, []logsFileSize) {
 	folders := make([]logsFolderSize, 0, len(folderSizes))
 	for name, size := range folderSizes {
 		folders = append(folders, logsFolderSize{name: name, size: size})
 	}
 	slices.SortFunc(folders, compareLogsFolderSizeDesc)
-
 	slices.SortFunc(files, compareLogsFileSizeDesc)
 	if len(files) > fileLimit {
 		files = files[:fileLimit]
 	}
-
-	return totalSize, folders, files, fileCount, nil
+	return folders, files
 }
 
 func initialLogsFolderSizes(path string) (map[string]int64, error) {
@@ -358,14 +369,14 @@ func (l *logsStorageLimit) initialize() error {
 	}
 	l.reportStartingUsage(size, folders, files, fileCount)
 	l.usedBytes = size
-	err = filepath.Walk(l.outputDir, func(path string, info os.FileInfo, walkErr error) error {
+	err = filepath.WalkDir(l.outputDir, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			if errors.Is(walkErr, fs.ErrNotExist) {
 				return nil
 			}
 			return walkErr
 		}
-		if info != nil && info.IsDir() && strings.HasPrefix(info.Name(), "run-") {
+		if entry != nil && entry.IsDir() && strings.HasPrefix(entry.Name(), "run-") {
 			l.completed[filepath.Clean(path)] = struct{}{}
 			return filepath.SkipDir
 		}
@@ -572,39 +583,13 @@ func pruneLogsCache(path string, bytesToFree int64, completedPaths map[string]st
 		return 0, nil
 	}
 
-	var candidates []logsPruneCandidate
-	err := filepath.Walk(path, func(candidatePath string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil {
-			if errors.Is(walkErr, fs.ErrNotExist) {
-				return nil
-			}
-			return walkErr
-		}
-		if info != nil && info.IsDir() && info.Name() == harborExportDirectory && harborCheckDestination(candidatePath) == nil {
-			return filepath.SkipDir
-		}
-		if info == nil || !info.Mode().IsRegular() {
-			return nil
-		}
-		if !isInCompletedLogsCachePath(candidatePath, completedPaths) {
-			return nil
-		}
-		relativePath, err := filepath.Rel(path, candidatePath)
-		if err != nil {
-			return err
-		}
-		if isPrunableLogsCacheFile(relativePath) {
-			candidates = append(candidates, logsPruneCandidate{path: candidatePath, size: info.Size()})
-		}
-		return nil
-	})
+	candidates, err := collectLogsPruneCandidates(path, completedPaths)
 	if errors.Is(err, fs.ErrNotExist) {
 		return 0, nil
 	}
 	if err != nil {
 		return 0, err
 	}
-
 	slices.SortFunc(candidates, func(a, b logsPruneCandidate) int {
 		if a.size == b.size {
 			return cmp.Compare(a.path, b.path)
@@ -629,6 +614,40 @@ func pruneLogsCache(path string, bytesToFree int64, completedPaths map[string]st
 		removeEmptyLogsCacheParents(filepath.Dir(candidate.path), path)
 	}
 	return freed, nil
+}
+
+func collectLogsPruneCandidates(path string, completedPaths map[string]struct{}) ([]logsPruneCandidate, error) {
+	var candidates []logsPruneCandidate
+	err := filepath.WalkDir(path, func(candidatePath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if errors.Is(walkErr, fs.ErrNotExist) {
+				return nil
+			}
+			return walkErr
+		}
+		if entry != nil && entry.IsDir() && entry.Name() == harborExportDirectory && harborCheckDestination(candidatePath) == nil {
+			return filepath.SkipDir
+		}
+		if entry == nil || !entry.Type().IsRegular() {
+			return nil
+		}
+		if !isInCompletedLogsCachePath(candidatePath, completedPaths) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		relativePath, err := filepath.Rel(path, candidatePath)
+		if err != nil {
+			return err
+		}
+		if isPrunableLogsCacheFile(relativePath) {
+			candidates = append(candidates, logsPruneCandidate{path: candidatePath, size: info.Size()})
+		}
+		return nil
+	})
+	return candidates, err
 }
 
 func isInCompletedLogsCachePath(path string, completedPaths map[string]struct{}) bool {

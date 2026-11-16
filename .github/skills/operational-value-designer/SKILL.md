@@ -1,9 +1,9 @@
 ---
 name: operational-value-designer
-description: "Design recorded-session outcome metrics using built-ins, isolated JavaScript, or separate-job operational-value Bash. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
+description: "Design recorded-session operational-value metrics using built-ins or isolated JavaScript. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
 argument-hint: "OWNER/REPO WORKFLOW-NAME"
 metadata:
-  version: "2.1.0"
+  version: "3.0.0"
 ---
 
 # Operational Value Designer
@@ -18,9 +18,8 @@ do not substitute activity metrics for operational outcomes.
 Custom metrics use `graders.<distinct-id>.script`: a synchronous JavaScript
 body receiving `session`, `config`, and `helpers`. The compiler runs it only
 in an isolated downstream `graders` job. Never inject user steps into
-`jobs.conclusion` or customize `jobs.graders`. Repository-owned Bash compatibility
-instead uses `graders.operational-value.run` in that same separate job, with the
-session-file contract below. Built-in implementation overrides remain unsupported.
+`jobs.conclusion` or customize `jobs.graders`. Shell-backed graders and `run`
+are unsupported. Built-in implementation overrides remain unsupported.
 
 JavaScript inputs are immutable snapshots. JavaScript graders cannot read files, invoke processes,
 use credentials, fetch evidence, call another model, or use clocks/randomness.
@@ -28,9 +27,9 @@ Reuse `helpers.createSessionLookups(session)` for statistics and lookups.
 Return `null` when required observations are absent; the runtime records
 `unavailable`. Never return the string `"unavailable"` or invent a zero.
 
-Preserve historical evaluator files and prior results unless explicitly
-retiring their workflow configuration. Freeze the workflow's intent and its
-grader acceptance contract together; corrections apply only prospectively.
+Remove legacy evaluator files after migrating their predicate into the workflow
+script. Preserve prior recorded results. Freeze the workflow's intent and grader
+acceptance contract together; corrections apply only prospectively.
 
 ## Design methodology
 
@@ -60,12 +59,15 @@ after the service confirms the operation.
 
 Conclusion records these observations as `safe_output.result` with the normalized
 tool name in `data.type`, the execution status in `data.status`, and an optional
-URI in `data.url`. Failed, cancelled, and skipped jobs do not publish a created
-resource URL. A successful job without a URI proves only successful execution,
-not resource creation; missing identity is unavailable evidence when identity is
-required. Filter for successful outcomes before counting resources. Historical
-events without status remain legacy observations, not newly verified outcomes.
-Prepared work-queue adapters still require their independent effect verification.
+URI in `data.url`. The event also carries normalized delivery and initial
+adoption fields from the versioned safe-output registry. Failed, cancelled, and
+skipped jobs do not publish a created resource URL. A successful job without a
+URI proves only successful execution, not resource creation; missing identity is
+unavailable evidence when identity is required. Filter for delivered effects
+before counting resources. Adoption is accepted evidence about the safe output,
+not operational value by itself. Older events without status are not newly
+verified deliveries. Prepared work-queue adapters still require their
+independent effect verification.
 
 ## Deliverables
 
@@ -121,81 +123,14 @@ script through the restricted custom-grader runtime, not an unrestricted
 
 Before implementation, summarize the design in a compact table containing the ultimate goal, outcome ladder, selected measurable effect, why stronger downstream effects are unavailable, primary metric and formula, applicability, success evidence, zero condition, null condition, noop interpretation, adoption point, and required recorded observations. Surface unresolved ambiguity instead of hiding it in code.
 
-### Existing Bash evaluators
+### Migrating shell evaluators
 
-Retain a repository-owned Bash evaluator when migrating its input is simpler
-than rewriting its domain logic:
-
-```yaml
-graders:
-  operational-value:
-    run: .github/graders/WORKFLOW-NAME-operational-value.sh
-    unit: boolean
-    direction: higher_is_better
-    threshold: 1
-    config:
-      repository: OWNER/REPO
-      issueNumber: 123
-```
-
-`run` is a confined `.sh` path, not an inline command. Root-relative paths resolve
-from the repository; `./` resolves from the declaring workflow. Source must be
-UTF-8, start with a Bash shebang, and fit within **64 KiB (65,536 UTF-8 bytes,
-inclusive)**. Compilation freezes the bytes into the separate graders job,
-never conclusion; evaluating the frozen script needs no source checkout.
-
-Refactor legacy stdin-request reads to session JSONL in `$1` /
-`GH_AW_SESSION_FILE`, and parse JSON configuration from `GH_AW_GRADER_CONFIG`.
-Stdin is empty. Replace legacy `.run`, `.event`, and `.outputs` wrapper
-assumptions with recorded unified events. For example, the same narrow target
-binding predicate above can retain its Bash metric-array output:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-session_file=$1
-jq -s --argjson config "$GH_AW_GRADER_CONFIG" '
-  def repository: type == "string" and test("\\S");
-  def issue: type == "number" and . >= 1 and floor == .;
-  [.[] | select(.type == "safe_output.result" and .data.type == "add_comment") | .data] as $comments
-  | if (($config.repository | repository) and ($config.issueNumber | issue) | not)
-       or ($comments | length == 0)
-       or any($comments[];
-         ((.repo | repository) and (.number | issue) and (.url | type == "string" and length > 0) | not))
-    then null
-    elif all($comments[]; .repo == $config.repository and .number == $config.issueNumber)
-    then 1 else 0 end
-  | [{id: "comment-target-match", value: .}]
-' "$session_file"
-```
-
-Keep a nonempty ordered array of unique `{id,value}` metrics. The first value
-supplies the canonical `operational-value` result; remaining metrics become
-diagnostics, and the complete `metrics` array is retained. Values are finite
-numbers or `null`; IDs and order remain stable across fixtures. Other custom
-IDs accept only JavaScript `script`, not `run`.
-
-Remove temporary-file writes, live API calls, checkout scans, and sourced
-helpers. Read only the session and compute in memory, then print metrics.
-Compiler validation and the default `grader-shell-file-write` rule parse Bash
-ASTs and reject detected writes and unchecked dynamic execution, even in disabled
-definitions. `gh aw lint --rules grader-shell-file-write WORKFLOW.md` requires no
-optional JavaScript parser.
-
-Bash starts without profiles or inherited credentials, in a temporary working
-directory, with a 120-second deadline and 1 MiB output cap. It is **trusted
-repository code**, not a filesystem/network sandbox. MicroVM isolation is
-future work. Static lint is not proof of arbitrary shell safety. Never execute
-session text as code or turn absent evidence into a successful score.
-
-Verify shell fixtures through
-`scripts/verify-operational-value-evaluator.sh EVALUATOR.sh FIXTURES.json`.
-Fixtures use `{name, session, config, expected}`: `session` is a unified-event
-array, `config` is data-only, and `expected` is the exact metric array. Include
-attained, missed, unavailable, and malformed-evidence cases. The helper invokes
-the same bounded Bash runtime as workflow execution and repeats each fixture.
-Use malformed recorded evidence inside valid unified events, not an invalid
-session envelope. Compile/lint separately to validate source paths and writes.
+Replace `graders.operational-value.run` with an inline JavaScript `script`.
+Translate the predicate over session JSONL into the `session`, `config`, and
+`helpers` contract. Return the primary finite number, `null`, or one result
+object; move independently useful diagnostics into separate grader IDs or the
+result object's `diagnostics`. Delete the external `.sh` evaluator and its
+metric-array fixtures after equivalent restricted-runtime fixtures pass.
 
 ## Design Procedure
 
@@ -223,14 +158,11 @@ Write two sentences before choosing a metric:
 
 If either sentence cannot be completed from authoritative workflow content and available evidence, stop and report the ambiguity instead of inventing a metric.
 
-Translate the sentence into a function before writing either implementation:
+Translate the sentence into a function before writing the script:
 
 ```text
 f(session, config, helpers) -> finite number | null | {value, ...}
 ```
-
-Bash encodes the same predicate over session JSONL and returns a metric array;
-the shell interface does not authorize additional evidence sources.
 
 For every input, the function must define whether the run was applicable and whether the result is attained, missed, correctly restrained, or unavailable. The implementation should be a direct encoding of this function.
 
@@ -378,7 +310,7 @@ Set `direction` to `higher_is_better` or `lower_is_better` according to the metr
 Freeze the metric prospectively to prevent hindsight bias:
 
 - choose the formula, thresholds, evidence rules, and fixtures before inspecting any scored outcomes;
-- commit the workflow intent, inline `script` or referenced Bash evaluator, data configuration, and semantic fixtures together; that commit is the adoption point for the contract;
+- commit the workflow intent, inline `script`, data configuration, and semantic fixtures together; that commit is the adoption point for the contract;
 - treat the evaluator as read-only while the workflow's intent and acceptance criteria are unchanged;
 - when those workflow semantics change, update the workflow and its grader together at the same workflow path and commit; the new contract applies only to future runs;
 - allow an evaluator-only defect correction only prospectively, without changing or regrading prior results;
@@ -446,12 +378,6 @@ metadata, not executable source. Audit optionally downloads registered custom
 results. `gh aw logs --graders` or `--artifacts graders` includes both artifacts.
 Custom results do not rewrite conclusion's session.
 
-For Bash, replay with `gh aw graders run WORKFLOW-NAME operational-value`.
-`verify-operational-value-evaluator.sh` validates session-file fixtures through
-the actual shell runtime. `verify-operational-value-contract-change.sh BASE-REF`
-checks evaluator/workflow pairing; use `--correction` only for an explicit
-prospective defect fix. These shell helpers do not validate inline JavaScript.
-
 Review the design against these checks:
 
 - The intent sentence describes an outcome, not activity.
@@ -472,6 +398,6 @@ Review the design against these checks:
 - Diagnostics are independently useful and do not duplicate the primary metric.
 - The workflow and evaluator were adopted together, and neither the function nor prior results were changed retroactively.
 - External research, if used, changed a definition rather than adding prestige or complexity.
-- The evaluator uses only supplied session evidence and configuration; JavaScript performs no I/O, and Bash reads the session file without writes or live evidence fetches.
-- JavaScript returns a finite number, `null`, or an object containing `value`; Bash returns the stable legacy metric array.
+- The evaluator uses only supplied session evidence and configuration; JavaScript performs no I/O.
+- JavaScript returns a finite number, `null`, or an object containing `value`.
 - Exact fixtures prove attained scores above missed, unavailable and malformed evidence return the declared result, and repeated evaluation is deterministic.

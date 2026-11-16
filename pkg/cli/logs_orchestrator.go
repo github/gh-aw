@@ -328,14 +328,14 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 		collectionErr := err
 		defer func() { err = errors.Join(err, collectionErr) }()
 	}
-	var outcomeReports []OutcomesData
+	var adoptionReports []AdoptionsData
 	if opts.Harbor {
 		if err := exportLogsHarbor(ctx, opts.OutputDir, result.processedRuns, opts.AdditionalGraders); err != nil {
 			return fmt.Errorf("harbor export: %w", err)
 		}
 	}
-	if opts.Outcomes {
-		outcomeReports, err = collectLogsOutcomes(ctx, result.processedRuns, opts.OutcomesDir, opts.Verbose)
+	if opts.Adoptions {
+		adoptionReports, err = collectLogsAdoptions(ctx, result.processedRuns, opts.AdoptionsDir, opts.Verbose)
 		if err != nil {
 			return err
 		}
@@ -349,10 +349,10 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 		return err
 	}
 
-	return renderCollectedWorkflowLogs(result, opts, apiRateLimit, outcomeReports)
+	return renderCollectedWorkflowLogs(result, opts, apiRateLimit, adoptionReports)
 }
 
-func renderCollectedWorkflowLogs(result workflowLogsResult, opts LogsDownloadOptions, apiRateLimit *GitHubAPIRateLimitReport, outcomeReports []OutcomesData) error {
+func renderCollectedWorkflowLogs(result workflowLogsResult, opts LogsDownloadOptions, apiRateLimit *GitHubAPIRateLimitReport, adoptionReports []AdoptionsData) error {
 	renderOpts := newRenderLogsOutputOptions(opts, result.artifactFilter)
 	renderOpts.continuation = result.continuation
 	renderOpts.startDate = opts.StartDate
@@ -362,7 +362,7 @@ func renderCollectedWorkflowLogs(result workflowLogsResult, opts LogsDownloadOpt
 	renderOpts.suppressRender = opts.SuppressRender
 	renderOpts.apiRateLimit = apiRateLimit
 	renderOpts.cachedJSONLWriter = opts.cachedJSONLWriter
-	renderOpts.outcomeReports = outcomeReports
+	renderOpts.adoptionReports = adoptionReports
 	return renderLogsOutput(result.processedRuns, renderOpts)
 }
 

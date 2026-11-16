@@ -153,14 +153,18 @@ func renderCompactLogsSummary(w *compactLogsWriter, s LogsSummary) {
 		}
 		summaryParts = append(summaryParts, "engines="+strings.Join(parts, ","))
 	}
-	// Outcome metrics if available
-	if s.OutcomeAccepted > 0 || s.OutcomeRejected > 0 {
+	// Adoption metrics if available
+	if s.AdoptionTotal > 0 {
 		summaryParts = append(summaryParts,
-			"accepted="+strconv.Itoa(s.OutcomeAccepted),
-			"rejected="+strconv.Itoa(s.OutcomeRejected),
+			"accepted="+strconv.Itoa(s.AdoptionAccepted),
+			"rejected="+strconv.Itoa(s.AdoptionRejected),
+			"pending="+strconv.Itoa(s.AdoptionPending),
+			"lifecycle="+strconv.Itoa(s.AdoptionLifecycle),
+			"not_applicable="+strconv.Itoa(s.AdoptionNotApplicable),
+			"unknown="+strconv.Itoa(s.AdoptionUnknown),
 		)
-		if s.OutcomeAcceptanceRate > 0 {
-			summaryParts = append(summaryParts, "acceptance="+fmt.Sprintf("%.0f%%", s.OutcomeAcceptanceRate*100))
+		if s.AdoptionAcceptanceRate > 0 {
+			summaryParts = append(summaryParts, "acceptance="+fmt.Sprintf("%.0f%%", s.AdoptionAcceptanceRate*100))
 		}
 	}
 	w.printf("[summary] %s\n", strings.Join(summaryParts, " "))
@@ -374,18 +378,20 @@ func renderCompactLogsVerboseSummary(w *compactLogsWriter, s LogsSummary) {
 		}
 		summaryParts = append(summaryParts, "engines="+strings.Join(parts, ","))
 	}
-	if s.OutcomeAccepted > 0 || s.OutcomeRejected > 0 {
+	if s.AdoptionTotal > 0 {
 		summaryParts = append(summaryParts,
-			"accepted="+strconv.Itoa(s.OutcomeAccepted),
-			"rejected="+strconv.Itoa(s.OutcomeRejected),
-			"ignored="+strconv.Itoa(s.OutcomeIgnored),
-			"pending="+strconv.Itoa(s.OutcomePending),
+			"accepted="+strconv.Itoa(s.AdoptionAccepted),
+			"rejected="+strconv.Itoa(s.AdoptionRejected),
+			"pending="+strconv.Itoa(s.AdoptionPending),
+			"lifecycle="+strconv.Itoa(s.AdoptionLifecycle),
+			"not_applicable="+strconv.Itoa(s.AdoptionNotApplicable),
+			"unknown="+strconv.Itoa(s.AdoptionUnknown),
 		)
-		if s.OutcomeAcceptanceRate > 0 {
-			summaryParts = append(summaryParts, "acceptance="+fmt.Sprintf("%.0f%%", s.OutcomeAcceptanceRate*100))
+		if s.AdoptionAcceptanceRate > 0 {
+			summaryParts = append(summaryParts, "acceptance="+fmt.Sprintf("%.0f%%", s.AdoptionAcceptanceRate*100))
 		}
-		if s.OutcomeWasteRate > 0 {
-			summaryParts = append(summaryParts, "waste="+fmt.Sprintf("%.0f%%", s.OutcomeWasteRate*100))
+		if s.AdoptionWasteRate > 0 {
+			summaryParts = append(summaryParts, "waste="+fmt.Sprintf("%.0f%%", s.AdoptionWasteRate*100))
 		}
 	}
 	w.printf("[summary] %s\n", strings.Join(summaryParts, " "))

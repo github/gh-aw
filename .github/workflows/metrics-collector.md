@@ -301,13 +301,13 @@ If you see any `.md` files at the root (e.g. `agent-performance-latest.md`, `sha
 - Extract typed safe-output counts as well:
   - `safe_outputs_by_type`: aggregate usage activity `safe_outputs.items_by_type` from each run
     (for example `create_issue`, `create_pull_request`, `add_comment`, `create_discussion`)
-  - `safe_output_outcomes`: aggregate outcome fields from logs summaries and outcome reports:
-    `accepted`, `rejected`, `ignored`, `pending`, `lifecycle`, and `lifecycle_close`
+  - `safe_output_adoptions`: aggregate `.adoptions[].summary` from logs reports:
+    `accepted`, `rejected`, `pending`, `lifecycle`, `not_applicable`, and `unknown`
   - Never leave these fields absent; use empty objects/zero counts only when the full data source
     was checked and no matching items exist.
 - **If the accumulated log batches still do not cover the full 24h window** (i.e. the oldest run
   collected is newer than 24h ago), do **not** report `safe_outputs`, `safe_outputs_by_type`, or
-  `safe_output_outcomes` as zero. Instead compute safe-output counts from the GitHub API fallback
+  `safe_output_adoptions` as zero. Instead compute safe-output counts from the GitHub API fallback
   described below and mark the source accordingly.
 
 **Safe Outputs Fallback (GitHub API)**:
@@ -324,8 +324,8 @@ API instead of zeroing them:
 Attribute each result to a workflow and type via its `gh-aw-workflow-call-id` footer marker and
 item shape, aggregate the counts per workflow, and set `"safe_outputs_source":
 "github_api_fallback"` alongside a `collection_note` explaining the truncation. When API fallback
-cannot determine outcome status, set those items to `"pending"` rather than omitting the
-`safe_output_outcomes` breakdown. The same fallback applies to `engagement` fields.
+cannot determine adoption status, set those items to `"unknown"` rather than omitting the
+`safe_output_adoptions` breakdown. The same fallback applies to `engagement` fields.
 
 **Workflow Runs Fallback (GitHub API)**:
 
@@ -382,13 +382,13 @@ Create a JSON object following this schema:
         "add_comment": 10,
         "create_discussion": 1
       },
-      "safe_output_outcomes": {
+      "safe_output_adoptions": {
         "accepted": 9,
         "rejected": 1,
-        "ignored": 2,
         "pending": 6,
         "lifecycle": 0,
-        "lifecycle_close": 0
+        "not_applicable": 2,
+        "unknown": 0
       },
       "workflow_runs": {
         "total": 7,
@@ -424,13 +424,13 @@ Create a JSON object following this schema:
       "add_comment": 15,
       "create_discussion": 2
     },
-    "safe_output_outcomes": {
+    "safe_output_adoptions": {
       "accepted": 24,
       "rejected": 5,
-      "ignored": 6,
       "pending": 10,
       "lifecycle": 0,
-      "lifecycle_close": 0
+      "not_applicable": 6,
+      "unknown": 0
     },
     "overall_success_rate": 0.892,
     "total_tokens": 1250000,

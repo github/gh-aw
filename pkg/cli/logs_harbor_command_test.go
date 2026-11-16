@@ -19,7 +19,7 @@ import (
 func TestLogsHarborOptions(t *testing.T) {
 	for _, args := range [][]string{
 		{"--harbor", "--output", "harbor-job"},
-		{"--harbor", "--artifacts", "detection", "--graders", "--outcomes", "--engine", "copilot"},
+		{"--harbor", "--artifacts", "detection", "--graders", "--adoptions", "--engine", "copilot"},
 	} {
 		cmd := NewLogsCommand()
 		require.NoError(t, cmd.ParseFlags(args))
@@ -36,19 +36,19 @@ func TestLogsHarborOptions(t *testing.T) {
 		if len(args) == 3 {
 			require.Equal(t, "harbor-job", options.OutputDir)
 			require.False(t, options.GradersOnly)
-			require.False(t, options.Outcomes)
+			require.False(t, options.Adoptions)
 		} else {
 			require.Contains(t, options.ArtifactSets, "detection")
-			require.Contains(t, options.ArtifactSets, "outcomes")
+			require.Contains(t, options.ArtifactSets, "adoptions")
 			require.True(t, options.GradersOnly)
-			require.True(t, options.Outcomes)
+			require.True(t, options.Adoptions)
 			require.Equal(t, "copilot", options.Engine)
 		}
 	}
 	cmd := NewLogsCommand()
 	require.Contains(t, cmd.Example, "logs --harbor --output ./my-logs")
 	require.Contains(t, cmd.Long, "portable Harbor job to DIR/harbor")
-	require.Contains(t, cmd.Long, "does not run graders or evaluate outcomes")
+	require.Contains(t, cmd.Long, "does not run graders or evaluate adoptions")
 	opts, err := loadCommonLogsOptions(cmd)
 	require.NoError(t, err)
 	require.False(t, opts.Harbor)
@@ -63,7 +63,7 @@ func TestLogsHarborArtifactNormalization(t *testing.T) {
 		require.Equal(t, opts.ArtifactSets, stdin.ArtifactSets)
 		require.Equal(t, opts, normalizeLogsDownloadOptions(opts), "normalization must be idempotent")
 		require.False(t, opts.GradersOnly)
-		require.False(t, opts.Outcomes)
+		require.False(t, opts.Adoptions)
 		require.False(t, cachedJSONLCanSatisfy(ResolveArtifactFilter(opts.ArtifactSets), false, false, false),
 			"compact metadata cannot supply Harbor session artifacts")
 		if len(sets) == 0 || sets[0] == "all" {

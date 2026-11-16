@@ -1,9 +1,0 @@
----
-"gh-aw": patch
----
-
-Make `gh aw logs --outcomes` the live outcome-evaluation entry point. Remove the scheduled collector and duplicate JavaScript evaluators, stop evaluating live outcomes during audit, and have the impact report consume CLI classifications. Preserve dispatched run IDs and destination repositories, and use the linked agent PR's repository for assignment outcomes.
-
-Keep ambiguous legacy workflow calls in separate episodes and make conflicting lineage deterministic. Populate AIC per accepted outcome from full observed run usage, including detection, independently of agent-only caches. Warn on unavailable usage without discarding evaluated outcomes.
-
-Expose parent repository, run, attempt, workflow, call identity, and event type from `aw_context` in unified session episode metadata. Record the executing workflow's compiler-owned identity separately from the caller's workflow reference. Add the current `workflow_call_id` to `aw_info.json` and preserve it as `workflowCallId` in the unified session. Preserve the current run attempt and legacy lineage inputs.

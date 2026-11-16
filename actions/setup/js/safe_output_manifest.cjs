@@ -5,13 +5,13 @@ const fs = require("fs");
 const nodePath = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
-const { buildSafeOutputOutcomes } = require("./safe_output_outcomes.cjs");
+const { buildSafeOutputDeliveries } = require("./safe_output_deliveries.cjs");
 const { MANIFEST_FILE_PATH, TEMPORARY_ID_MAP_FILE_PATH, SAFE_OUTPUT_ERRORS_FILE_PATH } = require("./constants.cjs");
 const { redactBuiltInPatterns, redactSecrets, extractMCPGatewayTokens, MCP_GATEWAY_CONFIG_PATHS } = require("./redact_secrets.cjs");
 const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentity, assertClaimArtifactDirectory, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
 
 const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
-const SAFE_OUTPUT_OUTCOMES_FILE_NAME = "safe-output-outcomes.jsonl";
+const SAFE_OUTPUT_DELIVERIES_FILE_NAME = "safe-output-deliveries.jsonl";
 const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
 const MERGE_PRODUCER_FAILURE_CODES = new Set(["required_check_producer_missing", "required_check_producer_mismatch", "required_check_producer_ambiguous"]);
 const MERGE_FAILURE_CODES = new Set([
@@ -152,15 +152,15 @@ function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath
 }
 
 /** @param {any[]} results @param {boolean} staged @param {string} [filePath] */
-function writeSafeOutputOutcomes(results, staged, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), SAFE_OUTPUT_OUTCOMES_FILE_NAME)) {
+function writeSafeOutputDeliveries(results, staged, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), SAFE_OUTPUT_DELIVERIES_FILE_NAME)) {
   try {
     const destination = scopedArtifactFile(filePath);
     fs.mkdirSync(nodePath.dirname(destination), { recursive: true });
     const secretValues = collectArtifactSecretValues();
-    const entries = buildSafeOutputOutcomes(results, staged).map(entry => redactManifestValue(entry, secretValues));
+    const entries = buildSafeOutputDeliveries(results, staged).map(entry => redactManifestValue(entry, secretValues));
     fs.appendFileSync(destination, entries.map(entry => JSON.stringify(entry)).join("\n") + (entries.length ? "\n" : ""), { mode: 0o600 });
   } catch (error) {
-    throw new Error(`${ERR_SYSTEM}: Failed to persist safe-output application outcomes`, { cause: error });
+    throw new Error(`${ERR_SYSTEM}: Failed to persist safe-output deliveries`, { cause: error });
   }
 }
 
@@ -253,7 +253,7 @@ const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing
 /**
  * @typedef {Object} ManifestEntry
  * @property {string} type - The safe output type (e.g., "create_issue")
- * @property {"success"} [status] - Execution outcome, present only for explicit successful handler results
+ * @property {"success"} [status] - Delivery status, present only for explicit successful handler results
  * @property {string} [url] - Canonical resource URI returned by the handler (not inferred from the request)
  * @property {number} [number] - Issue/PR/discussion number if applicable
  * @property {string} [repo] - Repository slug (owner/repo) if applicable
@@ -263,7 +263,7 @@ const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing
  * @property {Object} [target] - Entity associated with this operation
  * @property {Array<{name: string, database_id?: number, node_id?: string}>} [labels] - Labels added by this operation
  * @property {string} [temporaryId] - Temporary ID assigned to this item, if any
- * @property {Record<string, any>} [metadata] - Persisted outcome metadata captured at execution time
+ * @property {Record<string, any>} [metadata] - Persisted delivery metadata captured at execution time
  * @property {Object} [before_state] - Execution-time state snapshot captured before mutation
  * @property {Object} [after_state] - Execution-time state snapshot captured after mutation
  * @property {string[]} [labelsAdded] - Labels added by add_labels handler
@@ -419,7 +419,7 @@ function extractCreatedItemFromResult(type, result) {
     return null;
   }
 
-  // Non-applied outcomes must not be counted as created resources, even with a URL.
+  // Non-applied deliveries must not be counted as created resources, even with a URL.
   if (result.success === false || result.staged === true || result.skipped === true || result.deferred === true || result.cancelled === true || result.deferred_manifest === true || result.delegated === true) return null;
 
   // Normalize URL from different result shapes (present for creation types)
@@ -579,6 +579,6 @@ module.exports = {
   extractCreatedItemFromResult,
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
-  writeSafeOutputOutcomes,
+  writeSafeOutputDeliveries,
   writeMergePullRequestDecision,
 };

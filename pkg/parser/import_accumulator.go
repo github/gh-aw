@@ -36,7 +36,6 @@ type importAccumulator struct {
 	pluginObjects            []map[string]any
 	safeOutputs              []string
 	gradersBuilder           strings.Builder
-	graderRunSources         map[string]string
 	mcpScripts               []string
 	bots                     []string
 	botsSet                  map[string]bool
@@ -117,7 +116,6 @@ func newImportAccumulator() *importAccumulator {
 		sandboxAgentMountsSet:   make(map[string]bool),
 		excludedEnvSet:          make(map[string]bool),
 		actionPinSourceVersions: make(map[string]string),
-		graderRunSources:        make(map[string]string),
 	}
 }
 
@@ -143,7 +141,6 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedPluginObjects:           acc.pluginObjects,
 		MergedSafeOutputs:             acc.safeOutputs,
 		MergedGraders:                 acc.gradersBuilder.String(),
-		GraderRunSources:              acc.graderRunSources,
 		MergedMCPScripts:              acc.mcpScripts,
 		MergedMarkdown:                acc.markdownBuilder.String(),
 		ImportPaths:                   acc.importPaths,

@@ -6,7 +6,7 @@ const { runBuiltinGrader } = require("./trace_graders.cjs");
 const input = JSON.parse(fs.readFileSync(0, "utf8"));
 const grader = input.grader;
 let result;
-if (grader.source === "inline" || grader.source === "operational-value") {
+if (grader.source === "inline") {
   const { runCustomGraders } = require("./custom_graders.cjs");
   result = runCustomGraders(input.payload, [grader]).output.results.find(result => result.id === grader.id);
 } else if (grader.source === "builtin" && !Object.hasOwn(grader, "script")) {

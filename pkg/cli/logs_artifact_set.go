@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -77,9 +76,9 @@ const (
 	// conclusion job (aw-info.jsonl, usage summaries, token usage JSONL).
 	ArtifactSetUsage ArtifactSet = "usage"
 
-	// ArtifactSetOutcomes downloads executed safe-output manifests and compact
+	// ArtifactSetAdoptions downloads executed safe-output manifests and compact
 	// agent output used to recover references omitted from handler results.
-	ArtifactSetOutcomes ArtifactSet = "outcomes"
+	ArtifactSetAdoptions ArtifactSet = "adoptions"
 
 	// ArtifactSetGraders downloads the artifacts that carry grader results
 	// (grader_results.json): built-ins in usage, combined custom results from the
@@ -113,8 +112,8 @@ var artifactSetArtifacts = map[ArtifactSet][]string{
 	// also carries a copy of the state and assignments staged by the conclusion job.
 	ArtifactSetExperiment: {constants.ExperimentArtifactName.String(), constants.UsageArtifactName.String()},
 	// usage: compact conclusion artifact for lightweight reporting/forecasting.
-	ArtifactSetUsage:    {constants.UsageArtifactName.String()},
-	ArtifactSetOutcomes: {constants.SafeOutputItemsArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
+	ArtifactSetUsage:     {constants.UsageArtifactName.String()},
+	ArtifactSetAdoptions: {constants.SafeOutputItemsArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
 	// evals: evals results are now included in the usage artifact.
 	ArtifactSetEvals: {constants.UsageArtifactName.String()},
 	// graders: conclusion publishes built-ins in usage; the separate graders job
@@ -147,7 +146,7 @@ func ValidArtifactSetNames() []string {
 	for k := range artifactSetArtifacts {
 		names = append(names, string(k))
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }
 

@@ -50,7 +50,7 @@ Implementations claiming conformance MUST identify the version and conformance c
 10. [Span and Event Contracts](#10-span-and-event-contracts)
 11. [Metrics Contract](#11-metrics-contract)
 12. [Logs Contract](#12-logs-contract)
-13. [Outcome Evaluation](#13-outcome-evaluation)
+13. [Adoption Evaluation](#13-adoption-evaluation)
 14. [Local Mirrors and Artifacts](#14-local-mirrors-and-artifacts)
 15. [Security and Privacy](#15-security-and-privacy)
 16. [Reliability and Failure Handling](#16-reliability-and-failure-handling)
@@ -82,7 +82,7 @@ This specification covers:
 - W3C Trace Context propagation across jobs, child workflows, containers, HTTP, JSON-RPC, and MCP;
 - CI/CD, GenAI, MCP, HTTP, RPC, and repository-specific telemetry attributes;
 - trace, metric, log, and local-mirror contracts;
-- outcome evaluation and long-lived correlation;
+- adoption evaluation and long-lived correlation;
 - security, privacy, cardinality, and reliability requirements.
 
 This specification does not define vendor-specific dashboards, retention policies, model-quality algorithms, backend pricing formulas, or a requirement to use a particular OpenTelemetry backend.
@@ -556,7 +556,7 @@ Internal policy evaluation, routing, filtering, and DIFC processing SHOULD use `
 
 Span names MUST be low cardinality and MUST NOT contain run IDs, commit SHAs, issue or pull-request numbers, user input, prompt text, URLs with unbounded paths or query strings, or error messages.
 
-Span links SHOULD be used instead of parent-child relationships when outcome evaluation occurs substantially after the originating run, an asynchronous child workflow starts after the parent span has ended, one operation is causally related to several originating operations, or preserving the original parent would create false temporal containment.
+Span links SHOULD be used instead of parent-child relationships when adoption evaluation occurs substantially after the originating run, an asynchronous child workflow starts after the parent span has ended, one operation is causally related to several originating operations, or preserving the original parent would create false temporal containment.
 
 ---
 
@@ -686,9 +686,9 @@ A Level 3 implementation SHOULD emit the following custom metrics:
 |---|---|---|---|
 | `gh_aw.agent.turns` | Histogram | `{turn}` | Agent turns per completed agent invocation. |
 | `gh_aw.workflow.output.items` | Counter | `{item}` | Safe output items produced. |
-| `gh_aw.outcome.evaluations` | Counter | `{evaluation}` | Outcome evaluations grouped by bounded result and item type. |
-| `gh_aw.outcome.resolution.duration` | Histogram | `s` | Time from item creation to terminal resolution. |
-| `gh_aw.outcome.zero_touch` | Counter | `{item}` | Accepted items requiring no recorded human interaction. |
+| `gh_aw.adoption.evaluations` | Counter | `{evaluation}` | Adoption evaluations grouped by bounded result and item type. |
+| `gh_aw.adoption.resolution.duration` | Histogram | `s` | Time from item creation to terminal resolution. |
+| `gh_aw.adoption.zero_touch` | Counter | `{item}` | Accepted items requiring no recorded human interaction. |
 | `gh_aw.otlp.export.failures` | Counter | `{failure}` | Failed export attempts grouped by endpoint class and failure class. |
 | `gh_aw.ai.credits.usage` | Counter | `{credit}` | AI credits consumed when a stable credit definition exists. |
 
@@ -712,9 +712,9 @@ Each log SHOULD include timestamp, observed timestamp when applicable, severity,
 
 ### 12.2 Required Log Categories
 
-A Level 3 implementation SHOULD produce structured logs for exporter failures and retries, invalid or missing trace context, model-client errors, malformed model or tool output, policy and guardrail decisions, MCP protocol errors, artifact and mirror write failures, and outcome-evaluation diagnostics.
+A Level 3 implementation SHOULD produce structured logs for exporter failures and retries, invalid or missing trace context, model-client errors, malformed model or tool output, policy and guardrail decisions, MCP protocol errors, artifact and mirror write failures, and adoption-evaluation diagnostics.
 
-Recommended event names include `gh_aw.export.failure`, `gh_aw.export.retry`, `gh_aw.context.invalid`, `gh_aw.agent.error`, `gh_aw.model.error`, `gh_aw.tool.error`, `gh_aw.policy.decision`, `gh_aw.outcome.evaluation`, and `gh_aw.mirror.write_failure`.
+Recommended event names include `gh_aw.export.failure`, `gh_aw.export.retry`, `gh_aw.context.invalid`, `gh_aw.agent.error`, `gh_aw.model.error`, `gh_aw.tool.error`, `gh_aw.policy.decision`, `gh_aw.adoption.evaluation`, and `gh_aw.mirror.write_failure`.
 
 ### 12.3 Correlation
 
@@ -768,29 +768,31 @@ MUST NOT be retried after authorization failures.
 
 ---
 
-## 13. Outcome Evaluation
+## 13. Adoption Evaluation
 
 ### 13.1 Separate Evaluation Execution
 
-Outcome evaluation runs through `gh aw logs --outcomes` after the source workflow. The command returns JSON and optional JSONL; it does not emit outcome spans. A downstream exporter that converts these records to OpenTelemetry SHOULD create its own trace.
+Adoption evaluation runs through `gh aw logs --adoptions` after the source workflow. The command returns JSON and optional JSONL; it does not emit adoption spans. A downstream exporter that converts these records to OpenTelemetry SHOULD create its own trace.
 
 It MUST NOT extend the original workflow trace across hours or days when doing so would create false temporal containment.
 
 ### 13.2 Source Correlation
 
-Each outcome-evaluation span SHOULD contain a span link to the originating workflow root context when that context was persisted.
+Each adoption-evaluation span SHOULD contain a span link to the originating workflow root context when that context was persisted.
 
-When a full span context is unavailable, the evaluation span SHOULD include `gh-aw.outcome.source_run_id`, `gh-aw.outcome.source_workflow`, and `gh-aw.outcome.repo`.
+When a full span context is unavailable, the evaluation span SHOULD include `gh-aw.adoption.source_run_id`, `gh-aw.adoption.source_workflow`, and `gh-aw.adoption.repo`.
 
-For compatibility with existing processors, implementations MAY additionally emit `gh-aw.outcome.repository` as an alias. New implementations SHOULD prefer `gh-aw.outcome.repo` for consistency with `specs/safe-output-outcome-evaluation.md`.
+For compatibility with existing processors, implementations MAY additionally emit `gh-aw.adoption.repository` as an alias. New implementations SHOULD prefer `gh-aw.adoption.repo` for consistency with `specs/safe-output-adoption-evaluation.md`.
 
 ### 13.3 Evaluation Span and Metrics
 
-The span SHOULD be named `gh-aw.outcome.evaluate` and use `INTERNAL` span kind.
+The span SHOULD be named `gh-aw.adoption.evaluate` and use `INTERNAL` span kind.
 
-It SHOULD include `gh-aw.outcome.type`, `gh-aw.outcome.result`, `gh-aw.outcome.source_run_id`, `gh-aw.outcome.source_workflow`, and `gh-aw.outcome.repo`.
+It SHOULD include `gh-aw.adoption.type`, `gh-aw.adoption.result`, `gh-aw.adoption.source_run_id`, `gh-aw.adoption.source_workflow`, and `gh-aw.adoption.repo`.
 
-`gh-aw.outcome.result` SHOULD use the canonical outcome taxonomy defined in `specs/safe-output-outcome-evaluation.md` (`accepted`, `rejected`, `ignored`, `pending`, `lifecycle`, `lifecycle_close`).
+`gh-aw.adoption.result` SHOULD use the canonical adoption taxonomy defined in
+`specs/safe-output-adoption-evaluation.md` (`accepted`, `rejected`, `pending`,
+`lifecycle`, `not_applicable`, `unknown`).
 
 URLs and item identifiers MUST NOT be metric dimensions.
 
@@ -924,7 +926,7 @@ The following requirements apply to every runtime span emitter that consumes `GH
 
 Endpoint resolution and credential filtering MUST complete before fan-out. Eligible endpoint requests MAY run concurrently; retries remain bounded per endpoint. The ordered export/fan-out/finalization contract is in §6.4 and §16.5.
 
-The CLI outcome evaluator currently emits JSON/JSONL and has no OTLP exporter. OTLP unavailability therefore MUST NOT change its classification or suppress its output; any downstream exporter is responsible for preserving those records on export failure. See the [Safe Output Outcome Evaluation Specification](safe-output-outcome-evaluation.md#otlp-backend-unavailability).
+The CLI adoption evaluator currently emits JSON/JSONL and has no OTLP exporter. OTLP unavailability therefore MUST NOT change its classification or suppress its output; any downstream exporter is responsible for preserving those records on export failure. See the [Safe Output Adoption Evaluation Specification](safe-output-adoption-evaluation.md#otlp-backend-unavailability).
 
 ---
 
@@ -1013,7 +1015,7 @@ attribute-level checks mapped directly to Section 10 requirements:
 |---------|------------------------|----------------|---------------------|
 | **T-OT-008** | §10.2 `gh-aw.job.name` on built-in job spans | The setup span includes `gh-aw.job.name` equal to the GitHub Actions job name | Decode `/tmp/gh-aw/otel.jsonl` or captured OTLP payloads and assert the setup span attribute value exactly matches the workflow job name |
 | **T-OT-009** | §10.3 `gen_ai.system` on built-in agent spans | A known engine emits a non-empty normalized provider/system value | Run a workflow with a built-in agent span, decode exported spans, and assert `gen_ai.system` is present whenever the engine mapping is known |
-| **T-OT-010** | §13.3 `gh-aw.outcome.type` on optional downstream outcome-evaluation spans | Exported outcome spans preserve the safe-output type being evaluated | Feed `.outcomes[].items[]` from `gh aw logs --outcomes --json` to the downstream exporter under test and assert `gh-aw.outcome.type` matches the evaluated manifest item type; not a built-in CLI export |
+| **T-OT-010** | §13.3 `gh-aw.adoption.type` on optional downstream adoption-evaluation spans | Exported adoption spans preserve the safe-output type being evaluated | Feed `.adoptions[].items[]` from `gh aw logs --adoptions --json` to the downstream exporter under test and assert `gh-aw.adoption.type` matches the evaluated manifest item type; not a built-in CLI export |
 | **T-OT-011** | §17 Backward-compatibility: v0.3.0 fields present in v0.4.0 export | All span attribute keys that were present in v0.3.0 (`gh-aw.*`, `github.*`, `gen_ai.system`, `gen_ai.usage.total_tokens`, `OTEL_EXPORTER_OTLP_ENDPOINT`, built-in setup/conclusion span names) **MUST** also be present in a v0.4.0 export at the same semantic positions | Produce a v0.4.0 compliant export from the current implementation; compare the set of attribute keys against the v0.3.0 attribute inventory (defined in Version 0.3.0 change-log entry in Section 19); assert no v0.3.0 attribute has been removed or renamed; assert no built-in span name has changed |
 | **T-OT-012** | §16.6 Exporter-failure test coverage | Non-2xx responses, exhausted network retries, mirror-write failures, and bounded-shutdown-flush failures preserve the completed workflow result and do not report failed delivery as successful | Existing tests cover non-2xx responses, exhausted retries, and mirror-write failures; add a bounded-shutdown-flush failure case to complete coverage |
 | **T-OT-013** | Proposed stricter §15.2 identifier redaction | If the contract changes to redact authorized §15.4 identifiers, those values are absent from remote payloads, mirrors, artifacts, and diagnostics; metric-dimension restrictions remain | Proposed only; current payload tests expect authorized actor identifiers, and mirror redaction is not guaranteed. Add payload and mirror tests before adopting this requirement |
@@ -1021,7 +1023,7 @@ attribute-level checks mapped directly to Section 10 requirements:
 
 ### 17.2 Optional Extension Tests
 
-An implementation claiming Level 3 MUST add automated tests for every Level 3 feature it enables, including any OpenTelemetry-native root spans, full-duration job spans, metrics, structured logs, outcome span links, Collector mode, or versioned mirror companion files.
+An implementation claiming Level 3 MUST add automated tests for every Level 3 feature it enables, including any OpenTelemetry-native root spans, full-duration job spans, metrics, structured logs, adoption span links, Collector mode, or versioned mirror companion files.
 
 Level 3 extension tests MUST prove that the extension is additive. They MUST NOT require removal or renaming of Level 1 or Level 2 fields, files, environment variables, span names, or compatibility attributes.
 
@@ -1042,9 +1044,9 @@ The following implementation areas are authoritative for version 0.4.0 compatibi
 
 Any change that alters a listed compatibility surface MUST update the corresponding tests in the same change.
 
-Outcome-evaluation span contracts SHOULD stay aligned with the governance and attribution
+Adoption-evaluation span contracts SHOULD stay aligned with the governance and attribution
 schema defined in `specs/intent-attribution-agent-governance.md`, especially when intent
-context is added to outcome spans or links.
+context is added to adoption spans or links.
 
 ---
 
@@ -1072,7 +1074,7 @@ context is added to outcome spans or links.
 - `docs/src/content/docs/reference/open-telemetry.mdx`
 - `docs/src/content/docs/reference/frontmatter.md`
 - `docs/src/content/docs/reference/mcp-gateway.md`
-- `specs/safe-output-outcome-evaluation.md`
+- `specs/safe-output-adoption-evaluation.md`
 
 ---
 
@@ -1086,7 +1088,7 @@ context is added to outcome spans or links.
 ### Version 0.6.0 (Working Draft, November 5, 2026)
 
 - **Clarified**: Consolidated fail-closed endpoint, credential, mirror, fan-out, and shutdown safeguards in §16.6 and added a testable five-step finalization order in §16.5.
-- **Added**: Cross-reference to the safe-output outcome evaluation contract, clarifying that the CLI emits JSON/JSONL and does not currently export outcome spans.
+- **Added**: Cross-reference to the safe-output adoption evaluation contract, clarifying that the CLI emits JSON/JSONL and does not currently export adoption spans.
 
 ### Version 0.5.0 (Working Draft, August 27, 2026)
 
@@ -1108,7 +1110,7 @@ context is added to outcome spans or links.
 - **Added**: Metric cardinality, privacy, redaction, and secret-handling guidance while preserving existing artifacts and query surfaces.
 - **Added**: Inlined compatibility validation requirements, optional extension tests, and the implementation map so this document is self-contained.
 - **Added**: Consolidated fail-closed safeguards for export, endpoint fan-out, and shutdown handling.
-- **See also**: `specs/safe-output-outcome-evaluation.md` (Change Log, Version 1.0.1) for aligned outcome-taxonomy and provenance rules.
+- **See also**: `specs/safe-output-adoption-evaluation.md` (Change Log, Version 1.0.1) for aligned adoption-taxonomy and provenance rules.
 
 ### Version 0.3.0 (Working Draft, June 15, 2026)
 
@@ -1118,7 +1120,7 @@ context is added to outcome spans or links.
 
 ### Version 0.2.0 (Working Draft)
 
-- Added the initial trace model, span attributes, outcome spans, resource attributes, and trace-ID propagation.
+- Added the initial trace model, span attributes, adoption spans, resource attributes, and trace-ID propagation.
 
 ### Version 0.1.0 (Working Draft)
 

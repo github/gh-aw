@@ -222,11 +222,9 @@ func TestRegradeSessionResultRejectsUnknownStatus(t *testing.T) {
 	}
 }
 
-func TestRegradeRejectsBashAndUnsafeDefinitionsBeforeEvidence(t *testing.T) {
+func TestRegradeRejectsUnsafeDefinitionsBeforeEvidence(t *testing.T) {
 	for _, definition := range []graderRunDefinition{
-		{ID: "shell", Source: "operational-value"},
-		{ID: "shell", Source: "inline", Run: "script.sh"},
-		{ID: "shell", Source: "inline", ShellScript: "echo unsafe"},
+		{ID: "custom", Source: "inline"},
 		{ID: "loops", Source: "builtin", Script: "return 1"},
 		{ID: "unknown", Source: "unknown"},
 	} {

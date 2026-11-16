@@ -116,6 +116,24 @@ func TestNativeGraderFileIO(t *testing.T) {
 	}
 }
 
+func TestOperationalValueUsesJavaScriptFileIORule(t *testing.T) {
+	options := nativeGraderJavaScriptOptions(t)
+	document, err := aw.Parse(`---
+graders:
+  operational-value:
+    script: return require("node:fs").readFileSync("evidence");
+---
+Prompt
+`)
+	require.NoError(t, err)
+	runner, err := Default().Select("grader-file-io")
+	require.NoError(t, err)
+	diagnostics, err := runner.Run(t.Context(), Input{Document: document, JavaScript: options})
+	require.NoError(t, err)
+	require.NotEmpty(t, diagnostics)
+	assert.Equal(t, "graders.operational-value.script", diagnostics[0].Path)
+}
+
 type graderJavaScriptParserFunc func(context.Context, string) (*taint.JavaScriptNode, error)
 
 func (f graderJavaScriptParserFunc) Parse(ctx context.Context, source string) (*taint.JavaScriptNode, error) {

@@ -8127,7 +8127,7 @@
                     "additionalProperties": false
                   }
                 },
-                "outcomes": {
+                "adoptions": {
                   "type": [
                     "null",
                     "array"
@@ -8135,13 +8135,45 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "outcome_status": {
-                        "type": "string"
+                      "adoption_status": {
+                        "type": "string",
+                        "enum": [
+                          "accepted",
+                          "rejected",
+                          "pending",
+                          "lifecycle",
+                          "not_applicable",
+                          "unknown"
+                        ]
                       },
                       "evidence_strength": {
                         "type": "string"
                       },
                       "signal": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "rule_version": {
+                        "type": "string"
+                      },
+                      "effect_class": {
+                        "type": "string"
+                      },
+                      "fallback_to_delivery": {
+                        "type": "boolean"
+                      },
+                      "attribution_eligible": {
+                        "type": "boolean"
+                      },
+                      "survival_required": {
+                        "type": "boolean"
+                      },
+                      "adoption_at": {
+                        "type": "string"
+                      },
+                      "acceptance_kind": {
                         "type": "string"
                       },
                       "item_id": {
@@ -8171,7 +8203,7 @@
                       "detail": {
                         "type": "string"
                       },
-                      "time_to_outcome_hours": {
+                      "time_to_adoption_hours": {
                         "type": "number"
                       },
                       "human_comments": {
@@ -8207,13 +8239,44 @@
                       "checked_at": {
                         "type": "string"
                       },
+                      "delivery": {
+                        "type": [
+                          "null",
+                          "object"
+                        ],
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "signal": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "signal",
+                          "source"
+                        ],
+                        "additionalProperties": false
+                      },
                       "eval_error": {
                         "type": "string"
                       }
                     },
                     "required": [
-                      "outcome_status",
+                      "adoption_status",
                       "evidence_strength",
+                      "source",
+                      "rule_version",
+                      "fallback_to_delivery",
+                      "attribution_eligible",
+                      "survival_required",
                       "type",
                       "created_at",
                       "checked_at"
@@ -8221,7 +8284,7 @@
                     "additionalProperties": false
                   }
                 },
-                "outcome_summary": {
+                "adoption_summary": {
                   "type": [
                     "null",
                     "object"
@@ -8236,10 +8299,10 @@
                     "rejected": {
                       "type": "integer"
                     },
-                    "ignored": {
+                    "pending": {
                       "type": "integer"
                     },
-                    "pending": {
+                    "not_applicable": {
                       "type": "integer"
                     },
                     "unknown": {
@@ -8275,10 +8338,10 @@
                     "zero_touch_rate": {
                       "type": "number"
                     },
-                    "median_time_to_outcome_hours": {
+                    "median_time_to_adoption_hours": {
                       "type": "number"
                     },
-                    "cost_per_accepted_outcome": {
+                    "cost_per_accepted_adoption": {
                       "type": "number"
                     },
                     "total_objective_value": {
@@ -8343,8 +8406,8 @@
                     "total",
                     "accepted",
                     "rejected",
-                    "ignored",
                     "pending",
+                    "not_applicable",
                     "unknown",
                     "lifecycle",
                     "errors",

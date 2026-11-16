@@ -87,7 +87,7 @@ Choose the owning span first, then the attribute. Missing attributes mean unknow
 | Graders | `gh-aw.graders.count`, `passed`, `failed`, `errors`, `unavailable`, `other`; `grader.result` events | Conclusion span for the job that owns the results. Includes operational-value grader results |
 | Evals | `gh-aw.evals.count`, `yes`, `no`, `unknown`; `eval.result` events; `gh-aw.evals.status` for not-evaluated | Evals job span |
 | Work queue | `gh-aw.work_queue.*` on `work_queue.<op>.run` spans | Point-in-time snapshots on operation spans. Do not sum |
-| Outcome evaluation | No span producer in this checkout | `gh-aw.outcome.*` is documented in the public reference and spec only |
+| Adoption evaluation | No span producer in this checkout | `gh-aw.adoption.*` is documented in the public reference and spec only |
 
 Use `gh-aw.run.attempt` and `github.run_id` to correlate spans from re-runs. Do not use identifiers, error messages, or URLs as metric dimensions.
 
@@ -121,7 +121,7 @@ These describe current behavior. They do not change the normative specification.
 - **Metrics (spec §11.2–11.3):** `gh_aw.*` and `cicd.*` metric instruments are not emitted. Treat all measurements as span attributes or events.
 - **Span error type (spec §10.5):** The bare `error.type` key is not emitted. Work-queue spans use the prefixed `gh-aw.work_queue.error.type`. Built-in setup, conclusion, and agent spans use `status.code` and `exception` events.
 - **Lifecycle events (spec §10.6):** `gh_aw.job.setup.completed`, `gh_aw.agent.retry`, and related events are not emitted.
-- **Outcome spans (spec §13):** The `gh-aw.outcome.*` family appears in the public attribute reference and the spec, but no producer exists in this checkout. The corresponding formal tests in `pkg/workflow/otel_reliability_formal_test.go` are skipped.
+- **Adoption spans (spec §13):** The `gh-aw.adoption.*` family appears in the public attribute reference and the spec, but no producer exists in this checkout. The corresponding formal tests in `pkg/workflow/otel_reliability_formal_test.go` are skipped.
 - **Aliases not emitted:** `gen_ai.provider.name`, `gen_ai.usage.reasoning.output_tokens`, and `cicd.*` aliases are not emitted.
 - **Local mirror redaction (spec §14.3):** Span payloads from `sendJobSetupSpan`, `sendJobConclusionSpan` (agent and conclusion), and their mirror writes call `appendToOTLPJSONL(payload)` without `sanitizeOTLPPayload`. The wire export (`sendOTLPSpan`) and `logSpan` do sanitize. Source-observed; not confirmed by a runtime test.
 - **Validation status:** `specs/otel/attributes.tsp` already defines 200 attribute names, and they match the generated JavaScript and Go constants (verified by comparison). The TypeSpec compiler is not installed (`specs/otel/node_modules` is absent) and no lock installation is performed in this run. Compiler validation of `specs/otel/messages.tsp` is therefore deferred, and no TypeSpec file was created or changed.

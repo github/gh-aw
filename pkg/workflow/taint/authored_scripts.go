@@ -76,11 +76,7 @@ func authoredScripts(document *aw.Document) ([]authoredScript, error) {
 		if !ok {
 			continue // Built-in graders also accept scalar configuration.
 		}
-		profile := "grader"
-		if name == "operational-value" {
-			profile = "bash"
-		}
-		c.add(fields, "script", "graders."+name+".script", profile)
+		c.add(fields, "script", "graders."+name+".script", "grader")
 	}
 	c.memory(document)
 	c.engine(document)
@@ -300,10 +296,6 @@ func (a *analyzer) authoredScript(ctx context.Context, script authoredScript, bi
 		script.source = string(source)
 		return a.authoredJavaScript(script, bindings, sourcePath)
 	}
-	base := script.path
-	if index := strings.LastIndex(script.path, "."); index >= 0 {
-		base = script.path[:index]
-	}
 	if script.profile == "memory" {
 		parent := bindings
 		bindings = make(scope)
@@ -314,18 +306,7 @@ func (a *analyzer) authoredScript(ctx context.Context, script authoredScript, bi
 	if script.profile == "grader" {
 		bindings = nil // vm.compileFunction has no process, require, or inherited env.
 	}
-	if script.profile == "mcp-run" || script.profile == "bash" {
-		if script.profile == "bash" {
-			previous := a.literalScript
-			a.literalScript = true // Grader payload encoding prevents Actions interpolation.
-			defer func() { a.literalScript = previous }()
-			parent := bindings
-			bindings = make(scope)
-			for _, name := range []string{"PATH", "HOME", "TMPDIR", "TEMP", "TMP", "SystemRoot", "ComSpec", "GH_TOKEN", "GH_HOST", "GITHUB_API_URL", "GITHUB_GRAPHQL_URL", "GITHUB_SERVER_URL"} {
-				bindings["shell."+name] = parent["shell."+name]
-			}
-			bindings["shell.GH_TOKEN"] = a.source("github.token", base+".env.GH_TOKEN", nil)
-		}
+	if script.profile == "mcp-run" {
 		return a.script(script.source, map[string]any{"shell": "bash"}, script.path, bindings, make(scope), make(scope))
 	}
 	return a.authoredJavaScript(script, bindings, "")

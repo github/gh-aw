@@ -11,7 +11,7 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { getMcpRateLimitHint, getRpcRateLimitHint } = require("./mcp_rate_limit.cjs");
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
-const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
+const { projectSafeOutputData } = require("./safe_output_deliveries.cjs");
 const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, normalizeHarnessDecisionData } = require("./harness_retry_record.cjs");
 const { sessionMessageTimestamp } = require("./unified_session_order.cjs");
 
@@ -432,7 +432,7 @@ const EVENT_FIELDS = {
   },
   "safe_output.request": SAFE_OUTPUT_FIELDS,
   "safe_output.result": SAFE_OUTPUT_FIELDS,
-  "safe_output.outcome": SAFE_OUTPUT_FIELDS,
+  "safe_output.delivery": SAFE_OUTPUT_FIELDS,
   "safe_output.error": SAFE_OUTPUT_FIELDS,
   "experiment.state": { runId: ["runId", "run_id"], assignments: ["assignments"], counts: ["counts"] },
   "grader.manifest": { version: ["version"], customGraders: ["customGraders"] },
@@ -901,11 +901,11 @@ function normalizeUnifiedSessionEvent(event, phase) {
   }
   if (event.type.startsWith("safe_output.")) {
     for (const key of Object.keys(data)) delete data[key];
-    Object.assign(data, projectSafeOutputData(source));
+    Object.assign(data, projectSafeOutputData(source, event.type, event.timestamp ?? source.timestamp));
   }
   if (event.type === "safe_output.error") {
     const errors = source.errors ?? source.failures;
-    if (Array.isArray(errors)) data.errors = errors.filter(error => error && typeof error === "object" && !Array.isArray(error)).map(projectSafeOutputData);
+    if (Array.isArray(errors)) data.errors = errors.filter(error => error && typeof error === "object" && !Array.isArray(error)).map(error => projectSafeOutputData(error));
   }
   const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"], agentId: ["agentId"], ephemeral: ["ephemeral"] });
   const nativeTimestamp = sessionMessageTimestamp(event);

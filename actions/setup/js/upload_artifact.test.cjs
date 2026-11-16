@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { buildSafeOutputOutcomes } from "./safe_output_outcomes.cjs";
+import { buildSafeOutputDeliveries } from "./safe_output_deliveries.cjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -440,9 +440,9 @@ describe("upload_artifact.cjs", () => {
       expect(results[0].success).toBe(true);
       expect(results[0].staged).toBe(true);
       expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
-      const [outcome] = buildSafeOutputOutcomes([{ type: "upload_artifact", messageIndex: 0, success: true, result: results[0] }], false);
-      expect(outcome).toMatchObject({ type: "upload_artifact", status: "staged", staged: true });
-      expect(outcome).not.toHaveProperty("url");
+      const [delivery] = buildSafeOutputDeliveries([{ type: "upload_artifact", messageIndex: 0, success: true, result: results[0] }], false);
+      expect(delivery).toMatchObject({ type: "upload_artifact", status: "staged", staged: true });
+      expect(delivery).not.toHaveProperty("url");
     });
 
     it("emits a staged mode preview summary when staged mode is active", async () => {

@@ -135,7 +135,19 @@ describe("isolated custom graders", () => {
     expect(runCustomGraders(session, [definition("throw Error('disabled')", { enabled: false })]).output.results).toEqual([]);
   });
 
-  it.each([definition("return 1", { id: "loops" }), definition("return 1", { source: "builtin" }), definition("return 1", { run: "evaluator.sh" }), definition("return 1", { id: "operational-value" })])(
+  it("runs operational value through the same restricted JavaScript boundary", () => {
+    const result = runCustomGraders(session, [definition("return { value: session.length, diagnostics: { toolCalls: helpers.createSessionLookups(session).stats.toolCallCount } }", { id: "operational-value" })]).output.results[0];
+    expect(result).toMatchObject({
+      id: "operational-value",
+      source: "inline",
+      status: "pass",
+      value: session.length,
+      diagnostics: { toolCalls: 1 },
+      implementation: { id: "gh-aw/custom-graders" },
+    });
+  });
+
+  it.each([definition("return 1", { id: "loops" }), definition("return 1", { source: "builtin" }), definition("return 1", { run: "evaluator.sh" }), definition("return 1", { shellScript: "echo legacy" })])(
     "rejects built-in overrides and unsupported execution sources",
     grader => {
       expect(() => runCustomGraders(session, [grader])).toThrow(/unsupported/);

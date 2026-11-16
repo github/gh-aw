@@ -33,7 +33,7 @@ const (
 	exclusionRunUnavailable               = "run unavailable"
 )
 
-// GraderMetricObservation records one grader-derived experiment outcome.
+// GraderMetricObservation records one grader-derived experiment adoption.
 type GraderMetricObservation struct {
 	RunID        string  `json:"run_id"`
 	Variant      string  `json:"variant"`
@@ -51,15 +51,15 @@ type ExcludedObservationSummary struct {
 }
 
 type graderMetricObservationSet struct {
-	// MetricID identifies the grader, eval question, or outcome backing this observation set.
+	// MetricID identifies the grader, eval question, or adoption backing this observation set.
 	MetricID string
 	// Direction is the declared grader direction ("higher_is_better" or "lower_is_better").
 	// Empty (treated as higher_is_better) for eval-backed metrics.
-	Direction     string
-	ByVariant     map[string][]GraderMetricObservation
-	Exclusions    map[string][]ExcludedObservationSummary
-	Coverage      map[string]*OutcomeMetricCoverage
-	OutcomeWindow *OutcomeWindowInfo
+	Direction      string
+	ByVariant      map[string][]GraderMetricObservation
+	Exclusions     map[string][]ExcludedObservationSummary
+	Coverage       map[string]*AdoptionMetricCoverage
+	AdoptionWindow *AdoptionWindowInfo
 }
 
 type graderResultsArtifact struct {

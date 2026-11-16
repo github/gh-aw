@@ -39,9 +39,9 @@ immutable artifacts are reused. --json always returns the standard logs report.`
 			if err := validateEpisodeView(view); err != nil {
 				return err
 			}
-			outcomesDir := getStringFlag(cmd, "outcomes-dir")
-			if outcomesDir != "" && !opts.Outcomes {
-				return errors.New("--outcomes-dir requires --outcomes")
+			adoptionsDir := getStringFlag(cmd, "adoptions-dir")
+			if adoptionsDir != "" && !opts.Adoptions {
+				return errors.New("--adoptions-dir requires --adoptions")
 			}
 			if len(args) > 0 {
 				if err := resolveEpisodeSeed(&opts, args[0], repository); err != nil {
@@ -54,8 +54,8 @@ immutable artifacts are reused. --json always returns the standard logs report.`
 			if err != nil {
 				return err
 			}
-			if opts.Outcomes {
-				if err := collectEpisodeOutcomes(cmd.Context(), &data, outcomesDir, getBoolFlag(cmd, "verbose")); err != nil {
+			if opts.Adoptions {
+				if err := collectEpisodeAdoptions(cmd.Context(), &data, adoptionsDir, getBoolFlag(cmd, "verbose")); err != nil {
 					return err
 				}
 			}
@@ -66,8 +66,8 @@ immutable artifacts are reused. --json always returns the standard logs report.`
 	addEpisodeRetrievalFlags(cmd, &opts, &repository, &jsonOutput)
 	cmd.Flags().StringVar(&view, "view", "summary", "Episode view: summary or hops (JSON always includes both)")
 	cmd.Flags().BoolVar(&opts.Refresh, "refresh", false, "Refresh the cached episode snapshot using the current collection bounds")
-	cmd.Flags().BoolVar(&opts.Outcomes, "outcomes", false, "Evaluate current outcomes for episode members (additional live API requests beyond retrieval bounds)")
-	cmd.Flags().String("outcomes-dir", "", "Write outcome JSONL observations to this directory (requires --outcomes)")
+	cmd.Flags().BoolVar(&opts.Adoptions, "adoptions", false, "Evaluate current adoptions for episode members (additional live API requests beyond retrieval bounds)")
+	cmd.Flags().String("adoptions-dir", "", "Write adoption JSONL observations to this directory (requires --adoptions)")
 	return cmd
 }
 
@@ -76,7 +76,7 @@ func renderEpisodeLogs(w io.Writer, data LogsData, view string, jsonOutput bool)
 		return err
 	}
 	if !jsonOutput {
-		return renderLogsOutcomes(w, data)
+		return renderLogsAdoptions(w, data)
 	}
 	return nil
 }

@@ -127,7 +127,7 @@ type PermissionsConfig struct {
 }
 
 // GuardrailMetric defines a metric threshold that must not degrade during an experiment.
-// If the threshold is violated the experiment should be aborted regardless of primary metric outcome.
+// If the threshold is violated the experiment should be aborted regardless of primary metric adoption.
 type GuardrailMetric struct {
 	// Name is the metric to guard (e.g. "success_rate", "empty_output_rate").
 	Name string `json:"name"`
@@ -187,8 +187,8 @@ type ExperimentConfig struct {
 	// Metric names the primary metric that should be observed (e.g. "aic").
 	Metric string `json:"metric,omitempty"`
 
-	// OutcomeWindow is the maturity duration for outcome-backed metrics; empty or "auto" learns it.
-	OutcomeWindow string `json:"outcome_window,omitempty"`
+	// AdoptionWindow is the maturity duration for adoption-backed metrics; empty or "auto" learns it.
+	AdoptionWindow string `json:"adoption_window,omitempty"`
 
 	// SecondaryMetrics lists additional metrics to track alongside the primary metric.
 	SecondaryMetrics []string `json:"secondary_metrics,omitempty"`
@@ -357,7 +357,7 @@ type FrontmatterConfig struct {
 	// Core workflow fields
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
-	// Intent captures the durable outcome the workflow exists to achieve
+	// Intent captures the durable adoption the workflow exists to achieve
 	// (why it exists), as opposed to Description (what it does).
 	Intent string `json:"intent,omitempty"`
 	Emoji  string `json:"emoji,omitempty"` // Optional emoji to represent the workflow visually

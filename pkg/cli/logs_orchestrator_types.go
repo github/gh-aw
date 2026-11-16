@@ -28,10 +28,10 @@ type LogsDownloadOptions struct {
 	Parse              bool
 	JSONOutput         bool
 	Episodes           bool
-	Outcomes           bool
+	Adoptions          bool
 	Harbor             bool
 	AdditionalGraders  []string
-	OutcomesDir        string
+	AdoptionsDir       string
 	TimeoutMinutes     int
 	TimeoutSeconds     int
 	// MaxGitHubAPIRateLimit is the maximum number of core API requests that may
@@ -118,10 +118,10 @@ type StdinLogsOptions struct {
 	Parse             bool
 	JSONOutput        bool
 	Episodes          bool
-	Outcomes          bool
+	Adoptions         bool
 	Harbor            bool
 	AdditionalGraders []string
-	OutcomesDir       string
+	AdoptionsDir      string
 	Timeout           int
 	MaxStorageMB      int
 	PruneOlderRuns    bool
@@ -215,7 +215,7 @@ type renderLogsOutputOptions struct {
 	apiRateLimit      *GitHubAPIRateLimitReport
 	apiRateLimits     []*GitHubAPIRateLimitReport
 	cachedJSONLWriter *cachedLogsJSONLWriter
-	outcomeReports    []OutcomesData
+	adoptionReports   []AdoptionsData
 }
 
 // newRenderLogsOutputOptions returns renderLogsOutputOptions populated with the

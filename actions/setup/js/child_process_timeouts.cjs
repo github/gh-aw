@@ -19,15 +19,14 @@ const SETUP_TIMEOUTS = Object.freeze({
   artifactArchiveProbe: { env: "GH_AW_ARTIFACT_ARCHIVE_PROBE_TIMEOUT_MS", defaultMs: 15_000 },
   artifactFetch: { env: "GH_AW_ARTIFACT_FETCH_TIMEOUT_MS", defaultMs: 120_000 },
   artifactTransfer: { env: "GH_AW_ARTIFACT_TRANSFER_TIMEOUT_MS", defaultMs: 300_000 },
+  checkoutManifestGh: { env: "GH_AW_CHECKOUT_MANIFEST_GH_TIMEOUT_MS", defaultMs: 300_000 },
   gitBranch: { env: "GH_AW_GIT_BRANCH_TIMEOUT_MS", defaultMs: 15_000 },
   importGit: { env: "GH_AW_IMPORT_GIT_TIMEOUT_MS", defaultMs: 300_000 },
   mcpConfigConverter: { env: "GH_AW_MCP_CONFIG_CONVERTER_TIMEOUT_MS", defaultMs: 120_000 },
   mcpContainerStatus: { env: "GH_AW_MCP_CONTAINER_STATUS_TIMEOUT_MS", defaultMs: 15_000 },
   mcpDockerCleanup: { env: "GH_AW_MCP_DOCKER_CLEANUP_TIMEOUT_MS", defaultMs: 30_000 },
   mcpServerCheck: { env: "GH_AW_MCP_SERVER_CHECK_TIMEOUT_MS", defaultMs: 120_000 },
-  operationalValueEvaluator: { env: "GH_AW_OPERATIONAL_VALUE_EVALUATOR_TIMEOUT_MS", defaultMs: 120_000 },
-  operationalValueSyntaxCheck: { env: "GH_AW_OPERATIONAL_VALUE_SYNTAX_CHECK_TIMEOUT_MS", defaultMs: 5_000 },
-  outcomeGh: { env: "GH_AW_OUTCOME_GH_TIMEOUT_MS", defaultMs: 300_000 },
+  adoptionGh: { env: "GH_AW_ADOPTION_GH_TIMEOUT_MS", defaultMs: 300_000 },
   safeoutputsCli: { env: "GH_AW_SAFEOUTPUTS_CLI_TIMEOUT_MS", defaultMs: 120_000 },
 });
 

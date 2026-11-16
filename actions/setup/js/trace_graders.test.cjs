@@ -134,7 +134,7 @@ describe("pure unified-session graders", () => {
 
   it.each([
     { id: "custom", source: "inline", script: "return 1" },
-    { id: "operational-value", source: "operational-value", run: "test.sh" },
+    { id: "operational-value", source: "inline", script: "return 1" },
     { id: "loops", source: "builtin", script: "return 1" },
     { id: "loops", source: "builtin", run: "test.sh" },
     { id: "toString" },

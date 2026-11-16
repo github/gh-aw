@@ -250,7 +250,6 @@ func Default() *Runner {
 		FirewallSSLBumpRule(),
 		CustomJobDetectionRule(),
 		GraderFileIORule(),
-		GraderShellFileWriteRule(),
 		PullRequestTargetCheckoutRule(),
 		PromptExpressionRule(),
 		GatewayDispatchLiteralsRule(),

@@ -1,10 +1,10 @@
 package workflow
 
 // Formal predicates for specs/otel-observability-spec.md Sections 13-16:
-// Outcome Evaluation, Local Mirrors and Artifacts, Security and Privacy, and
+// Adoption Evaluation, Local Mirrors and Artifacts, Security and Privacy, and
 // Reliability and Failure Handling.
 //
-// No outcome-evaluation span emitter, mirror writer, or fan-out/retry
+// No adoption-evaluation span emitter, mirror writer, or fan-out/retry
 // orchestrator currently exists in pkg/workflow (the mirror writer and OTLP
 // fan-out/retry behavior are implemented in JavaScript under
 // actions/setup/js/send_otlp_span.cjs, and outcome-status taxonomy is
@@ -32,43 +32,43 @@ func TestFormal_MirrorPathIsStable(t *testing.T) {
 	assert.Equal(t, "/tmp/gh-aw/otel.jsonl", constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
 }
 
-// P1_OutcomeSeparateTrace
-// An outcome-evaluation span emitted long after (e.g. >24h) the source
+// P1_AdoptionSeparateTrace
+// An adoption-evaluation span emitted long after (e.g. >24h) the source
 // workflow completed MUST NOT extend the original workflow trace.
 // Specification reference: specs/otel-observability-spec.md §13.1.
 //
-// Pending: no outcome-evaluation span emitter exists in pkg/workflow yet.
-func TestFormal_OutcomeEvaluationUsesSeparateTrace(t *testing.T) {
-	t.Skip("pending: no production outcome-evaluation span emitter in pkg/workflow; " +
+// Pending: no adoption-evaluation span emitter exists in pkg/workflow yet.
+func TestFormal_AdoptionEvaluationUsesSeparateTrace(t *testing.T) {
+	t.Skip("pending: no production adoption-evaluation span emitter in pkg/workflow; " +
 		"replace t.Skip with assertions against the real emitter once it lands")
 }
 
-// P2_OutcomeSourceCorrelation
-// Each outcome-evaluation span SHOULD carry either a span link to the
+// P2_AdoptionSourceCorrelation
+// Each adoption-evaluation span SHOULD carry either a span link to the
 // originating workflow root context, or the full attribute triple
-// (gh-aw.outcome.source_run_id, gh-aw.outcome.source_workflow,
-// gh-aw.outcome.repo) when a persisted span context is unavailable.
+// (gh-aw.adoption.source_run_id, gh-aw.adoption.source_workflow,
+// gh-aw.adoption.repo) when a persisted span context is unavailable.
 // Specification reference: specs/otel-observability-spec.md §13.2.
 //
-// Pending: no outcome-evaluation span emitter exists in pkg/workflow yet.
-func TestFormal_OutcomeSourceCorrelation(t *testing.T) {
-	t.Skip("pending: no production outcome-evaluation span emitter in pkg/workflow; " +
+// Pending: no adoption-evaluation span emitter exists in pkg/workflow yet.
+func TestFormal_AdoptionSourceCorrelation(t *testing.T) {
+	t.Skip("pending: no production adoption-evaluation span emitter in pkg/workflow; " +
 		"replace t.Skip with assertions against the real emitter once it lands")
 }
 
-// P3_OutcomeResultTaxonomy
-// gh-aw.outcome.result MUST be restricted to the canonical outcome taxonomy
-// (accepted, rejected, ignored, pending, lifecycle, lifecycle_close) defined
-// in specs/safe-output-outcome-evaluation.md.
+// P3_AdoptionResultTaxonomy
+// gh-aw.adoption.result MUST be restricted to the canonical adoption taxonomy
+// (accepted, rejected, pending, lifecycle, not_applicable, unknown) defined
+// in specs/safe-output-adoption-evaluation.md.
 // Specification reference: specs/otel-observability-spec.md §13.3.
 //
-// Pending: the outcome-status taxonomy is implemented as pkg/cli.OutcomeStatus
-// (see pkg/cli/outcome_eval_formal_test.go), which pkg/workflow cannot import
+// Pending: the adoption-status taxonomy is implemented as pkg/cli.AdoptionStatus
+// (see pkg/cli/adoption_eval_formal_test.go), which pkg/workflow cannot import
 // without an import cycle; no OTel span attribute emitter reads that taxonomy
 // from pkg/workflow yet.
-func TestFormal_OutcomeResultTaxonomy(t *testing.T) {
-	t.Skip("pending: outcome taxonomy lives in pkg/cli.OutcomeStatus and no " +
-		"pkg/workflow span emitter reads it yet; see pkg/cli/outcome_eval_formal_test.go " +
+func TestFormal_AdoptionResultTaxonomy(t *testing.T) {
+	t.Skip("pending: adoption taxonomy lives in pkg/cli.AdoptionStatus and no " +
+		"pkg/workflow span emitter reads it yet; see pkg/cli/adoption_eval_formal_test.go " +
 		"for the taxonomy invariant that already covers this predicate")
 }
 

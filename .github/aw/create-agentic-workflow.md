@@ -26,7 +26,9 @@ Load only matching topic references:
 - Charts: [charts.md](charts.md); reports/digests: [report.md](report.md).
 - Release notes: [release-workflow.md](release-workflow.md); linter mining: [linter-workflows.md](linter-workflows.md).
 - Docker/Cloud Hypervisor/ARC/self-hosted: [agent-runtime-instructions.md](agent-runtime-instructions.md).
-- Skills/plugins: [skills.md](skills.md); graders: [operational-value-designer](../skills/operational-value-designer/SKILL.md).
+- Skills/plugins: [skills.md](skills.md); graders:
+  [operational-value-designer](../skills/operational-value-designer/SKILL.md)
+  with `graders.<distinct-id>.script`; delivery/adoption alone is not value.
 - Instruction/skill generators: [packing contract](../skills/prompt-token-efficiency/SKILL.md).
 - Persistent knowledge reuse, even without an explicit memory or dreaming request:
   [memory decision](memory.md#scheduled-dreaming); load [dreaming.md](dreaming.md)

@@ -14,7 +14,7 @@
 
 const { displayFileContent } = require("./display_file_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { classifySafeOutputResult, computeSafeOutputsStatus, pickOutcomeField } = require("./safe_outputs_status.cjs");
+const { classifySafeOutputResult, computeSafeOutputsStatus, pickDeliveryField } = require("./safe_outputs_status.cjs");
 const ERROR_CODES = require("./error_codes.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 
@@ -421,7 +421,7 @@ function generateSafeOutputSummary(options) {
   }
 
   if (type !== "merge_pull_request" && result?.operation_outcome === "indeterminate") {
-    summary += "**Operation outcome: indeterminate.** The operation may have been applied. Inspect the target system before retrying.\n\n";
+    summary += "**Operation delivery: indeterminate.** The operation may have been applied. Inspect the target system before retrying.\n\n";
   }
 
   // Display secrecy and integrity security metadata fields if present in the message.

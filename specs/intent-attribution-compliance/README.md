@@ -107,7 +107,7 @@ F9_UnmappedAttributionFailsClosed(a) ≜
 `PolicyCompiler` produces an `ExecutionPolicy` that carries the governance
 decision (`autonomy`, tool restrictions, `write_scope`, required checks,
 approval, auto-merge, attempts, and matched rule IDs). It does not populate
-CLI outcome-report fields directly. The outcome evaluator records
+CLI adoption-report fields directly. The adoption evaluator records
 `objective_value` and `objective_labels` from objective mapping and
 `traced_root_url` from the resolved artifact relationship; its
 `attribution_status` and `attribution_source` preserve the attribution
@@ -125,7 +125,7 @@ context that was supplied to policy compilation.
 | `F5_MappedStatusPermitsRelaxedPolicy` | `TestFormalFixture_MappedExplicitStatusIsNotFailClosed` | Explicitly mapped status is not forced into fail-closed policy when a permissive rule applies |
 | `F6_PolicyDeterminism` | `TestFormalFixture_PolicyDeterminismAcrossRepeatedResolution` | Resolving the same fixture input twice yields byte-identical attribution and policy |
 | `F7_SingleSourcePerRecord` | `TestFormalFixture_SingleSourcePerRecordAcrossResolverFixtures` | Each resolver-backed fixture resolves to exactly one attribution source, never a blend |
-| Edge case: order independence | `TestFormalFixture_AmbiguousOrderIndependence` | Reordering the two closing issues does not change the ambiguous outcome |
+| Edge case: order independence | `TestFormalFixture_AmbiguousOrderIndependence` | Reordering the two closing issues does not change the ambiguous result |
 | Edge case: empty labels do not mask unlinked | `TestFormalFixture_UnlinkedWithEmptyLabelsSlice` | An explicitly empty labels slice on the unlinked fixture still resolves to unlinked |
 | Edge case: explicit intent overrides even when closing issues would otherwise be unambiguous | `TestFormalFixture_ExplicitIntentOverridesSingleClosingIssue` | Explicit metadata wins even when only one closing issue is present |
 | Multi-root policy | `TestFormalFixture_MultiRootPolicyFailsClosed` | Three closing roots remain ambiguous and cannot select a relaxed policy |

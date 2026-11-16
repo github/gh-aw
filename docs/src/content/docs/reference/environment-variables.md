@@ -204,19 +204,20 @@ The JavaScript setup helpers bound child processes, archive operations, and setu
 
 | Variable | Default | Applies to |
 | --- | --- | --- |
+| `GH_AW_ADOPTION_GH_TIMEOUT_MS` | `300000` | `gh` CLI calls made by adoption evaluation. |
 | `GH_AW_APPLY_SAMPLES_FETCH_TIMEOUT_MS` | `120000` | GitHub API fetches performed by `apply_samples.cjs`. |
 | `GH_AW_APPLY_SAMPLES_GIT_TIMEOUT_MS` | `120000` | Git commands used while replaying sample patches. |
 | `GH_AW_ARTIFACT_ARCHIVE_PROBE_TIMEOUT_MS` | `15000` | `zip -v` and `unzip -v` availability probes. |
 | `GH_AW_ARTIFACT_ARCHIVE_TIMEOUT_MS` | `300000` | `zip` and `unzip` archive creation/extraction. |
 | `GH_AW_ARTIFACT_FETCH_TIMEOUT_MS` | `120000` | Artifact service metadata and redirect requests. |
 | `GH_AW_ARTIFACT_TRANSFER_TIMEOUT_MS` | `300000` | Artifact blob upload and download transfers. |
+| `GH_AW_CHECKOUT_MANIFEST_GH_TIMEOUT_MS` | `300000` | `gh` calls used to resolve default branches for checkout manifests. |
 | `GH_AW_GIT_BRANCH_TIMEOUT_MS` | `15000` | Current branch detection via `git rev-parse`. |
 | `GH_AW_IMPORT_GIT_TIMEOUT_MS` | `300000` | Sparse-checkout/import git commands for remote `.github` content. |
 | `GH_AW_MCP_CONFIG_CONVERTER_TIMEOUT_MS` | `120000` | MCP configuration converter subprocess. |
 | `GH_AW_MCP_CONTAINER_STATUS_TIMEOUT_MS` | `15000` | Docker/container status probes used in MCP gateway diagnostics. |
 | `GH_AW_MCP_DOCKER_CLEANUP_TIMEOUT_MS` | `30000` | Stale MCP gateway container cleanup. |
 | `GH_AW_MCP_SERVER_CHECK_TIMEOUT_MS` | `120000` | MCP server health-check script. |
-| `GH_AW_OUTCOME_GH_TIMEOUT_MS` | `300000` | `gh` CLI calls made by outcome evaluation. |
 | `GH_AW_SAFEOUTPUTS_CLI_TIMEOUT_MS` | `120000` | `safeoutputs` CLI invocations used for structured diagnostics. |
 
 ### MCP gateway readiness polling

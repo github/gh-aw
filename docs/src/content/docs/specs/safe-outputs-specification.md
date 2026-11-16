@@ -2443,7 +2443,7 @@ When a safe-output MCP tool schema changes (new required field, removed field, r
 1. This Section 7 type definition and JSON schema snippet.
 2. The corresponding handler contract in both Go and JavaScript runtime paths, if both runtimes support the type.
 3. Agent-facing prompt/tool examples that rely on the changed fields.
-4. Outcome-evaluation mappings when the change affects evaluable state or identifiers.
+4. Adoption-evaluation mappings when the change affects evaluable state or identifiers.
 
 Schema-only updates without matching agent/runtime sync updates **MUST NOT** be considered conformant.
 

@@ -126,7 +126,7 @@ This returns a JSON object with:
   - `variants` — per-variant assignment counts, observation counts, means, and `below_min_samples`
   - `chi_square`, `degrees_of_freedom`, `p_value`, `is_balanced` — chi-square balance test
   - `bonferroni_alpha` — Bonferroni-corrected threshold (for K ≥ 3 variants only)
-  - `guardrails` — declared metric thresholds (pass/fail requires per-run outcome data)
+  - `guardrails` — declared metric thresholds (pass/fail requires per-run observation data)
   - `readiness` — `COLLECTING` or `READY`
   - `recommendation` — `EXTEND` or `READY_FOR_ANALYSIS`
   - `rationale` — one-sentence explanation

@@ -191,8 +191,8 @@ func applyExperimentConfigMetadata(cfg *ExperimentConfig, raw map[string]any) {
 	if m, ok := raw["metric"].(string); ok {
 		cfg.Metric = m
 	}
-	if window, ok := raw["outcome_window"].(string); ok {
-		cfg.OutcomeWindow = window
+	if window, ok := raw["adoption_window"].(string); ok {
+		cfg.AdoptionWindow = window
 	}
 	if sd, ok := raw["start_date"].(string); ok {
 		cfg.StartDate = sd
@@ -473,10 +473,10 @@ func ParseExperimentMetricGraderReference(metric string) (string, bool) {
 	return "", false
 }
 
-// ParseExperimentMetricOutcomeReference returns the outcome kind for a supported
-// outcome:<kind> metric. An unrecognized kind retains the prefix match with an empty kind.
-func ParseExperimentMetricOutcomeReference(metric string) (string, bool) {
-	kind, ok := strings.CutPrefix(strings.TrimSpace(metric), "outcome:")
+// ParseExperimentMetricAdoptionReference returns the adoption kind for a supported
+// adoption:<kind> metric. An unrecognized kind retains the prefix match with an empty kind.
+func ParseExperimentMetricAdoptionReference(metric string) (string, bool) {
+	kind, ok := strings.CutPrefix(strings.TrimSpace(metric), "adoption:")
 	if !ok {
 		return "", false
 	}
@@ -490,7 +490,7 @@ func ParseExperimentMetricOutcomeReference(metric string) (string, bool) {
 	}
 }
 
-// validateExperimentMetricReferences validates outcome kinds and maturity windows,
+// validateExperimentMetricReferences validates adoption kinds and maturity windows,
 // and ensures metrics that reference evals or graders point to declared IDs.
 func validateExperimentMetricReferences(configs map[string]*ExperimentConfig, evals *EvalsConfig, graders *GradersConfig) error {
 	if len(configs) == 0 {
@@ -519,10 +519,10 @@ func validateExperimentMetricReferences(configs map[string]*ExperimentConfig, ev
 		if cfg == nil {
 			continue
 		}
-		if cfg.OutcomeWindow != "" && cfg.OutcomeWindow != "auto" {
-			window, err := time.ParseDuration(cfg.OutcomeWindow)
+		if cfg.AdoptionWindow != "" && cfg.AdoptionWindow != "auto" {
+			window, err := time.ParseDuration(cfg.AdoptionWindow)
 			if err != nil || window <= 0 {
-				return fmt.Errorf("experiments.%s.outcome_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: outcome_window: 72h", experimentName, cfg.OutcomeWindow)
+				return fmt.Errorf("experiments.%s.adoption_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: adoption_window: 72h", experimentName, cfg.AdoptionWindow)
 			}
 		}
 		if cfg.Continual != nil {
@@ -557,8 +557,8 @@ func validateExperimentMetricReference(
 	experimentName, field, metric string,
 	evalIDs, graderIDs map[string]struct{},
 ) error {
-	if kind, referencesOutcome := ParseExperimentMetricOutcomeReference(metric); referencesOutcome && kind == "" {
-		return fmt.Errorf("experiments.%s.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", experimentName, field, metric)
+	if kind, referencesAdoption := ParseExperimentMetricAdoptionReference(metric); referencesAdoption && kind == "" {
+		return fmt.Errorf("experiments.%s.%s: unknown adoption metric %q. Expected adoption:accepted or adoption:zero_touch. Example: metric: adoption:accepted", experimentName, field, metric)
 	}
 	referencedEvalID, referencesEval := ParseExperimentMetricEvalReference(metric)
 	if referencesEval {
@@ -852,7 +852,11 @@ func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, p
 func rewriteExpressionReferences(s string, prefix []string, replace func(string) (string, bool)) string {
 	var b strings.Builder
 	last := 0
-	spans, _ := actionslanguageservice.ExtractExpressions(s)
+	spans, err := actionslanguageservice.ExtractExpressions(s)
+	if err != nil {
+		experimentsLog.Printf("Cannot rewrite experiment expression references: %v", err)
+		return s
+	}
 	for _, span := range spans {
 		expression, err := actionslanguageservice.ParseSyntax(span.Content)
 		if err != nil {
@@ -864,7 +868,8 @@ func rewriteExpressionReferences(s string, prefix []string, replace func(string)
 				return true
 			}
 			if len(path) == len(prefix)+1 && referenceHasPrefix(path, prefix) {
-				if replacement, changed := replace(path[len(prefix)]); changed {
+				name := path[len(prefix)] //nolint:uncheckedsliceindex // The exact-length guard makes this index valid.
+				if replacement, changed := replace(name); changed {
 					start, end := span.Start+3+node.Start, span.Start+3+node.End
 					b.WriteString(s[last:start])
 					b.WriteString(replacement)

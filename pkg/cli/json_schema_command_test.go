@@ -281,10 +281,10 @@ func TestJSONSchemaCommandRejectsInvalidArguments(t *testing.T) {
 	}
 }
 
-func TestJSONSchemaRemovedEpisodeOutcomes(t *testing.T) {
+func TestJSONSchemaRemovedEpisodeAdoptions(t *testing.T) {
 	t.Parallel()
-	stdout, _, err := executeJSONSchemaCommand("outcomes-episodes")
-	if err == nil || !strings.Contains(err.Error(), "unsupported schema: outcomes-episodes") {
+	stdout, _, err := executeJSONSchemaCommand("adoptions-episodes")
+	if err == nil || !strings.Contains(err.Error(), "unsupported schema: adoptions-episodes") {
 		t.Fatalf("expected removed schema to be unsupported, got %v", err)
 	}
 	if stdout != "" {

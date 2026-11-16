@@ -107,11 +107,9 @@ func loadAdditionalGraders(selectors []string) ([]graderRunDefinition, error) {
 }
 
 func validateRegradeDefinition(definition graderRunDefinition) error {
-	if definition.Run != "" || definition.ShellScript != "" || definition.Source == "operational-value" {
-		return fmt.Errorf("grader %q uses Bash; collection regrading supports only built-in and isolated JavaScript graders", definition.ID)
-	}
 	if definition.ID == "" || (definition.Source != "builtin" && definition.Source != "inline") ||
-		(definition.Source == "builtin" && definition.Script != "") {
+		(definition.Source == "builtin" && definition.Script != "") ||
+		(definition.Source == "inline" && strings.TrimSpace(definition.Script) == "") {
 		return fmt.Errorf("grader %q has an unsupported collection definition", definition.ID)
 	}
 	return nil
@@ -200,7 +198,7 @@ func regradeOneProcessedRun(ctx context.Context, outputDir string, processed Pro
 
 func regradeSessionResult(ctx context.Context, definition graderRunDefinition, payload json.RawMessage) json.RawMessage {
 	var output bytes.Buffer
-	executionErr := runSessionGrader(ctx, definition, payload, &output, "")
+	executionErr := runSessionGrader(ctx, definition, payload, &output)
 	raw := bytes.TrimSpace(output.Bytes())
 	var record struct {
 		ID             string          `json:"id"`

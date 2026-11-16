@@ -528,7 +528,7 @@ describe("safe_output_manifest", () => {
   });
 
   describe("extractCreatedItemFromResult", () => {
-    it.each([123456, "123456"])("preserves dispatched run %s for outcome evaluation", runId => {
+    it.each([123456, "123456"])("preserves dispatched run %s for adoption evaluation", runId => {
       const item = extractCreatedItemFromResult("dispatch_workflow", {
         success: true,
         workflow_name: "worker",

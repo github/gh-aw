@@ -55,7 +55,7 @@ type ExperimentAnalysis struct {
 	// Empty when Metric is absent or does not reference an eval.
 	MetricQuestion string `json:"metric_question,omitempty"`
 
-	// MetricEvalResults summarizes observed eval outcomes when Metric references an eval ID
+	// MetricEvalResults summarizes observed eval adoptions when Metric references an eval ID
 	// and evals.jsonl data is available.
 	MetricEvalResults *MetricEvalResults `json:"metric_eval_results,omitempty"`
 
@@ -87,13 +87,13 @@ type ExperimentAnalysis struct {
 	BonferroniAlpha float64 `json:"bonferroni_alpha,omitempty"`
 
 	// Guardrails lists the declared metric thresholds.
-	// Pass/fail evaluation requires per-run outcome data not stored in state.jsonl/state.json (R-STAT-009).
+	// Pass/fail evaluation requires per-run adoption data not stored in state.jsonl/state.json (R-STAT-009).
 	Guardrails []GuardrailStatus `json:"guardrails,omitempty"`
 
-	// Comparisons contains control-versus-variant outcome analyses for grader observations.
+	// Comparisons contains control-versus-variant adoption analyses for grader observations.
 	Comparisons      []MetricComparison        `json:"comparisons,omitempty"`
 	SecondaryMetrics []SecondaryMetricAnalysis `json:"secondary_metrics,omitempty"`
-	OutcomeWindow    *OutcomeWindowInfo        `json:"outcome_window,omitempty"`
+	AdoptionWindow   *AdoptionWindowInfo       `json:"adoption_window,omitempty"`
 
 	// MetricDirection is the normalized primary metric direction: max or min.
 	MetricDirection string `json:"metric_direction,omitempty"`
@@ -104,7 +104,7 @@ type ExperimentAnalysis struct {
 	// VariantOrder preserves configured control/candidate ordering for the decision layer.
 	VariantOrder []string `json:"-"`
 
-	// UsesMetricObservations distinguishes usable outcome counts from assignment counts.
+	// UsesMetricObservations distinguishes usable adoption counts from assignment counts.
 	UsesMetricObservations bool `json:"-"`
 
 	// Readiness is COLLECTING until every variant reaches min_samples, then READY.
@@ -150,11 +150,11 @@ type VariantAnalysis struct {
 	Observations []GraderMetricObservation `json:"observations,omitempty"`
 
 	// Excluded summarizes assigned runs that did not yield a usable grader measurement.
-	Excluded        []ExcludedObservationSummary `json:"excluded,omitempty"`
-	OutcomeCoverage *OutcomeMetricCoverage       `json:"outcome_coverage,omitempty"`
+	Excluded         []ExcludedObservationSummary `json:"excluded,omitempty"`
+	AdoptionCoverage *AdoptionMetricCoverage      `json:"adoption_coverage,omitempty"`
 }
 
-// GuardrailStatusCode is the stable machine-readable outcome of a guardrail evaluation.
+// GuardrailStatusCode is the stable machine-readable adoption of a guardrail evaluation.
 type GuardrailStatusCode string
 
 const (
@@ -177,16 +177,16 @@ type GuardrailStatus struct {
 	Variants  []GuardrailVariantStatus `json:"variants,omitempty"`
 }
 
-// GuardrailVariantStatus reports one variant's aggregate guardrail outcome.
+// GuardrailVariantStatus reports one variant's aggregate guardrail adoption.
 type GuardrailVariantStatus struct {
-	Variant          string                 `json:"variant"`
-	ObservationCount int                    `json:"observation_count"`
-	Mean             *float64               `json:"mean,omitempty"`
-	Passed           *bool                  `json:"passed,omitempty"`
-	OutcomeCoverage  *OutcomeMetricCoverage `json:"outcome_coverage,omitempty"`
+	Variant          string                  `json:"variant"`
+	ObservationCount int                     `json:"observation_count"`
+	Mean             *float64                `json:"mean,omitempty"`
+	Passed           *bool                   `json:"passed,omitempty"`
+	AdoptionCoverage *AdoptionMetricCoverage `json:"adoption_coverage,omitempty"`
 }
 
-// SecondaryMetricAnalysis reports outcome-backed secondary metric observations.
+// SecondaryMetricAnalysis reports adoption-backed secondary metric observations.
 type SecondaryMetricAnalysis struct {
 	Metric      string                           `json:"metric"`
 	MetricType  string                           `json:"metric_type,omitempty"`
@@ -196,13 +196,13 @@ type SecondaryMetricAnalysis struct {
 
 // SecondaryMetricVariantAnalysis reports one variant's secondary metric results.
 type SecondaryMetricVariantAnalysis struct {
-	Variant          string                 `json:"variant"`
-	ObservationCount int                    `json:"observation_count"`
-	Mean             *float64               `json:"mean,omitempty"`
-	OutcomeCoverage  *OutcomeMetricCoverage `json:"outcome_coverage,omitempty"`
+	Variant          string                  `json:"variant"`
+	ObservationCount int                     `json:"observation_count"`
+	Mean             *float64                `json:"mean,omitempty"`
+	AdoptionCoverage *AdoptionMetricCoverage `json:"adoption_coverage,omitempty"`
 }
 
-// MetricEvalResults summarizes observed YES/NO/UNKNOWN outcomes for an eval-backed metric.
+// MetricEvalResults summarizes observed YES/NO/UNKNOWN adoptions for an eval-backed metric.
 type MetricEvalResults struct {
 	Yes          int    `json:"yes"`
 	No           int    `json:"no"`
@@ -247,11 +247,11 @@ func computeExperimentAnalysisWithObservationBundle(
 		a.MetricType = graderObservationMetricType(cfg, graderObservations)
 		a.MetricDirection = normalizeMetricDirection(graderObservations.Direction)
 		a.Comparisons = computeGraderMetricComparisons(cfg, graderObservations, variantNames, a.MetricType)
-		a.OutcomeWindow = graderObservations.OutcomeWindow
+		a.AdoptionWindow = graderObservations.AdoptionWindow
 	} else {
 		for _, set := range guardrailObservations {
-			if set != nil && set.OutcomeWindow != nil {
-				a.OutcomeWindow = set.OutcomeWindow
+			if set != nil && set.AdoptionWindow != nil {
+				a.AdoptionWindow = set.AdoptionWindow
 				break
 			}
 		}
@@ -263,7 +263,7 @@ func computeExperimentAnalysisWithObservationBundle(
 	return a
 }
 
-func computeOutcomeSecondaryMetricAnalyses(
+func computeAdoptionSecondaryMetricAnalyses(
 	cfg *workflow.ExperimentConfig,
 	sets map[string]*graderMetricObservationSet,
 	variants []VariantAnalysis,
@@ -286,7 +286,7 @@ func computeOutcomeSecondaryMetricAnalyses(
 			observations := set.ByVariant[variant.Name]
 			variantAnalysis := SecondaryMetricVariantAnalysis{
 				Variant: variant.Name, ObservationCount: len(observations),
-				OutcomeCoverage: outcomeVariantCoverage(set, variant.Name),
+				AdoptionCoverage: adoptionVariantCoverage(set, variant.Name),
 			}
 			if len(observations) > 0 {
 				mean := meanGraderObservations(observations)
@@ -382,7 +382,7 @@ func applyExperimentGuardrails(
 			variantStatus := GuardrailVariantStatus{
 				Variant:          variant.Name,
 				ObservationCount: len(observations),
-				OutcomeCoverage:  outcomeVariantCoverage(set, variant.Name),
+				AdoptionCoverage: adoptionVariantCoverage(set, variant.Name),
 			}
 			if len(observations) > 0 {
 				mean := meanGraderObservations(observations)
@@ -508,13 +508,13 @@ func experimentVariantCounts(exp ExperimentVariantStats, cfg *workflow.Experimen
 // variant. Shared by experimentVariantCounts and reconcileExperimentDetailsWithConfigs so
 // the two callers apply identical reconciliation semantics.
 func filterDeclaredVariantCounts(counts map[string]int, declaredVariants []string) map[string]int {
-	declared := make(map[string]bool, len(declaredVariants))
+	declared := make(map[string]struct{}, len(declaredVariants))
 	for _, name := range declaredVariants {
-		declared[name] = true
+		declared[name] = struct{}{}
 	}
 	filtered := make(map[string]int, typeutil.SafeAllocationCapacity(len(counts), len(declaredVariants)))
 	for name, count := range counts {
-		if declared[name] {
+		if _, ok := declared[name]; ok {
 			filtered[name] = count
 		}
 	}
@@ -556,14 +556,15 @@ func buildVariantAnalyses(
 		count := counts[name]
 		variant := VariantAnalysis{
 			Name: name, Count: count, ObservedPct: safePercent(count, total),
-			ExpectedPct: expected[i] * 100, MinSamples: minSamples, BelowMinSamples: count < minSamples,
+			ExpectedPct: expected[i] * 100, //nolint:uncheckedsliceindex // expected is built for the same names slice.
+			MinSamples:  minSamples, BelowMinSamples: count < minSamples,
 		}
 		if graderObservations != nil {
 			observations := graderObservations.ByVariant[name]
 			variant.ObservationCount = len(observations)
 			variant.BelowMinSamples = len(observations) < minSamples
 			variant.Excluded = graderObservations.Exclusions[name]
-			variant.OutcomeCoverage = outcomeVariantCoverage(graderObservations, name)
+			variant.AdoptionCoverage = adoptionVariantCoverage(graderObservations, name)
 			if len(observations) > 0 {
 				mean := meanGraderObservations(observations)
 				variant.Mean = &mean
@@ -589,7 +590,7 @@ func applyExperimentBalance(
 		a.IsBalanced = true
 	} else if total > 0 && k >= 2 {
 		for i, name := range names {
-			expected := float64(total) * expectedPcts[i]
+			expected := float64(total) * expectedPcts[i] //nolint:uncheckedsliceindex // expectedPcts corresponds one-to-one with names.
 			if expected > 0 {
 				diff := float64(counts[name]) - expected
 				a.ChiSquare += (diff * diff) / expected
@@ -634,7 +635,7 @@ func applyExperimentReadiness(a *ExperimentAnalysis, usesObservations bool) {
 	} else {
 		a.Readiness = ExperimentReadinessReady
 		a.Recommendation = "READY_FOR_ANALYSIS"
-		a.Rationale = fmt.Sprintf("all %d variants have reached min_samples (%d); outcome metric analysis is available",
+		a.Rationale = fmt.Sprintf("all %d variants have reached min_samples (%d); adoption metric analysis is available",
 			k, a.MinSamples)
 		experimentsStatsLog.Printf("Experiment %q recommendation: READY_FOR_ANALYSIS (all %d variants above min_samples=%d)",
 			a.ExperimentName, k, a.MinSamples)
@@ -655,7 +656,7 @@ func expectedProportions(sortedVariantNames []string, cfg *workflow.ExperimentCo
 		nameToWeight := make(map[string]float64, len(cfg.Variants))
 		totalWeight := 0.0
 		for i, name := range cfg.Variants {
-			w := float64(cfg.Weight[i])
+			w := float64(cfg.Weight[i]) //nolint:uncheckedsliceindex // The equal-length guard above bounds i.
 			nameToWeight[name] = w
 			totalWeight += w
 		}
@@ -669,7 +670,7 @@ func expectedProportions(sortedVariantNames []string, cfg *workflow.ExperimentCo
 					allFound = false
 					break
 				}
-				result[i] = w / totalWeight
+				result[i] = w / totalWeight //nolint:uncheckedsliceindex // The range index is bounded by result length k.
 			}
 			if allFound {
 				return result
@@ -725,17 +726,17 @@ func printOneExperimentAnalysis(a ExperimentAnalysis) {
 	printVariantProgress(a)
 	printObservationExclusions(a)
 	for _, variant := range a.Variants {
-		printOutcomeMetricCoverage(variant.Name, variant.OutcomeCoverage)
+		printAdoptionMetricCoverage(variant.Name, variant.AdoptionCoverage)
 	}
-	if a.OutcomeWindow != nil {
-		fmt.Fprintf(os.Stderr, "  Outcome window: %s (%s", a.OutcomeWindow.Window, a.OutcomeWindow.Source)
-		if a.OutcomeWindow.Source != "configured" {
-			fmt.Fprintf(os.Stderr, ", sample: %d outputs", a.OutcomeWindow.SampleSize)
+	if a.AdoptionWindow != nil {
+		fmt.Fprintf(os.Stderr, "  Adoption window: %s (%s", a.AdoptionWindow.Window, a.AdoptionWindow.Source)
+		if a.AdoptionWindow.Source != "configured" {
+			fmt.Fprintf(os.Stderr, ", sample: %d outputs", a.AdoptionWindow.SampleSize)
 		}
 		fmt.Fprintln(os.Stderr, ")")
 	}
 	printBalanceAnalysis(a)
-	printOutcomeComparisons(a.Comparisons)
+	printAdoptionComparisons(a.Comparisons)
 	printSecondaryMetricAnalyses(a.SecondaryMetrics)
 	printGuardrails(a.Guardrails)
 	fmt.Fprintf(os.Stderr, "  Readiness  : %s\n", a.Readiness)
@@ -752,9 +753,9 @@ func printSecondaryMetricAnalyses(metrics []SecondaryMetricAnalysis) {
 		fmt.Fprintln(os.Stderr)
 		for _, variant := range metric.Variants {
 			fmt.Fprintf(os.Stderr, "    %s: observations=%d\n", variant.Variant, variant.ObservationCount)
-			printOutcomeMetricCoverage(metric.Metric+" / "+variant.Variant, variant.OutcomeCoverage)
+			printAdoptionMetricCoverage(metric.Metric+" / "+variant.Variant, variant.AdoptionCoverage)
 		}
-		printOutcomeComparisons(metric.Comparisons)
+		printAdoptionComparisons(metric.Comparisons)
 	}
 }
 
@@ -870,11 +871,11 @@ func printBalanceAnalysis(a ExperimentAnalysis) {
 	}
 }
 
-func printOutcomeComparisons(comparisons []MetricComparison) {
+func printAdoptionComparisons(comparisons []MetricComparison) {
 	if len(comparisons) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, "  Outcome comparisons:")
+	fmt.Fprintln(os.Stderr, "  Adoption comparisons:")
 	for _, comparison := range comparisons {
 		fmt.Fprintf(os.Stderr, "    %s vs %s: %s, delta=%+.4g",
 			comparison.Variant, comparison.ControlVariant, comparison.AnalysisType, comparison.Delta)
@@ -902,7 +903,7 @@ func printGuardrails(guardrails []GuardrailStatus) {
 	fmt.Fprintf(os.Stderr, "  Guardrails : %s\n", strings.Join(parts, "  •  "))
 	for _, guardrail := range guardrails {
 		for _, variant := range guardrail.Variants {
-			printOutcomeMetricCoverage(guardrail.Name+" / "+variant.Variant, variant.OutcomeCoverage)
+			printAdoptionMetricCoverage(guardrail.Name+" / "+variant.Variant, variant.AdoptionCoverage)
 		}
 	}
 }

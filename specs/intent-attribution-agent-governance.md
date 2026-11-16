@@ -149,7 +149,7 @@ Agent execution
   ↓
 GitHub artifact
   ↓
-Outcome evaluation
+Adoption evaluation
   ↓
 Evidence
 ```
@@ -193,7 +193,7 @@ Examples:
 * mandatory human approval
 * auto-merge prohibited
 
-### Outcome
+### Adoption
 
 What observable GitHub state occurred.
 
@@ -943,7 +943,7 @@ open issue                   → pending
 ```
 
 ```go
-type OutcomeRecord struct {
+type AdoptionRecord struct {
     ArtifactURL string `json:"artifact_url"`
     Status      string `json:"status"`
 
@@ -972,7 +972,7 @@ type EvidenceRecord struct {
     HumanApprovalRequired bool `json:"human_approval_required"`
     HumanApprovalReceived bool `json:"human_approval_received"`
 
-    Outcome string `json:"outcome"`
+    Adoption string `json:"adoption"`
 
     TraceID string `json:"trace_id,omitempty"`
 }
@@ -985,13 +985,13 @@ The existing weighted reporting remains useful when interpreted correctly.
 ### Attribution coverage
 
 ```text
-mapped outcomes / all evaluated outcomes
+mapped adoptions / all evaluated adoptions
 ```
 
 ### Acceptance rate
 
 ```text
-accepted outcomes / attempted outcomes
+accepted adoptions / attempted adoptions
 ```
 
 ### Weighted acceptance rate
@@ -1044,7 +1044,7 @@ agentic.workflow.run
 ├── github.artifact.create
 ├── checks.evaluate
 ├── approval.evaluate
-└── outcome.evaluate
+└── adoption.evaluate
 ```
 
 Recommended span attributes:
@@ -1062,7 +1062,7 @@ agent.policy.human_approval_required
 agent.policy.auto_merge_allowed
 
 github.artifact.type
-github.artifact.outcome
+github.artifact.adoption
 ```
 
 High-cardinality identifiers belong on spans or persisted records, not metric dimensions.
@@ -1104,7 +1104,7 @@ priority
 risk
 domain
 autonomy
-outcome
+adoption
 ```
 
 ## CLI
@@ -1143,17 +1143,17 @@ Applied rules
   organization-security-baseline
 ```
 
-### Report outcomes
+### Report adoptions
 
 ```bash
-gh aw outcomes report \
+gh aw logs --adoptions \
   --repo acme/platform
 ```
 
 Example:
 
 ```text
-Outcomes
+Adoptions
   Total:                  40
   Accepted:               28
   Rejected:                7
@@ -1184,7 +1184,7 @@ Already implemented or partially implemented:
 2. Compute weights from labels
 3. Trace pull requests to closing issues
 4. Record root URL
-5. Enrich outcome reports
+5. Enrich adoption reports
 6. Aggregate accepted and attempted weights
 7. Produce per-label breakdowns
 
@@ -1279,7 +1279,7 @@ Implement:
 11. Authorization events
 12. Evidence records
 13. Low-cardinality operational metrics
-14. Asynchronous trace links for later GitHub outcomes
+14. Asynchronous trace links for later GitHub adoptions
 
 ### Phase 7: broader intent relationships
 
@@ -1391,7 +1391,7 @@ The initial governance release is complete when:
 5. Human approval and check requirements are enforced for the initial governed cases
 6. Every policy decision records enough provenance to audit why authority was granted or denied
 7. Every governed run emits execution telemetry
-8. Every resulting artifact receives an outcome and evidence record
+8. Every resulting artifact receives delivery, adoption, and evidence records
 9. No LLM decision is required for official authorization
 
 ## Product position

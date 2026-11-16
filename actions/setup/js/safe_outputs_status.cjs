@@ -1,17 +1,17 @@
 // @ts-check
 
 /**
- * @typedef {"delegated"|"cancelled"|"deferred"|"skipped"|"warning"|"success"|"failed"} SafeOutputOutcome
+ * @typedef {"delegated"|"cancelled"|"deferred"|"skipped"|"warning"|"success"|"failed"} SafeOutputDelivery
  */
 
 /**
- * Read an outcome field from either the processing record or its nested handler result.
+ * Read an delivery field from either the processing record or its nested handler result.
  *
  * @param {any} result
  * @param {string} field
  * @returns {any}
  */
-function pickOutcomeField(result, field) {
+function pickDeliveryField(result, field) {
   if (result && typeof result === "object" && result[field] !== undefined) {
     return result[field];
   }
@@ -23,20 +23,20 @@ function pickOutcomeField(result, field) {
 }
 
 /**
- * Classify a processing result using the shared safe-output outcome precedence.
+ * Classify a processing result using the shared safe-output delivery precedence.
  *
  * @param {any} result
- * @returns {SafeOutputOutcome}
+ * @returns {SafeOutputDelivery}
  */
 function classifySafeOutputResult(result) {
-  if (pickOutcomeField(result, "delegated") === true) return "delegated";
-  if (result?.type === "ledger_append" && pickOutcomeField(result, "queued") === true) return "delegated";
-  if (pickOutcomeField(result, "cancelled")) return "cancelled";
-  if (pickOutcomeField(result, "deferred")) return "deferred";
+  if (pickDeliveryField(result, "delegated") === true) return "delegated";
+  if (result?.type === "ledger_append" && pickDeliveryField(result, "queued") === true) return "delegated";
+  if (pickDeliveryField(result, "cancelled")) return "cancelled";
+  if (pickDeliveryField(result, "deferred")) return "deferred";
   // A skipped operation did not apply a mutation, even when it carries a warning.
-  if (pickOutcomeField(result, "skipped")) return "skipped";
-  if (pickOutcomeField(result, "warning")) return "warning";
-  if (pickOutcomeField(result, "success")) return pickOutcomeField(result, "deferred_manifest") ? "deferred" : "success";
+  if (pickDeliveryField(result, "skipped")) return "skipped";
+  if (pickDeliveryField(result, "warning")) return "warning";
+  if (pickDeliveryField(result, "success")) return pickDeliveryField(result, "deferred_manifest") ? "deferred" : "success";
   return "failed";
 }
 
@@ -58,8 +58,8 @@ function isFailedProcessingResult(result) {
  */
 function computeSafeOutputsStatus(results) {
   const safeResults = Array.isArray(results) ? results : [];
-  const outcomes = safeResults.map(classifySafeOutputResult).filter(outcome => outcome !== "delegated");
-  const count = outcome => outcomes.filter(itemOutcome => itemOutcome === outcome).length;
+  const deliveries = safeResults.map(classifySafeOutputResult).filter(delivery => delivery !== "delegated");
+  const count = delivery => deliveries.filter(itemDelivery => itemDelivery === delivery).length;
   const itemsApplied = count("success");
   const itemsSkipped = count("skipped");
   const itemsWarnings = count("warning");
@@ -89,5 +89,5 @@ module.exports = {
   classifySafeOutputResult,
   computeSafeOutputsStatus,
   isFailedProcessingResult,
-  pickOutcomeField,
+  pickDeliveryField,
 };

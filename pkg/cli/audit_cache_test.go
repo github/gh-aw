@@ -57,22 +57,22 @@ func TestLoadCachedAuditDataRequiresMatchingRunState(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestLoadCachedAuditDataDropsHistoricalOutcomeSnapshot(t *testing.T) {
+func TestLoadCachedAuditDataDropsHistoricalAdoptionSnapshot(t *testing.T) {
 	runDir := t.TempDir()
 	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success"}
 	data := AuditData{
-		CacheSource:    auditCacheSourceFull,
-		Overview:       buildAuditOverview(run, nil),
-		Outcomes:       []OutcomeReport{{Type: "create_issue"}},
-		OutcomeSummary: &OutcomeSummary{Total: 1},
+		CacheSource:     auditCacheSourceFull,
+		Overview:        buildAuditOverview(run, nil),
+		Adoptions:       []AdoptionReport{{Type: "create_issue"}},
+		AdoptionSummary: &AdoptionSummary{Total: 1},
 	}
 	require.NoError(t, writeAuditData(runDir, data))
 
 	cached, ok := loadCachedAuditData(runDir, run, auditCacheSourceFull)
 	require.True(t, ok)
 	assert.Equal(t, data.Overview, cached.Overview)
-	assert.Empty(t, cached.Outcomes)
-	assert.Nil(t, cached.OutcomeSummary)
+	assert.Empty(t, cached.Adoptions)
+	assert.Nil(t, cached.AdoptionSummary)
 }
 
 func TestLoadCachedAuditDataRejectsOlderSchema(t *testing.T) {
@@ -80,7 +80,7 @@ func TestLoadCachedAuditDataRejectsOlderSchema(t *testing.T) {
 
 	// Earlier audits lack captured queue diagnostics, unified-session model
 	// resolution findings, engine step failure findings, evals summaries scoped
-	// to the audited attempt, threat-detection outcomes, and AWF steering
+	// to the audited attempt, threat-detection adoptions, and AWF steering
 	// deliveries with gateway steering metadata, so must be regenerated.
 	require.Equal(t, 14, auditSchemaVersion)
 	for _, schemaVersion := range []int{0, 5, 6, 7, 8, 9, 10, 11, 12, 13} {

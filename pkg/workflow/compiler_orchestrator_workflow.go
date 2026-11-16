@@ -782,20 +782,6 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		return fmt.Errorf("invalid graders configuration: %w", err)
 	}
 	workflowData.Graders = gradersConfig
-	for id, source := range importsResult.GraderRunSources {
-		grader := gradersConfig.Graders[id]
-		if grader == nil || grader.Run == "" {
-			continue
-		}
-		if authored, ok := frontmatter["graders"].(map[string]any); ok {
-			if definition, ok := authored[id].(map[string]any); ok {
-				if _, overridesRun := definition["run"]; overridesRun {
-					continue
-				}
-			}
-		}
-		grader.RunSourcePath = source
-	}
 	if err := validateExperimentMetricReferences(workflowData.ExperimentConfigs, workflowData.Evals, workflowData.Graders); err != nil {
 		return fmt.Errorf("invalid experiments configuration: %w", err)
 	}

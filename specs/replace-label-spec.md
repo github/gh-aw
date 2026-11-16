@@ -525,7 +525,7 @@ The staged-mode preview SHOULD identify the `label_to_add` value that would be r
 
 ### 8.7 Sync Notes
 
-The REST failure and retry semantics in [Section 7](#7-error-handling) are mirrored by the `replace_label` outcome-evaluation rules in [`safe-output-outcome-evaluation.md` Section 30](safe-output-outcome-evaluation.md#30-replace_label). Changes to `404`, `5xx`, or `429` handling in either document SHOULD be reviewed against the other document in the same change.
+The REST failure and retry semantics in [Section 7](#7-error-handling) are mirrored by the `replace_label` adoption-evaluation rules in [`safe-output-adoption-evaluation.md` Section 30](safe-output-adoption-evaluation.md#30-replace_label). Changes to `404`, `5xx`, or `429` handling in either document SHOULD be reviewed against the other document in the same change.
 
 ---
 
@@ -538,7 +538,7 @@ The test suite for `replace-label` spans two layers:
 - **Unit tests** (`actions/setup/js/replace_label.test.cjs`): Test the JavaScript handler in isolation using mocked GitHub API clients.
 - **Integration tests** (`pkg/workflow/`): Test Go configuration parsing and schema validation using the common safe-output test infrastructure.
 
-For outcome evaluation compliance (verifying that the `replace_label` outcome evaluator correctly classifies `accepted`, `rejected`, `pending`, and API-failure scenarios), see the outcome evaluation conformance test requirements in [`specs/safe-output-outcome-evaluation.md`](safe-output-outcome-evaluation.md) — specifically the `replace_label` section (Section 30) and the Conformance Test Table entry for `replace_label`.
+For adoption evaluation compliance (verifying that the `replace_label` adoption evaluator correctly classifies `accepted`, `rejected`, `pending`, and API-failure scenarios), see the adoption evaluation conformance test requirements in [`specs/safe-output-adoption-evaluation.md`](safe-output-adoption-evaluation.md) — specifically the `replace_label` section (Section 30) and the Conformance Test Table entry for `replace_label`.
 
 ### 9.2 Test Requirements
 

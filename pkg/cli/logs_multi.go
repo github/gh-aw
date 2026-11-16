@@ -290,9 +290,9 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 			return fmt.Errorf("harbor export: %w", err)
 		}
 	}
-	var outcomeReports []OutcomesData
-	if opts.Outcomes {
-		outcomeReports, err = collectLogsOutcomes(ctx, processedRuns, opts.OutcomesDir, opts.Verbose)
+	var adoptionReports []AdoptionsData
+	if opts.Adoptions {
+		adoptionReports, err = collectLogsAdoptions(ctx, processedRuns, opts.AdoptionsDir, opts.Verbose)
 		if err != nil {
 			return err
 		}
@@ -324,7 +324,7 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	renderOpts.apiRateLimit = apiRateLimit
 	renderOpts.apiRateLimits = apiRateLimits
 	renderOpts.cachedJSONLWriter = opts.cachedJSONLWriter
-	renderOpts.outcomeReports = outcomeReports
+	renderOpts.adoptionReports = adoptionReports
 	return renderLogsOutput(processedRuns, renderOpts)
 }
 
@@ -421,7 +421,7 @@ type logsTargetSharedState struct {
 // branch below is reached only in the rare race where the shared deadline or
 // cancellation fires before this goroutine is scheduled. That branch is not
 // dead code: it must still build a resumable continuation (or report the
-// shared count/rate-limit outcome) so such a target is not silently dropped
+// shared count/rate-limit adoption) so such a target is not silently dropped
 // from the report.
 func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targetID int, target logsWorkflowTarget, shared logsTargetSharedState) (targetResult logsTargetResult) { //nolint:largefunc // Existing target collection remains centralized.
 	defer shared.batchScheduler.remove(targetID)

@@ -63,7 +63,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Enterprise |  | Band header (Enterprise): any agent, any provider, any scale. |
 | Infrastructure as code | illustrative | Workflows compile to plain Actions YAML, so they run on any runner, reuse the Actions ecosystem and keep enterprise controls, with the agent behind the firewall. |
 | OpenTelemetry | illustrative | Agentic workflows export OpenTelemetry traces to collectors you run, configured per workflow or as an organization default. |
-| Distributed tracing | illustrative | One shared trace follows a task from its workflow runs and jobs through agent sessions, tool calls, retries and dispatched runs in other repositories, with outcomes and cost on every span. |
+| Distributed tracing | illustrative | One shared trace follows a task from its workflow runs and jobs through agent sessions, tool calls, retries and dispatched runs in other repositories, with adoptions and cost on every span. |
 | GitHub-native governance | illustrative | Defaults and policy variables are set at enterprise, organization or repository scope and enforced with GitHub controls such as protected environments. |
 | Operator-owned infrastructure | illustrative | Operators run agentic jobs on their own Linux runners, on Kubernetes, or in air-gapped networks with mirrored actions and container images. |
 | GitHub App permissions | illustrative | A GitHub App installed on selected repositories mints short-lived scoped tokens, keeping the agent read-only and leaving writes to trusted safe-output jobs in each repository. |

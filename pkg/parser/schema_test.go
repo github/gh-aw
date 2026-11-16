@@ -1710,25 +1710,25 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_WorkflowRunConclus
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_OperationalValueGrader(t *testing.T) {
 	t.Parallel()
 
-	for _, runPath := range []string{
-		".github/workflows/graders/example-operational-value.sh",
-		".github/workflows/graders/..secret.sh",
-		"./graders/example-operational-value.sh",
-	} {
-		t.Run(runPath, func(t *testing.T) {
-			frontmatter := map[string]any{
-				"on": "workflow_dispatch",
-				"graders": map[string]any{
-					"operational-value": map[string]any{
-						"run": runPath,
-					},
-				},
-			}
+	frontmatter := map[string]any{
+		"on": "workflow_dispatch",
+		"graders": map[string]any{
+			"operational-value": map[string]any{
+				"script": "return session.length",
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/operational-value-grader-test.md"); err != nil {
+		t.Fatal(err)
+	}
 
-			if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/operational-value-grader-test.md"); err != nil {
-				t.Fatal(err)
-			}
-		})
+	frontmatter["graders"] = map[string]any{
+		"operational-value": map[string]any{
+			"run": "./graders/example-operational-value.sh",
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/operational-value-grader-test.md"); err == nil {
+		t.Fatal("expected graders.operational-value.run to fail schema validation")
 	}
 }
 

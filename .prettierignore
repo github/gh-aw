@@ -15,7 +15,6 @@ build/
 schemas/audit.schema.json
 schemas/logs.schema.json
 schemas/logs-jsonl.schema.json
-schemas/outcomes-episodes.schema.json
 
 # DevContainer configuration (should not be reformatted)
 .devcontainer/devcontainer.json
