@@ -264,7 +264,11 @@ func decodeErrorGuard(pass *analysis.Pass, ifStmt *ast.IfStmt, call *ast.CallExp
 
 func decodeErrorObject(pass *analysis.Pass, stmt ast.Stmt, call *ast.CallExpr) types.Object {
 	assign, ok := stmt.(*ast.AssignStmt)
-	if !ok || len(assign.Rhs) != 1 || astutil.UnwrapParenExpr(assign.Rhs[0]) != call {
+	if !ok || len(assign.Rhs) != 1 {
+		return nil
+	}
+	rhs, ok := astutil.RhsExprForIndex(assign.Rhs, 0)
+	if !ok || astutil.UnwrapParenExpr(rhs) != call {
 		return nil
 	}
 
