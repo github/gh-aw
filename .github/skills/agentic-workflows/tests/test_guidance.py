@@ -43,6 +43,62 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_browser_decision_routes_survive_prefix_reads(self):
+        route = "playwright.md#browser-decision-and-readiness"
+        for name in (
+            "github-agentic-workflows.md", "create-agentic-workflow.md",
+            "designer.md", "update-agentic-workflow.md",
+            "create-agentic-workflow-validation.md", "debug-agentic-workflow.md",
+            "designer-mappings.md", "syntax-tools-imports.md", "visual-regression.md",
+        ):
+            guide = ROOT / ".github/aw" / name
+            data = guide.read_bytes()
+            contract = data.split(b"<!-- instruction-prefix-end -->", 1)[0]
+            with self.subTest(guide=name):
+                self.assertLessEqual(len(contract), 7500)
+                self.assertIn(route, data[:7500].decode("utf-8"))
+                for link in re.findall(r"\]\(([^)]+)\)", contract.decode("utf-8")):
+                    if link.startswith("https://"):
+                        continue
+                    path, _, anchor = link.partition("#")
+                    target = guide.parent / path if path else guide
+                    self.assertTrue(target.is_file(), link)
+                    if anchor:
+                        headings = re.findall(r"^#{1,6} (.+)$", target.read_text(), re.MULTILINE)
+                        self.assertIn(anchor, [heading_anchor(heading) for heading in headings], link)
+
+    def test_browser_decision_covers_rendered_and_static_only_work(self):
+        guide = ROOT / ".github/aw/playwright.md"
+        contract = normalized(guide.read_text().split("<!-- instruction-prefix-end -->", 1)[0])
+        for required in (
+            "Rendered pages", "JavaScript interactions", "UI/navigation flows",
+            "screenshots", "browser-based accessibility/E2E checks",
+            "Source-only edits/reviews", "API checks", "plain-text documentation retrieval",
+            "Do not add a browser", 'not just the word "browser"',
+            "compiler provisions CLI, skills, and Chromium",
+            "never install during agent execution", "Same-sandbox loopback needs no `local`",
+            "startup, directory creation, bounded `curl` readiness, and PID cleanup",
+            "trailing", "normalized away", "exact full-command",
+            "Never use unrestricted Bash", "asynchronous shell mode",
+            "artifact publication", "required browser checks failed",
+            "mounted upload staging directory", "staging-relative `allowed-paths`",
+            "No-dispatch requests prohibit hosted execution, not explicitly authorized local work",
+            "grants no execution or live-test authorization",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+
+    def test_browser_network_mappings_do_not_require_local_ecosystem(self):
+        mappings = (ROOT / ".github/aw/designer-mappings.md").read_text()
+        syntax = (ROOT / ".github/aw/syntax-tools-imports.md").read_text()
+        visual = (ROOT / ".github/aw/visual-regression.md").read_text()
+        self.assertIn("loopback is available by default; do not add `local`", mappings)
+        self.assertIn("retrieve plain-text web pages/docs", mappings)
+        self.assertIn("inspect rendered pages, test UI flows, or capture screenshots", mappings)
+        self.assertNotIn("restrict network to `local` + `playwright`", syntax)
+        self.assertNotIn("    - local\n", visual)
+        self.assertIn("does not supply that application lifecycle", normalized(visual))
+
     def test_split_creator_routes_resolve_without_hidden_tail_reads(self):
         creator = ROOT / ".github/aw/create-agentic-workflow.md"
         topics = (

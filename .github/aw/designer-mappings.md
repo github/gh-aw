@@ -6,6 +6,16 @@ description: Quick reference mappings from user requirements to agentic workflow
 
 Quick-reference mapping tables for `.github/aw/designer.md`. Load this file during Phase 2–7 of the interview when translating user answers into workflow syntax.
 
+Before tool/network mapping, apply the
+[browser decision](playwright.md#browser-decision-and-readiness). Rendered UI
+evidence needs the built-in CLI and supporting lifecycle permissions; plain-text
+retrieval does not. Load the matching [trigger](#trigger-mapping),
+[output](#safe-output-mapping), [network](#network-mapping), [tool](#tool-mapping),
+[pattern](#pattern-heuristics), [auth](#integration-auth-mapping), and
+[data](#data-strategy-mapping) tables below when translating those requirements.
+
+<!-- instruction-prefix-end -->
+
 ## Trigger Mapping
 
 | User says... | Maps to |
@@ -91,7 +101,7 @@ Quick-reference mapping tables for `.github/aw/designer.md`. Load this file duri
 | "runs Playwright browser tests" | include `playwright` in `network.allowed` |
 | "runs apt install / yum / apk" | include `linux-distros` in `network.allowed` |
 | "uses Terraform / HashiCorp registry" | include `terraform` in `network.allowed` |
-| "connects to localhost / loopback / local services" | include `local` in `network.allowed` |
+| "connects to a server inside the same agent sandbox" | loopback is available by default; do not add `local` |
 | "no external access" | `network.allowed: [defaults]` (or `[]` if explicitly zero network) |
 
 For less common ecosystems (Swift, PHP, Dart, Haskell, Perl, fonts, Deno, Elixir, Bazel, Clojure, Julia, Kotlin, Lua, node CDNs, OCaml, PowerShell, R, Scala, Zig, dev-tools, Chrome, LaTeX, Lean, python-native) and the full list of **invalid shorthands** (`npm`, `pypi`, `docker`, etc. — see `.github/aw/network.md#invalid-shorthands`), consult `.github/aw/network.md` before generating.
@@ -105,8 +115,8 @@ For less common ecosystems (Swift, PHP, Dart, Haskell, Perl, fonts, Deno, Elixir
 | "use other MCP servers but keep token cost down" | `tools.cli-proxy: true` (hybrid CLI-proxy mode) |
 | "edit files" | `edit` tool (default unless restricted) |
 | "run commands/tests" | `bash` tool (default unless restricted) |
-| "browse web pages/docs" | `web-fetch` and/or `web-search` |
-| "test UI flows" | `playwright` |
+| "retrieve plain-text web pages/docs" | `web-fetch` and/or `web-search` |
+| "inspect rendered pages, test UI flows, or capture screenshots" | `tools.playwright` plus the [browser readiness contract](playwright.md#browser-decision-and-readiness) |
 
 ## Pattern Heuristics
 

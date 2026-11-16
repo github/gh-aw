@@ -2,9 +2,11 @@ package workflow
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/typeutil"
 )
 
@@ -190,16 +192,22 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 }
 
 func usesSafeOutputsArtifactStaging(config *SafeOutputsConfig) bool {
+	return len(safeOutputsArtifactStagingTypes(config)) != 0
+}
+
+func safeOutputsArtifactStagingTypes(config *SafeOutputsConfig) []string {
 	if config == nil {
-		return false
+		return nil
 	}
+	var types []string
 	if config.UploadArtifact != nil {
-		return true
+		types = append(types, "upload_artifact")
 	}
-	for _, script := range config.Scripts {
-		if len(connectorStagedFilePolicies(script.connectorInputSchema)) != 0 {
-			return true
+	for name, script := range config.Scripts {
+		if script != nil && len(connectorStagedFilePolicies(script.connectorInputSchema)) != 0 {
+			types = append(types, stringutil.NormalizeSafeOutputIdentifier(name))
 		}
 	}
-	return false
+	slices.Sort(types)
+	return slices.Compact(types)
 }

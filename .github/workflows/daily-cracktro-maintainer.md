@@ -71,7 +71,7 @@ safe-outputs:
       - .github/skills/cracktro/data-refresh.md
       - .github/skills/cracktro/refresh/**
   upload-artifact:
-    allowed-paths: ["/tmp/gh-aw/agent/cracktro-review/"]
+    allowed-paths: ["cracktro-review/**"]
     max-uploads: 1
     retention-days: 7
   noop:
@@ -140,7 +140,7 @@ Run `node --check docs/public/cracktro/deck.js`, `git diff --check`, and inspect
 the complete diff. Use the provisioned Playwright CLI; no build or installation.
 Run `node .github/scripts/cracktro_preview.cjs` as one standalone async Bash call.
 It serves `docs/public` on `127.0.0.1:4329` and creates
-`/tmp/gh-aw/agent/cracktro-review/`.
+`"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review/"`.
 Keep its process handle; do not run Python directly, `mkdir`, or shell loops.
 Check readiness in one standalone call:
 `curl http://127.0.0.1:4329/cracktro/ --fail --silent --show-error --retry 15 --retry-connrefused --retry-delay 2 --retry-max-time 25 --connect-timeout 2 --max-time 5`.
@@ -152,9 +152,11 @@ Inspect changed slides and adjacent transitions at desktop and narrow widths:
 keyboard navigation, links, notes, sound controls, content rules, console/network
 errors. Follow `docs/tests/talk.spec.ts`; run relevant tests only when dependencies
 exist. Distinguish browser checks from passing suites. Save screenshots under
-`/tmp/gh-aw/agent/cracktro-review/`; publish with `upload_artifact`.
+`"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review/"`; publish
+with `upload_artifact` using staging-relative `path: "cracktro-review"`.
+Do not upload an arbitrary `/tmp` source or the staging root itself.
 Close the browser; use `stop_bash` with the launcher handle, then verify its stop
-result and `list_bash`.
+result and `list_bash`, including on validation failure.
 
 Before publication, recheck overlapping PRs. Use only `create_pull_request`;
 never push, merge, enable auto-merge, dispatch, or use raw GitHub writes.

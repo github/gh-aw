@@ -2035,6 +2035,34 @@ describe("copilot_sdk_driver.cjs", () => {
       return capturedHandler;
     }
 
+    it("allows Daily Cracktro's browser launcher without direct Python or directory grants", async () => {
+      const source = fs.readFileSync(new URL("../../../.github/workflows/daily-cracktro-maintainer.md", import.meta.url), "utf8");
+      const frontmatter = source.split("\n---\n", 2)[0];
+      const launcherGrants = [...frontmatter.matchAll(/^    - "(node) \*"/gm)].map(match => `shell(${match[1]})`);
+      const handler = await makePermissionHandlerViaSDK([...launcherGrants, "shell(curl:*)", "shell(kill)", "shell(playwright-cli:*)"]);
+      for (const fullCommandText of [
+        "node .github/scripts/cracktro_preview.cjs",
+        "curl --fail --silent --show-error --connect-timeout 2 --max-time 5 --retry 10 --retry-connrefused --retry-all-errors --retry-max-time 30 http://127.0.0.1:4329/cracktro/",
+        "playwright-cli open --browser=chromium http://127.0.0.1:4329/cracktro/",
+        "playwright-cli close",
+        "kill 12345",
+      ]) {
+        expect(handler({ kind: "shell", commands: [], fullCommandText })).toEqual({ kind: "approve-once" });
+      }
+      for (const fullCommandText of [
+        "python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public",
+        'mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review"',
+        "python3 -c 'print(1)'",
+        "python3 -m http.server 4329 --bind 0.0.0.0 --directory docs/public",
+        "python3 -m http.server 4329 --bind 127.0.0.1 --directory /",
+        "mkdir -p /tmp/unrelated",
+        'mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review" /tmp/unrelated',
+        "curl http://127.0.0.1:4329/cracktro/ && sleep 1",
+      ]) {
+        expect(handler({ kind: "shell", commands: [], fullCommandText }).kind).toBe("reject");
+      }
+    });
+
     it("allows a piped command when SDK provides no identifiers but all commands are allowed", async () => {
       const handler = await makePermissionHandlerViaSDK(["shell(ls)", "shell(cat)", "shell(echo)"]);
       // Simulate what the Copilot SDK sends for a piped command: commands: [] (empty)

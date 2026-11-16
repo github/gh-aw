@@ -8,6 +8,57 @@ Use the built-in `playwright` tool for browser automation, accessibility checks,
 end-to-end flows, and visual regression testing. The integration uses
 `@playwright/cli`; it does not expose Playwright MCP tools.
 
+## Browser decision and readiness
+
+Before selecting tools or promising validation, inspect the requested outcome,
+workflow instructions, and relevant application scripts/tests:
+
+| Required evidence | Decision |
+| --- | --- |
+| Rendered pages, JavaScript interactions, UI/navigation flows, screenshots, visual comparisons, or browser-based accessibility/E2E checks | Enable `tools.playwright` and configure the complete lifecycle below. |
+| Source-only edits/reviews, API checks, or plain-text documentation retrieval without rendered behavior | Do not add a browser; use the existing read tools or deterministic checks. |
+
+Infer the need from the success criteria, not just the word "browser". A UI
+maintenance task requiring visual verification needs Playwright even when the
+request does not name it. Loading this guide alone does not justify adding it.
+
+When a browser is needed:
+
+1. Enable the [built-in CLI](#configure-the-tool); omit `mode`. The compiler
+   provisions CLI, skills, and Chromium before execution. Prepare required
+   application dependencies in trusted setup, never install during agent execution.
+2. Choose [scoped network access](#configure-network-access). Same-sandbox
+   loopback needs no `local` entry; external pages need approved destinations.
+3. For [local applications](#run-against-a-local-application), declare the exact
+   server command, loopback bind, readiness URL, and screenshot directory.
+   Under a restricted Bash allowlist, permit startup, directory creation,
+   bounded `curl` readiness, and PID cleanup explicitly. Playwright's automatic
+   CLI permission does not grant these supporting commands.
+4. Use explicit `:*` prefixes for multiword commands accepting arguments,
+   for example `"npm run dev:*"`. A trailing `" *"` is normalized away and
+   may leave an exact-command rule that rejects arguments. Use exact full-command
+   rules for fixed commands. Inspect compiled grants and check the actual
+   lifecycle commands, not just tool presence. Never use unrestricted Bash
+   or broader interpreter grants to repair a scoped lifecycle.
+5. Start the server using the agent's asynchronous shell mode; retain its
+   process handle/PID. Use one bounded `curl` command, not loops introducing
+   undeclared `seq` or `sleep`; bound each connection/transfer as well as retries.
+   Run browser checks, then close the browser and
+   stop only the server started for this task, including on failure.
+6. If screenshots are deliverables, create their scoped directory and configure
+   [artifact publication](#publish-screenshots): write into the mounted upload
+   staging directory and use staging-relative `allowed-paths`. State required checks and report
+   precise missing prerequisites or validation failures; never publish changes
+   whose required browser checks failed.
+
+Follow the [sandbox policy](#follow-the-awf-sandbox-policy) for every browser
+task. Compilation verifies configuration, not browser execution. Explanation-only
+requests remain read-only. No-dispatch requests prohibit hosted execution, not
+explicitly authorized local work; this decision grants no execution or live-test
+authorization.
+
+<!-- instruction-prefix-end -->
+
 ## Configure the tool
 
 Enable Playwright in workflow frontmatter:
@@ -72,7 +123,7 @@ avoid broad wildcard domains.
 
 Run `playwright-cli` through bash. With a restricted Bash allowlist, the compiler
 automatically allows `playwright-cli:*`; list only supporting lifecycle commands
-such as `npm`, `curl`, and `kill`. Before opening a browser, inspect package
+such as the scoped server command, `mkdir`, `curl`, and `kill`. Before opening a browser, inspect package
 scripts, Playwright configuration, and test filenames to determine whether the
 task is likely to run Playwright Test. If it is, use `--browser=chromium`, which
 selects Playwright's Chrome for Testing engine. Start with a snapshot and use its
@@ -131,7 +182,8 @@ steps:
 tools:
   playwright:
   bash:
-    - "npm run dev *"
+    - "npm run dev:*"
+    - 'mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/web-review"'
     - "curl *"
     - "kill *"
 
@@ -146,42 +198,70 @@ The server process then runs in the same sandbox and network namespace as
 or adding an external domain. It remains available across the agent's tool calls
 until it exits, the agent stops it, or the sandbox is torn down.
 
-Direct the agent to start the server in the background, retain its PID, and use
-one `curl` command with built-in retries and exponential backoff for readiness:
+Create the screenshot directory with its exact allowed command. Start the
+server using the asynchronous shell tool and retain its process handle/PID;
+do not append shell background syntax to a scoped command. Then use one `curl`
+command with built-in retries and exponential backoff for readiness:
 
 ```bash
-npm run dev -- --host 127.0.0.1 > /tmp/web-server.log 2>&1 &
-server_pid=$!
-curl --fail --silent --show-error --retry 10 --retry-connrefused \
+mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/web-review"
+npm run dev -- --host 127.0.0.1
+# Run the server command asynchronously; subsequent calls:
+curl --fail --silent --show-error --connect-timeout 2 --max-time 5 \
+  --retry 10 --retry-connrefused \
   --retry-all-errors --retry-max-time 30 http://127.0.0.1:4321/ >/dev/null
 playwright-cli open --browser=chromium "http://127.0.0.1:4321/"
 playwright-cli resize 1440 900
-playwright-cli screenshot --filename=/tmp/home.png
+playwright-cli screenshot --filename="$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/web-review/home.png"
 playwright-cli close
-kill "$server_pid"
+# Stop the retained server handle, or kill only its recorded PID.
 ```
 
-If commands run in separate shell calls, write the PID to a file under `/tmp`
-and read it back for cleanup. Redirect server logs to `/tmp` so they do not
-consume the agent context; inspect only the relevant tail when startup fails.
+If the shell tool cannot retain a process handle, use a reviewed lifecycle helper
+with explicitly allowed commands to record the PID under `/tmp` and clean it up.
+Keep logs bounded; inspect only their relevant tail when startup fails.
+The readiness command limits each transfer to five seconds and retry scheduling
+to thirty seconds (up to thirty-five seconds including the last transfer).
+
+A dependency-free static site needs no package installation. For a fixed
+preview, allow the full server command and the exact directory-creation command:
+
+```yaml
+tools:
+  playwright:
+  bash:
+    - "python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public"
+    - 'mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/web-review"'
+    - "curl *"
+    - "kill *"
+```
+
+Run these fixed commands standalone from the repository root. Do not append
+extra arguments or prepend unrelated shell commands to an exact-command grant.
 
 ## Publish screenshots
 
-Files under `/tmp`, including screenshots, disappear when the run sandbox ends.
-Declare `upload-artifact` and instruct the agent to publish files users need to
-retrieve:
+Write deliverable screenshots under
+`$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/web-review/`, the compiler-mounted
+upload staging directory. Other arbitrary `/tmp` paths are not allowed upload
+source roots. Declare `upload-artifact` with patterns relative to staging:
 
 ```markdown
 ---
 safe-outputs:
   upload-artifact:
-    allowed-paths: ["/tmp/*.png"]
+    allowed-paths: ["web-review/**"]
     max-uploads: 1
     retention-days: 7
 ---
 
-Capture `/tmp/home.png`, then call `upload_artifact` with
-`name: "home-screenshot"` and `path: "/tmp/home.png"`.
+Create the directory with the exact command shown above. Capture
+`"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/web-review/home.png"`, then call
+`upload_artifact` with `name: "home-screenshot"` and `path: "web-review/home.png"`.
+Do not upload the staging root itself or weaken the upload source-root guard.
+The safe-output job downloads staging only when this run requests `upload_artifact`
+or a staged-file connector output. No-op or incomplete runs with no such request
+do not require a screenshot staging artifact.
 ```
 
 ## Follow the AWF sandbox policy

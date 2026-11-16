@@ -30,8 +30,12 @@ For instruction/skill generation follow the
 
 - Trigger matches intent and event granularity; maintenance choices follow a
   bounded repository survey, separating observed signals from recommendations.
-- Enable only needed read/analysis tools; prefer `gh-proxy`. Add `playwright`
-  or `cache-memory` only for a demonstrated need.
+- Enable only needed read/analysis tools; prefer `gh-proxy`. Apply the
+  [browser decision](playwright.md#browser-decision-and-readiness): required
+  browser checks need CLI provisioning, scoped startup/directory/readiness/cleanup
+  permissions, network access, and artifact publication when screenshots are
+  deliverables. Check actual lifecycle commands against emitted grants.
+  Add `cache-memory` only for a demonstrated need.
 - Agent-job permissions remain read-only. PR reporting needs `contents: read`
   and `pull-requests: read`, not write scopes.
 - Route visible writes through configured safe outputs. Use `add-comment` for

@@ -4,6 +4,20 @@ description: Cache, tool, import, and permission reference for GitHub Agentic Wo
 
 # Tools, Imports, and Permissions
 
+Before selecting tools, apply the
+[browser decision](playwright.md#browser-decision-and-readiness). Rendered-page
+validation requires the built-in CLI and scoped supporting lifecycle commands,
+not just a `playwright` declaration.
+
+Load the matching field reference before emitting configuration:
+[cache](#cache-configuration), [tools](#tool-configuration),
+[plugins](#agent-plugins-plugins), [network](#engine-network-permissions),
+[imports](#imports-field), and [permissions](#permission-patterns).
+Keep agent permissions read-only and use configured safe outputs for GitHub
+mutations; follow [workflow constraints](workflow-constraints.md).
+
+<!-- instruction-prefix-end -->
+
 ### Cache Configuration
 
 The `cache:` field supports the same syntax as the GitHub Actions `actions/cache` action:
@@ -120,12 +134,11 @@ The `tools:` field configures which tools the coding agent may use.
   tools:
     bash: ["*"]
   ```
-- `playwright:` - Browser automation for visual regression, accessibility, and end-to-end testing. The built-in integration uses `playwright-cli <command>` in bash, and `localhost` reaches local servers directly. `mode: mcp` is removed; use a custom `mcp-servers` entry if MCP is required. Pin the CLI with `version:` and restrict network to `local` + `playwright`.
+- `playwright:` - Built-in CLI for rendered-page, visual, accessibility, and E2E checks. Omit `mode`; built-in MCP mode is unsupported. The compiler provisions CLI, skills, and Chromium. Same-sandbox loopback needs no `local` network entry. Follow the [browser readiness contract](playwright.md#browser-decision-and-readiness) for scoped network access and supporting lifecycle permissions.
 
   ```yaml
   tools:
     playwright:
-      version: "0.1.11"  # optional: @playwright/cli npm package version
   ```
 - `timeout:` - Per-operation timeout in seconds for all tool and MCP calls (integer or expression, default: 60 s for all engines).
 - `startup-timeout:` - Timeout in seconds for MCP server initialization (integer or expression, default: 120).
