@@ -50,6 +50,8 @@ slides.push({
   notes: "...",           // speaker notes (N key); public text
   group: "security",      // band id; picks the THEME (colours, grid, music, red wash); crossing groups slides up
   experimental: "lsp",    // optional; badge label from the feature's `cracktro` entry in pkg/workflow/data/experimental_features.json (the single source of truth; talk.spec.ts enforces it); renders the top-right .xbadge
+  key: "unsloppers",      // optional; names a pattern slide that heads a vertical column of examples
+  under: "unsloppers",    // optional; hangs this slide in the column below the same-group slide with that key (Up/Down; see mechanics.md)
   techno: 1,              // optional techno layer level
   el: h("section", { class: "slide" }, ...),
   enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back

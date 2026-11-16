@@ -28,6 +28,61 @@ description: Complete reference for gh aw CLI commands and their MCP tool equiva
 > - run: gh aw compile
 > ```
 
+## MCP Tool ↔ CLI Quick Reference
+
+| CLI command | MCP tool |
+|---|---|
+| `gh aw status` | `status` |
+| `gh aw compile` | `compile` |
+| `gh aw logs` | `logs` |
+| `gh aw audit` | `audit` |
+| `gh aw audit <id1> <id2>` | `audit-diff` |
+| `gh aw checks` | `checks` |
+| `gh aw mcp inspect` | `mcp-inspect` |
+| `gh aw add` | `add` |
+| `gh aw update` | `update` |
+| `gh aw fix` | `fix` |
+| `gh aw upgrade` | `upgrade` |
+
+Local only (no MCP tool): `skill`, `init`, `doctor`, `health`, `experiments`, `format`, `deploy`, `env`, `json-schema`. `gh aw run` has no MCP tool and no API/MCP/manual-dispatch substitution.
+`init` updates use the `upgrade` tool. `audit` covers single runs; BM25
+`audit --search` is CLI-only. Inside a workflow step, install
+`github/gh-aw/actions/setup-cli` to run local-only commands such as `deploy`.
+
+## Mandatory Rules
+
+### `gh aw run` rules
+
+> [!IMPORTANT]
+> **When dispatch is permitted and human-validated, prefer `gh aw run` over `gh workflow run <file>.lock.yml`** — it handles workflow resolution, input validation, and run-tracking. This preference grants no authorization.
+
+For troubleshooting, first follow the shared [strategy](debug-agentic-workflow.md): respect explicit no-dispatch contexts, and handle `403 Forbidden` from a permitted run attempt by stopping live debugging and returning to diagnosis/patching. Do not retry unchanged or bypass the denial. `--dry-run` is a compilation profile, not run access or authorization. Revalidate each source/lock revision; a valid [session authorization](debug-security-review.md#session-authorization) can cover in-scope iterations without repeated human approval.
+
+Follow the [live-outcome table](debug-live-testing.md#live-debug-loop) for unknown dispatch results, moved refs, run-SHA mismatches and audit/log denial. `--repeat` requires an approved matching run-count budget; examples below do not grant approval. Codespaces may still return SAML-related 403 responses — check the active token source and SSO authorization using the shared credential triage (environment tokens override stored CLI credentials); do not automatically replace tokens or retry a denied run.
+
+Copilot cloud agents must not substitute an API/MCP dispatch or request manual
+dispatch as a workaround.
+
+### `gh aw compile` rules
+
+For debugging, follow the [compilation guide](debug-compilation.md) for required
+checks, optional Docker scanners, warning severity, and diagnostic preservation.
+Low-severity/informational notices are not blanket failures; validation errors,
+unclassified compiler warnings, model-inventory failures, built-in AST lint findings,
+and scanner execution/parsing failures remain fatal to the dry-run gate.
+`validate` uses `--no-emit` and skips zizmor, actionlint and poutine; a successful
+`validate` does not establish scanner coverage. MCP `validate_images: true` opts
+into `--validate-images` (works with `dry_run: true`) and fails when Docker is
+unavailable. Built-in Actions/AW AST lint runs by default, including under
+`--no-emit`/`validate`, and fails on findings; `--no-lint` (MCP `skip_lint: true`)
+opts out but is rejected with `--dry-run`. `add`/`update`/`validate` lint too
+without exposing `--no-lint`; for JS driver/grader checks use
+`gh aw lint --javascript-module <path>`.
+
+Load only the matching [command section](#command-reference) below. Examples grant no authorization.
+
+<!-- instruction-prefix-end -->
+
 ---
 
 ## Command Reference
@@ -41,8 +96,6 @@ gh aw skill
 ```
 
 Works outside a Git repository with no authentication or network access. Uses the file list bundled with the installed CLI version.
-
-**MCP equivalent**: Not available.
 
 ---
 ### `gh aw init`
@@ -58,8 +111,6 @@ gh aw init --no-agent                   # Skip custom agent creation (Copilot en
 
 Creates `.github/skills/agentic-workflows/SKILL.md`. With the Copilot engine (default), also creates the custom agent (`.github/agents/agentic-workflows.md`) and enables MCP server integration — use `--no-mcp`/`--no-agent` to skip either. Non-Copilot engines skip both Copilot-specific artifacts automatically.
 
-**MCP equivalent**: Not available — run from a local terminal or use the `upgrade` tool for updates.
-
 ---
 ### `gh aw doctor`
 
@@ -70,8 +121,6 @@ gh aw doctor [--repo owner/repo]  # Check gh CLI auth; with --repo also verify r
 ```
 
 In a local checkout, also inspects workflows using `safe-outputs.assign-to-agent` for an available PAT secret and samples recent runs for credential-failure evidence. Does not verify stored secret values, expiry, or permissions.
-
-**MCP equivalent**: Not available — run from a local terminal.
 
 ---
 ### `gh aw compile`
@@ -93,33 +142,12 @@ gh aw compile --no-lint           # Disable default built-in AST lint (rejected 
 gh aw compile --actions-lock      # Run `gh actions-lock --no-narrow` after a successful compile (rejected with --dry-run)
 ```
 
-**MCP equivalent**: `compile` tool
-
-For debugging, follow the [compilation guide](debug-compilation.md) for required
-checks, optional Docker scanners, warning severity, and diagnostic preservation.
-Low-severity/informational notices are not blanket failures; validation errors,
-unclassified compiler warnings, model-inventory failures, built-in AST lint findings,
-and scanner execution/parsing failures remain fatal to the dry-run gate.
-`validate` uses `--no-emit` and skips zizmor, actionlint and poutine; a successful
-`validate` does not establish scanner coverage. MCP `validate_images: true` opts
-into `--validate-images` (works with `dry_run: true`) and fails when Docker is
-unavailable. Built-in Actions/AW AST lint runs by default, including under
-`--no-emit`/`validate`, and fails on findings; `--no-lint` (MCP `skip_lint: true`)
-opts out but is rejected with `--dry-run`. `add`/`update`/`validate` lint too
-without exposing `--no-lint`; for JS driver/grader checks use
-`gh aw lint --javascript-module <path>`.
+See the [`compile` rules](#gh-aw-compile-rules).
 
 ---
 ### `gh aw run`
 
-> [!IMPORTANT]
-> **When dispatch is permitted and human-validated, prefer `gh aw run` over `gh workflow run <file>.lock.yml`** — it handles workflow resolution, input validation, and run-tracking. This preference grants no authorization.
-
-Trigger a workflow on demand using `workflow_dispatch`.
-
-For troubleshooting, first follow the shared [strategy](debug-agentic-workflow.md): respect explicit no-dispatch contexts, and handle `403 Forbidden` from a permitted run attempt by stopping live debugging and returning to diagnosis/patching. Do not retry unchanged or bypass the denial. `--dry-run` is a compilation profile, not run access or authorization. Revalidate each source/lock revision; a valid [session authorization](debug-security-review.md#session-authorization) can cover in-scope iterations without repeated human approval.
-
-Follow the [live-outcome table](debug-live-testing.md#live-debug-loop) for unknown dispatch results, moved refs, run-SHA mismatches and audit/log denial. `--repeat` requires an approved matching run-count budget; examples below do not grant approval. Codespaces may still return SAML-related 403 responses — check the active token source and SSO authorization using the shared credential triage (environment tokens override stored CLI credentials); do not automatically replace tokens or retry a denied run.
+Trigger a workflow on demand using `workflow_dispatch`. Follow the [`run` rules](#gh-aw-run-rules) first.
 
 ```bash
 gh aw run                           # Interactive mode — pick workflow and fill inputs
@@ -129,9 +157,6 @@ gh aw run <workflow-name> --ref REVIEWED_REF      # Exact reviewed remote ref
 gh aw run <workflow-name> --repeat 3              # Run 4 times total (1 + 3 repeats)
 gh aw run <workflow-name> --raw-field key=value   # Pass a specific input
 ```
-
-**MCP equivalent**: Not available. Copilot cloud agents must not substitute an
-API/MCP dispatch or request manual dispatch as a workaround.
 
 ---
 ### `gh aw logs`
@@ -150,8 +175,6 @@ gh aw logs -o ./workflow-logs       # Save to directory
 gh aw logs --repo owner/repo        # Query logs in another repository
 gh aw logs --ignore-workflow-runs 123,456  # Exclude specific run IDs from results
 ```
-
-**MCP equivalent**: `logs` tool
 
 For failure triage methodology, see [analyzing-runs.md](analyzing-runs.md#select).
 
@@ -176,9 +199,6 @@ For audit triage methodology, including `--search` BM25/Drain3 grouping semantic
 see [analyzing-runs.md](analyzing-runs.md#audit). `--models` and `--search` are both
 single-run only: neither combines with `--group` or job/step URLs.
 
-**MCP equivalent**: `audit` tool (single run) / `audit-diff` tool (multi-run comparison)
-for ordinary audits; BM25 `--search` is CLI-only.
-
 ---
 ### `gh aw status`
 
@@ -189,8 +209,6 @@ gh aw status
 gh aw status --repo owner/repo    # Query status in another repository
 ```
 
-**MCP equivalent**: `status` tool
-
 ---
 ### `gh aw checks`
 
@@ -199,8 +217,6 @@ Show check run results for a workflow run.
 ```bash
 gh aw checks <run-id>
 ```
-
-**MCP equivalent**: `checks` tool
 
 ---
 ### `gh aw health`
@@ -219,8 +235,6 @@ Reports a bounded current-revision sample: compares `gh-aw-metadata` hashes acro
 `workflows[].revisions` for `recovery_observed`, and surfaces `failure_clusters`/
 `failure_investigation` alongside success/failure counts and trend. See [analyzing-runs.md](analyzing-runs.md) for interpreting the JSON output.
 
-**MCP equivalent**: Not available — run from a local terminal.
-
 ---
 ### `gh aw experiments`
 
@@ -233,8 +247,6 @@ gh aw experiments analyze <workflow>          # Analyze one experiment workflow
 gh aw experiments analyze <workflow> --repo owner/repo  # Analyze in another repository
 ```
 
-**MCP equivalent**: Not available — run from a local terminal.
-
 ---
 ### `gh aw fix`
 
@@ -244,8 +256,6 @@ Apply automatic codemods to fix deprecated fields in workflow files.
 gh aw fix                   # Preview changes (dry run)
 gh aw fix --write           # Apply changes
 ```
-
-**MCP equivalent**: `fix` tool
 
 ---
 ### `gh aw format`
@@ -257,8 +267,6 @@ gh aw format                        # Format all workflows in .github/workflows
 gh aw format <workflow-name>        # Format a specific workflow
 gh aw format --dir custom/workflows # Format workflows in a custom directory
 ```
-
-**MCP equivalent**: Not available — run from a local terminal.
 
 ---
 ### `gh aw upgrade`
@@ -275,8 +283,6 @@ gh aw upgrade --org my-org --repos '*-service'  # Limit org mode to matching rep
 gh aw upgrade --org my-org --create-issue   # Open issues in org repos with agentic workflows (requires --org)
 ```
 
-**MCP equivalent**: `upgrade` tool
-
 ---
 ### `gh aw add`
 
@@ -285,8 +291,6 @@ Add a new shared workflow component as an import.
 ```bash
 gh aw add <workflow-url>
 ```
-
-**MCP equivalent**: `add` tool
 
 ---
 ### `gh aw update`
@@ -303,8 +307,6 @@ gh aw update --repo owner/repo              # Update workflows in another reposi
 gh aw update --cool-down 3d                 # Custom cooldown before applying pending releases
 ```
 
-**MCP equivalent**: `update` tool
-
 ---
 ### `gh aw deploy`
 
@@ -316,8 +318,6 @@ gh aw deploy githubnext/agentics/ci-doctor --repo o/r   # Deploy a shared workfl
 gh aw deploy ./local-workflow.md --repo owner/repo      # Deploy a local workflow
 gh aw deploy <workflow> --repo owner/repo --force       # Overwrite without confirmation
 ```
-
-**MCP equivalent**: Not available — run from a local terminal or invoke the CLI inside a workflow step with `github/gh-aw/actions/setup-cli`.
 
 ---
 ### `gh aw env`
@@ -345,8 +345,6 @@ default_model_codex: null   # delete this variable
 
 Recognized keys include `default_max_ai_credits`, `default_max_turn_cache_misses`, `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, `default_detection_job_timeout_minutes`, `default_max_turns`, `default_detection_model`, `default_utc`, `default_model_copilot`, `default_model_claude`, `default_model_codex`. The compiler resolves model selection as `GH_AW_MODEL_*` → `GH_AW_DEFAULT_MODEL_*` → built-in engine fallback.
 
-**MCP equivalent**: Not available — run from a local terminal.
-
 ---
 ### `gh aw mcp inspect`
 
@@ -357,8 +355,6 @@ gh aw mcp inspect <workflow-name>
 gh aw mcp inspect <workflow-name> --inspector   # Launch web-based inspector UI
 gh aw mcp list                                   # List workflows with MCP servers
 ```
-
-**MCP equivalent**: `mcp-inspect` tool
 
 ---
 ### `gh aw json-schema`
@@ -371,23 +367,4 @@ gh aw json-schema logs
 gh aw json-schema logs-jsonl
 ```
 
-**MCP equivalent**: Not available — run from a local terminal.
-
 ---
-## MCP Tool ↔ CLI Quick Reference
-
-| CLI command | MCP tool |
-|---|---|
-| `gh aw status` | `status` |
-| `gh aw compile` | `compile` |
-| `gh aw logs` | `logs` |
-| `gh aw audit` | `audit` |
-| `gh aw audit <id1> <id2>` | `audit-diff` |
-| `gh aw checks` | `checks` |
-| `gh aw mcp inspect` | `mcp-inspect` |
-| `gh aw add` | `add` |
-| `gh aw update` | `update` |
-| `gh aw fix` | `fix` |
-| `gh aw upgrade` | `upgrade` |
-
-Local only (no MCP tool): `skill`, `init`, `doctor`, `health`, `experiments`, `format`, `deploy`, `env`, `json-schema`. `gh aw run` has no MCP tool and no API/MCP/manual-dispatch substitution.

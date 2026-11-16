@@ -4,68 +4,23 @@ description: GitHub context expression variables and Handlebars-style template c
 
 ## GitHub Context Expression Interpolation
 
-**For security reasons, only specific expressions are allowed.**
+**For security reasons, only the expressions below are allowed.** All others fail compilation with an error listing them.
 
 ### Allowed Context Variables
 
-- **`${{ github.event.after }}`** - SHA of the most recent commit after the push
-- **`${{ github.event.before }}`** - SHA of the most recent commit before the push
-- **`${{ github.event.check_run.id }}`** - ID of the check run
-- **`${{ github.event.check_suite.id }}`** - ID of the check suite
-- **`${{ github.event.comment.id }}`** - ID of the comment
-- **`${{ github.event.deployment.id }}`** - ID of the deployment
-- **`${{ github.event.deployment_status.id }}`** - ID of the deployment status
-- **`${{ github.event.head_commit.id }}`** - ID of the head commit
-- **`${{ github.event.installation.id }}`** - ID of the GitHub App installation
-- **`${{ github.event.issue.number }}`** - Issue number
-- **`${{ github.event.issue.state }}`** - State of the issue (open/closed)
-- **`${{ github.event.issue.title }}`** - Title of the issue
-- **`${{ github.event.label.id }}`** - ID of the label
-- **`${{ github.event.milestone.id }}`** - ID of the milestone
-- **`${{ github.event.milestone.number }}`** - Number of the milestone
-- **`${{ github.event.organization.id }}`** - ID of the organization
-- **`${{ github.event.page.id }}`** - ID of the GitHub Pages page
-- **`${{ github.event.project.id }}`** - ID of the project
-- **`${{ github.event.project_card.id }}`** - ID of the project card
-- **`${{ github.event.project_column.id }}`** - ID of the project column
-- **`${{ github.event.pull_request.number }}`** - Pull request number
-- **`${{ github.event.pull_request.state }}`** - State of the pull request (open/closed)
-- **`${{ github.event.pull_request.title }}`** - Title of the pull request
-- **`${{ github.event.pull_request.head.sha }}`** - SHA of the PR head commit
-- **`${{ github.event.pull_request.base.sha }}`** - SHA of the PR base commit
-- **`${{ github.event.discussion.number }}`** - Discussion number
-- **`${{ github.event.discussion.title }}`** - Title of the discussion
-- **`${{ github.event.discussion.category.name }}`** - Category name of the discussion
-- **`${{ github.event.release.assets[0].id }}`** - ID of the first release asset
-- **`${{ github.event.release.id }}`** - ID of the release
-- **`${{ github.event.release.name }}`** - Name of the release
-- **`${{ github.event.release.tag_name }}`** - Tag name of the release
-- **`${{ github.event.repository.id }}`** - ID of the repository
-- **`${{ github.event.repository.default_branch }}`** - Default branch of the repository
-- **`${{ github.event.review.id }}`** - ID of the review
-- **`${{ github.event.review_comment.id }}`** - ID of the review comment
-- **`${{ github.event.sender.id }}`** - ID of the user who triggered the event
-- **`${{ github.event.deployment.environment }}`** - Deployment environment name
-- **`${{ github.event.workflow_job.id }}`** - ID of the workflow job
-- **`${{ github.event.workflow_job.run_id }}`** - Run ID of the workflow job
-- **`${{ github.event.workflow_run.id }}`** - ID of the workflow run
-- **`${{ github.event.workflow_run.number }}`** - Number of the workflow run
-- **`${{ github.event.workflow_run.conclusion }}`** - Conclusion of the workflow run
-- **`${{ github.event.workflow_run.status }}`** - Status of the workflow run
-- **`${{ github.event.workflow_run.event }}`** - Event that triggered the workflow run
-- **`${{ github.event.workflow_run.html_url }}`** - HTML URL of the workflow run
-- **`${{ github.event.workflow_run.head_sha }}`** - Head SHA of the workflow run
-- **`${{ github.event.workflow_run.run_number }}`** - Run number of the workflow run
-- **`${{ github.actor }}`** - Username of the person who initiated the workflow
-- **`${{ github.event_name }}`** - Name of the event that triggered the workflow
-- **`${{ github.job }}`** - Job ID of the current workflow run
-- **`${{ github.repository }}`** - Repository name in "owner/name" format
-- **`${{ github.repository_owner }}`** - Owner of the repository (organization or user)
-- **`${{ github.run_id }}`** - Unique ID of the workflow run
-- **`${{ github.run_number }}`** - Number of the workflow run
-- **`${{ github.server_url }}`** - Base URL of the server, e.g. <https://github.com>
-- **`${{ github.workflow }}`** - Name of the workflow
-- **`${{ github.workspace }}`** - The default working directory on the runner for steps
+Use as `${{ <name> }}`, e.g. `${{ github.event.issue.number }}`.
+
+- **Workflow/run**: `github.actor` (initiating user), `github.event_name`, `github.job`, `github.repository` ("owner/name"), `github.repository_owner`, `github.run_id`, `github.run_number`, `github.server_url` (e.g. <https://github.com>), `github.workflow`, `github.workspace` (default runner working directory)
+- **Push/commits**: `github.event.after` (SHA after push), `github.event.before` (SHA before push), `github.event.head_commit.id`
+- **Issues**: `github.event.issue.number`, `github.event.issue.state` (open/closed), `github.event.issue.title`
+- **Pull requests**: `github.event.pull_request.number`, `github.event.pull_request.state` (open/closed), `github.event.pull_request.title`, `github.event.pull_request.head.sha`, `github.event.pull_request.base.sha`
+- **Discussions**: `github.event.discussion.number`, `github.event.discussion.title`, `github.event.discussion.category.name`
+- **Comments/reviews**: `github.event.comment.id`, `github.event.review.id`, `github.event.review_comment.id`
+- **Releases**: `github.event.release.id`, `github.event.release.name`, `github.event.release.tag_name`, `github.event.release.assets[0].id` (first asset)
+- **Deployments**: `github.event.deployment.id`, `github.event.deployment.environment`, `github.event.deployment_status.id`
+- **Checks**: `github.event.check_run.id`, `github.event.check_suite.id`
+- **Workflow jobs/runs**: `github.event.workflow_job.id`, `github.event.workflow_job.run_id`, `github.event.workflow_run.id`, `github.event.workflow_run.number`, `github.event.workflow_run.run_number`, `github.event.workflow_run.conclusion`, `github.event.workflow_run.status`, `github.event.workflow_run.event` (triggering event), `github.event.workflow_run.html_url`, `github.event.workflow_run.head_sha`
+- **Other IDs**: `github.event.installation.id` (GitHub App installation), `github.event.label.id`, `github.event.milestone.id`, `github.event.milestone.number`, `github.event.organization.id`, `github.event.page.id` (GitHub Pages page), `github.event.project.id`, `github.event.project_card.id`, `github.event.project_column.id`, `github.event.repository.id`, `github.event.repository.default_branch`, `github.event.sender.id` (triggering user)
 
 #### Special Pattern Expressions
 
@@ -74,8 +29,6 @@ description: GitHub context expression variables and Handlebars-style template c
 - **`${{ github.event.inputs.* }}`** - Any workflow inputs when triggered by workflow_dispatch (e.g., `${{ github.event.inputs.environment }}`)
 
 `aw_context` is reserved and injected by the compiler into supported dispatch and reusable-workflow triggers; do not declare it as a user input. Workflows with `tools.work-queue` receive a compiler-managed `work_queue_assignment` dispatch input. It is a version-3 immutable assignment containing a `claims` array; do not declare or construct it as a user input.
-
-All other expressions are disallowed.
 
 ### Sanitized Context Text (`steps.sanitized.outputs.text`)
 
@@ -97,10 +50,6 @@ Auto-populated per triggering event:
 - **Content limits**: truncates to 0.5MB / 65k lines max
 - **Control character removal**: strips ANSI escape sequences and non-printable characters
 
-### Security Validation
-
-Expression safety is validated at compile time. Unauthorized expressions cause compilation to fail with an error listing them.
-
 ### Example Usage
 
 ```markdown
@@ -120,7 +69,7 @@ Deploy to environment: "${{ github.event.inputs.environment }}"
 
 ## Prompt Template Conditionals (`{{#if}}`)
 
-Conditional blocks resolved **at runtime, before the agent sees the prompt** — the agent only sees the final resolved text.
+Conditional blocks resolve **at runtime, before the agent sees the prompt**; the agent sees only resolved text.
 
 ### Syntax
 
