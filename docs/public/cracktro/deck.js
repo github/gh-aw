@@ -2282,8 +2282,8 @@
   .smp-row { display: grid; grid-template-columns: 170px 1fr; gap: 12px; align-items: start; }
   .smp-l { font: 600 13px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); padding-top: 10px; }
   .smp-tiles { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
-  .smp-col { display: flex; flex-direction: column; gap: 6px; }
-  .smp-kids { display: flex; flex-direction: column; gap: 4px; margin-left: 12px; padding-left: 10px; border-left: 2px dotted var(--c); }
+  .smp-col { flex: 0 0 100%; display: flex; align-items: flex-start; gap: 6px; }
+  .smp-kids { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding-left: 10px; border-left: 2px dotted var(--c); }
   .smp-t { width: 168px; min-height: 58px; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 10px; border: 1px solid #3d444d;
     border-left: 3px solid var(--c); border-radius: 8px; background: #151b23; color: inherit; cursor: pointer; font: 500 13px/1.3 "Mona Sans", sans-serif; }
   .smp-t b { display: flex; font: 600 11px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
@@ -2294,7 +2294,7 @@
   .smp-t:hover { background: #1f2630; border-color: #9198a1; border-left-color: var(--c); }
   .smp-t.on { box-shadow: 0 0 0 2px var(--c); }
   .smp-t:focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
-  @media (max-width: 640px) { .smp-row { grid-template-columns: 1fr; gap: 6px; } .smp-l { padding-top: 0; } .smp-t, .smp-col { width: calc(50% - 3px); } .smp-col .smp-t { width: 100%; } .smp-col .smp-t.sub { width: auto; } }
+  @media (max-width: 640px) { .smp-row { grid-template-columns: 1fr; gap: 6px; } .smp-l { padding-top: 0; } .smp-t { width: calc(50% - 3px); } .smp-col { flex-direction: column; } .smp-col > .smp-t { width: calc(50% - 3px); } .smp-kids { width: 100%; box-sizing: border-box; } .smp-kids .smp-t.sub { width: calc(50% - 3px); } }
   body.light .smp { background: #f6f8faf5; color: #1f2328; }
   body.light .smp-t { background: #ffffff; border-color: #9ea7b3; border-left-color: var(--c); }
   body.light .smp-t.hd { background: transparent; }
@@ -20198,7 +20198,7 @@
   // ---------- slide map ----------
   // G (or the dock's map button) opens a full-screen overview: one row per band, one tile per slide, the current one ringed.
   // Click or Enter opens a slide; Left/Right step in slide order, Up/Down move to the nearest tile on the line above/below.
-  // A column (a pattern slide with `kids`) is drawn as a vertical stack: the pattern tile, then its examples on a dotted tree line.
+  // A column (a pattern slide with `kids`) gets its own line: the pattern tile, then its examples in a horizontal row behind a dotted rule.
   const smpBody = h("div", { class: "smp-body" });
   const smp = h(
     "dialog",
@@ -20226,7 +20226,7 @@
               smpTiles[n] = t;
               return t;
             });
-        // a column (pattern + its examples) stacks vertically, the examples hanging below the pattern tile
+        // a column (pattern + its examples) takes its own line, the examples in a row after the pattern tile
         const tiles = all.flatMap(t => {
             const s = slides[smpTiles.indexOf(t)];
             if (s.parent) return [];
