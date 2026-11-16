@@ -205,7 +205,7 @@ The `🧪 A/B Experiments` section of the audit report shows the variant chosen 
   • style = concise (cumulative: concise:5, detailed:4)
 ```
 
-See [A/B Experiments](/gh-aw/experimental/experiments/) for how to declare experiments in workflow frontmatter.
+See [A/B Experiments](/gh-aw/reference/experiments/) for how to declare experiments in workflow frontmatter.
 
 ## `usage`
 

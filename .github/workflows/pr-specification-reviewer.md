@@ -14,7 +14,6 @@ on:
       - 'scripts/**'
       - 'specs/**'
       - 'docs/src/content/docs/specs/**'
-      - 'docs/src/content/docs/experimental/experiments-specification.md'
       - 'docs/adr/**'
       - '.github/workflows/**'
       - '.github/aw/**'
@@ -91,7 +90,6 @@ safe-outputs:
     allowed-files:
       - 'specs/*.md'
       - 'docs/src/content/docs/specs/*.md'
-      - 'docs/src/content/docs/experimental/experiments-specification.md'
     protected-files: allowed
     fallback-as-pull-request: false
   create-pull-request-review-comment:
@@ -237,8 +235,7 @@ Wait for its result before publication. If unavailable, report that limitation
 and the needed updates without claiming that specifications were synchronized.
 
 Limit proposals to five existing, directly affected specification documents in
-`specs/*.md`, `docs/src/content/docs/specs/*.md`, and
-`docs/src/content/docs/experimental/experiments-specification.md`.
+`specs/*.md` and `docs/src/content/docs/specs/*.md`.
 Preserve W3C-style structure, normative/informative separation, RFC 2119
 terminology, requirement/test IDs, examples, references, and links. Include
 proposed version, date/status, and existing change-log updates where applicable;
