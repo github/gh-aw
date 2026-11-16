@@ -1267,21 +1267,29 @@ function parseOTLPEndpoints() {
  *
  * @param {OTLPEndpointEntry[]} endpoints  - Resolved endpoint list from {@link parseOTLPEndpoints}
  * @param {any} payload                 - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
- * @returns {Promise<void>}
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string, reportResults?: boolean }} [opts]
+ * @returns {Promise<boolean[] | void>} True per endpoint when `reportResults` is enabled.
  */
 async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
-  if (endpoints.length === 0) return;
-  await Promise.allSettled(
-    endpoints.map(ep =>
-      sendOTLPSpan(ep.url, payload, {
-        ...opts,
+  const { reportResults = false, ...sendOptions } = opts;
+  if (endpoints.length === 0) return reportResults ? [] : undefined;
+  const results = await Promise.allSettled(
+    endpoints.map(async ep => {
+      let success = false;
+      await sendOTLPSpan(ep.url, payload, {
+        ...sendOptions,
+        onResult: result => {
+          success = result;
+        },
         // Pass per-endpoint headers so each collector receives only its own
         // credentials (not the merged set from a different endpoint).
         headersOverride: ep.headers !== undefined ? ep.headers : "",
-      })
-    )
+      });
+      return success;
+    })
   );
+  const endpointResults = results.map(result => result.status === "fulfilled" && result.value === true);
+  return reportResults ? endpointResults : undefined;
 }
 
 /**
@@ -1302,11 +1310,14 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
  *
  * @param {string} endpoint  - OTLP base URL (e.g. https://traces.example.com:4317)
  * @param {any} payload   - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string, onResult?: (success: boolean) => void }} [opts]
  * @returns {Promise<void>}
  */
-async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces", sanitize = sanitizeOTLPPayload, protocolOverride } = {}) {
-  if (signal === "metrics" && process.env.GH_AW_OTEL_METRICS !== "true") return;
+async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces", sanitize = sanitizeOTLPPayload, protocolOverride, onResult } = {}) {
+  if (signal === "metrics" && process.env.GH_AW_OTEL_METRICS !== "true") {
+    onResult?.(false);
+    return;
+  }
   const sanitizedPayload = sanitize(payload);
   // Mirror payload locally so it survives even when the collector is unreachable.
   // Callers that already wrote the JSONL mirror pass skipJSONL: true to avoid a
@@ -1345,6 +1356,7 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
     const reason = getErrorMessage(err);
     console.warn(`OTLP export encoding failed: ${reason}`);
     recordOTLPExportError({ endpoint, reason });
+    onResult?.(false);
     return;
   }
   // The content type must describe the encoded body, not a caller header.
@@ -1379,6 +1391,7 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
           console.warn(diagnostic.reason);
           if (diagnostic.error) recordOTLPExportError({ endpoint, status: response.status, reason: diagnostic.reason });
         }
+        onResult?.(diagnostic.error !== true);
         return;
       }
       const reason = getOTLPExportFailureReason(response);
@@ -1386,6 +1399,7 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
       if (response.status === 401 || response.status === 403) {
         console.warn(`OTLP export authorization failed: ${msg}. Check this collector's configured authorization header and write permissions; unchanged credentials will not be retried.`);
         recordOTLPExportError({ endpoint, status: response.status, reason });
+        onResult?.(false);
         return;
       }
       if (attempt < maxRetries) {
@@ -1406,6 +1420,7 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
         console.warn(`OTLP export error after ${maxRetries + 1} attempts: ${msg}`);
         recordOTLPExportError({ endpoint, reason: msg });
       }
+      onResult?.(false);
     }
   }
 }
@@ -2225,8 +2240,8 @@ function readAgentRuntimeMetrics(engineId = "") {
  * - `OTEL_SERVICE_NAME`             – service name (defaults to "gh-aw")
  * - `GH_AW_AIC`                     – total AI Credits for the run
  * - `GH_AW_AGENT_CONCLUSION`        – agent job result ("success", "failure", "timed_out",
- *                                     "cancelled", "skipped"); when "failure" or "timed_out"
- *                                     the span status is set to STATUS_CODE_ERROR (2)
+ *                                     "cancelled", "skipped"); when "failure", "timed_out",
+ *                                     or "cancelled", the span status is STATUS_CODE_ERROR (2)
  * - `GH_AW_DETECTION_CONCLUSION`   – threat-detection scan outcome ("success", "warning",
  *                                     "failure", "skipped"); emitted as
  *                                     `gh-aw.detection.conclusion` when present.
@@ -2822,11 +2837,25 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     events: spanEvents,
   });
 
+  // Always mirror to JSONL — the artifact is useful even without a live collector.
+  appendToOTLPJSONL(payload);
+
+  if (endpoints.length > 0) {
+    // Pass skipJSONL: true so sendOTLPToAllEndpoints/sendOTLPSpan don't double-write the mirror.
+    await sendOTLPToAllEndpoints(endpoints, payload, { skipJSONL: true });
+  }
+
   if (process.env.GH_AW_OTEL_METRICS === "true") {
     try {
       const { buildBuiltinRunMetrics, buildOTLPMetricsPayload, sendOTLPMetrics } = require("./otlp_metrics.cjs");
       const gatewayMetrics = jobName === "conclusion" ? readJSONIfExists("/tmp/gh-aw/usage/activity/summary.json")?.gateway : undefined;
-      const metricAttributes = [...(eventName ? [buildAttr("github.event_name", eventName)] : []), ...(job ? [buildAttr("github.job", job)] : [])];
+      const metricAttributes = [
+        ...(eventName ? [buildAttr("github.event_name", eventName)] : []),
+        ...(job ? [buildAttr("github.job", job)] : []),
+        ...(repository ? [buildAttr(OTEL_ATTR_REPOSITORY, repository)] : []),
+        ...(workflowName ? [buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName)] : []),
+        ...(engineId ? [buildAttr(OTEL_ATTR_ENGINE_ID, engineId)] : []),
+      ];
       const metricVersion =
         (typeof awInfo.cli_version === "string" ? awInfo.cli_version : "") ||
         process.env.GH_AW_INFO_CLI_VERSION ||
@@ -2844,10 +2873,17 @@ async function sendJobConclusionSpan(spanName, options = {}) {
         endMs,
         inputTokens: agentUsage.input_tokens,
         outputTokens: agentUsage.output_tokens,
+        cacheReadTokens: agentUsage.cache_read_tokens,
+        cacheWriteTokens: agentUsage.cache_write_tokens,
         emitsTokenUsage: jobEmitsOwnTokenUsage,
+        turns: jobName === "agent" ? runtimeMetrics.turns : undefined,
         toolCalls: gatewayMetrics?.total_calls,
         failedToolCalls: gatewayMetrics?.failed_calls,
         outputItemTypes: jobName === "conclusion" ? rawItemTypes : [],
+        maxAICreditsExceeded: maxAICreditsExceeded === true,
+        aiCreditsRateLimitError: aiCreditsRateLimitError === true,
+        exportFailures: readOTLPExportErrorCount(),
+        traceContext: { traceId, spanId: conclusionSpanId },
       });
       await sendOTLPMetrics(
         buildOTLPMetricsPayload({
@@ -2855,22 +2891,13 @@ async function sendJobConclusionSpan(spanName, options = {}) {
           scopeVersion: metricVersion,
           resourceAttributes: metricAttributes,
           metrics,
-        })
+        }),
+        { traceId, spanId: conclusionSpanId }
       );
     } catch {
       console.warn("[otlp] failed to emit built-in metrics");
     }
   }
-
-  // Always mirror to JSONL — the artifact is useful even without a live collector.
-  appendToOTLPJSONL(payload);
-
-  if (endpoints.length === 0) {
-    return;
-  }
-
-  // Pass skipJSONL: true so sendOTLPToAllEndpoints/sendOTLPSpan don't double-write the mirror.
-  await sendOTLPToAllEndpoints(endpoints, payload, { skipJSONL: true });
 }
 
 module.exports = {
@@ -2896,6 +2923,7 @@ module.exports = {
   buildOTLPResourceAttributes,
   sanitizeOTLPPayload,
   sanitizeAttrs,
+  parseOTELResourceAttributes,
   parseOTLPHeaders,
   parseOTLPEndpoints,
   sendOTLPSpan,

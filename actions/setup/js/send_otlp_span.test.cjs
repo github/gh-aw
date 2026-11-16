@@ -2778,8 +2778,13 @@ describe("sendJobConclusionSpan", () => {
     const metricWrite = appendSpy.mock.calls.find(([filePath]) => filePath === "/tmp/gh-aw/otel-metrics.jsonl");
     expect(metricWrite).toBeDefined();
     expect(JSON.parse(metricWrite[1].trim()).resourceMetrics[0].scopeMetrics[0].metrics[0]).toMatchObject({
-      name: "gh_aw.run.duration",
+      name: "gh_aw.job.duration",
       unit: "s",
+    });
+    const metric = JSON.parse(metricWrite[1].trim()).resourceMetrics[0].scopeMetrics[0].metrics[0];
+    expect(metric.histogram.dataPoints[0].exemplars[0]).toMatchObject({
+      traceId: expect.stringMatching(/^[0-9a-f]{32}$/),
+      spanId: expect.stringMatching(/^[0-9a-f]{16}$/),
     });
   });
 
