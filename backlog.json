@@ -1,23 +1,5 @@
 [
  {
-  "id": "srdjan/aw-pack",
-  "kind": "workflow-collection",
-  "source": "repo search 2026-11-12: installable gh-aw pack (triage, PR review, doc sync)",
-  "discovered": "2026-11-12"
- },
- {
-  "id": "cajetzer/agentic-skills-runtime-consumer",
-  "kind": "other",
-  "source": "repo search 2026-11-12: reference issue-to-draft-PR loop on gh-aw",
-  "discovered": "2026-11-12"
- },
- {
-  "id": "brainupgrade-in/global-bank-platform",
-  "kind": "other",
-  "source": "repo search 2026-11-12: central gh-aw orchestration repo for a fleet",
-  "discovered": "2026-11-12"
- },
- {
   "id": "githubnext/autoloop",
   "kind": "other",
   "source": "linked from githubnext/agentics README 2026-11-12",
@@ -40,5 +22,17 @@
   "kind": "other",
   "source": "linked from githubnext/agentics README 2026-11-12",
   "discovered": "2026-11-12"
+ },
+ {
+  "id": "microsoft/neuro-formal-verification",
+  "kind": "other",
+  "source": "discovery topic:github-agentic-workflows 2026-11-16",
+  "discovered": "2026-11-16"
+ },
+ {
+  "id": "rodush/grait",
+  "kind": "other",
+  "source": "discovery topic:github-agentic-workflows 2026-11-16",
+  "discovered": "2026-11-16"
  }
 ]
