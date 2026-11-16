@@ -66,7 +66,7 @@ slides carries a "Research prototype" badge.
 Left/Right (or Space) step through the slides of the main line in reading
 order and wrap between bands, and Page Up/Page Down jump to the first slide of
 the band above or below. Some Human agent processes patterns head a column of
-worked examples: a rail on the right edge shows a bouncing "↓ N examples" cue,
+worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), and Left/Right from an example return to
 the main line. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,

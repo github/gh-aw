@@ -2168,30 +2168,19 @@
   .dots button.col { box-shadow: 0 3px 0 -1px #ffffff80; }
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
-  /* --- example column rail: right edge, only on a column's head and its examples --- */
-  .vnav { position: fixed; right: 22px; top: 50%; transform: translate(12px, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 5;
-    opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .35s, transform .35s cubic-bezier(.2,.9,.2,1), visibility 0s .35s; }
-  .vnav.on { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(0, -50%); transition-delay: 0s; }
-  .vnav > button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc; color: #9198a1; cursor: pointer;
-    transition: color .2s, border-color .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-  .vnav > button:hover { color: #f0f6fc; border-color: #9198a1; }
-  .vnav > button svg { width: 100%; height: 100%; display: block; }
-  .vnav.head > button:last-of-type { color: #f0f6fc; border-color: #f0f6fc; animation: vnudge 1.6s ease-in-out infinite; }
-  .vnav-dots { display: flex; flex-direction: column; align-items: center; gap: 6px; max-height: 50vh; overflow: hidden; }
-  .vnav-dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer; transition: height .4s cubic-bezier(.3,1.6,.4,1), background .3s; }
-  .vnav-dots button.top { box-shadow: inset 0 0 0 2px #ffffff80; background: transparent; }
-  .vnav-dots button.on { height: 22px; background: #f0f6fc; box-shadow: none; }
-  .vnav-cue { position: absolute; right: 46px; bottom: 0; white-space: nowrap; font: 600 13px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
-    color: #c9d1d9; padding: 6px 10px; border: 1px solid #3d444d; border-radius: 999px; background: #151b23cc; }
-  .vnav.head .vnav-cue { color: #0d1117; background: #f0f6fc; border-color: #f0f6fc; animation: vnudge 1.6s ease-in-out infinite; }
-  @keyframes vnudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
-  @media (prefers-reduced-motion: reduce) { .vnav.head > button:last-of-type, .vnav.head .vnav-cue { animation: none; } }
-  body.light .vnav > button, body.light .vnav-cue { background: #ffffffcc; border-color: #9ea7b3; color: #59636e; }
-  body.light .vnav.head > button:last-of-type { color: #1f2328; border-color: #1f2328; }
-  body.light .vnav.head .vnav-cue { background: #1f2328; border-color: #1f2328; color: #ffffff; }
-  body.light .vnav-dots button { background: #1f232833; }
-  body.light .vnav-dots button.top { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
-  body.light .vnav-dots button.on { background: #1f2328; box-shadow: none; }
+  /* --- example column button (dock): only on a column's head and its examples --- */
+  .vnb { position: fixed; right: 144px; bottom: 10px; height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+    background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
+  .vnb.on { display: flex; }
+  .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .vnb svg { width: 20px; height: 20px; display: block; flex: none; }
+  .vnb.head { color: #0d1117; background: #f0f6fc; border-color: #f0f6fc; }
+  .vnb.head svg { animation: vnudge 1.6s ease-in-out infinite; }
+  @keyframes vnudge { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
+  @media (prefers-reduced-motion: reduce) { .vnb.head svg { animation: none; } }
+  body.light .vnb { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .vnb:hover { color: #1f2328; border-color: #818b98; }
+  body.light .vnb.head { color: #ffffff; background: #1f2328; border-color: #1f2328; }
   /* --- band header --- */
   .bh-head { position: absolute; left: 140px; top: 170px; width: 960px; }
   .bh-head h2 { margin: 26px 0 0; font-size: 150px; line-height: .95; }
@@ -19077,15 +19066,15 @@
   const nextBtn = arrowBtn("Next slide", "→", "M9 5l7 7-7 7", () => next());
   const bandNextBtn = arrowBtn("Next band", "↓", "M18 5v14M6 6l7 6-7 6", () => band(1));
   const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
-  // Column rail (right edge): shown on a column's head and its examples; one button per slide, current one lit,
-  // and a bouncing "↓ N examples" cue on the head so the audience knows there is a line below.
-  const vnavUp = arrowBtn("Slide above", "↑", "M5 15l7-7 7 7", () => vstep(-1));
-  const vnavDown = arrowBtn("Slide below", "↓", "M5 9l7 7 7-7", () => vstep(1));
-  const vnavDots = h("div", { class: "vnav-dots" });
-  const vnavCue = h("div", { class: "vnav-cue", "aria-hidden": "true" });
-  const vnav = h("nav", { class: "vnav", "aria-label": "Examples" }, vnavUp, vnavDots, vnavDown, vnavCue);
-  vnav.addEventListener("click", e => e.stopPropagation());
-  for (const t of ["touchstart", "touchend"]) vnav.addEventListener(t, e => e.stopPropagation(), { passive: true });
+  // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
+  // arrow and the example count, so the audience knows there is a line below; it steps down the column and,
+  // on the last example, turns into an up arrow back to the pattern.
+  const vnb = h("button", { class: "vnb" });
+  vnb.addEventListener("click", e => {
+    e.stopPropagation();
+    vnb._nav?.();
+  });
+  for (const t of ["touchstart", "touchend"]) vnb.addEventListener(t, e => e.stopPropagation(), { passive: true });
   // Taps on the arrows navigate on touchend and cancel the default action, so Safari neither
   // double-tap zooms nor synthesizes a second click, and the window swipe handlers never see them.
   let arrowTouchAt = 0;
@@ -19149,7 +19138,7 @@
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnav, smBtn, fzBtn, snd, notes);
+  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, smBtn, fzBtn, snd, notes);
 
   // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; map/search/sound need ~150px on the right.
   const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
@@ -19918,22 +19907,17 @@
   };
   function paintColumn(n) {
     const col = colOf(slides[n]);
-    vnav.classList.toggle("on", !!col);
-    if (!col) return;
-    const list = [col, ...col.kids],
-      at = list.indexOf(slides[n]);
-    vnav.classList.toggle("head", at === 0);
-    vnavDots.replaceChildren(
-      ...list.map((s, i) =>
-        h("button", {
-          class: `${i ? "" : "top"}${i === at ? " on" : ""}`,
-          "aria-label": i ? `Example ${i} of ${col.kids.length}: ${label(s)}` : `Pattern: ${label(s)}`,
-          title: label(s),
-          onclick: () => go(slides.indexOf(s)),
-        })
-      )
-    );
-    vnavCue.textContent = at ? `${at} / ${col.kids.length}` : `↓ ${col.kids.length} example${col.kids.length > 1 ? "s" : ""}`;
+    vnb.classList.toggle("on", !!col);
+    if (!col) return (vnb._nav = null);
+    const N = col.kids.length,
+      at = [col, ...col.kids].indexOf(slides[n]),
+      back = at === N,
+      label = at ? (back ? "Back to the pattern" : `Next example (${at + 1} of ${N})`) : `${N} example${N > 1 ? "s" : ""} below`;
+    vnb.classList.toggle("head", at === 0);
+    vnb.setAttribute("aria-label", label);
+    vnb.title = `${label} (${back ? "↑" : "↓"})`;
+    vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
+    vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
   }
   const next = () => {
       if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));

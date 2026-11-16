@@ -193,33 +193,39 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(2));
 });
 
-test("walks a pattern's column of examples with up/down and hints at it", async ({ page }) => {
+test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
   const count = page.locator(CURRENT);
-  const rail = page.getByRole("navigation", { name: "Examples" });
+  const vnb = page.locator(".vnb");
   const head = slideNo("Daily Unsloppers");
   const first = slideNo("Research · Assign · Observe");
   const last = slideNo("Personas · Probe · Patch");
+  const n = last - head;
   await page.goto(`/gh-aw/cracktro/#${slideNo("Repo Assist")}`);
-  await expect(rail).toBeHidden();
+  await expect(vnb).toBeHidden();
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(head));
-  // the head shows the rail with a cue that a column of examples lies below
-  await expect(rail).toBeVisible();
-  await expect(rail.locator(".vnav-cue")).toHaveText(`↓ ${last - head} examples`);
+  // the head lights a toolbar button hinting that a column of examples lies below
+  await expect(page.getByRole("button", { name: `${n} examples below` })).toBeVisible();
+  await expect(vnb).toHaveText(`${n}`);
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(first));
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Research · Assign · Observe");
-  await expect(rail.locator(".vnav-cue")).toHaveText(`1 / ${last - head}`);
+  await expect(vnb).toHaveText(`1/${n}`);
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(head));
-  // the rail's buttons jump within the column; Right from an example rejoins the main line
-  await rail.getByRole("button", { name: /^Example 3 of / }).click();
-  await expect(count).toHaveAttribute("aria-label", at(head + 3));
+  // the toolbar button steps down the column; Right from an example rejoins the main line
+  await vnb.click();
+  await vnb.click();
+  await expect(count).toHaveAttribute("aria-label", at(head + 2));
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(last + 1));
-  await expect(rail).toBeHidden();
+  await expect(vnb).toBeHidden();
   // Left from the main line skips the column back to its head
   await page.keyboard.press("ArrowLeft");
+  await expect(count).toHaveAttribute("aria-label", at(head));
+  // on the last example the button leads back up to the pattern
+  await page.goto(`/gh-aw/cracktro/#${last}`);
+  await page.getByRole("button", { name: "Back to the pattern" }).click();
   await expect(count).toHaveAttribute("aria-label", at(head));
   // past the bottom of the column, Down moves on to the next band (trust the process)
   await page.goto(`/gh-aw/cracktro/#${last}`);
