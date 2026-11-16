@@ -29,12 +29,12 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 |---|---|
 | 16 Human Agent Processes | `refresh/human-agent-processes.md` |
 | 18 Pull Request Review² | `refresh/pr-review-squared.md` |
-| 21 Decide · Draft · Record | `refresh/decide-draft-record.md` |
-| 22 Daily Unsloppers | `refresh/daily-unsloppers.md` |
-| 23 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
-| 24 Research · Assign · Observe | `refresh/research-assign-observe.md` |
-| 27 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
-| 29 Spec · Model · Test | `refresh/spec-model-test.md` |
+| 21 Daily Unsloppers | `refresh/daily-unsloppers.md` |
+| 22 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
+| 23 Research · Assign · Observe | `refresh/research-assign-observe.md` |
+| 26 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
+| 28 Spec · Model · Test | `refresh/spec-model-test.md` |
+| 30 Decide · Draft · Record | `refresh/decide-draft-record.md` |
 | 31 Spec-driven testing | `refresh/spec-driven-testing.md` |
 | 32 Docs that heal | `refresh/docs-that-heal.md` |
 | 33 Multi-device tester | `refresh/multi-device-tester.md` |

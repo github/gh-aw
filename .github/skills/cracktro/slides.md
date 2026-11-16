@@ -34,7 +34,6 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Pull Request Review² | illustrative | Marking a pull request ready starts agentic reviewers, and Copilot is nudged to fix their findings so the human reviewer sees a clean pull request. |
 | Issues as intent | illustrative | Contributors run a debug agent on their own failures and file anonymized issues that state intent, which maintainers plan and assign to Copilot. |
 | Repo Assist | illustrative | A scheduled assistant picks maintenance tasks such as triage and stale pull requests, a maintainer reviews every result, and backlogs shrink. |
-| Decide · Draft · Record | illustrative | When a ready pull request carries an architecture decision with no record, an agent drafts an ADR that people finalize and merge with the code, and later agents read it to learn why the feature works that way. |
 | Daily Unsloppers | illustrative | Scheduled research agents find problems such as duplicated code, assign them to Copilot, and developers refine the resulting pull requests. |
 | Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily unsloppers clean up, instead of polishing each one through endless nit rounds. |
 | Research · Assign · Observe | illustrative | A daily benchmark agent files performance regressions, Copilot fixes them, and the next run observes the result to close the loop. |
@@ -44,6 +43,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Semantic clustering | illustrative | Grouping functions by intent rather than by text exposes misplaced code that duplicate detection misses, and Copilot moves it. |
 | Spec · Model · Test | illustrative | Specification requirements become TLA+ invariants; model checking explores every state, and its traces become conformance tests. |
 | Go Fan | illustrative | A daily agent compares each Go dependency's releases with how the code uses it and files review issues that Copilot turns into fixes. |
+| Decide · Draft · Record | illustrative | When a ready pull request carries an architecture decision with no record, an agent drafts an ADR that people finalize and merge with the code, and later agents read it to learn why the feature works that way. |
 | Spec-driven testing | illustrative | Agents keep specifications current from human intent and code changes, and an enforcer turns the specification into tests that guard the next change. |
 | Docs that heal | illustrative | Small agents update, simplify and test documentation the way a newcomer reads it, then fix the gaps and teach the updater new rules. |
 | Multi-device tester | illustrative | A daily agent browses the documentation on phone, tablet and desktop viewports and files what breaks; Copilot fixes it, a developer reviews the pull request and the next run re-tests. |
