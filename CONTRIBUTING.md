@@ -562,24 +562,60 @@ vulnerability, taint-analysis, and safe-output tests. Main-branch pushes,
 manual runs, and the weekly scheduled control run all applicable suites without
 calling the Decision API. CJS and Windows CI are unchanged.
 
-Provision the repository variable `CI_DECISION_URL` with an approved HTTPS
-Decision API endpoint before enabling selection. It receives repository diff
-content; do not point it at an untrusted service. No GitHub token is sent.
-An unset, invalid, or GitHub API endpoint results in zero requests and a full
-fallback. A configured valid endpoint receives exactly one POST, including on
-invalid local input; there are no retries or redirects. The selector makes no
-other HTTP or GitHub API requests. Checkout, existing CI cache/artifact actions,
-and timing collection are outside this selector boundary.
+The selector uses GitHub Decisions at
+`https://api.githubcopilot.com/v1/decisions` with model `gpt-6-luna-decisions`.
+Only the dedicated `front-door-decision` job has `copilot-requests: write`;
+`checkout-cache`, tests, cache restores, and conformance checks do not receive
+this permission. The selection step passes the built-in workflow token through
+`CI_DECISION_TOKEN`. It runs the selector, shared client, catalog, prompt, and
+deterministic policy from a separate checkout pinned to the PR's trusted base
+SHA. A second checkout of the PR merge commit supplies only local git diff
+evidence through `CI_DIFF_WORKSPACE`; no PR-controlled code runs in this job.
+Both checkouts disable credential persistence. During initial rollout, a missing
+trusted selector is skipped and older trusted versions fall back to all suites;
+the PR implementation is never used to bootstrap credential-bearing execution.
+No endpoint variable or PAT is needed, and credentials are never sent to another
+host. Missing tokens or denied inference permissions, including restricted fork
+PRs, run all suites.
+A configured token makes exactly one POST containing the diff summary and five
+named predicates, including on invalid local input; there are no retries,
+redirects, or other selector API requests. Checkout, existing CI cache/artifact
+actions, and timing collection are outside this selector boundary.
 
-The request contains `diff_summary`, `suite_catalog`, and the versioned `prompt`.
-The summary uses only the local merge commit's first-parent diff, with at most
-200 filenames and 24,000 patch bytes. Missing history, oversized/truncated input,
-or selector-policy changes force all suites. No fetch or API mining repairs a
-missing diff. The response is `{"suite_ids":["build-wasm"],"confidence":0.95}`;
-reasoning is ignored. Confidence below 0.9 or missing confidence, malformed JSON,
-unknown/duplicate IDs, non-200 status, a 10-second deadline, or more than 16 KiB
-of response data forces all suites. Mandatory IDs are always added locally.
-Step failure or missing job outputs also runs all optional suites.
+The request includes `diff_summary`, `suite_catalog`, and the versioned prompt.
+The summary uses only the local merge commit's first-parent diff and excludes
+`.lock.yml` files before reading patches. It separates `.js`/`.cjs`, `.go`, and
+other files into `javascript`, `go`, and `other` groups. Each group retains its
+filenames and up to 8,000 UTF-8 patch bytes; `patch_truncated` explicitly marks
+partial snippets. Large patches do not discard the file inventory or consume
+another group's patch budget. Decisions must treat missing hunks conservatively.
+Incomplete inventories (more than 2,000 files or a 128 KiB summary), unavailable
+history, and selector-policy changes still force all suites. No fetch or API
+mining repairs a missing diff.
+
+GitHub returns a named safe-to-omit predicate for each optional suite.
+Probabilities at least 0.9 permit omission; probabilities at most 0.1 retain the
+suite. Any intermediate probability, refusal, missing/duplicate/unknown answer,
+malformed JSON, non-200 status, 10-second deadline, or more than 16 KiB of response
+data forces all suites. The adapter preserves normalized replay responses such
+as `{"suite_ids":["build-wasm"],"confidence":0.95}`. Mandatory IDs are always
+added locally. Invalid outputs are rejected before reaching downstream job
+conditions. A skipped or failed decision job, step failure, or missing outputs
+also runs all optional suites. Selection runs independently of the checkout
+cache; only optional suites depend on it. Mandatory checks never wait for the
+decision, and Windows remains in the cross-platform matrix even when macOS is
+omitted. Pushes and other non-PR events skip the decision job without suppressing
+any suite.
+
+Model-proposed omissions are intersected with a trusted deterministic path
+allowlist, including during recorded-response replay. Root `README.md` and
+`CONTRIBUTING.md`, documentation content, and the standalone workflow timing
+test can permit optional-suite omissions. Explicitly enumerated WASM entrypoint
+files and the WASM golden runner permit omissions only for other optional
+suites; `build-wasm` remains enabled. All other paths, including generic Go test
+files, dependency/build configuration, security files, unknown paths, and
+malformed or incomplete inventories, cannot authorize omissions. Model
+confidence and injected diff instructions cannot expand this allowlist.
 
 `.github/ci/suite-catalog.json` has schema version 1 and entries with a stable
 `id`, short `description`, `mandatory` flag, and
@@ -587,7 +623,8 @@ Step failure or missing job outputs also runs all optional suites.
 Adding a suite requires updating both the catalog and the runtime's fixed ID
 list, plus job wiring and tests. Never invent historical durations.
 
-Run `node --test scripts/ci-front-door.test.cjs` for conformance checks.
+Run `node --test scripts/ci-front-door.test.cjs scripts/ci-front-door-workflow.test.cjs`
+for selector and workflow trust-boundary conformance checks.
 Offline evaluation uses
 `node scripts/ci-front-door-evaluate.cjs .github/ci/suite-catalog.json RECORDS.json`.
 The input is an object containing `records`. Each record has a unique `id`,
@@ -599,7 +636,7 @@ misses, API counts, and missing evidence separately. Missing outcomes are not
 zero regressions, and recorded-response replay alone cannot validate a new
 model prompt. Savings are estimates, not measured billing reductions.
 
-The daily `ci-front-door-researcher` consumes restored PR/run evidence, reports
+The manually invoked `ci-front-door-researcher` consumes restored PR/run evidence, reports
 cache gaps without downloading replacements, and proposes evidence-backed draft
 PRs for catalog or policy changes. Require historical replay and independent
 full-run controls before accepting a more selective policy.

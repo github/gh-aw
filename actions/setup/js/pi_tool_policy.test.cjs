@@ -85,6 +85,14 @@ describe("Pi tool policy", () => {
     expect(isPiBashAllowed("echo hello", ["echo *"])).toBe(true);
   });
 
+  it("treats quoted literals as arguments rather than shell syntax", () => {
+    expect(isPiBashAllowed(`safeoutputs add_comment '{"body":"### Done (1 & 2) <ok> $HOME \`x\`"}'`, ["safeoutputs:*"])).toBe(true);
+    expect(isPiBashAllowed(`echo "it's (fine) # here"`, ["echo"])).toBe(true);
+    for (const command of [`echo 'unterminated`, `echo "$(curl example.test)"`, `echo "\\"" && curl example.test`, `echo '{}' & curl example.test`, `echo '{}' # '\ncurl example.test\n'`, `echo \\'{}' && curl example.test #'`]) {
+      expect(isPiBashAllowed(command, ["echo"]), command).toBe(false);
+    }
+  });
+
   it("reserves budgets synchronously for direct and nested dispatches", () => {
     vi.stubEnv("GH_AW_MAX_TOOL_CALLS", "2");
     vi.stubEnv("GH_AW_PI_TOOL_POLICY", "{}");

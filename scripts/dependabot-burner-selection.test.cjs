@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
-const { buildCopilotSDKPermissionHandler } = require("../actions/setup/js/copilot_sdk_permissions.cjs");
+const { isPiBashAllowed } = require("../actions/setup/js/pi_tool_policy.cjs");
 const { extractInlineSubAgents } = require("../actions/setup/js/extract_inline_sub_agents.cjs");
 const { extractFrontmatterAndBody } = require("../actions/setup/js/frontmatter_hash_pure.cjs");
 
@@ -14,25 +14,25 @@ assert.ok(script, "Missing burner prefetch script");
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const prefetch = new AsyncFunction("github", "context", "require", "process", "console", script[1].replace(/^        /gm, ""));
 
-function compiledPermissionHandler() {
+function compiledBashPolicy() {
   const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
-  const toolConfig = lock.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/);
-  assert.ok(toolConfig, "Missing compiled SDK tool configuration");
-  const { permissions } = JSON.parse(toolConfig[1]);
-  assert.ok(permissions.allowedTools.length > 0, "Missing compiled permission policy");
-  return buildCopilotSDKPermissionHandler(permissions, () => assert.fail("Unrestricted approval is not expected"));
+  const toolPolicy = lock.match(/GH_AW_PI_TOOL_POLICY: '([^'\n]+)'/);
+  assert.ok(toolPolicy, "Missing compiled Pi tool policy");
+  const { bash } = JSON.parse(toolPolicy[1]);
+  assert.ok(Array.isArray(bash) && bash.length > 0 && !bash.includes("*"), "Missing restricted bash allowlist");
+  return command => isPiBashAllowed(command, bash);
 }
 
-test("burner tool-contract commands are executable under the compiled SDK policy", () => {
+test("burner tool-contract commands are executable under the compiled Pi policy", () => {
   const contract = workflow.match(/## Tool contract for every agent\n([\s\S]*?)\n## Read first/);
   assert.ok(contract, "Missing restricted-tool contract for the orchestrator and subagents");
-  const handler = compiledPermissionHandler();
+  const allowed = compiledBashPolicy();
   const { agents } = extractInlineSubAgents(workflow);
   const contracts = [contract[1], ...agents.map(agent => agent.content.match(/#{2,3} Tool contract\n([\s\S]*?)(?=\n## |Return compact JSON|$)/)?.[1] || "")];
-  const commands = contracts.flatMap(content => [...content.matchAll(/`((?:cat|git|github|safeoutputs) [^`]+)`/g)].map(match => match[1]));
+  const commands = contracts.flatMap(content => [...content.matchAll(/`((?:cat|git|safeoutputs) [^`]+)`/g)].map(match => match[1]));
   assert.ok(commands.length > 0, "Missing executable command examples");
   for (const command of commands) {
-    assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once", command);
+    assert.ok(allowed(command), command);
   }
   for (const command of [
     "command -v pull_request_read || command -v github-mcp-server || command -v mcp",
@@ -42,12 +42,11 @@ test("burner tool-contract commands are executable under the compiled SDK policy
     "git --no-pager status --short --branch",
     "git --no-pager status --short && git --no-pager remote -v",
     "git diff --stat && gh auth status",
-    "git diff --ext-diff",
-    "go test -exec /tmp/unreviewed",
+    'github pull_request_read \'{"method":"get_diff"}\'',
     "cd /tmp/gh-aw/agent/dependabot-burner && rg -n retry .",
     "find /tmp/gh-aw/agent/dependabot-burner -maxdepth 2 -type f | sort | head -50",
   ]) {
-    assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "reject", command);
+    assert.ok(!allowed(command), command);
   }
 });
 
@@ -78,24 +77,20 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   for (const agent of agents) {
     assert.ok(Buffer.byteLength(agent.prompt) <= 7500, `${agent.name} exceeds the instruction-prefix budget`);
     if (agent.tools.includes("bash")) {
-      assert.ok(agent.prompt.includes("github pull_request_read --help"), `${agent.name} is missing executable guidance`);
+      assert.ok(agent.prompt.includes("never through Bash"), `${agent.name} is missing GitHub tool guidance`);
       assert.ok(agent.prompt.includes("After the first permission denial, stop shell calls"), `${agent.name} is missing a denial stop condition`);
     }
   }
-  assert.deepEqual(remediator.tools, ["read", "search", "edit", "bash"]);
+  assert.deepEqual(remediator.tools, ["read", "grep", "find", "ls", "edit", "write", "bash"]);
   assert.ok(mainContent.includes("Do not launch a separate dependency analysis or feedback synthesis task"), "First attempts must not require retry synthesis");
   assert.ok(mainContent.includes("do not search the filesystem for history or relaunch the analyzer"));
 });
 
-test("the proxy PR-read route is allowed without standalone command probes", () => {
-  const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
-  const toolConfig = lock.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/);
-  assert.ok(toolConfig);
-  const { permissions } = JSON.parse(toolConfig[1]);
-  const handler = buildCopilotSDKPermissionHandler(permissions, () => assert.fail("Unrestricted approval is not expected"));
-  const command = 'github pull_request_read \'{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}\'';
-  assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once");
-  assert.match(workflow, /Tool names are subcommands of github, not standalone/);
+test("safe outputs are executable while GitHub reads stay off the shell", () => {
+  const allowed = compiledBashPolicy();
+  assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
+  assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
+  assert.match(workflow, /GitHub\n {2}tools are not shell commands: never invoke them through Bash/);
 });
 
 test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {

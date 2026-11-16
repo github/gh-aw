@@ -75,12 +75,23 @@ PY
   if ! python3 - "$workflow" >"$write_permissions_file" <<'PY'; then
 import re
 import sys
+from pathlib import Path
 
 workflow = sys.argv[1]
 
 # `actions: write` is required by the cleanup jobs that delete the shared
 # checkout cache at the end of a run; it grants no access to repository content.
 allowed_write_scopes = {"actions"}
+job_name = None
+
+
+def allowed_write_scope(scope):
+    return scope in allowed_write_scopes or (
+        scope == "copilot-requests"
+        and Path(workflow).name == "cgo.yml"
+        and job_name == "front-door-decision"
+        and permissions_indent == 4
+    )
 
 
 def strip_comment(line):
@@ -157,6 +168,11 @@ permissions_indent = -1
 for line_number, line in enumerate(lines, start=1):
     without_comment = strip_comment(line).rstrip()
     stripped = without_comment.strip()
+    if stripped and not without_comment.startswith(" "):
+        job_name = None
+    job_match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", without_comment)
+    if job_match:
+        job_name = job_match.group(1)
     if in_permissions:
         if not stripped:
             continue
@@ -168,7 +184,7 @@ for line_number, line in enumerate(lines, start=1):
             if (
                 match
                 and normalize(match.group(2)) == "write"
-                and match.group(1) not in allowed_write_scopes
+                and not allowed_write_scope(match.group(1))
             ):
                 print(f"{workflow}:{line_number}: {line.rstrip()}")
             continue
@@ -188,7 +204,7 @@ for line_number, line in enumerate(lines, start=1):
         print(f"{workflow}:{line_number}: {line.rstrip()}")
         continue
     for pair_key, pair_value in flow_pairs(value):
-        if pair_value == "write" and pair_key not in allowed_write_scopes:
+        if pair_value == "write" and not allowed_write_scope(pair_key):
             print(f"{workflow}:{line_number}: {line.rstrip()}")
             break
 PY

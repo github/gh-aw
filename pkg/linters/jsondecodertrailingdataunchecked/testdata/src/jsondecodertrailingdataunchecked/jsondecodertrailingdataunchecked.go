@@ -154,6 +154,32 @@ func goodTokenDrivenDecode(input string) error {
 	return nil
 }
 
+func badTokenWithUnrelatedEOFCheck(input string) error {
+	var value any
+	decoder := json.NewDecoder(strings.NewReader(input))
+	if err := decoder.Decode(&value); err != nil { // want `first Decode on an in-memory JSON reader`
+		return err
+	}
+	otherErr := errors.New("unrelated error")
+	if _, tokenErr := decoder.Token(); otherErr != io.EOF {
+		return tokenErr
+	}
+	return nil
+}
+
+func badTokenEOFCheckWithoutIfInit(input string) error {
+	var value any
+	decoder := json.NewDecoder(strings.NewReader(input))
+	if err := decoder.Decode(&value); err != nil { // want `first Decode on an in-memory JSON reader`
+		return err
+	}
+	_, err := decoder.Token()
+	if err == io.EOF {
+		return nil
+	}
+	return nil
+}
+
 func badReassignedInMemoryDecoder(input, replacement string) error {
 	var value, trailing any
 	decoder := json.NewDecoder(strings.NewReader(input))
