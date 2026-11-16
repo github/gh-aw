@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 function binding(tool, name) {
-  return `GH_AW_MCP_SCRIPTS_ENV_${Buffer.from(tool).toString("hex")}_${Buffer.from(name).toString("hex")}`;
+  return `GH_AW_MCP_SCRIPTS_ENV_${tool.length}_${tool.toUpperCase()}_${name}`;
 }
 
 const probes = {

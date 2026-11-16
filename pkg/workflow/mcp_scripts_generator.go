@@ -119,9 +119,37 @@ func generateMCPScriptInputSchema(inputs map[string]*MCPScriptParam) map[string]
 	return schema
 }
 
-// Hex encoding preserves distinct tool/name pairs without sanitization collisions.
+// mcpScriptEnvBindingName builds a readable, collision-free transport variable name
+// for a (tool, variable) pair: GH_AW_MCP_SCRIPTS_ENV_<len>_<TOOL>_<NAME>.
+// Long hexadecimal identifiers are avoided because secret scanners flag them as passwords.
+// Both components use injective escaping and the tool length prefix makes the join unambiguous.
 func mcpScriptEnvBindingName(toolName, envName string) string {
-	return fmt.Sprintf("GH_AW_MCP_SCRIPTS_ENV_%x_%x", toolName, envName)
+	tool := encodeMCPScriptEnvComponent(toolName, true)
+	return fmt.Sprintf("GH_AW_MCP_SCRIPTS_ENV_%d_%s_%s", len(tool), tool, encodeMCPScriptEnvComponent(envName, false))
+}
+
+// encodeMCPScriptEnvComponent maps a name onto [A-Z0-9_x] injectively. Lowercase 'x' is
+// reserved as the escape marker and is always followed by two uppercase hex digits.
+// Tool names (lowercase with dashes) map a-z to A-Z and '-' to '_'; variable names keep
+// A-Z, 0-9 and '_' unchanged. Every other byte is escaped.
+func encodeMCPScriptEnvComponent(name string, isToolName bool) string {
+	var sb strings.Builder
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		switch {
+		case c >= '0' && c <= '9':
+			sb.WriteByte(c)
+		case isToolName && c >= 'a' && c <= 'z':
+			sb.WriteByte(c - 'a' + 'A')
+		case isToolName && c == '-':
+			sb.WriteByte('_')
+		case !isToolName && (c >= 'A' && c <= 'Z' || c == '_'):
+			sb.WriteByte(c)
+		default:
+			fmt.Fprintf(&sb, "x%02X", c)
+		}
+	}
+	return sb.String()
 }
 
 func generateMCPScriptEnvRefs(toolName string, env map[string]string) map[string]string {

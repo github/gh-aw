@@ -15,7 +15,7 @@ The required boundary is least-privilege environment inheritance for co-hosted t
 
 ### Decision
 
-The compiler assigns every `(tool name, variable name)` pair a distinct transport variable, `GH_AW_MCP_SCRIPTS_ENV_<hex(tool)>_<hex(name)>`. The generated tools manifest maps tool-local names to those references, and the MCP scripts server startup environment supplies the values. Encoding both components separately preserves distinct pairs, including names that would collide after sanitization.
+The compiler assigns every `(tool name, variable name)` pair a distinct transport variable, `GH_AW_MCP_SCRIPTS_ENV_<len>_<TOOL>_<NAME>`. The generated tools manifest maps tool-local names to those references, and the MCP scripts server startup environment supplies the values. Each component is escaped injectively (tool names map `a-z` to `A-Z` and `-` to `_`; variable names keep `A-Z`, `0-9` and `_`; any other byte becomes `x<HH>`), and the encoded tool length prefix makes the join unambiguous. This preserves distinct pairs, including names that would collide after sanitization, while avoiding long hexadecimal identifiers that secret scanners flag as passwords.
 
 At invocation, each language handler receives a freshly built environment containing an explicit runtime allowlist plus only that tool's declared bindings. Runtime entries preserve interpreter lookup, home and temporary directories, locale, workspace location, and supported toolchain paths. Explicit bindings take precedence over allowlisted defaults; missing references fail before handler execution. The child receives tool-local names, not compiler-generated transport names.
 

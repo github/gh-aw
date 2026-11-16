@@ -937,7 +937,7 @@ jobs:
         # runner-guard:ignore RGS-018 -- writes first-party mcp-scripts tools.json manifest and mcp-server.cjs shim generated verbatim from the gh-aw compiler template, not an attacker-controlled dropper.
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_76d4470ee6718fb6_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_af30627a9867944f_EOF'
           {
             "serverName": "mcpscripts",
             "version": "1.0.0",
@@ -960,13 +960,13 @@ jobs:
                 },
                 "handler": "conformance-challenge.cjs",
                 "env": {
-                  "CONFORMANCE_STATE": "GH_AW_MCP_SCRIPTS_ENV_636f6e666f726d616e63652d6368616c6c656e6765_434f4e464f524d414e43455f5354415445"
+                  "CONFORMANCE_STATE": "GH_AW_MCP_SCRIPTS_ENV_21_CONFORMANCE_CHALLENGE_CONFORMANCE_STATE"
                 },
                 "timeout": 60
               }
             ]
           }
-          GH_AW_MCP_SCRIPTS_TOOLS_76d4470ee6718fb6_EOF
+          GH_AW_MCP_SCRIPTS_TOOLS_af30627a9867944f_EOF
           cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF'
             const path = require("path");
             const { startHttpServer } = require("./mcp_scripts_mcp_server_http.cjs");
@@ -1031,7 +1031,7 @@ jobs:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}
-          GH_AW_MCP_SCRIPTS_ENV_636f6e666f726d616e63652d6368616c6c656e6765_434f4e464f524d414e43455f5354415445: ${{ runner.temp }}/engine-conformance
+          GH_AW_MCP_SCRIPTS_ENV_21_CONFORMANCE_CHALLENGE_CONFORMANCE_STATE: ${{ runner.temp }}/engine-conformance
         run: |
           # Environment variables are set above to prevent template injection
           export DEBUG

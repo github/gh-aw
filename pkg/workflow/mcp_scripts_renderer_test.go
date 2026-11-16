@@ -58,8 +58,13 @@ func TestMCPScriptsPerToolEnvironmentBindings(t *testing.T) {
 		t.Fatal("overlapping variable names must use distinct transport references")
 	}
 	if mcpScriptEnvBindingName("a-b", "C") == mcpScriptEnvBindingName("a_b", "C") ||
-		mcpScriptEnvBindingName("a", "b_c") == mcpScriptEnvBindingName("a_b", "c") {
+		mcpScriptEnvBindingName("a", "b_c") == mcpScriptEnvBindingName("a_b", "c") ||
+		mcpScriptEnvBindingName("a", "B_C") == mcpScriptEnvBindingName("a-b", "C") ||
+		mcpScriptEnvBindingName("a", "Key") == mcpScriptEnvBindingName("a", "KEY") {
 		t.Fatal("binding names must not collide after normalization or joining")
+	}
+	if got := mcpScriptEnvBindingName("github-pr-query", "GH_TOKEN"); got != "GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GH_TOKEN" {
+		t.Fatalf("binding name must be readable, got %s", got)
 	}
 }
 
