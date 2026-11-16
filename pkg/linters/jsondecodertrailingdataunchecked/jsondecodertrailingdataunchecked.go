@@ -56,19 +56,26 @@ func analyzeFunction(pass *analysis.Pass, body *ast.BlockStmt, generatedFiles fi
 		if tokenCalls[decoder] != nil && tokenCallsCheckEOF(pass, body, tokenCalls[decoder]) {
 			continue
 		}
-		if len(calls) == 0 || decodeIsEOFLoop(pass, calls[0], parents) {
+		if len(calls) == 0 {
+			continue
+		}
+		first := calls[0] //nolint:uncheckedsliceindex // empty call groups cannot be inserted into decodeCalls.
+		if decodeIsEOFLoop(pass, first, parents) {
 			continue
 		}
 		checked := false
-		for _, followup := range calls[1:] {
-			if followsStraightLine(firstCall(calls), followup, parents) &&
+		for _, followup := range calls {
+			if followup == first {
+				continue
+			}
+			if followsStraightLine(first, followup, parents) &&
 				decodeChecksEOF(pass, body, followup, parents) {
 				checked = true
 				break
 			}
 		}
 		if !checked {
-			firstDecodes = append(firstDecodes, calls[0])
+			firstDecodes = append(firstDecodes, first)
 		}
 	}
 
@@ -83,13 +90,6 @@ func analyzeFunction(pass *analysis.Pass, body *ast.BlockStmt, generatedFiles fi
 		}
 		pass.ReportRangef(firstDecode, "first Decode on an in-memory JSON reader must be followed by a Decode that rejects non-EOF results")
 	}
-}
-
-func firstCall(calls []*ast.CallExpr) *ast.CallExpr {
-	if len(calls) == 0 {
-		return nil
-	}
-	return calls[0]
 }
 
 func collectDecoderCalls(pass *analysis.Pass, body *ast.BlockStmt) (map[ast.Node][]*ast.CallExpr, map[ast.Node][]*ast.CallExpr) {
@@ -189,7 +189,7 @@ func isInMemoryNewDecoder(pass *analysis.Pass, decoder *ast.CallExpr) bool {
 	if !isPackageCall(pass, decoder, "encoding/json", "NewDecoder") || len(decoder.Args) != 1 {
 		return false
 	}
-	reader, ok := astutil.UnwrapParenExpr(decoder.Args[0]).(*ast.CallExpr)
+	reader, ok := astutil.UnwrapParenExpr(decoder.Args[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // len(decoder.Args) == 1 is checked above.
 	if !ok || len(reader.Args) != 1 {
 		return false
 	}
@@ -248,10 +248,10 @@ func decodeErrorGuard(pass *analysis.Pass, ifStmt *ast.IfStmt, call *ast.CallExp
 		return false, nil
 	}
 	index := statementIndex(assign, ifStmt)
-	if index == 0 {
+	if index < 1 {
 		return false, nil
 	}
-	prev, ok := assign.List[index-1].(*ast.AssignStmt)
+	prev, ok := assign.List[index-1].(*ast.AssignStmt) //nolint:uncheckedsliceindex // index > 0 is checked above.
 	if !ok {
 		return false, nil
 	}
@@ -264,11 +264,13 @@ func decodeErrorGuard(pass *analysis.Pass, ifStmt *ast.IfStmt, call *ast.CallExp
 
 func decodeErrorObject(pass *analysis.Pass, stmt ast.Stmt, call *ast.CallExpr) types.Object {
 	assign, ok := stmt.(*ast.AssignStmt)
-	if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 ||
-		astutil.UnwrapParenExpr(assign.Rhs[0]) != call {
+	if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 		return nil
 	}
-	ident, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident)
+	if astutil.UnwrapParenExpr(assign.Rhs[0]) != call { //nolint:uncheckedsliceindex // len(assign.Rhs) == 1 is checked above.
+		return nil
+	}
+	ident, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident) //nolint:uncheckedsliceindex // len(assign.Lhs) == 1 is checked above.
 	if !ok || ident.Name == "_" {
 		return nil
 	}
@@ -315,7 +317,9 @@ func isErrorsIsEOF(pass *analysis.Pass, expr ast.Expr, call *ast.CallExpr, errOb
 	if !ok || !isPackageCall(pass, callExpr, "errors", "Is") || len(callExpr.Args) != 2 {
 		return false
 	}
-	return sameDecodeResult(pass, callExpr.Args[0], call, errObject) && isIOEOF(pass, callExpr.Args[1])
+	firstArg := callExpr.Args[0]  //nolint:uncheckedsliceindex // len(callExpr.Args) == 2 is checked above.
+	secondArg := callExpr.Args[1] //nolint:uncheckedsliceindex // len(callExpr.Args) == 2 is checked above.
+	return sameDecodeResult(pass, firstArg, call, errObject) && isIOEOF(pass, secondArg)
 }
 
 func sameDecodeResult(pass *analysis.Pass, expr ast.Expr, call *ast.CallExpr, errObject types.Object) bool {
@@ -354,7 +358,11 @@ func rejectsWithNonNilError(pass *analysis.Pass, block *ast.BlockStmt) bool {
 	if block == nil || len(block.List) == 0 {
 		return false
 	}
-	switch last := block.List[len(block.List)-1].(type) {
+	var lastStmt ast.Stmt
+	for _, stmt := range block.List {
+		lastStmt = stmt
+	}
+	switch last := lastStmt.(type) {
 	case *ast.ReturnStmt:
 		for _, result := range last.Results {
 			call, ok := astutil.UnwrapParenExpr(result).(*ast.CallExpr)
@@ -414,11 +422,11 @@ func parentNodes(root ast.Node) map[ast.Node]ast.Node {
 	var stack []ast.Node
 	ast.Inspect(root, func(node ast.Node) bool {
 		if node == nil {
-			stack = stack[:len(stack)-1]
+			stack = stack[:len(stack)-1] //nolint:uncheckedsliceindex // ast.Inspect closes a node after it was pushed.
 			return false
 		}
 		if len(stack) != 0 {
-			parents[node] = stack[len(stack)-1]
+			parents[node] = stack[len(stack)-1] //nolint:uncheckedsliceindex // len(stack) != 0 is checked above.
 		}
 		stack = append(stack, node)
 		return true
@@ -538,9 +546,12 @@ func conditionChecksDecodeEOF(pass *analysis.Pass, condition ast.Expr, call *ast
 				found = true
 			}
 		case *ast.CallExpr:
-			if isPackageCall(pass, node, "errors", "Is") && len(node.Args) == 2 &&
-				sameDecodeResult(pass, node.Args[0], call, errObject) && isIOEOF(pass, node.Args[1]) {
-				found = true
+			if isPackageCall(pass, node, "errors", "Is") && len(node.Args) == 2 {
+				firstArg := node.Args[0]  //nolint:uncheckedsliceindex // len(node.Args) == 2 is checked above.
+				secondArg := node.Args[1] //nolint:uncheckedsliceindex // len(node.Args) == 2 is checked above.
+				if sameDecodeResult(pass, firstArg, call, errObject) && isIOEOF(pass, secondArg) {
+					found = true
+				}
 			}
 		}
 		return !found
