@@ -2348,6 +2348,60 @@
   .active .imp-rules { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
   .imp-rules small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
   .imp-rules span { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #c9d1d9; white-space: nowrap; }
+  /* Skills: declare pinned skills, install them before the agent, apply the ones triage picks */
+  .skl .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ff7b72, #3fb950, #ab7df8, #e3b341, #79c0ff); }
+  .skl-col { position: absolute; top: 290px; opacity: 0; }
+  .active .skl-col { animation: rise .8s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .skl-col b { display: flex; align-items: center; gap: 14px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
+  .skl-col b i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 99px; background: #f0f6fc; color: #0d1117; font: normal 800 20px/1 "Mona Sans"; }
+  .skl-col span { display: block; margin: 10px 0 0 50px; font: 500 17px/1 var(--mono); color: #9198a1; letter-spacing: .04em; white-space: nowrap; }
+  .skl-pane { position: absolute; top: 380px; height: 530px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; transition: border-color .4s, box-shadow .4s; }
+  .skl-ed { left: 110px; width: 660px; }
+  .skl-ins { left: 800px; width: 440px; }
+  .skl-rev { left: 1270px; width: 540px; }
+  .active .skl-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
+  .active .skl-ins { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .active .skl-rev { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .8s; }
+  .skl-pane.hot { border-color: #f0f6fc; box-shadow: 0 0 40px -12px #f0f6fc; }
+  .skl-tab { display: flex; align-items: center; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; white-space: nowrap; }
+  .skl-tab > span { margin-left: auto; color: #656c76; font-size: 15px; letter-spacing: .1em; transition: color .3s; }
+  .skl-tab > span.ok { color: #3fb950; }
+  .skl-code { padding: 10px 0; font: 500 16px/26px var(--mono); }
+  .skl-row { display: flex; white-space: pre; transition: background .35s; }
+  .skl-row .no { width: 50px; padding-right: 16px; text-align: right; color: #656c76; flex: none; }
+  .skl-row.seen { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 10%, transparent), transparent 70%); }
+  .skl-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 26%, transparent), transparent 85%); }
+  .skl-fs { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .skl-f { padding: 11px 14px; border-radius: 12px; border: 1.5px solid #21262d; transition: all .35s; }
+  .skl-f > div { display: flex; align-items: baseline; gap: 10px; }
+  .skl-f b { font: 600 17px/1 var(--mono); color: #e6edf3; white-space: nowrap; transition: color .35s; }
+  .skl-f em { margin-left: auto; font: 600 12px/1 var(--mono); font-style: normal; letter-spacing: .1em; text-transform: uppercase; color: #656c76; white-space: nowrap; transition: color .35s; }
+  .skl-f p { margin: 8px 0 0; font: 500 14px/1.2 var(--mono); color: #9198a1; white-space: nowrap; }
+  .skl-f.seen { border-color: color-mix(in srgb, var(--k) 45%, transparent); }
+  .skl-f.seen b, .skl-f.on b, .skl-f.seen em { color: var(--k); }
+  .skl-f.on { border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); box-shadow: 0 0 24px -8px var(--k); }
+  .skl-f.dim { opacity: .35; }
+  .skl-ss { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+  .skl-s { opacity: .18; transform: translateY(6px); transition: opacity .4s, transform .4s; }
+  .skl-s.on { opacity: 1; transform: none; }
+  .skl-s > small { display: block; margin-bottom: 6px; font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #656c76; }
+  .skl-tri { font: 500 15px/1.5 var(--mono); color: #e6edf3; white-space: nowrap; }
+  .skl-tri i { font-style: normal; color: #a5d6ff; }
+  .skl-chips { display: flex; gap: 8px; }
+  .skl-chips span { padding: 5px 11px; border-radius: 99px; border: 1.5px solid var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); font: 600 15px/1 var(--mono); color: var(--k); white-space: nowrap; }
+  .skl-diff { border-radius: 8px; border: 1px solid #30363d; overflow: hidden; font: 500 14px/22px var(--mono); }
+  .skl-diff div { padding: 0 10px; white-space: pre; color: #9198a1; }
+  .skl-diff .del { background: #f8514926; color: #ffa198; }
+  .skl-diff .add { background: #2ea04333; color: #7ee787; }
+  .skl-cm { padding: 10px 12px; border-radius: 8px; border: 1px solid #30363d; border-left: 3px solid #3fb950; background: #161b22; font: 500 14px/1.4 "Mona Sans"; color: #e6edf3; }
+  .skl-cm b { font: 700 14px/1 var(--mono); color: #3fb950; }
+  .skl-cm u { text-decoration: none; color: #79c0ff; }
+  .skl-ok { display: flex; align-items: center; gap: 10px; font: 600 15px/1 var(--mono); color: #e6edf3; white-space: nowrap; }
+  .skl-ok i { font-style: normal; padding: 5px 10px; border-radius: 6px; background: #da363333; border: 1px solid #f85149; color: #ffa198; letter-spacing: .06em; }
+  .skl-rules { position: absolute; left: 110px; top: 950px; display: flex; align-items: center; gap: 10px; opacity: 0; }
+  .active .skl-rules { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .skl-rules small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
+  .skl-rules span { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #c9d1d9; white-space: nowrap; }
 
   /* --- enterprise operations: OpenTelemetry, governance, infrastructure (shared static visuals from ops-visuals.js) --- */
   .ops .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--oc), #a5d6ff, var(--oc)); }
@@ -12018,6 +12072,212 @@
             status.classList.add("ok");
             sfx.notify(false);
           });
+      },
+      el,
+    });
+  }
+
+  // Skills: the Matt Pocock Skills Reviewer declares commit-pinned skills from the public mattpocock/skills repo; the activation job installs them before the agent starts; a triage sub-agent picks the skills that fit the pull request and every review comment cites the skill it applied
+  {
+    resetIndex();
+    // [colour, skill, what it brings, frontmatter line, when the prompt applies it]
+    const SK = [
+      ["#ff7b72", "diagnosing-bugs", "reproduce · minimise · fix · regression-test", 6, "for bug fixes and regressions"],
+      ["#3fb950", "tdd", "red · green · refactor", 7, "where test coverage is thin"],
+      ["#79c0ff", "codebase-design", "interface seams · navigability", 8, "for large refactors"],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff";
+    const LINES = [
+      [["---", D]],
+      [["on:", K]],
+      [["  pull_request:", K]],
+      [
+        ["    types: ", K],
+        ["[ready_for_review]", V],
+      ],
+      [["skills:", K]],
+      ...SK.map(([c, n]) => [
+        ["  - ", K],
+        ["mattpocock/skills/", V],
+        [n, c],
+        ["@4ae2317", D],
+      ]),
+      [["safe-outputs:", K]],
+      [["  create-pull-request-review-comment:", K]],
+      [["  submit-pull-request-review:", K]],
+      [["---", D]],
+      [["# Matt Pocock Skills Reviewer", T]],
+      [["Run pr-triage, then apply only the skills it picks:", T]],
+      ...SK.map(([c, n, , , w]) => [
+        ["- ", T],
+        ["`/" + n + "`", c],
+        [" " + w, T],
+      ]),
+    ];
+    const rows = LINES.map((parts, i) =>
+      h(
+        "div",
+        { class: "skl-row" },
+        h("span", { class: "no" }, String(i + 1)),
+        h(
+          "span",
+          {},
+          parts.map(([s, c]) => h("span", { style: { color: c } }, s))
+        )
+      )
+    );
+    const ed = h("div", { class: "skl-pane skl-ed" }, h("div", { class: "skl-tab" }, "mattpocock-skills-reviewer.md", h("span", {}, "FRONTMATTER")), h("div", { class: "skl-code" }, rows));
+
+    const cards = SK.map(([c, n, d]) => h("div", { class: "skl-f", "--k": c }, h("div", {}, h("b", {}, "/" + n), h("em", {}, "pinned")), h("p", {}, d)));
+    const insStatus = h("span", {}, "");
+    const ins = h("div", { class: "skl-pane skl-ins" }, h("div", { class: "skl-tab" }, ".github/skills/", insStatus), h("div", { class: "skl-fs" }, cards));
+
+    // the review pane: triage → picked skills → diff → inline comment → submitted review
+    const PICK = [0, 1];
+    const steps = [
+      h("div", { class: "skl-s" }, h("small", {}, "pr-triage sub-agent"), h("div", { class: "skl-tri" }, "change_type: ", h("i", {}, '"bug_fix"'))),
+      h(
+        "div",
+        { class: "skl-s" },
+        h("small", {}, "recommended_skills"),
+        h(
+          "div",
+          { class: "skl-chips" },
+          PICK.map(i => h("span", { "--k": SK[i][0] }, "/" + SK[i][1]))
+        )
+      ),
+      h(
+        "div",
+        { class: "skl-s" },
+        h("small", {}, "pkg/timeutil/parse.go"),
+        h("div", { class: "skl-diff" }, h("div", {}, "  func ParseWindow(s string) (Window, error) {"), h("div", { class: "del" }, '-   if s == "" { return Window{}, nil }'), h("div", { class: "add" }, '+   if s == "" { return Window{}, ErrEmpty }'))
+      ),
+      h("div", { class: "skl-s" }, h("small", {}, "inline review comment · line 42"), h("div", { class: "skl-cm" }, h("b", {}, "[/tdd]"), " The empty-input fix has no regression test; add one that fails without it. ", h("u", {}, "@copilot please address this."))),
+      h("div", { class: "skl-s" }, h("small", {}, "safe output"), h("div", { class: "skl-ok" }, h("i", {}, "REQUEST_CHANGES"), "review submitted · cites 2 skills")),
+    ];
+    const revStatus = h("span", {}, "");
+    const rev = h("div", { class: "skl-pane skl-rev" }, h("div", { class: "skl-tab" }, "PR · ready for review", revStatus), h("div", { class: "skl-ss" }, steps));
+
+    const cols = [
+      [110, "1", "Declare", "skills: · owner/repo/skill@ref", ".2s"],
+      [800, "2", "Install", "activation job · before the agent", ".3s"],
+      [1270, "3", "Apply", "triage picks · comments cite skills", ".4s"],
+    ].map(([x, n, t, s, d]) => h("div", { class: "skl-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
+    const RULES = ["refs pinned to a commit SHA at compile time", "never installed by the agent at run time", "private skills: per-skill token or GitHub App"];
+    const el = h(
+      "section",
+      { class: "slide skl" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Expertise as a dependency · mattpocock/skills reviews gh-aw pull requests"), h("h2", {}, letters("Skills", "l-grad"))),
+      cols,
+      ed,
+      ins,
+      rev,
+      h(
+        "div",
+        { class: "skl-rules" },
+        h("small", {}, "Guardrails"),
+        RULES.map(r => h("span", {}, r))
+      )
+    );
+
+    // ms into the cycle when each skill installs, triage runs, skills are picked, each review step lands and the loop restarts
+    const INS_AT = SK.map((_, i) => 700 + i * 800),
+      INS_DONE = 3200,
+      STEP_AT = [4500, 5600, 6700, 7900, 9300],
+      CYC = 13500;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      cards.forEach(c => (c.classList.remove("on", "seen", "dim"), (c.querySelector("em").textContent = "pinned")));
+      rows.forEach(r => r.classList.remove("hot", "seen"));
+      steps.forEach(s => s.classList.remove("on"));
+      [ins, rev].forEach(p => p.classList.remove("hot"));
+      [insStatus, revStatus].forEach(s => ((s.textContent = ""), s.classList.remove("ok")));
+    };
+    const hotRow = i => {
+      rows.forEach(r => r.classList.remove("hot"));
+      if (i < 0) return;
+      const r = rows[SK[i][3] - 1];
+      r.style.setProperty("--k", SK[i][0]);
+      r.classList.add("hot", "seen");
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        INS_AT.forEach(
+          (ms, i) =>
+            u >= ms &&
+            fire("i" + i, () => {
+              hotRow(i);
+              ins.classList.add("hot");
+              insStatus.textContent = "INSTALLING";
+              cards.forEach((c, j) => c.classList.toggle("on", j === i));
+              cards[i].classList.add("seen");
+              cards[i].querySelector("em").textContent = "installed";
+              sfx.key(0.7);
+              sfx.pop(i);
+            })
+        );
+        if (u >= INS_DONE)
+          fire("id", () => {
+            hotRow(-1);
+            cards.forEach(c => c.classList.remove("on"));
+            ins.classList.remove("hot");
+            insStatus.textContent = `✓ ${SK.length} INSTALLED`;
+            insStatus.classList.add("ok");
+            sfx.compile();
+          });
+        STEP_AT.forEach(
+          (ms, i) =>
+            u >= ms &&
+            fire("s" + i, () => {
+              steps[i].classList.add("on");
+              if (i === 0) {
+                rev.classList.add("hot");
+                revStatus.textContent = "REVIEWING";
+                sfx.route(1);
+              } else if (i === 1) {
+                cards.forEach((c, j) => (c.classList.toggle("on", PICK.includes(j)), c.classList.toggle("dim", !PICK.includes(j))));
+                PICK.forEach(j => {
+                  const r = rows[LINES.length - SK.length + j];
+                  r.style.setProperty("--k", SK[j][0]);
+                  r.classList.add("hot");
+                });
+                sfx.pop(5);
+              } else if (i === 2) sfx.key(0.5);
+              else if (i === 3) sfx.review();
+              else {
+                rev.classList.remove("hot");
+                revStatus.textContent = "✓ SUBMITTED";
+                revStatus.classList.add("ok");
+                sfx.notify(false);
+              }
+            })
+        );
       },
       el,
     });

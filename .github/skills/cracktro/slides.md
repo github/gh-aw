@@ -66,6 +66,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Ephemerals | illustrative | Safe outputs carry their own end, so old reports, discussions, comments and drafts close or collapse automatically and human attention is protected. |
 | Index & search | illustrative | Experimental: a non-agentic job builds a search index and the agent gets read-only query access, cutting the tokens spent reading whole files. |
 | Imports & reuse | illustrative | Shared Markdown components are written and reviewed once, imported by path or from another repository at a ref, and merged and hashed by the compiler. |
+| Skills | illustrative | Skills are declared in front matter, pinned to a commit and installed before the agent starts; a triage sub-agent picks the ones that fit each pull request and every review comment cites the skill it applied. |
 | Experiments, graders & evals | illustrative | Experimental: A/B experiments assign a workflow variant to each run, graders measure every run, and evals judge which variant is better. |
 | Enterprise |  | Band header (Enterprise): any agent, any provider, any scale. |
 | Infrastructure as code | illustrative | Workflows compile to plain Actions YAML, so they run on any runner, reuse the Actions ecosystem and keep enterprise controls, with the agent behind the firewall. |
