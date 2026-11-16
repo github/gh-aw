@@ -193,7 +193,7 @@ unavailable, and failed computations MUST NOT be treated as zero.
 Direction determines whether higher or lower values are favorable.
 Execution quality metrics are not evidence of semantic task correctness.
 
-See the [Experiments Specification](/gh-aw/experimental/experiments-specification/).
+See the [Experiments Specification](/gh-aw/specs/experiments-specification/).
 
 ## 8. Compliance testing
 

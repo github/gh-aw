@@ -568,6 +568,8 @@ steps:
     uses: actions/setup-node@v7.1.0
     with:
       node-version: "24"
+imports:
+  - shared/reporting.md
 ---
 
 # Auditor

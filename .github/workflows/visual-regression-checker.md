@@ -90,9 +90,14 @@ evals:
 
 You are a visual quality agent. Setup installed `docs/node_modules` and built `docs/dist` for this run. Use these provisioned directories without installing dependencies or inspecting the process environment. Capture the built documentation inside the sandbox with the provisioned Playwright CLI.
 
+Use one standalone command per Bash call: no shell loops, command chaining, or
+extra helper commands. `/tmp/gh-aw/agent/` is pre-created; do not run `mkdir`.
+On the first tool denial, stop that capability and call `report_incomplete`
+with the exact command; do not retry variants or suggest credential changes.
+
 ## Steps
 
-1. **Start the sandbox-local preview** — Run `npm --prefix docs run preview -- --host 127.0.0.1 --port 4321` with the Bash tool's background/async mode. Keep its process handle for cleanup. Do not start a runner-host server, bind to `0.0.0.0`, install packages, or change proxy configuration. Poll `curl http://localhost:4321/gh-aw/ --fail --silent --show-error --connect-timeout 2 --max-time 5` for at most 30 seconds until it returns successfully; stop and report a setup failure if it does not become ready. Loopback preview traffic uses the sandbox's existing local bypass; do not inspect environment variables to discover proxy settings.
+1. **Start the sandbox-local preview** — Run `npm --prefix docs run preview -- --host 127.0.0.1 --port 4321` with the Bash tool's background/async mode. Keep its process handle for cleanup. Do not start a runner-host server, bind to `0.0.0.0`, install packages, or change proxy configuration. Poll `curl http://localhost:4321/gh-aw/ --fail --silent --show-error --retry 15 --retry-connrefused --retry-delay 2 --retry-max-time 25 --connect-timeout 2 --max-time 5` as one standalone call, bounded to 30 seconds; stop and report a setup failure if it does not become ready. Loopback preview traffic uses the sandbox's existing local bypass; do not inspect environment variables to discover proxy settings.
 2. **Capture screenshots** — Open `playwright-cli open http://localhost:4321/gh-aw/`, then use the pinned CLI's commands (not MCP `browser_*` tool names):
    - **Mobile**: `playwright-cli resize 375 812`, then `playwright-cli screenshot --filename=/tmp/gh-aw/agent/screenshot-mobile.png --full-page`
    - **Tablet**: resize to 768 × 1024, navigate, screenshot
@@ -106,4 +111,7 @@ You are a visual quality agent. Setup installed `docs/node_modules` and built `d
 Post the summary as a pull request comment using the `add_comment` safe-output tool.
 Call `noop` only when actual baseline comparison established no differences and inspection found no accessibility issues; missing comparison evidence is not a clean result. If basic capture fails, report the concrete failure with `report_incomplete`; an unavailable baseline alone is not a capture failure.
 
-Always close the browser with `playwright-cli close`, stop the preview using its process handle, and verify it stopped before finishing.
+Always close an opened browser with `playwright-cli close`. Stop the preview with
+`stop_bash` using its process handle; verify it stopped through `list_bash` and
+the stop result, not `ps` or host process inspection. Report unavailable cleanup
+verification as incomplete.

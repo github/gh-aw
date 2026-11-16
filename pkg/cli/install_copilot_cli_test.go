@@ -119,6 +119,7 @@ esac
 		"COPILOT_INSTALL_DIR="+installDir,
 		"GH_AW_COPILOT_GUEST_LIBC=musl",
 		"RUNNER_TEMP="+runnerTemp,
+		"GITHUB_PATH="+filepath.Join(tempDir, "github-path"),
 		"CURL_LOG="+curlLog,
 		"MUSL_CHECKSUMS="+checksums,
 		"MUSL_ARCHIVE="+guestArchive,
@@ -292,6 +293,7 @@ exit 97
 		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
+		"RUNNER_TEMP="+tempDir,
 		"COPILOT_INSTALL_DIR="+installDir,
 		"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
 	)
@@ -350,6 +352,7 @@ exec "$@"
 		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+filepath.Join(tempDir, "github-path"),
+		"RUNNER_TEMP="+tempDir,
 		"COPILOT_INSTALL_DIR="+toolcacheBin,
 		"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
 	)
@@ -461,6 +464,7 @@ exit 97
 		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
+		"RUNNER_TEMP="+tempDir,
 		"GH_AW_COMPILED_VERSION=dev",
 		"COPILOT_INSTALL_DIR="+installDir,
 		"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
@@ -589,6 +593,7 @@ exit 97
 		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
+		"RUNNER_TEMP="+tempDir,
 		"GH_AW_COMPILED_VERSION=dev",
 		"GH_AW_COPILOT_MIN_VERSION="+cachedMinVersion,
 		"COPILOT_INSTALL_DIR="+installDir,
@@ -650,6 +655,7 @@ exec "$@"
 			cmd.Env = append(os.Environ(),
 				"HOME="+tempDir,
 				"RUNNER_TOOL_CACHE="+toolcache,
+				"RUNNER_TEMP="+tempDir,
 				"GH_AW_COPILOT_MIN_VERSION=1.0.35",
 				"COPILOT_INSTALL_DIR="+installDir,
 				"GITHUB_PATH="+filepath.Join(tempDir, "github-path"),
@@ -696,6 +702,7 @@ exec "$@"
 	cmd := exec.Command("bash", installScript, "1.0.85")
 	cmd.Env = append(os.Environ(),
 		"HOME="+tempDir,
+		"RUNNER_TEMP="+tempDir,
 		"GH_AW_COPILOT_MIN_VERSION=1.0.87",
 		"COPILOT_INSTALL_DIR="+filepath.Join(tempDir, "install-bin"),
 		"GITHUB_PATH="+filepath.Join(tempDir, "github-path"),
@@ -932,6 +939,7 @@ exit 97
 		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
+		"RUNNER_TEMP="+tempDir,
 		"COPILOT_INSTALL_DIR="+installDir,
 		"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
 		// Explicitly unset GH_AW_COMPILED_VERSION to simulate the fallback scenario.

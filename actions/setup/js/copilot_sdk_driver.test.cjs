@@ -2035,14 +2035,13 @@ describe("copilot_sdk_driver.cjs", () => {
       return capturedHandler;
     }
 
-    it("allows Daily Cracktro's fixed browser lifecycle without broader Python or directory grants", async () => {
+    it("allows Daily Cracktro's browser launcher without direct Python or directory grants", async () => {
       const source = fs.readFileSync(new URL("../../../.github/workflows/daily-cracktro-maintainer.md", import.meta.url), "utf8");
       const frontmatter = source.split("\n---\n", 2)[0];
-      const fixedGrants = [...frontmatter.matchAll(/^    - (?:"(python3 -m http\.server[^"]*)"|'(mkdir -p [^']*)')/gm)].map(match => `shell(${match[1] ?? match[2]})`);
-      const handler = await makePermissionHandlerViaSDK([...fixedGrants, "shell(curl:*)", "shell(kill)", "shell(playwright-cli:*)"]);
+      const launcherGrants = [...frontmatter.matchAll(/^    - "(node) \*"/gm)].map(match => `shell(${match[1]})`);
+      const handler = await makePermissionHandlerViaSDK([...launcherGrants, "shell(curl:*)", "shell(kill)", "shell(playwright-cli:*)"]);
       for (const fullCommandText of [
-        "python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public",
-        'mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review"',
+        "node .github/scripts/cracktro_preview.cjs",
         "curl --fail --silent --show-error --connect-timeout 2 --max-time 5 --retry 10 --retry-connrefused --retry-all-errors --retry-max-time 30 http://127.0.0.1:4329/cracktro/",
         "playwright-cli open --browser=chromium http://127.0.0.1:4329/cracktro/",
         "playwright-cli close",
@@ -2051,6 +2050,8 @@ describe("copilot_sdk_driver.cjs", () => {
         expect(handler({ kind: "shell", commands: [], fullCommandText })).toEqual({ kind: "approve-once" });
       }
       for (const fullCommandText of [
+        "python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public",
+        'mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review"',
         "python3 -c 'print(1)'",
         "python3 -m http.server 4329 --bind 0.0.0.0 --directory docs/public",
         "python3 -m http.server 4329 --bind 127.0.0.1 --directory /",

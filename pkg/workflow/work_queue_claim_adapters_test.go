@@ -332,6 +332,6 @@ func TestWorkQueueActionAdapterIsPreparedAndHasNoCredentialedFallback(t *testing
 	require.Contains(t, strings.Join(job.Steps, ""), "GH_AW_CLAIM_OUTPUT")
 	require.NotContains(t, job.Permissions, "write")
 	state := safeOutputsHandlerOutputsAndActionState{outputs: make(map[string]string)}
-	compiler.appendCustomActionSteps(data, "", &state)
+	require.NoError(t, compiler.appendCustomActionSteps(data, "", &state))
 	require.Empty(t, state.steps)
 }

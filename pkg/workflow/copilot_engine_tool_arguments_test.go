@@ -25,8 +25,7 @@ func TestDailyCracktroBrowserLifecycleToolArguments(t *testing.T) {
 	}
 	args := NewCopilotEngine().computeCopilotToolArguments(tools, nil, nil, &WorkflowData{Tools: tools})
 	for _, grant := range []string{
-		"shell(python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public)",
-		`shell(mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review")`,
+		"shell(node)",
 		"shell(curl:*)", "shell(kill)", "shell(playwright-cli:*)",
 	} {
 		if !slices.Contains(args, grant) {

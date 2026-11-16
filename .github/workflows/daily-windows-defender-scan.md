@@ -510,6 +510,8 @@ safe-outputs:
   noop:
 features:
   gh-aw-detection: true
+imports:
+  - shared/reporting.md
 ---
 
 # Daily Windows Defender Release Scan

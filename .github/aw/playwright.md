@@ -259,6 +259,9 @@ Create the directory with the exact command shown above. Capture
 `"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/web-review/home.png"`, then call
 `upload_artifact` with `name: "home-screenshot"` and `path: "web-review/home.png"`.
 Do not upload the staging root itself or weaken the upload source-root guard.
+The safe-output job downloads staging only when this run requests `upload_artifact`
+or a staged-file connector output. No-op or incomplete runs with no such request
+do not require a screenshot staging artifact.
 ```
 
 ## Follow the AWF sandbox policy

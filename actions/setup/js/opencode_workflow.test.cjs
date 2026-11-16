@@ -18,9 +18,12 @@ async function harness({
   env = {},
   endpoints,
   processResult = {},
+  runs,
   events = [{ type: "text", sessionID: "ses", part: { text: "Finished." } }],
   mcp,
   stderrLines = [],
+  safeOutputsExists = true,
+  safeOutputsContents = "",
   sessionExport = { info: { id: "ses" }, messages: [{ type: "assistant", id: "default", finish: "stop", time: { completed: 1000 } }] },
   exportError,
   exportOutput,
@@ -42,13 +45,16 @@ async function harness({
     exitCode: undefined,
   };
   const runProcess = vi.fn(async options => {
-    for (const event of events) options.onStdoutLine(JSON.stringify(event));
-    for (const line of stderrLines) options.onStderrLine(line);
-    return { exitCode: 0, stderr: "", ...processResult };
+    const execution = runs?.[runProcess.mock.calls.length - 1] ?? { events, processResult, stderrLines };
+    for (const event of execution.events ?? []) options.onStdoutLine(JSON.stringify(event));
+    for (const line of execution.stderrLines ?? stderrLines) options.onStderrLine(line);
+    execution.afterRun?.();
+    return { exitCode: 0, stderr: "", ...(execution.processResult ?? processResult) };
   });
   const readFileSync = vi.fn(file => {
     if (file === "/prompt.txt") return "Secret prompt; $(do-not-execute) --flag\n";
     if (file === "/mcp.json") return JSON.stringify(mcp ?? { mcp: { servers: {} } });
+    if (file === "/outputs.jsonl") return typeof safeOutputsContents === "function" ? safeOutputsContents() : safeOutputsContents;
     throw new Error(`Unexpected file ${file}`);
   });
   const execFile = vi.fn((command, args, options, callback) => callback(exportError, exportOutput ?? JSON.stringify(sessionExport)));
@@ -56,7 +62,7 @@ async function harness({
     Error: HarnessError,
     process,
     require: name => {
-      if (name === "fs") return { readFileSync };
+      if (name === "fs") return { readFileSync, existsSync: vi.fn(() => safeOutputsExists) };
       if (name === "child_process") return { execFile };
       if (name === "./process_runner.cjs") return { runProcess };
       if (name === "./parse_opencode_log.cjs") return opencodeParser;
@@ -82,6 +88,7 @@ async function harness({
     errors,
     readFileSync,
     execFile,
+    runProcess,
   };
 }
 
@@ -109,6 +116,113 @@ describe("OpenCode shared workflow harness", () => {
     expect(result.options.logArgs.join(" ")).not.toContain("Secret prompt");
     expect(result.stderr).not.toContain("Secret prompt");
     expect(result.readFileSync.mock.calls.map(call => call[0])).toEqual(["/prompt.txt"]);
+  });
+
+  it.each([
+    ["unset", undefined],
+    ["empty", ""],
+  ])("uses only the lead model when the model roster is %s", async (_label, roster) => {
+    const result = await harness({ env: { GH_AW_OPENCODE_MODELS: roster } });
+    expect(result.config.providers["awf-proxy"].models).toEqual({ auto: { name: "auto" } });
+  });
+
+  it("trims and deduplicates model roster entries while retaining the lead model once", async () => {
+    const result = await harness({ env: { GH_AW_OPENCODE_MODELS: " fast , , auto, fast " } });
+    expect(result.config.providers["awf-proxy"].models).toEqual({ fast: { name: "fast" }, auto: { name: "auto" } });
+  });
+
+  it("continues an empty successful run in the same session until safe output appears", async () => {
+    let outputWritten = false;
+    const result = await harness({
+      env: { GH_AW_SAFE_OUTPUTS: "/outputs.jsonl" },
+      safeOutputsContents: () => (outputWritten ? '{"type":"noop"}\n' : ""),
+      runs: [
+        { events: [{ type: "text", sessionID: "ses", part: { text: "I will do that." } }] },
+        {
+          events: [{ type: "text", sessionID: "ses", part: { text: "Done." } }],
+          afterRun: () => {
+            outputWritten = true;
+          },
+        },
+      ],
+    });
+    const [, continuation] = result.runProcess.mock.calls.map(([options]) => options);
+    expect(result.runProcess).toHaveBeenCalledTimes(2);
+    expect(continuation.args).toContain("--session");
+    expect(continuation.args).toContain("ses");
+    expect(continuation.stdin).toContain("Do not explain or plan");
+    expect(continuation.onStdoutLine).toBe(result.options.onStdoutLine);
+  });
+
+  it("limits empty-session continuation to two nudges", async () => {
+    const textEvent = { type: "text", sessionID: "ses", part: { text: "Still working." } };
+    const result = await harness({
+      env: { GH_AW_SAFE_OUTPUTS: "/outputs.jsonl" },
+      runs: [{ events: [textEvent] }, { events: [textEvent] }, { events: [textEvent] }],
+    });
+    expect(result.runProcess).toHaveBeenCalledTimes(3);
+    expect(result.runProcess.mock.calls.slice(1).map(([options]) => options.stdin)).toEqual([expect.stringContaining("Do not explain or plan"), expect.stringContaining("Do not explain or plan")]);
+  });
+
+  it.each([
+    ["live completion", [{ type: "step_finish", sessionID: "ses", part: { id: "finish", reason: "stop" } }]],
+    ["completion missing from live events", [{ type: "text", sessionID: "ses", part: { text: "Finished." } }]],
+  ])("does not continue when the reconciled session has exhausted max-turns (%s)", async (_case, events) => {
+    const result = await harness({
+      env: { GH_AW_SAFE_OUTPUTS: "/outputs.jsonl", GH_AW_MAX_TURNS: "1" },
+      events,
+      sessionExport: { info: { id: "ses" }, messages: [{ type: "assistant", id: "first", finish: "stop", time: { completed: 1000 } }] },
+    });
+    expect(result.runProcess).toHaveBeenCalledOnce();
+    expect(result.process.exitCode).toBe(1);
+    expect(
+      result.stdout
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line).type)
+    ).toEqual(["step_finish", "opencode.max_turns"]);
+  });
+
+  it("limits a continuation to the remaining cumulative max-turns budget", async () => {
+    let outputWritten = false;
+    const result = await harness({
+      env: { GH_AW_SAFE_OUTPUTS: "/outputs.jsonl", GH_AW_MAX_TURNS: "3" },
+      safeOutputsContents: () => (outputWritten ? '{"type":"noop"}\n' : ""),
+      events: [{ type: "text", sessionID: "ses", part: { text: "Continuing." } }],
+      runs: [
+        { events: [{ type: "text", sessionID: "ses", part: { text: "Working." } }] },
+        {
+          events: [{ type: "text", sessionID: "ses", part: { text: "Done." } }],
+          afterRun: () => {
+            outputWritten = true;
+          },
+        },
+      ],
+      sessionExport: {
+        info: { id: "ses" },
+        messages: [
+          { type: "assistant", id: "first", finish: "stop", time: { completed: 1000 } },
+          { type: "assistant", id: "second", finish: "stop", time: { completed: 2000 } },
+        ],
+      },
+    });
+    const [initial, continuation] = result.runProcess.mock.calls.map(([options]) => options);
+    expect(JSON.parse(initial.env.OPENCODE_CONFIG_CONTENT).agents.build.steps).toBe(3);
+    expect(JSON.parse(continuation.env.OPENCODE_CONFIG_CONTENT).agents.build.steps).toBe(1);
+  });
+
+  it.each([
+    ["a nonzero exit", { events: [{ type: "text", sessionID: "ses", part: { text: "Finished." } }], processResult: { exitCode: 3 } }, {}],
+    ["a max-turns hit", { events: [{ type: "step_finish", sessionID: "ses", part: { id: "finish", reason: "tool-calls" } }] }, { GH_AW_MAX_TURNS: "1" }],
+    ["existing safe output", { events: [{ type: "text", sessionID: "ses", part: { text: "Finished." } }] }, {}],
+    ["a missing session ID", { events: [] }, {}],
+  ])("does not continue after %s", async (_case, execution, extraEnv) => {
+    const result = await harness({
+      env: { GH_AW_SAFE_OUTPUTS: "/outputs.jsonl", ...extraEnv },
+      safeOutputsContents: _case === "existing safe output" ? '{"type":"noop"}\n' : "",
+      runs: [execution],
+    });
+    expect(result.runProcess).toHaveBeenCalledOnce();
   });
 
   it("does not select a different configured provider when the requested one is missing", async () => {

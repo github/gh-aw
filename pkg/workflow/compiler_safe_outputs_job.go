@@ -21,9 +21,9 @@ var consolidatedSafeOutputsJobLog = logger.New("workflow:compiler_safe_outputs_j
 const stepNameLinePrefix = "      - name: "
 
 // uploadArtifactStagingDownloadStepCount is the number of YAML string entries emitted by the
-// upload-artifact staging download step block (name, continue-on-error, uses, with, name, path).
+// upload-artifact staging download step block (name, if, continue-on-error, uses, with, name, path).
 // It must match the literal slice appended in buildPreambleTokenSteps.
-const uploadArtifactStagingDownloadStepCount = 6
+const uploadArtifactStagingDownloadStepCount = 7
 
 // getSafeOutputsHeadApp returns the first non-nil HeadGitHubApp config from
 // create-pull-request or push-to-pull-request-branch handlers, used to generate
@@ -516,7 +516,9 @@ func (c *Compiler) buildSafeOutputsHandlerOutputsAndActionSteps(data *WorkflowDa
 	}
 	c.appendLedgerTransactionsArtifactUpload(data, &state)
 	c.appendSarifArtifactUploadStep(data, agentArtifactPrefix, &state)
-	c.appendCustomActionSteps(data, markdownPath, &state)
+	if err := c.appendCustomActionSteps(data, markdownPath, &state); err != nil {
+		return nil, nil, nil, err
+	}
 	addNamedSafeOutputHandlerOutputs(data, state.outputs)
 
 	return state.steps, state.outputs, state.safeOutputStepNames, nil
@@ -617,11 +619,17 @@ func (c *Compiler) appendCustomScriptFilesStep(data *WorkflowData, state *safeOu
 // staging artifact produced by the agent job, when the workflow uses the upload_artifact safe
 // output, so the handler manager can process staged files.
 func (c *Compiler) appendUploadArtifactStagingDownloadStep(data *WorkflowData, agentArtifactPrefix string, state *safeOutputsHandlerOutputsAndActionState) {
-	if usesSafeOutputsArtifactStaging(data.SafeOutputs) {
+	types := safeOutputsArtifactStagingTypes(data.SafeOutputs)
+	if len(types) != 0 {
 		consolidatedSafeOutputsJobLog.Print("Adding upload-artifact staging download step")
+		condition := BuildSafeOutputType(types[0])
+		for _, outputType := range types[1:] {
+			condition = BuildOr(condition, BuildSafeOutputType(outputType))
+		}
 		stagingArtifactName := agentArtifactPrefix + SafeOutputsUploadArtifactStagingArtifactName
 		state.steps = append(state.steps,
 			"      - name: Download upload-artifact staging\n",
+			fmt.Sprintf("        if: %s\n", RenderCondition(condition)),
 			"        continue-on-error: true\n",
 			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
 			"        with:\n",
@@ -660,12 +668,14 @@ func (c *Compiler) appendSarifArtifactUploadStep(data *WorkflowData, agentArtifa
 
 // appendCustomActionSteps resolves and appends the steps for any custom safe-output actions
 // declared by the workflow, recording a step name for each so later steps can depend on it.
-func (c *Compiler) appendCustomActionSteps(data *WorkflowData, markdownPath string, state *safeOutputsHandlerOutputsAndActionState) {
+func (c *Compiler) appendCustomActionSteps(data *WorkflowData, markdownPath string, state *safeOutputsHandlerOutputsAndActionState) error {
 	if isWorkQueueParticipant(data) {
-		return
+		return nil
 	}
 	if len(data.SafeOutputs.Actions) > 0 {
-		c.resolveAllActions(data, markdownPath)
+		if err := c.resolveAllActions(data, markdownPath); err != nil {
+			return err
+		}
 		actionStepYAML := c.buildActionSteps(data)
 		state.steps = append(state.steps, actionStepYAML...)
 		for actionName := range data.SafeOutputs.Actions {
@@ -673,6 +683,7 @@ func (c *Compiler) appendCustomActionSteps(data *WorkflowData, markdownPath stri
 			state.safeOutputStepNames = append(state.safeOutputStepNames, "action_"+normalizedName)
 		}
 	}
+	return nil
 }
 
 // addHandlerManagerOutputs populates the job outputs map with the common outputs exposed by the

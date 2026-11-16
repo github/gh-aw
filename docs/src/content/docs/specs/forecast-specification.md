@@ -79,7 +79,7 @@ This specification does NOT cover:
 
 - The AI Credits (AIC) computation algorithm (defined in the [AI Credits Specification](/gh-aw/specs/ai-credits-specification/))
 - The `aw_info.json` artifact schema
-- A/B experiment frontmatter schema (defined in the [A/B Experiments Specification](/gh-aw/experimental/experiments-specification/))
+- A/B experiment frontmatter schema (defined in the [A/B Experiments Specification](/gh-aw/specs/experiments-specification/))
 - Billing, pricing, or financial modeling beyond token projections
 - Streaming or real-time token consumption reporting
 - Episode grouping, episode-level metrics, and throughput (`yield`) reporting, removed from forecast in [#34750](https://github.com/github/gh-aw/pull/34750)
@@ -1106,7 +1106,7 @@ Safeguard requirements for this specification are now defined in §10.7.
 - **[RFC 2119]** Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14, RFC 2119, March 1997. <https://www.ietf.org/rfc/rfc2119.txt>
 - **[RFC 3339]** Klyne, G. and Newman, C., "Date and Time on the Internet: Timestamps", RFC 3339, July 2002. <https://www.ietf.org/rfc/rfc3339.txt>
 - **[AIC-SPEC]** GitHub Agentic Workflows Team, "AI Credits Specification". [AI Credits-specification](/gh-aw/specs/ai-credits-specification/)
-- **[EXP-SPEC]** GitHub Agentic Workflows Team, "A/B Experiments Specification". [experiments-specification](/gh-aw/experimental/experiments-specification/)
+- **[EXP-SPEC]** GitHub Agentic Workflows Team, "A/B Experiments Specification". [experiments-specification](/gh-aw/specs/experiments-specification/)
 
 ### Informative References
 

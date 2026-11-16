@@ -57,6 +57,18 @@ Prefix variables with a sanitized tool name (e.g. uppercased, non-alphanumerics 
 - Transport variable names never reach the child process; only the tool-declared names do.
 - The [MCP scripts reference](../src/content/docs/reference/mcp-scripts.md) and [specification](../src/content/docs/specs/mcp-scripts-specification.md) describe the per-tool binding contract.
 
+## Amendment (2026-11-15): readable transport variable names
+
+PR [#78184](https://github.com/github/gh-aw/pull/78184) found that GitHub secret scanning flagged the long hexadecimal transport names in compiled lock files as passwords (GH013), blocking pushes.
+
+**Decision**: Transport variables are now named `GH_AW_MCP_SCRIPTS_ENV_<len>_<TOOL>_<NAME>`, where `<len>` is the length of the encoded tool component. Both components use `[A-Z0-9_x]`, with lowercase `x` reserved as the escape marker:
+
+- Tool names map `a-z` to `A-Z`, `-` to `_`, and keep `0-9`.
+- Variable names keep `A-Z`, `0-9`, and `_`, and encode a lowercase letter as `x` plus its uppercase form (`some_name` becomes `xSxOxMxE_xNxAxMxE`).
+- Every other byte becomes `x` plus its three-digit decimal value (`.` becomes `x046`; `_` in a tool name becomes `x095`).
+
+After `x`, an uppercase letter or exactly three digits follows, so each component decodes uniquely, and the length prefix makes the join unambiguous. The encoding therefore remains injective, which was the reason for rejecting Alternative 3, while common names stay readable and escapes do not form long hex-like runs. This supersedes the hex encoding in the Decision and the opaque-name consequence.
+
 ---
 
 Maintainers must record the actual deciders and acceptance before changing the status to Accepted.

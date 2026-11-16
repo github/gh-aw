@@ -20,6 +20,7 @@ imports:
     expires: 3d
     title-prefix: "[doc-healer] "
 - shared/otlp.md
+- shared/reporting.md
 safe-outputs:
   create-issue:
     assignees:

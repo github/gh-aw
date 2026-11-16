@@ -23,10 +23,10 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Security |  | Band header (Security): design every workflow as if the agent is already compromised. |
 | Agentic attacks | illustrative | Common agent attacks, from prompt injection to secret exfiltration and destructive commands, are each stopped by one or more layered defenses. |
 | Safety and control |  | Inputs are filtered, the agent runs sandboxed with a read-only token behind a firewall and gateway, and writes happen only through scanned safe outputs. |
-| Zero-secret agents | illustrative | The agent runs in an isolated micro-VM holding no credentials; every key stays on the host behind the MCP gateway, API proxy and egress firewall. |
+| Zero-secret agents | illustrative | The agent runs in an isolated sandbox, here the experimental micro-VM runtime, holding no credentials; every key stays on the host behind the MCP gateway, API proxy and egress firewall. |
 | Supply chain hardening | illustrative | The compiler applies layered static checks, including trigger admission, expression safety, pinned actions, least privilege and secret scans, before any workflow runs. |
 | Safe outputs | illustrative | Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs. |
-| Need-to-know enclaves | illustrative | Single-use, isolated enclave agents read private repositories and return only schema-constrained values, so private data cannot leak into public replies. |
+| Need-to-know enclaves | illustrative | Experimental: single-use, isolated enclave agents read private repositories and return only schema-constrained values, so private data cannot leak into public replies. |
 | Continuous Red Teaming | illustrative | A daily red-team agent keeps trying new ways to escape the agent firewall, and each escape it finds is turned into a firewall fix. |
 | Stop manually translating intent into code. |  | The factory mindset: engineer processes that create trusted features instead of hand-translating intent into code. |
 | Human agent processes |  | Band header (Human agent processes): engineer processes, not code, with patterns that pair people and agents. |
@@ -50,26 +50,34 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | For PMs | illustrative | Agentic workflows also serve product managers: an existing team habit triggers an agent, which leaves an artifact for a human to decide on. |
 | If every PR needs deep human review, you don’t trust your process. | illustrative | Trust the process: if every pull request needs deep human review, improve checks, agent reviewers and tests until a skim is enough. |
 | Cost Optimization |  | Band header (Cost Optimization): debug, spend less and route smarter. |
-| Cost management | illustrative | Cut agent spend by scheduling less often, fetching data in deterministic steps, capping credits, using sub-agents and routing models. |
-| Model routing | illustrative | With model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
+| Cost management | illustrative | Cut agent spend by scheduling less often, fetching data in deterministic steps, capping credits, using sub-agents and routing models with experimental model routing. |
+| Cost guardrails | illustrative | Layered guardrails stop runaway agents: execution controls, including the experimental user rate limit, throttle events, the daily budget blocks runs before activation, per-run limits hard-stop a run, and optional central admission approves or denies each run before it starts. |
+| Model routing | illustrative | Experimental: with model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
 | DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
 | Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |
-| Agentic Engineering |  | Band header (Agentic Engineering): give agents memory, expiry, search and measurement. |
+| Agentic Engineering |  | Band header (Agentic Engineering): skip needless runs and give agents memory, hand-offs, expiry, search and measurement. |
 | Agents that debug agents | illustrative | The agentic-workflows MCP server exposes logs, audit and audit-diff so any agent can debug, audit and optimize other workflows from unified sessions. |
 | Any agent, any provider | illustrative | One Markdown workflow switches its coding agent and model provider with two front matter lines while keeping the same guardrails. |
+| Don’t Run the Agent | illustrative | The cheapest agent call is the one never made: cheap deterministic gates from triggers to noop short-circuits run first, and an experimental model-based skip decision only when necessary. |
 | Agent memory | illustrative | Configured memories are restored read-only into each run, and trusted jobs persist cache, repository, comment and ledger memory afterward. |
-| Durable execution | illustrative | Durable execution checkpoints the agent's native session, even after a failed step, so a rerun resumes the session instead of starting over. |
+| Memory with a History | illustrative | Ledgers keep append-only records on their own branch, agents read a disposable SQLite projection and request changes, and trusted jobs validate and append them. |
+| Durable execution | illustrative | Experimental: durable execution checkpoints the agent's native session, even after a failed step, so a rerun resumes the session instead of starting over. |
+| Agents Trigger Agents | illustrative | Agents chain through safe-output dispatches with typed inputs and completion signals, each running inside its own workflow run. |
 | Ephemerals | illustrative | Safe outputs carry their own end, so old reports, discussions, comments and drafts close or collapse automatically and human attention is protected. |
-| Index & search | illustrative | A non-agentic job builds a search index and the agent gets read-only query access, cutting the tokens spent reading whole files. |
+| Index & search | illustrative | Experimental: a non-agentic job builds a search index and the agent gets read-only query access, cutting the tokens spent reading whole files. |
 | Imports & reuse | illustrative | Shared Markdown components are written and reviewed once, imported by path or from another repository at a ref, and merged and hashed by the compiler. |
-| Experiments, graders & evals | illustrative | A/B experiments assign a workflow variant to each run, graders measure every run, and evals judge which variant is better. |
+| Experiments, graders & evals | illustrative | Experimental: A/B experiments assign a workflow variant to each run, graders measure every run, and evals judge which variant is better. |
 | Enterprise |  | Band header (Enterprise): any agent, any provider, any scale. |
 | Infrastructure as code | illustrative | Workflows compile to plain Actions YAML, so they run on any runner, reuse the Actions ecosystem and keep enterprise controls, with the agent behind the firewall. |
 | OpenTelemetry | illustrative | Agentic workflows export OpenTelemetry traces to collectors you run, configured per workflow or as an organization default. |
+| Distributed tracing | illustrative | One shared trace follows a task from its workflow runs and jobs through agent sessions, tool calls, retries and dispatched runs in other repositories, with outcomes and cost on every span. |
 | GitHub-native governance | illustrative | Defaults and policy variables are set at enterprise, organization or repository scope and enforced with GitHub controls such as protected environments. |
 | Operator-owned infrastructure | illustrative | Operators run agentic jobs on their own Linux runners, on Kubernetes, or in air-gapped networks with mirrored actions and container images. |
+| GitHub App permissions | illustrative | A GitHub App installed on selected repositories mints short-lived scoped tokens, keeping the agent read-only and leaving writes to trusted safe-output jobs in each repository. |
+| OIDC token broker | illustrative | Experimental: a deployment-owned broker verifies a job's OIDC identity and returns a short-lived credential, so no long-lived secret is stored in the repository. |
 | Push SDLC | illustrative | A task arrives with its own squad of human-led AI agents that join the developer's repository, pair with them, then step back and leave their decisions behind. |
-| Connectors | illustrative | A connector declares everything a third-party service offers; a workflow imports it and selects only the reads and writes it needs. |
+| Connectors | illustrative | Experimental: a connector declares everything a third-party service offers; a workflow imports it and selects only the reads and writes it needs. |
+| Webhook gateway | illustrative | Experimental: a hosted receiver authenticates external and GitHub events, matches declared subscriptions and dispatches verified batches to a workflow as untrusted input. |
 | Central Agentic Ops |  | Band header (Central Agentic Ops): gh cao, a research prototype for operating agentic workflows across many repositories. |
 | Hyperscale Agentics | illustrative | Research prototype: at enterprise scale every agent run reports into telemetry, an operations database and a session data lake, so fleets are managed from aggregates. |
 | Centralized campaigns | illustrative | Research prototype: a control repository installs and tracks campaigns that roll agentic processes out across an enterprise's repositories. |

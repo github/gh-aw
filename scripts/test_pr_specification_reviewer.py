@@ -68,23 +68,20 @@ class PRSpecificationReviewerTests(unittest.TestCase):
         self.assertIn("A missing or truncated patch is not proof of conformance", self.text)
         self.assertIn("report_incomplete", self.prompt)
 
-    def test_spec_proposals_are_comment_only_and_document_scoped(self):
-        self.assertNotIn("push_to_pull_request_branch", self.config)
-        self.assertNotIn("push-to-pull-request-branch:", self.frontmatter)
-        self.assertNotIn("  edit:", self.frontmatter)
-        self.assertNotIn("GH_AW_CI_TRIGGER_TOKEN", self.lock)
-        safe_outputs_job = re.search(
-            r"^  safe_outputs:\n(.*?)(?=^  [a-zA-Z_][\w-]*:\n|\Z)",
-            self.lock,
-            re.MULTILINE | re.DOTALL,
+    def test_spec_updates_are_document_scoped(self):
+        push = self.config["push_to_pull_request_branch"]
+        self.assertEqual(
+            push["allowed_files"],
+            ["specs/*.md", "docs/src/content/docs/specs/*.md"],
         )
-        self.assertIsNotNone(safe_outputs_job)
-        self.assertNotIn("contents: write", safe_outputs_job.group(1))
+        self.assertEqual(push["target"], "triggering")
+        self.assertEqual(push["max"], 1)
+        self.assertIs(push["fallback_as_pull_request"], False)
+        self.assertIn("never run `git push` directly", self.text)
         self.assertIn("Limit proposals to five existing", self.text)
         for path in (
             "specs/*.md",
             "docs/src/content/docs/specs/*.md",
-            "docs/src/content/docs/experimental/experiments-specification.md",
         ):
             self.assertIn(path, self.prompt)
         self.assertIn("safeoutputs create_pull_request_review_comment", self.text)
@@ -107,11 +104,16 @@ class PRSpecificationReviewerTests(unittest.TestCase):
         self.assertIn("git rev-parse HEAD", self.prompt)
         self.assertIn("Before any publication, re-read the PR state and head", self.text)
         self.assertIn("head differs from the captured SHA", self.text)
-        self.assertIn("same comment-only publication for same-repository and fork PRs", self.text)
-        self.assertIn("Never write the PR branch or substitute credentials", self.text)
+        self.assertIn("discard the pending comments and branch update", self.text)
+        self.assertIn(
+            "For fork PRs, do not edit or commit files or attempt a push; "
+            "retain the comment-only proposal path",
+            self.text,
+        )
+        self.assertIn("No fork credentials or alternate repositories are authorized", self.text)
         self.assertIn("Never force-push or retry against a different head", self.text)
-        self.assertIn("acknowledges intent, not a successfully published review comment", self.text)
-        self.assertIn("specification updates as proposed, never applied or synchronized", self.text)
+        self.assertIn("acknowledges the request, not a successful push", self.text)
+        self.assertIn("For forks, describe updates as proposed, never applied or synchronized", self.text)
 
     def test_reviews_are_bounded_and_clean_noops_do_not_create_issues(self):
         review = self.config["submit_pull_request_review"]

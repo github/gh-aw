@@ -63,6 +63,7 @@ imports:
       expires: 3d
 
   - shared/otlp.md
+  - shared/reporting.md
 pre-agent-steps:
   - name: Checkout agentics workflows
     uses: actions/checkout@v7.0.1

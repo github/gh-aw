@@ -49,6 +49,7 @@ The stage is a fixed 1920x1080 frame (`W`/`H`), scaled to fit the window.
 slides.push({
   notes: "...",           // speaker notes (N key); public text
   group: "security",      // band id; picks the THEME (colours, grid, music, red wash); crossing groups slides up
+  experimental: "lsp",    // optional; set when the slide shows an experimental gh-aw feature (compiler warning or docs Experimental group); renders the top-right .xbadge
   techno: 1,              // optional techno layer level
   el: h("section", { class: "slide" }, ...),
   enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back

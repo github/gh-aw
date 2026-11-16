@@ -63,6 +63,7 @@ imports:
   - shared/python-nlp.md
 
   - shared/otlp.md
+  - shared/reporting.md
 features:
   gh-aw-detection: true
 evals:
