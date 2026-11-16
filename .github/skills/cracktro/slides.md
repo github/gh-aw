@@ -37,6 +37,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Daily Unsloppers | illustrative | Scheduled research agents find problems such as duplicated code, assign them to Copilot, and developers refine the resulting pull requests. |
 | Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily unsloppers clean up, instead of polishing each one through endless nit rounds. |
 | Research · Assign · Observe | illustrative | A daily benchmark agent files performance regressions, Copilot fixes them, and the next run observes the result to close the loop. |
+| Hunt · Falsify · Fix | illustrative | A daily agent hunts for vulnerabilities in deterministically scoped, rotating files, discards every lead it can falsify, and files only the survivors as issues that Copilot fixes. |
 | Query · Ask · Grow | illustrative | An expert DevOps agent read live telemetry through observability MCP servers and filed the most important instrumentation gap each day, growing OpenTelemetry support. |
 | Mine · Refine · Apply | illustrative | Recurring review corrections are mined into Go linters, refined through review, and applied across the repository. |
 | Explore · Reuse · Lint | illustrative | A daily code-analysis agent keeps a strategy cache to balance reusing proven strategies with exploring new ones, and every pattern it finds becomes a linter. |
