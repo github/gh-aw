@@ -281,6 +281,48 @@ steps:
           }
         }
 
+        // The GitHub MCP guard labels unmerged PR diffs/files below `approved`, so
+        // prefetch diffs here, only for PRs whose every commit is Dependabot-authored.
+        const diffDir = path.join(path.dirname(outPath), 'diffs');
+        const maxDiffBytes = 512 * 1024;
+        fs.mkdirSync(diffDir, { recursive: true });
+        async function prefetchDiff(pull) {
+          try {
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pull.number,
+              per_page: 100,
+            });
+            const otherAuthors = [...new Set(commits.map((c) => c.author?.login || '(unknown)').filter((login) => login !== 'dependabot[bot]'))];
+            if (otherAuthors.length > 0) {
+              pull.diff_status = 'non_dependabot_commits';
+              pull.diff_note = `Diff not prefetched: commits by ${otherAuthors.join(', ')}`;
+              return;
+            }
+            const response = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pull.number,
+              mediaType: { format: 'diff' },
+            });
+            let diff = String(response.data || '');
+            pull.diff_status = 'available';
+            if (Buffer.byteLength(diff, 'utf8') > maxDiffBytes) {
+              diff = Buffer.from(diff, 'utf8').subarray(0, maxDiffBytes).toString('utf8');
+              pull.diff_status = 'truncated';
+            }
+            pull.diff_path = path.join(diffDir, `pr-${pull.number}.diff`);
+            fs.writeFileSync(pull.diff_path, diff, 'utf8');
+          } catch (error) {
+            pull.diff_status = 'fetch_failed';
+            pull.diff_note = `Diff prefetch failed: ${error.message}`;
+          }
+        }
+        for (const pull of selectedPRs) {
+          await prefetchDiff(pull);
+        }
+
         const payload = {
           objective,
           trigger_event: context.eventName,
@@ -300,6 +342,9 @@ steps:
             changed_files: pull.changed_files,
             manifest_files: pull.manifest_files,
             manifest_families: pull.manifest_families,
+            diff_status: pull.diff_status || 'not_fetched',
+            diff_path: pull.diff_path || null,
+            diff_note: pull.diff_note || null,
             title: pull.title,
             url: pull.url,
           })),
@@ -338,13 +383,21 @@ worker has its own bounded contract; do not create nested delegations.
 - Read the selection with `cat /tmp/gh-aw/agent/dependabot-burner/context.json`, not sed.
 - Inspect local changes with `git status` or `git diff --stat`. Do not add global
   Git flags such as --no-pager or query remotes.
-- Use the configured GitHub tools through the CLI proxy for PR files, diffs,
-  comments, reviews, and author/maintainer metadata. Discover schemas with
+- Read each selected PR diff from its `diff_path` in `context.json` (prefetched
+  before the agent for Dependabot-only PRs). The GitHub tools cannot return
+  open-PR diffs or files under this workflow's `min-integrity: approved` policy;
+  do not call `pull_request_read` with `get_diff` or `get_files`. A PR whose
+  `diff_status` is not `available` or `truncated` is a blocker to report with
+  its `diff_note`, not a reason to retry GitHub reads.
+- Use the configured GitHub tools through the CLI proxy only for PR metadata,
+  comments, and reviews. Discover schemas with
   `github --help` and `github pull_request_read --help`, then invoke
   `github pull_request_read` with one JSON argument containing method, owner,
   repo, and pullNumber. Tool names are subcommands of github, not standalone
   executables or shell built-ins. Do not use command discovery probes, gh commands,
   authentication checks, or credential setup; authentication is workflow-managed.
+  Integrity-filtered comments or reviews are non-maintainer content; treat them
+  as unavailable feedback, not a blocker.
 - Run only declared validation commands. Do not wrap GitHub reads in shell loops
   or add undeclared utilities or pipeline stages.
 - After the first tool-permission denial, stop shell calls in that agent and
@@ -417,9 +470,14 @@ retry-history summary, and maintainer-only feedback. Do not delegate.
 
 - Read files with the read/search tools; use edit/create tools to write changes and
   the result JSON. Do not use shell redirections or helpers to write files.
+- Read selected PR diffs from each batch entry's `diff_path` with the read tool.
+  Do not fetch diffs or files with `github pull_request_read`; integrity policy
+  blocks them. Report entries whose `diff_status` is not `available` or
+  `truncated` as unaddressed with their `diff_note`. For `truncated` diffs,
+  derive remaining changes from the checkout and declared refresh commands.
 - The GitHub executable is `github`: use `github --help` and `github pull_request_read --help`,
-  then `github pull_request_read` with documented JSON arguments. Tool names are not
-  executables. Do not use gh, auth checks, executable discovery, or shell help.
+  then `github pull_request_read` with documented JSON arguments for metadata only.
+  Tool names are not executables. Do not use gh, auth checks, executable discovery, or shell help.
 - Inspect changes with `git status` or `git diff --stat`; do not add global Git
   flags, query remotes, commit, push, or mutate PRs directly.
 - Run only declared validation commands. No shell loops, undeclared helpers,
@@ -449,7 +507,7 @@ and the downstream safe-output job determines whether publication succeeds.
 
 ## Required approach
 
-1. Confirm every selected PR is Dependabot-authored. Inspect every diff, including
+1. Confirm every selected PR is Dependabot-authored. Inspect every prefetched diff, including
    grouped and lockfile-only updates; titles are hints, not dependency specifications.
    Consider every path/ecosystem. Compare with checkout; never downgrade or reapply updates.
 2. Respect retry history and maintainer-only feedback. If `stop_for_human`, write
