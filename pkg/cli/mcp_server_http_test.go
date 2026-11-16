@@ -3,10 +3,30 @@
 package cli
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/require"
 )
+
+func TestMCPHTTPHandler_RenegotiatesStatefulProtocol(t *testing.T) {
+	server := createMCPServer("", "", false, false, "", nil)
+	httpServer := httptest.NewServer(newMCPHTTPHandler(server))
+	defer httpServer.Close()
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "1.0"}, nil)
+	session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{
+		Endpoint:             httpServer.URL,
+		DisableStandaloneSSE: true,
+	}, nil)
+	require.NoError(t, err)
+	defer func() { _ = session.Close() }()
+
+	require.Equal(t, "2025-11-25", session.InitializeResult().ProtocolVersion)
+}
 
 func TestMCPHTTPServerAddr_BindsToLoopback(t *testing.T) {
 	t.Parallel()
