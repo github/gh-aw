@@ -74,6 +74,14 @@ run_script() {
 echo "Testing setup_cache_memory_git.sh — pre-agent sanitization"
 echo ""
 
+# ── Test 0: Git diagnostics use private, unpredictable temporary paths ────────
+echo "Test 0: Git diagnostics use private temporary paths"
+assert "diagnostic directory is created with mktemp" \
+  "grep -q 'mktemp -d /tmp/gh-aw-cache-memory.XXXXXX' '${SCRIPT}'"
+assert "fixed diagnostic paths are not used" \
+  "! grep -Eq '/tmp/gh-aw-(git-fsck|checkout|merge)-' '${SCRIPT}'"
+echo ""
+
 # ── Test 1: Execute bits are stripped from restored files ────────────────────
 echo "Test 1: Execute bits are stripped unconditionally"
 D="${WORKSPACE}/test1"
