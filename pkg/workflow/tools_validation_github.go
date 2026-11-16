@@ -121,12 +121,8 @@ func validateGitHubGuardPolicy(tools *Tools, workflowName string) error {
 	}
 
 	github := tools.GitHub
-	if len(github.unsupportedAccessControlFields) > 0 {
-		fields := make([]string, len(github.unsupportedAccessControlFields))
-		for i, field := range github.unsupportedAccessControlFields {
-			fields[i] = "'tools.github." + field + "'"
-		}
-		return fmt.Errorf("%s is not supported by the local compiler and will not enforce access control; remove the unsupported field", strings.Join(fields, ", "))
+	if err := unsupportedGitHubAccessControlFieldsError(github.unsupportedAccessControlFields); err != nil {
+		return err
 	}
 	if github.reposParseErr != nil {
 		return github.reposParseErr
@@ -217,6 +213,18 @@ func validateGitHubGuardPolicy(tools *Tools, workflowName string) error {
 	}
 
 	return nil
+}
+
+func unsupportedGitHubAccessControlFieldsError(fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+
+	var quotedFields []string
+	for _, field := range fields {
+		quotedFields = append(quotedFields, "'tools.github."+field+"'")
+	}
+	return fmt.Errorf("%s is not supported by the local compiler and will not enforce access control; remove the unsupported field", strings.Join(quotedFields, ", "))
 }
 
 // validateReposScope validates the repos field in the guard policy
