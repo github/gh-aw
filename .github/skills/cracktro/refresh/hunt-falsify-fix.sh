@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Read-only: recompute the measured strip of the cracktro "Hunt · Falsify · Fix" slide.
 # Usage: hunt-falsify-fix.sh [SNAPSHOT_DATE]   (default: today, UTC). Needs gh and jq. Prints JSON.
+# Issue and PR text is untrusted: it is read only by the jq heuristics below and never emitted.
+# The output holds numbers, dates, enums, booleans and CWE ids only.
 set -euo pipefail
 REPO="${REPO:-github/gh-aw}"
 END="${1:-$(date -u +%F)}"
@@ -22,9 +24,10 @@ for n in $(jq -r '.[].number' <<<"$issues"); do
   cands="$linked"
   [ -z "$cands" ] && cands=$(jq -r '(.comments[-1].body // "") | [scan("(?:pull/|PR #)([0-9]+)")[0]] | unique | join(" ")' <<<"$issue")
   for p in $cands; do
-    j=$(gh pr view "$p" -R "$REPO" --json number,title,mergedAt,author,body 2>/dev/null || echo null)
-    if [ "$(jq -r '.mergedAt // empty' <<<"$j")" != "" ]; then
-      pr=$(jq '{number, title, mergedAt, copilot: (.author.login == "app/copilot-swe-agent" or .author.login == "copilot-swe-agent" or (.body | test("COPILOT CODING AGENT")))}' <<<"$j")
+    j=$(gh pr view "$p" -R "$REPO" --json number,mergedAt,author,body 2>/dev/null || echo null)
+    # Only merges on or before the snapshot date (UTC) count.
+    if [ "$(jq -r --arg end "$END" '(.mergedAt // "") | select(. != "" and .[0:10] <= $end)' <<<"$j")" != "" ]; then
+      pr=$(jq '{number, mergedAt, copilot: (.author.login == "app/copilot-swe-agent" or .author.login == "copilot-swe-agent" or ((.body // "") | test("COPILOT CODING AGENT")))}' <<<"$j")
       if [ -n "$linked" ]; then kind="fixed"; else kind="related"; fi
       break
     fi
@@ -32,7 +35,7 @@ for n in $(jq -r '.[].number' <<<"$issues"); do
   [ "$kind" = "none" ] && [ "$superseded" = "true" ] && kind="superseded"
   rows=$(jq --argjson i "$issue" --arg kind "$kind" --argjson pr "$pr" \
     '. + [{number: $i.number, created: $i.createdAt, state: $i.state, kind: $kind,
-           cwe: (($i.body | [scan("CWE-[0-9]+")] | .[0]) // null), pr: $pr}]' <<<"$rows")
+           cwe: ((($i.body // "") | [scan("CWE-[0-9]+")] | map(select(test("^CWE-[0-9]+$"))) | .[0]) // null), pr: $pr}]' <<<"$rows")
 done
 
 # 3. Runs of the compiled workflow, up to the snapshot date.
@@ -43,6 +46,7 @@ jq -n --arg end "$END" --argjson rows "$rows" --argjson runs "$runs" '
   def hours(a; b): (((b | fromdateiso8601) - (a | fromdateiso8601)) / 3600);
   def median: sort | if length == 0 then null elif length % 2 == 1 then .[length / 2 | floor] else (.[length / 2 - 1] + .[length / 2]) / 2 end;
   ($rows | map(select(.kind == "fixed"))) as $fixed
+  | ($rows | map(select(.kind == "fixed" or .kind == "related"))) as $merged
   | ($rows[0].created[0:10]) as $start
   | def day(d): (((d[0:10] + "T00:00:00Z") | fromdateiso8601) - (($start + "T00:00:00Z") | fromdateiso8601)) / 86400 | floor;
   {
@@ -56,7 +60,7 @@ jq -n --arg end "$END" --argjson rows "$rows" --argjson runs "$runs" '
     unresolved: ($rows | map(select(.kind == "none")) | length),
     open: ($rows | map(select(.state == "OPEN")) | length),
     copilotFixes: ($rows | map(select(.pr != null and .pr.copilot)) | length),
-    medianHoursToMerge: ($fixed | map(hours(.created; .pr.mergedAt)) | median | . * 10 | round / 10),
+    medianHoursToMerge: ($merged | map(hours(.created; .pr.mergedAt)) | median | . * 10 | round / 10),
     cwe: ($rows | map(.cwe // "none") | group_by(.) | map({(.[0]): length}) | add),
     REPORTS: ($rows | map([day(.created), (.kind | .[0:1])])),
     runs: {

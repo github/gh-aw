@@ -23,7 +23,7 @@ Recompute with `hunt-falsify-fix.sh`, then patch `deck.js`. Read-only on GitHub;
   - `TX = d => 10 + (d * (TW - 20)) / 116`: `116` is the axis span in days; set it to `days`.
   - Month ticks: `[[10,"Aug"],[41,"Sep"],[71,"Oct"],[102,"Nov"]]`, as day offsets from the first finding.
   - Timeline title: `"12 REPORTS · 10 FIXED · 2 SUPERSEDED"`.
-  - KPIs: `kpi("12","findings",…)`, `kpi("10","fixed by",…"all by Copilot")`, `kpi("9.2 h","median",…)`, `kpi("6","CWE-88",…)`, `kpi("108/122","runs",…"56 green in a row")`.
+  - KPIs: `kpi("12","findings",…)`, `kpi("10","fixed by",…"all by Copilot")`, `kpi("9.6 h","median",…)`, `kpi("6","CWE-88",…)`, `kpi("108/122","runs",…"56 green in a row")`.
   - Caption (`dhm-cap`): `"MEASURED · snapshot 15 Nov 2026 · findings 22 Jul–15 Nov 2026 (116 d) · runs since 21 Jul · loop illustrative"`.
   - `notes:` contains the sentences starting "The bottom strip is measured on gh-aw (snapshot …)".
 
@@ -50,16 +50,20 @@ Output shape:
 { "snapshot", "window": [first,end], "days", "reports", "fixed", "related", "superseded",
   "unresolved", "open", "copilotFixes", "medianHoursToMerge", "cwe": {"CWE-88": 6, ...},
   "REPORTS": [[day,"f|r|s|n"]...],
-  "runs": {"total","success","first","lastFailure","streak","byMonth"}, "detail": [...] }
+  "runs": {"total","success","first","lastFailure","streak","byMonth"},
+  "detail": [{"number","created","state","kind","cwe","pr": {"number","mergedAt","copilot"}}...] }
 ```
+
+The output deliberately carries no free text: only numbers, dates, enums, booleans and CWE ids matching `^CWE-[0-9]+$`. Issue and PR bodies, titles and comments are untrusted; the script reads them only inside jq heuristics and never prints them.
 
 The script's underlying queries (`REPO` env var, default gh-aw):
 
 1. Findings: `gh issue list --state all --search '"VulnHunter findings" in:title created:<=END'`, keeping only titles that start with `[vulnhunter] `.
-2. Fix: the first merged PR in `closedByPullRequestsReferences` (`f`); otherwise a merged PR cited in the last comment (`r`). A "closed as outdated" comment means `s`; anything else is `n` (unresolved).
+2. Fix: the first PR in `closedByPullRequestsReferences` merged on or before END (UTC) (`f`); otherwise such a PR cited in the last comment (`r`). A "closed as outdated" comment means `s`; anything else is `n` (unresolved).
 3. Copilot: PR author `app/copilot-swe-agent`, or a body containing `COPILOT CODING AGENT` (a bot-pushed PR can carry it).
 4. CWE: the first `CWE-<n>` in the issue body.
-5. Runs: `gh run list --workflow daily-vulnhunter-scan.lock.yml --limit 1000 --json conclusion,createdAt`.
+5. Median: `medianHoursToMerge` is issue creation to PR merge over all `f` and `r` rows.
+6. Runs: `gh run list --workflow daily-vulnhunter-scan.lock.yml --limit 1000 --json conclusion,createdAt`.
 
 Sanity baseline at the 2026-11-15 snapshot:
 
@@ -68,7 +72,7 @@ Sanity baseline at the 2026-11-15 snapshot:
 | findings | 12, 0 open, 2026-07-22 → 2026-11-15 (116 d) |
 | fixed | 10 (9 `f`, 1 `r`), all by Copilot |
 | superseded | 2 |
-| median issue → merge | 9.2 h |
+| median issue → merge (`f` + `r`) | 9.6 h |
 | CWE | CWE-88 ×6, CWE-94 ×2, CWE-214, CWE-346, CWE-74, CWE-918 ×1 |
 | runs | 122, 108 success, first 2026-07-21, last failure 2026-09-21, streak 56 |
 
@@ -101,4 +105,6 @@ cd docs && npx playwright test tests/talk.spec.ts
 - **Related fixes:** one finding was fixed by a separate PR that did not link it; it is found only from the PR cited in the issue's last comment. Check new `n` rows by hand.
 - **Bot-pushed Copilot PRs:** an author of `gh-aw-bot` can still be a Copilot coding-agent PR; the body marker decides.
 - **Cost is not mined:** per-run AI credits and duration come from `gh aw logs`, not gh + jq, so the slide does not show them.
+- **Untrusted text:** findings, comments and PR bodies are attacker-influenced. Keep the output free of free text; never add titles, bodies or comments to `detail`.
+- **Historical snapshots:** a PR merged after the snapshot date does not count as a fix.
 - **Date filter:** `created:..END` returns nothing; use `created:<=END`. Compute day offsets from UTC dates.
