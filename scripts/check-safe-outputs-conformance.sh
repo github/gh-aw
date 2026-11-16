@@ -4,8 +4,8 @@ set +o histexpand
 # Safe Outputs Specification Conformance Checker
 # This script implements automated checks for the Safe Outputs specification
 # Specification: docs/src/content/docs/specs/safe-outputs-specification.md
-# Spec Version: 1.29.21 (2026-11-08)
-# Script Version: 1.29.21 (2026-11-09)
+# Spec Version: 1.29.26 (2026-11-13)
+# Script Version: 1.29.26 (2026-11-16)
 
 set -euo pipefail
 
@@ -3470,6 +3470,301 @@ check_invocation_decision_skips() {
     fi
 }
 check_invocation_decision_skips
+
+# TYPE-019: push_to_pull_request_branch Classic Protection via GraphQL Ref.refUpdateRule
+# (Section 7.3 push_to_pull_request_branch Notes, v1.29.22)
+# Classic protection MUST be confirmed through GraphQL Ref.refUpdateRule, not the REST
+# classic-protection endpoint that requires Administration: read. Only an explicit null
+# refUpdateRule may permit a protected-flagged non-default branch; a missing field or failed
+# query MUST leave the push blocked, and a returned object MUST NOT be treated as absence.
+echo "Running TYPE-019: push_to_pull_request_branch Classic Protection Confirmation..."
+check_push_branch_ref_update_rule() {
+    local helpers="actions/setup/js/pr_helpers.cjs"
+    local handler="actions/setup/js/push_to_pull_request_branch.cjs"
+    local failed=0
+
+    if [ ! -f "$helpers" ]; then
+        log_high "TYPE-019: Branch pushability helper missing: $helpers"
+        return
+    fi
+
+    local fn
+    fn=$(sed -n '/^async function checkBranchPushable/,/^}/p' "$helpers")
+    if [ -z "$fn" ]; then
+        log_high "TYPE-019: checkBranchPushable not found in $helpers"
+        return
+    fi
+
+    if ! echo "$fn" | grep -q 'refUpdateRule' || ! echo "$fn" | grep -q 'graphql('; then
+        log_high "TYPE-019: Classic branch protection is not confirmed through GraphQL Ref.refUpdateRule"
+        failed=1
+    fi
+    if echo "$fn" | grep -qE 'getBranchProtection|/protection'; then
+        log_high "TYPE-019: Classic protection uses the REST endpoint that requires Administration: read"
+        failed=1
+    fi
+    # Missing field fails closed; only explicit null clears protection.
+    if ! echo "$fn" | grep -qE '=== undefined' || ! echo "$fn" | grep -qE '=== null'; then
+        log_high "TYPE-019: refUpdateRule absence is not distinguished from a missing field (explicit null required)"
+        failed=1
+    fi
+    if ! echo "$fn" | grep -q 'hasOnlyNonBlockingRules'; then
+        log_high "TYPE-019: Active rules are not inspected before considering a protected-branch exception"
+        failed=1
+    fi
+    # Rules/GraphQL query failures MUST block the push.
+    if ! echo "$fn" | grep -q 'catch (rulesError)' || ! echo "$fn" | grep -q 'Push blocked'; then
+        log_high "TYPE-019: Rules or GraphQL query failures do not leave the push blocked"
+        failed=1
+    fi
+    if [ ! -f "$handler" ] || ! grep -q 'checkBranchPushable' "$handler"; then
+        log_high "TYPE-019: push_to_pull_request_branch does not use the shared checkBranchPushable pre-flight"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "TYPE-019: Classic protection is confirmed via GraphQL Ref.refUpdateRule with explicit-null and fail-closed semantics"
+    fi
+}
+check_push_branch_ref_update_rule
+
+# TYPE-020: merge_pull_request Protected Changed Files (Section 7.3 merge_pull_request rule 11, v1.29.23)
+# Unless trusted configuration sets protected-files: allowed, the handler MUST inspect the complete
+# live changed-file list (including both rename paths) with the shared create-pull-request rules,
+# block on missing/malformed/incomplete evidence or >3000 files, and re-check during final
+# revalidation. Only blocked/allowed policies are supported (no creation-only fallbacks).
+echo "Running TYPE-020: merge_pull_request Protected Changed Files..."
+check_merge_pull_request_protected_files() {
+    local handler="actions/setup/js/merge_pull_request.cjs"
+    local go_config="pkg/workflow/merge_pull_request.go"
+    local registry="pkg/workflow/safe_outputs_handler_registry_pull_requests.go"
+    local failed=0
+
+    if [ ! -f "$handler" ]; then
+        log_high "TYPE-020: merge_pull_request handler missing: $handler"
+        return
+    fi
+
+    local fn
+    fn=$(sed -n '/^async function evaluateProtectedFiles/,/^}/p' "$handler")
+    if [ -z "$fn" ]; then
+        log_critical "TYPE-020: merge_pull_request does not evaluate protected changed files"
+        return
+    fi
+
+    if ! echo "$fn" | grep -q 'checkFileProtectionPostApply'; then
+        log_high "TYPE-020: Protected-file evaluation does not reuse the shared create-pull-request protection rules"
+        failed=1
+    fi
+    if ! echo "$fn" | grep -q 'protected_files_policy === "allowed"'; then
+        log_high "TYPE-020: protected-files: allowed is not the only configuration that disables the changed-file gate"
+        failed=1
+    fi
+    if ! echo "$fn" | grep -q '3000'; then
+        log_high "TYPE-020: Changed-file counts above GitHub's 3000-file listing limit are not rejected"
+        failed=1
+    fi
+    if ! echo "$fn" | grep -q 'previous_filename'; then
+        log_high "TYPE-020: Rename/copy source paths are not included in protected-file evaluation"
+        failed=1
+    fi
+    if ! echo "$fn" | grep -q 'pr.changed_files' || ! echo "$fn" | grep -q 'new Set'; then
+        log_high "TYPE-020: Incomplete or duplicate changed-file evidence is not rejected"
+        failed=1
+    fi
+    # Initial evaluation plus final revalidation.
+    local calls
+    calls=$(grep -c 'await evaluateProtectedFiles(' "$handler" || true)
+    if [ "${calls:-0}" -lt 2 ]; then
+        log_high "TYPE-020: Protected files are not re-checked during final revalidation"
+        failed=1
+    fi
+
+    if [ ! -f "$go_config" ] || ! grep -q "must be 'blocked', 'allowed'" "$go_config"; then
+        log_high "TYPE-020: Compiler does not restrict merge-pull-request protected-files to blocked/allowed"
+        failed=1
+    fi
+    if [ ! -f "$registry" ] || ! grep -q 'AddDefault("protected_files_policy", "blocked")' "$registry"; then
+        log_high "TYPE-020: merge-pull-request protected-files policy does not default to blocked"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "TYPE-020: merge_pull_request blocks protected changed files by default with complete evidence and revalidation"
+    fi
+}
+check_merge_pull_request_protected_files
+
+# SEC-013: Authenticated Author and Bot Validation (Section 3 GP5d, v1.29.25)
+# Automatic comment selection (add_comment replace-older-comments and comment_memory upserts)
+# MUST validate API author metadata: resolve the login via the handler's effective client,
+# lazily (only when candidates exist) with a shared cached lookup, require exact user.login
+# matches, and fall back to API-identified user.type === "Bot" (not a [bot] suffix) when
+# identity is unavailable, logging the fallback.
+echo "Running SEC-013: Authenticated Author and Bot Validation..."
+check_authenticated_author_validation() {
+    local auth="actions/setup/js/handler_auth.cjs"
+    local failed=0
+
+    if [ ! -f "$auth" ]; then
+        log_high "SEC-013: Handler auth module missing: $auth"
+        return
+    fi
+
+    local resolver
+    resolver=$(sed -n '/^function createAuthenticatedLoginResolver/,/^}/p' "$auth")
+    if [ -z "$resolver" ]; then
+        log_high "SEC-013: createAuthenticatedLoginResolver not found in $auth"
+        return
+    fi
+    if ! echo "$resolver" | grep -q 'githubClient.rest.users.getAuthenticated'; then
+        log_high "SEC-013: Authenticated login is not resolved through the handler's effective GitHub client"
+        failed=1
+    fi
+    # Shared concurrent lookup with cached resolved/unavailable identity.
+    if ! echo "$resolver" | grep -qE 'if \(!authenticatedLoginPromise\)' || ! echo "$resolver" | grep -q 'return null'; then
+        log_high "SEC-013: Authenticated login lookup is not shared and cached (including unavailable identity)"
+        failed=1
+    fi
+    if ! echo "$resolver" | grep -qi 'bot-authored'; then
+        log_medium "SEC-013: Lookup failures do not log the fallback to bot-authored comments"
+        failed=1
+    fi
+
+    local handler
+    for handler in actions/setup/js/add_comment.cjs actions/setup/js/comment_memory.cjs; do
+        if [ ! -f "$handler" ]; then
+            log_high "SEC-013: Comment selection handler missing: $handler"
+            failed=1
+            continue
+        fi
+        if ! grep -q 'createAuthenticatedLoginResolver(' "$handler"; then
+            log_high "SEC-013: $(basename "$handler") does not use the shared authenticated-author resolver"
+            failed=1
+        fi
+        # Lazy lookup: only when matching candidates exist.
+        if ! grep -qE 'length > 0 \? await getAuthenticatedLogin\(\) : null' "$handler"; then
+            log_high "SEC-013: $(basename "$handler") does not limit the authenticated-user lookup to cases with candidates"
+            failed=1
+        fi
+        # Exact login match or API-identified bot fallback; never github.actor/context.actor.
+        if ! grep -qE 'authenticatedLogin \? comment\.user\.login === authenticatedLogin : comment\.user\.type === "Bot"' "$handler"; then
+            log_critical "SEC-013: $(basename "$handler") does not require exact author login or API-identified bot fallback"
+            failed=1
+        fi
+        if grep -qE '(context|github)\.actor[^A-Za-z_]*===?[^=]*user\.login|user\.login[^=]*===?[^=]*(context|github)\.actor' "$handler"; then
+            log_critical "SEC-013: $(basename "$handler") substitutes the triggering actor for the publishing identity"
+            failed=1
+        fi
+    done
+
+    if [ $failed -eq 0 ]; then
+        log_pass "SEC-013: Automatic comment selection validates authenticated author with lazy cached lookup and Bot-type fallback"
+    fi
+}
+check_authenticated_author_validation
+
+# CFG-001: Imported Safe-Output Configuration Precedence (Section 5, v1.29.24)
+# Explicit local values MUST take precedence over imported values for safe-outputs.steer and
+# create-pull-request fields; imported values apply only when the local field is omitted.
+echo "Running CFG-001: Imported Safe-Output Configuration Precedence..."
+check_imported_config_precedence() {
+    local imports="pkg/workflow/imports.go"
+    local failed=0
+
+    if [ ! -f "$imports" ]; then
+        log_high "CFG-001: Imported configuration merger missing: $imports"
+        return
+    fi
+
+    # Explicit local steer (including false) removes the imported value before merging.
+    if ! grep -A2 -E 'topRawSafeOutputs\["steer"\]' "$imports" | grep -q 'delete(config, "steer")'; then
+        log_high "CFG-001: Explicit local safe-outputs.steer does not take precedence over imported steer"
+        failed=1
+    fi
+    # Imported create-pull-request fields apply only when the local field is omitted.
+    if ! grep -qE 'localConfig\["expires"\]; !defined' "$imports"; then
+        log_high "CFG-001: Imported create-pull-request.expires may override an explicit local value"
+        failed=1
+    fi
+    if ! grep -qE 'localConfig\["draft"\]; !defined' "$imports"; then
+        log_high "CFG-001: Imported create-pull-request.draft may override an explicit local value"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "CFG-001: Explicit local steer and create-pull-request values take precedence over imports"
+    fi
+}
+check_imported_config_precedence
+
+# TYPE-021: update_issue Workflow-Configured Body Operation (Section 7.3 update_issue, v1.29.26)
+# safe-outputs.update-issue.operation MUST accept only replace/append/prepend/replace-island
+# (invalid values rejected at configuration validation). The effective operation MUST be the
+# agent operation, then the workflow default, then append; it applies only when body updates are
+# enabled and a body is supplied.
+echo "Running TYPE-021: update_issue Workflow-Configured Body Operation..."
+check_update_issue_default_operation() {
+    local go_config="pkg/workflow/update_issue.go"
+    local registry="pkg/workflow/safe_outputs_handler_registry_issues.go"
+    local schema="pkg/parser/schemas/main_workflow_schema.json"
+    local handler="actions/setup/js/update_issue.cjs"
+    local helpers="actions/setup/js/update_entity_helpers.cjs"
+    local failed=0
+
+    if [ ! -f "$go_config" ] || ! grep -qE 'configMap\["operation"\]' "$go_config"; then
+        log_high "TYPE-021: Compiler does not parse safe-outputs.update-issue.operation"
+        failed=1
+    fi
+    if [ ! -f "$registry" ] || ! grep -q 'AddStringPtr("default_operation", c.Operation)' "$registry"; then
+        log_high "TYPE-021: update-issue operation is not emitted to the handler as default_operation"
+        failed=1
+    fi
+    if [ -f "$schema" ] && command -v python3 >/dev/null 2>&1; then
+        if ! python3 - "$schema" <<'PY'
+import json, sys
+schema = json.load(open(sys.argv[1]))
+node = schema["properties"]["safe-outputs"]["properties"]["update-issue"]
+found = []
+def walk(o):
+    if isinstance(o, dict):
+        op = o.get("properties", {}).get("operation")
+        if isinstance(op, dict):
+            found.append(sorted(op.get("enum", [])))
+        for v in o.values():
+            walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            walk(v)
+walk(node)
+expected = sorted(["replace", "append", "prepend", "replace-island"])
+sys.exit(0 if found and all(f == expected for f in found) else 1)
+PY
+        then
+            log_high "TYPE-021: Schema does not restrict update-issue.operation to replace/append/prepend/replace-island"
+            failed=1
+        fi
+    else
+        log_high "TYPE-021: Cannot validate update-issue.operation schema enum ($schema)"
+        failed=1
+    fi
+    if [ ! -f "$handler" ] || ! grep -q 'configDefaultOperation: config.default_operation' "$handler" || ! grep -q 'defaultOperation: "append"' "$handler"; then
+        log_high "TYPE-021: update_issue does not pass the workflow default operation with an append fallback"
+        failed=1
+    fi
+    if [ ! -f "$helpers" ] || ! grep -qE 'item\.operation \|\| configDefaultOperation \|\| defaultOperation' "$helpers"; then
+        log_high "TYPE-021: Body operation precedence is not agent operation, then workflow default, then fallback"
+        failed=1
+    elif ! sed -n '/item\.body !== undefined && canUpdateBody/,+2p' "$helpers" | grep -q 'resolvedOperation'; then
+        log_high "TYPE-021: Body operation is not limited to enabled body updates with a supplied body"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "TYPE-021: update-issue operation is validated and resolved as agent, workflow default, then append"
+    fi
+}
+check_update_issue_default_operation
 
 # Summary
 echo ""
