@@ -44,3 +44,15 @@ func TestValidateManifestResourceDestinationSharedWorkflowScripts(t *testing.T) 
 	}, "aw.yml")
 	require.Error(t, err)
 }
+
+func TestOperationalValueShellPathsAreNotPackageResources(t *testing.T) {
+	t.Parallel()
+	for _, destination := range []string{
+		".github/graders/score.sh",
+		".github/workflows/graders/score.sh",
+		"graders/score.sh",
+		"score.sh",
+	} {
+		assert.False(t, isPackageResourceDestination(destination), destination)
+	}
+}

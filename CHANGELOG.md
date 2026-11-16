@@ -70,7 +70,7 @@ also been removed. Use `gh aw logs --episodes --outcomes` for episode summaries.
 `compile --dry-run` accepts workflow `steps` and `post-steps` but omits their
 code and credentials from emitted locks, so separate dispatch cannot execute
 them. It rejects `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP
-servers/scripts, custom safe-output scripts, enabled Bash graders, and authored
+servers/scripts, custom safe-output scripts, and authored
 OIDC permissions, including imports. Custom jobs and custom safe-output jobs
 become disabled, credential-free placeholders with empty outputs. Existing
 actionable scanner findings fail alongside added findings. Migrate by removing
@@ -116,11 +116,10 @@ JavaScript lane and returns a nonempty ordered metric array. The first metric
 remains the primary value; remaining metrics remain diagnostics; schema-v2
 artifacts/events retain the full array and implementation digest. CLI replay,
 offline regrading, experiments, audit/logs, telemetry, and adapters continue to
-consume the same top-level source/value identity. Repository-owned
-`graders.operational-value.run` Bash remains temporarily supported with an
-explicit deprecation warning and unchanged result shape; it is not translated
-automatically. Compiler validation and `grader-shell-file-write` retain shared
-shell checks.
+consume the same top-level source/value identity.
+`graders.operational-value.run` has been removed; migrate manually to restricted
+`graders.operational-value.script`. Invalid legacy declarations fail explicitly
+and are never ignored or translated.
 Recompile workflows to move grading out of the
 agent job. Read schema-version-2 results from `usage/graders/`; CLI replay now
 accepts unified-session JSONL or a JSON event array instead of legacy trace

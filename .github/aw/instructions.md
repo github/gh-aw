@@ -92,12 +92,10 @@ Other custom IDs use `graders.<distinct-id>.script` and return one finite number
 `null`, or an object with `value`. Reuse
 `helpers.createSessionLookups(session)` for stats and event/tool lookups.
 
-Deprecated `graders.operational-value.run` Bash remains compatibility-only with
-an explicit warning and unchanged metric-array result shape. Do not translate
-shell automatically. Remove file writes and live API/checkout reads; compile/lint
-rejects detected writes. Shell is trusted code, not yet microVM-isolated.
+`graders.operational-value.run` is removed. Reject it with migration guidance to
+`graders.operational-value.script`; never ignore or translate shell automatically.
 
-The compiler owns the isolated downstream `graders` job for both custom forms.
+The compiler owns the isolated downstream `graders` job for custom JavaScript.
 Never override built-in implementations, customize `jobs.graders`, or inject
 user code or steps into `jobs.conclusion`.
 Collect required evidence before session publication; graders cannot fetch it.

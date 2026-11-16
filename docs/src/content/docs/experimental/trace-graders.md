@@ -7,8 +7,7 @@ Built-in and JavaScript graders compute metrics without model calls, file reads,
 subprocesses, or network access. Built-ins run in the **conclusion job**, after
 observations have been collected and redacted in memory. Custom JavaScript,
 including reserved operational-value JavaScript, runs only in a separate
-**graders job** after conclusion publishes that session. Deprecated
-operational-value Bash remains a compatibility path in that job.
+**graders job** after conclusion publishes that session.
 
 :::caution[Experimental]
 Graders and their result format are experimental.
@@ -58,8 +57,8 @@ Supported fields are `enabled`, `name`, `description`, `unit`, `direction`,
 `threshold`, `min`, `max`, and `config`. Disabling every default is valid.
 Custom IDs additionally require `script`. Built-in implementations cannot be
 overridden. Reserved `operational-value` accepts restricted JavaScript `script`
-with an ordered metric-array contract. Deprecated Bash `run` remains temporarily
-accepted only for that ID.
+with an ordered metric-array contract. Removed `run` declarations fail with
+migration guidance to `script`.
 
 ## Custom JavaScript
 
@@ -127,15 +126,6 @@ run snapshot, episode identity, grader artifacts/events, and replay. GitHub is
 authoritative for later object disposition. githubnext/gh-cao owns provider
 refresh, adoption/rejection/reversal/survival lifecycle, longitudinal
 repository/window/campaign Value, canonical storage/querying, and presentation.
-
-### Deprecated Bash compatibility
-
-`graders.operational-value.run` remains accepted with a deprecation warning and
-the same ordered metric-array result. It reads session JSONL from `$1` /
-`GH_AW_SESSION_FILE` and config from `GH_AW_GRADER_CONFIG`. Do not translate shell
-automatically. Capture required evidence before grading, then rewrite the
-predicate as pure JavaScript. Shell remains trusted code outside a filesystem or
-network sandbox; `grader-shell-file-write` retains static write checks.
 
 ## Opt-in trajectory graders
 

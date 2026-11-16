@@ -19,15 +19,13 @@ artifacts/events retain the full array and implementation digest. CLI replay,
 offline regrading, experiments, audit/logs, telemetry, and adapter consumers
 retain the existing top-level source/value shape.
 
-Repository-owned `graders.operational-value.run` Bash remains compatibility-only
-with an explicit deprecation warning and unchanged result shape. It is never
-translated automatically. Bash AST validation and `grader-shell-file-write`
-retain shared checks; shell is not a microVM or filesystem/network sandbox.
+**Breaking change:** `graders.operational-value.run` Bash has been removed.
+Migrate manually to restricted `graders.operational-value.script`. Invalid
+legacy declarations fail explicitly and are never ignored or translated.
 
-**Breaking change:** Legacy evaluator stdin requests and built-in overrides
-are rejected. Other custom IDs use pure JavaScript and the
-`session, config, helpers` contract. User-provided conclusion
-steps are rejected; move them to a separate job.
+Legacy evaluator stdin requests and built-in overrides are rejected. Other
+custom IDs use pure JavaScript and the `session, config, helpers` contract.
+User-provided conclusion steps are rejected; move them to a separate job.
 Expensive trajectory analyses now require explicit opt-in.
 
 Grader artifacts use schema version 2 and live in `usage/graders/`, not the

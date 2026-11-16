@@ -32,10 +32,11 @@ func TestAdditionalGradersSelection(t *testing.T) {
 	}
 }
 
-func TestAdditionalGradersRejectsBashWithoutLoadingScript(t *testing.T) {
+func TestAdditionalGradersRejectsRemovedOperationalValueRun(t *testing.T) {
 	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  operational-value:\n    run: ./does-not-exist.sh\n---\nTest.\n")
 	_, err := loadAdditionalGraders([]string{workflowID + ":operational-value"})
-	require.ErrorContains(t, err, "Bash")
+	require.ErrorContains(t, err, "graders.operational-value.run has been removed")
+	assert.Contains(t, err.Error(), "graders.operational-value.script")
 }
 
 func TestAdditionalGradersAcceptsOperationalValueJavaScript(t *testing.T) {
@@ -45,7 +46,6 @@ func TestAdditionalGradersAcceptsOperationalValueJavaScript(t *testing.T) {
 	require.Len(t, definitions, 1)
 	assert.Equal(t, "operational-value", definitions[0].Source)
 	assert.NotEmpty(t, definitions[0].Script)
-	assert.Empty(t, definitions[0].Run)
 }
 
 func TestOfflineGradersCommandCollection(t *testing.T) {

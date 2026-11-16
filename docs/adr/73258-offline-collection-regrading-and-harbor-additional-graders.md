@@ -4,6 +4,9 @@
 **Status**: Draft
 **Deciders**: pelikhan, Copilot (PR #73258)
 
+> **Partially superseded (2026-11-16):** Operational-value Bash and
+> single-session Bash replay have been removed; the offline JavaScript design remains.
+
 ---
 
 ### Context

@@ -26011,8 +26011,8 @@ import-schema:
 model: "example-value"
 
 # Graders over the unified session, including reserved operational-value
-# JavaScript and deprecated operational-value.run Bash. Fast built-ins run in
-# conclusion; executable custom graders run only in the separate graders job.
+# JavaScript. Fast built-ins run in conclusion; executable custom graders run only
+# in the separate graders job.
 # (optional)
 graders:
   {}

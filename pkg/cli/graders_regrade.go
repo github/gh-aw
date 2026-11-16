@@ -107,9 +107,6 @@ func loadAdditionalGraders(selectors []string) ([]graderRunDefinition, error) {
 }
 
 func validateRegradeDefinition(definition graderRunDefinition) error {
-	if definition.Run != "" || definition.ShellScript != "" {
-		return fmt.Errorf("grader %q uses Bash; collection regrading supports only built-in and isolated JavaScript graders", definition.ID)
-	}
 	if definition.ID == "" {
 		return fmt.Errorf("grader %q has an unsupported collection definition", definition.ID)
 	}
@@ -205,7 +202,7 @@ func regradeOneProcessedRun(ctx context.Context, outputDir string, processed Pro
 
 func regradeSessionResult(ctx context.Context, definition graderRunDefinition, payload json.RawMessage) json.RawMessage {
 	var output bytes.Buffer
-	executionErr := runSessionGrader(ctx, definition, payload, &output, "")
+	executionErr := runSessionGrader(ctx, definition, payload, &output)
 	raw := bytes.TrimSpace(output.Bytes())
 	var record struct {
 		ID             string          `json:"id"`
@@ -257,7 +254,7 @@ func regradeDigest(data []byte) string {
 func regradeDefinitionsMetadata(definitions []graderRunDefinition) ([]RegradeDefinition, error) {
 	runtime := sha256.New()
 	runtime.Write(gradersRunScript)
-	for _, name := range []string{"trace_graders.cjs", "grader_session.cjs", "error_codes.cjs", "trajectory_graders.cjs", "builtin_graders.json", "working_set_metrics.cjs", "custom_graders.cjs", "custom_grader_worker.cjs", "operational_value_grader.cjs"} {
+	for _, name := range []string{"trace_graders.cjs", "grader_session.cjs", "error_codes.cjs", "trajectory_graders.cjs", "builtin_graders.json", "working_set_metrics.cjs", "custom_graders.cjs", "custom_grader_worker.cjs"} {
 		content, err := setup.SessionParserSources.ReadFile("js/" + name)
 		if err != nil {
 			return nil, err

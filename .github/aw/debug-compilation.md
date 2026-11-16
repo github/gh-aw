@@ -85,7 +85,7 @@ authorized live test.
 Other host steps (`pre-steps`, `pre-agent-steps`, `on.steps`,
 safe-output/threat-detection/secret-masking steps, and unsafe built-in job
 overrides), custom MCP servers, `mcp-scripts`, custom safe-output scripts/actions,
-enabled Bash graders, and authored OIDC permissions (including safe-output
+and authored OIDC permissions (including safe-output
 permissions) are rejected, including declarations from imports. Compiler-owned
 pull-request stack gates remain enabled. Remove those declarations
 from a separate diagnostic workflow; there is no unsafe dry-run override.
@@ -108,6 +108,11 @@ is narrowed to maintainer/admin roles without bot exemptions.
 Use `DEBUG=workflow:compiler_development,cli:compile_development` for mutation logs;
 they report changed fields/keys and forced flags without configuration values.
 Compile text output reports excluded effects and scanner invocation coverage.
+Report the emitted artifact, outcome, checks run, and material missing coverage;
+say when no lock was emitted and never imply compilation executed the workflow.
+
+<!-- instruction-prefix-end -->
+
 `--json` adds a batch `workflow: "dry-run"` summary: `dry_run.gate` includes
 workflow and batch failures; scanner statuses distinguish `passed`, `failed`
 and `not_run`; each scanner's `differential` reports baseline, existing, added,

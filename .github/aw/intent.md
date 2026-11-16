@@ -77,8 +77,8 @@ strongest attributable recorded effect for a real run. Follow the
 [operational-value-designer skill](../skills/operational-value-designer/SKILL.md).
 `graders.operational-value.script` receives immutable session inputs downstream
 and returns ordered `{id,value}` metrics; the first is primary. Never fetch
-missing evidence. Deprecated Bash remains warning-only compatibility and must
-not be translated automatically.
+missing evidence. Removed `graders.operational-value.run` declarations must fail
+with migration guidance and must not be translated automatically.
 
 gh-aw owns facts knowable at conclusion: producer results, episode identity, direct outcome snapshots, run-scoped grading, artifacts/events, and replay. GitHub owns later object disposition. githubnext/gh-cao owns refresh, adoption/rejection/reversal/survival, longitudinal repository/window/campaign Value, canonical storage/querying, and presentation. `safe_output.outcome` is handler status, not human adoption.
 

@@ -38,7 +38,6 @@ type ImportsResult struct {
 	MergedPluginObjects           []map[string]any      // Object-form Agent Plugin references from all imports
 	MergedSafeOutputs             []string              // Merged safe-outputs configurations from all imports
 	MergedGraders                 string                // Merged graders configuration from all imports (JSON objects, one per line)
-	GraderRunSources              map[string]string     // Declaring files for imported grader run paths.
 	MergedMCPScripts              []string              // Merged mcp-scripts configurations from all imports
 	MergedMarkdown                string                // Only contains imports WITH inputs (for compile-time substitution)
 	ImportPaths                   []string              // List of import file paths for runtime-import macro generation (replaces MergedMarkdown)

@@ -4410,7 +4410,7 @@
     },
     "graders": {
       "type": "object",
-      "desc": "Graders over the unified session, including reserved operational-value JavaScript and deprecated operational-value.ru..."
+      "desc": "Graders over the unified session, including reserved operational-value JavaScript."
     },
     "evals": {
       "type": "array|object",

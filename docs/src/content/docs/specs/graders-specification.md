@@ -7,7 +7,7 @@ sidebar:
 
 # Graders Specification
 
-**Version**: 0.6.0
+**Version**: 0.7.0
 **Status**: Draft Specification
 **Feature Status**: Experimental
 
@@ -64,10 +64,9 @@ Supported per-grader fields are `enabled`, `name`, `description`, `unit`,
 `direction`, `threshold`, `min`, `max`, and `config`. These fields carry data
 only. Custom IDs MUST additionally declare an inline JavaScript `script`, limited
 to 256 KiB. Built-in IDs MUST NOT accept scripts or implementation overrides.
-The reserved `operational-value` ID MUST declare exactly one of restricted
-JavaScript `script` or deprecated repository-owned Bash `run`. Other IDs MUST
-NOT accept `run`. Unsupported fields and built-in overrides MUST fail validation,
-even when disabled.
+The reserved `operational-value` ID MUST declare restricted JavaScript `script`.
+`run` is unsupported for every ID. Unsupported fields and built-in overrides
+MUST fail validation, even when disabled.
 
 Disabling a default with `enabled: false` MUST persist through manifest
 normalization and replay. Disabling all defaults is valid.
@@ -114,11 +113,11 @@ implementation identity, numeric value or null, unit, status, and threshold
 outcome. Individual computation failures MUST be recorded as errors and surfaced
 in conclusion, not converted into successful scores.
 
-Conclusion MUST NOT receive or execute workflow-provided JavaScript or Bash.
+Conclusion MUST NOT receive or execute workflow-provided JavaScript.
 Its manifest MAY register custom grader IDs, but MUST NOT contain custom
 executable definitions. User-provided conclusion steps MUST be rejected.
 
-Custom JavaScript and Bash MUST run only in a separate **graders job**, downstream of a
+Custom JavaScript MUST run only in a separate **graders job**, downstream of a
 successful conclusion and its published `usage` artifact. This job MUST use a
 fresh hosted runner, read-only repository access, no inherited deployment
 environment, and no App, inference, or OIDC credential minting. Work-queue
@@ -139,36 +138,11 @@ Separate restricted Node processes MUST bound memory, output, and execution time
 Existing adapter projections, including gh-cao JSONL mapping, MUST continue to
 consume the top-level operational-value source and primary value.
 
-### Deprecated repository-owned Bash compatibility
+### Removed Bash syntax
 
-`graders.operational-value.run` MUST name a confined `.sh` repository file
-with a Bash shebang and at most 64 KiB of UTF-8 source. Paths are repository-root
-relative; `./` paths are relative to the declaring workflow. The compiler MUST
-freeze its bytes into the separate-job manifest, never conclusion.
-
-The runtime MUST invoke Bash with the redacted unified-session JSONL filename
-as `$1` and `GH_AW_SESSION_FILE`, configuration JSON as `GH_AW_GRADER_CONFIG`,
-and empty stdin. Evaluators MUST refactor legacy stdin-request reads to this
-session file. Existing nonempty arrays of unique `{id,value}` metrics remain the
-output contract: the first metric supplies `operational-value.value`; remaining
-metrics are diagnostics. Values MUST be finite numbers or null.
-
-The compatibility subprocess MUST have no inherited credentials or shell startup
-hooks, use a temporary working directory, and bound execution to 120 seconds
-and output to 1 MiB. Compiler validation and the default `grader-shell-file-write`
-rule MUST parse Bash ASTs and reject detected file writes or unanalyzable dynamic
-execution. Read-only session access, stdout/stderr, and `/dev/null` are permitted.
-
-Bash is repository-trusted code, not a pure JavaScript worker or a filesystem/
-network sandbox. Static analysis is not proof of safety. MicroVM isolation is
-future work, not a guarantee of this interface. Authors MUST derive scores only
-from recorded session evidence, never fetch missing evidence or execute session
-text as code.
-
-Compilers MUST emit an explicit deprecation warning for `run`. They MUST NOT
-translate Bash automatically. Its result source, primary value, diagnostics,
-ordered metrics, and implementation digest MUST remain compatible during the
-migration.
+`graders.operational-value.run` is invalid. Compilers MUST fail with clear
+migration guidance to `graders.operational-value.script`, including for disabled
+or imported declarations. They MUST NOT ignore or translate Bash automatically.
 
 ### Operational-value authority
 
@@ -200,9 +174,7 @@ For built-ins and JavaScript, including `operational-value.script`, the CLI
 SHOULD run Node with the permission model, an empty environment, a bounded
 execution time, and read access restricted to staged runtime modules. Offline
 collection regrading MUST accept restricted operational-value JavaScript and
-MUST reject Bash.
-Shell replay MUST use the same bounded Bash compatibility runtime and session-file
-contract as the separate job; Node's permission model does not sandbox Bash.
+MUST preserve the same ordered metrics and primary mapping.
 
 ## 7. Experiment metric references
 
@@ -223,12 +195,11 @@ See the [Experiments Specification](/gh-aw/specs/experiments-specification/).
 Conforming implementations MUST cover:
 
 - Default activation, explicit opt-ins, and disabling all defaults.
-- Rejection of built-in overrides, invalid metric arrays, invalid shell paths, detected file writes, and unsupported fields.
+- Rejection of built-in overrides, invalid metric arrays, removed `run`, and unsupported fields.
 - Custom source exclusion from conclusion and isolated downstream execution.
 - Optional custom-artifact discovery, missing-artifact fallback, and cache refresh.
 - Determinism, immutable inputs, and absence of file/process I/O in pure graders.
 - Ordered operational-value metrics, primary value, diagnostics, implementation digest, experiment lookup, events/artifacts, replay, and external adapter compatibility.
-- Shell session-file input, legacy metric output, warning, credential stripping, and bounded execution.
 - Shared lookups, tool correlation, duplicate accounting, and phase isolation.
 - Conclusion-only execution after unified-session collection and redaction.
 - Matching persisted results and unified-session grader events.
@@ -238,13 +209,21 @@ Conforming implementations MUST cover:
 
 ## 9. Change log
 
+### Version 0.7.0
+
+- Removes `graders.operational-value.run` Bash and its compile, runtime, replay,
+  resource, and lint surfaces.
+- Requires explicit migration to restricted `graders.operational-value.script`.
+- Preserves ordered metrics, primary mapping, artifacts, events, experiments,
+  replay, and implementation digests through JavaScript.
+
 ### Version 0.6.0
 
 - Adds reserved `graders.operational-value.script` through the restricted
   JavaScript custom-grader lane.
 - Preserves ordered metrics, primary value, source identity, digest, artifacts,
   events, experiments consumption, and CLI replay/regrading.
-- Deprecates Bash `run` without automatic translation.
+- Introduced restricted operational-value JavaScript before Bash removal.
 
 ### Version 0.5.0
 

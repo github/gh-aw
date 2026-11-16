@@ -61,7 +61,7 @@ and tests; configure supporting lifecycle permissions, not just Playwright.
 - when the user asks for specific skills or agent plugins, add them to the top-level `skills:` / `plugins:` frontmatter fields; never add on-the-fly install steps or prompt instructions to install them at run time (see [skills.md](skills.md))
 - migrate run-scoped outcome grading to `graders.operational-value.script`: synchronous restricted JavaScript over immutable `session`, `config`, and `helpers`; return a nonempty ordered array of unique `{id,value}` metrics whose first value is primary
 - use `graders.<distinct-id>.script` for other custom metrics; return one finite number, `null`, or an object with `value`
-- deprecated repository-owned Bash may temporarily retain `graders.operational-value.run` with its warning and metric-array shape; never translate shell automatically or wrap file/API behavior in JavaScript; capture evidence before grading and use the compiler-owned isolated `graders` job
+- reject removed `graders.operational-value.run` declarations with migration guidance; never ignore or translate shell automatically or wrap file/API behavior in JavaScript
 
 See [workflow-constraints.md](workflow-constraints.md) for the read-only security posture (keep the agent job read-only, route writes through `safe-outputs:`).
 

@@ -1737,8 +1737,13 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_OperationalValueGr
 				},
 			}
 
-			if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/operational-value-grader-test.md"); err != nil {
-				t.Fatal(err)
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/operational-value-grader-test.md")
+			if err == nil {
+				t.Fatal("expected removed operational-value.run to fail")
+			}
+			if !strings.Contains(err.Error(), "graders.operational-value.run has been removed") ||
+				!strings.Contains(err.Error(), "graders.operational-value.script") {
+				t.Fatalf("expected migration guidance, got: %v", err)
 			}
 		})
 	}

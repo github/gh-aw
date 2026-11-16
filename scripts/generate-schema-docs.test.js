@@ -101,7 +101,7 @@ allPassed &= assertNotContains(output, "```yaml\n---\n# Workflow name", "YAML co
 
 allPassed &= assertContains(output, "reserved operational-value", "Graders documentation should describe reserved operational-value JavaScript");
 
-allPassed &= assertContains(output, "deprecated operational-value.run Bash", "Graders documentation should describe deprecated Bash compatibility");
+allPassed &= assertNotContains(output, "operational-value.run", "Graders documentation should not expose removed Bash syntax");
 
 allPassed &= assertContains(output, 'cache-memory: [{"id":"default","key":"memory-default"},{"id":"session","key":"memory-session"}]', "Array variant examples should remain non-empty");
 allPassed &= assertContains(output, "Array items: A GitHub MCP server toolset name", "Toolset array items should resolve their schema description");

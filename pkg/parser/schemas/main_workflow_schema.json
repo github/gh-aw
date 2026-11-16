@@ -14515,7 +14515,7 @@
       "examples": ["gpt-5.4", "claude-3-5-sonnet-20241022", "gpt-4"]
     },
     "graders": {
-      "description": "Graders over the unified session, including reserved operational-value JavaScript and deprecated operational-value.run Bash. Fast built-ins run in conclusion; executable custom graders run only in the separate graders job.",
+      "description": "Graders over the unified session, including reserved operational-value JavaScript. Fast built-ins run in conclusion; executable custom graders run only in the separate graders job.",
       "type": "object",
       "propertyNames": {
         "pattern": "^[a-z][a-z0-9-]{0,63}$",
@@ -14574,11 +14574,6 @@
                 "minLength": 1,
                 "maxLength": 262144,
                 "description": "Synchronous JavaScript body for a custom grader. Receives session, config, and helpers; runs only in the separate restricted graders job. Distinct IDs return one numeric/null result; operational-value returns a nonempty ordered array of unique {id,value} metrics. Cannot override a built-in."
-              },
-              "run": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Deprecated compatibility only for operational-value: a repository-relative .sh evaluator path (./ is relative to the workflow). Frozen at compilation and run only in the separate graders job with the unified-session JSONL file as its first argument. Migrate manually to operational-value.script; automatic translation is not supported."
               }
             }
           }

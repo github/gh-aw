@@ -55,7 +55,7 @@ graders:
   custom:
     script: return trace.token;
   operational-value:
-    script: echo "$TOKEN"
+    script: return [{id: "restricted", value: typeof process === "undefined" ? 1 : 0}];
 tools:
   cache-memory:
     validation:

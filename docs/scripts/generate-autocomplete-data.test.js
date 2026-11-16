@@ -17,10 +17,10 @@ test("merge-pull-request exposes nested policy configuration in generated and pu
   assert.deepEqual(publishedMerge, generatedMerge, "published merge configuration must match the generator");
 });
 
-test("graders autocomplete describes operational-value JavaScript and deprecated Bash compatibility", () => {
+test("graders autocomplete describes JavaScript-only operational value", () => {
   for (const data of [autocompleteData, publishedData]) {
     assert.match(data.root.graders.desc, /reserved operational-value JavaScript/);
-    assert.match(data.root.graders.desc, /deprecated operational-value/);
+    assert.doesNotMatch(data.root.graders.desc, /operational-value\.run|deprecated operational-value/);
   }
 });
 

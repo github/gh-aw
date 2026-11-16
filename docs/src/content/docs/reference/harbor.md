@@ -139,9 +139,7 @@ gh aw graders run --logs-dir ./my-logs \
 The option is repeatable and accepts comma-separated
 `WORKFLOW:GRADER` selectors. Selectors resolve against local workflow grader
 definitions. Collection regrading supports built-in and isolated JavaScript
-graders only; Bash graders are rejected. JavaScript grader code executes, so
-select only trusted definitions. Single-session Bash replay is separate and is
-not supported in collection mode.
+graders. JavaScript grader code executes, so select only trusted definitions.
 
 The command emits a JSON document with format `gh-aw-regrading`, a version,
 CLI version, and per-run original evidence, selected grader definitions,

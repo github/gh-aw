@@ -8,8 +8,7 @@ const { createSessionLookups, serializeLookupsForWorker } = require("./grader_se
 const { buildGraderOutput, normalizeResult, BUILTIN_GRADERS, GRADER_VERSION } = require("./trace_graders.cjs");
 
 /**
- * Orchestration boundary: JavaScript uses restricted workers; trusted Bash uses
- * the separate-job compatibility runtime, never conclusion.
+ * Orchestration boundary: JavaScript uses restricted workers, never conclusion.
  * @param {import("./types/unified_session").UnifiedSession} session
  * @param {any[]} graders
  */
@@ -17,16 +16,19 @@ function runCustomGraders(session, graders) {
   const lookups = createSessionLookups(session);
   const worker = path.join(__dirname, "custom_grader_worker.cjs");
   const permission = process.allowedNodeEnvironmentFlags.has("--permission") ? "--permission" : "--experimental-permission";
-  if (graders.some(grader => typeof grader?.script === "string" && grader.enabled !== false) && !process.allowedNodeEnvironmentFlags.has(permission)) {
-    throw new Error("custom JavaScript graders require Node.js permission support");
-  }
   const ids = new Set();
   for (const grader of graders) {
+    if (grader?.id === "operational-value" && (Object.hasOwn(grader, "run") || Object.hasOwn(grader, "shellScript"))) {
+      throw new Error("graders.operational-value.run has been removed; use graders.operational-value.script with restricted JavaScript");
+    }
     if (!grader || typeof grader.id !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(grader.id) || Object.hasOwn(BUILTIN_GRADERS, grader.id) || !validCustomSource(grader)) {
-      throw new Error("custom graders require a distinct JavaScript ID or operational-value with restricted JavaScript or frozen Bash source; built-in overrides are unsupported");
+      throw new Error("custom graders require a distinct JavaScript ID or operational-value with restricted JavaScript; built-in overrides are unsupported");
     }
     if (ids.has(grader.id)) throw new Error(`duplicate custom grader ${grader.id}`);
     ids.add(grader.id);
+  }
+  if (graders.some(grader => typeof grader?.script === "string" && grader.enabled !== false) && !process.allowedNodeEnvironmentFlags.has(permission)) {
+    throw new Error("custom JavaScript graders require Node.js permission support");
   }
   const results = graders
     .filter(grader => grader.enabled !== false)
@@ -51,7 +53,7 @@ function runCustomGraders(session, graders) {
     manifest: {
       version: GRADER_VERSION,
       customGraders: graders.filter(grader => grader.enabled !== false).map(grader => grader.id),
-      graders: [...(Array.isArray(priorManifest?.graders) ? priorManifest.graders.filter(grader => grader.source === "builtin") : []), ...graders.map(({ script: _script, shellScript: _shellScript, ...metadata }) => metadata)],
+      graders: [...(Array.isArray(priorManifest?.graders) ? priorManifest.graders.filter(grader => grader.source === "builtin") : []), ...graders.map(({ script: _script, ...metadata }) => metadata)],
     },
     output: buildGraderOutput([...builtinResults, ...results], lookups),
   };
@@ -60,17 +62,7 @@ function runCustomGraders(session, graders) {
 /** @param {any} grader */
 function validCustomSource(grader) {
   if (grader.source === "operational-value") {
-    const javaScript =
-      grader.id === "operational-value" && typeof grader.script === "string" && !!grader.script.trim() && Buffer.byteLength(grader.script) <= 256 * 1024 && !Object.hasOwn(grader, "run") && !Object.hasOwn(grader, "shellScript");
-    const shell =
-      grader.id === "operational-value" &&
-      typeof grader.run === "string" &&
-      grader.run.endsWith(".sh") &&
-      typeof grader.shellScript === "string" &&
-      hasBashShebang(grader.shellScript) &&
-      Buffer.byteLength(grader.shellScript) <= 64 * 1024 &&
-      !Object.hasOwn(grader, "script");
-    return javaScript || shell;
+    return grader.id === "operational-value" && typeof grader.script === "string" && !!grader.script.trim() && Buffer.byteLength(grader.script) <= 256 * 1024 && !Object.hasOwn(grader, "run") && !Object.hasOwn(grader, "shellScript");
   }
   return (
     grader.id !== "operational-value" &&
@@ -83,14 +75,25 @@ function validCustomSource(grader) {
   );
 }
 
-/** @param {string} source */
-function hasBashShebang(source) {
-  const [line] = source.split("\n", 1);
-  if (!line.startsWith("#!")) return false;
-  const fields = line.slice(2).trim().split(/\s+/);
-  if (path.posix.isAbsolute(fields[0]) && path.posix.basename(fields[0]) === "bash") return true;
-  if (fields[0] !== "/usr/bin/env" && fields[0] !== "/bin/env") return false;
-  return (fields.length === 2 && fields[1] === "bash") || (fields.length >= 3 && fields[1] === "-S" && fields[2] === "bash");
+/** @param {any} metrics @returns {{id: string, value: number|null}[]} */
+function validateOperationalValueMetrics(metrics) {
+  if (!Array.isArray(metrics) || metrics.length === 0) throw new Error("operational-value script must return a nonempty metric array");
+  const ids = new Set();
+  for (const metric of metrics) {
+    if (
+      !metric ||
+      typeof metric !== "object" ||
+      Object.keys(metric).sort().join(",") !== "id,value" ||
+      typeof metric.id !== "string" ||
+      !metric.id.trim() ||
+      ids.has(metric.id) ||
+      (metric.value !== null && (typeof metric.value !== "number" || !Number.isFinite(metric.value)))
+    ) {
+      throw new Error("operational-value metrics must contain unique nonempty ids and finite numeric or null values");
+    }
+    ids.add(metric.id);
+  }
+  return metrics;
 }
 
 /**
@@ -135,11 +138,7 @@ function executeRestrictedJavaScriptGrader(session, grader, lookups, worker, per
 function runOperationalValueGrader(session, grader, runtime) {
   let result;
   try {
-    const { executeOperationalValueEvaluator, validateOperationalValueMetrics } = require("./operational_value_grader.cjs");
-    const metrics =
-      typeof grader.script === "string"
-        ? validateOperationalValueMetrics(executeRestrictedJavaScriptGrader(session, grader, runtime.lookups, runtime.worker, runtime.permission, "operational-value"))
-        : executeOperationalValueEvaluator(grader.shellScript, session, grader.config ?? {});
+    const metrics = validateOperationalValueMetrics(executeRestrictedJavaScriptGrader(session, grader, runtime.lookups, runtime.worker, runtime.permission, "operational-value"));
     result = {
       ...normalizeResult(
         grader.id,
@@ -160,9 +159,7 @@ function runOperationalValueGrader(session, grader, runtime) {
     implementation: {
       id: "gh-aw/operational-value",
       version: GRADER_VERSION,
-      digest: createHash("sha256")
-        .update(typeof grader.script === "string" ? grader.script : grader.shellScript)
-        .digest("hex"),
+      digest: createHash("sha256").update(grader.script).digest("hex"),
     },
   };
 }
@@ -188,4 +185,4 @@ async function main(options = {}) {
   if (output.results.some(result => result.source !== "builtin" && result.status === "error")) global.core.setFailed("One or more custom graders failed");
 }
 
-module.exports = { runCustomGraders, main };
+module.exports = { runCustomGraders, validateOperationalValueMetrics, main };

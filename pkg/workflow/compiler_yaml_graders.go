@@ -22,8 +22,6 @@ type graderManifestEntry struct {
 	Min         *float64       `json:"min,omitempty"`
 	Config      map[string]any `json:"config,omitempty"`
 	Script      string         `json:"script,omitempty"`
-	Run         string         `json:"run,omitempty"`
-	ShellScript string         `json:"shellScript,omitempty"`
 }
 
 type graderManifest struct {
@@ -47,7 +45,7 @@ func buildGraderManifest(cfg *GradersConfig, custom bool) *graderManifest {
 	slices.Sort(ids)
 	for _, id := range ids {
 		g := cfg.Graders[id]
-		if (g.Script != "" || g.Run != "") != custom {
+		if (g.Script != "") != custom {
 			continue
 		}
 		if custom && g.Enabled != nil && !*g.Enabled {
@@ -70,7 +68,6 @@ func buildGraderManifest(cfg *GradersConfig, custom bool) *graderManifest {
 		}
 		manifest.Graders = append(manifest.Graders, graderManifestEntry{
 			ID: id, Name: g.Name, Description: g.Description, Source: source, Script: g.Script,
-			Run: g.Run, ShellScript: g.ShellScript,
 			Enabled: g.Enabled == nil || *g.Enabled, Unit: g.Unit, Direction: g.Direction,
 			Threshold: g.Threshold, Max: g.Max, Min: g.Min, Config: g.Config,
 		})

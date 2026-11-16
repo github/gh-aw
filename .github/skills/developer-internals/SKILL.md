@@ -196,6 +196,11 @@ func (c *Compiler) validateStrictMode(frontmatter map[string]any, networkPermiss
 }
 ```
 
+For session graders, load
+[operational-value-designer](../operational-value-designer/SKILL.md) before
+editing compiler, runtime, replay, schema, artifact, or consumer contracts.
+
+<!-- instruction-prefix-end -->
 
 
 ## Session Graders
@@ -215,10 +220,9 @@ nonempty ordered array of unique `{id,value}` metrics; the first value is primar
 and the full array remains in schema-v2 results. The compiler partitions custom
 source into a downstream `graders` job; conclusion receives only custom IDs.
 Never execute user code in conclusion, permit its step hooks, or customize
-`jobs.graders`. Deprecated `graders.operational-value.run` Bash remains
-compatibility-only with an explicit warning and unchanged metric-array shape;
-never translate it automatically. Compilation and `grader-shell-file-write`
-retain the shared Bash AST checker. Built-in overrides remain rejected.
+`jobs.graders`. Removed `graders.operational-value.run` declarations fail with
+migration guidance to `script`; never ignore or translate them. Built-in
+overrides remain rejected.
 
 The separate job consumes `usage/aw_session.jsonl` and publishes combined results
 in the `graders` artifact without source. Preserve conclusion's published session.

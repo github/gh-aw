@@ -139,8 +139,8 @@ cat aw_session.jsonl | gh aw graders run WORKFLOW operational-value
 The verifier runs the restricted runtime twice and checks identity, digest, and
 order. A missing native parser warning means unchecked lint coverage.
 
-Legacy `graders.operational-value.run` remains compatibility-only with a warning
-and unchanged metrics. Automatic shell-to-JavaScript translation is not supported.
+`graders.operational-value.run` is removed. Invalid declarations must fail with
+migration guidance to `script`; never ignore or translate shell automatically.
 
 <!-- instruction-prefix-end -->
 
@@ -150,8 +150,7 @@ Inspect the DAG: `graders` depends on successful conclusion, downloads
 `usage/aw_session.jsonl`, has no write/inference/App/OIDC credentials, and uploads
 the separate `graders` artifact.
 
-## Legacy Bash migration
+## Removed Bash migration
 
 Do not wrap shell file/API behavior in JavaScript. Record required evidence in
-the session, then rewrite the predicate as pure JavaScript. Legacy Bash is
-trusted code, not a sandbox; shared `gradershell` checks remain.
+the session, then rewrite the predicate as pure JavaScript.

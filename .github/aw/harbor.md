@@ -101,9 +101,8 @@ and grader errors are reported per run. Collection mode and Harbor export suppor
 JavaScript, and reserved operational-value JavaScript, not Bash. Additional
 JavaScript grader code is executed; only select trusted graders.
 
-The runner supports built-ins, custom JavaScript, operational-value JavaScript,
-and deprecated repository-owned operational-value Bash. Only execute trusted
-grader code; Bash is not microVM-isolated. `logs --graders` retrieves recorded grader results and their
+The runner supports built-ins, custom JavaScript, and operational-value
+JavaScript. Only execute trusted grader code. `logs --graders` retrieves recorded grader results and their
 artifacts alongside automatic ATIF exports when sessions are available; it does
 not recompute historical results. Harbor export is separate from trajectory
 conversion: GitHub conclusions and grader pass/fail flags are not task outcomes
@@ -138,6 +137,10 @@ The trial's `gh-aw/evidence/` contains the downloaded evidence, including availa
 unified JSONL, grader results and manifests, and experiment state. Copy the
 `harbor/` directory to another machine to inspect it without GitHub access.
 Original download caches and normal logs reports remain outside that job.
+Missing sessions remain missing; invalid available sessions or export failures
+must be reported and fail the export.
+
+<!-- instruction-prefix-end -->
 
 This is an import of recorded evidence, not a runnable Harbor task or an agent
 replay. Missing sessions remain missing; invalid available sessions fail export.
