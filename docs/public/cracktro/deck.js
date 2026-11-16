@@ -755,7 +755,7 @@
   .mdt-svg .sdd-stamp.g { fill: #3fb950; }
   .mdm-tl .s { fill: #3fb950; } .mdm-tl .p { fill: #ab7df8; } .mdm-tl .o { fill: #79c0ff; } .mdm-tl .x { fill: #6e7681; }
   .mdm-tl tspan.s, .mdm-tl tspan.p { font-weight: 700; }
-  .ddr-lbl { fill: #9198a1; font: 600 20px var(--mono); text-anchor: end; transition: fill .4s; } .fm-task.on .ddr-lbl { fill: #3fb950; }
+  .ddr-lbl { fill: #9198a1; font: 600 20px var(--mono); text-anchor: middle; transition: fill .4s; } .fm-task.on .ddr-lbl { fill: #3fb950; }
   .ddm-tl rect { fill: #ab7df8; } .ddm-tl rect.h { fill: #ab7df877; }
   .ddm-tl .v { fill: #c9d1d9; font: 600 13px var(--mono); text-anchor: middle; }
   .dg-svg { left: 110px; top: 280px; width: 1700px; height: 586px; }
@@ -5424,7 +5424,7 @@
     });
   }
 
-  // Decide · Draft · Record: a ready pull request with no linked decision gets a drafted ADR that is finalized and merged with the code
+  // Decide · Draft · Record: a ready pull request with no linked decision gets a drafted ADR that is finalized, merged with the code and read back by later agents
   {
     resetIndex();
     const VW = 2160,
@@ -5485,6 +5485,7 @@
       ["ddrE0", "M342 106 H682", "p", "ready for review", 512, 90],
       ["ddrE1", "M1104 106 H1462", "p", "push", 1283, 90],
       ["ddrE2", "M1780 544 V630 H1028", "g", "merged with the code", 1520, 614],
+      ["ddrE3", "M954 630 H458", "p", "why was it built this way?", 704, 614],
     ];
     let g = `<defs><clipPath id="ddrClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
       <marker id="ddrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
@@ -5514,7 +5515,8 @@
     g += node("ddrAgent", 720, 106, 380, "Design Decision Gate", "#8957e5", "copilot");
     g += `<g class="fm-task" id="ddrMaint"><g class="fm-pill b"><rect x="1500" y="81" width="300" height="50" rx="25"/><text x="${1500 + 18 + 150}" y="114">Maintainer</text></g>
       <circle cx="1500" cy="106" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="1469" y="75" width="62" height="62" clip-path="url(#ddrClip)"/></g>`;
-    g += `<g class="fm-task" id="ddrDocs"><circle cx="990" cy="630" r="34" fill="#238636"/>${ico("file", 990, 631, 30)}<text class="ddr-lbl" x="940" y="637">docs/adr</text></g>`;
+    g += `<g class="fm-task" id="ddrDocs"><circle cx="990" cy="630" r="34" fill="#238636"/>${ico("file", 990, 631, 30)}<text class="ddr-lbl" x="990" y="584">docs/adr</text></g>`;
+    g += node("ddrNext", 120, 630, 330, "Next agent", "#8957e5", "copilot");
     g += `<circle class="fm-dot sdd-dot" r="9"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg ddr-svg");
@@ -5561,7 +5563,9 @@
       at(6900, () => (on("ddrL2_5"), on("ddrP2", "ok"), sfx.pop(8)));
       flight(7200, "ddrE2", 1500, "#3fb950", 7);
       at(8700, () => (on("ddrDocs"), on("ddrP1", "ok"), sfx.pop(9)));
-      len = 12000;
+      flight(9300, "ddrE3", 1200, "#ab7df8", 10);
+      at(10500, () => (on("ddrNext"), sfx.key(0.8)));
+      len = 14000;
     };
     // measured: ADR files on gh-aw main by month first added (snapshot 16 Nov 2026; November is partial)
     const MONTHS = [
@@ -5598,7 +5602,7 @@
     slides.push({
       group: "process",
       notes:
-        "Decide · Draft · Record, as gh-aw records its architecture decisions. When a pull request is marked ready for review or labelled implementation, the Design Decision Gate workflow starts. The agent reads the diff and, for changes large enough to carry a design decision, when no ADR is linked, drafts one in Michael Nygard form (context, decision, alternatives, consequences) with the imported adr-writer agent, pushes it to the pull request branch and comments that the decision must be reviewed before merge. The author and a maintainer complete it and it merges with the code. The bottom strip is measured on gh-aw's main branch (snapshot 16 November 2026): 980 ADR files in docs/adr since the first on 11 April 2026, 163 added in the last 30 days and 582 carrying the adr-writer agent's footer. 799 still say Draft and 97 Accepted, so drafts merge with the code but are rarely finalized afterwards. In a sample of recent gate runs, eight of the nine pull requests that received a draft merged with it. The pull request, ADR and review in the flow above are an illustrative, simplified example.",
+        "Decide · Draft · Record, as gh-aw records its architecture decisions. When a pull request is marked ready for review or labelled implementation, the Design Decision Gate workflow starts. The agent reads the diff and, for changes large enough to carry a design decision, when no ADR is linked, drafts one in Michael Nygard form (context, decision, alternatives, consequences) with the imported adr-writer agent, pushes it to the pull request branch and comments that the decision must be reviewed before merge. The author and a maintainer complete it and it merges with the code. The bottom strip is measured on gh-aw's main branch (snapshot 16 November 2026): 980 ADR files in docs/adr since the first on 11 April 2026, 163 added in the last 30 days and 582 carrying the adr-writer agent's footer. 799 still say Draft and 97 Accepted, so drafts merge with the code but are rarely finalized afterwards. The records are read back: the PR Specification Reviewer runs when docs/adr changes and rewrites a spec only when the pull request's ADR, implementation and tests agree, and coding agents changing a feature later search docs/adr to learn why it was built that way before they touch it. In a sample of recent gate runs, eight of the nine pull requests that received a draft merged with it. The pull request, ADR, review and next agent in the flow above are an illustrative, simplified example.",
       enter() {
         start = 0;
       },
@@ -5628,7 +5632,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Pull requests that need an architecture decision get a drafted ADR before they merge"), h("h2", {}, letters("Decide · Draft · "), letters("Record", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Pull requests that need a decision get a drafted ADR; later agents read it to learn why"), h("h2", {}, letters("Decide · Draft · "), letters("Record", "l-grad"))),
         svg,
         ddm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 16 Nov 2026 · ADRs on main 11 Apr–16 Nov 2026 (219 d) · flow illustrative")
