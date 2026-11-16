@@ -3,6 +3,8 @@ title: QMD Documentation Search
 description: Build an incremental documentation index in a separate job, persist it with cache-memory, and search it from the agent through QMD.
 sidebar:
   order: 820
+---
+
 :::caution[Experimental]
 QMD documentation search is experimental and may change.
 :::

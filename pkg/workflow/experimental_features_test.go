@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 const experimentalDocsRoot = "../../docs/src/content/docs"
@@ -40,7 +41,9 @@ func TestExperimentalFeaturesListIsWellFormed(t *testing.T) {
 
 func TestExperimentalFeatureChecksMatchList(t *testing.T) {
 	t.Parallel()
+	// Connector warnings are emitted separately for each alias, not by a predicate.
 	checked := map[string]bool{"connectors": true}
+	assert.NotPanics(t, func() { experimentalFeatureWarning("connectors") }, "connectors needs a compiler_warning")
 	for _, check := range experimentalFeatureChecks {
 		assert.False(t, checked[check.id], "duplicate compiler check for %q", check.id)
 		checked[check.id] = true
@@ -51,6 +54,22 @@ func TestExperimentalFeatureChecksMatchList(t *testing.T) {
 			assert.True(t, checked[feature.ID], "feature %q has a compiler_warning but no compiler check", feature.ID)
 		}
 	}
+}
+
+func TestQMDExperimentalDocsFrontmatter(t *testing.T) {
+	t.Parallel()
+	content, err := os.ReadFile(filepath.Join(experimentalDocsRoot, "experimental", "qmd.md"))
+	if os.IsNotExist(err) {
+		t.Skip("docs not available")
+	}
+	require.NoError(t, err)
+	parts := strings.SplitN(string(content), "---\n", 3)
+	require.Len(t, parts, 3, "QMD page must have opening and closing frontmatter delimiters")
+	assert.Empty(t, parts[0])
+	var frontmatter map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(parts[1]), &frontmatter))
+	assert.Equal(t, "QMD Documentation Search", frontmatter["title"])
+	assert.Contains(t, parts[2], ":::caution[Experimental]")
 }
 
 func TestExperimentalEnginesMatchList(t *testing.T) {
@@ -116,7 +135,7 @@ func TestExperimentalDocsSidebarGroupMatchesList(t *testing.T) {
 	var listed []string
 	for _, feature := range ExperimentalFeatures() {
 		if feature.DocsGroup {
-			listed = append(listed, feature.Docs[0])
+			listed = append(listed, feature.Docs...)
 		}
 	}
 	assert.ElementsMatch(t, listed, sidebar, "docs sidebar Experimental group must match docs_group entries in data/experimental_features.json")
