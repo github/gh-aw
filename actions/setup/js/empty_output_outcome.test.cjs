@@ -320,6 +320,47 @@ describe("empty output outcome", () => {
     expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
   });
 
+  it("tolerates a workflow.info event without data", () => {
+    const session = {
+      events: [
+        { type: "workflow.info", provenance: { component: "workflow", phase: "activation" } },
+        { type: "agent.execution", provenance: { component: "execution", phase: "agent" }, data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 80 } },
+      ],
+      maskedValues: [],
+    };
+    expect(buildEmptyOutputOutcome([], rootDir, session).details).toContain("Driver exit meaning: Unknown (engine-specific exit code)");
+  });
+
+  it.each([
+    ["copilot", 80, "Session failed after a workflow tool permission denial (use only"],
+    ["copilot", 79, "Copilot main-session model verification failed"],
+    ["claude", 80, "Unknown (engine-specific exit code)"],
+  ])("explains %s driver exit %s using gh-aw reserved exit codes only for that engine", (engine, exitCode, meaning) => {
+    vi.stubEnv("GH_AW_ENGINE_ID", engine);
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
+  });
+
+  it.each([undefined, ""])("falls back to workflow.info engineId for copilot exit 80 when GH_AW_ENGINE_ID is %j", envValue => {
+    vi.stubEnv("GH_AW_ENGINE_ID", envValue);
+    vi.stubEnv("GH_AW_PROTECTED_SESSION_CAPTURE", "1");
+    const session = {
+      events: [
+        { type: "workflow.info", provenance: { component: "workflow", phase: "activation" }, data: { engineId: "copilot" } },
+        { type: "agent.execution", provenance: { component: "execution", phase: "agent" }, data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 80 } },
+      ],
+      maskedValues: [],
+    };
+    expect(buildEmptyOutputOutcome([], rootDir, session).details).toContain("Driver exit meaning: Session failed after a workflow tool permission denial (use only");
+  });
+
+  it("reports the max-tool-denials limit for copilot exit 80 only with guard evidence", () => {
+    vi.stubEnv("GH_AW_ENGINE_ID", "copilot");
+    writeEvents([{ type: "guard.tool_denials_exceeded", data: { denialCount: 5, threshold: 5 } }]);
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "80");
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain("Driver exit meaning: Session failed after a workflow tool permission denial; max-tool-denials limit reached");
+  });
+
   it.each([
     ["copilot", "", "dependency_loading", "Driver dependency loading failed"],
     ["claude", "2026-10-25T12:00:00.000Z ", "runtime_exception", "Driver execution failed"],
