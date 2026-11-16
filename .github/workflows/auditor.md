@@ -59,7 +59,7 @@ jobs:
     name: Collect failure evidence
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch && inputs.acknowledge_gap == true)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
       actions: read
@@ -71,10 +71,22 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install gh-aw CLI
-        uses: ./actions/setup-cli
+      - name: Setup Go for the gh-aw CLI build
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
+          cache: true
+      # Build from the checked-out source so collection fixes apply without
+      # waiting for a CLI release.
+      - name: Build and install gh-aw CLI from source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          go build -ldflags "-s -w -X main.version=source-$(git rev-parse --short=12 HEAD)" -o gh-aw ./cmd/gh-aw
+          gh extension remove gh-aw || true
+          gh extension install .
+          gh aw version
       - name: Restore collection checkpoint and query cache
         id: restore_checkpoint
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -629,7 +641,8 @@ facts from inference. Never publish when a required check is incomplete.
 
 ## Evidence and selection
 
-The trusted `collect` job uses `gh aw health` and `gh aw logs`, caches
+The trusted `collect` job builds `gh aw` from the checked-out source, then uses
+`gh aw health` and `gh aw logs`, caches
 attempt-specific evidence, and locally generates up to three audits. Read its
 compact reports and audit JSON before source inspection. Only the manifest's
 relative files were transferred; report audit paths refer to the collection
@@ -733,7 +746,8 @@ collection removes retry state and restores the normal 300-second budget.
 Other partial reasons, malformed reports and evidence errors still fail closed.
 Logs and audits use `--count 1` and stop starting queries when they cannot fit
 (with subprocess slack) before an 18-minute script deadline, reserving time for
-artifact upload and cache saving. A per-run logs or audit query that times out
+artifact upload and cache saving within the 25-minute job (which also covers the
+source build). A per-run logs or audit query that times out
 (`ETIMEDOUT` or a CLI `Timeout reached` continuation) leaves that run pending for
 the next hour instead of crashing collection; other incomplete reports fail closed.
 If audits must defer, new failures remain unseen/pending and cached reports are
