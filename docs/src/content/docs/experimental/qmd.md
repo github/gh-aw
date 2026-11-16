@@ -5,6 +5,10 @@ sidebar:
   order: 820
 ---
 
+:::caution[Experimental]
+QMD documentation search is experimental and may change.
+:::
+
 [QMD](https://github.com/tobi/qmd) (Query Markup Documents) combines BM25 keyword search, vector similarity search, and local LLM reranking. In gh-aw, the integration is a shared agentic workflow file that supplies an indexing job, cache-memory, and an MCP search server. Agents can search indexed documentation and retrieve its contents without checking out the source repository.
 
 This page describes [QMD v2.8.3](https://github.com/tobi/qmd/releases/tag/v2.8.3), the latest upstream release at the time of writing. It requires Node.js 22 or newer and is published as `@tobilu/qmd`.

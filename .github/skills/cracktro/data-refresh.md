@@ -38,4 +38,5 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | 30 Docs that heal | `refresh/docs-that-heal.md` |
 | 32 Multi-device tester | `refresh/multi-device-tester.md` |
 | 34 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+| 55 Skills in review | `refresh/skills-in-review.md` |
 

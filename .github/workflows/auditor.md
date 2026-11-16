@@ -59,7 +59,7 @@ jobs:
     name: Collect failure evidence
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch && inputs.acknowledge_gap == true)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
       actions: read
@@ -71,10 +71,22 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install gh-aw CLI
-        uses: ./actions/setup-cli
+      - name: Setup Go for the gh-aw CLI build
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
+          cache: true
+      # Build from the checked-out source so collection fixes apply without
+      # waiting for a CLI release.
+      - name: Build and install gh-aw CLI from source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          go build -ldflags "-s -w -X main.version=source-$(git rev-parse --short=12 HEAD)" -o gh-aw ./cmd/gh-aw
+          gh extension remove gh-aw || true
+          gh extension install .
+          gh aw version
       - name: Restore collection checkpoint and query cache
         id: restore_checkpoint
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -234,12 +246,19 @@ jobs:
               });
             }
             const healthTimeoutSeconds = retry?.timeout_seconds || 300;
-            const health = JSON.parse(execFileSync('gh', ['aw', 'health',
-              '--repo', repository, '--start-date', retentionStart, '--end-date', end,
-              '--logs-dir', path.join(cache, 'health'), '--timeout', `${healthTimeoutSeconds}s`, '--json'], {
-              encoding: 'utf8', timeout: (healthTimeoutSeconds + 30) * 1000, // 30s slack beyond the CLI deadline
-              maxBuffer: 16 * 1024 * 1024
-            }));
+            let health;
+            try {
+              health = JSON.parse(execFileSync('gh', ['aw', 'health',
+                '--repo', repository, '--start-date', retentionStart, '--end-date', end,
+                '--logs-dir', path.join(cache, 'health'), '--timeout', `${healthTimeoutSeconds}s`, '--json'], {
+                encoding: 'utf8', timeout: (healthTimeoutSeconds + 30) * 1000, // 30s slack beyond the CLI deadline
+                maxBuffer: 16 * 1024 * 1024
+              }));
+            } catch (error) {
+              if (error.code !== 'ETIMEDOUT') throw error;
+              // The subprocess was killed before reporting; retry like a CLI time budget.
+              health = {collection: {partial: true, reason: 'time_budget', subprocess_timeout: true}, workflows: []};
+            }
             const discovery = health.collection;
             if (discovery?.partial === true && discovery.reason === 'time_budget' &&
                 Array.isArray(health.workflows) &&
@@ -353,20 +372,34 @@ jobs:
             // gh-aw's positive budget is absolute requests USED in this rate window,
             // not a per-query allowance. All queries share the same ceiling.
             const ceiling = rate.used + 150;
+            // 30s slack beyond the CLI's own `--timeout 2` (minutes) lets it report first.
+            const cliTimeoutMs = 150000;
+            // Timeouts defer the run (left pending, never seen) instead of failing
+            // collection; other incomplete evidence still fails closed.
             const cli = args => {
-              const stdout = execFileSync('gh', args, {
-                encoding: 'utf8', timeout: 120000, maxBuffer: 16 * 1024 * 1024
-              });
+              let stdout;
+              try {
+                stdout = execFileSync('gh', args, {
+                  encoding: 'utf8', timeout: cliTimeoutMs, maxBuffer: 16 * 1024 * 1024
+                });
+              } catch (error) {
+                if (error.code === 'ETIMEDOUT') return {deferred: 'gh-aw subprocess timed out'};
+                throw error;
+              }
               const report = JSON.parse(stdout);
-              if (report.partial === true || report.complete === false ||
-                  (report.coverage_status && report.coverage_status !== 'complete') ||
-                  report.continuation || (report.continuations || []).length) {
+              const incomplete = report.partial === true || report.complete === false ||
+                (report.coverage_status && report.coverage_status !== 'complete') ||
+                (report.continuations || []).length;
+              if (!incomplete && /^Timeout reached\b/.test(report.continuation?.message || '')) {
+                return {deferred: 'gh-aw logs timed out'};
+              }
+              if (incomplete || report.continuation) {
                 throw new Error('Incomplete gh-aw evidence; checkpoint unchanged');
               }
-              return report;
+              return {report};
             };
             for (const run of batch) {
-              if (Date.now() + 120000 > evidenceDeadline) break;
+              if (Date.now() + cliTimeoutMs > evidenceDeadline) break;
               const currentRate = (await github.rest.rateLimit.get()).data.resources.core;
               if (currentRate.used >= ceiling - 25 || currentRate.reset !== rate.reset) {
                 if (currentRate.reset !== rate.reset) throw new Error('API rate window reset');
@@ -381,13 +414,18 @@ jobs:
               if (fs.existsSync(reportFile) && read(reportFile).cli_version === cliVersion) {
                 report = read(reportFile).report;
               } else {
-                report = cli(['aw', 'logs', (run.path || '').split('@')[0],
+                const result = cli(['aw', 'logs', (run.path || '').split('@')[0],
                   '--repo', repository, '--after-run-id', String(run.id - 1),
-                  '--before-run-id', String(run.id + 1), '--count', '2',
+                  '--before-run-id', String(run.id + 1), '--count', '1',
                   '--artifacts', 'info,usage', '--json', '--verbose',
                   '--cached-jsonl', path.join(dir, `logs-${versionKey}.jsonl`),
                   '--output', path.join(dir, 'artifacts'), '--timeout', '2',
                   '--max-storage', '256', '--max-github-api-rate-limit', String(ceiling)]);
+                if (result.deferred) {
+                  core.warning(`Deferred run ${run.id} to the next collection: ${result.deferred}`);
+                  continue;
+                }
+                report = result.report;
                 write(reportFile, {cli_version: cliVersion, report});
               }
               if (!Array.isArray(report.runs) || report.runs.length !== 1 ||
@@ -436,13 +474,16 @@ jobs:
             let auditCount = 0;
             for (const cluster of ranked) {
               if (newFailures === 0 || deferred > 0 || auditCount >= 3) break;
-              if (Date.now() + 120000 > evidenceDeadline) {
+              const deferAudits = () => {
                 // Cached reports survive, but these failures must remain new until audits can finish.
                 for (const run of fresh) {
                   seen.delete(identity(run));
                   if (!pending.includes(run.id)) pending.push(run.id);
                 }
                 deferred = fresh.length;
+              };
+              if (Date.now() + cliTimeoutMs > evidenceDeadline) {
+                deferAudits();
                 break;
               }
               const member = cluster.members[0];
@@ -454,13 +495,19 @@ jobs:
               // Native --audit generates audit.json LOCALLY from these downloaded
               // runs, without automatic baseline or extra remote audit downloads.
               // Discovery/cache validation still shares the logs API ceiling.
-              const audited = cli(['aw', 'logs', (member.run.path || '').split('@')[0],
+              const auditResult = cli(['aw', 'logs', (member.run.path || '').split('@')[0],
                 '--repo', repository, '--after-run-id', String(member.run.id - 1),
-                '--before-run-id', String(member.run.id + 1), '--count', '2',
+                '--before-run-id', String(member.run.id + 1), '--count', '1',
                 '--artifacts', 'info,usage', '--audit', '--json', '--verbose',
                 '--cached-jsonl', path.join(dir, `logs-${versionKey}.jsonl`),
                 '--output', path.join(dir, 'artifacts'), '--timeout', '2',
                 '--max-storage', '256', '--max-github-api-rate-limit', String(ceiling)]);
+              if (auditResult.deferred) {
+                core.warning(`Deferred audit of run ${member.run.id}: ${auditResult.deferred}`);
+                deferAudits();
+                break;
+              }
+              const audited = auditResult.report;
               const selected = audited.runs?.[0];
               if (audited.runs?.length !== 1 || selected.run_id !== member.run.id ||
                   selected.run_attempt !== String(member.run.run_attempt) ||
@@ -594,7 +641,8 @@ facts from inference. Never publish when a required check is incomplete.
 
 ## Evidence and selection
 
-The trusted `collect` job uses `gh aw health` and `gh aw logs`, caches
+The trusted `collect` job builds `gh aw` from the checked-out source, then uses
+`gh aw health` and `gh aw logs`, caches
 attempt-specific evidence, and locally generates up to three audits. Read its
 compact reports and audit JSON before source inspection. Only the manifest's
 relative files were transferred; report audit paths refer to the collection
@@ -685,7 +733,8 @@ The `failure_listing_limit` may leave rankings partial. A `time_budget` result i
 usable only if both failure inventory and representative verification completed;
 unfinished success sampling is not required for failure collection.
 
-When either failure pass times out, collection defers without activating the agent
+When either failure pass times out, including a killed `gh aw health` subprocess,
+collection defers without activating the agent
 or advancing the last-successful-sample checkpoint. It uploads `health.json` and an
 explicitly incomplete manifest, preserves seen/backlog/pending state, and caches
 `health-retry.json`. The next hourly attempt increases the health budget from 300
@@ -695,8 +744,12 @@ warning, not a healthy verdict. A deferred first-ever sample retains its validat
 initial state separately so it can retry without resetting history. A successful
 collection removes retry state and restores the normal 300-second budget.
 Other partial reasons, malformed reports and evidence errors still fail closed.
-Logs and audits stop starting two-minute queries when they cannot fit before an
-18-minute script deadline, reserving time for artifact upload and cache saving.
+Logs and audits use `--count 1` and stop starting queries when they cannot fit
+(with subprocess slack) before an 18-minute script deadline, reserving time for
+artifact upload and cache saving within the 25-minute job (which also covers the
+source build). A per-run logs or audit query that times out
+(`ETIMEDOUT` or a CLI `Timeout reached` continuation) leaves that run pending for
+the next hour instead of crashing collection; other incomplete reports fail closed.
 If audits must defer, new failures remain unseen/pending and cached reports are
 reused next hour without duplicating backlog entries or activating the agent early.
 

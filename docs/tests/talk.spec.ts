@@ -464,27 +464,33 @@ test("places the enterprise tracing, access and event slides beside their neighb
 });
 
 test("labels exactly the slides that show experimental features", async ({ page }) => {
+  // pkg/workflow/data/experimental_features.json is the single source of truth for experimental features.
+  const { features } = JSON.parse(readFileSync(new URL("../../pkg/workflow/data/experimental_features.json", import.meta.url), "utf8")) as {
+    features: { id: string; cracktro?: { slide: string; badge: string }[] }[];
+  };
+  const badges = new Map<string, string>();
+  for (const feature of features) {
+    for (const { slide, badge } of feature.cracktro ?? []) {
+      const existing = badges.get(slide);
+      expect(existing ?? badge, `${feature.id}: slide "${slide}" has conflicting badges`).toBe(badge);
+      badges.set(slide, badge);
+    }
+  }
+  const expected = [...badges.keys()].sort((a, b) => slideNo(a) - slideNo(b));
   await page.goto("/gh-aw/cracktro/");
   const labelled = await page.evaluate(() =>
     [...document.querySelectorAll("section.slide")]
       .filter(s => s.querySelector(":scope > .xbadge"))
-      .map(s => (s.querySelector("h2")?.textContent || "").replace(/\s+/g, " ").trim())
+      .map(s => ({
+        heading: (s.querySelector("h2")?.textContent || "").replace(/\s+/g, " ").trim(),
+        badge: (s.querySelector(":scope > .xbadge > span")?.textContent || "").trim(),
+      }))
   );
-  expect(labelled).toEqual([
-    "Zero-secret agents",
-    "Need-to-know enclaves",
-    "Cost management",
-    "Cost guardrails",
-    "Model routing",
-    "Don’t Run the Agent",
-    "Durable execution",
-    "Index & search",
-    "Experiments, graders & evals",
-    "OIDC token broker",
-    "Connectors",
-    "Webhook gateway",
-  ]);
-  for (const heading of labelled) expect(SLIDES[slideNo(heading) - 1].summary, heading).toMatch(/experimental/i);
+  expect(labelled.map(l => l.heading)).toEqual(expected);
+  for (const { heading, badge } of labelled) {
+    expect(badge, heading).toBe(badges.get(heading));
+    expect(SLIDES[slideNo(heading) - 1].summary, heading).toMatch(/experimental/i);
+  }
 });
 
 test("keeps the frame loop running through the routed steps of the enterprise diagrams", async ({ page }) => {

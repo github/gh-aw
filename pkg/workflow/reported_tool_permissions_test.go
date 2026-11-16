@@ -16,7 +16,7 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 		workflow string
 		grants   []string
 	}{
-		{"daily-graft-intelligence", []string{"shell(graft:*)", "shell(cat /tmp/gh-aw/agent/graft-changed-files.txt)", "shell(cat /tmp/gh-aw/agent/graft-recent-activity.txt)"}},
+		{"daily-graft-intelligence", []string{"shell(graft --help)", "shell(graft --dir=/tmp/gh-aw/graft map:*)", "shell(graft --dir=/tmp/gh-aw/graft ask:*)", "shell(graft --dir=/tmp/gh-aw/graft callers:*)", "shell(graft --dir=/tmp/gh-aw/graft skeleton:*)", "shell(graft --dir=/tmp/gh-aw/graft grep:*)", "shell(cat /tmp/gh-aw/agent/graft-changed-files.txt)", "shell(cat /tmp/gh-aw/agent/graft-recent-activity.txt)"}},
 		{"daily-schema-audit-cursor", []string{"shell(find)", "shell(jq)", "shell(sort)", "shell(echo)"}},
 		{"daily-regression-audit-kiro", []string{"shell(cd)", "shell(cut)", "shell(jq)"}},
 		{"daily-compiler-quality", []string{"shell(cd)", "shell(test)", "shell([)", "shell(awk)"}},
@@ -48,11 +48,8 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 					assert.Contains(t, args, grant)
 				}
 				if tt.workflow == "daily-graft-intelligence" {
-					assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "graft")
-					graft, ok := data.Tools["graft"].(map[string]any)
-					require.True(t, ok)
-					assert.Contains(t, graft["allowed"], "graft_check")
-					assert.Contains(t, graft["allowed"], "graft_map")
+					assert.NotContains(t, args, "shell(graft:*)")
+					assert.NotContains(t, data.Tools, "graft")
 				}
 				if tt.workflow == "code-scanning-fixer" {
 					assert.NotContains(t, args, "shell")

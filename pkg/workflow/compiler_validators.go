@@ -583,37 +583,55 @@ func (c *Compiler) emitExperimentalFeatureWarnings(workflowData *WorkflowData) {
 	c.emitExperimentalFeatureWarningsTo(workflowData, os.Stderr)
 }
 
+// experimentalFeatureChecks maps experimental feature IDs from data/experimental_features.json
+// to the condition that makes a workflow use them.
+var experimentalFeatureChecks = []struct {
+	id      string
+	enabled func(*WorkflowData) bool
+}{
+	{"copilot-dynamic-workflows", func(w *WorkflowData) bool {
+		return ResolveEngineID(w) == string(constants.CopilotEngine) && w.EngineConfig.DynamicWorkflowsEnabled()
+	}},
+	{"rate-limit", func(w *WorkflowData) bool { return w.RateLimit != nil }},
+	{"skip-if-decision", isSkipIfDecisionEnabled},
+	{"token-broker", func(w *WorkflowData) bool { return w.TokenBrokerEnabled }},
+	{"engine-durable", func(w *WorkflowData) bool { return w.EngineConfig != nil && w.EngineConfig.Durable != nil }},
+	{"gateway-dispatch", func(w *WorkflowData) bool { return len(w.WebhookSubscriptions) > 0 }},
+	{"gateway-dispatch-projects-items", func(w *WorkflowData) bool { return hasWebhookSubscriptionEvent(w, "projects_v2_item") }},
+	{"gateway-dispatch-code-scanning-alert", func(w *WorkflowData) bool { return hasWebhookSubscriptionEvent(w, "code_scanning_alert") }},
+	{"gateway-dispatch-dependabot-alerts", func(w *WorkflowData) bool { return hasWebhookSubscriptionEvent(w, "dependabot_alert") }},
+	{"graders", func(w *WorkflowData) bool {
+		return w.RawFrontmatter["graders"] != nil && w.Graders != nil && w.Graders.HasGraders()
+	}},
+	{"merge-pull-request", func(w *WorkflowData) bool { return w.SafeOutputs != nil && w.SafeOutputs.MergePullRequest != nil }},
+	{"security-advisory-safe-outputs", func(w *WorkflowData) bool {
+		return w.SafeOutputs != nil && (w.SafeOutputs.CreateSecurityAdvisory != nil || w.SafeOutputs.AddSecurityAdvisoryComment != nil)
+	}},
+	{"lsp", func(w *WorkflowData) bool { return len(w.LSP) > 0 }},
+	{"enclaves", hasCloudHypervisorEnclaves},
+	{"plugins", func(w *WorkflowData) bool { return len(w.Plugins) > 0 }},
+	{"drive-memory", func(w *WorkflowData) bool { return w.DriveMemoryConfig != nil && len(w.DriveMemoryConfig.Drives) > 0 }},
+	{"continual-experiments", func(w *WorkflowData) bool { return hasContinualExperiment(w.ExperimentConfigs) }},
+	{"safe-outputs-steer", func(w *WorkflowData) bool { return w.SafeOutputs != nil && w.SafeOutputs.Steer }},
+}
+
+func hasWebhookSubscriptionEvent(workflowData *WorkflowData, event string) bool {
+	return slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == event })
+}
+
 func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData, writer io.Writer) {
-	warnings := []struct {
+	type experimentalWarning struct {
 		enabled bool
 		message string
-	}{
-		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows"},
-		{enabled: workflowData.RateLimit != nil, message: "Using experimental feature: rate limiting"},
-		{enabled: isSkipIfDecisionEnabled(workflowData), message: "Using experimental feature: skip-if-decision"},
-		{enabled: workflowData.TokenBrokerEnabled, message: "Using experimental feature: token-broker"},
-		{enabled: workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil, message: "Using experimental feature: engine.durable"},
-		{enabled: len(workflowData.WebhookSubscriptions) > 0, message: "Using experimental feature: on.gateway-dispatch (approved webhook bridge required)"},
-		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "projects_v2_item" }), message: "Using experimental feature: on.gateway-dispatch.projects-items (hosted CAO triggers)"},
-		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "code_scanning_alert" }), message: "Using experimental feature: on.gateway-dispatch.code-scanning-alert (hosted CAO triggers)"},
-		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "dependabot_alert" }), message: "Using experimental feature: on.gateway-dispatch.dependabot-alerts (hosted CAO triggers)"},
-		{enabled: workflowData.RawFrontmatter["graders"] != nil && workflowData.Graders != nil && workflowData.Graders.HasGraders(), message: "Using experimental feature: graders"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.MergePullRequest != nil, message: "Using experimental feature: merge-pull-request"},
-		{enabled: workflowData.SafeOutputs != nil && (workflowData.SafeOutputs.CreateSecurityAdvisory != nil || workflowData.SafeOutputs.AddSecurityAdvisoryComment != nil), message: "Using experimental feature: security advisory safe outputs"},
-		{enabled: len(workflowData.LSP) > 0, message: "Using experimental feature: lsp"},
-		{enabled: hasCloudHypervisorEnclaves(workflowData), message: "Using experimental feature: enclaves cloud-hypervisor runtime"},
-		{enabled: len(workflowData.Plugins) > 0, message: "Using experimental feature: plugins"},
-		{enabled: workflowData.DriveMemoryConfig != nil && len(workflowData.DriveMemoryConfig.Drives) > 0, message: "Using experimental feature: drive-memory"},
-		{enabled: hasContinualExperiment(workflowData.ExperimentConfigs), message: "Using experimental feature: continual experiments"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.Steer, message: "Using experimental feature: safe-outputs steer"},
+	}
+	warnings := make([]experimentalWarning, 0, len(experimentalFeatureChecks))
+	for _, check := range experimentalFeatureChecks {
+		warnings = append(warnings, experimentalWarning{enabled: check.enabled(workflowData), message: experimentalFeatureWarning(check.id)})
 	}
 	for _, alias := range sliceutil.SortedKeys(workflowData.Connectors) {
-		warnings = append(warnings, struct {
-			enabled bool
-			message string
-		}{
+		warnings = append(warnings, experimentalWarning{
 			enabled: workflowData.Connectors[alias].Experimental,
-			message: "Using experimental feature: connectors." + alias,
+			message: experimentalFeatureWarning("connectors") + "." + alias,
 		})
 	}
 	for _, warning := range warnings {

@@ -2369,6 +2369,82 @@
   .active .imp-rules { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
   .imp-rules small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
   .imp-rules span { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #c9d1d9; white-space: nowrap; }
+  /* Skills: declare pinned skills, install them before the agent, apply the ones triage picks */
+  .skl .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ff7b72, #3fb950, #ab7df8, #e3b341, #79c0ff); }
+  .skl-col { position: absolute; top: 290px; opacity: 0; }
+  .active .skl-col { animation: rise .8s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .skl-col b { display: flex; align-items: center; gap: 14px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
+  .skl-col b i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 99px; background: #f0f6fc; color: #0d1117; font: normal 800 20px/1 "Mona Sans"; }
+  .skl-col span { display: block; margin: 10px 0 0 50px; font: 500 17px/1 var(--mono); color: #9198a1; letter-spacing: .04em; white-space: nowrap; }
+  .skl-pane { position: absolute; top: 380px; height: 530px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; transition: border-color .4s, box-shadow .4s; }
+  .skl-ed { left: 110px; width: 660px; }
+  .skl-ins { left: 800px; width: 440px; }
+  .skl-rev { left: 1270px; width: 540px; }
+  .active .skl-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
+  .active .skl-ins { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .active .skl-rev { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .8s; }
+  .skl-pane.hot { border-color: #f0f6fc; box-shadow: 0 0 40px -12px #f0f6fc; }
+  .skl-tab { display: flex; align-items: center; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; white-space: nowrap; }
+  .skl-tab > span { margin-left: auto; color: #656c76; font-size: 15px; letter-spacing: .1em; transition: color .3s; }
+  .skl-tab > span.ok { color: #3fb950; }
+  .skl-code { padding: 10px 0; font: 500 16px/26px var(--mono); }
+  .skl-row { display: flex; white-space: pre; transition: background .35s; }
+  .skl-row .no { width: 50px; padding-right: 16px; text-align: right; color: #656c76; flex: none; }
+  .skl-row.seen { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 10%, transparent), transparent 70%); }
+  .skl-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 26%, transparent), transparent 85%); }
+  .skl-fs { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .skl-f { padding: 11px 14px; border-radius: 12px; border: 1.5px solid #21262d; transition: all .35s; }
+  .skl-f > div { display: flex; align-items: baseline; gap: 10px; }
+  .skl-f b { font: 600 17px/1 var(--mono); color: #e6edf3; white-space: nowrap; transition: color .35s; }
+  .skl-f em { margin-left: auto; font: 600 12px/1 var(--mono); font-style: normal; letter-spacing: .1em; text-transform: uppercase; color: #656c76; white-space: nowrap; transition: color .35s; }
+  .skl-f p { margin: 8px 0 0; font: 500 14px/1.2 var(--mono); color: #9198a1; white-space: nowrap; }
+  .skl-f.seen { border-color: color-mix(in srgb, var(--k) 45%, transparent); }
+  .skl-f.seen b, .skl-f.on b, .skl-f.seen em { color: var(--k); }
+  .skl-f.on { border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); box-shadow: 0 0 24px -8px var(--k); }
+  .skl-f.dim { opacity: .35; }
+  .skl-ss { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+  .skl-s { opacity: .18; transform: translateY(6px); transition: opacity .4s, transform .4s; }
+  .skl-s.on { opacity: 1; transform: none; }
+  .skl-s > small { display: block; margin-bottom: 6px; font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #656c76; }
+  .skl-tri { font: 500 15px/1.5 var(--mono); color: #e6edf3; white-space: nowrap; }
+  .skl-tri i { font-style: normal; color: #a5d6ff; }
+  .skl-chips { display: flex; gap: 8px; }
+  .skl-chips span { padding: 5px 11px; border-radius: 99px; border: 1.5px solid var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); font: 600 15px/1 var(--mono); color: var(--k); white-space: nowrap; }
+  .skl-diff { border-radius: 8px; border: 1px solid #30363d; overflow: hidden; font: 500 14px/22px var(--mono); }
+  .skl-diff div { padding: 0 10px; white-space: pre; color: #9198a1; }
+  .skl-diff .del { background: #f8514926; color: #ffa198; }
+  .skl-diff .add { background: #2ea04333; color: #7ee787; }
+  .skl-cm { padding: 10px 12px; border-radius: 8px; border: 1px solid #30363d; border-left: 3px solid #3fb950; background: #161b22; font: 500 14px/1.4 "Mona Sans"; color: #e6edf3; }
+  .skl-cm b { font: 700 14px/1 var(--mono); color: #3fb950; }
+  .skl-cm u { text-decoration: none; color: #79c0ff; }
+  .skl-ok { display: flex; align-items: center; gap: 10px; font: 600 15px/1 var(--mono); color: #e6edf3; white-space: nowrap; }
+  .skl-ok i { font-style: normal; padding: 5px 10px; border-radius: 6px; background: #da363333; border: 1px solid #f85149; color: #ffa198; letter-spacing: .06em; }
+  .skl-rules { position: absolute; left: 110px; top: 950px; display: flex; align-items: center; gap: 10px; opacity: 0; }
+  .active .skl-rules { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .skl-rules small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
+  .skl-rules span { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #c9d1d9; white-space: nowrap; }
+  .sir .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ff7b72, #e3b341, #3fb950); }
+  .sir-svg { position: absolute; left: 110px; top: 258px; width: 1700px; height: 790px; overflow: visible; }
+  .sir-card { fill: #0d1117e0; stroke: #3d444d; stroke-width: 2; }
+  .sir-h { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .1em; }
+  .sir-ax { fill: #6e7681; font: 500 15px var(--mono); }
+  .sir-base { stroke: #3d444d; stroke-width: 2; }
+  .sir-ms line { stroke: #6e7681; stroke-width: 1.5; stroke-dasharray: 4 5; transition: stroke .4s; }
+  .sir-ms text { fill: #6e7681; font: 600 15px var(--mono); transition: fill .4s; }
+  .sir-ms circle { fill: #6e7681; transition: fill .4s; }
+  .sir-ms.on line { stroke: #f0f6fc; } .sir-ms.on text { fill: #f0f6fc; } .sir-ms.on circle { fill: #f0f6fc; }
+  .sir-cur { stroke: #f0f6fc; stroke-width: 2; opacity: .5; }
+  .sir-v { fill: #f0f6fc; font: 700 50px "Mona Sans"; }
+  .sir-l { fill: #9198a1; font: 500 17px var(--mono); }
+  .sir-k { fill: #c9d1d9; font: 500 16px var(--mono); }
+  .sir-k.dim { fill: #6e7681; }
+  .sir-n { fill: #f0f6fc; font: 600 16px var(--mono); }
+  .sir-n.dim { fill: #6e7681; }
+  .sir-bar { transform-box: fill-box; transform-origin: left center; transform: scaleX(0); transition: transform 1s cubic-bezier(.2,.9,.2,1); }
+  .sir-in .sir-bar { transform: scaleX(1); }
+  .sir-fade { opacity: 0; transition: opacity .6s; } .sir-in .sir-fade { opacity: 1; }
+  .sir-ev { fill: #a5d6ff; font: 600 17px var(--mono); }
+  .sir-cap { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .06em; }
 
   /* --- enterprise operations: OpenTelemetry, governance, infrastructure (shared static visuals from ops-visuals.js) --- */
   .ops .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--oc), #a5d6ff, var(--oc)); }
@@ -12384,6 +12460,429 @@
             status.classList.add("ok");
             sfx.notify(false);
           });
+      },
+      el,
+    });
+  }
+
+  // Skills: the Matt Pocock Skills Reviewer declares commit-pinned skills from the public mattpocock/skills repo; the activation job installs them before the agent starts; a triage sub-agent picks the skills that fit the pull request and every review comment cites the skill it applied
+  {
+    resetIndex();
+    // [colour, skill, what it brings, frontmatter line, when the prompt applies it]
+    const SK = [
+      ["#ff7b72", "diagnosing-bugs", "reproduce · minimise · fix · regression-test", 6, "for bug fixes and regressions"],
+      ["#3fb950", "tdd", "red · green · refactor", 7, "where test coverage is thin"],
+      ["#79c0ff", "codebase-design", "interface seams · navigability", 8, "for large refactors"],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff";
+    const LINES = [
+      [["---", D]],
+      [["on:", K]],
+      [["  pull_request:", K]],
+      [
+        ["    types: ", K],
+        ["[ready_for_review]", V],
+      ],
+      [["skills:", K]],
+      ...SK.map(([c, n]) => [
+        ["  - ", K],
+        ["mattpocock/skills/", V],
+        [n, c],
+        ["@4ae2317", D],
+      ]),
+      [["safe-outputs:", K]],
+      [["  create-pull-request-review-comment:", K]],
+      [["  submit-pull-request-review:", K]],
+      [["---", D]],
+      [["# Matt Pocock Skills Reviewer", T]],
+      [["Run pr-triage, then apply only the skills it picks:", T]],
+      ...SK.map(([c, n, , , w]) => [
+        ["- ", T],
+        ["`/" + n + "`", c],
+        [" " + w, T],
+      ]),
+    ];
+    const rows = LINES.map((parts, i) =>
+      h(
+        "div",
+        { class: "skl-row" },
+        h("span", { class: "no" }, String(i + 1)),
+        h(
+          "span",
+          {},
+          parts.map(([s, c]) => h("span", { style: { color: c } }, s))
+        )
+      )
+    );
+    const ed = h("div", { class: "skl-pane skl-ed" }, h("div", { class: "skl-tab" }, "mattpocock-skills-reviewer.md", h("span", {}, "FRONTMATTER")), h("div", { class: "skl-code" }, rows));
+
+    const cards = SK.map(([c, n, d]) => h("div", { class: "skl-f", "--k": c }, h("div", {}, h("b", {}, "/" + n), h("em", {}, "pinned")), h("p", {}, d)));
+    const insStatus = h("span", {}, "");
+    const ins = h("div", { class: "skl-pane skl-ins" }, h("div", { class: "skl-tab" }, ".github/skills/", insStatus), h("div", { class: "skl-fs" }, cards));
+
+    // the review pane: triage → picked skills → diff → inline comment → submitted review
+    const PICK = [0, 1];
+    const steps = [
+      h("div", { class: "skl-s" }, h("small", {}, "pr-triage sub-agent"), h("div", { class: "skl-tri" }, "change_type: ", h("i", {}, '"bug_fix"'))),
+      h(
+        "div",
+        { class: "skl-s" },
+        h("small", {}, "recommended_skills"),
+        h(
+          "div",
+          { class: "skl-chips" },
+          PICK.map(i => h("span", { "--k": SK[i][0] }, "/" + SK[i][1]))
+        )
+      ),
+      h(
+        "div",
+        { class: "skl-s" },
+        h("small", {}, "pkg/timeutil/parse.go"),
+        h("div", { class: "skl-diff" }, h("div", {}, "  func ParseWindow(s string) (Window, error) {"), h("div", { class: "del" }, '-   if s == "" { return Window{}, nil }'), h("div", { class: "add" }, '+   if s == "" { return Window{}, ErrEmpty }'))
+      ),
+      h("div", { class: "skl-s" }, h("small", {}, "inline review comment · line 42"), h("div", { class: "skl-cm" }, h("b", {}, "[/tdd]"), " The empty-input fix has no regression test; add one that fails without it. ", h("u", {}, "@copilot please address this."))),
+      h("div", { class: "skl-s" }, h("small", {}, "safe output"), h("div", { class: "skl-ok" }, h("i", {}, "REQUEST_CHANGES"), "review submitted · cites 2 skills")),
+    ];
+    const revStatus = h("span", {}, "");
+    const rev = h("div", { class: "skl-pane skl-rev" }, h("div", { class: "skl-tab" }, "PR · ready for review", revStatus), h("div", { class: "skl-ss" }, steps));
+
+    const cols = [
+      [110, "1", "Declare", "skills: · owner/repo/skill@ref", ".2s"],
+      [800, "2", "Install", "activation job · before the agent", ".3s"],
+      [1270, "3", "Apply", "triage picks · comments cite skills", ".4s"],
+    ].map(([x, n, t, s, d]) => h("div", { class: "skl-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
+    const RULES = ["refs pinned to a commit SHA at compile time", "never installed by the agent at run time", "private skills: per-skill token or GitHub App"];
+    const el = h(
+      "section",
+      { class: "slide skl" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Expertise as a dependency · mattpocock/skills reviews gh-aw pull requests"), h("h2", {}, letters("Skills", "l-grad"))),
+      cols,
+      ed,
+      ins,
+      rev,
+      h(
+        "div",
+        { class: "skl-rules" },
+        h("small", {}, "Guardrails"),
+        RULES.map(r => h("span", {}, r))
+      )
+    );
+
+    // ms into the cycle when each skill installs, triage runs, skills are picked, each review step lands and the loop restarts
+    const INS_AT = SK.map((_, i) => 700 + i * 800),
+      INS_DONE = 3200,
+      STEP_AT = [4500, 5600, 6700, 7900, 9300],
+      CYC = 13500;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      cards.forEach(c => (c.classList.remove("on", "seen", "dim"), (c.querySelector("em").textContent = "pinned")));
+      rows.forEach(r => r.classList.remove("hot", "seen"));
+      steps.forEach(s => s.classList.remove("on"));
+      [ins, rev].forEach(p => p.classList.remove("hot"));
+      [insStatus, revStatus].forEach(s => ((s.textContent = ""), s.classList.remove("ok")));
+    };
+    const hotRow = i => {
+      rows.forEach(r => r.classList.remove("hot"));
+      if (i < 0) return;
+      const r = rows[SK[i][3] - 1];
+      r.style.setProperty("--k", SK[i][0]);
+      r.classList.add("hot", "seen");
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        INS_AT.forEach(
+          (ms, i) =>
+            u >= ms &&
+            fire("i" + i, () => {
+              hotRow(i);
+              ins.classList.add("hot");
+              insStatus.textContent = "INSTALLING";
+              cards.forEach((c, j) => c.classList.toggle("on", j === i));
+              cards[i].classList.add("seen");
+              cards[i].querySelector("em").textContent = "installed";
+              sfx.key(0.7);
+              sfx.pop(i);
+            })
+        );
+        if (u >= INS_DONE)
+          fire("id", () => {
+            hotRow(-1);
+            cards.forEach(c => c.classList.remove("on"));
+            ins.classList.remove("hot");
+            insStatus.textContent = `✓ ${SK.length} INSTALLED`;
+            insStatus.classList.add("ok");
+            sfx.compile();
+          });
+        STEP_AT.forEach(
+          (ms, i) =>
+            u >= ms &&
+            fire("s" + i, () => {
+              steps[i].classList.add("on");
+              if (i === 0) {
+                rev.classList.add("hot");
+                revStatus.textContent = "REVIEWING";
+                sfx.route(1);
+              } else if (i === 1) {
+                cards.forEach((c, j) => (c.classList.toggle("on", PICK.includes(j)), c.classList.toggle("dim", !PICK.includes(j))));
+                PICK.forEach(j => {
+                  const r = rows[LINES.length - SK.length + j];
+                  r.style.setProperty("--k", SK[j][0]);
+                  r.classList.add("hot");
+                });
+                sfx.pop(5);
+              } else if (i === 2) sfx.key(0.5);
+              else if (i === 3) sfx.review();
+              else {
+                rev.classList.remove("hot");
+                revStatus.textContent = "✓ SUBMITTED";
+                revStatus.classList.add("ok");
+                sfx.notify(false);
+              }
+            })
+        );
+      },
+      el,
+    });
+  }
+
+  // Skills in review: measured history of the Matt Pocock Skills Reviewer on gh-aw's own pull requests: weekly inline comments by skill tag, what happened to them, and the skill events each run exports to OpenTelemetry
+  {
+    resetIndex();
+    // [tag, colour, comments, retired after the 29–30 Jun switch to pinned skills: front matter]
+    const TAGS = [
+      ["tdd", "#3fb950", 3220],
+      ["codebase-design", "#79c0ff", 1370],
+      ["diagnosing-bugs", "#ff7b72", 1168],
+      ["grill-with-docs", "#e3b341", 694],
+      ["zoom-out", "#d2a8ff", 475, 1],
+      ["diagnose", "#ffa198", 458, 1],
+      ["improve-codebase-architecture", "#39c5cf", 262],
+      ["other", "#656c76", 49],
+    ];
+    // comments per week (Monday start, from 4 May) in TAGS order
+    const WEEKS = [
+      [16, 0, 0, 1, 7, 4, 2, 0],
+      [111, 0, 0, 14, 30, 25, 11, 0],
+      [159, 0, 0, 25, 82, 61, 21, 0],
+      [125, 0, 0, 35, 44, 40, 25, 0],
+      [158, 0, 0, 47, 61, 70, 35, 1],
+      [176, 0, 0, 65, 62, 59, 31, 0],
+      [191, 0, 0, 53, 65, 85, 31, 0],
+      [259, 0, 0, 69, 93, 103, 57, 2],
+      [310, 161, 78, 86, 31, 11, 30, 3],
+      [147, 74, 75, 29, 0, 0, 1, 1],
+      [126, 88, 42, 9, 0, 0, 0, 4],
+      [127, 81, 77, 9, 0, 0, 0, 0],
+      [126, 77, 74, 11, 0, 0, 0, 1],
+      [168, 76, 74, 11, 0, 0, 0, 2],
+      [116, 70, 48, 7, 0, 0, 1, 0],
+      [154, 101, 94, 10, 0, 0, 1, 4],
+      [108, 73, 55, 9, 0, 0, 2, 0],
+      [18, 11, 16, 4, 0, 0, 0, 0],
+      [32, 25, 28, 6, 0, 0, 0, 0],
+      [16, 18, 17, 2, 0, 0, 0, 0],
+      [27, 19, 32, 5, 0, 0, 0, 1],
+      [59, 62, 39, 16, 0, 0, 0, 0],
+      [42, 87, 52, 14, 0, 0, 1, 0],
+      [71, 85, 82, 22, 0, 0, 5, 2],
+      [50, 66, 39, 16, 0, 0, 4, 1],
+      [44, 38, 31, 10, 0, 0, 2, 2],
+      [157, 73, 106, 54, 0, 0, 1, 19],
+      [122, 84, 109, 55, 0, 0, 1, 6],
+      [5, 1, 0, 0, 0, 0, 0, 0],
+    ];
+    // [days after 4 May, label, label row, text-anchor]
+    const MS = [
+      [0, "workflow added", 0, "start"],
+      [19, "triage sub-agent", 1, "start"],
+      [53, "asks @copilot", 0, "end"],
+      [57, "front matter skills", 1, "start"],
+      [102, "triage fallback", 0, "start"],
+      [161, "skill events", 1, "start"],
+      [183, "OTLP session logs", 0, "end"],
+    ];
+    const MONTHS = [
+      [0, "May"],
+      [28, "Jun"],
+      [58, "Jul"],
+      [89, "Aug"],
+      [120, "Sep"],
+      [150, "Oct"],
+      [181, "Nov"],
+    ];
+    const TOT = [
+      [3954, "", "reviews on 3,877 PRs"],
+      [7696, "", "inline comments · median 2/PR"],
+      [32, "%", "of 11,961 new PRs reviewed"],
+    ];
+    // [label, comments, colour]; share of all 7,696 comments
+    const NEXT = [
+      ["author replied", 2423, "#f0f6fc"],
+      ["  by Copilot", 1956, "#ab7df8"],
+      ["code changed after", 2071, "#79c0ff"],
+      ["thread resolved", 1081, "#3fb950"],
+      ["any of these", 3540, "#e3b341"],
+    ];
+    const VERD = [
+      ["approve", 847, "#3fb950"],
+      ["request changes", 492, "#ff7b72"],
+      ["comment", 1969, "#9198a1"],
+      ["dismissed", 646, "#656c76"],
+    ];
+    // [event type, measured value, meaning]
+    const OTEL = [
+      ["skill.inventory", "418", "5 installed skills, sha256 each"],
+      ["skill.conflict", "2", "/reporting: same name, two scopes"],
+      ["skill.invoked", "1", "skill tool; other runs read via bash"],
+    ];
+    const N = 7696,
+      X0 = 40,
+      XW = 1180,
+      STEP = XW / WEEKS.length,
+      BASE = 318,
+      MAXW = Math.max(...WEEKS.map(w => w.reduce((a, b) => a + b, 0))),
+      SC = 214 / MAXW,
+      dx = d => X0 + (d / 7) * STEP,
+      fmt = n => n.toLocaleString("en-US");
+    let g = `<defs><clipPath id="sirClip"><rect id="sirClipR" x="0" y="0" width="0" height="360"/></clipPath></defs>`;
+    g += `<rect class="sir-card" x="0" y="0" width="1700" height="360" rx="16"/><text class="sir-h" x="24" y="34">HISTORY · INLINE REVIEW COMMENTS PER WEEK, BY SKILL TAG</text>`;
+    g += `<g clip-path="url(#sirClip)">`;
+    WEEKS.forEach((w, i) => {
+      let y = BASE;
+      w.forEach((n, k) => {
+        if (!n) return;
+        const hh = n * SC;
+        y -= hh;
+        g += `<rect x="${(X0 + i * STEP + 4).toFixed(1)}" y="${y.toFixed(1)}" width="${(STEP - 8).toFixed(1)}" height="${hh.toFixed(1)}" fill="${TAGS[k][1]}"/>`;
+      });
+    });
+    g += `</g><line class="sir-base" x1="${X0}" y1="${BASE}" x2="${X0 + XW}" y2="${BASE}"/>`;
+    MONTHS.forEach(([d, m]) => (g += `<text class="sir-ax" x="${dx(d) + 4}" y="${BASE + 26}">${m}</text>`));
+    MS.forEach(([d, lab, row, an], i) => {
+      const x = dx(d) + 2,
+        y = 62 + row * 24;
+      g += `<g class="sir-ms" id="sirM${i}"><line x1="${x}" y1="${y + 6}" x2="${x}" y2="${BASE}"/><circle cx="${x}" cy="${y + 6}" r="4"/><text x="${an === "end" ? x - 8 : x + 8}" y="${y}" text-anchor="${an}">${lab}</text></g>`;
+    });
+    g += `<line class="sir-cur" id="sirCur" x1="${X0}" y1="56" x2="${X0}" y2="${BASE}"/>`;
+    g += `<line class="sir-base" x1="1262" y1="28" x2="1262" y2="332"/>`;
+    TOT.forEach(([, , lab], i) => (g += `<text class="sir-v" id="sirT${i}" x="1296" y="${104 + i * 100}">0</text><text class="sir-l" x="1296" y="${132 + i * 100}">${lab}</text>`));
+
+    g += `<g class="sir-low"><rect class="sir-card" x="0" y="380" width="600" height="360" rx="16"/><text class="sir-h" x="24" y="414">WHICH SKILL · COMMENTS BY TAG</text>`;
+    TAGS.forEach(([t, c, n, old], i) => {
+      const y = 452 + i * 33;
+      g += `<text class="sir-k${old ? " dim" : ""}" x="24" y="${y}">/${t}</text><rect class="sir-bar" style="transition-delay:${i * 0.08}s" x="344" y="${y - 15}" width="${((n / TAGS[0][2]) * 170).toFixed(1)}" height="18" rx="3" fill="${c}"${old ? ' opacity=".5"' : ""}/><text class="sir-n sir-fade${old ? " dim" : ""}" x="${344 + (n / TAGS[0][2]) * 170 + 10}" y="${y}">${fmt(n)}</text>`;
+    });
+    g += `<text class="sir-ax sir-fade" x="24" y="${452 + TAGS.length * 33 + 6}">dimmed: retired at the 29–30 Jun switch</text>`;
+
+    g += `<rect class="sir-card" x="620" y="380" width="560" height="360" rx="16"/><text class="sir-h" x="644" y="414">WHAT HAPPENED NEXT · SHARE OF COMMENTS</text>`;
+    NEXT.forEach(([lab, n, c], i) => {
+      const y = 456 + i * 36,
+        p = n / N;
+      g += `<text class="sir-k" x="644" y="${y}" xml:space="preserve">${lab}</text><rect x="862" y="${y - 15}" width="160" height="18" rx="3" fill="#21262d"/><rect class="sir-bar" style="transition-delay:${0.2 + i * 0.1}s" x="862" y="${y - 15}" width="${(p * 160).toFixed(1)}" height="18" rx="3" fill="${c}"/><text class="sir-n sir-fade" x="1034" y="${y}">${Math.round(p * 100)}% · ${fmt(n)}</text>`;
+    });
+    g += `<text class="sir-h" x="644" y="648">VERDICTS · ${fmt(VERD.reduce((a, v) => a + v[1], 0))} REVIEWS</text>`;
+    let vx = 644;
+    VERD.forEach(([lab, n, c], i) => {
+      const w = (n / 3954) * 512;
+      g += `<rect class="sir-bar" style="transition-delay:${0.6 + i * 0.12}s" x="${vx.toFixed(1)}" y="660" width="${(w - 3).toFixed(1)}" height="16" rx="3" fill="${c}"/>`;
+      vx += w;
+    });
+    const vl = VERD.map(([l, n]) => `${fmt(n)} ${l}`);
+    g += `<text class="sir-ax sir-fade" x="644" y="702">${vl.slice(0, 2).join(" · ")}</text><text class="sir-ax sir-fade" x="644" y="724">${vl.slice(2).join(" · ")}</text>`;
+
+    g += `<rect class="sir-card" x="1200" y="380" width="500" height="360" rx="16"/><text class="sir-h" x="1224" y="414">OTEL · EVERY REVIEWER RUN</text><text class="sir-l" x="1224" y="444">session events → Sentry · Grafana</text>`;
+    OTEL.forEach(([ev, v, lab], i) => {
+      const y = 496 + i * 62;
+      g += `<g class="sir-fade" style="transition-delay:${0.3 + i * 0.2}s"><text class="sir-ev" x="1224" y="${y}">${ev}</text><text class="sir-n" x="1676" y="${y}" text-anchor="end">${v}</text><text class="sir-l" x="1224" y="${y + 26}">${lab}</text></g>`;
+    });
+    g += `<text class="sir-ax sir-fade" style="transition-delay:1s" x="1224" y="700">gh-aw.session.event_type</text><text class="sir-ax sir-fade" style="transition-delay:1s" x="1224" y="722">419 run sessions · 6–15 Nov 2026</text></g>`;
+    g += `<text class="sir-cap" x="0" y="776">MEASURED · gh-aw PRs created 4 May – 15 Nov 2026 (196 days) · snapshot 16 Nov 2026 · comments by review footer and skill tag</text>`;
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "sir-svg");
+    svg.setAttribute("viewBox", "0 0 1700 790");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      clip = $("sirClipR"),
+      cur = $("sirCur"),
+      ms = MS.map((_, i) => $("sirM" + i)),
+      tot = TOT.map((_, i) => $("sirT" + i));
+    const el = h(
+      "section",
+      { class: "slide sir" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Matt Pocock Skills Reviewer · six months on gh-aw's own pull requests"), h("h2", {}, letters("Skills in review", "l-grad"))),
+      svg
+    );
+    // ms: chart sweep starts, sweep length, lower cards appear
+    const SWEEP_AT = 500,
+      SWEEP = 3600,
+      LOW_AT = 1800;
+    let t0 = 0,
+      lit = -1,
+      low = false;
+    const set = p => {
+      const x = X0 + p * XW;
+      clip.setAttribute("width", x.toFixed(1));
+      cur.setAttribute("x1", x.toFixed(1));
+      cur.setAttribute("x2", x.toFixed(1));
+      cur.style.opacity = p > 0 && p < 1 ? "" : "0";
+      ms.forEach((m, i) => {
+        const on = dx(MS[i][0]) <= x;
+        if (on && i > lit) {
+          lit = i;
+          sfx.pop(i);
+        }
+        m.classList.toggle("on", on);
+      });
+      const e = 1 - (1 - p) ** 3;
+      TOT.forEach(([v, suf], i) => (tot[i].textContent = fmt(Math.round(v * e)) + suf));
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Skills in review, measured: gh-aw's Matt Pocock Skills Reviewer on gh-aw's own pull requests, from the day it was added, 4 May 2026, to 15 November 2026, snapshot 16 November. Of 11,961 pull requests created in that window, 3,877 got a review from it: 3,954 reviews and 7,696 inline comments, a median of two per commented pull request. Every comment starts with the skill it applied, so the chart can stack weekly comments by skill. Test-driven development leads with 3,220. The history is visible in the bars: a triage sub-agent in May, comments that ask Copilot to fix them from late June, then on 29 and 30 June the upstream skills were renamed and gh-aw shipped pinned skills front matter, so diagnose and zoom-out give way to diagnosing-bugs and codebase-design. Afterwards: authors replied to 31 percent of comments, Copilot to 25 percent, the code under 27 percent changed, 14 percent were resolved, and 46 percent saw at least one of these. Every run also records skill events in its unified session, exported to OpenTelemetry through Sentry and Grafana. Of 419 run sessions from 6 to 15 November, 418 carry a skill inventory listing the five installed skills, each with its sha256 digest; skill conflict twice flagged a reporting skill installed in two scopes; and skill invoked fired only once, because this agent mostly reads its skill files with bash, so the comment tag is the reliable usage signal.",
+      enter() {
+        t0 = 0;
+        lit = -1;
+        low = false;
+        svg.classList.remove("sir-in");
+        set(0);
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0;
+        set(Math.min(1, Math.max(0, (e - SWEEP_AT) / SWEEP)));
+        if (!low && e >= LOW_AT) {
+          low = true;
+          svg.classList.add("sir-in");
+          sfx.compile();
+        }
       },
       el,
     });

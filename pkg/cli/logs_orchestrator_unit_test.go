@@ -437,6 +437,64 @@ func TestCollectProcessedWorkflowRunsAccumulatesBatches(t *testing.T) {
 	assert.Equal(t, int64(3), runs[2].Run.DatabaseID)
 }
 
+// TestCollectProcessedWorkflowRunsStopsAtAfterRunIDBoundary is a regression test for
+// unbounded backward pagination when --count exceeds the runs inside a
+// --after-run-id/--before-run-id window, which made the Auditor's bounded
+// `gh aw logs` call exhaust its timeout paging through unrelated history.
+func TestCollectProcessedWorkflowRunsStopsAtAfterRunIDBoundary(t *testing.T) {
+	oldFetchRateLimitFunc := fetchRateLimitFunc
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		return rateLimitResource{Limit: 5000, Remaining: 5000, Reset: time.Now().Add(time.Hour).Unix()}, nil
+	}
+	t.Cleanup(func() { fetchRateLimitFunc = oldFetchRateLimitFunc })
+
+	originalFetch := logsFetchWorkflowRunBatch
+	originalProcess := logsProcessWorkflowRunBatch
+	t.Cleanup(func() {
+		logsFetchWorkflowRunBatch = originalFetch
+		logsProcessWorkflowRunBatch = originalProcess
+	})
+
+	for _, tt := range []struct {
+		name     string
+		runs     []WorkflowRun
+		wantRuns int
+	}{
+		{name: "matching run found", runs: []WorkflowRun{{DatabaseID: 100}}, wantRuns: 1},
+		{name: "batch filtered to zero runs", wantRuns: 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			fetchCalls := 0
+			logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+				fetchCalls++
+				// A full page whose oldest run is already older than --after-run-id.
+				return workflowRunBatch{
+					runs:                   tt.runs,
+					totalFetched:           6,
+					batchSize:              6,
+					oldestFetchedCreatedAt: time.Now().Add(-time.Hour),
+					oldestFetchedRunID:     42,
+				}, nil
+			}
+			logsProcessWorkflowRunBatch = func(_ context.Context, batch workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
+				for _, run := range batch.runs {
+					processedRuns = append(processedRuns, ProcessedRun{Run: run})
+				}
+				return processedRuns, len(batch.runs), true, false, false
+			}
+
+			runs, timeoutReached, _, _, _, err := collectProcessedWorkflowRuns(
+				logsDownloadRuntime{activeCtx: context.Background()},
+				LogsDownloadOptions{Count: 2, AfterRunID: 99, BeforeRunID: 101},
+			)
+			require.NoError(t, err)
+			assert.False(t, timeoutReached)
+			assert.Len(t, runs, tt.wantRuns)
+			assert.Equal(t, 1, fetchCalls, "pagination must stop once the after-run-id boundary is reached")
+		})
+	}
+}
+
 // TestFetchAndProcessLogsBatchKeepsCursorWhenStorageLimitReached verifies that
 // continuation does not skip unprocessed runs from the interrupted batch.
 func TestFetchAndProcessLogsBatchKeepsCursorWhenStorageLimitReached(t *testing.T) {

@@ -17,11 +17,11 @@ Most agentic workflow examples stop at one trigger and one comment. [svennijhuis
 
 **Review that never merges.** The reviewer allows only `COMMENT` reviews. The workflow explains why: without a separate builder identity, builder PRs and reviews share `github-actions[bot]`, and GitHub rejects `REQUEST_CHANGES` on your own PR. A maintainer stays the merge gate. The reviewer can add `ready-to-merge` or `needs-help` labels, but it never approves, merges or pushes.
 
-**Four axes plus a conditional security pass.** The reviewer starts `standards`, `spec`, `deslop` and `blast-radius` sub-agents, each in a fresh context and each asked for `path:line` evidence. A `security` sub-agent runs only when the diff touches a trust boundary, such as endpoints, auth, permissions, `.github/workflows/*`, dependency manifests, secrets, shell calls, outbound network or deserialisation. Each axis keeps its own heading and is not reranked, so a reader can see which axis raised a concern.
+**Four axes plus a conditional security pass.** The reviewer starts `standards`, `spec`, `deslop` and `blast-radius` sub-agents, each in a fresh context and each asked for `path:line` evidence. A `security` sub-agent runs only when the diff touches a trust boundary, such as endpoints, auth, permissions, `.github/workflows/*`, dependency manifests, secrets, shell calls, outbound network or deserialization. Each axis keeps its own heading and is not reranked, so a reader can see which axis raised a concern.
 
 **Fail-closed defaults in shared fragments.** [shared/security.md](https://github.com/svennijhuis/agentic-workflows/blob/main/workflows/shared/security.md) closes the network except for gh-aw defaults, requires importers to name any extra host, and keeps threat detection on. [shared/defaults.md](https://github.com/svennijhuis/agentic-workflows/blob/main/workflows/shared/defaults.md) pins the engine version. `max-ai-credits` and `max-daily-ai-credits` use the main workflow's values when set, then fall back to the first usable imported value. Other limits such as `max-turns` and `timeout-minutes` stay in each workflow's own frontmatter because the compiler ignores them in imports.
 
-**Vendored skills with provenance.** The `shared/skills/` folder holds local copies of eleven skills, mostly from [mattpocock/skills](https://github.com/mattpocock/skills). The [shared README](https://github.com/svennijhuis/agentic-workflows/blob/main/workflows/shared/README.md) records the source path, commit SHA and licence for each one, along with the update procedure.
+**Vendored skills with provenance.** The `shared/skills/` folder holds local copies of eleven skills, mostly from [mattpocock/skills](https://github.com/mattpocock/skills). The [shared README](https://github.com/svennijhuis/agentic-workflows/blob/main/workflows/shared/README.md) records the source path, commit SHA and license for each one, along with the update procedure.
 
 ## How it works
 
@@ -39,7 +39,7 @@ gh aw add svennijhuis/agentic-workflows/workflows/issue-builder.md@<tag>
 gh aw compile
 ```
 
-Pin `<tag>` to a released version rather than a branch. Each workflow names the other in `dispatch-workflow`, so installing either one brings the other along. The builder also references a `CI_TRIGGER_TOKEN` secret for an extra empty commit that starts CI. It is a placeholder name, so rename it to match your setup. The [install guide](https://github.com/svennijhuis/agentic-workflows/blob/main/docs/install.md) covers tokens, secrets and labels for an organisation.
+Pin `<tag>` to a released version rather than a branch. Each workflow names the other in `dispatch-workflow`, so installing either one brings the other along. The builder also references a `CI_TRIGGER_TOKEN` secret for an extra empty commit that starts CI. It is a placeholder name, so rename it to match your setup. The [install guide](https://github.com/svennijhuis/agentic-workflows/blob/main/docs/install.md) covers tokens, secrets and labels for an organization.
 
 Patterns worth borrowing even without the full loop:
 
