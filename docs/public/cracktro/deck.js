@@ -752,6 +752,22 @@
   .hff-svg .sdd-stamp.hff-noop { fill: #3fb950; text-anchor: middle; }
   .hff-m { width: 1420px; } .hff-m .dhm-k { gap: 34px; }
   .hff-tl tspan.u { font-weight: 700; }
+  .qga-src rect { fill: #151b23; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, filter .3s; }
+  .qga-src text { fill: #9198a1; font: 500 17px var(--mono); text-anchor: middle; transition: fill .3s; }
+  .qga-src.on rect { stroke: #ab7df8; filter: drop-shadow(0 0 8px #8957e566); } .qga-src.on text { fill: #e6edf3; }
+  .qga-fate { fill: #ff7b72; font: 600 15px var(--mono); text-anchor: end; opacity: 0; transition: opacity .3s; } .qga-fate.on { opacity: 1; } .qga-fate.g { fill: #3fb950; font-size: 18px; }
+  .qga-gate rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, filter .3s; }
+  .qga-gate text { fill: #6e7681; font: 500 19px var(--mono); transition: fill .3s; } .qga-gate .v { text-anchor: end; font-weight: 700; }
+  .qga-gate.ok rect { stroke: #3fb950; } .qga-gate.ok text { fill: #e6edf3; } .qga-gate.ok .v { fill: #3fb950; }
+  .qga-gate.no rect { stroke: #f85149; filter: drop-shadow(0 0 10px #da363399); } .qga-gate.no text { fill: #e6edf3; } .qga-gate.no .v { fill: #ff7b72; }
+  .qga-svg .sdd-stamp.qga-skip { fill: #ff7b72; text-anchor: middle; }
+  .qga-row { opacity: 0; transition: opacity .3s; } .qga-row.on { opacity: 1; }
+  .qga-row rect { fill: #ab7df8; opacity: .45; transition: opacity .3s, fill .3s; }
+  .qga-row text { fill: #c9d1d9; font: 500 18px var(--mono); } .qga-row .n { text-anchor: end; fill: #9198a1; }
+  .qga-row.hit rect { fill: #3fb950; opacity: .9; } .qga-row.hit text { fill: #f0f6fc; }
+  .qga-m { width: 1420px; } .qga-m .dhm-k { gap: 30px; }
+  .qga-tl .p { fill: #6e7681; }
+  .qga-tl .k { fill: none; stroke: #d29922; stroke-width: 2; } .qga-tl .kt { fill: #e3b341; font: 600 13px var(--mono); text-anchor: middle; }
   .mdt-frame { fill: #0d1117; stroke: #3d444d; stroke-width: 3; transition: stroke .4s, filter .4s; }
   .mdt-dev.on .mdt-frame { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
   .mdt-dev.ok .mdt-frame { stroke: #3fb950; filter: drop-shadow(0 0 14px #238636aa); }
@@ -5877,6 +5893,289 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))),
         panel,
         svg
+      ),
+    });
+  }
+
+  // Issue Monster: other agents file cookie issues, a 15-minute scheduler gates cheaply before any agent starts, filters and scores the queue, and Issue Monster assigns up to three to Copilot; the measured strip covers gh-aw's Issue Monster
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      QX = 270,
+      QW = 410,
+      QY = 90,
+      PX = 1470,
+      PW = 660,
+      PY = 190;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, icon, fill, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="${fill}"/>${ico(icon, x, y + 1, icon === "copilot" ? 38 : 30)}</g>`;
+    };
+    // measured: the five title prefixes that fed the most picks
+    const SRC = ["[deep-report]", "[aw-failures]", "[lint-monster]", "[refactor]", "[cli-consistency]"];
+    // illustrative queue; fate 0 = survives the filters
+    const Q = [
+      ["bug · cache key clash", 0],
+      ["refactor · split utils", "superseded"],
+      ["docs · --json help", 0],
+      ["bug · retry on 502", "has PR"],
+      ["quick-win · unused arg", 0],
+      ["lint · shadowed err", "assigned"],
+      ["perf · slow compile", 0],
+      ["bug · flaky retry", "retry 2/2"],
+    ];
+    const GATES = [
+      ["open Copilot PRs < 5", "3 open", "5 open"],
+      ["build · test · lint green", "green", "red"],
+      ["no 429 in the last hour", "clear", "429"],
+    ];
+    // gate that blocks each tick of a cycle; 3 = all pass
+    const BLOCK = [0, 0, 1, 3];
+    const RANK = [
+      ["cache key clash", 92],
+      ["docs · --json help", 75],
+      ["quick-win · unused arg", 70],
+      ["perf · slow compile", 48],
+    ];
+    const PR = [
+      ["fn", "cache key clash", "✓ merged", "g"],
+      ["fn", "docs · --json help", "✓ merged", "g"],
+      ["fn", "quick-win · unused arg", "✕ closed", ""],
+      ["q", "closed unmerged → retry 1/2", "", ""],
+      ["q", "2 closed → topic retry-blocked", "", ""],
+    ];
+    const RY = k => 384 + k * 44;
+    // [edge id, path, color, label, lx, ly]
+    const EDGES = [
+      ["qgaE0", `M${QX + QW + 8} 300 H724 V${RY(0) - 6} H748`, "p", "", 0, 0],
+      ["qgaE1", `M1392 ${RY(1) - 6} H1414 V106 H1478`, "p", "", 0, 0],
+      ["qgaE2", "M1782 106 H1863", "p", "assign ×3", 1822, 168],
+      ["qgaE3", `M1800 ${PY + 308} V612 H${QX + QW / 2} V${QY + 438}`, "g", "merged · next tick in 15 min", 1140, 600],
+    ];
+    let g = `<defs><marker id="qgaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="qgaG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 700, "QUEUE · COOKIE ISSUES"],
+      [700, 1440, "GATE · EVERY 15 MIN"],
+      [1440, VW, "ASSIGN · COPILOT"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="qgaLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    SRC.forEach((t, i) => {
+      const y = 126 + i * 84;
+      g += `<g class="qga-src" id="qgaS${i}"><rect x="20" y="${y - 22}" width="224" height="44" rx="22"/><text x="132" y="${y + 6}">${t}</text></g>
+        <path class="fm-wire p" d="M246 ${y} H${QX - 6}" marker-end="url(#qgaP)"/>`;
+    });
+    g += `<g class="sdd-panel" id="qgaQ"><rect class="sdd-card" x="${QX}" y="${QY}" width="${QW}" height="430" rx="16"/>
+      <line class="sdd-hd" x1="${QX}" y1="${QY + 50}" x2="${QX + QW}" y2="${QY + 50}"/>
+      <text class="sdd-file" x="${QX + 20}" y="${QY + 33}">label:cookie</text><text class="sdd-tag" x="${QX + QW - 20}" y="${QY + 32}">QUEUE</text>`;
+    const sp = s => s.replace(/ /g, "\u00a0");
+    Q.forEach(([t, f], j) => {
+      g += `<text class="sdd-ln" id="qgaQ${j}" x="${QX + 20}" y="${QY + 88 + j * 42}">${sp(t)}</text>`;
+      if (f) g += `<text class="qga-fate" id="qgaF${j}" x="${QX + QW - 16}" y="${QY + 87 + j * 42}">${f}</text>`;
+    });
+    g += `</g><g class="rpa-day">${ico("stopwatch", 740, 106, 26, "#ab7df8")}<text id="qgaTick" x="762" y="115">TICK 1</text></g>`;
+    GATES.forEach(([t], i) => {
+      const y = 140 + i * 68;
+      g += `<g class="qga-gate" id="qgaG${i}"><rect x="760" y="${y}" width="620" height="52" rx="10"/><text x="782" y="${y + 33}">${t}</text><text class="v" id="qgaV${i}" x="1360" y="${y + 33}"></text></g>`;
+    });
+    g += `<text class="sdd-stamp qga-skip" id="qgaSkip" x="1070" y="440">skip · the agent never starts</text>`;
+    g += `<text class="hff-sl qga-row" id="qgaRankT" x="760" y="${RY(0) - 32}">filter · score: bug +40 · docs +35 · age</text>`;
+    RANK.forEach(([t, s], k) => {
+      const y = RY(k);
+      g += `<g class="qga-row" id="qgaR${k}"><text x="760" y="${y}">${sp(t)}</text><rect x="1060" y="${y - 18}" width="${s * 2.6}" height="22" rx="4"/><text class="n" x="1380" y="${y}">${s}</text></g>`;
+    });
+    g += `<g class="sdd-panel" id="qgaP"><rect class="sdd-card" x="${PX}" y="${PY}" width="${PW}" height="308" rx="16"/>
+      <line class="sdd-hd" x1="${PX}" y1="${PY + 50}" x2="${PX + PW}" y2="${PY + 50}"/>
+      <text class="sdd-file" x="${PX + 20}" y="${PY + 33}">Copilot pull requests</text><text class="sdd-tag" x="${PX + PW - 20}" y="${PY + 32}">PR</text>`;
+    PR.forEach(([c, t, s, sc], j) => {
+      const y = PY + 88 + j * 44;
+      g += `<text class="sdd-ln ${c}" id="qgaL${j}" x="${PX + 20}" y="${y}">${sp(t)}</text>`;
+      if (s) g += `<text class="qga-fate ${sc}" id="qgaT${j}" x="${PX + PW - 20}" y="${y}">${s}</text>`;
+    });
+    g += `</g>`;
+    for (const [id, d, c, lab, lx, ly] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#qga${c.toUpperCase()})"/>`;
+      if (lab) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab}</text>`;
+    }
+    g += agent("qgaIM", 1630, 106, 250, "Issue Monster", "issue", "#8957e5") + agent("qgaCop", 1990, 106, 200, "Copilot", "copilot", "#238636", "g");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg qga-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const off = (id, cls = "on") => $(id).classList.remove(cls);
+    const SKIP = 1700;
+    let cs = 0,
+      cyc = -1,
+      len = 0,
+      ev = [],
+      evI = 0,
+      fly = null;
+    const clearGates = () =>
+      GATES.forEach((_, i) => {
+        off(`qgaG${i}`, "ok");
+        off(`qgaG${i}`, "no");
+        $(`qgaV${i}`).textContent = "";
+      });
+    const script = c => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(100, () => (on("qgaLane0"), on("qgaQ"), sfx.key(0.6)));
+      SRC.forEach((_, i) => at(200 + i * 160, () => (on(`qgaS${i}`), on(`qgaQ${i}`), sfx.key(0.5))));
+      Q.forEach((_, j) => j >= SRC.length && at(1000 + (j - SRC.length) * 160, () => on(`qgaQ${j}`)));
+      // the cheap ticks: one gate blocks and no agent runs
+      BLOCK.forEach((b, k) => {
+        const T = 1500 + k * SKIP;
+        at(T, () => {
+          clearGates();
+          off("qgaSkip");
+          on("qgaLane1");
+          $("qgaTick").textContent = `TICK ${c * BLOCK.length + k + 1}`;
+          sfx.key(0.7);
+        });
+        GATES.forEach(([, okV, noV], i) => {
+          if (i > b) return;
+          at(T + 200 + i * 220, () => {
+            const bad = i === b;
+            on(`qgaG${i}`, bad ? "no" : "ok");
+            $(`qgaV${i}`).textContent = bad ? `✕ ${noV}` : `✓ ${okV}`;
+            bad ? sfx.block(false) : sfx.key(0.5);
+          });
+        });
+        if (b < 3) at(T + 300 + b * 220, () => (on("qgaSkip"), sfx.pop(2)));
+      });
+      // the tick that passes: filter, score, assign
+      const T = 1500 + (BLOCK.length - 1) * SKIP + 1000;
+      at(T, () => (on("qgaQ", "ok"), sfx.notify()));
+      Q.forEach(([, f], j) => f && at(T + 200 + j * 120, () => (on(`qgaQ${j}`, "gone"), on(`qgaF${j}`), sfx.block(false))));
+      flight(T + 1300, "qgaE0", 600, "#ab7df8", 3);
+      at(T + 1900, () => on("qgaRankT"));
+      RANK.forEach((_, k) => at(T + 2000 + k * 220, () => (on(`qgaR${k}`), sfx.key(0.6))));
+      at(T + 3000, () => ([0, 1, 2].forEach(k => on(`qgaR${k}`, "hit")), sfx.pop(4)));
+      flight(T + 3300, "qgaE1", 800, "#ab7df8", 5);
+      at(T + 4100, () => (on("qgaLane2"), on("qgaIM"), sfx.key(0.8)));
+      flight(T + 4500, "qgaE2", 400, "#ab7df8", 6);
+      at(T + 4900, () => (on("qgaCop"), on("qgaP"), sfx.key(0.8)));
+      [0, 1, 2].forEach(j => at(T + 5100 + j * 260, () => (on(`qgaL${j}`), sfx.key(0.5))));
+      [0, 1, 2].forEach(j =>
+        at(T + 6100 + j * 450, () => {
+          on(`qgaT${j}`);
+          if (PR[j][3]) sfx.pop(6 + j);
+          else (on(`qgaL${j}`, "fail"), sfx.block(false));
+        })
+      );
+      at(T + 7600, () => (on("qgaL3"), sfx.key(0.5)));
+      at(T + 8200, () => (on("qgaL4"), on("qgaP", "ok"), sfx.review()));
+      flight(T + 8700, "qgaE3", 1700, "#3fb950", 7);
+      return T + 11000;
+    };
+    const reset = c => {
+      svg.querySelectorAll(".on, .hot, .ok, .no, .gone, .hit, .fail").forEach(x => x.classList.remove("on", "hot", "ok", "no", "gone", "hit", "fail"));
+      clearGates();
+      $("qgaTick").textContent = `TICK ${c * BLOCK.length + 1}`;
+      dot.style.opacity = 0;
+      fly = null;
+      len = script(c);
+    };
+    // measured: picks and picks closed by a merged Copilot PR, grouped by the issue's creation month (Apr–Nov 2026)
+    const MONTHS = [
+      ["Apr", 55, 39],
+      ["May", 378, 260],
+      ["Jun", 398, 58],
+      ["Jul", 584, 387],
+      ["Aug", 755, 534],
+      ["Sep", 132, 4],
+      ["Oct", 173, 27],
+      ["Nov", 155, 107],
+    ];
+    const TW = 460,
+      GW = TW / MONTHS.length,
+      BH = v => (v * 76) / 755;
+    let tl = `<text class="t" x="0" y="16">PICKED · <tspan class="u">MERGED BY COPILOT</tspan> · BY MONTH</text><line class="ax" x1="0" y1="102" x2="${TW}" y2="102"/>`;
+    MONTHS.forEach(([m, p, u], i) => {
+      const x = i * GW + GW / 2;
+      tl += `<rect class="p" style="--i:${2 * i}" x="${x - 19}" y="${102 - BH(p)}" width="18" height="${BH(p)}" rx="1"/><rect class="u" style="--i:${2 * i + 1}" x="${x + 1}" y="${102 - BH(u)}" width="18" height="${BH(u)}" rx="1"/>`;
+      tl += `<text class="m" x="${x}" y="122">${m}</text>`;
+    });
+    // Sep–Oct: the assign-to-agent token had expired, so picks got no Copilot PR
+    const k0 = 5 * GW + 4,
+      k1 = 7 * GW - 4;
+    tl += `<path class="k" d="M${k0} 80V72H${k1}V80"/><text class="kt" x="${(k0 + k1) / 2}" y="64">token expired</text>`;
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl hff-tl qga-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 126);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const strip = h(
+      "div",
+      { class: "dhm qga-m" },
+      h(
+        "div",
+        { class: "dhm-k" },
+        kpi("2,630", "picked", "issues assigned"),
+        kpi("1,416", "fixed by", ["merged PRs", h("br"), h("i", {}, "Copilot · 54%")], "g"),
+        kpi("8.1 h", "median", "issue → merge"),
+        kpi("1,126", "merged", "within a day"),
+        kpi("92%", "runs", ["skip the agent", h("br"), h("i", {}, "567 of 615 · 7 d")])
+      ),
+      tlSvg
+    );
+    slides.push({
+      group: "process",
+      notes:
+        "Issue Monster loves cookie issues. In gh-aw many agentic workflows, such as deep reports, failure investigators, linters and refactoring scans, file their follow-ups as issues labelled cookie. That label is a queue. Issue Monster drains it on a schedule every 15 minutes, and most of its work is deterministic. Before any agent starts, pre-activation gates check that fewer than five Copilot pull requests are open, that build, test and lint are green, and that no Copilot pull request hit a rate limit in the last hour. If a gate blocks, the run ends there and costs no tokens. Otherwise a script filters the queue: it drops issues that are already assigned, already have a pull request, are superseded by a newer issue on the same topic, or whose topic already had two Copilot pull requests closed without merging. It then scores the rest by label and age. Only then does the agent read the top candidates, pick up to three independent ones, and assign them to Copilot with a comment explaining why. Merged pull requests close the issues; closed ones count toward the topic's retry limit. The bottom strip is measured on gh-aw (snapshot 16 November 2026). From 19 April to 16 November 2026 (211 days), Issue Monster picked 2,630 issues. 1,416 of them (54%) were closed by merged pull requests from the Copilot coding agent, with a median of 8.1 hours from issue to merge, and 1,126 merged within a day. The bars group picks by the month each issue was created. In June most picks got no pull request. In September the special token that assign-to-agent needs expired, and the maintainer, busy with other work, did not refresh it, so through October Issue Monster kept picking issues but almost none reached Copilot; the cheap gates do not check that token. From 9 to 15 November the workflow ran 615 times, and 567 of those runs (92%) ended in pre-activation, at a gate or with nothing left after filtering, before the agent started. The issues, scores, gate values and pull requests in the animated loop are illustrative and simplified.",
+      enter() {
+        cyc = -1;
+      },
+      tick(t) {
+        if (cyc < 0 || t - cs >= len) {
+          cs = t;
+          reset(++cyc);
+        }
+        const u = t - cs;
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Issue Monster loves cookie issues"), h("h2", {}, letters("Issue "), letters("Monster", "l-grad"))),
+        svg,
+        strip,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 16 Nov 2026 · picks 19 Apr–16 Nov 2026 (211 d) · by issue month · runs 9–15 Nov · loop illustrative")
       ),
     });
   }
@@ -18343,6 +18642,11 @@
       "jsweep",
       "Create a JavaScript unbloater daily agent that focuses on cleaning one .cjs file per day. Call it jsweep … just cleaner leaner code",
       'Create a JavaScript unbloater daily agent that focuses on cleaning one .cjs file per day. Call it jsweep"\n\nThe agent is an expert at creating and maintaining solid, simple JavaScript (commonjs)\n\n- use cache and timestamps to find the next .cjs to cleanup\n\nPrincipals:\n\n- determines if the file runs in github-script context or node.js context. Expert in actions/github-script\n- always increase testing when cleaning\n- remove try/catch unless the exception is handled with control flow. Let errors bubble up otherwise.\n- leverage spread operators, map, reduce, lambda syntax, ?. operator\n- do not change logic, just cleaner leaner code\n\nProvides a pull request with label "unbloat" and title "[jsweep] "',
+    ],
+    "Issue Monster": [
+      "issue-monster",
+      '"Issue Monster" is the Cookie Monster of issues. It eats them and is always hungry for more … uses assign-to-agent',
+      '"Issue Monster" is the Cookie Monster of issues. It eats them and is always hungry for more.\n\nThis agent runs on a 1h schedule.\n- goes back to sleep if a pull request it created is still opened\n- looks for any recent issues labelled with "issue monster"\n- always prioritize fresh issues\n- if an issue already has a PR opened, skip\n- add a comment to the issue why it was picked\n- uses assign-to-agent to assign an agent to an issue\n\nThis agent handles issues one by one, and always looks for the best issue to assign to the agent.\n\n- use skip-if-match to efficiently skip runs when no issues are available',
     ],
     "Query · Ask · Grow": [
       "daily-otel-instrumentation-advisor",
