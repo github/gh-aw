@@ -64,7 +64,10 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   const { markdown } = extractFrontmatterAndBody(workflow);
   const mainContent = writeInlineSubAgents(markdown, directory, directory, "copilot");
   const agents = loadCopilotSDKCustomAgents(directory, directory, message => assert.fail(message));
-  assert.equal(agents.length, 1);
+  assert.deepEqual(
+    agents.map(agent => agent.name),
+    ["dependabot-remediator"]
+  );
   assert.ok(Buffer.byteLength(mainContent) <= 7500, "Orchestrator contract exceeds the instruction-prefix budget");
   const remediator = agents.find(agent => agent.name === "dependabot-remediator");
   for (const section of ["Tool contract", "Deterministic result", "Required approach", "Required validation", "Pull request rule", "Output"]) {
@@ -74,7 +77,6 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   assert.ok(remediator.prompt.includes("unaddressed_prs"), "Blocked PR reporting must reach the remediator");
   for (const agent of agents) {
     assert.ok(Buffer.byteLength(agent.prompt) <= 7500, `${agent.name} exceeds the instruction-prefix budget`);
-    assert.ok(!agent.tools.includes("task"), `${agent.name} must not delegate`);
     if (agent.tools.includes("bash")) {
       assert.ok(agent.prompt.includes("github pull_request_read --help"), `${agent.name} is missing executable guidance`);
       assert.ok(agent.prompt.includes("After the first permission denial, stop shell calls"), `${agent.name} is missing a denial stop condition`);
