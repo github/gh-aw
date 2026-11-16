@@ -6,6 +6,8 @@ const path = require("path");
 const { collectUnifiedSession } = require("./unified_session.cjs");
 const { agentErrorSummaryText, collectAgentErrorEvidence, classifyDriverStderr, DRIVER_STDERR_SUMMARIES } = require("./agent_execution.cjs");
 const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
+const { COPILOT_MODEL_VERIFICATION_EXIT_CODE } = require("./copilot_model_selection.cjs");
+const { WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
 const { sessionContext, isNestedSessionEvent } = require("./agent_session.cjs");
 const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
@@ -359,7 +361,18 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   }
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   const errorCodes = executionErrorCodes.filter(code => Number.isSafeInteger(code) && code >= 400 && code <= 599);
+  const workflowInfo = events.find(event => event.type === "workflow.info" && event.provenance.component === "workflow");
+  const engineId = process.env.GH_AW_ENGINE_ID ?? workflowInfo?.data.engineId ?? workflowInfo?.data.engine_id;
+  // gh-aw's Copilot driver reserves these codes; other engines may reuse the numbers.
+  const engineExitMeanings =
+    engineId === "copilot"
+      ? {
+          [COPILOT_MODEL_VERIFICATION_EXIT_CODE]: "Copilot main-session model verification failed",
+          [WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE]: "Workflow tool permission denials reached the max-tool-denials limit (use only allowed tools.bash commands, or allow the denied command)",
+        }
+      : {};
   const driverExitMeaning =
+    engineExitMeanings[driverExitCode] ||
     { 1: "General failure", 2: "Invalid usage (conventional; engine-specific)", 124: "Command timed out (timeout utility convention)", 126: "Command is not executable", 127: "Command not found" }[driverExitCode] ||
     (driverExitSignal ? `Terminated by ${driverExitSignal} (128 + signal number)` : "Unknown (engine-specific exit code)");
   const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));

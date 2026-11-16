@@ -321,6 +321,16 @@ describe("empty output outcome", () => {
   });
 
   it.each([
+    ["copilot", 80, "Workflow tool permission denials reached the max-tool-denials limit"],
+    ["copilot", 79, "Copilot main-session model verification failed"],
+    ["claude", 80, "Unknown (engine-specific exit code)"],
+  ])("explains %s driver exit %s using gh-aw reserved exit codes only for that engine", (engine, exitCode, meaning) => {
+    vi.stubEnv("GH_AW_ENGINE_ID", engine);
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
+  });
+
+  it.each([
     ["copilot", "", "dependency_loading", "Driver dependency loading failed"],
     ["claude", "2026-10-25T12:00:00.000Z ", "runtime_exception", "Driver execution failed"],
     ["codex", "2026-10-25T12:00:00.000Z ", "syntax_error", "Driver initialization failed"],
