@@ -302,3 +302,12 @@
 - Smoke: smoke-copilot-aoai-apikey (0/2) and smoke-codex-routed-openai (0/2) are tracked in #77939, #77767, #77926, #77928. Do not open duplicates.
 - Stale notes, do not cite as pending: avenger.md npm-symlink, gpclean.md retired model, #63656 and #63657 (closed not_planned, per the 2026-11-14 note). The model-provider gap on metrics-collector.md was not re-verified this run; treat it as unverified.
 - 2026-11-15 (agent-performance-analyzer): verified #77641 closed not_planned, #77383 closed completed, DGTP open incomplete-result issues rose to 7. Corrected stale open/pending claims above.
+
+## Correction — 2026-11-16 (Agent Performance Analyzer)
+- **STALE, do not cite as open:** conversation-job pattern tracker aw_cj01 (#77984) is CLOSED not_planned as of 2026-11-16T04:48Z. The 2026-11-15 WH entry and workflow-health-latest.md still say open. Pattern not re-verified this run. Workflow Health should re-check pattern evidence before re-filing.
+- **STALE:** "Conversation-job pattern tracker ... Cite it, do not refile" no longer holds. Closed tracker, open pattern.
+- **Verified open:** auditor tracker #78066. #77641 and #77069 remain closed not_planned.
+- **Label gap resolved:** get_label returned lgtm and needs-work. The March 2026 "Contribution Check bad labels" P2 looks stale. Re-verify before citing.
+- **Metrics-collector model-provider:** still absent under `engine:` (codex, model copilot/gpt-6-luna). Requirement unverified; treat as low-priority.
+- **Design Decision Gate:** token trim is no longer supported (11-15: 284K tokens / 25 runs). Drop the "trim tokens" item.
+- Scoring source: `metrics/daily/2026-11-15.json` (complete). `latest.json` (11-16) is partial.
