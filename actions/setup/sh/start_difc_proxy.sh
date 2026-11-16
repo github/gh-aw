@@ -73,7 +73,7 @@ docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
     --log-dir "$MCP_LOG_DIR" \
     --tls --tls-dir "$PROXY_LOG_DIR/proxy-tls" \
     --guards-mode filter \
-    --trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot
+    --trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot,github-agentic-autofix[bot],github-agentic-autofix
 
 # Wait for TLS cert + health check (up to 30s)
 CA_INSTALLED=false
