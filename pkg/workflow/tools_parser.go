@@ -224,6 +224,12 @@ func parseGitHubTool(val any) *GitHubToolConfig { //nolint:largefunc // Existing
 			ReadOnly: true, // default to read-only for security
 		}
 
+		for _, field := range []string{"roles", "private-repos"} {
+			if _, ok := configMap[field]; ok {
+				config.unsupportedAccessControlFields = append(config.unsupportedAccessControlFields, field)
+			}
+		}
+
 		if allowedSetting, ok := configMap["allowed"]; ok {
 			// Tool call limits are enforced by MCP guard policies; parser keeps only tool names.
 			allowedTools, _ := parseGitHubAllowedToolsAndLimits(allowedSetting)

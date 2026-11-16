@@ -234,6 +234,20 @@ DELTAS = {
 }
 
 
+def check_p1_backlog_modules():
+    readme = (ROOT / "README.md").read_text()
+    targets = re.findall(
+        r"^\|[^|]+\|\s*P1\s*\|[^|]*\|\s*`([^`]+\.tla)`",
+        readme,
+        re.MULTILINE,
+    )
+    if not targets:
+        raise RuntimeError("No P1 refinement backlog module targets found in README.md")
+    missing = [target for target in targets if not (ROOT / target).is_file()]
+    if missing:
+        raise RuntimeError(f"P1 refinement backlog references missing TLA+ modules: {', '.join(missing)}")
+
+
 def check_result(status, text, invariant=None):
     if invariant is None:
         if status != 0 or "Model checking completed. No error has been found." not in text:
@@ -654,6 +668,7 @@ def main():
     parser.add_argument("--verifier", type=Path, help="Built gh-aw-security-model binary")
     parser.add_argument("--compiled-workflows", type=Path, help="Directory of existing lock files to verify")
     args = parser.parse_args()
+    check_p1_backlog_modules()
     if bool(args.verifier) != bool(args.compiled_workflows):
         parser.error("--verifier and --compiled-workflows must be supplied together")
     if args.model != "all" and (args.compiler or args.verifier or args.write_examples):

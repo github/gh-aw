@@ -121,6 +121,13 @@ func validateGitHubGuardPolicy(tools *Tools, workflowName string) error {
 	}
 
 	github := tools.GitHub
+	if len(github.unsupportedAccessControlFields) > 0 {
+		fields := make([]string, len(github.unsupportedAccessControlFields))
+		for i, field := range github.unsupportedAccessControlFields {
+			fields[i] = "'tools.github." + field + "'"
+		}
+		return fmt.Errorf("%s is not supported by the local compiler and will not enforce access control; remove the unsupported field", strings.Join(fields, ", "))
+	}
 	if github.reposParseErr != nil {
 		return github.reposParseErr
 	}

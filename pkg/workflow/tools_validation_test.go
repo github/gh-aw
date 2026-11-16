@@ -265,6 +265,27 @@ func TestValidateGitHubGuardPolicy(t *testing.T) {
 			shouldError: false,
 		},
 		{
+			name:        "unsupported GitHub MCP roles field is rejected",
+			toolsMap:    map[string]any{"github": map[string]any{"roles": []any{"write"}}},
+			shouldError: true,
+			errorMsg:    "'tools.github.roles' is not supported by the local compiler",
+		},
+		{
+			name:        "unsupported GitHub MCP private-repos field is rejected",
+			toolsMap:    map[string]any{"github": map[string]any{"private-repos": false}},
+			shouldError: true,
+			errorMsg:    "'tools.github.private-repos' is not supported by the local compiler",
+		},
+		{
+			name: "unsupported GitHub MCP roles and private-repos fields are both reported",
+			toolsMap: map[string]any{"github": map[string]any{
+				"roles":         []any{"write"},
+				"private-repos": false,
+			}},
+			shouldError: true,
+			errorMsg:    "'tools.github.roles', 'tools.github.private-repos'",
+		},
+		{
 			name: "valid guard policy with allowed-repos=all",
 			toolsMap: map[string]any{
 				"github": map[string]any{

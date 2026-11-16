@@ -69,9 +69,10 @@ The denial code is selected by the first failing guard in the evaluation order a
 
 The local `pkg/workflow/` compiler has no `tools.github.roles` or
 `private-repos` fields. These controls remain normative in the specification but
-are deferred locally, so the abstract `P3_RoleAllow` and `P4_PrivateRepoAllow`
-fixtures test the specification model only and do not establish local Complete
-Conformance. The status was verified on 2026-11-10 in Section 4.8 of the
+are deferred locally and rejected during validation, so the abstract
+`P3_RoleAllow` and `P4_PrivateRepoAllow` fixtures test the specification model
+only and do not establish local Complete Conformance. The status was verified
+on 2026-11-16 in Section 4.8 of the
 [specification](../../scratchpad/github-mcp-access-control-specification.md).
 
 ## Behavioral Coverage Map
@@ -92,7 +93,7 @@ Conformance. The status was verified on 2026-11-10 in Section 4.8 of the
 | `INV2_ErrorCode` | `TestFormal_ErrorCodeFirstFailingGuard` | Deny error code matches first failing guard; table covers each guard as first failure |
 | `SAFETY_BlockedUserAlwaysDenied` | `TestFormal_BlockedUserSafetyProperty` | Safety: blocked user always produces `-32005` when all earlier guards pass |
 | `SAFETY_NoSpuriousAllow` | `TestFormal_NoSpuriousAllowInvariant` | Safety: no allow decision when any guard fails |
-| `P5_NotBlocked + P6_IntegrityMet` (combined) | `TestFormal_FixtureRunner` | P5 fires before P6 in evaluation order; blocked user denied with -32005 even when P6 would also fail; scenarios executed dynamically by the fixture runner |
+| `P5_NotBlocked + P6_IntegrityMet` (combined) | `TestFormal_FixtureRunner` | P5 fires before P6; scenario C returns -32005 when both fail, while scenario E returns -32006 when only P6 fails |
 
 ## Fixture Files
 
@@ -184,3 +185,7 @@ The test suite includes:
 
 The `combined-blocked-integrity.yaml` fixture verifies that the runner returns P5's `-32005`
 before P6's `-32006` when both guards fail.
+
+Sync note (2026-11-16): the Behavioral Coverage Map and `combined-blocked-integrity.yaml`
+agree that scenario C returns `-32005` because P5 precedes P6 in
+`formalEvaluateAccess` in `pkg/workflow/github_mcp_access_control_formal_test.go`.
