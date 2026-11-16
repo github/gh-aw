@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/testutil"
 	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
@@ -383,6 +384,47 @@ func TestCustomJobDetectionCLIInputModes(t *testing.T) {
 			assert.Equal(t, "jobs.report.if", diagnostics[0].Path)
 			assert.Equal(t, workflowlint.Error, diagnostics[0].Severity)
 			assert.Equal(t, "CTR-005", diagnostics[0].ThreatRuleID)
+		})
+	}
+}
+
+func TestWorkflowLintHonorsThreatDetectionSuppressions(t *testing.T) {
+	tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")
+	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+	for _, tt := range []struct {
+		name, suppress, wantErr string
+		wantFindings            int
+	}{
+		{name: "none", wantErr: "workflow lint found 1 error", wantFindings: 1},
+		{name: "active", suppress: "  - rule: CTR-005\n    reason: Accepted public intake risk\n    expires: " + tomorrow + "\n"},
+		{name: "unrelated", suppress: "  - rule: CTR-006\n    reason: Unrelated rule\n", wantErr: "workflow lint found 1 error", wantFindings: 1},
+		{name: "expired", suppress: "  - rule: CTR-005\n    reason: Accepted public intake risk\n    expires: " + yesterday + "\n", wantErr: "workflow lint found 1 error", wantFindings: 1},
+		{name: "invalid", suppress: "  - rule: CTR-005\n    reason: \"\"\n", wantErr: "threat-detection-suppress value is not recognized", wantFindings: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			source := "---\non:\n  issues:\n    types: [opened]\n  roles: all\nengine: copilot\nsafe-outputs:\n  add-comment: {}\n  threat-detection: false\n"
+			if tt.suppress != "" {
+				source += "threat-detection-suppress:\n" + tt.suppress
+			}
+			source += "---\nTriage the issue.\n"
+			file := filepath.Join(t.TempDir(), "test.md")
+			require.NoError(t, os.WriteFile(file, []byte(source), 0o600))
+			runner, err := workflowlint.Default().Select("untrusted-roles-detection")
+			require.NoError(t, err)
+			var output bytes.Buffer
+			err = runWorkflowLint(t.Context(), []string{file}, runner, &output, true)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
+			var diagnostics []workflowLintDiagnostic
+			require.NoError(t, json.Unmarshal(output.Bytes(), &diagnostics))
+			require.Len(t, diagnostics, tt.wantFindings)
+			for _, diagnostic := range diagnostics {
+				assert.Equal(t, "untrusted-roles-detection", diagnostic.RuleID)
+				assert.Equal(t, "CTR-005", diagnostic.ThreatRuleID)
+			}
 		})
 	}
 }

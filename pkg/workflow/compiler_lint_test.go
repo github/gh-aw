@@ -226,6 +226,36 @@ func TestCompilerLintPreservesThreatSuppressions(t *testing.T) {
 	}
 }
 
+func TestCompilerLintHonorsUntrustedRolesSuppression(t *testing.T) {
+	t.Parallel()
+	for _, active := range []bool{false, true} {
+		t.Run(fmt.Sprintf("active=%t", active), func(t *testing.T) {
+			t.Parallel()
+			expires := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+			if active {
+				expires = time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")
+			}
+			dir := t.TempDir()
+			path := filepath.Join(dir, "test.md")
+			source := "---\non:\n  issues:\n    types: [opened]\n  roles: all\nengine: copilot\npermissions:\n  contents: read\n" +
+				"safe-outputs:\n  add-comment: {}\n  threat-detection: false\n" +
+				"threat-detection-suppress:\n  - rule: CTR-005\n    reason: Accepted public intake risk\n    expires: " + expires + "\n" +
+				"---\nTriage the issue.\n"
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+			compiler.gitRoot = dir
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			err := compiler.CompileWorkflow(path)
+			if active {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "[untrusted-roles-detection]")
+			}
+		})
+	}
+}
+
 func TestCompilerLintWarningsRemainAdvisory(t *testing.T) {
 	t.Parallel()
 	content := "jobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: example/action@main\n"

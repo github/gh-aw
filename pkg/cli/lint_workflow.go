@@ -9,7 +9,9 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/aw"
 	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
@@ -52,12 +54,11 @@ func runWorkflowLint(ctx context.Context, files []string, runner *workflowlint.R
 		if err != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", file, err))
 		}
-		for _, diagnostic := range current {
-			if diagnostic.RuleID == "secret-leak" && diagnostic.Severity == workflowlint.Warning && !configuration.Debug && configuration.JavaScript == nil {
-				continue
-			}
-			diagnostics = append(diagnostics, workflowLintDiagnostic{File: file, Diagnostic: diagnostic})
+		kept, suppressErr := filterWorkflowLintDiagnostics(file, input, current, configuration)
+		if suppressErr != nil {
+			failures = append(failures, suppressErr)
 		}
+		diagnostics = append(diagnostics, kept...)
 	}
 	findings := 0
 	for _, diagnostic := range diagnostics {
@@ -84,6 +85,29 @@ func runWorkflowLint(ctx context.Context, files []string, runner *workflowlint.R
 		failures = append(failures, fmt.Errorf("workflow lint found %d error(s)", findings))
 	}
 	return errors.Join(failures...)
+}
+
+// filterWorkflowLintDiagnostics drops hidden secret-leak warnings and findings
+// covered by an active threat-detection-suppress entry, matching compile.
+func filterWorkflowLintDiagnostics(file string, input workflowlint.Input, current []workflowlint.Diagnostic, configuration workflowLintOptions) ([]workflowLintDiagnostic, error) {
+	var kept []workflowLintDiagnostic
+	var suppressionFailure error
+	for _, diagnostic := range current {
+		if diagnostic.RuleID == "secret-leak" && diagnostic.Severity == workflowlint.Warning && !configuration.Debug && configuration.JavaScript == nil {
+			continue
+		}
+		if diagnostic.ThreatRuleID != "" && input.Document != nil {
+			suppressed, err := workflow.IsThreatDetectionRuleSuppressedByFrontmatter(input.Document.Frontmatter, diagnostic.ThreatRuleID, time.Now())
+			if err != nil && suppressionFailure == nil {
+				suppressionFailure = fmt.Errorf("%s: threat-detection-suppress value is not recognized: %w", file, err)
+			}
+			if suppressed {
+				continue
+			}
+		}
+		kept = append(kept, workflowLintDiagnostic{File: file, Diagnostic: diagnostic})
+	}
+	return kept, suppressionFailure
 }
 
 func primeWorkflowLintJavaScript(ctx context.Context, files []string, runner *workflowlint.Runner, configuration workflowLintOptions) error {
@@ -123,7 +147,9 @@ func primeWorkflowLintJavaScript(ctx context.Context, files []string, runner *wo
 		}
 	}
 	// Priming is only an optimization; per-file analysis reports failures.
-	_ = taint.PrimeAuthoredJavaScript(ctx, documents, taint.SecretLeakRule(), *configuration.JavaScript)
+	if err := taint.PrimeAuthoredJavaScript(ctx, documents, taint.SecretLeakRule(), *configuration.JavaScript); err != nil {
+		lintCommandLog.Printf("JavaScript priming skipped: %v", err)
+	}
 	return ctx.Err()
 }
 
@@ -154,6 +180,7 @@ func loadWorkflowLintInput(file string, javascript ...*taint.JavaScriptOptions) 
 	}
 	var failures []error
 	input.Workflow, err = actions.Parse(content)
+	input.ThreatDetection = workflow.LockFileThreatDetectionPolicy(string(content))
 	if err != nil {
 		// Parser errors can contain YAML scalar values or credentials.
 		failures = append(failures, errors.New("could not parse workflow Actions AST"))

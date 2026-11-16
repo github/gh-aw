@@ -93,3 +93,14 @@ func isThreatDetectionDiagnosticSuppressed(err error, suppressions []ThreatDetec
 	return errors.As(err, &diagnosticErr) &&
 		isThreatDetectionRuleSuppressed(suppressions, diagnosticErr.Rule, now)
 }
+
+// IsThreatDetectionRuleSuppressedByFrontmatter reports whether raw workflow
+// frontmatter has an active threat-detection-suppress entry for rule. It uses
+// the same parsing, validation, and expiry semantics as compilation.
+func IsThreatDetectionRuleSuppressedByFrontmatter(frontmatter map[string]any, rule string, now time.Time) (bool, error) {
+	suppressions, err := parseThreatDetectionSuppressions(frontmatter["threat-detection-suppress"])
+	if err != nil {
+		return false, err
+	}
+	return isThreatDetectionRuleSuppressed(suppressions, rule, now), nil
+}

@@ -63,6 +63,21 @@ type Input struct {
 	GeneratedActionRefs map[string]struct{}
 	// SafeOutputJobs includes imported integration jobs resolved by the compiler.
 	SafeOutputJobs []string
+	// ThreatDetection is the compiler-resolved threat-detection policy, including
+	// imported safe-outputs. Lock-file linting reads it from the gh-aw-manifest
+	// header. Nil when unknown, such as for standalone AW documents.
+	ThreatDetection *ThreatDetectionPolicy
+	// SamplesReplay reports that the compiler replaced the agent with the
+	// deterministic samples replay driver, so no live engine reads event input.
+	SamplesReplay bool
+}
+
+// ThreatDetectionPolicy mirrors the gh-aw-manifest threat_detection entry.
+type ThreatDetectionPolicy struct {
+	// Mode is "enabled", "conditional", or "disabled".
+	Mode string
+	// Condition is the runtime expression that gates conditional detection.
+	Condition string
 }
 
 type Diagnostic struct {

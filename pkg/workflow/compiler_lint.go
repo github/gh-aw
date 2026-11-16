@@ -24,17 +24,7 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if err != nil {
 		return formatCompilerError(sourcePath, "error", "cannot parse generated Actions AST for linting", nil)
 	}
-	generatedActionRefs := compilerGeneratedActionRefs(data)
-	// An explicit --action-tag is a caller-selected reference override. Do not
-	// let compiler ownership downgrade mutable fallback refs; callers must opt in
-	// with --allow-action-refs when the override cannot be resolved to a SHA.
-	if c.actionTag != "" {
-		generatedActionRefs = nil
-	}
-	diagnostics, err := workflowlint.Default().Run(c.ctx, workflowlint.Input{
-		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
-		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
-	})
+	diagnostics, err := workflowlint.Default().Run(c.ctx, c.compiledWorkflowLintInput(data, graph, sourcePath))
 	var failures []error
 	if err != nil {
 		failures = append(failures, fmt.Errorf("workflow lint analysis failed: %w", err))
@@ -76,6 +66,21 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 		return formatCompilerError(sourcePath, "error", err.Error(), err)
 	}
 	return nil
+}
+
+func (c *Compiler) compiledWorkflowLintInput(data *WorkflowData, graph *actions.Workflow, sourcePath string) workflowlint.Input {
+	generatedActionRefs := compilerGeneratedActionRefs(data)
+	// An explicit --action-tag is a caller-selected reference override. Do not
+	// let compiler ownership downgrade mutable fallback refs; callers must opt in
+	// with --allow-action-refs when the override cannot be resolved to a SHA.
+	if c.actionTag != "" {
+		generatedActionRefs = nil
+	}
+	return workflowlint.Input{
+		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
+		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
+		ThreatDetection: lintThreatDetectionPolicy(collectDetectionPolicyForManifest(data)), SamplesReplay: data.UseSamples,
+	}
 }
 
 func compilerGeneratedActionRefs(data *WorkflowData) map[string]struct{} {
@@ -155,6 +160,24 @@ func (c *Compiler) lintPolicyDocument(data *WorkflowData) *aw.Document {
 	document.Frontmatter = data.SourceDocument.FrontmatterResult().Frontmatter
 	document.Frontmatter["strict"] = c.effectiveStrictMode(data.RawFrontmatter)
 	return &document
+}
+
+func lintThreatDetectionPolicy(policy *GHAWManifestDetectionPolicy) *workflowlint.ThreatDetectionPolicy {
+	if policy == nil {
+		return nil
+	}
+	return &workflowlint.ThreatDetectionPolicy{Mode: policy.Mode, Condition: policy.Condition}
+}
+
+// LockFileThreatDetectionPolicy returns the resolved threat-detection policy
+// recorded in a lock file's gh-aw-manifest header, or nil when it is absent or
+// unreadable so linting falls back to the compiled graph.
+func LockFileThreatDetectionPolicy(content string) *workflowlint.ThreatDetectionPolicy {
+	manifest, err := ExtractGHAWManifestFromLockFile(content)
+	if err != nil || manifest == nil {
+		return nil
+	}
+	return lintThreatDetectionPolicy(manifest.ThreatDetection)
 }
 
 func safeOutputLintJobs(data *WorkflowData) []string {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/workflow/actions"
+	"github.com/github/gh-aw/pkg/workflow/aw"
 )
 
 // untrustedRolesTrustedOnlyEvents can only be fired by actors that already have
@@ -56,18 +57,22 @@ func checkUntrustedRolesDetection(ctx context.Context, input Input) ([]Diagnosti
 	if !slices.Contains(roles, "all") || !hasUntrustedTrigger(on) {
 		return nil, err
 	}
-	disabled, detectionErr := untrustedRolesDetectionDisabled(input)
-	if detectionErr != nil || !disabled {
+	if untrustedRolesSamplesReplay(input) {
+		return nil, err
+	}
+	disablement, detectionErr := untrustedRolesDetectionDisablement(input)
+	if detectionErr != nil || disablement == nil {
 		return nil, errors.Join(err, detectionErr)
 	}
 	severity, severityErr := sourcePolicySeverity(input, "untrusted-roles-detection")
 	if severityErr != nil {
 		return nil, errors.Join(err, severityErr)
 	}
-	message := "roles: all lets any GitHub user trigger the agent while safe-outputs.threat-detection is disabled, so prompt-injected agent output is published without inspection; " +
-		"remove threat-detection: false or restrict on.roles to trusted repository roles"
+	message := "roles: all lets any GitHub user trigger the agent while " + disablement.cause +
+		", so prompt-injected agent output can be published without inspection. Keep threat detection enabled: " + disablement.fix +
+		", or restrict on.roles to trusted repository roles (for example roles: [admin, maintainer, write])"
 	if !authoredNVXRuntime(input) {
-		message += ", and run the agent in the NVX microVM sandbox (sandbox.agent.runtime: nvx) because the default container sandbox shares the runner's /tmp and user"
+		message += ". Also run the agent in the NVX microVM sandbox (sandbox.agent.runtime: nvx) because the default container sandbox shares the runner's /tmp and user"
 	}
 	return []Diagnostic{{Severity: severity, Path: "on.roles", Message: message}}, err
 }
@@ -82,27 +87,145 @@ func hasUntrustedTrigger(on map[string]any) bool {
 	return false
 }
 
-// untrustedRolesDetectionDisabled prefers the compiled graph, which reflects
-// imported safe-outputs, and falls back to explicit authored disablement.
-func untrustedRolesDetectionDisabled(input Input) (bool, error) {
+// untrustedRolesSamplesReplay reports deterministic samples replay, where the
+// compiler replaces the engine and omits detection because no live agent runs.
+func untrustedRolesSamplesReplay(input Input) bool {
+	if input.SamplesReplay {
+		return true
+	}
+	features, ok := input.Document.Frontmatter["features"].(map[string]any)
+	if !ok {
+		return false
+	}
+	samples, ok := features["samples"].(bool)
+	return ok && samples
+}
+
+type detectionDisablement struct {
+	cause, fix  string
+	conditional bool
+}
+
+var (
+	importedDetectionDisabled = &detectionDisablement{
+		cause: "an imported safe-outputs configuration disables threat detection",
+		fix:   "re-enable threat detection in the imported workflow or set safe-outputs.threat-detection: true in this workflow",
+	}
+	importedDetectionConditional = &detectionDisablement{
+		cause:       "an imported safe-outputs configuration gates threat detection on a runtime expression that can skip it",
+		fix:         "remove the threat-detection expression from the imported workflow or set safe-outputs.threat-detection: true in this workflow",
+		conditional: true,
+	}
+)
+
+// untrustedRolesDetectionDisablement returns why detection can be off for a
+// run, or nil when it always runs. It prefers the compiler-resolved policy,
+// then the compiled graph, and falls back to the authored frontmatter.
+// Expression-gated detection fails closed because it can skip inspection.
+func untrustedRolesDetectionDisablement(input Input) (*detectionDisablement, error) {
+	authored, err := authoredDetectionDisablement(input.Document.Frontmatter)
+	if err != nil {
+		return nil, err
+	}
+	if policy := input.ThreatDetection; policy != nil {
+		switch policy.Mode {
+		case "enabled":
+			return nil, nil
+		case "conditional":
+			if authored == nil || !authored.conditional {
+				return importedDetectionConditional, nil
+			}
+			return authored, nil
+		}
+		if !safeOutputsPublish(input) {
+			return nil, nil
+		}
+		if authored == nil || authored.conditional {
+			return importedDetectionDisabled, nil
+		}
+		return authored, nil
+	}
 	if input.Workflow != nil {
 		if hasWorkflowJob(input.Workflow, string(constants.DetectionJobName)) {
-			return false, nil
+			if authored != nil && authored.conditional {
+				return authored, nil
+			}
+			return nil, nil
 		}
-		if hasWorkflowJob(input.Workflow, string(constants.SafeOutputsJobName)) {
-			return true, nil
+		if safeOutputsPublish(input) && (authored == nil || authored.conditional) {
+			return importedDetectionDisabled, nil
 		}
 	}
-	outputs, err := policyMapping(input.Document.Frontmatter["safe-outputs"], "safe-outputs")
+	return authored, nil
+}
+
+// safeOutputsPublish reports whether the compiled graph publishes agent output:
+// the consolidated safe_outputs job, a resolved custom safe-output job, or an
+// agent job that exports safe-output types to downstream publishers.
+func safeOutputsPublish(input Input) bool {
+	if input.Workflow == nil {
+		return false
+	}
+	if hasWorkflowJob(input.Workflow, string(constants.SafeOutputsJobName)) {
+		return true
+	}
+	if slices.ContainsFunc(input.SafeOutputJobs, func(id string) bool { return hasWorkflowJob(input.Workflow, id) }) {
+		return true
+	}
+	return slices.ContainsFunc(input.Workflow.Jobs, func(job *actions.Job) bool {
+		if job == nil || string(job.ID) != string(constants.AgentJobName) {
+			return false
+		}
+		_, exported := job.Outputs["output_types"]
+		return exported
+	})
+}
+
+func authoredDetectionDisablement(frontmatter map[string]any) (*detectionDisablement, error) {
+	outputs, err := policyMapping(frontmatter["safe-outputs"], "safe-outputs")
 	if err != nil || outputs == nil {
-		return false, err
+		return nil, err
 	}
-	if detection, ok := outputs["threat-detection"].(map[string]any); ok {
-		if enabled, literal := detection["enabled"].(bool); literal && !enabled {
-			return true, nil
+	switch detection := outputs["threat-detection"].(type) {
+	case bool:
+		if detection {
+			return nil, nil
+		}
+		return &detectionDisablement{
+			cause: "safe-outputs.threat-detection: false disables threat detection",
+			fix:   "remove threat-detection: false",
+		}, nil
+	case string:
+		return &detectionDisablement{
+			cause:       "safe-outputs.threat-detection is a runtime expression that can skip threat detection",
+			fix:         "replace the expression with threat-detection: true",
+			conditional: true,
+		}, nil
+	case map[string]any:
+		switch enabled := detection["enabled"].(type) {
+		case bool:
+			if !enabled {
+				return &detectionDisablement{
+					cause: "safe-outputs.threat-detection.enabled: false disables threat detection",
+					fix:   "remove threat-detection.enabled: false",
+				}, nil
+			}
+		case string:
+			return &detectionDisablement{
+				cause:       "safe-outputs.threat-detection.enabled is a runtime expression that can skip threat detection",
+				fix:         "remove the threat-detection.enabled expression",
+				conditional: true,
+			}, nil
 		}
 	}
-	return customJobDetectionDisabled(Input{Document: input.Document})
+	disabled, err := customJobDetectionDisabled(Input{Document: &aw.Document{Frontmatter: frontmatter}})
+	if err != nil || !disabled {
+		return nil, err
+	}
+	return &detectionDisablement{
+		cause: "safe-outputs.threat-detection.engine: false without steps or post-steps leaves no detection to run",
+		fix:   "remove threat-detection.engine: false or add detection steps",
+	}, nil
 }
 
 func hasWorkflowJob(workflow *actions.Workflow, id string) bool {
