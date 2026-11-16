@@ -1,62 +1,21 @@
 {
-  "generated_at": "2026-11-15T18:18:16Z",
-  "run_id": "43745685546",
+  "generated_at": "2026-11-16T00:46:53Z",
+  "run_id": "43781849748",
   "source": "pr-triage",
-  "eligible_total": 3,
-  "open_copilot_prs": 3,
+  "eligible_total": 0,
+  "open_copilot_prs": 0,
   "cooldown_skipped": 0,
-  "category_counts": {
-    "bug": 3
-  },
-  "risk_counts": {
-    "medium": 3
-  },
-  "priority_counts": {
-    "medium": 3
-  },
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
   "action_counts": {
     "auto_merge": 0,
     "fast_track": 0,
-    "batch_review": 3,
+    "batch_review": 0,
     "defer": 0,
     "close": 0
   },
-  "selected_candidates": [
-    {
-      "number": 77994,
-      "title": "Enforce consistent workflow run metrics",
-      "category": "bug",
-      "risk": "medium",
-      "score": 66,
-      "action": "batch_review",
-      "batch": "runtime-ops"
-    },
-    {
-      "number": 77573,
-      "title": "Capture startup failure log details",
-      "category": "bug",
-      "risk": "medium",
-      "score": 60,
-      "action": "batch_review",
-      "batch": "runtime-ops"
-    },
-    {
-      "number": 77808,
-      "title": "Make workflow guidance prefix-safe and complete",
-      "category": "bug",
-      "risk": "medium",
-      "score": 55,
-      "action": "batch_review",
-      "batch": "runtime-ops"
-    }
-  ],
-  "batches": [
-    {
-      "id": "runtime-ops",
-      "members": [77994, 77573, 77808],
-      "category": "bug",
-      "risk": "medium"
-    }
-  ],
-  "summary": "Three eligible agent PRs passed the cooldown; all are medium-risk workflow/runtime bug fixes and should be handled as a single runtime-ops batch review."
+  "selected_candidates": [],
+  "batches": [],
+  "summary": "No eligible open PRs authored by app/github-copilot were found. Current open automation PRs were outside the required author filter and therefore excluded from this triage run."
 }
