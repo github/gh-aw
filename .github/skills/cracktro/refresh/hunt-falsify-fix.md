@@ -15,7 +15,7 @@ Recompute with `hunt-falsify-fix.sh`, then patch `deck.js`. Read-only on GitHub;
 
 ## 1. Slide
 
-- Heading: **Hunt · Falsify · Fix** (`group: "process"`, right after Research · Assign · Observe).
+- Heading: **Hunt · Falsify · Fix** (`group: "data"`, right after Research · Assign · Observe).
 - Marker: `grep -n "// Hunt · Falsify · Fix" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
 - CSS prefix `hff-` (funnel, file cells, gates, candidates, noop stamp, strip and caption offsets). It reuses `.sdd-panel`/`.sdd-ln` and the `.dhm`, `.dhm-k`, `.dhm-tl` and `.dhm-cap` strip from Docs that heal.
 - Data lives in the slide block:

@@ -15,7 +15,7 @@ Recompute with `issue-monster.sh`, then patch `deck.js`. Read-only on GitHub; ed
 
 ## 1. Slide
 
-- Heading: **Issue Monster** (`group: "process"`, right before Research · Assign · Observe). Kicker: "Issue Monster loves cookie issues".
+- Heading: **Issue Monster** (`group: "data"`, right before Research · Assign · Observe). Kicker: "Issue Monster loves cookie issues".
 - Marker: `grep -n "// Issue Monster:" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
 - CSS prefix `qga-` (source pills, queue fates, gates, skip stamp, score rows, strip, month bars, token bracket). It reuses `.hff-sl`, `.sdd-panel`/`.sdd-ln` and the `.dhm`, `.dhm-k`, `.dhm-tl` and `.dhm-cap` strip from Docs that heal.
 - Data lives in the slide block:
