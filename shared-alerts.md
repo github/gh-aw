@@ -297,7 +297,7 @@
 ## Update — 2026-11-15T04:30Z (Workflow Health Manager)
 - **New tracker for the conclusion-job pattern.** Filed "Conclusion job fails while agent succeeds across several agentic workflows" (temp id aw_cj01, output so_kzALXOX1QwCY). In 40 sampled failed runs, 14 had agent=success and conclusion=failure, across 10 workflows. Do not file per-workflow duplicates; cite this tracker.
 - **Dashboard filed** for 2026-11-15 (output so_oSSnc3KBQg-f). Tier counts use the same metrics window in both views.
-- Auditor: #77062 is closed. Only #77641 is open. Root cause still unverified (logs HTTP 403).
+- Auditor: superseded on 2026-11-16. #77641 is closed not_planned. The open Auditor tracker is #78066. Root cause still unverified (logs HTTP 403).
 - DGTP: #77069 closed not_planned while 0/9. Its conclusion-job failures are part of the aw_cj01 pattern.
 - Smoke: smoke-copilot-aoai-apikey (0/2) and smoke-codex-routed-openai (0/2) are tracked in #77939, #77767, #77926, #77928. Do not open duplicates.
 - Stale notes, do not cite as pending: avenger.md npm-symlink, gpclean.md retired model, #63656 and #63657 (closed not_planned, per the 2026-11-14 note). The model-provider gap on metrics-collector.md was not re-verified this run; treat it as unverified.

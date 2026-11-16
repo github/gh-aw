@@ -1,14 +1,17 @@
-# Workflow Health — 2026-11-15T04:30Z (Workflow Health Manager)
-- Compile: 367/367 executable `.md` workflows have `.lock.yml` (lock presence only; compile-validate.txt holds only the install line).
-- Metrics: `metrics/latest.json`, window 2026-11-14T02:33:44Z to 2026-11-15T02:33:44Z. Daily 2026-11-15 snapshot is identical.
-- Tiers, all 367 workflows: Healthy 17, Warning 3, Critical 8, Low-sample 141, Inactive 198.
-- Tiers, excluding 69 command/mention-triggered workflows (298 measured): Healthy 9, Warning 2, Critical 6, Low-sample 118, Inactive 163.
-- Critical (scored): auditor 0/21; daily-go-test-parallelizer 0/9; contribution-check 3/6; daily-credit-limit-test 1/2; smoke-codex-routed-openai 0/2.
-- Critical (command-triggered, activated runs only): ai-moderator 2/10; smoke-copilot-aoai-apikey 0/2.
-- Warning: aw-failure-investigator 3/4; code-scanning-fixer 3/4.
-- Trend: 7-day unavailable. Daily snapshots 11-11 and 11-12 have null counts, 11-09 is partial, 11-10 is missing.
-- Auditor P1 tracker #77641 open (#77062 closed not_planned). Failing step: Collect failure evidence. Root cause unverified (logs HTTP 403, DIFC).
-- DGTP parent #77069 closed not_planned while 0/9. Agent succeeds, conclusion job fails.
-- NEW tracker (temp id aw_cj01, output so_kzALXOX1QwCY): conclusion-job "Handle agent failure" fails while agent succeeds. 14/40 sampled failed runs, 10 workflows. Previously untracked.
-- Dashboard filed: "Workflow Health Dashboard - 2026-11-15" (output so_oSSnc3KBQg-f).
-- Metrics caveat: total != successful+failed+skipped+action_required for several rows. Unexplained.
+# Workflow Health — 2026-11-16T03:00Z (Workflow Health Manager)
+- Compile: 368/368 executable `.md` workflows have `.lock.yml` (lock presence only; compile-validate.txt holds only the install line).
+- Metrics: `metrics/latest.json`, window 2026-11-15T02:35Z to 2026-11-16T02:35Z, collection_status partial. Snapshot totals: 501 executed, 388 successful, 113 failed. Row arithmetic is consistent.
+- Tiers, all 368 measured: Healthy 11, Warning 4, Critical 5, Low-sample 109, Inactive 239 (sum 368).
+- Tiers, excluding 69 command/mention-triggered workflows (299 scored): Healthy 5, Warning 3, Critical 5, Low-sample 107, Inactive 179 (sum 299).
+- Command-triggered (69): Healthy 6, Warning 1 (pr-sous-chef 71/97), Low-sample 2, Inactive 60 (command gating, expected).
+- Critical (scored): ai-moderator 1/10; auditor 0/19; daily-go-test-parallelizer 1/7; visual-regression-checker 2/5; daily-credit-limit-test 1/2 (by design, INTENTIONALLY BROKEN).
+- Warning (scored): auto-triage-issues 2/3; aw-failure-investigator 3/4; code-scanning-fixer 3/4.
+- Trend: 7-day unavailable. Daily snapshots 11-10 missing; 11-11 and 11-12 are null-count partials; 11-01 and 11-05 show zero executed.
+- Auditor: tracker #78066 open (covers the failure). #77062 and #77641 are closed not_planned. Failing step: Collect failure evidence. Root cause unverified (logs HTTP 403, difc_forbidden). Live window: 24 failed, 0 successful.
+- ai-moderator: P1 issue filed this run (safe output so_SI-PzhdFQkKv). No open tracker existed. Run 43795076697 (pull_request, 2026-11-16T02:55:46Z) failed; jobs API returned no job records. Snapshot 10 executed vs live 6 failed + 69 skipped; reconcile.
+- Conclusion-job pattern: tracker #77984 open (aw_cj01). Not re-filed.
+- DGTP: parent #77069 closed not_planned; open incomplete-result issues continue.
+- visual-regression-checker: open trackers #78122 and #78185.
+- auto-triage-issues: tracker #78190 open.
+- Auditor comment attempt on #78066 failed: add_comment target accepts only "status". Reported via report_incomplete.
+- Metrics caveat: safe-output outcomes all pending; USD costs null; some discussion_replies null.
