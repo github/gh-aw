@@ -5,6 +5,7 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -52,7 +53,7 @@ func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	_ = os.Remove(response.FilePath)
 }
 
-func TestBuildLogsFileResponse_SetsOwnerOnlyPermissions(t *testing.T) {
+func TestBuildLogsFileResponse_SetsAgentReadablePermissions(t *testing.T) {
 	output := `{"summary":{"total_runs":1}}`
 	result := buildLogsFileResponse(output)
 
@@ -68,18 +69,19 @@ func TestBuildLogsFileResponse_SetsOwnerOnlyPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cache directory should exist: %v", err)
 	}
-	cachePerm := cacheInfo.Mode().Perm()
-	if cachePerm != 0o700 {
-		t.Errorf("Cache directory should be owner-only (expected 700), got mode %o", cachePerm)
-	}
-
 	fileInfo, err := os.Stat(response.FilePath)
 	if err != nil {
 		t.Fatalf("Cache file should exist: %v", err)
 	}
-	filePerm := fileInfo.Mode().Perm()
-	if filePerm != 0o600 {
-		t.Errorf("Cache file should be owner-only (expected 600), got mode %o", filePerm)
+	if runtime.GOOS != "windows" {
+		cachePerm := cacheInfo.Mode().Perm()
+		if cachePerm&0o005 != 0o005 {
+			t.Errorf("Cache directory should be accessible to the agent (expected other r-x bits set), got mode %o", cachePerm)
+		}
+		filePerm := fileInfo.Mode().Perm()
+		if filePerm&0o004 != 0o004 {
+			t.Errorf("Cache file should be readable by the agent (expected other read bit set), got mode %o", filePerm)
+		}
 	}
 
 	_ = os.Remove(response.FilePath)
