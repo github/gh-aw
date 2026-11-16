@@ -18,7 +18,7 @@ Recompute with `docs-that-heal.mjs`, then patch `deck.js`. Read-only on GitHub; 
 
 ## 1. Slide
 
-- Heading: **Docs that heal** (`group: "process"`).
+- Heading: **Docs that heal** (`group: "data"`, AW factory band).
 - Marker: `grep -n "// Docs that heal" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
 - CSS prefixes: `dh-` (the illustrative loop) and `dhm-` (the measured strip: `.dhm`, `.dhm-k`, `.dhm-tl`, `.dhm-cap`).
 - Data lives in the slide block:

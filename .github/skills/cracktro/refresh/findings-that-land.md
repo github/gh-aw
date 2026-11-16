@@ -24,7 +24,7 @@ For every issue: merged closing PRs (`closedByPullRequestsReferences`), their au
 
 ## 1. Slide
 
-- Heading: **Findings that land** (`group: "process"`), right after Multi-device tester.
+- Heading: **Findings that land** (`group: "data"`), right after Multi-device tester.
 - Marker: `grep -n "// Findings that land" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
 - CSS prefix `ftl-` (table, bars, cards). The KPI strip reuses `.dhm`, `.dhm-k` and `.dhm-cap` from Docs that heal.
 - Data lives in the slide block:

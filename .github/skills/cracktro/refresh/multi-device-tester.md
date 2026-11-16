@@ -15,7 +15,7 @@ Recompute with `multi-device-tester.mjs`, then patch `deck.js`. Read-only on Git
 
 ## 1. Slide
 
-- Heading: **Multi-device tester** (`group: "process"`).
+- Heading: **Multi-device tester** (`group: "data"`, AW factory band).
 - Marker: `grep -n "// Multi-device tester" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
 - CSS prefixes: `mdt-` (the illustrative loop: devices, badges, overflow, Developer review) and `mdm-` (bar colours of the measured timeline). The strip reuses `.dhm`, `.dhm-k`, `.dhm-tl` and `.dhm-cap` from Docs that heal.
 - Data lives in the slide block:

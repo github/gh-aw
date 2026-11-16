@@ -16,7 +16,7 @@ Recompute with `decide-draft-record.sh`, then patch `deck.js`. Read-only (git on
 
 ## 1. Slide
 
-- Heading: **Decide · Draft · Record** (`group: "process"`), right after Repo Assist.
+- Heading: **Decide · Draft · Record** (`group: "data"`), right after Go Fan.
 - Marker: `grep -n "// Decide · Draft · Record" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
 - CSS prefixes: `ddr-` (the illustrative flow: PR, ADR and review panels, docs/adr node) and `ddm-` (monthly bars). The strip reuses `.dhm`, `.dhm-k`, `.dhm-tl` and `.dhm-cap` from Docs that heal.
 - Data lives in the slide block:
