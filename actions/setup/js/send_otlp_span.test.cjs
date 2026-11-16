@@ -2695,6 +2695,7 @@ describe("sendJobConclusionSpan", () => {
   const savedEnv = {};
   const envKeys = [
     "GH_AW_OTLP_ENDPOINTS",
+    "GH_AW_OTEL_METRICS",
     "OTEL_SERVICE_NAME",
     "GH_AW_DEPRECATED_COST",
     "GH_AW_AIC",
@@ -2769,6 +2770,17 @@ describe("sendJobConclusionSpan", () => {
     expect(filePath).toBe(OTEL_JSONL_PATH);
     const payload = JSON.parse(content.trim());
     expect(payload).toHaveProperty("resourceSpans");
+  });
+
+  it("emits built-in metrics only when GH_AW_OTEL_METRICS is enabled", async () => {
+    process.env.GH_AW_OTEL_METRICS = "true";
+    await sendJobConclusionSpan("gh-aw.job.conclusion", { startMs: Date.now() - 5000 });
+    const metricWrite = appendSpy.mock.calls.find(([filePath]) => filePath === "/tmp/gh-aw/otel-metrics.jsonl");
+    expect(metricWrite).toBeDefined();
+    expect(JSON.parse(metricWrite[1].trim()).resourceMetrics[0].scopeMetrics[0].metrics[0]).toMatchObject({
+      name: "gh_aw.run.duration",
+      unit: "s",
+    });
   });
 
   it("sends a span with the given span name", async () => {

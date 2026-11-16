@@ -1,21 +1,21 @@
 ---
 title: gh-aw OpenTelemetry Observability Specification
 description: Formal W3C-style specification for observability contract for GitHub Agentic Workflows using OpenTelemetry traces, metrics, logs, and OTLP export.
-version: 0.6.0
+version: 0.7.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-09
+last_updated: 2026-11-16
 editors:
   - GitHub gh-aw Team
 ---
 
 # gh-aw OpenTelemetry Observability Specification
 
-**Version**: 0.6.0
+**Version**: 0.7.0
 **Status**: Working Draft  
 **Publication Date**: June 18, 2026
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md  
-**Previous Version**: 0.5.0
+**Previous Version**: 0.6.0
 **Editors**: GitHub gh-aw Team
 
 ---
@@ -28,13 +28,13 @@ This specification defines the compatibility-first OpenTelemetry observability c
 
 This document is a **Working Draft** maintained by the GitHub `gh-aw` Team. It may be changed, replaced, or made obsolete by subsequent versions.
 
-Version 0.6.0 clarifies fail-closed safeguards and required export, fan-out, and shutdown ordering without changing the shipped compatibility contract.
+Version 0.7.0 adds opt-in OTLP metrics emission and the `logMetric()` API.
 
 Sections explicitly marked **Informative** are non-normative. All other sections are normative unless stated otherwise.
 
-Implementation mapping, validation requirements, and compatibility test expectations are defined in this specification so version 0.6.0 has one authoritative contract.
+Implementation mapping, validation requirements, and compatibility test expectations are defined in this specification so version 0.7.0 has one authoritative contract.
 
-Implementations claiming conformance MUST identify the version and conformance classes they implement. A conformance claim for version 0.6.0 is a compatibility claim: it MUST preserve externally observable behavior documented by this specification unless a later specification explicitly defines a migration period and compatibility alias.
+Implementations claiming conformance MUST identify the version and conformance classes they implement. A conformance claim for version 0.7.0 is a compatibility claim: it MUST preserve externally observable behavior documented by this specification unless a later specification explicitly defines a migration period and compatibility alias.
 
 ## Table of Contents
 
@@ -700,6 +700,23 @@ Values MUST be normalized and bounded.
 
 Metric implementations SHOULD attach exemplars containing trace and span context when supported by the SDK and backend.
 
+### 11.5 Opt-in Job Metrics
+
+Built-in job metrics MUST be disabled unless `GH_AW_OTEL_METRICS` is exactly `true`. When enabled, each job conclusion MUST emit the applicable metrics below:
+
+| Metric | Instrument | Unit | Description |
+|---|---|---|---|
+| `gh_aw.run.duration` | Histogram | `s` | Wall-clock job duration. |
+| `gh_aw.run.errors` | Counter | `{run}` | One run on failure or timeout only. |
+| `gh_aw.tokens.input` | Counter | `{token}` | Input tokens for jobs that report model usage. |
+| `gh_aw.tokens.output` | Counter | `{token}` | Output tokens for jobs that report model usage. |
+| `gh_aw.tool_calls` | Counter | `{call}` | Tool executions, grouped by `gh-aw.tool.status`. |
+| `gh_aw.safe_outputs` | Counter | `{item}` | Safe-output items, grouped by `gh-aw.safe_output.type`. |
+
+The runtime MUST export metrics to `/v1/metrics` using the configured OTLP endpoint list and per-endpoint headers. Metrics MUST use OTLP/HTTP JSON. Export failures MUST NOT fail the workflow. Every emitted payload MUST be mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before remote export and included in the unified agent artifact when OTLP is configured. The mirror MUST NOT be written when metrics are disabled.
+
+Metric attributes MUST be bounded and MUST NOT include run IDs, repository URLs, commit SHAs, actor IDs, or other per-run identity. Token counters MUST be emitted only by jobs with their own model usage data to avoid downstream double counting.
+
 ---
 
 ## 12. Logs Contract
@@ -765,6 +782,20 @@ MUST issue a GitHub Actions warning explicitly identifying the export as partial
 If no record fits, the exporter MUST warn and skip the
 request. Export failures MUST NOT fail the workflow, and unchanged credentials
 MUST NOT be retried after authorization failures.
+
+### 12.6 Custom Metric API
+
+When `GH_AW_OTEL_METRICS` is exactly `true`, the setup action MUST expose
+`logMetric(name, value, options)` alongside `logSpan`. The API MUST support
+counters, gauges, and histograms; counters MUST use monotonic delta sums, and
+each histogram call MUST record one observation. `options` MAY specify `type`
+(default `gauge`), `unit`, `description`, bounded attributes, and explicit
+histogram buckets.
+
+`logMetric()` MUST use the configured OTLP endpoints and headers, mirror its
+payload before remote export, sanitize attribute values, and remain non-fatal:
+invalid metrics and export failures MUST NOT throw or fail the workflow. Calls
+MUST be no-ops when metrics are disabled.
 
 ---
 
@@ -1080,6 +1111,7 @@ context is added to outcome spans or links.
 
 ### Unreleased
 
+- **Added**: Opt-in built-in job metrics and the `logMetric()` API (§11.5, §12.6), including a separate local metrics mirror.
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 - **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
 

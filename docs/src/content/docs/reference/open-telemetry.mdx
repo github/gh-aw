@@ -383,6 +383,26 @@ await sendOTLPSpan(endpoint, buildOTLPPayload({
 
 </details>
 
+## Metrics
+
+Set `GH_AW_OTEL_METRICS=true` to export built-in per-job metrics and enable custom metrics. Without this opt-in flag, neither built-in nor custom metrics are emitted. Metrics use OTLP/HTTP JSON at `/v1/metrics`, the configured OTLP endpoints and their per-endpoint headers, and are mirrored to `/tmp/gh-aw/otel-metrics.jsonl`.
+
+The built-in metrics are `gh_aw.run.duration` (histogram, `s`), `gh_aw.run.errors` (counter, `{run}`, on failure or timeout), `gh_aw.tokens.input` and `gh_aw.tokens.output` (counters, `{token}`), `gh_aw.tool_calls` (counter, `{call}`, by `gh-aw.tool.status`), and `gh_aw.safe_outputs` (counter, `{item}`, by `gh-aw.safe_output.type`).
+
+Custom instrumentation can use `logMetric(name, value, options)` from `otlp.cjs`:
+
+```javascript
+const { logMetric } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "otlp.cjs"));
+
+await logMetric("my-tool.items_processed", 42, {
+  type: "counter",
+  unit: "{item}",
+  attributes: { "my-tool.result": "ok" },
+});
+```
+
+`type` accepts `counter`, `gauge` (the default), or `histogram`. Counters are delta sums; each histogram call records one observation and accepts optional explicit `buckets`. Attribute values are sanitized before export. Export and mirror failures are non-fatal.
+
 ## Learn More
 
 - [OpenTelemetry attribute reference](/gh-aw/reference/open-telemetry-attributes/)

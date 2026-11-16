@@ -32,6 +32,13 @@ describe("OTLP response diagnostics", () => {
     expect(inspectOTLPResponse(protobuf(0), "application/x-protobuf", "http/protobuf", signal)).toEqual({ reason: "", error: false });
   });
 
+  it("reports rejected OTLP metric data points without disclosing collector messages", () => {
+    const result = inspectJSON({ partialSuccess: { rejectedDataPoints: "2", errorMessage: privateMessage } }, "metrics");
+    expect(result).toEqual({ reason: expect.stringContaining("rejected_data_points=2"), error: true });
+    expect(result.reason).not.toContain("private");
+    expect(inspectJSON({ partial_success: { rejected_data_points: 3 } }, "metrics").reason).toContain("rejected_data_points=3");
+  });
+
   it.each([
     ["traces", "rejectedSpans", "rejected_spans", "rejectedLogRecords"],
     ["logs", "rejectedLogRecords", "rejected_log_records", "rejectedSpans"],

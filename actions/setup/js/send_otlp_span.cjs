@@ -1267,7 +1267,7 @@ function parseOTLPEndpoints() {
  *
  * @param {OTLPEndpointEntry[]} endpoints  - Resolved endpoint list from {@link parseOTLPEndpoints}
  * @param {any} payload                 - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
  * @returns {Promise<void>}
  */
 async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
@@ -1285,8 +1285,8 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
 }
 
 /**
- * POST an OTLP traces or logs payload with automatic retries. Base endpoints gain
- * the signal path; Azure Monitor logs use their own stream, not the traces stream.
+ * POST an OTLP payload with automatic retries. Base endpoints gain the signal path;
+ * Azure Monitor logs use their own stream, not the traces stream.
  *
  * Failures are surfaced as `console.warn` messages and never thrown; OTLP
  * export failures must not break the workflow.  Uses exponential back-off
@@ -1302,11 +1302,12 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
  *
  * @param {string} endpoint  - OTLP base URL (e.g. https://traces.example.com:4317)
  * @param {any} payload   - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
  * @returns {Promise<void>}
  */
-async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces" } = {}) {
-  const sanitizedPayload = sanitizeOTLPPayload(payload);
+async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces", sanitize = sanitizeOTLPPayload, protocolOverride } = {}) {
+  if (signal === "metrics" && process.env.GH_AW_OTEL_METRICS !== "true") return;
+  const sanitizedPayload = sanitize(payload);
   // Mirror payload locally so it survives even when the collector is unreachable.
   // Callers that already wrote the JSONL mirror pass skipJSONL: true to avoid a
   // duplicate line.
@@ -1317,20 +1318,23 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
   const suffixIndex = endpoint.search(/[?#]/);
   const base = (suffixIndex < 0 ? endpoint : endpoint.slice(0, suffixIndex)).replace(/\/+$/, "");
   const suffix = suffixIndex < 0 ? "" : endpoint.slice(suffixIndex);
-  const signalBase = base.replace(/\/v1\/(?:traces|logs)$/, "").replace(/\/streams\/Microsoft-OTLP-Traces\/otlp$/, "/streams/Microsoft-OTLP-Logs/otlp");
-  const url = (signal === "logs" ? signalBase + "/v1/logs" : base + (base.endsWith("/v1/traces") ? "" : "/v1/traces")) + suffix;
+  const signalBase = base.replace(/\/v1\/(?:traces|logs|metrics)$/, "");
+  const logsBase = signal === "logs" ? signalBase.replace(/\/streams\/Microsoft-OTLP-Traces\/otlp$/, "/streams/Microsoft-OTLP-Logs/otlp") : signalBase;
+  const url = (signal === "traces" ? base + (base.endsWith("/v1/traces") ? "" : "/v1/traces") : logsBase + `/v1/${signal}`) + suffix;
   // Use headersOverride when explicitly provided (including empty string, which means
   // "this endpoint has no configured headers" in the multi-endpoint fan-out path).
   // Fall back to OTEL_EXPORTER_OTLP_HEADERS only when headersOverride is absent
   // (undefined), which is the legacy single-endpoint case.
   const rawHeaders = headersOverride !== undefined ? headersOverride : process.env.OTEL_EXPORTER_OTLP_HEADERS || "";
   const extraHeaders = parseOTLPHeaders(rawHeaders);
-  const protocol = process.env[signal === "logs" ? "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL" : "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"] || process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/json";
+  const signalProtocol = process.env[`OTEL_EXPORTER_OTLP_${signal.toUpperCase()}_PROTOCOL`];
+  const protocol = protocolOverride || signalProtocol || process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/json";
   /** @type {string | Buffer} */
   let sanitizedBody;
   try {
     if (protocol === "http/protobuf") {
       const { encodeOTLPTraceRequest, encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
+      if (signal === "metrics") throw new Error("OTLP metrics protobuf is not supported");
       sanitizedBody = signal === "logs" ? encodeOTLPLogsRequest(sanitizedPayload) : encodeOTLPTraceRequest(sanitizedPayload);
     } else if (protocol === "http/json") {
       sanitizedBody = JSON.stringify(sanitizedPayload);
@@ -2818,6 +2822,46 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     events: spanEvents,
   });
 
+  if (process.env.GH_AW_OTEL_METRICS === "true") {
+    try {
+      const { buildBuiltinRunMetrics, buildOTLPMetricsPayload, sendOTLPMetrics } = require("./otlp_metrics.cjs");
+      const gatewayMetrics = jobName === "conclusion" ? readJSONIfExists("/tmp/gh-aw/usage/activity/summary.json")?.gateway : undefined;
+      const metricAttributes = [...(eventName ? [buildAttr("github.event_name", eventName)] : []), ...(job ? [buildAttr("github.job", job)] : [])];
+      const metricVersion =
+        (typeof awInfo.cli_version === "string" ? awInfo.cli_version : "") ||
+        process.env.GH_AW_INFO_CLI_VERSION ||
+        (typeof awInfo.agent_version === "string" ? awInfo.agent_version : "") ||
+        (typeof awInfo.version === "string" ? awInfo.version : "") ||
+        "unknown";
+      const conclusion = agentConclusion || (runStatus === "timeout" ? "timed_out" : runStatus);
+      const metrics = buildBuiltinRunMetrics({
+        jobName,
+        workflow: workflowName,
+        engine: engineId,
+        model,
+        conclusion,
+        startMs,
+        endMs,
+        inputTokens: agentUsage.input_tokens,
+        outputTokens: agentUsage.output_tokens,
+        emitsTokenUsage: jobEmitsOwnTokenUsage,
+        toolCalls: gatewayMetrics?.total_calls,
+        failedToolCalls: gatewayMetrics?.failed_calls,
+        outputItemTypes: jobName === "conclusion" ? rawItemTypes : [],
+      });
+      await sendOTLPMetrics(
+        buildOTLPMetricsPayload({
+          serviceName,
+          scopeVersion: metricVersion,
+          resourceAttributes: metricAttributes,
+          metrics,
+        })
+      );
+    } catch {
+      console.warn("[otlp] failed to emit built-in metrics");
+    }
+  }
+
   // Always mirror to JSONL — the artifact is useful even without a live collector.
   appendToOTLPJSONL(payload);
 
@@ -2849,7 +2893,9 @@ module.exports = {
   buildOTLPBatchPayload,
   buildOTLPBatchPayloads,
   buildOTLPPayload,
+  buildOTLPResourceAttributes,
   sanitizeOTLPPayload,
+  sanitizeAttrs,
   parseOTLPHeaders,
   parseOTLPEndpoints,
   sendOTLPSpan,

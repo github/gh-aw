@@ -40,6 +40,17 @@ func TestUnifiedSessionAgentArtifactPaths(t *testing.T) {
 	}
 }
 
+func TestUnifiedArtifactIncludesOTLPMetricsMirror(t *testing.T) {
+	compiler := NewCompiler()
+	engine, err := compiler.getAgenticEngine("copilot")
+	require.NoError(t, err)
+	data := &WorkflowData{AI: "copilot", Env: "GH_AW_OTLP_ENDPOINTS=[]"}
+
+	paths := compiler.collectArtifactPaths(data, engine, constants.AgentStdioLogPath, nil)
+
+	assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+}
+
 func TestRuntimeModelMetadataConclusionTransport(t *testing.T) {
 	for _, id := range []string{"copilot", "claude", "pi"} {
 		for _, routed := range []bool{false, true} {

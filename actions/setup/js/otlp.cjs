@@ -170,4 +170,6 @@ async function logSpan(toolName, attributes = {}, options = {}) {
   }
 }
 
-module.exports = { logSpan };
+const { logMetric } = require("./otlp_metrics.cjs");
+
+module.exports = { logSpan, logMetric };
