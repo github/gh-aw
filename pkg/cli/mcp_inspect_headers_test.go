@@ -65,9 +65,12 @@ func TestHeaderRoundTripper(t *testing.T) {
 			defer server.Close()
 
 			// Create HTTP client with custom round tripper
+			// Use a private transport so parallel tests closing idle connections on http.DefaultTransport can't break this request
+			base := http.DefaultTransport.(*http.Transport).Clone()
+			defer base.CloseIdleConnections()
 			client := &http.Client{
 				Transport: &headerRoundTripper{
-					base:    http.DefaultTransport,
+					base:    base,
 					headers: tt.headers,
 				},
 			}
