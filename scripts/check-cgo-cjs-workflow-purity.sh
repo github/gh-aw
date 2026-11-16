@@ -89,7 +89,7 @@ def allowed_write_scope(scope):
     return scope in allowed_write_scopes or (
         scope == "copilot-requests"
         and Path(workflow).name == "cgo.yml"
-        and job_name == "checkout-cache"
+        and job_name == "front-door-decision"
         and permissions_indent == 4
     )
 

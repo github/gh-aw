@@ -12,6 +12,62 @@ const LIMITS = Object.freeze({ ...DIFF_LIMITS, response: 16384, request: 262144 
 const DECISIONS_BASE_URL = "https://api.githubcopilot.com/v1";
 const DECISIONS_MODEL = "gpt-6-luna-decisions";
 
+function validDiffSummary(diff) {
+  if (
+    !diff ||
+    !Array.isArray(diff.files) ||
+    diff.files.length > LIMITS.files ||
+    new Set(diff.files).size !== diff.files.length ||
+    diff.files.some(file => typeof file !== "string" || !/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/.test(file) || file.split("/").some(part => part === "." || part === "..")) ||
+    typeof diff.patch !== "string" ||
+    Buffer.byteLength(diff.patch) > LIMITS.patch ||
+    typeof diff.truncated !== "boolean" ||
+    typeof diff.unavailable !== "boolean"
+  )
+    return false;
+  if (Object.hasOwn(diff, "groups")) {
+    const groups = diff.groups;
+    if (!groups || typeof groups !== "object" || Object.keys(groups).length !== 3) return false;
+    const remaining = new Set(diff.files);
+    for (const id of ["javascript", "go", "other"]) {
+      const group = groups[id];
+      if (!group || !Array.isArray(group.files) || typeof group.patch !== "string" || Buffer.byteLength(group.patch) > LIMITS.groupPatch || typeof group.patch_truncated !== "boolean") return false;
+      for (const file of group.files) {
+        if (typeof file !== "string" || !remaining.delete(file)) return false;
+        const expected = /\.(?:cjs|js)$/.test(file) ? "javascript" : file.endsWith(".go") ? "go" : "other";
+        if (id !== expected) return false;
+      }
+    }
+    if (remaining.size) return false;
+  }
+  try {
+    return Buffer.byteLength(JSON.stringify(diff)) <= LIMITS.summary;
+  } catch {
+    return false;
+  }
+}
+
+function eligibleOmissions(diff) {
+  if (!validDiffSummary(diff) || diff.truncated || diff.unavailable || !diff.files.length) return new Set();
+  // The other optional jobs build cmd/gh-aw or internal/tools/actions-build, not
+  // the separate WASM main package. Only build-wasm executes the WASM runner.
+  const wasmOnly = new Set(["cmd/gh-aw-wasm/compile_recovery.go", "cmd/gh-aw-wasm/compile_recovery_test.go", "cmd/gh-aw-wasm/main.go", "cmd/gh-aw-wasm/main_stub.go", "scripts/test-wasm-golden.mjs"]);
+  return new Set(
+    SUITE_IDS.filter(
+      id =>
+        !MANDATORY.includes(id) &&
+        diff.files.every(
+          file =>
+            /^(?:README|CONTRIBUTING)\.md$/.test(file) ||
+            /^docs\/src\/content\/docs\/.+\.mdx?$/.test(file) ||
+            // This standalone checkout-cache test is not consumed by optional jobs.
+            file === "scripts/workflow-timing.test.cjs" ||
+            (id !== "build-wasm" && wasmOnly.has(file))
+        )
+    )
+  );
+}
+
 function validateCatalog(catalog) {
   if (catalog?.version !== 1 || !Array.isArray(catalog.suites) || catalog.suites.length !== SUITE_IDS.length) throw new Error("invalid-catalog");
   const seen = new Set();
@@ -81,10 +137,12 @@ async function postDecision(token, input, { fetchImpl = fetch, onRequest = () =>
   };
 }
 
-function selectSuites(response, catalog) {
+function selectSuites(response, catalog, diff) {
   if (!response || !Array.isArray(response.suite_ids) || !Number.isFinite(response.confidence) || response.confidence < 0.9 || response.confidence > 1) throw new Error("invalid-or-low-confidence");
   if (response.suite_ids.length > SUITE_IDS.length || new Set(response.suite_ids).size !== response.suite_ids.length || response.suite_ids.some(id => typeof id !== "string" || !SUITE_IDS.includes(id))) throw new Error("invalid-suite-ids");
   const selected = new Set([...response.suite_ids, ...catalog.suites.filter(suite => suite.mandatory).map(suite => suite.id), ...MANDATORY]);
+  const eligible = eligibleOmissions(diff);
+  for (const id of SUITE_IDS) if (!eligible.has(id)) selected.add(id);
   return SUITE_IDS.filter(id => selected.has(id));
 }
 
@@ -97,7 +155,7 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   }
   let decisionCalls = 0;
   let response;
-  let reason = fullRun ? "full-run" : !validCatalog ? "invalid-catalog" : diff.unavailable ? "diff-unavailable" : diff.truncated ? "diff-truncated" : null;
+  let reason = fullRun ? "full-run" : !validCatalog ? "invalid-catalog" : !validDiffSummary(diff) ? "invalid-diff-summary" : diff.unavailable ? "diff-unavailable" : diff.truncated ? "diff-truncated" : null;
   if (!reason && diff.files.some(file => file.startsWith(".github/ci/") || file.startsWith("scripts/ci-front-door") || file === ".github/workflows/cgo.yml" || file === "actions/setup/js/decisions_client.cjs")) reason = "policy-changed";
   if (!fullRun) {
     try {
@@ -121,7 +179,7 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   let suiteIds = [...SUITE_IDS];
   if (!reason) {
     try {
-      suiteIds = selectSuites(response, validCatalog);
+      suiteIds = selectSuites(response, validCatalog, diff);
     } catch {
       reason = "invalid-or-low-confidence";
     }
@@ -144,6 +202,7 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
 
 async function main() {
   const cwd = path.resolve(__dirname, "..");
+  const diffCwd = path.resolve(process.env.CI_DIFF_WORKSPACE || cwd);
   let catalog;
   let prompt = "";
   try {
@@ -157,7 +216,7 @@ async function main() {
   const result = await frontDoor({
     catalog,
     prompt,
-    diff: fullRun ? { files: [], patch: "", truncated: false, unavailable: false } : summarizeDiff({ cwd }),
+    diff: fullRun ? { files: [], patch: "", truncated: false, unavailable: false } : summarizeDiff({ cwd: diffCwd }),
     token: process.env.CI_DECISION_TOKEN,
     fullRun,
   });

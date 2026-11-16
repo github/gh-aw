@@ -116,11 +116,16 @@ inclusion, and fail-open **all-suite fallback** for every uncertain, missing,
 malformed, unsupported, or failed decision. Do not lower confidence thresholds,
 weaken input bounds, change execution/network/authentication code, or edit the
 decision parser, output contract, fallback, tests, or CI wiring.
+Model confidence never overrides the trusted deterministic path policy: only
+policy-eligible suites may be omitted. Never change that policy in a proposal.
 
 The selector uses GitHub Decisions at `https://api.githubcopilot.com/v1/decisions`
-with model `gpt-6-luna-decisions`. The CI step supplies `CI_DECISION_TOKEN` from
-the built-in workflow token with job-scoped `copilot-requests: write`; no custom
-endpoint or PAT is needed. Missing credentials fail open with zero requests.
+with model `gpt-6-luna-decisions`. A dedicated inference job supplies
+`CI_DECISION_TOKEN` from the built-in workflow token with job-scoped
+`copilot-requests: write`. Execute selector, client, catalog, prompt, and policy
+from the pinned trusted base; use `CI_DIFF_WORKSPACE` only for local PR diff
+evidence. Never execute PR code in the credential-bearing job. No custom endpoint
+or PAT is needed. Missing credentials fail open with zero requests.
 A configured token makes exactly one request, with no retries or redirects.
 The researcher must never provision, probe, or call that service, or request
 credentials. Report authentication failures as prerequisites, not reasons to
@@ -136,14 +141,13 @@ do not pass a raw `answers` batch to the recorded-response evaluator.
 
 ## Required evaluation and publication gates
 
-Before replay or candidate edits, read [replay requirements](#replay-and-periodic-full-suite-evaluation).
-Before reporting or publication, read [metrics and publication rules](#metrics-and-publication-gate).
-Require provenance-matched responses, a disjoint chronological holdout with
-complete outcomes, no new missed regressions, and positive measured benefit.
-Otherwise make no changes, report gaps, and finish with `noop`.
-Before creating a draft PR, inspect `git diff` and run
-`node --test scripts/ci-front-door.test.cjs`. Edit only the three allowed files;
-never edit the selector module, merge, approve, or push directly.
+Before replay/edits, read [replay requirements](#replay-and-periodic-full-suite-evaluation);
+before reporting/publication, read [metrics rules](#metrics-and-publication-gate).
+Require matched provenance, disjoint chronological holdout, complete outcomes,
+no new missed regressions, and positive measured benefit; otherwise report gaps
+and `noop` without edits. Before a draft PR, inspect `git diff` and run
+`node --test scripts/ci-front-door.test.cjs`. Only edit the three allowed files;
+never edit the selector, merge, approve, or push directly.
 
 <!-- instruction-prefix-end -->
 

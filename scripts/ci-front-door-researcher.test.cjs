@@ -89,7 +89,11 @@ test("catalog and runtime safety contracts are explicit", () => {
 
 test("GitHub authentication never authorizes research calls or weaker fallback", () => {
   assert.match(prompt, /https:\/\/api\.githubcopilot\.com\/v1\/decisions/);
-  assert.match(prompt, /built-in workflow token with job-scoped `copilot-requests: write`/);
+  assert.match(prompt, /built-in workflow token with job-scoped\s+`copilot-requests: write`/);
+  assert.match(prompt, /pinned trusted base/);
+  assert.match(prompt, /`CI_DIFF_WORKSPACE` only for local PR diff/);
+  assert.match(prompt, /Never execute PR code in the credential-bearing job/);
+  assert.match(prompt, /Model confidence never overrides the trusted deterministic path policy/);
   assert.match(prompt, /Missing credentials fail open with zero requests/);
   assert.match(prompt, /exactly one request, with no retries or redirects/);
   assert.match(prompt, /never provision, probe, or call that service/);

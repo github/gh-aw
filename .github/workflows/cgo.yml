@@ -55,11 +55,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      copilot-requests: write
     outputs:
       dependencies-changed: ${{ steps.dependencies.outputs.changed }}
-      suite_ids: ${{ steps.front-door.outcome == 'success' && steps.front-door.outputs.suite_ids || '' }}
-      front-door-metrics: ${{ steps.front-door.outputs.metrics }}
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -80,18 +77,72 @@ jobs:
       run: bash scripts/check-cgo-cjs-workflow-purity.sh
     - name: Test workflow timing summaries
       run: node --test scripts/workflow-timing.test.cjs
-    - name: Select CI suites with GitHub Decisions
-      id: front-door
-      continue-on-error: true
-      env:
-        CI_DECISION_TOKEN: ${{ github.token }}
-      run: node scripts/ci-front-door.cjs
     - name: Cache repository checkout
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
       with:
         path: .
         # Keep reservations and cleanup isolated from other runs of this commit.
         key: checkout-cgo-${{ github.run_id }}-${{ github.sha }}
+
+  front-door-decision:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      copilot-requests: write
+    outputs:
+      suite_ids: ${{ steps.validated.outputs.suite_ids }}
+      metrics: ${{ steps.front-door.outputs.metrics }}
+    steps:
+    - name: Checkout trusted selector
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        path: trusted
+        fetch-depth: 1
+        persist-credentials: false
+    - name: Checkout PR diff evidence
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        ref: ${{ github.sha }}
+        path: evidence
+        fetch-depth: 2
+        persist-credentials: false
+    - name: Select CI suites with GitHub Decisions
+      # Never bootstrap a missing trusted selector from PR-controlled code.
+      if: hashFiles('trusted/scripts/ci-front-door.cjs') != ''
+      id: front-door
+      continue-on-error: true
+      working-directory: trusted
+      env:
+        CI_DECISION_TOKEN: ${{ github.token }}
+        CI_DIFF_WORKSPACE: ${{ github.workspace }}/evidence
+      run: node scripts/ci-front-door.cjs
+    - name: Validate suite outputs
+      id: validated
+      env:
+        SELECTOR_OUTCOME: ${{ steps.front-door.outcome }}
+        RAW_SUITE_IDS: ${{ steps.front-door.outputs.suite_ids }}
+      run: |
+        node <<'NODE'
+        const fs = require('node:fs');
+        const known = ['go-tests', 'security', 'native-javascript-tests', 'build-wasm', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'actions-build'];
+        const mandatory = ['go-tests', 'security', 'native-javascript-tests'];
+        let suiteIds = '';
+        try {
+          const ids = JSON.parse(process.env.RAW_SUITE_IDS);
+          if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(ids) &&
+              ids.length <= known.length && new Set(ids).size === ids.length &&
+              ids.every(id => known.includes(id)) && mandatory.every(id => ids.includes(id))) {
+            suiteIds = JSON.stringify(ids);
+          }
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) throw error;
+        }
+        if (!suiteIds) process.stderr.write('CI Front Door outputs unavailable or invalid; running all suites.\n');
+        fs.appendFileSync(process.env.GITHUB_OUTPUT, `suite_ids=${suiteIds}\n`);
+        NODE
 
   front-door-conformance:
     runs-on: ubuntu-latest
@@ -108,6 +159,7 @@ jobs:
       run: |
         node --test scripts/ci-front-door.test.cjs
         node --test scripts/ci-front-door-researcher.test.cjs
+        node --test scripts/ci-front-door-workflow.test.cjs
 
   verify-integration-build:
     needs: [checkout-cache]
@@ -642,8 +694,8 @@ jobs:
 
 
   build-wasm:
-    needs: [checkout-cache]
-    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'build-wasm')
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'build-wasm'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1779,8 +1831,8 @@ jobs:
       run: make lint-errors
 
   actions-build:
-    needs: [checkout-cache]
-    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'actions-build')
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'actions-build'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -2153,8 +2205,8 @@ jobs:
       run: ./gh-aw compile poem-bot ${{ matrix.tool.flag }} --verbose
 
   mcp-server-compile-test:
-    needs: [checkout-cache]
-    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'mcp-server-compile-test')
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'mcp-server-compile-test'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -2337,7 +2389,8 @@ jobs:
         echo "✅ Test completed successfully" >> $GITHUB_STEP_SUMMARY
 
   cross-platform-build:
-    needs: [checkout-cache, build]
+    needs: [checkout-cache, build, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.build.result == 'success'
     name: Build & Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -2346,7 +2399,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && needs.checkout-cache.outputs.suite_ids && !contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'cross-platform-build') && '["windows-latest"]' || '["macos-latest","windows-latest"]') }}
+        os: ${{ fromJSON(github.event_name == 'pull_request' && needs.front-door-decision.result == 'success' && needs.front-door-decision.outputs.suite_ids && !contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'cross-platform-build') && '["windows-latest"]' || '["macos-latest","windows-latest"]') }}
     concurrency:
       group: ci-${{ github.ref }}-cross-platform-${{ matrix.os }}
       cancel-in-progress: true
@@ -2729,9 +2782,9 @@ jobs:
         rm -f .github/workflows/test-cross-platform.lock.yml
 
   alpine-container-test:
-    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'alpine-container-test')
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'alpine-container-test'))
     name: Alpine Container Test
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -2945,6 +2998,7 @@ jobs:
   summarize-timing:
     name: Summarize workflow timing
     needs:
+    - front-door-decision
     - front-door-conformance
     - checkout-cache
     - verify-integration-build

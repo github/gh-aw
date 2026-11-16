@@ -196,7 +196,7 @@ else
   fail "other CJS path permission output was incorrect" "$(cat "$T9_OUT")"
 fi
 
-echo "Test 10: only the CGO checkout selector can request Copilot inference..."
+echo "Test 10: only the dedicated CGO selector can request Copilot inference..."
 T10="$TMP_ROOT/t10"
 for style in block flow; do
   T10_DIR="$T10/$style"
@@ -207,19 +207,19 @@ for style in block flow; do
     body='    permissions: { contents: read, copilot-requests: write }'
   fi
   write_workflow "$T10_DIR/cgo.yml" "$body"
-  sed 's/^  test:/  checkout-cache:/' "$T10_DIR/cgo.yml" > "$T10_DIR/selector.yml"
+  sed 's/^  test:/  front-door-decision:/' "$T10_DIR/cgo.yml" > "$T10_DIR/selector.yml"
   mv "$T10_DIR/selector.yml" "$T10_DIR/cgo.yml"
   T10_OUT="$TMP_ROOT/t10-$style-output.txt"
   if (cd "$T10_DIR" && bash "$PURITY_SCRIPT" cgo.yml >"$T10_OUT" 2>&1); then
-    pass "CGO checkout selector permits $style inference permission"
+    pass "CGO dedicated selector permits $style inference permission"
   else
     fail "CGO selector inference permission should pass" "$(cat "$T10_OUT")"
   fi
   cp "$T10_DIR/cgo.yml" "$T10_DIR/cjs.yml"
   if (cd "$T10_DIR" && bash "$PURITY_SCRIPT" cjs.yml >"$T10_OUT" 2>&1); then
-    fail "CJS checkout must still reject inference permission" "$(cat "$T10_OUT")"
+    fail "CJS selector must still reject inference permission" "$(cat "$T10_OUT")"
   else
-    pass "CJS checkout rejects $style inference permission"
+    pass "CJS selector rejects $style inference permission"
   fi
 done
 
@@ -233,6 +233,27 @@ if (cd "$T11" && bash "$PURITY_SCRIPT" cgo.yml >"$T11_OUT" 2>&1); then
 else
   pass "workflow-wide Copilot permission remains forbidden"
 fi
+
+echo "Test 12: the broad checkout-cache job cannot request Copilot inference..."
+T12="$TMP_ROOT/t12"
+mkdir -p "$T12"
+for style in block flow; do
+  if [ "$style" = block ]; then
+    body=$'    permissions:\n      contents: read\n      copilot-requests: write'
+  else
+    body='    permissions: { contents: read, copilot-requests: write }'
+  fi
+  write_workflow "$T12/source.yml" "$body"
+  sed 's/^  test:/  checkout-cache:/' "$T12/source.yml" > "$T12/cgo.yml"
+  T12_OUT="$TMP_ROOT/t12-$style-output.txt"
+  if (cd "$T12" && bash "$PURITY_SCRIPT" cgo.yml >"$T12_OUT" 2>&1); then
+    fail "checkout-cache inference permission should fail" "$(cat "$T12_OUT")"
+  elif grep -q "copilot-requests: write" "$T12_OUT"; then
+    pass "checkout-cache rejects $style inference permission"
+  else
+    fail "checkout-cache permission output was incorrect" "$(cat "$T12_OUT")"
+  fi
+done
 
 echo
 echo "Tests passed: $TESTS_PASSED"
