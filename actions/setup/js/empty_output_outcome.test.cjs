@@ -320,6 +320,17 @@ describe("empty output outcome", () => {
     expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
   });
 
+  it("tolerates a workflow.info event without data", () => {
+    const session = {
+      events: [
+        { type: "workflow.info", provenance: { component: "workflow", phase: "activation" } },
+        { type: "agent.execution", provenance: { component: "execution", phase: "agent" }, data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 80 } },
+      ],
+      maskedValues: [],
+    };
+    expect(buildEmptyOutputOutcome([], rootDir, session).details).toContain("Driver exit meaning: Unknown (engine-specific exit code)");
+  });
+
   it.each([
     ["copilot", 80, "Workflow tool permission denials reached the max-tool-denials limit"],
     ["copilot", 79, "Copilot main-session model verification failed"],
