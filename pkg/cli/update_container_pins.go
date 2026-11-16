@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/github/gh-aw/pkg/actionpins"
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/ctxutil"
@@ -53,6 +54,41 @@ type containerPinUpdateDeps struct {
 type containerPinUpdateOptions struct {
 	refreshExisting     bool
 	failOnResolveErrors bool
+	// refreshBuiltins re-resolves built-in images from the registry instead of using
+	// the compiler's embedded pins. Used when refreshing the trusted pins themselves.
+	refreshBuiltins bool
+}
+
+// isBuiltinContainerImage reports whether image (without digest) is a container that the
+// compiler injects itself (firewall, MCP gateway, router, gh-aw-node, GitHub MCP server).
+func isBuiltinContainerImage(image string) bool {
+	repo := image
+	if lastSlash := strings.LastIndex(repo, "/"); lastSlash >= 0 {
+		if colon := strings.LastIndex(repo[lastSlash:], ":"); colon >= 0 {
+			repo = repo[:lastSlash+colon]
+		}
+	}
+	switch repo {
+	case constants.DefaultMCPGatewayContainer, constants.DefaultRouterRegistry, constants.DefaultGhAwNodeImage, githubMCPServerImage:
+		return true
+	}
+	return strings.HasPrefix(repo, constants.DefaultFirewallRegistry+"/")
+}
+
+const githubMCPServerImage = "ghcr.io/github/github-mcp-server"
+
+// compilerContainerPin returns the compiler's embedded pin for a built-in image so that
+// update and upgrade keep built-in containers matched to the running compiler instead of
+// re-resolving the tag from the registry.
+func compilerContainerPin(image string, opts containerPinUpdateOptions) (actionpins.ContainerPin, bool) {
+	if opts.refreshBuiltins || !isBuiltinContainerImage(image) {
+		return actionpins.ContainerPin{}, false
+	}
+	pin, ok := actionpins.GetContainerPin(image)
+	if !ok || pin.Digest == "" || pin.PinnedImage == "" {
+		return actionpins.ContainerPin{}, false
+	}
+	return pin, true
 }
 
 func defaultContainerPinUpdateDeps() containerPinUpdateDeps {
@@ -66,6 +102,10 @@ func defaultContainerPinUpdateDeps() containerPinUpdateDeps {
 // Images that already have a digest appended (containing "@sha256:") are skipped,
 // as they are already pinned. Images without a cached pin are queried via the
 // Docker CLI ("docker buildx imagetools inspect").
+//
+// Built-in images injected by the compiler (firewall, MCP gateway, router, gh-aw-node,
+// GitHub MCP server) use the compiler's embedded pins when available so they always
+// match the running compiler, rather than being re-resolved from the registry.
 //
 // Resolution failures produce a short informational summary and return nil so
 // that the overall upgrade flow is not interrupted.
@@ -143,6 +183,9 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 	results := make([]digestResult, len(images))
 	jobs := make([]func(), 0, len(images))
 	for i, image := range images {
+		if _, ok := compilerContainerPin(image, opts); ok {
+			continue
+		}
 		pin, found := actionCache.GetContainerPin(image)
 		if found && pin.Digest != "" && !opts.refreshExisting {
 			continue
@@ -157,6 +200,19 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 
 	for i, image := range images {
 		existingPin, hasExistingPin := actionCache.GetContainerPin(image)
+		if builtinPin, ok := compilerContainerPin(image, opts); ok {
+			if hasExistingPin && existingPin.Digest == builtinPin.Digest && existingPin.PinnedImage == builtinPin.PinnedImage {
+				skippedImages = append(skippedImages, image)
+				continue
+			}
+			containerPinsLog.Printf("Pinning built-in image %s to compiler digest %s", image, builtinPin.Digest)
+			actionCache.SetContainerPin(image, builtinPin.Digest, builtinPin.PinnedImage)
+			updatedImages = append(updatedImages, pinnedEntry{image: image, pinnedImage: builtinPin.PinnedImage})
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Pinned built-in %s → %s (compiler pin)", image, builtinPin.Digest)))
+			}
+			continue
+		}
 		if hasExistingPin && existingPin.Digest != "" && !opts.refreshExisting {
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("%s already pinned: %s", image, existingPin.Digest)))

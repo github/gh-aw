@@ -416,7 +416,7 @@ func updateActionRefsInContentWithDeps(ctx context.Context, deps actionUpdateDep
 		}
 		repo := match[2]
 		effectiveAllowMajor := allowMajor || isCoreAction(repo)
-		if !effectiveAllowMajor {
+		if !effectiveAllowMajor && compilerPinnedActionTag(repo) == "" {
 			continue
 		}
 		currentVersion := actionUpdateCurrentVersion(match[3], match[4])
@@ -430,7 +430,7 @@ func updateActionRefsInContentWithDeps(ctx context.Context, deps actionUpdateDep
 		result := &cachedLatestRelease{}
 		resolutions[key] = result
 		jobs = append(jobs, func() {
-			result.version, result.sha, result.err = deps.getLatestRelease(ctx, repo, currentVersion, effectiveAllowMajor, verbose)
+			result.version, result.sha, result.err = resolveActionUpdateTarget(ctx, deps, repo, currentVersion, effectiveAllowMajor, verbose)
 		})
 	}
 	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
@@ -457,8 +457,10 @@ func updateActionRefsInContentWithDeps(ctx context.Context, deps actionUpdateDep
 		}
 
 		// When release bumps are disabled, skip non-core (non actions/*) action refs.
+		// The setup action is always pinned to the compiler version.
 		effectiveAllowMajor := allowMajor || isCoreAction(repo)
-		if !effectiveAllowMajor {
+		compilerPinned := compilerPinnedActionTag(repo) != ""
+		if !effectiveAllowMajor && !compilerPinned {
 			continue
 		}
 
@@ -493,7 +495,7 @@ func updateActionRefsInContentWithDeps(ctx context.Context, deps actionUpdateDep
 			// Prevent downgrades: if the proposed version is older than the current, skip.
 			currentVer := parseVersion(ref)
 			proposedVer := parseVersion(latestVersion)
-			if currentVer != nil && proposedVer != nil && currentVer.IsNewer(proposedVer) {
+			if currentVer != nil && proposedVer != nil && currentVer.IsNewer(proposedVer) && !compilerPinned {
 				updateLog.Printf("Skipping %s in workflow file: proposed version %s is older than current %s (would be a downgrade)", repo, latestVersion, ref)
 				continue
 			}

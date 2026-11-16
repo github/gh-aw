@@ -9,8 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/actionpins"
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow"
@@ -601,4 +603,102 @@ func containerPinNormalOutput(output string) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func TestUpdateContainerPins_BuiltinImagesUseCompilerPins(t *testing.T) {
+	const builtinImage = "ghcr.io/github/gh-aw-mcpg:v0.5.10"
+	const otherImage = "ghcr.io/example/tool:1.0"
+	embedded, ok := actionpins.GetContainerPin(builtinImage)
+	require.True(t, ok, "test requires an embedded compiler pin for %s", builtinImage)
+
+	const staleDigest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	const fetchedDigest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+
+	tests := []struct {
+		name          string
+		opts          containerPinUpdateOptions
+		wantBuiltin   string
+		wantFetchedOf []string
+	}{
+		{
+			name:          "update keeps built-ins on compiler pins",
+			opts:          containerPinUpdateOptions{refreshExisting: true},
+			wantBuiltin:   embedded.Digest,
+			wantFetchedOf: []string{otherImage},
+		},
+		{
+			name:          "refreshBuiltins re-resolves built-ins from the registry",
+			opts:          containerPinUpdateOptions{refreshExisting: true, refreshBuiltins: true},
+			wantBuiltin:   fetchedDigest,
+			wantFetchedOf: []string{builtinImage, otherImage},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			actionsLockDir := filepath.Join(tmpDir, ".github", "aw")
+			require.NoError(t, os.MkdirAll(actionsLockDir, 0755))
+			actionsLockContent := fmt.Sprintf(`{
+  "entries": {},
+  "containers": {
+    %[1]q: {"image": %[1]q, "digest": %[2]q, "pinned_image": %[3]q}
+  }
+}
+`, builtinImage, staleDigest, builtinImage+"@"+staleDigest)
+			require.NoError(t, os.WriteFile(filepath.Join(actionsLockDir, "actions-lock.json"), []byte(actionsLockContent), 0644))
+
+			workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+			require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+			lockFileContent := `name: test
+jobs:
+  setup:
+    steps:
+      - name: Download container images
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ` + builtinImage + " " + otherImage + "\n"
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "test.lock.yml"), []byte(lockFileContent), 0644))
+
+			originalDir, _ := os.Getwd()
+			defer os.Chdir(originalDir) //nolint:errcheck
+			require.NoError(t, os.Chdir(tmpDir))
+
+			var mu sync.Mutex
+			var fetched []string
+			deps := defaultContainerPinUpdateDeps()
+			deps.fetchDigest = func(_ context.Context, image string, verbose bool) (string, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				fetched = append(fetched, image)
+				return fetchedDigest, nil
+			}
+
+			changed, err := updateContainerPins(context.Background(), deps, workflowsDir, false, tt.opts)
+			require.NoError(t, err)
+			assert.True(t, changed)
+			assert.ElementsMatch(t, tt.wantFetchedOf, fetched)
+
+			cache := workflow.NewActionCache(tmpDir)
+			require.NoError(t, cache.Load())
+			pin, ok := cache.GetContainerPin(builtinImage)
+			require.True(t, ok)
+			assert.Equal(t, tt.wantBuiltin, pin.Digest)
+			assert.Equal(t, builtinImage+"@"+tt.wantBuiltin, pin.PinnedImage)
+		})
+	}
+}
+
+func TestIsBuiltinContainerImage(t *testing.T) {
+	builtin := []string{
+		"ghcr.io/github/gh-aw-firewall/agent:0.28.57",
+		"ghcr.io/github/gh-aw-firewall/squid:0.28.57",
+		"ghcr.io/github/gh-aw-mcpg:v0.4.31",
+		"ghcr.io/github/gh-aw-node",
+		"ghcr.io/github/github-mcp-server:v2.0.2",
+		"ghcr.io/githubnext/gh-aw-router:0.1.3",
+	}
+	for _, image := range builtin {
+		assert.True(t, isBuiltinContainerImage(image), image)
+	}
+	for _, image := range []string{"ghcr.io/oraios/serena:1.7.0", "node:lts-alpine", "ghcr.io/github/gh-aw-mcpg-extra:v1"} {
+		assert.False(t, isBuiltinContainerImage(image), image)
+	}
 }

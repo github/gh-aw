@@ -14,6 +14,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/github/gh-aw/pkg/syncutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -32,6 +33,48 @@ func isCoreAction(repo string) bool {
 func isGhAwNativeAction(repo string) bool {
 	base := gitutil.ExtractBaseRepo(repo)
 	return base == "github/gh-aw" || base == "github/gh-aw-actions"
+}
+
+// isGhAwSetupAction reports whether repo is the gh-aw setup action, either
+// github/gh-aw-actions/setup or the legacy github/gh-aw/actions/setup.
+func isGhAwSetupAction(repo string) bool {
+	return repo == workflow.GitHubActionsOrgRepo+"/setup" || repo == workflow.GitHubOrgRepo+"/actions/setup"
+}
+
+// compilerReleaseTag returns the running compiler version as a release tag
+// (e.g. "v0.68.3"), or "" for dev, dirty, or otherwise non-release builds.
+func compilerReleaseTag() string {
+	version := GetVersion()
+	if strings.Contains(version, "-") || parseVersion(version) == nil {
+		return ""
+	}
+	return semverutil.EnsureVPrefix(version)
+}
+
+// compilerPinnedActionTag returns the tag repo must be pinned to so that it matches the
+// running compiler, or "" when repo follows the regular release-based update policy.
+// The setup action is the runtime that compiled workflows depend on, so update and
+// upgrade pin it to exactly the compiler version instead of the latest release.
+func compilerPinnedActionTag(repo string) string {
+	if !isGhAwSetupAction(repo) {
+		return ""
+	}
+	return compilerReleaseTag()
+}
+
+// resolveActionUpdateTarget returns the version and SHA an action reference should be
+// updated to. Compiler-pinned actions resolve the compiler version tag; all other
+// actions resolve their latest release.
+func resolveActionUpdateTarget(ctx context.Context, deps actionUpdateDeps, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
+	if tag := compilerPinnedActionTag(repo); tag != "" {
+		updateActionsDepsLog.Printf("Pinning %s to compiler version %s", repo, tag)
+		sha, err := deps.getActionSHAForTag(ctx, gitutil.ExtractBaseRepo(repo), tag)
+		if err != nil {
+			return "", "", fmt.Errorf("cannot resolve SHA for compiler version %s: %w", tag, err)
+		}
+		return tag, sha, nil
+	}
+	return deps.getLatestRelease(ctx, repo, currentVersion, allowMajor, verbose)
 }
 
 type actionUpdateDeps struct {

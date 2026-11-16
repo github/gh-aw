@@ -231,6 +231,7 @@ func maybeForceRefreshContainerPins(ctx context.Context, config CompileConfig, w
 	if _, err := compileUpdateContainerPins(ctx, defaultContainerPinUpdateDeps(), workflowDir, config.Verbose, containerPinUpdateOptions{
 		refreshExisting:     true,
 		failOnResolveErrors: true,
+		refreshBuiltins:     true,
 	}); err != nil {
 		return fmt.Errorf("failed to refresh container pins: %w", err)
 	}
