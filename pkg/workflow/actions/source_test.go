@@ -349,6 +349,7 @@ func TestRepositoryWorkflowCommentEdits(t *testing.T) {
 	require.NotEmpty(t, files)
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
+			t.Parallel()
 			content, err := os.ReadFile(file)
 			require.NoError(t, err)
 			input, err := Parse(content)
@@ -360,5 +361,7 @@ func TestRepositoryWorkflowCommentEdits(t *testing.T) {
 				"editing the AST must not discard or duplicate comments elsewhere in a workflow")
 		})
 	}
-	t.Logf("Preserved comments through AST edits for all %d repository YAML workflows", len(files))
+	t.Cleanup(func() {
+		t.Logf("Preserved comments through AST edits for all %d repository YAML workflows", len(files))
+	})
 }
