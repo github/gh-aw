@@ -52,7 +52,7 @@ func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	_ = os.Remove(response.FilePath)
 }
 
-func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
+func TestBuildLogsFileResponse_SetsOwnerOnlyPermissions(t *testing.T) {
 	output := `{"summary":{"total_runs":1}}`
 	result := buildLogsFileResponse(output)
 
@@ -69,8 +69,8 @@ func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
 		t.Fatalf("Cache directory should exist: %v", err)
 	}
 	cachePerm := cacheInfo.Mode().Perm()
-	if cachePerm&0o005 != 0o005 {
-		t.Errorf("Cache directory should be accessible to other users (expected other r-x bits set), got mode %o", cachePerm)
+	if cachePerm != 0o700 {
+		t.Errorf("Cache directory should be owner-only (expected 700), got mode %o", cachePerm)
 	}
 
 	fileInfo, err := os.Stat(response.FilePath)
@@ -78,8 +78,8 @@ func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
 		t.Fatalf("Cache file should exist: %v", err)
 	}
 	filePerm := fileInfo.Mode().Perm()
-	if filePerm&0o004 != 0o004 {
-		t.Errorf("Cache file should be world-readable (expected other read bit set), got mode %o", filePerm)
+	if filePerm != 0o600 {
+		t.Errorf("Cache file should be owner-only (expected 600), got mode %o", filePerm)
 	}
 
 	_ = os.Remove(response.FilePath)
