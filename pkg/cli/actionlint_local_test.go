@@ -41,6 +41,7 @@ if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
 fi
 printf '%s\n' "$PWD" "$@" > "$ACTIONLINT_TEST_ARGS"
 printf '%s\n' "$ACTIONLINT_TEST_OUTPUT"
+printf '%s' "$ACTIONLINT_TEST_STDERR" >&2
 exit "$ACTIONLINT_TEST_EXIT"
 `
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "actionlint"), []byte(script), 0o755))
@@ -57,17 +58,20 @@ exit "$ACTIONLINT_TEST_EXIT"
 	relPath, err := filepath.Rel(root, files[0])
 	require.NoError(t, err)
 	for _, tt := range []struct {
-		name, exit, output, wantErr string
-		defaultIntegrations         bool
+		name, exit, output, stderr, wantErr string
+		defaultIntegrations                 bool
 	}{
-		{"clean", "0", "[]", "", false},
-		{"default integrations", "0", "[]", "", true},
-		{"findings", "1", fmt.Sprintf(`[{"message":"invalid syntax","kind":"syntax-check","filepath":%q,"line":1,"column":1}]`, relPath), "strict mode: actionlint found 1 errors", false},
-		{"tooling failure", "2", "", "actionlint failed with exit code 2", false},
+		{"clean", "0", "[]", "", "", false},
+		{"default integrations", "0", "[]", "", "", true},
+		{"findings", "1", fmt.Sprintf(`[{"message":"invalid syntax","kind":"syntax-check","filepath":%q,"line":1,"column":1}]`, relPath), "", "strict mode: actionlint found 1 errors", false},
+		{"tooling failure", "2", "", "scanner unavailable\n", "actionlint failed with exit code 2", false},
+		{"empty findings failure", "1", "[]", "fixture could not be read\n", "actionlint failed with exit code 1", false},
+		{"empty output failure", "1", "", "scanner startup failed\n", "actionlint failed with exit code 1", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("ACTIONLINT_TEST_EXIT", tt.exit)
 			t.Setenv("ACTIONLINT_TEST_OUTPUT", tt.output)
+			t.Setenv("ACTIONLINT_TEST_STDERR", tt.stderr)
 			var runErr error
 			output := testutil.CaptureStderr(t, func() {
 				if tt.defaultIntegrations {
@@ -94,6 +98,12 @@ exit "$ACTIONLINT_TEST_EXIT"
 			want := root + "\n" + strings.Join(append(wantArgs, relPath), "\n") + "\n"
 			assert.Equal(t, want, string(args))
 			assert.NotContains(t, output, "Run actionlint directly: docker")
+			if tt.stderr != "" {
+				assert.Contains(t, output, tt.stderr)
+				assert.Equal(t, 1, strings.Count(output, tt.stderr))
+				assert.Contains(t, output, "tooling error")
+				assert.NotContains(t, output, "actionlint found 0 errors")
+			}
 		})
 	}
 	ctx, cancel := context.WithCancel(context.Background())

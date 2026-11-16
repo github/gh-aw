@@ -268,9 +268,6 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 			if runResult.stdout != "" {
 				fmt.Fprint(os.Stderr, runResult.stdout)
 			}
-			if runResult.stderr != "" {
-				fmt.Fprint(os.Stderr, runResult.stderr)
-			}
 		} else if actionlintStats != nil {
 			// Track error statistics.
 			actionlintStats.TotalErrors += totalErrors
@@ -278,6 +275,10 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 				actionlintStats.ErrorsByKind[kind] += count
 			}
 		}
+	}
+
+	if runResult.stderr != "" && (runResult.err != nil || parseErr != nil) {
+		fmt.Fprint(os.Stderr, runResult.stderr)
 	}
 
 	if shouldParseOutput && actionlintStats != nil {
@@ -502,7 +503,7 @@ func handleActionlintExecutionError(err error, strict bool, lockFiles []string, 
 
 	exitCode := exitErr.ExitCode()
 	actionlintLog.Printf("Actionlint exited with code %d, found %d errors", exitCode, totalErrors)
-	if exitCode == 1 {
+	if exitCode == 1 && (totalErrors > 0 || parseErr != nil) {
 		return handleActionlintFindings(strict, lockFiles, totalErrors, parseErr, stdout)
 	}
 
