@@ -338,13 +338,12 @@ worker has its own bounded contract; do not create nested delegations.
 - Read the selection with `cat /tmp/gh-aw/agent/dependabot-burner/context.json`, not sed.
 - Inspect local changes with `git status` or `git diff --stat`. Do not add global
   Git flags such as --no-pager or query remotes.
-- Use the configured GitHub tools through the CLI proxy for PR files, diffs,
-  comments, reviews, and author/maintainer metadata. Discover schemas with
-  `github --help` and `github pull_request_read --help`, then invoke
-  `github pull_request_read` with one JSON argument containing method, owner,
-  repo, and pullNumber. Tool names are subcommands of github, not standalone
-  executables or shell built-ins. Do not use command discovery probes, gh commands,
-  authentication checks, or credential setup; authentication is workflow-managed.
+- Use the configured GitHub MCP tools directly for PR files, diffs, comments,
+  reviews, and author/maintainer metadata; for example, call the
+  `pull_request_read` tool with method, owner, repo, and pullNumber. GitHub
+  tools are not shell commands: never invoke them through Bash. Do not use
+  command discovery probes, gh commands, authentication checks, or credential
+  setup; authentication is workflow-managed.
 - Run only declared validation commands. Do not wrap GitHub reads in shell loops
   or add undeclared utilities or pipeline stages.
 - After the first tool-permission denial, stop shell calls in that agent and
@@ -415,11 +414,12 @@ retry-history summary, and maintainer-only feedback. Do not delegate.
 
 ## Tool contract
 
-- Read files with the read/search tools; use edit/create tools to write changes and
+- Read files with the read/grep/find/ls tools; use edit/write tools to write changes and
   the result JSON. Do not use shell redirections or helpers to write files.
-- The GitHub executable is `github`: use `github --help` and `github pull_request_read --help`,
-  then `github pull_request_read` with documented JSON arguments. Tool names are not
-  executables. Do not use gh, auth checks, executable discovery, or shell help.
+- Call GitHub MCP tools such as `pull_request_read` directly with documented
+  arguments, never through Bash; tool names are not executables. If they are
+  unavailable, use the diffs supplied by the orchestrator and report the gap.
+  Do not use gh, auth checks, executable discovery, or shell help.
 - Inspect changes with `git status` or `git diff --stat`; do not add global Git
   flags, query remotes, commit, push, or mutate PRs directly.
 - Run only declared validation commands. No shell loops, undeclared helpers,
