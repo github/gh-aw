@@ -377,7 +377,8 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     engineId === "copilot"
       ? {
           [COPILOT_MODEL_VERIFICATION_EXIT_CODE]: "Copilot main-session model verification failed",
-          [WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE]: "Workflow tool permission denials reached the max-tool-denials limit (use only allowed tools.bash commands, or allow the denied command)",
+          // Exit 80 follows any workflow tool denial; only the guard event proves the limit was reached.
+          [WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE]: `Session failed after a workflow tool permission denial${toolDenialLimitExceeded ? "; max-tool-denials limit reached" : ""} (use only allowed tools.bash commands, or allow the denied command)`,
         }
       : {};
   const driverExitMeaning =

@@ -332,13 +332,20 @@ describe("empty output outcome", () => {
   });
 
   it.each([
-    ["copilot", 80, "Workflow tool permission denials reached the max-tool-denials limit"],
+    ["copilot", 80, "Session failed after a workflow tool permission denial (use only"],
     ["copilot", 79, "Copilot main-session model verification failed"],
     ["claude", 80, "Unknown (engine-specific exit code)"],
   ])("explains %s driver exit %s using gh-aw reserved exit codes only for that engine", (engine, exitCode, meaning) => {
     vi.stubEnv("GH_AW_ENGINE_ID", engine);
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
     expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
+  });
+
+  it("reports the max-tool-denials limit for copilot exit 80 only with guard evidence", () => {
+    vi.stubEnv("GH_AW_ENGINE_ID", "copilot");
+    writeEvents([{ type: "guard.tool_denials_exceeded", data: { denialCount: 5, threshold: 5 } }]);
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "80");
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain("Driver exit meaning: Session failed after a workflow tool permission denial; max-tool-denials limit reached");
   });
 
   it.each([
