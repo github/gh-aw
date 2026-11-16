@@ -3,9 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -224,7 +226,7 @@ Say hello.
 	// Network stubs: every action has a newer release and every image a different digest.
 	const newerSetupSHA = "fedcba0987654321fedcba0987654321fedcba09"
 	const driftedDigest = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-	actionDeps := newTestActionUpdateDeps()
+	actionDeps := defaultActionUpdateDeps()
 	actionDeps.getLatestRelease = func(_ context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
 		if isGhAwSetupAction(repo) {
 			return "v1.3.0", newerSetupSHA, nil
@@ -268,7 +270,7 @@ Say hello.
 	saved := workflow.NewActionCache(tempDir)
 	require.NoError(t, saved.Load())
 	entry, ok := saved.Entries["github/gh-aw-actions/setup@v1.2.3"]
-	require.True(t, ok, "setup action must stay pinned to the compiler version, got %v", savedEntryKeys(saved))
+	require.True(t, ok, "setup action must stay pinned to the compiler version, got %v", slices.Collect(maps.Keys(saved.Entries)))
 	require.Equal(t, setupSHA, entry.SHA)
 	for _, image := range builtinImages {
 		pin, ok := saved.GetContainerPin(image)
