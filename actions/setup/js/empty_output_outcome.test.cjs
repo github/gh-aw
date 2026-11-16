@@ -341,6 +341,19 @@ describe("empty output outcome", () => {
     expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
   });
 
+  it.each([undefined, ""])("falls back to workflow.info engineId for copilot exit 80 when GH_AW_ENGINE_ID is %j", envValue => {
+    vi.stubEnv("GH_AW_ENGINE_ID", envValue);
+    vi.stubEnv("GH_AW_PROTECTED_SESSION_CAPTURE", "1");
+    const session = {
+      events: [
+        { type: "workflow.info", provenance: { component: "workflow", phase: "activation" }, data: { engineId: "copilot" } },
+        { type: "agent.execution", provenance: { component: "execution", phase: "agent" }, data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 80 } },
+      ],
+      maskedValues: [],
+    };
+    expect(buildEmptyOutputOutcome([], rootDir, session).details).toContain("Driver exit meaning: Session failed after a workflow tool permission denial (use only");
+  });
+
   it("reports the max-tool-denials limit for copilot exit 80 only with guard evidence", () => {
     vi.stubEnv("GH_AW_ENGINE_ID", "copilot");
     writeEvents([{ type: "guard.tool_denials_exceeded", data: { denialCount: 5, threshold: 5 } }]);

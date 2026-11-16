@@ -6,8 +6,7 @@ const path = require("path");
 const { collectUnifiedSession } = require("./unified_session.cjs");
 const { agentErrorSummaryText, collectAgentErrorEvidence, classifyDriverStderr, DRIVER_STDERR_SUMMARIES } = require("./agent_execution.cjs");
 const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
-const { COPILOT_MODEL_VERIFICATION_EXIT_CODE } = require("./copilot_model_selection.cjs");
-const { WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
+const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./driver_exit_codes.cjs");
 const { sessionContext, isNestedSessionEvent } = require("./agent_session.cjs");
 const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
@@ -168,7 +167,7 @@ function workflowInfoData(events) {
 /** @param {import("./types/unified_session").UnifiedSession} events @returns {unknown} */
 function workflowEngineId(events) {
   const info = workflowInfoData(events);
-  return process.env.GH_AW_ENGINE_ID ?? info?.engineId ?? info?.engine_id;
+  return process.env.GH_AW_ENGINE_ID || info?.engineId || info?.engine_id;
 }
 
 /** @param {import("./types/unified_session").UnifiedSession} events @returns {boolean} */

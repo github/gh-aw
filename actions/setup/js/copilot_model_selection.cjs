@@ -9,13 +9,10 @@ const { validateModelIdentifier } = require("./model_attribution.cjs");
 const { normalizeForCopilotCLI, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { copilotSessionContext } = require("./copilot_session.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { COPILOT_MODEL_VERIFICATION_EXIT_CODE } = require("./driver_exit_codes.cjs");
 
 // Bounds the per-run model history persisted in the selection log (16 KiB) and aw_info.json.
 const MAX_OBSERVED_MODELS = 32;
-
-// Exit code the SDK driver uses to report a main-session model verification failure (substitution
-// or unverifiable evidence) so the harness stops without retrying, as it does in CLI mode.
-const COPILOT_MODEL_VERIFICATION_EXIT_CODE = 79;
 
 function modelID(value) {
   return validateModelIdentifier(normalizeForCopilotCLI(splitModelIdentifier(String(value || "")).base));
