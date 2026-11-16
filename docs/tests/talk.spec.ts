@@ -57,8 +57,9 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   expect(await page.evaluate(() => localStorage.getItem("aw-mute"))).toBe("0");
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
+  // Space follows the main line, past the Issue Monster example hanging below Event-driven Hand-offs
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${HANDOFFS + 1}$`));
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Pull Request Review²")}$`));
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
@@ -144,6 +145,9 @@ test("jumps to any slide from the dock's full-screen slide map", async ({ page }
   await button.click();
   await expect(dialog).toBeVisible();
   await expect(tiles).toHaveCount(TOTAL);
+  // a column's examples are stacked below its pattern tile
+  const kids = dialog.getByRole("group", { name: "Daily Unsloppers examples" });
+  await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${slideNo("Repo Assist")}:`) })).toBeVisible();
   const current = dialog.locator('[aria-current="true"]');
   await expect(current).toHaveAccessibleName(/^Go to slide 3:/);
   await expect(current).toBeFocused();
@@ -183,6 +187,53 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
+  // Page Up/Page Down always switch bands
+  await page.keyboard.press("PageDown");
+  await expect(count).toHaveAttribute("aria-label", at(2));
+  await page.keyboard.press("PageDown");
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await page.keyboard.press("PageUp");
+  await expect(count).toHaveAttribute("aria-label", at(2));
+});
+
+test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
+  const count = page.locator(CURRENT);
+  const vnb = page.locator(".vnb");
+  const head = slideNo("Daily Unsloppers");
+  const first = slideNo("Repo Assist");
+  const last = slideNo("Personas · Probe · Patch");
+  const n = last - head;
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Issues as intent")}`);
+  await expect(vnb).toBeHidden();
+  await page.keyboard.press("ArrowRight");
+  await expect(count).toHaveAttribute("aria-label", at(head));
+  // the head lights a toolbar button hinting that a column of examples lies below
+  await expect(page.getByRole("button", { name: `${n} examples below` })).toBeVisible();
+  await expect(vnb).toHaveText(`${n}`);
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(first));
+  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Repo Assist");
+  await expect(vnb).toHaveText(`1/${n}`);
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(head));
+  // the toolbar button steps down the column; Right from an example rejoins the main line
+  await vnb.click();
+  await vnb.click();
+  await expect(count).toHaveAttribute("aria-label", at(head + 2));
+  await page.keyboard.press("ArrowRight");
+  await expect(count).toHaveAttribute("aria-label", at(last + 1));
+  await expect(vnb).toBeHidden();
+  // Left from the main line skips the column back to its head
+  await page.keyboard.press("ArrowLeft");
+  await expect(count).toHaveAttribute("aria-label", at(head));
+  // on the last example the button leads back up to the pattern
+  await page.goto(`/gh-aw/cracktro/#${last}`);
+  await page.getByRole("button", { name: "Back to the pattern" }).click();
+  await expect(count).toHaveAttribute("aria-label", at(head));
+  // past the bottom of the column, Down moves on to the next band (trust the process)
+  await page.goto(`/gh-aw/cracktro/#${last}`);
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("For PMs") + 1));
 });
 
 test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
