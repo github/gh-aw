@@ -7,12 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/cli/go-gh/v2/pkg/auth"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 // queueGit adapts the ledger object operations to Git plumbing. API clients are
@@ -28,6 +29,7 @@ type queueGit struct {
 	dir, remote, ref, head string
 	env                    []string
 	reuseValidated         bool
+	filterSupported        bool
 }
 
 // LedgerSession reuses one isolated object store for a scoped series of ledger
@@ -43,6 +45,8 @@ const queueGitCommandTimeout = 120 * time.Second
 const queueGitMetadataBytes = 1 << 20
 
 var errQueueGitOutputLimit = errors.New("queue Git output exceeds size limit")
+var errQueueGitFilterUnsupported = errors.New("queue Git server must support blob filtering; unfiltered asset downloads are not permitted")
+var queueGitFilterCapability = regexp.MustCompile(`(?m)\bpacket:\s+\S+< fetch=(?:[^\r\n]* )?filter(?: |\r?$)|\bpacket:\s+\S+< [a-f0-9]{40,64} [^\r\n]*\\0[^\r\n]* filter(?: |\r?$)`)
 
 type queueGitOutput struct {
 	buffer   bytes.Buffer
@@ -84,7 +88,13 @@ func (b Branch) withLedger(ctx context.Context) (Branch, func(), error) {
 		return b, nil, err
 	}
 	b.ledger = ledger
-	return b, func() { _ = os.RemoveAll(ledger.dir) }, nil
+	return b, func() { cleanupQueueGit(ledger.dir) }, nil
+}
+
+func cleanupQueueGit(dir string) {
+	if err := os.RemoveAll(dir); err != nil {
+		console.PrintWarningMessage("queue_git_cleanup_failed: temporary Git object cleanup failed; check temporary-directory permissions")
+	}
 }
 
 // OpenLedgerSession creates a scoped session with an isolated Git object store.
@@ -174,7 +184,7 @@ func newQueueGit(ctx context.Context, remote, branch, token string) (*queueGit, 
 	}
 	absolute, err := filepath.Abs(dir)
 	if err != nil {
-		_ = os.RemoveAll(dir)
+		cleanupQueueGit(dir)
 		return nil, err
 	}
 	dir = absolute
@@ -197,7 +207,7 @@ func newQueueGit(ctx context.Context, remote, branch, token string) (*queueGit, 
 			"GIT_CONFIG_VALUE_0=AUTHORIZATION: basic "+header)
 	}
 	if _, err := q.run(ctx, nil, "init", "--bare", "--template=", dir); err != nil {
-		_ = os.RemoveAll(dir)
+		cleanupQueueGit(dir)
 		return nil, err
 	}
 	return q, nil
@@ -206,23 +216,43 @@ func newQueueGit(ctx context.Context, remote, branch, token string) (*queueGit, 
 func (q *queueGit) run(ctx context.Context, input []byte, operation string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, queueGitCommandTimeout)
 	defer cancel()
+	if filepath.IsAbs(q.remote) && (operation == "fetch" || operation == "ls-remote" || operation == "push") {
+		// Git rejects absolute filesystem paths as filtered promisor remote names.
+		remotePath := filepath.ToSlash(q.remote)
+		if !strings.HasPrefix(remotePath, "/") {
+			remotePath = "/" + remotePath
+		}
+		commandRemote := (&url.URL{Scheme: "file", Path: remotePath}).String()
+		args = slices.Clone(args)
+		for index, arg := range args {
+			if arg == q.remote {
+				args[index] = commandRemote
+			}
+		}
+	}
 	limit := queueGitMetadataBytes
 	if operation == "cat-file" && slices.Contains(args, "blob") {
 		limit = maxParseBytes
 	}
 	output := &queueGitOutput{limit: limit, cancel: cancel}
+	diagnostics := &queueGitOutput{limit: queueGitMetadataBytes, cancel: cancel}
 	base := []string{"--no-replace-objects", "-c", "core.hooksPath=" + os.DevNull,
 		"-c", "credential.helper=", "-c", "core.askPass=", "-c", "http.followRedirects=false",
 		"-c", "protocol.allow=never", "-c", "protocol.https.allow=always",
 		"-c", "fetch.fsckObjects=true",
 		"-c", "maintenance.auto=false", "-c", "gc.auto=0", operation}
 	command := exec.CommandContext(ctx, "git", append(base, args...)...)
-	command.Dir, command.Env = q.dir, q.env
+	command.Dir, command.Env = q.dir, append(slices.Clone(q.env), "LC_ALL=C")
+	probeFilter := operation == "ls-remote" && slices.Contains(args, "--refs")
+	if probeFilter {
+		// Capture protocol advertisement packets only, never HTTP credentials.
+		command.Env = append(command.Env, "GIT_TRACE_PACKET=1")
+	}
 	command.Stdin = bytes.NewReader(input)
-	command.Stdout, command.Stderr = output, io.Discard
+	command.Stdout, command.Stderr = output, diagnostics
 	command.WaitDelay = time.Second
 	err := command.Run()
-	if output.exceeded {
+	if output.exceeded || diagnostics.exceeded {
 		return nil, errQueueGitOutputLimit
 	}
 	if err != nil {
@@ -230,6 +260,13 @@ func (q *queueGit) run(ctx context.Context, input []byte, operation string, args
 			err = ctx.Err()
 		}
 		return output.buffer.Bytes(), fmt.Errorf("queue Git %s failed: %w", operation, err)
+	}
+	if probeFilter {
+		q.filterSupported = queueGitFilterCapability.Match(diagnostics.buffer.Bytes())
+	}
+	if operation == "fetch" && slices.Contains(args, "--filter=blob:none") &&
+		bytes.Contains(diagnostics.buffer.Bytes(), []byte("filtering not recognized by server, ignoring")) {
+		return nil, errQueueGitFilterUnsupported
 	}
 	return output.buffer.Bytes(), nil
 }
@@ -257,6 +294,9 @@ func (q *queueGit) resolve(ctx context.Context) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !q.filterSupported {
+		return nil, errQueueGitFilterUnsupported
+	}
 	if q.reuseValidated && sha == q.head {
 		if _, err := os.Stat(filepath.Join(q.dir, "shallow")); !os.IsNotExist(err) {
 			return nil, errors.New("queue Git history must not be shallow")
@@ -267,7 +307,7 @@ func (q *queueGit) resolve(ctx context.Context) (any, error) {
 	}
 	previousHead := q.head
 	if _, err := q.run(ctx, nil, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
-		q.remote, "+"+q.ref+":refs/heads/ledger"); err != nil {
+		"--filter=blob:none", q.remote, "+"+q.ref+":refs/heads/ledger"); err != nil {
 		return nil, err
 	}
 	output, err := q.run(ctx, nil, "rev-parse", "--verify", "refs/heads/ledger^{commit}")
@@ -285,6 +325,7 @@ func (q *queueGit) resolve(ctx context.Context) (any, error) {
 }
 
 func (q *queueGit) advertisedHead(ctx context.Context) (string, error) {
+	q.filterSupported = false
 	output, err := q.run(ctx, nil, "ls-remote", "--exit-code", "--refs", q.remote, q.ref)
 	if err != nil {
 		var exit *exec.ExitError
@@ -327,15 +368,8 @@ func (q *queueGit) verifyFetchedHistory(ctx context.Context, previousHead, newHe
 	}
 	if previousHead != "" {
 		if _, err := q.run(ctx, nil, "merge-base", "--is-ancestor", previousHead, newHead); err == nil {
-			var added []byte
-			added, err = q.run(ctx, nil, "rev-list", "--objects", "--missing=print", newHead, "^"+previousHead)
-			if err != nil {
+			if _, err := q.run(ctx, nil, "rev-list", "--quiet", "--objects", "--missing=allow-promisor", newHead, "^"+previousHead); err != nil {
 				return err
-			}
-			for line := range strings.SplitSeq(string(added), "\n") {
-				if strings.HasPrefix(line, "?") {
-					return errors.New("queue Git history must not contain missing objects")
-				}
 			}
 		} else {
 			var exit *exec.ExitError
@@ -349,7 +383,10 @@ func (q *queueGit) verifyFetchedHistory(ctx context.Context, previousHead, newHe
 	} else if _, err := q.run(ctx, nil, "fsck", "--connectivity-only", "--no-dangling", "--no-reflogs", newHead); err != nil {
 		return err
 	}
-	return nil
+	// Promisor connectivity permits omitted blobs, not missing causal commits
+	// or trees. Traverse the complete metadata graph without hydrating blobs.
+	_, err := q.run(ctx, nil, "rev-list", "--quiet", "--objects", "--filter=blob:none", "--missing=error", newHead)
+	return err
 }
 
 func (q *queueGit) commit(ctx context.Context, sha string) (string, []string, error) {
@@ -402,6 +439,15 @@ func (q *queueGit) request(ctx context.Context, method, endpoint string, body an
 		sha := strings.TrimPrefix(endpoint, "git/blobs/")
 		if !revisionPattern.MatchString(sha) {
 			return nil, errors.New("invalid queue Git blob")
+		}
+		if _, err := q.run(ctx, nil, "cat-file", "-e", sha+"^{blob}"); err != nil {
+			if !q.filterSupported {
+				return nil, errQueueGitFilterUnsupported
+			}
+			if _, err := q.run(ctx, nil, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
+				"--filter=blob:none", q.remote, sha); err != nil {
+				return nil, err
+			}
 		}
 		data, err := q.run(ctx, nil, "cat-file", "blob", sha)
 		return map[string]string{"encoding": "base64", "content": base64.StdEncoding.EncodeToString(data)}, err

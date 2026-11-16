@@ -22,7 +22,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup();
 });
 
-function fixture(options = {}) {
+function fixture({ gitFilter = true, ...options } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-git-test-"));
   cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
   const env = gitEnvironment();
@@ -32,13 +32,15 @@ function fixture(options = {}) {
       .trim();
   }
   git(["init", "--bare", "--quiet", "--initial-branch=main", "--template="]);
+  git(["config", "uploadpack.allowFilter", String(gitFilter)]);
+  git(["config", "uploadpack.allowReachableSHA1InWant", "true"]);
   const queue = queueFixture({ count: 2, batch: 1, ...options });
   let head;
   let serial = 0;
-  function store(transactions, { mode = "100644", parents = head ? [head] : [] } = {}) {
+  function store(transactions, { mode = "100644", parents = head ? [head] : [], blobs = [] } = {}) {
     const contents = typeof transactions === "string" ? transactions : transactions.map(commit => canonical(commit)).join("\n") + "\n";
     const blob = git(["hash-object", "-w", "--stdin"], contents);
-    const tree = git(["mktree"], `${mode} blob ${blob}\twork-queue.jsonl\n`);
+    const tree = git(["mktree"], `${mode} blob ${blob}\twork-queue.jsonl\n${blobs.map(({ sha, name }) => `100644 blob ${sha}\t${name}\n`).join("")}`);
     head = git(["commit-tree", tree, ...parents.flatMap(parent => ["-p", parent]), "-F", "-"], `Queue fixture ${++serial}`);
     git(["update-ref", "refs/heads/work-queue", head]);
     return head;
@@ -75,7 +77,7 @@ function fixture(options = {}) {
   const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote: directory });
   registerQueueLedgerClient(githubClient, ledger);
   cleanups.push(() => ledger.close());
-  return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
+  return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head, remote: "" };
 }
 
 async function unusedPort() {
@@ -85,6 +87,29 @@ async function unusedPort() {
   await new Promise((resolve, reject) => server.close(error => (error ? reject(error) : resolve())));
   if (!address || typeof address === "string") throw new Error("temporary Git server did not bind a TCP port");
   return address.port;
+}
+
+async function serveFixture(f) {
+  const directory = f.git(["rev-parse", "--absolute-git-dir"]);
+  const port = await unusedPort();
+  const remote = `git://127.0.0.1:${port}/${path.basename(directory)}`;
+  const daemon = spawn("git", ["daemon", "--reuseaddr", "--export-all", "--strict-paths", `--base-path=${path.dirname(directory)}`, "--listen=127.0.0.1", `--port=${port}`, directory], { stdio: "ignore" });
+  cleanups.push(() => daemon.kill());
+  let advertised = false;
+  for (let attempt = 0; attempt < 50 && !advertised; attempt++) {
+    try {
+      execFileSync("git", ["ls-remote", remote], { env: gitEnvironment(), stdio: "ignore", timeout: 1000 });
+      advertised = true;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  }
+  expect(advertised).toBe(true);
+  f.remote = remote;
+  const ledger = createGitLedgerClient({ githubClient: f.githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote });
+  registerQueueLedgerClient(f.githubClient, ledger);
+  cleanups.push(() => ledger.close());
+  return ledger;
 }
 
 function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound = false, corruptOldest = false } = {}) {
@@ -122,65 +147,80 @@ function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound 
 }
 
 describe("Git-only work queue ledger", { timeout: 90000 }, () => {
+  it.skipIf(process.platform === "win32")("exports only the exact disposable repository, not a neighboring fixture", async () => {
+    const f = fixture();
+    const neighbor = fixture();
+    await serveFixture(f);
+    const neighborURL = new URL(f.remote);
+    neighborURL.pathname = `/${path.basename(neighbor.git(["rev-parse", "--absolute-git-dir"]))}`;
+    expect(() => execFileSync("git", ["ls-remote", neighborURL.href], { env: gitEnvironment(), stdio: "ignore", timeout: 1000 })).toThrow();
+    expect((await readWorkQueueLog(f.options)).transactions).toEqual(f.queue.transactions);
+  });
+
   it.skipIf(process.platform === "win32")("filters asset blobs from queue history and fetches only requested blobs", async () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-git-filter-test-"));
-    cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
-    const remoteDirectory = path.join(directory, "remote.git");
-    const env = {
-      ...gitEnvironment(),
-      GIT_AUTHOR_NAME: "Queue filter fixture",
-      GIT_AUTHOR_EMAIL: "queue-filter@example.invalid",
-      GIT_COMMITTER_NAME: "Queue filter fixture",
-      GIT_COMMITTER_EMAIL: "queue-filter@example.invalid",
-    };
-    const git = (args, input) =>
-      execFileSync("git", ["--git-dir", remoteDirectory, ...args], { env, input, stdio: ["pipe", "pipe", "pipe"] })
-        .toString("utf8")
-        .trim();
-    execFileSync("git", ["init", "--bare", "--quiet", "--initial-branch=main", "--template=", remoteDirectory], { env });
-    git(["config", "uploadpack.allowFilter", "true"]);
-    git(["config", "uploadpack.allowReachableSHA1InWant", "true"]);
-    const queue = queueFixture({ count: 2, batch: 1 });
-    const queueBlob = git(["hash-object", "-w", "--stdin"], serializeTransactionLog(queue.transactions));
+    const f = fixture();
     const assetContent = Buffer.alloc(1024 * 1024, 97);
-    const assetBlob = git(["hash-object", "-w", "--stdin"], assetContent);
-    const tree = git(["mktree", "-z"], [`100644 blob ${queueBlob}\twork-queue.jsonl\0`, `100644 blob ${assetBlob}\tasset.bin\0`].join(""));
-    const commit = git(["commit-tree", tree, "-m", "Queue filter fixture"]);
-    git(["update-ref", "refs/heads/main", commit]);
-    git(["update-ref", "refs/heads/work-queue", commit]);
+    const assetBlob = f.git(["hash-object", "-w", "--stdin"], assetContent);
+    f.store(f.queue.transactions, { blobs: [{ sha: assetBlob, name: "historical-asset.bin" }] });
+    const first = compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at);
+    const currentContent = Buffer.alloc(1024 * 1024, 98);
+    const currentBlob = f.git(["hash-object", "-w", "--stdin"], currentContent);
+    f.store(first, { blobs: [{ sha: currentBlob, name: "current-asset.bin" }] });
+    const second = compactTransactions(first, f.head(), f.queue.administrator, f.queue.at + 1);
+    f.store(second, { blobs: [{ sha: currentBlob, name: "current-asset.bin" }] });
+    const ledger = await serveFixture(f);
 
-    const port = await unusedPort();
-    const remote = `git://127.0.0.1:${port}/remote.git`;
-    const daemon = spawn("git", ["daemon", "--reuseaddr", "--export-all", `--base-path=${directory}`, "--listen=127.0.0.1", `--port=${port}`], { stdio: "ignore" });
-    cleanups.push(() => daemon.kill());
-    let advertised = false;
-    for (let attempt = 0; attempt < 50 && !advertised; attempt++) {
-      try {
-        execFileSync("git", ["ls-remote", remote], { env, stdio: "ignore", timeout: 1000 });
-        advertised = true;
-      } catch {
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-    }
-    expect(advertised).toBe(true);
-
-    let authentications = 0;
-    const githubClient = {
-      auth: async () => {
-        authentications++;
-        return { type: "token", token: "queue-filter-test" };
-      },
-    };
-    const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote });
-    registerQueueLedgerClient(githubClient, ledger);
-    cleanups.push(() => ledger.close());
-
-    const read = await readWorkQueueLog({ githubClient, owner: "owner", repo: "repo" });
-    expect(read.transactions).toEqual(queue.transactions);
-    const afterQueueRead = authentications;
+    const read = await readWorkQueueLog(f.options);
+    expect(read.transactions).toEqual(second);
+    expect(read.state.works.size).toBe(2);
+    expect(f.networkCalls).toHaveLength(5);
+    const afterQueueRead = f.networkCalls.length;
     const asset = await ledger.rest.git.getBlob({ file_sha: assetBlob });
     expect(Buffer.from(asset.data.content, "base64")).toEqual(assetContent);
-    expect(authentications).toBe(afterQueueRead + 1);
+    expect(f.networkCalls).toHaveLength(afterQueueRead + 1);
+    const current = await ledger.rest.git.getBlob({ file_sha: currentBlob });
+    expect(Buffer.from(current.data.content, "base64")).toEqual(currentContent);
+    expect(f.networkCalls).toHaveLength(afterQueueRead + 2);
+    await ledger.rest.git.getBlob({ file_sha: assetBlob });
+    expect(f.networkCalls).toHaveLength(afterQueueRead + 2);
+    expect(f.calls).toEqual([]);
+  });
+
+  it.skipIf(process.platform === "win32")("rejects a corrupt oldest checkpoint with on-demand ledger blobs", async () => {
+    const f = fixture();
+    const first = compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at);
+    f.store(first, { parents: [] });
+    const second = compactTransactions(first, f.head(), f.queue.administrator, f.queue.at + 1);
+    f.store(second);
+    await serveFixture(f);
+    await expect(readWorkQueueLog(f.options)).rejects.toMatchObject({ code: "checkpoint_invalid" });
+    expect(f.calls).toEqual([]);
+  });
+
+  it.skipIf(process.platform === "win32").each([false, true])("rejects unsupported filtering without inventing queue absence (absent: %s)", async absent => {
+    const f = fixture({ gitFilter: false });
+    if (absent) {
+      f.git(["update-ref", "refs/heads/main", f.head()]);
+      f.git(["update-ref", "-d", "refs/heads/work-queue"]);
+    }
+    await serveFixture(f);
+    if (absent) expect((await readWorkQueueLog(f.options)).sha).toBeNull();
+    else await expect(readWorkQueueLog(f.options)).rejects.toMatchObject({ code: "git_transport_failed" });
+    expect(f.networkCalls).toHaveLength(1);
+    expect(f.calls).toEqual([]);
+  });
+
+  it.skipIf(process.platform === "win32")("propagates denied on-demand blob authentication rather than returning an empty queue", async () => {
+    const f = fixture();
+    await serveFixture(f);
+    const authenticate = f.githubClient.auth;
+    f.githubClient.auth = async () => {
+      if (f.networkCalls.length === 2) throw new Error("fixture object access denied");
+      return authenticate();
+    };
+    await expect(readWorkQueueLog(f.options)).rejects.toThrow("fixture object access denied");
+    expect(f.networkCalls).toHaveLength(2);
+    expect(f.calls).toEqual([]);
   });
 
   it.each([false, true])("shares production ledger clients with a paced Issue wrapper created before the first read: %s", async wrapFirst => {
@@ -217,17 +257,17 @@ describe("Git-only work queue ledger", { timeout: 90000 }, () => {
   it("looks up unchanged history locally but fetches a changed remote head", async () => {
     const f = fixture();
     const current = await readWorkQueueLog(f.options);
-    expect(f.networkCalls).toHaveLength(2);
+    expect(f.networkCalls).toHaveLength(3);
     await f.ledger.rest.repos.get();
     const files = await f.ledger.readFiles(current.sha, ["work-queue.jsonl"]);
     expect(files.get("work-queue.jsonl")).toBe(serializeTransactionLog(f.queue.transactions));
-    expect(f.networkCalls).toHaveLength(3);
+    expect(f.networkCalls).toHaveLength(4);
 
     f.store(f.queue.transactions);
     const refreshed = await readWorkQueueLog(f.options);
     expect(refreshed.sha).toBe(f.head());
     expect(refreshed.sha).not.toBe(current.sha);
-    expect(f.networkCalls).toHaveLength(5);
+    expect(f.networkCalls).toHaveLength(6);
     expect(f.calls).toEqual([]);
   });
 
@@ -302,7 +342,7 @@ describe("Git-only work queue ledger", { timeout: 90000 }, () => {
       expect(cold.state.requests.size).toBe(initial.requests.size + retained + generations);
       expect(cold.state.claims.size).toBe(initial.claims.size);
     }
-    expect(f.networkCalls).toHaveLength(2);
+    expect(f.networkCalls).toHaveLength(generations + 3);
     expect(f.calls).toEqual([]);
     console.info(
       JSON.stringify({

@@ -86,13 +86,13 @@ describe("projection lock acquisition diagnostics", () => {
     expect(githubClient.graphql).toHaveBeenCalledTimes(1);
   });
 
-  it("starts paced GraphQL acquisition and release deadlines at dispatch", async () => {
+  it.each(["acquisition", "release"])("starts the full paced GraphQL %s deadline at dispatch", async phase => {
     simulateDeadlines();
     const keys = Array.from({ length: 50 }, (_, index) => `work:${index}`);
     const githubClient = {
       graphql: vi.fn((query, variables) => {
         expect(variables.request.signal.aborted).toBe(false);
-        if (query.includes("WorkQueueProjectionUnlocks")) return waitForAbort(variables.request);
+        if (phase === "acquisition" || query.includes("WorkQueueProjectionUnlocks")) return waitForAbort(variables.request);
         return Object.fromEntries(
           keys.map((_key, index) => {
             const input = variables[`l${index}`];
@@ -102,18 +102,26 @@ describe("projection lock acquisition diagnostics", () => {
       }),
     };
     const { client } = wrapGithubClient(githubClient);
-    const pending = withProjectionLocks({ githubClient: client, repositoryId: "repository", head: "a".repeat(40), keys }, async () => ({}));
+    const operation = vi.fn().mockResolvedValue({});
+    let settled = false;
+    const pending = withProjectionLocks({ githubClient: client, repositoryId: "repository", head: "a".repeat(40), keys }, operation).finally(() => {
+      settled = true;
+    });
     const rejected = expect(pending).rejects.toMatchObject({ code: "projection_coordination_pending" });
 
     await vi.advanceTimersByTimeAsync(50000);
     expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(50000);
-    expect(githubClient.graphql).toHaveBeenCalledTimes(2);
+    if (phase === "release") {
+      await vi.advanceTimersByTimeAsync(50000);
+      expect(githubClient.graphql).toHaveBeenCalledTimes(2);
+    }
     await vi.advanceTimersByTimeAsync(29999);
-    expect(githubClient.graphql).toHaveBeenCalledTimes(2);
+    expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await rejected;
-    expect(githubClient.graphql).toHaveBeenCalledTimes(2);
+    expect(settled).toBe(true);
+    expect(operation).toHaveBeenCalledTimes(phase === "release" ? 1 : 0);
+    expect(githubClient.graphql).toHaveBeenCalledTimes(phase === "release" ? 2 : 1);
   });
 
   it.each([false, true])("bounds REST acquisition at 15 seconds and cleans up only acknowledged locks (partial=%s)", async partial => {
@@ -265,5 +273,32 @@ describe("projection lock acquisition diagnostics", () => {
     expect(output()).toContain("projection.locks.release.failed");
     expect(output()).toContain("http_status=403");
     expect(output()).not.toContain("private-release-payload");
+  });
+
+  it.each(["REST", "GraphQL"])("preserves a pre-dispatch %s release rejection without deleting held locks", async transport => {
+    simulateDeadlines();
+    const failure = Object.assign(new Error("private-rate-payload"), { status: 429 });
+    const createRef = vi.fn().mockResolvedValue({});
+    const deleteRef = vi.fn().mockResolvedValue({});
+    const githubClient = {
+      rest: { git: { createRef, deleteRef } },
+      graphql: vi.fn((query, options) => {
+        if (query.includes("WorkQueueProjectionLocks")) return Promise.resolve({ l0: { ref: { id: "lock", prefix: "refs/heads/", name: options.l0.name.slice(11), target: { oid: options.l0.oid } } } });
+        return Promise.reject(failure);
+      }),
+    };
+    registerQueueLedgerClient(githubClient, githubClient);
+    const { client } = wrapGithubClient(githubClient, { sleep: async () => {} });
+    const operation = vi.fn(() => client.graphql("query { viewer { login } }", {}));
+    const options = { githubClient: client, head: "a".repeat(40), keys: ["work:work"], ...(transport === "REST" ? { owner: "owner", repo: "repo" } : { repositoryId: "repository" }) };
+
+    await expect(withProjectionLocks(options, operation)).rejects.toMatchObject({ code: "projection_rate_pending" });
+
+    expect(operation).toHaveBeenCalledTimes(1);
+    expect(createRef).toHaveBeenCalledTimes(transport === "REST" ? 1 : 0);
+    expect(deleteRef).not.toHaveBeenCalled();
+    expect(githubClient.graphql).toHaveBeenCalledTimes(transport === "REST" ? 1 : 2);
+    expect(output()).toContain("projection.locks.release.failed");
+    expect(output()).not.toContain("private-rate-payload");
   });
 });

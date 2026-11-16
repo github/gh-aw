@@ -1,10 +1,11 @@
 // @ts-check
 "use strict";
 
-const { execFileSync } = require("node:child_process");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const { queueError } = require("./work_queue_codec.cjs");
 const { buildGitAuthEnv } = require("./git_auth_env.cjs");
 const { createQueueGitObjectReader } = require("./work_queue_git_objects.cjs");
@@ -99,35 +100,52 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
   let verifiedHead = "";
   let advertised = new Map();
   let defaultBranch = "";
+  let filterSupported = false;
 
   /** @param {string[]} args @param {string | Buffer | undefined} [input] */
-  function git(args, input = undefined, env = baseEnv) {
-    try {
-      return execFileSync("git", [...gitArgs, ...args], {
-        env,
-        input,
-        maxBuffer: 81 * 1024 * 1024,
-        timeout: 120000,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    } catch (error) {
+  function git(args, input = undefined, env = baseEnv, probeFilter = false) {
+    const result = spawnSync("git", [...gitArgs, ...args], {
+      env,
+      input,
+      maxBuffer: 81 * 1024 * 1024,
+      timeout: 120000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    if (result.error || result.status !== 0) {
       // Never forward child-process arguments/environment/stderr to logs.
-      const failure = queueError("git_transport_failed", `queue Git ${args[0]} failed (${typeof error.status === "number" ? error.status : "transport"}); check queue credentials and repository access`);
-      throw Object.assign(failure, { gitStatus: error.status });
+      const failure = queueError("git_transport_failed", `queue Git ${args[0]} failed (${typeof result.status === "number" ? result.status : "transport"}); check queue credentials and repository access`);
+      throw Object.assign(failure, { gitStatus: result.status });
     }
+    const diagnostics = result.stderr.toString("utf8");
+    if (probeFilter) {
+      // Capture only the advertisement's protocol packets in memory. Never
+      // trace HTTP authentication or forward diagnostics to callers or logs.
+      filterSupported = /\bpacket:\s+\S+< fetch=(?:[^\r\n]* )?filter(?: |\r?$)/m.test(diagnostics) || /\bpacket:\s+\S+< [a-f0-9]{40,64} [^\r\n]*\\0[^\r\n]* filter(?: |\r?$)/m.test(diagnostics);
+    }
+    if (args.includes("--filter=blob:none") && /filtering not recognized by server, ignoring/.test(diagnostics))
+      throw queueError("git_transport_failed", "queue Git server must support blob filtering; unfiltered asset downloads are not permitted");
+    return result.stdout;
   }
   git(["init", "--bare", "--quiet", "--template="]);
   git(["check-ref-format", `refs/heads/${branch}`]);
 
-  async function network(args) {
+  async function network(args, probeFilter = false) {
     if (typeof githubClient.auth !== "function") throw queueError("repository_unavailable", "queue Git transport requires the selected queue client's credentials");
     const authentication = await githubClient.auth({ type: "token" });
     if (authentication?.type !== "token" || typeof authentication.token !== "string" || !authentication.token) throw queueError("repository_unavailable", "queue Git transport requires a repository token");
-    return git(args, undefined, gitEnvironment(buildGitAuthEnv(authentication.token)));
+    // Git rejects absolute filesystem paths as filtered promisor remote names.
+    const commandRemote = path.isAbsolute(remote) ? pathToFileURL(remote).href : remote;
+    return git(
+      args.map(arg => (arg === remote ? commandRemote : arg)),
+      undefined,
+      gitEnvironment({ ...buildGitAuthEnv(authentication.token), LC_ALL: "C", ...(probeFilter ? { GIT_TRACE_PACKET: "1" } : {}) }),
+      probeFilter
+    );
   }
 
   async function advertise() {
-    const output = await network(["ls-remote", "--symref", remote, "HEAD", "refs/heads/*"]);
+    filterSupported = false;
+    const output = await network(["ls-remote", "--symref", remote, "HEAD", "refs/heads/*"], true);
     advertised = new Map();
     defaultBranch = "";
     for (const line of output.toString("utf8").trim().split("\n")) {
@@ -141,6 +159,7 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
   async function fetchObjects() {
     if (fetched) return;
     if (fs.existsSync(path.join(directory, "shallow"))) throw queueError("checkpoint_invalid", "queue history must not be shallow");
+    if (!filterSupported) throw queueError("git_transport_failed", "queue Git server must support blob filtering; unfiltered asset downloads are not permitted");
     // Recheck access through advertisement, then reuse the validated local history.
     if (verifiedHead && advertised.get(`refs/heads/${branch}`) === verifiedHead) {
       fetched = true;
@@ -149,6 +168,7 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
     await network(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--filter=blob:none", remote, `+refs/heads/${branch}:refs/heads/queue`]);
     if (fs.existsSync(path.join(directory, "shallow"))) throw queueError("checkpoint_invalid", "queue history must not be shallow");
     git(["fsck", "--connectivity-only", "--no-dangling", "--no-reflogs", "refs/heads/queue"]);
+    git(["rev-list", "--quiet", "--objects", "--filter=blob:none", "--missing=error", "refs/heads/queue"]);
     verifiedHead = git(["rev-parse", "--verify", "refs/heads/queue^{commit}"]).toString("utf8").trim();
     fetched = true;
   }
@@ -163,7 +183,7 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
       try {
         git(["cat-file", "-e", `${oid}^{blob}`]);
       } catch {
-        await network(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", remote, oid]);
+        await network(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--filter=blob:none", remote, oid]);
       }
     }
     const data = await objectReader.object(oid, type);

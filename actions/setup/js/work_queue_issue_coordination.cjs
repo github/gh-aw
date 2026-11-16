@@ -123,7 +123,7 @@ async function withGraphQLProjectionLocks({ githubClient, repositoryId, head, ke
 }
 
 function projectionReleaseFailure(error, request) {
-  if (!request.signal.aborted) return error;
+  if (!request.signal?.aborted) return error;
   return Object.assign(queueError("projection_coordination_pending", "coordination release is uncertain"), { cause: error, originalError: error });
 }
 

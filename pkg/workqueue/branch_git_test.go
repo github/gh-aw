@@ -1,12 +1,21 @@
 package workqueue
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -23,6 +32,24 @@ func disposableQueueGit(t *testing.T, remote string) *queueGit {
 	// without changing process configuration or contacting GitHub.
 	q.env = append(q.env, "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=protocol.file.allow", "GIT_CONFIG_VALUE_0=always")
 	return q
+}
+
+func TestQueueGitCleanupReportsSanitizedFailure(t *testing.T) {
+	if os.Getenv("GH_AW_TEST_CLEANUP_CHILD") == "1" {
+		cleanupQueueGit("invalid\x00private-cleanup-sentinel")
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestQueueGitCleanupReportsSanitizedFailure$")
+	command.Env = append(os.Environ(), "GH_AW_TEST_CLEANUP_CHILD=1")
+	data, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "queue_git_cleanup_failed") || strings.Contains(string(data), "private-cleanup-sentinel") {
+		t.Fatalf("cleanup failure was absent or exposed the raw path: %s", data)
+	}
 }
 
 func TestQueueGitExplicitHost(t *testing.T) {
@@ -184,6 +211,8 @@ func gitQueueBranch(t *testing.T) (Branch, *queueAPI) {
 	t.Helper()
 	remote := disposableQueueGit(t, "")
 	queueGitRun(t, remote, nil, "symbolic-ref", "HEAD", "refs/heads/main")
+	queueGitRun(t, remote, nil, "config", "uploadpack.allowFilter", "true")
+	queueGitRun(t, remote, nil, "config", "uploadpack.allowReachableSHA1InWant", "true")
 	q := disposableQueueGit(t, remote.dir)
 	branch, mock := newQueueAPI(t)
 	branch.ledgerRequestFn, branch.ledger = nil, q
@@ -197,6 +226,258 @@ func queueGitRun(t *testing.T, q *queueGit, input []byte, operation string, args
 		t.Fatal(err)
 	}
 	return strings.TrimSpace(string(raw))
+}
+
+const queueGitHTTPTestToken = "synthetic-queue-http-token"
+
+type queueGitHTTPFixture struct {
+	remote   string
+	deny     atomic.Bool
+	rejected atomic.Bool
+	mu       sync.Mutex
+	wants    [][]string
+}
+
+func authenticatedQueueGitFixture(t *testing.T, source *queueGit) *queueGitHTTPFixture {
+	t.Helper()
+	fixture := &queueGitHTTPFixture{}
+	prefix := "/" + filepath.Base(source.dir)
+	want := regexp.MustCompile(`want ([a-f0-9]{40}|[a-f0-9]{64})\n`)
+	authorization := "basic " + base64.StdEncoding.EncodeToString([]byte("x-access-token:"+queueGitHTTPTestToken))
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		advertisement := r.URL.Path == prefix+"/info/refs" && r.Method == http.MethodGet && r.URL.Query().Get("service") == "git-upload-pack"
+		upload := r.URL.Path == prefix+"/git-upload-pack" && r.Method == http.MethodPost && r.URL.RawQuery == ""
+		if !advertisement && !upload {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") != authorization || fixture.deny.Load() {
+			fixture.rejected.Store(true)
+			w.Header().Set("WWW-Authenticate", `Basic realm="queue-fixture"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, queueGitMetadataBytes+1))
+		if err != nil || len(body) > queueGitMetadataBytes {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if r.Method == http.MethodPost {
+			var wants []string
+			for _, match := range want.FindAllSubmatch(body, -1) {
+				wants = append(wants, string(match[1]))
+			}
+			fixture.mu.Lock()
+			fixture.wants = append(fixture.wants, wants)
+			fixture.mu.Unlock()
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		command := exec.CommandContext(ctx, "git", "http-backend")
+		command.Dir = source.dir
+		command.Env = []string{
+			"PATH=" + os.Getenv("PATH"), "TMPDIR=" + source.dir, "TEMP=" + source.dir, "TMP=" + source.dir,
+			"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_TERMINAL_PROMPT=0",
+			"GIT_NO_REPLACE_OBJECTS=1", "GIT_NO_LAZY_FETCH=1", "LC_ALL=C",
+			"GIT_PROJECT_ROOT=" + filepath.Dir(source.dir), "GIT_HTTP_EXPORT_ALL=1",
+			"PATH_INFO=" + r.URL.Path, "REQUEST_METHOD=" + r.Method, "QUERY_STRING=" + r.URL.RawQuery,
+			"CONTENT_TYPE=" + r.Header.Get("Content-Type"), "CONTENT_LENGTH=" + strconv.Itoa(len(body)),
+			"HTTP_GIT_PROTOCOL=" + r.Header.Get("Git-Protocol"), "SERVER_PROTOCOL=HTTP/1.1", "REMOTE_ADDR=127.0.0.1",
+		}
+		command.Stdin = bytes.NewReader(body)
+		output := &queueGitOutput{limit: maxParseBytes, cancel: cancel}
+		command.Stdout, command.Stderr = output, io.Discard
+		command.WaitDelay = time.Second
+		if err := command.Run(); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		headers, response, ok := bytes.Cut(output.buffer.Bytes(), []byte("\r\n\r\n"))
+		if !ok {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		status := http.StatusOK
+		for line := range strings.SplitSeq(string(headers), "\r\n") {
+			name, value, ok := strings.Cut(line, ":")
+			if !ok {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			value = strings.TrimSpace(value)
+			if name == "Status" {
+				code, _, _ := strings.Cut(value, " ")
+				status, err = strconv.Atoi(code)
+				if err != nil || status < 100 || status > 599 {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			} else {
+				w.Header().Set(name, value)
+			}
+		}
+		w.WriteHeader(status)
+		_, _ = w.Write(response)
+	}))
+	server.Config.ReadHeaderTimeout = 10 * time.Second
+	server.Config.ReadTimeout = 10 * time.Second
+	server.Config.WriteTimeout = 15 * time.Second
+	server.Start()
+	t.Cleanup(server.Close)
+	fixture.remote = server.URL + prefix
+	return fixture
+}
+
+func coldAuthenticatedQueueGit(t *testing.T, fixture *queueGitHTTPFixture) *queueGit {
+	t.Helper()
+	q, err := newQueueGit(context.Background(), fixture.remote, DefaultBranch, queueGitHTTPTestToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(q.dir) })
+	// Only this local fixture opts into HTTP; production remains HTTPS-only.
+	q.env = append(q.env, "GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_1=protocol.http.allow", "GIT_CONFIG_VALUE_1=always",
+		"http_proxy=", "https_proxy=", "all_proxy=", "HTTP_PROXY=", "HTTPS_PROXY=", "ALL_PROXY=", "NO_PROXY=127.0.0.1")
+	return q
+}
+
+func (fixture *queueGitHTTPFixture) exactFetches(sha string) int {
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	var count int
+	for _, wants := range fixture.wants {
+		if len(wants) == 1 && wants[0] == sha {
+			count++
+		}
+	}
+	return count
+}
+
+func TestQueueGitColdFetchExcludesAssetsAndVerifiesCheckpoints(t *testing.T) {
+	for _, corrupt := range []bool{false, true} {
+		t.Run(strconv.FormatBool(corrupt), func(t *testing.T) {
+			ctx := context.Background()
+			b, mock := gitQueueBranch(t)
+			history := testGenesis(t, nil)
+			prior := writeRawQueueGit(t, b, history)
+			first, err := CompactCheckpoint(history, prior, testActor("administrator"), 3001)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parents := []string{prior}
+			if corrupt {
+				parents = nil
+			}
+			firstHead := writeRawQueueGit(t, b, first, parents...)
+			second, err := CompactCheckpoint(first, firstHead, testActor("administrator"), 4001)
+			if err != nil {
+				t.Fatal(err)
+			}
+			secondHead := writeRawQueueGit(t, b, second, firstHead)
+			source := &queueGit{dir: b.ledger.remote, env: b.ledger.env}
+			asset := queueGitRun(t, source, bytes.Repeat([]byte("a"), 1024*1024), "hash-object", "-w", "--stdin")
+			claims := queueGitRun(t, source, []byte("100644 blob "+asset+"\t"+asset+".bin\x00"), "mktree", "-z")
+			contents, err := Serialize(second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			log := queueGitRun(t, source, contents, "hash-object", "-w", "--stdin")
+			tree := queueGitRun(t, source, []byte("100644 blob "+log+"\t"+FileName+"\x00"+"040000 tree "+claims+"\tclaims\x00"), "mktree", "-z")
+			head := queueGitRun(t, source, []byte("Asset fixture\n"), "commit-tree", tree, "-p", secondHead)
+			queueGitRun(t, source, nil, "update-ref", b.ledger.ref, head, secondHead)
+			fixture := authenticatedQueueGitFixture(t, source)
+			b.ledger = coldAuthenticatedQueueGit(t, fixture)
+			b.ledger.reuseValidated = true
+			got, err := b.Read(ctx)
+			if corrupt {
+				if err == nil || !strings.Contains(err.Error(), "checkpoint_invalid") {
+					t.Fatalf("corrupt oldest checkpoint accepted: %v", err)
+				}
+				return
+			}
+			if err != nil || !sameJSON(got, second) {
+				t.Fatalf("cold filtered checkpoint read: %v", err)
+			}
+			if fixture.rejected.Load() || fixture.exactFetches(log) != 1 {
+				t.Fatal("required ledger blob was not fetched exactly once with scoped authentication")
+			}
+			for _, transactions := range [][]QueueCommit{history, first} {
+				data, err := Serialize(transactions)
+				if err != nil {
+					t.Fatal(err)
+				}
+				blob := queueGitRun(t, source, data, "hash-object", "--stdin")
+				if fixture.exactFetches(blob) != 1 {
+					t.Fatal("checkpoint ancestry ledger blob was not fetched by exact identity")
+				}
+			}
+			if _, err := b.ledger.run(ctx, nil, "cat-file", "-e", asset+"^{blob}"); err == nil {
+				t.Fatal("cold queue read downloaded an unrelated asset blob")
+			}
+			if count := queueGitRun(t, b.ledger, nil, "rev-list", "--count", head); count != "4" {
+				t.Fatalf("filtered read lost causal commit history: %s", count)
+			}
+			if _, err := b.Read(ctx); err != nil || fixture.exactFetches(log) != 1 {
+				t.Fatalf("warm read refetched immutable ledger blobs: %v", err)
+			}
+			if _, err := b.ledger.request(ctx, http.MethodGet, "git/blobs/"+asset, nil); err != nil || fixture.exactFetches(asset) != 1 {
+				t.Fatalf("exact asset fetch did not remain authenticated: %v", err)
+			}
+			if mock.ledgerCalls != 0 {
+				t.Fatal("filtered ledger used an API fallback")
+			}
+		})
+	}
+}
+
+func TestQueueGitRejectsUnsupportedFilteringBeforeObjectFetch(t *testing.T) {
+	b, _ := gitQueueBranch(t)
+	prior := writeRawQueueGit(t, b, testGenesis(t, nil))
+	source := &queueGit{dir: b.ledger.remote, env: b.ledger.env}
+	queueGitRun(t, source, nil, "config", "uploadpack.allowFilter", "false")
+	fixture := authenticatedQueueGitFixture(t, source)
+	b.ledger = coldAuthenticatedQueueGit(t, fixture)
+	if _, err := b.Read(context.Background()); !errors.Is(err, errQueueGitFilterUnsupported) {
+		t.Fatalf("unsupported filtering was not rejected: %v", err)
+	}
+	if fixture.exactFetches(prior) != 0 || fixture.rejected.Load() {
+		t.Fatal("unsupported filtering downloaded objects or used incorrect authentication")
+	}
+	if refs := queueGitRun(t, b.ledger, nil, "for-each-ref", "--format=%(refname)"); refs != "" {
+		t.Fatal("unsupported filtering published a local queue ref")
+	}
+	queueGitRun(t, source, nil, "update-ref", "-d", "refs/heads/work-queue", prior)
+	if _, err := b.Read(context.Background()); err == nil || !strings.Contains(err.Error(), "queue_missing") {
+		t.Fatalf("authenticated queue absence was not distinguished: %v", err)
+	}
+}
+
+func TestQueueGitDeniedExactBlobFetchIsNotQueueAbsence(t *testing.T) {
+	ctx := context.Background()
+	b, _ := gitQueueBranch(t)
+	head := writeRawQueueGit(t, b, testGenesis(t, nil))
+	source := &queueGit{dir: b.ledger.remote, env: b.ledger.env}
+	fixture := authenticatedQueueGitFixture(t, source)
+	b.ledger = coldAuthenticatedQueueGit(t, fixture)
+	if _, err := b.ledger.resolve(ctx); err != nil {
+		t.Fatal(err)
+	}
+	tree, _, err := b.ledger.commit(ctx, head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := queueGitRun(t, b.ledger, nil, "ls-tree", tree, "--", FileName)
+	blob := strings.Fields(entries)[2]
+	if _, err := b.ledger.run(ctx, nil, "cat-file", "-e", blob+"^{blob}"); err == nil {
+		t.Fatal("initial filtered fetch already downloaded the ledger blob")
+	}
+	fixture.deny.Store(true)
+	if _, err := b.ledger.request(ctx, http.MethodGet, "git/blobs/"+blob, nil); err == nil || hasStatus(err, http.StatusNotFound) {
+		t.Fatalf("denied promised blob became queue absence: %v", err)
+	}
+	if !fixture.rejected.Load() {
+		t.Fatal("denied on-demand fetch did not reauthenticate with the fixture")
+	}
 }
 
 // Write arbitrary wire history so rejection tests do not accidentally validate
