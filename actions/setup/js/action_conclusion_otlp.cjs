@@ -44,6 +44,10 @@ require("./shim.cjs");
 
 const sendOtlpSpan = require("./send_otlp_span.cjs");
 const { getActionInput } = require("./action_input_utils.cjs");
+const fs = require("fs");
+const path = require("path");
+
+const PREUPLOAD_CONCLUSION_MARKER = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/actions/otel-conclusion-emitted");
 
 /**
  * Build the OTLP span name from an optional job name.
@@ -72,7 +76,10 @@ function parseJobStartMs(raw) {
  */
 async function run() {
   const endpoints = process.env.GH_AW_OTLP_ENDPOINTS;
-  const spanName = buildSpanName(getActionInput("JOB_NAME"));
+  const jobName = getActionInput("JOB_NAME");
+  const preUpload = process.env.GH_AW_OTEL_CONCLUSION_PREUPLOAD === "true";
+  if (!preUpload && fs.existsSync(PREUPLOAD_CONCLUSION_MARKER)) return;
+  const spanName = buildSpanName(jobName);
   // Use the job-start timestamp set by action_setup_otlp so the conclusion span
   // duration covers the actual job execution window, not just this step's overhead.
   const startMs = parseJobStartMs(process.env.GITHUB_AW_OTEL_JOB_START_MS);
@@ -83,9 +90,19 @@ async function run() {
     core.info("[otlp] GH_AW_OTLP_ENDPOINTS not set, skipping OTLP export (will attempt JSONL mirror)");
   }
 
-  await sendOtlpSpan.sendJobConclusionSpan(spanName, { startMs });
+  /** @type {{ startMs: number | undefined, jobResult?: string }} */
+  const conclusionOptions = { startMs };
+  if (process.env.GH_AW_JOB_RESULT) conclusionOptions.jobResult = process.env.GH_AW_JOB_RESULT;
+  await sendOtlpSpan.sendJobConclusionSpan(spanName, conclusionOptions);
+  if (preUpload) {
+    try {
+      fs.writeFileSync(PREUPLOAD_CONCLUSION_MARKER, "emitted", { mode: 0o600 });
+    } catch {
+      // Duplicate prevention is best-effort; telemetry remains non-fatal.
+    }
+  }
 
-  if (getActionInput("JOB_NAME") === "conclusion") {
+  if (jobName === "conclusion") {
     await require("./send_otlp_session_logs.cjs").sendSessionLogs();
   }
 

@@ -1049,6 +1049,7 @@ function sendOTLPViaCurl(url, headers, body) {
  * @type {RegExp}
  */
 const SENSITIVE_ATTR_KEY_RE = /token|secret|password|passwd|\bkey\b|auth|credential|api[_-]?key|access[_-]?key/i;
+const SAFE_TOKEN_TYPE_VALUES = new Set(["input", "output", "input_cache_read", "input_cache_write"]);
 
 /**
  * Maximum length (in characters) allowed for a string attribute value.
@@ -1084,6 +1085,7 @@ function sanitizeAttrs(attrs) {
     const isSensitive = SENSITIVE_ATTR_KEY_RE.test(attr.key);
     const val = attr.value;
     if (typeof val !== "object" || val === null) return attr;
+    if (attr.key === "gen_ai.token.type" && "stringValue" in val && typeof val.stringValue === "string" && SAFE_TOKEN_TYPE_VALUES.has(val.stringValue)) return attr;
     if (isSensitive && "stringValue" in val) {
       return { key: attr.key, value: { stringValue: REDACTED } };
     }
@@ -1275,17 +1277,12 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
   if (endpoints.length === 0) return reportResults ? [] : undefined;
   const results = await Promise.allSettled(
     endpoints.map(async ep => {
-      let success = false;
-      await sendOTLPSpan(ep.url, payload, {
+      return sendOTLPSpan(ep.url, payload, {
         ...sendOptions,
-        onResult: result => {
-          success = result;
-        },
         // Pass per-endpoint headers so each collector receives only its own
         // credentials (not the merged set from a different endpoint).
         headersOverride: ep.headers !== undefined ? ep.headers : "",
       });
-      return success;
     })
   );
   const endpointResults = results.map(result => result.status === "fulfilled" && result.value === true);
@@ -1310,13 +1307,12 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
  *
  * @param {string} endpoint  - OTLP base URL (e.g. https://traces.example.com:4317)
  * @param {any} payload   - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string, onResult?: (success: boolean) => void }} [opts]
- * @returns {Promise<void>}
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
+ * @returns {Promise<boolean>}
  */
-async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces", sanitize = sanitizeOTLPPayload, protocolOverride, onResult } = {}) {
+async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces", sanitize = sanitizeOTLPPayload, protocolOverride } = {}) {
   if (signal === "metrics" && process.env.GH_AW_OTEL_METRICS !== "true") {
-    onResult?.(false);
-    return;
+    return false;
   }
   const sanitizedPayload = sanitize(payload);
   // Mirror payload locally so it survives even when the collector is unreachable.
@@ -1330,8 +1326,9 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
   const base = (suffixIndex < 0 ? endpoint : endpoint.slice(0, suffixIndex)).replace(/\/+$/, "");
   const suffix = suffixIndex < 0 ? "" : endpoint.slice(suffixIndex);
   const signalBase = base.replace(/\/v1\/(?:traces|logs|metrics)$/, "");
-  const logsBase = signal === "logs" ? signalBase.replace(/\/streams\/Microsoft-OTLP-Traces\/otlp$/, "/streams/Microsoft-OTLP-Logs/otlp") : signalBase;
-  const url = (signal === "traces" ? base + (base.endsWith("/v1/traces") ? "" : "/v1/traces") : logsBase + `/v1/${signal}`) + suffix;
+  const azureSignal = signal === "metrics" ? "Metrics" : signal === "logs" ? "Logs" : "Traces";
+  const signalBaseForExport = signalBase.replace(/\/streams\/Microsoft-OTLP-(?:Traces|Logs|Metrics)\/otlp$/, () => `/streams/Microsoft-OTLP-${azureSignal}/otlp`);
+  const url = (signal === "traces" ? base + (base.endsWith("/v1/traces") ? "" : "/v1/traces") : signalBaseForExport + `/v1/${signal}`) + suffix;
   // Use headersOverride when explicitly provided (including empty string, which means
   // "this endpoint has no configured headers" in the multi-endpoint fan-out path).
   // Fall back to OTEL_EXPORTER_OTLP_HEADERS only when headersOverride is absent
@@ -1356,8 +1353,7 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
     const reason = getErrorMessage(err);
     console.warn(`OTLP export encoding failed: ${reason}`);
     recordOTLPExportError({ endpoint, reason });
-    onResult?.(false);
-    return;
+    return false;
   }
   // The content type must describe the encoded body, not a caller header.
   for (const key of Object.keys(extraHeaders)) {
@@ -1391,16 +1387,14 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
           console.warn(diagnostic.reason);
           if (diagnostic.error) recordOTLPExportError({ endpoint, status: response.status, reason: diagnostic.reason });
         }
-        onResult?.(diagnostic.error !== true);
-        return;
+        return diagnostic.error !== true;
       }
       const reason = getOTLPExportFailureReason(response);
       const msg = formatOTLPExportFailureMessage(response, reason);
       if (response.status === 401 || response.status === 403) {
         console.warn(`OTLP export authorization failed: ${msg}. Check this collector's configured authorization header and write permissions; unchanged credentials will not be retried.`);
         recordOTLPExportError({ endpoint, status: response.status, reason });
-        onResult?.(false);
-        return;
+        return false;
       }
       if (attempt < maxRetries) {
         console.warn(`OTLP export attempt ${attempt + 1}/${maxRetries + 1} failed: ${msg}, retrying…`);
@@ -1420,9 +1414,9 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
         console.warn(`OTLP export error after ${maxRetries + 1} attempts: ${msg}`);
         recordOTLPExportError({ endpoint, reason: msg });
       }
-      onResult?.(false);
     }
   }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -2277,7 +2271,7 @@ function readAgentRuntimeMetrics(engineId = "") {
  *                                    summary attributes and per-result span events
  *
  * @param {string} spanName - OTLP span name (e.g. `"gh-aw.job.conclusion"`)
- * @param {{ startMs?: number }} [options]
+ * @param {{ startMs?: number, jobResult?: string }} [options]
  * @returns {Promise<void>}
  */
 async function sendJobConclusionSpan(spanName, options = {}) {
@@ -2354,6 +2348,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // needs.detection.outputs.* in downstream jobs (conclusion, safe_outputs, etc.).
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
   const detectionReason = process.env.GH_AW_DETECTION_REASON || "";
+  const jobResult = options.jobResult || (jobName === "detection" ? detectionConclusion : "");
   const runtimeMetrics = readAgentRuntimeMetrics(engineId);
   // Read once and reuse for both gh-aw.aic and gen_ai.usage.* attributes.
   const agentUsageFilePath = jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_usage.json" : "/tmp/gh-aw/agent_usage.json";
@@ -2412,6 +2407,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     statusCode = 2;
     statusMessage = (errorMessages.length > 0 ? `errors detected: ${errorMessages[0]}` : "errors detected").slice(0, 256);
   }
+  const metricJobConclusion = jobResult || (runStatus === "timeout" ? "timed_out" : runStatus);
 
   if (isAgentFailure && errorMessages.length > 0) {
     statusMessage = `agent ${agentConclusion}: ${errorMessages[0]}`.slice(0, 256);
@@ -2847,7 +2843,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
 
   if (process.env.GH_AW_OTEL_METRICS === "true") {
     try {
-      const { buildBuiltinRunMetrics, buildOTLPMetricsPayload, sendOTLPMetrics } = require("./otlp_metrics.cjs");
+      const { buildBuiltinRunMetrics, buildOTLPMetricsPayload, sendOTLPMetrics, flushCustomMetrics, getUnreportedOTLPMetricFailures } = require("./otlp_metrics.cjs");
+      await flushCustomMetrics();
       const gatewayMetrics = jobName === "conclusion" ? readJSONIfExists("/tmp/gh-aw/usage/activity/summary.json")?.gateway : undefined;
       const metricAttributes = [
         ...(eventName ? [buildAttr("github.event_name", eventName)] : []),
@@ -2862,13 +2859,14 @@ async function sendJobConclusionSpan(spanName, options = {}) {
         (typeof awInfo.agent_version === "string" ? awInfo.agent_version : "") ||
         (typeof awInfo.version === "string" ? awInfo.version : "") ||
         "unknown";
-      const conclusion = agentConclusion || (runStatus === "timeout" ? "timed_out" : runStatus);
+      const runConclusion = agentConclusion || (runStatus === "timeout" ? "timed_out" : runStatus);
       const metrics = buildBuiltinRunMetrics({
         jobName,
         workflow: workflowName,
         engine: engineId,
         model,
-        conclusion,
+        jobConclusion: metricJobConclusion,
+        runConclusion,
         startMs,
         endMs,
         inputTokens: agentUsage.input_tokens,
@@ -2882,7 +2880,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
         outputItemTypes: jobName === "conclusion" ? rawItemTypes : [],
         maxAICreditsExceeded: maxAICreditsExceeded === true,
         aiCreditsRateLimitError: aiCreditsRateLimitError === true,
-        exportFailures: readOTLPExportErrorCount(),
+        exportFailures: getUnreportedOTLPMetricFailures(),
         traceContext: { traceId, spanId: conclusionSpanId },
       });
       await sendOTLPMetrics(
@@ -2930,6 +2928,7 @@ module.exports = {
   sendOTLPToAllEndpoints,
   hasProxyConfigured,
   readJSONIfExists,
+  readOTLPExportErrorCount,
   readLastRateLimitEntry,
   buildCurrentWorkflowCallId,
   buildEpisodeAttributesFromContext,

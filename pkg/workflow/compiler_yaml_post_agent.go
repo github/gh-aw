@@ -86,7 +86,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Only included when OTLP is configured for this workflow.
 	if isOTLPEnabled(data) {
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
-		if strings.EqualFold(fmt.Sprint(parseEnvYAMLSection(data.Env)["GH_AW_OTEL_METRICS"]), "true") {
+		if fmt.Sprint(parseEnvYAMLSection(data.Env)["GH_AW_OTEL_METRICS"]) == "true" {
 			paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
 		}
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
@@ -220,6 +220,20 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 	c.generateObservabilitySummary(yaml, data)
 }
 
+func (c *Compiler) generateOTLPMetricsConclusionStep(yaml *strings.Builder, data *WorkflowData) {
+	if !isOTLPEnabled(data) || fmt.Sprint(parseEnvYAMLSection(data.Env)["GH_AW_OTEL_METRICS"]) != "true" {
+		return
+	}
+	yaml.WriteString("      - name: Emit OTLP job conclusion before artifacts\n")
+	yaml.WriteString("        if: always() && env.GH_AW_OTEL_METRICS == 'true'\n")
+	yaml.WriteString("        continue-on-error: true\n")
+	yaml.WriteString("        run: node \"${{ runner.temp }}/gh-aw/actions/action_conclusion_otlp.cjs\"\n")
+	yaml.WriteString("        env:\n")
+	yaml.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
+	yaml.WriteString("          GH_AW_JOB_RESULT: ${{ job.status }}\n")
+	yaml.WriteString("          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'\n")
+}
+
 // generatePostAgentCollectionAndUpload orchestrates the post-agent phase:
 // engine output cleanup, access log collection, artifact path accumulation via collectArtifactPaths,
 // step-summary generation via generateSummarySteps, safe-outputs/memory/staging artifact uploads,
@@ -311,6 +325,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 			targetPath: "agent/harness_retry.json",
 		})
 	}
+	c.generateOTLPMetricsConclusionStep(yaml, data)
 	generateRecoveryEnvelopeValidationStep(yaml, "validate_final_recovery_envelopes", data, c.getActionPin, recoveryArtifactScanRoots(artifactPaths)...)
 
 	// Generate single unified artifact upload with all collected paths.

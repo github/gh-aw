@@ -56,6 +56,10 @@ func TestUnifiedArtifactIncludesOTLPMetricsMirrorOnlyWhenEnabled(t *testing.T) {
 			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'false'\n",
 		},
 		{
+			name: "case mismatch",
+			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'TRUE'\n",
+		},
+		{
 			name: "not configured",
 			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n",
 		},
@@ -75,6 +79,30 @@ func TestUnifiedArtifactIncludesOTLPMetricsMirrorOnlyWhenEnabled(t *testing.T) {
 			}
 			assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
 			assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
+		})
+	}
+}
+
+func TestOTLPMetricsConclusionRunsBeforeArtifactUploadOnlyWhenEnabled(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		env  string
+		want bool
+	}{
+		{name: "enabled", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'true'\n", want: true},
+		{name: "case mismatch", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'TRUE'\n"},
+		{name: "disabled", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'false'\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var yaml strings.Builder
+			NewCompiler().generateOTLPMetricsConclusionStep(&yaml, &WorkflowData{Env: tt.env})
+
+			if tt.want {
+				assert.Contains(t, yaml.String(), "action_conclusion_otlp.cjs")
+				assert.Contains(t, yaml.String(), "GH_AW_JOB_RESULT: ${{ job.status }}")
+			} else {
+				assert.Empty(t, yaml.String())
+			}
 		})
 	}
 }

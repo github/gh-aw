@@ -193,7 +193,7 @@ describe("OTLP delivery diagnostics across transports", () => {
         vi.stubEnv("HTTPS_PROXY", "http://proxy.invalid");
         spawn.mockReturnValue({ status: 0, stdout: Buffer.concat([Buffer.from(`HTTP/1.1 200 OK\r\nContent-Type: ${type}\r\n\r\n`), body, Buffer.from(`\n200\n${type}`)]), stderr: Buffer.alloc(0) });
       }
-      await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+      await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBe(false);
       expect(transport === "proxy" ? spawn : fetch).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledOnce();
       expect(write).toHaveBeenCalledOnce();
@@ -253,7 +253,7 @@ describe("OTLP delivery diagnostics across transports", () => {
         vi.stubEnv("HTTPS_PROXY", "http://proxy.invalid");
         spawn.mockReturnValue({ status: 0, stdout: Buffer.from(`${body}\n200\napplication/json`) });
       }
-      await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true })).resolves.toBeUndefined();
+      await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true })).resolves.toBe(kind !== "rejection");
       expect(transport === "proxy" ? spawn : fetch).toHaveBeenCalledOnce();
       expect(write).toHaveBeenCalledTimes(kind === "rejection" ? 1 : 0);
       expect(warn).toHaveBeenCalledTimes(kind === "full" ? 0 : 1);

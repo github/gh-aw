@@ -7,6 +7,20 @@ const require = createRequire(import.meta.url);
 const metrics = require("./otlp_metrics.cjs");
 const { buildBuiltinRunMetrics } = metrics;
 
+function mockOTLPMirror() {
+  const writes = [];
+  vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+  vi.spyOn(fs, "chmodSync").mockImplementation(() => undefined);
+  vi.spyOn(fs, "openSync").mockReturnValue(1);
+  vi.spyOn(fs, "fchmodSync").mockImplementation(() => undefined);
+  vi.spyOn(fs, "writeSync").mockImplementation((_fd, data) => {
+    writes.push(String(data));
+    return String(data).length;
+  });
+  vi.spyOn(fs, "closeSync").mockImplementation(() => undefined);
+  return writes;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -22,7 +36,10 @@ describe("buildOTLPMetric", () => {
     expect(gauge.gauge.dataPoints[0]).toMatchObject({ asDouble: 0.5, timeUnixNano: "2000000000" });
 
     const histogram = metrics.buildOTLPMetric({ name: "duration", value: 2, type: "histogram", buckets: [5, 1], startMs: 1000, endMs: 2000 });
-    expect(histogram.histogram.dataPoints[0]).toMatchObject({ count: "1", bucketCounts: ["0", "1", "0"], explicitBounds: [1, 5] });
+    expect(histogram.histogram.dataPoints[0]).toMatchObject({ count: "1", bucketCounts: ["0", "1", "1"], explicitBounds: [1, 5] });
+
+    const cumulative = metrics.buildOTLPMetric({ name: "duration", value: 3, type: "histogram", buckets: [1, 5, 15] });
+    expect(cumulative.histogram.dataPoints[0].bucketCounts).toEqual(["0", "1", "1", "1"]);
   });
 
   it("rejects invalid metric values and buckets", () => {
@@ -103,6 +120,14 @@ describe("buildBuiltinRunMetrics", () => {
     expect(buildBuiltinRunMetrics({ conclusion: "cancelled", startMs: 1000, endMs: 2000 }).map(metric => metric.name)).toEqual(["gh_aw.job.duration", "gh_aw.run.duration", "gh_aw.job.errors", "gh_aw.run.errors"]);
   });
 
+  it("keeps the emitting job result separate from the inherited run result", () => {
+    const result = buildBuiltinRunMetrics({ jobConclusion: "failure", runConclusion: "success", startMs: 1000, endMs: 2000 });
+    expect(result.map(metric => metric.name)).toContain("gh_aw.job.errors");
+    expect(result.map(metric => metric.name)).not.toContain("gh_aw.run.errors");
+    expect(result[0].histogram.dataPoints[0].attributes).toContainEqual({ key: "cicd.pipeline.task.run.result", value: { stringValue: "failure" } });
+    expect(result[1].histogram.dataPoints[0].attributes).toContainEqual({ key: "cicd.pipeline.task.run.result", value: { stringValue: "success" } });
+  });
+
   it("keeps metric resource attributes to stable low-cardinality identity", () => {
     vi.stubEnv("OTEL_RESOURCE_ATTRIBUTES", "gh-aw.repository=owner%2Frepo,gh-aw.engine.id=copilot,gh-aw.run.id=123,github.run_id=123,custom.label=ignored");
     const payload = metrics.buildOTLPMetricsPayload({ serviceName: "gh-aw", metrics: [] });
@@ -113,6 +138,31 @@ describe("buildBuiltinRunMetrics", () => {
     expect(attributes.map(attribute => attribute.key)).not.toContain("github.run_id");
     expect(attributes.map(attribute => attribute.key)).not.toContain("custom.label");
   });
+
+  it("preserves safe token type enums and redacts secrets from ordinary string attributes", () => {
+    const configuredValue = "local-value-42";
+    vi.stubEnv("OTEL_EXPORTER_OTLP_HEADERS", `X-Test=${configuredValue}`);
+    const payload = metrics.buildOTLPMetricsPayload({
+      serviceName: "gh-aw",
+      metrics: [
+        metrics.buildOTLPMetric({
+          name: "gen_ai.client.token.usage",
+          value: 1,
+          type: "counter",
+          attributes: [
+            { key: "gen_ai.token.type", value: { stringValue: "input_cache_read" } },
+            { key: "status", value: { stringValue: `prefix-${configuredValue}` } },
+            { key: "external.label", value: { stringValue: configuredValue } },
+          ],
+        }),
+      ],
+    });
+
+    const sanitized = metrics.sanitizeOTLPMetricsPayload(payload);
+    const attributes = sanitized.resourceMetrics[0].scopeMetrics[0].metrics[0].sum.dataPoints[0].attributes;
+    expect(attributes).toContainEqual({ key: "gen_ai.token.type", value: { stringValue: "input_cache_read" } });
+    expect(JSON.stringify(sanitized)).not.toContain(configuredValue);
+  });
 });
 
 describe("OTLP metrics export", () => {
@@ -120,49 +170,68 @@ describe("OTLP metrics export", () => {
     vi.stubEnv("GH_AW_OTEL_METRICS", "true");
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://collector.example/v1/traces", headers: "X-Trace-Endpoint=metrics" }]));
     vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
-    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
-    const mirror = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    const mirror = mockOTLPMirror();
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body: null, headers: new Headers() });
     vi.stubGlobal("fetch", fetchMock);
     const payload = metrics.buildOTLPMetricsPayload({ serviceName: "gh-aw", metrics: [metrics.buildOTLPMetric({ name: "test", value: 1 })] });
 
     await metrics.sendOTLPMetrics(payload);
 
-    expect(mirror).toHaveBeenCalledWith(metrics.OTEL_METRICS_JSONL_PATH, expect.stringContaining('"resourceMetrics"'));
-    expect(mirror.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
+    expect(mirror[0]).toContain('"resourceMetrics"');
+    expect(fs.writeSync.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
     expect(fetchMock.mock.calls[0][0]).toBe("https://collector.example/v1/metrics");
     expect(fetchMock.mock.calls[0][1].headers).toMatchObject({ "Content-Type": "application/json", "X-Trace-Endpoint": "metrics" });
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).resourceMetrics).toBeDefined();
   });
 
   it("does not mirror or export when the opt-in flag is absent", async () => {
-    const mirror = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    const mirror = mockOTLPMirror();
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const payload = metrics.buildOTLPMetricsPayload({ serviceName: "gh-aw", metrics: [metrics.buildOTLPMetric({ name: "test", value: 1 })] });
 
     await metrics.sendOTLPMetrics(payload);
 
-    expect(mirror).not.toHaveBeenCalled();
+    expect(mirror).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("exposes a non-fatal custom metric API that is also opt-in", async () => {
-    const mirror = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    const mirror = mockOTLPMirror();
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(require("./otlp.cjs").logMetric("custom.items", 3, { type: "counter" })).resolves.toBeUndefined();
-    expect(mirror).not.toHaveBeenCalled();
+    expect(mirror).toHaveLength(0);
 
     vi.stubEnv("GH_AW_OTEL_METRICS", "true");
     await expect(require("./otlp.cjs").logMetric("custom.items", 3, { type: "counter" })).resolves.toBeUndefined();
-    expect(mirror).toHaveBeenCalledWith(metrics.OTEL_METRICS_JSONL_PATH, expect.stringContaining('"custom.items"'));
+    await metrics.flushCustomMetrics();
+    expect(mirror.join("")).toContain('"custom.items"');
+  });
+
+  it("buffers and aggregates custom observations into one bounded export", async () => {
+    vi.stubEnv("GH_AW_OTEL_METRICS", "true");
+    vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://collector.example" }]));
+    mockOTLPMirror();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body: null, headers: new Headers() });
+    vi.stubGlobal("fetch", fetchMock);
+    const logMetric = require("./otlp.cjs").logMetric;
+
+    await logMetric("custom.requests", 2, { type: "counter" });
+    await logMetric("custom.requests", 3, { type: "counter" });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    await metrics.flushCustomMetrics();
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const exported = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(exported.resourceMetrics[0].scopeMetrics[0].metrics[0].sum.dataPoints[0].asInt).toBe("5");
   });
 
   it("rejects unbounded custom metric attributes without throwing", async () => {
     vi.stubEnv("GH_AW_OTEL_METRICS", "true");
-    const mirror = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    const mirror = mockOTLPMirror();
     const logMetric = require("./otlp.cjs").logMetric;
 
     await logMetric("custom.items", 1, { attributes: { "gh-aw.repository": "owner/repo", "gh-aw.run.id": "123" } });
@@ -170,15 +239,19 @@ describe("OTLP metrics export", () => {
     await logMetric("custom.items", 1, { attributes: { ["k".repeat(129)]: "value" } });
     await logMetric("custom.items", 1, { attributes: { "label.value": "v".repeat(129) } });
 
-    expect(mirror).not.toHaveBeenCalled();
+    expect(mirror).toHaveLength(0);
   });
 
   it("records metric endpoint failures locally and exports the failure counter to healthy endpoints", async () => {
     vi.stubEnv("GH_AW_OTEL_METRICS", "true");
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://failed.example/v1/traces" }, { url: "https://healthy.example/v1/traces" }]));
-    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
-    vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
-    const mirror = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    const persisted = new Map();
+    vi.spyOn(fs, "readFileSync").mockImplementation(filePath => {
+      if (persisted.has(String(filePath))) return persisted.get(String(filePath));
+      throw Object.assign(new Error("missing test file"), { code: "ENOENT" });
+    });
+    vi.spyOn(fs, "writeFileSync").mockImplementation((filePath, value) => persisted.set(String(filePath), String(value)));
+    const mirror = mockOTLPMirror();
     vi.spyOn(globalThis, "setTimeout").mockImplementation(callback => {
       callback();
       return 0;
@@ -191,20 +264,33 @@ describe("OTLP metrics export", () => {
 
     await metrics.sendOTLPMetrics(payload, { traceId: "1234567890abcdef1234567890abcdef", spanId: "1234567890abcdef" });
 
-    const mirroredPayloads = mirror.mock.calls.filter(([filePath]) => filePath === metrics.OTEL_METRICS_JSONL_PATH).map(([, line]) => JSON.parse(line));
+    const mirroredPayloads = mirror.map(line => JSON.parse(line));
     const failurePayload = mirroredPayloads.find(entry => entry.resourceMetrics[0].scopeMetrics[0].metrics[0].name === "gh_aw.otlp.export.failures");
     expect(failurePayload).toBeDefined();
     expect(fetchMock.mock.calls.map(([url]) => new URL(url).hostname)).toContain("healthy.example");
     expect(fetchMock.mock.calls.some(([, options]) => JSON.parse(options.body).resourceMetrics[0].scopeMetrics[0].metrics[0].name === "gh_aw.otlp.export.failures")).toBe(true);
+    expect(persisted.get("/tmp/gh-aw/otlp-metric-failures-reported.txt")).toBe("1");
+    expect(metrics.getUnreportedOTLPMetricFailures()).toBe(0);
   });
 
   it("caps unique custom metric series per process", async () => {
     vi.stubEnv("GH_AW_OTEL_METRICS", "true");
-    const mirror = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    const mirror = mockOTLPMirror();
     const logMetric = require("./otlp.cjs").logMetric;
 
     await Promise.all(Array.from({ length: 101 }, (_, index) => logMetric(`custom.series.${index}`, 1)));
+    await metrics.flushCustomMetrics();
 
-    expect(mirror.mock.calls.length).toBeLessThanOrEqual(metrics.MAX_CUSTOM_METRIC_SERIES);
+    expect(mirror.length).toBeLessThanOrEqual(metrics.MAX_CUSTOM_METRIC_SERIES);
+  });
+
+  it("creates the mirror directory and file with private permissions", () => {
+    mockOTLPMirror();
+    metrics.appendToOTLPMetricsJSONL({ resourceMetrics: [] });
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith("/tmp/gh-aw", { recursive: true, mode: 0o700 });
+    expect(fs.chmodSync).toHaveBeenCalledWith("/tmp/gh-aw", 0o700);
+    expect(fs.openSync).toHaveBeenCalledWith(metrics.OTEL_METRICS_JSONL_PATH, expect.any(Number), 0o600);
+    expect(fs.fchmodSync).toHaveBeenCalledWith(1, 0o600);
   });
 });

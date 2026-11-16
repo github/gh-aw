@@ -812,7 +812,7 @@ describe("sendOTLPSpan", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const payload = { resourceSpans: [] };
-    await sendOTLPSpan("https://traces.example.com:4317", payload);
+    await expect(sendOTLPSpan("https://traces.example.com:4317", payload)).resolves.toBe(true);
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, init] = mockFetch.mock.calls[0];
@@ -882,7 +882,7 @@ describe("sendOTLPSpan", () => {
     const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
 
     // Should not throw
-    await expect(sendOTLPSpan("https://traces.example.com", {}, { maxRetries: 1, baseDelayMs: 1 })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://traces.example.com", {}, { maxRetries: 1, baseDelayMs: 1 })).resolves.toBe(false);
 
     // Two attempts (1 initial + 1 retry)
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -900,7 +900,7 @@ describe("sendOTLPSpan", () => {
     vi.stubGlobal("fetch", mockFetch);
     const appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
 
-    await expect(sendOTLPSpan("https://collector.example.com:4318", {}, { maxRetries: 0, skipJSONL: true })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com:4318", {}, { maxRetries: 0, skipJSONL: true })).resolves.toBe(false);
 
     expect(appendSpy).toHaveBeenCalledWith("/tmp/gh-aw/otlp-export-errors.jsonl", `${JSON.stringify({ host: "collector.example.com:4318", status: 401, reason: "Unauthorized" })}\n`);
 
@@ -913,7 +913,7 @@ describe("sendOTLPSpan", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
 
-    await expect(sendOTLPSpan("https://collector.example.com", { resourceSpans: [] }, { baseDelayMs: 1 })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com", { resourceSpans: [] }, { baseDelayMs: 1 })).resolves.toBe(false);
 
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(warnSpy).toHaveBeenCalledOnce();
@@ -932,7 +932,7 @@ describe("sendOTLPSpan", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
 
-    await expect(sendOTLPSpan("https://collector.example.com", {}, { baseDelayMs: 1, skipJSONL: true })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com", {}, { baseDelayMs: 1, skipJSONL: true })).resolves.toBe(false);
 
     expect(spawnSyncSpy).toHaveBeenCalledOnce();
     expect(fetch).not.toHaveBeenCalled();
@@ -948,7 +948,7 @@ describe("sendOTLPSpan", () => {
     spawnSyncSpy.mockReturnValue({ error: undefined, status: 0, stdout: "401", stderr: "" });
     const appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
 
-    await expect(sendOTLPSpan("https://collector.example.com:4318", {}, { maxRetries: 0, skipJSONL: true })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com:4318", {}, { maxRetries: 0, skipJSONL: true })).resolves.toBe(false);
 
     expect(appendSpy).toHaveBeenCalledWith("/tmp/gh-aw/otlp-export-errors.jsonl", `${JSON.stringify({ host: "collector.example.com:4318", status: 401, reason: "HTTP 401" })}\n`);
 
@@ -960,7 +960,7 @@ describe("sendOTLPSpan", () => {
     vi.stubGlobal("fetch", mockFetch);
     const appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
 
-    await expect(sendOTLPSpan("https://user:secret@collector.example.com:4318?token=abc", {}, { maxRetries: 0, skipJSONL: true })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://user:secret@collector.example.com:4318?token=abc", {}, { maxRetries: 0, skipJSONL: true })).resolves.toBe(false);
 
     expect(appendSpy).toHaveBeenCalledWith("/tmp/gh-aw/otlp-export-errors.jsonl", `${JSON.stringify({ host: "collector.example.com:4318", reason: "Failed to parse URL from [REDACTED]" })}\n`);
 
@@ -987,7 +987,7 @@ describe("sendOTLPSpan", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
 
-    await expect(sendOTLPSpan("https://traces.example.com", {}, { maxRetries: 1, baseDelayMs: 1 })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://traces.example.com", {}, { maxRetries: 1, baseDelayMs: 1 })).resolves.toBe(false);
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(warnSpy.mock.calls[1][0]).toContain("error after 2 attempts");
@@ -2696,6 +2696,7 @@ describe("sendJobConclusionSpan", () => {
   const envKeys = [
     "GH_AW_OTLP_ENDPOINTS",
     "GH_AW_OTEL_METRICS",
+    "GH_AW_JOB_RESULT",
     "OTEL_SERVICE_NAME",
     "GH_AW_DEPRECATED_COST",
     "GH_AW_AIC",
@@ -2737,7 +2738,7 @@ describe("sendJobConclusionSpan", () => {
     "GITHUB_WORKFLOW",
     "OTEL_RESOURCE_ATTRIBUTES",
   ];
-  let mkdirSpy, appendSpy;
+  let mkdirSpy, appendSpy, mirrorLines, chmodSpy, fchmodSpy, writeSpy, closeSpy;
 
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -2747,6 +2748,14 @@ describe("sendJobConclusionSpan", () => {
     }
     mkdirSpy = vi.spyOn(fs, "mkdirSync").mockImplementation(() => {});
     appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
+    mirrorLines = [];
+    chmodSpy = vi.spyOn(fs, "chmodSync").mockImplementation(() => {});
+    fchmodSpy = vi.spyOn(fs, "fchmodSync").mockImplementation(() => {});
+    writeSpy = vi.spyOn(fs, "writeSync").mockImplementation((_fd, data) => {
+      mirrorLines.push(String(data));
+      return String(data).length;
+    });
+    closeSpy = vi.spyOn(fs, "closeSync").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -2760,6 +2769,10 @@ describe("sendJobConclusionSpan", () => {
     }
     mkdirSpy.mockRestore();
     appendSpy.mockRestore();
+    chmodSpy.mockRestore();
+    fchmodSpy.mockRestore();
+    writeSpy.mockRestore();
+    closeSpy.mockRestore();
   });
 
   it("skips OTLP export but writes JSONL mirror when GH_AW_OTLP_ENDPOINTS is not set", async () => {
@@ -2775,13 +2788,13 @@ describe("sendJobConclusionSpan", () => {
   it("emits built-in metrics only when GH_AW_OTEL_METRICS is enabled", async () => {
     process.env.GH_AW_OTEL_METRICS = "true";
     await sendJobConclusionSpan("gh-aw.job.conclusion", { startMs: Date.now() - 5000 });
-    const metricWrite = appendSpy.mock.calls.find(([filePath]) => filePath === "/tmp/gh-aw/otel-metrics.jsonl");
+    const metricWrite = mirrorLines.find(line => line.includes('"resourceMetrics"'));
     expect(metricWrite).toBeDefined();
-    expect(JSON.parse(metricWrite[1].trim()).resourceMetrics[0].scopeMetrics[0].metrics[0]).toMatchObject({
+    expect(JSON.parse(metricWrite.trim()).resourceMetrics[0].scopeMetrics[0].metrics[0]).toMatchObject({
       name: "gh_aw.job.duration",
       unit: "s",
     });
-    const metric = JSON.parse(metricWrite[1].trim()).resourceMetrics[0].scopeMetrics[0].metrics[0];
+    const metric = JSON.parse(metricWrite.trim()).resourceMetrics[0].scopeMetrics[0].metrics[0];
     expect(metric.histogram.dataPoints[0].exemplars[0]).toMatchObject({
       traceId: expect.stringMatching(/^[0-9a-f]{32}$/),
       spanId: expect.stringMatching(/^[0-9a-f]{16}$/),
@@ -7606,6 +7619,23 @@ describe("sendOTLPToAllEndpoints", () => {
     expect(urls).toEqual(["https://primary.example.com:4317/v1/traces", "https://secondary.example.com:4317/v1/traces"].sort());
   });
 
+  it("returns one final result per endpoint", async () => {
+    const mockFetch = vi.fn().mockImplementation(url => Promise.resolve({ ok: !url.includes("failed"), status: url.includes("failed") ? 500 : 200, statusText: "status" }));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(sendOTLPToAllEndpoints([{ url: "https://failed.example" }, { url: "https://healthy.example" }], { resourceSpans: [] }, { skipJSONL: true, maxRetries: 0, reportResults: true })).resolves.toEqual([false, true]);
+  });
+
+  it("routes Azure metrics to the metrics stream", async () => {
+    vi.stubEnv("GH_AW_OTEL_METRICS", "true");
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(sendOTLPSpan("https://example.ingest.monitor.azure.com/dcr-test/streams/Microsoft-OTLP-Traces/otlp/v1/traces", { resourceMetrics: [] }, { skipJSONL: true, signal: "metrics" })).resolves.toBe(true);
+
+    expect(mockFetch.mock.calls[0][0]).toBe("https://example.ingest.monitor.azure.com/dcr-test/streams/Microsoft-OTLP-Metrics/otlp/v1/metrics");
+  });
+
   it("uses per-endpoint headers (not global OTEL_EXPORTER_OTLP_HEADERS)", async () => {
     process.env.OTEL_EXPORTER_OTLP_HEADERS = "X-Global=global";
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
@@ -7994,6 +8024,7 @@ describe("sendJobConclusionSpan does not emit OTLP metrics", () => {
     vi.resetModules();
     process.env.INPUT_JOB_NAME = "agent";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    delete process.env.GH_AW_OTEL_METRICS;
     readFileSpy = vi.spyOn(fs, "readFileSync");
     statSpy = vi.spyOn(fs, "statSync").mockImplementation(() => {
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
@@ -8012,6 +8043,7 @@ describe("sendJobConclusionSpan does not emit OTLP metrics", () => {
     statSpy.mockRestore();
     delete process.env.INPUT_JOB_NAME;
     delete process.env.GH_AW_AGENT_CONCLUSION;
+    delete process.env.GH_AW_OTEL_METRICS;
     delete process.env.GH_AW_AIC;
     delete process.env.GH_AW_OTLP_ENDPOINTS;
   });
