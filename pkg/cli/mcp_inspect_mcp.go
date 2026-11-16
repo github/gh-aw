@@ -211,6 +211,7 @@ func connectHTTPMCPServer(ctx context.Context, config parser.RegistryMCPServerCo
 	transport := &mcp.StreamableClientTransport{
 		Endpoint:             config.URL,
 		DisableStandaloneSSE: true,
+		MaxEventSize:         mcp.DefaultMaxEventSize,
 	}
 
 	// Add custom headers if provided

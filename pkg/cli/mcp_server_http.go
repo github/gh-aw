@@ -42,6 +42,21 @@ func mcpHTTPServerDisplayURL(port int) string {
 	return fmt.Sprintf("http://127.0.0.1:%d", port)
 }
 
+func newMCPHTTPHandler(server *mcp.Server) http.Handler {
+	return mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{
+		// Stateless mode is deliberately left disabled. Stateless servers opt into
+		// the 2026-07-28 protocol revision but drop session affinity, which the
+		// long-running logs/audit tools rely on for progress notifications over the
+		// lifetime of a session. Staying stateful lets the SDK negotiate down to
+		// 2025-11-25 for peers that still expect the initialize handshake.
+		SessionTimeout:             2 * time.Hour, // Close idle sessions after 2 hours
+		DisableLocalhostProtection: false,         // Keep the SDK's localhost Host-header checks enabled.
+		Logger:                     logger.NewSlogLoggerWithHandler(mcpLog),
+	})
+}
+
 func loggingHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -79,18 +94,7 @@ func runHTTPServer(server *mcp.Server, port int) error {
 	mcpLog.Printf("Creating HTTP server on port %d", port)
 
 	// Create the streamable HTTP handler.
-	handler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{
-		// Stateless mode is deliberately left disabled. Stateless servers opt into
-		// the 2026-07-28 protocol revision but drop session affinity, which the
-		// long-running logs/audit tools rely on for progress notifications over the
-		// lifetime of a session. Staying stateful lets the SDK negotiate down to
-		// 2025-11-25 for peers that still expect the initialize handshake.
-		SessionTimeout:             2 * time.Hour, // Close idle sessions after 2 hours
-		DisableLocalhostProtection: false,         // Keep the SDK's localhost Host-header checks enabled.
-		Logger:                     logger.NewSlogLoggerWithHandler(mcpLog),
-	})
+	handler := newMCPHTTPHandler(server)
 
 	handlerWithLogging := loggingHandler(handler)
 

@@ -249,6 +249,106 @@ func TestUpdateActions_GhAwNativeActionCappedAtCLIVersion(t *testing.T) {
 	}
 }
 
+// TestUpdateActions_SetupActionPinnedToCompilerVersion verifies that the gh-aw setup
+// action is pinned to exactly the compiler version, even when the latest release is
+// older, the lock already holds a newer version, or release bumps are disabled.
+func TestUpdateActions_SetupActionPinnedToCompilerVersion(t *testing.T) {
+	setReleaseVersionForTest(t, "v0.68.3", true)
+
+	const cliVersionSHA = "cliversha12345678901234567890123456789012"
+	tests := []struct {
+		name               string
+		lockedVersion      string
+		disableReleaseBump bool
+	}{
+		{name: "older lock, latest release below compiler", lockedVersion: "v0.67.0"},
+		{name: "lock newer than compiler", lockedVersion: "v0.69.0"},
+		{name: "release bumps disabled", lockedVersion: "v0.67.0", disableReleaseBump: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			deps := newTestActionUpdateDeps()
+			deps.getLatestRelease = func(_ context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
+				if repo == "github/gh-aw-actions/setup" {
+					t.Errorf("getLatestRelease must not be called for the compiler-pinned setup action")
+				}
+				return currentVersion, "defaultsha12345678901234567890123456789012", nil
+			}
+			deps.getActionSHAForTag = func(_ context.Context, repo, tag string) (string, error) {
+				if repo != "github/gh-aw-actions" || tag != "v0.68.3" {
+					t.Errorf("unexpected tag lookup %s@%s", repo, tag)
+				}
+				return cliVersionSHA, nil
+			}
+
+			tmpDir := testutil.TempDir(t, "test-*")
+			cache := workflow.NewActionCache(tmpDir)
+			cache.Set("github/gh-aw-actions/setup", tt.lockedVersion, "oldsha1234567890123456789012345678901234a")
+			if err := cache.Save(); err != nil {
+				t.Fatalf("failed to save initial cache: %v", err)
+			}
+			wd, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("failed to get working directory: %v", err)
+			}
+			t.Cleanup(func() { _ = os.Chdir(wd) })
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatalf("failed to chdir: %v", err)
+			}
+
+			if err := updateActions(context.Background(), deps, false, false, tt.disableReleaseBump, 0); err != nil {
+				t.Fatalf("updateActions() error = %v", err)
+			}
+
+			saved := workflow.NewActionCache(tmpDir)
+			if err := saved.Load(); err != nil {
+				t.Fatalf("failed to reload cache: %v", err)
+			}
+			entry, ok := saved.Entries["github/gh-aw-actions/setup@v0.68.3"]
+			if !ok {
+				t.Fatalf("expected setup pinned to compiler version v0.68.3, got entries: %v", savedEntryKeys(saved))
+			}
+			if entry.SHA != cliVersionSHA {
+				t.Errorf("setup SHA = %q, want %q", entry.SHA, cliVersionSHA)
+			}
+			if _, found := saved.Entries["github/gh-aw-actions/setup@"+tt.lockedVersion]; found {
+				t.Errorf("stale entry for %s should have been replaced", tt.lockedVersion)
+			}
+		})
+	}
+}
+
+// setReleaseVersionForTest sets the compiler version and release flag, restoring both on cleanup.
+func setReleaseVersionForTest(t *testing.T, version string, release bool) {
+	t.Helper()
+	origVersion, origRelease := GetVersion(), workflow.IsRelease()
+	SetVersionInfo(version)
+	workflow.SetIsRelease(release)
+	t.Cleanup(func() {
+		SetVersionInfo(origVersion)
+		workflow.SetIsRelease(origRelease)
+	})
+}
+
+// TestCompilerPinnedActionTag_RequiresReleaseBuild verifies that a semver-shaped
+// version on a non-release binary does not pin the setup action.
+func TestCompilerPinnedActionTag_RequiresReleaseBuild(t *testing.T) {
+	setReleaseVersionForTest(t, "v0.68.3", false)
+	if got := compilerPinnedActionTag("github/gh-aw-actions/setup"); got != "" {
+		t.Errorf("compilerPinnedActionTag() = %q for non-release build, want empty", got)
+	}
+
+	workflow.SetIsRelease(true)
+	if got := compilerPinnedActionTag("github/gh-aw-actions/setup"); got != "v0.68.3" {
+		t.Errorf("compilerPinnedActionTag() = %q for release build, want v0.68.3", got)
+	}
+
+	SetVersionInfo("v0.69.0-beta.1")
+	if got := compilerPinnedActionTag("github/gh-aw-actions/setup"); got != "v0.69.0-beta.1" {
+		t.Errorf("compilerPinnedActionTag() = %q for prerelease build, want v0.69.0-beta.1", got)
+	}
+}
+
 // TestUpdateActions_NeverDowngradesRefreshesCurrentTagSHA verifies that when the
 // resolved latest version is older than the pinned version, UpdateActions refreshes
 // the SHA for the current version instead of downgrading.

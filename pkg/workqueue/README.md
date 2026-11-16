@@ -26,6 +26,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `WorkState` | struct | Current lifecycle state and immutable definition for one Work item. |
 | `ClaimState` | struct | Lifecycle and terminal evidence for one attempt. |
 | `DispatchState` | struct | Assignment and worker-run state for a dispatch. |
+| `Stats` | struct | Aggregate counts for Work lifecycle and availability, Claims, Dispatches, transactions, and replayed graph nodes. |
 | `Assignment` | struct | Worker input containing one dispatch and its Claims. |
 | `Evidence` | struct | Recorded evidence used to validate lifecycle and delivery transitions. |
 | `Selection` | struct | Scheduler selection or the reason no Work was selected. |

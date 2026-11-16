@@ -82,11 +82,69 @@ type fixtureOutcomeRunSource struct {
 	calls []string
 }
 
+type cancellationProbeOutcomeSource struct {
+	started  chan struct{}
+	canceled chan bool
+}
+
+func (s *cancellationProbeOutcomeSource) Load(ctx context.Context, _ string) outcomeRunData {
+	close(s.started)
+	select {
+	case <-ctx.Done():
+		s.canceled <- true
+	case <-time.After(time.Second):
+		s.canceled <- false
+	}
+	return outcomeRunData{}
+}
+
 func (s *fixtureOutcomeRunSource) Load(_ context.Context, id string) outcomeRunData {
 	s.mu.Lock()
 	s.calls = append(s.calls, id)
 	s.mu.Unlock()
 	return outcomeRunData{Report: OutcomesData{Items: []OutcomeReport{experimentOutcome(OutcomeStatusAccepted, true, true)}}}
+}
+
+func TestLoadOutcomeObservationSetsPropagatesCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	source := &cancellationProbeOutcomeSource{
+		started: make(chan struct{}), canceled: make(chan bool, 1),
+	}
+	now := time.Now()
+	details := &ExperimentDetails{
+		Experiments: []ExperimentVariantStats{{Name: "prompt", Variants: map[string]int{"control": 1}, Total: 1}},
+		Runs: []ExperimentRunRecord{{
+			RunID: "1", Timestamp: now.Add(-80 * time.Hour).Format(time.RFC3339),
+			Assignments: map[string]string{"prompt": "control"},
+		}},
+	}
+	frontmatter := experimentFrontmatterResult{
+		ExperimentConfigs: map[string]*workflow.ExperimentConfig{"prompt": {Metric: "outcome:accepted"}},
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, _, _, cleanup, err := loadOutcomeObservationSetsForAnalysis(
+			ctx, details, frontmatter, "acme/repo",
+			func(string, string) outcomeRunSource { return source },
+		)
+		cleanup()
+		result <- err
+	}()
+
+	select {
+	case <-source.started:
+		cancel()
+	case <-time.After(time.Second):
+		cancel()
+		t.Fatal("outcome source was not called")
+	}
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("outcome observation loading did not stop after cancellation")
+	}
+	assert.True(t, <-source.canceled, "outcome source should receive the canceled context")
 }
 
 func TestOutcomeMetricMaturityAndAssignmentJoin(t *testing.T) {
@@ -348,7 +406,7 @@ func TestOutcomeMetricsRequireOptIn(t *testing.T) {
 			frontmatter := experimentFrontmatterResult{
 				ExperimentConfigs: map[string]*workflow.ExperimentConfig{"prompt": tc.config},
 			}
-			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(&ExperimentDetails{}, frontmatter, "acme/repo", false)
+			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(t.Context(), &ExperimentDetails{}, frontmatter, "acme/repo", false)
 			defer cleanup()
 			require.ErrorContains(t, err, "require --outcome")
 			assert.Contains(t, err.Error(), "additional GitHub API requests")
@@ -364,7 +422,7 @@ func TestOutcomeOptInWithoutOutcomeMetrics(t *testing.T) {
 		t.Run(strconv.FormatBool(outcome), func(t *testing.T) {
 			calls := installOutcomeAPIFixture(t, "exit 1\n")
 			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(
-				&ExperimentDetails{}, experimentFrontmatterResult{}, "acme/repo", outcome,
+				t.Context(), &ExperimentDetails{}, experimentFrontmatterResult{}, "acme/repo", outcome,
 			)
 			defer cleanup()
 			require.NoError(t, err)
@@ -393,7 +451,7 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}},
 		},
 	}}
-	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(details, frontmatter, "acme/repo", true)
+	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(t.Context(), details, frontmatter, "acme/repo", true)
 	require.NoError(t, err)
 	defer cleanup()
 	require.Len(t, bundle.Primary["prompt"].ByVariant["control"], 1)

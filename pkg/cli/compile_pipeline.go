@@ -1018,7 +1018,7 @@ func runPostProcessing(
 	// check for expires fields; only reconcile when using the default
 	// workflow directory (custom --dir compiles and --no-emit compiles are
 	// left untouched).
-	if !config.NoEmit && config.WorkflowDir == "" && len(compiledLockFiles) > 0 {
+	if !config.NoEmit && config.usesDefaultWorkflowDir() && len(compiledLockFiles) > 0 {
 		if gitRoot, err := gitutil.FindGitRoot(); err == nil {
 			absWorkflowDir := getAbsoluteWorkflowDir(getWorkflowsDir(), gitRoot)
 			repoConfig, err := workflow.LoadRepoConfig(gitRoot)
@@ -1078,7 +1078,7 @@ func runPostProcessingForDirectory(
 	// Generate maintenance workflow if needed.
 	// Skip maintenance workflow generation when using custom --dir option.
 	// Keep invoking generators for empty workflowDataList so stale generated files are cleaned up.
-	if !config.NoEmit && config.WorkflowDir == "" {
+	if !config.NoEmit && config.usesDefaultWorkflowDir() {
 		absWorkflowDir := getAbsoluteWorkflowDir(workflowsDir, gitRoot)
 		if err := generateMaintenanceWorkflowWrapper(ctx, compiler, workflowDataList, absWorkflowDir, gitRoot, config.Verbose, config.Strict, config.NoLogo); err != nil {
 			if config.Strict {
