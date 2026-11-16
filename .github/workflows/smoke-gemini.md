@@ -53,6 +53,8 @@ network:
   allowed:
     - defaults
     - github
+runtimes:
+  go: {}
 tools:
   cache-memory: true
   github:
