@@ -102,7 +102,7 @@ tools:
   playwright:
 safe-outputs:
   upload-artifact:
-    allowed-paths: ["output/*.png"]
+    allowed-paths: ["*.png"]
     max-uploads: 1
     retention-days: 7
 ---
