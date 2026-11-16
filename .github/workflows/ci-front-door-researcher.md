@@ -108,23 +108,48 @@ The complete suite IDs are:
 Only the other five optional CGO jobs can be selected away. Do not add, remove, or
 rename IDs or change mandatory flags.
 
-The runtime API input is `{diff_summary:{...},suite_catalog:catalog,prompt:string}`;
-the decision output is `{suite_ids:[IDs],confidence:number}` with confidence at
+The internal selector input is `{diff_summary:{...},suite_catalog:catalog,prompt:string}`;
+the normalized decision output is `{suite_ids:[IDs],confidence:number}` with confidence at
 least **0.9**. Reasoning is ignored. Runtime outputs are `suite_ids` JSON,
 `fallback` boolean and `metrics` JSON. Preserve validation, mandatory-suite
 inclusion, and fail-open **all-suite fallback** for every uncertain, missing,
 malformed, unsupported, or failed decision. Do not lower confidence thresholds,
 weaken input bounds, change execution/network/authentication code, or edit the
 decision parser, output contract, fallback, tests, or CI wiring.
+Model confidence never overrides the trusted deterministic path policy: only
+policy-eligible suites may be omitted. Never change that policy in a proposal.
 
-The selector requires a pre-provisioned HTTPS service configured through the
-repository variable `CI_DECISION_URL`; it sends no authentication token. Missing
-or invalid endpoint configuration fails open with zero requests. A valid
-configured endpoint receives exactly one request, with no retries or redirects.
+The selector uses GitHub Decisions at `https://api.githubcopilot.com/v1/decisions`
+with model `gpt-6-luna-decisions`. A dedicated inference job supplies
+`CI_DECISION_TOKEN` from the built-in workflow token with job-scoped
+`copilot-requests: write`. Execute selector, client, catalog, prompt, and policy
+from the pinned trusted base; use `CI_DIFF_WORKSPACE` only for local PR diff
+evidence. Never execute PR code in the credential-bearing job. No custom endpoint
+or PAT is needed. Missing credentials fail open with zero requests.
+A configured token makes exactly one request, with no retries or redirects.
 The researcher must never provision, probe, or call that service, or request
-credentials. Report missing provisioning as a prerequisite, not a reason to
+credentials. Report authentication failures as prerequisites, not reasons to
 weaken fallback. Do not confuse zero requests on a configuration fallback with
 the one-request budget for valid configured decisions.
+
+The summarizer excludes `.lock.yml` files and separates `.js`/`.cjs`, `.go`, and
+other files into `javascript`, `go`, and `other` groups. Complete filenames remain
+available when a group's bounded patch has `patch_truncated: true`; missing
+hunks never establish safety. Incomplete filename inventories still fail open.
+GitHub's named predicate answers are normalized to the replay output above;
+do not pass a raw `answers` batch to the recorded-response evaluator.
+
+## Required evaluation and publication gates
+
+Before replay/edits, read [replay requirements](#replay-and-periodic-full-suite-evaluation);
+before reporting/publication, read [metrics rules](#metrics-and-publication-gate).
+Require matched provenance, disjoint chronological holdout, complete outcomes,
+no new missed regressions, and positive measured benefit; otherwise report gaps
+and `noop` without edits. Before a draft PR, inspect `git diff` and run
+`node --test scripts/ci-front-door.test.cjs`. Only edit the three allowed files;
+never edit the selector, merge, approve, or push directly.
+
+<!-- instruction-prefix-end -->
 
 ## Replay and periodic full-suite evaluation
 

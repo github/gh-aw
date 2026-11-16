@@ -146,7 +146,7 @@ else
   fail "CJS write permission output was incorrect" "$(cat "$T6_OUT")"
 fi
 
-echo "Test 7: CGO still rejects Copilot write permission..."
+echo "Test 7: non-selector CGO jobs still reject Copilot write permission..."
 T7="$TMP_ROOT/t7"
 T7_CGO="$T7/cgo.yml"
 write_workflow "$T7_CGO" "    permissions: { contents: read, copilot-requests: write }
@@ -195,6 +195,65 @@ elif grep -q "^cjs.yml:.*copilot-requests: write" "$T9_OUT" && grep -q "^other/c
 else
   fail "other CJS path permission output was incorrect" "$(cat "$T9_OUT")"
 fi
+
+echo "Test 10: only the dedicated CGO selector can request Copilot inference..."
+T10="$TMP_ROOT/t10"
+for style in block flow; do
+  T10_DIR="$T10/$style"
+  mkdir -p "$T10_DIR"
+  if [ "$style" = block ]; then
+    body=$'    permissions:\n      contents: read\n      copilot-requests: write'
+  else
+    body='    permissions: { contents: read, copilot-requests: write }'
+  fi
+  write_workflow "$T10_DIR/cgo.yml" "$body"
+  sed 's/^  test:/  front-door-decision:/' "$T10_DIR/cgo.yml" > "$T10_DIR/selector.yml"
+  mv "$T10_DIR/selector.yml" "$T10_DIR/cgo.yml"
+  T10_OUT="$TMP_ROOT/t10-$style-output.txt"
+  if (cd "$T10_DIR" && bash "$PURITY_SCRIPT" cgo.yml >"$T10_OUT" 2>&1); then
+    pass "CGO dedicated selector permits $style inference permission"
+  else
+    fail "CGO selector inference permission should pass" "$(cat "$T10_OUT")"
+  fi
+  cp "$T10_DIR/cgo.yml" "$T10_DIR/cjs.yml"
+  if (cd "$T10_DIR" && bash "$PURITY_SCRIPT" cjs.yml >"$T10_OUT" 2>&1); then
+    fail "CJS selector must still reject inference permission" "$(cat "$T10_OUT")"
+  else
+    pass "CJS selector rejects $style inference permission"
+  fi
+done
+
+echo "Test 11: workflow-wide Copilot permission remains forbidden..."
+T11="$TMP_ROOT/t11"
+mkdir -p "$T11"
+printf 'name: Test\non: push\npermissions: { copilot-requests: write }\njobs:\n  checkout-cache:\n    runs-on: ubuntu-latest\n' > "$T11/cgo.yml"
+T11_OUT="$TMP_ROOT/t11-output.txt"
+if (cd "$T11" && bash "$PURITY_SCRIPT" cgo.yml >"$T11_OUT" 2>&1); then
+  fail "workflow-wide inference permission should fail" "$(cat "$T11_OUT")"
+else
+  pass "workflow-wide Copilot permission remains forbidden"
+fi
+
+echo "Test 12: the broad checkout-cache job cannot request Copilot inference..."
+T12="$TMP_ROOT/t12"
+mkdir -p "$T12"
+for style in block flow; do
+  if [ "$style" = block ]; then
+    body=$'    permissions:\n      contents: read\n      copilot-requests: write'
+  else
+    body='    permissions: { contents: read, copilot-requests: write }'
+  fi
+  write_workflow "$T12/source.yml" "$body"
+  sed 's/^  test:/  checkout-cache:/' "$T12/source.yml" > "$T12/cgo.yml"
+  T12_OUT="$TMP_ROOT/t12-$style-output.txt"
+  if (cd "$T12" && bash "$PURITY_SCRIPT" cgo.yml >"$T12_OUT" 2>&1); then
+    fail "checkout-cache inference permission should fail" "$(cat "$T12_OUT")"
+  elif grep -q "copilot-requests: write" "$T12_OUT"; then
+    pass "checkout-cache rejects $style inference permission"
+  else
+    fail "checkout-cache permission output was incorrect" "$(cat "$T12_OUT")"
+  fi
+done
 
 echo
 echo "Tests passed: $TESTS_PASSED"

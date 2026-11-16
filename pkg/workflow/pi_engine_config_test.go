@@ -140,3 +140,19 @@ func TestPiEngineToolPolicyAndRPC(t *testing.T) {
 	assert.Contains(t, rendered, "GH_AW_PI_TOOL_POLICY")
 	assert.Contains(t, piToolPolicyJSON(data), `"bash":["echo"]`)
 }
+
+func TestPiEngineToolPolicyAllowsMountedCLIs(t *testing.T) {
+	tools := map[string]any{"bash": []any{"echo"}}
+	data := &WorkflowData{
+		EngineConfig: &EngineConfig{ID: "pi"},
+		Tools:        tools,
+		ParsedTools:  NewTools(tools),
+		SafeOutputs:  &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+	}
+	policy := piToolPolicyJSON(data)
+	assert.Contains(t, policy, `"safeoutputs:*"`)
+	assert.Equal(t, []any{"echo"}, data.Tools["bash"], "the workflow allowlist must not be mutated")
+
+	tools["bash"] = []any{"*"}
+	assert.NotContains(t, piToolPolicyJSON(data), "safeoutputs:*", "unrestricted bash needs no mounted CLI entries")
+}
