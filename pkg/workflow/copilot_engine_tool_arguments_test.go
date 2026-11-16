@@ -3,8 +3,41 @@
 package workflow
 
 import (
+	"os"
+	"slices"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/parser"
 )
+
+func TestDailyCracktroBrowserLifecycleToolArguments(t *testing.T) {
+	source, err := os.ReadFile("../../.github/workflows/daily-cracktro-maintainer.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	frontmatter, err := parser.ExtractFrontmatterFromContent(string(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools, ok := frontmatter.Frontmatter["tools"].(map[string]any)
+	if !ok {
+		t.Fatal("workflow tools must be an object")
+	}
+	args := NewCopilotEngine().computeCopilotToolArguments(tools, nil, nil, &WorkflowData{Tools: tools})
+	for _, grant := range []string{
+		"shell(node)",
+		"shell(curl:*)", "shell(kill)", "shell(playwright-cli:*)",
+	} {
+		if !slices.Contains(args, grant) {
+			t.Errorf("missing browser lifecycle grant %q", grant)
+		}
+	}
+	for _, grant := range []string{"--allow-all-tools", "shell", "shell(python3)", "shell(python3:*)", "shell(mkdir)"} {
+		if slices.Contains(args, grant) {
+			t.Errorf("browser lifecycle must not require unrestricted grant %q", grant)
+		}
+	}
+}
 
 func TestCopilotEngineComputeToolArguments(t *testing.T) {
 	engine := NewCopilotEngine()

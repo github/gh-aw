@@ -17,8 +17,9 @@ for triggers, path scope, outputs and `noop` conditions.
 
 ## Persona-to-Toolset Matrix
 
-Use GitHub's default toolset for GitHub-only reads. Add `playwright` for visual
-checks; add `cache-memory` only for persistent baselines or comparisons.
+Use GitHub's default toolset for GitHub-only reads. Apply the
+[browser decision](playwright.md#browser-decision-and-readiness) before selecting
+tools; add `cache-memory` only for persistent baselines or comparisons.
 
 ## Replace Previous Results
 

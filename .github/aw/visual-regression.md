@@ -7,6 +7,11 @@ description: Reference prompt for visual regression testing using playwright + c
 
 Use `playwright` for screenshots and `cache-memory` to persist baselines between PR runs.
 
+First apply the [browser readiness contract](playwright.md#browser-decision-and-readiness).
+Prepare trusted application dependencies before agent execution and configure
+the application's scoped server, readiness, screenshot-directory, and cleanup
+commands; the baseline example below does not supply that application lifecycle.
+
 ## Example Workflow
 
 ```markdown
@@ -21,7 +26,6 @@ permissions:
 engine: copilot
 network:
   allowed:
-    - local
     - playwright
 tools:
   playwright:
@@ -54,7 +58,7 @@ Otherwise compare each screenshot to its baseline. Post a comment summarizing: p
 
 - **`cache-memory` key per base branch** — scopes baselines to `main`, `develop`, etc.
 - **Explicit baseline source** — state whether baselines come from `cache-memory`, a generated artifact, or a branch directory; do not leave baseline origin implicit.
-- **`network.allowed: [local, playwright]`** — prevents SSRF; serve app locally, allow browser binary downloads
+- **`network.allowed: [playwright]`** — permits browser downloads; same-sandbox loopback is available without `local`. Scope external destinations separately; this is not a general SSRF guarantee.
 - **`retention-days: 30`** — beyond the default 7-day cache expiry
 - **Filesystem-safe timestamps** — `YYYY-MM-DD-HH-MM-SS`; colons break artifact filenames
 - **Minimal permissions** — all PR writes go through `safe-outputs`

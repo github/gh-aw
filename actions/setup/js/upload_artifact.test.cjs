@@ -376,6 +376,21 @@ describe("upload_artifact.cjs", () => {
   });
 
   describe("allowed-paths policy", () => {
+    it("publishes Daily Cracktro screenshots using its staging-relative policy", async () => {
+      const source = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/daily-cracktro-maintainer.md"), "utf8");
+      const policy = source.match(/allowed-paths: \[("[^"]+")\]/);
+      if (!policy) throw new Error("Daily Cracktro must declare an artifact path policy");
+      const allowedPaths = [JSON.parse(policy[1])];
+      writeStaging("cracktro-review/slide.png");
+      writeStaging("unrelated/secret.env");
+
+      const results = await runHandler(buildConfig({ "allowed-paths": allowedPaths }), [{ type: "upload_artifact", path: "cracktro-review" }]);
+
+      expect(results[0].success).toBe(true);
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockArtifactClient.uploadArtifact.mock.calls[0][1]).toEqual([path.join(STAGING_DIR, "cracktro-review/slide.png")]);
+    });
+
     it("filters out files not in allowed-paths", async () => {
       writeStaging("dist/app.js");
       writeStaging("secret.env");

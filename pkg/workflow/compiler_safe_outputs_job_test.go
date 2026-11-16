@@ -18,6 +18,115 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUploadArtifactStagingDownloadCondition(t *testing.T) {
+	stagedFileScript := &SafeScriptConfig{connectorInputSchema: map[string]any{
+		"properties": map[string]any{
+			"file": map[string]any{"x-gh-aw-staged-file": map[string]any{"max-bytes": 1024}},
+		},
+	}}
+	configurations := []struct {
+		name   string
+		config *SafeOutputsConfig
+		types  []string
+	}{
+		{"public artifacts", &SafeOutputsConfig{UploadArtifact: &UploadArtifactConfig{}}, []string{"upload_artifact"}},
+		{"connector files without public artifacts", &SafeOutputsConfig{
+			Scripts: map[string]*SafeScriptConfig{"provider.upload-attachment": stagedFileScript},
+		}, []string{"provider_upload_attachment"}},
+		{"shared staging", &SafeOutputsConfig{
+			UploadArtifact: &UploadArtifactConfig{},
+			Scripts: map[string]*SafeScriptConfig{
+				"provider.upload-attachment": stagedFileScript,
+				"unrelated-script":           {connectorInputSchema: map[string]any{}},
+			},
+		}, []string{"provider_upload_attachment", "upload_artifact"}},
+	}
+	for _, configuration := range configurations {
+		t.Run(configuration.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			state := &safeOutputsHandlerOutputsAndActionState{}
+			data := &WorkflowData{SafeOutputs: configuration.config}
+			compiler.appendUploadArtifactStagingDownloadStep(data, "fixture-", state)
+			var parsed struct {
+				Steps []struct {
+					Name string         `yaml:"name"`
+					If   string         `yaml:"if"`
+					With map[string]any `yaml:"with"`
+				} `yaml:"steps"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte("steps:\n"+strings.Join(state.steps, "")), &parsed))
+			require.Len(t, parsed.Steps, 1)
+			step := parsed.Steps[0]
+			require.Equal(t, "fixture-"+SafeOutputsUploadArtifactStagingArtifactName, step.With["name"])
+			require.Equal(t, artifactStagingDirExpr, step.With["path"])
+			require.NotEmpty(t, step.If)
+			scenarios := []struct {
+				outputs string
+				result  string
+				allowed bool
+			}{
+				{"", "success", false},
+				{"noop", "success", false},
+				{"report_incomplete", "success", false},
+				{"create_issue,unrelated_script", "success", false},
+				{strings.Join(configuration.types, ","), "success", true},
+				{strings.Join(configuration.types, ","), "skipped", false},
+			}
+			for _, outputType := range configuration.types {
+				scenarios = append(scenarios, struct {
+					outputs string
+					result  string
+					allowed bool
+				}{outputType, "success", true})
+			}
+			for _, scenario := range scenarios {
+				condition := strings.ReplaceAll(step.If, "!cancelled()", "('true' == 'true')")
+				for _, outputType := range configuration.types {
+					condition = strings.ReplaceAll(condition,
+						"contains(needs.agent.outputs.output_types, '"+outputType+"')",
+						fmt.Sprintf("('%t' == 'true')", strings.Contains(scenario.outputs, outputType)))
+				}
+				assert.Equal(t, scenario.allowed, evaluateTestCondition(t, condition, map[string]string{
+					"needs.agent.result": scenario.result,
+				}), "%s/%s: %s", scenario.outputs, scenario.result, step.If)
+			}
+		})
+	}
+	t.Run("preamble offset includes the conditional staging block", func(t *testing.T) {
+		compiler := NewCompiler()
+		before := &WorkflowData{SafeOutputs: &SafeOutputsConfig{}}
+		after := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
+			Scripts: map[string]*SafeScriptConfig{"provider.upload-attachment": stagedFileScript},
+		}}
+		state := &safeOutputsHandlerOutputsAndActionState{}
+		compiler.appendUploadArtifactStagingDownloadStep(after, "", state)
+		assert.Equal(t, len(state.steps),
+			compiler.calculatePreambleInsertIndex(nil, after, "")-compiler.calculatePreambleInsertIndex(nil, before, ""))
+	})
+	t.Run("no staged-file consumer emits no download", func(t *testing.T) {
+		compiler := NewCompiler()
+		state := &safeOutputsHandlerOutputsAndActionState{}
+		compiler.appendUploadArtifactStagingDownloadStep(&WorkflowData{SafeOutputs: &SafeOutputsConfig{
+			Scripts: map[string]*SafeScriptConfig{"unrelated": {}},
+		}}, "", state)
+		assert.Empty(t, state.steps)
+	})
+}
+
+func TestSafeOutputsHandlerActionResolutionError(t *testing.T) {
+	data := &WorkflowData{
+		ActionPinMappings: map[string]string{"actions/source@v1": "./invalid-mapped-action"},
+		SafeOutputs: &SafeOutputsConfig{Actions: map[string]*SafeOutputActionConfig{
+			"source": {Uses: "actions/source@v1"},
+		}},
+	}
+	steps, outputs, names, err := NewCompiler().buildSafeOutputsHandlerOutputsAndActionSteps(data, "", "workflow.md")
+	require.ErrorContains(t, err, "invalid action pin mapping")
+	require.Nil(t, steps)
+	require.Nil(t, outputs)
+	require.Nil(t, names)
+}
+
 func TestSafeOutputsRequireAgentSuccess(t *testing.T) {
 	for _, setting := range []string{"", "false", "true"} {
 		for _, detection := range []string{"false", "true", `"${{ vars.DETECT == 'true' }}"`} {

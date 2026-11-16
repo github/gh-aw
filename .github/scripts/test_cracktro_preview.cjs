@@ -10,6 +10,7 @@ function fixture() {
   const child = new EventEmitter();
   const process = new EventEmitter();
   process.argv = ["node", "cracktro_preview.cjs"];
+  process.env = { RUNNER_TEMP: "/tmp/cracktro-preview-fixture" };
   const calls = [];
   const errors = [];
   child.kill = signal => calls.push(["kill", signal]);
@@ -36,7 +37,7 @@ test("launches only the fixed loopback preview and creates the exact screenshot 
   const { run, calls } = fixture();
   run();
   assert.equal(calls[0][0], "mkdir");
-  assert.equal(calls[0][1], "/tmp/gh-aw/agent/cracktro-review");
+  assert.equal(calls[0][1], "/tmp/cracktro-preview-fixture/gh-aw/safeoutputs/upload-artifacts/cracktro-review");
   assert.equal(calls[0][2].recursive, true);
   assert.equal(calls[1][0], "spawn");
   assert.equal(calls[1][1], "python3");
@@ -61,6 +62,13 @@ test("rejects arguments instead of allowing another bind address or document roo
   const { run, process, calls } = fixture();
   process.argv.push("--bind", "0.0.0.0");
   assert.throws(run, /accepts no arguments/);
+  assert.equal(calls.length, 0);
+});
+
+test("fails before creating output or starting a server when the staging environment is missing", () => {
+  const { run, process, calls } = fixture();
+  delete process.env.RUNNER_TEMP;
+  assert.throws(run, /RUNNER_TEMP is required/);
   assert.equal(calls.length, 0);
 });
 

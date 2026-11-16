@@ -3,7 +3,9 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 
 function startCracktroPreview() {
-  fs.mkdirSync("/tmp/gh-aw/agent/cracktro-review", { recursive: true });
+  const runnerTemp = process.env.RUNNER_TEMP;
+  if (!runnerTemp) throw new Error("RUNNER_TEMP is required for Cracktro screenshot staging");
+  fs.mkdirSync(path.join(runnerTemp, "gh-aw", "safeoutputs", "upload-artifacts", "cracktro-review"), { recursive: true });
   const server = spawn("python3", ["-m", "http.server", "4329", "--bind", "127.0.0.1", "--directory", "docs/public"], {
     cwd: path.resolve(__dirname, "../.."),
     stdio: "inherit",
