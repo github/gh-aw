@@ -5,6 +5,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/gitutil"
@@ -52,6 +53,10 @@ func TestCLIVersionCheckerReleaseResolutionContract(t *testing.T) {
 	} {
 		require.Contains(t, workflow, instruction)
 	}
+
+	require.Contains(t, workflow, "NPM_CONFIG_REGISTRY: https://registry.npmjs.org/")
+	require.Equal(t, 2, strings.Count(workflow, "${TOKEN}"))
+	require.Equal(t, 2, strings.Count(workflow, "Accept: application/vnd.oci.image.index.v1+json"))
 
 	for _, pkg := range []string{
 		"@anthropic-ai/claude-code", "@github/copilot", "@openai/codex",

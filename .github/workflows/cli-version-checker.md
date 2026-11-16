@@ -123,7 +123,7 @@ Apply this policy to **all release resolution**: every CLI, MCP server, threat-d
   - Update the version with the `v` prefix used by GitHub release tags
 **Optimization**: Fetch all versions in parallel using multiple npm view or WebFetch calls in a single turn.
 
-**npm registry**: Use the public registry `https://registry.npmjs.org/` for every npm command. `NPM_CONFIG_REGISTRY` is preset; if npm still contacts `packagefeedproxy.microsoft.io` (from the repository `.npmrc`, which the firewall blocks), pass `--registry=https://registry.npmjs.org/` explicitly. Never edit `.npmrc` or disable TLS verification.
+**npm registry**: The public registry is configured through the workflow's `NPM_CONFIG_REGISTRY` setting. Never edit `.npmrc` or disable TLS verification.
 
 ### Research & Analysis
 For each update, analyze intermediate versions:
@@ -268,7 +268,7 @@ For every Docker image, fetch the registry digest for the cooldown-eligible targ
 TOKEN=$(curl -s "https://auth.docker.io/token?scope=repository:anchore/syft:pull&service=registry.docker.io" | jq -r .token)
 # Fetch the manifest digest (amd64 manifest list or single-arch)
 curl -sI \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -H "Accept: application/vnd.oci.image.index.v1+json" \
   -H "Accept: application/vnd.oci.image.manifest.v1+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
@@ -288,7 +288,7 @@ If `docker` is unavailable, fall back to the GHCR anonymous API. GHCR returns HT
 ```bash
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:zizmorcore/zizmor:pull&service=ghcr.io" | jq -r .token)
 curl -sI \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -H "Accept: application/vnd.oci.image.index.v1+json" \
   -H "Accept: application/vnd.oci.image.manifest.v1+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
