@@ -48,20 +48,20 @@ Output shape:
 
 ```json
 { "snapshot", "window": [first,end], "days", "reports", "fixed", "related", "superseded",
-  "unresolved", "open", "copilotFixes", "medianHoursToMerge", "cwe": {"CWE-88": 6, ...},
+  "unresolved", "open", "copilotFixes", "medianHoursToMerge", "cwe": null,
   "REPORTS": [[day,"f|r|s|n"]...],
   "runs": {"total","success","first","lastFailure","streak","byMonth"},
-  "detail": [{"number","created","state","kind","cwe","pr": {"number","mergedAt","copilot"}}...] }
+  "detail": [{"number","created","state","kind","cwe":null,"pr": {"number","mergedAt","copilot"}}...] }
 ```
 
-The output deliberately carries no free text: only numbers, dates, enums, booleans and CWE ids matching `^CWE-[0-9]+$`. Issue and PR bodies, titles and comments are untrusted; the script reads them only inside jq heuristics and never prints them.
+The output deliberately carries no free text: only numbers, dates, enums, booleans and nulls. The script does not fetch issue or PR bodies, titles or comments.
 
 The script's underlying queries (`REPO` env var, default gh-aw):
 
-1. Findings: `gh issue list --state all --search '"VulnHunter findings" in:title created:<=END'`, keeping only titles that start with `[vulnhunter] `.
-2. Fix: the first PR in `closedByPullRequestsReferences` merged on or before END (UTC) (`f`); otherwise such a PR cited in the last comment (`r`). A "closed as outdated" comment means `s`; anything else is `n` (unresolved).
-3. Copilot: PR author `app/copilot-swe-agent`, or a body containing `COPILOT CODING AGENT` (a bot-pushed PR can carry it).
-4. CWE: the first `CWE-<n>` in the issue body.
+1. Findings: filter with `--label vulnhunter --search created:<=END`; request only `number,createdAt,closedAt,state,stateReason,closedByPullRequestsReferences`.
+2. Fix: the first linked PR merged on or before END (UTC) (`f`); otherwise a merged, non-closing PR cross-reference from a structured `CROSS_REFERENCED_EVENT` (`r`). A `NOT_PLANNED` state reason means superseded (`s`); anything else is `n` (unresolved).
+3. Copilot: PR author `app/copilot-swe-agent` or `copilot-swe-agent`; do not infer attribution from PR text.
+4. CWE: `null`; do not fetch or parse issue bodies.
 5. Median: `medianHoursToMerge` is issue creation to PR merge over all `f` and `r` rows.
 6. Runs: `gh run list --workflow daily-vulnhunter-scan.lock.yml --limit 1000 --json conclusion,createdAt`.
 
@@ -80,7 +80,7 @@ If the new numbers are lower than the baseline, suspect the query first: the tit
 
 ## 5. Update steps
 
-1. **KPIs:** set `reports`, `fixed + related` (and whether `copilotFixes` still equals it: "all by Copilot" or "N by Copilot"), `medianHoursToMerge`, the top CWE and its count, and `runs.success/runs.total` with `runs.streak`.
+1. **KPIs:** set `reports`, `fixed + related` (and whether `copilotFixes` still equals it: "all by Copilot" or "N by Copilot"), `medianHoursToMerge`, and `runs.success/runs.total` with `runs.streak`. The helper does not refresh the historical CWE figure.
 2. **Timeline:** replace `REPORTS` (drop `n` or add a class for it), set the `116` span in `TX`, and recompute the month ticks as day offsets of the 1st of each month from `window[0]`. Update the title counts.
 3. **Caption:** update the snapshot date, the window end and its day count. Keep "MEASURED ·" and "loop illustrative", and keep it left of the sound button.
 4. **Notes:** update the snapshot, window and every number in the measured sentences. Keep "…are illustrative and simplified." so the notes still match `/illustrative|synthetic|simulated/i`.
@@ -101,10 +101,10 @@ cd docs && npx playwright test tests/talk.spec.ts
 
 ## 7. Pitfalls
 
-- **Search matches failure reports:** `[aw] Daily VulnHunter … failed` issues also match; always filter on the `[vulnhunter] ` prefix.
-- **Related fixes:** one finding was fixed by a separate PR that did not link it; it is found only from the PR cited in the issue's last comment. Check new `n` rows by hand.
-- **Bot-pushed Copilot PRs:** an author of `gh-aw-bot` can still be a Copilot coding-agent PR; the body marker decides.
+- **Finding filter:** the workflow labels findings `vulnhunter`; keep that label filter to exclude scan-failure reports without fetching titles.
+- **Related fixes:** one finding was fixed by a separate PR that did not link it; detect it through structured cross-reference events, not comment text.
+- **Copilot attribution:** only PR author identity is used; do not infer it from titles or bodies.
 - **Cost is not mined:** per-run AI credits and duration come from `gh aw logs`, not gh + jq, so the slide does not show them.
-- **Untrusted text:** findings, comments and PR bodies are attacker-influenced. Keep the output free of free text; never add titles, bodies or comments to `detail`.
+- **Untrusted text:** never fetch or emit issue/PR titles, bodies or comments. Keep `detail` to structural fields.
 - **Historical snapshots:** a PR merged after the snapshot date does not count as a fix.
 - **Date filter:** `created:..END` returns nothing; use `created:<=END`. Compute day offsets from UTC dates.

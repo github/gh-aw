@@ -1,41 +1,70 @@
 #!/usr/bin/env bash
 # Read-only: recompute the measured strip of the cracktro "Hunt · Falsify · Fix" slide.
 # Usage: hunt-falsify-fix.sh [SNAPSHOT_DATE]   (default: today, UTC). Needs gh and jq. Prints JSON.
-# Issue and PR text is untrusted: it is read only by the jq heuristics below and never emitted.
-# The output holds numbers, dates, enums, booleans and CWE ids only.
+# Do not fetch issue or PR text. The output holds numbers, dates, enums, booleans and nulls only.
 set -euo pipefail
 REPO="${REPO:-github/gh-aw}"
 END="${1:-$(date -u +%F)}"
 WF="daily-vulnhunter-scan.lock.yml"
 
-# 1. Findings issues: title prefix "[vulnhunter] " only (the search also matches failure reports).
+# 1. Findings issues: filter by the workflow label and fetch only structural fields.
 issues=$(gh issue list -R "$REPO" --state all --limit 500 \
-  --search "\"VulnHunter findings\" in:title created:<=$END" \
-  --json number,title,createdAt,closedAt,state,stateReason,body,comments,closedByPullRequestsReferences |
-  jq --arg end "$END" '[.[] | select(.title | startswith("[vulnhunter] ")) | select(.createdAt[0:10] <= $end)] | sort_by(.createdAt)')
+  --label vulnhunter --search "created:<=$END" \
+  --json number,createdAt,closedAt,state,stateReason,closedByPullRequestsReferences |
+  jq --arg end "$END" '[.[] | select(.createdAt[0:10] <= $end)] | sort_by(.createdAt)')
 
-# 2. Candidate fix PRs: linked closing PRs, else PRs cited in the last comment ("related" fixes).
+# 2. Candidate fix PRs: linked closing PRs, else structured cross-reference events.
 rows='[]'
 for n in $(jq -r '.[].number' <<<"$issues"); do
   issue=$(jq --argjson n "$n" '.[] | select(.number == $n)' <<<"$issues")
   linked=$(jq -r '[.closedByPullRequestsReferences[]?.number] | join(" ")' <<<"$issue")
-  superseded=$(jq '[.comments[]?.body | select(test("closed as outdated"))] | length > 0' <<<"$issue")
+  superseded=$(jq '.stateReason == "NOT_PLANNED"' <<<"$issue")
   kind="none" pr='null'
-  cands="$linked"
-  [ -z "$cands" ] && cands=$(jq -r '(.comments[-1].body // "") | [scan("(?:pull/|PR #)([0-9]+)")[0]] | unique | join(" ")' <<<"$issue")
-  for p in $cands; do
-    j=$(gh pr view "$p" -R "$REPO" --json number,mergedAt,author,body 2>/dev/null || echo null)
+  for p in $linked; do
+    j=$(gh pr view "$p" -R "$REPO" --json number,mergedAt,author 2>/dev/null || echo null)
     # Only merges on or before the snapshot date (UTC) count.
     if [ "$(jq -r --arg end "$END" '(.mergedAt // "") | select(. != "" and .[0:10] <= $end)' <<<"$j")" != "" ]; then
-      pr=$(jq '{number, mergedAt, copilot: (.author.login == "app/copilot-swe-agent" or .author.login == "copilot-swe-agent" or ((.body // "") | test("COPILOT CODING AGENT")))}' <<<"$j")
-      if [ -n "$linked" ]; then kind="fixed"; else kind="related"; fi
+      pr=$(jq '{number, mergedAt, copilot: (.author.login == "app/copilot-swe-agent" or .author.login == "copilot-swe-agent")}' <<<"$j")
+      kind="fixed"
       break
     fi
   done
+  if [ "$kind" = "none" ]; then
+    created=$(jq -r '.createdAt' <<<"$issue")
+    refs=$(gh api graphql -F owner="${REPO%%/*}" -F name="${REPO#*/}" -F number="$n" -f query='
+      query($owner: String!, $name: String!, $number: Int!) {
+        repository(owner: $owner, name: $name) {
+          issue(number: $number) {
+            timelineItems(first: 100, itemTypes: [CROSS_REFERENCED_EVENT]) {
+              nodes {
+                ... on CrossReferencedEvent {
+                  willCloseTarget
+                  source {
+                    __typename
+                    ... on PullRequest {
+                      number
+                      mergedAt
+                      author { login }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }' |
+      jq --arg end "$END" --arg created "$created" '[.data.repository.issue.timelineItems.nodes[]?
+        | select(.willCloseTarget == false)
+        | .source
+        | select(.__typename == "PullRequest" and .mergedAt != null and .mergedAt >= $created and .mergedAt[0:10] <= $end)
+        | {number, mergedAt, copilot: (.author.login == "app/copilot-swe-agent" or .author.login == "copilot-swe-agent")}]')
+    pr=$(jq 'sort_by(.mergedAt) | .[0] // null' <<<"$refs")
+    if [ "$pr" != "null" ]; then kind="related"; fi
+  fi
   [ "$kind" = "none" ] && [ "$superseded" = "true" ] && kind="superseded"
   rows=$(jq --argjson i "$issue" --arg kind "$kind" --argjson pr "$pr" \
     '. + [{number: $i.number, created: $i.createdAt, state: $i.state, kind: $kind,
-           cwe: ((($i.body // "") | [scan("CWE-[0-9]+")] | map(select(test("^CWE-[0-9]+$"))) | .[0]) // null), pr: $pr}]' <<<"$rows")
+           cwe: null, pr: $pr}]' <<<"$rows")
 done
 
 # 3. Runs of the compiled workflow, up to the snapshot date.
@@ -61,7 +90,7 @@ jq -n --arg end "$END" --argjson rows "$rows" --argjson runs "$runs" '
     open: ($rows | map(select(.state == "OPEN")) | length),
     copilotFixes: ($rows | map(select(.pr != null and .pr.copilot)) | length),
     medianHoursToMerge: ($merged | map(hours(.created; .pr.mergedAt)) | median | . * 10 | round / 10),
-    cwe: ($rows | map(.cwe // "none") | group_by(.) | map({(.[0]): length}) | add),
+    cwe: null,
     REPORTS: ($rows | map([day(.created), (.kind | .[0:1])])),
     runs: {
       total: ($runs | length),
