@@ -16,7 +16,7 @@ describe("mcp_dependencies_manager", () => {
 
   it("preserves credential-free installer configuration but never forwards server or tool credentials", async () => {
     vi.stubEnv("GH_AW_MCP_SCRIPTS_API_KEY", "server-secret");
-    vi.stubEnv("GH_AW_MCP_SCRIPTS_ENV_616c706861_4150495f4b4559", "tool-secret");
+    vi.stubEnv("GH_AW_MCP_SCRIPTS_ENV_5_ALPHA_API_KEY", "tool-secret");
     vi.stubEnv("JOB_SECRET", "job-secret");
     vi.stubEnv("GITHUB_TOKEN", "github-secret");
     vi.stubEnv("NPM_TOKEN", "npm-secret");
@@ -58,7 +58,7 @@ describe("mcp_dependencies_manager", () => {
     for (const [, , options] of execRunner.mock.calls) {
       expect(options.env.PATH).toBe(process.env.PATH);
       expect(options.env.GH_AW_MCP_SCRIPTS_API_KEY).toBeUndefined();
-      expect(options.env.GH_AW_MCP_SCRIPTS_ENV_616c706861_4150495f4b4559).toBeUndefined();
+      expect(options.env.GH_AW_MCP_SCRIPTS_ENV_5_ALPHA_API_KEY).toBeUndefined();
       expect(options.env.JOB_SECRET).toBeUndefined();
       for (const name of ["GITHUB_TOKEN", "NPM_TOKEN", "PIP_CONFIG_FILE", "NPM_CONFIG_USERCONFIG", "NODE_OPTIONS"]) expect(options.env).not.toHaveProperty(name);
       expect(options.env).toMatchObject(config);

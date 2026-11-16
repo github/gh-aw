@@ -1171,7 +1171,7 @@ jobs:
         # runner-guard:ignore RGS-018 -- writes first-party mcp-scripts tools.json manifest and mcp-server.cjs shim generated verbatim from the gh-aw compiler template, not an attacker-controlled dropper.
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_1be699fbc4841a44_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_48e021f2eb2f059e_EOF'
           {
             "serverName": "mcpscripts",
             "version": "1.0.0",
@@ -1186,13 +1186,13 @@ jobs:
                 },
                 "handler": "caveman-run-state.cjs",
                 "env": {
-                  "CAVEMAN_RUN_ID": "GH_AW_MCP_SCRIPTS_ENV_636176656d616e2d72756e2d7374617465_434156454d414e5f52554e5f4944"
+                  "CAVEMAN_RUN_ID": "GH_AW_MCP_SCRIPTS_ENV_17_CAVEMAN_RUN_STATE_CAVEMAN_RUN_ID"
                 },
                 "timeout": 60
               }
             ]
           }
-          GH_AW_MCP_SCRIPTS_TOOLS_1be699fbc4841a44_EOF
+          GH_AW_MCP_SCRIPTS_TOOLS_48e021f2eb2f059e_EOF
           cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF'
             const path = require("path");
             const { startHttpServer } = require("./mcp_scripts_mcp_server_http.cjs");
@@ -1254,7 +1254,7 @@ jobs:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}
-          GH_AW_MCP_SCRIPTS_ENV_636176656d616e2d72756e2d7374617465_434156454d414e5f52554e5f4944: ${{ github.run_id }}
+          GH_AW_MCP_SCRIPTS_ENV_17_CAVEMAN_RUN_STATE_CAVEMAN_RUN_ID: ${{ github.run_id }}
         run: |
           # Environment variables are set above to prevent template injection
           export DEBUG

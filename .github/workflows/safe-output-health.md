@@ -36,6 +36,7 @@ imports:
   - ../skills/jqschema/SKILL.md
 
   - shared/otlp.md
+  - shared/reporting.md
 steps:
   - name: Check successful audit cadence
     uses: actions/github-script@v9.0.0

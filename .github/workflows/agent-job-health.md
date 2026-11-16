@@ -40,6 +40,7 @@ imports:
   - shared/aw-logs-24h-fetch.md
   - ../skills/jqschema/SKILL.md
   - shared/graders.md
+  - shared/reporting.md
 safe-outputs:
   mentions: false
   create-issue:

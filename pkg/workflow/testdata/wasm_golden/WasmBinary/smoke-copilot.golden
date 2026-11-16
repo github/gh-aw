@@ -1147,8 +1147,8 @@ jobs:
                 },
                 "handler": "gh.sh",
                 "env": {
-                  "GH_AW_GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6768_47485f41575f47485f544f4b454e",
-                  "GH_DEBUG": "GH_AW_MCP_SCRIPTS_ENV_6768_47485f4445425547"
+                  "GH_AW_GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_2_GH_GH_AW_GH_TOKEN",
+                  "GH_DEBUG": "GH_AW_MCP_SCRIPTS_ENV_2_GH_GH_DEBUG"
                 },
                 "timeout": 60
               },
@@ -1174,9 +1174,9 @@ jobs:
                 },
                 "handler": "github-discussion-query.sh",
                 "env": {
-                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_47485f544f4b454e",
-                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f5259",
-                  "GITHUB_REPOSITORY_OWNER": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f52595f4f574e4552"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_23_GITHUB_DISCUSSION_QUERY_GH_TOKEN",
+                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_23_GITHUB_DISCUSSION_QUERY_GITHUB_REPOSITORY",
+                  "GITHUB_REPOSITORY_OWNER": "GH_AW_MCP_SCRIPTS_ENV_23_GITHUB_DISCUSSION_QUERY_GITHUB_REPOSITORY_OWNER"
                 },
                 "timeout": 60
               },
@@ -1206,8 +1206,8 @@ jobs:
                 },
                 "handler": "github-issue-query.sh",
                 "env": {
-                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_47485f544f4b454e",
-                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_4749544855425f5245504f5349544f5259"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_18_GITHUB_ISSUE_QUERY_GH_TOKEN",
+                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_18_GITHUB_ISSUE_QUERY_GITHUB_REPOSITORY"
                 },
                 "timeout": 60
               },
@@ -1237,8 +1237,8 @@ jobs:
                 },
                 "handler": "github-pr-query.sh",
                 "env": {
-                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_47485f544f4b454e",
-                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_4749544855425f5245504f5349544f5259"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GH_TOKEN",
+                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GITHUB_REPOSITORY"
                 },
                 "timeout": 60
               }
@@ -1614,15 +1614,15 @@ jobs:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}
-          GH_AW_MCP_SCRIPTS_ENV_6768_47485f41575f47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_MCP_SCRIPTS_ENV_6768_47485f4445425547: 1
-          GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f5259: ${{ github.repository }}
-          GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f52595f4f574e4552: ${{ github.repository_owner }}
-          GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_4749544855425f5245504f5349544f5259: ${{ github.repository }}
-          GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_4749544855425f5245504f5349544f5259: ${{ github.repository }}
+          GH_AW_MCP_SCRIPTS_ENV_2_GH_GH_AW_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_2_GH_GH_DEBUG: 1
+          GH_AW_MCP_SCRIPTS_ENV_23_GITHUB_DISCUSSION_QUERY_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_23_GITHUB_DISCUSSION_QUERY_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_MCP_SCRIPTS_ENV_23_GITHUB_DISCUSSION_QUERY_GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GH_AW_MCP_SCRIPTS_ENV_18_GITHUB_ISSUE_QUERY_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_18_GITHUB_ISSUE_QUERY_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           # Environment variables are set above to prevent template injection
           export DEBUG

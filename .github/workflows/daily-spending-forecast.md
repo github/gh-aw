@@ -19,6 +19,7 @@ engine:
 strict: true
 imports:
   - shared/trending-charts-simple.md
+  - shared/reporting.md
 tools:
   github:
     mode: local

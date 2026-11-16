@@ -11,6 +11,7 @@ on:
         default: "-30d..-0d"
 
 imports:
+  - shared/opencode.md
   - shared/graders.md
 permissions:
   contents: read
@@ -96,7 +97,7 @@ evals:
     question: Was a trend report created with per-workflow AIC data for the requested period?
 
 engine:
-  id: codex
+  id: opencode
   model-provider: github
 model: copilot/gpt-6-sol
 ---

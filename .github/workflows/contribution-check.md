@@ -28,6 +28,7 @@ engine:
 
 imports:
   - shared/otlp.md
+  - shared/reporting.md
 tools:
   cli-proxy: true
   bash: ["cat", "ls", "find", "grep", "head", "tail", "wc", "git", "jq *"]

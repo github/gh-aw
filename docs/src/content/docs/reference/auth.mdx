@@ -442,7 +442,7 @@ configured OpenAI WIF endpoint before launching.
 Codex threat detection inherits the main Codex engine's auth unless its engine
 configuration supplies its own auth, including with a same-engine detector
 override. The generated detection job receives `id-token: write`. This does not
-apply to [evals](/gh-aw/experimental/experiments/#analyze-an-eval-backed-metric), which call Decisions
+apply to [evals](/gh-aw/reference/experiments/#analyze-an-eval-backed-metric), which call Decisions
 directly and still require `CODEX_API_KEY` or `OPENAI_API_KEY` for OpenAI models.
 Complete OpenAI WIF settings supplied through `engine.env.AWF_AUTH_*` also
 produce a keyless Codex detector; setting only the auth type and provider does

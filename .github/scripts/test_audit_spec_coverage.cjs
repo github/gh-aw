@@ -123,7 +123,22 @@ test("the generated workflow authorizes the scanner through the real SDK permiss
   const config = JSON.parse(match[1].replace(/''/g, "'"));
   const handler = buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));
   assert.equal(handler({ kind: "shell", fullCommandText: "node .github/scripts/audit_spec_coverage.cjs" }).kind, "approve-once");
+  assert.equal(handler({ kind: "shell", fullCommandText: 'node .github/scripts/audit_spec_coverage.cjs; echo "EXIT=$?"' }).kind, "reject");
   assert.equal(handler({ kind: "shell", fullCommandText: "node -e 'process.exit(0)'" }).kind, "reject");
+  const workflow = fs.readFileSync(path.join(__dirname, "../workflows/daily-spec-coverage-kiro.md"), "utf8");
+  assert.match(workflow, /one standalone Bash call/);
+  assert.match(workflow, /Read the Bash tool's exit result directly/);
+});
+
+test("related issues use title-scoped searches without treating filtered results as clean", () => {
+  const workflow = fs.readFileSync(path.join(__dirname, "../workflows/daily-spec-coverage-kiro.md"), "utf8");
+  for (const word of ["spec", "docs"]) {
+    assert.ok(workflow.includes(`repo:\${{ github.repository }} is:issue is:open ${word} in:title sort:created-desc`));
+  }
+  assert.match(workflow, /each with `perPage: 5`/);
+  assert.match(workflow, /deduplicate by issue number/);
+  assert.match(workflow, /If integrity policy filters either response, call `report_incomplete`/);
+  assert.match(workflow, /Do not bypass\s+the policy/);
 });
 
 test("CLI executes the real scan without credentials and emits complete JSON", t => {

@@ -37,6 +37,7 @@ sandbox:
     id: awf
 imports:
   - shared/otlp.md
+  - shared/reporting.md
 evals:
   - id: security_aspect_rotated
     question: Did the agent load and update the cache-memory state to rotate the security focus aspect using the 60/40 rule?

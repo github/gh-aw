@@ -201,6 +201,8 @@ evals:
     question: Did the agent classify each finding as vendored (fixable in this repo) or upstream (owned by another repository), and avoid requesting a local code-fix PR for upstream-owned findings?
 features:
   gh-aw-detection: true
+imports:
+  - shared/reporting.md
 ---
 
 # Daily Container Image Security Scan
