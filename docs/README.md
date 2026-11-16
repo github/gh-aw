@@ -63,9 +63,13 @@ Security, Human agent processes, Cost Optimization, Agentic Engineering, Enterpr
 slide that lists the band's slides (click a tile to jump) and a map of all bands.
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
-Left/Right (or Space, Page Up/Page Down) step through the slides in reading
-order and wrap between bands, and Up/Down jump to the first slide of the band
-above or below. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
+Left/Right (or Space) step through the slides of the main line in reading
+order and wrap between bands, and Page Up/Page Down jump to the first slide of
+the band above or below. Some Human agent processes patterns head a column of
+worked examples: a rail on the right edge shows a bouncing "↓ N examples" cue,
+Up/Down walk down the column and back (past either end they switch bands, as
+they do on slides without a column), and Left/Right from an example return to
+the main line. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
 and M to toggle sound. The slide map button (or G) opens a full-screen grid of
 every slide grouped by band, with the current slide focused; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,

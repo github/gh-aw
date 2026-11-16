@@ -2165,6 +2165,33 @@
     transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
   .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
   .dots button.on { width: 24px; background: #f0f6fc; box-shadow: none; }
+  .dots button.col { box-shadow: 0 3px 0 -1px #ffffff80; }
+  .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
+  .dots button.sub.on { width: 12px; background: #f0f6fc; }
+  /* --- example column rail: right edge, only on a column's head and its examples --- */
+  .vnav { position: fixed; right: 22px; top: 50%; transform: translate(12px, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 5;
+    opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .35s, transform .35s cubic-bezier(.2,.9,.2,1), visibility 0s .35s; }
+  .vnav.on { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(0, -50%); transition-delay: 0s; }
+  .vnav > button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc; color: #9198a1; cursor: pointer;
+    transition: color .2s, border-color .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .vnav > button:hover { color: #f0f6fc; border-color: #9198a1; }
+  .vnav > button svg { width: 100%; height: 100%; display: block; }
+  .vnav.head > button:last-of-type { color: #f0f6fc; border-color: #f0f6fc; animation: vnudge 1.6s ease-in-out infinite; }
+  .vnav-dots { display: flex; flex-direction: column; align-items: center; gap: 6px; max-height: 50vh; overflow: hidden; }
+  .vnav-dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer; transition: height .4s cubic-bezier(.3,1.6,.4,1), background .3s; }
+  .vnav-dots button.top { box-shadow: inset 0 0 0 2px #ffffff80; background: transparent; }
+  .vnav-dots button.on { height: 22px; background: #f0f6fc; box-shadow: none; }
+  .vnav-cue { position: absolute; right: 46px; bottom: 0; white-space: nowrap; font: 600 13px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+    color: #c9d1d9; padding: 6px 10px; border: 1px solid #3d444d; border-radius: 999px; background: #151b23cc; }
+  .vnav.head .vnav-cue { color: #0d1117; background: #f0f6fc; border-color: #f0f6fc; animation: vnudge 1.6s ease-in-out infinite; }
+  @keyframes vnudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+  @media (prefers-reduced-motion: reduce) { .vnav.head > button:last-of-type, .vnav.head .vnav-cue { animation: none; } }
+  body.light .vnav > button, body.light .vnav-cue { background: #ffffffcc; border-color: #9ea7b3; color: #59636e; }
+  body.light .vnav.head > button:last-of-type { color: #1f2328; border-color: #1f2328; }
+  body.light .vnav.head .vnav-cue { background: #1f2328; border-color: #1f2328; color: #ffffff; }
+  body.light .vnav-dots button { background: #1f232833; }
+  body.light .vnav-dots button.top { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
+  body.light .vnav-dots button.on { background: #1f2328; box-shadow: none; }
   /* --- band header --- */
   .bh-head { position: absolute; left: 140px; top: 170px; width: 960px; }
   .bh-head h2 { margin: 26px 0 0; font-size: 150px; line-height: .95; }
@@ -2191,7 +2218,8 @@
   .bh-row li:hover { border-color: var(--bh2); background: #1f2630cc; }
   .active .bh-row li { animation: rowin .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .5s); }
   @keyframes rowin { from { opacity: 0; transform: translateX(120px); } to { opacity: 1; transform: none; } }
-  .bh-n { font: 600 22px/1 var(--mono); color: var(--bh2); letter-spacing: .1em; }
+  .bh-n { font: 600 22px/1 var(--mono); color: var(--bh2); letter-spacing: .1em; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .bh-k { font-size: .8em; letter-spacing: .02em; padding: 3px 8px; border-radius: 999px; color: #0d1117; background: var(--bh2); }
   .bh-row.many { display: grid; grid-template-columns: repeat(7, 1fr); bottom: 140px; }
   .bh-row.many.lots { grid-template-columns: repeat(10, 1fr); gap: 14px; }
   .bh-row.many.lots li { padding: 16px 14px; }
@@ -2270,6 +2298,7 @@
   .smp-t b { font: 600 11px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
   .smp-t span { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .smp-t.hd { background: transparent; border-style: dashed; border-left-style: solid; }
+  .smp-t.sub { width: 132px; min-height: 48px; font-size: 12px; border-left-style: dotted; opacity: .85; }
   .smp-t:hover { background: #1f2630; border-color: #9198a1; border-left-color: var(--c); }
   .smp-t.on { box-shadow: 0 0 0 2px var(--c); }
   .smp-t:focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
@@ -5076,6 +5105,7 @@
     };
     slides.push({
       group: "process",
+      key: "handoffs",
       notes:
         "Event-driven Hand-offs: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself over a 30-day window, 15 October to 14 November 2026 (snapshot taken 14 November 2026): auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed 935 runs on 906 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals are a snapshot of the triggers in gh-aw's own workflow files on 14 November 2026, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
       enter() {
@@ -5223,6 +5253,7 @@
       };
       slides.push({
         group: "process",
+        key: "prr",
         notes:
           "Pull Request Review squared. The flow is illustrative and its open-thread counter is synthetic; the bottom strip is measured only on gh-aw pull requests merged in the 30 days from 15 October to 13 November 2026, snapshot taken 14 November, not on all pull requests. Of the 1,263 pull requests merged in that window, 938 were checked by the Matt Pocock Skills Reviewer, PR Code Quality Reviewer or Test Quality Sentinel workflows, which submitted 1,337 reviews and opened 1,612 inline review threads. PR Sous Chef posted 517 @copilot nudges on 336 pull requests, and Copilot pushed 965 fix commits after a nudge on 305 of them. 660 of the 682 reviewed pull requests merged after a single review round per reviewer, with a median of 1.8 hours from ready for review to merge. Reviewers are identified by their workflow footers and nudges by the Sous Chef workflow marker. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
         enter() {
@@ -5658,6 +5689,7 @@
     };
     slides.push({
       group: "process",
+      key: "unsloppers",
       notes:
         "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Duplicate Code Detector, Daily Test Improver and Daily Perf Improver. The flow is illustrative, with synthetic files; the panel in the middle is measured on gh-aw itself. From 7 October 2025 to 26 October 2026 the Duplicate Code Detector filed 211 issues titled duplicate-code, 144 of them assigned to Copilot; 115 were closed by merged pull requests, 112 of them opened by Copilot, with a median of 3.8 hours from issue to merge. The data window, 7 October 2025 to 26 October 2026, 385 days, is printed on the panel. The bars show issues filed and pull requests merged per month; empty months are months it filed nothing. Since 27 October 2026 the detector opens its pull requests directly. Snapshot taken 14 November 2026 from GitHub issue search and each issue's closing event. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
@@ -14914,7 +14946,8 @@
       tlSvg
     );
     slides.push({
-      group: "data",
+      group: "process",
+      under: "handoffs",
       notes:
         "Issue Monster loves cookie issues. In gh-aw many agentic workflows, such as deep reports, failure investigators, linters and refactoring scans, file their follow-ups as issues labelled cookie. That label is a queue. Issue Monster drains it on a schedule every 15 minutes, and most of its work is deterministic. Before any agent starts, pre-activation gates check that fewer than five Copilot pull requests are open, that build, test and lint are green, and that no Copilot pull request hit a rate limit in the last hour. If a gate blocks, the run ends there and costs no tokens. Otherwise a script filters the queue: it drops issues that are already assigned, already have a pull request, are superseded by a newer issue on the same topic, or whose topic already had two Copilot pull requests closed without merging. It then scores the rest by label and age. Only then does the agent read the top candidates, pick up to three independent ones, and assign them to Copilot with a comment explaining why. Merged pull requests close the issues; closed ones count toward the topic's retry limit. The bottom strip is measured on gh-aw (snapshot 16 November 2026). From 19 April to 16 November 2026 (211 days), Issue Monster picked 2,630 issues. 1,416 of them (54%) were closed by merged pull requests from the Copilot coding agent, with a median of 8.1 hours from issue to merge, and 1,126 merged within a day. The bars group picks by the month each issue was created. In June most picks got no pull request. In September the special token that assign-to-agent needs expired, and the maintainer, busy with other work, did not refresh it, so through October Issue Monster kept picking issues but almost none reached Copilot; the cheap gates do not check that token. From 9 to 15 November the workflow ran 615 times, and 567 of those runs (92%) ended in pre-activation, at a gate or with nothing left after filtering, before the agent started. The issues, scores, gate values and pull requests in the animated loop are illustrative and simplified.",
       enter() {
@@ -15218,7 +15251,8 @@
     };
     let prevT = 0;
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Research, assign, observe: an agentic feedback loop. Measured: the green panel and caption are gh-aw's own daily-cli-performance data, 13 Mar to 25 Oct 2026. The workflow benchmarks the compiler every day, keeps its history in repo memory (101 daily snapshots, 5 Apr to 13 Nov) and files '[performance] Regression in ...' issues labelled cookie: 116 of them. 101 were assigned to Copilot, 72 picked by Issue Monster, and 62 were closed by merged Copilot fixes, with a median of 6.8 hours from issue to merge (55 within a day); the next daily run re-benchmarks and observes the result. The five rows are real regressions with their slowdown and hours to fix. Illustrative: the production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
       enter() {
@@ -15527,7 +15561,8 @@
       tlSvg
     );
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Hunt, falsify, fix: gh-aw runs a daily vulnerability hunt on its own code with the vulnhunt skill from Capital One's open-source VulnHunter. A deterministic job, not the agent, picks the scope: it snapshots the repository, keeps only source files without tests, ranks them by risky patterns such as process execution, HTTP, tokens and file access, and hands the agent the 20 riskiest files plus a 20-file window of the ranked tail that rotates every day, so the whole codebase is covered over time. Inside the sandbox the agent hunts for injection-class bugs and then tries to falsify every candidate: is the code reachable, is the input attacker-controlled, and does exploiting it give the attacker a capability they did not already have? Only a survivor becomes a single issue, with its CWE; on most days nothing survives and the run ends with noop. The issue is assigned to Copilot, whose pull request fixes it with a regression test, and a maintainer reviews and merges it. The bottom strip is measured on gh-aw (snapshot 15 November 2026): 12 findings from 22 July to 15 November 2026 (116 days), six of them CWE-88 argument injection. Ten were fixed by merged pull requests, all opened by the Copilot coding agent, with a median of 9.6 hours from issue to merge; the other two were superseded. The workflow ran 122 times since 21 July and 108 succeeded; the early failures were cost caps and runtime issues, and the last 56 runs succeeded in a row. The files, candidates, finding and fix in the animated loop are illustrative and simplified.",
       enter() {
@@ -15756,7 +15791,8 @@
       dot.style.color = col;
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Query, ask, grow: how gh-aw's OpenTelemetry support was built. The loop at the top is illustrative; the timeline at the bottom is measured from gh-aw's own issues. OTLP export landed on 4 April 2026. From 5 April a daily OTel Instrumentation Advisor, prompted as a senior DevOps engineer, read live gh-aw spans through the Sentry MCP server, and from 4 May a second advisor did the same through the Grafana MCP server. Each run asked one question: do these spans hold enough data to answer operational questions, such as why did this run fail, which release, which environment, how slow is the agent, what did it cost? It filed the single most impactful gap as one issue for Copilot, so the feature grew one small, reviewable increment at a time, the feature grower pattern. Measured: 89 advisor issues between 5 April and 9 June 2026, 17 from the Grafana advisor; 62 were closed by merged pull requests and 25 as not planned. When two weeks of findings stopped landing, the advisors were retired; a smoke workflow still checks that both backends accept spans and can be queried.",
       enter() {
@@ -15971,7 +16007,8 @@
     const nums = STATS.map(() => h("div", { class: "ct-num" }, "0"));
     const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Mine, refine, apply: harvesting recurring corrections into Go linters. The loop is illustrative of three of gh-aw's own workflows; the feed and numbers are mined from gh-aw's history, 15 May to 11 November 2026. Mine: every day Linter Miner reads recent issues, discussions and the Go code, picks one pattern no existing analyzer catches, and opens a draft pull request with a go/analysis analyzer and its tests under pkg/linters. It opened 73 such pull requests; 65 merged and 8 were closed. Refine: Copilot code review and a maintainer leave review threads, and Copilot pushes fixes; 58 of the 65 needed follow-up commits, 376 reviews in all, and the median analyzer merged about two hours after it was opened. Apply: once merged the analyzer runs in make golint-custom. Every day LintMonster runs it, groups the findings by root cause and keeps one tracking issue per category, 235 so far, some counting thousands of findings, such as 3,561 unchecked errors on 4 October. Maintainers assign them to Copilot, and 92 merged Copilot pull requests closed them, changing 54,128 lines. For example, the sortslice analyzer merged on 8 June and the next day a Copilot pull request moved every sort.Slice call to slices.SortFunc. Human corrections become deterministic checks.",
       enter() {
@@ -16325,7 +16362,8 @@
       coverage();
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces. The strip at the bottom is measured, not illustrative, over 16 April to 14 November 2026 (213 days, snapshot 14 November 2026); each panel is labelled with its own window. It comes from Sergo's repo memory in gh-aw (the memory/sergo branch: its run statistics and the history of its strategy cache) and from gh-aw issues and pull requests labelled sergo, 16 April to 14 November 2026. Over 128 cached runs, 6 May to 14 November, Sergo logged 667 findings, and findings per run fell from 8.3 in May to 3.3 in October: the easy patterns run out, which is the exhaustion the grid shows. No runs were cached in August. It filed 287 issues, 16 April to 29 October; 164 merged pull requests closed 172 of them, 158 of those authored by Copilot. Since late October Sergo opens its own pull requests: 17 merged. Thirteen of them, 31 October to 12 November, came from one cached strategy, paren_unwrap_gap, linters that missed calls wrapped in parentheses: each day's cache entry reads cached: paren_unwrap_gap plus new: some untried corner, reuse and explore in the same run. The three cache lines are real entries, shortened.",
       enter() {
@@ -16478,7 +16516,8 @@
       fired = 0;
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Semantic clustering: instead of matching text, an agent reads what each function is for and groups functions by intent. This is a real report from gh-aw's Semantic Function Refactoring workflow, issue 30711 of 7 May 2026. It catalogued 762 non-test Go files and 3,727 functions in pkg/ using naming patterns, Serena LSP analysis and code review, and found 0 true duplicates. Clustering by intent still exposed misplaced code: env.go held only YAML-writing helpers, and five public validation functions sat in parser, checker and helper files. The Copilot coding agent merged PR 30770 the same day (+149 −142, 8 files), renaming env.go to yaml_env_helpers.go and moving the validators into *_validation.go files. Function names, signatures, files and counts are real; the scan, beams and chip animation are illustrative. The workflow now reviews a small rotating slice of functions each day rather than the whole package tree.",
       enter() {
@@ -16669,7 +16708,8 @@
       return s;
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Spec, model, test: formal methods as the backbone of spec-driven development, on gh-aw's own work queue. Measured, data window 2 Oct to 14 Nov 2026 (43 days), snapshot taken 14 Nov 2026: the top-right ledger counts the repository's specs/work-queue folder (16 TLA+ modules, 218 TLC configurations, of which 99 are Broken mutants and 55 are witnesses) and the 35 merged pull requests that changed it between 2 Oct and 14 Nov 2026 (file counts are as of the 14 Nov snapshot). The Daily Work Queue Formal Verification workflow re-runs the two expensive configurations every day; on its 11 Nov run FairDAGGitHub exhausted 1,055,182 distinct states at depth 20 in 16 min 33 s with Safety holding, while QueueOrdering was still open after 4 h 40 m with 178.9 million distinct states at depth 20, so it is reported as not established, not as a pass. The BrokenCAS mutant must fail TerminalPersistence (735 states) and the WeakOrderingWitness must reach an out-of-order Claim (756 states), from the 7 Oct 2026 verification record; that witness is why the spec says oldest-first is best effort, not strict FIFO. Shared fixtures replay against the real Go and JavaScript engines. Illustrative: the requirement wording, the abridged TLA+ excerpt, the small state graph and its animation are simplified; the invariant, mutant and witness names are real. Bounded checks are strong evidence, not a proof.",
       enter() {
@@ -16924,7 +16964,8 @@
       $("gfShipT").textContent = title;
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Go Fan: learning the libraries you depend on and keeping up with their releases. The loop is illustrative of what the Go Fan workflow does. Every weekday it reads go.mod, picks the next direct dependency, most recently updated upstream first and skipping the ones it remembers reviewing in cache memory, then studies the module's README, release notes and changelog and compares them with how our code actually uses it: new APIs we ignore, deprecated calls we still make, defaults that changed. It files one review issue; a maintainer assigns the good ones to Copilot, which opens a pull request that a maintainer reviews and merges. Dependabot bumps the version; Go Fan teaches you what changed and how to use it. The numbers and pull request titles are mined from gh-aw's own history, February to November 2026: 121 daily review issues covering 28 modules, most often the MCP Go SDK (22) and x/tools (15); 43 merged pull requests closed those reviews, all authored by Copilot, changing 16,372 lines. Titles are shortened. Before February the reviews were posted as discussions and are not counted.",
       enter() {
@@ -17161,7 +17202,8 @@
       tlSvg
     );
     slides.push({
-      group: "data",
+      group: "process",
+      under: "prr",
       notes:
         "Decide · Draft · Record, as gh-aw records its architecture decisions. When a pull request is marked ready for review or labelled implementation, the Design Decision Gate workflow starts. The agent reads the diff and, for changes large enough to carry a design decision, when no ADR is linked, drafts one in Michael Nygard form (context, decision, alternatives, consequences) with the imported adr-writer agent, pushes it to the pull request branch and comments that the decision must be reviewed before merge. The author and a maintainer complete it and it merges with the code. The bottom strip is measured on gh-aw's main branch (snapshot 16 November 2026): 980 ADR files in docs/adr since the first on 11 April 2026, 163 added in the last 30 days and 582 carrying the adr-writer agent's footer. 799 still say Draft and 97 Accepted, so drafts merge with the code but are rarely finalized afterwards. The records are read back: the PR Specification Reviewer runs when docs/adr changes and rewrites a spec only when the pull request's ADR, implementation and tests agree, and coding agents changing a feature later search docs/adr to learn why it was built that way before they touch it. In a sample of recent gate runs, eight of the nine pull requests that received a draft merged with it. The pull request, ADR, review and next agent in the flow above are an illustrative, simplified example.",
       enter() {
@@ -17311,6 +17353,9 @@
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.style.setProperty("--c", "#ab7df8");
     svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      scan = $("sddScan");
     // measured on gh-aw (snapshot 14 Nov 2026): merged PRs / issues by workflow title prefix, and TestSpec_ functions in pkg/**spec_test.go on main at the start of each month
     const SDM_STATS = [
       ["spec-extractor", "83", "README spec PRs merged"],
@@ -17403,7 +17448,8 @@
       script();
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Spec-driven testing, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt in the flow is an illustrative, simplified view of gh-aw's ctxutil package. The strip below is measured on gh-aw's public history over the whole life of these workflows, 30 March to 14 November 2026 (229 days, snapshot 14 November 2026): 83 merged spec-extractor pull requests updating package README specs; 69 merged spec-enforcer pull requests adding 12,731 lines of spec tests; 68 spec-librarian audit issues, which led to 38 merged Copilot fix pull requests; 22 merged pull requests from the weekly safe outputs spec review; and TestSpec functions in pkg on main growing from 0 at the start of April to 415 across 48 spec test files. The real ctxutil helper followed this path too: added on 3 August, spec tests on 14 August after a librarian audit, enforced on 6 October. Counts come from pull requests and issues matched by each workflow's title prefix, and from git history on main. pr-specification-reviewer and the W3C specification writer agent also take part.",
       enter() {
@@ -17687,7 +17733,8 @@
       script();
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, from the first one on 10 October 2025 to 14 November 2026 (400 days): 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026 (246 days): 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
       enter() {
@@ -18029,7 +18076,8 @@
       script();
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Multi-device tester, as gh-aw tests its own documentation site. Every day the Multi-Device Docs Tester workflow builds the docs, starts a preview server inside the sandbox and drives a real browser with the Playwright CLI across ten viewports: four phones, three tablets and three desktops. On each one it checks layout (overflow, truncation, broken grids), accessibility, and interactions such as navigation, search and the responsive header menu. If everything passes it calls noop; otherwise it files one report issue that groups findings by severity, critical first, with the details folded away. Reports expire after two days, so only the ones a maintainer acts on survive: they are assigned to Copilot, whose pull request fixes the site or the tester itself and usually adds a regression test; a developer reviews and merges it, and the next daily run checks the fix. The bottom strip is measured on gh-aw (snapshot 15 November 2026): all 61 daily report issues from the first on 7 December 2025 to 15 November 2026 (343 days). 39 were closed by merged pull requests, 35 of them opened by Copilot: 28 changed the docs site (touch targets, skip links, headings, table overflow, header breakpoints), 9 hardened the tester workflow (browser startup, preview server, navigation selectors) and 2 changed something else. The median from report to merged fix was 6.5 hours. The other 22 closed without a merged fix, 19 of them expiring unaddressed. The devices, report, fix and review in the loop above are an illustrative, simplified example.",
       enter() {
@@ -18127,7 +18175,8 @@
       h("div", { class: "dhm-k" }, kpi("583", "findings filed", "by 8 docs auditors"), kpi("273", "fixed by", ["merged PRs", h("br"), h("i", {}, "255 by Copilot")]), kpi("79%", "fixed when", ["assigned to Copilot", h("br"), h("i", {}, "256 of 323")], "g"), kpi("7%", "fixed when", ["left unassigned", h("br"), h("i", {}, "17 of 260")], "r"))
     );
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Findings that land. Eight gh-aw workflows audit the documentation and file what they find as issues: a persona walking the enterprise docs, the spec librarian, the multi-device tester, the CLI consistency checker, the doc healer, a spec coverage check, an SEO optimizer for the docs and a designer drift audit. The table is measured on gh-aw (snapshot 15 November 2026): every issue each auditor filed, matched by its title prefix, from the first on 12 November 2025 to 15 November 2026 (368 days), excluding the workflows' own failure reports. 583 findings were filed and 273 were closed by merged pull requests, 255 of those opened by Copilot. What separates the top five from the bottom three is not the auditor but the hand-off: 323 findings were assigned to Copilot, by the workflow itself or by a maintainer triaging it, and 256 of them, 79 percent, were fixed by a merged pull request; of the 260 left unassigned only 17, 7 percent, were. Read this as correlation, not proof: maintainers assign the findings they judge worth fixing, and the unassigned auditors post rolling reports that close the previous one and expire after two to seven days by design. The lesson for auditors is to file one checkable defect per issue and route it to an agent that can fix it. The two issue cards on the right are an illustrative, simplified example.",
       el: h(
@@ -18387,7 +18436,8 @@
       script();
     };
     slides.push({
-      group: "data",
+      group: "process",
+      under: "unsloppers",
       notes:
         "Personas, probe, patch: how gh-aw tests the agent that writes its workflows. Every day the Agent Persona Explorer workflow rotates through nine software personas (backend, frontend, DevOps, QA, product manager, program manager, designer, legal and compliance, information worker), picks three, and invents realistic automation requests for each. A sub-agent role-plays the agentic-workflows custom agent and answers them; the explorer scores every answer from 1 to 5 on trigger choice, tools, security, prompt clarity and completeness. Then comes the probe: it re-runs one scenario with only the first 8,000 bytes of each guidance file, because that is all some prompt-file loaders expose, and reports any rule that sits past the cut. The findings go into one report issue; a maintainer can assign it to Copilot, whose pull request moves the rule up or tightens the guidance, and the next run scores again. The bottom strip is measured on gh-aw (snapshot 15 November 2026): all 133 daily report issues from 8 June 2026, when the report moved from discussions to issues, to 15 November 2026 (160 days). 25 were closed by merged pull requests, 22 of them opened by Copilot and one by a bot: 23 changed the agent's guidance files and 2 changed something else. The other 108 were closed without a merged fix when the next report replaced them. The agentic-workflows agent file is 17,035 bytes, so the probe sees less than half of it. The personas, scores, rule and fix in the loop above are an illustrative, simplified example.",
       enter() {
@@ -18877,6 +18927,25 @@
       1
     )
   );
+  // Columns (third level): a slide with `key` heads a vertical column of example slides that set `under: key`
+  // (same group). Examples are numbered right after their parent; Up/Down walk the column, Left/Right the band.
+  for (const r of rows) {
+    const kids = r.items.filter(s => s.under);
+    if (!kids.length) continue;
+    r.items = r.items.flatMap(s => {
+      if (s.under) return [];
+      if (!s.key) return [s];
+      const ks = kids.filter(k => k.under === s.key);
+      if (!ks.length) return [s];
+      s.kids = ks;
+      ks.forEach(k => (k.parent = s));
+      return [s, ...ks];
+    });
+    const lost = kids.find(k => !k.parent);
+    if (lost) throw new Error(`slide under "${lost.under}" has no parent with that key in group "${r.group}"`);
+  }
+  // the column a slide belongs to (its head), or null
+  const colOf = s => s.parent || (s.kids?.length ? s : null);
   // A slide's heading as one readable line (per-letter lines joined by spaces); the search index reuses it.
   const headingText = s => {
     const hd = s.el.querySelector("h1, h2, h3");
@@ -18904,7 +18973,8 @@
       resetIndex();
       const [title, sub] = BANDS[r.group],
         part = parts.indexOf(r) + 1,
-        c = THEME[r.group].accent;
+        c = THEME[r.group].accent,
+        tops = r.items.filter(s => !s.parent);
       const map = h(
         "div",
         { class: "bh-map", "aria-hidden": "true" },
@@ -18914,14 +18984,14 @@
             { class: `bh-mrow${o === r ? " on" : ""}`, "--i": i },
             h("span", { class: "bh-ml" }, BANDS[o.group]?.[0] || SOLO[o.group]),
             BANDS[o.group] ? h("i", { class: "hd" }) : null,
-            o.items.map(() => h("i"))
+            o.items.filter(s => !s.parent).map(() => h("i"))
           )
         )
       );
       r.header = {
         group: r.group,
         header: true,
-        notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${r.items.map(label).join(", ")}.`,
+        notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${tops.map(s => label(s) + (s.kids ? ` (with ${s.kids.length} example${s.kids.length > 1 ? "s" : ""} below)` : "")).join(", ")}.`,
         el: h(
           "section",
           { class: "slide bh", "--bh": c[0], "--bh2": c[2] },
@@ -18939,8 +19009,16 @@
           map,
           h(
             "ol",
-            { class: `bh-row${r.items.length > 8 ? " many" : ""}${r.items.length > 14 ? " lots" : ""}` },
-            r.items.map((s, i) => h("li", { "--i": i, "data-go": r.first + i - 1 }, h("span", { class: "bh-n" }, String(r.first + i).padStart(2, "0")), h("span", { class: "bh-t" }, label(s))))
+            { class: `bh-row${tops.length > 8 ? " many" : ""}${tops.length > 14 ? " lots" : ""}` },
+            tops.map((s, i) => {
+              const n = r.first + r.items.indexOf(s);
+              return h(
+                "li",
+                { "--i": i, "data-go": n - 1 },
+                h("span", { class: "bh-n" }, String(n).padStart(2, "0"), s.kids ? h("span", { class: "bh-k", title: `${s.kids.length} examples below` }, `↓ ${s.kids.length}`) : null),
+                h("span", { class: "bh-t" }, label(s))
+              );
+            })
           )
         ),
       };
@@ -18968,7 +19046,7 @@
   // the dots are a mini-map of the table: one row of dots per band
   const dotBtns = slides.map((s, i) =>
     h("button", {
-      class: s.header ? "hd" : "",
+      class: s.header ? "hd" : s.parent ? "sub" : s.kids ? "col" : "",
       "aria-label": `Slide ${i + 1}`,
       onclick: e => {
         e.stopPropagation();
@@ -18999,6 +19077,15 @@
   const nextBtn = arrowBtn("Next slide", "→", "M9 5l7 7-7 7", () => next());
   const bandNextBtn = arrowBtn("Next band", "↓", "M18 5v14M6 6l7 6-7 6", () => band(1));
   const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
+  // Column rail (right edge): shown on a column's head and its examples; one button per slide, current one lit,
+  // and a bouncing "↓ N examples" cue on the head so the audience knows there is a line below.
+  const vnavUp = arrowBtn("Slide above", "↑", "M5 15l7-7 7 7", () => vstep(-1));
+  const vnavDown = arrowBtn("Slide below", "↓", "M5 9l7 7 7-7", () => vstep(1));
+  const vnavDots = h("div", { class: "vnav-dots" });
+  const vnavCue = h("div", { class: "vnav-cue", "aria-hidden": "true" });
+  const vnav = h("nav", { class: "vnav", "aria-label": "Examples" }, vnavUp, vnavDots, vnavDown, vnavCue);
+  vnav.addEventListener("click", e => e.stopPropagation());
+  for (const t of ["touchstart", "touchend"]) vnav.addEventListener(t, e => e.stopPropagation(), { passive: true });
   // Taps on the arrows navigate on touchend and cancel the default action, so Safari neither
   // double-tap zooms nor synthesizes a second click, and the window swipe handlers never see them.
   let arrowTouchAt = 0;
@@ -19062,10 +19149,10 @@
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, smBtn, fzBtn, snd, notes);
+  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnav, smBtn, fzBtn, snd, notes);
 
-  // Dot map: left offset + the longest band of 8px dots with 5px gaps + 16px for the wide active dot; map/search/sound need ~150px on the right.
-  const dotsWidth = 28 + Math.max(...rows.map(r => r.items.length + (r.header ? 1 : 0))) * 13 + 16 + 400;
+  // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; map/search/sound need ~150px on the right.
+  const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
@@ -19766,7 +19853,7 @@
     const th = THEME[slides[n].group];
     document.body.classList.toggle("light", !!th.light);
     if (cur >= 0) sfx.slide(dir, th.music, th.prog[slides[n].step % th.prog.length]);
-    const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : null;
+    const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : cur >= 0 && colOf(slides[n]) && colOf(slides[n]) === colOf(slides[cur]) ? (dir > 0 ? "up" : "down") : null;
     const TR = ["up-in", "up-out", "down-in", "down-out"];
     if (cur >= 0 && covered) {
       // already hidden under the red wash: drop it instantly so it doesn't flash back when the wash moves behind the stage
@@ -19799,24 +19886,68 @@
     dotBtns.forEach((d, i) => d.classList.toggle("on", i === n));
     [...dots.children].forEach((r, i) => r.classList.toggle("on", i === slides[n].band));
     prevBtn.disabled = n === 0;
-    nextBtn.disabled = n === slides.length - 1;
+    nextBtn.disabled = nextTop(n) == null;
     bandPrevBtn.disabled = slides[n].band === 0;
     bandNextBtn.disabled = slides[n].band === rows.length - 1;
+    paintColumn(n);
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
   }
-  // Left/right move one slide and wrap across bands; up/down jump to the first slide (header) of the band above/below.
+  // Left/right walk the main line of slides (column heads, never their examples) and wrap across bands;
+  // up/down walk a column, and past its ends (or off any column) jump to the header of the band above/below.
+  const top = n => (slides[n].parent ? slides.indexOf(slides[n].parent) : n);
+  const nextTop = n => {
+    for (let i = top(n) + 1; i < slides.length; i++) if (!slides[i].parent) return i;
+    return null;
+  };
+  const prevTop = n => {
+    for (let i = top(n) - 1; i >= 0; i--) if (!slides[i].parent) return i;
+    return null;
+  };
   const band = d => {
     const b = slides[cur].band + d;
     if (b >= 0 && b < rows.length) go(rows[b].start);
   };
+  const vstep = d => {
+    const col = colOf(slides[cur]);
+    if (!col) return band(d);
+    const list = [col, ...col.kids],
+      i = list.indexOf(slides[cur]) + d;
+    if (i >= 0 && i < list.length) go(slides.indexOf(list[i]));
+    else band(d);
+  };
+  function paintColumn(n) {
+    const col = colOf(slides[n]);
+    vnav.classList.toggle("on", !!col);
+    if (!col) return;
+    const list = [col, ...col.kids],
+      at = list.indexOf(slides[n]);
+    vnav.classList.toggle("head", at === 0);
+    vnavDots.replaceChildren(
+      ...list.map((s, i) =>
+        h("button", {
+          class: `${i ? "" : "top"}${i === at ? " on" : ""}`,
+          "aria-label": i ? `Example ${i} of ${col.kids.length}: ${label(s)}` : `Pattern: ${label(s)}`,
+          title: label(s),
+          onclick: () => go(slides.indexOf(s)),
+        })
+      )
+    );
+    vnavCue.textContent = at ? `${at} / ${col.kids.length}` : `↓ ${col.kids.length} example${col.kids.length > 1 ? "s" : ""}`;
+  }
   const next = () => {
       if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
-      else go(cur + 1);
+      else {
+        const i = nextTop(cur);
+        if (i != null) go(i);
+      }
     },
     prev = () => {
       if (slides[cur].onPrev?.()) (sfx.touch(), sfx.step(-1));
-      else go(cur - 1);
+      else {
+        const i = prevTop(cur);
+        if (i != null) go(i);
+      }
     };
 
   addEventListener("keydown", e => {
@@ -19838,15 +19969,18 @@
       e.preventDefault();
       return;
     }
-    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) {
+    if (["ArrowRight", " ", "Enter"].includes(e.key)) {
       e.preventDefault();
       next();
-    } else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) {
+    } else if (["ArrowLeft", "Backspace"].includes(e.key)) {
       e.preventDefault();
       prev();
+    } else if (e.key === "PageDown" || e.key === "PageUp") {
+      e.preventDefault();
+      band(e.key === "PageDown" ? 1 : -1);
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      band(e.key === "ArrowDown" ? 1 : -1);
+      vstep(e.key === "ArrowDown" ? 1 : -1);
     } else if (e.key === "Home") go(0);
     else if (e.key === "End") go(slides.length - 1);
     else if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
@@ -19868,7 +20002,7 @@
     const dx = e.changedTouches[0].clientX - tx,
       dy = e.changedTouches[0].clientY - ty;
     tx = ty = null;
-    if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && band(dy < 0 ? 1 : -1);
+    if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && vstep(dy < 0 ? 1 : -1);
     else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
   });
   addEventListener("hashchange", () => go((parseInt(location.hash.slice(1), 10) || 1) - 1));
@@ -20093,7 +20227,7 @@
               const n = slides.indexOf(s),
                 t = h(
                   "button",
-                  { class: `smp-t${s.header ? " hd" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || BANDS[r.group]?.[0] || SOLO[r.group]}`, onclick: () => (smp.close(), go(n)) },
+                  { class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || BANDS[r.group]?.[0] || SOLO[r.group]}`, onclick: () => (smp.close(), go(n)) },
                   h("b", {}, String(n + 1).padStart(2, "0")),
                   h("span", {}, label(s) || BANDS[r.group]?.[0] || SOLO[r.group])
                 );
