@@ -2,14 +2,14 @@
 package workflow
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/gradershell"
 )
@@ -100,7 +100,7 @@ type GraderDefinition struct {
 	Min           *float64       // theoretical minimum
 	Config        map[string]any // arbitrary config passed to grader at runtime
 	Script        string         // JavaScript executed only in the isolated graders job
-	Run           string         // Repository Bash evaluator path, only for operational-value
+	Run           string         // Deprecated repository Bash evaluator path, only for operational-value
 	RunSourcePath string         // Declaring import file, for workflow-relative run paths
 	ShellScript   string         // Frozen evaluator source, never sent to conclusion
 }
@@ -149,7 +149,7 @@ func (gc *GradersConfig) EnabledGraderIDs() []string {
 			custom = append(custom, id)
 		}
 	}
-	sort.Strings(custom)
+	slices.Sort(custom)
 	result = append(result, custom...)
 	return result
 }
@@ -237,7 +237,7 @@ func (c *Compiler) parseGradersFromFrontmatter(frontmatter map[string]any) (*Gra
 		if entryRaw == nil {
 			if !isBuiltin {
 				if id == "operational-value" {
-					return nil, errors.New("graders.operational-value requires run: a repository Bash evaluator path")
+					return nil, errors.New("graders.operational-value requires script: restricted JavaScript or deprecated run: a repository Bash evaluator path")
 				}
 				return nil, fmt.Errorf("graders.%s requires a JavaScript script over the in-memory session", id)
 			}
@@ -253,8 +253,8 @@ func (c *Compiler) parseGradersFromFrontmatter(frontmatter map[string]any) (*Gra
 		if err := parseGraderEntryFields(def, entry, id); err != nil {
 			return nil, err
 		}
-		if id == "operational-value" && def.Run == "" {
-			return nil, errors.New("graders.operational-value requires run: a repository Bash evaluator path")
+		if id == "operational-value" && (def.Script == "") == (def.Run == "") {
+			return nil, errors.New("graders.operational-value requires exactly one of script: restricted JavaScript or deprecated run: a repository Bash evaluator path")
 		}
 		if !isBuiltin && id != "operational-value" && def.Script == "" {
 			return nil, fmt.Errorf("graders.%s requires a JavaScript script over the in-memory session", id)
@@ -315,9 +315,6 @@ func parseGraderEntryFields(def *GraderDefinition, entry map[string]any, id stri
 		def.Run = run
 	}
 	if raw, exists := entry["script"]; exists {
-		if id == "operational-value" {
-			return errors.New("graders.operational-value requires run instead of script; use a distinct ID for JavaScript")
-		}
 		if _, builtin := builtinGraderMetaByID[id]; builtin {
 			return fmt.Errorf("graders.%s.script cannot override a built-in grader; choose a custom grader ID", id)
 		}
@@ -431,13 +428,26 @@ func mergeImportedGradersFrontmatter(frontmatter map[string]any, importedGraders
 			continue
 		}
 		var imported map[string]any
-		if err := json.Unmarshal([]byte(line), &imported); err != nil {
+		if err := jsonutil.UnmarshalString(line, &imported); err != nil {
 			return nil, fmt.Errorf("imported graders configuration is not valid JSON: %w", err)
 		}
 		mergedGraders = deepMergeMaps(mergedGraders, imported)
 	}
 
 	if raw, ok := frontmatter["graders"].(map[string]any); ok {
+		for id, value := range raw {
+			override, overrideIsMap := value.(map[string]any)
+			imported, importedIsMap := mergedGraders[id].(map[string]any)
+			if !overrideIsMap || !importedIsMap {
+				continue
+			}
+			if _, overridesScript := override["script"]; overridesScript {
+				delete(imported, "run")
+			}
+			if _, overridesRun := override["run"]; overridesRun {
+				delete(imported, "script")
+			}
+		}
 		mergedGraders = deepMergeMaps(mergedGraders, raw)
 	}
 	if len(mergedGraders) == 0 {

@@ -56,3 +56,16 @@ func TestOperationalValueResourceDownloadErrorsAreSurfaced(t *testing.T) {
 	}
 	require.ErrorContains(t, fetchAndSaveRemoteResourcesWithDownloader(t.Context(), content, spec, target, false, false, nil, download), "download unavailable")
 }
+
+func TestOperationalValueJavaScriptDoesNotDownloadEvaluatorResources(t *testing.T) {
+	target := t.TempDir()
+	content := "---\ngraders:\n  operational-value:\n    script: return [{id: \"primary\", value: 1}]\n---\n"
+	spec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: "owner/repo", Version: "main"}, WorkflowPath: ".github/workflows/test.md"}
+	downloaded := false
+	download := func(context.Context, string, string, string, string) ([]byte, error) {
+		downloaded = true
+		return nil, errors.New("unexpected download")
+	}
+	require.NoError(t, fetchAndSaveRemoteResourcesWithDownloader(t.Context(), content, spec, target, false, false, nil, download))
+	assert.False(t, downloaded)
+}

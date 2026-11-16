@@ -8,6 +8,27 @@ const { spawnSync } = require("child_process");
 const EVALUATOR_TIMEOUT_MS = 120000;
 const EVALUATOR_MAX_OUTPUT = 1024 * 1024;
 
+/** @param {any} metrics @returns {{id: string, value: number|null}[]} */
+function validateOperationalValueMetrics(metrics) {
+  if (!Array.isArray(metrics) || metrics.length === 0) throw new Error("operational-value evaluator must return a nonempty metric array");
+  const ids = new Set();
+  for (const metric of metrics) {
+    if (
+      !metric ||
+      typeof metric !== "object" ||
+      Object.keys(metric).sort().join(",") !== "id,value" ||
+      typeof metric.id !== "string" ||
+      !metric.id.trim() ||
+      ids.has(metric.id) ||
+      (metric.value !== null && (typeof metric.value !== "number" || !Number.isFinite(metric.value)))
+    ) {
+      throw new Error("operational-value metrics must contain unique nonempty ids and finite numeric or null values");
+    }
+    ids.add(metric.id);
+  }
+  return metrics;
+}
+
 /**
  * Repository-owned shell compatibility boundary, not a sandbox. MicroVM
  * isolation is future work; never call this module from conclusion.
@@ -50,26 +71,10 @@ function executeOperationalValueEvaluator(source, session, config, options = {})
     } catch (error) {
       throw new Error("operational-value evaluator returned invalid JSON", { cause: error });
     }
-    if (!Array.isArray(metrics) || metrics.length === 0) throw new Error("operational-value evaluator must return a nonempty metric array");
-    const ids = new Set();
-    for (const metric of metrics) {
-      if (
-        !metric ||
-        typeof metric !== "object" ||
-        Object.keys(metric).sort().join(",") !== "id,value" ||
-        typeof metric.id !== "string" ||
-        !metric.id.trim() ||
-        ids.has(metric.id) ||
-        (metric.value !== null && (typeof metric.value !== "number" || !Number.isFinite(metric.value)))
-      ) {
-        throw new Error("operational-value metrics must contain unique nonempty ids and finite numeric or null values");
-      }
-      ids.add(metric.id);
-    }
-    return metrics;
+    return validateOperationalValueMetrics(metrics);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 }
 
-module.exports = { executeOperationalValueEvaluator };
+module.exports = { executeOperationalValueEvaluator, validateOperationalValueMetrics };

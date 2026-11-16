@@ -1040,14 +1040,14 @@ The command and its output formats may change.
 
 #### `graders`
 
-Run one enabled built-in, custom JavaScript, or operational-value Bash grader against a unified session from a saved run's
-`usage` artifact or from standard input. Input accepts unified-session JSONL
-or a JSON event array. The ten fast built-ins are available without explicit
-frontmatter configuration. Custom JavaScript uses a separate restricted worker
-with the same in-memory interface as the downstream graders job. Repository-owned
-`graders.operational-value.run` Bash uses that job's session-file compatibility
-runtime: session JSONL in `$1` / `GH_AW_SESSION_FILE`, config JSON in
-`GH_AW_GRADER_CONFIG`, and legacy metric-array output.
+Run one enabled built-in, custom JavaScript, or operational-value grader against
+a unified session from a saved run's `usage` artifact or standard input. Input
+accepts unified-session JSONL or a JSON event array. Reserved
+`graders.operational-value.script` uses the restricted JavaScript worker and
+returns ordered metrics whose first value is primary. Deprecated
+`graders.operational-value.run` Bash retains the session-file compatibility
+runtime and unchanged metric-array result shape.
+Custom JavaScript uses a separate restricted worker for both forms.
 
 Pure built-in/JavaScript replay requires Node.js 20+ with the permission model. The CLI picks
 `--permission` or `--experimental-permission` as supported, restricts reads to
@@ -1073,9 +1073,9 @@ Collection mode emits a JSON report, preserves original grader artifacts without
 rewriting them, and records the selected definitions, implementation identities,
 and session digests separately from historical scores. It uses only GH-AW logs
 and unified sessions, never Harbor bundles. Missing sessions and grader errors
-are explicit per-run results. Collection mode and `logs --harbor` additional
-grading support only in-memory built-ins and isolated JavaScript, not Bash.
-The existing single-session Bash replay behavior is unchanged.
+are explicit per-run results. Collection mode and `logs --harbor` additional grading support in-memory
+built-ins, isolated custom JavaScript, and operational-value JavaScript, not
+Bash. Single-session legacy Bash replay remains available with a warning.
 
 **Options:** `--additional-grader`, `--logs-dir`, `--repo/-r`
 

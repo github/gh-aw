@@ -1710,6 +1710,18 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_WorkflowRunConclus
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_OperationalValueGrader(t *testing.T) {
 	t.Parallel()
 
+	scriptFrontmatter := map[string]any{
+		"on": "workflow_dispatch",
+		"graders": map[string]any{
+			"operational-value": map[string]any{
+				"script": `return [{id: "primary", value: 1}]`,
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(scriptFrontmatter, "/tmp/gh-aw/operational-value-grader-test.md"); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, runPath := range []string{
 		".github/workflows/graders/example-operational-value.sh",
 		".github/workflows/graders/..secret.sh",

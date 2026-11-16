@@ -97,13 +97,13 @@ gh aw graders run --logs-dir ./my-logs \
 Collection mode emits a JSON report and keeps original grader artifacts separate
 from regraded results and their implementation identities and session digests.
 It reads GH-AW logs and unified sessions, not Harbor bundles. Missing sessions
-and grader errors are reported per run. Collection mode and Harbor export support
-in-memory built-in and isolated JavaScript graders, not Bash. Additional JavaScript
-grader code is executed; only select trusted graders.
+and grader errors are reported per run. Collection mode and Harbor export support in-memory built-ins, isolated custom
+JavaScript, and reserved operational-value JavaScript, not Bash. Additional
+JavaScript grader code is executed; only select trusted graders.
 
-The runner supports built-in graders, custom JavaScript, and repository-owned
-operational-value Bash. Only execute trusted grader code; Bash is not
-microVM-isolated. `logs --graders` retrieves recorded grader results and their
+The runner supports built-ins, custom JavaScript, operational-value JavaScript,
+and deprecated repository-owned operational-value Bash. Only execute trusted
+grader code; Bash is not microVM-isolated. `logs --graders` retrieves recorded grader results and their
 artifacts alongside automatic ATIF exports when sessions are available; it does
 not recompute historical results. Harbor export is separate from trajectory
 conversion: GitHub conclusions and grader pass/fail flags are not task outcomes

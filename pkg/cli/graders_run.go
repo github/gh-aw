@@ -96,10 +96,12 @@ func loadGraderRunDefinitionMode(workflowArg, graderID string, collection bool) 
 		return graderRunDefinition{}, fmt.Errorf("grader %q is disabled in workflow %s", graderID, workflowPath)
 	}
 	source := "builtin"
-	if definition.Script != "" {
-		source = "inline"
-	} else if definition.Run != "" {
+	if definition.ID == "operational-value" && (definition.Script != "" || definition.Run != "") {
 		source = "operational-value"
+	} else if definition.Script != "" {
+		source = "inline"
+	}
+	if definition.Run != "" {
 		if collection {
 			return graderRunDefinition{}, fmt.Errorf("grader %q uses Bash; collection regrading supports only built-in and isolated JavaScript graders", graderID)
 		}
@@ -213,8 +215,9 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 	if err != nil {
 		return errors.New("node is required to run graders")
 	}
+	legacyShell := grader.Run != "" || grader.ShellScript != ""
 	var permissionFlag string
-	if grader.Source != "operational-value" {
+	if !legacyShell {
 		permissionFlag, err = graderNodePermissionFlag(ctx, nodePath)
 		if err != nil {
 			return err
@@ -237,25 +240,16 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 		return fmt.Errorf("failed to encode grader input: %w", err)
 	}
 	timeout := graderJSTimeout
-	if grader.Source == "operational-value" {
+	if legacyShell {
 		timeout = 125 * time.Second
 	}
 	gradersRunLog.Printf("Executing grader %q via node: source=%s, timeout=%s, payloadBytes=%d", grader.ID, grader.Source, timeout, len(payload))
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	args := []string{permissionFlag, "--allow-fs-read=" + directory}
-	switch grader.Source {
-	case "inline":
-		args = append(args, "--allow-child-process")
-	case "operational-value":
-		// Node's permissions do not sandbox a spawned Bash interpreter. Shell
-		// replay has the same trusted-code boundary as the separate Actions job.
-		args = nil
-	}
-	args = append(args, filepath.Join(directory, "graders_run.cjs"))
+	args := graderRuntimeArgs(directory, permissionFlag, grader, legacyShell)
 	cmd := exec.CommandContext(commandCtx, nodePath, args...)
 	cmd.Env = []string{}
-	if grader.Source == "operational-value" && searchPath != "" {
+	if legacyShell && searchPath != "" {
 		cmd.Env = []string{"PATH=" + searchPath}
 	}
 	cmd.Stdin = bytes.NewReader(input)
@@ -269,6 +263,20 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 		return fmt.Errorf("grader failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return nil
+}
+
+func graderRuntimeArgs(directory, permissionFlag string, grader graderRunDefinition, legacyShell bool) []string {
+	runner := filepath.Join(directory, "graders_run.cjs")
+	if legacyShell {
+		// Node's permissions do not sandbox a spawned Bash interpreter. Shell
+		// replay has the same trusted-code boundary as the separate Actions job.
+		return []string{runner}
+	}
+	args := []string{permissionFlag, "--allow-fs-read=" + directory}
+	if grader.Source == "inline" || grader.Source == "operational-value" && grader.Script != "" {
+		args = append(args, "--allow-child-process")
+	}
+	return append(args, runner)
 }
 
 func stageGraderRuntime(directory string) (string, error) {

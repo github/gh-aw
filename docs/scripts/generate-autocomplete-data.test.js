@@ -17,6 +17,13 @@ test("merge-pull-request exposes nested policy configuration in generated and pu
   assert.deepEqual(publishedMerge, generatedMerge, "published merge configuration must match the generator");
 });
 
+test("graders autocomplete describes operational-value JavaScript and deprecated Bash compatibility", () => {
+  for (const data of [autocompleteData, publishedData]) {
+    assert.match(data.root.graders.desc, /reserved operational-value JavaScript/);
+    assert.match(data.root.graders.desc, /deprecated operational-value/);
+  }
+});
+
 test("other safe-output entries retain shallow completion data", () => {
   assert.equal(autocompleteData.root["safe-outputs"].children["create-pull-request"].children, undefined);
 });

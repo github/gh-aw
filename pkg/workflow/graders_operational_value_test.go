@@ -12,7 +12,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOperationalValueGraderCompileBoundary(t *testing.T) {
+func TestOperationalValueJavaScriptCompileBoundary(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, exec.Command("git", "-C", root, "init", "-q").Run())
+	file := filepath.Join(root, "test.md")
+	const source = `return [{id: "recorded-outcome", value: 1}, {id: "diagnostic", value: null}]`
+	require.NoError(t, os.WriteFile(file, []byte("---\non: workflow_dispatch\nengine: copilot\nstrict: false\ngraders:\n  operational-value:\n    script: |\n      "+source+"\n---\nTest.\n"), 0o600))
+	compiler := NewCompiler(WithVersion("dev"))
+	stderr := captureStderr(func() {
+		require.NoError(t, compiler.CompileWorkflow(file))
+	})
+	assert.NotContains(t, stderr, "graders.operational-value.run is deprecated")
+	lock, err := os.ReadFile(stringutil.MarkdownToLockFile(file))
+	require.NoError(t, err)
+	conclusion := extractJobSection(string(lock), "conclusion")
+	custom := extractJobSection(string(lock), "graders")
+	assert.NotContains(t, conclusion, "recorded-outcome")
+	assert.Contains(t, conclusion, `"customGraders":["operational-value"]`)
+	assert.Contains(t, custom, `"source":"operational-value"`)
+	assert.Contains(t, custom, "recorded-outcome")
+	assert.NotContains(t, custom, "shellScript")
+	assert.NotContains(t, custom, `"run"`)
+	assert.NotContains(t, custom, "Checkout repository")
+}
+
+func TestLegacyOperationalValueGraderCompileBoundary(t *testing.T) {
 	for _, imported := range []bool{false, true} {
 		t.Run(map[bool]string{false: "authored", true: "imported"}[imported], func(t *testing.T) {
 			root := t.TempDir()
@@ -31,7 +55,12 @@ func TestOperationalValueGraderCompileBoundary(t *testing.T) {
 			file := filepath.Join(directory, "test.md")
 			require.NoError(t, os.WriteFile(file, []byte("---\non: workflow_dispatch\nengine: copilot\nstrict: false\n"+declaration+"---\nTest.\n"), 0o600))
 			compiler := NewCompiler(WithVersion("dev"))
-			require.NoError(t, compiler.CompileWorkflow(file))
+			stderr := captureStderr(func() {
+				require.NoError(t, compiler.CompileWorkflow(file))
+			})
+			assert.GreaterOrEqual(t, compiler.GetWarningCount(), 1)
+			assert.Contains(t, stderr, "graders.operational-value.run is deprecated")
+			assert.Contains(t, stderr, "automatic shell-to-JavaScript translation is not supported")
 			lock, err := os.ReadFile(stringutil.MarkdownToLockFile(file))
 			require.NoError(t, err)
 			conclusion := extractJobSection(string(lock), "conclusion")

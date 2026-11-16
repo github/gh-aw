@@ -12,12 +12,17 @@ combined `graders` results artifact when custom IDs are registered, including
 when refreshing cached reports. The logs `graders` artifact set includes both jobs'
 results, including workflow-call-prefixed names and cached usage-only downloads.
 
-Repository-owned `graders.operational-value.run` Bash executes only in that
-separate job. Refactor evaluators to read unified-session JSONL from `$1` /
-`GH_AW_SESSION_FILE` and configuration from `GH_AW_GRADER_CONFIG`; retain the
-legacy metric-array output. Bash AST validation and `grader-shell-file-write`
-reject detected file writes. This is trusted shell compatibility, not a
-microVM or filesystem/network sandbox.
+Reserved `graders.operational-value.script` runs through the restricted
+JavaScript lane and preserves its ordered metric-array contract: the first
+metric is primary, remaining metrics are diagnostics, and schema-v2
+artifacts/events retain the full array and implementation digest. CLI replay,
+offline regrading, experiments, audit/logs, telemetry, and adapter consumers
+retain the existing top-level source/value shape.
+
+Repository-owned `graders.operational-value.run` Bash remains compatibility-only
+with an explicit deprecation warning and unchanged result shape. It is never
+translated automatically. Bash AST validation and `grader-shell-file-write`
+retain shared checks; shell is not a microVM or filesystem/network sandbox.
 
 **Breaking change:** Legacy evaluator stdin requests and built-in overrides
 are rejected. Other custom IDs use pure JavaScript and the

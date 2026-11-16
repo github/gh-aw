@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -45,7 +44,7 @@ func buildGraderManifest(cfg *GradersConfig, custom bool) *graderManifest {
 	for id := range cfg.Graders {
 		ids = append(ids, id)
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	for _, id := range ids {
 		g := cfg.Graders[id]
 		if (g.Script != "" || g.Run != "") != custom {
@@ -65,7 +64,7 @@ func buildGraderManifest(cfg *GradersConfig, custom bool) *graderManifest {
 		source := "builtin"
 		if custom {
 			source = "inline"
-			if g.Run != "" {
+			if id == "operational-value" {
 				source = "operational-value"
 			}
 		}

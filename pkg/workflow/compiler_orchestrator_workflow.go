@@ -796,6 +796,7 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		}
 		grader.RunSourcePath = source
 	}
+	c.warnLegacyOperationalValueRun(workflowData)
 	if err := validateExperimentMetricReferences(workflowData.ExperimentConfigs, workflowData.Evals, workflowData.Graders); err != nil {
 		return fmt.Errorf("invalid experiments configuration: %w", err)
 	}

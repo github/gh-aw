@@ -3,7 +3,9 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/workflow/gradershell"
 )
 
@@ -13,10 +15,24 @@ func prepareOperationalValueGrader(data *WorkflowData, markdownPath string) erro
 		return nil
 	}
 	grader := data.Graders.Graders["operational-value"]
-	if grader == nil {
+	if grader == nil || grader.Run == "" {
 		return nil
 	}
 	return grader.PrepareShellScript(markdownPath)
+}
+
+func (c *Compiler) warnLegacyOperationalValueRun(data *WorkflowData) {
+	if data == nil || data.Graders == nil {
+		return
+	}
+	grader := data.Graders.Graders["operational-value"]
+	if grader == nil || grader.Run == "" {
+		return
+	}
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		"graders.operational-value.run is deprecated. Migrate manually to graders.operational-value.script; automatic shell-to-JavaScript translation is not supported.",
+	))
+	c.IncrementWarningCount()
 }
 
 // PrepareShellScript validates and freezes a repository shell evaluator for compilation or replay.

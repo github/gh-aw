@@ -1780,11 +1780,11 @@ An optional field under top-level `metadata:` frontmatter holding an absolute HT
 
 ### Graders (`graders:`)
 
-Non-LLM metrics over the redacted unified session. Ten fast built-ins run as pure computation in conclusion, even when `graders:` is omitted. Frontmatter can override thresholds, disable defaults, or opt into other built-ins. Custom JavaScript and repository-owned operational-value Bash run only in the separate graders job. Built-ins use the `usage` artifact; combined custom results use `graders`. See [Graders Reference](/gh-aw/experimental/trace-graders/).
+Non-LLM metrics over the redacted unified session. Ten fast built-ins run as pure computation in conclusion, even when `graders:` is omitted. Frontmatter can override thresholds, disable defaults, or opt into other built-ins. Custom JavaScript, reserved operational-value JavaScript, and deprecated operational-value Bash run only in the separate graders job. Built-ins use the `usage` artifact; combined custom results use `graders`. See [Graders Reference](/gh-aw/experimental/trace-graders/).
 
 ### Operational Value Grader (`graders.operational-value`)
 
-A repository-owned Bash evaluator configured with `graders.operational-value.run`. It runs only in the separate graders job, reads session JSONL from `$1` / `GH_AW_SESSION_FILE` and config JSON from `GH_AW_GRADER_CONFIG`, and emits legacy metric arrays. Detected file writes are rejected. Shell is trusted code, not yet microVM-isolated. Execution quality metrics alone do not establish operational value.
+A run-scoped restricted JavaScript evaluator configured with `graders.operational-value.script`. It returns a nonempty ordered array of unique `{id,value}` metrics; the first supplies the primary value and the complete array remains in schema-v2 results. gh-aw owns recorded run facts and replay, not later human adoption or longitudinal repository Value. Deprecated `graders.operational-value.run` Bash remains compatibility-only with a warning and unchanged shape.
 
 ### Recurrence Trapping Time (RQA TT) (`graders.recurrence-trapping-time`)
 

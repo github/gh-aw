@@ -98,7 +98,48 @@ func TestRunGraderRejectsCustomCode(t *testing.T) {
 	}
 }
 
-func TestRunOperationalValueFromUnifiedSession(t *testing.T) {
+func TestRunOperationalValueJavaScriptFromUnifiedSession(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node unavailable")
+	}
+	workflowID := writeGraderRunWorkflow(t, `---
+on: workflow_dispatch
+graders:
+  operational-value:
+    direction: higher_is_better
+    threshold: 3
+    config:
+      offset: 2
+    script: |
+      return [
+        {id: "effect", value: session.length + config.offset},
+        {id: "diagnostic", value: null},
+      ];
+---
+Test.
+`)
+	var output bytes.Buffer
+	require.NoError(t, runGrader(context.Background(), graderRunConfig{
+		Workflow: workflowID, GraderID: "operational-value", Input: strings.NewReader("[]"), Output: &output,
+	}))
+	var result struct {
+		ID             string
+		Source         string
+		Value          float64
+		Status         string
+		Metrics        []map[string]any
+		Implementation struct{ Digest string }
+	}
+	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+	assert.Equal(t, "operational-value", result.ID)
+	assert.Equal(t, "operational-value", result.Source)
+	assert.InDelta(t, 2.0, result.Value, 0)
+	assert.Equal(t, "fail", result.Status)
+	assert.Len(t, result.Metrics, 2)
+	assert.Len(t, result.Implementation.Digest, 64)
+}
+
+func TestRunLegacyOperationalValueFromUnifiedSession(t *testing.T) {
 	if _, err := exec.LookPath("node"); err != nil {
 		t.Skip("node unavailable")
 	}

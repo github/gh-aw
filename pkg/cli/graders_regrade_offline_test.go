@@ -38,6 +38,16 @@ func TestAdditionalGradersRejectsBashWithoutLoadingScript(t *testing.T) {
 	require.ErrorContains(t, err, "Bash")
 }
 
+func TestAdditionalGradersAcceptsOperationalValueJavaScript(t *testing.T) {
+	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  operational-value:\n    script: |\n      return [{id: \"primary\", value: session.length}, {id: \"diagnostic\", value: null}]\n---\nTest.\n")
+	definitions, err := loadAdditionalGraders([]string{workflowID + ":operational-value"})
+	require.NoError(t, err)
+	require.Len(t, definitions, 1)
+	assert.Equal(t, "operational-value", definitions[0].Source)
+	assert.NotEmpty(t, definitions[0].Script)
+	assert.Empty(t, definitions[0].Run)
+}
+
 func TestOfflineGradersCommandCollection(t *testing.T) {
 	regradeTestRequireNode(t)
 	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  extra:\n    script: return session.length\n---\nTest.\n")
@@ -71,6 +81,30 @@ func TestOfflineGradersCommandCollection(t *testing.T) {
 	files, err := os.ReadDir(first.Run.LogsPath)
 	require.NoError(t, err)
 	assert.Len(t, files, 1, "offline grading must not write new files into run evidence")
+}
+
+func TestOfflineGradersCollectionRunsOperationalValueJavaScript(t *testing.T) {
+	regradeTestRequireNode(t)
+	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  operational-value:\n    script: |\n      return [{id: \"primary\", value: session.length}, {id: \"diagnostic\", value: null}]\n---\nTest.\n")
+	root := t.TempDir()
+	run := regradeTestRun(t, root, 11, regradeTestEvent)
+	definitions, err := loadAdditionalGraders([]string{workflowID + ":operational-value"})
+	require.NoError(t, err)
+	results, err := regradeProcessedRuns(t.Context(), root, []ProcessedRun{run}, definitions)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Results, 1)
+	var result struct {
+		ID      string
+		Source  string
+		Value   float64
+		Metrics []map[string]any
+	}
+	require.NoError(t, json.Unmarshal(results[0].Results[0], &result))
+	assert.Equal(t, "operational-value", result.ID)
+	assert.Equal(t, "operational-value", result.Source)
+	assert.InDelta(t, 1, result.Value, 0)
+	assert.Len(t, result.Metrics, 2)
 }
 
 func TestAdditionalGradersCollectionLoadDoesNotResolveRemoteImports(t *testing.T) {
