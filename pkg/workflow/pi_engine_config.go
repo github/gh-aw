@@ -33,8 +33,11 @@ func piSessionSettings(data *WorkflowData) piSessionConfig {
 func piToolPolicyJSON(data *WorkflowData) string {
 	policy := make(map[string]any)
 	if data != nil {
+		// Mounted MCP CLIs (for example github and safeoutputs) must stay executable
+		// under a restricted bash allowlist, matching the other engines.
+		tools := withMountedCLIShellCommandsInRestrictedBash(data)
 		for _, name := range []string{"bash", "edit"} {
-			if value, ok := data.Tools[name]; ok {
+			if value, ok := tools[name]; ok {
 				policy[name] = value
 			}
 		}
