@@ -240,7 +240,7 @@ func decodeErrorGuard(pass *analysis.Pass, ifStmt *ast.IfStmt, call *ast.CallExp
 	if object := decodeErrorObject(pass, ifStmt.Init, call); object != nil {
 		return true, object
 	}
-	if containsCall(ifStmt.Cond, call) {
+	if containsNode(ifStmt.Cond, func(node ast.Node) bool { return node == call }) {
 		return true, nil
 	}
 	assign, ok := parents[ifStmt].(*ast.BlockStmt)
@@ -264,13 +264,20 @@ func decodeErrorGuard(pass *analysis.Pass, ifStmt *ast.IfStmt, call *ast.CallExp
 
 func decodeErrorObject(pass *analysis.Pass, stmt ast.Stmt, call *ast.CallExpr) types.Object {
 	assign, ok := stmt.(*ast.AssignStmt)
-	if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+	if !ok || len(assign.Rhs) != 1 || astutil.UnwrapParenExpr(assign.Rhs[0]) != call {
 		return nil
 	}
-	if astutil.UnwrapParenExpr(assign.Rhs[0]) != call { //nolint:uncheckedsliceindex // len(assign.Rhs) == 1 is checked above.
+
+	resultIndex := 0
+	if results, ok := pass.TypesInfo.TypeOf(call).(*types.Tuple); ok {
+		if results.Len() != len(assign.Lhs) || results.Len() == 0 {
+			return nil
+		}
+		resultIndex = results.Len() - 1
+	} else if len(assign.Lhs) != 1 {
 		return nil
 	}
-	ident, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident) //nolint:uncheckedsliceindex // len(assign.Lhs) == 1 is checked above.
+	ident, ok := astutil.UnwrapParenExpr(assign.Lhs[resultIndex]).(*ast.Ident) //nolint:uncheckedsliceindex // resultIndex is selected from a non-empty result list.
 	if !ok || ident.Name == "_" {
 		return nil
 	}
@@ -434,10 +441,13 @@ func parentNodes(root ast.Node) map[ast.Node]ast.Node {
 	return parents
 }
 
-func containsCall(node ast.Node, call *ast.CallExpr) bool {
+func containsNode(root ast.Node, match func(ast.Node) bool) bool {
+	if root == nil {
+		return false
+	}
 	found := false
-	ast.Inspect(node, func(candidate ast.Node) bool {
-		if candidate == call {
+	ast.Inspect(root, func(candidate ast.Node) bool {
+		if match(candidate) {
 			found = true
 			return false
 		}
@@ -455,13 +465,9 @@ func tokenCallsCheckEOF(pass *analysis.Pass, body *ast.BlockStmt, calls []*ast.C
 		if _, ok := node.(*ast.FuncLit); ok {
 			return false
 		}
-		if ifStmt, ok := node.(*ast.IfStmt); ok && conditionMentionsEOF(pass, ifStmt.Cond) {
+		if ifStmt, ok := node.(*ast.IfStmt); ok {
 			for _, call := range calls {
-				if containsCall(ifStmt.Init, call) || containsCall(ifStmt.Cond, call) {
-					checked = true
-					return false
-				}
-				if assign, ok := ifStmt.Init.(*ast.AssignStmt); ok && decodeErrorObject(pass, assign, call) != nil {
+				if ifChecksCallEOF(pass, ifStmt, call) {
 					checked = true
 					return false
 				}
@@ -472,16 +478,14 @@ func tokenCallsCheckEOF(pass *analysis.Pass, body *ast.BlockStmt, calls []*ast.C
 	return checked
 }
 
-func conditionMentionsEOF(pass *analysis.Pass, condition ast.Expr) bool {
-	found := false
-	ast.Inspect(condition, func(node ast.Node) bool {
-		if selector, ok := node.(*ast.SelectorExpr); ok && isIOEOF(pass, selector) {
-			found = true
-			return false
-		}
-		return !found
-	})
-	return found
+func ifChecksCallEOF(pass *analysis.Pass, ifStmt *ast.IfStmt, call *ast.CallExpr) bool {
+	errObject := decodeErrorObject(pass, ifStmt.Init, call)
+	if errObject != nil && (conditionChecksDecodeEOF(pass, ifStmt.Cond, call, errObject) ||
+		blockChecksDecodeEOF(pass, ifStmt.Body, call, errObject)) {
+		return true
+	}
+	return containsNode(ifStmt.Cond, func(node ast.Node) bool { return node == call }) &&
+		conditionChecksDecodeEOF(pass, ifStmt.Cond, call, nil)
 }
 
 func decodeIsEOFLoop(pass *analysis.Pass, call *ast.CallExpr, parents map[ast.Node]ast.Node) bool {
@@ -499,17 +503,9 @@ func decodeIsEOFLoop(pass *analysis.Pass, call *ast.CallExpr, parents map[ast.No
 			if _, ok := candidate.(*ast.FuncLit); ok {
 				return false
 			}
-			if ifStmt, ok := candidate.(*ast.IfStmt); ok {
-				errObject := decodeErrorObject(pass, ifStmt.Init, call)
-				if errObject != nil && (conditionChecksDecodeEOF(pass, ifStmt.Cond, call, errObject) ||
-					blockChecksDecodeEOF(pass, ifStmt.Body, call, errObject)) {
-					checked = true
-					return false
-				}
-				if containsCall(ifStmt.Cond, call) && conditionChecksDecodeEOF(pass, ifStmt.Cond, call, nil) {
-					checked = true
-					return false
-				}
+			if ifStmt, ok := candidate.(*ast.IfStmt); ok && ifChecksCallEOF(pass, ifStmt, call) {
+				checked = true
+				return false
 			}
 			return !checked
 		})
