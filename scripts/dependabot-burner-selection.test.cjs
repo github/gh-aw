@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
 const { buildCopilotSDKPermissionHandler } = require("../actions/setup/js/copilot_sdk_permissions.cjs");
+const { extractInlineSubAgents } = require("../actions/setup/js/extract_inline_sub_agents.cjs");
+const { extractFrontmatterAndBody } = require("../actions/setup/js/frontmatter_hash_pure.cjs");
 
 const workflow = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.md"), "utf8");
 const script = workflow.match(/      script: \|\n([\s\S]*?)\nevals:/);
@@ -12,16 +14,22 @@ assert.ok(script, "Missing burner prefetch script");
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const prefetch = new AsyncFunction("github", "context", "require", "process", "console", script[1].replace(/^        /gm, ""));
 
-test("burner tool-contract commands are executable under the compiled SDK policy", () => {
-  const contract = workflow.match(/## Tool contract for every agent\n([\s\S]*?)\n## Read first/);
-  assert.ok(contract, "Missing restricted-tool contract for the orchestrator and subagents");
+function compiledPermissionHandler() {
   const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
   const toolConfig = lock.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/);
   assert.ok(toolConfig, "Missing compiled SDK tool configuration");
   const { permissions } = JSON.parse(toolConfig[1]);
   assert.ok(permissions.allowedTools.length > 0, "Missing compiled permission policy");
-  const handler = buildCopilotSDKPermissionHandler(permissions, () => assert.fail("Unrestricted approval is not expected"));
-  const commands = [...contract[1].matchAll(/`([^`]+)`/g)].map(match => match[1]);
+  return buildCopilotSDKPermissionHandler(permissions, () => assert.fail("Unrestricted approval is not expected"));
+}
+
+test("burner tool-contract commands are executable under the compiled SDK policy", () => {
+  const contract = workflow.match(/## Tool contract for every agent\n([\s\S]*?)\n## Read first/);
+  assert.ok(contract, "Missing restricted-tool contract for the orchestrator and subagents");
+  const handler = compiledPermissionHandler();
+  const { agents } = extractInlineSubAgents(workflow);
+  const contracts = [contract[1], ...agents.map(agent => agent.content.match(/#{2,3} Tool contract\n([\s\S]*?)(?=\n## |Return compact JSON|$)/)?.[1] || "")];
+  const commands = contracts.flatMap(content => [...content.matchAll(/`((?:cat|git|github|safeoutputs) [^`]+)`/g)].map(match => match[1]));
   assert.ok(commands.length > 0, "Missing executable command examples");
   for (const command of commands) {
     assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once", command);
@@ -34,9 +42,51 @@ test("burner tool-contract commands are executable under the compiled SDK policy
     "git diff --stat && gh auth status",
     "git diff --ext-diff",
     "go test -exec /tmp/unreviewed",
+    "command -v pull_request_read || command -v github-mcp-server || command -v mcp",
+    "help pull_request_read",
+    "cd /tmp/gh-aw/agent/dependabot-burner && rg -n retry .",
+    "find /tmp/gh-aw/agent/dependabot-burner -maxdepth 2 -type f | sort | head -50",
   ]) {
     assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "reject", command);
   }
+});
+
+test("runtime extraction keeps the complete remediator contract and bounded prompts", t => {
+  const { withCompilerFixtures } = require("./markdown_metadata_test_adapter.cjs");
+  const { writeInlineSubAgents, loadCopilotSDKCustomAgents } = withCompilerFixtures(require("../actions/setup/js/extract_inline_sub_agents.cjs"));
+  const directory = fs.mkdtempSync(path.join(__dirname, ".burner-agents-"));
+  const previousCore = global.core;
+  global.core = { info() {} };
+  t.after(() => {
+    global.core = previousCore;
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  const { markdown } = extractFrontmatterAndBody(workflow);
+  const mainContent = writeInlineSubAgents(markdown, directory, directory, "copilot");
+  const agents = loadCopilotSDKCustomAgents(directory, directory, message => assert.fail(message));
+  assert.equal(agents.length, 5);
+  assert.ok(Buffer.byteLength(mainContent) <= 7500, "Orchestrator contract exceeds the instruction-prefix budget");
+  const remediator = agents.find(agent => agent.name === "dependabot-remediator");
+  for (const section of ["Tool contract", "Deterministic result", "Required approach", "Required validation", "Pull request rule", "Output"]) {
+    assert.ok(remediator.prompt.includes(`## ${section}`), `Runtime discarded ${section}`);
+    assert.ok(!mainContent.includes(`## ${section}\n`), `${section} leaked out of the remediator`);
+  }
+  assert.ok(remediator.prompt.includes("unaddressed_prs"), "Blocked PR reporting must reach the remediator");
+  for (const agent of agents) {
+    assert.ok(Buffer.byteLength(agent.prompt) <= 7500, `${agent.name} exceeds the instruction-prefix budget`);
+    assert.ok(!agent.tools.includes("task"), `${agent.name} must not delegate`);
+    if (agent.name !== "dependabot-remediator") {
+      assert.ok(!agent.tools.includes("edit"), `${agent.name} must remain read-only`);
+    }
+    if (agent.tools.includes("bash")) {
+      assert.ok(agent.prompt.includes("github pull_request_read --help"), `${agent.name} is missing executable guidance`);
+      assert.ok(agent.prompt.includes("After the first permission denial, stop shell calls"), `${agent.name} is missing a denial stop condition`);
+    }
+  }
+  assert.deepEqual(agents.find(agent => agent.name === "pr-group-analyzer").tools, ["read"]);
+  assert.deepEqual(agents.find(agent => agent.name === "retry-feedback-synthesizer").tools, []);
+  assert.ok(mainContent.includes("do not invoke the `retry-feedback-synthesizer`"), "First attempts must not require retry synthesis");
+  assert.ok(mainContent.includes("do not search the filesystem for history or relaunch the analyzer"));
 });
 
 function pull(number, files, author = "dependabot[bot]") {
