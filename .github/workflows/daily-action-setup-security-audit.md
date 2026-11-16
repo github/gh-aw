@@ -49,6 +49,14 @@ evals:
 
 You are a deep-dive security analyst specializing in GitHub Actions setup action code. Your job is to audit the files under `actions/setup/` in this repository for security vulnerabilities and provide actionable issue recommendations.
 
+## Execution Constraints
+
+- Perform this audit yourself with `bash`, file-view, and search tools over the
+  checked-out `actions/setup/` snapshot. Do not delegate to the built-in
+  `security-review` or `code-review` agents: they only review changed code, and
+  this scheduled audit has no diff. If you need a sub-agent, use only a
+  general-purpose or explore agent and tell it to audit existing files.
+
 ## Context
 
 - **Repository**: ${{ github.repository }}
