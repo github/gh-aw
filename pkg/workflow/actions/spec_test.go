@@ -278,3 +278,90 @@ func TestSpec_PublicAPI_RenderExpression(t *testing.T) {
 		})
 	}
 }
+
+// TestSpec_PublicAPI_ExpressionConstructors follows README.md / Public API:
+// Secret and Variable construct expressions for their corresponding reference
+// values, while Or and Concat construct composable expressions.
+// SPEC_AMBIGUITY: constructor representations and rendered quoting are not
+// specified, so tests compare reference semantics and retain authored operands.
+func TestSpec_PublicAPI_ExpressionConstructors(t *testing.T) {
+	t.Parallel()
+
+	resolved, err := actions.Resolve(&actions.Workflow{
+		Jobs: []*actions.Job{{
+			ID: "build", RunsOn: "ubuntu-latest",
+			Steps: []actions.Step{actions.RunStep{Run: "echo ready"}},
+		}},
+	})
+	require.NoError(t, err, "a native workflow must resolve before rendering expressions")
+
+	for _, tt := range []struct {
+		name         string
+		expression   actions.Expression
+		equivalent   actions.Expression
+		constituents []string
+	}{
+		{
+			name: "secret reference", expression: actions.Secret("SPEC_EXAMPLE"),
+			equivalent: actions.SecretRef("SPEC_EXAMPLE"),
+		},
+		{
+			name: "variable reference", expression: actions.Variable("SPEC_EXAMPLE"),
+			equivalent: actions.VariableRef("SPEC_EXAMPLE"),
+		},
+		{
+			name:         "fallback expression",
+			expression:   actions.Or(actions.Context("github.ref"), actions.Literal("fallback")),
+			constituents: []string{"github.ref", "fallback"},
+		},
+		{
+			name:         "concatenation",
+			expression:   actions.Concat(actions.Literal("prefix"), actions.Context("github.ref")),
+			constituents: []string{"prefix", "github.ref"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			rendered, err := actions.RenderExpression(tt.expression, "build", resolved, true)
+			require.NoError(t, err, "the documented %s constructor must produce a renderable expression", tt.name)
+			require.NotEmpty(t, rendered, "constructed expressions must retain their values when rendered")
+			if tt.equivalent != nil {
+				expected, err := actions.RenderExpression(tt.equivalent, "build", resolved, true)
+				require.NoError(t, err, "the corresponding reference node must render")
+				assert.Equal(t, expected, rendered, "the constructor must represent the same reference as its documented node type")
+			}
+			for _, constituent := range tt.constituents {
+				assert.Contains(t, rendered, constituent, "composition must retain the authored operand %q", constituent)
+			}
+		})
+	}
+}
+
+// TestSpec_Types_ExpressionNodes follows README.md / Public API's expression
+// node list without assuming any undocumented concrete serialization format.
+func TestSpec_Types_ExpressionNodes(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name       string
+		expression actions.Expression
+	}{
+		{name: "binary", expression: actions.Binary{Left: actions.Boolean(true), Operator: "==", Right: actions.Boolean(false)}},
+		{name: "boolean", expression: actions.Boolean(true)},
+		{name: "call", expression: actions.Call{Name: "contains", Args: []actions.Expression{actions.Literal("abc"), actions.Literal("a")}}},
+		{name: "context", expression: actions.Context("github.ref")},
+		{name: "literal", expression: actions.Literal("authored")},
+		{name: "not", expression: actions.Not{Value: actions.Boolean(false)}},
+		{name: "number", expression: actions.Number(42)},
+		{name: "secret reference", expression: actions.SecretRef("SPEC_EXAMPLE")},
+		{name: "variable reference", expression: actions.VariableRef("SPEC_EXAMPLE")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.NotNil(t, tt.expression, "the documented %s node must implement Expression", tt.name)
+		})
+	}
+}
+
+// SPEC_MISMATCH: README.md / Public API documents Visit as an expression
+// traversal API, but the package has no exported Visit declaration. An external
+// behavioral test cannot call that documented API until the mismatch is resolved.
