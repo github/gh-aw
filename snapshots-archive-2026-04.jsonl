@@ -16,3 +16,6 @@
 {"date":"2026-04-23","total_tokens":71581398,"wf":[{"n":"Smoke CI","t":9440161,"r":26},{"n":"Daily Syntax Error Quality Check","t":8255787,"r":1},{"n":"Test Quality Sentinel","t":7055864,"r":20},{"n":"Smoke Copilot","t":5604090,"r":5},{"n":"Package Specification Extractor","t":3768958,"r":1},{"n":"Package Specification Librarian","t":3650647,"r":1},{"n":"Contribution Check","t":3600717,"r":3},{"n":"Workflow Skill Extractor","t":3097139,"r":1},{"n":"Daily CLI Tools Exploratory Tester","t":2413001,"r":1},{"n":"Agentic Optimization Kit","t":2331568,"r":1}]}
 {"date":"2026-04-24","period_days":30,"overall":{"total_runs":99,"total_tokens":54842866,"total_cost":0,"total_action_minutes":683},"top_workflows":[{},{},{},{},{}]}
 {"date":"2026-04-27","period_days":null,"overall":null,"top_workflows":[]}
+{"date":"2026-04-28","period_days":30,"overall":{"total_runs":99,"total_tokens":48474287,"total_cost":0,"total_action_minutes":569},"top_workflows":[{},{},{},{},{}]}
+{"date":"2026-04-29","period_days":30,"overall":{"total_runs":94,"total_tokens":43252414,"total_cost":0.0,"total_action_minutes":620.0},"top_workflows":[{},{},{},{},{}]}
+{"date":"2026-04-30","period_days":30,"overall":{"total_runs":98,"total_tokens":72562018,"total_cost":0,"total_action_minutes":820},"top_workflows":[{},{},{},{},{}]}
