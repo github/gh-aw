@@ -32,6 +32,7 @@ network:
   allowed:
     - defaults
     - node
+    - packagefeedproxy.microsoft.io
 
 imports:
   - shared/pr-safe-output-defaults.md
