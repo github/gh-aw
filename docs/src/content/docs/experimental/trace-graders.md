@@ -127,6 +127,15 @@ authoritative for later object disposition. githubnext/gh-cao owns provider
 refresh, adoption/rejection/reversal/survival lifecycle, longitudinal
 repository/window/campaign Value, canonical storage/querying, and presentation.
 
+Standalone workflows publish longitudinal Value without a campaign. Use
+githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME` without
+`--campaign`. The optional `--campaign` flag only scopes ownership and rolls up
+directly included worker Value; it does not create campaign-specific metric
+semantics. Delivery, adoption, reversal, and survival apply independently of
+campaign membership and Value configuration. The restricted-JavaScript
+operational-value grader is optional run-scoped evidence, not a prerequisite or
+substitute for CAO longitudinal Value.
+
 ## Opt-in trajectory graders
 
 These built-ins are not enabled by default:

@@ -3,7 +3,7 @@ name: operational-value-designer
 description: "Design recorded-session, run-scoped operational value with restricted JavaScript. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
 argument-hint: "OWNER/REPO WORKFLOW-NAME"
 metadata:
-  version: "3.0.0"
+  version: "3.1.0"
 ---
 
 # Operational Value Designer
@@ -11,22 +11,25 @@ metadata:
 Design a deterministic, run-scoped operational-value grader from evidence already
 recorded in the unified session.
 
-## Ownership boundary
+## Ownership and CAO handoff
 
-Ownership follows when a fact becomes knowable, avoiding duplicate acquisition
-and false causal claims.
+gh-aw owns execution-time producer facts, run identity, optional restricted-JS
+run-scoped grading, artifacts/events, experiments, and replay. GitHub owns later
+object disposition. githubnext/gh-cao owns provider refresh, universal
+delivery/adoption/reversal/survival lifecycle, longitudinal Value, canonical
+storage/querying, and Dashboard Language.
 
-| Authority | Owns |
-|---|---|
-| gh-aw | Execution-time producer facts, episode/run identity, direct outcome snapshots, the restricted-JavaScript run-scoped grader, implementation digest, grader artifacts/events, experiments consumption, and CLI replay/regrading |
-| GitHub | Later authoritative disposition of issues, pull requests, comments, commits, releases, and other GitHub objects |
-| githubnext/gh-cao | Provider refresh; adoption/rejection/reversal/survival; longitudinal repository/window/campaign Value; canonical storage/querying and Dashboard Language |
+Every standalone Agentic Workflow publishes longitudinal Value without a
+campaign: use githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME`
+and omit `--campaign`. `--campaign` only scopes ownership and rolls up the Value
+of directly included workers; it adds no separate campaign metric semantics.
+Lifecycle tracking applies whether or not a workflow joins a campaign and whether
+or not Value is configured.
 
-`safe_output.result` records producer execution facts. `safe_output.outcome` records
-the handler's run-time application status. Neither proves later human adoption or
-repository Operational Value. For repository/window/campaign Value, use
-githubnext/gh-cao's `add-operational-value` skill instead of adding collectors,
-campaign adapters, canonical databases, or refresh logic to gh-aw.
+`safe_output.result` and `safe_output.outcome` record run-time facts, not later
+adoption. `graders.operational-value.script` is optional run-scoped evidence; it
+is neither a prerequisite nor a substitute for CAO longitudinal Value. Do not add
+CAO collectors, campaign adapters, canonical databases, or refresh logic to gh-aw.
 
 ## Reserved grader contract
 

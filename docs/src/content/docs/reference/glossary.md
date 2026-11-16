@@ -1784,7 +1784,7 @@ Non-LLM metrics over the redacted unified session. Ten fast built-ins run as pur
 
 ### Operational Value Grader (`graders.operational-value`)
 
-A run-scoped restricted JavaScript evaluator configured with `graders.operational-value.script`. It returns a nonempty ordered array of unique `{id,value}` metrics; the first supplies the primary value and the complete array remains in schema-v2 results. gh-aw owns recorded run facts and replay, not later human adoption or longitudinal repository Value. Removed `graders.operational-value.run` declarations fail with migration guidance to `script`.
+A run-scoped restricted JavaScript evaluator configured with `graders.operational-value.script`. It returns a nonempty ordered array of unique `{id,value}` metrics; the first supplies the primary value and the complete array remains in schema-v2 results. This grader is optional evidence, not a prerequisite or substitute for CAO longitudinal Value. Every standalone workflow uses githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME` without a campaign; `--campaign` only scopes ownership and rolls up directly included worker Value. Delivery/adoption/reversal/survival applies independently of campaign and Value configuration. Removed `graders.operational-value.run` declarations fail with migration guidance to `script`.
 
 ### Recurrence Trapping Time (RQA TT) (`graders.recurrence-trapping-time`)
 

@@ -154,6 +154,15 @@ refresh; adoption, rejection, reversal, and survival lifecycle; longitudinal
 repository/window/campaign Value; canonical storage/querying; and presentation.
 `safe_output.outcome` is handler application status, not human adoption.
 
+Every standalone Agentic Workflow MUST publish longitudinal Value through
+githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME` without a
+campaign. `--campaign` MUST only scope ownership and roll up directly included
+worker Value; it MUST NOT define separate campaign metric semantics. Delivery,
+adoption, reversal, and survival lifecycle applies independently of campaign
+membership and independently of whether Value is configured. The restricted
+JavaScript operational-value grader is optional run-scoped evidence and MUST NOT
+be treated as a prerequisite or substitute for CAO longitudinal Value.
+
 The separate `graders` artifact MUST contain combined built-in and custom
 results and data-only metadata, without overwriting built-in outcomes or
 replacing the conclusion session. Custom implementation identity MUST include a
