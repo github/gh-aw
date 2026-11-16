@@ -18,6 +18,9 @@ describe("safe-output submission tracker", () => {
     addDependencySchema(tool);
     expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
     expect(dependencySchema.description).toContain("Do not use ledger output IDs as prerequisites");
+    expect(dependencySchema.description).toContain(
+      "Not supported by noop, report_incomplete, report_missing_tool, report_missing_data, upload_asset, call_workflow, push_repo_memory, or custom safe jobs: omit depends-on on those calls (they are rejected)"
+    );
     expect(tool.inputSchema.required || []).not.toContain("depends-on");
 
     for (const reservedName of ["depends-on", "depends_on", "output_id"]) {
