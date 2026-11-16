@@ -12,6 +12,10 @@ permissions:
   issues: read
   copilot-requests: write
 model: copilot/gpt-5
+env:
+  # The repository .npmrc targets packagefeedproxy.microsoft.io, which this
+  # workflow's firewall does not allow; query the public npm registry instead.
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
 strict: false
 engine:
   id: pi
@@ -118,6 +122,8 @@ Apply this policy to **all release resolution**: every CLI, MCP server, threat-d
   - Constant: `DefaultThreatDetectVersion` in `pkg/constants/version_constants.go`
   - Update the version with the `v` prefix used by GitHub release tags
 **Optimization**: Fetch all versions in parallel using multiple npm view or WebFetch calls in a single turn.
+
+**npm registry**: Use the public registry `https://registry.npmjs.org/` for every npm command. `NPM_CONFIG_REGISTRY` is preset; if npm still contacts `packagefeedproxy.microsoft.io` (from the repository `.npmrc`, which the firewall blocks), pass `--registry=https://registry.npmjs.org/` explicitly. Never edit `.npmrc` or disable TLS verification.
 
 ### Research & Analysis
 For each update, analyze intermediate versions:
@@ -262,7 +268,9 @@ For every Docker image, fetch the registry digest for the cooldown-eligible targ
 TOKEN=$(curl -s "https://auth.docker.io/token?scope=repository:anchore/syft:pull&service=registry.docker.io" | jq -r .token)
 # Fetch the manifest digest (amd64 manifest list or single-arch)
 curl -sI \
-  -H "Authorization: ******" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/vnd.oci.image.index.v1+json" \
+  -H "Accept: application/vnd.oci.image.manifest.v1+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
   "https://registry-1.docker.io/v2/anchore/syft/manifests/v1.49.0" \
@@ -276,11 +284,13 @@ Replace the `scope` repository slug and the tag as appropriate for each image.
 docker manifest inspect "ghcr.io/zizmorcore/zizmor:v1.0.0" --verbose 2>/dev/null \
   | jq -r 'if type == "array" then .[0].Descriptor.digest else .config.digest end'
 ```
-If `docker` is unavailable, fall back to the GHCR anonymous API:
+If `docker` is unavailable, fall back to the GHCR anonymous API. GHCR returns HTTP 401 without the anonymous bearer token, and multi-arch images are OCI indexes, so keep both the token and the OCI `Accept` types:
 ```bash
 TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:zizmorcore/zizmor:pull&service=ghcr.io" | jq -r .token)
 curl -sI \
-  -H "Authorization: ******" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/vnd.oci.image.index.v1+json" \
+  -H "Accept: application/vnd.oci.image.manifest.v1+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
   "https://ghcr.io/v2/zizmorcore/zizmor/manifests/v1.0.0" \
