@@ -1,24 +1,24 @@
 {
-  "last_run_date": "2026-11-15",
+  "last_run_date": "2026-11-16",
   "last_window": {
-    "start": "2026-11-14T07:52:42Z",
-    "end": "2026-11-15T07:52:42Z"
+    "start": "2026-11-15T08:02:39Z",
+    "end": "2026-11-16T08:02:39Z"
   },
   "observed_window": {
-    "coverage": "413 cached runs, created 2026-11-14T17:05:45Z through 2026-11-15T07:52:42Z. Count-limited collection leaves earlier requested window missing; no fleet refetch. GitHub reads corroborate selected events in the gap.",
-    "continuation_start": "2026-11-14T07:55:09Z",
-    "continuation_end": "2026-11-14T17:05:26Z",
-    "continuation_before_run_id": 43619207978
+    "coverage": "330 cached run records created 2026-11-15T23:51:05Z through 2026-11-16T08:02:39Z; count-limited, no fleet refetch. Earlier requested interval is missing. One cached run created after cutoff was excluded.",
+    "continuation_start": "2026-11-15T08:05:17Z",
+    "continuation_end": "2026-11-15T23:49:53Z",
+    "continuation_before_run_id": 43777018471
   },
   "key_themes": [
-    "Auditor collection failed in 15 cached runs; tracker #77641 expired; dashboard #77985 and assignment request remain.",
-    "Four workflows failed Process Safe Outputs after agent success; causes unknown. PR #77644 merged; reviewer failed on #77899.",
-    "Conclusion failure tracker #77984 opened; Sous Chef sample fails checkout ahead of failure handler."
+    "Auditor repair merged; collection jobs show success, success, failure, success afterward; agent skipped. Issue 78066 remains open.",
+    "Review startup failures across two PR groups; collaborator attributed six on PR 78232 to transient provider outage.",
+    "Three workflows failed safe-output processing after successful agent jobs, with common cause unverified."
   ],
   "carry_forward_questions": [
-    "Did Auditor collection recover and was its dedicated tracker replaced or reopened?",
-    "Do safe-output failures share a cause and did ledger diagnostics help?",
-    "What causes conclusion failures across workflows and is the tracker progressing?",
-    "Can the missing early portion of the window be assessed separately?"
+    "Did Auditor achieve three consecutive scheduled passes and end-to-end agent execution after the later failure?",
+    "Were the interrupted reviews rerun and did their findings reach the PR?",
+    "Do safe-output failures share a cause and are outputs delivered?",
+    "Can the missing early portion be assessed separately?"
   ]
 }
