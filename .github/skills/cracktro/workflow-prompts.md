@@ -40,7 +40,7 @@ Slides built on a gh-aw agentic workflow show, at `top: 30px`, the first user me
 | Spec-driven testing | spec-extractor / enforcer / librarian | #26083 | task `fca20c82-56ce-4da2-bfc3-629bc47c120f`, session `1b7312fb-2292-4227-84ea-2d170e3906be` |
 | Docs that heal | daily-doc-updater | #1861 | PR body |
 | Hunt · Falsify · Fix | daily-vulnhunter-scan | #46742 | task `47b76064-1f05-4c71-b671-c2939ad34ef1`, session `5287d715-09be-492d-ba81-44e6b8175b31` (VulnHunter URL replaced by the `capitalone/VulnHunter` slug) |
-| Speak · Map · Grep | dictation-prompt | #2147 | PR body |
+| Speech To Agent | dictation-prompt | #2147 | PR body |
 
 Alternates that were not used:
 - lint-monster: #32687, task `906f95f4-b0fb-4743-a58d-44bcc5693072`, session `57e5e168-24eb-4ba4-8dcc-15bf71e21dd5`.
