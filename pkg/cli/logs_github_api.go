@@ -404,11 +404,14 @@ type ListWorkflowRunsOptions struct {
 	// OldestFetchedCreatedAt, when set, is populated with the oldest run creation
 	// timestamp returned by GitHub in this batch before any workflow/conclusion filtering.
 	OldestFetchedCreatedAt *time.Time
-	ProcessedCount         int  // number of runs already processed (for progress display)
-	TargetCount            int  // target number of runs to fetch (for progress display)
-	Verbose                bool // enable verbose logging
-	CachedJSONLCache       *cachedLogsJSONLCache
-	CachedJSONLWriter      *cachedLogsJSONLWriter
+	// OldestFetchedRunID, when set, is populated with the smallest run database ID
+	// returned by GitHub in this batch before any filtering (0 when empty).
+	OldestFetchedRunID *int64
+	ProcessedCount     int  // number of runs already processed (for progress display)
+	TargetCount        int  // target number of runs to fetch (for progress display)
+	Verbose            bool // enable verbose logging
+	CachedJSONLCache   *cachedLogsJSONLCache
+	CachedJSONLWriter  *cachedLogsJSONLWriter
 }
 
 // listWorkflowRunsWithPagination fetches workflow runs from GitHub Actions using the GitHub CLI.
@@ -552,6 +555,15 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 			oldest = run.CreatedAt
 		}
 		*opts.OldestFetchedCreatedAt = oldest
+	}
+	if opts.OldestFetchedRunID != nil {
+		var oldestID int64
+		for _, run := range runs {
+			if oldestID == 0 || (run.DatabaseID > 0 && run.DatabaseID < oldestID) {
+				oldestID = run.DatabaseID
+			}
+		}
+		*opts.OldestFetchedRunID = oldestID
 	}
 
 	// Filter only agentic workflow runs when no specific workflow is specified

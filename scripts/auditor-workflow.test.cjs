@@ -15,6 +15,7 @@ const script = workflow
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const collect = new AsyncFunction("require", "process", "context", "github", "core", "Date", script);
 const now = new Date().toISOString();
+const timeoutError = () => Object.assign(new Error("spawnSync gh ETIMEDOUT"), { code: "ETIMEDOUT" });
 const run = (id, overrides = {}) => ({
   id,
   run_attempt: 1,
@@ -102,6 +103,7 @@ async function fixture(t, options = {}) {
         if (args[1] === "version") return "gh aw test-version";
         assert.ok(!args.includes("all"));
         if (args[1] === "health") {
+          if (options.healthTimeout) throw timeoutError();
           assert.equal(args[args.indexOf("--repo") + 1], "example/repo");
           const start = args[args.indexOf("--start-date") + 1];
           const end = args[args.indexOf("--end-date") + 1];
@@ -134,6 +136,9 @@ async function fixture(t, options = {}) {
           clock.time = new Date(Date.parse(clock.time) + (options.logElapsedMs || 0)).toISOString();
           used += options.logCost || 0;
           const id = Number(args[args.indexOf("--after-run-id") + 1]) + 1;
+          assert.equal(args[args.indexOf("--count") + 1], "1");
+          const timeout = (options.logTimeouts || []).find(item => item.id === id && item.audit === args.includes("--audit"));
+          if (timeout?.kind === "subprocess") throw timeoutError();
           const selected = runs.find(item => item.id === id);
           const report = {
             runs: [
@@ -156,6 +161,7 @@ async function fixture(t, options = {}) {
               },
             ],
             ...(options.partial ? { continuation: { before_run_id: id } } : {}),
+            ...(timeout?.kind === "cli" ? { continuation: { message: "Timeout reached. Use these parameters to continue fetching more logs.", before_run_id: id } } : {}),
             ...(options.changedAttempt ? { runs: [{ run_id: id, run_attempt: "2" }] } : {}),
           };
           if (args.includes("--audit")) {
@@ -756,6 +762,53 @@ test("evidence deadline leaves unqueried failures pending rather than overrunnin
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "true");
   assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).clusters[0].count, 2);
+});
+
+for (const kind of ["subprocess", "cli"]) {
+  test(`${kind} logs timeout defers only that run and keeps collecting`, async t => {
+    const options = { runs: [run(42), run(43)], logTimeouts: [{ id: 42, audit: false, kind }] };
+    const f = await fixture(t, options);
+    await f.execute();
+    let state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+    assert.deepEqual(state.seen, [`43-1-${now}`]);
+    assert.deepEqual(state.pending, [42]);
+    assert.deepEqual(
+      state.backlog.map(item => item.run.id),
+      [43]
+    );
+    assert.equal(f.outputs.has_new_failures, "false");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).evidence_complete, false);
+    assert.match(f.warnings.join("\n"), /Deferred run 42/);
+    options.logTimeouts = [];
+    await f.execute();
+    state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+    assert.deepEqual(state.pending, []);
+    assert.equal(f.outputs.has_new_failures, "true");
+  });
+}
+
+test("audit timeout leaves new failures pending without activating", async t => {
+  const options = { runs: [run(42)], logTimeouts: [{ id: 42, audit: true, kind: "subprocess" }] };
+  const f = await fixture(t, options);
+  await f.execute();
+  let state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.deepEqual(state.seen, []);
+  assert.deepEqual(state.pending, [42]);
+  assert.equal(state.backlog.length, 1);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.match(f.warnings.join("\n"), /Deferred audit of run 42/);
+  options.logTimeouts = [];
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "true");
+});
+
+test("health subprocess timeout uses the bounded retry path", async t => {
+  const f = await fixture(t, { healthTimeout: true });
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.cache, "health-retry.json"))).timeout_seconds, 600);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).complete, false);
+  assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
 });
 
 test("health removes previously collected superseded failures from the backlog", async t => {

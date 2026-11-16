@@ -33,6 +33,7 @@ type workflowRunBatch struct {
 	totalFetched           int
 	batchSize              int
 	oldestFetchedCreatedAt time.Time
+	oldestFetchedRunID     int64
 }
 
 type logsCollectionStats struct {
@@ -530,13 +531,8 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 	opts.collectionStats.recordDiscovered(len(batch.runs))
 	logsJSONLFromContext(runtime.activeCtx).emit(logsJSONLEvent{Type: "progress", Stage: "discovered", Workflow: opts.WorkflowName, Repository: opts.RepoOverride, Count: len(batch.runs)})
 	if len(batch.runs) == 0 {
-		cursor, shouldContinue, shouldStop := handleEmptyWorkflowRunBatch(batch, opts.Verbose)
-		if shouldStop {
-			return true, nil
-		}
-		if shouldContinue {
-			state.beforeDate = cursor
-			return false, nil
+		if handled, stop := handleEmptyLogsBatch(state, batch, opts); handled {
+			return stop, nil
 		}
 	}
 	logWorkflowRunBatchFound(batch, state.iteration, opts.Verbose)
@@ -575,6 +571,23 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		return true, errLogsAPIRateLimitReached
 	}
 	return finishLogsBatch(state, runtime, opts, batch, allRunsConsumed, batchStorageLimitReached), nil
+}
+
+// handleEmptyLogsBatch decides how the iteration loop proceeds after a batch
+// with no matching runs. handled is false when the caller should fall through.
+func handleEmptyLogsBatch(state *logsCollectionState, batch workflowRunBatch, opts LogsDownloadOptions) (handled, stop bool) {
+	if reachedAfterRunIDBoundary(batch, opts.AfterRunID, opts.Verbose) {
+		return true, true
+	}
+	cursor, shouldContinue, shouldStop := handleEmptyWorkflowRunBatch(batch, opts.Verbose)
+	if shouldStop {
+		return true, true
+	}
+	if shouldContinue {
+		state.beforeDate = cursor
+		return true, false
+	}
+	return false, false
 }
 
 func handleLogsATIFBatchError(state *logsCollectionState, fetchAllInRange bool, opts LogsDownloadOptions, batchStorageLimitReached bool) error {
@@ -630,7 +643,23 @@ func finishLogsBatch(
 	if markSharedLogsCountReached(state, runtime.fetchAllInRange, opts.countLimit) {
 		return true
 	}
+	if reachedAfterRunIDBoundary(batch, opts.AfterRunID, opts.Verbose) {
+		return true
+	}
 	return shouldStopAfterWorkflowRunBatch(batch, opts.Verbose)
+}
+
+// reachedAfterRunIDBoundary reports whether this batch already reached runs at
+// or below --after-run-id. Runs are listed newest first and run IDs increase
+// with creation time, so older pages cannot contain matching runs.
+func reachedAfterRunIDBoundary(batch workflowRunBatch, afterRunID int64, verbose bool) bool {
+	if afterRunID <= 0 || batch.oldestFetchedRunID <= 0 || batch.oldestFetchedRunID > afterRunID {
+		return false
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Reached --after-run-id boundary (%d), stopping iteration", afterRunID)))
+	}
+	return true
 }
 
 func markSharedLogsCountReached(state *logsCollectionState, fetchAllInRange bool, limit *logsCountLimit) bool {
@@ -753,6 +782,7 @@ func logLogsIterationFetch(opts LogsDownloadOptions, fetchAllInRange bool, itera
 func fetchWorkflowRunBatch(ctx context.Context, opts LogsDownloadOptions, beforeDate string, processedCount int, fetchAllInRange bool) (workflowRunBatch, error) {
 	batchSize := computeLogsBatchSize(opts.WorkflowName, opts.Count, processedCount, fetchAllInRange)
 	var oldestFetchedCreatedAt time.Time
+	var oldestFetchedRunID int64
 	runs, totalFetched, err := listWorkflowRunsWithPagination(ListWorkflowRunsOptions{
 		Context:                ctx,
 		WorkflowName:           opts.WorkflowName,
@@ -766,13 +796,14 @@ func fetchWorkflowRunBatch(ctx context.Context, opts LogsDownloadOptions, before
 		IgnoreWorkflowRuns:     opts.IgnoreWorkflowRuns,
 		RepoOverride:           opts.RepoOverride,
 		OldestFetchedCreatedAt: &oldestFetchedCreatedAt,
+		OldestFetchedRunID:     &oldestFetchedRunID,
 		ProcessedCount:         processedCount,
 		TargetCount:            opts.Count,
 		Verbose:                opts.Verbose,
 		CachedJSONLCache:       opts.cachedJSONLCache,
 		CachedJSONLWriter:      opts.cachedJSONLWriter,
 	})
-	return workflowRunBatch{runs: runs, totalFetched: totalFetched, batchSize: batchSize, oldestFetchedCreatedAt: oldestFetchedCreatedAt}, err
+	return workflowRunBatch{runs: runs, totalFetched: totalFetched, batchSize: batchSize, oldestFetchedCreatedAt: oldestFetchedCreatedAt, oldestFetchedRunID: oldestFetchedRunID}, err
 }
 
 func computeLogsBatchSize(workflowName string, count, processedCount int, fetchAllInRange bool) int {
