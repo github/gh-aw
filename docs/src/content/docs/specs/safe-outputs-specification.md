@@ -4403,6 +4403,70 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "create_pull_request_review_comment",
+  "description": "Create a review comment on a specific line of code in a pull request.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["path", "line", "body"],
+    "properties": {
+      "path": {"type": "string", "description": "File path relative to the repository root. Must be a file changed in the PR."},
+      "line": {"type": ["number", "string"], "description": "Target line, or the ending line for multi-line comments."},
+      "body": {"type": "string", "maxLength": 524288, "description": "Review comment content in Markdown."},
+      "pull_request_number": {"type": ["number", "string"], "description": "Pull request number. Required when the configured target is \"*\"."},
+      "start_line": {"type": ["number", "string"], "description": "Starting line for multi-line comments."},
+      "side": {"type": "string", "enum": ["LEFT", "RIGHT"], "description": "Diff side. Defaults to RIGHT."},
+      "repo": {"type": "string", "description": "Target repository in owner/repo format. Must be permitted by allowed-repos when set."}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Repository Resolution**: The target repository MUST be resolved from `repo` or `target-repo` and validated against `allowed-repos` before any API call.
+2. **Context Check**: With `target: "triggering"`, the handler MUST skip the item (without error) when the invocation context is not a pull request or a pull-request comment.
+3. **Field Validation**: `path`, `line`, and `body` MUST be present. `line` MUST be a positive integer. `start_line`, when present, MUST be a positive integer not greater than `line`. `side` MUST be `LEFT` or `RIGHT` and defaults to the configured `side` (default `RIGHT`).
+4. **Target Resolution**: The pull request number is resolved per the Target Authorization rules. The handler MUST obtain the pull request head SHA, fetching the pull request when the payload does not carry it, and MUST fail the item if no head SHA is available.
+5. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST skip the item (without error) if the pull request does not satisfy them.
+6. **Buffering**: The handler MUST NOT post the comment directly. It MUST sanitize and size-fit the body, append any configured footer blocks, and add the comment to the per-pull-request review buffer. The buffered comments are published as one review per [§7.0.4](#704-dependency-and-batch-processing-semantics).
+7. **Per-Run Limit**: Items beyond `max` MUST fail with a max-count error and MUST NOT be buffered.
+8. **Commit Pinning**: When `commit-id` is configured, the buffered review MUST be attributed to that commit instead of the current pull request head.
+9. **Staged Mode**: In staged mode the review buffer MUST preview the review and MUST NOT submit it.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 10)
+- `side`: Default diff side, `"LEFT"` or `"RIGHT"` (default: `"RIGHT"`)
+- `target`: `"triggering"` (default), `"*"` (request MUST include `pull_request_number`), or a fixed pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the pull request for the comment to be processed
+- `required-title-prefix`: Title prefix that the pull request MUST have for the comment to be processed
+- `commit-id`: Commit SHA to which the review is attributed
+- `mentions`: Mention-resolution policy applied to the body
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- The comment body MUST be sanitized, and agent-supplied mentions MUST be limited to the resolved allowed aliases
+- Cross-repository targets MUST be validated against `allowed-repos` before any API call
+- The pull request MUST be selected only according to the Target Authorization rules, enforced at runtime
+- Comments within one review MUST be bound to a single repository and pull request; in the legacy single-buffer mode a comment for a different pull request MUST be rejected
+
+**Target Authorization**:
+
+- **CRC-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
+- **CRC-002**: With `target: "triggering"`, the handler MUST use only the pull request from trusted invocation context and MUST ignore any agent-supplied `pull_request_number`.
+- **CRC-003**: With a fixed numeric `target`, the handler MUST use the configured pull request number and MUST ignore any conflicting agent-supplied `pull_request_number`.
+- **CRC-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`; omitting it with `target: "*"` MUST fail the item.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -4430,6 +4494,69 @@ or review bodies to returned or persisted decision evidence.
 **Default Max**: 1  
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "submit_pull_request_review",
+  "description": "Submit a pull request review with a status decision. Buffered inline comments are attached automatically.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "body": {"type": "string", "maxLength": 524288, "description": "Overall review summary in Markdown. Required for REQUEST_CHANGES."},
+      "event": {"type": "string", "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"], "description": "Review decision. Defaults to COMMENT."},
+      "pull_request_number": {"type": ["number", "string"], "description": "Pull request number. Required when the configured target is \"*\"."},
+      "repo": {"type": "string", "description": "Target repository in owner/repo format. Must be permitted by allowed-repos when set."}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Event Validation**: `event` MUST be one of `APPROVE`, `REQUEST_CHANGES`, or `COMMENT` (case-insensitive) and defaults to `COMMENT`.
+2. **Allowed Events**: When `allowed-events` is configured, the handler MUST reject any event outside that set with an error.
+3. **Body Requirement**: A `REQUEST_CHANGES` review MUST carry a non-empty `body`. A review with no `body` and no buffered inline comments MUST be rejected rather than published empty.
+4. **Target and Filter Resolution**: The pull request and repository are resolved per the Target Authorization rules and validated against `allowed-repos`. When `required-labels` or `required-title-prefix` is configured, the handler MUST skip the item (without error) if the pull request does not satisfy them.
+5. **Buffering**: The handler MUST NOT submit the review directly. It records the body and event in the per-pull-request review buffer, which publishes all buffered inline comments and the review together at finalization per [§7.0.4](#704-dependency-and-batch-processing-semantics).
+6. **Single Submission**: A second submission for the same repository and pull request within one run MUST fail with an error.
+7. **Per-Run Limit**: Items beyond `max` MUST fail with a max-count error.
+8. **Commit Attribution**: The review MUST be attributed to `commit-id` when configured, otherwise to the trigger-time head SHA, otherwise to the current pull request head SHA.
+9. **Own-Pull-Request Fallback**: When GitHub rejects an `APPROVE` or `REQUEST_CHANGES` review because the reviewer authored the pull request, publication retries the review as `COMMENT`.
+10. **Supersede**: When `supersede-older-reviews` is enabled, publication of a `COMMENT` review with no inline comments MAY dismiss older `REQUEST_CHANGES` reviews from the same workflow. This step is best-effort and failures MUST NOT fail the review.
+11. **Staged Mode**: In staged mode the review MUST be previewed and MUST NOT be submitted.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"` (request MUST include `pull_request_number`), or a fixed pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `allowed-events`: Restrict permitted review events (empty or omitted permits all)
+- `supersede-older-reviews`: Best-effort dismissal of older same-workflow `REQUEST_CHANGES` reviews (default: `false`)
+- `required-labels`: Labels that must ALL be present on the pull request for the review to be processed
+- `required-title-prefix`: Title prefix that the pull request MUST have for the review to be processed
+- `commit-id`: Commit SHA to which the review is attributed
+- `footer`: `"always"` (default), `"none"`, or `"if-body"`
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- `allowed-events` MUST be enforced by the privileged handler; prompt instructions MUST NOT replace it
+- Cross-repository targets MUST be validated against `allowed-repos` before any API call
+- The pull request MUST be selected only according to the Target Authorization rules, enforced at runtime
+- The review body MUST be sanitized and size-fitted before publication
+
+**Target Authorization**:
+
+- **SPR-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
+- **SPR-002**: With `target: "triggering"`, the handler MUST use only the pull request from trusted triggering-event context and MUST ignore any agent-supplied `pull_request_number`.
+- **SPR-003**: With a fixed numeric `target`, the handler MUST use the configured pull request number and MUST ignore any conflicting agent-supplied `pull_request_number`.
+- **SPR-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
 
 **Required Permissions**:
 
@@ -4461,6 +4588,25 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "resolve_pull_request_review_thread",
+  "description": "Resolve a review thread on a pull request after the feedback has been addressed.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["thread_id"],
+    "properties": {
+      "thread_id": {"type": "string", "description": "GraphQL node ID of the review thread (e.g., PRRT_kwDO...)."}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 10)
@@ -4477,6 +4623,13 @@ or review bodies to returned or persisted decision evidence.
 3. **Resolution**: The processor MUST use GitHub's `resolveReviewThread` GraphQL mutation only for a verified, unresolved thread. Already-resolved threads and stale or missing thread IDs are successful no-ops; staged mode MUST preview without calling the mutation.
 4. **Comment-ID Lookup**: When `thread_id` contains a review-comment ID, the processor MUST search the parent pull request's review threads and comments, following GraphQL cursors until the comment is found or all pages are exhausted. If no containing thread is found, the operation MUST fail without mutation.
 5. **Permission Failure**: If GitHub rejects the mutation because the integration token cannot access the thread, the processor MUST report a skipped operation with guidance to configure a suitable `github-token`; unrelated API errors MUST remain failures.
+
+**Security Requirements**:
+
+- The thread's pull request and repository MUST be derived from GitHub's response, never from agent-supplied metadata
+- Repository allowlists, the configured `target`, and `required-labels`/`required-title-prefix` MUST be enforced before the resolve mutation
+- Node IDs that do not identify a review thread or review comment MUST be rejected without mutation
+- The pull request MUST be selected only according to the Target Authorization rules, enforced at runtime
 
 **Target Authorization**:
 
@@ -4519,6 +4672,37 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "reply_to_pull_request_review_comment",
+  "description": "Reply to an existing review comment on a pull request.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["comment_id", "body"],
+    "properties": {
+      "comment_id": {"type": ["number", "string"], "description": "Numeric ID of the review comment to reply to."},
+      "body": {"type": "string", "maxLength": 524288, "description": "Reply text in Markdown."},
+      "pull_request_number": {"type": ["number", "string"], "description": "Pull request number. Required when the configured target is \"*\"."}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Field Validation**: `comment_id` MUST be a positive integer (number or numeric string) and `body` MUST be a non-empty string; invalid items fail before counting against `max`.
+2. **Repository Resolution**: The target repository MUST be resolved from `target-repo` and validated against `allowed-repos` before any API call.
+3. **Target Resolution**: The pull request is resolved per the Target Authorization rules. With `target: "triggering"` outside a pull request context the item MUST be skipped without error.
+4. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST skip the item (without error) if the pull request does not satisfy them.
+5. **Per-Run Limit**: Items beyond `max` MUST fail with a max-count error.
+6. **Staged Mode**: In staged mode the handler MUST preview the reply and MUST NOT call the reply API.
+7. **Publication**: The body is sanitized and size-fitted, a detection caution is prepended when threat detection raised a warning, and the footer is appended unless `footer` is `false`. The reply is created through the REST `createReplyForReviewComment` endpoint on the resolved pull request.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -4539,6 +4723,19 @@ or review bodies to returned or persisted decision evidence.
 - `required-labels`: Labels that must ALL be present on the pull request for the reply to be processed
 - `required-title-prefix`: Title prefix that the pull request MUST have for the reply to be processed
 - `footer`: Whether to append footer attribution (default: `true`)
+
+**Security Requirements**:
+
+- The reply body MUST be sanitized, and agent-supplied mentions MUST be limited to the resolved allowed aliases
+- Cross-repository targets MUST be validated against `allowed-repos` before any API call
+- The pull request MUST be selected only according to the Target Authorization rules, enforced at runtime
+
+**Target Authorization**:
+
+- **RRC-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
+- **RRC-002**: With `target: "triggering"`, the handler MUST use only the pull request from trusted triggering-event context and MUST ignore any agent-supplied `pull_request_number`.
+- **RRC-003**: With a fixed numeric `target`, the handler MUST use the configured pull request number and MUST ignore any conflicting agent-supplied `pull_request_number`.
+- **RRC-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`; omitting it with `target: "*"` MUST fail the item.
 
 **Notes**:
 
