@@ -1,0 +1,122 @@
+{
+ "date": "2026-11-16",
+ "window": "2026-10-17..2026-11-16",
+ "total_prs": 620,
+ "merged": 534,
+ "closed": 84,
+ "open": 2,
+ "merge_rate": 0.864,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "feature": [
+   72,
+   62,
+   10,
+   0
+  ],
+  "bug_fix": [
+   79,
+   61,
+   18,
+   0
+  ],
+  "security": [
+   38,
+   30,
+   8,
+   0
+  ],
+  "testing": [
+   46,
+   42,
+   3,
+   1
+  ],
+  "documentation": [
+   43,
+   42,
+   1,
+   0
+  ],
+  "refactor": [
+   29,
+   20,
+   9,
+   0
+  ],
+  "dependency": [
+   45,
+   42,
+   3,
+   0
+  ],
+  "other": [
+   268,
+   235,
+   32,
+   1
+  ]
+ },
+ "category_format": "[total,merged,closed,open]",
+ "length_buckets_completed": {
+  "0-100": [
+   334,
+   279
+  ],
+  "100-150": [
+   166,
+   144
+  ],
+  "150-250": [
+   27,
+   23
+  ],
+  "250+": [
+   91,
+   88
+  ]
+ },
+ "signals_completed": {
+  "code_block": [
+   354,
+   322
+  ],
+  "file_path": [
+   155,
+   145
+  ],
+  "acceptance": [
+   80,
+   73
+  ],
+  "test_cmd": [
+   25,
+   24
+  ],
+  "no_code_file_accept_test": [
+   71,
+   52
+  ]
+ },
+ "negative_titles": {
+  "wip_draft": [
+   11,
+   3
+  ],
+  "triage_verify_investigate": [
+   18,
+   3
+  ]
+ },
+ "avg_words_merged": 155.8,
+ "avg_words_closed": 97.8,
+ "last_7_days": {
+  "total": 186,
+  "merged": 155,
+  "closed": 29,
+  "open": 2,
+  "merge_rate": 0.842
+ },
+ "category_rules": "v5-recomputed-2026-11-16 (same rule family as 2026-11-15 v5 but independently re-implemented; category counts NOT directly comparable to 2026-11-15; merge_rate is comparable)",
+ "caveat": "PR body used as prompt proxy; bodies may include agent-written summaries"
+}
