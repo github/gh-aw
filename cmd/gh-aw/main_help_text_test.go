@@ -3,6 +3,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,6 +33,23 @@ func TestRunCommandHelpTextConsistency(t *testing.T) {
 	assert.Equal(t, "use the long form --raw-field instead", runRawField.ShorthandDeprecated, "run -F shorthand should be marked deprecated")
 	assert.Contains(t, runRef.Usage, "requires default-branch registration")
 	assert.Contains(t, runRef.Usage, "repository default with --repo")
+}
+
+func TestRootHelpCommonTasksUsesSpaces(t *testing.T) {
+	t.Parallel()
+	start := strings.Index(rootCmd.Long, "Common Tasks:")
+	require.NotEqual(t, -1, start)
+	end := strings.Index(rootCmd.Long[start:], "\n\n")
+	require.NotEqual(t, -1, end)
+	assert.NotContains(t, rootCmd.Long[start:start+end], "\t")
+}
+
+func TestUnknownCommandErrorUsesExtensionPath(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, `unknown command "foo" for "gh aw work-queue"`,
+		fixCommandPathInError(`unknown command "foo" for "gh work-queue"`))
+	assert.Equal(t, `unknown command "foo" for "gh aw"`,
+		fixCommandPathInError(`unknown command "foo" for "gh aw"`))
 }
 
 func TestCompileScheduleSeedHelpUsesConsistentQuotes(t *testing.T) {

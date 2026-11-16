@@ -44,6 +44,9 @@ func TestAddCommandRequiresArguments(t *testing.T) {
 	if !strings.Contains(errMsg, "missing workflow specification") {
 		t.Errorf("Expected error to mention 'missing workflow specification', got: %s", errMsg)
 	}
+	if !strings.Contains(errMsg, "Usage:\n  gh aw add") || !strings.Contains(errMsg, "Run 'gh aw add --help'") {
+		t.Errorf("Expected error to use the extension command path, got: %s", errMsg)
+	}
 }
 
 // TestAddCommandWithWorkflow verifies that add command works with a workflow specification
