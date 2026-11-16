@@ -145,6 +145,9 @@ test("jumps to any slide from the dock's full-screen slide map", async ({ page }
   await button.click();
   await expect(dialog).toBeVisible();
   await expect(tiles).toHaveCount(TOTAL);
+  // a column's examples are stacked below its pattern tile
+  const kids = dialog.getByRole("group", { name: "Daily Unsloppers examples" });
+  await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${slideNo("Repo Assist")}:`) })).toBeVisible();
   const current = dialog.locator('[aria-current="true"]');
   await expect(current).toHaveAccessibleName(/^Go to slide 3:/);
   await expect(current).toBeFocused();
@@ -197,10 +200,10 @@ test("walks a pattern's column of examples with up/down and hints at it from the
   const count = page.locator(CURRENT);
   const vnb = page.locator(".vnb");
   const head = slideNo("Daily Unsloppers");
-  const first = slideNo("Research · Assign · Observe");
+  const first = slideNo("Repo Assist");
   const last = slideNo("Personas · Probe · Patch");
   const n = last - head;
-  await page.goto(`/gh-aw/cracktro/#${slideNo("Repo Assist")}`);
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Issues as intent")}`);
   await expect(vnb).toBeHidden();
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(head));
@@ -209,7 +212,7 @@ test("walks a pattern's column of examples with up/down and hints at it from the
   await expect(vnb).toHaveText(`${n}`);
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(first));
-  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Research · Assign · Observe");
+  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Repo Assist");
   await expect(vnb).toHaveText(`1/${n}`);
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(head));

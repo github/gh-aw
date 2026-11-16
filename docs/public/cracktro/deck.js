@@ -2281,17 +2281,20 @@
   .smp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
   .smp-row { display: grid; grid-template-columns: 170px 1fr; gap: 12px; align-items: start; }
   .smp-l { font: 600 13px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); padding-top: 10px; }
-  .smp-tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .smp-tiles { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
+  .smp-col { display: flex; flex-direction: column; gap: 6px; }
+  .smp-kids { display: flex; flex-direction: column; gap: 4px; margin-left: 12px; padding-left: 10px; border-left: 2px dotted var(--c); }
   .smp-t { width: 168px; min-height: 58px; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 10px; border: 1px solid #3d444d;
     border-left: 3px solid var(--c); border-radius: 8px; background: #151b23; color: inherit; cursor: pointer; font: 500 13px/1.3 "Mona Sans", sans-serif; }
-  .smp-t b { font: 600 11px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
+  .smp-t b { display: flex; font: 600 11px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
+  .smp-t b i { margin-left: auto; font-style: normal; color: var(--c); }
   .smp-t span { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .smp-t.hd { background: transparent; border-style: dashed; border-left-style: solid; }
-  .smp-t.sub { width: 132px; min-height: 48px; font-size: 12px; border-left-style: dotted; opacity: .85; }
+  .smp-t.sub { width: 146px; min-height: 44px; font-size: 12px; border-left-style: dotted; opacity: .85; }
   .smp-t:hover { background: #1f2630; border-color: #9198a1; border-left-color: var(--c); }
   .smp-t.on { box-shadow: 0 0 0 2px var(--c); }
   .smp-t:focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
-  @media (max-width: 640px) { .smp-row { grid-template-columns: 1fr; gap: 6px; } .smp-l { padding-top: 0; } .smp-t { width: calc(50% - 3px); } }
+  @media (max-width: 640px) { .smp-row { grid-template-columns: 1fr; gap: 6px; } .smp-l { padding-top: 0; } .smp-t, .smp-col { width: calc(50% - 3px); } .smp-col .smp-t { width: 100%; } .smp-col .smp-t.sub { width: auto; } }
   body.light .smp { background: #f6f8faf5; color: #1f2328; }
   body.light .smp-t { background: #ffffff; border-color: #9ea7b3; border-left-color: var(--c); }
   body.light .smp-t.hd { background: transparent; }
@@ -5483,6 +5486,7 @@
     resetIndex();
     slides.push({
       group: "process",
+      under: "unsloppers",
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
       enter() {
@@ -5832,6 +5836,7 @@
     const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
     slides.push({
       group: "process",
+      under: "unsloppers",
       notes:
         "Merge fast, unslop daily. The two lanes are an illustrative, synthetic timeline; the panel at the top right is measured on gh-aw's merged pull requests over a 30-day window, 15 October to 13 November 2026, and the counts along the bottom are all-time merged unslopper pull requests from 26 September 2025 to 12 November 2026; both are a snapshot of 14 November 2026. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. In the illustration the feature ships a slice at a time, so its percentage climbs with every merge and it is complete while the polished lane is still in review. The measured panel shows what that looks like: in the thirty days from 15 October to 13 November 2026, 1,263 pull requests merged, about 42 a day, with a median of 166 lines changed and a median of one hour fifty-four minutes from opening to merge; the bars are merged pull requests per day. The slop that gets through is eaten by background unsloppers, daily workflows that open their own small clean-up pull requests. The purple dots mark days on which an unslopper pull request merged: 25 of those 30 days. Along the bottom are their all-time merged clean-up pull requests, counted by title prefix: jsweep 144, dead code remover 117, code simplifier 89, tidy 66, daily file diet 7 and duplicate code detector 4, which mostly files issues instead. Together that is 427 merged clean-up pull requests, adding 34,691 lines and removing 44,700, on 261 different days between 26 September 2025 and 12 November 2026. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
       enter() {
@@ -5918,7 +5923,7 @@
     });
   }
 
-  // Speak → Map → Grep: a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
+  // Speech To Agent (speak → map → grep): a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
   {
     resetIndex();
     const VW = 1800,
@@ -6004,7 +6009,7 @@
     svg.setAttribute("role", "img");
     svg.setAttribute(
       "aria-label",
-      "Speak, map, grep: a misheard speech-to-text phrase is mapped by the DICTATION.md glossary to the exact identifier, the agent greps it and finds matches; a daily namer agent proposes clearer API names, a weekly dictation agent opens a pull request adding them to the glossary, and the maintainer reviews and merges it"
+      "Speech To Agent: a misheard speech-to-text phrase is mapped by the DICTATION.md glossary to the exact identifier, the agent greps it and finds matches; a daily namer agent proposes clearer API names, a weekly dictation agent opens a pull request adding them to the glossary, and the maintainer reviews and merges it"
     );
     svg.style.setProperty("--c", "#4493f8");
     svg.innerHTML = g;
@@ -6045,7 +6050,7 @@
     slides.push({
       group: "process",
       notes:
-        "Speak, map, grep: talking to agents instead of typing. The run is illustrative; the phrases and corrections come from gh-aw's real DICTATION.md, while the grep counts and the renamed functions are synthetic. When you dictate a prompt, speech-to-text hears words, not identifiers: you say cache-memory and it writes cash memory, you say Dependabot and it writes depend a bot. Agents search the codebase with grep, which matches exact tokens, so cash memory finds nothing. DICTATION.md is a prompt you paste into your voice dictation app: a project glossary plus a list of spoken forms and the exact identifiers they map to, hyphens, dots and casing included. The app's model rewrites the transcript, the agent receives cache-memory, and grep lands on every definition and call site. Two agentic workflows keep it true. A daily namer agent reviews one package at a time and proposes renames so functions say what they do, procSO becomes parseSafeOutputs, which is also how you would say it out loud; Copilot implements the rename. A weekly dictation prompt agent re-reads the docs and code, extracts the vocabulary and opens a pull request that adds the new terms to DICTATION.md; the maintainer, the same person who dictates, reviews and merges it, so the glossary only holds words they actually say. Names you can say map to names you can grep.",
+        "Speech To Agent: talking to agents instead of typing. The run is illustrative; the phrases and corrections come from gh-aw's real DICTATION.md, while the grep counts and the renamed functions are synthetic. When you dictate a prompt, speech-to-text hears words, not identifiers: you say cache-memory and it writes cash memory, you say Dependabot and it writes depend a bot. Agents search the codebase with grep, which matches exact tokens, so cash memory finds nothing. DICTATION.md is a prompt you paste into your voice dictation app: a project glossary plus a list of spoken forms and the exact identifiers they map to, hyphens, dots and casing included. The app's model rewrites the transcript, the agent receives cache-memory, and grep lands on every definition and call site. Two agentic workflows keep it true. A daily namer agent reviews one package at a time and proposes renames so functions say what they do, procSO becomes parseSafeOutputs, which is also how you would say it out loud; Copilot implements the rename. A weekly dictation prompt agent re-reads the docs and code, extracts the vocabulary and opens a pull request that adds the new terms to DICTATION.md; the maintainer, the same person who dictates, reviews and merges it, so the glossary only holds words they actually say. Names you can say map to names you can grep.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -6092,7 +6097,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Dictate to agents · say the word, hit the symbol"), h("h2", {}, letters("Speak · Map · "), letters("Grep", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Dictate to agents · say the word, hit the symbol"), h("h2", {}, letters("Speech To "), letters("Agent", "l-grad"))),
         svg,
         h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["DICTATION.md", "dictation-prompt", "daily-function-namer"].map(n => h("span", {}, n)))
       ),
@@ -10089,6 +10094,7 @@
     };
     slides.push({
       group: "engineering",
+      key: "skills",
       notes:
         "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency.",
       enter() {
@@ -10353,6 +10359,7 @@
     };
     slides.push({
       group: "engineering",
+      under: "skills",
       notes:
         "Skills in review, measured: gh-aw's Matt Pocock Skills Reviewer on gh-aw's own pull requests, from the day it was added, 4 May 2026, to 15 November 2026, snapshot 16 November. Of 11,961 pull requests created in that window, 3,877 got a review from it: 3,954 reviews and 7,696 inline comments, a median of two per commented pull request. Every comment starts with the skill it applied, so the chart can stack weekly comments by skill. Test-driven development leads with 3,220. The history is visible in the bars: a triage sub-agent in May, comments that ask Copilot to fix them from late June, then on 29 and 30 June the upstream skills were renamed and gh-aw shipped pinned skills front matter, so diagnose and zoom-out give way to diagnosing-bugs and codebase-design. Afterwards: authors replied to 31 percent of comments, Copilot to 25 percent, the code under 27 percent changed, 14 percent were resolved, and 46 percent saw at least one of these. Every run also records skill events in its unified session, exported to OpenTelemetry through Sentry and Grafana. Of 419 run sessions from 6 to 15 November, 418 carry a skill inventory listing the five installed skills, each with its sha256 digest; skill conflict twice flagged a reporting skill installed in two scopes; and skill invoked fired only once, because this agent mostly reads its skill files with bash, so the comment tag is the reliable usage signal.",
       enter() {
@@ -18723,7 +18730,7 @@
       "Generate an agentic workflow that runs daily and update docs with features from the last 24h\n\n- scan merged PRs and code changes from the last 24h\n- summarize features added, removed, modified\n- for each missing docs feature, update docs following the documenation instructions (tell LLM to load th instructions file)",
     ],
     "Hunt · Falsify · Fix": ["daily-vulnhunter-scan", "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox", "Create a daily agentic workflow that runs capitalone/VulnHunter on the sandbox"],
-    "Speak · Map · Grep": [
+    "Speech To Agent": [
       "dictation-prompt",
       "Create an agentic workflow … generates a dictation prompt … designed to rephrase text generated by text-to-speech recognition",
       "Create an agentic workflow that runs on workflow dispatch and generates a dictation prompt.\n\nThe prompt is designed to rephrase text generated by text-to-speech recognition and optimize it for the context of this repository.\n\n- scan the repository and extract a 100 words glossary specific to the project, on top of known technical terms for software engineering. Provide glossary in prompt (no descriptions)\n- fix ambiguous sentences by correcting the terminology to use the glossary or technical/software development.\n- rephrase the tone to create a planning Agentic prompt that will be used on GitHub copilot agentic tasks.\n\nWrite results in a pull request to .github/instructions/dictation.instructions.md",
@@ -20191,6 +20198,7 @@
   // ---------- slide map ----------
   // G (or the dock's map button) opens a full-screen overview: one row per band, one tile per slide, the current one ringed.
   // Click or Enter opens a slide; Left/Right step in slide order, Up/Down move to the nearest tile on the line above/below.
+  // A column (a pattern slide with `kids`) is drawn as a vertical stack: the pattern tile, then its examples on a dotted tree line.
   const smpBody = h("div", { class: "smp-body" });
   const smp = h(
     "dialog",
@@ -20205,19 +20213,26 @@
     smpBody.replaceChildren(
       ...rows.map(r => {
         const c = THEME[r.group].accent[0],
-          tiles = slides
+          all = slides
             .filter(s => s.band === slides[r.start].band)
             .map(s => {
               const n = slides.indexOf(s),
                 t = h(
                   "button",
                   { class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || BANDS[r.group]?.[0] || SOLO[r.group]}`, onclick: () => (smp.close(), go(n)) },
-                  h("b", {}, String(n + 1).padStart(2, "0")),
+                  h("b", {}, String(n + 1).padStart(2, "0"), s.kids ? h("i", { title: `${s.kids.length} examples below` }, `↓${s.kids.length}`) : null),
                   h("span", {}, label(s) || BANDS[r.group]?.[0] || SOLO[r.group])
                 );
               smpTiles[n] = t;
               return t;
             });
+        // a column (pattern + its examples) stacks vertically, the examples hanging below the pattern tile
+        const tiles = all.flatMap(t => {
+            const s = slides[smpTiles.indexOf(t)];
+            if (s.parent) return [];
+            if (!s.kids) return [t];
+            return [h("div", { class: "smp-col" }, t, h("div", { class: "smp-kids", role: "group", "aria-label": `${label(s)} examples` }, s.kids.map(k => smpTiles[slides.indexOf(k)])))];
+          });
         return h("section", { class: "smp-row", "--c": c }, h("div", { class: "smp-l" }, BANDS[r.group]?.[0] || SOLO[r.group]), h("div", { class: "smp-tiles" }, tiles));
       })
     );

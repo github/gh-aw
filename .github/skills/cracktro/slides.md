@@ -35,8 +35,9 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Pull Request Review² | illustrative | Marking a pull request ready starts agentic reviewers, and Copilot is nudged to fix their findings so the human reviewer sees a clean pull request. |
 | Decide · Draft · Record | illustrative | When a ready pull request carries an architecture decision with no record, an agent drafts an ADR that people finalize and merge with the code, and later agents read it to learn why the feature works that way. |
 | Issues as intent | illustrative | Contributors run a debug agent on their own failures and file anonymized issues that state intent, which maintainers plan and assign to Copilot. |
-| Repo Assist | illustrative | A scheduled assistant picks maintenance tasks such as triage and stale pull requests, a maintainer reviews every result, and backlogs shrink. |
 | Daily Unsloppers | illustrative | Scheduled research agents find problems such as duplicated code, assign them to Copilot, and developers refine the resulting pull requests. |
+| Repo Assist | illustrative | A scheduled assistant picks maintenance tasks such as triage and stale pull requests, a maintainer reviews every result, and backlogs shrink. |
+| Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily unsloppers clean up, instead of polishing each one through endless nit rounds. |
 | Research · Assign · Observe | illustrative | A daily benchmark agent files performance regressions, Copilot fixes them, and the next run observes the result to close the loop. |
 | Hunt · Falsify · Fix | illustrative | A daily agent hunts for vulnerabilities in deterministically scoped, rotating files, discards every lead it can falsify, and files only the survivors as issues that Copilot fixes. |
 | Query · Ask · Grow | illustrative | An expert DevOps agent read live telemetry through observability MCP servers and filed the most important instrumentation gap each day, growing OpenTelemetry support. |
@@ -50,8 +51,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Multi-device tester | illustrative | A daily agent browses the documentation on phone, tablet and desktop viewports and files what breaks; Copilot fixes it, a developer reviews the pull request and the next run re-tests. |
 | Findings that land | illustrative | Docs auditor agents file what they find as issues; the findings handed to Copilot as one checkable defect get fixed by merged pull requests, while unassigned rolling reports mostly expire. |
 | Personas · Probe · Patch | illustrative | A daily agent role-plays software personas asking the workflow-authoring agent for automations, scores its answers, and re-runs one on a truncated guidance prefix to find rules the cut hides; Copilot moves them up and the next run re-scores. |
-| Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily unsloppers clean up, instead of polishing each one through endless nit rounds. |
-| Speak · Map · Grep | illustrative | A dictation glossary maps misheard speech-to-text phrases to exact identifiers, so spoken prompts produce terms agents can grep. |
+| Speech To Agent | illustrative | A dictation glossary maps misheard speech-to-text phrases to exact identifiers, so spoken prompts produce terms agents can grep. |
 | Scan · Fix · Learn | illustrative | The .NET runtime team's CI health loop: a scanner files known build errors, a fixer attempts fixes, and a feedback agent tunes both. |
 | For PMs | illustrative | Agentic workflows also serve product managers: an existing team habit triggers an agent, which leaves an artifact for a human to decide on. |
 | If every PR needs deep human review, you don’t trust your process. | illustrative | Trust the process: if every pull request needs deep human review, improve checks, agent reviewers and tests until a skim is enough. |
