@@ -229,7 +229,7 @@ func loadOutcomeRunData(ctx context.Context, runs []ExperimentRunRecord, windows
 	return result
 }
 
-func loadOutcomeObservationSetsForAnalysis(details *ExperimentDetails, frontmatter experimentFrontmatterResult, repoOverride string) (map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, func(), error) {
+func loadOutcomeObservationSetsForAnalysis(ctx context.Context, details *ExperimentDetails, frontmatter experimentFrontmatterResult, repoOverride string) (map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, func(), error) {
 	primary, guardrails, windows, automatic, err := resolveOutcomeMetricReferences(frontmatter.ExperimentConfigs)
 	if err != nil || len(windows) == 0 {
 		return nil, nil, nil, func() {}, err
@@ -245,7 +245,7 @@ func loadOutcomeObservationSetsForAnalysis(details *ExperimentDetails, frontmatt
 	cleanup := func() { _ = os.RemoveAll(cacheDir) }
 	now := time.Now()
 	source := &githubOutcomeRunSource{artifacts: newGitHubGraderRunArtifactSource(cacheDir, repoOverride)}
-	data := loadOutcomeRunData(context.Background(), details.Runs, windows, automatic, now, source)
+	data := loadOutcomeRunData(ctx, details.Runs, windows, automatic, now, source)
 	windowInfo := make(map[string]*OutcomeWindowInfo, len(windows))
 	for name := range automatic {
 		info := estimateOutcomeWindowInfo(details.Runs, map[string]struct{}{name: {}}, data, now)

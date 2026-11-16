@@ -348,7 +348,7 @@ func TestOutcomeMetricsRequireOptIn(t *testing.T) {
 			frontmatter := experimentFrontmatterResult{
 				ExperimentConfigs: map[string]*workflow.ExperimentConfig{"prompt": tc.config},
 			}
-			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(&ExperimentDetails{}, frontmatter, "acme/repo", false)
+			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(t.Context(), &ExperimentDetails{}, frontmatter, "acme/repo", false)
 			defer cleanup()
 			require.ErrorContains(t, err, "require --outcome")
 			assert.Contains(t, err.Error(), "additional GitHub API requests")
@@ -364,7 +364,7 @@ func TestOutcomeOptInWithoutOutcomeMetrics(t *testing.T) {
 		t.Run(strconv.FormatBool(outcome), func(t *testing.T) {
 			calls := installOutcomeAPIFixture(t, "exit 1\n")
 			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(
-				&ExperimentDetails{}, experimentFrontmatterResult{}, "acme/repo", outcome,
+				t.Context(), &ExperimentDetails{}, experimentFrontmatterResult{}, "acme/repo", outcome,
 			)
 			defer cleanup()
 			require.NoError(t, err)
@@ -393,7 +393,7 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}},
 		},
 	}}
-	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(details, frontmatter, "acme/repo", true)
+	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(t.Context(), details, frontmatter, "acme/repo", true)
 	require.NoError(t, err)
 	defer cleanup()
 	require.Len(t, bundle.Primary["prompt"].ByVariant["control"], 1)
