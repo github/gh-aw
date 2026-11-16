@@ -245,6 +245,7 @@ func Default() *Runner {
 		CheckoutModeRule(),
 		ForkAssociationRule(),
 		PullRequestTargetRolesRule(),
+		UntrustedRolesDetectionRule(),
 		SafeOutputShellExpansionRule(),
 		FirewallSSLBumpRule(),
 		CustomJobDetectionRule(),
