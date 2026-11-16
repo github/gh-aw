@@ -73,6 +73,8 @@ or a replacement for sandbox, credential, retry, budget, or publication
 controls. Section 7.11 specifies this compiler/runtime boundary and its
 residual semantic-evidence risks.
 
+### 3.1 Externally Documented Incidents
+
 An adversary may also intercept network traffic while possessing a formerly trusted intermediate CA private key, as in the [October 2026 eMudhra compromise](https://emudhra.we-have-a-problem.com). Such an adversary can impersonate an allowlisted HTTPS service to an unpatched client and replace both an executable and an unsigned checksum served beside it. CTR-011 authorizes destinations; it does not authenticate their operators or attest client distrust updates. CTR-002 action pins and CTR-016 manifest checks likewise do not establish remote TLS identity.
 
 The [November 2026 Depi Security Codex disclosure](https://depi.security/blog/20261111-backdooring-codex/) chained an anyone-can-trigger issue workflow into release compromise. The steps were: a prompt injection in an issue body, shell execution inside the agent sandbox, and an escape through the runner's CoreCLR debug pipes and diagnostic socket in the host temp directory. The agent then read `ACTIONS_RUNTIME_TOKEN` and `GITHUB_TOKEN` from runner process memory and leaked them through logs. The stolen runtime token was used outside the run to write an Actions cache entry with a predictable key, which a privileged release workflow restored. In gh-aw terms, the entry point is `on.roles: all` with an untrusted trigger. CTR-005's `untrusted-roles-detection` subset (Section 7.4) rejects that combination in strict mode when threat detection is disabled, and recommends the NVX microVM runtime. The remaining steps are runtime and platform boundaries that compilation cannot establish:
@@ -877,7 +879,7 @@ A test ID that is deprecated under Section 5.4 MUST remain listed in Section 8.1
 - GitHub Actions syntax and permissions documentation
 - gh-aw security architecture and safe-output specifications
 - zizmor maintainers and contributors: [zizmor](https://github.com/zizmorcore/zizmor), [Audit Rules](https://docs.zizmor.sh/audits/), and [MIT License](https://github.com/zizmorcore/zizmor/blob/main/LICENSE) (informative upstream attribution for selected AST checks)
-- Depi Security: [Backdooring the next release of Codex through GitHub Action pipeline exploit chaining](https://depi.security/blog/20261111-backdooring-codex/) (November 2026; informative incident record for Section 3)
+- Depi Security: [Backdooring the next release of Codex through GitHub Action pipeline exploit chaining](https://depi.security/blog/20261111-backdooring-codex/) (November 2026; informative incident record for Section 3.1)
 
 ## 10. Change Log
 
