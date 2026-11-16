@@ -31,15 +31,16 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | 18 Pull Request Review² | `refresh/pr-review-squared.md` |
 | 21 Daily Unsloppers | `refresh/daily-unsloppers.md` |
 | 22 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
-| 23 Research · Assign · Observe | `refresh/research-assign-observe.md` |
-| 24 Hunt · Falsify · Fix | `refresh/hunt-falsify-fix.md` |
-| 27 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
-| 29 Spec · Model · Test | `refresh/spec-model-test.md` |
-| 31 Decide · Draft · Record | `refresh/decide-draft-record.md` |
-| 32 Spec-driven testing | `refresh/spec-driven-testing.md` |
-| 33 Docs that heal | `refresh/docs-that-heal.md` |
-| 34 Multi-device tester | `refresh/multi-device-tester.md` |
-| 35 Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
-| 37 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
-| 58 Skills in review | `refresh/skills-in-review.md` |
+| 23 Issue Monster | `refresh/issue-monster.md` |
+| 24 Research · Assign · Observe | `refresh/research-assign-observe.md` |
+| 25 Hunt · Falsify · Fix | `refresh/hunt-falsify-fix.md` |
+| 28 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
+| 30 Spec · Model · Test | `refresh/spec-model-test.md` |
+| 32 Decide · Draft · Record | `refresh/decide-draft-record.md` |
+| 33 Spec-driven testing | `refresh/spec-driven-testing.md` |
+| 34 Docs that heal | `refresh/docs-that-heal.md` |
+| 35 Multi-device tester | `refresh/multi-device-tester.md` |
+| 36 Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
+| 38 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+| 59 Skills in review | `refresh/skills-in-review.md` |
 
