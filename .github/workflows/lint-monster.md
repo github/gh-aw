@@ -24,6 +24,8 @@ concurrency:
   cancel-in-progress: false
   queue: max
 timeout-minutes: 45
+runtimes:
+  go: {}
 tools:
   cli-proxy: true
   github:
