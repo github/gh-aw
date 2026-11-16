@@ -207,3 +207,79 @@ func TestSpec_PublicAPI_HasSuccessfulDetectionCondition(t *testing.T) {
 	t.Parallel()
 	assert.True(t, aw.HasSuccessfulDetectionCondition(""), "an empty job condition must be considered successful")
 }
+
+// TestSpec_PublicAPI_FrontmatterResult follows README.md / Public API: callers
+// can obtain the parser's frontmatter result and its source locations.
+// SPEC_AMBIGUITY: prompt whitespace in the shared parser result is unspecified;
+// byte preservation is tested through Parse/Emit, whose contract promises it.
+func TestSpec_PublicAPI_FrontmatterResult(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		source string
+	}{
+		{name: "LF", source: "---\n# authored comment\nname: Example\n---\n\nPrompt.\n"},
+		{name: "CRLF", source: "---\r\n# authored comment\r\nname: Example\r\n---\r\n\r\nPrompt.\r\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			document, err := aw.Parse(tt.source)
+			require.NoError(t, err, "a workflow must parse before requesting its frontmatter result")
+			result := document.FrontmatterResult()
+			require.NotNil(t, result, "a parsed document must expose its frontmatter result")
+			assert.Equal(t, document.Frontmatter, result.Frontmatter, "the parser result must retain the document's frontmatter")
+			assert.Equal(t, document.Location.FrontmatterLines, result.FrontmatterLines, "the parser result must retain original frontmatter lines")
+			assert.Equal(t, document.Location.FrontmatterStart, result.FrontmatterStart, "the parser result must retain the frontmatter source location")
+			assert.Equal(t, document.Location.FieldLines, result.FieldLines, "the parser result must retain field source locations")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_ExecutionBlockFieldPath follows README.md / Public API:
+// FieldPath joins the field name to the execution block's source path.
+// SPEC_AMBIGUITY: the path notation is unspecified; only retention of the block
+// path and field name is asserted.
+func TestSpec_PublicAPI_ExecutionBlockFieldPath(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		path  string
+		field string
+	}{
+		{name: "engine field", path: "engine", field: "steps"},
+		{name: "custom job field", path: "jobs.build", field: "if"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			block := aw.ExecutionBlock{Path: tt.path}
+			path := block.FieldPath(tt.field)
+			assert.Contains(t, path, tt.path, "the joined field path must retain its execution block's source path")
+			assert.Contains(t, path, tt.field, "the joined field path must retain the requested field name")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_IsPreAgentCustomJobRequiresProof follows README.md /
+// Public API: graph edges must prove that a custom job precedes the agent.
+// SPEC_AMBIGUITY: built-in job identifiers and detection-data edges are not
+// specified, so these cases only assert the absence of proof without edges.
+func TestSpec_PublicAPI_IsPreAgentCustomJobRequiresProof(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		graph aw.JobDependencyGraph
+	}{
+		{name: "nil graph"},
+		{name: "empty graph", graph: aw.JobDependencyGraph{}},
+		{name: "isolated custom job", graph: aw.JobDependencyGraph{"prepare": {}}},
+		{name: "disconnected custom jobs", graph: aw.JobDependencyGraph{"prepare": {}, "check": {}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.False(t, tt.graph.IsPreAgentCustomJob("prepare"), "a graph without edges cannot prove a custom job precedes the agent")
+		})
+	}
+}
