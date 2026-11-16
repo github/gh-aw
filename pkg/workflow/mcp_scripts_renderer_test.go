@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -60,11 +61,25 @@ func TestMCPScriptsPerToolEnvironmentBindings(t *testing.T) {
 	if mcpScriptEnvBindingName("a-b", "C") == mcpScriptEnvBindingName("a_b", "C") ||
 		mcpScriptEnvBindingName("a", "b_c") == mcpScriptEnvBindingName("a_b", "c") ||
 		mcpScriptEnvBindingName("a", "B_C") == mcpScriptEnvBindingName("a-b", "C") ||
-		mcpScriptEnvBindingName("a", "Key") == mcpScriptEnvBindingName("a", "KEY") {
-		t.Fatal("binding names must not collide after normalization or joining")
+		mcpScriptEnvBindingName("a", "Key") == mcpScriptEnvBindingName("a", "KEY") ||
+		mcpScriptEnvBindingName("a", "a") == mcpScriptEnvBindingName("a", "xA") ||
+		mcpScriptEnvBindingName("a", "a") == mcpScriptEnvBindingName("a", ".") {
+		t.Fatal("binding names must not collide after normalization, escaping, or joining")
 	}
-	if got := mcpScriptEnvBindingName("github-pr-query", "GH_TOKEN"); got != "GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GH_TOKEN" {
-		t.Fatalf("binding name must be readable, got %s", got)
+	hexLikeRun := regexp.MustCompile(`[0-9A-Fa-f]{8,}`)
+	for _, tc := range []struct{ tool, name, want string }{
+		{"github-pr-query", "GH_TOKEN", "GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GH_TOKEN"},
+		{"a", "some_name", "GH_AW_MCP_SCRIPTS_ENV_1_A_xSxOxMxE_xNxAxMxE"},
+		{"a", "A.B", "GH_AW_MCP_SCRIPTS_ENV_1_A_Ax046B"},
+		{"list_label", "GH_TOKEN", "GH_AW_MCP_SCRIPTS_ENV_13_LISTx095LABEL_GH_TOKEN"},
+	} {
+		got := mcpScriptEnvBindingName(tc.tool, tc.name)
+		if got != tc.want {
+			t.Errorf("mcpScriptEnvBindingName(%q, %q) = %s, want %s", tc.tool, tc.name, got, tc.want)
+		}
+		if hexLikeRun.MatchString(got) {
+			t.Errorf("binding name %s contains a hex-like run", got)
+		}
 	}
 }
 

@@ -15,7 +15,7 @@ The required boundary is least-privilege environment inheritance for co-hosted t
 
 ### Decision
 
-The compiler assigns every `(tool name, variable name)` pair a distinct transport variable, `GH_AW_MCP_SCRIPTS_ENV_<len>_<TOOL>_<NAME>`. The generated tools manifest maps tool-local names to those references, and the MCP scripts server startup environment supplies the values. Each component is escaped injectively (tool names map `a-z` to `A-Z` and `-` to `_`; variable names keep `A-Z`, `0-9` and `_`; any other byte becomes `x<HH>`), and the encoded tool length prefix makes the join unambiguous. This preserves distinct pairs, including names that would collide after sanitization, while avoiding long hexadecimal identifiers that secret scanners flag as passwords.
+The compiler assigns every `(tool name, variable name)` pair a distinct transport variable, `GH_AW_MCP_SCRIPTS_ENV_<hex(tool)>_<hex(name)>`. The generated tools manifest maps tool-local names to those references, and the MCP scripts server startup environment supplies the values. Encoding both components separately preserves distinct pairs, including names that would collide after sanitization.
 
 At invocation, each language handler receives a freshly built environment containing an explicit runtime allowlist plus only that tool's declared bindings. Runtime entries preserve interpreter lookup, home and temporary directories, locale, workspace location, and supported toolchain paths. Explicit bindings take precedence over allowlisted defaults; missing references fail before handler execution. The child receives tool-local names, not compiler-generated transport names.
 
@@ -56,6 +56,18 @@ Prefix variables with a sanitized tool name (e.g. uppercased, non-alphanumerics 
 - The shared server still holds all tool transport values. This is an environment-inheritance boundary only: handlers and installers remain trusted code on the runner host, with shared filesystem and network access. It does not prevent reading credentials from accessible files, inspecting other processes where host permissions permit, or a tool returning its own secret in output.
 - Transport variable names never reach the child process; only the tool-declared names do.
 - The [MCP scripts reference](../src/content/docs/reference/mcp-scripts.md) and [specification](../src/content/docs/specs/mcp-scripts-specification.md) describe the per-tool binding contract.
+
+## Amendment (2026-11-15): readable transport variable names
+
+PR [#78184](https://github.com/github/gh-aw/pull/78184) found that GitHub secret scanning flagged the long hexadecimal transport names in compiled lock files as passwords (GH013), blocking pushes.
+
+**Decision**: Transport variables are now named `GH_AW_MCP_SCRIPTS_ENV_<len>_<TOOL>_<NAME>`, where `<len>` is the length of the encoded tool component. Both components use `[A-Z0-9_x]`, with lowercase `x` reserved as the escape marker:
+
+- Tool names map `a-z` to `A-Z`, `-` to `_`, and keep `0-9`.
+- Variable names keep `A-Z`, `0-9`, and `_`, and encode a lowercase letter as `x` plus its uppercase form (`some_name` becomes `xSxOxMxE_xNxAxMxE`).
+- Every other byte becomes `x` plus its three-digit decimal value (`.` becomes `x046`; `_` in a tool name becomes `x095`).
+
+After `x`, an uppercase letter or exactly three digits follows, so each component decodes uniquely, and the length prefix makes the join unambiguous. The encoding therefore remains injective, which was the reason for rejecting Alternative 3, while common names stay readable and escapes do not form long hex-like runs. This supersedes the hex encoding in the Decision and the opaque-name consequence.
 
 ---
 

@@ -989,7 +989,7 @@ jobs:
         # runner-guard:ignore RGS-018 -- writes first-party mcp-scripts tools.json manifest and mcp-server.cjs shim generated verbatim from the gh-aw compiler template, not an attacker-controlled dropper.
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_ec3ce450311aabcc_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_90e10584c5ff41ba_EOF'
           {
             "serverName": "mcpscripts",
             "version": "1.0.0",
@@ -1029,7 +1029,7 @@ jobs:
                 },
                 "handler": "list_label.sh",
                 "env": {
-                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_12_LISTx5FLABEL_GH_TOKEN"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_13_LISTx095LABEL_GH_TOKEN"
                 },
                 "timeout": 60
               },
@@ -1063,13 +1063,13 @@ jobs:
                 },
                 "handler": "list_workflows.sh",
                 "env": {
-                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_16_LISTx5FWORKFLOWS_GH_TOKEN"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_17_LISTx095WORKFLOWS_GH_TOKEN"
                 },
                 "timeout": 60
               }
             ]
           }
-          GH_AW_MCP_SCRIPTS_TOOLS_ec3ce450311aabcc_EOF
+          GH_AW_MCP_SCRIPTS_TOOLS_90e10584c5ff41ba_EOF
           cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF'
             const path = require("path");
             const { startHttpServer } = require("./mcp_scripts_mcp_server_http.cjs");
@@ -1225,8 +1225,8 @@ jobs:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}
-          GH_AW_MCP_SCRIPTS_ENV_12_LISTx5FLABEL_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_MCP_SCRIPTS_ENV_16_LISTx5FWORKFLOWS_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_13_LISTx095LABEL_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_17_LISTx095WORKFLOWS_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Environment variables are set above to prevent template injection
           export DEBUG
