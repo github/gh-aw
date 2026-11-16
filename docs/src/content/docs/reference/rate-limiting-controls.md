@@ -111,7 +111,7 @@ Configure environments in repository Settings → Environments, add reviewers, t
 
 ## Rate Limiting Per User
 
-The `user-rate-limit` frontmatter field prevents users from triggering workflows too frequently:
+`user-rate-limit` is experimental; `gh aw compile` emits an experimental feature warning when a workflow uses it. The field prevents users from triggering workflows too frequently:
 
 ```yaml wrap
 user-rate-limit:

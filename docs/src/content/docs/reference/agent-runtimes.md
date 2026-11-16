@@ -77,7 +77,7 @@ This profile runs AWF with the host privileges required for legacy iptables netw
 
 ## Cloud Hypervisor (preview)
 
-Cloud Hypervisor runs the agent in a KVM-backed microVM. It is supported only on GitHub-hosted Ubuntu x86_64 runners with `/dev/kvm`.
+Cloud Hypervisor runs the agent in a KVM-backed microVM. The microVM runtimes are experimental. It is supported only on GitHub-hosted Ubuntu x86_64 runners with `/dev/kvm`.
 
 ```aw wrap
 ---
