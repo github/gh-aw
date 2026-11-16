@@ -181,10 +181,11 @@ exec /bin/rm "$@"`
     expect(result.calls).not.toContain("logs awmg-cli-proxy");
   });
 
-  it("trusts Copilot review comments without disabling integrity filtering", () => {
+  it("trusts Copilot reviews and agentic autofix PRs without disabling integrity filtering", () => {
     const result = runProxy({ ready: true });
     expect(result.status).toBe(0);
-    expect(result.calls).toContain("--trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot,copilot-pull-request-reviewer");
+    // REST reports bot logins with [bot]; GraphQL author.login omits it.
+    expect(result.calls).toContain("--trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot,copilot-pull-request-reviewer,github-agentic-autofix[bot],github-agentic-autofix\n");
     expect(result.calls).toContain("--guards-mode filter");
   });
 

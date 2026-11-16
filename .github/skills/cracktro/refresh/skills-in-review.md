@@ -16,7 +16,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
 
 ## 1. Slide
 
-- Marker: `// Skills in review:` (`grep -n "// Skills in review:" docs/public/cracktro/deck.js`). CSS prefix `sir-`. Group `engineering`. Row 54 in `slides.md` (Notes empty: fully measured).
+- Marker: `// Skills in review:` (`grep -n "// Skills in review:" docs/public/cracktro/deck.js`). CSS prefix `sir-`. Group `engineering`. Row 55 in `slides.md` (Notes empty: fully measured).
 - Data lives inside that block only:
   1. `TAGS`: `[tag, colour, comments, retired]`; order is the stacking order of `WEEKS`.
   2. `WEEKS`: one row per week starting on the window start (Monday 4 May), values in `TAGS` order (`other` = everything else).
@@ -83,7 +83,7 @@ Use the actual run dates (`run.json` `createdAt`) for the window text, not the r
 ```bash
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # async
-# browser canvas: http://127.0.0.1:4329/cracktro/#54, wait ~5 s for the sweep, screenshot .sir-svg
+# browser canvas: http://127.0.0.1:4329/cracktro/#55, wait ~5 s for the sweep, screenshot .sir-svg
 grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code'   # must be empty
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```

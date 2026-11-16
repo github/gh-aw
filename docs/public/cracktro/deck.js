@@ -734,6 +734,27 @@
   @keyframes dhm-up { from { transform: scaleY(0); } }
   .dhm-tl .u { fill: #3fb950; } .dhm-tl .h { fill: #7ee78799; } .dhm-tl .x { fill: #6e7681; }
   .dhm-cap { position: absolute; left: 470px; top: 1036px; font: 500 14px/1 var(--mono); color: #6e7681; }
+  .mdt-dev { opacity: .35; transition: opacity .4s; } .mdt-dev.on { opacity: 1; }
+  .mdt-frame { fill: #0d1117; stroke: #3d444d; stroke-width: 3; transition: stroke .4s, filter .4s; }
+  .mdt-dev.on .mdt-frame { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .mdt-dev.ok .mdt-frame { stroke: #3fb950; filter: drop-shadow(0 0 14px #238636aa); }
+  .mdt-dev.bad .mdt-frame { stroke: #f85149; filter: drop-shadow(0 0 16px #da363399); }
+  .mdt-stand { fill: #3d444d; }
+  .mdt-hdr { fill: #161b22; } .mdt-logo { fill: #8957e5; } .mdt-hero { fill: #ab7df8; opacity: .75; } .mdt-txt { fill: #30363d; }
+  .mdt-card { fill: #151b23; stroke: #30363d; stroke-width: 1.5; }
+  .mdt-nav { fill: #6e7681; transition: fill .3s, opacity .4s; } .mdt-dev.bad .mdt-nav.ov { fill: #f85149; }
+  .mdt-burger { stroke: #c9d1d9; stroke-width: 3; stroke-linecap: round; transition: opacity .4s; }
+  .mdt-burger.alt { opacity: 0; } .mdt-dev.fixed .mdt-burger.alt { opacity: 1; } .mdt-dev.fixed .mdt-nav { opacity: 0; }
+  .mdt-ov { fill: none; stroke: #f85149; stroke-width: 2; stroke-dasharray: 6 5; opacity: 0; transition: opacity .3s; }
+  .mdt-ov.on { opacity: 1; } .mdt-dev.fixed .mdt-ov { opacity: 0; }
+  .mdt-lbl { fill: #9198a1; font: 600 18px var(--mono); text-anchor: middle; } .mdt-dev.on .mdt-lbl { fill: #e6edf3; }
+  .mdt-b { opacity: 0; transition: opacity .3s; } .mdt-b.on { opacity: 1; }
+  .mdt-b circle { fill: #0d1117; stroke-width: 3; } .mdt-b text { font: 700 22px var(--mono); text-anchor: middle; }
+  .mdt-b.g circle { stroke: #3fb950; filter: drop-shadow(0 0 8px #3fb950); } .mdt-b.g text { fill: #3fb950; }
+  .mdt-b.r circle { stroke: #f85149; filter: drop-shadow(0 0 8px #f85149); } .mdt-b.r text { fill: #f85149; }
+  .mdt-svg .sdd-stamp.g { fill: #3fb950; }
+  .mdm-tl .s { fill: #3fb950; } .mdm-tl .p { fill: #ab7df8; } .mdm-tl .o { fill: #79c0ff; } .mdm-tl .x { fill: #6e7681; }
+  .mdm-tl tspan.s, .mdm-tl tspan.p { font-weight: 700; }
   .dg-svg { left: 110px; top: 280px; width: 1700px; height: 586px; }
   .dg-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dg-svg .mra-l.g { fill: #3fb950; }
   .dg-band { fill: #ffffff06; }
@@ -8071,6 +8092,351 @@
         svg,
         dhm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 14 Nov 2026 · PRs 10 Oct 2025–14 Nov 2026 (400 d) · healer issues 26 Feb–30 Oct 2026 (246 d) · loop illustrative")
+      ),
+    });
+  }
+
+  // Multi-device tester: a daily agent opens the docs on phone, tablet and desktop viewports, files what breaks as one severity report, Copilot fixes it and the next run re-tests
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372,
+      AY = 300,
+      RX = 1280,
+      RW = 360,
+      FX = 1760,
+      FW = 370;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="${cls ? "#238636" : "#8957e5"}"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    };
+    // illustrative viewports: [x, y, w, h, label, card columns, card rows, nav]; the tablet's header links overflow
+    const DEV = [
+      [70, 170, 170, 350, "phone · 390×844", 1, 3, "burger"],
+      [300, 170, 270, 350, "tablet · 768×1024", 2, 2, "overflow"],
+      [650, 170, 560, 315, "desktop · 1920×1080", 3, 2, "links"],
+    ];
+    const page = ([x, y, w, h, , cols, rows, nav]) => {
+      const sx = x + 8,
+        sy = y + 8,
+        sw = w - 16,
+        sh = h - 16;
+      let s = `<rect class="mdt-hdr" x="${sx}" y="${sy}" width="${sw}" height="28" rx="4"/><rect class="mdt-logo" x="${sx + 10}" y="${sy + 7}" width="14" height="14" rx="3"/>`;
+      const burger = cls => [8, 14, 20].map(d => `<line class="mdt-burger ${cls}" x1="${sx + sw - 30}" x2="${sx + sw - 12}" y1="${sy + d}" y2="${sy + d}"/>`).join("");
+      if (nav === "burger") s += burger("");
+      if (nav === "links") for (let i = 0; i < 4; i++) s += `<rect class="mdt-nav" x="${sx + sw - 12 - 36 - i * 44}" y="${sy + 10}" width="36" height="8" rx="4"/>`;
+      if (nav === "overflow") {
+        for (let i = 0; i < 4; i++) s += `<rect class="mdt-nav${450 + i * 44 + 36 > x + w ? " ov" : ""}" x="${450 + i * 44}" y="${sy + 10}" width="36" height="8" rx="4"/>`;
+        s += burger("alt") + `<rect class="mdt-ov" id="mdtOv" x="${x + w - 12}" y="${sy + 2}" width="${450 + 4 * 44 - 8 - (x + w) + 18}" height="24" rx="4"/>`;
+      }
+      s += `<rect class="mdt-hero" x="${sx + 12}" y="${sy + 46}" width="${sw * 0.6}" height="14" rx="4"/>`;
+      s += `<rect class="mdt-txt" x="${sx + 12}" y="${sy + 70}" width="${sw * 0.8}" height="7" rx="3"/><rect class="mdt-txt" x="${sx + 12}" y="${sy + 84}" width="${sw * 0.5}" height="7" rx="3"/>`;
+      const cy = sy + 106,
+        gap = 10,
+        cw = (sw - 24 - gap * (cols - 1)) / cols,
+        ch = (sh - 106 - 12 - gap * (rows - 1)) / rows;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) s += `<rect class="mdt-card" x="${sx + 12 + c * (cw + gap)}" y="${cy + r * (ch + gap)}" width="${cw}" height="${ch}" rx="6"/>`;
+      return s;
+    };
+    // an illustrative, simplified report and fix
+    const PANELS = [
+      [
+        RX,
+        RW,
+        "docs report",
+        "ISSUE",
+        [
+          ["h", "### Results"],
+          ["pass", "● Passed: 9 devices"],
+          ["fail", "● Critical: 1"],
+          ["", "tablet 768×1024:"],
+          ["", "  header links spill"],
+          ["", "  48px past the edge"],
+          ["fn", "→ assign to Copilot"],
+        ],
+      ],
+      [
+        FX,
+        FW,
+        "fix tablet header",
+        "PR",
+        [
+          ["fn", "custom.css"],
+          ["", "  hamburger below"],
+          ["", "- max-width: 767px"],
+          ["add", "+ max-width: 1023px"],
+          ["fn", "mobile-responsive.spec"],
+          ["add", "+ no overflow at 768"],
+          ["pass", "✓ merged"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly]
+    const EDGES = [
+      ["mdtE0", "M124 106 H345", "p", ["daily"], 236, 90],
+      ["mdtE1", `M693 106 H${RX + RW / 2} V${PY - 8}`, "p", ["findings by severity"], 1010, 90],
+      ["mdtE2", `M${RX + RW + 6} ${AY} H${FX - 8}`, "p", ["assign"], 1700, AY - 22],
+      ["mdtE3", `M1800 ${PY + PH + 4} V609`, "p", ["review"], 1858, 586],
+      ["mdtE4", "M1764 645 H435 V572", "g", ["merged · next run re-tests"], 1360, 631],
+    ];
+    let g = `<defs><clipPath id="mdtClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="mdtP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="mdtG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 1250, "BROWSE · 10 VIEWPORTS"],
+      [1250, 1700, "REPORT"],
+      [1700, VW, "FIX"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="mdtLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    DEV.forEach((d, i) => {
+      const [x, y, w, h, label] = d;
+      g += `<g class="mdt-dev" id="mdtD${i}"><rect class="mdt-frame" x="${x}" y="${y}" width="${w}" height="${h}" rx="${i === 2 ? 10 : 22}"/>`;
+      if (i === 2) g += `<rect class="mdt-stand" x="${x + w / 2 - 20}" y="${y + h}" width="40" height="24"/><rect class="mdt-stand" x="${x + w / 2 - 80}" y="${y + h + 24}" width="160" height="8" rx="4"/>`;
+      g += page(d) + `<text class="mdt-lbl" x="${x + w / 2}" y="550">${label}</text>`;
+      g += `<g class="mdt-b g" id="mdtOk${i}"><circle cx="${x + w}" cy="${y}" r="20"/><text x="${x + w}" y="${y + 8}">✓</text></g>`;
+      if (i === 1) g += `<g class="mdt-b r" id="mdtBad1"><circle cx="${x + w}" cy="${y}" r="20"/><text x="${x + w}" y="${y + 8}">✗</text></g>`;
+      g += `</g>`;
+    });
+    g += `<rect class="sdd-scan" id="mdtScan" x="0" y="0" width="0" height="5" rx="2"/>`;
+    g += `<text class="sdd-stamp g" id="mdtStamp" x="930" y="606" text-anchor="middle">noop · 10 of 10 devices passed</text>`;
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([x, w, file, tag, lines], i) => {
+      g += `<g class="sdd-panel" id="mdtP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${w}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + w}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + w - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => (g += `<text class="sdd-ln ${c}" id="mdtL${i}_${j}" x="${x + 22}" y="${PY + 88 + j * 40}">${sp(s)}</text>`));
+      g += `</g>`;
+    });
+    for (const [id, d, c, lab, lx, ly] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mdt${c === "g" ? "G" : "P"})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab[0]}</text>`;
+    }
+    g += `<g class="fm-task" id="mdtSched"><circle cx="88" cy="106" r="32" fill="#8957e5"/>${ico("calendar", 88, 106, 30)}</g>`;
+    g += agent("mdtTester", 520, 106, 300, "Multi-Device Tester") + agent("mdtCopilot", 1960, 106, 200, "Copilot", "g");
+    g += `<g class="fm-task" id="mdtDev"><g class="fm-pill b"><rect x="1800" y="620" width="210" height="50" rx="25"/><text x="${1800 + 18 + 105}" y="653">Developer</text></g>
+      <circle cx="1800" cy="645" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/ducky.jpg" x="1769" y="614" width="62" height="62" clip-path="url(#mdtClip)"/></g>`;
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg mdt-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      scan = $("mdtScan");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const CYC = 18000;
+    let t0 = 0,
+      cyc = -1,
+      ev = [],
+      evI = 0,
+      fly = null,
+      scanning = null;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const off = (id, cls = "on") => $(id).classList.remove(cls);
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("mdtLane0"), on("mdtSched")));
+      flight(500, "mdtE0", 500, "#ab7df8", 0);
+      at(1000, () => (on("mdtTester"), sfx.key(0.6)));
+      DEV.forEach((_, i) => {
+        const s = 1300 + i * 1000;
+        at(s, () => (on(`mdtD${i}`), (scanning = { i, start: s })));
+        at(s + 900, () => {
+          scanning = null;
+          scan.style.opacity = 0;
+          if (i === 1) {
+            on("mdtD1", "bad");
+            on("mdtOv");
+            on("mdtBad1");
+            sfx.omen();
+          } else {
+            on(`mdtD${i}`, "ok");
+            on(`mdtOk${i}`);
+            sfx.pop(2 + i);
+          }
+        });
+      });
+      flight(4500, "mdtE1", 1100, "#ab7df8", 5);
+      at(5600, () => (on("mdtLane1"), on("mdtP0")));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(5800 + j * 230, () => (on(`mdtL0_${j}`), sfx.key(0.5))));
+      at(7500, () => (on("mdtP0", "bad"), sfx.notify()));
+      flight(7800, "mdtE2", 600, "#ab7df8", 6);
+      at(8400, () => (on("mdtLane2"), on("mdtCopilot"), on("mdtP1"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4, 5].forEach(j => at(8700 + j * 300, () => (on(`mdtL1_${j}`), sfx.key(0.5))));
+      at(9500, () => on("mdtL1_2", "gone"));
+      flight(10400, "mdtE3", 500, "#ab7df8", 7);
+      at(10900, () => (on("mdtDev"), sfx.review()));
+      at(11600, () => (on("mdtL1_6"), on("mdtP1", "ok"), sfx.pop(8)));
+      flight(11900, "mdtE4", 1700, "#3fb950", 7);
+      at(13600, () => (on("mdtD1", "fixed"), off("mdtD1", "bad"), off("mdtBad1"), on("mdtOk1"), on("mdtD1", "ok"), off("mdtP0", "bad"), on("mdtP0", "ok"), sfx.pop(9)));
+      at(14100, () => (on("mdtStamp"), sfx.pop(8)));
+    };
+    // measured: every "🔍 Multi-Device Docs Testing Report" issue by day since 7 Dec 2025, coloured by how it closed;
+    // s = merged PR changed the docs site, t = merged PR changed the tester workflow, o = merged PR elsewhere, x = no merged PR
+    const REPORTS = [
+      [0, "t"],
+      [14, "t"],
+      [15, "x"],
+      [24, "s"],
+      [36, "s"],
+      [48, "x"],
+      [51, "s"],
+      [78, "x"],
+      [78, "x"],
+      [98, "s"],
+      [101, "s"],
+      [102, "s"],
+      [103, "x"],
+      [104, "o"],
+      [105, "s"],
+      [106, "s"],
+      [107, "s"],
+      [108, "s"],
+      [109, "s"],
+      [112, "x"],
+      [113, "s"],
+      [116, "s"],
+      [119, "s"],
+      [130, "s"],
+      [134, "s"],
+      [135, "s"],
+      [136, "x"],
+      [137, "s"],
+      [138, "s"],
+      [139, "s"],
+      [140, "s"],
+      [141, "s"],
+      [152, "x"],
+      [193, "x"],
+      [197, "x"],
+      [199, "x"],
+      [200, "x"],
+      [209, "t"],
+      [211, "x"],
+      [217, "s"],
+      [218, "t"],
+      [219, "t"],
+      [222, "t"],
+      [230, "t"],
+      [241, "x"],
+      [243, "s"],
+      [244, "o"],
+      [245, "t"],
+      [258, "s"],
+      [267, "x"],
+      [279, "x"],
+      [287, "x"],
+      [292, "x"],
+      [296, "x"],
+      [324, "x"],
+      [328, "s"],
+      [329, "x"],
+      [331, "s"],
+      [335, "t"],
+      [337, "x"],
+      [343, "s"],
+    ];
+    const CL = { s: ["s", 50], t: ["p", 36], o: ["o", 30], x: ["x", 16] };
+    const TW = 540,
+      TX = d => 10 + (d * (TW - 20)) / 346;
+    let tl = `<text class="t" x="0" y="16">61 REPORTS · <tspan class="s">28 SITE</tspan> · <tspan class="p">9 TESTER</tspan> · 2 OTHER FIXES</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    REPORTS.forEach(([d, s], i) => {
+      const [cls, hh] = CL[s];
+      tl += `<rect class="${cls}" style="--i:${i}" x="${TX(d) - 2}" y="${96 - hh}" width="4" height="${hh}" rx="1"/>`;
+    });
+    [
+      [25, "Jan"],
+      [84, "Mar"],
+      [145, "May"],
+      [206, "Jul"],
+      [268, "Sep"],
+      [329, "Nov"],
+    ].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl mdm-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const mdm = h(
+      "div",
+      { class: "dhm" },
+      h("div", { class: "dhm-k" }, kpi("61", "daily reports", "filed"), kpi("39", "fixed by", ["merged PRs", h("br"), h("i", {}, "35 by Copilot")]), kpi("28", "docs site", "fixes", "g"), kpi("6.5 h", "median", "report → merge")),
+      tlSvg
+    );
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone, .fixed").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone", "fixed"));
+      scan.style.opacity = 0;
+      dot.style.opacity = 0;
+      fly = null;
+      scanning = null;
+      script();
+    };
+    slides.push({
+      group: "process",
+      notes:
+        "Multi-device tester, as gh-aw tests its own documentation site. Every day the Multi-Device Docs Tester workflow builds the docs, starts a preview server inside the sandbox and drives a real browser with the Playwright CLI across ten viewports: four phones, three tablets and three desktops. On each one it checks layout (overflow, truncation, broken grids), accessibility, and interactions such as navigation, search and the responsive header menu. If everything passes it calls noop; otherwise it files one report issue that groups findings by severity, critical first, with the details folded away. Reports expire after two days, so only the ones a maintainer acts on survive: they are assigned to Copilot, whose pull request fixes the site or the tester itself and usually adds a regression test; a developer reviews and merges it, and the next daily run checks the fix. The bottom strip is measured on gh-aw (snapshot 15 November 2026): all 61 daily report issues from the first on 7 December 2025 to 15 November 2026 (343 days). 39 were closed by merged pull requests, 35 of them opened by Copilot: 28 changed the docs site (touch targets, skip links, headings, table overflow, header breakpoints), 9 hardened the tester workflow (browser startup, preview server, navigation selectors) and 2 changed something else. The median from report to merged fix was 6.5 hours. The other 22 closed without a merged fix, 19 of them expiring unaddressed. The devices, report, fix and review in the loop above are an illustrative, simplified example.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (scanning) {
+          const [x, y, w, hh] = DEV[scanning.i],
+            f = Math.min(1, (u - scanning.start) / 900);
+          scan.style.opacity = 1;
+          scan.setAttribute("x", x + 8);
+          scan.setAttribute("width", w - 16);
+          scan.setAttribute("y", y + 8 + f * (hh - 24));
+        }
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every day an agent opens the docs on phones, tablets and desktops, and Copilot fixes what breaks"), h("h2", {}, letters("Multi-device "), letters("tester", "l-grad"))),
+        svg,
+        mdm,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 7 Dec 2025–15 Nov 2026 (343 d) · loop illustrative")
       ),
     });
   }
