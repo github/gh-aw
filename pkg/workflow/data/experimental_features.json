@@ -1,0 +1,192 @@
+{
+  "$comment": "Single source of truth for experimental gh-aw features. compiler_warning is the text after 'Using experimental feature: ' in compiler notices; engine marks a built-in engine whose definition sets experimental: true; docs lists docs pages (site paths) that must state the feature is experimental; docs_group marks pages listed in the docs sidebar Experimental group; cracktro lists talk-deck slides (slides.md headings) that carry the Experimental badge and its exact label. Tests in pkg/workflow and docs/tests/talk.spec.ts enforce every field.",
+  "features": [
+    {
+      "id": "agy-engine",
+      "name": "Agy engine",
+      "engine": "agy",
+      "docs": ["/engines/agy/"],
+      "docs_group": true
+    },
+    {
+      "id": "copilot-dynamic-workflows",
+      "name": "Copilot dynamic workflows",
+      "compiler_warning": "copilot.dynamic-workflows",
+      "docs": ["/reference/engines/copilot/"]
+    },
+    {
+      "id": "rate-limit",
+      "name": "User rate limiting",
+      "compiler_warning": "rate limiting",
+      "docs": ["/reference/rate-limiting-controls/"],
+      "cracktro": [{ "slide": "Cost guardrails", "badge": "user-rate-limit" }]
+    },
+    {
+      "id": "skip-if-decision",
+      "name": "Model-based skip decisions",
+      "compiler_warning": "skip-if-decision",
+      "docs": ["/reference/frontmatter/"],
+      "cracktro": [{ "slide": "Don’t Run the Agent", "badge": "skip-if-decision" }]
+    },
+    {
+      "id": "token-broker",
+      "name": "OIDC token broker",
+      "compiler_warning": "token-broker",
+      "docs": ["/reference/enterprise-configuration/"],
+      "cracktro": [{ "slide": "OIDC token broker", "badge": "deployment-owned broker" }]
+    },
+    {
+      "id": "engine-durable",
+      "name": "Durable execution",
+      "compiler_warning": "engine.durable",
+      "docs": ["/reference/engines/"],
+      "cracktro": [{ "slide": "Durable execution", "badge": "engine.durable" }]
+    },
+    {
+      "id": "gateway-dispatch",
+      "name": "Webhook gateway dispatch",
+      "compiler_warning": "on.gateway-dispatch (approved webhook bridge required)",
+      "docs": ["/reference/webhook-triggers/"],
+      "cracktro": [{ "slide": "Webhook gateway", "badge": "hosted receiver required" }]
+    },
+    {
+      "id": "gateway-dispatch-projects-items",
+      "name": "Webhook gateway Projects v2 item events",
+      "compiler_warning": "on.gateway-dispatch.projects-items (hosted CAO triggers)"
+    },
+    {
+      "id": "gateway-dispatch-code-scanning-alert",
+      "name": "Webhook gateway code scanning alert events",
+      "compiler_warning": "on.gateway-dispatch.code-scanning-alert (hosted CAO triggers)"
+    },
+    {
+      "id": "gateway-dispatch-dependabot-alerts",
+      "name": "Webhook gateway Dependabot alert events",
+      "compiler_warning": "on.gateway-dispatch.dependabot-alerts (hosted CAO triggers)"
+    },
+    {
+      "id": "graders",
+      "name": "Graders",
+      "compiler_warning": "graders",
+      "docs": ["/experimental/trace-graders/"],
+      "docs_group": true,
+      "cracktro": [{ "slide": "Experiments, graders & evals", "badge": "experiments · graders" }]
+    },
+    {
+      "id": "experiments",
+      "name": "Experiments",
+      "docs": ["/reference/experiments/"],
+      "cracktro": [{ "slide": "Experiments, graders & evals", "badge": "experiments · graders" }]
+    },
+    {
+      "id": "continual-experiments",
+      "name": "Continual experiments",
+      "compiler_warning": "continual experiments",
+      "docs": ["/reference/experiments/"]
+    },
+    {
+      "id": "merge-pull-request",
+      "name": "merge-pull-request safe output",
+      "compiler_warning": "merge-pull-request",
+      "docs": ["/reference/safe-outputs-pull-requests/"]
+    },
+    {
+      "id": "security-advisory-safe-outputs",
+      "name": "Security advisory safe outputs",
+      "compiler_warning": "security advisory safe outputs",
+      "docs": ["/reference/safe-outputs/"]
+    },
+    {
+      "id": "safe-outputs-steer",
+      "name": "safe-outputs steer",
+      "compiler_warning": "safe-outputs steer",
+      "docs": ["/reference/safe-outputs/"]
+    },
+    {
+      "id": "lsp",
+      "name": "Language servers (lsp)",
+      "compiler_warning": "lsp",
+      "docs": ["/reference/glossary/"]
+    },
+    {
+      "id": "plugins",
+      "name": "Plugins",
+      "compiler_warning": "plugins",
+      "docs": ["/reference/frontmatter/"]
+    },
+    {
+      "id": "drive-memory",
+      "name": "Drive memory",
+      "compiler_warning": "drive-memory",
+      "docs": ["/experimental/drive-memory/"],
+      "docs_group": true
+    },
+    {
+      "id": "enclaves",
+      "name": "Private repository enclaves",
+      "compiler_warning": "enclaves cloud-hypervisor runtime",
+      "docs": ["/experimental/enclaves/"],
+      "docs_group": true,
+      "cracktro": [{ "slide": "Need-to-know enclaves", "badge": "enclaves" }]
+    },
+    {
+      "id": "microvm-runtime",
+      "name": "Micro-VM agent runtime",
+      "docs": ["/reference/agent-runtimes/"],
+      "cracktro": [{ "slide": "Zero-secret agents", "badge": "microVM runtime" }]
+    },
+    {
+      "id": "connectors",
+      "name": "Connectors",
+      "compiler_warning": "connectors",
+      "docs": ["/reference/connectors/"],
+      "cracktro": [{ "slide": "Connectors", "badge": "connectors" }]
+    },
+    {
+      "id": "model-router",
+      "name": "Model routing (model: router)",
+      "docs": ["/reference/model-routing/"],
+      "cracktro": [
+        { "slide": "Cost management", "badge": "model: router" },
+        { "slide": "Model routing", "badge": "model: router" }
+      ]
+    },
+    {
+      "id": "qmd",
+      "name": "QMD documentation search",
+      "docs": ["/experimental/qmd/"],
+      "docs_group": true,
+      "cracktro": [{ "slide": "Index & search", "badge": "QMD search" }]
+    },
+    {
+      "id": "correction-ops",
+      "name": "CorrectionOps",
+      "docs": ["/experimental/correction-ops/"],
+      "docs_group": true
+    },
+    {
+      "id": "monitoring-with-projects",
+      "name": "Monitoring with Projects",
+      "docs": ["/experimental/monitoring-with-projects/"],
+      "docs_group": true
+    },
+    {
+      "id": "safe-outputs-samples",
+      "name": "Safe-outputs samples",
+      "docs": ["/experimental/safe-outputs-samples/"],
+      "docs_group": true
+    },
+    {
+      "id": "trial-ops",
+      "name": "TrialOps",
+      "docs": ["/experimental/trial-ops/"],
+      "docs_group": true
+    },
+    {
+      "id": "wasm-compilation",
+      "name": "WASM compilation",
+      "docs": ["/reference/wasm-compilation/"],
+      "docs_group": true
+    }
+  ]
+}

@@ -3,7 +3,9 @@ title: QMD Documentation Search
 description: Build an incremental documentation index in a separate job, persist it with cache-memory, and search it from the agent through QMD.
 sidebar:
   order: 820
----
+:::caution[Experimental]
+QMD documentation search is experimental and may change.
+:::
 
 [QMD](https://github.com/tobi/qmd) (Query Markup Documents) combines BM25 keyword search, vector similarity search, and local LLM reranking. In gh-aw, the integration is a shared agentic workflow file that supplies an indexing job, cache-memory, and an MCP search server. Agents can search indexed documentation and retrieve its contents without checking out the source repository.
 
