@@ -450,6 +450,7 @@ async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
   const [owner, name] = repo.split("/");
   // The proxy reconstructs the first connection when reviews are filtered.
   // Keep reviews separate so they cannot replace thread or commit nodes.
+  // PR-level authorAssociation is omitted for the guard; see fetchCandidate.
   const detail = {};
   for (const [field, selection] of [
     ["reviewThreads", "reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved path line originalLine comments(first:100){pageInfo{hasNextPage} nodes{author{login} authorAssociation body createdAt updatedAt url}}}}"],
@@ -461,7 +462,7 @@ async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
       "-f",
       `query=query($owner:String!,$name:String!,$number:Int!){
         repository(owner:$owner,name:$name){pullRequest(number:$number){
-          number author{login} authorAssociation
+          number author{login}
           ${selection}
         }}}`,
       "-f",
@@ -514,6 +515,8 @@ const prFields = "number,updatedAt,author,isDraft,state,labels";
 export async function fetchCandidate(repo, number, api = gh, now) {
   // The proxy can mistake REST PR labels for the response collection and return [].
   // Use an explicit repository-scoped query, without gh pr view's union fragments.
+  // Omit PR-level authorAssociation: GraphQL lacks fork fields, so the guard
+  // labels same-repo bot PRs from REST facts only when the association is absent.
   const [owner, name] = repo.split("/");
   const response = await api([
     "api",
@@ -522,7 +525,7 @@ export async function fetchCandidate(repo, number, api = gh, now) {
     `query=query($owner:String!,$name:String!,$number:Int!){
       repository(owner:$owner,name:$name){pullRequest(number:$number){
         number title url state isDraft headRefOid headRefName baseRefName
-        createdAt updatedAt changedFiles mergeStateStatus author{login} authorAssociation
+        createdAt updatedAt changedFiles mergeStateStatus author{login}
         labels(first:100){pageInfo{hasNextPage} nodes{name}}
       }}}`,
     "-f",

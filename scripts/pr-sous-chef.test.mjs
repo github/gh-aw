@@ -1431,7 +1431,10 @@ test("refresh isolates filtered reviews from thread connections and head commit 
   assert.equal(queries.length, 3);
   assert.ok(queries.every(query => !query.includes("commits(")));
   assert.ok(queries.every(query => !(query.includes("reviewThreads(") && query.includes("reviews("))));
-  assert.match(queries[1], /number author\{login\} authorAssociation/);
+  assert.match(queries[1], /number author\{login\}\n/);
+  // PR-level authorAssociation suppresses the guard's REST fork lookup, which
+  // filters same-repo PRs from non-member bots below approved integrity.
+  assert.ok(queries.every(query => !/(?:number|mergeStateStatus) author\{login\} authorAssociation/.test(query)));
 });
 
 test("malformed or proxy-corrupted review connections fail closed with actionable errors", async () => {
