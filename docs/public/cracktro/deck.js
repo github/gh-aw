@@ -755,6 +755,21 @@
   .mdt-svg .sdd-stamp.g { fill: #3fb950; }
   .mdm-tl .s { fill: #3fb950; } .mdm-tl .p { fill: #ab7df8; } .mdm-tl .o { fill: #79c0ff; } .mdm-tl .x { fill: #6e7681; }
   .mdm-tl tspan.s, .mdm-tl tspan.p { font-weight: 700; }
+  .ppx-pc { fill: #1f6feb; } .ppx-sc { fill: #9198a1; font: italic 500 19px "Mona Sans"; text-anchor: middle; }
+  .ppx-svg .sdd-ln.drop { fill: #ff7b72; font-weight: 700; } .ppx-svg .sdd-ln.up { fill: #3fb950; font-weight: 700; }
+  .ppx-doc { opacity: .35; transition: opacity .4s; } .ppx-doc.on { opacity: 1; }
+  .ppx-dt { fill: #e6edf3; font: 600 20px var(--mono); }
+  .ppx-frame { fill: #0d1117; stroke: #3d444d; stroke-width: 2; } .ppx-doc.on .ppx-frame { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .ppx-ln { fill: #30363d; }
+  .ppx-hide { fill: #010409; opacity: 0; transition: opacity .5s; } .ppx-hide.on { opacity: .82; }
+  .ppx-rule { transition: transform 1.2s cubic-bezier(.2,.9,.2,1); } .ppx-rule.fixed { transform: translateY(-213px); }
+  .ppx-rule rect { fill: #161b22; stroke: #d29922; stroke-width: 2; transition: stroke .4s; } .ppx-rule text { fill: #e3b341; font: 600 17px var(--mono); text-anchor: middle; }
+  .ppx-rule.bad rect { stroke: #f85149; stroke-dasharray: 6 5; } .ppx-rule.fixed rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #3fb950); } .ppx-rule.fixed text { fill: #7ee787; }
+  .ppx-cut { stroke: #f85149; stroke-width: 3; stroke-dasharray: 10 6; opacity: .25; transition: opacity .3s; } .ppx-cut.on { opacity: 1; filter: drop-shadow(0 0 6px #f85149); }
+  .ppx-cl { fill: #ff7b72; font: 700 20px var(--mono); opacity: 0; transition: opacity .3s; } .ppx-cl.on { opacity: 1; }
+  .ppx-an { fill: #9198a1; font: 500 18px var(--mono); opacity: 0; transition: opacity .4s; } .ppx-an.r { fill: #ff7b72; } .ppx-an.on { opacity: 1; }
+  .ppx-svg .sdd-stamp.ppx-st { text-anchor: start; font-size: 18px; fill: #ff7b72; } .ppx-svg .sdd-stamp.ppx-st.g { fill: #3fb950; }
+  .ppx-tl .g { fill: #3fb950; } .ppx-tl .o { fill: #79c0ff; } .ppx-tl .x { fill: #6e7681; } .ppx-tl tspan.g { font-weight: 700; }
   .dg-svg { left: 110px; top: 280px; width: 1700px; height: 586px; }
   .dg-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dg-svg .mra-l.g { fill: #3fb950; }
   .dg-band { fill: #ffffff06; }
@@ -8437,6 +8452,274 @@
         svg,
         mdm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 7 Dec 2025–15 Nov 2026 (343 d) · loop illustrative")
+      ),
+    });
+  }
+
+  // Personas · Probe · Patch: a daily agent role-plays personas asking the agentic-workflows agent for workflows, scores the answers, re-runs one on the first 8,000 bytes of guidance to find rules the cut hides, and Copilot moves them up
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372,
+      DX = 1150,
+      DW = 230,
+      CUT = 353,
+      RULE = 412;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="${cls ? "#238636" : "#8957e5"}"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    };
+    // illustrative: three of the nine personas in today's rotation, each with one scenario
+    const PERS = [
+      ["Product Manager", "tasklist", "“weekly release digest”"],
+      ["Designer", "person", "“accessibility check on PRs”"],
+      ["Legal · Compliance", "lock", "“flag new licences”"],
+    ];
+    // an illustrative, simplified scorecard and fix; completeness drops when only the 8,000-byte prefix is read
+    const FULL = "completeness  ●●●●○",
+      CUTS = "completeness  ●●●○○";
+    const PANELS = [
+      [
+        600,
+        430,
+        "scorecard · PM",
+        "SCORE",
+        [
+          ["h", "“weekly release digest”"],
+          ["", "trigger       ●●●●●"],
+          ["", "tools         ●●●●○"],
+          ["", "security      ●●●●●"],
+          ["", "clarity       ●●●●○"],
+          ["", FULL],
+          ["pass", "avg 4.4 / 5"],
+        ],
+      ],
+      [
+        1700,
+        420,
+        "move rule above cut",
+        "PR",
+        [
+          ["fn", "triggers.md"],
+          ["", "- fork-PR rule at 11 KB"],
+          ["add", "+ fork-PR rule at 2 KB"],
+          ["fn", "test_guidance.py"],
+          ["add", "+ rule in first 8,000 B"],
+          ["pass", "✓ merged"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly]
+    const EDGES = [
+      ["ppxE0", "M106 106 H190", "p", "daily", 148, 72],
+      ["ppxE1", "M300 133 V188", "p", "3 of 9", 360, 168],
+      ["ppxE2", "M524 106 H706", "p", "sub-agent", 615, 88],
+      ["ppxA0", "M472 220 C535 220 535 330 596 330", "p", "ask", 520, 205],
+      ["ppxA1", "M472 320 C535 320 535 330 596 330", "p", "", 0, 0],
+      ["ppxA2", "M472 420 C535 420 535 330 596 330", "p", "", 0, 0],
+      ["ppxE3", `M1032 330 H${DX - 6}`, "p", "probe", 1090, 312],
+      ["ppxE4", "M1452 106 H1838", "p", "assign", 1645, 88],
+      ["ppxE5", `M1800 ${PY + PH + 4} V609`, "p", "review", 1858, 586],
+      ["ppxE6", `M1764 645 H815 V${PY + PH + 8}`, "g", "merged · next run re-scores", 1300, 631],
+    ];
+    let g = `<defs><clipPath id="ppxClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="ppxP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="ppxG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 560, "PERSONAS"],
+      [560, 1100, "ASK · SCORE"],
+      [1100, 1670, "PROBE · 8,000 B"],
+      [1670, VW, "PATCH"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="ppxLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    PERS.forEach(([role, icon, ask], i) => {
+      const y = 220 + i * 100;
+      g += `<g class="fm-task" id="ppxP${i}"><g class="fm-pill"><rect x="100" y="${y - 25}" width="370" height="50" rx="25"/><text x="303" y="${y + 8}">${role}</text></g>
+        <circle class="ppx-pc" cx="100" cy="${y}" r="30"/>${ico(icon, 100, y, 28)}<text class="ppx-sc" x="303" y="${y + 52}">${ask}</text></g>`;
+    });
+    // the guidance file, to scale: the 8,000-byte cut and the rule it hides (byte 11,225 of 16,120)
+    g += `<g class="ppx-doc" id="ppxDoc"><text class="ppx-dt" x="${DX}" y="114">triggers.md · 16 KB</text><rect class="ppx-frame" x="${DX}" y="${PY}" width="${DW}" height="${PH}" rx="12"/>`;
+    for (let i = 0; i < 17; i++) g += `<rect class="ppx-ln" x="${DX + 18}" y="${PY + 18 + i * 20}" width="${[150, 190, 120, 175, 160][i % 5]}" height="7" rx="3"/>`;
+    g += `<rect class="ppx-hide" id="ppxHide" x="${DX}" y="${CUT}" width="${DW}" height="${PY + PH - CUT}" rx="12"/>
+      <g class="ppx-rule" id="ppxRule"><rect x="${DX + 14}" y="${RULE}" width="${DW - 28}" height="32" rx="6"/><text x="${DX + DW / 2}" y="${RULE + 22}">fork-PR rule</text></g>
+      <line class="ppx-cut" id="ppxCut" x1="${DX - 20}" x2="${DX + DW + 20}" y1="${CUT}" y2="${CUT}"/><text class="ppx-cl" id="ppxCl" x="${DX + DW + 26}" y="${CUT + 7}">✂ 8,000 B</text>
+      <text class="ppx-an" id="ppxSeen" x="${DX + DW + 26}" y="${CUT - 70}">agent reads ↑</text><text class="ppx-an r" id="ppxUnseen" x="${DX + DW + 26}" y="${CUT + 80}">never seen ↓</text>
+      <text class="sdd-stamp ppx-st" id="ppxDrop" x="${DX + DW + 26}" y="${PY + PH - 6}">completeness 4 → 3</text>
+      <text class="sdd-stamp ppx-st g" id="ppxBack" x="${DX + DW + 26}" y="${PY + PH - 6}">now in the prefix ✓</text></g>`;
+    g += `<g class="fm-task" id="ppxIssue"><circle cx="1420" cy="106" r="30" fill="#8957e5"/>${ico("issue", 1420, 106, 28)}</g>`;
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([x, w, file, tag, lines], i) => {
+      g += `<g class="sdd-panel" id="ppxS${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${w}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + w}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + w - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => (g += `<text class="sdd-ln ${c}" id="ppxL${i}_${j}" x="${x + 22}" y="${PY + 88 + j * 40}">${sp(s)}</text>`));
+      g += `</g>`;
+    });
+    for (const [id, d, c, lab, lx, ly] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#ppx${c === "g" ? "G" : "P"})"/>`;
+      if (lab) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab}</text>`;
+    }
+    g += `<g class="fm-task" id="ppxSched"><circle cx="70" cy="106" r="32" fill="#8957e5"/>${ico("calendar", 70, 106, 30)}</g>`;
+    g += agent("ppxExp", 360, 106, 290, "Persona Explorer") + agent("ppxAgent", 880, 106, 300, "agentic-workflows") + agent("ppxCopilot", 1960, 106, 200, "Copilot", "g");
+    g += `<g class="fm-task" id="ppxDev"><g class="fm-pill b"><rect x="1800" y="620" width="230" height="50" rx="25"/><text x="${1800 + 18 + 115}" y="653">Maintainer</text></g>
+      <circle cx="1800" cy="645" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="1769" y="614" width="62" height="62" clip-path="url(#ppxClip)"/></g>`;
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg ppx-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      comp = $("ppxL0_5");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const CYC = 18000;
+    let t0 = 0,
+      cyc = -1,
+      ev = [],
+      evI = 0,
+      fly = null;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const off = (id, cls = "on") => $(id).classList.remove(cls);
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("ppxLane0"), on("ppxSched")));
+      flight(500, "ppxE0", 500, "#ab7df8", 0);
+      at(1000, () => (on("ppxExp"), sfx.key(0.6)));
+      flight(1200, "ppxE1", 400, "#ab7df8", 1);
+      PERS.forEach((_, i) => at(1600 + i * 300, () => (on(`ppxP${i}`), sfx.pop(2 + i))));
+      flight(2600, "ppxE2", 500, "#ab7df8", 4);
+      at(3100, () => (on("ppxLane1"), on("ppxAgent"), sfx.key(0.7)));
+      PERS.forEach((_, i) => flight(3300 + i * 400, `ppxA${i}`, 400, "#ab7df8", 5));
+      at(4500, () => on("ppxS0"));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(4700 + j * 230, () => (on(`ppxL0_${j}`), sfx.key(0.5))));
+      flight(6400, "ppxE3", 500, "#ab7df8", 6);
+      at(6900, () => (on("ppxLane2"), on("ppxDoc"), on("ppxCut"), on("ppxCl"), sfx.cut()));
+      at(7400, () => (on("ppxHide"), on("ppxSeen"), on("ppxUnseen"), on("ppxRule", "bad")));
+      at(8000, () => ((comp.textContent = sp(CUTS)), on("ppxL0_5", "drop"), on("ppxS0", "bad"), on("ppxDrop"), sfx.omen()));
+      at(8600, () => (on("ppxIssue"), sfx.notify()));
+      flight(8900, "ppxE4", 600, "#ab7df8", 7);
+      at(9500, () => (on("ppxLane3"), on("ppxCopilot"), on("ppxS1"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4].forEach(j => at(9700 + j * 300, () => (on(`ppxL1_${j}`), sfx.key(0.5))));
+      at(10300, () => on("ppxL1_1", "gone"));
+      flight(11300, "ppxE5", 500, "#ab7df8", 7);
+      at(11800, () => (on("ppxDev"), sfx.review()));
+      at(12500, () => (on("ppxL1_5"), on("ppxS1", "ok"), sfx.pop(8)));
+      flight(12800, "ppxE6", 1700, "#3fb950", 7);
+      at(14500, () => {
+        on("ppxRule", "fixed");
+        off("ppxRule", "bad");
+        off("ppxDrop");
+        on("ppxBack");
+        comp.textContent = sp(FULL);
+        off("ppxL0_5", "drop");
+        on("ppxL0_5", "up");
+        off("ppxS0", "bad");
+        on("ppxS0", "ok");
+        sfx.pop(9);
+      });
+    };
+    // measured: every "Agent Persona Exploration" report issue by day since 8 Jun 2026 (when the report moved from discussions to issues);
+    // g = closed by a merged PR that changed agent guidance, o = merged PR elsewhere, otherwise no merged PR
+    const DAYS = [
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 60, 61, 62, 63, 64, 66, 67, 68, 69, 71, 72,
+      73, 74, 75, 76, 77, 78, 79, 81, 82, 83, 84, 85, 86, 87, 88, 106, 107, 108, 109, 110, 111, 112, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 148,
+      149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
+    ];
+    const FIXED = {
+      g: [0, 2, 21, 22, 24, 26, 27, 47, 49, 53, 55, 58, 64, 69, 121, 124, 125, 126, 153, 154, 155, 156, 158],
+      o: [118, 160],
+    };
+    const TW = 540,
+      TX = d => 10 + (d * (TW - 20)) / 160;
+    let tl = `<text class="t" x="0" y="16">133 REPORTS · <tspan class="g">23 GUIDANCE</tspan> · 2 OTHER FIXES</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    DAYS.forEach((d, i) => {
+      const [cls, hh] = FIXED.g.includes(d) ? ["g", 50] : FIXED.o.includes(d) ? ["o", 30] : ["x", 16];
+      tl += `<rect class="${cls}" style="--i:${Math.round(i / 3)}" x="${TX(d) - 1.5}" y="${96 - hh}" width="3" height="${hh}" rx="1"/>`;
+    });
+    [
+      [8, "Jun"],
+      [38, "Jul"],
+      [69, "Aug"],
+      [100, "Sep"],
+      [130, "Oct"],
+      [155, "Nov"],
+    ].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl ppx-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const ppm = h(
+      "div",
+      { class: "dhm" },
+      h("div", { class: "dhm-k" }, kpi("133", "daily reports", "filed"), kpi("25", "fixed by", ["merged PRs", h("br"), h("i", {}, "22 by Copilot")]), kpi("23", "guidance", "fixes", "g"), kpi("17,035 B", "agent file", ["probe reads", h("br"), h("i", {}, "first 8,000 B")], "r")),
+      tlSvg
+    );
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone, .fixed, .drop, .up").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone", "fixed", "drop", "up"));
+      comp.textContent = sp(FULL);
+      dot.style.opacity = 0;
+      fly = null;
+      script();
+    };
+    slides.push({
+      group: "process",
+      notes:
+        "Personas, probe, patch: how gh-aw tests the agent that writes its workflows. Every day the Agent Persona Explorer workflow rotates through nine software personas (backend, frontend, DevOps, QA, product manager, program manager, designer, legal and compliance, information worker), picks three, and invents realistic automation requests for each. A sub-agent role-plays the agentic-workflows custom agent and answers them; the explorer scores every answer from 1 to 5 on trigger choice, tools, security, prompt clarity and completeness. Then comes the probe: it re-runs one scenario with only the first 8,000 bytes of each guidance file, because that is all some prompt-file loaders expose, and reports any rule that sits past the cut. The findings go into one report issue; a maintainer can assign it to Copilot, whose pull request moves the rule up or tightens the guidance, and the next run scores again. The bottom strip is measured on gh-aw (snapshot 15 November 2026): all 133 daily report issues from 8 June 2026, when the report moved from discussions to issues, to 15 November 2026 (160 days). 25 were closed by merged pull requests, 22 of them opened by Copilot and one by a bot: 23 changed the agent's guidance files and 2 changed something else. The other 108 were closed without a merged fix when the next report replaced them. The agentic-workflows agent file is 17,035 bytes, so the probe sees less than half of it. The personas, scores, rule and fix in the loop above are an illustrative, simplified example.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every day an agent plays your users, grades the workflow agent, and probes what its guidance hides"), h("h2", {}, letters("Personas · Probe · "), letters("Patch", "l-grad"))),
+        svg,
+        ppm,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 8 Jun–15 Nov 2026 (160 d) · loop illustrative")
       ),
     });
   }
