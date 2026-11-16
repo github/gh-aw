@@ -42,10 +42,12 @@ func isGhAwSetupAction(repo string) bool {
 }
 
 // compilerReleaseTag returns the running compiler version as a release tag
-// (e.g. "v0.68.3"), or "" for dev, dirty, or otherwise non-release builds.
+// (e.g. "v0.68.3"), or "" for dev, dirty, or otherwise non-release builds. Release
+// status comes from workflow.IsReleasedVersion so a semver-shaped version on a
+// non-release binary still falls back to the regular update policy.
 func compilerReleaseTag() string {
 	version := GetVersion()
-	if strings.Contains(version, "-") || parseVersion(version) == nil {
+	if !workflow.IsReleasedVersion(version) || strings.Contains(version, "-") || parseVersion(version) == nil {
 		return ""
 	}
 	return semverutil.EnsureVPrefix(version)

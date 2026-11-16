@@ -253,9 +253,7 @@ func TestUpdateActions_GhAwNativeActionCappedAtCLIVersion(t *testing.T) {
 // action is pinned to exactly the compiler version, even when the latest release is
 // older, the lock already holds a newer version, or release bumps are disabled.
 func TestUpdateActions_SetupActionPinnedToCompilerVersion(t *testing.T) {
-	origVersion := GetVersion()
-	SetVersionInfo("v0.68.3")
-	defer SetVersionInfo(origVersion)
+	setReleaseVersionForTest(t, "v0.68.3", true)
 
 	const cliVersionSHA = "cliversha12345678901234567890123456789012"
 	tests := []struct {
@@ -317,6 +315,32 @@ func TestUpdateActions_SetupActionPinnedToCompilerVersion(t *testing.T) {
 				t.Errorf("stale entry for %s should have been replaced", tt.lockedVersion)
 			}
 		})
+	}
+}
+
+// setReleaseVersionForTest sets the compiler version and release flag, restoring both on cleanup.
+func setReleaseVersionForTest(t *testing.T, version string, release bool) {
+	t.Helper()
+	origVersion, origRelease := GetVersion(), workflow.IsRelease()
+	SetVersionInfo(version)
+	workflow.SetIsRelease(release)
+	t.Cleanup(func() {
+		SetVersionInfo(origVersion)
+		workflow.SetIsRelease(origRelease)
+	})
+}
+
+// TestCompilerPinnedActionTag_RequiresReleaseBuild verifies that a semver-shaped
+// version on a non-release binary does not pin the setup action.
+func TestCompilerPinnedActionTag_RequiresReleaseBuild(t *testing.T) {
+	setReleaseVersionForTest(t, "v0.68.3", false)
+	if got := compilerPinnedActionTag("github/gh-aw-actions/setup"); got != "" {
+		t.Errorf("compilerPinnedActionTag() = %q for non-release build, want empty", got)
+	}
+
+	workflow.SetIsRelease(true)
+	if got := compilerPinnedActionTag("github/gh-aw-actions/setup"); got != "v0.68.3" {
+		t.Errorf("compilerPinnedActionTag() = %q for release build, want v0.68.3", got)
 	}
 }
 

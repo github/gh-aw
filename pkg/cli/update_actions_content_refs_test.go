@@ -573,9 +573,7 @@ func TestUpdateSkillRefsInContentOnlyRewritesFrontmatterBlock(t *testing.T) {
 }
 
 func TestUpdateActionRefsInContent_SetupActionPinnedToCompilerVersion(t *testing.T) {
-	origVersion := GetVersion()
-	SetVersionInfo("v0.68.3")
-	defer SetVersionInfo(origVersion)
+	setReleaseVersionForTest(t, "v0.68.3", true)
 
 	const cliSHA = "cliversha12345678901234567890123456789012"
 	deps := newActionUpdateDepsWithLatestRelease(func(_ context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
