@@ -772,6 +772,27 @@
   .mdt-svg .sdd-stamp.g { fill: #3fb950; }
   .mdm-tl .s { fill: #3fb950; } .mdm-tl .p { fill: #ab7df8; } .mdm-tl .o { fill: #79c0ff; } .mdm-tl .x { fill: #6e7681; }
   .mdm-tl tspan.s, .mdm-tl tspan.p { font-weight: 700; }
+  .ftl-t { position: absolute; left: 200px; top: 318px; width: 1010px; font-family: var(--mono); }
+  .ftl-r { display: grid; grid-template-columns: 330px 380px 86px 92px 110px; align-items: center; height: 54px; font: 500 19px/1 var(--mono); color: #c9d1d9; }
+  .ftl-r.hd { height: 34px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #6e7681; }
+  .ftl-r.cut { border-top: 2px dashed #3d444d; }
+  .ftl-r > :nth-child(n+3) { text-align: right; }
+  .ftl-r .p { font-weight: 700; color: #f0f6fc; } .ftl-r .p.g { color: #3fb950; } .ftl-r .p.x { color: #6e7681; }
+  .ftl-r .n { color: #6e7681; font-size: 16px; }
+  .ftl-r .c { color: #ab7df8; font-weight: 700; } .ftl-r .c.z { color: #484f58; font-weight: 500; }
+  .ftl-bar { height: 22px; border-radius: 4px; background: #21262d; display: flex; overflow: hidden; }
+  .ftl-bar b { width: var(--w); background: #3fb950; transform-origin: left; }
+  .active .ftl-bar b { animation: ftl-grow .7s cubic-bezier(.2,.9,.2,1) both; animation-delay: calc(.4s + var(--i) * 90ms); }
+  @keyframes ftl-grow { from { transform: scaleX(0); } }
+  .ftl-cards { position: absolute; left: 1300px; top: 318px; width: 520px; display: flex; flex-direction: column; gap: 26px; }
+  .ftl-card { border: 2px solid #30363d; border-radius: 12px; background: #151b23; padding: 22px 26px; font: 500 18px/1.35 var(--mono); color: #c9d1d9; }
+  .active .ftl-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both; animation-delay: calc(1.2s + var(--i) * .5s); }
+  .ftl-card.g { border-color: #238636; box-shadow: 0 0 24px #23863633; } .ftl-card.x { opacity: .78; }
+  .ftl-card h4 { margin: 0 0 14px; font: 600 22px/1.25 "Mona Sans"; color: #f0f6fc; }
+  .ftl-card p { margin: 6px 0 0; color: #9198a1; } .ftl-card p b { color: #ab7df8; } .ftl-card p.no b { color: #6e7681; }
+  .ftl-card .s { display: inline-block; margin-top: 16px; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 17px; }
+  .ftl-card.g .s { background: #8957e5; color: #fff; } .ftl-card.x .s { background: #30363d; color: #9198a1; }
+  .ftl-ill { font: 500 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #6e7681; }
   .ddr-lbl { fill: #9198a1; font: 600 20px var(--mono); text-anchor: middle; transition: fill .4s; } .fm-task.on .ddr-lbl { fill: #3fb950; }
   .ddm-tl rect { fill: #ab7df8; } .ddm-tl rect.h { fill: #ab7df877; }
   .ddm-tl .v { fill: #c9d1d9; font: 600 13px var(--mono); text-anchor: middle; }
@@ -8992,6 +9013,71 @@
     });
   }
 
+  // Findings that land: eight docs auditors file issues; the findings handed to Copilot are mostly fixed by merged PRs, the unassigned ones mostly expire
+  {
+    // [workflow, fixed, filed, % assigned to Copilot]; ranked by fixed share. Measured: refresh/findings-that-land.md
+    const AUD = [
+      ["enterprise-docs-audit", 4, 4, 100],
+      ["spec-librarian", 44, 69, 75],
+      ["multi-device-docs-tester", 39, 61, 75],
+      ["cli-consistency-checker", 168, 287, 70],
+      ["doc-healer", 13, 29, 69],
+      ["spec-coverage-kiro", 4, 42, 0],
+      ["github-docs-seo-optimizer", 1, 87, 0],
+      ["designer-drift-audit", 0, 4, 0],
+    ];
+    const pct = (a, b) => Math.round((100 * a) / b);
+    const table = h(
+      "div",
+      { class: "ftl-t" },
+      h("div", { class: "ftl-r hd" }, h("span", {}, "auditor"), h("span", {}, "fixed by a merged PR"), h("span", {}, "%"), h("span", {}, "of"), h("span", {}, "→ Copilot")),
+      AUD.map(([n, f, t, c], i) => {
+        const p = pct(f, t);
+        return h(
+          "div",
+          { class: "ftl-r" + (i && !c && AUD[i - 1][3] ? " cut" : "") },
+          h("span", {}, n),
+          h("div", { class: "ftl-bar" }, h("b", { "--w": p + "%", "--i": i })),
+          h("span", { class: "p " + (c ? "g" : "x") }, p + "%"),
+          h("span", { class: "n" }, f + "/" + t),
+          h("span", { class: "c" + (c ? "" : " z") }, c + "%")
+        );
+      })
+    );
+    const card = (cls, i, tag, title, who, why, state) =>
+      h("div", { class: "ftl-card " + cls, "--i": i }, h("div", { class: "ftl-ill" }, tag), h("h4", {}, title), h("p", { class: cls === "x" ? "no" : "" }, "Assignee: ", h("b", {}, who)), h("p", {}, why), h("span", { class: "s" }, state));
+    const cards = h(
+      "div",
+      { class: "ftl-cards" },
+      card("g", 0, "illustrative · finding", "[cli-consistency] compile --help lists a flag the docs never mention", "Copilot", "One defect, its evidence, a fix anyone can check", "PR merged · 4 h"),
+      card("x", 1, "illustrative · report", "[github-docs-seo] Daily report: 12 pages to improve", "none", "Tomorrow's report replaces it; it expires in 7 days", "Closed as not planned")
+    );
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const ftm = h(
+      "div",
+      { class: "dhm" },
+      h("div", { class: "dhm-k" }, kpi("583", "findings filed", "by 8 docs auditors"), kpi("273", "fixed by", ["merged PRs", h("br"), h("i", {}, "255 by Copilot")]), kpi("79%", "fixed when", ["assigned to Copilot", h("br"), h("i", {}, "256 of 323")], "g"), kpi("7%", "fixed when", ["left unassigned", h("br"), h("i", {}, "17 of 260")], "r"))
+    );
+    slides.push({
+      group: "process",
+      notes:
+        "Findings that land. Eight gh-aw workflows audit the documentation and file what they find as issues: a persona walking the enterprise docs, the spec librarian, the multi-device tester, the CLI consistency checker, the doc healer, a spec coverage check, an SEO optimizer for the docs and a designer drift audit. The table is measured on gh-aw (snapshot 15 November 2026): every issue each auditor filed, matched by its title prefix, from the first on 12 November 2025 to 15 November 2026 (368 days), excluding the workflows' own failure reports. 583 findings were filed and 273 were closed by merged pull requests, 255 of those opened by Copilot. What separates the top five from the bottom three is not the auditor but the hand-off: 323 findings were assigned to Copilot, by the workflow itself or by a maintainer triaging it, and 256 of them, 79 percent, were fixed by a merged pull request; of the 260 left unassigned only 17, 7 percent, were. Read this as correlation, not proof: maintainers assign the findings they judge worth fixing, and the unassigned auditors post rolling reports that close the previous one and expire after two to seven days by design. The lesson for auditors is to file one checkable defect per issue and route it to an agent that can fix it. The two issue cards on the right are an illustrative, simplified example.",
+      el: h(
+        "section",
+        { class: "slide" },
+        h(
+          "div",
+          { class: "slide-head" },
+          h("div", { class: "kicker" }, "Eight agents audit the docs; the findings handed to Copilot get fixed"),
+          h("h2", {}, letters("Findings "), letters("that land", "l-grad"))
+        ),
+        table,
+        cards,
+        ftm,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · issues 12 Nov 2025–15 Nov 2026 (368 d) · cards illustrative")
+      ),
+    });
+  }
   // Personas · Probe · Patch: a daily agent role-plays personas asking the agentic-workflows agent for workflows, scores the answers, re-runs one on the first 8,000 bytes of guidance to find rules the cut hides, and Copilot moves them up
   {
     resetIndex();

@@ -39,7 +39,8 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | 32 Spec-driven testing | `refresh/spec-driven-testing.md` |
 | 33 Docs that heal | `refresh/docs-that-heal.md` |
 | 34 Multi-device tester | `refresh/multi-device-tester.md` |
-| 35 Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
-| 37 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
-| 58 Skills in review | `refresh/skills-in-review.md` |
+| 35 Findings that land | `refresh/findings-that-land.md` |
+| 36 Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
+| 38 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+| 59 Skills in review | `refresh/skills-in-review.md` |
 
