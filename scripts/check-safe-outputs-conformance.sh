@@ -3560,7 +3560,7 @@ check_merge_pull_request_protected_files() {
         log_high "TYPE-020: protected-files: allowed is not the only configuration that disables the changed-file gate"
         failed=1
     fi
-    if ! echo "$fn" | grep -q '3000'; then
+    if ! echo "$fn" | grep -qE 'pr\.changed_files[[:space:]]*>[[:space:]]*3000'; then
         log_high "TYPE-020: Changed-file counts above GitHub's 3000-file listing limit are not rejected"
         failed=1
     fi
@@ -3568,7 +3568,8 @@ check_merge_pull_request_protected_files() {
         log_high "TYPE-020: Rename/copy source paths are not included in protected-file evaluation"
         failed=1
     fi
-    if ! echo "$fn" | grep -q 'pr.changed_files' || ! echo "$fn" | grep -q 'new Set'; then
+    if ! echo "$fn" | grep -qF 'files.length !== pr.changed_files' ||
+        ! echo "$fn" | grep -qF 'new Set(files.map(file => file.filename)).size !== files.length'; then
         log_high "TYPE-020: Incomplete or duplicate changed-file evidence is not rejected"
         failed=1
     fi
