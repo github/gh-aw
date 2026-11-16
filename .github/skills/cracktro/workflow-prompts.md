@@ -54,3 +54,4 @@ Skipped slides:
 - agent-job-health (#52108, task `c61d0dc7-94f5-4510-9e52-2158490e6c0f`): empty prompt.
 - Grafana advisor (#30190): human PR.
 - Scan·Fix·Learn: not a gh-aw workflow.
+- Multi-device tester (daily-multi-device-docs-tester, #3603): human PR, generated in a local `create-agentic-workflow` interactive session; later PRs only fix or retune it.
