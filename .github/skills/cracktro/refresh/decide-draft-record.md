@@ -34,7 +34,7 @@ Recompute with `decide-draft-record.sh`, then patch `deck.js`. Read-only (git on
 ## 3. Sources
 
 - `docs/adr/[0-9]*-*.md` on `origin/main` (files are named after their PR number; `work-queue-protocol-upgrades.md` is not counted).
-- `git log --diff-filter=AR` for first-add dates (one ADR arrived by rename).
+- `git log --diff-filter=AR` for first-add dates: the earliest add or rename-in date per file (one ADR arrived by rename).
 - The "eight of nine drafts merged" sentence in the notes comes from a one-off `gh aw logs design-decision-gate` sample of runs with `push_to_pull_request_branch` output; it is not refreshed. Drop or re-measure it with `gh aw logs design-decision-gate -c 100 --json` if it ages.
 
 ## 4. Queries
@@ -43,7 +43,9 @@ Recompute with `decide-draft-record.sh`, then patch `deck.js`. Read-only (git on
 bash .github/skills/cracktro/refresh/decide-draft-record.sh 2026-11-16 > /tmp/ddr.json   # omit date = today UTC; ~40 s
 ```
 
-Output: `{ "snapshot", "ref", "total", "first", "last30", "agentFooter", "status": {draft, accepted, proposed, superseded, ...}, "monthly": [["YYYY-MM", n], ...] }`.
+Every metric is read from `commit`: the last first-parent commit on `origin/main` on or before the snapshot day (UTC), so re-running an old date reproduces that snapshot.
+
+Output: `{ "snapshot", "ref", "commit", "total", "first", "last30", "agentFooter", "status": {draft, accepted, proposed, superseded, ...}, "monthly": [["YYYY-MM", n], ...] }`.
 
 Sanity baseline at the 2026-11-16 snapshot:
 
