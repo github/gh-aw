@@ -603,8 +603,10 @@ class GuidanceTests(unittest.TestCase):
 
     def test_command_reference_defers_gates_and_session_authorization(self):
         commands = (ROOT / ".github/aw/cli-commands.md").read_text()
-        compile_section = commands.split("### `gh aw compile`\n", 1)[1].split("\n---", 1)[0]
-        run_section = commands.split("### `gh aw run`\n", 1)[1].split("\n---", 1)[0]
+        compile_section = commands.split("### `gh aw compile` rules\n", 1)[1].split("\n### ", 1)[0]
+        compile_section += commands.split("### `gh aw compile`\n", 1)[1].split("\n---", 1)[0]
+        run_section = commands.split("### `gh aw run` rules\n", 1)[1].split("\n### ", 1)[0]
+        run_section += commands.split("### `gh aw run`\n", 1)[1].split("\n---", 1)[0]
         self.assertIn("](debug-compilation.md)", compile_section)
         self.assertNotIn("warnings are errors", compile_section)
         self.assertIn("Low-severity/informational notices are not blanket failures", compile_section)
