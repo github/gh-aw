@@ -2,46 +2,39 @@
 
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { EventEmitter } = require("node:events");
 const http = require("node:http");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
-const { SUITE_IDS, MANDATORY, LIMITS, validateCatalog, summarizeDiff, postDecision, frontDoor } = require("./ci-front-door.cjs");
+const { SUITE_IDS, MANDATORY, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, postDecision, frontDoor } = require("./ci-front-door.cjs");
 const { evaluate } = require("./ci-front-door-evaluate.cjs");
 const catalog = require("../.github/ci/suite-catalog.json");
 const diff = { files: ["pkg/console/style.go"], patch: "+change", truncated: false, unavailable: false };
-const endpoint = "https://decision.example.test/select";
+const token = "test-token";
 
-function transport({ value = { suite_ids: ["build-wasm"], confidence: 0.99 }, status = 200, raw, error, hanging = false } = {}) {
-  const calls = [];
-  const request = (url, options, callback) => {
-    calls.push({ url: String(url), options });
-    const req = new EventEmitter();
-    req.destroy = failure => {
-      req.emit("error", failure);
-      req.emit("close");
-    };
-    req.end = body => {
-      calls.at(-1).body = JSON.parse(body);
-      if (hanging) return;
-      queueMicrotask(() => {
-        if (error) {
-          req.destroy(new Error(error));
-          return;
-        }
-        const res = new EventEmitter();
-        res.statusCode = status;
-        callback(res);
-        res.emit("data", Buffer.from(raw === undefined ? JSON.stringify(value) : raw));
-        res.emit("end");
-        req.emit("close");
-      });
-    };
-    return req;
+function decisionResponse({ suite_ids = ["build-wasm"], confidence = 0.99 } = {}) {
+  return {
+    answers: SUITE_IDS.filter(id => !MANDATORY.includes(id)).map(id => ({
+      type: "predicate",
+      name: id,
+      probability: suite_ids.includes(id) ? 1 - confidence : confidence,
+    })),
   };
-  return { calls, request };
+}
+
+function transport({ value = decisionResponse(), status = 200, raw, error, hanging = false } = {}) {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    if (error) throw new Error(error);
+    if (hanging)
+      return new Promise((resolve, reject) => {
+        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+      });
+    return new Response(raw === undefined ? JSON.stringify(value) : raw, { status });
+  };
+  return { calls, fetchImpl };
 }
 
 async function exercise(options = {}, response = {}) {
@@ -49,23 +42,30 @@ async function exercise(options = {}, response = {}) {
   const result = await frontDoor({
     catalog,
     diff,
-    endpoint,
+    token,
     prompt: "Select conservatively.",
     ...options,
-    decide: (url, input, opts) => postDecision(url, input, { ...opts, request: mock.request }),
+    decide: (key, input, opts) => postDecision(key, input, { ...opts, fetchImpl: mock.fetchImpl }),
   });
   return { result, calls: mock.calls };
 }
 
-test("valid selection makes exactly one decision request, no GitHub requests, and adds mandatory suites", async () => {
+test("GitHub selection authenticates one batched Decisions request and adds mandatory suites", async () => {
   const { result, calls } = await exercise();
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, endpoint);
+  assert.equal(calls[0].url, `${DECISIONS_BASE_URL}/decisions`);
   assert.equal(calls[0].options.method, "POST");
-  assert.deepEqual(Object.keys(calls[0].body).sort(), ["diff_summary", "prompt", "suite_catalog"]);
-  assert.deepEqual(calls[0].body.diff_summary, diff);
-  assert.deepEqual(calls[0].body.suite_catalog, catalog);
-  assert.ok(!JSON.stringify(calls).includes("authorization"));
+  assert.equal(calls[0].options.headers.Authorization, `Bearer ${token}`);
+  assert.equal(calls[0].options.headers["Copilot-Integration-Id"], "agentic-workflows");
+  assert.equal(calls[0].options.redirect, "error");
+  assert.equal(calls[0].body.model, DECISIONS_MODEL);
+  assert.equal(calls[0].body.input[0].role, "developer");
+  assert.equal(calls[0].body.input[0].content, "Select conservatively.");
+  assert.deepEqual(JSON.parse(calls[0].body.input[1].content), { diff_summary: diff, suite_catalog: catalog });
+  assert.deepEqual(
+    calls[0].body.questions.map(question => question.name),
+    SUITE_IDS.filter(id => !MANDATORY.includes(id))
+  );
   assert.deepEqual(result.suite_ids, [...MANDATORY, "build-wasm"]);
   assert.equal(result.fallback, false);
   assert.equal(result.metrics.decision_api_requests, 1);
@@ -79,15 +79,15 @@ test("invalid responses fail open after one request, without retrying", async ()
     null,
     [],
     {},
-    { suite_ids: ["unknown"], confidence: 1 },
-    { suite_ids: ["build-wasm", "build-wasm"], confidence: 1 },
-    { suite_ids: ["build-wasm"], confidence: 0.89 },
-    { suite_ids: [], confidence: 1.01 },
-    { suite_ids: [], confidence: "1" },
-    { suite_ids: [] },
-    { suite_ids: "security", confidence: 1 },
-    { suite_ids: [null], confidence: 1 },
-    { suite_ids: ["security\ninjected=true"], confidence: 1 },
+    { answers: [] },
+    { answers: decisionResponse().answers.slice(1) },
+    { answers: decisionResponse().answers.map(answer => ({ ...answer, name: "unknown" })) },
+    { answers: decisionResponse().answers.map(answer => ({ ...answer, name: "build-wasm" })) },
+    { answers: decisionResponse().answers.map(answer => ({ type: "refusal", name: answer.name })) },
+    { answers: decisionResponse().answers.map(answer => ({ ...answer, probability: null })) },
+    { answers: decisionResponse().answers.map(answer => ({ ...answer, probability: 1.01 })) },
+    decisionResponse({ confidence: 0.89 }),
+    decisionResponse({ confidence: 0.5 }),
   ]) {
     const { result, calls } = await exercise({}, { value });
     assert.equal(calls.length, 1);
@@ -107,19 +107,21 @@ test("transport errors, malformed and oversized JSON, rate limits and redirects 
 });
 
 test("deadline bounds a hung request without a retry", async t => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
-  const mock = transport({ hanging: true });
-  const pending = frontDoor({ catalog, diff, endpoint, prompt: "", decide: (url, input, opts) => postDecision(url, input, { ...opts, request: mock.request }) });
-  t.mock.timers.tick(LIMITS.timeout);
-  const result = await pending;
+  t.mock.method(AbortSignal, "timeout", milliseconds => {
+    assert.equal(milliseconds, LIMITS.timeout);
+    const controller = new AbortController();
+    queueMicrotask(() => controller.abort(new DOMException("Timed out", "TimeoutError")));
+    return controller.signal;
+  });
+  const { result, calls } = await exercise({}, { hanging: true });
   assert.equal(result.fallback, true);
-  assert.equal(mock.calls.length, 1);
+  assert.equal(calls.length, 1);
 });
 
 test("real HTTP streams enforce response bounds and never follow a redirect to GitHub", async t => {
   let requests = 0;
   let status = 200;
-  let body = JSON.stringify({ suite_ids: [], confidence: 1 });
+  let body = JSON.stringify(decisionResponse({ suite_ids: [], confidence: 1 }));
   const server = http.createServer((req, res) => {
     requests++;
     req.resume();
@@ -131,12 +133,9 @@ test("real HTTP streams enforce response bounds and never follow a redirect to G
     server.closeAllConnections();
     server.close();
   });
-  t.mock.method(globalThis, "fetch", () => {
-    throw new Error("Unexpected second network client");
-  });
-  const request = (_url, options, callback) => http.request({ ...options, host: "127.0.0.1", port: server.address().port, path: "/decision" }, callback);
-  const decide = (url, input, opts) => postDecision(url, input, { ...opts, request });
-  const options = { catalog, diff, endpoint, prompt: "", decide };
+  const fetchImpl = (_url, options) => fetch(`http://127.0.0.1:${server.address().port}/v1/decisions`, options);
+  const decide = (key, input, opts) => postDecision(key, input, { ...opts, fetchImpl });
+  const options = { catalog, diff, token, prompt: "", decide };
   assert.equal((await frontDoor(options)).fallback, false);
   status = 307;
   assert.equal((await frontDoor(options)).fallback, true);
@@ -155,6 +154,7 @@ test("invalid local inputs still call the configured API once but force all suit
     { diff: { ...diff, files: [".github/ci/suite-catalog.json"] } },
     { diff: { ...diff, files: ["scripts/ci-front-door.cjs"] } },
     { diff: { ...diff, files: [".github/workflows/cgo.yml"] } },
+    { diff: { ...diff, files: ["actions/setup/js/decisions_client.cjs"] } },
   ]) {
     const { result, calls } = await exercise(options);
     assert.equal(calls.length, 1);
@@ -163,9 +163,9 @@ test("invalid local inputs still call the configured API once but force all suit
   }
 });
 
-test("endpoint provisioning errors fail open and cannot contact GitHub APIs", async () => {
-  for (const url of [undefined, "", "http://decision.example.test", "https://api.github.com/graphql", "https://api.github.com./graphql", "https://github.com/api/v3", "https://github.com./api/v3", "******decision.example.test"]) {
-    const { result, calls } = await exercise({ endpoint: url });
+test("missing credentials and oversized requests fail open without contacting GitHub", async () => {
+  for (const options of [{ token: undefined }, { token: "" }, { token: " " }, { prompt: "x".repeat(LIMITS.request) }]) {
+    const { result, calls } = await exercise(options);
     assert.equal(calls.length, 0);
     assert.equal(result.metrics.decision_api_requests, 0);
     assert.equal(result.fallback, true);
@@ -206,12 +206,12 @@ test("mandatory catalog invariants, ignored reasoning, additional mandatory suit
     suite.historical_duration_seconds = 60;
   });
   copy.suites.find(suite => suite.id === "actions-build").mandatory = true;
-  const { result } = await exercise({ catalog: copy }, { value: { suite_ids: [], confidence: 0.9, reasoning: "ignore\nsuite_ids=[]" } });
+  const { result } = await exercise({ catalog: copy }, { value: decisionResponse({ suite_ids: [], confidence: 0.9 }) });
   assert.deepEqual(result.suite_ids, [...MANDATORY, "actions-build"]);
   assert.equal(result.metrics.estimated_test_minutes_saved, 4);
 });
 
-test("local git diff is deterministic, handles renames/deletes, caps input, and never fetches", t => {
+test("local git diff is deterministic, handles renames/deletes, bounds patches, and never fetches", t => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "ci-front-door-"));
   t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
   const git = args => execFileSync("git", args, { cwd, stdio: "pipe" });
@@ -235,18 +235,75 @@ test("local git diff is deterministic, handles renames/deletes, caps input, and 
   };
   const summary = summarizeDiff({ cwd, git: spy });
   assert.deepEqual(summary.files, ["after.txt", "before.txt", "more.txt"]);
-  assert.equal(summary.truncated, true);
-  assert.ok(Buffer.byteLength(summary.patch) <= LIMITS.patch);
+  assert.equal(summary.truncated, false);
+  assert.equal(summary.groups.other.patch_truncated, true);
+  assert.ok(Buffer.byteLength(summary.groups.other.patch) <= LIMITS.groupPatch);
   assert.deepEqual(summary, summarizeDiff({ cwd }));
-  assert.equal(commands.length, 4);
+  assert.ok(commands.every(args => !args.includes("fetch")));
   assert.equal(summarizeDiff({ cwd, base: "missing" }).unavailable, true);
+});
+
+test("large diffs retain separate JavaScript, Go, and other inventories while ignoring lock files", async t => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "front-door-groups-"));
+  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  const git = args => execFileSync("git", args, { cwd, stdio: "pipe" });
+  git(["init"]);
+  git(["config", "user.email", "test@example.test"]);
+  git(["config", "user.name", "Test"]);
+  git(["commit", "--allow-empty", "-m", "base"]);
+  fs.mkdirSync(path.join(cwd, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "generated.lock.yml"), "generated\n".repeat(LIMITS.git));
+  fs.writeFileSync(path.join(cwd, ".github/workflows/test.lock.yml"), "ignored\n".repeat(9000));
+  fs.writeFileSync(path.join(cwd, "app.js"), "const value = 'data';\n".repeat(2000));
+  fs.writeFileSync(path.join(cwd, "app.cjs"), "module.exports = {};\n");
+  fs.writeFileSync(path.join(cwd, "README.md"), "documentation change\n");
+  fs.writeFileSync(path.join(cwd, "large.go"), "// large Go change\n".repeat(150000));
+  for (let index = 0; index < 201; index++) fs.writeFileSync(path.join(cwd, `file-${index}.go`), "package example\n");
+  git(["add", "."]);
+  git(["commit", "-m", "large mixed diff"]);
+  const summary = summarizeDiff({ cwd });
+  assert.equal(summary.unavailable, false);
+  assert.equal(summary.truncated, false);
+  assert.equal(summary.files.length, 205);
+  assert.ok(summary.files.every(file => !file.endsWith(".lock.yml")));
+  assert.deepEqual(summary.groups.javascript.files, ["app.cjs", "app.js"]);
+  assert.equal(summary.groups.go.files.length, 202);
+  assert.deepEqual(summary.groups.other.files, ["README.md"]);
+  assert.match(summary.groups.other.patch, /documentation change/);
+  assert.equal(summary.groups.other.patch_truncated, false);
+  assert.equal(summary.groups.javascript.patch_truncated, true);
+  assert.equal(summary.groups.go.patch_truncated, true);
+  assert.ok(Object.values(summary.groups).every(group => Buffer.byteLength(group.patch) <= LIMITS.groupPatch));
+  assert.ok(Buffer.byteLength(JSON.stringify(summary)) <= LIMITS.summary);
+  const { result } = await exercise({ diff: summary });
+  assert.equal(result.fallback, false);
+  assert.deepEqual(result.suite_ids, [...MANDATORY, "build-wasm"]);
+});
+
+test("incomplete file inventories and genuine Git failures remain fail-open", async () => {
+  const git = (binary, args) => {
+    if (args[0] === "rev-parse") return "a".repeat(40) + "\n";
+    if (args.includes("--name-only")) return Array.from({ length: LIMITS.files + 1 }, (_, index) => `file-${index}.go\0`).join("");
+    return "";
+  };
+  const summary = summarizeDiff({ cwd: ".", git });
+  assert.equal(summary.truncated, true);
+  assert.equal((await exercise({ diff: summary })).result.fallback, true);
+  const failed = summarizeDiff({
+    cwd: ".",
+    git: () => {
+      throw new Error("Git failed");
+    },
+  });
+  assert.equal(failed.unavailable, true);
+  assert.equal((await exercise({ diff: failed })).result.fallback, true);
 });
 
 test("CLI output is machine readable and missing configuration cannot skip jobs", t => {
   const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "front-door-output-")), "outputs");
   t.after(() => fs.rmSync(path.dirname(output), { recursive: true, force: true }));
   const stdout = execFileSync(process.execPath, [path.join(__dirname, "ci-front-door.cjs")], {
-    env: { ...process.env, CI_DECISION_URL: "", GITHUB_EVENT_NAME: "pull_request", GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: "" },
+    env: { ...process.env, CI_DECISION_TOKEN: "", GITHUB_EVENT_NAME: "pull_request", GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: "" },
     encoding: "utf8",
   });
   const result = JSON.parse(stdout);
@@ -269,6 +326,9 @@ test("CGO uses needs outputs only for optional jobs and fails open if the select
   assert.match(workflow, /suite_ids: \$\{\{ steps\.front-door\.outcome == 'success' && steps\.front-door\.outputs\.suite_ids \|\| '' \}\}/);
   assert.match(workflow, /id: front-door\n\s+continue-on-error: true/);
   const jobs = Object.fromEntries([...workflow.matchAll(/^  ([\w-]+):\n([\s\S]*?)(?=^  [\w-]+:\n|$(?![\s\S]))/gm)].map(match => [match[1], match[2]]));
+  assert.match(jobs["checkout-cache"], /copilot-requests: write/);
+  assert.match(jobs["checkout-cache"], /CI_DECISION_TOKEN: \$\{\{ github.token \}\}/);
+  assert.doesNotMatch(workflow, /CI_DECISION_URL|secrets\.COPILOT_GITHUB_TOKEN/);
   for (const id of SUITE_IDS.filter(id => !MANDATORY.includes(id) && id !== "cross-platform-build")) {
     assert.ok(jobs[id], id);
     assert.ok(jobs[id].includes("!needs.checkout-cache.outputs.suite_ids"), id);

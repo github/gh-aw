@@ -55,6 +55,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      copilot-requests: write
     outputs:
       dependencies-changed: ${{ steps.dependencies.outputs.changed }}
       suite_ids: ${{ steps.front-door.outcome == 'success' && steps.front-door.outputs.suite_ids || '' }}
@@ -79,11 +80,11 @@ jobs:
       run: bash scripts/check-cgo-cjs-workflow-purity.sh
     - name: Test workflow timing summaries
       run: node --test scripts/workflow-timing.test.cjs
-    - name: Select CI suites with one Decision API request
+    - name: Select CI suites with GitHub Decisions
       id: front-door
       continue-on-error: true
       env:
-        CI_DECISION_URL: ${{ vars.CI_DECISION_URL }}
+        CI_DECISION_TOKEN: ${{ github.token }}
       run: node scripts/ci-front-door.cjs
     - name: Cache repository checkout
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0

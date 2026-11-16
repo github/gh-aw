@@ -40,7 +40,7 @@ async function evaluate(catalog, input) {
       catalog,
       diff: record.diff_summary,
       prompt: "",
-      endpoint: "",
+      token: "",
       decide: async () => record.response,
     });
     const omitted = SUITE_IDS.filter(id => !selection.suite_ids.includes(id));

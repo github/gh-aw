@@ -87,13 +87,16 @@ test("catalog and runtime safety contracts are explicit", () => {
   assert.match(prompt, /diff_summary:\{\.\.\.\},suite_catalog:catalog,prompt:string/);
 });
 
-test("endpoint provisioning never authorizes research calls or weaker fallback", () => {
-  assert.match(prompt, /repository variable `CI_DECISION_URL`/);
-  assert.match(prompt, /no authentication token/);
-  assert.match(prompt, /invalid endpoint configuration fails open with zero requests/);
+test("GitHub authentication never authorizes research calls or weaker fallback", () => {
+  assert.match(prompt, /https:\/\/api\.githubcopilot\.com\/v1\/decisions/);
+  assert.match(prompt, /built-in workflow token with job-scoped `copilot-requests: write`/);
+  assert.match(prompt, /Missing credentials fail open with zero requests/);
   assert.match(prompt, /exactly one request, with no retries or redirects/);
   assert.match(prompt, /never provision, probe, or call that service/);
   assert.match(prompt, /make no changes: report the gap/);
+  assert.match(prompt, /summarizer excludes `\.lock\.yml` files/);
+  assert.match(prompt, /`javascript`, `go`, and `other` groups/);
+  assert.match(prompt, /Incomplete filename inventories still fail open/);
 });
 
 test("candidate replay cannot reuse decisions for a different prompt or input", () => {
