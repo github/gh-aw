@@ -17,7 +17,7 @@ model: copilot/gpt-6-luna
 imports:
   - uses: shared/meta-analysis-base.md
     with:
-      toolsets: [default]
+      toolsets: [default, discussions, actions]
   - shared/otlp.md
   - shared/reporting.md
 tools:
@@ -340,10 +340,10 @@ failures. Include all counts in every workflow's `workflow_runs` object, includi
 set `"data_source": "github_api_fallback"` plus a `collection_note` describing why fallback was used.
 
 **Additional Metrics via GitHub API**:
-- Use GitHub MCP server (default toolset) to supplement with:
+- Use GitHub MCP server (`default`, `discussions`, and `actions` toolsets) to supplement with:
   - Engagement metrics: reactions on issues created by workflows
   - Comment counts on PRs created by workflows
-  - Discussion reply counts
+  - Discussion reply counts (`list_discussions`, then `get_discussion_comments`)
   
 **Quality Indicators**:
 - For merged PRs: Calculate merge time (created_at to merged_at)

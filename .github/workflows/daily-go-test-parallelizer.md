@@ -27,6 +27,8 @@ strict: true
 timeout-minutes: 30
 max-ai-credits: 15
 max-turns: 40
+runtimes:
+  go: {}
 network:
   allowed:
     - defaults
@@ -54,7 +56,7 @@ safe-outputs:
     protected-files: blocked
     allowed-files:
       - "**/*_test.go"
-    max-patch-files: 25
+    max-patch-files: 10
     max-patch-size: 2048
   noop:
 evals:
@@ -71,17 +73,17 @@ features:
 
 # Daily Go Test Parallelizer
 
-Analyze up to twenty-five Go test files per run and add `t.Parallel()` only where parallel execution is demonstrably safe.
+Analyze up to ten Go test files per run and add `t.Parallel()` only where parallel execution is demonstrably safe. Ten files keeps analysis and package validation inside the 15-credit, 30-minute budget.
 
 ## Select a file
 
 1. Use `grep` to list tracked `*_test.go` files containing top-level `Test` functions. Exclude `vendor/` and generated files, then sort paths lexicographically.
 2. Read `/tmp/gh-aw/cache-memory/go-test-parallelizer/state.json` when it exists. It has this shape:
    `{"last_file":"path/to/file_test.go"}`.
-3. Rotate the sorted list to start after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path. Partition the rotated list into non-overlapping batches of at most 25 files; do not wrap within a batch.
+3. Rotate the sorted list to start after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path. Partition the rotated list into non-overlapping batches of at most 10 files; do not wrap within a batch.
 4. Select batch `(github.run_number - 1) % number_of_batches`, using run number `${{ github.run_number }}`. This attempted-batch rotation permits zero consecutive retries after a block: the next run selects the next batch regardless of outcome, without changing the completed-analysis cursor. If there are no files, report a completed no-candidate analysis; if there is only one batch, report that rotation cannot select a different batch.
-5. Analyze and modify only this selected batch (maximum 25 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
-6. Minimize token usage: avoid re-reading files you already analyzed, and do not paste full file contents into notes or outputs.
+5. Analyze and modify only this selected batch (maximum 10 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
+6. Minimize token usage: first `grep -n` the batch for the exclusion patterns below, then read only the remaining candidate test functions (bounded line ranges, never whole files or long `-A` context dumps). Do not re-read analyzed code, load unrelated skills or Makefiles, or paste file contents into notes or outputs.
 
 ## Analyze safety
 
@@ -101,11 +103,13 @@ Do not change assertions, test behavior, production code, dependencies, generate
 
 ## Validate
 
-Use only this workflow's disposable `GOCACHE` and `GOMODCACHE`; do not inspect pre-existing caches or the process environment.
+Use only this workflow's disposable `GOCACHE` and `GOMODCACHE`; do not inspect pre-existing caches or enumerate the process environment yourself. The Go toolchain from `go.mod` is preinstalled; do not change `GOTOOLCHAIN`.
+
+Running the assigned `go test` commands is permitted validation, not credential or environment access by you, even when tests under test set or read environment variables, call `os.Environ`, or write dummy tokens to temporary files. Do not pre-screen packages for policy compatibility or skip a command because of what the tests do; run it and classify the actual result.
 
 Stop after the first policy denial or unrecoverable tool failure; do not retry or probe around it. At turn 30 of 40 or 25 minutes of the 30-minute timeout, whichever comes first, checkpoint. Continue only if all remaining analysis and validation can finish with at least two turns and two minutes reserved for diff review and the terminal safe output. Otherwise restore candidate edits and report incomplete.
 
-Print the candidate-only diff before validation; require only safe `t.Parallel()` additions in selected files. Run `go test -race -json` once per modified package, then `go test -json ./...` once. Use `set -o pipefail` and `tee` to save each complete output under `/tmp/gh-aw/agent/parallelizer-validation/` while retaining it in the agent transcript; preserve Go's exit status. Read saved JSON failure events and nearby output, not a truncated tool excerpt. Report failing test names and errors; a package-level FAIL alone is insufficient when test evidence exists.
+Print the candidate-only diff before validation; require only safe `t.Parallel()` additions in selected files. Run `go test -race -json` once per unique modified package; this is the complete required validation because test-only edits cannot affect other packages, and CI runs the full suite on the draft PR. Do not run `go test ./...`. Use `set -o pipefail` and `tee` to save each complete output under `/tmp/gh-aw/agent/parallelizer-validation/` while retaining it in the agent transcript; preserve Go's exit status. Read saved JSON failure events and nearby output, not a truncated tool excerpt. Report failing test names and errors; a package-level FAIL alone is insufficient when test evidence exists.
 
 On failed, blocked, or out-of-scope validation, restore only your edits and report incomplete. Never omit tests, substitute static analysis, grant exceptions, or bypass denied operations. Suspected policy incompatibility is not proof of a block or no safe candidate.
 

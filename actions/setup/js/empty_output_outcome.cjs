@@ -6,6 +6,7 @@ const path = require("path");
 const { collectUnifiedSession } = require("./unified_session.cjs");
 const { agentErrorSummaryText, collectAgentErrorEvidence, classifyDriverStderr, DRIVER_STDERR_SUMMARIES } = require("./agent_execution.cjs");
 const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
+const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./driver_exit_codes.cjs");
 const { sessionContext, isNestedSessionEvent } = require("./agent_session.cjs");
 const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
@@ -158,10 +159,20 @@ function collectOutcomeSession(rootDir = "/tmp/gh-aw") {
   });
 }
 
+/** @param {import("./types/unified_session").UnifiedSession} events @returns {any} */
+function workflowInfoData(events) {
+  return events.find(event => event.type === "workflow.info" && event.provenance.component === "workflow")?.data;
+}
+
+/** @param {import("./types/unified_session").UnifiedSession} events @returns {unknown} */
+function workflowEngineId(events) {
+  const info = workflowInfoData(events);
+  return process.env.GH_AW_ENGINE_ID || info?.engineId || info?.engine_id;
+}
+
 /** @param {import("./types/unified_session").UnifiedSession} events @returns {boolean} */
 function hasFailedFinalResult(events) {
-  const workflowInfo = events.find(event => event.type === "workflow.info" && event.provenance.component === "workflow");
-  const engineId = process.env.GH_AW_ENGINE_ID ?? workflowInfo?.data.engineId ?? workflowInfo?.data.engine_id;
+  const engineId = workflowEngineId(events);
   if (typeof engineId !== "string" || !["aider", "gemini"].includes(engineId)) return false;
   const result = events.filter(event => event.type === "session.result" && event.provenance.component === "agent" && event.provenance.phase === "agent" && !isNestedSessionEvent(event)).at(-1);
   return Array.isArray(result?.data.errors) && result.data.errors.length > 0;
@@ -297,7 +308,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     if (evidence.status === "recorded") {
       try {
         const execution = JSON.parse(evidence.content);
-        const runId = process.env.GITHUB_RUN_ID || events.find(event => event.type === "workflow.info" && event.provenance.component === "workflow")?.data.runId;
+        const runId = process.env.GITHUB_RUN_ID || workflowInfoData(events)?.runId;
         const runAttempt = process.env.GITHUB_RUN_ATTEMPT;
         agentNotStarted =
           execution?.version === 1 &&
@@ -326,7 +337,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     redactedLines.push(event.type === "json" ? redactJson(event.value) + ending : redact(event.rawLine));
   }
   const safeStdio = redactedLines.join("");
-  const rawSourceEngine = process.env.GH_AW_ENGINE_ID === "aider" || events.some(event => event.type === "workflow.info" && event.provenance.component === "workflow" && event.data.engineId === "aider") ? "aider" : undefined;
+  const rawSourceEngine = process.env.GH_AW_ENGINE_ID === "aider" || events.some(event => event.type === "workflow.info" && event.provenance.component === "workflow" && event.data?.engineId === "aider") ? "aider" : undefined;
   const engineSummary = agentNotStarted ? "" : agentErrorSummaryText(safeStdio, events, rawSourceEngine);
   if (engineSummary) diagnostics.add(engineSummary);
   const driverExitSignal = crashSignalNameForExitCode(driverExitCode) ?? ({ 130: "SIGINT", 137: "SIGKILL", 143: "SIGTERM" }[driverExitCode] || undefined);
@@ -359,7 +370,18 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   }
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   const errorCodes = executionErrorCodes.filter(code => Number.isSafeInteger(code) && code >= 400 && code <= 599);
+  const engineId = workflowEngineId(events);
+  // gh-aw's Copilot driver reserves these codes; other engines may reuse the numbers.
+  const engineExitMeanings =
+    engineId === "copilot"
+      ? {
+          [COPILOT_MODEL_VERIFICATION_EXIT_CODE]: "Copilot main-session model verification failed",
+          // Exit 80 follows any workflow tool denial; only the guard event proves the limit was reached.
+          [WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE]: `Session failed after a workflow tool permission denial${toolDenialLimitExceeded ? "; max-tool-denials limit reached" : ""} (use only allowed tools.bash commands, or allow the denied command)`,
+        }
+      : {};
   const driverExitMeaning =
+    engineExitMeanings[driverExitCode] ||
     { 1: "General failure", 2: "Invalid usage (conventional; engine-specific)", 124: "Command timed out (timeout utility convention)", 126: "Command is not executable", 127: "Command not found" }[driverExitCode] ||
     (driverExitSignal ? `Terminated by ${driverExitSignal} (128 + signal number)` : "Unknown (engine-specific exit code)");
   const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));

@@ -34,6 +34,8 @@ imports:
   - shared/smoke-test-brevity.md
 network:
   allowed: []
+runtimes:
+  go: {}
 tools:
   cache-memory: true
   github:
