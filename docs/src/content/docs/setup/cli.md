@@ -1296,9 +1296,9 @@ Merge conflicts leave the existing workflow and lock file unchanged by default. 
 
 Before updating action, skill, and plugin pins, `update` scans workflow Markdown files for conflict markers. A missing workflow directory is treated as empty. Other scan errors, including unreadable files or broken symlinks inside an existing directory, fail the command and skip these pin updates because the absence of conflict markers cannot be verified.
 
-By default, `update` also force-updates all GitHub Actions referenced in your workflows (both in `actions-lock.json` and workflow files) to their latest major version. Use `--no-release-bump` to restrict force-updates to core `actions/*` actions only.
+By default, `update` also force-updates all GitHub Actions referenced in your workflows (both in `actions-lock.json` and workflow files) to their latest major version. Use `--no-release-bump` to restrict force-updates to core `actions/*` actions only. The `github/gh-aw-actions/setup` runtime action is always pinned to the installed gh-aw version, not the latest release.
 
-Container digest pins are refreshed on a best-effort basis using Docker Buildx or `crane`. If a lookup fails, `update` prints one short informational message with the reason and preserves existing pins. Set `DEBUG=cli:update_container_pins` for per-image diagnostics.
+Container digest pins are refreshed on a best-effort basis using Docker Buildx or `crane`. Built-in containers (firewall, MCP gateway, router, `gh-aw-node`, GitHub MCP server) use the digests bundled with the installed gh-aw version instead of the registry. If a lookup fails, `update` prints one short informational message with the reason and preserves existing pins. Set `DEBUG=cli:update_container_pins` for per-image diagnostics.
 
 If no workflows in the repository contain a `source` field, the command exits gracefully with an informational message rather than an error. This is expected behavior for repositories that have not yet added updatable workflows.
 

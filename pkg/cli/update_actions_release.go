@@ -403,6 +403,27 @@ func getActionSHAForTag(ctx context.Context, repo, tag string) (string, error) {
 	return sha, nil
 }
 
+// getActionSHAForTagViaGit resolves a tag to its underlying commit using git ls-remote.
+// parseActionTagRefs prefers peeled SHAs for annotated tags.
+func getActionSHAForTagViaGit(ctx context.Context, repo, tag string) (string, error) {
+	baseRepo := gitutil.ExtractBaseRepo(repo)
+	repoURL := fmt.Sprintf("%s/%s.git", getGitHubHostForRepo(baseRepo), baseRepo)
+
+	// #nosec G204 -- repoURL is constructed from the known setup-action repository
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--tags", repoURL)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve tag via git ls-remote: %w", err)
+	}
+
+	_, tagToSHA := parseActionTagRefs(string(output))
+	sha, ok := tagToSHA[tag]
+	if !ok {
+		return "", fmt.Errorf("tag %s not found in %s", tag, baseRepo)
+	}
+	return sha, nil
+}
+
 // actionRefPattern matches "uses: org/repo@SHA-or-tag" in workflow files for any org.
 // Requires the org to start with an alphanumeric character and contain only alphanumeric,
 // hyphens, or underscores (no dots, matching GitHub's org naming rules) to exclude local

@@ -571,3 +571,40 @@ func TestUpdateSkillRefsInContentOnlyRewritesFrontmatterBlock(t *testing.T) {
 		t.Fatalf("markdown body was rewritten instead of frontmatter\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
 }
+
+func TestUpdateActionRefsInContent_SetupActionPinnedToCompilerVersion(t *testing.T) {
+	setReleaseVersionForTest(t, "v0.68.3", true)
+
+	const cliSHA = "cliversha12345678901234567890123456789012"
+	deps := newActionUpdateDepsWithLatestRelease(func(_ context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
+		t.Errorf("getLatestRelease must not be called, got %s", repo)
+		return currentVersion, "", nil
+	})
+	deps.getActionSHAForTag = func(_ context.Context, repo, tag string) (string, error) {
+		if repo != "github/gh-aw-actions" || tag != "v0.68.3" {
+			t.Errorf("unexpected tag lookup %s@%s", repo, tag)
+		}
+		return cliSHA, nil
+	}
+
+	input := `steps:
+  - uses: github/gh-aw-actions/setup@v0.67.0
+  - uses: github/gh-aw-actions/setup@11bd71901bbe5b1630ceea73d27597364c9af683 # v0.69.0
+  - uses: other/action@v1`
+	want := `steps:
+  - uses: github/gh-aw-actions/setup@v0.68.3
+  - uses: github/gh-aw-actions/setup@` + cliSHA + `  # v0.68.3
+  - uses: other/action@v1`
+
+	// allowMajor=false: non-core actions are skipped, but setup is still pinned.
+	changed, got, err := updateActionRefsInContentWithDeps(context.Background(), deps, input, make(map[string]latestReleaseResult), make(map[string]coolDownCheckResult), false, false, 0)
+	if err != nil {
+		t.Fatalf("updateActionRefsInContent() error = %v", err)
+	}
+	if !changed {
+		t.Error("updateActionRefsInContent() changed = false, want true")
+	}
+	if got != want {
+		t.Errorf("updateActionRefsInContent() output mismatch\nGot:\n%s\nWant:\n%s", got, want)
+	}
+}
