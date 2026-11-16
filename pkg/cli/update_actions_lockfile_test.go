@@ -342,6 +342,11 @@ func TestCompilerPinnedActionTag_RequiresReleaseBuild(t *testing.T) {
 	if got := compilerPinnedActionTag("github/gh-aw-actions/setup"); got != "v0.68.3" {
 		t.Errorf("compilerPinnedActionTag() = %q for release build, want v0.68.3", got)
 	}
+
+	SetVersionInfo("v0.69.0-beta.1")
+	if got := compilerPinnedActionTag("github/gh-aw-actions/setup"); got != "v0.69.0-beta.1" {
+		t.Errorf("compilerPinnedActionTag() = %q for prerelease build, want v0.69.0-beta.1", got)
+	}
 }
 
 // TestUpdateActions_NeverDowngradesRefreshesCurrentTagSHA verifies that when the

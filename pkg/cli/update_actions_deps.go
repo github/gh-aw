@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/github/gh-aw/pkg/errorutil"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/semverutil"
@@ -43,11 +44,11 @@ func isGhAwSetupAction(repo string) bool {
 
 // compilerReleaseTag returns the running compiler version as a release tag
 // (e.g. "v0.68.3"), or "" for dev, dirty, or otherwise non-release builds. Release
-// status comes from workflow.IsReleasedVersion so a semver-shaped version on a
+// status comes from workflow.IsRelease so a semver-shaped version on a
 // non-release binary still falls back to the regular update policy.
 func compilerReleaseTag() string {
 	version := GetVersion()
-	if !workflow.IsReleasedVersion(version) || strings.Contains(version, "-") || parseVersion(version) == nil {
+	if !workflow.IsRelease() || parseVersion(version) == nil {
 		return ""
 	}
 	return semverutil.EnsureVPrefix(version)
@@ -72,6 +73,14 @@ func resolveActionUpdateTarget(ctx context.Context, deps actionUpdateDeps, repo,
 		updateActionsDepsLog.Printf("Pinning %s to compiler version %s", repo, tag)
 		sha, err := deps.getActionSHAForTag(ctx, gitutil.ExtractBaseRepo(repo), tag)
 		if err != nil {
+			if errorutil.IsAuthError(err.Error()) && deps.getActionSHAForTagViaGit != nil {
+				updateActionsDepsLog.Printf("GitHub API authentication failed, resolving %s@%s via git ls-remote", repo, tag)
+				gitSHA, gitErr := deps.getActionSHAForTagViaGit(ctx, gitutil.ExtractBaseRepo(repo), tag)
+				if gitErr == nil {
+					return tag, gitSHA, nil
+				}
+				return "", "", fmt.Errorf("cannot resolve SHA for compiler version %s via GitHub API and git: API error: %w, Git Error: %w", tag, err, gitErr)
+			}
 			return "", "", fmt.Errorf("cannot resolve SHA for compiler version %s: %w", tag, err)
 		}
 		return tag, sha, nil
@@ -80,11 +89,12 @@ func resolveActionUpdateTarget(ctx context.Context, deps actionUpdateDeps, repo,
 }
 
 type actionUpdateDeps struct {
-	getLatestRelease       func(ctx context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error)
-	getLatestReleaseViaGit func(ctx context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error)
-	runGHReleasesAPI       func(ctx context.Context, baseRepo string) ([]byte, error)
-	getActionSHAForTag     func(ctx context.Context, repo, tag string) (string, error)
-	checkCoolDown          func(ctx context.Context, repo, tag string, coolDown time.Duration) coolDownCheckResult
+	getLatestRelease         func(ctx context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error)
+	getLatestReleaseViaGit   func(ctx context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error)
+	runGHReleasesAPI         func(ctx context.Context, baseRepo string) ([]byte, error)
+	getActionSHAForTag       func(ctx context.Context, repo, tag string) (string, error)
+	getActionSHAForTagViaGit func(ctx context.Context, repo, tag string) (string, error)
+	checkCoolDown            func(ctx context.Context, repo, tag string, coolDown time.Duration) coolDownCheckResult
 }
 
 type cachedLatestRelease struct {
@@ -100,6 +110,7 @@ func newCachedActionUpdateDeps(base actionUpdateDeps) actionUpdateDeps {
 	latestReleases := make(map[string]*syncutil.OnceLoader[cachedLatestRelease])
 	releaseLists := make(map[string]*syncutil.OnceLoader[[]byte])
 	shas := make(map[string]*syncutil.OnceLoader[string])
+	gitShas := make(map[string]*syncutil.OnceLoader[string])
 	cooldowns := make(map[string]*syncutil.OnceLoader[coolDownCheckResult])
 
 	cached := base
@@ -132,6 +143,16 @@ func newCachedActionUpdateDeps(base actionUpdateDeps) actionUpdateDeps {
 			updateActionsDepsLog.Printf("Cache miss: resolving SHA for %s@%s", repo, tag)
 			return base.getActionSHAForTag(ctx, repo, tag)
 		})
+	}
+	if base.getActionSHAForTagViaGit != nil {
+		cached.getActionSHAForTagViaGit = func(ctx context.Context, repo, tag string) (string, error) {
+			repo = gitutil.ExtractBaseRepo(repo)
+			key := repo + "|" + tag
+			return loadActionUpdateResult(&mu, gitShas, key, func() (string, error) {
+				updateActionsDepsLog.Printf("Cache miss: resolving SHA for %s@%s via git ls-remote", repo, tag)
+				return base.getActionSHAForTagViaGit(ctx, repo, tag)
+			})
+		}
 	}
 	cached.checkCoolDown = func(ctx context.Context, repo, tag string, coolDown time.Duration) coolDownCheckResult {
 		key := fmt.Sprintf("%s|%s|%s", repo, tag, coolDown)
@@ -168,6 +189,7 @@ func defaultActionUpdateDeps() actionUpdateDeps {
 			}
 			return workflow.RunGHCombinedContext(ctx, "Fetching releases...", "api", "--paginate", fmt.Sprintf("/repos/%s/releases?per_page=100", baseRepo), "--jq", ".[].tag_name")
 		},
-		getActionSHAForTag: getActionSHAForTag,
+		getActionSHAForTag:       getActionSHAForTag,
+		getActionSHAForTagViaGit: getActionSHAForTagViaGit,
 	})
 }
