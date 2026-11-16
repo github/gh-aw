@@ -8481,7 +8481,9 @@
     ];
     // an illustrative, simplified scorecard and fix; completeness drops when only the 8,000-byte prefix is read
     const FULL = "completeness  ●●●●○",
-      CUTS = "completeness  ●●●○○";
+      CUTS = "completeness  ●●●○○",
+      AVG = "avg 4.4 / 5",
+      AVG_CUT = "avg 4.2 / 5";
     const PANELS = [
       [
         600,
@@ -8495,7 +8497,7 @@
           ["", "security      ●●●●●"],
           ["", "clarity       ●●●●○"],
           ["", FULL],
-          ["pass", "avg 4.4 / 5"],
+          ["pass", AVG],
         ],
       ],
       [
@@ -8578,7 +8580,8 @@
     svg.innerHTML = g;
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".sdd-dot"),
-      comp = $("ppxL0_5");
+      comp = $("ppxL0_5"),
+      avg = $("ppxL0_6");
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const CYC = 18000;
     let t0 = 0,
@@ -8614,9 +8617,9 @@
       at(4500, () => on("ppxS0"));
       [0, 1, 2, 3, 4, 5, 6].forEach(j => at(4700 + j * 230, () => (on(`ppxL0_${j}`), sfx.key(0.5))));
       flight(6400, "ppxE3", 500, "#ab7df8", 6);
-      at(6900, () => (on("ppxLane2"), on("ppxDoc"), on("ppxCut"), on("ppxCl"), sfx.cut()));
+      at(6900, () => (on("ppxLane2"), on("ppxDoc"), on("ppxCut"), on("ppxCl")));
       at(7400, () => (on("ppxHide"), on("ppxSeen"), on("ppxUnseen"), on("ppxRule", "bad")));
-      at(8000, () => ((comp.textContent = sp(CUTS)), on("ppxL0_5", "drop"), on("ppxS0", "bad"), on("ppxDrop"), sfx.omen()));
+      at(8000, () => ((comp.textContent = sp(CUTS)), (avg.textContent = sp(AVG_CUT)), on("ppxL0_5", "drop"), on("ppxL0_6", "drop"), on("ppxS0", "bad"), on("ppxDrop"), sfx.omen()));
       at(8600, () => (on("ppxIssue"), sfx.notify()));
       flight(8900, "ppxE4", 600, "#ab7df8", 7);
       at(9500, () => (on("ppxLane3"), on("ppxCopilot"), on("ppxS1"), sfx.key(0.8)));
@@ -8632,8 +8635,10 @@
         off("ppxDrop");
         on("ppxBack");
         comp.textContent = sp(FULL);
+        avg.textContent = sp(AVG);
         off("ppxL0_5", "drop");
         on("ppxL0_5", "up");
+        off("ppxL0_6", "drop");
         off("ppxS0", "bad");
         on("ppxS0", "ok");
         sfx.pop(9);
@@ -8646,15 +8651,14 @@
       73, 74, 75, 76, 77, 78, 79, 81, 82, 83, 84, 85, 86, 87, 88, 106, 107, 108, 109, 110, 111, 112, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 148,
       149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
     ];
-    const FIXED = {
-      g: [0, 2, 21, 22, 24, 26, 27, 47, 49, 53, 55, 58, 64, 69, 121, 124, 125, 126, 153, 154, 155, 156, 158],
-      o: [118, 160],
-    };
+    // one class per report, by index (days can repeat)
+    const CLS = "gxgxxxxxxxxxxxxxxxxxxggxgxggxxxxxxxxxxxxxxxxgxgxxxgxgxxgxxxxgxxxgxxxxxxxxxxxxxxxxxxxxxxxxxoxxgxxgggxxxxxxxxxxxxxxxxxxxxxxxxxxggggxgxo";
     const TW = 540,
       TX = d => 10 + (d * (TW - 20)) / 160;
     let tl = `<text class="t" x="0" y="16">133 REPORTS · <tspan class="g">23 GUIDANCE</tspan> · 2 OTHER FIXES</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
     DAYS.forEach((d, i) => {
-      const [cls, hh] = FIXED.g.includes(d) ? ["g", 50] : FIXED.o.includes(d) ? ["o", 30] : ["x", 16];
+      const cls = CLS[i],
+        hh = { g: 50, o: 30 }[cls] || 16;
       tl += `<rect class="${cls}" style="--i:${Math.round(i / 3)}" x="${TX(d) - 1.5}" y="${96 - hh}" width="3" height="${hh}" rx="1"/>`;
     });
     [
@@ -8680,6 +8684,7 @@
     const reset = () => {
       svg.querySelectorAll(".on, .hot, .ok, .bad, .gone, .fixed, .drop, .up").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone", "fixed", "drop", "up"));
       comp.textContent = sp(FULL);
+      avg.textContent = sp(AVG);
       dot.style.opacity = 0;
       fly = null;
       script();

@@ -9,9 +9,12 @@ const REPO = process.env.REPO || "github/gh-aw";
 const END = process.argv[2] || new Date().toISOString().slice(0, 10);
 const gh = args => JSON.parse(execFileSync("gh", args, { encoding: "utf8", maxBuffer: 1 << 28 }));
 const DAY = 864e5;
+// Snapshot cutoff: end of the END day (UTC). Later merges and closures do not count.
+const CUTOFF = Date.parse(END + "T00:00:00Z") + DAY;
+const before = t => t && Date.parse(t) < CUTOFF;
 
 // 1. Daily report issues (label + title prefix; the label alone also matches older experiments).
-const issues = gh(["issue", "list", "-R", REPO, "--state", "all", "--limit", "1000", "--label", "agent-research", "--search", `created:<=${END}`, "--json", "number,title,createdAt,state,stateReason,closedByPullRequestsReferences"])
+const issues = gh(["issue", "list", "-R", REPO, "--state", "all", "--limit", "1000", "--label", "agent-research", "--search", `created:<=${END}`, "--json", "number,title,createdAt,closedAt,stateReason,closedByPullRequestsReferences"])
   .filter(i => i.title.startsWith("Agent Persona Exploration - "))
   .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -29,13 +32,13 @@ const REPORTS = [];
 const detail = [];
 for (const i of issues) {
   const day = Math.round((Date.parse(i.createdAt.slice(0, 10) + "T00:00:00Z") - first) / DAY);
-  const merged = i.closedByPullRequestsReferences.map(r => pr(r.number)).filter(p => p.mergedAt);
-  let c = i.state === "OPEN" ? "open" : "x";
+  const merged = i.closedByPullRequestsReferences.map(r => pr(r.number)).filter(p => before(p.mergedAt));
+  let c = before(i.closedAt) ? "x" : "open";
   if (merged.length) c = merged.some(p => p.files.some(f => GUIDE.test(f.path))) ? "g" : "o";
   REPORTS.push([day, c]);
   detail.push([day, c, i.number, i.stateReason, merged.map(p => `${p.number} ${p.author.login}`)]);
 }
-const fixPrs = [...prCache.values()].filter(p => p.mergedAt);
+const fixPrs = [...prCache.values()].filter(p => before(p.mergedAt));
 const count = c => REPORTS.filter(r => r[1] === c).length;
 const out = {
   snapshot: END,
@@ -51,8 +54,10 @@ const out = {
   copilotPrs: fixPrs.filter(p => p.author.login === "app/copilot-swe-agent").length,
   botPrs: fixPrs.filter(p => BOTS.test(p.author.login)).length,
   personas: (readFileSync(".github/workflows/agent-persona-explorer.md", "utf8").match(/^\d+\. \*\*[^*]+\*\* - /gm) || []).length,
-  agentBytes: readFileSync(".github/agents/agentic-workflows.md").length,
+  agentBytes: Buffer.byteLength(readFileSync(".github/agents/agentic-workflows.md")),
   REPORTS,
+  // Paste into the slide block: one bar per report, classified by index (days can repeat).
+  deck: `const DAYS = ${JSON.stringify(REPORTS.map(r => r[0]))};\nconst CLS = "${REPORTS.map(r => (r[1] === "open" ? "x" : r[1])).join("")}";`,
   detail,
 };
 process.stdout.write(JSON.stringify(out, null, 1) + "\n");

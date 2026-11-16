@@ -21,7 +21,7 @@ Recompute with `personas-probe-patch.mjs`, then patch `deck.js`. Read-only on Gi
 - CSS prefix: `ppx-` (persona chips, guidance file, cut line, rule, stamps, timeline colours). The strip reuses `.dhm`, `.dhm-k`, `.dhm-tl` and `.dhm-cap` from Docs that heal; panels reuse `sdd-`.
 - Data lives in the slide block:
   - `const DAYS = [...]`: one entry per report issue, as days since the first report (repeats allowed).
-  - `const FIXED = { g: [...], o: [...] }`: days whose report a merged PR closed; `g` changed agent guidance, `o` something else. Every other day is drawn grey.
+  - `const CLS = "gxo…"`: one character per report, in `DAYS` order (bars are classified by index, so repeated days can differ). `g` = closed by a merged PR that changed agent guidance, `o` = merged PR elsewhere, `x` = no merged PR (drawn grey).
   - `TX = d => 10 + (d * (TW - 20)) / 160`: `160` is the axis span in days. Set it to `max(day)`.
   - Month ticks: `[[8,"Jun"],[38,"Jul"],[69,"Aug"],[100,"Sep"],[130,"Oct"],[155,"Nov"]]`, day offsets near mid-month (`Jun` sits right of the first bar).
   - Timeline title: `"133 REPORTS · 23 GUIDANCE · 2 OTHER FIXES"`.
@@ -34,6 +34,7 @@ Recompute with `personas-probe-patch.mjs`, then patch `deck.js`. Read-only on Gi
 
 - **All-time since issues.** Until 7 Jun 2026 the workflow posted discussions; the window starts at the first issue report (8 Jun 2026) and ends at the snapshot date. Roll it forward by passing today's date; the start stays fixed.
 - Day counts are differences of UTC dates. Current value: 160 d (the newest report falls on the snapshot day).
+- **Cutoff:** everything is measured as of the end of the snapshot day (UTC). PRs merged later do not count as fixes or in author totals, and an issue counts as open unless its `closedAt` is before the cutoff, so re-running an old snapshot gives the same numbers.
 
 ## 3. Sources
 
@@ -53,14 +54,15 @@ Output shape:
 ```json
 { "snapshot": "YYYY-MM-DD", "window": [first,end], "days", "reports", "fixed",
   "guidance", "other", "noMergedPr", "open", "mergedPrs", "copilotPrs", "botPrs",
-  "personas", "agentBytes", "REPORTS": [[day,"g|o|x|open"]...], "detail": [...] }
+  "personas", "agentBytes", "REPORTS": [[day,"g|o|x|open"]...],
+  "deck": "const DAYS = [...];\nconst CLS = \"...\";", "detail": [...] }
 ```
 
 The script's underlying queries (`REPO` env var, default gh-aw):
 
 1. Reports, keeping only titles that start with `Agent Persona Exploration - `:
-   `gh issue list --state all --limit 1000 --label agent-research --search 'created:<=END' --json number,title,createdAt,state,stateReason,closedByPullRequestsReferences`
-2. For each closing PR: `gh pr view N --json number,author,mergedAt,files`. Only merged PRs count. The class is `g` if any file matches `^\.github/(aw|agents|skills/agentic-workflows)/`, else `o`.
+   `gh issue list --state all --limit 1000 --label agent-research --search 'created:<=END' --json number,title,createdAt,closedAt,stateReason,closedByPullRequestsReferences`
+2. For each closing PR: `gh pr view N --json number,author,mergedAt,files`. Only PRs merged before the cutoff count. The class is `g` if any file matches `^\.github/(aw|agents|skills/agentic-workflows)/`, else `o`.
 
 Sanity baseline at the 2026-11-15 snapshot:
 
@@ -71,14 +73,14 @@ Sanity baseline at the 2026-11-15 snapshot:
 | merged PRs / by Copilot / by bot | 25 / 22 / 1 |
 | no merged PR | 108 (all NOT_PLANNED: replaced by the next report) |
 | personas | 9 |
-| agent file | 17,035 B |
+| agent file | 17,035 B (`Buffer.byteLength`, UTF-8) |
 
 If the new numbers are lower than the baseline, suspect the query, not the data: check the label, the title filter and pagination first.
 
 ## 5. Update steps
 
 1. **KPIs:** set the four `kpi()` values from `reports`, `fixed` (with `copilotPrs`), `guidance` and `agentBytes`.
-2. **Timeline:** rebuild `DAYS` from `REPORTS[*][0]` and `FIXED.g`/`FIXED.o` from the `g`/`o` entries; update the `160` axis span in `TX` and the month ticks (day offsets from `window[0]`, about 6 labels). Update the title counts from `reports`, `guidance` and `other`.
+2. **Timeline:** replace `DAYS` and `CLS` with the two lines in `deck` (open reports are emitted as `x`); update the `160` axis span in `TX` and the month ticks (day offsets from `window[0]`, about 6 labels). Update the title counts from `reports`, `guidance` and `other`.
 3. **Caption:** update the snapshot date, the window end and its day count. Keep "MEASURED ·" and "loop illustrative", and keep the caption ending left of the sound button.
 4. **Notes:** update the snapshot date, the window, the persona count, the agent-file size and every number in the measured sentence. Keep "…illustrative, simplified example…" so the notes still match `/illustrative|synthetic|simulated/i`.
 5. **`.github/skills/cracktro/content-rules.md`:** update the numbers and dates in the "Personas · Probe · Patch slide" Exception bullet. Do not change other bullets.
