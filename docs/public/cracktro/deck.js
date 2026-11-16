@@ -755,6 +755,9 @@
   .mdt-svg .sdd-stamp.g { fill: #3fb950; }
   .mdm-tl .s { fill: #3fb950; } .mdm-tl .p { fill: #ab7df8; } .mdm-tl .o { fill: #79c0ff; } .mdm-tl .x { fill: #6e7681; }
   .mdm-tl tspan.s, .mdm-tl tspan.p { font-weight: 700; }
+  .ddr-lbl { fill: #9198a1; font: 600 20px var(--mono); text-anchor: middle; transition: fill .4s; } .fm-task.on .ddr-lbl { fill: #3fb950; }
+  .ddm-tl rect { fill: #ab7df8; } .ddm-tl rect.h { fill: #ab7df877; }
+  .ddm-tl .v { fill: #c9d1d9; font: 600 13px var(--mono); text-anchor: middle; }
   .ppx-pc { fill: #1f6feb; } .ppx-sc { fill: #9198a1; font: italic 500 19px "Mona Sans"; text-anchor: middle; }
   .ppx-svg .sdd-ln.drop { fill: #ff7b72; font-weight: 700; } .ppx-svg .sdd-ln.up { fill: #3fb950; font-weight: 700; }
   .ppx-doc { opacity: .35; transition: opacity .4s; } .ppx-doc.on { opacity: 1; }
@@ -7581,6 +7584,222 @@
     });
   }
 
+  // Decide · Draft · Record: a ready pull request with no linked decision gets a drafted ADR that is finalized, merged with the code and read back by later agents
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const node = (id, cx, y, w, label, fill, icon, cls = "") =>
+      `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${cx}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${cx + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${cx}" cy="${y}" r="34" fill="${fill}"/>${ico(icon, cx, y + 1, icon === "copilot" ? 38 : 30)}</g>`;
+    // an illustrative pull request, its drafted ADR and the review
+    const PANELS = [
+      [
+        40,
+        540,
+        "pull request",
+        "READY",
+        [
+          ["h", "Cache hot reads"],
+          ["", "src/ pkg/   +312 lines"],
+          ["", "ADR linked        –"],
+          ["", "label  implementation"],
+          ["pass", "→ needs a decision"],
+        ],
+      ],
+      [
+        680,
+        620,
+        "docs/adr/use-cache.md",
+        "DRAFT",
+        [
+          ["h", "# Use a read-through cache"],
+          ["q", "Status: Draft"],
+          ["fn", "## Context"],
+          ["", "  hot reads hit the API"],
+          ["fn", "## Decision"],
+          ["", "  cache, 5-minute TTL"],
+          ["fn", "## Alternatives · Consequences"],
+        ],
+      ],
+      [
+        1460,
+        640,
+        "review",
+        "PR",
+        [
+          ["fn", "docs/adr/use-cache.md"],
+          ["add", "+ why not a CDN"],
+          ["gone", "Status: Draft"],
+          ["add", "Status: Accepted"],
+          ["", "code + decision together"],
+          ["pass", "✓ merged"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly]
+    const EDGES = [
+      ["ddrE0", "M342 106 H682", "p", "ready for review", 512, 90],
+      ["ddrE1", "M1104 106 H1462", "p", "push", 1283, 90],
+      ["ddrE2", "M1780 544 V630 H1028", "g", "merged with the code", 1520, 614],
+      ["ddrE3", "M954 630 H458", "p", "why was it built this way?", 704, 614],
+    ];
+    let g = `<defs><clipPath id="ddrClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="ddrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="ddrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 620, "READY"],
+      [620, 1400, "DRAFT"],
+      [1400, VW, "DECIDE"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="ddrLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([x, w, file, tag, lines], i) => {
+      g += `<g class="sdd-panel" id="ddrP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${w}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + w}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + w - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => (g += `<text class="sdd-ln ${c}" id="ddrL${i}_${j}" x="${x + 22}" y="${PY + 88 + j * 40}">${sp(s)}</text>`));
+      g += `</g>`;
+    });
+    for (const [id, d, c, lab, lx, ly] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#ddr${c === "g" ? "G" : "P"})"/>`;
+      if (lab) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab}</text>`;
+    }
+    g += node("ddrPR", 88, 106, 250, "PR ready", "#238636", "pr", "g");
+    g += node("ddrAgent", 720, 106, 380, "Design Decision Gate", "#8957e5", "copilot");
+    g += `<g class="fm-task" id="ddrMaint"><g class="fm-pill b"><rect x="1500" y="81" width="300" height="50" rx="25"/><text x="${1500 + 18 + 150}" y="114">Maintainer</text></g>
+      <circle cx="1500" cy="106" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="1469" y="75" width="62" height="62" clip-path="url(#ddrClip)"/></g>`;
+    g += `<g class="fm-task" id="ddrDocs"><circle cx="990" cy="630" r="34" fill="#238636"/>${ico("file", 990, 631, 30)}<text class="ddr-lbl" x="990" y="584">docs/adr</text></g>`;
+    g += node("ddrNext", 120, 630, 330, "Next agent", "#8957e5", "copilot");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg ddr-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    let start = 0,
+      len = 0,
+      ev = [],
+      evI = 0,
+      fly = null;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const begin = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "gone"));
+      dot.style.opacity = 0;
+      fly = null;
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, n) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(n);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("ddrLane0"), on("ddrPR"), on("ddrP0"), sfx.key(0.6)));
+      [0, 1, 2, 3, 4].forEach(j => at(400 + j * 230, () => (on(`ddrL0_${j}`), sfx.key(0.5))));
+      at(1600, () => (on("ddrP0", "ok"), sfx.pop(2)));
+      flight(1900, "ddrE0", 600, "#ab7df8", 3);
+      at(2500, () => (on("ddrLane1"), on("ddrAgent"), on("ddrP1"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(2700 + j * 230, () => (on(`ddrL1_${j}`), sfx.key(0.5))));
+      flight(4400, "ddrE1", 600, "#ab7df8", 5);
+      at(5000, () => (on("ddrLane2"), on("ddrMaint"), on("ddrP2"), sfx.review()));
+      [0, 1, 2, 3, 4].forEach(j => at(5200 + j * 300, () => (on(`ddrL2_${j}`), sfx.key(0.5))));
+      at(6000, () => on("ddrL2_2", "gone"));
+      at(6900, () => (on("ddrL2_5"), on("ddrP2", "ok"), sfx.pop(8)));
+      flight(7200, "ddrE2", 1500, "#3fb950", 7);
+      at(8700, () => (on("ddrDocs"), on("ddrP1", "ok"), sfx.pop(9)));
+      flight(9300, "ddrE3", 1200, "#ab7df8", 10);
+      at(10500, () => (on("ddrNext"), sfx.key(0.8)));
+      len = 14000;
+    };
+    // measured: ADR files on gh-aw main by month first added (snapshot 16 Nov 2026; November is partial)
+    const MONTHS = [
+      ["Apr", 101],
+      ["May", 94],
+      ["Jun", 108],
+      ["Jul", 174],
+      ["Aug", 151],
+      ["Sep", 90],
+      ["Oct", 197],
+      ["Nov", 65],
+    ];
+    const TW = 470,
+      MAX = Math.max(...MONTHS.map(m => m[1]));
+    let tl = `<text class="t" x="0" y="16">980 ADRS ON MAIN · BY MONTH</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    MONTHS.forEach(([m, v], i) => {
+      const x = 14 + i * 58,
+        hh = (v * 54) / MAX;
+      tl += `<rect class="${i === MONTHS.length - 1 ? "h" : ""}" style="--i:${i}" x="${x}" y="${96 - hh}" width="36" height="${hh}" rx="2"/>`;
+      tl += `<text class="v" x="${x + 18}" y="${90 - hh}">${v}</text><text class="m" x="${x + 18}" y="118">${m}</text>`;
+    });
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl ddm-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const ddm = h(
+      "div",
+      { class: "dhm" },
+      h("div", { class: "dhm-k" }, kpi("980", "ADRs", "in docs/adr"), kpi("163", "added in", "the last 30 days"), kpi("582", "drafted by", "the ADR agent", "g"), kpi("82%", "still", "Status: Draft", "r")),
+      tlSvg
+    );
+    slides.push({
+      group: "process",
+      notes:
+        "Decide · Draft · Record, as gh-aw records its architecture decisions. When a pull request is marked ready for review or labelled implementation, the Design Decision Gate workflow starts. The agent reads the diff and, for changes large enough to carry a design decision, when no ADR is linked, drafts one in Michael Nygard form (context, decision, alternatives, consequences) with the imported adr-writer agent, pushes it to the pull request branch and comments that the decision must be reviewed before merge. The author and a maintainer complete it and it merges with the code. The bottom strip is measured on gh-aw's main branch (snapshot 16 November 2026): 980 ADR files in docs/adr since the first on 11 April 2026, 163 added in the last 30 days and 582 carrying the adr-writer agent's footer. 799 still say Draft and 97 Accepted, so drafts merge with the code but are rarely finalized afterwards. The records are read back: the PR Specification Reviewer runs when docs/adr changes and rewrites a spec only when the pull request's ADR, implementation and tests agree, and coding agents changing a feature later search docs/adr to learn why it was built that way before they touch it. In a sample of recent gate runs, eight of the nine pull requests that received a draft merged with it. The pull request, ADR, review and next agent in the flow above are an illustrative, simplified example.",
+      enter() {
+        start = 0;
+      },
+      tick(t) {
+        if (!start) {
+          start = t;
+          begin();
+        }
+        let u = t - start;
+        if (u > len) {
+          start = t;
+          u = 0;
+          begin();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Pull requests that need a decision get a drafted ADR; later agents read it to learn why"), h("h2", {}, letters("Decide · Draft · "), letters("Record", "l-grad"))),
+        svg,
+        ddm,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 16 Nov 2026 · ADRs on main 11 Apr–16 Nov 2026 (219 d) · flow illustrative")
+      ),
+    });
+  }
+
   // Spec-driven testing: a human states intent, the W3C spec writer formalizes it with RFC 2119 keywords, an agent extracts the spec from each code change, a librarian keeps specs consistent, and an enforcer turns the spec into tests that guard the next change
   {
     resetIndex();
@@ -8448,7 +8667,12 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every day an agent opens the docs on phones, tablets and desktops, and Copilot fixes what breaks"), h("h2", {}, letters("Multi-device "), letters("tester", "l-grad"))),
+        h(
+          "div",
+          { class: "slide-head" },
+          h("div", { class: "kicker" }, "Every day an agent opens the docs on phones, tablets and desktops, and Copilot fixes what breaks"),
+          h("h2", {}, letters("Multi-device "), letters("tester", "l-grad"))
+        ),
         svg,
         mdm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 7 Dec 2025–15 Nov 2026 (343 d) · loop illustrative")
@@ -12829,9 +13053,20 @@
         "div",
         { class: "skl-s" },
         h("small", {}, "pkg/timeutil/parse.go"),
-        h("div", { class: "skl-diff" }, h("div", {}, "  func ParseWindow(s string) (Window, error) {"), h("div", { class: "del" }, '-   if s == "" { return Window{}, nil }'), h("div", { class: "add" }, '+   if s == "" { return Window{}, ErrEmpty }'))
+        h(
+          "div",
+          { class: "skl-diff" },
+          h("div", {}, "  func ParseWindow(s string) (Window, error) {"),
+          h("div", { class: "del" }, '-   if s == "" { return Window{}, nil }'),
+          h("div", { class: "add" }, '+   if s == "" { return Window{}, ErrEmpty }')
+        )
       ),
-      h("div", { class: "skl-s" }, h("small", {}, "inline review comment · line 42"), h("div", { class: "skl-cm" }, h("b", {}, "[/tdd]"), " The empty-input fix has no regression test; add one that fails without it. ", h("u", {}, "@copilot please address this."))),
+      h(
+        "div",
+        { class: "skl-s" },
+        h("small", {}, "inline review comment · line 42"),
+        h("div", { class: "skl-cm" }, h("b", {}, "[/tdd]"), " The empty-input fix has no regression test; add one that fails without it. ", h("u", {}, "@copilot please address this."))
+      ),
       h("div", { class: "skl-s" }, h("small", {}, "safe output"), h("div", { class: "skl-ok" }, h("i", {}, "REQUEST_CHANGES"), "review submitted · cites 2 skills")),
     ];
     const revStatus = h("span", {}, "");
@@ -19137,17 +19372,19 @@
     smpBody.replaceChildren(
       ...rows.map(r => {
         const c = THEME[r.group].accent[0],
-          tiles = slides.filter(s => s.band === slides[r.start].band).map(s => {
-            const n = slides.indexOf(s),
-              t = h(
-                "button",
-                { class: `smp-t${s.header ? " hd" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || BANDS[r.group]?.[0] || SOLO[r.group]}`, onclick: () => (smp.close(), go(n)) },
-                h("b", {}, String(n + 1).padStart(2, "0")),
-                h("span", {}, label(s) || BANDS[r.group]?.[0] || SOLO[r.group])
-              );
-            smpTiles[n] = t;
-            return t;
-          });
+          tiles = slides
+            .filter(s => s.band === slides[r.start].band)
+            .map(s => {
+              const n = slides.indexOf(s),
+                t = h(
+                  "button",
+                  { class: `smp-t${s.header ? " hd" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || BANDS[r.group]?.[0] || SOLO[r.group]}`, onclick: () => (smp.close(), go(n)) },
+                  h("b", {}, String(n + 1).padStart(2, "0")),
+                  h("span", {}, label(s) || BANDS[r.group]?.[0] || SOLO[r.group])
+                );
+              smpTiles[n] = t;
+              return t;
+            });
         return h("section", { class: "smp-row", "--c": c }, h("div", { class: "smp-l" }, BANDS[r.group]?.[0] || SOLO[r.group]), h("div", { class: "smp-tiles" }, tiles));
       })
     );
