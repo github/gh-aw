@@ -1,32 +1,46 @@
-### PR Triage Report
+### Executive Summary
 
-#### Executive totals
-- Eligible Copilot PRs: 3
-- Open Copilot PRs reviewed: 3
-- Cooldown-skipped PRs: 0
-- Category mix: bug 3
-- Risk mix: medium 3
-- Priority mix: medium 3
-- Recommended actions: batch_review 3
+- Eligible open PRs: 19
+- Skipped by 1h cooldown: 3
+- Priority mix: 16 low, 2 medium, 1 high
+- Recommended actions: 1 auto_merge, 3 fast_track, 15 batch_review, 0 defer, 0 close
 
-#### Top-priority PRs
-- #77994 — Enforce consistent workflow run metrics — score 66 — batch_review
-- #77573 — Capture startup failure log details — score 60 — batch_review
-- #77808 — Make workflow guidance prefix-safe and complete — score 55 — batch_review
+#### Top priority
+- #76957 — Restrict legacy credential-backed proxy ingress (risk: high, score: 81, action: fast_track)
+- #78246 — fix(cli): thread command context through experiments analyze loaders (risk: medium, score: 71, action: fast_track)
+- #78256 — [spec-review] Update Safe Outputs conformance checker for recent spec changes (risk: medium, score: 65, action: fast_track)
 
 #### Auto-merge candidates
-- None
-
-#### Fast-track items
-- None
+- #78253 — chore: update drain3 default log pattern weights (score: 42)
 
 #### Batch opportunities
-- pr-batch:runtime-ops — #77994, #77573, #77808
+- deps-2026-11-16: 15 dependency update PRs, all low-risk chore work, action=batch_review
 
 #### Close candidates
 - None
 
-#### Key trends and next actions
-- Three eligible agent PRs cleared the 1-hour cooldown.
-- All are medium-risk workflow/runtime bug fixes and should be reviewed together in a single runtime-ops batch.
-- Keep monitoring for additional Copilot PRs once they stabilize beyond the cooldown window.
+### Distribution
+
+| Category | Count |
+|---|---:|
+| chore | 16 |
+| bug | 2 |
+| feature | 1 |
+
+| Risk | Count |
+|---|---:|
+| low | 16 |
+| medium | 2 |
+| high | 1 |
+
+| Action | Count |
+|---|---:|
+| auto_merge | 1 |
+| fast_track | 3 |
+| batch_review | 15 |
+
+### Key trends
+
+- Dependency bump PRs dominate the queue and are safe to review as a batch.
+- Security-sensitive ingress changes need close human review; this is the only high-risk item.
+- The CLI bugfix and Safe Outputs review are the best near-term code changes for detailed reviewer attention.

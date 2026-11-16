@@ -1,21 +1,104 @@
 {
-  "generated_at": "2026-11-16T00:46:53Z",
-  "run_id": "43781849748",
+  "generated_at": "2026-11-16T06:39:19Z",
+  "run_id": "43817907030",
   "source": "pr-triage",
-  "eligible_total": 0,
-  "open_copilot_prs": 0,
-  "cooldown_skipped": 0,
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
+  "eligible_total": 19,
+  "open_copilot_prs": 22,
+  "cooldown_skipped": 3,
+  "category_counts": {
+    "bug": 2,
+    "chore": 16,
+    "feature": 1
+  },
+  "risk_counts": {
+    "low": 16,
+    "medium": 2,
+    "high": 1
+  },
+  "priority_counts": {
+    "low": 16,
+    "medium": 1,
+    "high": 2
+  },
   "action_counts": {
-    "auto_merge": 0,
-    "fast_track": 0,
-    "batch_review": 0,
+    "auto_merge": 1,
+    "fast_track": 3,
+    "batch_review": 15,
     "defer": 0,
     "close": 0
   },
-  "selected_candidates": [],
-  "batches": [],
-  "summary": "No eligible open PRs authored by app/github-copilot were found. Current open automation PRs were outside the required author filter and therefore excluded from this triage run."
+  "selected_candidates": [
+    {
+      "number": 76957,
+      "title": "Restrict legacy credential-backed proxy ingress",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 81
+    },
+    {
+      "number": 78246,
+      "title": "fix(cli): thread command context through experiments analyze loaders",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 71
+    },
+    {
+      "number": 78256,
+      "title": "[spec-review] Update Safe Outputs conformance checker for recent spec changes",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "fast_track",
+      "score": 65
+    },
+    {
+      "number": 78253,
+      "title": "chore: update drain3 default log pattern weights",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 42
+    },
+    {
+      "number": 77544,
+      "title": "build(deps): bump go.opentelemetry.io/otel/trace from 1.45.0 to 1.47.0 in the go_modules group across 1 directory",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 23
+    }
+  ],
+  "batches": [
+    {
+      "id": "deps-2026-11-16",
+      "count": 15,
+      "numbers": [
+        77544,
+        77319,
+        76615,
+        76614,
+        76492,
+        76489,
+        76488,
+        76487,
+        76486,
+        76485,
+        76483,
+        76482,
+        76481,
+        76479,
+        76477
+      ],
+      "category": "chore",
+      "risk": "low",
+      "action": "batch_review"
+    }
+  ],
+  "summary": "19 older-than-1h app/github-copilot PRs were triaged. Dependency bumps dominated the queue and were batched. Three higher-value PRs merit human review: security ingress fix, CLI bugfix, and Safe Outputs conformance update. One low-risk chore is ready for auto-merge."
 }
