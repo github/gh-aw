@@ -5,11 +5,44 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadRepoConfig_IssueLabel(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		content string
+		want    string
+		invalid bool
+	}{
+		{name: "omitted", content: `{}`},
+		{name: "custom", content: `{"issue_label":"area:agentic-workflows"}`, want: "area:agentic-workflows"},
+		{name: "spaces and punctuation", content: `{"issue_label":"area: team's \"workflows\""}`, want: `area: team's "workflows"`},
+		{name: "empty", content: `{"issue_label":""}`, invalid: true},
+		{name: "blank", content: `{"issue_label":"   "}`, invalid: true},
+		{name: "null", content: `{"issue_label":null}`, invalid: true},
+		{name: "boolean", content: `{"issue_label":false}`, invalid: true},
+		{name: "newline", content: `{"issue_label":"area:\nworkflows"}`, invalid: true},
+		{name: "expression", content: `{"issue_label":"${{ secrets.TOKEN }}"}`, invalid: true},
+		{name: "too long", content: `{"issue_label":"` + strings.Repeat("x", 51) + `"}`, invalid: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeAWJSON(t, dir, tt.content)
+			cfg, err := LoadRepoConfig(dir)
+			if tt.invalid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.IssueLabel)
+		})
+	}
+}
 
 func TestLoadRepoConfig_FileNotFound(t *testing.T) {
 	dir := t.TempDir()

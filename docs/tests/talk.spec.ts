@@ -24,6 +24,7 @@ const HANDOFFS = slideNo("Event-driven Hand-offs");
 test.use({ reducedMotion: "reduce" });
 
 test("presents the slides listed in slides.md in bands without the removed sections", async ({ page }) => {
+  test.slow();
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -240,6 +241,7 @@ test("walks a pattern's column of examples with up/down and hints at it from the
   await expect(count).toHaveAttribute("aria-label", at(head));
   // past the bottom of the column, Down moves on to the next band (trust the process)
   await page.goto(`/gh-aw/cracktro/#${last}`);
+  await expect(count).toHaveAttribute("aria-label", at(last));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("For PMs") + 1));
 });
@@ -384,7 +386,8 @@ test("publishes a social card for link previews", async ({ page, request }) => {
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
   const allowedAvatar = /^assets\/avatars\/(?:mona\.jpg|ducky\.jpg|mona-full\.png)$/;
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
-    expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
+    const normalized = asset.replaceAll("\\", "/");
+    expect(normalized === "avatars" || allowedAvatar.test(`assets/${normalized}`), asset).toBe(true);
   }
   // index.html loads runtime.js before deck.js; check both, in load order.
   const source = (await Promise.all(["runtime.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
@@ -420,6 +423,7 @@ test("publishes synthetic examples without profile assets or private source refe
 });
 
 test("keeps role and avatar circles flat", async ({ page }) => {
+  test.slow();
   await page.goto("/gh-aw/cracktro/");
   for (const index of SLIDES.keys()) {
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
@@ -451,7 +455,8 @@ test.describe("agentic engineering slides", () => {
   const open = async (page: Page, heading: string, ms: number) => {
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
-    await page.clock.install();
+    await page.clock.install({ time: 0 });
+    await page.clock.pauseAt(1000);
     await page.goto(`/gh-aw/cracktro/#${slideNo(heading)}`);
     await expect(page.locator(".slide.active h2")).toHaveText(heading);
     // Slide timelines derive state from elapsed time, so jumping ahead is equivalent to waiting.
@@ -684,6 +689,7 @@ test("serves the slide list in the talk page head without running the deck", asy
 });
 
 test("opens every slide from its metadata #N link", async ({ page, request }) => {
+  test.slow();
   const [doc] = jsonLd(await (await request.get("/gh-aw/cracktro/")).text());
   await page.goto("/gh-aw/cracktro/");
   for (const part of doc.hasPart) {

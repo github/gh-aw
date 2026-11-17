@@ -2673,12 +2673,42 @@
   .active .evo-fact { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 1.4s); }
   .evo-fact b { display: block; font: 700 40px/1 var(--mono); color: var(--c); white-space: nowrap; }
   .evo-fact span { display: block; margin-top: 8px; font-size: 19px; line-height: 1.25; color: #c9d1d9; }
+  .psc-hd { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .12em; }
+  .psc-c { font: 600 20px var(--mono); opacity: 0; transition: opacity .35s; }
+  .psc-c.on { opacity: 1; } .psc-c.i { fill: #d29922; } .psc-c.a { fill: #79c0ff; } .psc-c.r { fill: #d2a8ff; } .psc-c.f { fill: #ff7b72; } .psc-c.n { fill: #9198a1; }
+  .psc-v { text-anchor: end; font-weight: 700; } .psc-v.k { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95099); }
+  .psc-m { width: 1360px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
 
   // ---------- helpers ----------
   // h, letters and resetIndex come from runtime.js; the deck's own CSS above is injected by CracktroDeck.create.
   const { h, letters, resetIndex } = window.CracktroDeck;
+
+  // Agentic workflow nodes show a coding agent drawn from a seeded PRNG at load, one per slide, to show engine diversity.
+  // Nodes for the Copilot coding agent itself (assignee, PR author) keep ico("copilot").
+  const AGENTS = ["codex", "claude", "copilot", "pi", "agy"];
+  const pickAgent = (() => {
+    let a = 0x6a77;
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return AGENTS[Math.floor((((t ^ (t >>> 14)) >>> 0) / 4294967296) * AGENTS.length)];
+    };
+  })();
+  // Brand colours: disc (bg), mark on the disc (fg), bare mark (mark). OpenAI (Codex) and Pi brands are monochrome.
+  const AGENT_BRAND = {
+    copilot: { bg: "#8957e5", fg: "#f0f6fc" },
+    claude: { bg: "#d97757", fg: "#ffffff", mark: "#d97757" },
+    codex: { bg: "#f0f6fc", fg: "#0d0d0d", mark: "#f0f6fc" },
+    pi: { bg: "#111111", fg: "#f6f6f6", ring: "#f6f6f6", mark: "#f6f6f6" },
+    agy: { bg: "#3186ff", fg: "#ffffff", mark: "#3186ff" },
+  };
+  const agBrand = n => AGENT_BRAND[n] || AGENT_BRAND.copilot;
+  const agDisc = n => `fill="${agBrand(n).bg}"${agBrand(n).ring ? ` stroke="${agBrand(n).ring}" stroke-width="2"` : ""}`;
+  const agFg = n => agBrand(n).fg;
+  const agAvatar = n => ({ background: agBrand(n).bg, boxShadow: agBrand(n).ring ? `inset 0 0 0 2px ${agBrand(n).ring}` : "" });
 
   // Primer Octicons (© GitHub, Inc., MIT license), drawn into canvases as Path2D.
   // Keys are the octicon name plus the grid size its path is drawn on.
@@ -3815,6 +3845,7 @@
 
   // Zero-secret agents: the agent runs in a micro-VM with no auth; every key lives on the host (GitHub MCP server, API proxy) and every exit goes through safe outputs or the Squid firewall
   {
+    const AG = pickAgent();
     resetIndex();
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "zs-svg");
@@ -3880,7 +3911,7 @@
       g += `<g class="zs-area" style="--d:2.1s"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
       g += `<g class="zs-area zs-vm-g" style="--d:.3s"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
       g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
-      g += `<circle cx="150" cy="156" r="48" fill="#8957e5"/>${ico("copilot", 150, 156, 58)}<text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
+      g += `<circle cx="150" cy="156" r="48" ${agDisc(AG)}/>${ico(AG, 150, 156, 58, agFg(AG))}<text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
       [
         ["copilot", 14],
         ["claude", 107],
@@ -4329,6 +4360,7 @@
 
   // Safe outputs: the boxed agent can't create an issue, so it proposes create-issue; threat detection scans it; a separate job writes it
   {
+    const AG = pickAgent();
     resetIndex();
     const BX = [110, 710, 1310];
     const CMD = 'gh issue create -t "Flaky test"';
@@ -4353,7 +4385,7 @@
           { class: "so-shake" },
           h("i", {}, "01 · AGENT · SANDBOXED"),
           h("h3", {}, "Agent job"),
-          h("div", { class: "so-who" }, h("span", { class: "so-av" }, h("span", { class: "so-ico", "data-ico": "copilot" })), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
+          h("div", { class: "so-who" }, h("span", { class: "so-av", style: agAvatar(AG) }, h("span", { class: "so-ico", "data-ico": AG, "data-fill": agFg(AG) })), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
           h("div", { class: "so-term" }, h("div", {}, "$ ", typed), h("div", { class: "l2" }, "✕ 403 · token is read-only"), h("div", { class: "l3" }, "→ safe output: create_issue"))
         )
       ),
@@ -4362,7 +4394,7 @@
         { class: "so-box so-b1", "--c": "#d29922", "--i": 1, style: { left: `${BX[1]}px` } },
         h("i", {}, "02 · DETECT · ISOLATED"),
         h("h3", {}, "Threat detection"),
-        h("div", { class: "so-who" }, h("span", { class: "so-av det" }, h("span", { class: "so-ico", "data-ico": "copilot" })), "Detection agent", h("span", { class: "so-perm" }, "no tools")),
+        h("div", { class: "so-who" }, h("span", { class: "so-av det" }, h("span", { class: "so-ico", "data-ico": AG })), "Detection agent", h("span", { class: "so-perm" }, "no tools")),
         h("ul", { class: "so-checks" }, checks)
       ),
       h(
@@ -4565,6 +4597,18 @@
       "M23.922 16.992c-.861 1.495-5.859 5.023-11.922 5.023-6.063 0-11.061-3.528-11.922-5.023A.641.641 0 0 1 0 16.736v-2.869a.841.841 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.195 10.195 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952 1.399-1.136 3.392-2.093 6.122-2.093 2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.832.832 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256ZM12.172 11h-.344a4.323 4.323 0 0 1-.355.508C10.703 12.455 9.555 13 7.965 13c-1.725 0-2.989-.359-3.782-1.259a2.005 2.005 0 0 1-.085-.104L4 11.741v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.323 4.323 0 0 1-.355-.508h-.016.016Zm.641-2.935c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z",
       "M14.5 14.25a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1Zm-5 0a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1Z",
     ],
+    // Agent marks for workflow nodes (pickAgent): Claude, OpenAI/Codex from Simple Icons (CC0), Pi from pi.dev,
+    // Antigravity (agy) from antigravity.google, normalised to a 24 grid. Trademarks belong to their respective owners.
+    claude: [
+      "m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z",
+    ],
+    codex: [
+      "M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z",
+    ],
+    pi: ["M17 12H12V7H2V2H17V12Z", "M22 22H17V12H22V22Z", "M7 22H2V7H7V12H12V17H7V22Z"],
+    agy: [
+      "M21.191 22.28C22.463 23.235 24.373 22.599 22.623 20.849C17.373 15.758 18.486 1.758 11.963 1.758C5.441 1.758 6.554 15.758 1.304 20.849C-0.605 22.758 1.463 23.235 2.736 22.28C7.668 18.94 7.35 13.053 11.963 13.053C16.577 13.053 16.259 18.94 21.191 22.28Z",
+    ],
     tag: [
       "M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z",
       "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z",
@@ -4632,6 +4676,8 @@
   };
   // Event-driven Hand-offs: trigger → agent → output → human patterns, then the Repo Assist loop
   {
+    const AG = pickAgent(), // Event-driven Hand-offs
+      AG_RA = pickAgent(); // Repo Assist
     resetIndex();
     const ICON = OCTI;
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${ICON[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
@@ -4657,7 +4703,7 @@
       MX = 930,
       MY = 330,
       OX = 790;
-    const agent = (p, x, y, r = 30) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#8957e5"/>${ico("copilot", x, y + 1, r * 1.15)}`;
+    const agent = (p, x, y, r = 30) => `<circle cx="${x}" cy="${y}" r="${r}" ${agDisc(AG_RA)}/>${ico(AG_RA, x, y + 1, r * 1.15, agFg(AG_RA))}`;
     const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 23}" width="${w}" height="46" rx="23"/><text x="${x + 15 + w / 2}" y="${y + 8}">${label}</text></g>`;
     const svgFor = (L, p) => {
       let g = `<defs><marker id="${p}ArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
@@ -4756,7 +4802,7 @@
         g += `<line id="bdHead" class="bd-head" x1="${X0}" y1="${YT - 10}" x2="${X0}" y2="${YB}"/>`;
         g += `<line id="bdAdopt" class="bd-adopt" x1="${XA}" y1="${YT - 30}" x2="${XA}" y2="${YB}" pathLength="1"/>`;
         g += `<g id="bdPill" class="bd-pill"><rect x="${XA - 120}" y="${YT - 62}" width="240" height="48" rx="24"/>${ico("calendar", XA - 82, YT - 38, 26)}<text x="${XA + 18}" y="${YT - 30}">Adoption day</text></g>`;
-        g += `<g id="bdBot" class="bd-bot"><circle cx="0" cy="0" r="22" fill="#8957e5"/>${ico("copilot", 0, 1, 26)}</g>`;
+        g += `<g id="bdBot" class="bd-bot"><circle cx="0" cy="0" r="22" ${agDisc(AG_RA)}/>${ico(AG_RA, 0, 1, 26, agFg(AG_RA))}</g>`;
         g += `<g id="bdRes" class="bd-res"><text x="${X1 + 34}" y="${y(med[med.length - 1]) + 2}">−${drop}%</text><text class="s" x="${X1 + 36}" y="${y(med[med.length - 1]) + 26}">median</text></g>`;
         g += `<text class="bd-note" x="${(X0 + X1) / 2}" y="${YB + 100}">illustrative redraw · F# open-source repositories</text>`;
         return g;
@@ -4892,7 +4938,7 @@
         "#3fb950",
         [
           ["e", "issue", "Issue opened"],
-          ["a", "copilot", "Triage"],
+          ["a", AG, "Triage"],
           ["e", "comment", "Comment"],
           ["h", "person", "Maintainer"],
         ],
@@ -4904,7 +4950,7 @@
         "#d29922",
         [
           ["e", "calendar", "Schedule"],
-          ["a", "copilot", "Daily scan"],
+          ["a", AG, "Daily scan"],
           ["e", "issue", "Issue"],
         ],
         ["30", "issues · 16 done", "daily-cli-tools-tester", "1 of 194 scheduled"],
@@ -4915,7 +4961,7 @@
         "#ab7df8",
         [
           ["e", "pr", "Ready for review"],
-          ["a", "copilot", "Code review"],
+          ["a", AG, "Code review"],
           ["e", "comment", "Comments"],
           ["h", "person", "Maintainer"],
         ],
@@ -4927,7 +4973,7 @@
         "#f778ba",
         [
           ["e", "tag", "Label added"],
-          ["a", "copilot", "Investigate"],
+          ["a", AG, "Investigate"],
           ["e", "comment", "Comment"],
           ["h", "person", "Maintainer"],
         ],
@@ -4962,7 +5008,7 @@
         });
         nodes.forEach(([kind, icon, label], k) => {
           const x = HCX[k];
-          const disc = kind === "a" ? `<circle cx="${x}" cy="${y}" r="32" fill="#8957e5"/>${ico(icon, x, y + 1, 36)}` : `<circle class="hap-disc ${kind}" cx="${x}" cy="${y}" r="32"/>${ico(icon, x, y, kind === "h" ? 38 : 30)}`;
+          const disc = kind === "a" ? `<circle cx="${x}" cy="${y}" r="32" ${agDisc(icon)}/>${ico(icon, x, y + 1, 36, agFg(icon))}` : `<circle class="hap-disc ${kind}" cx="${x}" cy="${y}" r="32"/>${ico(icon, x, y, kind === "h" ? 38 : 30)}`;
           g += `<g class="hap-node" id="hapN${r}_${k}"><g class="fm-pill${kind === "h" ? " b" : kind === "e" ? " g" : ""}"><rect x="${x}" y="${y - 25}" width="${HPW}" height="50" rx="25"/><text x="${x + 16 + HPW / 2}" y="${y + 8}">${label}</text></g>${disc}</g>`;
         });
         g += `<g class="hap-m" id="hapM${r}"><text x="${HMX}" y="${y - 6}"><tspan class="hap-mn" fill="${c}">${num}</tspan><tspan class="hap-mw" dx="10">${what}</tspan></text><text class="hap-mf" x="${HMX}" y="${y + 20}">${wf}</text><text class="hap-mo" x="${HMX}" y="${y + 42}">${of}</text></g>`;
@@ -5049,12 +5095,13 @@
     const raCap = h("div", { class: "fm-cap ra-cap-flow" });
     // PR Review²: the classic review gains a ready-for-review step that starts agentic reviewers and a Sous Chef loop before a human merges
     {
+      const AG = pickAgent();
       resetIndex();
       const VW = 1700,
         VH = 830;
       const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
       const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-        <circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
+        <circle cx="${x}" cy="${y}" r="34" ${agDisc(label === "Copilot" ? "copilot" : AG)}/>${ico(label === "Copilot" ? "copilot" : AG, x, y + 1, 38, agFg(label === "Copilot" ? "copilot" : AG))}</g>`;
       // measured on gh-aw merged PRs, 15 Oct to 13 Nov 2026; [edge that lights it, value, label lines]
       const STATS = [
         ["p1", "938", ["of 1,263 PRs merged", "in 30 days checked"]],
@@ -5408,12 +5455,14 @@
       bdRun = -1;
     // Issues as intent: how gh-aw itself is built; an on-prem failure is investigated privately with the debug.md agent, an anonymized issue is filed, triaged, assigned to Copilot, reviewed by agents and merged, with real repository counts
     {
+      const AG = pickAgent();
       resetIndex();
       const VW = 1800,
         VH = 600;
       const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
       const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
-      const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
+      const agent = (id, x, y, w, label) =>
+        `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" ${agDisc(label === "Copilot" ? "copilot" : AG)}/>${ico(label === "Copilot" ? "copilot" : AG, x, y + 1, 38, agFg(label === "Copilot" ? "copilot" : AG))}</g>`;
       const user = (id, x, y, w) =>
         `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/><image href="assets/avatars/ducky.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
       const lock = (x, y, s = 1) => `<g class="ct-lock" transform="translate(${x},${y}) scale(${s})"><path d="M-7 -2 V-8 A7 7 0 0 1 7 -8 V-2" fill="none" stroke-width="3"/><rect x="-11" y="-3" width="22" height="17" rx="3"/></g>`;
@@ -5617,12 +5666,13 @@
 
   // Daily Improvers (research → assign → refine): deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1700,
       VH = 680;
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" ${agDisc(label === "Copilot" ? "copilot" : AG)}/>${ico(label === "Copilot" ? "copilot" : AG, x, y + 1, 38, agFg(label === "Copilot" ? "copilot" : AG))}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rpaClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
@@ -5662,7 +5712,7 @@
       c += `<text class="rpa-badge" x="24" y="446">≈ duplicate block · 94% similar</text>`;
       // the beam is carried by two researcher agents, one on each side of the files
       c += `<g class="rpa-scan" id="rpaScan"><rect x="24" y="-28" width="462" height="28" fill="url(#rpaBeam)"/><line x1="24" y1="0" x2="486" y2="0"/>`;
-      for (const x of [8, 502]) c += `<circle cx="${x}" cy="0" r="14" fill="#8957e5"/>${ico("copilot", x, 1, 18)}`;
+      for (const x of [8, 502]) c += `<circle cx="${x}" cy="0" r="14" ${agDisc(AG)}/>${ico(AG, x, 1, 18, agFg(AG))}`;
       return c + `</g></g>`;
     };
     const scan = f => {
@@ -5840,6 +5890,7 @@
 
   // Merge fast, unslop daily: three slow pull requests polished through many nit rounds (each still merging slop) vs many fast pull requests, agentic reviewers and background improvers that eat the slop
   {
+    const AG = pickAgent();
     resetIndex();
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const CYC = 12800,
@@ -5911,7 +5962,7 @@
       g += `<circle class="us-commit" id="usC${i}" cx="${x}" cy="${LB}" r="11"/>`;
       SPECKS[i].forEach(([dx, dy], j) => (g += `<circle class="us-slop" id="usS${i}_${j}" cx="${x + dx}" cy="${LB + dy}" r="5"/>`));
     }
-    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily improvers</text></g>
+    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" ${agDisc(AG)}/>${ico(AG, 0, LB + 1, 34, agFg(AG))}<text x="0" y="${LB - 44}">daily improvers</text></g>
       <text class="us-bots" x="0" y="${LB + 100}">${UNSLOP.map(([n, c]) => `${n} <tspan class="n">${c}</tspan>`).join(" · ")}</text>
       <text class="us-meas" x="0" y="${LB + 132}">MEASURED · improver PRs, all time · 26 Sep 2025 – 12 Nov 2026 · 427 merged, +34,691 −44,700 · lanes illustrative</text>
       <text class="us-num" id="usNA" x="1620" y="${LA - 50}">0%</text><text class="us-cap" x="1620" y="${LA - 16}">of feature</text><text class="us-cap" id="usMA" x="1620" y="${LA + 16}"></text><text class="us-cap bad" id="usCA" x="1620" y="${LA + 44}"></text>
@@ -5934,7 +5985,6 @@
     const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
     slides.push({
       group: "process",
-      under: "improvers",
       notes:
         "Merge fast, unslop daily. The two lanes are an illustrative, synthetic timeline; the panel at the top right is measured on gh-aw's merged pull requests over a 30-day window, 15 October to 13 November 2026, and the counts along the bottom are all-time merged improver pull requests from 26 September 2025 to 12 November 2026; both are a snapshot of 14 November 2026. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. In the illustration the feature ships a slice at a time, so its percentage climbs with every merge and it is complete while the polished lane is still in review. The measured panel shows what that looks like: in the thirty days from 15 October to 13 November 2026, 1,263 pull requests merged, about 42 a day, with a median of 166 lines changed and a median of one hour fifty-four minutes from opening to merge; the bars are merged pull requests per day. The slop that gets through is eaten by background improvers, daily workflows that open their own small clean-up pull requests. The purple dots mark days on which an improver pull request merged: 25 of those 30 days. Along the bottom are their all-time merged clean-up pull requests, counted by title prefix: jsweep 144, dead code remover 117, code simplifier 89, tidy 66, daily file diet 7 and duplicate code detector 4, which mostly files issues instead. Together that is 427 merged clean-up pull requests, adding 34,691 lines and removing 44,700, on 261 different days between 26 September 2025 and 12 November 2026. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
       enter() {
@@ -6023,6 +6073,7 @@
 
   // Trust the process: deep human review on every PR means the process is not trusted
   {
+    const AG = pickAgent();
     resetIndex();
     const MERGE = `<svg viewBox="0 0 16 16"><path d="${OCTI.merge[0]}"/></svg>`;
     const lane = (cls, label) => {
@@ -6091,6 +6142,7 @@
 
   // Cost management: guard, measure, optimize (+ model routing)
   {
+    const AG = pickAgent();
     resetIndex();
     const STEPS = [
       { id: "on", n: 1, label: "Scheduling", c: "#4493f8", aic: 700, bar: "weekly" },
@@ -6440,6 +6492,7 @@
   // daily check at activation, spends AI credits, gets budget notices and hard-stops at max-ai-credits; queued run B is then blocked at
   // activation by the rolling 24 h max-daily-ai-credits budget; finally an admission authority approves run D with an allowance and denies run E
   {
+    const AG = pickAgent();
     resetIndex();
     const RUNW = 804,
       RUNMAX = 600,
@@ -6983,6 +7036,7 @@
   // notice to the end of the agent's next request, the notice lands at the bottom of the conversation, the budget meter turns amber then red,
   // and the agent submits through a safe output before the hard stop
   {
+    const AG = pickAgent();
     resetIndex();
     const CAP = 500,
       START = 0,
@@ -7027,7 +7081,7 @@
     const msgs = h("div", { class: "bst-msgs" });
     const pin = h("div", { class: "bst-pin" });
     const ff = h("em", { class: "bst-ff" }, "▶▶ fast-forward");
-    const cvIco = h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI.copilot.map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    const cvIco = h("span", { innerHTML: `<svg viewBox="0 0 24 24" style="fill:${agBrand(AG).mark || "#f0f6fc"}">${OCTI[AG].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
     const cv = h("div", { class: "bst-cv" }, h("div", { class: "bst-ch" }, cvIco, h("b", {}, "agent"), h("span", {}, "conversation"), ff), pin, msgs);
     const noticeMsg = (used, fit) =>
       h(
@@ -8082,6 +8136,7 @@
 
   // Agents that debug agents: any agent calls the agentic-workflows MCP server; logs, audit and audit-diff read runs as unified sessions to debug, audit and optimize other agents
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1700,
       VH = 680;
@@ -8177,7 +8232,7 @@
     });
     for (const [id, d, c] of EDGES) g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mc${c === "p" ? "P" : "B"})"/>`;
     // the caller: any agent that speaks MCP
-    g += `<g class="fm-task" id="mcCaller"><g class="fm-pill"><rect x="70" y="105" width="270" height="50" rx="25"/><text x="223" y="138">any agent</text></g><circle cx="70" cy="130" r="34" fill="#8957e5"/>${ico("copilot", 70, 131, 38)}</g>`;
+    g += `<g class="fm-task" id="mcCaller"><g class="fm-pill"><rect x="70" y="105" width="270" height="50" rx="25"/><text x="223" y="138">any agent</text></g><circle cx="70" cy="130" r="34" ${agDisc(AG)}/>${ico(AG, 70, 131, 38, agFg(AG))}</g>`;
     g += `<text class="mc-eng" x="190" y="206">Copilot · Claude · Codex</text><text class="mc-eng" x="190" y="230">IDE · terminal · workflow</text>`;
     g += `<g class="sfl-box" id="mcCalls"><rect class="sfl-card" x="24" y="250" width="332" height="290" rx="12"/><text class="sfl-title" x="40" y="276">MCP TOOL CALLS</text>`;
     CALLS.forEach(([v, c], p) => {
@@ -8609,6 +8664,7 @@
 
   // Don’t Run the Agent: a stream of workflow events meets cheap deterministic gates first (triggers, if:, search checks, on.steps, custom jobs, a noop short-circuit) and a model-based skip-if-decision gate last; each gate routes one event to SKIP and one survivor reaches the AI engine
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1620,
       VH = 620,
@@ -8645,7 +8701,7 @@
       g += `</g>`;
     });
     // the AI engine at the end of the pipeline, and the optional central admission service
-    g += `<g class="sfl-box dra-eng" id="draE"><rect class="sfl-card" x="${EX}" y="150" width="220" height="190" rx="16"/><circle cx="${EX + 110}" cy="206" r="32" fill="#8957e5"/>${ico("copilot", EX + 110, 207, 38)}`;
+    g += `<g class="sfl-box dra-eng" id="draE"><rect class="sfl-card" x="${EX}" y="150" width="220" height="190" rx="16"/><circle cx="${EX + 110}" cy="206" r="32" ${agDisc(AG)}/>${ico(AG, EX + 110, 207, 38, agFg(AG))}`;
     g += `<text class="aex-t" x="${EX + 110}" y="276" text-anchor="middle">AI ENGINE</text><text class="aex-d" x="${EX + 110}" y="304" text-anchor="middle">allow · unknown</text><text class="aex-d" x="${EX + 110}" y="324" text-anchor="middle">→ run as planned</text></g>`;
     g += `<g class="dra-adm" id="draA"><rect x="${EX}" y="372" width="220" height="150" rx="14"/><text class="dra-exp" x="${EX + 110}" y="400">OPTIONAL</text>`;
     g += `<text class="aex-c" x="${EX + 18}" y="430">on.admission</text><text class="aex-d" x="${EX + 18}" y="456">central service</text><text class="aex-d" x="${EX + 18}" y="476">may deny activation</text><text class="aex-c k" x="${EX + 18}" y="506">→ Cost management</text></g>`;
@@ -8744,6 +8800,7 @@
 
   // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
   {
+    const AG = pickAgent();
     resetIndex();
     const icon = (name, fill = "#f0f6fc") => h("span", { class: "mem-ico", "data-ico": name, "data-fill": fill });
     // cache-memory files: [icon, file, integrity of the run that wrote it, level colour, writer, visible to an approved run]
@@ -8788,7 +8845,7 @@
       { class: "mem-col", "--c": "#ab7df8", "--i": 1, style: { left: "610px", width: "580px" } },
       h("i", {}, "02 · AGENT · SANDBOXED"),
       h("h3", {}, "Agent · run #", runNo),
-      h("div", { class: "so-who" }, h("span", { class: "so-av" }, icon("copilot")), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
+      h("div", { class: "so-who" }, h("span", { class: "so-av", style: agAvatar(AG) }, icon(AG, agFg(AG))), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
       h("div", { class: "mem-term" }, lines)
     );
     const inCol = h(
@@ -8912,6 +8969,7 @@
 
   // Memory with a History: a ledger keeps append-only JSONL records on its own branch; trusted preparation replays them into a disposable read-only SQLite projection, the agent reads state and requests a change through a safe output, and a trusted job validates and appends it
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1620,
       VH = 620;
@@ -8949,7 +9007,7 @@
     STATE.forEach(([k, v], i) => (g += `<g class="aex-row" id="mhlS${i}"><text class="aex-c" x="760" y="${128 + i * 30}">${k}</text><text class="aex-c" x="880" y="${128 + i * 30}">${v}</text></g>`));
     g += `<g class="aex-row" id="mhlS3"><text class="aex-c k" x="660" y="236">records</text><text class="aex-c" x="760" y="236">4 rows of history</text></g>`;
     g += `<text class="aex-d" x="660" y="276">queued writes not visible this run</text></g>`;
-    g += `<g class="sfl-box" id="mhlA"><rect class="sfl-card" x="640" y="360" width="420" height="220" rx="14"/><circle cx="684" cy="402" r="22" fill="#8957e5"/>${ico("copilot", 684, 403, 26)}<text class="aex-t" x="718" y="410">AGENT</text>`;
+    g += `<g class="sfl-box" id="mhlA"><rect class="sfl-card" x="640" y="360" width="420" height="220" rx="14"/><circle cx="684" cy="402" r="22" ${agDisc(AG)}/>${ico(AG, 684, 403, 26, agFg(AG))}<text class="aex-t" x="718" y="410">AGENT</text>`;
     g += `<g class="aex-row" id="mhlA1"><text class="aex-c" x="660" y="452">SELECT … FROM state</text></g>`;
     g += `<g class="aex-chip" id="mhlA2" style="--c:#ab7df8"><rect x="660" y="472" width="380" height="64" rx="12"/><text class="aex-c k" x="676" y="498">ledger_append</text><text class="aex-c" x="676" y="524">update F-2 → fixed</text></g>`;
     g += `<text class="aex-st" id="mhlAst" x="660" y="564"></text></g>`;
@@ -9090,6 +9148,7 @@
 
   // Durable execution: engine.durable publishes the native agent session as a checkpoint artifact even after a failed agent step; the rerun restores it and resumes the exact session instead of starting over
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1620,
       VH = 580;
@@ -9102,7 +9161,7 @@
     // one attempt: agent badge, title, status, restore chip and a bar of turn cells
     const attempt = (k, y, title, restoreText) => {
       let s = `<g class="sfl-box dur-card" id="dur${k}"><rect class="sfl-card" x="0" y="${y}" width="1120" height="180" rx="16"/>`;
-      s += `<circle cx="266" cy="${y + 28}" r="16" fill="#8957e5"/>${ico("copilot", 266, y + 29, 20)}`;
+      s += `<circle cx="266" cy="${y + 28}" r="16" ${agDisc(AG)}/>${ico(AG, 266, y + 29, 20, agFg(AG))}`;
       s += `<text class="sfl-title" x="292" y="${y + 34}">${title}</text><text class="dur-st" id="dur${k}st" x="1096" y="${y + 34}"></text>`;
       s += `<g class="dur-chip${k === "C" ? " ok" : ""}" id="dur${k}r"><rect x="24" y="${y + 58}" width="196" height="72" rx="12"/><text class="n" x="40" y="${y + 90}">↻ restore</text><text class="d" x="40" y="${y + 116}">${restoreText}</text></g>`;
       for (let i = 0; i < N; i++) s += `<rect class="dur-cell" id="dur${k}${i}" x="${CX(i)}" y="${y + 64}" width="28" height="60" rx="5"/>`;
@@ -9308,6 +9367,7 @@
 
   // Agents Trigger Agents: a triage agent dispatches a fix agent through the dispatch-workflow safe output with typed inputs, the fix run's completion triggers a verify agent through workflow_run, and each agent works inside its own run boundary
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1620,
       VH = 620;
@@ -9322,7 +9382,7 @@
     RUNS.forEach(([x, run, name, on, act, out], i) => {
       g += `<g class="sfl-box att-run" id="attR${i}"><rect class="att-edge" x="${x}" y="170" width="440" height="270" rx="18"/><rect class="sfl-card" x="${x + 14}" y="196" width="412" height="230" rx="14"/>`;
       g += `<text class="att-tag" x="${x + 16}" y="160">${run} · own job · own token · own firewall</text>`;
-      g += `<circle cx="${x + 62}" cy="244" r="26" fill="#8957e5"/>${ico("copilot", x + 62, 245, 30)}<text class="aex-t" x="${x + 102}" y="252">${name}</text>`;
+      g += `<circle cx="${x + 62}" cy="244" r="26" ${agDisc(AG)}/>${ico(AG, x + 62, 245, 30, agFg(AG))}<text class="aex-t" x="${x + 102}" y="252">${name}</text>`;
       g += `<g class="aex-row" id="attR${i}a"><text class="aex-c k" x="${x + 34}" y="306">${on}</text></g>`;
       g += `<g class="aex-row" id="attR${i}b"><text class="aex-c" x="${x + 34}" y="338">${act}</text></g>`;
       g += `<g class="aex-chip" id="attR${i}c" style="--c:#3fb950"><rect x="${x + 34}" y="358" width="300" height="44" rx="10"/><text class="aex-c" x="${x + 50}" y="386">${out}</text></g>`;
@@ -10629,12 +10689,13 @@
 
   // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1700,
       VH = 680;
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" ${agDisc(label === "Copilot" ? "copilot" : AG)}/>${ico(label === "Copilot" ? "copilot" : AG, x, y + 1, 38, agFg(label === "Copilot" ? "copilot" : AG))}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/ducky.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
@@ -10762,7 +10823,7 @@
       if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${esc(l)}</tspan>`).join("")}</text>`;
     }
     g += run + term + sess + diff;
-    const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="#8957e5"/>${ico("copilot", x, y + 1, 20)}</g>`;
+    const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" ${agDisc(AG)}/>${ico(AG, x, y + 1, 20, agFg(AG))}</g>`;
     g += badge(1232, 444) + badge(1666, 394);
 
     g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
@@ -10915,6 +10976,7 @@
 
   // Need-to-know enclaves: the GitLost story; a public issue asks about a private repo, an isolated enclave reads it, and only schema values come back
   {
+    const AG = pickAgent();
     resetIndex();
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "ek-svg");
@@ -10925,7 +10987,7 @@
       "Need-to-know enclaves: a public issue asks whether version 2 is compatible with an internal integration; the primary agent hands the task through a trusted broker to a single-use enclave agent with read access to a private repository; the enclave tries to return a confidential launch date but the output gate drops anything outside the response schema; only compatibility and migrationRequired values reach the public comment, and the enclave is cleaned up"
     );
     const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})"${fill ? ` fill="${fill}"` : ""}>${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const bot = (cx, cy, s, c) => ico("copilot", cx, cy, 60 * s, c);
+    const bot = (cx, cy, s, c) => ico(AG, cx, cy, 60 * s, c);
     const pill = (x, y, w, t, c) => `<g class="ek-pill ${c}"><rect x="${x}" y="${y}" width="${w}" height="28" rx="14"/><text x="${x + w / 2}" y="${y + 19}">${t}</text></g>`;
     const PATHS = {
       ekP1: "M380 175 H440",
@@ -10943,11 +11005,11 @@
       g += `<g class="ek-area" style="--i:1"><rect class="ek-card b" x="0" y="50" width="380" height="250" rx="16"/>`;
       g += `<g class="ek-iss">${ico("issue", 34, 86, 26, "#3fb950")}</g><text class="ek-t" x="56" y="94">Issue #42</text>${pill(290, 72, 70, "Public", "b")}`;
       g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}<g class="ek-who"><circle cx="196" cy="258" r="17"/><image href="assets/avatars/ducky.jpg" x="181" y="243" width="30" height="30" clip-path="url(#ekClip)"/><text x="222" y="264">Ducky opened</text></g></g>`;
-      g += `<g class="ek-cmt"><rect class="ek-card c" x="0" y="340" width="380" height="200" rx="16"/>${bot(34, 380, 0.5, "#d2a8ff")}<text class="ek-t s" x="58" y="386">AI agent commented</text>${pill(24, 406, 190, "Visible to everyone", "b")}`;
+      g += `<g class="ek-cmt"><rect class="ek-card c" x="0" y="340" width="380" height="200" rx="16"/>${bot(34, 380, 0.5, agBrand(AG).mark || "#d2a8ff")}<text class="ek-t s" x="58" y="386">AI agent commented</text>${pill(24, 406, 190, "Visible to everyone", "b")}`;
       g += `<text class="ek-tx" x="24" y="470">v2 is <tspan class="ek-hl">compatible</tspan> with our</text><text class="ek-tx" x="24" y="496">internal integration.</text><text class="ek-tx" x="24" y="522"><tspan class="ek-hl">No migration</tspan> is required.</text></g>`;
       g += `<text class="ek-ft f6" x="190" y="582">✓ no project name · no launch date</text>`;
       // B: primary agent + output gate
-      g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="#8957e5"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
+      g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" ${agDisc(AG)}/>${bot(500, 120, 0.8, agFg(AG))}`;
       g += `<text class="ek-t" x="556" y="112">Primary agent</text><text class="ek-s" x="556" y="140">public repo · untrusted</text>`;
       g += `<rect class="ek-task" x="460" y="176" width="340" height="38" rx="10"/><text class="ek-m c" x="630" y="201">task: check v2 compatibility</text></g>`;
       g += `<g class="ek-area ek-gate" style="--i:3"><rect class="ek-card gt" x="440" y="300" width="380" height="240" rx="16"/><text class="ek-t" x="460" y="338">Output gate</text><text class="ek-s" x="460" y="364">only schema values leave</text>`;
@@ -11109,6 +11171,7 @@
 
   // The Great Escapi: a daily red-team agent tries a new firewall escape each run; 400 recorded techniques fail, #401 (SNI domain fronting through a CDN-shared allowed host) escapes, and the firewall is fixed to check the TLS SNI. Counts and dates are measured from the workflow's repo memory
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 600;
@@ -11159,7 +11222,7 @@
         g += `<path class="ge-wire ${c}" id="${id}" d="${d}" marker-end="url(#geM${c})"/>`;
         if (lab.length) g += `<text class="ge-l ${c}" x="${lx}" y="${ly}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
       }
-      g += `<g class="ge-node" id="geAgent"><circle cx="155" cy="200" r="54" fill="#da3633"/>${ico("copilot", 155, 202, 58)}<text class="ge-n" x="155" y="294">Great Escapi</text></g>`;
+      g += `<g class="ge-node" id="geAgent"><circle cx="155" cy="200" r="54" fill="#da3633"/>${ico(AG, 155, 202, 58)}<text class="ge-n" x="155" y="294">Great Escapi</text></g>`;
       g += `<g class="ge-node ge-proxy" id="geSquid"><rect x="525" y="120" width="215" height="160" rx="18"/><text class="ge-k" x="632" y="160">EGRESS PROXY</text><text class="ge-n" x="632" y="202">allowlist</text><text class="ge-s" id="geSquidT" x="632" y="244"></text></g>`;
       g += `<g class="ge-node" id="geCdn"><rect x="955" y="130" width="250" height="140" rx="70"/><text class="ge-k" x="1080" y="186">SHARED CDN EDGE</text><text class="ge-s" x="1080" y="226">routes by SNI</text></g>`;
       g += `<g class="ge-node ge-dest ok" id="geOk"><rect x="1365" y="88" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="129">registry.npmjs.org</text><text class="ge-tag g" x="1677" y="128">allowed</text></g>`;
@@ -15922,6 +15985,7 @@
   }
   // Mine → Refine → Apply: Linter Miner turns recurring patterns into analyzers, review refines them, LintMonster applies them across the repo. Feed events and counts are mined from gh-aw's history
   {
+    const AG = pickAgent();
     resetIndex();
     const RX = 460,
       VW = 1700 + RX,
@@ -16484,6 +16548,7 @@
 
   // Semantic clustering: gh-aw's Semantic Function Refactoring report of 7 May 2026 found no copies, but grouping functions by intent exposed code filed in the wrong place; Copilot moved it the same day
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 680,
@@ -16631,6 +16696,7 @@
 
   // Spec → Model → Test: spec requirements become TLA+ invariants; TLC explores every state, a broken mutant must fail, a witness trace becomes a conformance test, and a surprise changes the spec first
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 680;
@@ -16919,6 +16985,7 @@
 
   // Go Fan: a daily agent picks the next Go dependency, studies its README, releases and changelog, compares them with how the repo uses it and files a review; Copilot ships the fix. Counts and pull request titles are mined from gh-aw's history
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 600;
@@ -17328,6 +17395,7 @@
 
   // Spec-driven testing: a human states intent, the W3C spec writer formalizes it with RFC 2119 keywords, an agent extracts the spec from each code change, a librarian keeps specs consistent, and an enforcer turns the spec into tests that guard the next change
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 2160,
       VH = 680,
@@ -17863,6 +17931,7 @@
 
   // Multi-device tester: a daily agent opens the docs on phone, tablet and desktop viewports, files what breaks as one severity report, Copilot fixes it and the next run re-tests
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 2160,
       VH = 680,
@@ -18282,6 +18351,7 @@
   }
   // Personas · Probe · Patch: a daily agent role-plays personas asking the agentic-workflows agent for workflows, scores the answers, re-runs one on the first 8,000 bytes of guidance to find rules the cut hides, and Copilot moves them up
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 2160,
       VH = 680,
@@ -18568,6 +18638,7 @@
 
   // Speech To Agent (speak → map → grep): a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 620;
@@ -18749,6 +18820,7 @@
 
   // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
   {
+    const AG = pickAgent();
     resetIndex();
     const VW = 1700,
       VH = 680;
@@ -19083,6 +19155,228 @@
         h("div", { class: "pm-doc" }, h("div", { class: "pm-doc-h" }, docIco, docT, docS), docLines),
         h("div", { class: "pm-idea" }, h("small", {}, "THE IDEA · FROM THE REPO"), ideaB, ideaP),
         h("div", { class: "pm-cap" }, "Workflows and ideas from chrizbo/agentics-beyond-code (MIT) · issue and report contents synthetic")
+      ),
+    });
+  }
+
+  // PR Sous Chef: every five minutes it finds pull requests that sit idle with work waiting (review comments, failing CI) and nudges Copilot to pick them back up; humans still review and merge
+  {
+    const AG = pickAgent();
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const node = (id, cx, y, w, label, fill, icon, cls = "") =>
+      `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${cx}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${cx + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${cx}" cy="${y}" r="34" fill="${fill}"/>${ico(icon, cx, y + 1, icon === "copilot" ? 38 : 30)}</g>`;
+    // illustrative open pull requests: [name, idle chip, idle class, work chip, work class, nudged]
+    const PRS = [
+      ["PR A", "idle 3 h", "i", "2 review comments", "r", 1],
+      ["PR B", "active now", "a", "CI failing", "f", 0],
+      ["PR C", "idle 1 d", "i", "nothing to do", "n", 0],
+      ["PR D", "idle 5 h", "i", "CI failing", "f", 1],
+      ["PR E", "idle 2 h", "i", "comments + CI", "f", 1],
+    ];
+    // [x, w, file, tag, lines] for the rule and the nudge
+    const PANELS = [
+      [
+        860,
+        540,
+        "the rule",
+        "RULE",
+        [
+          ["h", "1. Is it idle?"],
+          ["q", "   no push, no agent at work"],
+          ["h", "2. Is there work to do?"],
+          ["fn", "   review comments"],
+          ["fn", "   failing CI"],
+          ["", ""],
+          ["pass", "yes + yes → nudge"],
+        ],
+      ],
+      [
+        1440,
+        680,
+        "comment on PR E",
+        "NUDGE",
+        [
+          ["h", "@copilot  this is idle, please:"],
+          ["add", "+ address 2 review comments"],
+          ["add", "+ fix the failing CI check"],
+          ["q", "Copilot pushes · CI reruns"],
+          ["q", "humans still review and merge"],
+          ["pass", "✓ moving again"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly]
+    const EDGES = [
+      ["pscE0", "M470 106 H830", "p", "scan · every 5 min", 650, 90],
+      ["pscE1", "M1234 106 H1470", "p", "nudge", 1352, 90],
+      ["pscE2", "M1780 544 V626 H420 V546", "g", "back in motion · humans review and merge", 1100, 610],
+    ];
+    let g = `<defs><marker id="pscP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="pscG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 830, "OPEN PULL REQUESTS"],
+      [830, 1420, "SOUS CHEF"],
+      [1420, VW, "COPILOT"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="pscLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    g += `<g class="sdd-panel" id="pscQ"><rect class="sdd-card" x="40" y="${PY}" width="760" height="${PH}" rx="16"/>
+      <line class="sdd-hd" x1="40" y1="${PY + 50}" x2="800" y2="${PY + 50}"/>
+      <text class="sdd-file" x="62" y="${PY + 33}">open pull requests</text><text class="sdd-tag" x="778" y="${PY + 32}">SCAN</text>
+      <text class="psc-hd" x="180" y="${PY + 84}">IDLE?</text><text class="psc-hd" x="370" y="${PY + 84}">WORK TO DO?</text>`;
+    PRS.forEach(([n, idle, ic, work, wc, k], j) => {
+      const y = PY + 132 + j * 52;
+      g += `<text class="sdd-ln h" id="pscQ${j}" x="62" y="${y}">${sp(n)}</text>
+        <text class="psc-c ${ic}" id="pscI${j}" x="180" y="${y}">${sp(idle)}</text>
+        <text class="psc-c ${wc}" id="pscW${j}" x="370" y="${y}">${sp(work)}</text>
+        <text class="psc-c psc-v${k ? " k" : " n"}" id="pscV${j}" x="778" y="${y}">${k ? "nudge" : "skip"}</text>`;
+    });
+    g += `</g>`;
+    PANELS.forEach(([x, w, file, tag, lines], i) => {
+      g += `<g class="sdd-panel" id="pscP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${w}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + w}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + w - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => (g += `<text class="sdd-ln ${c}" id="pscL${i}_${j}" x="${x + 22}" y="${PY + 88 + j * 40}">${sp(s)}</text>`));
+      g += `</g>`;
+    });
+    for (const [id, d, c, lab, lx, ly] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#psc${c === "g" ? "G" : "P"})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab}</text>`;
+    }
+    g += node("pscOpen", 88, 106, 340, "Open pull requests", "#1f6feb", "pr", "b");
+    g += node("pscChef", 900, 106, 300, "PR Sous Chef", "#8957e5", "tasklist");
+    g += node("pscBot", 1510, 106, 240, "Copilot", "#8957e5", "copilot");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg psc-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    let start = 0,
+      len = 0,
+      ev = [],
+      evI = 0,
+      fly = null;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const begin = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "gone"));
+      dot.style.opacity = 0;
+      fly = null;
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, n) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(n);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("pscLane0"), on("pscOpen"), on("pscQ"), sfx.key(0.6)));
+      PRS.forEach((_, j) => at(400 + j * 120, () => (on(`pscQ${j}`), sfx.key(0.4))));
+      flight(1200, "pscE0", 700, "#ab7df8", 3);
+      at(1900, () => (on("pscLane1"), on("pscChef"), on("pscP0"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(2100 + j * 220, () => (on(`pscL0_${j}`), sfx.key(0.5))));
+      PRS.forEach(([, , ic, , wc, k], j) => {
+        const t = 3800 + j * 600;
+        at(t, () => (on(`pscI${j}`), sfx.key(ic === "i" ? 0.6 : 0.3)));
+        at(t + 180, () => (on(`pscW${j}`), sfx.key(wc === "n" ? 0.3 : 0.6)));
+        at(t + 380, () => (on(`pscV${j}`), k ? sfx.pop(4) : on(`pscQ${j}`, "gone")));
+      });
+      at(7000, () => (on("pscP0", "ok"), sfx.pop(5)));
+      flight(7200, "pscE1", 600, "#ab7df8", 6);
+      at(7800, () => (on("pscLane2"), on("pscBot"), on("pscP1"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4].forEach(j => at(8000 + j * 300, () => (on(`pscL1_${j}`), sfx.key(0.5))));
+      at(9600, () => (on("pscL1_5"), on("pscP1", "ok"), sfx.pop(8)));
+      flight(9900, "pscE2", 1500, "#3fb950", 7);
+      at(11400, () => (on("pscQ", "ok"), sfx.pop(10)));
+      len = 14500;
+    };
+    // measured: Sous Chef nudges to Copilot on gh-aw pull requests by month (snapshot 17 Nov 2026; May starts 13 May, November is partial)
+    const MONTHS = [
+      ["May", 211],
+      ["Jun", 509],
+      ["Jul", 1414],
+      ["Aug", 1610],
+      ["Sep", 832],
+      ["Oct", 662],
+      ["Nov", 588],
+    ];
+    const TW = 440,
+      MAX = Math.max(...MONTHS.map(m => m[1]));
+    let tl = `<text class="t" x="0" y="16">NUDGES BY MONTH</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    MONTHS.forEach(([m, v], i) => {
+      const x = 14 + i * 60,
+        hh = (v * 54) / MAX;
+      tl += `<rect class="${i === MONTHS.length - 1 ? "h" : ""}" style="--i:${i}" x="${x}" y="${96 - hh}" width="38" height="${hh}" rx="2"/>`;
+      tl += `<text class="v" x="${x + 19}" y="${90 - hh}">${v.toLocaleString("en-US")}</text><text class="m" x="${x + 19}" y="118">${m}</text>`;
+    });
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl ddm-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const pscm = h(
+      "div",
+      { class: "dhm psc-m" },
+      h("div", { class: "dhm-k" }, kpi("5,826", "@copilot", "nudges"), kpi("2,623", "pull requests", "nudged"), kpi("71%", "answered", "by Copilot", "g"), kpi("90%", "merged, median", "1.8 h after a nudge", "g")),
+      tlSvg
+    );
+    slides.push({
+      group: "process",
+      under: "prr",
+      notes:
+        "PR Sous Chef keeps gh-aw's pull requests from going stale. Every five minutes it asks two questions of each open pull request: is it idle (no recent push, no agent already working on it, idle for at least ten minutes), and is there work to do (unresolved review comments, failing CI, or a branch that needs updating)? When both answers are yes it nudges: one comment that mentions @copilot and lists exactly what is left, so Copilot picks the pull request back up, pushes, and CI runs again. The picking is a deterministic script with no AI, and it hands the agent at most four pull requests per run; drafts, opted-out (the broccoli label) and dependency-bot pull requests are skipped, and a fingerprint of the requested work means the same nudge is never sent twice. Sous Chef has read-only permissions and writes only through safe outputs; it never merges and never triggers CI itself, so humans still review and merge. The bottom strip is measured from gh-aw pull request comments carrying the Sous Chef marker, 13 May to 16 November 2026 (snapshot 17 November 2026): 5,826 Copilot nudges on 2,623 pull requests; Copilot's coding agent replied before the next nudge to 71%; 90% of the nudged pull requests merged, a median 1.8 hours after the first nudge (pull requests that were going to merge anyway are included). Since 4 November the nudges are a deterministic list: 550 of them named 2,105 review threads and 580 failing checks. The pull requests, rule card and nudge comment in the flow above are an illustrative, synthetic example.",
+      enter() {
+        start = 0;
+      },
+      tick(t) {
+        if (!start) {
+          start = t;
+          begin();
+        }
+        let u = t - start;
+        if (u > len) {
+          start = t;
+          u = 0;
+          begin();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finds pull requests that sit idle with work waiting, and nudges Copilot to pick them back up"), h("h2", {}, letters("PR Sous "), letters("Chef", "l-grad"))),
+        svg,
+        pscm,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 17 Nov 2026 · PR comments 13 May–16 Nov 2026 (188 d) · flow illustrative")
       ),
     });
   }

@@ -250,7 +250,7 @@ func (c *Compiler) generateLogParsing(yaml *strings.Builder, data *WorkflowData,
 		logFileForParsing = strings.ReplaceAll(logFileForParsing, constants.TmpGhAwDir, constants.GhAwRootDir)
 	}
 	yaml.WriteString("      - name: Parse agent logs for step summary\n")
-	yaml.WriteString("        if: always()\n")
+	fmt.Fprintf(yaml, "        if: %s\n", logParsingCondition(engine)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString(protectedSessionCaptureParserID(engine))
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        env:\n")
@@ -294,6 +294,13 @@ func protectedSessionCaptureParserID(engine CodingAgentEngine) string {
 		return ""
 	}
 	return "        id: parse_agent_logs\n"
+}
+
+func logParsingCondition(engine CodingAgentEngine) string {
+	if protectedSessionCaptureParserID(engine) != "" {
+		return "always() && steps.agentic_execution.outcome != 'skipped'"
+	}
+	return "always()"
 }
 
 // generateMCPScriptsLogParsing generates a step that parses mcp-scripts logs and adds them to the step summary

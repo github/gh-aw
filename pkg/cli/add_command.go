@@ -197,7 +197,7 @@ func runAddCommand(cmd *cobra.Command, args []string, validateEngine func(string
 	if err := rejectBootstrapProfileForRegularAdd(args, resolved.BootstrapProfile); err != nil {
 		return err
 	}
-	if err := ensureAddRepositoryInitialized(engineOverride, verbose, noGitattributes); err != nil {
+	if err := ensureAddRepositoryInitialized(cmd.Context(), engineOverride, verbose, noGitattributes); err != nil {
 		return err
 	}
 	if _, err := AddResolvedWorkflows(cmd.Context(), args, resolved, opts); err != nil {
