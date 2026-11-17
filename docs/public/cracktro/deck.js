@@ -20283,7 +20283,10 @@
         return b;
       };
     })();
+    // A GainNode passes at full gain (1) until its first scheduled event, so silence it right away:
+    // a source started before `t` must not blast an unshaped burst into the speaker.
     const env = (g, t, a, peak, rel) => {
+      g.gain.value = 0.0001;
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(peak, t + a);
       g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel);
@@ -20332,16 +20335,16 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
       src.start(t, Math.random() * 0.4);
       src.stop(t + 0.55);
-      // sub drop for weight
+      // sub drop for weight: starts silent with the envelope and swells in, so small speakers get no click
       const o = ac.createOscillator(),
         og = ac.createGain();
       o.type = "sine";
       o.frequency.setValueAtTime(dir > 0 ? 90 : 60, t + 0.12);
-      o.frequency.exponentialRampToValueAtTime(dir > 0 ? 42 : 80, t + 0.5);
+      o.frequency.exponentialRampToValueAtTime(dir > 0 ? 50 : 80, t + 0.5);
       o.connect(og);
       og.connect(out);
-      env(og, t + 0.12, 0.02, 0.224, 0.4);
-      o.start(t + 0.1);
+      env(og, t + 0.12, 0.06, 0.16, 0.36);
+      o.start(t + 0.12);
       o.stop(t + 0.6);
     };
     const osc = (type, f0, t, dur, vol, { f1 = f0, dest = out, a = 0.005 } = {}) => {
