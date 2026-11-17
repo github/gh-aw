@@ -995,13 +995,9 @@
   /* --- cli vs mcp --- */
   .cvm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
   .cvm-k { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
-  .cvm-chip { opacity: 0; transition: opacity .3s; } .cvm-chip.on { opacity: 1; } .cvm-chip.on.gone { opacity: .15; }
-  .cvm-chip rect { fill: #d2992214; stroke: #d29922; stroke-width: 1.5; }
-  .cvm-chip text { fill: #e6edf3; font: 500 13px var(--mono); }
-  .cvm-chip.s1 rect { fill: #8957e51a; stroke: #ab7df8; } .cvm-chip.s2 rect { fill: #1f6feb1a; stroke: #4493f8; }
   .cvm-ln { opacity: 0; transition: opacity .3s; } .cvm-ln.on { opacity: 1; } .cvm-ln.gone { opacity: .15; }
   .cvm-ln text { fill: #9198a1; font: 500 15px var(--mono); white-space: pre; }
-  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #3fb950; } .cvm-ln .ed { fill: #d29922; } .cvm-ln .jq { fill: #ffa657; font-weight: 700; } .cvm-ln .fl { fill: #79c0ff; font-weight: 700; }
+  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #3fb950; } .cvm-ln .ed { fill: #d29922; } .cvm-ln .jq { fill: #ffa657; font-weight: 700; } .cvm-ln .fl { fill: #79c0ff; font-weight: 700; } .cvm-js text { font-size: 13px; fill: #d29922; } .cvm-js .ed { fill: #f0f6fc; }
   .cvm-yaml text { fill: #e6edf3; font: 500 20px var(--mono); white-space: pre; }
   .cvm-yaml .k { fill: #79c0ff; } .cvm-yaml .v { fill: #d29922; transition: fill .3s; } .cvm-yaml .v.on { fill: #3fb950; }
   .cvm-hl { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .3s, stroke .3s; } .cvm-hl.on { fill: #3fb9501a; stroke: #3fb950; }
@@ -8038,72 +8034,77 @@
     });
   }
 
-  // CLI vs MCP: MCP schemas and every page of results land in the context; gh-proxy and cli-proxy put gh and every MCP server on PATH, so output goes to files and through pipes, which scale to any size and leave only the answer in context
+  // CLI vs MCP: a fat MCP call like list_code_scanning_alerts dumps every field of every alert into the context; with gh-proxy and cli-proxy the agent discovers CLIs with --help, writes the response to a file and pipes out only the answer
   {
     resetIndex();
     const VW = 1620,
       VH = 684;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    // synthetic tool schemas: [server class, tool name]
-    const TOOLS = [
-      ...["issue_read", "list_issues", "search_issues", "pull_request_read", "list_pull_requests", "search_pull_requests", "get_file_contents", "search_code", "list_commits", "get_commit", "list_branches", "list_workflows", "list_workflow_runs", "get_job_logs", "list_discussions", "get_discussion", "list_releases", "+ more github…"].map(n => [0, n]),
-      ...["create_issue", "add_comment", "create_pull_request", "noop"].map(n => [1, n]),
-      ...["search", "get_page"].map(n => [2, n]),
-    ];
-    const CALL = [
-      ["cmd", '→ list_pull_requests {"perPage":100}'],
-      ["ed", "← 100 pull requests · full JSON in context"],
-      ["", "  body, user, labels, head, base, links…"],
-      ["ed", "→ page 2 … page 5 · every page in context"],
+    // synthetic list_code_scanning_alerts response: one alert of many, every field into context
+    const CALL = '→ list_code_scanning_alerts {"state":"open"}';
+    const WALL = [
+      '← [{"number":1284,"state":"open","created_at":"…",',
+      '    "url":"…","html_url":"…","instances_url":"…",',
+      '    "rule":{"id":"js/sql-injection","severity":"error",',
+      '      "security_severity_level":"high","name":"…",',
+      '      "description":"Database query built from user-…",',
+      '      "tags":["security","external/cwe/cwe-089"]},',
+      '    "tool":{"name":"CodeQL","guid":null,"version":"…"},',
+      '    "most_recent_instance":{"ref":"refs/heads/main",',
+      '      "analysis_key":"…","environment":"{}","state":"open",',
+      '      "commit_sha":"…","classifications":[],',
+      '      "message":{"text":"This query depends on a user-…"},',
+      '      "location":{"path":"src/db.js","start_line":42,',
+      '        "end_line":42,"start_column":9,"end_column":31}}},',
+      '   {"number":1283,"state":"open", … × every alert',
+      '→ page 2 · page 3 · … every page into context',
     ];
     const BINS = [
-      ["gh", "gh-proxy · no GitHub MCP server"],
+      ["gh", "gh-proxy · pre-authenticated, no MCP"],
       ["safeoutputs", "cli-proxy · via the MCP gateway"],
       ["docs-search", "cli-proxy · via the MCP gateway"],
     ];
-    // output goes to a file; pipes pull out only the answer
+    // discover with --help, write the response to a file, pipe out only the answer
     const SHELL = [
-      ["cmd", "$ gh pr list --limit 500 --json number,title,labels \\"],
-      ["cmd", "    > prs.json"],
-      ["ok", "✓ 500 pull requests on disk · 0 lines in context"],
-      ["cmd", "$ jq '[.[] | select(.labels == [])] | length' prs.json"],
-      ["", "37"],
-      ["cmd", "$ jq -r '.[] | select(.labels == []) | .title' \\"],
-      ["cmd", "    prs.json | head -2"],
-      ["", "Fix flaky retry in cache step"],
-      ["", "Add dark mode to settings"],
-      ["cmd", "$ docs-search search --query retry > hits.json"],
-      ["cmd", "$ jq -c '.hits[0] | {path, line}' hits.json"],
-      ["ok", '{"path":"docs/cache.md","line":42}'],
+      ["cmd", "$ gh help | grep api"],
+      ["", "  api:  Make an authenticated GitHub API request"],
+      ["cmd", "$ gh api --help | grep paginate"],
+      ["", "  --paginate   fetch all pages of results"],
+      ["cmd", "$ gh api --paginate \\"],
+      ["cmd", "  repos/{owner}/{repo}/code-scanning/alerts > alerts.json"],
+      ["ok", "✓ every alert, every page on disk · 0 lines in context"],
+      ["cmd", "$ jq -r '.[].rule.severity' alerts.json | sort | uniq -c"],
+      ["", "     12 error"],
+      ["", "     85 warning"],
+      ["cmd", "$ jq -r '.[].most_recent_instance.location.path' \\"],
+      ["cmd", "  alerts.json | sort | uniq -c | sort -rn | head -2"],
+      ["", "      9 src/db.js"],
+      ["", "      3 src/api/user.js"],
     ];
     let g = `<defs><marker id="cvmG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
       <marker id="cvmC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
-      [0, 600, "MCP · SCHEMAS UP FRONT"],
+      [0, 600, "MCP · RESPONSE INTO CONTEXT"],
       [600, 1020, "FRONT MATTER"],
-      [1020, VW, "CLI · HELP ON DEMAND"],
+      [1020, VW, "BASH · DISCOVER · FILES · PIPES"],
     ].forEach(([x0, x1, t], i) => {
       g += `<text class="fm-lane-t mra-lane" id="cvmLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
     });
     g += `<path class="fm-wire" id="cvmW0" d="M584 450 C 606 450, 594 230, 614 230" stroke="#d29922" marker-end="url(#cvmG)"/>`;
     g += `<path class="fm-wire" id="cvmW1" d="M1004 400 C 1026 400, 1014 180, 1034 180" stroke="#3fb950" marker-end="url(#cvmC)"/>`;
-    // measured (refresh/cli-vs-mcp.md): median first model request of one workflow, same model, 15 runs per side
+    // what ends up in the context: qualitative, synthetic
     const ctx = (x, id, col, txt) =>
-      `<g class="cvm-ctx" id="${id}"><text class="cvm-k" x="${x + 16}" y="556">MEASURED · FIRST REQUEST · MEDIAN</text>` +
-      `<rect x="${x + 16}" y="568" width="536" height="40" rx="8" stroke="${col}"/><text x="${x + 32}" y="594" fill="${col}">${esc(txt)}</text></g>`;
-    // MCP: every server's tool schemas ride along in every model request
-    g += `<g class="sfl-box" id="cvmMcp"><rect class="sfl-card" x="16" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="32" y="104">agent context · github: local + 2 MCP servers</text>`;
-    g += `<text class="cvm-k" x="32" y="136">TOOL SCHEMAS · IN EVERY REQUEST</text>`;
-    TOOLS.forEach(([s, n], i) => {
-      const x = 32 + (i % 3) * 180,
-        y = 148 + Math.floor(i / 3) * 30;
-      g += `<g class="cvm-chip s${s}" id="cvmT${i}"><rect x="${x}" y="${y}" width="172" height="24" rx="5"/><text x="${x + 8}" y="${y + 17}">${esc(n)}</text></g>`;
-    });
-    g += `<text class="cvm-k" x="32" y="414">TOOL CALL</text>`;
-    CALL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmC${i}"><text class="${c}" x="32" y="${444 + i * 26}">${esc(t)}</text></g>`));
-    g += ctx(16, "cvmXm", "#d29922", "16 GitHub tool schemas · 16.7k tokens") + `</g>`;
+      `<g class="cvm-ctx" id="${id}"><text class="cvm-k" x="${x + 16}" y="572">IN CONTEXT</text>` +
+      `<rect x="${x + 16}" y="582" width="536" height="38" rx="8" stroke="${col}"/><text x="${x + 32}" y="607" fill="${col}">${esc(txt)}</text></g>`;
+    // MCP: one fat call; the whole response, every page, goes straight into the context
+    g += `<g class="sfl-box" id="cvmMcp"><rect class="sfl-card" x="16" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="32" y="104">agent context · github: local</text>`;
+    g += `<text class="cvm-k" x="32" y="136">TOOL CALL</text>`;
+    g += `<g class="cvm-ln" id="cvmC0"><text class="cmd" x="32" y="162">${esc(CALL)}</text></g>`;
+    g += `<text class="cvm-k" x="32" y="196">RESPONSE · STRAIGHT INTO CONTEXT</text>`;
+    WALL.forEach((t, i) => (g += `<g class="cvm-ln cvm-js" id="cvmT${i}"><text class="${i === WALL.length - 1 ? "ed" : ""}" x="32" y="${222 + i * 22}">${esc(t)}</text></g>`));
+    g += ctx(16, "cvmXm", "#d29922", "every field of every alert, every page") + `</g>`;
     // front matter: two lines move GitHub reads to gh and mount every MCP server as a CLI
     g += `<g class="sfl-box" id="cvmFm"><rect class="sfl-card" x="616" y="76" width="388" height="556" rx="12"/><text class="sfl-title" x="632" y="104">.github/workflows/triage.md</text>`;
     g += `<rect class="cvm-hl" id="cvmH0" x="626" y="186" width="368" height="30" rx="6"/><rect class="cvm-hl" id="cvmH1" x="626" y="218" width="368" height="30" rx="6"/>`;
@@ -8115,21 +8116,21 @@
       const y = 306 + i * 64;
       g += `<g class="cvm-bin" id="cvmB${i}"><rect x="632" y="${y}" width="356" height="54" rx="8"/><text class="n" x="648" y="${y + 24}">${n}</text><text class="d" x="648" y="${y + 44}">${esc(d)}</text></g>`;
     });
-    g += `<g class="dto-big" id="cvmBig"><text x="810" y="560">0</text><text class="dto-cap" x="810" y="600">MCP tool schemas in context</text></g></g>`;
-    // CLI: one prompt line per tool; schemas and data enter context only when asked for, already filtered
-    g += `<g class="sfl-box" id="cvmCli"><rect class="sfl-card" x="1036" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="1052" y="104">agent context · gh-proxy + cli-proxy</text>`;
+    g += `<g class="dto-big" id="cvmBig"><text x="810" y="560">--help</text><text class="dto-cap" x="810" y="600">CLIs describe themselves</text></g></g>`;
+    // bash: the agent discovers the CLI, writes the response to a file and pipes out only the answer
+    g += `<g class="sfl-box" id="cvmCli"><rect class="sfl-card" x="1036" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="1052" y="104">agent shell · gh-proxy + cli-proxy</text>`;
     g += `<text class="cvm-k" x="1052" y="136">PROMPT · ONE LINE PER CLI</text>`;
-    g += `<g class="cvm-ln" id="cvmP"><text x="1052" y="164">gh · safeoutputs · docs-search · <tspan class="cmd">--help</tspan> on demand</text></g>`;
-    g += `<text class="cvm-k" x="1052" y="206">SHELL · OUTPUT TO FILES · PIPES PICK THE ANSWER</text>`;
+    g += `<g class="cvm-ln" id="cvmP"><text x="1052" y="162">gh · safeoutputs · docs-search · run <tspan class="cmd">--help</tspan></text></g>`;
+    g += `<text class="cvm-k" x="1052" y="196">SHELL · DISCOVER → FILE → PIPES</text>`;
     // highlight files and pipe stages
     const pipe = t =>
       esc(t)
         .replace(/(&gt; )?[\w-]+\.json/g, m => `<tspan class="fl">${m}</tspan>`)
-        .replace(/\b(jq|head)\b/g, m => `<tspan class="jq">${m}</tspan>`)
+        .replace(/\b(jq|head|sort|uniq|grep)\b/g, m => `<tspan class="jq">${m}</tspan>`)
         .replace(/ \| /g, ` <tspan class="jq">|</tspan> `);
-    SHELL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmS${i}"><text class="${c}" x="1052" y="${236 + i * 26}">${pipe(t)}</text></g>`));
-    g += ctx(1036, "cvmXc", "#3fb950", "gh on PATH · 12.8k tokens · −23%") + `</g>`;
-    g += `<text class="cvm-k cvm-cap" x="${VW / 2}" y="672">MEASURED · one gh-aw workflow, MCP → gh-proxy + cli-proxy, same model · 15 runs per side, 23 Aug – 3 Sep 2026 · snapshot 17 Nov 2026 · whole-run cost: no consistent change</text>`;
+    SHELL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmS${i}"><text class="${c}" x="1052" y="${222 + i * 24}">${pipe(t)}</text></g>`));
+    g += ctx(1036, "cvmXc", "#3fb950", "two help lines · two counts · two paths") + `</g>`;
+    g += `<text class="cvm-k cvm-cap" x="${VW / 2}" y="672">MEASURED, schemas only · 1 workflow, MCP → gh-proxy, 15 runs/side, 23 Aug – 3 Sep 2026 · first request 16.7k → 12.8k tokens, whole run ≈ same · snapshot 17 Nov 2026</text>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg ao-svg");
@@ -8140,7 +8141,7 @@
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const clamp = u => Math.min(1, Math.max(0, u));
     // phases: [start ms, duration ms]
-    const P = { SCH: [400, 2400], CALL: [3000, 1200], W0: [4400, 700], FLIP: [5100, 700], BIN: [5800, 1200], W1: [7100, 700], SH: [7800, 3600], BIG: [11600, 1] };
+    const P = { CALL: [400, 500], SCH: [1100, 3000], W0: [4400, 700], FLIP: [5100, 700], BIN: [5800, 1200], W1: [7100, 700], SH: [7800, 3600], BIG: [11600, 1] };
     const CYC = 15600;
     let t0 = 0,
       cyc = -1,
@@ -8180,7 +8181,7 @@
     slides.push({
       group: "cost",
       notes:
-        "CLI vs MCP: the workflow, servers, tool calls and pull requests in the flow are illustrative and synthetic; only the two boxes at the bottom and the caption are measured. An MCP server costs tokens before the agent does anything: every tool it exposes sends its name, description and JSON schema with the model request, and each call returns whole JSON objects into the context. Two front matter lines change the surface without changing the servers. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. That is what makes pipes and files possible, and they scale where MCP cannot. An MCP result has nowhere to go but the context, page after page, so a bigger task means a fuller context. A command's output can go to a file instead: five hundred pull requests land on disk and nothing enters the context. Then jq, grep and head pull out only the answer, a count or two titles, and the agent can query the same file again without fetching it again. The data grows on disk, not in the context. The prompt carries one line per command, and the agent reads --help only for the tool it needs. What we measured, from the usage artifact of gh-aw's own runs: one workflow switched from the GitHub MCP server, with its 16 tool schemas loaded up front, to gh-proxy plus cli-proxy, with the same model and nothing else changed. Over 15 runs on each side, between 23 August and 3 September 2026, the median first model request fell from 16,690 to 12,766 tokens, 23 percent. But prompt caching makes that fixed overhead cheap: the whole run's prompt tokens and AI credits did not fall, they were within a few percent. A larger natural experiment, 21 workflows switched in one commit that also changed the sandbox runtime, showed lower median AI credits on the gh-proxy side, against almost no drift in unchanged workflows, but individual workflows swung from minus 78 to plus 123 percent, so we do not put a number on it. Engines that defer MCP tool schemas, and MCP servers already behind cli-proxy, carried a median of about 400 extra first-request tokens. Snapshot taken 17 November 2026. Both modes need bash; strict workflows with bash disabled stay on MCP.",
+        "CLI vs MCP: the workflow, alerts, counts, files and paths on this slide are illustrative and synthetic; only the caption's figures are measured. Take a fat API call such as listing a repository's code scanning alerts. Through the GitHub MCP server, list_code_scanning_alerts returns every alert as a full JSON object, rule, tool, latest instance, location, message and links, and the whole response goes straight into the context, page after page. A bigger repository means a fuller context, and the agent has nowhere else to put it. Two front matter lines change the surface without changing what the agent can reach. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. Now the agent works in bash. It discovers what it needs by itself: the prompt has one line per command, and gh help, gh api --help or any server's --help explain the rest, a few lines at a time. It writes the full response to a file, every alert and every page, and none of it enters the context. Then pipes pull out only the answer: jq picks fields, sort and uniq count by severity and by file, head keeps the top two. The data grows on disk, not in the context, and the agent can query the same file again without fetching it again. The caption is the one thing we measured, and it is about tool schemas only: one gh-aw workflow that switched from the GitHub MCP server to gh-proxy plus cli-proxy, same model, 15 runs on each side between 23 August and 3 September 2026, had a median first request of 16,690 tokens before and 12,766 after, while its whole-run tokens and AI credits stayed within a few percent. A larger, confounded switch of 21 workflows swung from minus 78 to plus 123 percent per workflow, so we show no run-level number. Snapshot taken 17 November 2026. Both modes need bash; strict workflows with bash disabled stay on MCP.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -8197,22 +8198,16 @@
         const ph = k => clamp((u - P[k][0]) / P[k][1]);
         svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
         dot.style.opacity = 0;
-        // schemas load into the context before the first thought
+        // one fat call
+        if (u >= P.CALL[0]) once("call", () => (sfx.key(), $("cvmC0").classList.add("on")));
+        // its whole response floods the context
         if (u >= P.SCH[0]) {
           reveal(
-            TOOLS.map((_, i) => "cvmT" + i),
+            WALL.map((_, i) => "cvmT" + i),
             ph("SCH"),
-            i => i % 4 === 0 && sfx.pop(i / 4),
+            i => i % 3 === 0 && sfx.pop(i / 3),
           );
-        }
-        // one call returns whole objects
-        if (u >= P.CALL[0]) {
-          once("call", () => sfx.key());
-          reveal(
-            CALL.map((_, i) => "cvmC" + i),
-            ph("CALL"),
-          );
-          if (ph("CALL") >= 1) $("cvmXm").classList.add("on");
+          if (ph("SCH") >= 1) $("cvmXm").classList.add("on");
         }
         if (u >= P.W0[0] && u < P.FLIP[0]) wire("cvmW0", ph("W0"));
         // two front matter lines flip the surface
@@ -8223,7 +8218,7 @@
             $("cvmV0").textContent = "gh-proxy";
             $("cvmV1").textContent = "true";
             ["cvmV0", "cvmV1", "cvmH0", "cvmH1"].forEach(id => $(id).classList.add("on"));
-            svg.querySelectorAll("#cvmMcp .cvm-chip, #cvmMcp .cvm-ln").forEach(x => x.classList.add("gone"));
+            svg.querySelectorAll("#cvmMcp .cvm-ln").forEach(x => x.classList.add("gone"));
             sfx.compile();
           });
         if (u >= P.BIN[0])
@@ -8233,7 +8228,7 @@
             i => sfx.pop(4 + i),
           );
         if (u >= P.W1[0] && u < P.SH[0]) wire("cvmW1", ph("W1"));
-        // the agent asks for help and data only when it needs them, filtered in the shell
+        // discover with --help, write the file, pipe out the answer
         if (u >= P.SH[0]) {
           once("sh", () => {
             $("cvmLane2").classList.add("on");
@@ -8249,7 +8244,7 @@
             sfx.pop(7);
           });
       },
-      el: h("section", { class: "slide cvm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · pipes and files, not context"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))), svg),
+      el: h("section", { class: "slide cvm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · bash, files and pipes, not context"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))), svg),
     });
   }
 

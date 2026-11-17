@@ -20,11 +20,10 @@ Same-workflow before/after natural experiments: commits that flip `tools.github.
 ## 1. Slide
 
 - Marker: `// CLI vs MCP:` (`grep -n "// CLI vs MCP:" docs/public/cracktro/deck.js`). CSS prefix `cvm-`. Group `cost`. Row 66 in `slides.md` (Notes `illustrative`: the flow is synthetic).
+- The flow (fat `list_code_scanning_alerts` response vs `--help` → `> alerts.json` → `jq | sort | uniq -c | head`) and its `IN CONTEXT` boxes are synthetic and qualitative: no measured numbers there.
 - Data lives inside that block only:
-  1. `ctx(16, "cvmXm", ...)`: `16 GitHub tool schemas · 16.7k tokens` (MCP side median first request).
-  2. `ctx(1036, "cvmXc", ...)`: `gh on PATH · 12.8k tokens · −23%` (gh-proxy side median, change).
-  3. The `.cvm-cap` caption: workflow count, runs per side, window, snapshot, whole-run verdict.
-  4. `notes:` string: repeats every number, the window, the snapshot, the bulk result and its confound.
+  1. The `.cvm-cap` caption: `MEASURED, schemas only`, workflow count, runs per side, window, first-request medians (16.7k → 12.8k), whole-run verdict, snapshot.
+  2. `notes:` string: repeats every number, the window, the snapshot, the bulk result and its confound.
 - Elsewhere: the `content-rules.md` Exception bullet "the CLI vs MCP slide (`cvm-` classes)".
 
 ## 2. Window & snapshot
@@ -61,7 +60,7 @@ Baseline (snapshot 2026-11-17):
 
 ## 5. Update steps
 
-1. Update the two `ctx(...)` texts and the `.cvm-cap` caption (window, runs per side, snapshot).
+1. Update the `.cvm-cap` caption (medians, window, runs per side, snapshot); the `ctx(...)` boxes stay qualitative.
 2. Update the notes: every number, window, snapshot, the bulk range and confound. Keep `illustrative and synthetic` for the flow.
 3. Update the `content-rules.md` Exception bullet. `slides.md` row 66 stays free of numbers and dates.
 4. If a newer clean switch (one workflow, same model, no runtime change) exists, prefer it for the boxes and say which in the notes.
