@@ -1029,7 +1029,18 @@
   .dto-sec.ag.on rect { fill: #8957e514; stroke: #ab7df8; stroke-dasharray: none; } .dto-sec.ag.on text { fill: #c297ff; }
   .dto-row { transition: transform 1s cubic-bezier(.5,0,.2,1); }
   .dto-row rect { fill: #161b22; stroke: #3d444d; stroke-width: 2; transition: fill .3s, stroke .3s; }
-  .dto-row .c { fill: #e6edf3; font: 500 16px var(--mono); }
+  .dto-row .c { fill: #e6edf3; font: 500 16px var(--mono); opacity: 0; transition: opacity .5s .35s; }
+  .dto-row .p { fill: #d1d7e0; font: 500 17px "Mona Sans"; transition: opacity .35s; }
+  .dto-row.det .c { opacity: 1; } .dto-row.det .p { opacity: 0; transition-delay: 0s; }
+  .dto-file { opacity: 0; transition: opacity .6s .6s; } .dto-file.on { opacity: 1; }
+  .dto-file rect { fill: #1f6feb14; stroke: #4493f8; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .dto-file .fp { fill: #79c0ff; font: 600 15px var(--mono); } .dto-file .fj { fill: #9198a1; font: 500 14px var(--mono); } .dto-file .tg { fill: #79c0ff; font: 600 13px var(--mono); text-anchor: end; letter-spacing: .06em; }
+  .dto-file .cap { fill: #9198a1; font: 500 15px "Mona Sans"; text-anchor: middle; }
+  .dto-dial { position: absolute; left: 1240px; top: 44px; width: 620px; height: 250px; overflow: visible; font-family: "Mona Sans"; }
+  .dto-dial .tk { stroke: #0d1117; stroke-width: 3; } .dto-dial .tk.mj { stroke-width: 4; }
+  .dto-dial .gh { opacity: 0; transition: opacity .5s; } .dto-dial .gh.on { opacity: .45; }
+  .dto-dial .end { font: 600 14px var(--mono); letter-spacing: .08em; text-anchor: middle; } .dto-dial .sub { fill: #9198a1; font: 500 14px "Mona Sans"; text-anchor: middle; }
+  .dto-dial .rv { fill: #f0f6fc; font: 700 44px "Mona Sans"; text-anchor: middle; } .dto-dial .rl { fill: #9198a1; font: 600 14px var(--mono); text-anchor: middle; letter-spacing: .1em; }
   .dto-row .tg { font: 600 13px var(--mono); text-anchor: end; letter-spacing: .06em; fill: #c297ff; }
   .dto-row.hot rect { stroke: #d29922; fill: #d2992218; } .dto-row.hot .tg { fill: #d29922; }
   .dto-row.det rect { stroke: #4493f8; fill: #1f6feb22; } .dto-row.det .tg { fill: #79c0ff; }
@@ -8922,7 +8933,7 @@
     });
   }
 
-  // DeterministicOps: run history shows the same data-gathering calls in every run; audit flags them, they move from the agentic plan into deterministic steps:, and the next run spends fewer tokens
+  // DeterministicOps: run history shows the same prompt lines turning into the same data-gathering calls in every run; audit flags them, they become commands in deterministic steps: that write a file the agent reads, a dial swings from 100% agentic toward deterministic, and the next run spends fewer tokens
   {
     resetIndex();
     const VW = 1620,
@@ -8938,14 +8949,14 @@
       ["#1829", 12, "422k"],
       ["#1830", 9, "412k"],
     ];
-    // the agentic plan: [command, moves to steps:]
+    // the prompt, line by line: [prompt line, command it always became, moves to steps:, prompt once data is pre-fetched]
     const PLAN = [
-      ["gh pr list --merged --since 1d", 1],
-      ["gh pr view #N --json files ×14", 1],
-      ["jq 'group_by(.labels[0])'", 1],
-      ["count changed lines per area", 1],
-      ["read diffs · pick highlights", 0],
-      ["write summary → create-discussion", 0],
+      ["“list yesterday’s merged PRs”", "gh pr list --state merged", 1],
+      ["“fetch the files each one changed”", "gh pr view $N --json files", 1],
+      ["“group them by label”", "jq 'group_by(.labels[0])'", 1],
+      ["“count changed lines per area”", "jq -f areas.jq > areas.json", 1],
+      ["“read the diffs, pick highlights”", "", 0, "“read areas.json, pick highlights”"],
+      ["“write the summary as a discussion”", "", 0],
     ];
     const FINDS = [
       ["ed", "⚠ Partially Reducible To Deterministic"],
@@ -8956,7 +8967,10 @@
     const rowY = r => 130 + r * 50,
       detY = i => 178 + i * 38,
       agY = i => 392 + i * 38,
-      BW = 448;
+      agMY = i => 492 + i * 38,
+      BW = 448,
+      AG0 = 100,
+      AG1 = 29;
     let g = `<defs><marker id="dtoG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
       <marker id="dtoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
@@ -8996,9 +9010,11 @@
     // the workflow: deterministic steps: on top, the agent below
     g += `<g class="sfl-box" id="dtoWf"><rect class="sfl-card" x="570" y="76" width="500" height="556" rx="12"/><text class="sfl-title" x="586" y="104">daily-pr-summary.md</text>`;
     g += `<g class="dto-sec det" id="dtoDet"><rect x="586" y="120" width="468" height="200" rx="10"/><text x="602" y="144">steps: · deterministic · 0 tokens</text></g>`;
-    g += `<g class="dto-sec ag" id="dtoAg"><rect x="586" y="336" width="468" height="282" rx="10"/><text x="602" y="360">agent · reasoning only</text></g>`;
-    PLAN.forEach(([c], i) => {
-      g += `<g class="dto-row" id="dtoP${i}" style="transform: translate(0px, ${agY(i)}px)"><rect x="600" y="-20" width="440" height="32" rx="6"/><text class="c" x="614" y="2">${esc(c)}</text><text class="tg" x="1028" y="1">AGENT</text></g>`;
+    g += `<g class="dto-sec ag" id="dtoAg"><rect x="586" y="336" width="468" height="282" rx="10"/><text id="dtoAgT" x="602" y="360">prompt · agent runs every line</text></g>`;
+    // the file steps: leave for the agent, plus the slimmer prompt that reads it
+    g += `<g class="dto-file" id="dtoFile"><rect x="600" y="376" width="440" height="72" rx="8"/><text class="fp" x="614" y="402">/tmp/gh-aw/agent/areas.json</text><text class="tg" x="1028" y="401">FILE</text><text class="fj" x="614" y="430">{"cli": 1288, "docs": 412, "ci": 96}</text><text class="cap" x="820" y="598">the prompt keeps only the judgement</text></g>`;
+    PLAN.forEach(([p, c], i) => {
+      g += `<g class="dto-row" id="dtoP${i}" style="transform: translate(0px, ${agY(i)}px)"><rect x="600" y="-20" width="440" height="32" rx="6"/><text class="p" x="614" y="2">${esc(p)}</text><text class="c" x="614" y="2">${esc(c)}</text><text class="tg" x="1028" y="1">AGENT</text></g>`;
     });
     g += `</g>`;
     // the next run: same summary, fewer tokens
@@ -9017,6 +9033,35 @@
     svg.setAttribute("class", "fm-svg ao-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.innerHTML = g;
+    // dial: share of each run that is still agentic, 100% (left) to fully deterministic (right)
+    const DX = 310,
+      DY = 168,
+      DR = 150,
+      rot = v => `rotate(${(-180 * v) / 100} ${DX} ${DY})`;
+    let dg = `<defs><linearGradient id="dtoDialG" gradientUnits="userSpaceOnUse" x1="${DX - DR}" y1="0" x2="${DX + DR}" y2="0"><stop offset="0" stop-color="#ab7df8"/><stop offset="1" stop-color="#4493f8"/></linearGradient></defs>`;
+    dg += `<path d="M${DX - DR} ${DY} A${DR} ${DR} 0 0 1 ${DX + DR} ${DY}" fill="none" stroke="url(#dtoDialG)" stroke-width="22"/>`;
+    for (let k = 0; k <= 10; k++) {
+      const a = Math.PI * (k / 10),
+        mj = k % 5 === 0,
+        r0 = DR - 11,
+        r1 = DR + (mj ? 11 : 4);
+      dg += `<line class="tk${mj ? " mj" : ""}" x1="${DX + r0 * Math.cos(a)}" y1="${DY - r0 * Math.sin(a)}" x2="${DX + r1 * Math.cos(a)}" y2="${DY - r1 * Math.sin(a)}"/>`;
+    }
+    dg += `<line class="gh" id="dtoGhost" x1="${DX}" y1="${DY}" x2="${DX + DR - 20}" y2="${DY}" stroke="#c297ff" stroke-width="4" stroke-dasharray="6 6" transform="${rot(AG0)}"/>`;
+    dg += `<line id="dtoNeedle" x1="${DX}" y1="${DY}" x2="${DX + DR - 20}" y2="${DY}" stroke="#f0f6fc" stroke-width="5" stroke-linecap="round" transform="${rot(AG0)}"/><circle cx="${DX}" cy="${DY}" r="11" fill="#f0f6fc"/><circle cx="${DX}" cy="${DY}" r="4" fill="#0d1117"/>`;
+    dg += `<text class="end" x="${DX - DR}" y="${DY + 34}" fill="#c297ff">100% AGENTIC</text><text class="sub" x="${DX - DR}" y="${DY + 54}">the prompt does it all</text>`;
+    dg += `<text class="end" x="${DX + DR}" y="${DY + 34}" fill="#79c0ff">DETERMINISTIC</text><text class="sub" x="${DX + DR}" y="${DY + 54}">steps: only · 0 tokens</text>`;
+    dg += `<text class="rv" id="dtoDialV" x="${DX}" y="${DY + 56}">${AG0}%</text><text class="rl" x="${DX}" y="${DY + 78}">AGENTIC</text>`;
+    const dial = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    dial.setAttribute("class", "dto-dial");
+    dial.setAttribute("viewBox", "0 0 620 250");
+    dial.setAttribute("role", "img");
+    dial.setAttribute("aria-label", "Dial from 100% agentic to deterministic");
+    dial.innerHTML = dg;
+    const setDial = v => {
+      dial.querySelector("#dtoNeedle").setAttribute("transform", rot(v));
+      dial.querySelector("#dtoDialV").textContent = `${Math.round(v)}%`;
+    };
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".mra-dot");
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
@@ -9035,18 +9080,23 @@
     const place = moved => {
       let a = 0,
         d = 0;
-      PLAN.forEach(([, det], i) => {
+      PLAN.forEach(([p, , det, alt], i) => {
         const row = $("dtoP" + i),
-          y = moved && det ? detY(d++) : agY(moved ? a++ : i);
+          y = moved && det ? detY(d++) : moved ? agMY(a++) : agY(i);
         row.style.transform = `translate(0px, ${y}px)`;
         row.classList.toggle("det", moved && !!det);
         row.querySelector(".tg").textContent = moved && det ? "STEPS:" : "AGENT";
+        if (alt) row.querySelector(".p").textContent = moved ? alt : p;
       });
+      $("dtoAgT").textContent = moved ? "prompt · agent reasons only" : "prompt · agent runs every line";
+      $("dtoFile").classList.toggle("on", moved);
     };
     const reset = () => {
       svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
       svg.querySelectorAll(".fx.f").forEach(b => b.classList.replace("f", "t"));
       place(false);
+      setDial(AG0);
+      dial.querySelector("#dtoGhost").classList.remove("on");
       $("dtoAfter").setAttribute("width", BW);
       $("dtoAfterV").textContent = "412k";
       $("dtoTurns").textContent = "34";
@@ -9067,7 +9117,7 @@
     slides.push({
       group: "cost",
       notes:
-        "DeterministicOps: every run, workflow, command and number on this slide is illustrative and synthetic. Agentic workflows often spend most of their turns gathering data: listing pull requests, fetching files, grouping and counting. That work is the same on every run, and it does not need a model. Because every run is recorded as a unified session, we can look at the history: in the last 30 runs of this daily summary, the same four calls run in the same order before any reasoning starts. gh aw audit flags this as Partially Reducible To Deterministic, from the share of turns that only gather data. The fix is DeterministicOps: move those calls out of the agentic plan into the workflow's steps:, plain Actions steps that run before the agent and write their results to /tmp/gh-aw/agent/. They cost no tokens and give the same answer every time. The agent keeps only the reasoning, reading the diffs and writing the summary, so the next run makes the same summary with fewer turns and far fewer tokens. Agentic first, then mine the history and make the common parts deterministic.",
+        "DeterministicOps: every run, workflow, prompt line, command, file and number on this slide is illustrative and synthetic. Think of a dial: at one end a workflow is 100% agentic, where the prompt says everything and the model does everything; at the other end it is fully deterministic, plain Actions steps with no tokens at all. Agentic workflows often start at the agentic end and spend most of their turns gathering data: listing pull requests, fetching files, grouping and counting. That work is the same on every run, and it does not need a model. Because every run is recorded as a unified session, we can look at the history: in the last 30 runs of this daily summary, the same four prompt lines turn into the same four calls, in the same order, before any reasoning starts. gh aw audit flags this as Partially Reducible To Deterministic, from the share of turns that only gather data. The fix is DeterministicOps: translate those prompt lines into the commands they always became and put them in the workflow's steps:, plain Actions steps that run before the agent and write their results to a file, here /tmp/gh-aw/agent/areas.json. They cost no tokens and give the same answer every time. The prompt shrinks to the judgement: read areas.json, pick highlights and write the summary, so the dial swings from 100% agentic to about 29% and the next run makes the same summary with fewer turns and far fewer tokens. Agentic first, then mine the history and turn the dial towards deterministic where the work is always the same.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -9125,8 +9175,11 @@
             $("dtoAg").classList.add("on");
             PLAN.forEach((_, i) => $("dtoP" + i).classList.remove("hot"));
             place(true);
+            dial.querySelector("#dtoGhost").classList.add("on");
             sfx.compile();
           });
+        // the dial swings from all agentic toward deterministic as the next run settles
+        if (u >= P.MOVE[0]) setDial(AG0 - (AG0 - AG1) * ease(Math.min(1, (u - P.MOVE[0]) / (P.RES[0] + P.RES[1] - P.MOVE[0]))));
         if (u >= P.W1[0] && u < P.RES[0]) wire("dtoW1", ph("W1"));
         if (u >= P.RES[0]) {
           once("res", () => {
@@ -9141,7 +9194,13 @@
           if (f >= 1) once("big", () => $("dtoBig").classList.add("on"));
         }
       },
-      el: h("section", { class: "slide dto" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic → deterministic · mined from run history"), h("h2", {}, letters("Deterministic"), letters("Ops", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide dto" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic → deterministic · mined from run history"), h("h2", {}, letters("Deterministic"), letters("Ops", "l-grad"))),
+        dial,
+        svg
+      ),
     });
   }
 
@@ -9168,7 +9227,7 @@
       '      "location":{"path":"src/db.js","start_line":42,',
       '        "end_line":42,"start_column":9,"end_column":31}}},',
       '   {"number":1283,"state":"open", … × every alert',
-      '→ page 2 · page 3 · … every page into context',
+      "→ page 2 · page 3 · … every page into context",
     ];
     const BINS = [
       ["gh", "gh-proxy · pre-authenticated, no MCP"],
@@ -9316,7 +9375,7 @@
           reveal(
             WALL.map((_, i) => "cvmT" + i),
             ph("SCH"),
-            i => i % 3 === 0 && sfx.pop(i / 3),
+            i => i % 3 === 0 && sfx.pop(i / 3)
           );
           if (ph("SCH") >= 1) $("cvmXm").classList.add("on");
         }
@@ -9336,7 +9395,7 @@
           reveal(
             BINS.map((_, i) => "cvmB" + i),
             ph("BIN"),
-            i => sfx.pop(4 + i),
+            i => sfx.pop(4 + i)
           );
         if (u >= P.W1[0] && u < P.SH[0]) wire("cvmW1", ph("W1"));
         // discover with --help, write the file, pipe out the answer
@@ -9355,7 +9414,12 @@
             sfx.pop(7);
           });
       },
-      el: h("section", { class: "slide cvm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · bash, files and pipes, not context"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide cvm" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · bash, files and pipes, not context"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))),
+        svg
+      ),
     });
   }
 
