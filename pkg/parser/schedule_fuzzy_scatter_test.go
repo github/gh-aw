@@ -561,6 +561,67 @@ func TestScatterScheduleTriWeekly(t *testing.T) {
 	}
 }
 
+func TestScatterScheduleDailyInterval(t *testing.T) {
+	// Must not be swallowed by the FUZZY:DAILY handler and must keep the */N day field.
+	result, err := ScatterSchedule("FUZZY:DAILY_INTERVAL/2 * * *", "smoke-copilot")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fields := strings.Fields(result)
+	if len(fields) != 5 || fields[2] != "*/2" || fields[3] != "*" || fields[4] != "*" {
+		t.Fatalf("expected 'M H */2 * *', got %q", result)
+	}
+	hour, minute := weightedDailyTimeSlot("smoke-copilot")
+	if want := fmt.Sprintf("%d %d */2 * *", minute, hour); result != want {
+		t.Errorf("expected %q, got %q", want, result)
+	}
+
+	// Distinct workflows sharing "every 2 days" spread across many distinct times.
+	distinct := map[string]bool{}
+	for i := range 60 {
+		r, err := ScatterSchedule("FUZZY:DAILY_INTERVAL/2 * * *", fmt.Sprintf("github/gh-aw/.github/workflows/smoke-%d.md", i))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		distinct[r] = true
+	}
+	if len(distinct) < 50 {
+		t.Errorf("expected at least 50 distinct crons for 60 workflows, got %d", len(distinct))
+	}
+
+	if _, err := ScatterSchedule("FUZZY:DAILY_INTERVAL/0 * * *", "wf"); err == nil {
+		t.Error("expected error for zero interval")
+	}
+}
+
+func TestScatterScheduleMonthlyInterval(t *testing.T) {
+	tests := []struct {
+		fuzzyCron     string
+		expectedMonth string
+	}{
+		{"FUZZY:MONTHLY_INTERVAL/1 * * *", "*"},
+		{"FUZZY:MONTHLY_INTERVAL/3 * * *", "*/3"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.fuzzyCron, func(t *testing.T) {
+			for i := range 100 {
+				result, err := ScatterSchedule(tt.fuzzyCron, fmt.Sprintf("workflow-%d", i))
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				fields := strings.Fields(result)
+				if len(fields) != 5 || fields[3] != tt.expectedMonth || fields[4] != "*" {
+					t.Fatalf("unexpected cron %q", result)
+				}
+				var day int
+				if _, err := fmt.Sscanf(fields[2], "%d", &day); err != nil || day < 1 || day > 28 {
+					t.Fatalf("day of month must be in [1, 28], got %q", result)
+				}
+			}
+		})
+	}
+}
+
 func TestStableHash(t *testing.T) {
 	// Test that hash is deterministic
 	s := "test-workflow"

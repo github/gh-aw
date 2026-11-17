@@ -56,7 +56,7 @@
 name: "Smoke Copilot SDK"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "21 12 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:

@@ -75,7 +75,7 @@ name: "Smoke Copilot"
 on:
   # restore-memory: true # Restore-memory enables pre-activation memory restore
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "34 11 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:

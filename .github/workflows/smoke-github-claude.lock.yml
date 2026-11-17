@@ -55,7 +55,7 @@
 name: "Smoke GitHub Claude"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "26 5 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:

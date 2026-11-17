@@ -51,7 +51,7 @@
 name: "Smoke Built-in Ledgers"
 on:
   schedule:
-    - cron: "0 0 */2 * *"  # Friendly format: every 2 days
+    - cron: "5 23 */2 * *"  # Friendly format: every 2 days (scattered)
   workflow_dispatch:
     inputs:
       aw_context:
