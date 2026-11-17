@@ -22247,7 +22247,10 @@
           .replace(/\s+/g, " ")
           .trim()
       ];
-    if (p) s.el.append(h("div", { class: "awp" }, h("button", { type: "button", "aria-haspopup": "dialog", title: "Show the full prompt", onclick: () => openPrompt(...p) }, "/agentic-workflows"), p[1]));
+    if (!p) continue;
+    s.el.append(h("div", { class: "awp" }, h("button", { type: "button", "aria-haspopup": "dialog", "aria-keyshortcuts": "P", title: "Show the full prompt (P)", onclick: () => openPrompt(...p) }, "/agentic-workflows"), p[1]));
+    const onKey = s.onKey;
+    s.onKey = e => (e.key === "p" || e.key === "P" ? (openPrompt(...p), true) : onKey?.call(s, e));
   }
   // Full-screen phone (GitHub app) dialog showing the full prompt; isolates deck keys, clicks and swipes while open.
   const phone = h("div", { class: "awd", role: "dialog", "aria-modal": "true", "aria-label": "Original prompt" });
@@ -22255,7 +22258,7 @@
     phoneInert = [];
   function openPrompt(wf, _, full) {
     phoneBack = document.activeElement;
-    const close = h("button", { type: "button", class: "awd-x", "aria-label": "Close", onclick: closePrompt }, "Done");
+    const close = h("button", { type: "button", class: "awd-x", "aria-label": "Close", "aria-keyshortcuts": "Escape", title: "Close (Esc)", onclick: closePrompt }, "Done");
     phone.replaceChildren(
       h(
         "div",

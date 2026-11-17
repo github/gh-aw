@@ -415,6 +415,7 @@
       h("button", {
         class: s.header ? "hd" : s.parent ? "sub" : s.kids ? "col" : "",
         "aria-label": `Slide ${i + 1}`,
+        title: `Slide ${i + 1} (type ${i + 1}, Enter)`,
         onclick: e => {
           e.stopPropagation();
           go(i);
@@ -426,9 +427,10 @@
       { class: "dots" },
       rows.map(r => h("div", { class: "drow", title: rowName(r.group) }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
     );
-    const arrowBtn = (label, key, d, fn) => {
+    const arrowBtn = (label, key, keys, d, fn) => {
       const b = h("button", {
         "aria-label": label,
+        "aria-keyshortcuts": keys,
         title: `${label} (${key})`,
         onclick: e => {
           e.stopPropagation();
@@ -439,10 +441,10 @@
       b._nav = fn;
       return b;
     };
-    const bandPrevBtn = arrowBtn("Previous band", "↑", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-    const prevBtn = arrowBtn("Previous slide", "←", "M15 5l-7 7 7 7", () => prev());
-    const nextBtn = arrowBtn("Next slide", "→", "M9 5l7 7-7 7", () => next());
-    const bandNextBtn = arrowBtn("Next band", "↓", "M18 5v14M6 6l7 6-7 6", () => band(1));
+    const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
+    const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft Backspace", "M15 5l-7 7 7 7", () => prev());
+    const nextBtn = arrowBtn("Next slide", "→", "ArrowRight Space Enter", "M9 5l7 7-7 7", () => next());
+    const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
     const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
     // arrow and the example count, so the audience knows there is a line below; it steps down the column and,
@@ -478,6 +480,7 @@
     const snd = h("button", {
       class: "snd",
       "aria-label": "Toggle sound (M)",
+      "aria-keyshortcuts": "M",
       title: "Sound on/off (M)",
       onclick: e => {
         e.stopPropagation();
@@ -492,6 +495,7 @@
     const fzBtn = h("button", {
       class: "fzb",
       "aria-label": "Search slides (/)",
+      "aria-keyshortcuts": "/ Control+K Meta+K",
       "aria-haspopup": "dialog",
       title: "Search slides (/)",
       onclick: e => {
@@ -504,6 +508,7 @@
     const smBtn = h("button", {
       class: "smb",
       "aria-label": "Slide map (G)",
+      "aria-keyshortcuts": "G",
       "aria-haspopup": "dialog",
       title: "Slide map (G)",
       onclick: e => {
@@ -673,7 +678,8 @@
         label = at ? (back ? "Back to the pattern" : `Next example (${at + 1} of ${N})`) : `${N} example${N > 1 ? "s" : ""} below`;
       vnb.classList.toggle("head", at === 0);
       vnb.setAttribute("aria-label", label);
-      vnb.title = `${label} (${back ? "↑" : "↓"})`;
+      vnb.setAttribute("aria-keyshortcuts", back ? "U" : "ArrowDown");
+      vnb.title = `${label} (${back ? "U" : "↓"})`;
       vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
       vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
     }
@@ -692,6 +698,8 @@
         }
       };
 
+    let jumpBuf = "",
+      jumpT = null;
     addEventListener("keydown", e => {
       /** @type {any} */
       const target = e.target;
@@ -713,6 +721,20 @@
         e.preventDefault();
         return;
       }
+      // typing a slide number then Enter jumps there (the dots' shortcut); the digits expire after 2 s
+      const typed = jumpBuf;
+      jumpBuf = "";
+      clearTimeout(jumpT);
+      if (/^[0-9]$/.test(e.key)) {
+        jumpBuf = (typed + e.key).slice(-4);
+        jumpT = setTimeout(() => (jumpBuf = ""), 2000);
+        return;
+      }
+      if (e.key === "Enter" && +typed) {
+        e.preventDefault();
+        go(+typed - 1);
+        return;
+      }
       if (["ArrowRight", " ", "Enter"].includes(e.key)) {
         e.preventDefault();
         next();
@@ -724,7 +746,10 @@
         band(e.key === "PageDown" ? 1 : -1);
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        vstep(e.key === "ArrowDown" ? 1 : -1);
+        (e.shiftKey ? band : vstep)(e.key === "ArrowDown" ? 1 : -1);
+      } else if (e.key === "u" || e.key === "U") {
+        const col = colOf(slides[cur]);
+        if (col) go(slides.indexOf(col));
       } else if (e.key === "Home") go(0);
       else if (e.key === "End") go(slides.length - 1);
       else if (e.key === "f" || e.key === "F") toggleFullscreen();

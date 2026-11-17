@@ -204,6 +204,32 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(2));
 });
 
+test("gives every navigation button a keyboard shortcut", async ({ page }) => {
+  const count = page.locator(CURRENT);
+  await page.goto("/gh-aw/cracktro/#3");
+  for (const name of ["Previous band", "Previous slide", "Next slide", "Next band", "Slide map (G)", "Search slides (/)", "Toggle sound (M)"])
+    await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-keyshortcuts", /\S/);
+  // Shift+Down switches bands even on a column head
+  await page.keyboard.press("Shift+ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await page.keyboard.press("Shift+ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(2));
+  // a typed slide number then Enter jumps there
+  for (const k of [...String(HANDOFFS), "Enter"]) await page.keyboard.press(k);
+  await expect(count).toHaveAttribute("aria-label", at(HANDOFFS));
+  // U returns from any example to its pattern
+  const head = slideNo("Daily Improvers");
+  await page.goto(`/gh-aw/cracktro/#${head + 2}`);
+  await page.keyboard.press("u");
+  await expect(count).toHaveAttribute("aria-label", at(head));
+  // P opens a slide's original prompt; Escape closes it
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Speech To Agent")}`);
+  await page.keyboard.press("p");
+  await expect(page.getByRole("dialog", { name: "Original prompt" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Original prompt" })).toBeHidden();
+});
+
 test("hangs CI reuse below workflow anatomy", async ({ page }) => {
   const parent = slideNo("Anatomy of a workflow");
   const child = slideNo("Reuse your CI");
