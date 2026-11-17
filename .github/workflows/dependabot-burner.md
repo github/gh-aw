@@ -31,6 +31,8 @@ concurrency:
 model: copilot/gpt-5
 engine:
   id: pi
+env:
+  NODE_USE_SYSTEM_CA: "1"
 skip-if-decision:
   - >-
     Does @/tmp/gh-aw/agent/dependabot-burner/context.json conclusively establish
