@@ -19,6 +19,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | CI/CD meetsContinuous AI | illustrative | Agentic steps run inside the GitHub Actions pipelines teams already use, on the same runners, logs and checks. |
 | Continuous AI | illustrative | Continuous AI, named after CI/CD, is any automated AI that supports software collaboration, such as documentation, triage, fault analysis and quality, kept auditable, event-triggered and under the team's control. |
 | Anatomy of a workflow | illustrative | A workflow is one Markdown file: front matter declares triggers, tools, permissions, steps and safe outputs, and the body is the agent prompt. |
+| Compatible with Actions | illustrative | Agentic workflows compile to plain GitHub Actions, so teams keep their environments, runners, Entra ID and Vault OIDC, GitHub Apps, marketplace actions, custom jobs and bots: all Actions infrastructure is reused. |
 | Turn Intent to Automation |  | Describe a job in plain language, an agent writes the Markdown workflow, and gh aw compile deterministically turns it into a hardened Actions lock file. |
 | Turn Automation into Value | illustrative | Track outcomes such as backlog burndown, quality and delivery speed to show what agentic workflows are worth. |
 | Security |  | Band header (Security): design every workflow as if the agent is already compromised. |
