@@ -97,6 +97,41 @@
     background: linear-gradient(115deg, transparent 30%, #ffffff14 45%, transparent 60%); background-size: 300% 100%;
     animation: glare 5s ease-in-out infinite; }
   @keyframes glare { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  /* --- Continuous AI (GitHub Next): definition, lineage, eight examples, shared traits --- */
+  .cai-head { position: absolute; left: 110px; top: 70px; }
+  .cai-head h2 { margin: 18px 0 0; font-size: 120px; line-height: .9; white-space: nowrap; font-variation-settings: "wght" 700, "wdth" 100; }
+  .cai-head h2 .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950); }
+  .cai-def { position: absolute; left: 110px; top: 262px; width: 1070px; }
+  .cai-def p { margin: 0; font: 600 38px/1.2 "Mona Sans"; color: #f0f6fc; }
+  .cai-def b { color: #3fb950; font-weight: 700; }
+  .active .cai-def { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .25s; }
+  .cai-line { position: absolute; right: 110px; top: 96px; width: 620px; display: flex; align-items: center; gap: 14px; }
+  .cai-step { flex: 0 0 auto; padding: 16px 20px; border-radius: 14px; border: 1px solid #3d444d; background: #151b23e6; text-align: center; }
+  .cai-step b { display: block; font: 700 34px/1 "Mona Sans"; color: #e6edf3; }
+  .cai-step span { display: block; margin-top: 8px; font: 500 17px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9198a1; }
+  .cai-step.now { flex: 1; border-color: #2ea043; background: #0f2a18e6; box-shadow: 0 0 40px #2ea04344; }
+  .cai-step.now b { color: #3fb950; white-space: nowrap; font-size: 30px; }
+  .cai-arr { color: #6e7681; font: 700 30px/1 var(--mono); }
+  .cai-years { position: absolute; right: 110px; top: 196px; width: 620px; text-align: right; font: 500 20px/1.3 var(--mono); color: #9198a1; }
+  .active .cai-line .cai-step, .active .cai-line .cai-arr { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(.3s + var(--i) * .14s); }
+  .active .cai-years { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.1s; }
+  .cai-grid { position: absolute; left: 110px; right: 110px; top: 384px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+  .cai-card { position: relative; height: 196px; box-sizing: border-box; padding: 108px 28px 0; border-radius: 16px; border: 1px solid #3d444d; background: #0d1117e6;
+    transition: border-color .4s, box-shadow .4s, transform .4s; }
+  .active .cai-card { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(.5s + var(--i) * .08s); }
+  .cai-card svg { position: absolute; left: 28px; top: 28px; width: 60px; height: 60px; fill: var(--c); }
+  .cai-card b { display: block; font: 700 34px/1.05 "Mona Sans"; color: #f0f6fc; white-space: nowrap; }
+  .cai-card code { position: absolute; right: 24px; top: 30px; font: 500 16px/1 var(--mono); color: #6e7681; transition: color .4s; }
+  .cai-card.hot { border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 0 46px -6px var(--c); transform: translateY(-6px); }
+  .cai-card.hot code { color: var(--c); }
+  .cai-traits { position: absolute; left: 110px; right: 110px; top: 850px; display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
+  .cai-traits > span { margin-right: 8px; font: 600 17px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: #9198a1; white-space: nowrap; }
+  .cai-traits em { font: 600 21px/1 "Mona Sans"; font-style: normal; color: #e6edf3; padding: 11px 16px; border-radius: 2em; border: 1px solid #2ea04366; background: #2ea0431f; white-space: nowrap; }
+  .active .cai-traits em { animation: rise .6s cubic-bezier(.2,.9,.2,1) both calc(1.2s + var(--i) * .07s); }
+  .cai-foot { position: absolute; left: 110px; right: 110px; top: 930px; display: flex; gap: 22px; }
+  .cai-foot div { position: relative; padding: 16px 26px 16px 74px; border-radius: 14px; border: 1px solid #3d444d; background: #151b23e6; font: 600 26px/1.2 "Mona Sans"; color: #f0f6fc; white-space: nowrap; }
+  .cai-foot svg { position: absolute; left: 22px; top: 50%; margin-top: -19px; width: 38px; height: 38px; fill: #ab7df8; }
+  .active .cai-foot div { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(1.6s + var(--i) * .15s); }
 
   /* --- central agentic ops --- */
   .cao-steps { position: absolute; left: 114px; top: 276px; width: 560px; display: flex; flex-direction: column; gap: 20px; }
@@ -335,32 +370,44 @@
   .pnt-flow i { font-style: normal; color: #30363d; }
   .pnt-flow span.on { color: #f0f6fc; border-color: #a371f7; background: #24173f; }
   .pnt-flow span.ok.on { border-color: #3fb950; background: #12261e; }
-  .pnt-diff { position: absolute; left: 110px; top: 370px; width: 860px; height: 540px; background: #0d1117; border: 1px solid #30363d; border-radius: 16px; overflow: hidden; font: 500 20px/29px var(--mono); }
+  .pnt-diff { position: absolute; left: 110px; top: 352px; width: 860px; height: 456px; background: #0d1117; border: 1px solid #30363d; border-radius: 16px; overflow: hidden; font: 500 18px/26px var(--mono); }
   .pnt-fh { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #30363d; background: #161b22; color: #9198a1; }
   .pnt-fh b { color: #3fb950; font-weight: 600; }
   .pnt-body { position: relative; padding-top: 8px; }
-  .pnt-l { height: 29px; max-height: 29px; padding: 0 20px 0 16px; border-left: 4px solid transparent; white-space: pre; color: #e6edf3; background: rgba(46,160,67,.10); overflow: hidden; transition: max-height .5s, opacity .5s, background .4s, border-color .4s, color .4s; }
+  .pnt-l { height: 26px; max-height: 26px; padding: 0 20px 0 16px; border-left: 4px solid transparent; white-space: pre; color: #e6edf3; background: rgba(46,160,67,.10); overflow: hidden; transition: max-height .5s, opacity .5s, background .4s, border-color .4s, color .4s; }
   .pnt-l .s { color: #3fb950; }
   .pnt-l.hot { background: rgba(248,81,73,.16); border-left-color: #f85149; color: #ffa198; }
   .pnt-l.cut { max-height: 0; opacity: 0; }
   .pnt-l.fix { max-height: 0; opacity: 0; }
-  .pnt-l.fix.on { max-height: 29px; opacity: 1; background: rgba(46,160,67,.24); }
+  .pnt-l.fix.on { max-height: 26px; opacity: 1; background: rgba(46,160,67,.24); }
   .pnt-scan { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: #d2a8ff; box-shadow: 0 0 18px #a371f7; opacity: 0; }
-  .pnt-scan.go { opacity: 1; top: 440px; transition: top 2s linear; }
-  .pnt-scan.end { opacity: 0; top: 440px; transition: opacity .4s; }
-  .pnt-cm { position: absolute; left: 1010px; width: 800px; padding: 16px 22px; background: #161b22; border: 1px solid #a371f7; border-radius: 14px; opacity: 0; transform: translateX(24px); transition: opacity .45s, transform .45s, border-color .5s; }
+  .pnt-scan.go { opacity: 1; top: 392px; transition: top 2s linear; }
+  .pnt-scan.end { opacity: 0; top: 392px; transition: opacity .4s; }
+  .pnt-cm { position: absolute; left: 1010px; width: 800px; padding: 13px 22px; background: #161b22; border: 1px solid #a371f7; border-radius: 14px; opacity: 0; transform: translateX(24px); transition: opacity .45s, transform .45s, border-color .5s; }
   .pnt-cm.on { opacity: 1; transform: none; }
   .pnt-cm.dim { opacity: .35; border-color: #30363d; }
   .pnt-who { display: flex; align-items: center; gap: 12px; font: 500 18px/1 var(--mono); color: #d2a8ff; }
   .pnt-who svg { width: 30px; height: 30px; padding: 5px; border-radius: 50%; background: #8957e5; }
   .pnt-who em { margin-left: auto; font-style: normal; font-weight: 600; color: #3fb950; }
   .pnt-who .n { color: #f0f6fc; }
-  .pnt-cm p { margin: 10px 0 0; font-size: 24px; line-height: 1.3; color: #e6edf3; }
-  .pnt-cm code { font: 500 21px var(--mono); color: #79c0ff; }
-  .pnt-v { position: absolute; left: 1010px; top: 806px; width: 800px; padding: 18px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
+  .pnt-cm p { margin: 8px 0 0; font-size: 22px; line-height: 1.3; color: #e6edf3; }
+  .pnt-cm code { font: 500 19px var(--mono); color: #79c0ff; }
+  .pnt-v { position: absolute; left: 1010px; top: 724px; width: 800px; padding: 16px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
   .pnt-v.on { opacity: 1; color: #f0f6fc; border-color: #a371f7; }
   .pnt-v.ok { opacity: 1; color: #3fb950; border-color: #3fb950; background: #12261e; }
-  .pnt .ct-src { top: 1000px; }
+  .rw { position: absolute; display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-radius: 999px; border: 1px solid #3d444d; background: #0d1117e6; font: 600 21px/1 var(--mono); color: #f0f6fc; white-space: nowrap; opacity: 0; }
+  .active .rw { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .rw svg { width: 24px; height: 24px; fill: #9198a1; flex: none; }
+  .rw i { display: flex; align-items: center; gap: 7px; margin-left: 6px; padding-left: 14px; border-left: 1px solid #3d444d; font-style: normal; }
+  .rw i svg { width: 22px; height: 22px; fill: #e3b341; }
+  .rw b { font-weight: 700; color: #e3b341; }
+  .pnt-rw { right: 110px; top: 118px; }
+  .skl-rw { right: 110px; top: 118px; }
+  .ix-rw { right: 110px; top: 150px; }
+  .pnt-m { width: 1420px; gap: 30px; } .pnt-m .dhm-k { gap: 26px; }
+  .pnt-m .dhm-tl .y { fill: #a371f7; } .pnt-m .dhm-tl .s { fill: #d2a8ff; } .pnt-m .dhm-tl .d { fill: #ff7b72; } .pnt-m .dhm-tl .b { fill: #79c0ff; } .pnt-m .dhm-tl .x { fill: #6e7681; }
+  .pnt-m .dhm-tl .v { fill: #f0f6fc; font: 600 14px var(--mono); text-anchor: middle; }
+  .pnt-m .dhm-tl .lg { fill: #9198a1; font: 500 14px var(--mono); }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
@@ -2966,6 +3013,7 @@
     const gaLen = p => GA_RUNS[p][5].reduce((a, j) => a + j[3], 0) + GA_HOLD[p];
     slides.push({
       group: "platform",
+      key: "continuous-ai",
       enter() {
         gaT0 = performance.now();
         gaM = -1;
@@ -3016,6 +3064,94 @@
             gaSvg,
             h("div", { class: "glare" })
           )
+        )
+      ),
+    });
+  }
+
+  // Continuous AI: GitHub Next's definition of the category, its CI/CD lineage, eight example workloads and their shared traits
+  {
+    resetIndex();
+    // Primer Octicons 24px paths (© GitHub, Inc., MIT license); the shared OCTI table is declared later in this file.
+    const CAI_ICON = {
+      book: ["M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.495 4.495 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.752.752 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a2.996 2.996 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.503 4.503 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z"],
+      sparkle: ["M11.296 1.924c.24-.656 1.168-.656 1.408 0l.717 1.958a11.25 11.25 0 0 0 6.697 6.697l1.958.717c.657.24.657 1.168 0 1.408l-1.958.717a11.25 11.25 0 0 0-6.697 6.697l-.717 1.958c-.24.657-1.168.657-1.408 0l-.717-1.958a11.25 11.25 0 0 0-6.697-6.697l-1.958-.717c-.656-.24-.656-1.168 0-1.408l1.958-.717a11.25 11.25 0 0 0 6.697-6.697l.717-1.958Z"],
+      tag: ["M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z", "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z"],
+      note: ["M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z", "M5 8.75A.75.75 0 0 1 5.75 8h11.5a.75.75 0 0 1 0 1.5H5.75A.75.75 0 0 1 5 8.75Zm0 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z"],
+      alert: ["M13 17.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-.25-8.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5Z", "M9.836 3.244c.963-1.665 3.365-1.665 4.328 0l8.967 15.504c.963 1.667-.24 3.752-2.165 3.752H3.034c-1.926 0-3.128-2.085-2.165-3.752Zm3.03.751a1.002 1.002 0 0 0-1.732 0L2.168 19.499A1.002 1.002 0 0 0 3.034 21h17.932a1.002 1.002 0 0 0 .866-1.5L12.866 3.994Z"],
+      shield: ["M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z", "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z"],
+      heart: ["m12 20.703.343.667a.748.748 0 0 1-.686 0l-.003-.002-.007-.003-.025-.013a31.138 31.138 0 0 1-5.233-3.576C3.8 15.573 1 12.332 1 8.514v-.001C1 5.053 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262a31.148 31.148 0 0 1-5.233 3.576l-.025.013-.007.003-.002.001ZM6.736 4C4.657 4 2.5 5.88 2.5 8.514c0 3.107 2.324 5.96 4.861 8.12a29.655 29.655 0 0 0 4.566 3.175l.073.041.073-.04c.271-.153.661-.38 1.13-.674.94-.588 2.19-1.441 3.436-2.502 2.537-2.16 4.861-5.013 4.861-8.12C21.5 5.88 19.343 4 17.264 4c-2.106 0-3.801 1.389-4.553 3.643a.751.751 0 0 1-1.422 0C10.537 5.389 8.841 4 6.736 4Z"],
+      a11y: ["M13.974 8.114a3.573 3.573 0 1 0-3.947 0c-.302.21-.57.467-.79.762H3.708a.75.75 0 1 0 0 1.5h4.885a2.93 2.93 0 0 0-.026.188l-.814 7.267-.499 4.142a.75.75 0 1 0 1.49.18l.42-3.486h5.67l.42 3.485a.75.75 0 0 0 1.49-.18l-.5-4.142-.813-7.266a3.502 3.502 0 0 0-.026-.188h4.885a.75.75 0 1 0 0-1.5h-5.527a3.466 3.466 0 0 0-.79-.762Zm.099-2.979a2.073 2.073 0 1 1-4.146 0 2.073 2.073 0 0 1 4.146 0Zm-.131 5.596.72 6.436H9.338l.72-6.436a1.954 1.954 0 0 1 3.884 0Z"],
+      people: ["M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z"],
+      sliders: ["M11 18.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75Zm-8-12a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 3 6.25Zm13 6a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.75 16a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z", "M3 18.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Zm0-6a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM16.75 10a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75ZM14 6.25a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75ZM11.25 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"],
+    };
+    const caiIcon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${CAI_ICON[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    // [name, icon, colour, illustrative trigger]
+    const CAI = [
+      ["Documentation", "book", "#4493f8", "on: push · main"],
+      ["Code Improvement", "sparkle", "#ab7df8", "on: schedule · daily"],
+      ["Triage", "tag", "#3fb950", "on: issues · opened"],
+      ["Summarization", "note", "#d29922", "on: schedule · weekly"],
+      ["Fault Analysis", "alert", "#f85149", "on: workflow_run · failure"],
+      ["Quality", "shield", "#3fb950", "on: pull_request"],
+      ["Team Motivation", "heart", "#db61a2", "on: release · published"],
+      ["Accessibility", "a11y", "#4493f8", "on: pull_request · docs/**"],
+    ];
+    const TRAITS = ["automatable", "repetitive", "collaborative", "integrated", "auditable", "many variants", "event-triggered"];
+    const caiCards = CAI.map(([name, icon, c, on], i) => h("div", { class: "cai-card", "--c": c, "--i": i }, caiIcon(icon), h("b", {}, name), h("code", {}, on)));
+    const CAI_STEP = 1700,
+      CAI_START = 1800;
+    let caiT0 = 0,
+      caiHot = -1;
+    slides.push({
+      group: "platform",
+      under: "continuous-ai",
+      enter() {
+        caiT0 = performance.now();
+        caiHot = -1;
+        caiCards.forEach(c => c.classList.remove("hot"));
+      },
+      tick() {
+        const u = performance.now() - caiT0 - CAI_START,
+          k = u < 0 ? -1 : Math.floor(u / CAI_STEP) % caiCards.length;
+        if (k === caiHot) return;
+        if (caiHot >= 0) caiCards[caiHot].classList.remove("hot");
+        if (k >= 0) caiCards[k].classList.add("hot");
+        caiHot = k;
+      },
+      notes:
+        "Continuous AI, as GitHub Next frames it on its Continuous AI project page. Continuous AI is a label for any use of automated AI to support software collaboration, on any platform. The name deliberately echoes CI/CD: continuous integration automated merging, continuous deployment automated shipping, and Continuous AI automates and enriches the collaboration around the code. It is not a term GitHub owns or a single technology GitHub builds; it is a category: an open-ended set of workloads, recipes and tools, most of them expected to be third-party open source, and GitHub Next expects it to run for thirty years or more, just like CI/CD. The eight examples are the ones the page lists: continuous documentation, code improvement, triage, summarization, fault analysis, quality, team motivation and accessibility. The triggers on each card are illustrative, not taken from the page. What these tasks share: they are automatable, repetitive, collaborative, integrated into existing platforms, auditable, come in many variants, and are event-triggered, so the rate of triggering has to be balanced against other goals. Two points matter most. First, this is AI for the team, not just individual productivity: one person generating code faster can shift the burden to reviewers and later stages, so Continuous AI looks at the collective impact. Second, teams and organisations must stay in control of the models, how automations are invoked and how they integrate. Most Continuous AI is scripted, agent-like workflows with human oversight rather than fully autonomous agents. GitHub Agentic Workflows is GitHub Next's partner project for building agentic Continuous AI in natural language, running on GitHub Actions.",
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "cai-head" }, h("div", { class: "kicker" }, "GitHub Next · a category, not a product"), h("h2", {}, letters("Continuous AI", "l-grad"))),
+        h(
+          "div",
+          { class: "cai-line" },
+          h("div", { class: "cai-step", "--i": 0 }, h("b", {}, "CI"), h("span", {}, "integrate")),
+          h("div", { class: "cai-arr", "--i": 1 }, "→"),
+          h("div", { class: "cai-step", "--i": 2 }, h("b", {}, "CD"), h("span", {}, "deploy")),
+          h("div", { class: "cai-arr", "--i": 3 }, "→"),
+          h("div", { class: "cai-step now", "--i": 4 }, h("b", {}, "Continuous AI"), h("span", {}, "collaborate"))
+        ),
+        h("div", { class: "cai-years" }, "a 30+ year story, like CI/CD"),
+        h(
+          "div",
+          { class: "cai-def" },
+          h("p", {}, "Any use of ", h("b", {}, "automated AI"), " to support ", h("b", {}, "software collaboration"), ".")
+        ),
+        h("div", { class: "cai-grid" }, caiCards),
+        h(
+          "div",
+          { class: "cai-traits" },
+          h("span", {}, "What they share"),
+          TRAITS.map((t, i) => h("em", { "--i": i }, t))
+        ),
+        h(
+          "div",
+          { class: "cai-foot" },
+          h("div", { "--i": 0 }, caiIcon("people"), "For the team, not the individual"),
+          h("div", { "--i": 1 }, caiIcon("sliders"), "Teams stay in control")
         )
       ),
     });
@@ -4892,6 +5028,41 @@
     file: [
       "M3 3a2 2 0 0 1 2-2h9.982a2 2 0 0 1 1.414.586l4.018 4.018A2 2 0 0 1 21 7.018V21a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm2-.5a.5.5 0 0 0-.5.5v18a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V8.5h-4a2 2 0 0 1-2-2v-4Zm10 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0-.146-.336l-4.018-4.018A.5.5 0 0 0 15 2.5Z",
     ],
+    star: [
+      "M12 .25a.75.75 0 0 1 .673.418l3.058 6.197 6.839.994a.75.75 0 0 1 .415 1.279l-4.948 4.823 1.168 6.811a.751.751 0 0 1-1.088.791L12 18.347l-6.117 3.216a.75.75 0 0 1-1.088-.79l1.168-6.812-4.948-4.823a.75.75 0 0 1 .416-1.28l6.838-.993L11.327.668A.75.75 0 0 1 12 .25Z",
+    ],
+  };
+  // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
+  // fetches the live count once per repo by numeric id (no owner handle in source) and keeps the default on failure.
+  const REPO_API = "https://api.github.com/repositories/";
+  const repoStars = new Map();
+  const fmtStars = n => (n >= 1e4 ? `${Math.round(n / 1e3)}k` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${n}`);
+  const repoWidget = (id, name, stars, cls) => {
+    const svg = n => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      s.setAttribute("viewBox", "0 0 24 24");
+      s.innerHTML = OCTI[n].map(d => `<path d="${d}"/>`).join("");
+      return s;
+    };
+    const count = h("b", {}, fmtStars(stars));
+    const el = h("div", { class: `rw ${cls}`, title: "GitHub stars" }, svg("repo"), h("span", {}, name), h("i", {}, svg("star"), count));
+    const load = () => {
+      if (location.protocol !== "https:" || typeof fetch !== "function") return;
+      if (!repoStars.has(id))
+        repoStars.set(
+          id,
+          fetch(REPO_API + id)
+            .then(r => (r.ok ? r.json() : null))
+            .then(j => (j && Number.isFinite(j.stargazers_count) ? j.stargazers_count : null))
+            .catch(() => null)
+        );
+      repoStars.get(id).then(n => {
+        if (n === null) return;
+        count.textContent = fmtStars(n);
+        el.classList.add("live");
+      });
+    };
+    return { el, load };
   };
   // Event-driven Hand-offs: trigger → agent → output → human patterns, then the Repo Assist loop
   {
@@ -5534,7 +5705,7 @@
       const scan = h("div", { class: "pnt-scan" });
       const diff = h("div", { class: "pnt-diff" }, h("div", { class: "pnt-fh" }, h("span", {}, "pkg/config/settings.go"), added), h("div", { class: "pnt-body" }, scan, ...lines));
       const cards = FIND.map(([, kind, txt, n], i) => {
-        const el = h("div", { class: "pnt-cm", style: `top:${370 + i * 142}px` });
+        const el = h("div", { class: "pnt-cm", style: `top:${352 + i * 122}px` });
         el.innerHTML = `<div class="pnt-who">${svgIco("copilot")}<span class="n">${i + 1}</span> Ponytail Reviewer · ${kind}<em>−${n} lines</em></div><p>${txt}</p>`;
         return el;
       });
@@ -5543,6 +5714,62 @@
       const steps = STEP.map((s, i) => h("span", { class: i === STEP.length - 1 ? "ok" : "" }, s));
       const flow = h("div", { class: "pnt-flow" }, ...steps.flatMap((s, i) => (i ? [h("i", {}, "→"), s] : [s])));
       const grp = g => lines.filter(l => l.dataset.g === g);
+      // measured on gh-aw, PRs created 6 Aug–16 Nov 2026 (refresh/ponytail-reviewer.md): inline findings by the kind tag in their first line; since November findings are prose without a tag
+      const KINDS = [
+        ["yagni", "y", 203],
+        ["shrink", "s", 135],
+        ["delete", "d", 68],
+        ["stdlib/native", "b", 16],
+        ["untagged", "x", 158],
+      ];
+      // median AI credits per review, from the review footer, by month
+      const AICM = [
+        ["Aug", 20],
+        ["Sep", 5.2],
+        ["Oct", 11.6],
+        ["Nov", 5],
+      ];
+      const svgEl = (w, hh, inner) => {
+        const e = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        e.setAttribute("class", "dhm-tl");
+        e.setAttribute("width", w);
+        e.setAttribute("height", hh);
+        e.innerHTML = inner;
+        return e;
+      };
+      const KMAX = Math.max(...KINDS.map(k => k[2]));
+      const kindsSvg = svgEl(
+        290,
+        122,
+        `<text class="t" x="0" y="16">FINDINGS BY KIND</text>` +
+          KINDS.map(([n, c, v], i) => `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`).join("")
+      );
+      const aicSvg = svgEl(
+        190,
+        122,
+        `<text class="t" x="0" y="16">MEDIAN AIC/REVIEW</text><line class="ax" x1="0" y1="96" x2="190" y2="96"/>` +
+          AICM.map(([m, v], i) => {
+            const x = 12 + i * 46,
+              hh = (v * 56) / 20;
+            return `<rect class="y" style="--i:${i}" x="${x}" y="${96 - hh}" width="30" height="${hh}" rx="2"/><text class="v" x="${x + 15}" y="${90 - hh}">${v}</text><text class="m" x="${x + 15}" y="116">${m}</text>`;
+          }).join("")
+      );
+      const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+      const strip = h(
+        "div",
+        { class: "dhm pnt-m" },
+        h(
+          "div",
+          { class: "dhm-k" },
+          kpi("469", "reviews", "on 467 PRs"),
+          kpi("580", "findings", "inline"),
+          kpi("79%", "Lean already.", ["Ship.", h("br"), "run sample"], "g"),
+          kpi("57%", "acted on", ["code changed,", h("br"), "resolved, replied"]),
+          kpi("10,219", "lines claimed", "median 12")
+        ),
+        kindsSvg,
+        aicSvg
+      );
       const CYC = 13000;
       // [ms into the cycle, action]
       const T = [
@@ -5574,15 +5801,17 @@
         verdict.textContent = "";
         done = new Set();
       };
+      const repo = repoWidget(1266797999, "ponytail · ponytail-review skill", 192360, "pnt-rw");
       slides.push({
         group: "process",
         under: "prr",
         notes:
-          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship.",
+          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship. The bottom strip is measured on gh-aw (snapshot 17 November 2026). From 8 August to 16 November 2026 (101 days) the workflow ran 2,928 times and posted 469 COMMENT reviews on 467 pull requests: 580 inline findings, mostly one per pull request, and 35 pull requests with none inline. The reviews claim 10,219 lines that could go, a median of 12 per review. 57% of the findings were acted on: the code changed under them, the thread was resolved, or someone replied, usually Copilot. Until November each finding started with its kind: yagni 203, shrink 135, delete 68, stdlib or native 16; the newer prose findings carry no tag. In a one-in-five sample of runs, 79% of the verdicts from runs with saved output were Lean already. Ship. The median AI credits per review fell from about 20 in August, on the Copilot auto model, to about 5 in November after the move to Codex and economy routing; October's rise came with a larger model. The badge top right is the skill's open-source repo and its GitHub star count, fetched live when online. The diff and findings in the animation are illustrative.",
         enter() {
           t0 = 0;
           cyc = -1;
           reset();
+          repo.load();
         },
         tick(t) {
           if (!t0) t0 = t;
@@ -5603,7 +5832,9 @@
           diff,
           ...cards,
           verdict,
-          h("div", { class: "ct-src" }, "illustrative · synthetic diff and findings · workflow: ponytail-reviewer.md")
+          strip,
+          repo.el,
+          h("div", { class: "dhm-cap" }, "MEASURED · snapshot 17 Nov 2026 · reviews 8 Aug–16 Nov 2026 (101 d) · run sample 19 Aug–16 Nov · diff and findings illustrative")
         ),
       });
     }
@@ -9877,6 +10108,7 @@
       ioRestore = h("div", { class: "io" }, "restore →");
     const cache = h("div", { class: "ix-cache" }, h("i", {}, "ACTIONS CACHE"), cyl, h("div", { class: "n" }, "index.sqlite"), h("div", { class: "k" }, "key: qmd-docs"), ioSave, ioRestore);
     const shared = h("div", { class: "ix-shared", "--c": "#79c0ff", "--i": 2 }, h("i", {}, "SHARED AGENTIC WORKFLOW"), h("span", {}, h("b", {}, "imports"), ": [shared/qmd.md] adds both jobs · one cache key links them, run after run"));
+    const repo = repoWidget(1112365301, "qmd", 31177, "ix-rw");
     const el = h(
       "section",
       { class: "slide ix" },
@@ -9885,7 +10117,8 @@
       wall,
       cache,
       agt,
-      shared
+      shared,
+      repo.el
     );
     // ms into the cycle when each indexing step, the handoff and each agent step light up
     const IDX_AT = [700, 1500, 2300, 3100],
@@ -9904,8 +10137,9 @@
       group: "engineering",
       experimental: "QMD search",
       notes:
-        "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs.",
+        "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs. The badge top right is the open-source qmd repo and its GitHub star count, fetched live when online.",
       enter() {
+        repo.load();
         t0 = 0;
         cyc = -1;
       },
@@ -10246,10 +10480,12 @@
       [1270, "3", "Apply", "triage picks · comments cite skills", ".4s"],
     ].map(([x, n, t, s, d]) => h("div", { class: "skl-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
     const RULES = ["refs pinned to a commit SHA at compile time", "never installed by the agent at run time", "private skills: per-skill token or GitHub App"];
+    const repo = repoWidget(1148788086, "mattpocock/skills", 326117, "skl-rw");
     const el = h(
       "section",
       { class: "slide skl" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Expertise as a dependency · mattpocock/skills reviews gh-aw pull requests"), h("h2", {}, letters("Skills", "l-grad"))),
+      repo.el,
       cols,
       ed,
       ins,
@@ -10294,8 +10530,9 @@
       group: "engineering",
       key: "skills",
       notes:
-        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency.",
+        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency. The badge top right is the skills repo and its GitHub star count, fetched live when online.",
       enter() {
+        repo.load();
         t0 = 0;
         cyc = -1;
       },
@@ -20046,7 +20283,10 @@
         return b;
       };
     })();
+    // A GainNode passes at full gain (1) until its first scheduled event, so silence it right away:
+    // a source started before `t` must not blast an unshaped burst into the speaker.
     const env = (g, t, a, peak, rel) => {
+      g.gain.value = 0.0001;
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(peak, t + a);
       g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel);
@@ -20095,16 +20335,16 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
       src.start(t, Math.random() * 0.4);
       src.stop(t + 0.55);
-      // sub drop for weight
+      // sub drop for weight: starts silent with the envelope and swells in, so small speakers get no click
       const o = ac.createOscillator(),
         og = ac.createGain();
       o.type = "sine";
       o.frequency.setValueAtTime(dir > 0 ? 90 : 60, t + 0.12);
-      o.frequency.exponentialRampToValueAtTime(dir > 0 ? 42 : 80, t + 0.5);
+      o.frequency.exponentialRampToValueAtTime(dir > 0 ? 50 : 80, t + 0.5);
       o.connect(og);
       og.connect(out);
-      env(og, t + 0.12, 0.02, 0.224, 0.4);
-      o.start(t + 0.1);
+      env(og, t + 0.12, 0.06, 0.16, 0.36);
+      o.start(t + 0.12);
       o.stop(t + 0.6);
     };
     const osc = (type, f0, t, dur, vol, { f1 = f0, dest = out, a = 0.005 } = {}) => {
