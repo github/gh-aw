@@ -35,6 +35,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/goroutinemissingrecover"
 	"github.com/github/gh-aw/pkg/linters/goroutineresourceleak"
 	"github.com/github/gh-aw/pkg/linters/hardcodedfilepath"
+	"github.com/github/gh-aw/pkg/linters/httpclientnotimeout"
 	"github.com/github/gh-aw/pkg/linters/httpnoctx"
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
@@ -144,6 +145,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	goroutineresourceleak.Analyzer,
 	goroutinemissingrecover.Analyzer,
 	hardcodedfilepath.Analyzer,
+	httpclientnotimeout.Analyzer,
 	httpnoctx.Analyzer,
 	httprespbodyclose.Analyzer,
 	ioutildeprecated.Analyzer,
