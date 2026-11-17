@@ -9,11 +9,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/workflow"
-	"github.com/sourcegraph/conc/pool"
 )
 
 const maxGraderResultsBytes = 10 * 1024 * 1024
@@ -322,20 +320,7 @@ func loadGraderRunData(ctx context.Context, runs []ExperimentRunRecord, experime
 		}
 	}
 
-	result := make(map[string]graderRunData, len(runIDs))
-	var mu sync.Mutex
-	p := pool.New().WithContext(ctx).WithMaxGoroutines(getMaxConcurrentDownloads())
-	for runID := range runIDs {
-		p.Go(func(ctx context.Context) error {
-			data := source.Load(ctx, runID)
-			mu.Lock()
-			result[runID] = data
-			mu.Unlock()
-			return nil
-		})
-	}
-	_ = p.Wait()
-	return result
+	return loadRunsConcurrently(ctx, runIDs, source.Load)
 }
 
 func buildGraderMetricObservationSets(
