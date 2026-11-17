@@ -647,7 +647,16 @@ if [ "${1:-}" = "chown" ]; then exit 0; fi
 exec "$@"
 `), 0o755))
 			curlLog := filepath.Join(tempDir, "curl.log")
-			require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "curl"), []byte("#!/usr/bin/env bash\necho \"$*\" >> \""+curlLog+"\"\nexit 97\n"), 0o755))
+			curlScript := fmt.Sprintf(`#!/usr/bin/env bash
+echo "$*" >> %q
+case "$*" in
+  *https://github.com/github/copilot-cli/releases/latest*)
+    printf '%%s' 'https://github.com/github/copilot-cli/releases/tag/v1.0.999'
+    ;;
+  *) exit 97 ;;
+esac
+`, curlLog)
+			require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "curl"), []byte(curlScript), 0o755))
 
 			installDir := filepath.Join(tempDir, "install-bin")
 			require.NoError(t, os.MkdirAll(installDir, 0o755))
@@ -673,7 +682,10 @@ exec "$@"
 				require.Error(t, err, "the mocked download must fail: %s", output)
 				assert.NotContains(t, string(output), "Using cached GitHub Copilot CLI")
 				assert.Contains(t, string(output), "No reviewed SHA256 pin")
-				assert.NoFileExists(t, curlLog, "an unreviewed latest download must fail before network access")
+				curlCalls, readErr := os.ReadFile(curlLog)
+				require.NoError(t, readErr)
+				assert.Contains(t, string(curlCalls), "https://github.com/github/copilot-cli/releases/latest")
+				assert.NotContains(t, string(curlCalls), "/releases/download/", "an unreviewed release must not download assets")
 				assert.NoFileExists(t, filepath.Join(installDir, "copilot"))
 			}
 		})

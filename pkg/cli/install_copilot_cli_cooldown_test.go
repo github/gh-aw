@@ -28,18 +28,20 @@ func TestInstallCopilotCLIWithoutReleaseMetadata(t *testing.T) {
 		token     string
 		wantError string
 		tamper    bool
+		latest    bool
 	}{
-		{"cached-enterprise-token", true, "", "ghe-test-token", "", false},
-		{"download-enterprise-token", false, "", "ghe-test-token", "", false},
-		{"cached-no-token", true, "", "", "", false},
-		{"download-no-token", false, "", "", "", false},
-		{"cached-legacy-cooldown", true, "3", "ghe-test-token", "", false},
-		{"download-legacy-cooldown", false, "7", "ghe-test-token", "", false},
-		{"cached-legacy-disabled", true, "0", "", "", false},
-		{"download-tampered-manifest", false, "3", "ghe-test-token", "SHA256", true},
-		{"negative-days", true, "-1", "", "nonnegative integer", false},
-		{"boolean-days", true, "false", "", "nonnegative integer", false},
-		{"fractional-days", true, "1.5", "", "nonnegative integer", false},
+		{"cached-enterprise-token", true, "", "ghe-test-token", "", false, false},
+		{"download-enterprise-token", false, "", "ghe-test-token", "", false, false},
+		{"cached-no-token", true, "", "", "", false, false},
+		{"download-no-token", false, "", "", "", false, false},
+		{"cached-legacy-cooldown", true, "3", "ghe-test-token", "", false, false},
+		{"download-legacy-cooldown", false, "7", "ghe-test-token", "", false, false},
+		{"cached-legacy-disabled", true, "0", "", "", false, false},
+		{"download-tampered-manifest", false, "3", "ghe-test-token", "SHA256", true, false},
+		{"negative-days", true, "-1", "", "nonnegative integer", false, false},
+		{"boolean-days", true, "false", "", "nonnegative integer", false, false},
+		{"fractional-days", true, "1.5", "", "nonnegative integer", false, false},
+		{"download-latest", false, "", "", "", false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -93,6 +95,7 @@ authorization=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) output="$2"; shift 2 ;;
+    -w) shift 2 ;;
     -H)
       case "$2" in Authorization:*) authorization="$2" ;; esac
       shift 2
@@ -106,6 +109,8 @@ case "$url" in
   https://api.github.com/repos/github/copilot-cli/releases/*)
     echo "curl: (22) The requested URL returned error: 401" >&2
     exit 22 ;;
+  https://github.com/github/copilot-cli/releases/latest)
+    printf '%s' "https://github.com/github/copilot-cli/releases/tag/v1.2.3" ;;
   */SHA256SUMS.txt) cp "$MOCK_MANIFEST" "$output" ;;
   */copilot-linux-x64.tar.gz) cp "$MOCK_ARCHIVE" "$output" ;;
   *) echo "unexpected URL: $url" >&2; exit 97 ;;
@@ -116,7 +121,11 @@ esac
 			require.NoError(t, os.MkdirAll(installDir, 0o755))
 			runnerTemp := filepath.Join(dir, "runner-temp")
 			require.NoError(t, os.MkdirAll(runnerTemp, 0o700))
-			args := []string{installerPath, "1.2.3"}
+			version := "1.2.3"
+			if test.latest {
+				version = "latest"
+			}
+			args := []string{installerPath, version}
 			if test.days != "" {
 				args = append(args, "--cooldown-days", test.days)
 			}
@@ -148,6 +157,12 @@ esac
 				assert.Empty(t, log, "an exact toolcache hit must not need network access")
 			} else {
 				assert.Contains(t, string(log), "/SHA256SUMS.txt", "downloads must still verify the pinned manifest")
+			}
+			if test.latest {
+				assert.Contains(t, string(log), "https://github.com/github/copilot-cli/releases/latest")
+				assert.Contains(t, string(log), "/releases/download/v1.2.3/SHA256SUMS.txt")
+				assert.Contains(t, string(log), "/releases/download/v1.2.3/copilot-linux-x64.tar.gz")
+				assert.NotContains(t, string(log), "/releases/latest/download")
 			}
 		})
 	}

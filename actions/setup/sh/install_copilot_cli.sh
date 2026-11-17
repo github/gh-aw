@@ -799,6 +799,31 @@ if [ "$REQUESTED_VERSION" = "latest" ] && [ -n "$COMPAT_MATCHED_MAX_AGENT" ] &&
   VERSION="$DEFAULT_COPILOT_VERSION"
 fi
 
+# Resolve latest through GitHub's public release redirect, not the releases API.
+# This keeps runtime installation independent of github.com API authentication
+# and binds checksum lookup and downloads to the same immutable release tag.
+if [ "$VERSION" = "latest" ]; then
+  LATEST_RELEASE_URL="https://github.com/${COPILOT_REPO}/releases/latest"
+  if ! RESOLVED_RELEASE_URL="$(curl --proto '=https' --proto-redir '=https' -fsSL --retry 5 --retry-delay 2 --retry-max-time 60 --retry-all-errors -o /dev/null -w '%{url_effective}' "$LATEST_RELEASE_URL")"; then
+    echo "ERROR: Could not resolve the latest Copilot CLI release tag from GitHub." >&2
+    exit 1
+  fi
+
+  RELEASE_TAG_URL_PREFIX="https://github.com/${COPILOT_REPO}/releases/tag/"
+  case "$RESOLVED_RELEASE_URL" in
+    "$RELEASE_TAG_URL_PREFIX"*) VERSION="${RESOLVED_RELEASE_URL#"$RELEASE_TAG_URL_PREFIX"}" ;;
+    *)
+      echo "ERROR: GitHub returned an unexpected URL while resolving the latest Copilot CLI release." >&2
+      exit 1
+      ;;
+  esac
+  VERSION="${VERSION%%[?#]*}"
+  if [[ ! "$VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "ERROR: GitHub returned an invalid latest Copilot CLI release tag." >&2
+    exit 1
+  fi
+fi
+
 # Build download URLs
 if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
   BASE_URL="https://github.com/${COPILOT_REPO}/releases/latest/download"
