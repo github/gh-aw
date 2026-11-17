@@ -21,9 +21,10 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 		expectError   bool
 	}{
 		{
-			name:       "empty flag leaves components untouched",
-			repoFlag:   "",
-			components: parser.GitHubURLComponents{},
+			name:        "bare run ID requires repo flag",
+			repoFlag:    "",
+			components:  parser.GitHubURLComponents{},
+			expectError: true,
 		},
 		{
 			name:          "owner already resolved from URL wins",

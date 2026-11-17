@@ -284,8 +284,11 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 }
 
 func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents) error {
-	if repoFlag == "" || components.Owner != "" {
+	if components.Owner != "" {
 		return nil
+	}
+	if repoFlag == "" {
+		return errors.New("--repo is required for bare run IDs; use --repo owner/repo")
 	}
 	parts := strings.SplitN(repoFlag, "/", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" { //nolint:uncheckedsliceindex // len(parts) is checked first
