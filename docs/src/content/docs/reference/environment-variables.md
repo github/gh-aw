@@ -216,7 +216,7 @@ The JavaScript setup helpers bound child processes, archive operations, and setu
 | `GH_AW_MCP_CONTAINER_STATUS_TIMEOUT_MS` | `15000` | Docker/container status probes used in MCP gateway diagnostics. |
 | `GH_AW_MCP_DOCKER_CLEANUP_TIMEOUT_MS` | `30000` | Stale MCP gateway container cleanup. |
 | `GH_AW_MCP_SERVER_CHECK_TIMEOUT_MS` | `120000` | MCP server health-check script. |
-| `GH_AW_OUTCOME_GH_TIMEOUT_MS` | `300000` | `gh` CLI calls made by outcome evaluation. |
+| `GH_AW_ADOPTION_GH_TIMEOUT_MS` | `300000` | `gh` CLI calls made by outcome evaluation. |
 | `GH_AW_SAFEOUTPUTS_CLI_TIMEOUT_MS` | `120000` | `safeoutputs` CLI invocations used for structured diagnostics. |
 
 ### MCP gateway readiness polling

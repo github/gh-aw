@@ -80,14 +80,14 @@ and returns ordered `{id,value}` metrics; the first is primary. Never fetch
 missing evidence. Removed `graders.operational-value.run` declarations must fail
 with migration guidance and must not be translated automatically.
 
-gh-aw owns facts knowable at conclusion; GitHub owns later object disposition.
-For every standalone workflow, use githubnext/gh-cao
-`add-operational-value OWNER/REPO WORKFLOW-NAME` without `--campaign`.
-`--campaign` only scopes ownership and rolls up directly included worker Value;
-it defines no separate campaign metric. Delivery/adoption/reversal/survival
-applies independently of campaign and Value configuration.
-`graders.operational-value.script` remains optional run-scoped evidence, not a
-prerequisite or substitute for CAO longitudinal Value.
+gh-aw owns recorded facts, run-scoped grading, and shared delivery/adoption/
+reversal/survival rules and provider refresh. GitHub owns resource disposition.
+Inspect lifecycle evidence with `logs --delivery`, `logs --adoption`, or single-run
+`audit --adoption`; no CAO or campaign is required.
+Attributed value additionally requires a declared measurement, attribution evidence,
+and complete post-adoption-window survival. CAO is an optional scheduler/consumer.
+`graders.operational-value.script` is optional recorded evidence, not attributed
+value by itself.
 
 For execution-quality diagnostics, follow [Infer Trace Graders](#infer-trace-graders-from-intent).
 

@@ -55,6 +55,7 @@ describe("compact unified session projection", () => {
       event("guardrail.daily_aic", { status: "under_budget", exceeded: false, total: 2 }),
       event("workflow.job_result", { jobId: "agent", result: "success", durationMs: 42 }),
       event("execution.result", { outcome: "success", exitCode: 0 }),
+      event("safe_output.execution", { type: "create_issue", messageIndex: 2, status: "success", staged: false, operation_outcome: "indeterminate", url: "https://github.com/org/repo/issues/1", body: "private" }),
       event("harness.retry", {
         attempts: 2,
         exitCode: 0,
@@ -85,7 +86,8 @@ describe("compact unified session projection", () => {
     const projected = parse(result);
     expect(projected[2].data).toEqual({ aic: 1.5, model: "model", usage: { inputTokens: 10, outputTokens: 3, inputTokensIncludeCache: false } });
     expect(projected[3].data).toEqual({ status: "success", numTurns: 2, usage: { totalTokens: 13 } });
-    expect(projected[8].data).toEqual({
+    expect(projected[8].data).toEqual({ type: "create_issue", messageIndex: 2, status: "success", staged: false, operation_outcome: "indeterminate" });
+    expect(projected[9].data).toEqual({
       attempts: 2,
       exitCode: 0,
       attemptResults: [
@@ -93,8 +95,8 @@ describe("compact unified session projection", () => {
         { attempt: 2, exitCode: 0, failureClasses: [] },
       ],
     });
-    expect(projected[9].data).toEqual({ value: 1, run: { passed: 1, errors: 0 } });
-    expect(projected[10].data).toEqual({
+    expect(projected[10].data).toEqual({ value: 1, run: { passed: 1, errors: 0 } });
+    expect(projected[11].data).toEqual({
       memoryId: "default",
       jobResult: "failure",
       outcome: "success",
@@ -103,6 +105,7 @@ describe("compact unified session projection", () => {
       commit: "b".repeat(40),
     });
     expect(result.session).not.toContain("private");
+    expect(result.session).not.toContain("github.com");
     expect(JSON.stringify(events)).toBe(original);
   });
 
@@ -248,9 +251,9 @@ describe("compact unified session projection", () => {
   });
 
   it("prioritizes metadata, outcomes, guardrails/graders, retries, usage, then memory", () => {
-    const types = ["session.format", "workflow.info", "execution.result", "grader.result", "engine.retry", "usage.report", "memory.push"];
-    expect(types.map(type => sessionEventPriority({ type, data: {} }))).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    expect(leastEssentialSessionEventIndex(types.map(type => ({ type, data: {} })))).toBe(6);
+    const types = ["session.format", "workflow.info", "execution.result", "safe_output.execution", "grader.result", "engine.retry", "usage.report", "memory.push"];
+    expect(types.map(type => sessionEventPriority({ type, data: {} }))).toEqual([0, 1, 2, 2, 3, 4, 5, 6]);
+    expect(leastEssentialSessionEventIndex(types.map(type => ({ type, data: {} })))).toBe(7);
   });
 
   it.each([

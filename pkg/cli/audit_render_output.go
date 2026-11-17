@@ -64,6 +64,17 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 			return err
 		}
 	}
+	if opts.Delivery || opts.Adoption {
+		processedRun.Run.LogsPath = runOutputDir
+		report, err := collectRunLifecycle(ctx, processedRun, nil, opts.Verbose, opts.Adoption)
+		if err != nil {
+			return err
+		}
+		auditData.Delivery = report.Delivery
+		if opts.Adoption {
+			auditData.Outcomes, auditData.OutcomeSummary = report.Items, &report.Summary
+		}
+	}
 	return renderPreparedAuditReport(ctx, auditData, opts)
 }
 
@@ -150,6 +161,18 @@ func renderAuditOutput(auditData AuditData, runOutputDir string, jsonOutput, ver
 		return nil
 	}
 	renderConsole(auditData, runOutputDir)
+	if auditData.Delivery != nil {
+		data := LogsData{Delivery: []DeliveryData{*auditData.Delivery}}
+		if auditData.OutcomeSummary != nil {
+			data.Outcomes = []OutcomesData{{
+				RunID: auditData.Overview.RunID, Workflow: auditData.Overview.WorkflowName,
+				Items: auditData.Outcomes, Summary: *auditData.OutcomeSummary,
+			}}
+		}
+		if err := renderLogsOutcomes(os.Stdout, data); err != nil {
+			return err
+		}
+	}
 	if verbose {
 		auditLog.Printf("Rendered console audit report for %s", runOutputDir)
 	}

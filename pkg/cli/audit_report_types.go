@@ -49,8 +49,9 @@ type AuditData struct {
 	ToolUsage                  []ToolUsageInfo          `json:"tool_usage,omitempty"`
 	MCPToolUsage               *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`
 	CreatedItems               []CreatedItemReport      `json:"created_items,omitempty"`
-	Outcomes                   []OutcomeReport          `json:"outcomes,omitempty"`
-	OutcomeSummary             *OutcomeSummary          `json:"outcome_summary,omitempty"`
+	Delivery                   *DeliveryData            `json:"delivery,omitempty"`
+	Outcomes                   []OutcomeReport          `json:"adoption,omitempty"`
+	OutcomeSummary             *OutcomeSummary          `json:"adoption_summary,omitempty"`
 	Experiments                *ExperimentData          `json:"experiments,omitempty"`
 	Graders                    *GradersData             `json:"graders,omitempty"`
 	Evals                      *EvalsSummary            `json:"evals,omitempty"`
@@ -147,6 +148,10 @@ type FileInfo struct {
 // URL is present for creation types (e.g. create_issue, add_comment) but may be empty
 // for modification types (e.g. add_labels, close_issue) that do not return a URL.
 type CreatedItemReport struct {
+	Status          string         `json:"status,omitempty" console:"-"`
+	EvidenceID      string         `json:"-" console:"-"`
+	InvocationID    string         `json:"-" console:"-"`
+	EvidenceSource  string         `json:"-" console:"-"`
 	Type            string         `json:"type" console:"header:Type"`
 	URL             string         `json:"url,omitempty" console:"header:URL,omitempty"`
 	Number          int            `json:"number,omitempty" console:"header:Number,omitempty"`

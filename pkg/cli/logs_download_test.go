@@ -460,6 +460,42 @@ fi
 	assert.NoDirExists(t, filepath.Join(outputDir, "agent"))
 }
 
+func TestDownloadRunArtifacts_RetainsCachedEvidenceWhenAdditionalArtifactsDoNotExist(t *testing.T) {
+	fakeBinDir := t.TempDir()
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	require.NoError(t, os.WriteFile(fakeGH, []byte("#!/bin/sh\nif [ \"$1\" = api ]; then\n  printf '%s\\n' info usage\n  exit 0\nfi\nexit 1\n"), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	for _, tt := range []struct {
+		name   string
+		filter []string
+		kept   bool
+	}{
+		{"requested cached evidence", []string{"info", "usage", "safe-outputs-items", "agent-output-fallback"}, true},
+		{"unrelated cached evidence", []string{"safe-outputs-items", "agent-output-fallback"}, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			outputDir := t.TempDir()
+			require.NoError(t, markArtifactDownloaded(outputDir, "info"))
+			require.NoError(t, markArtifactDownloaded(outputDir, "usage"))
+			evidencePath := filepath.Join(outputDir, "aw_session.jsonl")
+			require.NoError(t, os.WriteFile(evidencePath, []byte("recorded execution evidence\n"), 0o600))
+
+			err := downloadRunArtifacts(context.Background(), downloadArtifactsOptions{
+				runID: 12345, outputDir: outputDir, owner: "github", repo: "gh-aw", artifactFilter: tt.filter,
+			})
+			if tt.kept {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, ErrNoArtifacts)
+			}
+			evidence, err := os.ReadFile(evidencePath)
+			require.NoError(t, err)
+			assert.Equal(t, "recorded execution evidence\n", string(evidence))
+		})
+	}
+}
+
 func TestDownloadArtifactsByName_DoesNotCacheFailedStagingDirectory(t *testing.T) {
 	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
 	fakeGH := filepath.Join(fakeBinDir, "gh")

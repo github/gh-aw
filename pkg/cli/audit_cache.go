@@ -13,7 +13,7 @@ import (
 
 type auditCacheSource string
 
-const auditSchemaVersion = 14
+const auditSchemaVersion = 15
 
 const (
 	auditCacheSourceFull auditCacheSource = "full"
@@ -51,6 +51,7 @@ func loadCachedAuditData(runOutputDir string, run WorkflowRun, source auditCache
 	}
 	auditData.Outcomes = nil
 	auditData.OutcomeSummary = nil
+	auditData.Delivery = nil
 	auditData.DurableSession = readDurableSessionReport(runOutputDir, run, auditData.DurableSession != nil)
 	if auditData.Retries == nil {
 		auditData.Retries = readAuditRetrySummary(runOutputDir)
@@ -59,6 +60,7 @@ func loadCachedAuditData(runOutputDir string, run WorkflowRun, source auditCache
 }
 
 func writeAuditData(runOutputDir string, auditData AuditData) error {
+	auditData.Outcomes, auditData.OutcomeSummary, auditData.Delivery = nil, nil, nil
 	auditData.EvidenceSearch = nil
 	auditData.ModelCatalog = nil
 	auditData.SchemaVersion = auditSchemaVersion

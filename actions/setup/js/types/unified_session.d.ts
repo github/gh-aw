@@ -462,6 +462,32 @@ export interface SafeOutputErrorData extends SafeOutputData {
   errors?: SafeOutputData[];
 }
 
+/** Post-run lifecycle supplement; never append this event to its source run session. */
+export interface LifecycleAdoptionData {
+  sourceRunId: string;
+  sourceWorkflow?: string;
+  repository?: string;
+  outputType: string;
+  deliveryState: "delivered";
+  deliverySignal: string;
+  deliveryAt: string;
+  deliveryObservedAt: string;
+  deliverySource: string;
+  adoptionState: "pending" | "accepted" | "rejected" | "lifecycle" | "not_applicable" | "unknown";
+  adoptionSignal: string;
+  adoptionAt?: string;
+  adoptionObservedAt: string;
+  adoptionSource: string;
+  adoptionRuleVersion: string;
+  acceptanceKind?: "explicit_human" | "fallback_delivery";
+  humanVerified: boolean;
+  adoptionCoverage: "available" | "unobserved" | "unsupported" | "unavailable";
+  survivalState: "observed" | "reversed" | "unknown";
+  survivalSignal?: string;
+  survivalObservedAt?: string;
+  survivalCoverage: "snapshot" | "unobserved" | "unsupported" | "unavailable";
+}
+
 export interface ExperimentStateData {
   runId?: JsonValue;
   assignments?: JsonValue;
@@ -945,8 +971,9 @@ export interface UnifiedSessionEventDataMap {
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;
   "safe_output.result": SafeOutputData;
-  "safe_output.outcome": SafeOutputData;
+  "safe_output.execution": SafeOutputData;
   "safe_output.error": SafeOutputErrorData;
+  "lifecycle.adoption": LifecycleAdoptionData;
   "experiment.state": ExperimentStateData;
   "experiment.assignment": ExperimentAssignmentData;
   "grader.manifest": GraderManifestData;
