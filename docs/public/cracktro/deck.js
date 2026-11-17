@@ -1858,6 +1858,81 @@
   .tv-take.done div { animation: tvpulse 1.6s ease-in-out 2; }
   .tv-cap { position: absolute; left: 110px; right: 110px; top: 950px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
 
+  /* --- add operational value: define once, measure repeatedly --- */
+  .aov .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
+  .pf-prompt.aov-phone { left: 130px; top: 318px; width: 430px; height: 600px; }
+  .aov-msg { margin-left: 22px; padding: 18px 22px; min-height: 152px; border-radius: 26px 26px 6px 26px; background: linear-gradient(135deg, #8957e5, #6e40c9); font: 500 21px/1.42 var(--mono); color: #e6dcff; white-space: pre; }
+  .aov-msg .cmd { color: #fff; font-weight: 700; }
+  .aov-msg .opt { color: #fff; text-decoration: underline dashed #e6dcffaa; text-underline-offset: 6px; }
+  .aov-reply { margin: 16px 22px 0 0; padding: 16px 20px; border-radius: 26px 26px 26px 6px; background: #21262d; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 18px; line-height: 1.3; color: #d1d7e0; opacity: 0; transition: opacity .5s; }
+  .aov-reply.on { opacity: 1; }
+  .aov-reply li { opacity: 0; transform: translateX(-10px); transition: opacity .4s, transform .5s; }
+  .aov-reply li.on { opacity: 1; transform: none; }
+  .aov-reply b { color: #d2a8ff; margin-right: 6px; }
+  .aov-cue { position: absolute; left: 130px; top: 950px; width: 430px; box-sizing: border-box; padding: 12px 18px; border-radius: 14px; border: 2px dashed #3d444d; font: 500 16px/1.45 var(--mono); color: #9198a1; opacity: 0; transition: opacity .6s; }
+  .aov-cue.on { opacity: 1; }
+  .aov-cue code { font-family: var(--mono); color: #d2a8ff; font-weight: 700; }
+  .aov-cue b { color: #f0f6fc; font-weight: 600; }
+  .aov-cap { position: absolute; top: -44px; left: 4px; font: 600 16px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: var(--c); white-space: nowrap; }
+  .aov-design { position: absolute; left: 620px; top: 330px; width: 1190px; height: 150px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 70px; --c: #ab7df8; }
+  .aov-d { position: relative; padding: 0 26px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 5px solid var(--c); display: flex; flex-direction: column; justify-content: center; gap: 12px;
+    box-shadow: 0 0 50px -25px var(--c); opacity: 0; transform: translateY(16px); transition: opacity .5s, transform .6s cubic-bezier(.2,.9,.2,1); }
+  .aov-d.on { opacity: 1; transform: none; }
+  .aov-d + .aov-d::after { content: "→"; position: absolute; left: -54px; top: 50%; transform: translateY(-50%); font: 700 34px/1 var(--mono); color: #656c76; }
+  .aov-d h4 { margin: 0; font-size: 34px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
+  .aov-d p { margin: 0; font: 500 19px/1.2 var(--mono); color: #9198a1; }
+  .aov-d.frozen { border: 2px dashed #db6d28; border-top: 5px solid #db6d28; }
+  .aov-d.frozen p { color: #ffa657; }
+  .aov-d em { position: absolute; top: 16px; right: 18px; padding: 5px 12px; border-radius: 99px; border: 1px solid #ab7df8; font: 600 14px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: #d2a8ff; }
+  .aov-down { position: absolute; left: 1539px; top: 488px; width: 3px; height: 74px; background: linear-gradient(#db6d28, #4493f8); transform-origin: top; transform: scaleY(0); transition: transform .6s cubic-bezier(.2,.9,.2,1); }
+  .aov-down::after { content: ""; position: absolute; left: -8px; bottom: -4px; border: 9px solid transparent; border-top: 12px solid #4493f8; border-bottom: 0; }
+  .aov-down.on { transform: none; }
+  .aov-cyc { position: absolute; left: 1280px; top: 560px; width: 520px; height: 400px; --c: #79c0ff; opacity: 0; transition: opacity .6s; }
+  .aov-cyc.on { opacity: 1; }
+  .aov-cyc .aov-cap { top: -40px; }
+  .aov-cyc svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .aov-cyc .ring { fill: none; stroke: #4493f8; stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; opacity: .8; }
+  .aov-cyc .chev { fill: #4493f8; }
+  .aov-cyc .n rect { fill: #0d1117; stroke: #4493f8; stroke-width: 2; transition: fill .3s, stroke-width .3s; }
+  .aov-cyc .n text { font: 600 22px/1 "Mona Sans"; fill: #f0f6fc; }
+  .aov-cyc .n tspan { font: 700 22px/1 var(--mono); fill: #79c0ff; }
+  .aov-cyc .n.hot rect { fill: #4493f833; stroke-width: 4; }
+  .aov-cyc .mid1 { font: 700 26px/1 "Mona Sans"; fill: #f0f6fc; }
+  .aov-cyc .mid2 { font: 700 20px/1 var(--mono); letter-spacing: .14em; fill: #79c0ff; }
+  .aov-cyc .dot { fill: #79c0ff; filter: drop-shadow(0 0 8px #79c0ff); opacity: 0; }
+  .aov-cyc.run .dot { opacity: 1; }
+  .aov-pub { position: absolute; left: 1176px; top: 759px; width: 96px; height: 3px; background: #4493f8; transform-origin: right; transform: scaleX(0); transition: transform .6s cubic-bezier(.2,.9,.2,1); }
+  .aov-pub::before { content: ""; position: absolute; left: -6px; top: -8px; border: 9px solid transparent; border-right: 12px solid #4493f8; border-left: 0; }
+  .aov-pub span { position: absolute; left: 0; right: 0; top: 16px; font: 500 15px/1.3 var(--mono); color: #9198a1; text-align: center; opacity: 0; transition: opacity .4s .3s; }
+  .aov-pub.on { transform: none; }
+  .aov-pub.on span { opacity: 1; }
+  .aov-val { position: absolute; left: 620px; top: 570px; width: 550px; height: 390px; box-sizing: border-box; padding: 24px 30px 22px; border-radius: 22px; background: #161b22e8; border: 1px solid #3d444d; border-top: 5px solid #4493f8; --c: #79c0ff;
+    display: flex; flex-direction: column; gap: 14px; opacity: 0; transform: translateY(18px); transition: opacity .6s, transform .6s cubic-bezier(.2,.9,.2,1), box-shadow .5s; }
+  .aov-val.on { opacity: 1; transform: none; box-shadow: 0 24px 60px -34px #4493f8; }
+  .aov-val.ping { animation: aovping 1s ease-out; }
+  @keyframes aovping { 0% { box-shadow: 0 0 0 0 #79c0ff99, 0 24px 60px -34px #4493f8; } 100% { box-shadow: 0 0 0 22px #79c0ff00, 0 24px 60px -34px #4493f8; } }
+  .aov-vh { display: flex; justify-content: space-between; align-items: flex-end; }
+  .aov-vh small { font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #79c0ff; }
+  .aov-vh h4 { margin: 10px 0 0; font-size: 34px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
+  .aov-vh p { margin: 8px 0 0; font: 500 17px/1 var(--mono); color: #9198a1; }
+  .aov-vh b { font: 700 64px/1 var(--mono); color: #79c0ff; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .aov-vh b i { font: 500 28px/1 var(--mono); font-style: normal; margin-left: 4px; }
+  .aov-bars { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; align-items: end; }
+  .aov-bar { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font: 500 14px/1 var(--mono); color: #9198a1; }
+  .aov-bar i { display: block; width: 100%; height: var(--h); border-radius: 8px 8px 2px 2px; background: #4493f8; transform-origin: bottom; transform: scaleY(0); transition: transform .5s cubic-bezier(.2,.9,.2,1); }
+  .aov-bar.on i { transform: none; }
+  .aov-bar span { margin-top: 8px; }
+  .aov-bar.base i { background: repeating-linear-gradient(135deg, #4493f8 0 6px, #4493f888 6px 12px); }
+  .aov-bar.miss i { background: none; border: 2px dashed #db6d28; box-sizing: border-box; }
+  .aov-bar em { position: absolute; bottom: calc(var(--h) + 30px); left: 50%; transform: translateX(-50%); font: 600 14px/1.2 var(--mono); font-style: normal; white-space: nowrap; color: #d1d7e0; opacity: 0; transition: opacity .4s; }
+  .aov-bar.miss em { color: #ffa657; }
+  .aov-bar.on em { opacity: 1; }
+  .aov-chips { display: flex; gap: 12px; font: 500 16px/1 var(--mono); white-space: nowrap; color: #d1d7e0; opacity: 0; transition: opacity .5s; }
+  .aov-chips.on { opacity: 1; }
+  .aov-chips span { padding: 9px 14px; border-radius: 99px; border: 1px solid #3d444d; background: #0d1117; }
+  .aov-chips span:last-child { border-color: #ab7df8; color: #d2a8ff; }
+  .aov-foot { position: absolute; left: 620px; right: 110px; top: 1000px; font: 500 17px/1.3 var(--mono); color: #9198a1; }
+
   /* --- turn intent to automation --- */
   .slide-head h2.pf-h { font-size: 100px; }
   .pf-card { position: absolute; top: 360px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -25px var(--c); opacity: 0; transform: translateY(30px) scale(.97); transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1); }
@@ -3639,6 +3714,210 @@
         flow,
         take,
         h("div", { class: "tv-cap" }, "Illustrative, synthetic data · delivery → adoption is not a conversion rate")
+      ),
+    });
+  }
+
+  // Add Operational Value: /add-operational-value prompt → a design agent turns the workflow's adoption-time intent into verified code with a frozen measurement rule once → a deterministic, LLM-free cycle (window, collect, evaluate, publish) repeats on cadence and publishes outcome + evidence as CAO Value
+  {
+    resetIndex();
+    // the real skill syntax with synthetic coordinates; [text, class] per line
+    const CMD = [
+      ["/add-operational-value", "cmd"],
+      ["acme/app", ""],
+      ["dashboard-performance", ""],
+      ["--campaign self-care", "opt"],
+    ];
+    const CMDLEN = CMD.reduce((n, [s]) => n + s.length + 1, 0);
+    const msg = h("div", { class: "aov-msg" });
+    const REPLY = ["intent recovered at adoption", "1 outcome + evidence contract frozen", "baseline verified, if evidenced", "deterministic collector ready"];
+    const rlis = REPLY.map(s => h("li", {}, h("b", {}, "✓"), s)),
+      reply = h("ul", { class: "aov-reply" }, rlis);
+    const phone = h("div", { class: "pf-card pf-prompt aov-phone" }, h("div", { class: "cap" }, "01 · Prompt"), h("div", { class: "sb" }, "9:41", h("span", {}, "▂▄▆ ▮")), h("div", { class: "you" }, "Copilot"), msg, reply);
+    const cue = h("div", { class: "aov-cue" }, "no ", h("code", {}, "--campaign"), " → ", h("b", {}, "standalone"), h("br"), h("code", {}, "--campaign"), " → owns + rolls up this worker’s Value; ", h("b", {}, "no new campaign metric"));
+    const dcard = (cls, c, t, d, pill) => h("div", { class: `aov-d ${cls}`, "--c": c }, pill ? h("em", {}, pill) : null, h("h4", {}, t), h("p", {}, d));
+    const dcards = [dcard("", "#4493f8", "Workflow .md", "intent · guardrails"), dcard("", "#ab7df8", "Design agent", "recover · freeze · probe", "LLM · once"), dcard("frozen", "#db6d28", "Verified code", "🔒 frozen measurement rule")];
+    const design = h("div", { class: "aov-design" }, h("div", { class: "aov-cap" }, "02 · Define once"), dcards);
+    const down = h("div", { class: "aov-down" });
+    // repeat-on-cadence cycle: four nodes clockwise on an ellipse around "Deterministic · No LLM"
+    const CX = 260,
+      CY = 200,
+      RX = 190,
+      RY = 150,
+      NODES = ["Window", "Collect", "Evaluate", "Publish"],
+      at = a => [CX + RX * Math.sin(a), CY - RY * Math.cos(a)];
+    let g = `<ellipse class="ring" cx="${CX}" cy="${CY}" rx="${RX}" ry="${RY}"/>`;
+    for (let k = 0; k < 4; k++) {
+      const a = Math.PI / 4 + (k * Math.PI) / 2,
+        [x, y] = at(a),
+        deg = (Math.atan2(RY * Math.sin(a), RX * Math.cos(a)) * 180) / Math.PI;
+      g += `<path class="chev" d="M-8 -9 L8 0 L-8 9Z" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${deg.toFixed(1)})"/>`;
+    }
+    g += `<text class="mid1" x="${CX}" y="${CY - 4}" text-anchor="middle">Deterministic</text><text class="mid2" x="${CX}" y="${CY + 32}" text-anchor="middle">NO LLM</text><circle class="dot" r="9" cx="${CX}" cy="${CY - RY}"/>`;
+    NODES.forEach((n, i) => {
+      const [x, y] = at((i * Math.PI) / 2);
+      g += `<g class="n"><rect x="${x - 78}" y="${y - 29}" width="156" height="58" rx="14"/><text x="${x}" y="${y + 8}" text-anchor="middle"><tspan>${i + 1}</tspan> ${n}</text></g>`;
+    });
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 520 400");
+    svg.innerHTML = g;
+    const nodes = [...svg.querySelectorAll(".n")],
+      dot = svg.querySelector(".dot");
+    const cyc = h("div", { class: "aov-cyc" }, h("div", { class: "aov-cap" }, "03 · On cadence"), svg);
+    const pub = h("div", { class: "aov-pub" }, h("span", {}, "outcome", h("br"), "+ evidence"));
+    // synthetic weekly p95 dashboard load in seconds (lower is better); baseline is pre-adoption, null = missing
+    const VAL = [2.6, 2.4, null, 2.2, 2.0, 1.8],
+      LBL = ["baseline", "W1", "W2", "W3", "W4", "W5"];
+    const bars = VAL.map((v, i) =>
+      h(
+        "div",
+        { class: `aov-bar${i === 0 ? " base" : ""}${v === null ? " miss" : ""}`, "--h": `${v === null ? 70 : Math.round((110 * v) / 2.6)}px` },
+        i === 0 ? h("em", {}, "evidenced") : v === null ? h("em", {}, "missing ≠ 0") : null,
+        h("i"),
+        h("span", {}, LBL[i])
+      )
+    );
+    const num = h("span", {}, "--"),
+      chips = h("div", { class: "aov-chips" }, h("span", {}, "⊘ not run success"), h("span", {}, "+ contribution: separate"));
+    const val = h(
+      "div",
+      { class: "aov-val" },
+      h("div", { class: "aov-cap" }, "04 · CAO Value"),
+      h("div", { class: "aov-vh" }, h("div", {}, h("small", {}, "Primary outcome"), h("h4", {}, "p95 dashboard load"), h("p", {}, "repo state · weekly · any actor")), h("b", {}, num, h("i", {}, "s"))),
+      h("div", { class: "aov-bars" }, bars),
+      chips
+    );
+    const caret = () => h("span", { class: "pf-caret" });
+    const renderCmd = k => {
+      const out = [];
+      for (const [s, cls] of CMD) {
+        if (k <= 0) break;
+        const part = s.slice(0, k);
+        k -= part.length;
+        out.push(h("span", { class: cls }, part));
+        if (k > 0) {
+          out.push("\n");
+          k--;
+        }
+      }
+      msg.replaceChildren(...out, caret());
+    };
+    // [element, seconds after enter]; ArrowRight fast-forwards to the next stage: prompt sent, design verified, cycle running, Value published
+    const T_TYPE = 0.8,
+      T_DESIGN = 3.6,
+      T_CYCLE = 6.4,
+      T_RUN = 7.0,
+      LAP = 4,
+      T_PUB = T_RUN + (LAP * 3) / 4,
+      BEATS = [
+        [phone, 0.3],
+        [cue, 2.6],
+        [reply, T_DESIGN],
+        [dcards[0], T_DESIGN],
+        [rlis[0], T_DESIGN + 0.4],
+        [dcards[1], T_DESIGN + 0.6],
+        [rlis[1], T_DESIGN + 1.0],
+        [rlis[2], T_DESIGN + 1.4],
+        [dcards[2], T_DESIGN + 1.8],
+        [rlis[3], T_DESIGN + 2.2],
+        [down, T_CYCLE],
+        [cyc, T_CYCLE + 0.2],
+        [pub, T_PUB],
+        [val, T_PUB + 0.2],
+        ...bars.map((b, i) => [b, T_PUB + 0.6 + i * 0.22]),
+        [chips, T_PUB + 2.0],
+      ],
+      STAGES = [T_DESIGN - 0.2, T_CYCLE, T_PUB, T_PUB + 2.2];
+    let t0 = 0,
+      now = 0,
+      snd = {};
+    slides.push({
+      group: "platform",
+      notes:
+        "Define once. Measure repeatedly. Illustrative: the repository, workflow, campaign and values are synthetic. The CAO skill takes /add-operational-value OWNER/REPO [WORKFLOW-NAME] [--campaign CAMPAIGN-SLUG]. With only the repository it lists the workflows to pick from; with a workflow name it designs exactly one workflow's Operational Value. Without --campaign the workflow stays standalone. With --campaign the selection is limited to workers the campaign directly includes, the campaign owns the module and the shared adapter, and the campaign view rolls up each directly included worker's Value under namespaced metric ids; it never invents a separate campaign metric or merges different outcome contracts. Define once: a design agent, the only LLM step, recovers the intent the workflow had at adoption from its Markdown, guardrails, triggers and safe outputs, names the pre-existing repository problem, freezes one native primary outcome and its evidence contract before looking at any result, probes a pre-adoption baseline when history can reconstruct it, and writes deterministic collection code that must pass verification. Measure repeatedly: on every cadence a deterministic job with no LLM fixes the window, collects the evidence, evaluates the frozen rule and publishes the outcome plus its evidence as canonical CAO Value. This follows the Daily File Diet pattern: a daily agent that splits oversized source files is not valued by successful runs or opened pull requests but by the repository's own file-size state at a fixed snapshot, whoever shrank the files, a maintainer, another tool or the agent. Contribution from its accepted outputs is tracked separately and never added in. A baseline is shown only when pre-adoption evidence exists, a window with missing evidence stays missing rather than becoming zero, early windows stay interim, and any movement after adoption is association, not causation.",
+      enter() {
+        t0 = 0;
+        snd = { p: 0, beat: new Set(), hit: -1, lap: -1 };
+        BEATS.forEach(([e]) => e.classList.remove("on"));
+        cyc.classList.remove("run");
+        val.classList.remove("ping");
+        nodes.forEach(n => n.classList.remove("hot"));
+        msg.replaceChildren(caret());
+        num.textContent = "--";
+      },
+      onNext() {
+        if (!t0) return false;
+        const e = (now - t0) / 1000,
+          next = STAGES.find(s => s > e + 0.05);
+        if (next === undefined) return false;
+        t0 = now - next * 1000;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        const e = (t - t0) / 1000;
+        const pk = Math.max(0, Math.min(CMDLEN - 1, Math.floor((e - T_TYPE) * 30)));
+        if (pk > snd.p) {
+          sfx.key();
+          snd.p = pk;
+        }
+        renderCmd(pk);
+        BEATS.forEach(([el, s], i) => {
+          const on = e >= s;
+          el.classList.toggle("on", on);
+          if (on && !snd.beat.has(i)) {
+            snd.beat.add(i);
+            if (el === phone || dcards.includes(el) || el === val) sfx.pop(snd.beat.size);
+          }
+        });
+        const running = e >= T_RUN;
+        cyc.classList.toggle("run", running);
+        if (running) {
+          const a = (((e - T_RUN) / LAP) % 1) * 2 * Math.PI,
+            [x, y] = at(a),
+            lap = Math.floor((e - T_RUN) / LAP);
+          dot.setAttribute("cx", x.toFixed(1));
+          dot.setAttribute("cy", y.toFixed(1));
+          let hit = -1;
+          nodes.forEach((n, i) => {
+            const d = Math.abs(((a - (i * Math.PI) / 2 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+            const hot = d < 0.32;
+            n.classList.toggle("hot", hot);
+            if (hot) hit = i;
+          });
+          if (hit >= 0 && hit !== snd.hit && lap === 0) sfx.pop(hit + 2);
+          snd.hit = hit;
+          // every later Publish pass pings the Value card
+          if (hit === 3 && lap > snd.lap && lap > 0) {
+            val.classList.remove("ping");
+            void val.offsetWidth;
+            val.classList.add("ping");
+          }
+          if (hit === 3) snd.lap = lap;
+        }
+        const shown = bars.filter(b => b.classList.contains("on")).length,
+          last = VAL.slice(0, shown)
+            .filter(v => v !== null)
+            .pop();
+        num.textContent = last === undefined ? "--" : last.toFixed(1);
+        if (e >= STAGES[3] && !snd.done) {
+          snd.done = true;
+          sfx.review();
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide aov" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Add Operational Value"), h("h2", { class: "pf-h" }, letters("Define once. "), letters("Measure repeatedly.", "l-grad"))),
+        phone,
+        cue,
+        design,
+        down,
+        cyc,
+        pub,
+        val,
+        h("div", { class: "aov-foot" }, "Illustrative · synthetic repository, workflow, campaign and values")
       ),
     });
   }
