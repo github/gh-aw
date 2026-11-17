@@ -40,20 +40,14 @@ func TestEngineCooldownParsingAndValidation(t *testing.T) {
 					obj["runtime"] = map[string]any{"id": "codex"}
 				}
 				_, config, _ := NewCompiler().ExtractEngineConfig(map[string]any{"engine": obj})
-				err := validateEngineCooldown(config, false)
+				err := validateEngineCooldown(config)
 				if !test.valid {
 					require.Error(t, err)
-					require.Error(t, validateEngineCooldown(config, true))
 					return
 				}
 				require.NoError(t, err)
 				require.NotNil(t, config.Cooldown)
 				assert.Equal(t, test.days, *config.Cooldown)
-				if test.days == 0 {
-					require.Error(t, validateEngineCooldown(config, true))
-				} else {
-					require.NoError(t, validateEngineCooldown(config, true))
-				}
 			})
 		}
 	}
@@ -76,8 +70,31 @@ func TestApplyEngineCooldownFieldRejectsNativeIntOverflow(t *testing.T) {
 
 	config := &EngineConfig{}
 	applyEngineCooldownField(config, map[string]any{"cooldown": json.Number("2147483648")})
-	require.Error(t, validateEngineCooldown(config, false))
+	require.Error(t, validateEngineCooldown(config))
 	assert.Nil(t, config.Cooldown)
+}
+
+func TestValidateEngineCooldownZeroRequiresStaticVersion(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		version string
+		wantErr bool
+	}{
+		{name: "compiler default"},
+		{name: "literal version", version: "1.2.3"},
+		{name: "expression version", version: "${{ inputs.engine-version }}", wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			zero := 0
+			err := validateEngineCooldown(&EngineConfig{Version: test.version, Cooldown: &zero})
+			if test.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "statically known engine version")
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestEngineCooldownInstalls(t *testing.T) {
@@ -159,7 +176,7 @@ func TestCompileEngineCooldown(t *testing.T) {
 					content := fmt.Sprintf("---\non: workflow_dispatch\nstrict: %t\nnetwork: defaults\nengine:\n%s  cooldown: %s\n---\nInspect the repository.\n", strict, engine, value)
 					require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 					err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
-					if value != "7" && (value != "0" || strict) {
+					if value != "7" && value != "0" {
 						require.Error(t, err)
 						assert.Contains(t, err.Error(), "cooldown")
 						return
@@ -233,7 +250,7 @@ func TestWarnLegacyBehaviorInstallationCooldown(t *testing.T) {
 	})
 	assert.Contains(t, output, `engine definition "legacy" uses deprecated behaviors.installation.cooldown, which is ignored`)
 	assert.Contains(t, output, "set workflow engine.cooldown instead")
-	assert.Contains(t, output, "0 disables cooldown only outside strict mode; strict mode rejects zero")
+	assert.Contains(t, output, "zero requires a statically known engine version")
 	assert.Equal(t, 1, compiler.GetWarningCount())
 
 	compiler.ResetWarningCount()
@@ -265,7 +282,7 @@ Inspect the repository.
 `, strict, value)
 				require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 				err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
-				if value != "7" && (value != "0" || strict) {
+				if value != "7" && value != "0" {
 					require.Error(t, err)
 					assert.Contains(t, err.Error(), "cooldown")
 					return
@@ -309,15 +326,21 @@ func TestCompileEngineCooldownImport(t *testing.T) {
 			content := fmt.Sprintf("---\non: workflow_dispatch\nstrict: %t\nnetwork: defaults\nimports:\n  - shared.md\n---\nInspect the repository.\n", strict)
 			require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 			err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
-			if strict {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "cooldown")
-				return
-			}
 			require.NoError(t, err)
 			result, err := os.ReadFile(strings.TrimSuffix(path, ".md") + ".lock.yml")
 			require.NoError(t, err)
 			assert.Contains(t, string(result), "NPM_CONFIG_MIN_RELEASE_AGE: '0'")
 		})
+	}
+}
+
+func TestCompileEngineCooldownRejectsExpressionVersion(t *testing.T) {
+	for _, strict := range []bool{false, true} {
+		path := filepath.Join(t.TempDir(), "cooldown-expression.md")
+		content := fmt.Sprintf("---\non: workflow_dispatch\nstrict: %t\nnetwork: defaults\nengine:\n  id: codex\n  version: ${{ inputs.engine-version }}\n  cooldown: 0\n---\nInspect the repository.\n", strict)
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+		err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "statically known engine version")
 	}
 }

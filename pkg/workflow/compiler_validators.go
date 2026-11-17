@@ -192,13 +192,12 @@ func (c *Compiler) validateFeatureConfig(workflowData *WorkflowData, markdownPat
 // permission requirement, and dispatch/call-workflow configurations.
 // workflowPermissions is the *Permissions value returned by validatePermissions.
 func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdownPath string, workflowPermissions *Permissions) error {
-	strict := c.effectiveStrictMode(workflowData.RawFrontmatter)
-	if err := validateEngineCooldown(workflowData.EngineConfig, strict); err != nil {
+	if err := validateEngineCooldown(workflowData.EngineConfig); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	c.warnLegacyBehaviorInstallationCooldown(workflowData, markdownPath)
 	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ThreatDetection != nil {
-		if err := validateEngineCooldown(workflowData.SafeOutputs.ThreatDetection.EngineConfig, strict); err != nil {
+		if err := validateEngineCooldown(workflowData.SafeOutputs.ThreatDetection.EngineConfig); err != nil {
 			return formatCompilerError(markdownPath, "error", "safe-outputs.threat-detection: "+err.Error(), err)
 		}
 	}
@@ -259,7 +258,7 @@ func (c *Compiler) warnLegacyBehaviorInstallationCooldown(workflowData *Workflow
 	}
 
 	message := fmt.Sprintf(
-		"engine definition %q uses deprecated behaviors.installation.cooldown, which is ignored; set workflow engine.cooldown instead (0 disables cooldown only outside strict mode; strict mode rejects zero)",
+		"engine definition %q uses deprecated behaviors.installation.cooldown, which is ignored; set workflow engine.cooldown instead (zero requires a statically known engine version)",
 		definition.ID,
 	)
 	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
