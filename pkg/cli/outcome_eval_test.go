@@ -665,7 +665,7 @@ func TestWriteOutcomeJSONLEmitsNormalizedFields(t *testing.T) {
 	sessionData, err := os.ReadFile(filepath.Join(dir, "adoption-session-123.jsonl"))
 	require.NoError(t, err)
 	var sessionLines []map[string]any
-	for _, line := range bytes.Split(bytes.TrimSpace(sessionData), []byte("\n")) {
+	for line := range bytes.SplitSeq(bytes.TrimSpace(sessionData), []byte("\n")) {
 		var event map[string]any
 		require.NoError(t, json.Unmarshal(line, &event))
 		sessionLines = append(sessionLines, event)
