@@ -95,16 +95,6 @@ function parsePiLog(logContent) {
 }
 
 /**
- * Parse Atomic CLI `--mode json` streaming log output through the shared Pi parser
- * while attributing canonical session events to `atomic`.
- * @param {string} logContent - The raw log content to parse
- * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
- */
-function parseAtomicLog(logContent) {
-  return parsePiStreamLog(logContent, { sourceEngine: "atomic", displayName: "Atomic" });
-}
-
-/**
  * Transforms raw Pi JSONL entries into the canonical logEntries format
  * used by the shared generateConversationMarkdown function.
  *
@@ -172,7 +162,6 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     main,
     parsePiLog,
-    parseAtomicLog,
     transformPiEntries,
     isPiV3Schema,
     transformPiV3Entries,

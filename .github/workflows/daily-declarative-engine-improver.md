@@ -46,7 +46,6 @@ safe-outputs:
     protected-files: allowed
     allowed-files:
       - .github/workflows/shared/aider.md
-      - .github/workflows/shared/atomic.md
       - .github/workflows/shared/crush.md
       - .github/workflows/shared/cursor.md
       - .github/workflows/shared/deepseek-harness.md
@@ -55,7 +54,6 @@ safe-outputs:
       - .github/workflows/shared/kiro.md
       - .github/workflows/shared/opencode.md
       - .github/workflows/smoke-aider.*
-      - .github/workflows/smoke-atomic.*
       - .github/workflows/smoke-crush.*
       - .github/workflows/smoke-cursor.*
       - .github/workflows/smoke-deepseek-harness.*
