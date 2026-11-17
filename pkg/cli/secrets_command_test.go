@@ -109,5 +109,5 @@ func TestSecretsCommandUnknownSubcommandReturnsError(t *testing.T) {
 
 	err := cmd.Execute()
 	require.Error(t, err)
-	assert.Equal(t, `unknown command "unknown-cmd" for "secrets"`, err.Error())
+	assert.Equal(t, `unknown command "unknown-cmd" for "gh aw secrets"`, err.Error())
 }

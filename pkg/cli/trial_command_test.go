@@ -43,6 +43,9 @@ func TestNewTrialCommandNoArgsErrorIncludesExample(t *testing.T) {
 	if !strings.Contains(err.Error(), "Example:") {
 		t.Fatalf("expected trial usage error to include an Example section, got: %s", err)
 	}
+	if !strings.Contains(err.Error(), "Usage:\n  gh aw trial") || !strings.Contains(err.Error(), "Run 'gh aw trial --help'") {
+		t.Fatalf("expected trial usage error to use the extension command path, got: %s", err)
+	}
 }
 
 // Test the host repo slug processing logic with dot notation

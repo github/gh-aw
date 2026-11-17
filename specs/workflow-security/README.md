@@ -903,6 +903,8 @@ operational and environmental refinements outside those core boundaries.
 | Safe-output token precedence | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `SafeOutputGeneration.tla` | Runtime entry precedence, representative missing-key fallbacks, and independence from neighboring scoped Apps are modeled. Static/shared checkout target selection, installation grants, and handler/head-token variants still require separate refinement. |
 | Filesystem and platform enforcement | P2 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `SafeOutputTransport.tla` | Artifact service origin, immutable event metadata, AWF/gateway isolation, labels, action pin integrity, post-job cleanup, and revocation are environmental assumptions at this layer. |
 
+Before model checking, `check.py` verifies that every P1 backlog target names an existing TLA+ module in this directory.
+
 ## Daily investigation
 
 [`daily-workflow-security-model.md`](../../.github/workflows/daily-workflow-security-model.md)

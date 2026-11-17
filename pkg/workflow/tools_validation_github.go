@@ -121,6 +121,9 @@ func validateGitHubGuardPolicy(tools *Tools, workflowName string) error {
 	}
 
 	github := tools.GitHub
+	if err := unsupportedGitHubAccessControlFieldsError(github.unsupportedAccessControlFields); err != nil {
+		return err
+	}
 	if github.reposParseErr != nil {
 		return github.reposParseErr
 	}
@@ -210,6 +213,29 @@ func validateGitHubGuardPolicy(tools *Tools, workflowName string) error {
 	}
 
 	return nil
+}
+
+func unsupportedGitHubAccessControlFieldsError(fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+
+	var quotedFields []string
+	for _, field := range fields {
+		quotedFields = append(quotedFields, "'tools.github."+field+"'")
+	}
+
+	verb, enforcementAndRemoval := "is", "it is not enforced. Remove this unsupported field."
+	if len(fields) > 1 {
+		verb = "are"
+		enforcementAndRemoval = "these settings are not enforced. Remove these unsupported fields."
+	}
+	return fmt.Errorf(
+		"%s %s not supported by the local compiler; %s "+
+			"Supported repository-scope example (not a substitute for role or visibility filtering):\n"+
+			"tools:\n  github:\n    allowed-repos: [\"owner/repo\"]",
+		strings.Join(quotedFields, ", "), verb, enforcementAndRemoval,
+	)
 }
 
 // validateReposScope validates the repos field in the guard policy

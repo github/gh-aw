@@ -33,6 +33,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sort"
 	"testing"
@@ -603,16 +604,8 @@ func TestFormal_FC_P8_RunSummaryRoundTrip(t *testing.T) {
 // Specification reference: §6.2.2 Duration Derivation
 func TestFormal_FC_P9_TimestampOrdering(t *testing.T) {
 	t.Parallel()
-	fixtures := []string{
-		"run_summary_minimal.json",
-		"run_summary_zero_aic.json",
-		"run_summary_failed.json",
-		"run_summary_high_aic.json",
-		"run_summary_cancelled.json",
-		"run_summary_partial_aic.json",
-	}
 
-	for _, name := range fixtures {
+	for _, name := range documentedForecastFixtures {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			data, err := os.ReadFile(filepath.Join(fixtureDir(t), name))
@@ -701,11 +694,9 @@ func TestFormal_FC_P10_MonteCarloInputCompleteness(t *testing.T) {
 	}
 }
 
-// documentedForecastFixtures mirrors the baseline fixture ("Fixture Files" section)
-// plus the "Available Additional Fixtures" table in
-// specs/forecast-compliance-fixtures/README.md. This list MUST be kept in sync with
-// the JSON files present in the fixture directory; a mismatch signals that the
-// README, the fixture directory, or this test has drifted out of sync.
+// documentedForecastFixtures mirrors the "Available Fixtures" table in
+// specs/forecast-compliance-fixtures/README.md. This list MUST be kept in sync
+// with the JSON files present in the fixture directory.
 var documentedForecastFixtures = []string{
 	"run_summary_minimal.json",
 	"run_summary_zero_aic.json",
@@ -715,10 +706,8 @@ var documentedForecastFixtures = []string{
 	"run_summary_partial_aic.json",
 }
 
-// TestFormal_FixtureCountConsistency verifies that the fixture files documented in
-// specs/forecast-compliance-fixtures/README.md exactly match the `.json` files
-// present in the fixture directory, so the README table cannot silently drift from
-// the fixtures actually exercised by the tests above.
+// TestFormal_FixtureCountConsistency verifies that the README fixture table and the
+// fixture files present on disk match the files exercised by the tests above.
 func TestFormal_FixtureCountConsistency(t *testing.T) {
 	t.Parallel()
 	dir := fixtureDir(t)
@@ -733,13 +722,27 @@ func TestFormal_FixtureCountConsistency(t *testing.T) {
 		onDisk = append(onDisk, entry.Name())
 	}
 
+	readme, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	require.NoError(t, err, "forecast compliance fixture README must be readable")
+	fixtureTableRow := regexp.MustCompile(
+		"(?m)^\\|\\s*`(run_summary_[^`]+\\.json)`\\s*\\|",
+	)
+	readmeFixtures := fixtureTableRow.FindAllSubmatch(readme, -1)
+	var documentedInReadme []string
+	for _, match := range readmeFixtures {
+		documentedInReadme = append(documentedInReadme, string(match[1]))
+	}
+
 	documented := append([]string(nil), documentedForecastFixtures...)
 	sort.Strings(documented)
 	sort.Strings(onDisk)
+	sort.Strings(documentedInReadme)
 
+	assert.Equal(t, documented, documentedInReadme,
+		"README fixture table in %s must list exactly the documented forecast fixtures",
+		filepath.Join(dir, "README.md"))
 	assert.Equal(t, documented, onDisk,
-		"fixture files on disk in %s must match the README's documented fixture list exactly "+
-			"(update both the README and documentedForecastFixtures when fixtures change)",
+		"fixture files on disk in %s must match the README fixture table exactly",
 		dir)
 }
 
