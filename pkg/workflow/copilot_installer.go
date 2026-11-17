@@ -10,6 +10,8 @@ import (
 
 var copilotInstallerLog = logger.New("workflow:copilot_installer")
 
+// generateCopilotInstallerSteps retains the legacy cooldown flag to keep compiled locks stable.
+// The installer accepts it as a no-op; the pinned CLI default's cooldown is checked at build time.
 func generateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion, copilotMinVersion, guestLibc, checksumsSHA256 string, cooldownDays ...int) []GitHubActionStep {
 	preferToolcache := false
 	if checksumsSHA256 == "" && (version == "" || strings.TrimPrefix(version, "v") == string(constants.DefaultCopilotVersion)) {
@@ -31,8 +33,6 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 	if preferToolcache {
 		installerFlags += " --prefer-toolcache"
 	}
-	// Retain the legacy flag to keep compiled locks stable. The installer accepts it
-	// as a no-op; the pinned CLI default's cooldown is checked at build time.
 	if len(cooldownDays) > 0 {
 		installerFlags += fmt.Sprintf(" --cooldown-days %d", cooldownDays[0])
 	}
