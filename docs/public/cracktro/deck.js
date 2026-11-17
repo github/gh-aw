@@ -335,32 +335,35 @@
   .pnt-flow i { font-style: normal; color: #30363d; }
   .pnt-flow span.on { color: #f0f6fc; border-color: #a371f7; background: #24173f; }
   .pnt-flow span.ok.on { border-color: #3fb950; background: #12261e; }
-  .pnt-diff { position: absolute; left: 110px; top: 370px; width: 860px; height: 540px; background: #0d1117; border: 1px solid #30363d; border-radius: 16px; overflow: hidden; font: 500 20px/29px var(--mono); }
+  .pnt-diff { position: absolute; left: 110px; top: 352px; width: 860px; height: 456px; background: #0d1117; border: 1px solid #30363d; border-radius: 16px; overflow: hidden; font: 500 18px/26px var(--mono); }
   .pnt-fh { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #30363d; background: #161b22; color: #9198a1; }
   .pnt-fh b { color: #3fb950; font-weight: 600; }
   .pnt-body { position: relative; padding-top: 8px; }
-  .pnt-l { height: 29px; max-height: 29px; padding: 0 20px 0 16px; border-left: 4px solid transparent; white-space: pre; color: #e6edf3; background: rgba(46,160,67,.10); overflow: hidden; transition: max-height .5s, opacity .5s, background .4s, border-color .4s, color .4s; }
+  .pnt-l { height: 26px; max-height: 26px; padding: 0 20px 0 16px; border-left: 4px solid transparent; white-space: pre; color: #e6edf3; background: rgba(46,160,67,.10); overflow: hidden; transition: max-height .5s, opacity .5s, background .4s, border-color .4s, color .4s; }
   .pnt-l .s { color: #3fb950; }
   .pnt-l.hot { background: rgba(248,81,73,.16); border-left-color: #f85149; color: #ffa198; }
   .pnt-l.cut { max-height: 0; opacity: 0; }
   .pnt-l.fix { max-height: 0; opacity: 0; }
-  .pnt-l.fix.on { max-height: 29px; opacity: 1; background: rgba(46,160,67,.24); }
+  .pnt-l.fix.on { max-height: 26px; opacity: 1; background: rgba(46,160,67,.24); }
   .pnt-scan { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: #d2a8ff; box-shadow: 0 0 18px #a371f7; opacity: 0; }
-  .pnt-scan.go { opacity: 1; top: 440px; transition: top 2s linear; }
-  .pnt-scan.end { opacity: 0; top: 440px; transition: opacity .4s; }
-  .pnt-cm { position: absolute; left: 1010px; width: 800px; padding: 16px 22px; background: #161b22; border: 1px solid #a371f7; border-radius: 14px; opacity: 0; transform: translateX(24px); transition: opacity .45s, transform .45s, border-color .5s; }
+  .pnt-scan.go { opacity: 1; top: 392px; transition: top 2s linear; }
+  .pnt-scan.end { opacity: 0; top: 392px; transition: opacity .4s; }
+  .pnt-cm { position: absolute; left: 1010px; width: 800px; padding: 13px 22px; background: #161b22; border: 1px solid #a371f7; border-radius: 14px; opacity: 0; transform: translateX(24px); transition: opacity .45s, transform .45s, border-color .5s; }
   .pnt-cm.on { opacity: 1; transform: none; }
   .pnt-cm.dim { opacity: .35; border-color: #30363d; }
   .pnt-who { display: flex; align-items: center; gap: 12px; font: 500 18px/1 var(--mono); color: #d2a8ff; }
   .pnt-who svg { width: 30px; height: 30px; padding: 5px; border-radius: 50%; background: #8957e5; }
   .pnt-who em { margin-left: auto; font-style: normal; font-weight: 600; color: #3fb950; }
   .pnt-who .n { color: #f0f6fc; }
-  .pnt-cm p { margin: 10px 0 0; font-size: 24px; line-height: 1.3; color: #e6edf3; }
-  .pnt-cm code { font: 500 21px var(--mono); color: #79c0ff; }
-  .pnt-v { position: absolute; left: 1010px; top: 806px; width: 800px; padding: 18px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
+  .pnt-cm p { margin: 8px 0 0; font-size: 22px; line-height: 1.3; color: #e6edf3; }
+  .pnt-cm code { font: 500 19px var(--mono); color: #79c0ff; }
+  .pnt-v { position: absolute; left: 1010px; top: 724px; width: 800px; padding: 16px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
   .pnt-v.on { opacity: 1; color: #f0f6fc; border-color: #a371f7; }
   .pnt-v.ok { opacity: 1; color: #3fb950; border-color: #3fb950; background: #12261e; }
-  .pnt .ct-src { top: 1000px; }
+  .pnt-m { width: 1420px; gap: 30px; } .pnt-m .dhm-k { gap: 26px; }
+  .pnt-m .dhm-tl .y { fill: #a371f7; } .pnt-m .dhm-tl .s { fill: #d2a8ff; } .pnt-m .dhm-tl .d { fill: #ff7b72; } .pnt-m .dhm-tl .b { fill: #79c0ff; } .pnt-m .dhm-tl .x { fill: #6e7681; }
+  .pnt-m .dhm-tl .v { fill: #f0f6fc; font: 600 14px var(--mono); text-anchor: middle; }
+  .pnt-m .dhm-tl .lg { fill: #9198a1; font: 500 14px var(--mono); }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
@@ -5265,7 +5268,7 @@
       const scan = h("div", { class: "pnt-scan" });
       const diff = h("div", { class: "pnt-diff" }, h("div", { class: "pnt-fh" }, h("span", {}, "pkg/config/settings.go"), added), h("div", { class: "pnt-body" }, scan, ...lines));
       const cards = FIND.map(([, kind, txt, n], i) => {
-        const el = h("div", { class: "pnt-cm", style: `top:${370 + i * 142}px` });
+        const el = h("div", { class: "pnt-cm", style: `top:${352 + i * 122}px` });
         el.innerHTML = `<div class="pnt-who">${svgIco("copilot")}<span class="n">${i + 1}</span> Ponytail Reviewer · ${kind}<em>−${n} lines</em></div><p>${txt}</p>`;
         return el;
       });
@@ -5274,6 +5277,62 @@
       const steps = STEP.map((s, i) => h("span", { class: i === STEP.length - 1 ? "ok" : "" }, s));
       const flow = h("div", { class: "pnt-flow" }, ...steps.flatMap((s, i) => (i ? [h("i", {}, "→"), s] : [s])));
       const grp = g => lines.filter(l => l.dataset.g === g);
+      // measured on gh-aw, PRs created 6 Aug–16 Nov 2026 (refresh/ponytail-reviewer.md): inline findings by the kind tag in their first line; since November findings are prose without a tag
+      const KINDS = [
+        ["yagni", "y", 203],
+        ["shrink", "s", 135],
+        ["delete", "d", 68],
+        ["stdlib/native", "b", 16],
+        ["untagged", "x", 158],
+      ];
+      // median AI credits per review, from the review footer, by month
+      const AICM = [
+        ["Aug", 19.9],
+        ["Sep", 5.2],
+        ["Oct", 11.6],
+        ["Nov", 5],
+      ];
+      const svgEl = (w, hh, inner) => {
+        const e = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        e.setAttribute("class", "dhm-tl");
+        e.setAttribute("width", w);
+        e.setAttribute("height", hh);
+        e.innerHTML = inner;
+        return e;
+      };
+      const KMAX = Math.max(...KINDS.map(k => k[2]));
+      const kindsSvg = svgEl(
+        290,
+        122,
+        `<text class="t" x="0" y="16">FINDINGS BY KIND</text>` +
+          KINDS.map(([n, c, v], i) => `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`).join("")
+      );
+      const aicSvg = svgEl(
+        190,
+        122,
+        `<text class="t" x="0" y="16">MEDIAN AIC/REVIEW</text><line class="ax" x1="0" y1="96" x2="190" y2="96"/>` +
+          AICM.map(([m, v], i) => {
+            const x = 12 + i * 46,
+              hh = (v * 56) / 20;
+            return `<rect class="y" style="--i:${i}" x="${x}" y="${96 - hh}" width="30" height="${hh}" rx="2"/><text class="v" x="${x + 15}" y="${90 - hh}">${v}</text><text class="m" x="${x + 15}" y="116">${m}</text>`;
+          }).join("")
+      );
+      const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+      const strip = h(
+        "div",
+        { class: "dhm pnt-m" },
+        h(
+          "div",
+          { class: "dhm-k" },
+          kpi("469", "reviews", "on 467 PRs"),
+          kpi("580", "findings", "inline"),
+          kpi("76%", "Lean already.", ["Ship.", h("br"), "run sample"], "g"),
+          kpi("57%", "acted on", ["code changed,", h("br"), "resolved, replied"]),
+          kpi("10,219", "lines claimed", "median 12")
+        ),
+        kindsSvg,
+        aicSvg
+      );
       const CYC = 13000;
       // [ms into the cycle, action]
       const T = [
@@ -5309,7 +5368,7 @@
         group: "process",
         under: "prr",
         notes:
-          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship.",
+          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship. The bottom strip is measured on gh-aw (snapshot 17 November 2026). From 8 August to 16 November 2026 (101 days) the workflow ran 2,928 times and posted 469 COMMENT reviews on 467 pull requests: 580 inline findings, mostly one per pull request, and 35 reviews with none inline. The reviews claim 10,219 lines that could go, a median of 12 per review. 57% of the findings were acted on: the code changed under them, the thread was resolved, or someone replied, usually Copilot. Until November each finding started with its kind: yagni 203, shrink 135, delete 68, stdlib or native 16; the newer prose findings carry no tag. In a one-in-five sample of runs with saved output, 76% of verdicts were Lean already. Ship. The median AI credits per review fell from about 20 in August, on the Copilot auto model, to about 5 in November after the move to Codex and economy routing; October's rise came with a larger model. The diff and findings in the animation are illustrative.",
         enter() {
           t0 = 0;
           cyc = -1;
@@ -5334,7 +5393,8 @@
           diff,
           ...cards,
           verdict,
-          h("div", { class: "ct-src" }, "illustrative · synthetic diff and findings · workflow: ponytail-reviewer.md")
+          strip,
+          h("div", { class: "dhm-cap" }, "MEASURED · snapshot 17 Nov 2026 · reviews 8 Aug–16 Nov 2026 (101 d) · run sample 19 Aug–16 Nov · diff and findings illustrative")
         ),
       });
     }

@@ -44,4 +44,5 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
 | Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
 | Skills in review | `refresh/skills-in-review.md` |
+| Ponytail Reviewer | `refresh/ponytail-reviewer.md` |
 
