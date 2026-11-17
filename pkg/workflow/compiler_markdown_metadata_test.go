@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -10,8 +11,47 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "workflow.md")
+	content := "---\non:\n  workflow_call:\nstrict: false\nengine: copilot\n---\n# Work\n\n" +
+		"## agent: reader\n---\nmodel: ${{ inputs.model }}\ntools: [Read]\n---\nRead files.\n"
+	require.NoError(t, os.WriteFile(source, []byte(content), 0o600))
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowFile(source)
+	require.NoError(t, err)
+	generated, err := compiler.CompileToYAML(data, source)
+	require.NoError(t, err)
+	var document struct {
+		Jobs map[string]struct {
+			Env map[string]string `yaml:"env"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(generated), &document))
+	embedded := document.Jobs["activation"].Env["GH_AW_INFO_MARKDOWN_METADATA"]
+	require.NotEmpty(t, embedded)
+	require.NotContains(t, embedded, "${{", "compiler metadata must not evaluate authored expressions")
+	decoded, err := base64.StdEncoding.DecodeString(embedded)
+	require.NoError(t, err)
+	var catalog GHAWMarkdownMetadata
+	require.NoError(t, json.Unmarshal(decoded, &catalog))
+	require.Equal(t, 2, catalog.Version)
+	require.NotEmpty(t, catalog.Records)
+	for _, record := range catalog.Records {
+		require.Empty(t, record.References, "embedded records must be self-contained")
+	}
+	require.NotEmpty(t, data.CompiledPromptMarkdown)
+	for _, prompt := range data.CompiledPromptMarkdown {
+		for _, block := range parser.ExtractMarkdownMetadataBlocks(prompt) {
+			digest := sha256.Sum256([]byte(block.Source))
+			require.Contains(t, string(decoded), hex.EncodeToString(digest[:]), "include post-substitution prompt metadata")
+		}
+	}
+	require.Contains(t, string(decoded), `"Read"`)
+}
 
 func TestCompilerMarkdownMetadataManifest(t *testing.T) {
 	root := t.TempDir()

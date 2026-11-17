@@ -216,6 +216,9 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
 		return "", nil, nil, fmt.Errorf("workflow compilation requires valid jobs and dependencies; check job definitions and needs references: %w", err)
 	}
+	if err := c.embedActivationMarkdownMetadata(data); err != nil {
+		return "", nil, nil, err
+	}
 	repoConfig, err = resolvedArtifactRetentionConfig(repoConfig, data)
 	if err != nil {
 		return "", nil, nil, err

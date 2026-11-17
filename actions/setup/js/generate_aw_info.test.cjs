@@ -304,6 +304,23 @@ describe("generate_aw_info.cjs", () => {
     expect(info.workflow_call_id).not.toBe(info.context.workflow_call_id);
   });
 
+  it("generates run info for a private reusable workflow using embedded compiler metadata", async () => {
+    const source = "model: private-model\ntools: [Read]";
+    const sha256 = createHash("sha256").update(source).digest("hex");
+    const value = { model: "private-model", tools: ["Read"] };
+    process.env.GH_AW_INFO_WORKFLOW_ID = "private/shared/.github/workflows/worker.lock.yml@refs/heads/main";
+    process.env.GH_AW_INFO_MARKDOWN_METADATA = Buffer.from(JSON.stringify({ version: 2, records: [{ kind: "artifact", sha256, value }] })).toString("base64");
+    const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 })) } } };
+
+    await main(mockCore, mockContext, githubClient);
+
+    const info = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(info.agent_metadata).toEqual({ [sha256.slice(0, 20)]: value });
+    expect(info.workflow_ref).toBe(process.env.GH_AW_INFO_WORKFLOW_ID);
+    expect(info.repository).toBe("github/my-repo");
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+  });
+
   it("does not misidentify the caller as the executing workflow when its reference is unavailable", async () => {
     delete process.env.GH_AW_INFO_WORKFLOW_ID;
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");

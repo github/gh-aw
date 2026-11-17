@@ -159,6 +159,27 @@ describe("compiler metadata source acquisition", () => {
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small", tools: ["Read"] });
   });
 
+  it.each([{ records: [] }, { records: [record({ model: "small", tools: ["Read"] })] }])("uses embedded executing metadata for a private reusable workflow without source access: %j", async ({ records }) => {
+    const file = ".github/workflows/main.lock.yml";
+    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
+    const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 })) } } };
+    const result = await metadata.loadMarkdownMetadata(`private/shared/${file}@main`, workspace, {
+      repository: "owner/caller",
+      revision,
+      githubClient,
+      embeddedMetadata: Buffer.from(JSON.stringify(catalog(records))).toString("base64"),
+    });
+    expect(result).toEqual(catalog(records));
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(records.length ? records[0].value : {});
+  });
+
+  it.each(["", "not-base64", Buffer.from("{invalid").toString("base64"), Buffer.from('{"version":1,"records":[]}').toString("base64")])("rejects malformed embedded metadata without falling back to the API: %s", async embeddedMetadata => {
+    const githubClient = { rest: { repos: { getContent: vi.fn() } } };
+    await expect(metadata.loadMarkdownMetadata("private/shared/.github/workflows/main.lock.yml@main", workspace, { revision, githubClient, embeddedMetadata })).rejects.toThrow();
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+  });
+
   it("never falls back to checkout metadata after a source authorization failure", async () => {
     const file = ".github/workflows/main.lock.yml";
     fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));

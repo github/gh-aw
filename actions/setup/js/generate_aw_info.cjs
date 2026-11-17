@@ -69,6 +69,7 @@ async function main(core, ctx, githubClient, options = {}) {
       repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
       githubClient: githubClient || global.github,
       revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
+      embeddedMetadata: process.env.GH_AW_INFO_MARKDOWN_METADATA,
       quotaWait: options.quotaWait,
     });
   } catch (error) {
