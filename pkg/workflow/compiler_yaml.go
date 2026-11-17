@@ -47,6 +47,7 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 	if stepIndex < 0 || stepIndex >= len(activation.Steps) {
 		return errors.New("activation run info step missing: cannot embed Markdown metadata")
 	}
+	step := &activation.Steps[stepIndex]
 	env := "          GH_AW_INFO_MARKDOWN_METADATA: '" + payload + "'\n"
 	if len(payload) > activationMetadataChunkSize {
 		// Keep both run strings and environment entries below runner limits.
@@ -60,11 +61,11 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 			}
 			steps = append(steps, fmt.Sprintf("      - name: Write activation metadata chunk %d\n        shell: bash\n        run: |\n          printf '%%s' '%s' %s \"$RUNNER_TEMP/gh-aw-markdown-metadata.json\"\n", offset/activationMetadataChunkSize+1, chunk, redirect))
 		}
-		activation.Steps[stepIndex] = strings.Replace(activation.Steps[stepIndex], awInfoStepEnvAnchor, awInfoStepEnvAnchor+env, 1)
+		*step = strings.Replace(*step, awInfoStepEnvAnchor, awInfoStepEnvAnchor+env, 1)
 		activation.Steps = append(steps, activation.Steps...)
 		return nil
 	}
-	activation.Steps[stepIndex] = strings.Replace(activation.Steps[stepIndex], awInfoStepEnvAnchor, awInfoStepEnvAnchor+env, 1)
+	*step = strings.Replace(*step, awInfoStepEnvAnchor, awInfoStepEnvAnchor+env, 1)
 	return nil
 }
 
