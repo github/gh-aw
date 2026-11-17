@@ -302,8 +302,11 @@ func (pe *PackageExtractor) isCommandName(word string) bool {
 // (e.g., "pip install <package>" or "go get <package>")
 func (pe *PackageExtractor) extractWithSubcommands(words []string, commandIndex int, subcommands []string) string {
 	// Look for any of the required subcommands after the command name
-	for j := commandIndex + 1; j < len(words); j++ {
-		if slices.Contains(subcommands, words[j]) {
+	for j, word := range words {
+		if j <= commandIndex {
+			continue
+		}
+		if slices.Contains(subcommands, word) {
 			// Found a matching subcommand - now find the package name
 			return pe.findPackageName(words, j+1)
 		}
@@ -332,13 +335,18 @@ func (pe *PackageExtractor) FindPackageName(words []string, startIndex int) stri
 
 // findPackageName is the internal implementation of FindPackageName
 func (pe *PackageExtractor) findPackageName(words []string, startIndex int) string {
-	for i := startIndex; i < len(words); i++ {
-		pkg := words[i]
+	skipNext := false
+	for i, pkg := range words {
+		if i < startIndex {
+			continue
+		}
+		if skipNext {
+			skipNext = false
+			continue
+		}
 		// Skip flags (start with - or --)
 		if strings.HasPrefix(pkg, "-") {
-			if slices.Contains(pe.FlagsWithValues, pkg) && i+1 < len(words) {
-				i++
-			}
+			skipNext = slices.Contains(pe.FlagsWithValues, pkg)
 			continue
 		}
 		// Trim configured suffixes (e.g., shell operators)
