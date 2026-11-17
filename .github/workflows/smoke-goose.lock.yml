@@ -90,6 +90,7 @@ run-name: "Smoke Goose"
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+  GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.smoke-goose
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Smoke%20Goose,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=goose'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -371,6 +372,7 @@ jobs:
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_INCLUDE_PR_CONTEXT: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -463,6 +465,7 @@ jobs:
             - `safeoutputs` — run `safeoutputs --help` to see available tools
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -530,6 +533,7 @@ jobs:
             - `safeoutputs` — run `safeoutputs --help` to see available tools
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -545,6 +549,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -559,6 +564,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -1845,6 +1851,14 @@ jobs:
         with:
           script: "const assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst read = file => {\n  const stat = fs.lstatSync(file);\n  assert.ok(stat.isFile() && !stat.isSymbolicLink(), \"Smoke evidence must be a regular file\");\n  assert.ok(stat.size <= 16384, \"Smoke evidence exceeds 16 KiB\");\n  return fs.readFileSync(file, \"utf8\");\n};\nassert.equal(process.env.SMOKE_EXECUTION, \"success\", \"Goose execution failed\");\nconst root = process.env.SMOKE_ROOT;\nconst run = process.env.SMOKE_RUN_ID;\nconst result = JSON.parse(read(path.join(root, `smoke-test-goose-${run}.json`)));\nassert.deepEqual(Object.keys(result).sort(), [\"bash\", \"build\", \"fileWrite\", \"pullRequests\", \"runtime\", \"webFetch\"]);\nfor (const key of [\"bash\", \"build\", \"fileWrite\", \"runtime\", \"webFetch\"]) {\n  assert.equal(result[key], true, `Goose smoke check ${key} did not pass`);\n}\nassert.equal(result.pullRequests.length, 2, \"Exactly two merged PRs are required\");\nassert.equal(new Set(result.pullRequests.map(pr => pr.number)).size, 2, \"PRs must be distinct\");\nfor (const pr of result.pullRequests) {\n  assert.deepEqual(Object.keys(pr).sort(), [\"number\", \"title\"]);\n  assert.ok(Number.isSafeInteger(pr.number) && pr.number > 0);\n  const { data } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });\n  assert.ok(data.merged_at, `PR ${pr.number} is not merged`);\n  assert.equal(pr.title, data.title);\n}\nassert.deepEqual(JSON.parse(read(path.join(process.env.SMOKE_STATE, \"web-fetch.json\"))), { containsGitHub: true });\nassert.match(read(path.join(root, `smoke-test-goose-${run}.txt`)), /^Smoke test passed for Goose at .+\\n?$/);\nconst binary = fs.lstatSync(path.join(process.env.GITHUB_WORKSPACE, \"gh-aw\"));\nassert.ok(binary.isFile() && !binary.isSymbolicLink() && (binary.mode & 0o111) !== 0, \"gh-aw build output is missing\");\nconst log = fs.readFileSync(\"/tmp/gh-aw/agent-stdio.log\", \"utf8\");\nassert.ok(log.includes(\"[goose-harness] verified Goose 1.54.0\"), \"Pinned CLI verification is missing\");\nassert.ok(!log.includes(\"Failed to start extension\"), \"A Goose MCP extension failed to connect\");\nconst events = log.split(\"\\n\").filter(line => line.trim().startsWith(\"{\")).map(line => JSON.parse(line));\nassert.ok(events.some(event => event.type === \"complete\"), \"Goose did not finish a structured run\");\nconst requests = events.flatMap(event => event.message?.content || []).filter(item =>\n  item.type === \"toolRequest\" && item.toolCall?.status === \"success\" && item.toolCall.value.name.startsWith(\"github__\"));\nconst responses = events.flatMap(event => event.message?.content || []).filter(item =>\n  item.type === \"toolResponse\" && item.toolResult?.status === \"success\" && item.toolResult.value.isError !== true);\nassert.ok(requests.some(request => responses.some(response => response.id === request.id)), \"No successful native GitHub MCP round-trip\");\nconst session = fs.readFileSync(\"/tmp/gh-aw/agent-session.jsonl\", \"utf8\").trim().split(\"\\n\").map(line => JSON.parse(line));\nassert.ok(session.every(event => event.type.includes(\".\") && event.data && typeof event.data === \"object\"), \"Goose session contains non-canonical events\");\nassert.ok(session.some(event => event.type === \"session.init\" && event.data.sourceEngine === \"goose\"), \"Goose session initialization is missing\");\nassert.ok(session.some(event => event.type === \"assistant.message\" && typeof event.data.content === \"string\"), \"Goose assistant text is missing\");\nconst starts = session.filter(event => event.type === \"tool.execution_start\");\nconst completions = session.filter(event => event.type === \"tool.execution_complete\");\nassert.ok(starts.length > 0 && completions.length > 0, \"Goose tool events are missing\");\nassert.equal(new Set(starts.map(event => event.data.toolCallId)).size, starts.length, \"Goose tool starts are duplicated\");\nfor (const event of completions) {\n  assert.ok(starts.some(start => start.data.toolCallId === event.data.toolCallId), \"Goose tool completion has no matching start\");\n}\nconst native = events.findLast(event => event.type === \"complete\");\nconst parsed = session.findLast(event => event.type === \"session.result\").data;\nassert.equal(parsed.status, \"completed\", \"Goose session result is not complete\");\nfor (const key of [\"input_tokens\", \"output_tokens\", \"total_tokens\", \"cache_read_input_tokens\"]) {\n  if (native[key] !== undefined) assert.equal(parsed.usage[key], native[key], `Goose session ${key} differs from native usage`);\n}\nif (native.cache_write_input_tokens !== undefined) assert.equal(parsed.usage.cache_creation_input_tokens, native.cache_write_input_tokens);\nassert.equal(parsed.usage.input_tokens_include_cache, true);\nassert.ok(session.some(event => event.type === \"agent.execution\" && event.data.exitCode === 0), \"Goose execution result is missing\");\nawait core.summary.addHeading(\"Goose smoke: PASS\", 2).addRaw(\"All six checks passed with host-verified file, build, web-fetch, PR, native MCP, and canonical unified-session evidence.\\n\").write();"
 
+      - name: Emit OTLP job conclusion before artifacts
+        if: always() && env.GH_AW_OTEL_METRICS == 'true'
+        continue-on-error: true
+        run: node "${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs"
+        env:
+          INPUT_JOB_NAME: ${{ github.job }}
+          GH_AW_JOB_RESULT: ${{ job.status }}
+          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1910,6 +1924,7 @@ jobs:
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
+            ${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json

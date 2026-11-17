@@ -70,6 +70,8 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   );
   assert.ok(Buffer.byteLength(mainContent) <= 7500, "Orchestrator contract exceeds the instruction-prefix budget");
   const remediator = agents.find(agent => agent.name === "dependabot-remediator");
+  assert.ok(mainContent.includes("Never invoke GitHub tools through Bash"), "Orchestrator is missing GitHub tool guidance");
+  assert.ok(remediator.prompt.includes("You have no GitHub MCP tools"), "Remediator must not assume GitHub tools are available");
   for (const section of ["Tool contract", "Deterministic result", "Required approach", "Required validation", "Pull request rule", "Output"]) {
     assert.ok(remediator.prompt.includes(`## ${section}`), `Runtime discarded ${section}`);
     assert.ok(!mainContent.includes(`## ${section}\n`), `${section} leaked out of the remediator`);
@@ -150,6 +152,7 @@ async function select(pulls, trigger = null, fallback = null) {
     name => {
       if (name === "crypto") return crypto;
       if (name === "path") return path;
+      if (name === "crypto") return require("node:crypto");
       assert.equal(name, "fs");
       return {
         mkdirSync() {},

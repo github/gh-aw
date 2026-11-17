@@ -2,11 +2,11 @@
 "use strict";
 
 /**
- * Minimal OTLP trace and logs request encoders. Field numbers and wire types
- * follow opentelemetry-proto; no generated code or runtime dependencies.
+ * Minimal OTLP trace, logs, and metrics request encoders. Field numbers and wire
+ * types follow opentelemetry-proto; no generated code or runtime dependencies.
  *
- * @typedef {"string" | "bool" | "int64" | "uint32" | "fixed32" | "fixed64" | "double" | "traceId" | "spanId" | "bytes" | "message"} WireType
- * @typedef {{ id: number, name: string, type: WireType, repeated?: boolean, fields?: Field[] }} Field
+ * @typedef {"string" | "bool" | "int64" | "uint32" | "fixed32" | "fixed64" | "sfixed64" | "double" | "traceId" | "spanId" | "bytes" | "message"} WireType
+ * @typedef {{ id: number, name: string, type: WireType, repeated?: boolean, packed?: boolean, fields?: Field[] }} Field
  */
 
 /** @param {bigint} value @returns {Buffer} */
@@ -90,6 +90,11 @@ function encodeField(field, value) {
       bytes = Buffer.alloc(8);
       bytes.writeBigUInt64LE(integer(value, 0n, (1n << 64n) - 1n));
       break;
+    case "sfixed64":
+      wire = 1;
+      bytes = Buffer.alloc(8);
+      bytes.writeBigInt64LE(integer(value, -(1n << 63n), (1n << 63n) - 1n));
+      break;
     case "double":
       if (value === "NaN") value = NaN;
       else if (value === "Infinity") value = Infinity;
@@ -123,6 +128,14 @@ function encodeMessage(value, fields) {
     const item = value[field.name];
     if (item === undefined || item === null) continue;
     if (field.repeated && !Array.isArray(item)) throw new TypeError("OTLP protobuf repeated field must be an array");
+    if (field.packed) {
+      // Packed scalars: one length-delimited field holding the concatenated fixed-width values.
+      if (item.length === 0) continue;
+      const tagLength = varint(BigInt(field.id << 3)).length;
+      const payload = Buffer.concat(item.map(/** @param {any} entry */ entry => encodeField(field, entry).subarray(tagLength)));
+      chunks.push(Buffer.concat([varint(BigInt((field.id << 3) | 2)), varint(BigInt(payload.length)), payload]));
+      continue;
+    }
     for (const entry of field.repeated ? item : [item]) chunks.push(encodeField(field, entry));
   }
   return Buffer.concat(chunks);
@@ -273,6 +286,93 @@ const logsRequest = [
   },
 ];
 
+// Metric fields are listed in field-number order so bytes match the reference SDK encoder.
+/** @type {Field} */
+const exemplars = {
+  id: 0,
+  name: "exemplars",
+  type: "message",
+  repeated: true,
+  fields: [
+    { id: 2, name: "timeUnixNano", type: "fixed64" },
+    { id: 3, name: "asDouble", type: "double" },
+    { id: 4, name: "spanId", type: "spanId" },
+    { id: 5, name: "traceId", type: "traceId" },
+    { id: 6, name: "asInt", type: "sfixed64" },
+    { ...attributes, id: 7, name: "filteredAttributes" },
+  ],
+};
+/** @type {Field[]} */
+const numberDataPoint = [
+  { id: 2, name: "startTimeUnixNano", type: "fixed64" },
+  { id: 3, name: "timeUnixNano", type: "fixed64" },
+  { id: 4, name: "asDouble", type: "double" },
+  { ...exemplars, id: 5 },
+  { id: 6, name: "asInt", type: "sfixed64" },
+  { ...attributes, id: 7 },
+  { id: 8, name: "flags", type: "uint32" },
+];
+/** @type {Field[]} */
+const histogramDataPoint = [
+  { id: 2, name: "startTimeUnixNano", type: "fixed64" },
+  { id: 3, name: "timeUnixNano", type: "fixed64" },
+  { id: 4, name: "count", type: "fixed64" },
+  { id: 5, name: "sum", type: "double" },
+  { id: 6, name: "bucketCounts", type: "fixed64", repeated: true, packed: true },
+  { id: 7, name: "explicitBounds", type: "double", repeated: true, packed: true },
+  { ...exemplars, id: 8 },
+  { ...attributes, id: 9 },
+  { id: 10, name: "flags", type: "uint32" },
+  { id: 11, name: "min", type: "double" },
+  { id: 12, name: "max", type: "double" },
+];
+/** @type {Field[]} */
+const metric = [
+  { id: 1, name: "name", type: "string" },
+  { id: 2, name: "description", type: "string" },
+  { id: 3, name: "unit", type: "string" },
+  { id: 5, name: "gauge", type: "message", fields: [{ id: 1, name: "dataPoints", type: "message", repeated: true, fields: numberDataPoint }] },
+  {
+    id: 7,
+    name: "sum",
+    type: "message",
+    fields: [
+      { id: 1, name: "dataPoints", type: "message", repeated: true, fields: numberDataPoint },
+      { id: 2, name: "aggregationTemporality", type: "uint32" },
+      { id: 3, name: "isMonotonic", type: "bool" },
+    ],
+  },
+  {
+    id: 9,
+    name: "histogram",
+    type: "message",
+    fields: [
+      { id: 1, name: "dataPoints", type: "message", repeated: true, fields: histogramDataPoint },
+      { id: 2, name: "aggregationTemporality", type: "uint32" },
+    ],
+  },
+];
+/** @type {Field[]} */
+const metricsRequest = [
+  {
+    id: 1,
+    name: "resourceMetrics",
+    type: "message",
+    repeated: true,
+    fields: [
+      resource,
+      {
+        id: 2,
+        name: "scopeMetrics",
+        type: "message",
+        repeated: true,
+        fields: [scope, { id: 2, name: "metrics", type: "message", repeated: true, fields: metric }, { id: 3, name: "schemaUrl", type: "string" }],
+      },
+      { id: 3, name: "schemaUrl", type: "string" },
+    ],
+  },
+];
+
 /**
  * Encode the same OTLP JSON trace object used by the local JSONL mirror.
  * OTLP JSON IDs are hex, bytesValue is base64, and 64-bit integers are decimal.
@@ -292,4 +392,14 @@ function encodeOTLPLogsRequest(payload) {
   return encodeMessage(payload, logsRequest);
 }
 
-module.exports = { encodeOTLPTraceRequest, encodeOTLPLogsRequest };
+/**
+ * Encode an ExportMetricsServiceRequest (gauge, monotonic sum, explicit-bucket
+ * histogram) from the OTLP JSON object used by the metrics JSONL mirror.
+ * @param {any} payload
+ * @returns {Buffer}
+ */
+function encodeOTLPMetricsRequest(payload) {
+  return encodeMessage(payload, metricsRequest);
+}
+
+module.exports = { encodeOTLPTraceRequest, encodeOTLPLogsRequest, encodeOTLPMetricsRequest };

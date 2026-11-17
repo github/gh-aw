@@ -170,4 +170,25 @@ async function logSpan(toolName, attributes = {}, options = {}) {
   }
 }
 
-module.exports = { logSpan };
+/**
+ * Record a custom OTLP metric. Loaded lazily (like send_otlp_span.cjs) so
+ * isolated bundles that ship otlp.cjs do not statically depend on telemetry export.
+ *
+ * @param {string} name
+ * @param {number} value
+ * @param {{type?: "counter" | "gauge" | "histogram", unit?: string, description?: string, attributes?: Record<string, string | number | boolean>, buckets?: number[]}} [options]
+ * @returns {Promise<void>}
+ */
+async function logMetric(name, value, options = {}) {
+  if (process.env.GH_AW_OTEL_METRICS !== "true") return;
+  let emitMetric;
+  try {
+    ({ logMetric: emitMetric } = require(path.join(__dirname, "otlp_metrics.cjs")));
+  } catch (err) {
+    console.warn(`[otlp] ${name}: failed to load metrics exporter: ${getErrorMessage(err)}`);
+    return;
+  }
+  return emitMetric(name, value, options);
+}
+
+module.exports = { logSpan, logMetric };

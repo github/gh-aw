@@ -45,7 +45,7 @@ describe("bounded curl response status", () => {
   it.each(["traces", "logs"].flatMap(signal => ["http/json", "http/protobuf"].map(protocol => [signal, protocol])))("does not retry oversized known-2xx %s %s exports", async (signal, protocol) => {
     vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol);
     spawn.mockReturnValue(overflow("HTTP/2 200\r\ncontent-type: application/json\r\n\r\n"));
-    await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBe(false);
     expect(spawn).toHaveBeenCalledOnce();
     expect(warn.mock.calls[0][0]).toContain("acceptance unknown");
     expect(append.mock.calls[0][1]).toContain('"status":200');
@@ -58,7 +58,7 @@ describe("bounded curl response status", () => {
 
   it.each([401, 403, 503])("preserves oversized HTTP %s retry policy", async status => {
     spawn.mockReturnValue(overflow(`HTTP/1.1 ${status} Error\r\nContent-Type: text/plain\r\n\r\n`));
-    await expect(sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBe(false);
     expect(spawn).toHaveBeenCalledTimes(status === 503 ? 3 : 1);
     expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
     expect(warn.mock.calls[0][0]).toContain(status === 503 ? "retrying" : "authorization failed");
@@ -72,7 +72,7 @@ describe("bounded curl response status", () => {
       stdout: Buffer.from(status ? `HTTP/1.1 ${status} Response\r\n\r\n{}\n200\napplication/json` : "untrusted body\n200\napplication/json"),
       stderr: Buffer.alloc(0),
     });
-    await expect(sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBe(false);
     expect(spawn).toHaveBeenCalledTimes(status === 0 || status === 503 ? 3 : 1);
     if (status) expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
     else expect(append.mock.calls[0][1]).not.toContain('"status"');
@@ -180,7 +180,7 @@ describe("bounded curl response status", () => {
         results.push(result);
         return result;
       });
-      await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+      await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBe(false);
       expect(results).toHaveLength(status === 503 ? 3 : 1);
       for (const result of results) {
         if (forceOverflow) expect(result.error?.code).toBe("ENOBUFS");
@@ -232,7 +232,7 @@ describe("bounded curl response status", () => {
           results.push(result);
           return result;
         });
-        await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+        await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBe(false);
         expect(results).toHaveLength(status === 0 || status === 503 ? 3 : 1);
         for (const result of results) {
           expect(result.error).toBeUndefined();
@@ -276,7 +276,7 @@ describe("bounded curl response status", () => {
         results.push(result);
         return result;
       });
-      await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+      await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBe(false);
       expect(results).toHaveLength(status === 503 ? 3 : 1);
       for (const result of results) expect(result.error?.code).toBe("ENOBUFS");
       expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
