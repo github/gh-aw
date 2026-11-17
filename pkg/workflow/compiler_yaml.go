@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -37,8 +39,10 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 		activation.Env = map[string]string{}
 	}
 	payload := base64.StdEncoding.EncodeToString(encoded)
+	preview := activationMetadataPreview(encoded)
 	if len(payload) <= activationMetadataChunkSize {
 		activation.Env["GH_AW_INFO_MARKDOWN_METADATA"] = payload
+		activation.markdownMetadataPreview = preview
 		return nil
 	}
 	// Keep both run strings and environment entries below runner limits.
@@ -50,10 +54,36 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 		if offset == 0 {
 			redirect = ">"
 		}
-		steps = append(steps, fmt.Sprintf("      - name: Write activation metadata chunk %d\n        shell: bash\n        run: |\n          printf '%%s' '%s' %s \"$RUNNER_TEMP/gh-aw-markdown-metadata.b64\"\n", offset/activationMetadataChunkSize+1, chunk, redirect))
+		comment := ""
+		if offset == 0 {
+			comment = "          # Activation metadata preview: " + preview + "\n"
+		}
+		steps = append(steps, fmt.Sprintf("      - name: Write activation metadata chunk %d\n        shell: bash\n        run: |\n%s          printf '%%s' '%s' %s \"$RUNNER_TEMP/gh-aw-markdown-metadata.b64\"\n", offset/activationMetadataChunkSize+1, comment, chunk, redirect))
 	}
 	activation.Steps = append(steps, activation.Steps...)
 	return nil
+}
+
+func activationMetadataPreview(encoded []byte) string {
+	var preview strings.Builder
+	count := 0
+	for _, r := range string(encoded) {
+		if count == 42 {
+			preview.WriteString("...")
+			break
+		}
+		count++
+		switch {
+		case r == '$':
+			preview.WriteString(`\u0024`)
+		case !unicode.IsPrint(r):
+			quoted := strconv.QuoteRuneToASCII(r)
+			preview.WriteString(quoted[1 : len(quoted)-1])
+		default:
+			preview.WriteRune(r)
+		}
+	}
+	return preview.String()
 }
 
 // buildJobsAndValidate builds all workflow jobs and validates their dependencies.

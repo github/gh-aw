@@ -37,6 +37,7 @@ func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
 	require.NotEmpty(t, embedded)
 	decoded, err := base64.StdEncoding.DecodeString(embedded)
 	require.NoError(t, err)
+	require.Contains(t, generated, "      # Activation metadata preview: "+activationMetadataPreview(decoded)+"\n      GH_AW_INFO_MARKDOWN_METADATA: "+embedded)
 	require.Contains(t, string(decoded), "${{ inputs.model }}", "authored expressions must survive as inert data")
 	var catalog GHAWMarkdownMetadata
 	require.NoError(t, json.Unmarshal(decoded, &catalog))
@@ -85,7 +86,11 @@ func TestCompilerEmbedsLargeActivationMarkdownMetadata(t *testing.T) {
 	runnerTemp := t.TempDir()
 	chunks := 0
 	for _, step := range activation.Steps {
-		if !strings.HasPrefix(step.Run, "printf '%s' '") {
+		run := step.Run
+		if chunks == 0 {
+			_, run, _ = strings.Cut(run, "\n")
+		}
+		if !strings.HasPrefix(run, "printf '%s' '") {
 			break
 		}
 		require.Less(t, len(step.Run), 21000)
@@ -101,9 +106,16 @@ func TestCompilerEmbedsLargeActivationMarkdownMetadata(t *testing.T) {
 	require.Greater(t, len(payload), 128*1024)
 	decoded, err := base64.StdEncoding.DecodeString(string(payload))
 	require.NoError(t, err)
+	require.Contains(t, generated, "          # Activation metadata preview: "+activationMetadataPreview(decoded)+"\n          printf '%s' '")
 	var catalog GHAWMarkdownMetadata
 	require.NoError(t, json.Unmarshal(decoded, &catalog))
 	require.Len(t, catalog.Records, 200)
+}
+
+func TestActivationMetadataPreview(t *testing.T) {
+	require.Equal(t, `short`, activationMetadataPreview([]byte("short")))
+	require.Equal(t, `\u0024{{ inputs.model }}\n\u2028\u0085`, activationMetadataPreview([]byte("${{ inputs.model }}\n\u2028\u0085")))
+	require.Equal(t, strings.Repeat("x", 41)+`é...`, activationMetadataPreview([]byte(strings.Repeat("x", 41)+"éz")))
 }
 
 func TestCompilerActivationMarkdownMetadataErrors(t *testing.T) {
