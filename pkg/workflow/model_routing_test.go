@@ -1234,7 +1234,8 @@ func TestCompileDefaultModelRouting_IneligibleUnchanged(t *testing.T) {
 
 // TestRecompileDefaultModelRouting_EligibleLocksOnly checks the committed
 // repository locks: only workflows whose source chooses neither a model nor
-// routing carry the implicit default, and every workflow with an explicit model,
+// routing carry the implicit default, workflows that route from a model
+// expression declare that model, and every workflow with an explicit model,
 // explicit routing, or the opt-out keeps its non-defaulted lock.
 func TestRecompileDefaultModelRouting_EligibleLocksOnly(t *testing.T) {
 	workflowsDir := filepath.Join("..", "..", ".github", "workflows")
@@ -1258,7 +1259,10 @@ func TestRecompileDefaultModelRouting_EligibleLocksOnly(t *testing.T) {
 		name := filepath.Base(sourcePath)
 		explicitChoice := declaresModelOrRoutingChoice(result.Frontmatter, "", nil, "", false)
 		guarded := strings.Contains(lock, "id: "+modelRoutingDecisionStepID)
-		if guarded {
+		// The dynamic decision step resolves a model expression the workflow declares.
+		if guarded && strings.Contains(lock, "GH_AW_MODEL_SELECTOR:") {
+			require.True(t, explicitChoice, "%s resolves a model expression at run time but declares no model", name)
+		} else if guarded {
 			implicit++
 			require.False(t, explicitChoice, "%s declares a model or routing choice but its lock carries the implicit routing default", name)
 		}
