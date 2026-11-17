@@ -1924,6 +1924,95 @@
   @keyframes cgBlink { 50% { opacity: .45; } }
   @keyframes cgPop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+  /* --- budget steering --- */
+  .bst .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #e3b341, #f0883e, #e3b341); }
+  .bst-now * { transition: none !important; }
+  /* left: the API proxy that prices every request and appends notices */
+  .bst-mon { position: absolute; left: 110px; top: 290px; width: 950px; height: 700px; opacity: 0; }
+  .active .bst-mon { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .bst-mon svg { position: absolute; left: 0; top: 0; width: 950px; height: 700px; overflow: visible; }
+  .bst-wire { fill: none; stroke: #c9d1d9; stroke-width: 2.5; stroke-dasharray: 8 8; animation: bstFlow 1.2s linear infinite; }
+  .bst-wl { font: 600 18px var(--mono); fill: #f0f6fc; text-anchor: middle; letter-spacing: .08em; }
+  .bst-model { fill: #161b22; stroke: #ab7df8; stroke-width: 2.5; transition: filter .25s; }
+  .bst-mon.hit .bst-model { filter: drop-shadow(0 0 22px #ab7df8); }
+  .bst-mn, .bst-pn { font: 700 32px "Mona Sans"; fill: #f0f6fc; }
+  .bst-px { fill: #0d1117eb; stroke: #e3b341; stroke-width: 2.5; }
+  .bst-bay { fill: #e3b3410f; stroke: #e3b34199; stroke-width: 1.5; stroke-dasharray: 6 6; }
+  .bst-beam { position: absolute; left: 240px; top: 362px; width: 4px; height: 136px; border-radius: 2px; background: #fff8e1; box-shadow: 0 0 18px 5px #e3b341; opacity: 0; pointer-events: none; }
+  .bst-mon.scan .bst-beam { animation: bstScan .5s ease-in-out both; }
+  .bst-st { position: absolute; left: 520px; top: 262px; padding: 8px 14px; border-radius: 99px; border: 2px solid #c9d1d9; font: 700 17px/1 var(--mono); letter-spacing: .08em; color: #f0f6fc; transition: background .3s, color .3s, border-color .3s, box-shadow .3s; }
+  .bst-st.on { background: #e3b341; border-color: #e3b341; color: #0d1117; box-shadow: 0 0 30px -4px #e3b341; }
+  .bst-la { position: absolute; left: 66px; top: 576px; font: 600 18px/1 var(--mono); color: #f0f6fc; }
+  .bst-lamp { position: absolute; top: 566px; width: 104px; height: 44px; margin-left: -52px; box-sizing: border-box; border-radius: 22px; border: 2px solid #6e7681; display: grid; place-items: center; font: 700 20px/1 var(--mono); color: #f0f6fc; background: #0d1117; transition: background .4s, color .4s, border-color .4s, box-shadow .4s; }
+  .bst-lamp.on { color: #0d1117; background: var(--c); border-color: var(--c); box-shadow: 0 0 34px -4px var(--c); }
+  .bst-pk, .bst-rp, .bst-chip, .bst-fly { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; transition-property: transform, opacity; transition-timing-function: cubic-bezier(.5,0,.25,1), ease; }
+  .bst-pk { width: 128px; box-sizing: border-box; padding: 10px 14px 12px; border-radius: 12px; background: #161b22; border: 2px solid #f0f6fc; box-shadow: 0 0 26px -6px #f0f6fc; z-index: 2; transition-property: transform, opacity, border-color, box-shadow; }
+  .bst-pk i { display: block; height: 7px; margin: 6px 0; border-radius: 4px; background: #c9d1d9; }
+  .bst-pk i:nth-child(2) { width: 72%; } .bst-pk i:nth-child(3) { width: 86%; } .bst-pk i:nth-child(4) { width: 58%; }
+  .bst-pk b { display: block; max-height: 0; overflow: hidden; margin: 0 -14px -12px; border-radius: 0 0 9px 9px; background: #e3b341; color: #0d1117; font: 700 15px/28px var(--mono); text-align: center; transition: max-height .35s, margin .35s; }
+  .bst-pk.n { border-color: #e3b341; box-shadow: 0 0 40px -2px #e3b341; }
+  .bst-pk.n b { max-height: 28px; margin-top: 8px; }
+  .bst-rp { width: 96px; box-sizing: border-box; padding: 8px 12px; border-radius: 10px; background: #161b22; border: 2px solid #ab7df8; box-shadow: 0 0 24px -6px #ab7df8; }
+  .bst-rp i { display: block; height: 6px; margin: 5px 0; border-radius: 3px; background: #d2a8ff; }
+  .bst-rp i + i { width: 64%; }
+  .bst-chip, .bst-fly { padding: 8px 14px; border-radius: 10px; background: #e3b341; color: #0d1117; font: 700 16px/1 var(--mono); white-space: nowrap; box-shadow: 0 0 30px -4px #e3b341; z-index: 3; }
+  .bst-fly { z-index: 6; box-shadow: 0 0 40px 4px #e3b341; }
+  .bst-cost { position: absolute; left: 600px; top: 410px; font: 700 26px/1 var(--mono); color: #f0f6fc; text-shadow: 0 0 12px #0d1117; opacity: 0; pointer-events: none; }
+  .bst-cost.go { animation: bstCost 1.2s ease-out both; }
+  .bst-aud { position: absolute; left: 40px; top: 664px; margin: 0; font: 600 19px/1.3 var(--mono); color: #f0f6fc; opacity: 0; transition: opacity .6s; }
+  .bst-aud b { color: #e3b341; }
+  .bst-aud.on { opacity: 1; }
+  /* right: the agent's conversation, where the notices land */
+  .bst-cv { position: absolute; left: 1110px; top: 64px; width: 590px; height: 946px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 18px; background: #0d1117f2; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .bst-cv { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .45s; }
+  .bst-ch { flex: none; display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; }
+  .bst-ch svg { width: 30px; height: 30px; fill: #f0f6fc; }
+  .bst-ch b { font: 700 24px/1 "Mona Sans"; color: #f0f6fc; }
+  .bst-ch span { font: 600 17px/1 var(--mono); color: #e6edf3; }
+  .bst-ff { margin-left: auto; padding: 6px 12px; border-radius: 99px; border: 2px solid #f0f6fc; font: 700 15px/1 var(--mono); font-style: normal; color: #f0f6fc; opacity: 0; transition: opacity .4s; }
+  .bst-ff.on { opacity: 1; animation: bstPulse .8s ease-in-out infinite; }
+  .bst-pin { flex: none; display: flex; flex-direction: column; gap: 10px; padding: 16px 18px 10px; }
+  .bst-msgs { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding: 0 18px 18px; overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 70px); mask-image: linear-gradient(transparent, #000 70px); }
+  .bst-m { flex: none; box-sizing: border-box; padding: 10px 14px; border-radius: 12px; background: #161b22; border: 1px solid #30363d; border-left: 4px solid var(--c); font: 500 18px/1.35 var(--mono); color: #f0f6fc; overflow: hidden; }
+  .bst-m.in { animation: bstGrow .6s cubic-bezier(.2,.9,.2,1) both; }
+  .bst-m.in.q { animation: none; }
+  .bst-m small { display: block; margin-bottom: 6px; font: 700 13px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
+  .bst-m.sys { --c: #f0f6fc; }
+  .bst-m.usr { --c: #4493f8; }
+  /* assistant turns share the model's purple; tool results are cyan */
+  .bst-m.ast { --c: #ab7df8; }
+  .bst-m.tool { --c: #39c5cf; background: #0d1117; }
+  .bst-m.say > div { font: 600 20px/1.3 "Mona Sans"; }
+  .bst-m.nt { --c: #e3b341; padding: 14px 16px; border: 2px solid #e3b341; border-left-width: 6px; background: #241d0c; box-shadow: 0 0 44px -12px #e3b341; transition: box-shadow .5s, background .5s; }
+  .bst-nh { display: flex; align-items: center; gap: 10px; }
+  .bst-nh b { font: 700 18px/1 var(--mono); color: #e3b341; }
+  .bst-nh em { margin-left: auto; padding: 6px 10px; border-radius: 99px; background: #e3b341; color: #0d1117; font: 700 13px/1 var(--mono); font-style: normal; white-space: nowrap; }
+  .bst-m.nt p { margin: 6px 0 0; max-height: 120px; font: 600 22px/1.25 "Mona Sans"; color: #f0f6fc; transition: max-height .6s, opacity .4s, margin .6s; }
+  .bst-m.nt p.big { margin-top: 12px; font: 600 22px/1.1 "Mona Sans"; color: #f0f6fc; }
+  .bst-m.nt p.big b { font: 700 40px/1 var(--mono); color: #f0f6fc; }
+  .bst-m.nt p.d1 { margin-top: 12px; font: 700 26px/1.2 "Mona Sans"; color: #e3b341; }
+  .bst-m.nt.done { box-shadow: none; background: #e3b34110; border-style: dashed; }
+  .bst-m.nt.done p { max-height: 0; margin-top: 0; opacity: 0; }
+  .bst-m.ok { --c: #ab7df8; border: 2px solid #ab7df8; border-left-width: 6px; background: #1c1530; box-shadow: 0 0 44px -12px #ab7df8; }
+  .bst-m.ok b { display: block; margin-top: 6px; font: 700 21px/1.3 "Mona Sans"; color: #f0f6fc; }
+  .bst-m.ok em { display: inline-block; margin-top: 10px; padding: 6px 12px; border-radius: 99px; background: #3fb950; color: #0d1117; font: 700 14px/1 var(--mono); font-style: normal; }
+  /* the AI-credit budget beside the conversation: green, amber past 80%, red past 90% */
+  .bst-mt { position: absolute; left: 1722px; top: 64px; width: 88px; height: 946px; opacity: 0; --c: #3fb950; }
+  .active .bst-mt { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .bst-mt > b { display: block; text-align: center; font: 700 19px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #f0f6fc; }
+  .bst-tr { position: absolute; left: 14px; top: 46px; width: 60px; height: 900px; box-sizing: border-box; border-radius: 16px; background: #0d1117; border: 2px solid #6e7681; }
+  .bst-fill { position: absolute; left: 4px; right: 4px; bottom: 4px; border-radius: 11px; background: var(--c); box-shadow: 0 0 34px -4px var(--c); transition: background .6s, box-shadow .6s, opacity .6s; }
+  .bst-mt.r .bst-fill { animation: bstPulse 1.1s ease-in-out infinite; }
+  .bst-foot { position: absolute; left: 110px; top: 1034px; margin: 0; font: 500 16px/1 "Mona Sans"; color: #e6edf3; }
+  /* the loop: the finished run fades out before the slide restarts from an empty session */
+  .bst-msgs, .bst-pin { transition: opacity .6s; }
+  .bst-out .bst-msgs, .bst-out .bst-pin, .bst-out .bst-aud, .bst-out .bst-fill { opacity: 0; }
+  @keyframes bstFlow { to { stroke-dashoffset: -32; } }
+  @keyframes bstScan { 0% { opacity: 0; transform: translateX(0); } 15%, 85% { opacity: 1; } 100% { opacity: 0; transform: translateX(256px); } }
+  @keyframes bstCost { 0% { opacity: 0; transform: translate(-50%, 10px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60px); } }
+  @keyframes bstPulse { 50% { filter: brightness(1.35); } }
+  @keyframes bstGrow { from { max-height: 0; opacity: 0; transform: translateY(18px); } to { max-height: 460px; opacity: 1; transform: none; } }
+
   /* --- model routing --- */
   .mr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #ab7df8); }
   /* the run card starts centred, then glides left when the results arrive */
@@ -7165,6 +7254,404 @@
         if (stage < ACTS.length - 1 && !q.length && now - tS > DUR[stage]) {
           begin(stage + 1);
           sfx.step(1);
+        }
+      },
+      el: root,
+    });
+  }
+
+  // Budget steering: every model request passes the firewall's API proxy, which prices it; past 80% and 90% of max-ai-credits it appends a
+  // notice to the end of the agent's next request, the notice lands at the bottom of the conversation, the budget meter turns amber then red,
+  // and the agent submits through a safe output before the hard stop
+  {
+    resetIndex();
+    const CAP = 500,
+      START = 0,
+      FH = 888;
+    // positions inside the 950×700 monitor; the conversation sits to its right
+    const IN = [930, 430],
+      SCAN = [370, 430],
+      TAIL = [370, 492],
+      UP = [370, 150],
+      R0 = [600, 52],
+      R1 = [930, 52];
+    const LAMPS = [
+      [80, 262, "#e3b341"],
+      [90, 380, "#f85149"],
+      [95, 498, "#f85149"],
+      [99, 616, "#f85149"],
+    ];
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const sparkle = (x, y, r, fill) => `<path transform="translate(${x},${y}) scale(${r / 14})" fill="${fill}" d="M0,-14 C1.5,-4 4,-1.5 14,0 C4,1.5 1.5,4 0,14 C-1.5,4 -4,1.5 -14,0 C-4,-1.5 -1.5,-4 0,-14Z"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 950 700");
+    svg.innerHTML =
+      `<defs><marker id="bstArr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c9d1d9"/></marker></defs>` +
+      `<path class="bst-wire" d="M944,430 H712" marker-end="url(#bstArr)"/>` +
+      `<path class="bst-wire" d="M370,224 V112" marker-end="url(#bstArr)"/>` +
+      `<path class="bst-wire" d="M540,52 H944" marker-end="url(#bstArr)"/>` +
+      `<text class="bst-wl" x="826" y="412">request</text><text class="bst-wl" x="826" y="34">reply</text>` +
+      `<rect class="bst-model" x="210" y="4" width="320" height="96" rx="18"/>${sparkle(290, 52, 18, "#d2a8ff")}<text class="bst-mn" x="322" y="63">Model</text>` +
+      `<rect class="bst-px" x="40" y="230" width="660" height="410" rx="28"/>${ico("shieldCheck", 92, 284, 38, "#e3b341")}<text class="bst-pn" x="126" y="295">AWF API proxy</text>` +
+      `<rect class="bst-bay" x="240" y="362" width="260" height="136" rx="16"/>`;
+    const stat = h("b", { class: "bst-st" }, "forward");
+    const lamps = LAMPS.map(([p, x, c]) => h("span", { class: "bst-lamp", "--c": c, style: { left: `${x}px` } }, `${p}%`));
+    const pk = h("div", { class: "bst-pk" }, h("i", {}), h("i", {}), h("i", {}), h("i", {}), h("b", {}, "+ notice"));
+    const rp = h("div", { class: "bst-rp" }, h("i", {}), h("i", {}));
+    const chip = h("div", { class: "bst-chip" }, "⚠ notice");
+    const costEl = h("div", { class: "bst-cost" });
+    const aud = h("p", { class: "bst-aud" }, "every notice → unified session → ", h("b", {}, "gh aw audit"));
+    const mon = h("div", { class: "bst-mon" }, svg, h("i", { class: "bst-beam" }), stat, h("span", { class: "bst-la" }, "notice at"), lamps, chip, pk, rp, costEl, aud);
+    const fly = h("div", { class: "bst-fly" }, "⚠ notice");
+
+    const M = (kind, role, ...body) => h("div", { class: `bst-m ${kind}` }, role ? h("small", {}, role) : null, h("div", {}, ...body));
+    const msgs = h("div", { class: "bst-msgs" });
+    const pin = h("div", { class: "bst-pin" });
+    const ff = h("em", { class: "bst-ff" }, "▶▶ fast-forward");
+    const cvIco = h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI.copilot.map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    const cv = h("div", { class: "bst-cv" }, h("div", { class: "bst-ch" }, cvIco, h("b", {}, "agent"), h("span", {}, "conversation"), ff), pin, msgs);
+    const noticeMsg = (used, fit) =>
+      h(
+        "div",
+        { class: "bst-m nt" },
+        h("div", { class: "bst-nh" }, h("b", {}, "⚠ AWF AI CREDIT WARNING"), h("em", {}, "added by the proxy")),
+        h("p", { class: "big" }, h("b", {}, `${used} / ${CAP}`), " AI credits used"),
+        h("p", {}, `about ${fit} more requests fit`),
+        h("p", { class: "d1" }, "Stop and submit what you have.")
+      );
+
+    // the budget: one word over a bar that fills and turns amber past 80% and red past 90%
+    const fill = h("div", { class: "bst-fill" });
+    const meter = h("div", { class: "bst-mt" }, h("b", {}, "Budget"), h("div", { class: "bst-tr" }, fill));
+
+    let quiet = false,
+      aim = START,
+      shown = START,
+      lastNotice = null;
+    const snd = f => quiet || f();
+    const xy = ([x, y], dx = 0, dy = 0) => `translate(${x + dx}px, ${y + dy}px) translate(-50%, -50%)`;
+    const at = (el, p, ms, dx, dy) => {
+      el.style.transitionDuration = quiet ? "0ms, 0ms" : `${ms}ms, 300ms`;
+      el.style.transform = xy(p, dx, dy);
+    };
+    const show = (el, on) => (el.style.opacity = on ? "1" : "0");
+    const restart = (el, cls) => {
+      el.classList.remove(cls);
+      if (quiet) return;
+      void el.offsetWidth;
+      el.classList.add(cls);
+    };
+    const add = (el, to = msgs) => {
+      el.classList.add("in");
+      if (quiet) el.classList.add("q");
+      to.append(el);
+      while (msgs.children.length > 10) msgs.firstElementChild.remove();
+      return el;
+    };
+    const setStat = on => {
+      stat.textContent = on ? "+ notice" : "forward";
+      stat.classList.toggle("on", on);
+    };
+    const draw = () => {
+      fill.style.height = `${(shown / CAP) * FH}px`;
+      meter.style.setProperty("--c", shown >= CAP * 0.9 ? "#f85149" : shown >= CAP * 0.8 ? "#e3b341" : "#3fb950");
+      meter.classList.toggle("r", shown >= CAP * 0.9);
+      // a threshold lamp lights only when the meter itself crosses it
+      LAMPS.forEach(([p], i) => {
+        const on = shown >= (CAP * p) / 100;
+        if (on && !lamps[i].classList.contains("on")) snd(() => sfx.notify(false));
+        lamps[i].classList.toggle("on", on);
+      });
+    };
+
+    // One model round trip as [ms, action] pairs: the request leaves the conversation, the proxy prices it and appends any pending
+    // notice to its end (the same notice drops into the bottom of the conversation), then the model replies and the conversation grows.
+    const turn = ({ cost, notice, replies }) => {
+      const a = [];
+      let t = 0;
+      a.push([
+        t,
+        () => {
+          if (lastNotice) lastNotice.classList.add("done");
+          pk.classList.remove("n");
+          at(pk, IN, 0);
+          show(pk, true);
+          snd(() => sfx.route(2));
+        },
+      ]);
+      a.push([(t += 60), () => at(pk, SCAN, 900)]);
+      // pricing: the beam reads the request and its AI credits go on the meter (after any notice, which quotes the meter as it stands)
+      const price = () => {
+        restart(mon, "scan");
+        costEl.textContent = `+${cost} AIC`;
+        restart(costEl, "go");
+        aim += cost;
+        snd(() => sfx.pop(1));
+      };
+      t += 900;
+      if (notice) {
+        // the notice springs from the threshold lamp that was crossed and lands on the end of this request
+        const i = LAMPS.findIndex(l => l[0] === notice[2]);
+        a.push([
+          t,
+          () => {
+            at(chip, [LAMPS[i][1], 588], 0);
+            show(chip, true);
+          },
+        ]);
+        a.push([(t += 40), () => at(chip, TAIL, 550)]);
+        a.push([
+          (t += 550),
+          () => {
+            pk.classList.add("n");
+            show(chip, false);
+            setStat(true);
+            fly.style.transitionDuration = "0ms, 0ms";
+            fly.style.transform = xy(TAIL, 110, 290);
+            show(fly, !quiet);
+            void fly.offsetWidth;
+            at(fly, [1405, 940], 700);
+            snd(() => sfx.block(true));
+          },
+        ]);
+        a.push([
+          (t += 700),
+          () => {
+            show(fly, false);
+            lastNotice = add(noticeMsg(...notice));
+          },
+        ]);
+        a.push([(t += 900), price]);
+        t += 900;
+      } else {
+        a.push([t, price]);
+        t += 900;
+      }
+      a.push([t, () => at(pk, UP, 800)]);
+      a.push([
+        (t += 800),
+        () => {
+          show(pk, false);
+          setStat(false);
+          restart(mon, "hit");
+        },
+      ]);
+      a.push([
+        (t += 200),
+        () => {
+          at(rp, R0, 0);
+          show(rp, true);
+        },
+      ]);
+      a.push([(t += 40), () => at(rp, R1, 700)]);
+      replies.forEach((r, i) =>
+        a.push([
+          (t += i ? 650 : 720),
+          () => {
+            if (!i) show(rp, false);
+            add(r());
+            snd(() => sfx.key(1));
+          },
+        ])
+      );
+      return { a, len: t + 900 };
+    };
+    // A time-lapsed round trip for the fast-forward: no pricing float, the meter just climbs
+    const fastTurn = (cost, ...replies) => {
+      const a = [];
+      let t = 0;
+      a.push([
+        t,
+        () => {
+          at(pk, IN, 0);
+          show(pk, true);
+        },
+      ]);
+      a.push([(t += 40), () => at(pk, SCAN, 240)]);
+      a.push([
+        (t += 240),
+        () => {
+          restart(mon, "scan");
+          aim += cost;
+        },
+      ]);
+      a.push([(t += 60), () => at(pk, UP, 200)]);
+      a.push([
+        (t += 200),
+        () => {
+          show(pk, false);
+          restart(mon, "hit");
+          at(rp, R0, 0);
+          show(rp, true);
+        },
+      ]);
+      a.push([(t += 40), () => at(rp, R1, 200)]);
+      replies.forEach(([kind, role, text], i) =>
+        a.push([
+          (t += i ? 110 : 200),
+          () => {
+            if (!i) show(rp, false);
+            add(M(kind, role, text));
+            snd(() => sfx.key(0.6));
+          },
+        ])
+      );
+      return { a, len: t + 60 };
+    };
+    const act = (ms, f) => ({ a: [[0, f]], len: ms });
+    const chain = (...turns) => {
+      const out = [];
+      let off = 0;
+      for (const { a, len } of turns) {
+        a.forEach(([ms, f]) => out.push([off + ms, f]));
+        off += len;
+      }
+      return out;
+    };
+    const FAST = [
+      [30, "→ bash  go test ./pkg/retry/", "FAIL TestRetry (0.31s)"],
+      [40, "→ read  pkg/retry/retry.go", "func Do(ctx, fn, attempts int) error {…"],
+      [50, '→ grep  -rn "retry.Do(" pkg/', "11 call sites in pkg/sync, pkg/fetch, …"],
+      [60, "→ read  pkg/retry/retry_test.go", "func TestRetry(t *testing.T) {…"],
+      [66, "→ bash  go test -race ./pkg/retry/", "FAIL · race on attempt counter"],
+      [70, "→ edit  pkg/retry/retry.go", "ok"],
+      [78, "→ bash  go test -run TestRetry -count=20 ./pkg/retry/", "--- FAIL: TestRetry (0.31s) timeout after 3 attempts"],
+    ];
+    const STEPS = [
+      chain(
+        act(1600, () => {}),
+        act(600, () => add(M("sys", "system", "You are the workflow agent. Fix the flaky TestRetry and open a pull request."), pin)),
+        act(900, () => add(M("usr", "user", "TestRetry fails about one run in ten."), pin)),
+        act(0, () => ff.classList.add("on")),
+        ...FAST.map(([cost, call, out]) => fastTurn(cost, ["ast", "assistant", call], ["tool", "tool", out])),
+        act(900, () => ff.classList.remove("on")),
+        turn({ cost: 8, replies: [() => M("ast", "assistant", "→ edit  pkg/retry/retry.go: back off between attempts"), () => M("tool", "tool", "ok")] })
+      ),
+      chain(
+        turn({
+          cost: 16,
+          notice: [402, 12, 80],
+          replies: [() => M("ast say", "assistant", "Finishing this step, then opening the pull request."), () => M("tool", "tool", "ok  pkg/retry  212.4s · 0 of 200 runs failed")],
+        })
+      ),
+      chain(
+        turn({ cost: 34, replies: [() => M("ast", "assistant", "→ bash  git diff --stat"), () => M("tool", "tool", "pkg/retry/retry.go | 12 ++++++------")] }),
+        turn({
+          cost: 16,
+          notice: [452, 3, 90],
+          replies: [
+            () => {
+              snd(() => sfx.review());
+              return M("ok", "assistant", "→ create_pull_request", h("b", {}, "Fix TestRetry timeout under load"), h("em", {}, "safe output ✓"));
+            },
+          ],
+        })
+      ),
+      [[300, () => aud.classList.add("on")]],
+    ];
+    const HOLD = [2500, 6500, 5000, 7000];
+
+    let stage = 0,
+      tS = 0,
+      last = 0,
+      done = null,
+      fadeAt = null,
+      q = [];
+    const reset = () => {
+      aim = shown = START;
+      lastNotice = null;
+      msgs.replaceChildren();
+      pin.replaceChildren();
+      ff.classList.remove("on");
+      lamps.forEach(l => l.classList.remove("on"));
+      [pk, rp, chip, fly].forEach(el => show(el, false));
+      pk.classList.remove("n");
+      setStat(false);
+      aud.classList.remove("on");
+      mon.classList.remove("scan", "hit");
+      costEl.classList.remove("go");
+      draw();
+    };
+    const begin = s => {
+      stage = s;
+      tS = performance.now();
+      q = STEPS[s].slice();
+      done = null;
+    };
+    const root = h(
+      "section",
+      { class: "slide bst" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Warn the agent before the hard stop"), h("h2", {}, letters("Budget "), letters("steering", "l-grad"))),
+      mon,
+      cv,
+      meter,
+      fly,
+      h("p", { class: "bst-foot" }, "Illustrative: synthetic run and numbers. Notices are on by default; sandbox.agent.token-steering: false turns them off.")
+    );
+    const jump = s => {
+      root.classList.add("bst-now");
+      root.classList.remove("bst-out");
+      fadeAt = null;
+      quiet = true;
+      reset();
+      for (let k = 0; k < s; k++) STEPS[k].forEach(([, f]) => f());
+      shown = aim;
+      draw();
+      quiet = false;
+      void root.offsetWidth;
+      root.classList.remove("bst-now");
+      begin(s);
+    };
+    const flush = () => {
+      quiet = true;
+      q.forEach(([, f]) => f());
+      quiet = false;
+      q = [];
+    };
+    slides.push({
+      group: "cost",
+      notes:
+        "Budget steering: warn the agent before the hard stop. Illustrative: the run, conversation and numbers are synthetic; the run starts empty and its middle is fast-forwarded until the budget nears 80 percent. An agent cannot see its own budget, so on its own it keeps working until max-ai-credits or timeout-minutes cuts it off, and the unfinished work is lost. Every model request already passes through the firewall's API proxy, which prices it in AI credits. When the run crosses 80, 90, 95 or 99 percent of its AI-credit budget or of its agent time limit, the proxy appends a short notice to the end of the next request that ends with a tool result: after the last tool result, never in the system prompt, so the provider's prompt cache still hits. The notice says how much is used and about how many more requests fit at the current rate, then what to do: the agent responsible for the final output stops and submits what it has, and a sub-agent finishes its step and returns what it has to the agent that started it. The card on the slide is abridged; the first notice really reads: [AWF AI CREDIT WARNING] 402 of 500 AI credits are used; at the current rate about 12 more model requests fit. If you are responsible for this workflow's final output, stop the remaining work and submit it now with what you have. Otherwise, finish your current step and return what you have to the agent that started you. One more notice goes out when only about five requests' worth of credits, or about five minutes, remain. The harness resends its own copy of the conversation on every turn, so a notice lasts one request; the proxy therefore gives each conversation in the run, sub-agents included, the current notice once, and a conversation that missed earlier notices hears only the newest. In this run the meter turns amber at 80 percent and red at 90; after the second notice the agent opens its pull request through a safe output with credits to spare, so the hard stop never fires. Every delivery is recorded in the run's unified session, so gh aw audit and gh aw logs show which conversation heard which notice. Notices are on by default; sandbox.agent.token-steering: false turns them off. Steering never changes the model or raises the budget. Keys: → next step.",
+      enter() {
+        last = 0;
+        jump(0);
+      },
+      onNext() {
+        if (stage < STEPS.length - 1) {
+          flush();
+          begin(stage + 1);
+          return true;
+        }
+        return false;
+      },
+      onPrev() {
+        if (stage > 0) {
+          jump(stage - 1);
+          return true;
+        }
+        return false;
+      },
+      tick(t) {
+        const now = performance.now();
+        while (q.length && now - tS >= q[0][0]) q.shift()[1]();
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (shown < aim) {
+          shown = Math.min(aim, shown + Math.max(0.03 * dt, ((aim - shown) * dt) / 260));
+          draw();
+        }
+        if (!q.length && done === null) done = now;
+        if (stage < STEPS.length - 1 && done !== null && now - done > HOLD[stage]) {
+          begin(stage + 1);
+          sfx.step(1);
+        } else if (stage === STEPS.length - 1 && done !== null && now - done > HOLD[stage]) {
+          // loop: fade the finished run out, then start again from an empty session and an empty budget
+          if (fadeAt === null) {
+            fadeAt = now;
+            root.classList.add("bst-out");
+          } else if (now - fadeAt > 700) {
+            jump(0);
+          }
         }
       },
       el: root,
