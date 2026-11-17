@@ -34,17 +34,22 @@ func marshalYAMLWithOptions(value any, options ...yaml.EncodeOption) ([]byte, er
 		if !ok {
 			continue
 		}
-		if !strings.ContainsAny(text.Value, "\r\n") {
+		boundaryWhitespace := strings.HasPrefix(text.Value, " ") || strings.HasPrefix(text.Value, "\t") ||
+			strings.HasSuffix(text.Value, " ") || strings.HasSuffix(text.Value, "\t")
+		multiline := strings.ContainsAny(text.Value, "\r\n")
+		if !multiline && !boundaryWhitespace {
 			continue
 		}
-		firstContent := strings.TrimLeft(text.Value, "\n")
-		unsafe := firstContent == "" || strings.Contains(text.Value, "\r") || strings.HasPrefix(firstContent, " ") ||
-			strings.HasPrefix(firstContent, "\t") ||
-			strings.HasSuffix(text.Value, " ") || strings.HasSuffix(text.Value, "\t")
-		repaired = repaired || unsafe
+		unsafe := boundaryWhitespace
+		if multiline {
+			firstContent := strings.TrimLeft(text.Value, "\n")
+			unsafe = unsafe || firstContent == "" || strings.Contains(text.Value, "\r") ||
+				strings.HasPrefix(firstContent, " ") || strings.HasPrefix(firstContent, "\t")
+		}
 		// Reparsing an AST literal can also strip its final whitespace.
 		if unsafe || strings.HasSuffix(text.Value, "\n\n") {
 			text.Token.Type = token.DoubleQuoteType
+			repaired = true
 		}
 	}
 	if !repaired {

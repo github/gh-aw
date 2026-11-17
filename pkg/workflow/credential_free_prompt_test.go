@@ -32,7 +32,7 @@ func TestCredentialFreePromptEnvironment(t *testing.T) {
       if (global.core.marker !== "core" || global.context.marker !== "context") throw new Error("Prompt globals missing");
       if (process.env.GITHUB_OUTPUT !== "synthetic-output-path") throw new Error("github-script output path removed");
       process.stdout.write(process.env.GH_AW_PUBLIC);
-`, &WorkflowData{Env: "env:\n  ARBITRARY_SECRET: ${{ secrets.PRIVATE }}\n"}))
+`, &WorkflowData{Env: "env:\n  ARBITRARY_SECRET: ${{ secrets.PRIVATE }}\n"}, nil))
 	var steps []WorkflowStep
 	require.NoError(t, yaml.Unmarshal([]byte(output.String()), &steps))
 	require.Len(t, steps, 1)
@@ -77,7 +77,7 @@ func TestCredentialFreePromptPreservesShellSteps(t *testing.T) {
 	require.NoError(t, writeCredentialFreePromptSteps(&output, `
 - name: Validate prompt
   run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
-`, &WorkflowData{}))
+`, &WorkflowData{}, nil))
 	var steps []WorkflowStep
 	require.NoError(t, yaml.Unmarshal([]byte(output.String()), &steps))
 	require.Len(t, steps, 1)
@@ -96,25 +96,24 @@ func TestCredentialFreePromptPreservesIndentedChunks(t *testing.T) {
 	compiler := &Compiler{}
 	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
 	var generated strings.Builder
-	compiler.generateUnifiedPromptCreationStep(&generated, nil, chunks, nil, data)
-	var expected []WorkflowStep
-	require.NoError(t, yaml.Unmarshal([]byte(generated.String()), &expected))
+	_, sourceContent := compiler.generateUnifiedPromptCreationStepWithContent(&generated, nil, chunks, nil, data)
+	require.Len(t, sourceContent, len(chunks))
+	require.Equal(t, "   Continuation text\n145. Step 145: do the thing\n\n", sourceContent["GH_AW_PROMPT_CONTENT_0001"])
 
 	var output strings.Builder
-	require.NoError(t, writeCredentialFreePromptSteps(&output, generated.String(), data))
+	require.NoError(t, writeCredentialFreePromptSteps(&output, generated.String(), data, sourceContent))
 	var actual []WorkflowStep
 	require.NoError(t, yaml.Unmarshal([]byte(output.String()), &actual))
-	require.Len(t, actual, len(expected))
 	promptValues := 0
-	for i, step := range expected {
+	for _, step := range actual {
 		for key, value := range step.Env {
 			if strings.HasPrefix(key, "GH_AW_PROMPT_CONTENT_") {
-				assert.Equal(t, value, actual[i].Env[key], key)
+				assert.Equal(t, sourceContent[key], value, key)
 				promptValues++
 			}
 		}
 	}
-	require.Equal(t, len(chunks), promptValues)
+	require.Equal(t, len(sourceContent), promptValues)
 }
 
 func TestValidatePromptContentRoundTrip(t *testing.T) {
@@ -122,6 +121,7 @@ func TestValidatePromptContentRoundTrip(t *testing.T) {
 		Name: "Create prompt",
 		Env:  map[string]string{"GH_AW_PROMPT_CONTENT_0000": "   continuation\nnext\n"},
 	}}
+	intendedContent := map[string]string{"GH_AW_PROMPT_CONTENT_0000": "   continuation\nnext\n"}
 	for _, tt := range []struct {
 		name    string
 		encoded string
@@ -134,7 +134,7 @@ func TestValidatePromptContentRoundTrip(t *testing.T) {
 		{"changed content", "- env:\n    GH_AW_PROMPT_CONTENT_0000: \"continuation\\nnext\\n\"\n", "preserved exactly"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validatePromptContentRoundTrip([]byte(tt.encoded), expected)
+			err := validatePromptContentRoundTrip([]byte(tt.encoded), expected, intendedContent)
 			if tt.message == "" {
 				require.NoError(t, err)
 			} else {

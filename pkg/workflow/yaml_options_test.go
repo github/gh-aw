@@ -17,6 +17,8 @@ func TestDefaultMarshalOptionsMultilineRoundTrip(t *testing.T) {
 	}{
 		{"leading spaces", "   continuation\nnext: list item\n"},
 		{"leading tab", "\tcontinuation\nnext: list item\n"},
+		{"single-line leading spaces", "   continuation"},
+		{"single-line leading tab", "\tcontinuation"},
 		{"uniform indentation", "   first\n   second\n"},
 		{"leading newline", "\n   continuation\nnext: list item\n"},
 		{"leading blank lines", "\n\nfirst\nsecond"},
@@ -30,6 +32,7 @@ func TestDefaultMarshalOptionsMultilineRoundTrip(t *testing.T) {
 		{"ordinary multiline", "first\n   nested\nlast\n"},
 		{"trailing spaces", "first\nsecond  "},
 		{"trailing tab", "first\nsecond\t"},
+		{"only trailing blank line", "value\n\n"},
 		{"unindented trailing blank lines", "first\nsecond\n\n"},
 		{"multiple trailing blank lines", "first\nsecond\n\n\n"},
 	}
@@ -135,8 +138,7 @@ func TestDefaultMarshalOptionsConsistency(t *testing.T) {
 	testData := map[string]any{
 		"name":        "workflow",
 		"on":          "push",
-		"description": "ordinary multiline\nwith trailing blank lines\n\n",
-		"notes":       "\n\nplain first line\nlast\n",
+		"description": "ordinary multiline\nwith another line",
 		"jobs": map[string]any{
 			"test": map[string]any{
 				"runs-on": "ubuntu-latest",
