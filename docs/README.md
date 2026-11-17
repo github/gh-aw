@@ -134,7 +134,10 @@ talk-agnostic classic script that sets `window.CracktroDeck`. `deck.js` holds th
 talk's slides, styles, prompts, band themes and synth, and ends with
 `CracktroDeck.create({ slides, themes, bands, ... })`; another deck can reuse the
 runtime by loading `runtime.js` and calling `create` with its own slides. The
-page needs no build or module loader and also works when opened from disk.
+API is declared in `public/cracktro/runtime.d.ts`; run `npm run check:cracktro`
+from `docs/` to type-check the runtime and its contract. The docs build runs
+this check too. The page needs no build or module loader and also works when
+opened from disk.
 Mona Sans reuses `public/fonts/`; Monaspace Neon and its SIL Open Font License
 are in `public/cracktro/fonts/`.
 

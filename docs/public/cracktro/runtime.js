@@ -1,3 +1,4 @@
+/// <reference path="./runtime.d.ts" />
 // Cracktro deck runtime: a reusable, content-free engine for full-screen slide decks.
 // Classic script (no build, works from file://); load it before the deck script that calls CracktroDeck.create(config).
 // It owns the stage, band headers, dock chrome, navigation, URL hash, search, slide map and animated background.
@@ -245,6 +246,7 @@
   // ---------- create ----------
   // config: { slides (array, or factory receiving services), themes, bands, solo, prototypes, last, sound, css, width, height }.
   // Returns a controller: { slides, rows, go, next, prev, band, current }.
+  /** @param {CracktroDeck.Config} config */
   function create(config = {}) {
     const { width: W = 1920, height: H = 1080, css = "", bands: BANDS = {}, solo: SOLO = {}, prototypes: PROTO = {}, last = null } = config;
     const sfx = config.sound || SILENT;
@@ -260,11 +262,16 @@
     const canvas = h("canvas", { class: "bg" });
 
     // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
+    /** @type {CracktroDeck.Row[]} */
     const rows = [];
     for (const s of slides) {
       const row = rows.find(r => r.group === s.group);
       if (row) row.items.push(s);
-      else rows.push({ group: s.group, items: [s] });
+      else {
+        /** @type {any} */
+        const newRow = { group: s.group, items: [s] };
+        rows.push(newRow);
+      }
     }
     // config.last names the group that closes the deck (e.g. a finale), wherever its slides sit.
     const lastAt = last == null ? -1 : rows.findIndex(r => r.group === last);
@@ -647,6 +654,8 @@
       };
 
     addEventListener("keydown", e => {
+      /** @type {any} */
+      const target = e.target;
       if (fz.open || smp.open) return; // the search and map dialogs handle their own keys
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
@@ -654,12 +663,12 @@
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "/" && !e.target.closest?.("input, textarea, select, [contenteditable]")) {
+      if (e.key === "/" && !target.closest?.("input, textarea, select, [contenteditable]")) {
         e.preventDefault();
         openSearch();
         return;
       }
-      if ((e.key === "Enter" || e.key === " ") && e.target.closest?.("a, button, input, textarea, select, [contenteditable]")) return;
+      if ((e.key === "Enter" || e.key === " ") && target.closest?.("a, button, input, textarea, select, [contenteditable]")) return;
       if (slides[cur].onKey?.(e)) {
         sfx.touch();
         e.preventDefault();
@@ -685,8 +694,10 @@
       else if (e.key === "g" || e.key === "G") openMap();
     });
     addEventListener("click", e => {
-      if (fz.open || smp.open || e.target.closest(".fz, .smp, a, button")) return;
-      const tile = e.target.closest("[data-go]");
+      /** @type {any} */
+      const target = e.target;
+      if (fz.open || smp.open || target.closest(".fz, .smp, a, button")) return;
+      const tile = target.closest("[data-go]");
       if (tile) return go(+tile.dataset.go);
       e.clientX < innerWidth / 3 ? prev() : next();
     });
@@ -711,6 +722,7 @@
     // window is bounded (at most one and a half times the term), so letters scattered through long notes never match.
     // The tightest window wins: forward from each occurrence of the first letter to the earliest end, then backward to
     // the latest start. Its bounds score the match (term length / window width, word-start and field bonuses) and mark it.
+    /** @type {[string, number][]} */
     const FZ_FIELDS = [
       ["title", 3],
       ["summary", 2],
@@ -749,6 +761,7 @@
     const fzBounds = (text, term) => {
       const n = term.length,
         max = n + Math.ceil(n / 2);
+      /** @type {[number, number] | null} */
       let best = null;
       for (let i = text.indexOf(term[0]); i >= 0; i = text.indexOf(term[0], i + 1)) {
         let j = i,
@@ -897,7 +910,11 @@
     // a click on the dialog's own surface (outside the search box) closes it
     fz.addEventListener("click", e => e.target === fz && fz.close());
     // closing returns focus to the opener; drop it so Space and Enter go back to driving the deck
-    fz.addEventListener("close", () => document.activeElement?.blur?.());
+    fz.addEventListener("close", () => {
+      /** @type {any} */
+      const active = document.activeElement;
+      active?.blur?.();
+    });
     for (const t of ["touchstart", "touchend"]) fz.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
     // ---------- slide map ----------
@@ -999,7 +1016,11 @@
       if (to) (to.focus({ preventScroll: true }), to.scrollIntoView({ block: "nearest" }));
     });
     smp.addEventListener("click", e => e.target === smp && smp.close());
-    smp.addEventListener("close", () => document.activeElement?.blur?.());
+    smp.addEventListener("close", () => {
+      /** @type {any} */
+      const active = document.activeElement;
+      active?.blur?.();
+    });
     for (const t of ["touchstart", "touchend"]) smp.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
     // ---------- animated background ----------
