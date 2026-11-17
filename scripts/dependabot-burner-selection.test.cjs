@@ -206,6 +206,29 @@ test("mixed source and generated manifest PRs are selected with all paths preser
   assert.deepEqual(result.excluded_prs, []);
   assert.deepEqual(result.selected_batch_dependencies[0].changed_files, files);
   assert.deepEqual(result.selected_batch_dependencies[0].manifest_files, files);
+  assert.deepEqual(result.selected_batch_dependencies[0].compiler_generated_files, [".github/workflows/package.json"]);
+});
+
+test("compiler provenance distinguishes named Python locks from generated declarations", async () => {
+  const generated = [".github/workflows/package.json", ".github/workflows/package-lock.json", ".github/workflows/requirements.txt", ".github/workflows/go.mod", ".github/workflows/smoke.lock.yml"];
+  const standalone = [
+    ".github/workflows/requirements-agentrx.txt",
+    ".github/workflows/requirements-geo-optimizer.txt",
+    ".github/workflows/requirements-harbor.in",
+    ".github/workflows/requirements-harbor.txt",
+    "docs/package.json",
+    "docs/package-lock.json",
+    "go.mod",
+    "go.sum",
+    "Dockerfile",
+  ];
+  const result = await select([pull(1, [...generated, ...standalone]), pull(2, standalone)]);
+  assert.deepEqual(result.selected_batch_pr_numbers, [1, 2]);
+  assert.deepEqual(
+    result.selected_batch_dependencies.map(item => item.compiler_generated_files),
+    [generated, []]
+  );
+  assert.deepEqual(result.excluded_prs, []);
 });
 
 test("compiled workflow lock YAML does not dilute shared-file grouping", async () => {
@@ -270,6 +293,11 @@ test("slash-command fallback admits source dependencies and groups existing rela
   assert.equal(result.open_pr_count, 3);
   assert.deepEqual([...result.selected_batch_pr_numbers].sort(), [1, 2]);
   assert.deepEqual(result.trigger_pr.manifest_families, ["npm"]);
+  assert.deepEqual(result.trigger_pr.compiler_generated_files, []);
+  assert.deepEqual(
+    result.selected_batch_dependencies.map(item => item.compiler_generated_files),
+    [[], []]
+  );
 });
 
 test("all fourteen PR file sets excluded by run 43439265743 are eligible", async () => {
