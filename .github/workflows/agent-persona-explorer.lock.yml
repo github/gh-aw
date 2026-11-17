@@ -201,6 +201,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"a48e0c6afa219fdf55f4e888769f0955030884b26a94390b565e9a6c36965767","kind":"artifact","value":{"model":"inherit","name":"persona-evaluator"}}]}'
           GH_AW_INFO_ENGINE_ID: "claude"
           GH_AW_INFO_ENGINE_NAME: "Claude Code"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'agent' }}
@@ -784,9 +785,6 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.325
@@ -2257,9 +2255,6 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
         id: detection_awf_install
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

@@ -6644,6 +6644,7 @@
       };
       slides.push({
         group: "process",
+        id: "pull-request-review-squared",
         key: "prr",
         notes:
           "Pull Request Review squared. The flow is illustrative and its open-thread counter is synthetic; the bottom strip is measured only on gh-aw pull requests merged in the 30 days from 15 October to 13 November 2026, snapshot taken 14 November, not on all pull requests. Of the 1,263 pull requests merged in that window, 938 were checked by the Matt Pocock Skills Reviewer, PR Code Quality Reviewer or Test Quality Sentinel workflows, which submitted 1,337 reviews and opened 1,612 inline review threads. PR Sous Chef posted 517 @copilot nudges on 336 pull requests, and Copilot pushed 965 fix commits after a nudge on 305 of them. 660 of the 682 reviewed pull requests merged after a single review round per reviewer, with a median of 1.8 hours from ready for review to merge. Reviewers are identified by their workflow footers and nudges by the Sous Chef workflow marker. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
@@ -16396,6 +16397,7 @@
     };
     slides.push({
       group: "finale",
+      id: "finale",
       notes:
         "An illustrative pattern: a control repository coordinates small agentic processes across repositories and receives proposed results as issues and pull requests. All repository and run counts are simulated, not production metrics or a product roadmap. Processes, not prompts: engineered, guarded and measured. That's GitHub Agentic Workflows.",
       enter() {
@@ -22413,6 +22415,41 @@
   const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
   // Bands that are not shipped product: every slide (header included) carries a corner badge.
   const PROTO = { cao: "gh cao" };
+  // Tours: shareable filtered views (#<slide id>&tour=<name>), listed at the bottom of the slide map (G).
+  // `bands` takes whole bands by group, `slides` adds slide ids from slides.md; the deck keeps its own order.
+  const TOURS = {
+    overview: {
+      title: "Overview",
+      summary: "the big picture in a few slides",
+      slides: [
+        "github-agentic-workflows",
+        "agentic-workflows",
+        "ci-cd-meets-continuous-ai",
+        "anatomy-of-a-workflow",
+        "security",
+        "safe-outputs",
+        "zero-secret-agents",
+        "stop-manually-translating-intent-into-code",
+        "human-agent-processes",
+        "daily-improvers",
+        "if-every-pr-needs-deep-human-review-you-dont-trust-your-process",
+        "cost-optimization",
+        "agentic-engineering",
+        "enterprise",
+        "aw-factory",
+        "finale",
+      ],
+    },
+    security: { title: "Security deep dive", summary: "defence in depth for agents", bands: ["security"], slides: ["github-agentic-workflows", "finale"] },
+    builders: { title: "For workflow authors", summary: "write, run and improve workflows", bands: ["platform", "process", "engineering"], slides: ["github-agentic-workflows", "finale"] },
+    cost: { title: "Cost and observability", summary: "measure, budget and route", bands: ["cost"], slides: ["github-agentic-workflows", "opentelemetry", "distributed-tracing", "finale"] },
+    enterprise: {
+      title: "For enterprises",
+      summary: "governance, scale and central ops",
+      bands: ["enterprise", "cao"],
+      slides: ["github-agentic-workflows", "agentic-workflows", "security", "safe-outputs", "zero-secret-agents", "finale"],
+    },
+  };
 
   // ---------- sound: tiny WebAudio synth (M to mute) ----------
   const sfx = (() => {
@@ -23061,5 +23098,5 @@
 
   // ---------- start ----------
   // runtime.js (CracktroDeck) builds the bands, chrome, navigation, search, slide map and background from this content.
-  window.CracktroDeck.create({ width: W, height: H, css, slides, themes: THEME, bands: BANDS, solo: SOLO, prototypes: PROTO, last: "finale", sound: sfx });
+  window.CracktroDeck.create({ width: W, height: H, css, slides, themes: THEME, bands: BANDS, solo: SOLO, prototypes: PROTO, tours: TOURS, last: "finale", sound: sfx });
 })();

@@ -158,6 +158,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"4d0cc351f012051ee0b5cceb6c3352814d7ed199a9908d5f9dfd96b571be2d6e","kind":"artifact","value":{"model":"small"}},{"sha256":"77c313270d2c0c2c0de38582850fc7e67314102f4c35eb3fd0fcd534ac277126","kind":"artifact","value":{"model":"large"}},{"sha256":"83c55071f7cc951b8e88f03635c1b744d47375d514ba4fda1dc18dc18ed740c1","kind":"artifact","value":{"model":"large"}},{"sha256":"c4a94961b80050865d80d36f41305b822bbec0615db903fc72123ab9a3f9dccb","kind":"artifact","value":{"model":"large"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}
@@ -751,9 +752,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Install GitHub Copilot SDK (Node.js)
         run: cd "${GITHUB_WORKSPACE}" && npm install --ignore-scripts --no-save @github/copilot-sdk@1.0.16 undici@6.28.0
@@ -2207,9 +2205,6 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
         id: detection_awf_install
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
