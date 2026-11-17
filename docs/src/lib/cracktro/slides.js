@@ -5,16 +5,18 @@ import { readFileSync } from "node:fs";
 
 export const SLIDES_FILE = new URL("../../../../.github/skills/cracktro/slides.md", import.meta.url);
 
-const HEADER = "| Heading | Notes | Summary |";
-const SEPARATOR = "|---|---|---|";
+const HEADER = "| Id | Heading | Notes | Summary |";
+const SEPARATOR = "|---|---|---|---|";
 const NOTES = new Set(["", "illustrative"]);
+// A stable `#id` link anchor: lowercase kebab-case.
+const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
- * @typedef {{ heading: string, illustrative: boolean, summary: string, line: number }} Slide
+ * @typedef {{ id: string, heading: string, illustrative: boolean, summary: string, line: number }} Slide
  */
 
 /**
- * Parses the slide table. Throws `source:line: message` on any malformed, empty, unknown or duplicate entry.
+ * Parses the slide table. Throws `source:line: message` on any malformed, invalid, empty, unknown or duplicate entry.
  * @param {string} text
  * @param {string} [source]
  * @returns {Slide[]}
@@ -34,34 +36,39 @@ export function parseSlides(text, source = "slides.md") {
   /** @type {Slide[]} */
   const slides = [];
   /** @type {Map<string, number>} */
+  const ids = new Map();
+  /** @type {Map<string, number>} */
   const headings = new Map();
   /** @type {Map<string, number>} */
   const summaries = new Map();
   let index = headerIndex + 2;
   for (; index < lines.length && isRow(lines[index]); index++) {
     const line = lines[index];
-    if (!line.startsWith("| ") || !line.endsWith(" |")) fail(index, `malformed row, expected "| Heading | Notes | Summary |": ${line}`);
+    if (!line.startsWith("| ") || !line.endsWith(" |")) fail(index, `malformed row, expected "| Id | Heading | Notes | Summary |": ${line}`);
     const cells = line
       .slice(1, -1)
       .split("|")
       .map(cell => cell.trim());
-    if (cells.length !== 3) fail(index, `expected 3 cells, found ${cells.length} (cells must not contain "|"): ${line}`);
-    const [heading, notes, summary] = cells;
+    if (cells.length !== 4) fail(index, `expected 4 cells, found ${cells.length} (cells must not contain "|"): ${line}`);
+    const [id, heading, notes, summary] = cells;
+    if (!ID.test(id)) fail(index, `invalid Id "${id}" for "${heading}" (expected lowercase kebab-case)`);
+    if (ids.has(id)) fail(index, `duplicate Id "${id}" (first on line ${ids.get(id)})`);
     if (!heading) fail(index, "empty Heading");
     if (!NOTES.has(notes)) fail(index, `unknown Notes value "${notes}" (expected empty or "illustrative")`);
     if (!summary) fail(index, `empty Summary for "${heading}"`);
     const headingKey = heading.toLowerCase();
     if (headings.has(headingKey)) fail(index, `duplicate Heading "${heading}" (first on line ${headings.get(headingKey)})`);
     if (summaries.has(summary)) fail(index, `duplicate Summary for "${heading}" (first on line ${summaries.get(summary)})`);
+    ids.set(id, index + 1);
     headings.set(headingKey, index + 1);
     summaries.set(summary, index + 1);
-    slides.push({ heading, illustrative: notes === "illustrative", summary, line: index + 1 });
+    slides.push({ id, heading, illustrative: notes === "illustrative", summary, line: index + 1 });
   }
   if (!slides.length) fail(headerIndex, "slide table has no rows");
   for (; index < lines.length; index++) {
     if (!lines[index].trim()) continue;
     if (isRow(lines[index])) fail(index, "table row outside the slide table (one table only, no blank lines inside it)");
-    fail(index, `malformed row, expected "| Heading | Notes | Summary |": ${lines[index]}`);
+    fail(index, `malformed row, expected "| Id | Heading | Notes | Summary |": ${lines[index]}`);
   }
   return slides;
 }
@@ -75,7 +82,7 @@ export function loadSlides(file = SLIDES_FILE) {
 }
 
 /**
- * schema.org `hasPart` entries: one per slide, in order, linking to its `#N` hash.
+ * schema.org `hasPart` entries: one per slide, in order, linking to its stable `#id` hash.
  * @param {Slide[]} slides
  * @param {string} pageUrl
  */
@@ -85,7 +92,7 @@ export function slideParts(slides, pageUrl) {
     position: i + 1,
     name: slide.heading,
     description: slide.summary.replace(/^Band header \([^)]*\):\s*/, ""),
-    url: `${pageUrl}#${i + 1}`,
+    url: `${pageUrl}#${slide.id}`,
   }));
 }
 

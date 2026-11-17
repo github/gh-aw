@@ -81,9 +81,17 @@ every slide under its band's title, each pattern's examples beside it, with the 
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
 `slides.md` summaries and slide text; arrows pick a result, Enter opens it, and
-`#N` jumps to slide N. Hovering a dock button shows its keyboard shortcut. The navigation dots form a map with one row per band and
+`#<id>` jumps to that slide. Hovering a dock button shows its keyboard shortcut. The navigation dots form a map with one row per band and
 jump directly to a slide (on narrow screens they become previous/next slide arrows
-flanked by track-style previous/next band buttons); `#N` hashes are shareable slide links. Clicking the left third
+flanked by track-style previous/next band buttons). Each slide has a stable id
+(its `slides.md` Id), so `#<id>` hashes are shareable slide links that survive
+added or moved slides; old `#N` links redirect to the id. Tours are curated
+subsets of the deck (Overview, Security deep dive, ...), listed at the bottom of
+the slide map: picking one adds `&tour=<name>` to the hash, a pill shows the tour
+and position, navigation skips the other slides, and × leaves the tour. Examples
+in a pattern's column only appear together with their pattern. "Design a view"
+in the slide map lets you tick slides or whole bands and copy a link that
+encodes the selection as `&view=<base64url>`. Clicking the left third
 goes back; clicking elsewhere advances. On touch screens, swipe left or right
 within a band and up or down between bands. On phones the toolbar dims after a
 few idle seconds and brightens on any touch, key or focus. iPhone Safari offers no
@@ -97,7 +105,7 @@ Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
 The ordered slide list, with a one-sentence summary per slide, lives in
 [`.github/skills/cracktro/slides.md`](../.github/skills/cracktro/slides.md).
 The docs build (and dev server) adds it to the page's JSON-LD as `hasPart`
-entries with `#N` links, so crawlers and agents can find a slide without
+entries with `#<id>` links, so crawlers and agents can find a slide without
 running the deck; `src/lib/cracktro/` holds the parser and Astro integration.
 
 The [daily Cracktro maintainer](../.github/workflows/daily-cracktro-maintainer.md)
@@ -137,8 +145,8 @@ operator-owned infrastructure diagrams come from `public/cracktro/ops-visuals.js
 a dependency-free script that sets `window.AW_OPS_VISUALS` for the deck. The
 homepage imports the same file at build time for its matching sections, so
 edit those diagrams in one place and keep them free of external references.
-The deck engine (stage, navigation dock, band headers, search, slide map, `#N`
-hashes and animated background) lives in `public/cracktro/runtime.js`, a
+The deck engine (stage, navigation dock, band headers, search, slide map, `#<id>`
+hashes, tours and animated background) lives in `public/cracktro/runtime.js`, a
 talk-agnostic classic script that sets `window.CracktroDeck`. `deck.js` holds the
 talk's slides, styles, prompts, band themes and synth, and ends with
 `CracktroDeck.create({ slides, themes, bands, ... })`; another deck can reuse the

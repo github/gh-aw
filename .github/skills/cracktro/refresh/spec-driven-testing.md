@@ -97,7 +97,7 @@ Output shape and baseline (14 Nov 2026):
 ## 6. Validation
 
 - `node --check docs/public/cracktro/deck.js`.
-- Preview: `python3 -m http.server 4341` in `docs/public` (background, record pid, `kill <pid>` after); open the browser canvas at `/cracktro/?v=<n>#<slide>`; wait ~22 s; screenshot. Check the strip and the one-line caption clear the dot minimap.
+- Preview: `python3 -m http.server 4341` in `docs/public` (background, record pid, `kill <pid>` after); open the browser canvas at `/cracktro/?v=<n>#spec-driven-testing`; wait ~22 s; screenshot. Check the strip and the one-line caption clear the dot minimap.
 - `cd docs && npx playwright test tests/talk.spec.ts`.
 - Content rules: no 40-hex SHAs, no URLs, no `github/<repo>` strings, no `who:`, no people's names — agent/workflow names only.
 

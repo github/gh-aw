@@ -166,10 +166,10 @@
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
      Only opacity changes, so the first tap still lands; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
-  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb) { opacity: .4; }
-  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible) { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb) { transition: none; } }
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { transition: none; } }
   .snd, .fzb, .smb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
   .snd:hover, .fzb:hover, .smb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -258,15 +258,71 @@
   body.light .smp-t:hover { background: #eaeef2; }
   body.light .smp-h, body.light .smp-t b, body.light .smp-l small { color: #59636e; }
   body.light .smp-l { color: #1f2328; }
+  /* tours: dimmed tiles are outside the current tour; the tours list sits at the very bottom of the map */
+  .smp-t.out { opacity: .35; }
+  .smp-tl { display: flex; flex-wrap: wrap; gap: 8px; }
+  .smp-tb { display: flex; flex-direction: column; gap: 5px; min-width: 180px; max-width: 340px; text-align: left; padding: 10px 12px; border: 1px solid #3d444d;
+    border-left: 3px solid var(--c); border-radius: 8px; background: #151b23; color: inherit; cursor: pointer; font: 500 13px/1.3 "Mona Sans", sans-serif; }
+  .smp-tb b { font-weight: 600; font-size: 14px; }
+  .smp-tb span { font: 500 11px/1.35 var(--mono); color: #9198a1; }
+  .smp-tb:hover { background: #1f2630; border-color: #9198a1; border-left-color: var(--c); }
+  .smp-tb[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--c); }
+  .smp-tb.design { border-style: dashed; border-left-style: solid; border-left-color: #db6d28; background: transparent; }
+  .smp-tb:focus-visible, .smp-db:focus-visible, .smp-d input:focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
+  /* design mode: tiles toggle (a check box drawn before the number), band headings get a whole-band checkbox, the bar below holds the link */
+  .smp-bx { display: none; width: 16px; height: 16px; margin: 0; align-self: center; accent-color: #4493f8; cursor: pointer; }
+  .smp.design .smp-bx { display: block; }
+  .smp.design .smp-t { position: relative; padding-left: 30px; }
+  .smp.design .smp-t::before { content: ""; position: absolute; left: 9px; top: 8px; width: 13px; height: 13px; border: 1.5px solid #9198a1; border-radius: 3px;
+    font: 700 11px/13px var(--mono); text-align: center; color: #0d1117; }
+  .smp.design .smp-t[aria-pressed="true"] { border-color: #4493f8; border-left-color: var(--c); background: #4493f81f; }
+  .smp.design .smp-t[aria-pressed="true"]::before { content: "✓"; background: #4493f8; border-color: #4493f8; }
+  .smp.design .smp-t[aria-pressed="false"] { opacity: .5; }
+  /* an example whose pattern is not picked cannot be picked: dashed and faint, with a struck box */
+  .smp.design .smp-t.off { opacity: .25; border-style: dashed; cursor: not-allowed; }
+  .smp.design .smp-t.off::before { content: ""; background: linear-gradient(to top right, transparent 45%, #9198a1 45% 55%, transparent 55%); }
+  .smp-d { display: none; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 24px calc(14px + var(--sb)); border-top: 1px solid #3d444d; background: #0d1117; }
+  .smp.design .smp-d { display: flex; }
+  .smp-dc { font: 600 13px/1 var(--mono); color: #f0f6fc; margin-right: 6px; }
+  .smp-db, .smp-d input { font: 600 13px/1 var(--mono); color: #c9d1d9; background: #151b23; border: 1px solid #3d444d; border-radius: 8px; padding: 9px 12px; }
+  .smp-db { cursor: pointer; }
+  .smp-db:hover:not(:disabled) { color: #f0f6fc; border-color: #9198a1; }
+  .smp-db:disabled { opacity: .4; cursor: default; }
+  .smp-db.go { color: #0d1117; background: #4493f8; border-color: #4493f8; }
+  .smp-dt { width: 200px; }
+  .smp-dl { flex: 1; min-width: 200px; font-weight: 500 !important; color: #9198a1 !important; }
+  body.light .smp-tb { background: #ffffff; border-color: #9ea7b3; border-left-color: var(--c); }
+  body.light .smp-tb.design { background: transparent; border-left-color: #bc4c00; }
+  body.light .smp-tb span { color: #59636e; }
+  body.light .smp-d { background: #f6f8fa; border-color: #9ea7b3; }
+  body.light .smp-dc { color: #1f2328; }
+  body.light .smp-db, body.light .smp-d input { background: #ffffff; border-color: #9ea7b3; color: #1f2328; }
+  body.light .smp-db.go { background: #0969da; border-color: #0969da; color: #ffffff; }
+  body.light .smp.design .smp-t[aria-pressed="true"] { border-color: #0969da; background: #0969da14; }
+  body.light .smp.design .smp-t[aria-pressed="true"]::before { background: #0969da; border-color: #0969da; color: #ffffff; }
+  /* during a tour the dots and band-header tiles keep only its slides; the pill (top right) names the tour */
+  .dots .drow.out, .dots button.out { display: none; }
+  .bh-row li.out { opacity: .3; }
+  .tourp { position: fixed; top: 12px; right: calc(24px + var(--sr)); display: none; z-index: 5; font: 600 13px/1 var(--mono); }
+  body.touring .tourp { display: flex; }
+  .tourp button { border: 1px solid #3d444d; background: #151b23cc; color: #9198a1; cursor: pointer; font: inherit; transition: color .2s, border-color .2s; }
+  .tourp button:hover { color: #f0f6fc; border-color: #9198a1; }
+  .tourp-b { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: min(60vw, 560px); padding: 9px 12px; border-radius: 8px 0 0 8px; }
+  .tourp-b i { font-style: normal; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #4493f8; }
+  .tourp-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f0f6fc; font-family: "Mona Sans", sans-serif; font-size: 14px; }
+  .tourp-x { padding: 0 12px; border-left: 0 !important; border-radius: 0 8px 8px 0; font-size: 18px !important; }
+  body.light .tourp button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .tourp-t { color: #1f2328; }
+  body.light .tourp-b i { color: #0969da; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
 
   // ---------- create ----------
-  // config: { slides (array, or factory receiving services), themes, bands, solo, prototypes, last, sound, css, width, height }.
+  // config: { slides (array, or factory receiving services), themes, bands, solo, prototypes, tours, last, sound, css, width, height }.
   // Returns a controller: { slides, rows, go, next, prev, band, current }.
   /** @param {CracktroDeck.Config} config */
   function create(config = {}) {
-    const { width: W = 1920, height: H = 1080, css = "", bands: BANDS = {}, solo: SOLO = {}, prototypes: PROTO = {}, last = null } = config;
+    const { width: W = 1920, height: H = 1080, css = "", bands: BANDS = {}, solo: SOLO = {}, prototypes: PROTO = {}, tours: TOURS = {}, last = null } = config;
     const sfx = config.sound || SILENT;
     const services = { h, letters, resetIndex, sound: sfx, current: () => slides[cur] };
     const slides = typeof config.slides === "function" ? config.slides(services) : [...(config.slides || [])];
@@ -403,6 +459,28 @@
         });
       });
     }
+    // Stable link ids (#id): a slide's own `id`, else a slug of its heading, so shared links survive reordering.
+    // A rename changes the slug; pin the old link by setting `id` on the slide. Duplicates get -2, -3, ...
+    {
+      const slug = t =>
+        t
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/ı/g, "i")
+          .replace(/['’]/g, "")
+          .replace(/&/g, " and ")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+      const seen = new Set();
+      for (const s of slides) {
+        const base = s.id || slug(headingText(s)) || slug(String(s.group)) || "slide";
+        let id = base;
+        for (let k = 2; seen.has(id); k++) id = `${base}-${k}`;
+        seen.add(id);
+        s.id = id;
+      }
+    }
 
     const stage = h(
       "div",
@@ -514,9 +592,46 @@
     smBtn.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="5" height="4" rx="1"/><rect x="10" y="4" width="5" height="4" rx="1"/><rect x="16.5" y="4" width="4" height="4" rx="1"/><rect x="3.5" y="10" width="5" height="4" rx="1"/><rect x="10" y="10" width="5" height="4" rx="1"/><rect x="3.5" y="16" width="5" height="4" rx="1"/><rect x="10" y="16" width="5" height="4" rx="1"/><rect x="16.5" y="16" width="4" height="4" rx="1"/></svg>';
     const notes = h("div", { class: "notes" });
+    // tour pill (top right, only during a tour): the tour title and position open the map; × shows every slide again
+    const tourT = h("span", { class: "tourp-t" }),
+      tourN = h("span", { class: "tourp-n" });
+    const tourB = h(
+      "button",
+      {
+        class: "tourp-b",
+        type: "button",
+        onclick: e => {
+          e.stopPropagation();
+          openMap();
+        },
+      },
+      h("i", {}, "Tour"),
+      tourT,
+      tourN
+    );
+    const tourP = h(
+      "div",
+      { class: "tourp" },
+      tourB,
+      h(
+        "button",
+        {
+          class: "tourp-x",
+          type: "button",
+          "aria-label": "Leave the tour and show all slides",
+          title: "Show all slides",
+          onclick: e => {
+            e.stopPropagation();
+            setView(null);
+          },
+        },
+        "×"
+      )
+    );
+    for (const t of ["touchstart", "touchend"]) tourP.addEventListener(t, e => e.stopPropagation(), { passive: true });
     const wash = h("div", { class: "wash" });
     const gridc = h("canvas", { class: "gridc" });
-    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes);
+    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     snd.classList.toggle("off", sfx.muted);
 
     // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; map/search/sound need ~150px on the right.
@@ -557,6 +672,54 @@
       setTimeout(() => snd.classList.remove("flash"), 400);
     }
 
+    // ---------- tours ----------
+    // A tour is a filtered view of the deck: only its slides are walked, dotted and counted; jumping to any other slide
+    // (search, map, band header) leaves it. config.tours holds named tours { title, bands?, slides? } (group and slide ids);
+    // a view designed in the slide map travels as base64url JSON { t: title, b: bands, s: slide ids }.
+    // Hash: #<slide-id>, #<slide-id>&tour=<name> or #<slide-id>&view=<payload>.
+    const b64e = o =>
+      btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o))))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    const b64d = p => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))));
+    // An example (a slide hung `under` a pattern) rides with its pattern: without the pattern it drops out of the view.
+    const resolveView = spec => {
+      const bs = new Set(spec?.bands || spec?.b || []),
+        ids = new Set(spec?.slides || spec?.s || []),
+        set = new Set();
+      slides.forEach((s, i) => (bs.has(s.group) || ids.has(s.id)) && set.add(i));
+      for (const i of set) if (slides[i].parent && !set.has(slides.indexOf(slides[i].parent))) set.delete(i);
+      return set.size ? set : null;
+    };
+    // a renamed slide id or band, or an example listed without its pattern, silently shrinks a tour: name it
+    for (const [name, t] of Object.entries(TOURS)) {
+      const miss = [...(t.bands || []).filter(g => !slides.some(s => s.group === g)), ...(t.slides || []).filter(id => !slides.some(s => s.id === id))];
+      if (miss.length) console.warn(`CracktroDeck: tour "${name}" names unknown bands or slide ids: ${miss.join(", ")}`);
+      const set = resolveView(t) || new Set(),
+        orphans = (t.slides || []).filter(id => slides.some((s, i) => s.id === id && s.parent && !set.has(i)));
+      if (orphans.length) console.warn(`CracktroDeck: tour "${name}" lists examples without their pattern slide: ${orphans.join(", ")}`);
+    }
+    const viewFrom = q => {
+      if (q.tour && Object.hasOwn(TOURS, q.tour)) {
+        const set = resolveView(TOURS[q.tour]);
+        return set && { key: `tour=${q.tour}`, tour: q.tour, title: TOURS[q.tour].title || q.tour, set };
+      }
+      if (q.view)
+        try {
+          const spec = b64d(q.view),
+            set = resolveView(spec);
+          return set && { key: `view=${q.view}`, title: typeof spec.t === "string" && spec.t.trim() ? spec.t.trim().slice(0, 80) : "Custom view", set };
+        } catch {}
+      return null;
+    };
+    /** @type {{ key: string, tour?: string, title: string, set: Set<number>, order: number[] } | null} */
+    let view = null;
+    const vis = i => !view || view.set.has(i);
+    const firstVis = () => slides.findIndex((s, i) => vis(i));
+    const lastVis = () => { for (let i = slides.length - 1; i >= 0; i--) if (vis(i)) return i; return -1; };
+    const hashFor = n => `#${slides[n].id}${view ? "&" + view.key : ""}`;
+
     // ---------- navigation ----------
     let cur = -1,
       redT = null,
@@ -564,6 +727,7 @@
     // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
     function go(n) {
       n = Math.max(0, Math.min(slides.length - 1, n));
+      if (!vis(n)) setView(null); // jumping outside the tour leaves it
       if (n === cur || redT) return;
       if (cur >= 0 && n > cur && slides[n].red && !slides[cur].red && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
         wash.classList.add("on", "cover");
@@ -629,46 +793,71 @@
       el.classList.add("active");
       cur = n;
       slides[n].enter?.(dir);
-      progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
+      chrome(n);
+    }
+    // progress, dots, dock buttons, notes and hash for slide n (also refreshed when a tour starts or ends)
+    function chrome(n) {
+      const at = view ? view.order.indexOf(n) : n,
+        len = view ? view.order.length : slides.length;
+      progress.style.transform = `scaleX(${(at + 1) / len})`;
       dotBtns.forEach((d, i) => d.classList.toggle("on", i === n));
       [...dots.children].forEach((r, i) => r.classList.toggle("on", i === slides[n].band));
-      prevBtn.disabled = n === 0;
+      prevBtn.disabled = prevTop(n) == null;
       nextBtn.disabled = nextTop(n) == null;
-      bandPrevBtn.disabled = slides[n].band === 0;
-      bandNextBtn.disabled = slides[n].band === rows.length - 1;
+      bandPrevBtn.disabled = bandTo(slides[n].band, -1) == null;
+      bandNextBtn.disabled = bandTo(slides[n].band, 1) == null;
       paintColumn(n);
       notes.textContent = slides[n].notes || "";
-      history.replaceState(null, "", `#${n + 1}`);
+      if (view) tourN.textContent = `${at + 1}/${len}`;
+      history.replaceState(null, "", hashFor(n));
     }
     // Left/right walk the main line of slides (column heads, never their examples) and wrap across bands;
     // up/down walk a column, and past its ends (or off any column) jump to the header of the band above/below.
-    const top = n => (slides[n].parent ? slides.indexOf(slides[n].parent) : n);
+    // In a tour only its slides count (an example is only ever in a tour together with its pattern).
+    const pat = n => (slides[n].parent ? slides.indexOf(slides[n].parent) : -1);
+    const onMain = i => vis(i) && pat(i) < 0;
+    const top = n => (pat(n) >= 0 ? pat(n) : n);
     const nextTop = n => {
-      for (let i = top(n) + 1; i < slides.length; i++) if (!slides[i].parent) return i;
+      for (let i = top(n) + 1; i < slides.length; i++) if (onMain(i)) return i;
       return null;
     };
     const prevTop = n => {
-      for (let i = top(n) - 1; i >= 0; i--) if (!slides[i].parent) return i;
+      for (let i = top(n) - 1; i >= 0; i--) if (onMain(i)) return i;
+      return null;
+    };
+    // first visible slide of the nearest band above (d=-1) or below (d=1) that has one
+    const bandTo = (from, d) => {
+      for (let b = from + d; b >= 0 && b < rows.length; b += d) {
+        const i = slides.findIndex((s, k) => s.band === b && vis(k));
+        if (i >= 0) return i;
+      }
       return null;
     };
     const band = d => {
-      const b = slides[cur].band + d;
-      if (b >= 0 && b < rows.length) go(rows[b].start);
+      const i = bandTo(slides[cur].band, d);
+      if (i != null) go(i);
+    };
+    // the visible part of a slide's column, pattern first, or null when there is nothing to walk
+    const colList = s => {
+      const col = colOf(s);
+      if (!col || !vis(slides.indexOf(col))) return null;
+      const list = [col, ...col.kids.filter(k => vis(slides.indexOf(k)))];
+      return list.length > 1 ? list : null;
     };
     const vstep = d => {
-      const col = colOf(slides[cur]);
-      if (!col) return band(d);
-      const list = [col, ...col.kids],
-        i = list.indexOf(slides[cur]) + d;
+      const list = colList(slides[cur]);
+      if (!list) return band(d);
+      const i = list.indexOf(slides[cur]) + d;
       if (i >= 0 && i < list.length) go(slides.indexOf(list[i]));
       else band(d);
     };
     function paintColumn(n) {
-      const col = colOf(slides[n]);
-      vnb.classList.toggle("on", !!col);
-      if (!col) return (vnb._nav = null);
-      const N = col.kids.length,
-        at = [col, ...col.kids].indexOf(slides[n]),
+      const list = colList(slides[n]);
+      vnb.classList.toggle("on", !!list);
+      if (!list) return (vnb._nav = null);
+      const col = list[0],
+        N = list.length - 1,
+        at = list.indexOf(slides[n]),
         back = at === N,
         label = at ? (back ? "Back to the pattern" : `Next example (${at + 1} of ${N})`) : `${N} example${N > 1 ? "s" : ""} below`;
       vnb.classList.toggle("head", at === 0);
@@ -725,8 +914,8 @@
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         vstep(e.key === "ArrowDown" ? 1 : -1);
-      } else if (e.key === "Home") go(0);
-      else if (e.key === "End") go(slides.length - 1);
+      } else if (e.key === "Home") go(firstVis());
+      else if (e.key === "End") go(lastVis());
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
       else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
       else if (e.key === "m" || e.key === "M") toggleSound();
@@ -751,7 +940,48 @@
       if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && vstep(dy < 0 ? 1 : -1);
       else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
     });
-    addEventListener("hashchange", () => go((parseInt(location.hash.slice(1), 10) || 1) - 1));
+    // #id selects a slide; a legacy numeric #N still opens the Nth slide and is rewritten to its #id.
+    // &tour=<name> or &view=<payload> after it starts (or keeps) a tour; a slide outside the tour opens its first slide.
+    const parseHash = () => {
+      const [head, ...rest] = location.hash.slice(1).split("&"),
+        q = {};
+      for (const p of head.includes("=") ? [head, ...rest] : rest) {
+        const k = p.indexOf("=");
+        if (k > 0)
+          try {
+            q[p.slice(0, k)] = decodeURIComponent(p.slice(k + 1));
+          } catch {}
+      }
+      let id = head.includes("=") ? "" : head;
+      try {
+        id = decodeURIComponent(id);
+      } catch {}
+      return { id, q };
+    };
+    const followHash = () => {
+      const { id, q } = parseHash(),
+        v = viewFrom(q);
+      if ((v?.key ?? null) !== (view?.key ?? null)) setView(v);
+      let n = /^\d+$/.test(id) ? Math.max(0, Math.min(slides.length - 1, +id - 1)) : slides.findIndex(s => s.id === id);
+      if (n < 0 || !vis(n)) n = firstVis();
+      if (n === cur) history.replaceState(null, "", hashFor(n));
+      else go(n);
+    };
+    addEventListener("hashchange", followHash);
+    // Start, switch or (with null) leave a tour; dots, band-header tiles and the dock show only its slides.
+    function setView(v) {
+      view = v && { ...v, order: [...v.set].sort((a, b) => a - b) };
+      document.body.classList.toggle("touring", !!view);
+      dotBtns.forEach((d, i) => d.classList.toggle("out", !vis(i)));
+      [...dots.children].forEach((r, b) => r.classList.toggle("out", !slides.some((s, i) => s.band === b && vis(i))));
+      for (const li of stage.querySelectorAll(".bh-row li[data-go]")) li.classList.toggle("out", !vis(+li.dataset.go));
+      tourT.textContent = view?.title || "";
+      tourB.firstChild.textContent = view?.tour ? "Tour" : "View";
+      tourB.title = view ? `${view.tour ? "Tour" : "Custom view"}: ${view.title}. Open the slide map (G)` : "";
+      tourB.setAttribute("aria-label", tourB.title);
+      if (cur >= 0 && vis(cur)) chrome(cur);
+      if (smpTiles) smpPaint();
+    }
 
     // ---------- search ----------
     // "/" (or Ctrl/Cmd+K, or the dock's search button) opens a full-screen dialog that fuzzy-searches every slide.
@@ -962,11 +1192,119 @@
     // Click or Enter opens a slide; Left/Right step in slide order, Up/Down move to the nearest tile on the line above/below.
     // A column (a pattern slide with `kids`) gets its own grid line: the pattern tile, then its examples behind a dotted rule.
     const smpBody = h("div", { class: "smp-body" });
+    const smpHead = h("h2", { class: "smp-h" }, "Slide map");
+    // Tours (very bottom of the map): every slide, each config.tours entry, the custom view in use, and "Design a view".
+    // Design mode turns tiles into toggles and band headings into whole-band checkboxes; the bar below the map shows
+    // the count, an optional title and the shareable link (#<first slide>&view=<base64url { t, b, s }>).
+    let smpDesign = false;
+    const smpSel = new Set();
+    const bandIdx = b => slides.flatMap((s, i) => (s.band === b ? [i] : []));
+    const smpTourList = h("div", { class: "smp-tl", role: "group", "aria-label": "Tours" });
+    const smpTours = h(
+      "section",
+      { class: "smp-row smp-tours", "--c": "#4493f8", "aria-labelledby": "smp-tours-h" },
+      h("h3", { class: "smp-l", id: "smp-tours-h" }, "Tours", " ", h("small", {}, "filtered views of the deck, shareable by link")),
+      smpTourList
+    );
+    const smpCount = h("span", { class: "smp-dc", "aria-live": "polite" });
+    const smpTitle = h("input", { type: "text", class: "smp-dt", placeholder: "View title (optional)", maxLength: 80, "aria-label": "View title", oninput: () => smpPaint() });
+    const smpLink = h("input", { type: "text", class: "smp-dl", readOnly: true, "aria-label": "Link to this view", onfocus: e => e.target.select() });
+    const dbtn = (text, fn, cls = "") => h("button", { class: `smp-db ${cls}`, type: "button", onclick: fn }, text);
+    const smpApply = dbtn("Apply view", () => smpUse(viewFrom({ view: b64e(smpSpec()) }), false), "go");
+    const smpCopy = dbtn("Copy link", () => {
+      const done = () => ((smpCopy.textContent = "Copied"), setTimeout(() => (smpCopy.textContent = "Copy link"), 1500));
+      navigator.clipboard?.writeText(smpLink.value).then(done, () => smpLink.select()) ?? smpLink.select();
+    });
+    const smpDBar = h(
+      "div",
+      { class: "smp-d", role: "group", "aria-label": "Design a view" },
+      smpCount,
+      dbtn("Select all", () => smpPick(slides.map((s, i) => i), true)),
+      dbtn("Clear", () => smpPick([...smpSel], false)),
+      smpTitle,
+      smpLink,
+      smpCopy,
+      smpApply,
+      dbtn("Cancel", () => smpDesignMode(false))
+    );
+    // the designed view: whole bands by group (later slides of the band join automatically), other slides by id
+    const smpSpec = () => {
+      const b = [],
+        s = [];
+      rows.forEach((r, bi) => {
+        const idx = bandIdx(bi);
+        if (idx.every(i => smpSel.has(i))) b.push(r.group);
+        else for (const i of idx) if (smpSel.has(i)) s.push(slides[i].id);
+      });
+      const t = smpTitle.value.trim();
+      return { ...(t && { t }), ...(b.length && { b }), ...(s.length && { s }) };
+    };
+    const smpPick = (idx, on) => {
+      for (const i of idx) on ? smpSel.add(i) : smpSel.delete(i);
+      // an example rides with its pattern: it cannot be picked alone and leaves with it
+      for (const i of smpSel) if (pat(i) >= 0 && !smpSel.has(pat(i))) smpSel.delete(i);
+      smpPaint();
+    };
+    function smpDesignMode(on) {
+      smpDesign = on;
+      if (on) {
+        smpSel.clear();
+        for (const i of view ? view.order : []) smpSel.add(i);
+        smpTitle.value = view && !view.tour && view.title !== "Custom view" ? view.title : "";
+      }
+      smp.classList.toggle("design", on);
+      smpHead.textContent = on ? "Design a view: pick slides or whole bands" : "Slide map";
+      smpPaint();
+      if (on) smpTiles[cur]?.focus({ preventScroll: true });
+    }
+    // start (or, with null, leave) a view from the map; a new tour opens its first slide
+    function smpUse(v, restart = true) {
+      smp.close();
+      setView(v);
+      go(!restart && vis(cur) ? cur : firstVis());
+    }
+    const smpTourBtn = (text, sub, pressed, fn) => h("button", { class: "smp-tb", type: "button", "aria-pressed": String(pressed), onclick: fn }, h("b", {}, text), h("span", {}, sub));
+    function smpPaint() {
+      smpTiles.forEach((t, i) => {
+        t.classList.toggle("out", !smpDesign && !vis(i));
+        const off = smpDesign && pat(i) >= 0 && !smpSel.has(pat(i));
+        t.classList.toggle("off", off);
+        if (off) t.setAttribute("aria-disabled", "true");
+        else t.removeAttribute("aria-disabled");
+        if (smpDesign) t.setAttribute("aria-pressed", String(smpSel.has(i)));
+        else t.removeAttribute("aria-pressed");
+      });
+      smpBody.querySelectorAll(".smp-bx").forEach((x, b) => {
+        const idx = bandIdx(b),
+          k = idx.filter(i => smpSel.has(i)).length;
+        x.checked = k === idx.length;
+        x.indeterminate = k > 0 && k < idx.length;
+      });
+      const count = n => `${n} slide${n === 1 ? "" : "s"}`;
+      smpTourList.replaceChildren(
+        ...[
+          smpTourBtn("All slides", count(slides.length), !view, () => smpUse(null, false)),
+          ...Object.entries(TOURS).map(([name, t]) => {
+            const set = resolveView(t);
+            return set && smpTourBtn(t.title || name, t.summary ? `${count(set.size)} · ${t.summary}` : count(set.size), view?.tour === name, () => smpUse(viewFrom({ tour: name })));
+          }),
+          view && !view.tour ? smpTourBtn(view.title, `${count(view.set.size)} · custom view`, true, () => smpUse(view, false)) : null,
+          h("button", { class: "smp-tb design", type: "button", "aria-pressed": String(smpDesign), onclick: () => smpDesignMode(!smpDesign) }, h("b", {}, "Design a view"), h("span", {}, "pick slides or bands, share the link")),
+        ].filter(Boolean)
+      );
+      if (!smpDesign) return;
+      const spec = smpSpec(),
+        first = slides.findIndex((s, i) => smpSel.has(i));
+      smpCount.textContent = `${smpSel.size} of ${count(slides.length)}`;
+      smpLink.value = smpSel.size ? `${location.href.split("#")[0]}#${slides[first].id}&view=${b64e(spec)}` : "";
+      smpApply.disabled = smpCopy.disabled = !smpSel.size;
+    }
     const smp = h(
       "dialog",
       { class: "smp", "aria-label": "Slide map" },
-      h("div", { class: "smp-bar" }, h("h2", { class: "smp-h" }, "Slide map"), h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", onclick: () => smp.close() }, "Esc")),
-      smpBody
+      h("div", { class: "smp-bar" }, smpHead, h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", onclick: () => smp.close() }, "Esc")),
+      smpBody,
+      smpDBar
     );
     document.body.append(smp);
     let smpTiles = null;
@@ -986,7 +1324,7 @@
                     class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`,
                     type: "button",
                     "aria-label": `Go to slide ${n + 1}: ${label(s) || rowName(r.group)}`,
-                    onclick: () => (smp.close(), go(n)),
+                    onclick: () => (smpDesign ? smpPick([n], !smpSel.has(n)) : (smp.close(), go(n))),
                   },
                   h("b", {}, String(n + 1).padStart(2, "0"), s.kids ? h("i", { title: `${s.kids.length} examples below` }, `↓${s.kids.length}`) : null),
                   h("span", {}, label(s) || rowName(r.group))
@@ -1016,10 +1354,23 @@
           return h(
             "section",
             { class: "smp-row", "--c": c, "aria-labelledby": id },
-            h("h3", { class: "smp-l", id, "data-n": r.start }, rowName(r.group), " ", h("small", {}, first === last ? `#${first}` : `#${first}–${last}`)),
+            h(
+              "h3",
+              { class: "smp-l", id, "data-n": r.start },
+              h("input", {
+                type: "checkbox",
+                class: "smp-bx",
+                "aria-label": `Include the whole ${rowName(r.group)} band`,
+                onchange: e => smpPick(bandIdx(b), e.target.checked),
+              }),
+              rowName(r.group),
+              " ",
+              h("small", {}, first === last ? `#${first}` : `#${first}–${last}`)
+            ),
             h("div", { class: "smp-tiles" }, tiles)
           );
-        })
+        }),
+        smpTours
       );
     };
     // nearest tile on the next visual line above or below (tiles wrap, so bands can span several lines)
@@ -1061,6 +1412,7 @@
       // band headers enter with their first tile; a column's dotted rule with its first example
       for (const l of smpBody.querySelectorAll(".smp-l")) l.style.setProperty("--d", smpDelay(+l.dataset.n));
       for (const k of smpBody.querySelectorAll(".smp-kids")) k.style.setProperty("--d", k.firstChild.style.getPropertyValue("--d"));
+      smpPaint();
       smp.showModal();
       smpFit();
       const t = smpTiles[cur];
@@ -1068,6 +1420,10 @@
       t?.scrollIntoView({ block: "center" });
     }
     smp.addEventListener("keydown", e => {
+      /** @type {any} */
+      const target = e.target;
+      // typing a view title, or toggling a band checkbox, keeps its own keys
+      if (target.matches?.("input") && e.key !== "Escape" && !(target.type === "checkbox" && e.key.startsWith("Arrow"))) return;
       // settle the entrance so Up/Down measure final tile positions
       for (const a of smp.getAnimations?.({ subtree: true }) || []) a.finish();
       const i = smpTiles.indexOf(document.activeElement);
@@ -1076,7 +1432,11 @@
       else if (e.key === "ArrowDown" || e.key === "ArrowUp") to = smpVert(smpTiles[i < 0 ? cur : i], e.key === "ArrowDown");
       else if (e.key === "Home") to = smpTiles[0];
       else if (e.key === "End") to = smpTiles[slides.length - 1];
-      else if (e.key === "Escape" || e.key === "g" || e.key === "G") {
+      else if (e.key === "Escape" && smpDesign) {
+        e.preventDefault();
+        smpDesignMode(false);
+        return;
+      } else if (e.key === "Escape" || e.key === "g" || e.key === "G") {
         e.preventDefault();
         smp.close();
         return;
@@ -1086,6 +1446,7 @@
     });
     smp.addEventListener("click", e => e.target === smp && smp.close());
     smp.addEventListener("close", () => {
+      if (smpDesign) smpDesignMode(false);
       /** @type {any} */
       const active = document.activeElement;
       active?.blur?.();
@@ -1179,9 +1540,16 @@
       requestAnimationFrame(frame);
     }
 
-    go((parseInt(location.hash.slice(1), 10) || 1) - 1);
+    followHash();
     requestAnimationFrame(frame);
-    return { slides, rows, go, next, prev, band, current: () => cur };
+    // tour(name) starts a config.tours entry at its first slide; tour(null) shows every slide again
+    const tour = name => {
+      const v = name == null ? null : viewFrom({ tour: name });
+      if (name != null && !v) throw new Error(`CracktroDeck: unknown or empty tour "${name}"`);
+      setView(v);
+      if (v) go(firstVis());
+    };
+    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS) };
   }
 
   window.CracktroDeck = { h, letters, resetIndex, create };

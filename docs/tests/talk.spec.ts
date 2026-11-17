@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync, readdirSync } from "node:fs";
 import { injectSlideMetadata, loadSlides, parseSlides, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
 
-// The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its row position.
+// The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its row position, its link the stable #id.
 const SLIDES = loadSlides();
 const PAGE_URL = "https://github.github.com/gh-aw/cracktro/";
 const SOURCE_HTML = readFileSync(new URL("../public/cracktro/index.html", import.meta.url), "utf8");
@@ -15,6 +15,7 @@ const slideNo = (heading: string) => {
   if (!n) throw new Error(`slide "${heading}" missing from slides.md`);
   return n;
 };
+const slideId = (heading: string) => SLIDES[slideNo(heading) - 1].id;
 // the current slide is the active dot of the slide mini-map (the deck shows no slide counter)
 const CURRENT = '.dots button.on[aria-label^="Slide "]';
 const at = (n: number) => `Slide ${n}`;
@@ -60,7 +61,7 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
 
   // Space follows the main line from Event-driven Hand-offs to Repo Commands
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Repo Commands")}$`));
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideId("Repo Commands")}$`));
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
@@ -459,7 +460,7 @@ test("starts the slide-change whoosh silent instead of with a full-scale bass bu
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {
   await page.goto("/gh-aw/");
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
-  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#1$/);
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${SLIDES[0].id}$`));
 
   const assets = ["runtime.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
@@ -770,13 +771,13 @@ test("splits inline skills and agents, defers context and preserves step navigat
 });
 
 test.describe("slides.md metadata", () => {
-  const table = (...rows: string[]) => ["# Slides", "", "| Heading | Notes | Summary |", "|---|---|---|", ...rows, ""].join("\n");
+  const table = (...rows: string[]) => ["# Slides", "", "| Id | Heading | Notes | Summary |", "|---|---|---|---|", ...rows, ""].join("\n");
 
-  test("parses every row with a unique, public summary", () => {
+  test("parses every row with a unique id and a unique, public summary", () => {
     expect(SLIDES.length).toBeGreaterThan(0);
-    expect(parseSlides(table("| A |  | First. |", "| B | illustrative | Second. |"))).toEqual([
-      { heading: "A", illustrative: false, summary: "First.", line: 5 },
-      { heading: "B", illustrative: true, summary: "Second.", line: 6 },
+    expect(parseSlides(table("| a | A |  | First. |", "| b-2 | B | illustrative | Second. |"))).toEqual([
+      { id: "a", heading: "A", illustrative: false, summary: "First.", line: 5 },
+      { id: "b-2", heading: "B", illustrative: true, summary: "Second.", line: 6 },
     ]);
     for (const slide of SLIDES) {
       expect(`${slide.heading} ${slide.summary}`, slide.heading).not.toMatch(PRIVATE_REFS);
@@ -786,27 +787,30 @@ test.describe("slides.md metadata", () => {
 
   test("rejects malformed slide lists with the offending line", () => {
     const cases: [string, RegExp][] = [
-      [table("| A | First. |"), /:5: expected 3 cells, found 2/],
-      [table("| A |  | First. | extra |"), /:5: expected 3 cells, found 4/],
-      [table("| A |  | First."), /:5: malformed row/],
-      [table("|  |  | First. |"), /:5: empty Heading/],
-      [table("| A |  |  |"), /:5: empty Summary for "A"/],
-      [table("| A | synthetic | First. |"), /:5: unknown Notes value "synthetic"/],
-      [table("| A |  | First. |", "| A |  | Second. |"), /:6: duplicate Heading "A" \(first on line 5\)/],
-      [table("| Human agent processes |  | First. |", "| Human Agent Processes |  | Second. |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
-      [table("| A |  | Same. |", "| B |  | Same. |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
-      [table("| A |  | First. |", "B | illustrative | Last slide. |"), /:6: malformed row, expected "\| Heading \| Notes \| Summary \|": B \| illustrative \| Last slide\. \|/],
-      [table("| A |  | First. |", "", "| B |  | Second. |"), /:7: table row outside the slide table/],
+      [table("| a | A | First. |"), /:5: expected 4 cells, found 3/],
+      [table("| a | A |  | First. | extra |"), /:5: expected 4 cells, found 5/],
+      [table("| a | A |  | First."), /:5: malformed row/],
+      [table("| A | A |  | First. |"), /:5: invalid Id "A" for "A"/],
+      [table("|  | A |  | First. |"), /:5: invalid Id "" for "A"/],
+      [table("| a | A |  | First. |", "| a | B |  | Second. |"), /:6: duplicate Id "a" \(first on line 5\)/],
+      [table("| a |  |  | First. |"), /:5: empty Heading/],
+      [table("| a | A |  |  |"), /:5: empty Summary for "A"/],
+      [table("| a | A | synthetic | First. |"), /:5: unknown Notes value "synthetic"/],
+      [table("| a | A |  | First. |", "| b | A |  | Second. |"), /:6: duplicate Heading "A" \(first on line 5\)/],
+      [table("| a | Human agent processes |  | First. |", "| b | Human Agent Processes |  | Second. |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
+      [table("| a | A |  | Same. |", "| b | B |  | Same. |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
+      [table("| a | A |  | First. |", "b | B | illustrative | Last slide. |"), /:6: malformed row, expected "\| Id \| Heading \| Notes \| Summary \|": b \| B \| illustrative \| Last slide\. \|/],
+      [table("| a | A |  | First. |", "", "| b | B |  | Second. |"), /:7: table row outside the slide table/],
       [table(), /:3: slide table has no rows/],
-      ["| Heading | Notes |\n|---|---|\n| A |  |\n", /:1: expected table header/],
-      ["| Heading | Notes | Summary |\n|---|---|\n", /:2: expected separator/],
+      ["| Heading | Notes | Summary |\n|---|---|---|\n| A |  | First. |\n", /:1: expected table header/],
+      ["| Id | Heading | Notes | Summary |\n|---|---|---|\n", /:2: expected separator/],
       ["no table", /missing slide table/],
     ];
     for (const [text, error] of cases) expect(() => parseSlides(text, "slides.md"), String(error)).toThrow(error);
   });
 
   test("injects escaped, idempotent JSON-LD and leaves the rest of the page untouched", () => {
-    const hostile = parseSlides(table("| A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. |"));
+    const hostile = parseSlides(table("| a | A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. |"));
     const html = injectSlideMetadata(SOURCE_HTML, hostile, PAGE_URL);
     expect(html.match(/<\/script>/gi)).toHaveLength(SOURCE_HTML.match(/<\/script>/gi)!.length);
     expect(html).not.toContain("<b>");
@@ -847,7 +851,7 @@ test("serves the slide list in the talk page head without running the deck", asy
   expect(head.match(/https:\/\/[^"\s]+/g)!.every(url => url.startsWith("https://schema.org") || url.startsWith("https://github.github.com/gh-aw/"))).toBe(true);
 });
 
-test("opens every slide from its metadata #N link", async ({ page, request }) => {
+test("opens every slide from its metadata #id link", async ({ page, request }) => {
   test.slow();
   const [doc] = jsonLd(await (await request.get("/gh-aw/cracktro/")).text());
   await page.goto("/gh-aw/cracktro/");
@@ -856,7 +860,60 @@ test("opens every slide from its metadata #N link", async ({ page, request }) =>
     await page.evaluate(h => (location.hash = h), hash);
     await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(part.position));
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(part.name);
+    await expect(page).toHaveURL(new RegExp(`${hash}$`));
   }
+});
+
+test("names every slide with its slides.md id and rewrites legacy #N links", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/");
+  const ids = await page.locator(".dots button").evaluateAll(dots =>
+    dots.map(dot => {
+      (dot as HTMLElement).click();
+      return location.hash.slice(1);
+    })
+  );
+  expect(ids).toEqual(SLIDES.map(s => s.id));
+  await page.goto(`/gh-aw/cracktro/#${SECURITY}`);
+  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(SECURITY));
+  await expect(page).toHaveURL(new RegExp(`#${slideId("Security")}$`));
+  await page.goto("/gh-aw/cracktro/#no-such-slide");
+  await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(1));
+});
+
+test("opens every hard-coded tour from the hash with all its slides found", async ({ page }) => {
+  const warnings: string[] = [];
+  page.on("console", msg => msg.type() === "warning" && warnings.push(msg.text()));
+  await page.goto("/gh-aw/cracktro/#finale&tour=overview");
+  await expect(page.locator(".tourp")).toContainText("Overview");
+  await expect(page.locator(".tourp-n")).toHaveText(/^(\d+)\/\1$/);
+  await page.keyboard.press("g");
+  await expect(page.getByRole("group", { name: "Tours" }).getByRole("button")).toHaveCount(7);
+  expect(warnings.filter(w => w.includes("CracktroDeck"))).toEqual([]);
+});
+
+test("keeps an example in a view only together with its pattern slide", async ({ page }) => {
+  const view = (s: string[]) => Buffer.from(JSON.stringify({ s })).toString("base64url");
+  await page.goto(`/gh-aw/cracktro/#github-agentic-workflows&view=${view(["github-agentic-workflows", "repo-assist"])}`);
+  await expect(page.locator(".tourp-n")).toHaveText("1/1");
+  await page.evaluate(h => (location.hash = h), `#daily-improvers&view=${view(["daily-improvers", "repo-assist"])}`);
+  await expect(page.locator(".tourp-n")).toHaveText("1/2");
+  await page.keyboard.press("ArrowDown");
+  await expect(page).toHaveURL(/#repo-assist&view=/);
+
+  // in design mode, unpicking a pattern drops its examples and disables their tiles
+  await page.keyboard.press("g");
+  await page.getByRole("button", { name: /^Design a view/ }).click();
+  const pattern = page.getByRole("button", { name: /: Daily Improvers$/ }),
+    example = page.getByRole("button", { name: /: Repo Assist$/ });
+  await expect(example).toHaveAttribute("aria-pressed", "true");
+  await pattern.click();
+  await expect(example).toHaveAttribute("aria-pressed", "false");
+  await expect(example).toHaveAttribute("aria-disabled", "true");
+  await example.click();
+  await expect(example).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("group", { name: "Design a view" })).toContainText(`0 of ${SLIDES.length} slides`);
+  await pattern.click();
+  await expect(example).not.toHaveAttribute("aria-disabled");
 });
 
 // A tiny second deck on runtime.js alone: no talk content, themes, solo labels or sound service.
@@ -881,6 +938,7 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
       ];
     },
     bands: { part: ["Part one", "The only band"] },
+    tours: { ends: { title: "Both ends", summary: "first and last", slides: ["hello", "goodbye"] }, part: { title: "Just the part", bands: ["part"] }, ghost: { slides: ["nope"] } },
     last: last === "none" ? null : last || "outro",
   });
 </script></body></html>`;
@@ -909,13 +967,13 @@ test.describe("reusable runtime", () => {
     expect(await page.evaluate(() => typeof (window as unknown as { sfx?: unknown }).sfx)).toBe("undefined");
 
     await page.keyboard.press("ArrowRight");
-    await expect(page).toHaveURL(/#3$/);
+    await expect(page).toHaveURL(/#alpha$/);
     await expect(heading(page)).toHaveText("Alpha");
     await page.keyboard.press("End");
-    await expect(page).toHaveURL(/#5$/);
+    await expect(page).toHaveURL(/#goodbye$/);
     await expect(heading(page)).toHaveText("Goodbye");
     await page.keyboard.press("m");
-    await expect(page).toHaveURL(/#5$/);
+    await expect(page).toHaveURL(/#goodbye$/);
     expect(errors).toEqual([]);
   });
 
@@ -924,11 +982,11 @@ test.describe("reusable runtime", () => {
     await expect(heading(page)).toHaveText("Hello");
     await page.keyboard.press("x");
     await page.keyboard.press("ArrowRight");
-    await expect(page).toHaveURL(/#1$/);
+    await expect(page).toHaveURL(/#hello$/);
     expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toEqual(["enter:1", "key:Hello notes", "step"]);
     await page.keyboard.press("ArrowRight");
-    await expect(page).toHaveURL(/#2$/);
-    await page.evaluate(() => (location.hash = "#4"));
+    await expect(page).toHaveURL(/#part-one$/);
+    await page.evaluate(() => (location.hash = "#beta"));
     await expect(heading(page)).toHaveText("Beta");
     await page.keyboard.press("PageUp");
     await expect(heading(page)).toHaveText("Hello");
@@ -947,5 +1005,105 @@ test.describe("reusable runtime", () => {
       await expect(heading(page)).toHaveText("Beta");
       expect(errors).toEqual([]);
     }
+  });
+
+  test("walks a tour from the hash and leaves it on a jump outside", async ({ page }) => {
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html#goodbye&tour=ends");
+    await expect(heading(page)).toHaveText("Goodbye");
+    await expect(page.locator(".tourp")).toBeVisible();
+    await expect(page.locator(".tourp")).toContainText("Both ends");
+    await expect(page.locator(".tourp")).toContainText("2/2");
+    await expect(page.locator(".dots button:visible")).toHaveCount(2);
+    await page.keyboard.press("ArrowLeft");
+    await expect(heading(page)).toHaveText("Hello");
+    await expect(page).toHaveURL(/#hello&tour=ends$/);
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await expect(heading(page)).toHaveText("Goodbye");
+    await page.keyboard.press("Home");
+    await expect(heading(page)).toHaveText("Hello");
+    await page.keyboard.press("PageDown");
+    await expect(heading(page)).toHaveText("Goodbye");
+
+    // a hash slide outside the tour opens the tour's first slide; an unknown or empty tour shows every slide
+    await page.evaluate(() => (location.hash = "#alpha&tour=part"));
+    await expect(heading(page)).toHaveText("Alpha");
+    await expect(page.locator(".tourp")).toContainText("Just the part");
+    await page.evaluate(() => (location.hash = "#hello&tour=part"));
+    await expect(heading(page)).toHaveText("Part one");
+    await expect(page).toHaveURL(/#part-one&tour=part$/);
+    await page.evaluate(() => (location.hash = "#alpha&tour=ghost"));
+    await expect(page).toHaveURL(/#alpha$/);
+    await expect(page.locator(".tourp")).toBeHidden();
+
+    // jumping to a slide outside the tour (map, search, header tile) leaves it
+    await page.evaluate(() => (location.hash = "#alpha&tour=ends"));
+    await expect(heading(page)).toHaveText("Hello");
+    await page.getByRole("button", { name: "Slide 3", exact: true }).evaluate(b => (b as HTMLElement).click());
+    await expect(heading(page)).toHaveText("Alpha");
+    await expect(page).toHaveURL(/#alpha$/);
+    await expect(page.locator(".tourp")).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
+  test("picks tours from the bottom of the slide map", async ({ page }) => {
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html#beta");
+    await page.keyboard.press("g");
+    const tours = page.getByRole("group", { name: "Tours" });
+    await expect(tours.getByRole("button")).toHaveText([/^All slides\s*5 slides$/, /^Both ends\s*2 slides · first and last$/, /^Just the part\s*3 slides$/, /^Design a view/]);
+    await expect(tours.getByRole("button", { name: /^All slides/ })).toHaveAttribute("aria-pressed", "true");
+    await tours.getByRole("button", { name: /^Both ends/ }).click();
+    await expect(page.locator(".smp")).toBeHidden();
+    await expect(heading(page)).toHaveText("Hello");
+    await expect(page).toHaveURL(/#hello&tour=ends$/);
+    await page.keyboard.press("g");
+    await expect(page.locator(".smp-t.out")).toHaveCount(3);
+    await tours.getByRole("button", { name: /^All slides/ }).click();
+    await expect(page).toHaveURL(/#hello$/);
+    await expect(page.locator(".tourp")).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
+  test("designs a custom view from slides and whole bands and shares it as a link", async ({ page }) => {
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html#hello");
+    await page.keyboard.press("g");
+    await page.getByRole("button", { name: /^Design a view/ }).click();
+    const bar = page.getByRole("group", { name: "Design a view" });
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText("0 of 5 slides");
+    await expect(bar.getByRole("button", { name: "Apply view" })).toBeDisabled();
+    // a tile toggles instead of navigating; a band checkbox takes the whole band
+    await page.getByRole("button", { name: /^Go to slide 5:/ }).click();
+    await expect(page.getByRole("button", { name: /^Go to slide 5:/ })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("checkbox", { name: "Include the whole Part one band" }).check();
+    await expect(bar).toContainText("4 of 5 slides");
+    await page.getByRole("button", { name: /^Go to slide 4:/ }).click();
+    await expect(page.getByRole("checkbox", { name: "Include the whole Part one band" })).toHaveJSProperty("indeterminate", true);
+    await expect(bar).toContainText("3 of 5 slides");
+    await bar.getByRole("textbox", { name: "View title" }).fill("Part and outro");
+    const link = await bar.getByRole("textbox", { name: "Link to this view" }).inputValue();
+    const payload = link.match(/#part-one&view=([\w-]+)$/)![1];
+    // whole bands travel by group (slides added to them later join the view), the rest by slide id
+    expect(JSON.parse(Buffer.from(payload, "base64url").toString())).toEqual({ t: "Part and outro", b: ["outro"], s: ["part-one", "alpha"] });
+
+    await bar.getByRole("button", { name: "Apply view" }).click();
+    await expect(page.locator(".smp")).toBeHidden();
+    await expect(heading(page)).toHaveText("Part one");
+    await expect(page.locator(".tourp")).toContainText("Part and outro");
+    await page.keyboard.press("End");
+    await expect(heading(page)).toHaveText("Goodbye");
+    await expect(page).toHaveURL(new RegExp(`#goodbye&view=${payload}$`));
+
+    // the shared link reopens the same view in a fresh page
+    await page.goto(link);
+    await expect(heading(page)).toHaveText("Part one");
+    await expect(page.locator(".tourp")).toContainText("Part and outro");
+    await page.keyboard.press("ArrowLeft");
+    await expect(heading(page)).toHaveText("Part one");
+    await page.getByRole("button", { name: "Leave the tour and show all slides" }).click();
+    await expect(page).toHaveURL(/#part-one$/);
+    await page.keyboard.press("ArrowLeft");
+    await expect(heading(page)).toHaveText("Hello");
+    expect(errors).toEqual([]);
   });
 });

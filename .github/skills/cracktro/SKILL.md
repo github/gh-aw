@@ -11,7 +11,7 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 
 ## Agent navigation and maintenance (mandatory)
 
-- Find slides in `slides.md`: row N is slide N (`#N`); read its Summary before opening `deck.js`.
+- Find slides in `slides.md` by Id; link them as `#<id>` (stable; never `#N`, the layout is two-dimensional). Read the Summary before opening `deck.js`.
 - When you add, remove, move, rename a slide or change its message, update its `slides.md` row in the same change. Summaries are public, durable takeaways without aging counts or dates; band headers start `Band header (<band>):`.
 - Never copy slide lists, numbers or summaries elsewhere (`index.html` included): the docs build and dev server inject every row into JSON-LD `hasPart`; an invalid row fails the build.
 
@@ -38,7 +38,7 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 | `const OCTI` | Octicon paths for `ico(name,x,y,size,fill)`. |
 | `---------- sound:` | WebAudio synth `sfx` (methods in `mechanics.md`); `MUSIC` themes; `slide(dir, music, shift)` transposes `shift` semitones. |
 | `---------- band themes ----------` | `THEME` per band (see `mechanics.md`). |
-| `---------- start ----------` | `CracktroDeck.create({ width, height, css, slides, themes, bands, solo, prototypes, last, sound })`; `slides` may be a factory of `{ h, letters, resetIndex, sound, current }`. |
+| `---------- start ----------` | `CracktroDeck.create({ width, height, css, slides, themes, bands, solo, prototypes, last, sound, tours })`; `TOURS` above it holds the hard-coded tours (`mechanics.md`); `slides` may be a factory of `{ h, letters, resetIndex, sound, current }`. |
 | runtime.js `create`, `navigation`, `search`, `slide map`, `animated background` | Rows, headers, chrome; `go()`, keys, dots, notes, hash; `fz-` search; map; `THEME` canvas grid. |
 
 The stage is a fixed 1920x1080 frame (`W`/`H`) scaled to the window.
@@ -90,7 +90,7 @@ No build step (static page lacks injected JSON-LD). Serve and open in the browse
 
 ```bash
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # run async + detached
-# open http://127.0.0.1:4329/cracktro/#11   (#N = row N of slides.md)
+# open http://127.0.0.1:4329/cracktro/#security   (#<id> = Id column of slides.md)
 ```
 
 After each edit:
