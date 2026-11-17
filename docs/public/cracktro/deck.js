@@ -221,9 +221,9 @@
   .slide.fmm.fadeout { opacity: 1; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-copy > * { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-grid { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
-  /* Augmentation · Automation · Transformation: light concept band like trust/mindset; brand statement layout, a stage rail with Automation in focus */
+  /* Augmentation · Automation · Transformation: light concept band; typography matches the trust-the-process slide (.tp-q / .tp-go); stage rail with Automation in focus */
   .ecu-copy { position: absolute; left: 230px; right: 140px; top: 0; bottom: 60px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; text-align: left; }
-  .ecu-copy h2 { position: relative; margin: 44px 0 0; display: flex; flex-direction: column; gap: 30px; line-height: 1; letter-spacing: -.02em; color: #f0f6fc; }
+  .ecu-copy h2 { position: relative; margin: 44px 0 0; display: flex; flex-direction: column; gap: 30px; line-height: 1.1; letter-spacing: -.02em; font-variation-settings: "wght" 520, "wdth" 100; color: #f0f6fc; }
   .ecu-copy h2::before { content: ""; position: absolute; left: 63px; top: 60px; bottom: 60px; width: 4px; border-radius: 2px; transform-origin: top;
     background: linear-gradient(#8b949e, #4493f8 35%, #ab7df8 65%, #8b949e); opacity: .5; }
   .ecu-s { position: relative; display: flex; align-items: center; gap: 56px; }
@@ -231,13 +231,12 @@
   .ecu-i svg { width: 96px; height: 96px; overflow: visible; }
   .ecu-i circle { fill: #161b22; stroke: #30363d; stroke-width: 2; }
   .ecu-i path { fill: #8b949e; }
-  .ecu-s:not(.ecu-on) .ecu-t { font-size: 84px; color: #8b949e; font-variation-settings: "wght" 520, "wdth" 100; }
+  .ecu-s:not(.ecu-on) .ecu-t { font-size: 76px; color: #8b949e; }
   .ecu-on .ecu-i svg { width: 130px; height: 130px; }
   .ecu-on .ecu-i circle.ecu-bg { fill: url(#ecu-g); stroke: none; }
   .ecu-on .ecu-i circle.ecu-ring { fill: none; stroke: #4493f8; stroke-width: 3; transform-origin: 50% 50%; transform-box: fill-box; }
   .ecu-on .ecu-i path { fill: #fff; }
-  .ecu-on .ecu-t { font-size: 224px; letter-spacing: -.035em; font-variation-settings: "wght" 780, "wdth" 100; padding: 0 0 .08em;
-    background: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950) 0 0 / 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ecu-on .ecu-t { font-size: 112px; line-height: 1.04; color: #3fb950; }
   .ecu-src { position: absolute; left: 230px; right: 140px; bottom: 96px; font-size: 24px; line-height: 1.4; color: #8b949e; }
   .ecu-src b { display: block; margin-bottom: 6px; font-size: 18px; letter-spacing: .14em; text-transform: uppercase; font-variation-settings: "wght" 650; }
   .ecu-src i { color: #c9d1d9; }
@@ -246,7 +245,7 @@
   body.light .ecu-s:not(.ecu-on) .ecu-t { color: #57606a; }
   body.light .ecu-on .ecu-i path { fill: #ffffff; }
   body.light .ecu-on .ecu-i circle.ecu-ring { stroke: #0969da; }
-  body.light .ecu-on .ecu-t { background-image: linear-gradient(90deg, #116329, #0550ae, #8250df, #116329); }
+  body.light .ecu-on .ecu-t { color: #116329; }
   body.light .ecu-copy h2::before { background: linear-gradient(#d0d7de, #0969da 35%, #8250df 65%, #d0d7de); opacity: .6; }
   body.light .ecu-src { color: #57606a; }
   body.light .ecu-src i { color: #1f2328; }
@@ -255,12 +254,10 @@
   .active .ecu-s:nth-child(2) { animation-delay: .1s; }
   .active .ecu-s:nth-child(3), .active .ecu-src { animation-delay: .2s; }
   .active .ecu-copy h2::before { animation: ecu-rail .6s cubic-bezier(.55,0,1,.45) both .1s; }
-  .active .ecu-on .ecu-t { animation: ecu-shine 4s linear infinite 1s; }
   .active .ecu-on .ecu-ring { animation: ecu-ping 2.4s ease-out infinite 1s; }
   @keyframes ecu-drop { from { opacity: 0; transform: translateY(-120px); } }
   @keyframes ecu-rail { from { transform: scaleY(0); } }
   @keyframes ecu-ping { 0% { opacity: .9; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(1.45); } }
-  @keyframes ecu-shine { to { background-position: 300% 0; } }
   .slide.ecu.up-in, .slide.ecu.down-in, .slide.ecu.leaving { animation: none; }
   .slide.ecu.fadeout { opacity: 1; }
   .ecu:is(.fadeout, .leaving) :is(.ecu-copy > .kicker, .ecu-s, .ecu-src) { animation: ecu-fall .45s cubic-bezier(.55,0,1,.45) both !important; }
