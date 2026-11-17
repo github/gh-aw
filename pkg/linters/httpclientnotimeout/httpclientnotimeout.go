@@ -43,7 +43,7 @@ func isHTTPClient(t types.Type) bool {
 		t = pointer.Elem()
 	}
 
-	named, ok := t.(*types.Named)
+	named, ok := types.Unalias(t).(*types.Named)
 	return ok && named.Obj().Name() == "Client" && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == "net/http"
 }
 
@@ -67,7 +67,7 @@ func hasTimeoutField(pass *analysis.Pass, literal *ast.CompositeLit) bool {
 	if pointer, ok := t.(*types.Pointer); ok {
 		t = pointer.Elem()
 	}
-	named, ok := t.(*types.Named)
+	named, ok := types.Unalias(t).(*types.Named)
 	if !ok {
 		return false
 	}
