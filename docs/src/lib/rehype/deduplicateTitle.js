@@ -48,7 +48,9 @@ function isLandingPage(filePath) {
 
 /** @param {import('unist').Node} node */
 function isCommentExpression(node) {
-  return node.type === "mdxFlowExpression" && "value" in node && typeof node.value === "string" && /^\s*(?:\{\s*)?\/\*[\s\S]*?\*\/(?:\s*\})?\s*$/.test(node.value);
+  if (node.type !== "mdxFlowExpression" || !node.data || !("estree" in node.data)) return false;
+  const program = node.data.estree;
+  return typeof program === "object" && program !== null && "body" in program && Array.isArray(program.body) && program.body.length === 0;
 }
 
 /**

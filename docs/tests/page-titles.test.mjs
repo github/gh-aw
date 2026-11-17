@@ -21,7 +21,7 @@ const cases = [
     title: "A Smart Title & Links",
     body: "# A **smart** `Title` &amp;   [Links](#details)\n\n## Details",
     headings: 1,
-    anchor: "a-smart-title----links",
+    anchor: "a-smart-title--links",
   },
   { name: "distinct", body: "# A different title", headings: 2 },
   { name: "later", body: "Introduction.\n\n# Page Title", headings: 2 },
@@ -102,7 +102,10 @@ for (const extension of ["md", "mdx"]) {
         assert.ok(html.includes(`<span id="${scenario.anchor}"></span>`), "original title anchor is preserved");
         assert.ok(!html.includes(`href="#${scenario.anchor}"`), "duplicate title is not in the table of contents");
       }
-      if (scenario.name === "matching") assert.match(html, /class="table-scroll-wrapper"/);
+      if (scenario.name === "matching") {
+        assert.match(html, /class="table-scroll-wrapper"/);
+        assert.match(html, /<td data-label="Column">Cell<\/td>/);
+      }
       if (scenario.section) assert.ok(html.includes(`id="${scenario.section}"`), "section heading keeps its original slug");
     });
   }
