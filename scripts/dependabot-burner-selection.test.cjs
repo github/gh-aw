@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
@@ -77,7 +78,7 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   for (const agent of agents) {
     assert.ok(Buffer.byteLength(agent.prompt) <= 7500, `${agent.name} exceeds the instruction-prefix budget`);
     if (agent.tools.includes("bash")) {
-      assert.ok(agent.prompt.includes("You have no GitHub MCP tools"), `${agent.name} is missing GitHub tool guidance`);
+      assert.ok(agent.prompt.includes("You have no GitHub MCP tools") || agent.prompt.includes("GitHub tools are not shell commands"), `${agent.name} is missing GitHub tool guidance`);
       assert.ok(agent.prompt.includes("After the first permission denial, stop shell calls"), `${agent.name} is missing a denial stop condition`);
     }
   }
@@ -90,7 +91,7 @@ test("safe outputs are executable while GitHub reads stay off the shell", () => 
   const allowed = compiledBashPolicy();
   assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
   assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
-  assert.match(workflow, /Never invoke GitHub tools through Bash/);
+  assert.match(workflow, /Never invoke GitHub tools through Bash|GitHub tools are not shell commands: never\s+invoke them through Bash/);
 });
 
 test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
@@ -147,8 +148,8 @@ async function select(pulls, trigger = null, fallback = null) {
     github,
     { repo: { owner: "example", repo: "repo" }, eventName: trigger ? "issue_comment" : "schedule", payload: trigger ? { issue: { number: trigger, pull_request: {} } } : {} },
     name => {
+      if (name === "crypto") return crypto;
       if (name === "path") return path;
-      if (name === "crypto") return require("node:crypto");
       assert.equal(name, "fs");
       return {
         mkdirSync() {},

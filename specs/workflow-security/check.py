@@ -234,6 +234,39 @@ DELTAS = {
 }
 
 
+def check_p1_backlog_modules():
+    readme = (ROOT / "README.md").read_text()
+    p1_rows = [
+        (line_number, line)
+        for line_number, line in enumerate(readme.splitlines(), start=1)
+        if re.search(r"\|\s*P1\s*\|", line)
+    ]
+    if not p1_rows:
+        raise RuntimeError("No P1 refinement backlog module targets found in README.md")
+
+    targets = []
+    for line_number, row in p1_rows:
+        row = row.strip()
+        if not row.startswith("|"):
+            raise RuntimeError(
+                f"P1 refinement backlog row at line {line_number} must be a "
+                "pipe-delimited table row"
+            )
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        target_cell = cells[3] if len(cells) > 3 else ""
+        match = re.fullmatch(r"`([^`/\\]+\.tla)`", target_cell)
+        if not match:
+            raise RuntimeError(
+                f"P1 refinement backlog row at line {line_number} must have a "
+                "backticked .tla module target"
+            )
+        targets.append(match.group(1))
+
+    missing = [target for target in targets if not (ROOT / target).is_file()]
+    if missing:
+        raise RuntimeError(f"P1 refinement backlog references missing TLA+ modules: {', '.join(missing)}")
+
+
 def check_result(status, text, invariant=None):
     if invariant is None:
         if status != 0 or "Model checking completed. No error has been found." not in text:
@@ -654,6 +687,7 @@ def main():
     parser.add_argument("--verifier", type=Path, help="Built gh-aw-security-model binary")
     parser.add_argument("--compiled-workflows", type=Path, help="Directory of existing lock files to verify")
     args = parser.parse_args()
+    check_p1_backlog_modules()
     if bool(args.verifier) != bool(args.compiled_workflows):
         parser.error("--verifier and --compiled-workflows must be supplied together")
     if args.model != "all" and (args.compiler or args.verifier or args.write_examples):

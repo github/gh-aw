@@ -4,6 +4,14 @@ description: Detects inconsistencies between JSON schema, implementation code, a
 on:
   schedule: daily
   workflow_dispatch:
+    inputs:
+      level:
+        description: Routing level for a manual run
+        type: choice
+        options: [router/economy, router/balanced, router/robust]
+        default: router/economy
+concurrency:
+  job-discriminator: ${{ github.run_id }}
 permissions:
   contents: read
   discussions: read
@@ -13,9 +21,8 @@ permissions:
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  # Scheduled runs have no inputs and keep economy.
+  model: ${{ inputs.level || 'router/economy' }}
 max-ai-credits: 1500
 tools:
   cli-proxy: true
