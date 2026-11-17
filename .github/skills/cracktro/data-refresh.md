@@ -51,5 +51,5 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | Inlined Skills & Agents | `refresh/inlined-skills-agents.md` |
 | Fuzzy schedules | `refresh/fuzzy-schedules.md` |
 | Week of daily runs | `refresh/week-of-daily-runs.md` |
-| Unknown, not zero | `refresh/unknown-not-zero.md` |
 | From Delivery to Value | `refresh/from-delivery-to-value.md` |
+| Deliver · Accept · Attribute | `refresh/deliver-accept-attribute.md` |

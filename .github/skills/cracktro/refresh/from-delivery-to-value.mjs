@@ -113,6 +113,7 @@ cases.sort((a, b) => Date.parse(a.members[0].merged) - Date.parse(b.members[0].m
 
 // 5. Windows: [first merge - 7 days, first merge) and [last merge, last merge + 7 days), daily, no lag.
 // Day 0 uses the exact last accepted commit; samples after now stay pending (null).
+// Survival (single merges): every first-parent main commit in (merge, merge + 7 days] must leave the merge's files untouched.
 const windows = cases.map(c => {
   const first = Date.parse(c.members[0].merged),
     last = Date.parse(c.members.at(-1).merged),
@@ -122,17 +123,34 @@ const windows = cases.map(c => {
     const t = (d < 0 ? first : last) + d * DAY;
     samples.push(t > now ? null : pair(measure(d === 0 ? c.members.at(-1).sha : snapshot(t))));
   }
+  let survival = null;
+  if (c.kind === "single" && end <= now) {
+    const m = c.members[0],
+      endSha = snapshot(end),
+      files = git("diff", "--name-only", `${m.sha}^1`, m.sha).split("\n").filter(Boolean);
+    survival = {
+      through: iso(end),
+      commits: Number(git("rev-list", "--first-parent", "--count", `${m.sha}..${endSha}`)),
+      files: files.length,
+      touched: git("log", "--first-parent", "--format=%h", `${m.sha}..${endSha}`, "--", ...files)
+        .split("\n")
+        .filter(Boolean).length,
+    };
+  }
   return {
     label: c.label,
     kind: c.kind,
     prs: c.members.map(m => m.pr),
+    delivered: c.members.map(m => m.delivered),
     first: iso(first),
     last: iso(last),
     gaps: c.gaps,
     removed: c.removed,
+    closed: [...new Set(c.members.flatMap(m => m.closed))].sort(),
     before: pair(c.members[0].before),
     end: end <= now ? pair(measure(snapshot(end))) : null,
     samples,
+    survival,
   };
 });
 
