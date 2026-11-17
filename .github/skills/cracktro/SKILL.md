@@ -95,10 +95,12 @@ After each edit:
 4. Dispatch keys on `window`: `dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight'}))`.
 5. Transitions: read `getComputedStyle(el).transform` ~200 ms after navigating.
 
+Screenshots are always 16:9. The canvas panel can be any shape and cannot be resized, so never screenshot the whole page. Capture the stage element instead: `screenshot_page` with `selector: ".stage"` and `scroll_into_view_if_needed: false`. This returns only the 1920x1080 frame, scaled, without the navigation chrome. To check the chrome (buttons, dots, minimap), take a separate full-page screenshot.
+
 ## Tests
 
 Run from `docs/` after `npm ci`: `npx playwright test tests/talk.spec.ts`. The config builds and previews (`npm run build && npm run preview`, `localhost:4321`, `/gh-aw/cracktro/`, Chromium `/usr/bin/chromium-browser`), covering built JSON-LD; under `npm run dev`, check `curl -s localhost:4321/gh-aw/cracktro/ | grep hasPart`. If `node_modules` is missing, report the tests as not run.
 
 ## Pull requests
 
-A PR that adds or changes a slide must show it. Screenshot each changed slide from the preview in a 1920x1080 viewport, at the step that carries its message (often the last), and upload the image into the PR description so it renders inline. Never commit screenshots. If you cannot upload images, say so in the PR description and ask the author to attach one.
+A PR that adds or changes a slide must show it. Screenshot each changed slide from the preview as a 16:9 `.stage` capture (see Preview loop), at the step that carries its message (often the last), and upload the image into the PR description so it renders inline. Never commit screenshots. If you cannot upload images, say so in the PR description and ask the author to attach one.

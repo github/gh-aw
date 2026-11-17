@@ -29,25 +29,28 @@ Never name the author of the external `ponytail-review` skill (a personal handle
 
 ## 2. Window & snapshot
 
-- PRs **created** from 2026-08-06 (two days before the first run) to yesterday UTC; runs from the first run to yesterday; snapshot = run day.
+- PRs **created**, reviews **submitted** and runs **created** from 2026-08-06 (two days before the first run) to END (default yesterday UTC); snapshot = run day. Thread state (resolved, outdated, replies) is read at the snapshot.
+- Republish the baseline window with the explicit dates below; the script rejects anything but `YYYY-MM-DD`.
 - Baseline: first run 8 Aug 2026, last counted review 16 Nov 2026 (101 days), snapshot 17 Nov 2026.
-- Run sample: only runs whose artifacts have not expired (baseline: 19 Aug to 16 Nov 2026). State the sample window separately in the caption.
+- Run sample: every 5th run of the window (newest first, any conclusion); only runs whose artifact has not expired have output (baseline: 19 Aug to 16 Nov 2026). State the sample window separately in the caption.
 
 ## 3. Sources
 
 - Reviews: GraphQL PR search in 2-day windows; keep reviews whose body contains `workflow_id: ponytail-reviewer`. All are `COMMENTED`.
-- Findings: review threads whose first comment is in one of those reviews. Kind = first `yagni:`/`shrink:`/`delete:`/`stdlib:`/`native:` tag in the first 260 chars; none = `untagged` (the prose format, "What this is / Problem / Fix", since November).
+- Findings: review threads whose first comment is in one of those reviews. Kind = first `yagni:`/`shrink:`/`delete:`/`stdlib:`/`native:` tag in the first 260 chars (scanning the whole body finds no more). `untagged` is a format proxy, not a kind: almost all are November prose findings ("What this is / Problem / Fix") and mix every kind.
 - Acted = thread resolved **or** outdated (code changed under it) **or** replied to (replies are mostly the Copilot coding agent applying the fix).
 - Lines claimed: `Lean: -N lines` or `net: -N lines` in the review body; median over reviews that state one.
 - AIC: `· N AIC` in the review footer; median per month. Models change monthly (`modelByMonth`), which explains most of the AIC swings; say so in notes, not on the slide.
-- Noop share: in the run sample, runs whose `agent_output.json` has `noop` and no review item, over noop + review runs. Runs with no artifact, or only `report_incomplete`, are excluded.
+- Noop share: `classify()` sorts each sampled run's `agent_output.json`: `review` (any review item), `lean` (noop saying "Lean already"), `clean` (other nothing-to-cut noop), `skip` (noop for missing or empty pre-fetched input), `other`. Share = (lean + clean) / (lean + clean + review); `skip`, `other`, `noArtifact` (expired) are excluded. `downloadErrors` lists failed run IDs and exits 1: rerun, never publish a partial sample. `--self-test` checks the classifier offline.
+- Medians average the two middle values for even counts.
 
 ## 4. Queries
 
 Read-only; `gh auth status` must pass. ~10 min for PRs and runs; the sample adds ~10 min per 500 runs.
 
 ```bash
-SAMPLE=5 node .github/skills/cracktro/refresh/ponytail-reviewer.mjs 2026-08-06 END > "$TMPDIR/pnt.json"
+node .github/skills/cracktro/refresh/ponytail-reviewer.mjs --self-test
+SAMPLE=5 node .github/skills/cracktro/refresh/ponytail-reviewer.mjs 2026-08-06 2026-11-16 > "$TMPDIR/pnt.json"   # END: last full day
 ```
 
 | JSON | Baseline | Slide |
@@ -55,13 +58,13 @@ SAMPLE=5 node .github/skills/cracktro/refresh/ponytail-reviewer.mjs 2026-08-06 E
 | `runs.total` (`byEvent`, `byConclusion`) | 2928 (2920 PR, 8 dispatch; 2289 success, 624 failure) | notes |
 | `prsScanned` / `reviewedPRs` / `reviewedMerged` | 5344 / 467 / 424 | KPI `on 467 PRs`, notes |
 | `reviews.total` / `byMonth` | 469 / Aug 174, Sep 69, Oct 105, Nov 121 | KPI `469` |
-| `findings.total` / `perPR` | 580 / 0:35, 1:319, 2:88, 3:18, 4:4, 5:3 | KPI `580`, notes (35 reviews without inline findings) |
+| `findings.total` / `perPR` | 580 / 0:35, 1:319, 2:88, 3:18, 4:4, 5:3 | KPI `580`, notes (35 PRs without inline findings) |
 | `findings.kinds` | yagni 203, shrink 135, delete 68, stdlib 10 + native 6, untagged 158 | `KINDS` |
 | `findings.acted` (`resolved`, `outdated`, `replied`, `copilotReplied`) | 332 = 57% (118, 227, 283, 215) | KPI `57%` |
 | `linesClaimed` (`reviews`, `total`, `median`) | 446, 10219, 12 | KPI `10,219`, `median 12` |
-| `aicPerReview.medianByMonth` | Aug 19.9, Sep 5.19, Oct 11.6, Nov 5 | `AICM` (one decimal) |
-| `sample` (`every` 5) `noopShare` (`noop`/`review`, `withOutput`) | 0.763 (300/93, 431 of 585) | KPI `76%` |
-| `sample.aicMedianPerRun` | ~5.8 | notes only |
+| `aicPerReview.medianByMonth` | Aug 19.95, Sep 5.19, Oct 11.6, Nov 5 | `AICM` (one decimal; Aug shown as 20) |
+| `sample` (`every` 5) `noopShare` (`lean`+`clean` / `verdicts`, `withOutput`) | 0.789 (297+2 of 379, 421 of 585; 164 expired) | KPI `79%` |
+| `sample.aicMedianPerRun` | ~5.7 | notes only |
 
 ## 5. Update steps
 

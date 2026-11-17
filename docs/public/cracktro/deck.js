@@ -368,6 +368,7 @@
   .rw b { font-weight: 700; color: #e3b341; }
   .pnt-rw { right: 110px; top: 118px; }
   .skl-rw { right: 110px; top: 118px; }
+  .ix-rw { right: 110px; top: 150px; }
   .pnt-m { width: 1420px; gap: 30px; } .pnt-m .dhm-k { gap: 26px; }
   .pnt-m .dhm-tl .y { fill: #a371f7; } .pnt-m .dhm-tl .s { fill: #d2a8ff; } .pnt-m .dhm-tl .d { fill: #ff7b72; } .pnt-m .dhm-tl .b { fill: #79c0ff; } .pnt-m .dhm-tl .x { fill: #6e7681; }
   .pnt-m .dhm-tl .v { fill: #f0f6fc; font: 600 14px var(--mono); text-anchor: middle; }
@@ -5377,7 +5378,7 @@
       ];
       // median AI credits per review, from the review footer, by month
       const AICM = [
-        ["Aug", 19.9],
+        ["Aug", 20],
         ["Sep", 5.2],
         ["Oct", 11.6],
         ["Nov", 5],
@@ -5416,7 +5417,7 @@
           { class: "dhm-k" },
           kpi("469", "reviews", "on 467 PRs"),
           kpi("580", "findings", "inline"),
-          kpi("76%", "Lean already.", ["Ship.", h("br"), "run sample"], "g"),
+          kpi("79%", "Lean already.", ["Ship.", h("br"), "run sample"], "g"),
           kpi("57%", "acted on", ["code changed,", h("br"), "resolved, replied"]),
           kpi("10,219", "lines claimed", "median 12")
         ),
@@ -5459,7 +5460,7 @@
         group: "process",
         under: "prr",
         notes:
-          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship. The bottom strip is measured on gh-aw (snapshot 17 November 2026). From 8 August to 16 November 2026 (101 days) the workflow ran 2,928 times and posted 469 COMMENT reviews on 467 pull requests: 580 inline findings, mostly one per pull request, and 35 reviews with none inline. The reviews claim 10,219 lines that could go, a median of 12 per review. 57% of the findings were acted on: the code changed under them, the thread was resolved, or someone replied, usually Copilot. Until November each finding started with its kind: yagni 203, shrink 135, delete 68, stdlib or native 16; the newer prose findings carry no tag. In a one-in-five sample of runs with saved output, 76% of verdicts were Lean already. Ship. The median AI credits per review fell from about 20 in August, on the Copilot auto model, to about 5 in November after the move to Codex and economy routing; October's rise came with a larger model. The badge top right is the skill's open-source repo and its GitHub star count, fetched live when online. The diff and findings in the animation are illustrative.",
+          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship. The bottom strip is measured on gh-aw (snapshot 17 November 2026). From 8 August to 16 November 2026 (101 days) the workflow ran 2,928 times and posted 469 COMMENT reviews on 467 pull requests: 580 inline findings, mostly one per pull request, and 35 pull requests with none inline. The reviews claim 10,219 lines that could go, a median of 12 per review. 57% of the findings were acted on: the code changed under them, the thread was resolved, or someone replied, usually Copilot. Until November each finding started with its kind: yagni 203, shrink 135, delete 68, stdlib or native 16; the newer prose findings carry no tag. In a one-in-five sample of runs, 79% of the verdicts from runs with saved output were Lean already. Ship. The median AI credits per review fell from about 20 in August, on the Copilot auto model, to about 5 in November after the move to Codex and economy routing; October's rise came with a larger model. The badge top right is the skill's open-source repo and its GitHub star count, fetched live when online. The diff and findings in the animation are illustrative.",
         enter() {
           t0 = 0;
           cyc = -1;
@@ -9761,6 +9762,7 @@
       ioRestore = h("div", { class: "io" }, "restore →");
     const cache = h("div", { class: "ix-cache" }, h("i", {}, "ACTIONS CACHE"), cyl, h("div", { class: "n" }, "index.sqlite"), h("div", { class: "k" }, "key: qmd-docs"), ioSave, ioRestore);
     const shared = h("div", { class: "ix-shared", "--c": "#79c0ff", "--i": 2 }, h("i", {}, "SHARED AGENTIC WORKFLOW"), h("span", {}, h("b", {}, "imports"), ": [shared/qmd.md] adds both jobs · one cache key links them, run after run"));
+    const repo = repoWidget(1112365301, "qmd", 31177, "ix-rw");
     const el = h(
       "section",
       { class: "slide ix" },
@@ -9769,7 +9771,8 @@
       wall,
       cache,
       agt,
-      shared
+      shared,
+      repo.el
     );
     // ms into the cycle when each indexing step, the handoff and each agent step light up
     const IDX_AT = [700, 1500, 2300, 3100],
@@ -9788,8 +9791,9 @@
       group: "engineering",
       experimental: "QMD search",
       notes:
-        "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs.",
+        "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs. The badge top right is the open-source qmd repo and its GitHub star count, fetched live when online.",
       enter() {
+        repo.load();
         t0 = 0;
         cyc = -1;
       },
