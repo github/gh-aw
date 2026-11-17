@@ -311,3 +311,8 @@
 - **Metrics-collector model-provider:** still absent under `engine:` (codex, model copilot/gpt-6-luna). Requirement unverified; treat as low-priority.
 - **Design Decision Gate:** token trim is no longer supported (11-15: 284K tokens / 25 runs). Drop the "trim tokens" item.
 - Scoring source: `metrics/daily/2026-11-15.json` (complete). `latest.json` (11-16) is partial.
+
+## Update — 2026-11-17T04:45Z (Workflow Health Manager)
+- Conclusion-job `Handle agent failure` failures recurred after #77984 was closed not_planned (11-16): dependabot-burner §44014831252, visual-regression-checker §44011223351. Do not cite #77984 as a pending fix.
+- Auditor streak: 7 consecutive failures at `Collect failure evidence`; #78066 open; root cause unverified (job logs 403 difc_forbidden).
+- daily-go-test-parallelizer: failures are agent-declared budget-limited incompletes, not infra; parent #77069 closed not_planned.
