@@ -79,7 +79,10 @@ Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
 jump directly to a slide (on narrow screens they become previous/next slide arrows
 flanked by track-style previous/next band buttons); `#N` hashes are shareable slide links. Clicking the left third
 goes back; clicking elsewhere advances. On touch screens, swipe left or right
-within a band and up or down between bands. Slides within a band push left, and
+within a band and up or down between bands. On phones the toolbar dims after a
+few idle seconds and brightens on any touch, key or focus. iPhone Safari offers no
+page fullscreen; to present without the browser bars, use
+Share → Add to Home Screen and open the talk from that icon. Slides within a band push left, and
 moving to a later band slides up (reversed when going back). Slides built on a gh-aw
 workflow show its original `/agentic-workflows` prompt along the top; click it to
 open the full prompt in a phone-style dialog (Escape or Done closes it).
