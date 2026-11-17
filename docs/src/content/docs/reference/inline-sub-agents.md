@@ -73,6 +73,8 @@ contents. Be concise and factual.
 
 At runtime, each inline sub-agent block is extracted to a location that the AI engine can access natively. The destination path depends on the engine:
 
+Copilot and Claude copies include a compiler-approved name (defaulting to the block name) and a description derived from that name so native agent discovery can register them. Experiment-selected models are preserved through prompt rendering.
+
 | Engine | Destination path |
 |--------|-----------------|
 | `copilot` | `.github/agents/<name>.agent.md` |

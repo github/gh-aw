@@ -137,16 +137,14 @@ function resolveSubAgentExperimentReferences(agentName, content, env = process.e
 }
 
 /**
- * Claude Code skips a project agent file without a frontmatter `name`, so the
- * generated Claude copy gets the declared block name when the author omitted it.
- * An authored `name` from compiler JSON is kept. Invalid or missing compiler
- * metadata is rejected before Claude starts.
+ * Native agent discovery needs a name and description. Keep the compiler-approved
+ * name or use the declared block name, and derive the description from it.
  *
  * @param {string} agentName - Declared sub-agent name from the `## agent:` marker.
  * @param {string} content - Agent block content (frontmatter + prompt).
- * @returns {string} Content with Claude's required name and name-derived description.
+ * @returns {string} Content with a name and name-derived description.
  */
-function ensureClaudeSubAgentName(agentName, content) {
+function ensureSubAgentIdentity(agentName, content) {
   const { editMarkdownMetadata, readMarkdownMetadata } = require("./markdown_metadata.cjs");
   const replacements = Object.fromEntries([...content.matchAll(/\x00VALUE_[0-9a-f-]+_\d+\x00/g)].map(match => [match[0], match[0]]));
   const named = readMarkdownMetadata("ensure-name", content, { value: agentName, replacements }).content;
@@ -394,8 +392,7 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, re
   }
 
   const baseDir = agentsBaseDir || workspaceDir;
-  // Normalise once so the target directory and the Claude `name:` injection always agree:
-  // every id that stages into .claude/agents also gets the name Claude Code registers by.
+  // Normalize once so native agent identity and the target directory agree.
   const normalizedEngineId = (engineId || "").trim().toLowerCase();
   const { dir, ext } = inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget(normalizedEngineId));
   const agentsDir = path.join(baseDir, dir);
@@ -410,7 +407,7 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, re
   for (const agent of agents) {
     const agentPath = path.join(agentsDir, agent.name + ext);
     let filteredContent = resolveSubAgentExperimentReferences(agent.name, preserveSubAgentFrontmatter(agent.content));
-    if (normalizedEngineId === "claude") filteredContent = ensureClaudeSubAgentName(agent.name, filteredContent);
+    if (normalizedEngineId === "claude" || normalizedEngineId === "copilot") filteredContent = ensureSubAgentIdentity(agent.name, filteredContent);
     const agentContent = restoreValues(filteredContent.endsWith("\n") ? filteredContent : filteredContent + "\n", agentPath);
     try {
       fs.writeFileSync(agentPath, agentContent, "utf8");
@@ -486,7 +483,7 @@ module.exports = {
   getEngineSubAgentTarget,
   preserveSubAgentFrontmatter,
   resolveSubAgentExperimentReferences,
-  ensureClaudeSubAgentName,
+  ensureSubAgentIdentity,
   closeUnterminatedSubAgentMarkers,
   loadCopilotSDKCustomAgents,
 };

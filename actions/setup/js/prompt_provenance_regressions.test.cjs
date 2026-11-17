@@ -184,8 +184,8 @@ describe("prompt provenance through the generated substitution sequence", () => 
     const document = readDocumentMetadata(frontmatter);
     expect(document.value.model).toBe("small");
     expect(document.value.tools).toBe(process.env.GH_AW_INPUTS_COMMENT);
-    expect(document.value.description).toBe(engine === "claude" ? "helper" : undefined);
-    if (engine === "claude") expect(document.value.name).toBe("helper");
+    expect(document.value.description).toBe("helper");
+    expect(document.value.name).toBe("helper");
     expect(agent).toContain("AUTHOR RULE");
   });
 
