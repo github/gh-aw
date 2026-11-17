@@ -426,7 +426,7 @@ func TestHandleLogsRateLimitWaitError(t *testing.T) {
 		state := logsCollectionState{}
 		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, context.DeadlineExceeded)
 		assert.True(t, stop)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, state.timeoutReached)
 	})
 
@@ -436,7 +436,7 @@ func TestHandleLogsRateLimitWaitError(t *testing.T) {
 		state := logsCollectionState{}
 		stop, err := handleLogsRateLimitWaitError(&state, true, LogsDownloadOptions{countLimit: limit}, context.Canceled)
 		assert.True(t, stop)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, state.countLimitReached)
 	})
 
@@ -446,14 +446,14 @@ func TestHandleLogsRateLimitWaitError(t *testing.T) {
 		state := logsCollectionState{}
 		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{rateLimitState: rateLimitState}, context.Canceled)
 		assert.True(t, stop)
-		assert.ErrorIs(t, err, errLogsAPIRateLimitReached)
+		require.ErrorIs(t, err, errLogsAPIRateLimitReached)
 	})
 
 	t.Run("genuine cancellation clears partial state", func(t *testing.T) {
 		state := logsCollectionState{iteration: 2, beforeDate: "cursor"}
 		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, context.Canceled)
 		assert.True(t, stop)
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 		assert.Equal(t, logsCollectionState{}, state)
 	})
 
@@ -461,7 +461,7 @@ func TestHandleLogsRateLimitWaitError(t *testing.T) {
 		state := logsCollectionState{}
 		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, errors.New("temporary error"))
 		assert.False(t, stop)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 1, state.iteration)
 	})
 }
