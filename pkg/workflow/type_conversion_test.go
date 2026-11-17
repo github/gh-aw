@@ -232,41 +232,36 @@ func TestParseIntValueOverflow(t *testing.T) {
 			name:  "MaxFloat64",
 			input: math.MaxFloat64,
 			validate: func(t *testing.T, result int, ok bool) {
-				if !ok {
-					t.Errorf("Expected ok=true for MaxFloat64")
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for MaxFloat64, got (%d, %t)", result, ok)
 				}
-				// Result is undefined but should not panic
-				t.Logf("MaxFloat64 parsed to: %d", result)
 			},
 		},
 		{
 			name:  "positive infinity",
 			input: math.Inf(1),
 			validate: func(t *testing.T, result int, ok bool) {
-				if !ok {
-					t.Errorf("Expected ok=true for Inf(1)")
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for Inf(1), got (%d, %t)", result, ok)
 				}
-				t.Logf("Inf(1) parsed to: %d", result)
 			},
 		},
 		{
 			name:  "negative infinity",
 			input: math.Inf(-1),
 			validate: func(t *testing.T, result int, ok bool) {
-				if !ok {
-					t.Errorf("Expected ok=true for Inf(-1)")
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for Inf(-1), got (%d, %t)", result, ok)
 				}
-				t.Logf("Inf(-1) parsed to: %d", result)
 			},
 		},
 		{
 			name:  "NaN",
 			input: math.NaN(),
 			validate: func(t *testing.T, result int, ok bool) {
-				if !ok {
-					t.Errorf("Expected ok=true for NaN")
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for NaN, got (%d, %t)", result, ok)
 				}
-				t.Logf("NaN parsed to: %d", result)
 			},
 		},
 	}

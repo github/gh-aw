@@ -69,7 +69,7 @@
   .active .kicker { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .1s; }
   .ch { display: inline-block; font-variation-settings: "wght" 700, "wdth" 100; }
   .l-grad .ch { color: transparent; -webkit-background-clip: text; background-clip: text;
-    background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #4493f8, #ab7df8);
+    background-image: linear-gradient(90deg, #f0f6fc, var(--lg, #f0f6fc), #f0f6fc, var(--lg, #f0f6fc), #f0f6fc);
     background-size: 1800px 100%; background-position: var(--bx) 0;
     padding-bottom: .14em; margin-bottom: -.14em; }
   @keyframes settle { from { opacity: 0; transform: translateY(.25em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
@@ -95,7 +95,7 @@
   .xbadge span { color: #9198a1; letter-spacing: .04em; text-transform: none; padding-left: 12px; border-left: 1px solid #3d444d; }
   /* --- chrome --- */
   .progress { position: fixed; left: 0; bottom: 0; height: 5px; width: 100%; transform-origin: 0 50%;
-    background: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950); transition: transform .8s cubic-bezier(.7,0,.2,1); z-index: 5; }
+    background: #3fb950; transition: transform .8s cubic-bezier(.7,0,.2,1); z-index: 5; }
   /* dot map: one row per band, header dot outlined; the band you are in is bright, others dim until hovered */
   .dots { position: fixed; left: calc(28px + var(--sl)); bottom: calc(22px + var(--sb)); display: flex; flex-direction: column; gap: 5px; z-index: 5; opacity: .25; transition: opacity .3s; }
   .dots:hover, .dots:focus-within { opacity: 1; }
