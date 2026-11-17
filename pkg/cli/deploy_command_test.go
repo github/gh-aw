@@ -29,6 +29,8 @@ func TestNewDeployCommand_RequiresWorkflowArg(t *testing.T) {
 	err := cmd.Args(cmd, []string{})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "missing workflow specification")
+	require.ErrorContains(t, err, "Usage:\n  gh aw deploy")
+	require.ErrorContains(t, err, "Run 'gh aw deploy --help'")
 }
 
 func TestNewDeployCommand_RegistersCoreFlags(t *testing.T) {

@@ -126,7 +126,7 @@ func NewAddCommand(validateEngine func(string) error) *cobra.Command {
 		Example: addCommandExample,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return fmt.Errorf("missing workflow specification. Expected at least one workflow source argument. Example: %[1]s githubnext/agentics/daily-repo-status\n\nUsage:\n  %[1]s <workflow>...\n\nExamples:\n  %[1]s githubnext/agentics/daily-repo-status      Add from repository\n  %[1]s ./my-workflow.md                           Add local workflow\n\nRun '%[1]s --help' for more information", cmd.CommandPath())
+				return fmt.Errorf("missing workflow specification. Expected at least one workflow source argument. Example: %[1]s githubnext/agentics/daily-repo-status\n\nUsage:\n  %[1]s <workflow>...\n\nExamples:\n  %[1]s githubnext/agentics/daily-repo-status      Add from repository\n  %[1]s ./my-workflow.md                           Add local workflow\n\nRun '%[1]s --help' for more information", cliCommandPath(cmd))
 			}
 			return nil
 		},

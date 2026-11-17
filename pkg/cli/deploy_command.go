@@ -94,7 +94,7 @@ func runDeploy(ctx context.Context, targetRepo string, workflows []string, addOp
 
 func validateDeployArgs(cmd *cobra.Command, args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("missing workflow specification\n\nUsage:\n  %s <workflow>...\n\nExamples:\n  %[1]s githubnext/agentics/ci-doctor --repo owner/repo\n\nRun '%[1]s --help' for more information", cmd.CommandPath())
+		return fmt.Errorf("missing workflow specification\n\nUsage:\n  %s <workflow>...\n\nExamples:\n  %[1]s githubnext/agentics/ci-doctor --repo owner/repo\n\nRun '%[1]s --help' for more information", cliCommandPath(cmd))
 	}
 	return nil
 }
