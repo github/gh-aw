@@ -51,6 +51,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/manualmutexunlock"
 	"github.com/github/gh-aw/pkg/linters/manualpathconcat"
 	"github.com/github/gh-aw/pkg/linters/mapclearloop"
+	"github.com/github/gh-aw/pkg/linters/mapcopyloop"
 	"github.com/github/gh-aw/pkg/linters/mapdeletecheck"
 	"github.com/github/gh-aw/pkg/linters/nilctxpassed"
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
@@ -156,6 +157,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	manualmutexunlock.Analyzer,
 	manualpathconcat.Analyzer,
 	mapclearloop.Analyzer,
+	mapcopyloop.Analyzer,
 	mapdeletecheck.Analyzer,
 	nilctxpassed.Analyzer,
 	osexitinlibrary.Analyzer,
