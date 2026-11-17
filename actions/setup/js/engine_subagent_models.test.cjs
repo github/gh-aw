@@ -898,8 +898,8 @@ describe("Codex sub-agent endpoint names on native OpenAI (Spec Enforcer run 397
     ["fails it when they list only chat_completions", ["chat_completions"], { resolved_model: null, status: "failed", cause: "unsupported_endpoint" }],
   ])("checks an exact model with complete endpoint names and %s", async (_label, endpoints, expected) => {
     const run = codexLayout();
-    // Fixture mutation: the recorded agent pinned to gpt-5.4, the run's only OpenAI model with
-    // complete metadata (`chat_completions`, `responses`); the second case also drops `responses`.
+    // Fixture mutation: the recorded agent pinned to gpt-5.4, whose recorded entry has complete
+    // metadata (`chat_completions`, `responses`); the second case also drops `responses`.
     const reflect = runs.specEnforcerReflect();
     expect(entryOf(reflect, "gpt-5.4")).toEqual({ model_id: "gpt-5.4", supported_endpoints: ["chat_completions", "responses"], candidate_metadata_complete: true });
     if (endpoints) entryOf(reflect, "gpt-5.4").supported_endpoints = endpoints;
