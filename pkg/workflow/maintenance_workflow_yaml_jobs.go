@@ -457,7 +457,7 @@ func buildMaintenanceActivityReportIssueStep(resolver SHAResolver) string {
               repo: context.repo.repo,
               title: '[aw] agentic status report',
               body,
-              labels: ['agentic-workflows'],
+              labels: [process.env.GH_AW_ISSUE_LABEL || 'agentic-workflows'],
             });
             core.info('Created issue #' + createdIssue.data.number + ': ' + createdIssue.data.html_url);
 `

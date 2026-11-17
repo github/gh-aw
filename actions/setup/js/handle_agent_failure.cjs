@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel, getIssueLabelQuery } = require("./issue_label.cjs");
 const { createReportIssue, renderIssueParameters } = require("./issue_report.cjs");
 
 const { iterateJsonl, readJsonlFileEvents, iterateLines } = require("./jsonl_helpers.cjs");
@@ -654,7 +655,7 @@ async function findExistingFailureIssue(options) {
   const since = new Date(windowStartMs).toISOString().slice(0, 19) + "Z";
   const escapedWorkflowId = escapeGitHubSearchPhrase(workflowId);
   const failureCauseQuery = typeof failureCause === "string" ? ` "failure_cause: ${failureCause}"` : "";
-  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:agentic-workflows created:>=${since} ` + `"gh-aw-agentic-workflow:" "workflow_id: ${escapedWorkflowId}"${failureCauseQuery} in:body`;
+  const searchQuery = `repo:${owner}/${repo} is:issue is:open ${getIssueLabelQuery()} created:>=${since} ` + `"gh-aw-agentic-workflow:" "workflow_id: ${escapedWorkflowId}"${failureCauseQuery} in:body`;
   const perPage = 100;
   for (let page = 1; ; page += 1) {
     const searchResult = await github.rest.search.issuesAndPullRequests({
@@ -712,7 +713,7 @@ async function countRecentFailureIssuesByCategory(options) {
   const windowStartMs = Date.now() - FAILURE_ISSUE_WINDOW_MS;
   const since = new Date(windowStartMs).toISOString().slice(0, 19) + "Z";
   const escapedCategory = escapeGitHubSearchPhrase(category);
-  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:agentic-workflows created:>=${since} ` + `"gh-aw-failure-issue:" "failure_categories:" "${escapedCategory}" in:body`;
+  const searchQuery = `repo:${owner}/${repo} is:issue is:open ${getIssueLabelQuery()} created:>=${since} ` + `"gh-aw-failure-issue:" "failure_categories:" "${escapedCategory}" in:body`;
   const perPage = 100;
   let count = 0;
 
@@ -796,12 +797,12 @@ async function ensureParentIssue(previousParentNumber = null, ownerOverride, rep
   const owner = ownerOverride || contextOwner;
   const repo = repoOverride || contextRepo;
   const parentTitle = "[aw] Failed runs";
-  const parentLabel = "agentic-workflows";
+  const parentLabel = getIssueLabel();
 
   core.info(`Searching for parent issue: "${parentTitle}"`);
 
   // Search for existing parent issue
-  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:${parentLabel} in:title "${parentTitle}"`;
+  const searchQuery = `repo:${owner}/${repo} is:issue is:open ${getIssueLabelQuery()} in:title "${parentTitle}"`;
 
   try {
     const searchResult = await github.rest.search.issuesAndPullRequests({
@@ -3962,7 +3963,7 @@ async function findRecentFailureIssues(owner, repo) {
   const since = windowStart.toISOString().slice(0, 19) + "Z"; // e.g. "2026-05-22T02:00:00Z"
 
   // GitHub search API supports `created:>=YYYY-MM-DDTHH:MM:SSZ`
-  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:agentic-workflows "[aw]" in:title created:>=${since}`;
+  const searchQuery = `repo:${owner}/${repo} is:issue is:open ${getIssueLabelQuery()} "[aw]" in:title created:>=${since}`;
 
   try {
     const result = await github.rest.search.issuesAndPullRequests({
@@ -4015,7 +4016,7 @@ async function findExistingCascadeRollupIssue(owner, repo) {
  * @returns {Promise<{number: number, html_url: string} | null>}
  */
 async function findOrCreateDailyCapRollupIssue(owner, repo) {
-  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:agentic-workflows in:title "${DAILY_CAP_ROLLUP_TITLE}"`;
+  const searchQuery = `repo:${owner}/${repo} is:issue is:open ${getIssueLabelQuery()} in:title "${DAILY_CAP_ROLLUP_TITLE}"`;
   try {
     const result = await github.rest.search.issuesAndPullRequests({
       q: searchQuery,
@@ -4053,7 +4054,7 @@ async function findOrCreateDailyCapRollupIssue(owner, repo) {
         owner,
         repo,
         title: DAILY_CAP_ROLLUP_TITLE,
-        labels: ["agentic-workflows", DAILY_CAP_ROLLUP_LABEL],
+        labels: [getIssueLabel(), DAILY_CAP_ROLLUP_LABEL],
         headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
       },
       report
@@ -4177,7 +4178,7 @@ async function detectAndHandleFailureCascade(owner, repo, triggeringIssueNumber)
           owner,
           repo,
           title: CASCADE_ROLLUP_TITLE,
-          labels: ["agentic-workflows", CASCADE_ROLLUP_LABEL],
+          labels: [getIssueLabel(), CASCADE_ROLLUP_LABEL],
           headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
         },
         rollupReport
@@ -5414,12 +5415,12 @@ async function main() {
         });
 
         report.preamble = getDetectionCautionBlocks(workflowName, runUrl);
-        const request = renderIssueParameters({ owner, repo, title: issueTitle, labels: ["agentic-workflows"], headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION } }, report);
+        const request = renderIssueParameters({ owner, repo, title: issueTitle, labels: [getIssueLabel()], headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION } }, report);
         const { title: reportTitle, body: issueBody } = request;
 
         let newIssue;
         if (failureIssue) {
-          const labels = [...new Set([...(failureIssue.labels || []).map(label => (typeof label === "string" ? label : label.name || "")).filter(Boolean), "agentic-workflows"])];
+          const labels = [...new Set([...(failureIssue.labels || []).map(label => (typeof label === "string" ? label : label.name || "")).filter(Boolean), getIssueLabel()])];
           newIssue = await github.rest.issues.update({
             owner,
             repo,

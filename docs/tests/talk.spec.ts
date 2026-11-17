@@ -58,9 +58,9 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   expect(await page.evaluate(() => localStorage.getItem("aw-mute"))).toBe("0");
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
-  // Space follows the main line, past the Issue Monster example hanging below Event-driven Hand-offs
+  // Space follows the main line from Event-driven Hand-offs to Repo Commands
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Pull Request Review²")}$`));
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Repo Commands")}$`));
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
@@ -183,6 +183,9 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
+  // down walks the Continuous AI column first, then leaves for the next band
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last slide of the band above
@@ -280,8 +283,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
   // from an interior slide, next band lands on the header below and previous band on the header above
-  await page.goto("/gh-aw/cracktro/#3");
-  await expect(count).toHaveAttribute("aria-label", at(3));
+  const interior = slideNo("Anatomy of a workflow");
+  await page.goto(`/gh-aw/cracktro/#${interior}`);
+  await expect(count).toHaveAttribute("aria-label", at(interior));
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
@@ -324,7 +328,7 @@ test.describe("compact navigation on touch screens", () => {
     await page.goto("/gh-aw/cracktro/#3");
     await expect(count).toHaveAttribute("aria-label", at(3));
     await page.getByRole("button", { name: "Next slide", exact: true }).tap();
-    await expect(count).toHaveAttribute("aria-label", at(4));
+    await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
     await page.getByRole("button", { name: "Next band", exact: true }).tap();
     await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 
@@ -354,6 +358,75 @@ test.describe("compact navigation on touch screens", () => {
     await expect(count).toHaveAttribute("aria-label", at(1));
     await expect(page.locator(".arrows")).toHaveCSS("touch-action", "manipulation");
   });
+
+  test("dims the idle toolbar without swallowing the first tap or hiding keyboard focus", async ({ page }) => {
+    const count = page.locator(CURRENT);
+    const arrows = page.locator(".arrows");
+    const sound = page.locator(".snd");
+    await page.goto("/gh-aw/cracktro/#3");
+    await expect(count).toHaveAttribute("aria-label", at(3));
+    await expect(arrows).toHaveCSS("opacity", "1");
+    await expect(page.locator("body")).toHaveClass(/\bnav-idle\b/, { timeout: 5000 });
+    await expect(arrows).toHaveCSS("opacity", "0.4");
+    await expect(sound).toHaveCSS("opacity", "0.4");
+    // the first tap on a dimmed button both wakes the toolbar and navigates, exactly once
+    await page.getByRole("button", { name: "Next slide", exact: true }).tap();
+    await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
+    await expect(page.locator("body")).not.toHaveClass(/\bnav-idle\b/);
+    await expect(arrows).toHaveCSS("opacity", "1");
+    // a keyboard-focused control stays fully readable while the rest of the toolbar dims again
+    await page.keyboard.press("Shift");
+    await page.getByRole("button", { name: "Next band", exact: true }).focus();
+    await expect(page.locator("body")).toHaveClass(/\bnav-idle\b/, { timeout: 5000 });
+    await expect(arrows).toHaveCSS("opacity", "1");
+    await expect(sound).toHaveCSS("opacity", "0.4");
+  });
+});
+
+test("draws edge to edge on phones and keeps the wide-screen dock opaque", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/#1");
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /viewport-fit=cover/);
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute("content", "yes");
+  await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute("content", "black-translucent");
+  // the dim only applies to the compact (phone) toolbar
+  await page.evaluate(() => document.body.classList.add("nav-idle"));
+  await expect(page.locator(".snd")).toHaveCSS("opacity", "1");
+});
+
+test("starts the slide-change whoosh silent instead of with a full-scale bass burst", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/#1");
+  // render one slide change offline: a GainNode passes at full gain until its first scheduled event,
+  // so an oscillator started before its envelope used to blast an unshaped burst that clicks phone speakers
+  const level = await page.evaluate(async () => {
+    const SR = 48000;
+    const w = window as unknown as { AudioContext: unknown; sfx: { slide(dir: number, music?: string): void } };
+    let ac: OfflineAudioContext | undefined;
+    w.AudioContext = class extends OfflineAudioContext {
+      constructor() {
+        super(1, SR, SR);
+        ac = this;
+      }
+      resume() {
+        return Promise.resolve();
+      }
+    };
+    w.sfx.slide(1);
+    const d = (await ac!.startRendering()).getChannelData(0);
+    let peak = 0,
+      jump = 0,
+      early = 0;
+    for (let i = 1; i < d.length; i++) {
+      const v = Math.abs(d[i]);
+      peak = Math.max(peak, v);
+      jump = Math.max(jump, Math.abs(d[i] - d[i - 1]));
+      if (i >= 0.1 * SR && i < 0.135 * SR) early = Math.max(early, v);
+    }
+    return { peak, jump, early };
+  });
+  expect(level.peak).toBeGreaterThan(0.01);
+  expect(level.early).toBeLessThan(0.02);
+  expect(level.jump).toBeLessThan(0.05);
+  expect(level.peak).toBeLessThan(0.3);
 });
 
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {
@@ -393,7 +466,7 @@ test("publishes synthetic examples without profile assets or private source refe
   const source = (await Promise.all(["runtime.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
-  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://github.com/chrizbo/agentics-beyond-code"]);
+  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://api.github.com/repositories/", "https://github.com/chrizbo/agentics-beyond-code"]);
 
   const externalRequests: string[] = [];
   const errors: string[] = [];

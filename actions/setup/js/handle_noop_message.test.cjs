@@ -605,7 +605,9 @@ safe-outputs:
     expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
   });
 
-  it("should create no-op runs issue if it doesn't exist", async () => {
+  it.each([undefined, "area:agentic workflows"])("should create no-op runs issue if it doesn't exist (label %s)", async label => {
+    if (label) process.env.GH_AW_ISSUE_LABEL = label;
+    else delete process.env.GH_AW_ISSUE_LABEL;
     process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123456";
     process.env.GH_AW_NOOP_MESSAGE = "No updates needed";
@@ -654,11 +656,12 @@ safe-outputs:
       q: expect.stringContaining("[aw] No-Op Runs"),
       per_page: 1,
     });
+    expect(mockGithub.rest.search.issuesAndPullRequests.mock.calls[0][0].q).toContain(`label:"${label || "agentic-workflows"}"`);
 
     // Verify issue was created with correct title
     const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
     expect(createCall.title).toBe("[aw] No-Op Runs");
-    expect(createCall.labels).toContain("agentic-workflows");
+    expect(createCall.labels).toEqual([label || "agentic-workflows"]);
     expect(createCall.body).toContain("tracks all no-op runs");
 
     // Verify comment was posted

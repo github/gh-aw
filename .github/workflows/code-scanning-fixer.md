@@ -236,10 +236,6 @@ Your goal is to select and fix the highest-priority eligible alert, create a pul
 
 Use the `code-scanning-fixer-operations` skill for error recovery, safe tool usage, and oversized-patch handling. Alert fetching, priority ranking, and cache-state classification are precomputed in `/tmp/gh-aw/agent/alert-selection.json`; do not refetch or re-sort the alert list.
 
-**Self-Assessment Checkpoint**: This workflow has a hard 40-minute timeout. A hang or timeout during the fix-attempt phase previously produced zero output and zero visibility. To avoid that:
-- Before starting the expensive analyze-and-fix work on a selected alert, immediately record an `in_progress` checkpoint in cache memory (step 2). After each successful milestone in steps 3-6, append another `in_progress` record with the same `alert_number`, `fingerprint`, and original `started_at`, updating `last_successful_step`. This is cheap and happens before any risk of hanging.
-- On the *next* run, if a stale `in_progress` checkpoint is found for an alert with no later outcome recorded, that is evidence the previous run hung or timed out mid-fix. Report it via a diagnostic `create-issue` describing what was known about the alert, then skip that alert this run instead of silently retrying it with no visibility.
-
 ## Workflow Steps
 
 Use the `edit` tool to write cache records, not shell heredocs. Pass report bodies as arguments to the `safeoutputs` CLI, invoked through bash (use `--help` for parameters).
@@ -265,7 +261,7 @@ The candidate list contains only the highest-severity eligible alert and exclude
 
 Immediately after selecting the alert, and **before** doing any analysis or fix generation:
 - Append `{"alert_number": [alert-number], "fingerprint": [candidate fingerprint], "outcome": "in_progress", "started_at": "[current-timestamp]", "last_successful_step": "alert_selected"}` to `/tmp/gh-aw/cache-memory/fixed-alerts.jsonl`
-- This is a cheap, fast write that happens before steps 3-6, which are the steps most likely to hang or exceed the workflow timeout. If this run times out afterward, the next run's step 1 stall-detection will find this checkpoint and report the partial diagnostic that this run failed to produce.
+- This is a cheap write before steps 3-6, which may hang or exceed the workflow timeout. If a stale checkpoint has no later outcome, the next run reports a diagnostic issue and skips the alert rather than silently retrying it.
 
 ### 3. Get Alert Details
 

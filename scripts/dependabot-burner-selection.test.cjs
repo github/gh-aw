@@ -17,16 +17,17 @@ const prefetch = new AsyncFunction("github", "context", "require", "process", "c
 
 function compiledBashPolicy() {
   const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
-  const toolPolicy = lock.match(/GH_AW_PI_TOOL_POLICY: '([^'\n]+)'/);
+  const toolPolicy = lock.match(/GH_AW_PI_TOOL_POLICY: ('[^'\n]+'|"(?:\\.|[^"\\])*")/);
   assert.ok(toolPolicy, "Missing compiled Pi tool policy");
-  const { bash } = JSON.parse(toolPolicy[1]);
-  assert.ok(Array.isArray(bash) && bash.length > 0 && !bash.includes("*"), "Missing restricted bash allowlist");
+  const policyJSON = toolPolicy[1].startsWith('"') ? JSON.parse(toolPolicy[1]) : toolPolicy[1].slice(1, -1);
+  const { bash } = JSON.parse(policyJSON);
+  assert.ok(Array.isArray(bash) && bash.includes("*"), "Missing wildcard Bash policy");
   return command => isPiBashAllowed(command, bash);
 }
 
 test("burner tool-contract commands are executable under the compiled Pi policy", () => {
   const contract = workflow.match(/## Tool contract for every agent\n([\s\S]*?)\n## Read first/);
-  assert.ok(contract, "Missing restricted-tool contract for the orchestrator and subagents");
+  assert.ok(contract, "Missing shared tool contract for the orchestrator and subagents");
   const allowed = compiledBashPolicy();
   const { agents } = extractInlineSubAgents(workflow);
   const contracts = [contract[1], ...agents.map(agent => agent.content.match(/#{2,3} Tool contract\n([\s\S]*?)(?=\n## |Return compact JSON|$)/)?.[1] || "")];
@@ -34,20 +35,6 @@ test("burner tool-contract commands are executable under the compiled Pi policy"
   assert.ok(commands.length > 0, "Missing executable command examples");
   for (const command of commands) {
     assert.ok(allowed(command), command);
-  }
-  for (const command of [
-    "command -v pull_request_read || command -v github-mcp-server || command -v mcp",
-    "help pull_request_read",
-    "sed -n '1,240p' /tmp/gh-aw/agent/dependabot-burner/context.json",
-    "gh auth status",
-    "git --no-pager status --short --branch",
-    "git --no-pager status --short && git --no-pager remote -v",
-    "git diff --stat && gh auth status",
-    'github pull_request_read \'{"method":"get_diff"}\'',
-    "cd /tmp/gh-aw/agent/dependabot-burner && rg -n retry .",
-    "find /tmp/gh-aw/agent/dependabot-burner -maxdepth 2 -type f | sort | head -50",
-  ]) {
-    assert.ok(!allowed(command), command);
   }
 });
 
@@ -89,11 +76,23 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   assert.ok(mainContent.includes("do not search the filesystem for history or relaunch the analyzer"));
 });
 
-test("safe outputs are executable while GitHub reads stay off the shell", () => {
+test("safe outputs are executable while the prompt keeps GitHub reads off the shell", () => {
   const allowed = compiledBashPolicy();
   assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
-  assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
   assert.match(workflow, /Never invoke GitHub tools through Bash|GitHub tools are not shell commands: never\s+invoke them through Bash/);
+});
+
+test("wildcard Bash supports grouped validation and local inspection", () => {
+  const allowed = compiledBashPolicy();
+  for (const command of [
+    "git status --short && git diff --stat",
+    "make dependabot && make build",
+    "npm --prefix .github/workflows install --package-lock-only --ignore-scripts",
+    "git -C docs diff --stat",
+    "find docs -name package.json -print | sort",
+  ]) {
+    assert.ok(allowed(command), command);
+  }
 });
 
 test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
@@ -105,7 +104,7 @@ test("one remediation worker replaces analysis fan-out and the parent owns publi
   assert.match(workflow, /report incomplete work for a blocked or failed wave/);
   assert.match(workflow, /Leave `replacement_pr_created` false/);
   assert.match(workflow, /Do not submit create-pull-request or noop safe outputs from this worker/);
-  assert.match(workflow, /cd \.github\/workflows && npm install --package-lock-only --ignore-scripts/);
+  assert.match(workflow, /npm --prefix \.github\/workflows install --package-lock-only --ignore-scripts/);
   assert.doesNotMatch(workflow, /npm install --package-lock-only(?:["`]|\n)/);
 });
 
@@ -209,6 +208,29 @@ test("mixed source and generated manifest PRs are selected with all paths preser
   assert.deepEqual(result.excluded_prs, []);
   assert.deepEqual(result.selected_batch_dependencies[0].changed_files, files);
   assert.deepEqual(result.selected_batch_dependencies[0].manifest_files, files);
+  assert.deepEqual(result.selected_batch_dependencies[0].compiler_generated_files, [".github/workflows/package.json"]);
+});
+
+test("compiler provenance distinguishes named Python locks from generated declarations", async () => {
+  const generated = [".github/workflows/package.json", ".github/workflows/package-lock.json", ".github/workflows/requirements.txt", ".github/workflows/go.mod", ".github/workflows/smoke.lock.yml"];
+  const standalone = [
+    ".github/workflows/requirements-agentrx.txt",
+    ".github/workflows/requirements-geo-optimizer.txt",
+    ".github/workflows/requirements-harbor.in",
+    ".github/workflows/requirements-harbor.txt",
+    "docs/package.json",
+    "docs/package-lock.json",
+    "go.mod",
+    "go.sum",
+    "Dockerfile",
+  ];
+  const result = await select([pull(1, [...generated, ...standalone]), pull(2, standalone)]);
+  assert.deepEqual(result.selected_batch_pr_numbers, [1, 2]);
+  assert.deepEqual(
+    result.selected_batch_dependencies.map(item => item.compiler_generated_files),
+    [generated, []]
+  );
+  assert.deepEqual(result.excluded_prs, []);
 });
 
 test("compiled workflow lock YAML does not dilute shared-file grouping", async () => {
@@ -273,6 +295,11 @@ test("slash-command fallback admits source dependencies and groups existing rela
   assert.equal(result.open_pr_count, 3);
   assert.deepEqual([...result.selected_batch_pr_numbers].sort(), [1, 2]);
   assert.deepEqual(result.trigger_pr.manifest_families, ["npm"]);
+  assert.deepEqual(result.trigger_pr.compiler_generated_files, []);
+  assert.deepEqual(
+    result.selected_batch_dependencies.map(item => item.compiler_generated_files),
+    [[], []]
+  );
 });
 
 test("all fourteen PR file sets excluded by run 43439265743 are eligible", async () => {
