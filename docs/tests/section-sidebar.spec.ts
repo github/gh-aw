@@ -20,7 +20,7 @@ const sections = [
     preview: ["FAQ", "AI Engines", "Cost Management", "Safe Outputs", "Workflows", "More..."],
     more: "/gh-aw/reference/workflow-structure/",
     other: "/gh-aw/reference/engines/copilot/",
-    count: 77,
+    count: 79,
   },
 ];
 

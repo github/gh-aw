@@ -51,7 +51,7 @@ for (const route of [
 
     if (route.startsWith("reference/") || route.startsWith("troubleshooting/")) {
       await expect(content.locator(`a[href="${awf}compatibility.md#environment-and-runner-applicability"]`).first()).toBeVisible();
-      await expect(content).toContainText("unconfirmed");
+      await expect(content).toContainText(route === "reference/arc-dind-copilot-agent" ? "does not certify ARC or GHES availability" : "unconfirmed");
     }
   });
 }
@@ -83,7 +83,7 @@ test("GHES troubleshooting distinguishes inference availability from repository 
   await expect(content.locator("tr").filter({ hasText: "Error loading models: 400 Bad Request" })).toContainText(diagnosis);
 
   await page.goto("/gh-aw/reference/auth/");
-  const authEntry = page.locator(".sl-markdown-content p").filter({ hasText: "Error loading models: 400 Bad Request" });
+  const authEntry = page.locator(".sl-markdown-content p").filter({ hasText: "Error loading models: 400 Bad Request" }).locator("+ p");
   await expect(authEntry).toContainText(diagnosis);
   await expect(authEntry.getByRole("link", { name: "Copilot Engine Prerequisites on GHES" })).toHaveAttribute("href", "/gh-aw/troubleshooting/common-issues/#copilot-engine-prerequisites-on-ghes");
 });
