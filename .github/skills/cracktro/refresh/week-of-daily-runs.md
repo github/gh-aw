@@ -79,7 +79,7 @@ git diff -U0 docs/public/cracktro/deck.js | grep '^+' | grep -nE '[0-9a-f]{40}|(
 cd docs && npx playwright test tests/talk.spec.ts
 ```
 
-- Screenshot after ~3 s, once the bands and totals have faded in. Check that two-digit counts fit their cells, the band labels clear the grid and the key lines clear the foot.
+- The slide animates in `tick`: a playhead steps one UTC hour every 110 ms, switching that column on and advancing every day's total bar and counter by the same hour; bands, busiest outline, key and caption then switch on one per 320 ms. Screenshot after ~5 s, once the caption is on. Check that two-digit counts fit their cells, the band labels clear the grid and the key lines clear the foot.
 - No people, real names, issue or PR numbers, or URLs. Stop the server afterwards.
 
 ## 7. Pitfalls
