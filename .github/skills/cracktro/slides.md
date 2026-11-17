@@ -23,6 +23,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Security |  | Band header (Security): design every workflow as if the agent is already compromised. |
 | Agentic attacks | illustrative | Common agent attacks, from prompt injection to secret exfiltration and destructive commands, are each stopped by one or more layered defenses. |
 | Safety and control |  | Inputs are filtered, the agent runs sandboxed with a read-only token behind a firewall and gateway, and writes happen only through scanned safe outputs. |
+| Integrity filtering | illustrative | Malicious comments on a public pull request never reach the agent: the MCP gateway rates each item by its author's trust and drops everything below the configured minimum integrity before the model sees it. |
 | Zero-secret agents | illustrative | The agent runs in an isolated sandbox, here the experimental micro-VM runtime, holding no credentials; every key stays on the host behind the MCP gateway, API proxy and egress firewall. |
 | Supply chain hardening | illustrative | The compiler applies layered static checks, including trigger admission, expression safety, pinned actions, least privilege and secret scans, before any workflow runs. |
 | Safe outputs | illustrative | Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs. |
