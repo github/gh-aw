@@ -23,15 +23,16 @@ func TestParseExperimentMetricOutcomeReference(t *testing.T) {
 		{"ai_credits_total", "", false},
 		{"grader:accepted", "", false},
 		{"outcomes.accepted", "", false},
-		{"outcome:accepted", "accepted", true},
-		{"outcome:zero_touch", "zero_touch", true},
-		{" outcome: accepted ", "accepted", true},
-		{"outcome: zero_touch ", "zero_touch", true},
-		{"outcome:", "", true},
-		{"outcome: ", "", true},
-		{"outcome:merged", "", true},
-		{"outcome:ACCEPTED", "", true},
-		{"outcome:accepted.value", "", true},
+		{"adoption:accepted", "accepted", true},
+		{"adoption:zero_touch", "zero_touch", true},
+		{" adoption: accepted ", "accepted", true},
+		{"adoption: zero_touch ", "zero_touch", true},
+		{"adoption:", "", true},
+		{"adoption: ", "", true},
+		{"adoption:merged", "", true},
+		{"adoption:ACCEPTED", "", true},
+		{"outcome:accepted", "", false},
+		{"adoption:accepted.value", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.metric, func(t *testing.T) {
@@ -43,7 +44,7 @@ func TestParseExperimentMetricOutcomeReference(t *testing.T) {
 }
 
 func TestValidateExperimentOutcomeMetricReferences(t *testing.T) {
-	for _, metric := range []string{"outcome:accepted", "outcome:zero_touch", "outcome:merged", "outcome:"} {
+	for _, metric := range []string{"adoption:accepted", "adoption:zero_touch", "adoption:merged", "adoption:"} {
 		for _, field := range []string{"metric", "secondary_metrics", "guardrail_metrics"} {
 			t.Run(field+"/"+metric, func(t *testing.T) {
 				cfg := &ExperimentConfig{}
@@ -56,22 +57,40 @@ func TestValidateExperimentOutcomeMetricReferences(t *testing.T) {
 					cfg.GuardrailMetrics = []GuardrailMetric{{Name: metric, Threshold: ">=0.9"}}
 				}
 				err := validateExperimentMetricReferences(map[string]*ExperimentConfig{"quality": cfg}, nil, nil)
-				if metric == "outcome:accepted" || metric == "outcome:zero_touch" {
+				if metric == "adoption:accepted" || metric == "adoption:zero_touch" {
 					require.NoError(t, err)
 				} else {
-					require.EqualError(t, err, fmt.Sprintf("experiments.quality.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", field, metric))
+					require.EqualError(t, err, fmt.Sprintf("experiments.quality.%s: unknown adoption metric %q. Expected adoption:accepted or adoption:zero_touch. Example: metric: adoption:accepted", field, metric))
 				}
 			})
 		}
 	}
 }
 
+func TestRemovedExperimentOutcomeMetric(t *testing.T) {
+	for _, field := range []string{"metric", "secondary_metrics", "guardrail_metrics"} {
+		t.Run(field, func(t *testing.T) {
+			cfg := &ExperimentConfig{}
+			switch field {
+			case "metric":
+				cfg.Metric = "outcome:accepted"
+			case "secondary_metrics":
+				cfg.SecondaryMetrics = []string{"outcome:accepted"}
+			case "guardrail_metrics":
+				cfg.GuardrailMetrics = []GuardrailMetric{{Name: "outcome:accepted", Threshold: ">=0.9"}}
+			}
+			err := validateExperimentMetricReferences(map[string]*ExperimentConfig{"quality": cfg}, nil, nil)
+			require.EqualError(t, err, "experiments.quality."+field+": outcome: metrics have been removed; use adoption:accepted or adoption:zero_touch")
+		})
+	}
+}
+
 func TestExperimentOutcomeWindow(t *testing.T) {
 	for _, window := range []string{"", "auto", "72h", "1h30m", "0.5h", "1ns", "0", "0h", "-1h", "3d", "invalid", " 72h ", "999999999999999999999h"} {
 		t.Run(window, func(t *testing.T) {
-			raw := map[string]any{"variants": []any{"control", "candidate"}, "metric": "outcome:accepted"}
+			raw := map[string]any{"variants": []any{"control", "candidate"}, "metric": "adoption:accepted"}
 			if window != "" {
-				raw["outcome_window"] = window
+				raw["adoption_window"] = window
 			}
 			cfg := extractOneExperimentConfig("quality", raw)
 			require.NotNil(t, cfg)
@@ -82,13 +101,13 @@ func TestExperimentOutcomeWindow(t *testing.T) {
 				require.NoError(t, err)
 				spec := buildExperimentSpecJSON(nil, map[string]*ExperimentConfig{"quality": cfg}, []string{"quality"})
 				if window == "" {
-					assert.NotContains(t, spec, "outcome_window", "omission preserves the analysis default of auto")
+					assert.NotContains(t, spec, "adoption_window", "omission preserves the analysis default of auto")
 				} else {
-					assert.Contains(t, spec, fmt.Sprintf(`"outcome_window":%q`, window))
+					assert.Contains(t, spec, fmt.Sprintf(`"adoption_window":%q`, window))
 				}
 			default:
-				require.ErrorContains(t, err, "experiments.quality.outcome_window:")
-				require.ErrorContains(t, err, `Expected "auto" or a positive Go duration. Example: outcome_window: 72h`)
+				require.ErrorContains(t, err, "experiments.quality.adoption_window:")
+				require.ErrorContains(t, err, `Expected "auto" or a positive Go duration. Example: adoption_window: 72h`)
 			}
 		})
 	}
@@ -100,15 +119,15 @@ func TestParseWorkflowExperimentOutcomes(t *testing.T) {
 		fields  string
 		wantErr string
 	}{
-		{"valid", "metric: outcome:accepted\n    secondary_metrics: [outcome:zero_touch]\n    guardrail_metrics:\n      - name: outcome:accepted\n        threshold: '>=0.9'\n    outcome_window: 48h", ""},
-		{"automatic window", "metric: outcome:accepted\n    outcome_window: auto", ""},
-		{"invalid primary", "metric: outcome:merged", `unknown outcome metric "outcome:merged"`},
-		{"invalid secondary", "secondary_metrics: [outcome:merged]", `secondary_metrics: unknown outcome metric "outcome:merged"`},
-		{"invalid guardrail", "guardrail_metrics:\n      - name: outcome:merged\n        threshold: '>=0.9'", `guardrail_metrics: unknown outcome metric "outcome:merged"`},
-		{"invalid window", "outcome_window: 3d", `Expected "auto" or a positive Go duration`},
-		{"zero window", "outcome_window: 0h", `Expected "auto" or a positive Go duration`},
-		{"negative window", "outcome_window: -1h", `Expected "auto" or a positive Go duration`},
-		{"empty window", "outcome_window: ''", "outcome_window"},
+		{"valid", "metric: adoption:accepted\n    secondary_metrics: [adoption:zero_touch]\n    guardrail_metrics:\n      - name: adoption:accepted\n        threshold: '>=0.9'\n    adoption_window: 48h", ""},
+		{"automatic window", "metric: adoption:accepted\n    adoption_window: auto", ""},
+		{"invalid primary", "metric: adoption:merged", `unknown adoption metric "adoption:merged"`},
+		{"invalid secondary", "secondary_metrics: [adoption:merged]", `secondary_metrics: unknown adoption metric "adoption:merged"`},
+		{"invalid guardrail", "guardrail_metrics:\n      - name: adoption:merged\n        threshold: '>=0.9'", `guardrail_metrics: unknown adoption metric "adoption:merged"`},
+		{"invalid window", "adoption_window: 3d", `Expected "auto" or a positive Go duration`},
+		{"zero window", "adoption_window: 0h", `Expected "auto" or a positive Go duration`},
+		{"negative window", "adoption_window: -1h", `Expected "auto" or a positive Go duration`},
+		{"empty window", "adoption_window: ''", "adoption_window"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			source := filepath.Join(t.TempDir(), "workflow.md")
@@ -122,13 +141,13 @@ func TestParseWorkflowExperimentOutcomes(t *testing.T) {
 			require.NoError(t, err)
 			cfg := data.ExperimentConfigs["quality"]
 			require.NotNil(t, cfg)
-			if strings.Contains(tt.fields, "metric: outcome:accepted") {
-				assert.Equal(t, "outcome:accepted", cfg.Metric)
+			if strings.Contains(tt.fields, "metric: adoption:accepted") {
+				assert.Equal(t, "adoption:accepted", cfg.Metric)
 			}
-			if strings.Contains(tt.fields, "outcome_window: 48h") {
+			if strings.Contains(tt.fields, "adoption_window: 48h") {
 				assert.Equal(t, "48h", cfg.OutcomeWindow)
 			}
-			if strings.Contains(tt.fields, "outcome_window: auto") {
+			if strings.Contains(tt.fields, "adoption_window: auto") {
 				assert.Equal(t, "auto", cfg.OutcomeWindow)
 			}
 		})

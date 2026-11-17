@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/lifecycle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,6 +49,11 @@ func TestLatestEpisodeOutcomesConflictingFields(t *testing.T) {
 		{"comments", func(item *EpisodeOutcomeObservation) { item.HumanComments++ }},
 		{"edits", func(item *EpisodeOutcomeObservation) { item.HumanEdits++ }},
 		{"reviews", func(item *EpisodeOutcomeObservation) { item.HumanReviews++ }},
+		{"adoption decision", func(item *EpisodeOutcomeObservation) {
+			item.Adoption = &lifecycle.Adoption{AcceptanceKind: "fallback_delivery"}
+		}},
+		{"survival coverage", func(item *EpisodeOutcomeObservation) { item.Survival = &lifecycle.Survival{Coverage: "unavailable"} }},
+		{"reversal", func(item *EpisodeOutcomeObservation) { item.ReversalSignal = "reopened" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, legacy := range []bool{false, true} {
@@ -75,7 +81,7 @@ func TestLatestEpisodeOutcomesConflictingFields(t *testing.T) {
 							require.NoError(t, err)
 							assert.Equal(t, []EpisodeOutcomeObservation{newer}, got)
 						} else {
-							require.ErrorContains(t, err, "conflicting outcomes")
+							require.ErrorContains(t, err, "conflicting adoption")
 						}
 					}
 				}
@@ -150,7 +156,7 @@ func TestEpisodeOutcomesConflictingPositionalTargets(t *testing.T) {
 		{conflict, first, older},
 	} {
 		_, err := latestEpisodeOutcomes(input)
-		require.ErrorContains(t, err, "conflicting outcomes", "one matching target cannot hide an ambiguous positional alias")
+		require.ErrorContains(t, err, "conflicting adoption", "one matching target cannot hide an ambiguous positional alias")
 		input = append(input, second)
 		got, err := latestEpisodeOutcomes(input)
 		require.NoError(t, err)
@@ -240,7 +246,7 @@ func TestBuildEpisodeOutcomesCostAndEvidence(t *testing.T) {
 				assert.Equal(t, "partial", row.OutcomeCoverage)
 			}
 			if tc.status == OutcomeStatusPending || tc.status == OutcomeStatusUnknown || tc.status == OutcomeStatusError {
-				assert.Contains(t, row.Qualifications, "Pending, unknown, and error outcomes remain unresolved; accepted counts are an observation snapshot.")
+				assert.Contains(t, row.Qualifications, "Pending, unknown, and error adoption remain unresolved; accepted counts are an observation snapshot.")
 			}
 		})
 	}
@@ -379,22 +385,22 @@ func TestLatestEpisodeOutcomesIdentitySnapshots(t *testing.T) {
 		{
 			name:         "partially refreshed precise snapshots do not supersede newer legacy",
 			observations: []EpisodeOutcomeObservation{first, second, snapshot("", OutcomeStatusRejected, legacyTime), firstRefreshed},
-			err:          "legacy outcome for run 1 is newer than precise item observations; reevaluate the run",
+			err:          "legacy adoption for run 1 is newer than precise item observations; reevaluate the run",
 		},
 		{
 			name:         "newer legacy acceptance is ambiguous",
 			observations: []EpisodeOutcomeObservation{first, second, snapshot("", OutcomeStatusAccepted, legacyTime)},
-			err:          "legacy outcome for run 1 is newer than precise item observations; reevaluate the run",
+			err:          "legacy adoption for run 1 is newer than precise item observations; reevaluate the run",
 		},
 		{
 			name:         "newer legacy rejection is ambiguous",
 			observations: []EpisodeOutcomeObservation{first, second, snapshot("", OutcomeStatusRejected, legacyTime)},
-			err:          "legacy outcome for run 1 is newer than precise item observations; reevaluate the run",
+			err:          "legacy adoption for run 1 is newer than precise item observations; reevaluate the run",
 		},
 		{
 			name:         "newer legacy pending status is ambiguous",
 			observations: []EpisodeOutcomeObservation{first, second, snapshot("", OutcomeStatusPending, legacyTime)},
-			err:          "legacy outcome for run 1 is newer than precise item observations; reevaluate the run",
+			err:          "legacy adoption for run 1 is newer than precise item observations; reevaluate the run",
 		},
 		{
 			name:         "conflicting stale legacy is superseded by precise snapshots",
@@ -414,12 +420,12 @@ func TestLatestEpisodeOutcomesIdentitySnapshots(t *testing.T) {
 		{
 			name:         "conflicting latest modern statuses remain errors",
 			observations: []EpisodeOutcomeObservation{firstRefreshed, firstRejected, legacyOld},
-			err:          "conflicting outcomes",
+			err:          "conflicting adoption",
 		},
 		{
 			name:         "conflicting latest legacy statuses remain errors",
 			observations: []EpisodeOutcomeObservation{legacyRejected, snapshot("", OutcomeStatusAccepted, newTime)},
-			err:          "conflicting outcomes",
+			err:          "conflicting adoption",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -474,7 +480,7 @@ func TestBuildEpisodeOutcomesRecordedMembershipCoverage(t *testing.T) {
 			map[int64]episodeOutcomeCost{1: episodeCost(2)})
 		require.NoError(t, err)
 		row := data.Episodes[0]
-		assert.Equal(t, "complete", row.OutcomeCoverage, "lineage and outcome coverage are independent")
+		assert.Equal(t, "complete", row.OutcomeCoverage, "lineage and adoption coverage are independent")
 		assert.Equal(t, "available", row.CostCoverage)
 		assert.Equal(t, coverage, row.MembershipCoverage)
 		assert.Nil(t, row.CostPerAcceptedOutcome)
@@ -494,7 +500,7 @@ func TestLatestEpisodeOutcomesValidation(t *testing.T) {
 
 	newer.CheckedAt = item.CheckedAt
 	_, err = latestEpisodeOutcomes([]EpisodeOutcomeObservation{newer, item})
-	require.ErrorContains(t, err, "conflicting outcomes")
+	require.ErrorContains(t, err, "conflicting adoption")
 	item.CheckedAt = "invalid"
 	_, err = latestEpisodeOutcomes([]EpisodeOutcomeObservation{item})
 	require.ErrorContains(t, err, "invalid checked_at")

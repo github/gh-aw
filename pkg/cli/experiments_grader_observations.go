@@ -9,11 +9,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/workflow"
-	"github.com/sourcegraph/conc/pool"
 )
 
 const maxGraderResultsBytes = 10 * 1024 * 1024
@@ -121,21 +119,26 @@ func (s *githubGraderRunArtifactSource) Load(ctx context.Context, runIDText stri
 }
 
 func (s *githubGraderRunArtifactSource) eligibleRunID(ctx context.Context, runIDText string) (int64, string) {
+	run, reason := s.eligibleRun(ctx, runIDText)
+	return run.DatabaseID, reason
+}
+
+func (s *githubGraderRunArtifactSource) eligibleRun(ctx context.Context, runIDText string) (WorkflowRun, string) {
 	runID, err := strconv.ParseInt(runIDText, 10, 64)
 	if err != nil || runID <= 0 {
-		return 0, exclusionRunUnavailable
+		return WorkflowRun{}, exclusionRunUnavailable
 	}
 	run, err := fetchWorkflowRunMetadata(ctx, runID, s.owner, s.repo, s.hostname, false)
 	if err != nil {
-		return 0, exclusionRunUnavailable
+		return WorkflowRun{}, exclusionRunUnavailable
 	}
 	if run.Status != "completed" {
-		return 0, exclusionRunIncomplete
+		return WorkflowRun{}, exclusionRunIncomplete
 	}
 	if run.Conclusion == "cancelled" || run.Conclusion == "skipped" {
-		return 0, exclusionRunCancelled
+		return WorkflowRun{}, exclusionRunCancelled
 	}
-	return runID, ""
+	return run, ""
 }
 
 func (s *githubGraderRunArtifactSource) downloadGraderArtifact(ctx context.Context, runID int64, runIDText string) graderRunData {
@@ -322,20 +325,7 @@ func loadGraderRunData(ctx context.Context, runs []ExperimentRunRecord, experime
 		}
 	}
 
-	result := make(map[string]graderRunData, len(runIDs))
-	var mu sync.Mutex
-	p := pool.New().WithContext(ctx).WithMaxGoroutines(getMaxConcurrentDownloads())
-	for runID := range runIDs {
-		p.Go(func(ctx context.Context) error {
-			data := source.Load(ctx, runID)
-			mu.Lock()
-			result[runID] = data
-			mu.Unlock()
-			return nil
-		})
-	}
-	_ = p.Wait()
-	return result
+	return loadRunsConcurrently(ctx, runIDs, source.Load)
 }
 
 func buildGraderMetricObservationSets(

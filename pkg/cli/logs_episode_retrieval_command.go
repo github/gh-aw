@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -39,9 +40,9 @@ immutable artifacts are reused. --json always returns the standard logs report.`
 			if err := validateEpisodeView(view); err != nil {
 				return err
 			}
-			outcomesDir := getStringFlag(cmd, "outcomes-dir")
+			outcomesDir := getStringFlag(cmd, "adoption-dir")
 			if outcomesDir != "" && !opts.Outcomes {
-				return errors.New("--outcomes-dir requires --outcomes")
+				return errors.New("--adoption-dir requires --adoption")
 			}
 			if len(args) > 0 {
 				if err := resolveEpisodeSeed(&opts, args[0], repository); err != nil {
@@ -50,12 +51,14 @@ immutable artifacts are reused. --json always returns the standard logs report.`
 			} else {
 				return errors.New("expected one seed run ID or URL")
 			}
-			data, err := RetrieveEpisodeLogs(cmd.Context(), opts)
+			ctx, cancel := context.WithTimeout(cmd.Context(), opts.Timeout)
+			defer cancel()
+			data, err := RetrieveEpisodeLogs(ctx, opts)
 			if err != nil {
 				return err
 			}
-			if opts.Outcomes {
-				if err := collectEpisodeOutcomes(cmd.Context(), &data, outcomesDir, getBoolFlag(cmd, "verbose")); err != nil {
+			if opts.Outcomes || opts.Delivery {
+				if err := collectEpisodeLifecycles(ctx, &data, outcomesDir, getBoolFlag(cmd, "verbose"), opts.Outcomes); err != nil {
 					return err
 				}
 			}
@@ -66,8 +69,9 @@ immutable artifacts are reused. --json always returns the standard logs report.`
 	addEpisodeRetrievalFlags(cmd, &opts, &repository, &jsonOutput)
 	cmd.Flags().StringVar(&view, "view", "summary", "Episode view: summary or hops (JSON always includes both)")
 	cmd.Flags().BoolVar(&opts.Refresh, "refresh", false, "Refresh the cached episode snapshot using the current collection bounds")
-	cmd.Flags().BoolVar(&opts.Outcomes, "outcomes", false, "Evaluate current outcomes for episode members (additional live API requests beyond retrieval bounds)")
-	cmd.Flags().String("outcomes-dir", "", "Write outcome JSONL observations to this directory (requires --outcomes)")
+	cmd.Flags().BoolVar(&opts.Delivery, "delivery", false, "Report safe-output delivery for episode members")
+	cmd.Flags().BoolVar(&opts.Outcomes, "adoption", false, "Refresh adoption for episode members within the remaining retrieval bounds")
+	cmd.Flags().String("adoption-dir", "", "Write outcome JSONL observations to this directory (requires --adoption)")
 	return cmd
 }
 

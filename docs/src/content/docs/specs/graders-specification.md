@@ -152,7 +152,7 @@ consumption, and replay because these facts are knowable at conclusion. GitHub
 is authoritative for later object disposition. githubnext/gh-cao owns provider
 refresh; adoption, rejection, reversal, and survival lifecycle; longitudinal
 repository/window/campaign Value; canonical storage/querying; and presentation.
-`safe_output.outcome` is handler application status, not human adoption.
+`safe_output.execution` is handler application status, not human adoption.
 
 Every standalone Agentic Workflow MUST publish longitudinal Value through
 githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME` without a

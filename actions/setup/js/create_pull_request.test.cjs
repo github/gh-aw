@@ -149,6 +149,62 @@ describe("create_pull_request - draft policy enforcement", () => {
     return global.core.warning.mock.calls.filter(args => String(args[0]).includes("Agent requested draft"));
   }
 
+  it.each([
+    ["warn", "init_miss_fail"],
+    ["error", "init_miss_nerr_fail"],
+    ["ignore", "init_miss_ignr_fail"],
+  ])("traces the exercised %s policy when the patch is missing", async (ifNoChanges, expectedTrace) => {
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ if_no_changes: ifNoChanges });
+
+    const result = await handler({ title: "Test PR" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.execution_trace).toBe(expectedTrace);
+  });
+
+  it.each(["error", "ignore"])("does not trace staged or %s no-change routes before repository validation", async ifNoChanges => {
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ staged: true, if_no_changes: ifNoChanges });
+
+    const result = await handler({ title: "Test PR", repo: "other-owner/other-repo" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.execution_trace).toBe("init_repo_fail");
+    expect(global.core.summary.addRaw).not.toHaveBeenCalled();
+  });
+
+  it("traces the staged preview rather than the no-change policy for a missing patch", async () => {
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ staged: true, if_no_changes: "error" });
+
+    const result = await handler({ title: "Test PR" }, {});
+
+    expect(result.staged).toBe(true);
+    expect(result.execution_trace).toBe("init_miss_stag_done");
+    expect(global.core.summary.addRaw).toHaveBeenCalled();
+  });
+
+  it("retains the empty-push failure route when transport integrity fails", async () => {
+    const patchPath = canonicalPatchPath("empty-push-integrity");
+    fs.writeFileSync(patchPath, "");
+    global.exec.exec.mockImplementation(async (cmd, args) => {
+      if (cmd === "git" && args[0] === "commit") {
+        fs.writeFileSync(patchPath, "tampered during empty commit");
+        throw new Error("empty commit failed");
+      }
+      return 0;
+    });
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true });
+
+    const result = await handler({ title: "Test PR", branch: "empty-push-integrity" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("SECURITY:");
+    expect(result.execution_trace).toBe("init_ecmt_eper_fail");
+  });
+
   it("should propagate the created pull request's durable id and node_id", async () => {
     global.github.rest.pulls.create = vi.fn().mockResolvedValue({
       data: { id: 555111222, node_id: "PR_kwDOtest456", number: 1, html_url: "https://github.com/test", head: { sha: "abc123" } },
@@ -160,6 +216,7 @@ describe("create_pull_request - draft policy enforcement", () => {
 
     expect(result.success).toBe(true);
     expect(result.id).toBe(555111222);
+    expect(result.execution_trace).toBe("init_miss_alwe_ecmt_publ_capt_done");
     expect(result.metadata).toEqual({ node_id: "PR_kwDOtest456" });
   });
 
@@ -610,6 +667,7 @@ index 0000000..abc1234
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("allow-full-history-fetch: true");
+    expect(result.execution_trace).toBe("init_bund_bfal_fail");
     expect(result.error).toContain("safe-outputs.create-pull-request");
     const directFetch = global.exec.exec.mock.calls.find(([, args]) => Array.isArray(args) && args[0] === "fetch" && args.includes("origin") && args.includes(prereq));
     expect(directFetch).toBeUndefined();
@@ -648,6 +706,7 @@ index 0000000..abc1234
 
     expect(result.success).toBe(true);
     expect(pushSignedSpy).toHaveBeenCalledWith(expect.objectContaining({ signedCommits: false }));
+    expect(result.execution_trace).toBe("init_bund_push_publ_capt_done");
   });
 
   it("should create the PR when the bundle push fails once with a transient workflows-scope timeout and succeeds on retry", async () => {
@@ -685,6 +744,7 @@ index 0000000..abc1234
 
       expect(result.success).toBe(true);
       expect(result.fallback_used).not.toBe(true);
+      expect(result.execution_trace).toBe("init_bund_push_push_publ_capt_done");
       expect(pushSignedSpy).toHaveBeenCalledTimes(2);
       expect(global.github.rest.pulls.create).toHaveBeenCalled();
       expect(global.github.rest.issues.create).not.toHaveBeenCalled();
@@ -796,6 +856,7 @@ index 0000000..abc1234
     expect(result.fallback_used).not.toBe(true);
     expect(pushSignedSpy).toHaveBeenCalledTimes(2);
     expect(global.exec.exec).toHaveBeenCalledWith("git", ["reset", "--soft", "origin/main"]);
+    expect(result.execution_trace).toBe("init_bund_push_sign_publ_capt_done");
     expect(global.exec.exec).toHaveBeenCalledWith("git", ["commit", "-m", "bundle merge headline"]);
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
   });
@@ -2207,6 +2268,7 @@ ${diffs}
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("outside the allowed-files list");
+    expect(result.execution_trace).toBe("init_deny_fail");
     expect(result.error).toContain("src/index.js");
   });
 
@@ -2388,6 +2450,7 @@ ${diffs}
     const result = await handler({ title: "Test PR", body: "Test body", branch: "feature/protected-identical" }, {});
 
     expect(result.issue_number).toBe(76);
+    expect(result.execution_trace).toBe("init_fall_ptch_prot_reus_done");
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
     expect(global.github.paginate).toHaveBeenCalledWith(global.github.rest.issues.listForRepo, expect.objectContaining({ owner: "test-owner", repo: "test-repo", state: "all", labels: "pull-request-fallback" }));
     const updateCall = global.github.rest.issues.update.mock.calls[0][0];
@@ -3464,17 +3527,18 @@ describe("create_pull_request - patch apply fallback to original base commit", (
     return false;
   }
 
-  it("should create the PR branch from the patch-embedded base commit when available", async () => {
+  it.each(["warn", "error", "ignore"])("should create the PR branch from the patch-embedded base commit with %s no-change policy", async ifNoChanges => {
     global.exec = {
       exec: vi.fn().mockResolvedValue(0),
       getExecOutput: vi.fn().mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" }),
     };
 
     const { main } = require("./create_pull_request.cjs");
-    const handler = await main({});
+    const handler = await main({ if_no_changes: ifNoChanges });
     const result = await handler({ title: "Test PR", body: "Test body", branch: "test-branch", base_commit: `  ${MOCK_BASE_COMMIT_SHA}  ` }, {});
 
     expect(result.success).toBe(true);
+    expect(result.execution_trace).toBe("init_ptch_publ_capt_done");
     expect(global.exec.exec).toHaveBeenCalledWith("git", ["cat-file", "-e", MOCK_BASE_COMMIT_SHA]);
     const checkoutWithBaseCommit = global.exec.exec.mock.calls.find(([cmd, args]) => cmd === "git" && Array.isArray(args) && args[0] === "checkout" && args[1] === "-b" && args[3] === MOCK_BASE_COMMIT_SHA);
     expect(checkoutWithBaseCommit).toBeTruthy();
@@ -3560,6 +3624,7 @@ describe("create_pull_request - patch apply fallback to original base commit", (
 
     expect(result.success).toBe(true);
     // Should warn that the PR will show merge conflicts
+    expect(result.execution_trace).toBe("init_ptch_pfal_rply_publ_capt_done");
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("merge conflicts"));
   });
 
@@ -5102,6 +5167,7 @@ describe("create_pull_request - E003 file-limit fallback-to-issue", () => {
     expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
     expect(result.success).toBe(false);
     expect(result.error).toContain("SECURITY:");
+    expect(result.execution_trace).toBe("init_flim_fail");
   });
 
   it("should use the actual received file count (not maxFiles*2) as the suggested limit", async () => {
@@ -5148,6 +5214,7 @@ describe("create_pull_request - E003 file-limit fallback-to-issue", () => {
     // Staged mode: no API side effects, just a preview
     expect(result.success).toBe(true);
     expect(result.staged).toBe(true);
+    expect(result.execution_trace).toBe("init_flim_stag_done");
     expect(result.fallback_used).toBeUndefined();
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
     expect(global.github.rest.pulls.create).not.toHaveBeenCalled();

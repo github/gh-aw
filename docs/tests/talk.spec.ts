@@ -58,9 +58,9 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   expect(await page.evaluate(() => localStorage.getItem("aw-mute"))).toBe("0");
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
-  // Space follows the main line, past the Issue Monster example hanging below Event-driven Hand-offs
+  // Space follows the main line from Event-driven Hand-offs to Repo Commands
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Pull Request Review²")}$`));
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Repo Commands")}$`));
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
@@ -202,6 +202,33 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.keyboard.press("PageUp");
   await expect(count).toHaveAttribute("aria-label", at(2));
+});
+
+test("hangs CI reuse below workflow anatomy", async ({ page }) => {
+  const parent = slideNo("Anatomy of a workflow");
+  const child = slideNo("Reuse your CI");
+  const count = page.locator(CURRENT);
+  await page.goto(`/gh-aw/cracktro/#${parent}`);
+  await expect(page.getByRole("button", { name: "1 example below", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Reuse your CI");
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.locator(".vnb").click();
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await page.getByRole("button", { name: "Back to the pattern", exact: true }).click();
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.getByRole("button", { name: "Slide map (G)", exact: true }).click();
+  const kids = page.getByRole("group", { name: "Anatomy of a workflow examples", exact: true });
+  await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${child}:`) })).toBeVisible();
+});
+
+test("keeps the CI reuse workflow inside its code panel", async ({ page }) => {
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Reuse your CI")}`);
+  await page.evaluate(() => document.fonts.ready);
+  const overflowing = await page.locator(".cwa-ln").evaluateAll(lines => lines.filter(line => line.scrollWidth > line.clientWidth).map(line => line.textContent));
+  expect(overflowing).toEqual([]);
 });
 
 test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
@@ -358,6 +385,75 @@ test.describe("compact navigation on touch screens", () => {
     await expect(count).toHaveAttribute("aria-label", at(1));
     await expect(page.locator(".arrows")).toHaveCSS("touch-action", "manipulation");
   });
+
+  test("dims the idle toolbar without swallowing the first tap or hiding keyboard focus", async ({ page }) => {
+    const count = page.locator(CURRENT);
+    const arrows = page.locator(".arrows");
+    const sound = page.locator(".snd");
+    await page.goto("/gh-aw/cracktro/#3");
+    await expect(count).toHaveAttribute("aria-label", at(3));
+    await expect(arrows).toHaveCSS("opacity", "1");
+    await expect(page.locator("body")).toHaveClass(/\bnav-idle\b/, { timeout: 5000 });
+    await expect(arrows).toHaveCSS("opacity", "0.4");
+    await expect(sound).toHaveCSS("opacity", "0.4");
+    // the first tap on a dimmed button both wakes the toolbar and navigates, exactly once
+    await page.getByRole("button", { name: "Next slide", exact: true }).tap();
+    await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
+    await expect(page.locator("body")).not.toHaveClass(/\bnav-idle\b/);
+    await expect(arrows).toHaveCSS("opacity", "1");
+    // a keyboard-focused control stays fully readable while the rest of the toolbar dims again
+    await page.keyboard.press("Shift");
+    await page.getByRole("button", { name: "Next band", exact: true }).focus();
+    await expect(page.locator("body")).toHaveClass(/\bnav-idle\b/, { timeout: 5000 });
+    await expect(arrows).toHaveCSS("opacity", "1");
+    await expect(sound).toHaveCSS("opacity", "0.4");
+  });
+});
+
+test("draws edge to edge on phones and keeps the wide-screen dock opaque", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/#1");
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /viewport-fit=cover/);
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute("content", "yes");
+  await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute("content", "black-translucent");
+  // the dim only applies to the compact (phone) toolbar
+  await page.evaluate(() => document.body.classList.add("nav-idle"));
+  await expect(page.locator(".snd")).toHaveCSS("opacity", "1");
+});
+
+test("starts the slide-change whoosh silent instead of with a full-scale bass burst", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/#1");
+  // render one slide change offline: a GainNode passes at full gain until its first scheduled event,
+  // so an oscillator started before its envelope used to blast an unshaped burst that clicks phone speakers
+  const level = await page.evaluate(async () => {
+    const SR = 48000;
+    const w = window as unknown as { AudioContext: unknown; sfx: { slide(dir: number, music?: string): void } };
+    let ac: OfflineAudioContext | undefined;
+    w.AudioContext = class extends OfflineAudioContext {
+      constructor() {
+        super(1, SR, SR);
+        ac = this;
+      }
+      resume() {
+        return Promise.resolve();
+      }
+    };
+    w.sfx.slide(1);
+    const d = (await ac!.startRendering()).getChannelData(0);
+    let peak = 0,
+      jump = 0,
+      early = 0;
+    for (let i = 1; i < d.length; i++) {
+      const v = Math.abs(d[i]);
+      peak = Math.max(peak, v);
+      jump = Math.max(jump, Math.abs(d[i] - d[i - 1]));
+      if (i >= 0.1 * SR && i < 0.135 * SR) early = Math.max(early, v);
+    }
+    return { peak, jump, early };
+  });
+  expect(level.peak).toBeGreaterThan(0.01);
+  expect(level.early).toBeLessThan(0.02);
+  expect(level.jump).toBeLessThan(0.05);
+  expect(level.peak).toBeLessThan(0.3);
 });
 
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {
@@ -504,13 +600,15 @@ test.describe("agentic engineering slides", () => {
 test("places the enterprise tracing, access and event slides beside their neighbours", async ({ page }) => {
   expect(slideNo("Distributed tracing")).toBe(slideNo("OpenTelemetry") + 1);
   expect(slideNo("GitHub App permissions")).toBe(slideNo("Operator-owned infrastructure") + 1);
-  expect(slideNo("OIDC token broker")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("Multi-repo PRs")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("OIDC token broker")).toBe(slideNo("Multi-repo PRs") + 1);
   expect(slideNo("Webhook gateway")).toBe(slideNo("Connectors") + 1);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   const NEW: [string, string | null][] = [
     ["Distributed tracing", null],
     ["GitHub App permissions", null],
+    ["Multi-repo PRs", null],
     ["OIDC token broker", "Experimental"],
     ["Webhook gateway", "Experimental"],
   ];

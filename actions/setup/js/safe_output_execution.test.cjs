@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { buildSafeOutputOutcomes, canonicalSafeOutputUrl, projectSafeOutputData, finalizeBufferedReviewOutcomes } from "./safe_output_outcomes.cjs";
-import { writeSafeOutputOutcomes, extractCreatedItemFromResult } from "./safe_output_manifest.cjs";
+import { buildSafeOutputExecutions, canonicalSafeOutputUrl, projectSafeOutputData, finalizeBufferedReviewExecutions } from "./safe_output_execution.cjs";
+import { writeSafeOutputExecutions, extractCreatedItemFromResult } from "./safe_output_manifest.cjs";
 import { main as actionHandlerFactory } from "./safe_output_action_handler.cjs";
 import { computeSafeOutputsStatus } from "./safe_outputs_status.cjs";
 import { main as handlerManagerMain, processMessages, rollbackReviewResultsForPR, skipReviewResultsForPR } from "./safe_output_handler_manager.cjs";
@@ -27,7 +27,7 @@ describe("safe-output application outcomes", () => {
     [{ success: true, result: { deferred_manifest: true } }, "deferred"],
     [{ success: true, result: { staged: true } }, "staged"],
   ])("records %j as %s without content", (result, status) => {
-    const [outcome] = buildSafeOutputOutcomes([{ type: "add_comment", messageIndex: 0, body: "PRIVATE_BODY", metadata: { content: "PRIVATE_METADATA" }, ...result }]);
+    const [outcome] = buildSafeOutputExecutions([{ type: "add_comment", messageIndex: 0, body: "PRIVATE_BODY", metadata: { content: "PRIVATE_METADATA" }, ...result }]);
     expect(outcome).toMatchObject({ type: "add_comment", messageIndex: 0, status });
     expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
     expect(Object.keys(outcome).sort()).toEqual(["messageIndex", "staged", "status", "timestamp", "type"]);
@@ -35,20 +35,20 @@ describe("safe-output application outcomes", () => {
 
   it("does not describe staged previews or rolled-back reviews as applied", () => {
     const result = { type: "submit_pull_request_review", messageIndex: 0, success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true, review_url: "https://github.com/org/repo/pull/1#pullrequestreview-5" } };
-    expect(buildSafeOutputOutcomes([result], true)[0]).toMatchObject({ status: "deferred", staged: true });
+    expect(buildSafeOutputExecutions([result], true)[0]).toMatchObject({ status: "deferred", staged: true });
     rollbackReviewResultsForPR([result], "org/repo", 1, "PRIVATE_ERROR");
-    expect(buildSafeOutputOutcomes([result])[0]).toMatchObject({ status: "failed" });
-    expect(buildSafeOutputOutcomes([result])[0]).not.toHaveProperty("url");
+    expect(buildSafeOutputExecutions([result])[0]).toMatchObject({ status: "failed" });
+    expect(buildSafeOutputExecutions([result])[0]).not.toHaveProperty("url");
     const skipped = { ...result, success: true };
     skipReviewResultsForPR([skipped], "org/repo", 1, "PRIVATE_REASON");
-    expect(buildSafeOutputOutcomes([skipped])[0]).toMatchObject({ status: "skipped" });
+    expect(buildSafeOutputExecutions([skipped])[0]).toMatchObject({ status: "skipped" });
     expect(skipped.result.deferred_manifest).toBe(false);
     expect(skipped.skipReason).toBe("PRIVATE_REASON");
-    expect(buildSafeOutputOutcomes([{ success: true }], true)[0]).toMatchObject({ status: "staged", staged: true });
+    expect(buildSafeOutputExecutions([{ success: true }], true)[0]).toMatchObject({ status: "staged", staged: true });
   });
 
   it.each(["merge_pull_request", "add_comment", "create_issue"])("retains indeterminate %s outcomes while failing processing and withholding success URLs", type => {
-    const [outcome] = buildSafeOutputOutcomes([{ type, messageIndex: 0, success: false, result: { operation_outcome: "indeterminate", url: "https://github.com/org/repo/issues/1" } }]);
+    const [outcome] = buildSafeOutputExecutions([{ type, messageIndex: 0, success: false, result: { operation_outcome: "indeterminate", url: "https://github.com/org/repo/issues/1" } }]);
     expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
     expect(outcome).not.toHaveProperty("url");
     expect(projectSafeOutputData(outcome).operation_outcome).toBe("indeterminate");
@@ -56,20 +56,88 @@ describe("safe-output application outcomes", () => {
   });
 
   it("retains operation uncertainty from top-level processing results", () => {
-    const [outcome] = buildSafeOutputOutcomes([{ type: "custom_output", success: false, operation_outcome: "indeterminate" }]);
+    const [outcome] = buildSafeOutputExecutions([{ type: "custom_output", success: false, operation_outcome: "indeterminate" }]);
     expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
+  });
+
+  it.each(["success", "failed", "skipped", "staged"])("retains the execution path for %s outcomes", status => {
+    const result = { success: status !== "failed", skipped: status === "skipped", staged: status === "staged", execution_trace: "init_ptch_done" };
+    const [outcome] = buildSafeOutputExecutions([{ type: "create_pull_request", success: result.success, result }]);
+    expect(outcome).toMatchObject({ status, execution_trace: "init_ptch_done" });
+    expect(projectSafeOutputData(outcome).execution_trace).toBe("init_ptch_done");
+  });
+
+  it.each(["", "push_".repeat(205) + "done", "ABc", "init_done\n", "_init", "init_", "init__done", "init_don", "init_donee", "init_d0ne", "init/done", "route=private", 123, ["init"]])(
+    "omits invalid execution traces: %j",
+    execution_trace => {
+      expect(projectSafeOutputData({ execution_trace })).not.toHaveProperty("execution_trace");
+      expect(buildSafeOutputExecutions([{ success: true, result: { execution_trace } }])[0]).not.toHaveProperty("execution_trace");
+    }
+  );
+
+  it("retains complete traces at the length limit", () => {
+    const execution_trace = "push_".repeat(204) + "done";
+    expect(execution_trace).toHaveLength(1024);
+    expect(projectSafeOutputData({ execution_trace }).execution_trace).toBe(execution_trace);
+  });
+
+  it("persists isolated handler traces through processing and unified-session collection, including failures", async () => {
+    const root = fs.mkdtempSync("/tmp/safe-output-traces-");
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    const traces = ["init_done", "init_fail", "init_thrw", "init_noop_fail", "init_stag_done"];
+    try {
+      for (const type of ["create_pull_request", "push_to_pull_request_branch"]) {
+        const handler = async message => {
+          const execution_trace = traces[message.scenario];
+          if (message.scenario === 2) throw Object.assign(new Error("PRIVATE_ERROR"), { execution_trace });
+          return {
+            success: message.scenario !== 1,
+            execution_trace,
+            ...(message.scenario === 1 ? { error: "PRIVATE_ERROR" } : {}),
+            ...(message.scenario === 3 ? { skipped: true, reason: "PRIVATE_REASON" } : {}),
+            ...(message.scenario === 4 ? { staged: true } : {}),
+          };
+        };
+        // Agent-request fields must never substitute for handler execution evidence.
+        const messages = traces.map((_, scenario) => ({ type, scenario, execution_trace: "fake_done" }));
+        const processing = await processMessages(new Map([[type, handler]]), messages);
+        writeSafeOutputExecutions(processing.results, false, path.join(root, type, "safe-output-executions.jsonl"));
+        const events = writeUnifiedSession({ rootDir: path.join(root, type), graders: [] });
+        const outcomes = events.filter(event => event.type === "safe_output.execution");
+        expect(outcomes.map(event => event.data.execution_trace)).toEqual(traces);
+        expect(outcomes.map(event => event.data.status)).toEqual(["success", "failed", "failed", "skipped", "staged"]);
+        const persisted = fs.readFileSync(path.join(root, type, "usage/aw_session.jsonl"), "utf8");
+        expect(persisted).not.toContain("fake_done");
+        expect(persisted).not.toContain("PRIVATE");
+        expect(validateSession(persisted)).toBe(events.length);
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces a deferred trace with the terminal retry failure trace", async () => {
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    const handler = vi
+      .fn()
+      .mockResolvedValueOnce({ deferred: true, execution_trace: "init_wait" })
+      .mockRejectedValueOnce(Object.assign(new Error("PRIVATE_ERROR"), { execution_trace: "init_thrw" }));
+    const processing = await processMessages(new Map([["create_pull_request", handler]]), [{ type: "create_pull_request" }]);
+    expect(buildSafeOutputExecutions(processing.results)[0]).toMatchObject({ status: "failed", execution_trace: "init_thrw" });
   });
 
   it("records queued ledger appends as delegated until persistence", () => {
     const record = { type: "ledger_append", messageIndex: 0, success: true, result: { queued: true } };
-    const [outcome] = buildSafeOutputOutcomes([record]);
+    const [outcome] = buildSafeOutputExecutions([record]);
 
     expect(outcome).toMatchObject({ type: "ledger_append", messageIndex: 0, status: "delegated" });
     expect(computeSafeOutputsStatus([record])).toMatchObject({ itemsApplied: 0, itemsSucceeded: 0, itemsFailed: 0 });
   });
 
   it("fans out array results without promoting failed, skipped, or empty results to applied", () => {
-    const outcomes = buildSafeOutputOutcomes([
+    const outcomes = buildSafeOutputExecutions([
       {
         type: "add_comment",
         messageIndex: 3,
@@ -91,13 +159,13 @@ describe("safe-output application outcomes", () => {
   it("uses durable inline comment URLs and marks filtered comments skipped", () => {
     const makeComment = line => ({ type: "create_pull_request_review_comment", success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true, metadata: { path: "PRIVATE_PATH", line, side: "RIGHT" } } });
     const records = [makeComment(2), makeComment(3), { type: "submit_pull_request_review", success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true } }];
-    finalizeBufferedReviewOutcomes(records, "org/repo", 1, {
+    finalizeBufferedReviewExecutions(records, "org/repo", 1, {
       success: true,
       review_url: "https://github.com/org/repo/pull/1#pullrequestreview-5",
       comment_count: 1,
       review_comments: [{ url: "https://github.com/org/repo/pull/1#discussion_r6", metadata: { path: "PRIVATE_PATH", line: 2, side: "RIGHT" } }],
     });
-    const outcomes = buildSafeOutputOutcomes(records);
+    const outcomes = buildSafeOutputExecutions(records);
     expect(outcomes.map(outcome => outcome.status)).toEqual(["success", "skipped", "success"]);
     expect(outcomes[0].url).toBe("https://github.com/org/repo/pull/1#discussion_r6");
     expect(outcomes[2].url).toBe("https://github.com/org/repo/pull/1#pullrequestreview-5");
@@ -106,20 +174,20 @@ describe("safe-output application outcomes", () => {
 
   it("keeps incomplete review evidence deferred and staged reviews non-applied", () => {
     const record = { type: "create_pull_request_review_comment", success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true, metadata: { path: "PRIVATE_PATH", line: 2 } } };
-    finalizeBufferedReviewOutcomes([record], "org/repo", 1, { success: true, comment_count: 2, review_comments: [] });
-    expect(buildSafeOutputOutcomes([record])[0].status).toBe("deferred");
-    finalizeBufferedReviewOutcomes([record], "org/repo", 1, { success: true, staged: true });
-    expect(buildSafeOutputOutcomes([record])[0].status).toBe("staged");
+    finalizeBufferedReviewExecutions([record], "org/repo", 1, { success: true, comment_count: 2, review_comments: [] });
+    expect(buildSafeOutputExecutions([record])[0].status).toBe("deferred");
+    finalizeBufferedReviewExecutions([record], "org/repo", 1, { success: true, staged: true });
+    expect(buildSafeOutputExecutions([record])[0].status).toBe("staged");
   });
 
   it("redacts configured secrets before JSON serialization, including quoted and multiline inputs", () => {
-    const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-outcomes-test-"));
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-execution-test-"));
     const secrets = ["opaque-secret", 'opaque"quoted', "opaque\nmultiline"];
     vi.stubEnv("GH_AW_SECRET_NAMES", "PLAIN,QUOTED,MULTILINE");
     for (const [index, name] of ["PLAIN", "QUOTED", "MULTILINE"].entries()) vi.stubEnv(`SECRET_${name}`, secrets[index]);
     try {
-      const file = path.join(root, "safe-output-outcomes.jsonl");
-      writeSafeOutputOutcomes(
+      const file = path.join(root, "safe-output-executions.jsonl");
+      writeSafeOutputExecutions(
         secrets.map(secret => ({ type: secret, success: true, result: { url: `https://github.com/${secret}/repo/issues/1`, body: secret } })),
         false,
         file
@@ -205,9 +273,9 @@ describe("safe-output application outcomes", () => {
     ["create_security_advisory", { ghsa_id: "GHSA-2345-6789-cfgh", url: "https://github.com/org/repo/security/advisories/GHSA-2345-6789-cfgh" }],
     ["add_security_advisory_comment", { comment_id: 17, url: "https://github.com/org/repo/security/advisories/GHSA-2345-6789-cfgh#advisory-comment-17" }],
   ])("retains %s handler result URLs only for applied outcomes", (type, result) => {
-    expect(buildSafeOutputOutcomes([{ type, success: true, result: { success: true, ...result } }])[0]).toMatchObject({ type, status: "success", url: result.url });
-    expect(buildSafeOutputOutcomes([{ type, success: true, result }], true)[0]).not.toHaveProperty("url");
-    expect(buildSafeOutputOutcomes([{ type, success: false, result }])[0]).not.toHaveProperty("url");
+    expect(buildSafeOutputExecutions([{ type, success: true, result: { success: true, ...result } }])[0]).toMatchObject({ type, status: "success", url: result.url });
+    expect(buildSafeOutputExecutions([{ type, success: true, result }], true)[0]).not.toHaveProperty("url");
+    expect(buildSafeOutputExecutions([{ type, success: false, result }])[0]).not.toHaveProperty("url");
   });
 
   it("rejects credential-bearing resource URLs", () => {
@@ -235,12 +303,12 @@ describe("safe-output application outcomes", () => {
     "run_url",
     "workflow_run_url",
   ])("retains a canonical URL from the %s result alias", field => {
-    const [outcome] = buildSafeOutputOutcomes([{ type: "custom_output", success: true, result: { [field]: "https://github.com/org/repo/issues/1?secret=PRIVATE" } }]);
+    const [outcome] = buildSafeOutputExecutions([{ type: "custom_output", success: true, result: { [field]: "https://github.com/org/repo/issues/1?secret=PRIVATE" } }]);
     expect(outcome.url).toBe("https://github.com/org/repo/issues/1");
   });
 
   it("falls back to a safe result alias and accepts opaque commit/check identities", () => {
-    const [outcome] = buildSafeOutputOutcomes([{ type: "create_check_run", success: true, result: { url: "https://example.com/PRIVATE", check_run_url: "https://github.com/org/repo/runs/123?secret=PRIVATE" } }]);
+    const [outcome] = buildSafeOutputExecutions([{ type: "create_check_run", success: true, result: { url: "https://example.com/PRIVATE", check_run_url: "https://github.com/org/repo/runs/123?secret=PRIVATE" } }]);
     expect(outcome.url).toBe("https://github.com/org/repo/runs/123");
     expect(canonicalSafeOutputUrl(`https://github.com/org/repo/commit/${"a".repeat(40)}?secret=PRIVATE`)).toBe(`https://github.com/org/repo/commit/${"a".repeat(40)}`);
     expect(canonicalSafeOutputUrl("https://github.com/org/repo/commit/PRIVATE_TITLE")).toBeUndefined();
@@ -272,7 +340,7 @@ describe("safe-output application outcomes", () => {
     vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
     const handler = await actionHandlerFactory({ action_name: "external_action" });
     const processing = await processMessages(new Map([["external_action", handler]]), [{ type: "external_action", body: "PRIVATE_BODY", url: "https://github.com/org/repo/issues/999" }]);
-    const [outcome] = buildSafeOutputOutcomes(processing.results);
+    const [outcome] = buildSafeOutputExecutions(processing.results);
     expect(outcome).toMatchObject({ type: "external_action", messageIndex: 0, status: "delegated" });
     expect(outcome).not.toHaveProperty("url");
     expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
@@ -298,7 +366,7 @@ describe("safe-output application outcomes", () => {
     const message = scenario === "custom_job" ? { type: "external_job", body: "PRIVATE_BODY" } : { type: "noop", ...(scenario === "handler_failure" ? {} : { message: "PRIVATE_MESSAGE" }) };
     await handlerManagerMain({ messages: [message] });
     expect(append).toHaveBeenCalledTimes(1);
-    expect(String(append.mock.calls[0][0])).toMatch(/safe-output-outcomes\.jsonl$/);
+    expect(String(append.mock.calls[0][0])).toMatch(/safe-output-executions\.jsonl$/);
     const content = String(append.mock.calls[0][1]);
     expect(content).not.toContain("PRIVATE");
     if (expectedStatus) {
@@ -330,7 +398,7 @@ describe("safe-output application outcomes", () => {
     await handlerManagerMain({ messages: [{ type: "submit_pull_request_review", pull_request_number: 1, body: "PRIVATE_REVIEW_BODY", event: "COMMENT" }] });
     expect(global.core.setFailed).not.toHaveBeenCalled();
     expect(createReview).not.toHaveBeenCalled();
-    const outcomesCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-outcomes.jsonl"));
+    const outcomesCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-executions.jsonl"));
     expect(outcomesCall).toBeDefined();
     const outcome = JSON.parse(String(outcomesCall[1]));
     expect(outcome).toMatchObject({ type: "submit_pull_request_review", messageIndex: 0, status: "staged", staged: true });
@@ -380,7 +448,7 @@ describe("safe-output application outcomes", () => {
         { type: "create_check_run", output_id: "so_000000000002", "depends-on": scenario.startsWith("chained") ? "so_000000000003" : "so_000000000001", conclusion: "success", title: "Review complete", summary: "PRIVATE_CHECK_BODY" },
       ],
     });
-    const outcomesCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-outcomes.jsonl"));
+    const outcomesCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-executions.jsonl"));
     expect(outcomesCall).toBeDefined();
     const outcomes = String(outcomesCall[1])
       .trim()
@@ -459,7 +527,7 @@ describe("safe-output application outcomes", () => {
           },
         ],
       });
-      const outcomeCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-outcomes.jsonl"));
+      const outcomeCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-executions.jsonl"));
       const outcomes = String(outcomeCall[1])
         .trim()
         .split("\n")
@@ -483,7 +551,7 @@ describe("safe-output application outcomes", () => {
   );
 
   it("persists real processing results and collects root and Claim outcomes into the unified session", async () => {
-    const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-outcomes-test-"));
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-execution-test-"));
     vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
     vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
     try {
@@ -503,10 +571,10 @@ describe("safe-output application outcomes", () => {
         ["add_labels", async () => ({ skipped: true, reason: "PRIVATE_REASON" })],
       ]);
       const processing = await processMessages(handlers, messages);
-      writeSafeOutputOutcomes([...processing.results, { type: "add_comment", messageIndex: 3, success: false, result: { operation_outcome: "indeterminate" } }], false, path.join(root, "safe-output-outcomes.jsonl"));
-      writeSafeOutputOutcomes([{ type: "add_comment", messageIndex: 0, delegated: true }], false, path.join(root, "claims/claim-1/safe-output-outcomes.jsonl"));
+      writeSafeOutputExecutions([...processing.results, { type: "add_comment", messageIndex: 3, success: false, result: { operation_outcome: "indeterminate" } }], false, path.join(root, "safe-output-executions.jsonl"));
+      writeSafeOutputExecutions([{ type: "add_comment", messageIndex: 0, delegated: true }], false, path.join(root, "claims/claim-1/safe-output-executions.jsonl"));
       const events = writeUnifiedSession({ rootDir: root, graders: [], jobResults: JSON.stringify({ external_job: { result: "failure", outputs: { body: "PRIVATE_OUTPUT" } } }) });
-      const outcomes = events.filter(event => event.type === "safe_output.outcome");
+      const outcomes = events.filter(event => event.type === "safe_output.execution");
       expect(outcomes.map(event => event.data.status)).toEqual(["success", "failed", "skipped", "failed", "delegated"]);
       expect(outcomes[3].data.operation_outcome).toBe("indeterminate");
       expect(outcomes[0].data.url).toBe("https://github.com/org/repo/issues/1");

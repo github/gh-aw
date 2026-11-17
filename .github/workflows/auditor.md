@@ -367,7 +367,31 @@ jobs:
               Date.parse(item.run.updated_at) >= Date.parse(retentionStart));
             const cliVersion = execFileSync('gh', ['aw', 'version'], {encoding: 'utf8', timeout: 30000}).trim();
             const versionKey = crypto.createHash('sha256').update(cliVersion).digest('hex').slice(0, 16);
-            const rate = (await github.rest.rateLimit.get()).data.resources.core;
+            const readCoreRateLimit = async () => {
+              try {
+                const coreRate = (await github.rest.rateLimit.get()).data?.resources?.core;
+                if (!Number.isSafeInteger(coreRate?.remaining) ||
+                    !Number.isSafeInteger(coreRate?.used) ||
+                    !Number.isSafeInteger(coreRate?.reset)) return null;
+                return coreRate;
+              } catch {
+                return null;
+              }
+            };
+            const reportUnverifiedRateLimit = async () => {
+              const message = 'GitHub API rate limit could not be verified; collection incomplete and checkpoint unchanged.';
+              write(path.join(data, 'manifest.json'), {
+                complete: false, repository, window_start: retentionStart, window_end: end,
+                new_failures: 0, evidence_complete: false
+              });
+              core.warning(message);
+              await core.summary.addRaw(message).write();
+            };
+            const rate = await readCoreRateLimit();
+            if (!rate) {
+              await reportUnverifiedRateLimit();
+              return;
+            }
             if (rate.remaining < 350) throw new Error('Insufficient API reserve for collection');
             // gh-aw's positive budget is absolute requests USED in this rate window,
             // not a per-query allowance. All queries share the same ceiling.
@@ -400,7 +424,11 @@ jobs:
             };
             for (const run of batch) {
               if (Date.now() + cliTimeoutMs > evidenceDeadline) break;
-              const currentRate = (await github.rest.rateLimit.get()).data.resources.core;
+              const currentRate = await readCoreRateLimit();
+              if (!currentRate) {
+                core.warning('GitHub API rate limit could not be verified; deferring remaining evidence.');
+                break;
+              }
               if (currentRate.used >= ceiling - 25 || currentRate.reset !== rate.reset) {
                 if (currentRate.reset !== rate.reset) throw new Error('API rate window reset');
                 break; // Persist unprocessed identities for the next hourly batch.
@@ -488,7 +516,12 @@ jobs:
               }
               const member = cluster.members[0];
               const dir = path.join(cache, path.dirname(member.report_file));
-              const currentRate = (await github.rest.rateLimit.get()).data.resources.core;
+              const currentRate = await readCoreRateLimit();
+              if (!currentRate) {
+                core.warning('GitHub API rate limit could not be verified; deferring audits.');
+                deferAudits();
+                break;
+              }
               if (currentRate.used >= ceiling - 25 || currentRate.reset !== rate.reset) {
                 throw new Error('Shared API budget exhausted or reset; checkpoint unchanged');
               }
@@ -527,6 +560,14 @@ jobs:
               cluster.audit_file = auditFile;
               auditCount++;
             }
+            const finalRate = await readCoreRateLimit();
+            if (!finalRate) {
+              await reportUnverifiedRateLimit();
+              return;
+            }
+            if (finalRate.used > ceiling || finalRate.reset !== rate.reset) {
+              throw new Error('Shared API budget exceeded or reset; checkpoint unchanged');
+            }
             // Copy ONLY this collection's compact reports and selected audit
             // evidence. Do not upload the whole historical download cache.
             const manifest = {
@@ -551,10 +592,6 @@ jobs:
                 fs.copyFileSync(cluster.audit_file, path.join(data, file));
                 cluster.audit_file = file;
               }
-            }
-            const finalRate = (await github.rest.rateLimit.get()).data.resources.core;
-            if (finalRate.used > ceiling || finalRate.reset !== rate.reset) {
-              throw new Error('Shared API budget exceeded or reset; checkpoint unchanged');
             }
             const recoveryDir = path.join(cache, 'recovery');
             for (const [index, gap] of samplingGaps.entries()) {

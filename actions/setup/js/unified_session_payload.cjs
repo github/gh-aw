@@ -11,7 +11,7 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { getMcpRateLimitHint, getRpcRateLimitHint } = require("./mcp_rate_limit.cjs");
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
-const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
+const { projectSafeOutputData } = require("./safe_output_execution.cjs");
 const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, normalizeHarnessDecisionData } = require("./harness_retry_record.cjs");
 const { sessionMessageTimestamp } = require("./unified_session_order.cjs");
 
@@ -432,8 +432,32 @@ const EVENT_FIELDS = {
   },
   "safe_output.request": SAFE_OUTPUT_FIELDS,
   "safe_output.result": SAFE_OUTPUT_FIELDS,
-  "safe_output.outcome": SAFE_OUTPUT_FIELDS,
+  "safe_output.execution": SAFE_OUTPUT_FIELDS,
   "safe_output.error": SAFE_OUTPUT_FIELDS,
+  "lifecycle.adoption": {
+    sourceRunId: ["sourceRunId"],
+    sourceWorkflow: ["sourceWorkflow"],
+    repository: ["repository"],
+    outputType: ["outputType"],
+    deliveryState: ["deliveryState"],
+    deliverySignal: ["deliverySignal"],
+    deliveryAt: ["deliveryAt"],
+    deliveryObservedAt: ["deliveryObservedAt"],
+    deliverySource: ["deliverySource"],
+    adoptionState: ["adoptionState"],
+    adoptionSignal: ["adoptionSignal"],
+    adoptionAt: ["adoptionAt"],
+    adoptionObservedAt: ["adoptionObservedAt"],
+    adoptionSource: ["adoptionSource"],
+    adoptionRuleVersion: ["adoptionRuleVersion"],
+    acceptanceKind: ["acceptanceKind"],
+    humanVerified: ["humanVerified"],
+    adoptionCoverage: ["adoptionCoverage"],
+    survivalState: ["survivalState"],
+    survivalSignal: ["survivalSignal"],
+    survivalObservedAt: ["survivalObservedAt"],
+    survivalCoverage: ["survivalCoverage"],
+  },
   "experiment.state": { runId: ["runId", "run_id"], assignments: ["assignments"], counts: ["counts"] },
   "grader.manifest": { version: ["version"], customGraders: ["customGraders"] },
   "grader.result": GRADER_FIELDS,

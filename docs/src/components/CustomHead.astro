@@ -1,11 +1,7 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
 import { getCollection } from 'astro:content';
-
-type BlogAuthor = {
-  name?: string;
-  url?: string;
-};
+import { escapeJsonLd } from '../lib/json-ld.js';
 
 // Access page data via Starlight's route locals
 const route = Astro.locals.starlightRoute;
@@ -55,38 +51,8 @@ const toSchemaDate = (value: unknown) => {
   return undefined;
 };
 
-const normalizeAuthorsArray = (value: unknown) => {
-  if (!value) return [];
-  return Array.isArray(value) ? value : [value];
-};
-
 const pageUrl = new URL(pathname, siteOrigin).toString();
 const socialUrl = isDocsHomePage ? 'https://gh.io/gh-aw' : pageUrl;
-const blogPublishedDate = toSchemaDate(entry?.data?.date);
-const blogModifiedDate = toSchemaDate(entry?.data?.lastUpdated ?? entry?.data?.date);
-const authorInput = entry?.data?.authors ?? entry?.data?.author;
-const blogAuthors = normalizeAuthorsArray(authorInput).flatMap((author) => {
-    if (typeof author === 'string') {
-      return [{
-        '@type': 'Person',
-        name: author,
-      }];
-    }
-
-    if (author && typeof author === 'object') {
-      const { name, url } = author as BlogAuthor;
-      if (!name) return [];
-
-      return [{
-        '@type': 'Person',
-        name,
-        ...(url ? { url } : {}),
-      }];
-    }
-
-    return [];
-  });
-const isBlogPost = isBlogPath && Boolean(blogPublishedDate);
 const hasContentEntry = Boolean(entry);
 
 const homeJsonLd = {
@@ -193,26 +159,12 @@ const homeJsonLd = {
 
 type PageJsonLd = {
   '@context': 'https://schema.org';
-  '@type': 'BlogPosting' | 'TechArticle';
+  '@type': 'TechArticle';
 } & Record<string, unknown>;
 
 let pageJsonLd: PageJsonLd | undefined;
 
-if (isBlogPost) {
-  pageJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: rawPageTitle,
-    description: pageDescription,
-    url: pageUrl,
-    datePublished: blogPublishedDate,
-    dateModified: blogModifiedDate,
-    ...(blogAuthors.length > 0 ? { author: blogAuthors } : {}),
-    publisher: {
-      '@id': organizationId,
-    },
-  };
-} else if (hasContentEntry && !isDocsHomePage && !isBlogPath) {
+if (hasContentEntry && !isDocsHomePage && !isBlogPath) {
   pageJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'TechArticle',
@@ -234,6 +186,18 @@ const overriddenProps = new Set([
   'twitter:title', 'twitter:description', 'twitter:image', 'twitter:url',
 ]);
 
+// Enrich starlight-blog's BlogPosting instead of emitting a duplicate.
+const enrichBlogPosting = (content: string) => {
+  const data = JSON.parse(content);
+  const things = Array.isArray(data['@graph']) ? data['@graph'] : [data];
+  for (const thing of things) {
+    if (thing['@type'] !== 'BlogPosting') continue;
+    thing.publisher ??= { '@id': organizationId };
+    thing.dateModified ??= toSchemaDate(entry?.data?.lastUpdated) ?? thing.datePublished;
+  }
+  return JSON.stringify(data);
+};
+
 // Filter Starlight's head tags to remove OG/Twitter tags we'll override.
 // The home page's <title> is the site name alone, not "Home | …".
 const head = route?.head ?? [];
@@ -243,16 +207,21 @@ const filteredHead = head
     const prop = attrs?.property || attrs?.name;
     return !overriddenProps.has(prop);
   })
-  .map((item) => (isHomePage && item.tag === 'title' ? { ...item, content: siteTitle } : item));
+  .map((item) => {
+    if (item.tag === 'script' && item.attrs?.type === 'application/ld+json' && item.content) {
+      return { ...item, content: escapeJsonLd(isBlogPath ? enrichBlogPosting(item.content) : item.content) };
+    }
+    return isHomePage && item.tag === 'title' ? { ...item, content: siteTitle } : item;
+  });
 ---
 
 <!-- Starlight's head tags (with OG/Twitter duplicates removed) -->
 {filteredHead.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}
 {isDocsHomePage && (
-  <script type="application/ld+json" set:html={JSON.stringify(homeJsonLd)} />
+  <script type="application/ld+json" set:html={escapeJsonLd(JSON.stringify(homeJsonLd))} />
 )}
 {pageJsonLd && (
-  <script type="application/ld+json" set:html={JSON.stringify(pageJsonLd)} />
+  <script type="application/ld+json" set:html={escapeJsonLd(JSON.stringify(pageJsonLd))} />
 )}
 
 <!-- Enhanced OG tags with site name in title and social image -->

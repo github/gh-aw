@@ -293,7 +293,7 @@ func extractEpisodeArtifact(ctx context.Context, data []byte, dir string) error 
 
 func episodeArtifactKind(name string) string {
 	if artifactMatchesFilter(name, []string{"safe-outputs-items"}) {
-		return "outcomes"
+		return "adoption"
 	}
 	if artifactMatchesFilter(name, []string{"info"}) {
 		return "info"
@@ -305,12 +305,12 @@ func episodeArtifactKind(name string) string {
 }
 
 func validEpisodeArtifactKind(kind string) bool {
-	return kind == "info" || kind == "usage" || kind == "outcomes" || kind == "enrichment"
+	return kind == "info" || kind == "usage" || kind == "adoption" || kind == "enrichment"
 }
 
 func episodeArtifactNeedsIdentity(name string) bool {
 	kind := episodeArtifactKind(name)
-	return kind == "outcomes" || kind == "enrichment"
+	return kind == "adoption" || kind == "enrichment"
 }
 
 func readEpisodeArtifactInfo(dir string, run WorkflowRun) ([]*AwInfo, error) {
