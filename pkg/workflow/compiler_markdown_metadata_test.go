@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -17,37 +16,64 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
-	source := filepath.Join(t.TempDir(), "workflow.md")
-	content := "---\non:\n  workflow_call:\nstrict: false\nengine: copilot\n---\n# Work\n\n" +
-		"## agent: reader\n---\nmodel: ${{ inputs.model }}\ntools: [Read]\n---\nRead files.\n## end agent: reader\n\n" +
-		"## agent: writer\n---\ndescription: Writes files\n---\nWrite files.\n"
+type activationMetadataDocument struct {
+	Jobs map[string]struct {
+		Env   map[string]string `yaml:"env"`
+		Steps []struct {
+			ID  string            `yaml:"id"`
+			Env map[string]string `yaml:"env"`
+			Run string            `yaml:"run"`
+		} `yaml:"steps"`
+	} `yaml:"jobs"`
+}
+
+func compileActivationMetadataWorkflow(t *testing.T, content string) (string, *WorkflowData, map[string]string) {
+	t.Helper()
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".github", "workflows"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".github", "agents"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".github", "agents", "repo.agent.md"), []byte("---\nmodel: repo-model\ntools: [Edit]\n---\nBody"), 0o600))
+	source := filepath.Join(root, ".github", "workflows", "workflow.md")
 	require.NoError(t, os.WriteFile(source, []byte(content), 0o600))
 	compiler := NewCompiler()
 	data, err := compiler.ParseWorkflowFile(source)
 	require.NoError(t, err)
 	generated, err := compiler.CompileToYAML(data, source)
 	require.NoError(t, err)
-	var document struct {
-		Jobs map[string]struct {
-			Env map[string]string `yaml:"env"`
-		} `yaml:"jobs"`
-	}
+	var document activationMetadataDocument
 	require.NoError(t, yaml.Unmarshal([]byte(generated), &document))
-	embedded := document.Jobs["activation"].Env["GH_AW_INFO_MARKDOWN_METADATA"]
+	activation := document.Jobs["activation"]
+	require.NotContains(t, activation.Env, "GH_AW_INFO_MARKDOWN_METADATA", "only the run info step reads the catalog")
+	for _, step := range activation.Steps {
+		if step.ID == "generate_aw_info" {
+			return generated, data, step.Env
+		}
+	}
+	require.FailNow(t, "generate_aw_info step missing")
+	return "", nil, nil
+}
+
+func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
+	content := "---\non:\n  workflow_call:\nstrict: false\nengine: copilot\n---\n# Work\n\n" +
+		"## agent: reader\n---\nmodel: ${{ inputs.model }}\ntools: [Read, \"it's-café\"]\n---\nRead files.\n## end agent: reader\n\n" +
+		"## agent: writer\n---\ndescription: Writes files\n---\nWrite files.\n"
+	generated, data, env := compileActivationMetadataWorkflow(t, content)
+	embedded := env["GH_AW_INFO_MARKDOWN_METADATA"]
 	require.NotEmpty(t, embedded)
-	decoded, err := base64.StdEncoding.DecodeString(embedded)
-	require.NoError(t, err)
-	require.Contains(t, generated, "      # Activation metadata preview: "+activationMetadataPreview(decoded)+"\n      GH_AW_INFO_MARKDOWN_METADATA: "+embedded)
-	require.Contains(t, string(decoded), "${{ inputs.model }}", "authored expressions must survive as inert data")
+	require.Contains(t, embedded, `\u0024{{ inputs.model }}`, "authored expressions must stay inert")
+	require.Contains(t, embedded, `it\u0027s-caf\u00e9`)
 	var catalog GHAWMarkdownMetadata
-	require.NoError(t, json.Unmarshal(decoded, &catalog))
+	require.NoError(t, json.Unmarshal([]byte(embedded), &catalog))
 	require.Equal(t, 2, catalog.Version)
 	require.NotEmpty(t, catalog.Records)
 	for _, record := range catalog.Records {
 		require.Empty(t, record.References, "embedded records must be self-contained")
 		require.NotContains(t, []string{"{}", "null"}, string(record.Value), "empty records are implied by absence")
+		require.NotContains(t, string(record.Value), "repo-model", "repository agents are recovered from the checkout")
 	}
+	var value struct{ Model string }
+	require.NoError(t, json.Unmarshal(catalog.Records[0].Value, &value))
+	require.Equal(t, "${{ inputs.model }}", value.Model)
 	require.NotEmpty(t, data.CompiledPromptMarkdown)
 	for _, prompt := range data.CompiledPromptMarkdown {
 		for _, block := range parser.ExtractMarkdownMetadataBlocks(prompt) {
@@ -55,47 +81,34 @@ func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
 				continue
 			}
 			digest := sha256.Sum256([]byte(block.Source))
-			require.Contains(t, string(decoded), hex.EncodeToString(digest[:]), "include post-substitution prompt metadata")
+			require.Contains(t, embedded, hex.EncodeToString(digest[:]), "include post-substitution prompt metadata")
 		}
 	}
-	require.Contains(t, string(decoded), `"Read"`)
 	require.NotContains(t, generated, "model: ${{ inputs.model }}")
 }
 
+func TestCompilerOmitsEmptyActivationMarkdownMetadata(t *testing.T) {
+	generated, _, _ := compileActivationMetadataWorkflow(t, "---\non: workflow_dispatch\nstrict: false\nengine: copilot\n---\n# Work\n\n## agent: writer\n---\ndescription: Writes files\n---\nWrite files.\n")
+	require.NotContains(t, generated, "GH_AW_INFO_MARKDOWN_METADATA")
+	require.NotContains(t, generated, "activation metadata chunk")
+}
+
 func TestCompilerEmbedsLargeActivationMarkdownMetadata(t *testing.T) {
-	source := filepath.Join(t.TempDir(), "workflow.md")
 	var content strings.Builder
 	content.WriteString("---\non: workflow_dispatch\nstrict: false\nengine: copilot\n---\n# Work\n\n")
 	for i := range 200 {
-		fmt.Fprintf(&content, "## agent: reader-%d\n---\nmodel: model-%d-%s\ntools: [Read]\n---\nRead files.\n## end agent: reader-%d\n\n", i, i, strings.Repeat("x", 600), i)
+		fmt.Fprintf(&content, "## agent: reader-%d\n---\nmodel: model-%d-%s\ntools: [Read]\n---\nRead files.\n## end agent: reader-%d\n\n", i, i, strings.Repeat("é", 300), i)
 	}
-	require.NoError(t, os.WriteFile(source, []byte(content.String()), 0o600))
-	compiler := NewCompiler()
-	data, err := compiler.ParseWorkflowFile(source)
-	require.NoError(t, err)
-	generated, err := compiler.CompileToYAML(data, source)
-	require.NoError(t, err)
-	require.NoError(t, compiler.validateExpressionSizes(generated))
-	var document struct {
-		Jobs map[string]struct {
-			Env   map[string]string `yaml:"env"`
-			Steps []struct {
-				Run string `yaml:"run"`
-			} `yaml:"steps"`
-		} `yaml:"jobs"`
-	}
+	generated, _, env := compileActivationMetadataWorkflow(t, content.String())
+	require.NoError(t, NewCompiler().validateExpressionSizes(generated))
+	require.NotContains(t, env, "GH_AW_INFO_MARKDOWN_METADATA")
+	require.Equal(t, "${{ runner.temp }}/gh-aw-markdown-metadata.json", env["GH_AW_INFO_MARKDOWN_METADATA_FILE"])
+	var document activationMetadataDocument
 	require.NoError(t, yaml.Unmarshal([]byte(generated), &document))
-	activation := document.Jobs["activation"]
-	require.NotContains(t, activation.Env, "GH_AW_INFO_MARKDOWN_METADATA")
-	require.Equal(t, "${{ runner.temp }}/gh-aw-markdown-metadata.b64", activation.Env["GH_AW_INFO_MARKDOWN_METADATA_FILE"])
 	runnerTemp := t.TempDir()
 	chunks := 0
-	for _, step := range activation.Steps {
-		run := step.Run
-		if chunks == 0 {
-			_, run, _ = strings.Cut(run, "\n")
-		}
-		if !strings.HasPrefix(run, "printf '%s' '") {
+	for _, step := range document.Jobs["activation"].Steps {
+		if !strings.HasPrefix(step.Run, "printf '%s' '") {
 			break
 		}
 		require.Less(t, len(step.Run), 21000)
@@ -106,33 +119,36 @@ func TestCompilerEmbedsLargeActivationMarkdownMetadata(t *testing.T) {
 		chunks++
 	}
 	require.Greater(t, chunks, 1)
-	payload, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw-markdown-metadata.b64"))
+	payload, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw-markdown-metadata.json"))
 	require.NoError(t, err)
 	require.Greater(t, len(payload), 128*1024)
-	decoded, err := base64.StdEncoding.DecodeString(string(payload))
-	require.NoError(t, err)
-	require.Contains(t, generated, "          # Activation metadata preview: "+activationMetadataPreview(decoded)+"\n          printf '%s' '")
 	var catalog GHAWMarkdownMetadata
-	require.NoError(t, json.Unmarshal(decoded, &catalog))
+	require.NoError(t, json.Unmarshal(payload, &catalog))
 	require.Len(t, catalog.Records, 200)
+	var value struct{ Model string }
+	require.NoError(t, json.Unmarshal(catalog.Records[0].Value, &value))
+	require.Contains(t, value.Model, strings.Repeat("é", 300))
 }
 
-func TestActivationMetadataPreview(t *testing.T) {
-	require.Equal(t, `short`, activationMetadataPreview([]byte("short")))
-	require.Equal(t, `\u0024{{ inputs.model }}\n\u2028\u0085`, activationMetadataPreview([]byte("${{ inputs.model }}\n\u2028\u0085")))
-	require.Equal(t, strings.Repeat("x", 41)+`é...`, activationMetadataPreview([]byte(strings.Repeat("x", 41)+"éz")))
+func TestInertJSON(t *testing.T) {
+	input := []byte(`{"a":"${{ x }}'é😀\u003c"}`)
+	encoded := inertJSON(input)
+	require.Equal(t, `{"a":"\u0024{{ x }}\u0027\u00e9\ud83d\ude00\u003c"}`, encoded)
+	var want, got any
+	require.NoError(t, json.Unmarshal(input, &want))
+	require.NoError(t, json.Unmarshal([]byte(encoded), &got))
+	require.Equal(t, want, got)
 }
 
 func TestCompilerActivationMarkdownMetadataErrors(t *testing.T) {
 	compiler := NewCompiler()
 	catalog := &GHAWMarkdownMetadata{Version: 2, Records: []GHAWMarkdownMetadataRecord{}}
+	require.NoError(t, compiler.embedActivationMarkdownMetadata(catalog), "an empty catalog embeds nothing")
+	catalog.Records = append(catalog.Records, GHAWMarkdownMetadataRecord{SHA256: strings.Repeat("a", 64), Kind: "artifact", Value: json.RawMessage(`{"model":"small"}`)})
 	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "activation job missing")
 	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "activation"}))
-	catalog.Records = append(catalog.Records, GHAWMarkdownMetadataRecord{
-		SHA256: strings.Repeat("a", 64),
-		Kind:   "artifact",
-		Value:  json.RawMessage(`{"model":"` + strings.Repeat("x", maxActivationMetadataBytes) + `"}`),
-	})
+	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "run info step missing")
+	catalog.Records[0].Value = json.RawMessage(`{"model":"` + strings.Repeat("x", maxActivationMetadataBytes) + `"}`)
 	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "4194304-byte limit")
 }
 

@@ -122,8 +122,6 @@ jobs:
       pull-requests: write # Create or update pull requests and review comments.
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"03cbf89...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwM2NiZjg5MzFkZWZmMjFkNTExNjk1ZDk5ZDAyMWZhNzMxOTQ0MzQ5ZWQ2MGMwOGQwMmJmOWM3OGU3MjJlMmNiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IkFnZW50aWMgV29ya2Zsb3dzIn19LHsic2hhMjU2IjoiM2YxNDUyMWYzMDM3ODczYzYwYTgyNmQyNDdmOTRlNDhjZmIzNjE2MjA5MjczMWJhOGJkMGVhYTBkZjEwZWY0MSIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoibWFpLWNvZGUifX0seyJzaGEyNTYiOiI0OTQzY2ZmZWViYjY3MDZhYThiY2MxNmZkNTg3OTMwYWIwZDBjODcyYjE4OWFiMTkxNDhiOTBhNmE0NjRmMjZiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IlNxdWFkIiwidG9vbHMiOlsiKiJdfX0seyJzaGEyNTYiOiI5ZWE2Mzk1NThkZjkxM2U2NTBlNDZhZDI1ZDlkODM1ZjRjYTZmZTgyMTQyMjg3YjlhODg4MGM3MzIyYjFiYTZmIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InRlY2huaWNhbC1kb2Mtd3JpdGVyIn19LHsic2hhMjU2IjoiYTE3YzZjNjJmZmNkNzQwMWY0MGY2NzIxZjY0ODVhNDVjYzJmNTdkYjg2YmY0YjU3ZTMxNjIwM2U4ODM2ZTI2OCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJhZHItd3JpdGVyIn19LHsic2hhMjU2IjoiYWQ2ZmYwZmU5MjE5ZmJmYTVjY2M3N2QwMjc3NjIzYmJlNGY0MTAyMjJlM2ZkODY4NDVhYjc4ZWNjMTNiZTFhNCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJncnVtcHktcmV2aWV3ZXIiLCJ0b29scyI6WyJyZWFkIiwic2VhcmNoIl19fSx7InNoYTI1NiI6ImIyMDc3MWY1NzA5NjYxNmI4ODgxYzViM2U3MmY0NzliMTA0MGY4MDZhZGJiNGM5Yzg4MDc2NzVmNDc4ZDA0NDUiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJtb2RlbCI6Im1haS1jb2RlIn19LHsic2hhMjU2IjoiZTBjMzVhOTZkZWRmYjI5Y2I5YjE1NTJmOTlhYTI0YmRhNjdmNGYxYTk2N2Y1MzM2MTQ3ZTg2Mjk1NGViNmI3ZSIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJ3M2Mtc3BlY2lmaWNhdGlvbi13cml0ZXIifX1dfQ==
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -186,6 +184,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"3f14521f3037873c60a826d247f94e48cfb36162092731ba8bd0eaa0df10ef41","kind":"artifact","value":{"model":"mai-code"}},{"sha256":"b20771f57096616b8881c5b3e72f479b1040f806adbb4c9c8807675f478d0445","kind":"artifact","value":{"model":"mai-code"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}

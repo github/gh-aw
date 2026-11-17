@@ -33,6 +33,16 @@ type GHAWMarkdownMetadata struct {
 // The source is an exact lookup key, so stale repository files cannot acquire
 // metadata by matching only a name or path.
 func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMetadata {
+	return c.collectMarkdownMetadataRecords(data, true)
+}
+
+// collectWorkflowMarkdownMetadata omits repository agents that the workflow
+// does not reference; they live in the checkout and its compiled lock headers.
+func (c *Compiler) collectWorkflowMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMetadata {
+	return c.collectMarkdownMetadataRecords(data, false)
+}
+
+func (c *Compiler) collectMarkdownMetadataRecords(data *WorkflowData, includeRepository bool) *GHAWMarkdownMetadata {
 	records := map[string]GHAWMarkdownMetadataRecord{}
 	scan := func(content, documentKind string) {
 		scanMarkdownMetadata(records, content, documentKind)
@@ -50,7 +60,9 @@ func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMeta
 	root := markdownMetadataRoot(c.markdownPath)
 	scanRuntimeImportMetadata(root, data, scan)
 	scanImportedDocumentMetadata(root, c.markdownPath, data, scan)
-	scanRepositoryArtifactMetadata(root, scan)
+	if includeRepository {
+		scanRepositoryArtifactMetadata(root, scan)
+	}
 	keys := make([]string, 0, len(records))
 	for key := range records {
 		keys = append(keys, key)

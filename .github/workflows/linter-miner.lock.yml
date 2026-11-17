@@ -109,8 +109,6 @@ jobs:
       issues: write # Create or update issues and comments.
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"03cbf89...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwM2NiZjg5MzFkZWZmMjFkNTExNjk1ZDk5ZDAyMWZhNzMxOTQ0MzQ5ZWQ2MGMwOGQwMmJmOWM3OGU3MjJlMmNiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IkFnZW50aWMgV29ya2Zsb3dzIn19LHsic2hhMjU2IjoiNDk0M2NmZmVlYmI2NzA2YWE4YmNjMTZmZDU4NzkzMGFiMGQwYzg3MmIxODlhYjE5MTQ4YjkwYTZhNDY0ZjI2YiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJTcXVhZCIsInRvb2xzIjpbIioiXX19LHsic2hhMjU2IjoiNTIxM2JhMzhlNDY2MzZiNjA0Y2I5NmEyMGFmMzMwZmU4YWI2Yzk0NGYzZDUzNTE0YjlmNDRhNjA0ZTcwNGRkZiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoiY29waWxvdC9jbGF1ZGUtc29ubmV0LTUuNSJ9fSx7InNoYTI1NiI6Ijc5MzQwYzBiZTQ5Yjk4NTQzODAxZGQ2ZTcwZDQ2NTFhNGU0YTFlNjA5ODdjY2VkNjdiNWU5MjUzODE3ZDcxYTYiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJtb2RlbCI6ImNvcGlsb3QvY2xhdWRlLXNvbm5ldC01LjUifX0seyJzaGEyNTYiOiI5ZWE2Mzk1NThkZjkxM2U2NTBlNDZhZDI1ZDlkODM1ZjRjYTZmZTgyMTQyMjg3YjlhODg4MGM3MzIyYjFiYTZmIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InRlY2huaWNhbC1kb2Mtd3JpdGVyIn19LHsic2hhMjU2IjoiYTE3YzZjNjJmZmNkNzQwMWY0MGY2NzIxZjY0ODVhNDVjYzJmNTdkYjg2YmY0YjU3ZTMxNjIwM2U4ODM2ZTI2OCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJhZHItd3JpdGVyIn19LHsic2hhMjU2IjoiYWQ2ZmYwZmU5MjE5ZmJmYTVjY2M3N2QwMjc3NjIzYmJlNGY0MTAyMjJlM2ZkODY4NDVhYjc4ZWNjMTNiZTFhNCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJncnVtcHktcmV2aWV3ZXIiLCJ0b29scyI6WyJyZWFkIiwic2VhcmNoIl19fSx7InNoYTI1NiI6ImQ2ZDI3MGI1NjUyMWNhYmFmZmMxYmRjY2VjZWJjMzJiOTY3ZTI2YWY2NjA5ZjJlOWU2YTI3MTA3OGY4ODcxZGYiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJtb2RlbCI6ImNvcGlsb3QvY2xhdWRlLXNvbm5ldC01LjUifX0seyJzaGEyNTYiOiJlMGMzNWE5NmRlZGZiMjljYjliMTU1MmY5OWFhMjRiZGE2N2Y0ZjFhOTY3ZjUzMzYxNDdlODYyOTU0ZWI2YjdlIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InczYy1zcGVjaWZpY2F0aW9uLXdyaXRlciJ9fV19
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -167,6 +165,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"5213ba38e46636b604cb96a20af330fe8ab6c944f3d53514b9f44a604e704ddf","kind":"artifact","value":{"model":"copilot/claude-sonnet-5.5"}},{"sha256":"79340c0be49b98543801dd6e70d4651a4e4a1e60987cced67b5e9253817d71a6","kind":"artifact","value":{"model":"copilot/claude-sonnet-5.5"}},{"sha256":"d6d270b56521cabaffc1bdccecebc32b967e26af6609f2e9e6a271078f8871df","kind":"artifact","value":{"model":"copilot/claude-sonnet-5.5"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}
