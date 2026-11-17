@@ -116,7 +116,7 @@ const finalAssistantEnd = {
   thinkingLevel: "off",
 };
 
-const atomicWorkflowStream = [
+const piWorkflowStream = [
   { type: "session", version: 4, id: "01a1cda5-618c-773e-a218-2b71aeb9777d", createdAt: "2026-11-12T02:45:30.124Z", cwd: "/workspace/repo" },
   { type: "agent_start" },
   { type: "turn_start" },
@@ -145,4 +145,4 @@ const atomicWorkflowStream = [
   { type: "agent_settled", aborted: false },
 ];
 
-module.exports = { atomicWorkflowStream };
+module.exports = { piWorkflowStream };

@@ -88,6 +88,10 @@ describe("Declared custom engine log parsers", () => {
     expect(parseEngineSession("PRIVATE_PROMPT", "unknown-engine")).toEqual([]);
   });
 
+  it("does not expose a parser for the withdrawn Atomic engine", () => {
+    expect(loadEngineLogParser("atomic")).toBeUndefined();
+  });
+
   it("recognizes persisted mixed transcripts before selecting a plaintext behavior", () => {
     const entries = [
       { type: "system", subtype: "init", model: "model" },

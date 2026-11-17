@@ -259,16 +259,20 @@ func TestEngineCatalog_Resolve_KnownImportTip(t *testing.T) {
 	}
 }
 
-func TestEngineCatalog_Resolve_RemovedLegacyCustom(t *testing.T) {
+func TestEngineCatalog_Resolve_RemovedEngines(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join("..", "..", knownEngineImportsPath))
 	require.NoError(t, err)
 	withKnownEngineImportsForTest(t, content, nil)
 
 	registry := NewEngineRegistry()
 	catalog := NewEngineCatalog(registry)
-	_, err = catalog.Resolve("custom", &EngineConfig{ID: "custom"})
-	require.ErrorContains(t, err, `unknown engine "custom"`)
-	require.NotContains(t, err.Error(), "Tip:", "removed engines must not advertise an import")
+	for _, id := range []string{"custom", "atomic"} {
+		t.Run(id, func(t *testing.T) {
+			_, err := catalog.Resolve(id, &EngineConfig{ID: id})
+			require.ErrorContains(t, err, `unknown engine "`+id+`"`)
+			require.NotContains(t, err.Error(), "Tip:", "removed engines must not advertise an import")
+		})
+	}
 }
 
 // TestEngineCatalog_Resolve_UnknownNoTip verifies that truly unknown engines (not in
