@@ -92,6 +92,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | GitHub-native governance | illustrative | Defaults and policy variables are set at enterprise, organization or repository scope and enforced with GitHub controls such as protected environments. |
 | Operator-owned infrastructure | illustrative | Operators run agentic jobs on their own Linux runners, on Kubernetes, or in air-gapped networks with mirrored actions and container images. |
 | GitHub App permissions | illustrative | A GitHub App installed on selected repositories mints short-lived scoped tokens, keeping the agent read-only and leaving writes to trusted safe-output jobs in each repository. |
+| Multi-repo PRs | illustrative | One run checks out several repositories with a read-only GitHub App, the agent edits them without any token, and the safe-outputs job uses a second, write-capable GitHub App to open one pull request in each allowlisted repository. |
 | OIDC token broker | illustrative | Experimental: a deployment-owned broker verifies a job's OIDC identity and returns a short-lived credential, so no long-lived secret is stored in the repository. |
 | Push SDLC | illustrative | A task arrives with its own squad of human-led AI agents that join the developer's repository, pair with them, then step back and leave their decisions behind. |
 | Connectors | illustrative | Experimental: a connector declares everything a third-party service offers; a workflow imports it and selects only the reads and writes it needs. |
