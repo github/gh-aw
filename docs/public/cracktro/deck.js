@@ -1191,7 +1191,7 @@
   .mnt-tile b { font: 600 19px/1 var(--mono); color: #f0f6fc; }
   .mnt-tile em { font: 600 14px/1 var(--mono); font-style: normal; color: var(--tc); text-transform: uppercase; letter-spacing: .06em; min-height: 14px; }
   .mnt-tile.fix { animation: mnt-fix .6s ease-out; }
-  @keyframes mnt-fix { 40% { transform: scale(1.12); box-shadow: 0 0 22px #3fb950; } }
+  @keyframes mnt-fix { 40% { transform: scale(1.12); box-shadow: 0 0 22px #3fb95055; } }
   /* --- gh cao: session data lake --- */
   .lake-wrap { position: absolute; left: 110px; top: 300px; width: 1700px; height: 660px; opacity: 0; }
   .active .lake-wrap { animation: rise .9s cubic-bezier(.2,.9,.2,1) both 300ms; }
@@ -1204,21 +1204,21 @@
   .lake-t.sm { font-size: 28px; }
   .lake-s { font-family: var(--mono); font-size: 19px; fill: #9198a1 !important; }
   .lake-n { font-family: var(--mono); font-size: 22px; fill: #c9d1d9 !important; }
-  .lake-l { font-family: var(--mono); font-size: 18px; fill: #79c0ff !important; }
-  .lake-l.red { fill: #56d4dd !important; }
-  .lake-l.no { fill: #ff7b72 !important; }
-  .lake-gen { font-family: var(--mono); font-size: 19px; font-weight: 600; fill: #3fb950 !important; }
-  .lake-part { fill: #161b22; stroke: #3fb95066; stroke-width: 1.5; transition: fill .3s; }
-  .lake-part.on { fill: #2ea04366; }
-  .lake-part.new { fill: #3fb950; }
-  .lake-q { font-family: var(--mono); font-size: 20px; font-weight: 600; fill: #d2a8ff !important; }
+  .lake-l { font-family: var(--mono); font-size: 18px; fill: #b3f0f5 !important; }
+  .lake-l.red { fill: #c9d1d9 !important; }
+  .lake-l.no { fill: #ffa657 !important; }
+  .lake-gen { font-family: var(--mono); font-size: 19px; font-weight: 600; fill: #56d4dd !important; }
+  .lake-part { fill: #161b22; stroke: #56d4dd66; stroke-width: 1.5; transition: fill .3s; }
+  .lake-part.on { fill: #1b9aaa66; }
+  .lake-part.new { fill: #56d4dd; }
+  .lake-q { font-family: var(--mono); font-size: 20px; font-weight: 600; fill: #f0f6fc !important; }
   .lake-r { font-family: var(--mono); font-size: 19px; fill: #9198a1 !important; }
-  .lake-dot { fill: #79c0ff; filter: drop-shadow(0 0 6px #79c0ff); }
-  .lake-dot.red { fill: #56d4dd; }
-  .lake-dot.drop { fill: #ff7b72; }
+  .lake-dot { fill: #b3f0f5; filter: drop-shadow(0 0 6px #56d4dd55); }
+  .lake-dot.red { fill: #8b949e; }
+  .lake-dot.drop { fill: #ffa657; }
   .lake-store rect { fill: #0d1117e6; stroke: #9198a1; stroke-width: 2; stroke-dasharray: 8 6; }
-  .lake-wall { fill: none; stroke: #ff7b72; stroke-width: 2.5; stroke-dasharray: 6 8; }
-  .lake-x { font-family: var(--mono); font-size: 21px; font-weight: 600; fill: #ff7b72 !important; }
+  .lake-wall { fill: none; stroke: #ffa657; stroke-width: 2.5; stroke-dasharray: 6 8; }
+  .lake-x { font-family: var(--mono); font-size: 21px; font-weight: 600; fill: #ffa657 !important; }
   .lake-foot { position: absolute; left: 110px; bottom: 76px; display: flex; gap: 14px; }
   .lake-foot span { padding: 10px 20px; border: 1px solid #3d444d; border-radius: 999px; font: 600 19px/1 var(--mono); color: #c9d1d9; background: #0d1117cc; }
   /* --- gh cao: ops data for agents --- */
@@ -1229,7 +1229,7 @@
   .oql-card pre { margin: 0; padding: 22px 24px; border: 1px solid #30363d; border-radius: 12px; background: #0d1117e6; font: 500 17px/1.65 var(--mono); }
   .oql-ln { opacity: .12; transition: opacity .25s; white-space: pre; }
   .oql-ln.on { opacity: 1; }
-  .oql-ln span { color: #79c0ff; }
+  .oql-ln span { color: #56d4dd; }
   .oql-ln b { color: #f0f6fc; font-weight: 500; }
   .oql-rules { display: flex; gap: 12px; margin-top: 20px; }
   .oql-rules span { padding: 8px 16px; border: 1px solid #3d444d; border-radius: 999px; font: 600 17px/1 var(--mono); color: #c9d1d9; }
@@ -1241,13 +1241,13 @@
   .oql-tools { display: flex; gap: 10px; margin-top: 4px; }
   .oql-tools em { font: 600 17px/1 var(--mono); font-style: normal; padding: 7px 12px; border-radius: 6px; background: #56d4dd22; color: #56d4dd; }
   .oql-arrow { font: 600 17px/1.3 var(--mono); color: #3d444d; padding-left: 20px; white-space: nowrap; transition: color .3s; }
-  .oql-arrow.on { color: #e3b341; }
-  .oql-arrow.back.on { color: #3fb950; }
+  .oql-arrow.on { color: #56d4dd; }
+  .oql-arrow.back.on { color: #b3f0f5; }
   .oql-metas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .oql-meta { padding: 10px 14px; border: 1px solid #30363d; border-radius: 8px; opacity: .15; transition: opacity .3s; display: flex; flex-direction: column; gap: 6px; }
   .oql-meta.on { opacity: 1; }
   .oql-meta span { font: 500 15px/1 var(--mono); color: #9198a1; }
-  .oql-meta b { font: 600 19px/1 var(--mono); color: #3fb950; }
+  .oql-meta b { font: 600 19px/1 var(--mono); color: #f0f6fc; }
   .oql-bars { left: 1210px; width: 620px; }
   .oql-row { display: grid; grid-template-columns: 190px 330px 80px; align-items: center; height: 66px; }
   .oql-name span { display: block; font: 500 15px/1.2 var(--mono); color: #9198a1; }
@@ -13484,14 +13484,14 @@
       RING = 400,
       MAXC = 64;
     const SINKS = [
-      { name: "OpenTelemetry", sub: "traces · metrics · logs", unit: "spans", c: "#79c0ff", k: 42 },
-      { name: "Ops database", sub: "runs · campaigns · budgets", unit: "runs", c: "#e3b341", k: 1, prem: 1 },
-      { name: "Session data lake", sub: "aw_session.jsonl → Parquet", unit: "events", c: "#3fb950", k: 180, prem: 1 },
+      { name: "OpenTelemetry", sub: "traces · metrics · logs", unit: "spans", c: "#b3f0f5", k: 42 },
+      { name: "Ops database", sub: "runs · campaigns · budgets", unit: "runs", c: "#56d4dd", k: 1, prem: 1 },
+      { name: "Session data lake", sub: "aw_session.jsonl → Parquet", unit: "events", c: "#39c5cf", k: 180, prem: 1 },
     ];
     const CAMP = [
       { name: "cost", c: "#56d4dd" },
-      { name: "upgrade", c: "#d2a8ff" },
-      { name: "fix", c: "#ff7b72" },
+      { name: "upgrade", c: "#b3f0f5" },
+      { name: "fix", c: "#39c5cf" },
     ];
     const ORDER = [0, 1, 0, 2];
     const cv = h("canvas", { class: "hyp-cv", width: CW * DPR, height: CH * DPR, style: "--i:1" });
@@ -13513,14 +13513,14 @@
     const spark = h("div", { class: "hyp-spark" });
     const outEls = [
       card("Cost control", "#56d4dd", "each campaign capped · optimize as you go", spark),
-      card("Evolution", "#d2a8ff", "upgrade campaigns recompile the fleet"),
-      card("Monitoring", "#ff7b72", "drift detected → next campaign"),
+      card("Evolution", "#b3f0f5", "upgrade campaigns recompile the fleet"),
+      card("Monitoring", "#39c5cf", "drift detected → next campaign"),
     ];
     const vals = [0, 1, 2].map(() => h("strong", {}, ""));
     const valBox = h("div", { class: "hyp-val" }, h("b", {}, "Value"), h("div", {}, "healthy repositories", vals[0]), h("div", {}, "changes landed", vals[1]), h("div", {}, "cost per fix", vals[2]));
     const el = h(
       "section",
-      { class: "slide hyp" },
+      { class: "slide hyp", "--lg": "#56d4dd" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · agentic workflows at enterprise scale"), h("h2", {}, letters("Hyperscale "), letters("Agentics", "l-grad"))),
       h("div", { class: "hyp-scale", style: "--i:0" }, num, h("span", {}, "repositories running agents")),
       h("div", { class: "hyp-ruler" }, h("i", {}), fill, ...ticks),
@@ -13668,7 +13668,7 @@
           pr = (t / 20) % 24,
           lw = waves[waves.length - 1],
           la = lw ? t - lw.s : 1e9;
-        ctx.strokeStyle = "#d2a8ff";
+        ctx.strokeStyle = "#f0f6fc";
         ctx.lineWidth = 1.5;
         ctx.globalAlpha = 0.7 * (1 - pr / 24);
         ctx.strokeRect(caoX - cs / 2 - pr / 2, caoY - cs / 2 - pr / 2, cs + pr, cs + pr);
@@ -13680,8 +13680,8 @@
           ctx.strokeRect(caoX - cs / 2 - g / 2, caoY - cs / 2 - g / 2, cs + g, cs + g);
         }
         ctx.globalAlpha = 1;
-        ctx.fillStyle = la < 700 ? CAMP[lw.k].c : "#d2a8ff";
-        ctx.shadowColor = la < 900 ? CAMP[lw.k].c : "#d2a8ff";
+        ctx.fillStyle = la < 700 ? CAMP[lw.k].c : "#f0f6fc";
+        ctx.shadowColor = la < 900 ? CAMP[lw.k].c : "#f0f6fc55";
         ctx.shadowBlur = la < 900 ? 18 : 10;
         ctx.beginPath();
         ctx.roundRect(caoX - cs / 2, caoY - cs / 2, cs, cs, 4);
@@ -13692,7 +13692,7 @@
           ctw = ctx.measureText(ct).width;
         ctx.fillStyle = "#0d1117cc";
         ctx.fillRect(caoX - ctw / 2 - 4, caoY - cs / 2 - 24, ctw + 8, 17);
-        ctx.fillStyle = "#d2a8ff";
+        ctx.fillStyle = "#f0f6fc";
         ctx.fillText(ct, caoX - ctw / 2, caoY - cs / 2 - 11);
         // telemetry: only squares where an agent just worked (a campaign wave) report into the three sinks
         if (work.length > 300) work.splice(0, work.length - 300);
@@ -13838,11 +13838,11 @@
   {
     resetIndex();
     const steps = [
-      ["01", "Observe", "Runs, costs and outcomes from every repo in one dashboard", "#4493f8"],
-      ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#ab7df8"],
-      ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#d29922"],
-      ["04", "Work", "One target per worker, bounded mission, correlated results", "#3fb950"],
-      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#f778ba"],
+      ["01", "Observe", "Runs, costs and outcomes from every repo in one dashboard", "#56d4dd"],
+      ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#56d4dd"],
+      ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#56d4dd"],
+      ["04", "Work", "One target per worker, bounded mission, correlated results", "#56d4dd"],
+      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#56d4dd"],
     ];
     const CW = 1180,
       CH = 690,
@@ -13856,10 +13856,10 @@
     const ICON = 16,
       GEAR = 24;
     const campaigns = [
-      { name: "Dependabot", c: "#4493f8", rate: 1.3 },
-      { name: "Repo Assist", c: "#39c5cf", rate: 1.1 },
-      { name: "ESLint Factory", c: "#e3b341", rate: 0.9 },
-      { name: "EU CRA", c: "#b083f0", rate: 0.7 },
+      { name: "Dependabot", c: "#b3f0f5", rate: 1.3 },
+      { name: "Repo Assist", c: "#56d4dd", rate: 1.1 },
+      { name: "ESLint Factory", c: "#39c5cf", rate: 0.9 },
+      { name: "EU CRA", c: "#8ae4ea", rate: 0.7 },
     ].map(k => ({ ...k, v: 1 }));
     const CA = 124,
       CHD = 40,
@@ -14194,7 +14194,7 @@
         const vw = ctx.measureText(vt).width;
         if (pop > 0) {
           ctx.globalAlpha = pop;
-          ctx.fillStyle = "#f778ba";
+          ctx.fillStyle = "#56d4dd";
           ctx.beginPath();
           ctx.roundRect(vx - vw - 7, k.y - 9, vw + 14, 18, 9);
           ctx.fill();
@@ -14296,7 +14296,7 @@
       },
       el: h(
         "section",
-        { class: "slide" },
+        { class: "slide", "--lg": "#56d4dd" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · campaigns"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
         h(
           "div",
@@ -14314,7 +14314,8 @@
     resetIndex();
     const ORGS = ["@platform", "@payments", "@mobile", "@data", "@infra"];
     const NAMES = ["web", "api", "docs", "cli", "sdk", "ops", "auth", "ui"];
-    const KIND = { old: "#e3b341", drift: "#f778ba", fail: "#ff7b72", heavy: "#d2a8ff" };
+    // every problem shares one attention hue; the tag on the tile says which loop fixes it
+    const KIND = { old: "#e3b341", drift: "#e3b341", fail: "#e3b341", heavy: "#e3b341" };
     const TAG = { old: "v1.8", drift: "drift", fail: "fail", heavy: "heavy" };
     const LOOPS = [
       ["old", "gh cao update", "Bump gh-aw-version in cao.json · recompile every lock · ship one atomic revision"],
@@ -14322,7 +14323,7 @@
       ["fail", "Failure investigator", "Cluster failed runs by signature · one issue per root cause"],
       ["heavy", "Token optimizer", "Audit spend · propose a smaller model or fewer turns"],
     ];
-    const loops = LOOPS.map(([k, b, s], i) => h("div", { class: "mnt-loop", "--i": i, "--c": KIND[k] }, h("i", {}, String(i + 1).padStart(2, "0")), h("b", {}, b), h("span", {}, s)));
+    const loops = LOOPS.map(([k, b, s], i) => h("div", { class: "mnt-loop", "--i": i, "--c": "#56d4dd" }, h("i", {}, String(i + 1).padStart(2, "0")), h("b", {}, b), h("span", {}, s)));
     const tiles = [];
     const grid = h(
       "div",
@@ -14346,7 +14347,7 @@
     const fleet = h("div", { class: "mnt-fleet" }, h("div", { class: "mnt-top" }, h("span", {}, "cao.json · gh-aw-version "), ver, h("span", { class: "mnt-sep" }, "·"), h("span", {}, "healthy "), healthy, h("span", {}, " / 40")), grid);
     const el = h(
       "section",
-      { class: "slide mnt" },
+      { class: "slide mnt", "--lg": "#56d4dd" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · keep the fleet current"), h("h2", {}, letters("AW "), letters("maintenance", "l-grad"))),
       h("div", { class: "mnt-loops" }, loops),
       fleet
@@ -14383,7 +14384,7 @@
     slides.push({
       group: "cao",
       notes:
-        "AW maintenance, an illustrative, simulated fleet: the org names, repository names, version numbers and failure counts are synthetic. gh cao is a research prototype, and keeping dozens of agentic workflows healthy is its day-to-day job. Every tile is a repository running agentic workflows; amber ones are still on an old gh-aw version, pink ones have a lock file that drifted from its markdown source, red ones have failing runs and violet ones spend far more tokens than they need to. Four maintenance loops sweep the fleet. gh cao update bumps the gh-aw-version pinned in cao.json, recompiles every lock file and ships it as one atomic revision, so nobody hand-edits a lock file. The integrity drift check compares each lock with its source and reports what changed. The failure investigator clusters failed runs by error signature and files one issue per root cause instead of one per run. The token optimizer audits spend and proposes a smaller model or fewer turns. Then time passes, new problems appear, and the loops run again: maintenance is a loop, not a project.",
+        "AW maintenance, an illustrative, simulated fleet: the org names, repository names, version numbers and failure counts are synthetic. gh cao is a research prototype, and keeping dozens of agentic workflows healthy is its day-to-day job. Every tile is a repository running agentic workflows; amber ones need attention, and their tag says why: v1.8 is still on an old gh-aw version, drift has a lock file that drifted from its markdown source, fail has failing runs and heavy spends far more tokens than it needs to. Four maintenance loops sweep the fleet. gh cao update bumps the gh-aw-version pinned in cao.json, recompiles every lock file and ships it as one atomic revision, so nobody hand-edits a lock file. The integrity drift check compares each lock with its source and reports what changed. The failure investigator clusters failed runs by error signature and files one issue per root cause instead of one per run. The token optimizer audits spend and proposes a smaller model or fewer turns. Then time passes, new problems appear, and the loops run again: maintenance is a loop, not a project.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -14443,11 +14444,11 @@
     const Y = 210,
       X = [130, 480, 830, 1180, 1540];
     const STAGES = [
-      ["Runs", "aw_session.jsonl", "#79c0ff"],
-      ["Gate", "opt-in · redact · scope", "#e3b341"],
+      ["Runs", "aw_session.jsonl", "#56d4dd"],
+      ["Gate", "opt-in · redact · scope", "#56d4dd"],
       ["Project", "typed events · trace.tsp", "#56d4dd"],
-      ["Parquet", "immutable · Zstandard", "#3fb950"],
-      ["Query", "DuckDB · ADX tables", "#d2a8ff"],
+      ["Parquet", "immutable · Zstandard", "#56d4dd"],
+      ["Query", "DuckDB · ADX tables", "#56d4dd"],
     ];
     svg.append(s("line", { x1: X[0], y1: Y, x2: X[4], y2: Y, class: "lake-rail" }));
     const boxes = STAGES.map(([t, sub, c], i) => {
@@ -14497,7 +14498,7 @@
     svg.append(dots);
     const el = h(
       "section",
-      { class: "slide lake" },
+      { class: "slide lake", "--lg": "#56d4dd" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · every run, one queryable history"), h("h2", {}, letters("Session "), letters("data lake", "l-grad"))),
       h("div", { class: "lake-wrap" }, svg),
       h("div", { class: "lake-foot" }, h("span", {}, "private"), h("span", {}, "default off"), h("span", {}, "separately approved"), h("span", {}, "atomic generation pointer"))
@@ -14686,7 +14687,7 @@
     );
     const el = h(
       "section",
-      { class: "slide oql" },
+      { class: "slide oql", "--lg": "#56d4dd" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · query the fleet, optimize the enterprise"), h("h2", {}, letters("Ops data "), letters("for Agents", "l-grad"))),
       query,
       mcp,
