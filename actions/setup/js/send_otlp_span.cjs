@@ -1269,7 +1269,7 @@ function parseOTLPEndpoints() {
  *
  * @param {OTLPEndpointEntry[]} endpoints  - Resolved endpoint list from {@link parseOTLPEndpoints}
  * @param {any} payload                 - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any }} [opts]
  * @returns {Promise<boolean[]>} Per-endpoint export success, in `endpoints` order.
  */
 async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
@@ -1298,16 +1298,16 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
  * Reads `OTEL_EXPORTER_OTLP_HEADERS` from the environment and merges any
  * configured headers into every request, unless `headersOverride` is provided
  * (used for per-endpoint headers in the multi-endpoint case).
- * `OTEL_EXPORTER_OTLP_{TRACES,LOGS}_PROTOCOL` overrides `OTEL_EXPORTER_OTLP_PROTOCOL`
+ * `OTEL_EXPORTER_OTLP_{TRACES,LOGS,METRICS}_PROTOCOL` overrides `OTEL_EXPORTER_OTLP_PROTOCOL`
  * for the matching signal;
  * both accept `http/json` (the compatibility default) or `http/protobuf`.
  *
  * @param {string} endpoint  - OTLP base URL (e.g. https://traces.example.com:4317)
  * @param {any} payload   - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any }} [opts]
  * @returns {Promise<boolean>}
  */
-async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces", sanitize = sanitizeOTLPPayload, protocolOverride } = {}) {
+async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces", sanitize = sanitizeOTLPPayload } = {}) {
   if (signal === "metrics" && process.env.GH_AW_OTEL_METRICS !== "true") {
     return false;
   }
@@ -1333,14 +1333,14 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
   const rawHeaders = headersOverride !== undefined ? headersOverride : process.env.OTEL_EXPORTER_OTLP_HEADERS || "";
   const extraHeaders = parseOTLPHeaders(rawHeaders);
   const signalProtocol = process.env[`OTEL_EXPORTER_OTLP_${signal.toUpperCase()}_PROTOCOL`];
-  const protocol = protocolOverride || signalProtocol || process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/json";
+  const protocol = signalProtocol || process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/json";
   /** @type {string | Buffer} */
   let sanitizedBody;
   try {
     if (protocol === "http/protobuf") {
-      const { encodeOTLPTraceRequest, encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
-      if (signal === "metrics") throw new Error("OTLP metrics protobuf is not supported");
-      sanitizedBody = signal === "logs" ? encodeOTLPLogsRequest(sanitizedPayload) : encodeOTLPTraceRequest(sanitizedPayload);
+      const { encodeOTLPTraceRequest, encodeOTLPLogsRequest, encodeOTLPMetricsRequest } = require("./otlp_protobuf.cjs");
+      const encode = signal === "metrics" ? encodeOTLPMetricsRequest : signal === "logs" ? encodeOTLPLogsRequest : encodeOTLPTraceRequest;
+      sanitizedBody = encode(sanitizedPayload);
     } else if (protocol === "http/json") {
       sanitizedBody = JSON.stringify(sanitizedPayload);
     } else {

@@ -310,8 +310,8 @@ async function sendOTLPMetrics(payload, traceContext) {
   const { parseOTLPEndpoints, sendOTLPToAllEndpoints } = require("./send_otlp_span.cjs");
   const sanitizedPayload = sanitizeOTLPMetricsPayload(payload);
   appendToOTLPMetricsJSONL(sanitizedPayload);
-  /** @type {{skipJSONL: true, signal: "metrics", sanitize: (payload: any) => any, protocolOverride: "http/json"}} */
-  const options = { skipJSONL: true, signal: "metrics", sanitize: sanitizeOTLPMetricsPayload, protocolOverride: "http/json" };
+  /** @type {{skipJSONL: true, signal: "metrics", sanitize: (payload: any) => any}} */
+  const options = { skipJSONL: true, signal: "metrics", sanitize: sanitizeOTLPMetricsPayload };
   const endpoints = parseOTLPEndpoints();
   const endpointResults = await sendOTLPToAllEndpoints(endpoints, sanitizedPayload, options);
   // Failures already carried by this payload reached the healthy collectors, so

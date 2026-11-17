@@ -200,6 +200,7 @@ describe("OTLP metrics export", () => {
     vi.stubEnv("GH_AW_OTEL_METRICS", "true");
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://collector.example/v1/traces", headers: "X-Trace-Endpoint=metrics" }]));
     vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
+    vi.stubEnv("OTEL_EXPORTER_OTLP_METRICS_PROTOCOL", "http/json");
     const mirror = mockOTLPMirror();
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body: null, headers: new Headers() });
     vi.stubGlobal("fetch", fetchMock);
@@ -212,6 +213,24 @@ describe("OTLP metrics export", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://collector.example/v1/metrics");
     expect(fetchMock.mock.calls[0][1].headers).toMatchObject({ "Content-Type": "application/json", "X-Trace-Endpoint": "metrics" });
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).resourceMetrics).toBeDefined();
+  });
+
+  it("exports protobuf when OTEL_EXPORTER_OTLP_PROTOCOL selects it, keeping the JSON mirror", async () => {
+    vi.stubEnv("GH_AW_OTEL_METRICS", "true");
+    vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://collector.example/v1/traces" }]));
+    vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
+    const mirror = mockOTLPMirror();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body: null, headers: new Headers() });
+    vi.stubGlobal("fetch", fetchMock);
+    const payload = metrics.buildOTLPMetricsPayload({ serviceName: "gh-aw", metrics: [metrics.buildOTLPMetric({ name: "test", value: 1, type: "histogram" })] });
+
+    await metrics.sendOTLPMetrics(payload);
+
+    const { encodeOTLPMetricsRequest } = require("./otlp_protobuf.cjs");
+    expect(mirror[0]).toContain('"resourceMetrics"');
+    expect(fetchMock.mock.calls[0][0]).toBe("https://collector.example/v1/metrics");
+    expect(fetchMock.mock.calls[0][1].headers["Content-Type"]).toBe("application/x-protobuf");
+    expect(fetchMock.mock.calls[0][1].body).toEqual(encodeOTLPMetricsRequest(metrics.sanitizeOTLPMetricsPayload(payload)));
   });
 
   it("does not mirror or export when the opt-in flag is absent", async () => {

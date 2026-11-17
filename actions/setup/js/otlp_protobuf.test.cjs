@@ -4,7 +4,8 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { encodeOTLPTraceRequest, encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
+const { encodeOTLPTraceRequest, encodeOTLPLogsRequest, encodeOTLPMetricsRequest } = require("./otlp_protobuf.cjs");
+const { buildOTLPMetric, buildOTLPMetricsPayload } = require("./otlp_metrics.cjs");
 const { buildAttr, buildOTLPPayload, sanitizeOTLPPayload, sendOTLPSpan, sendOTLPToAllEndpoints, OTEL_JSONL_PATH } = require("./send_otlp_span.cjs");
 
 function payload() {
@@ -176,6 +177,45 @@ describe("minimal OTLP logs protobuf encoder", () => {
   it("rejects requests for the wrong signal instead of silently dropping them", () => {
     expect(() => encodeOTLPLogsRequest(payload())).toThrow(/unknown field: resourceSpans/);
     expect(() => encodeOTLPTraceRequest(logsPayload())).toThrow(/unknown field: resourceLogs/);
+  });
+});
+
+describe("minimal OTLP metrics protobuf encoder", () => {
+  it("encodes signed asInt as sfixed64 and histogram buckets/bounds as packed fields", () => {
+    const request = {
+      resourceMetrics: [
+        {
+          scopeMetrics: [
+            {
+              metrics: [
+                { name: "g", gauge: { dataPoints: [{ asInt: "-1" }] } },
+                { name: "h", histogram: { aggregationTemporality: 1, dataPoints: [{ count: "1", bucketCounts: ["0", "1"], explicitBounds: [1.5] }] } },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(encodeOTLPMetricsRequest(request).toString("hex")).toBe(
+      "0a44124212100a01672a0b0a0931ffffffffffffffff" + "122e0a01684a290a25" + "210100000000000000" + "32100000000000000000" + "0100000000000000" + "3a08000000000000f83f" + "1001"
+    );
+  });
+
+  it("encodes built-in metric payloads, including exemplar trace IDs as bytes", () => {
+    const traceContext = { traceId: "0123456789abcdef0123456789abcdef", spanId: "fedcba9876543210" };
+    const payload = buildOTLPMetricsPayload({
+      serviceName: "gh-aw",
+      metrics: ["gauge", "counter", "histogram"].map(type => buildOTLPMetric({ name: `gh_aw.test.${type}`, type, value: 3, traceContext })),
+    });
+    const encoded = encodeOTLPMetricsRequest(payload);
+    expect(encoded.includes(Buffer.from("gh_aw.test.histogram"))).toBe(true);
+    expect(encoded.includes(Buffer.from(traceContext.traceId, "hex"))).toBe(true);
+    expect(encoded.includes(Buffer.from(traceContext.traceId))).toBe(false);
+  });
+
+  it("rejects requests for the wrong signal", () => {
+    expect(() => encodeOTLPMetricsRequest(payload())).toThrow(/unknown field: resourceSpans/);
+    expect(() => encodeOTLPMetricsRequest({ resourceMetrics: [{ scopeMetrics: [{ metrics: [{ name: "x", summary: {} }] }] }] })).toThrow(/unknown field: summary/);
   });
 });
 
