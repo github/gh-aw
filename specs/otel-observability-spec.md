@@ -28,7 +28,7 @@ This specification defines the compatibility-first OpenTelemetry observability c
 
 This document is a **Working Draft** maintained by the GitHub `gh-aw` Team. It may be changed, replaced, or made obsolete by subsequent versions.
 
-Version 0.7.0 adds opt-in OTLP metrics emission and the `logMetric()` API.
+Version 0.7.0 adds OTLP metrics emission (enabled by default when configured) and the `logMetric()` API.
 
 Sections explicitly marked **Informative** are non-normative. All other sections are normative unless stated otherwise.
 
@@ -702,9 +702,9 @@ Values MUST be normalized and bounded.
 
 Metric implementations SHOULD attach exemplars containing trace and span context when supported by the SDK and backend. The JavaScript metrics exporter attaches an exemplar when a valid trace and span context is available.
 
-### 11.5 Opt-in Job Metrics
+### 11.5 Default-on Job Metrics
 
-Built-in job metrics MUST be disabled unless `GH_AW_OTEL_METRICS` is exactly `true`. When enabled and the job conclusion step runs, it MUST emit the applicable metrics below. Collection is best-effort: runner loss or a hard cancellation that prevents the conclusion step can prevent that job's metrics from being emitted.
+Built-in job metrics MUST be enabled by default when OTLP is configured. The effective `GH_AW_OTEL_METRICS` value MUST be the workflow-defined value when present, otherwise the `GH_AW_OTEL_METRICS` Actions variable, otherwise `true`. Only the literal value `true` enables metrics; `false` opts out. `gh aw env` MUST manage this Actions variable through the `default_otel_metrics` key, accepting only `true` or `false`. When enabled and the job conclusion step runs, it MUST emit the applicable metrics below. Collection is best-effort: runner loss or a hard cancellation that prevents the conclusion step can prevent that job's metrics from being emitted.
 
 | Metric | Instrument | Unit | Data-point attributes | Description |
 |---|---|---|---|---|
@@ -724,7 +724,7 @@ The aliases in parentheses carry the same observations as the canonical metric; 
 
 All built-in counters and histograms MUST use delta temporality. The JavaScript custom metric API uses the same temporality.
 
-The runtime MUST export metrics to `/v1/metrics` using the configured OTLP endpoint list and per-endpoint headers. Metrics MUST honor a non-empty `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` before `OTEL_EXPORTER_OTLP_PROTOCOL`, MUST default to OTLP/HTTP JSON, and with `http/protobuf` MUST encode the sanitized payload as a binary `ExportMetricsServiceRequest` (`Content-Type: application/x-protobuf`) without runtime package dependencies. Unsupported protocols or encoding failures MUST produce an exporter diagnostic and count as export failures without a JSON fallback. Protobuf `partialSuccess.rejected_data_points` MUST be handled like its JSON equivalent. Export failures MUST NOT fail the workflow. Every emitted payload MUST be mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before remote export. The mirror MUST NOT be written when metrics are disabled and MUST be included in the unified agent artifact only when metrics are explicitly enabled at compile time.
+The runtime MUST export metrics to `/v1/metrics` using the configured OTLP endpoint list and per-endpoint headers. Metrics MUST honor a non-empty `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` before `OTEL_EXPORTER_OTLP_PROTOCOL`, MUST default to OTLP/HTTP JSON, and with `http/protobuf` MUST encode the sanitized payload as a binary `ExportMetricsServiceRequest` (`Content-Type: application/x-protobuf`) without runtime package dependencies. Unsupported protocols or encoding failures MUST produce an exporter diagnostic and count as export failures without a JSON fallback. Protobuf `partialSuccess.rejected_data_points` MUST be handled like its JSON equivalent. Export failures MUST NOT fail the workflow. Every emitted payload MUST be mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before remote export. The mirror MUST NOT be written when metrics are disabled and MUST be included in the unified agent artifact only when the effective runtime value is `true`.
 
 Metric resource attributes and dimensions MUST be bounded and MUST NOT include run IDs, repository URLs, commit SHAs, actor IDs, or other per-run identity. Token counters MUST be emitted only by jobs with their own model usage data to avoid downstream double counting. Compatibility aliases are additive and retain the original issue-requested names.
 
@@ -1043,7 +1043,7 @@ current repository.
 | Privacy defaults | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_SecretRefResourceAttributeRejected`; `actions/setup/js/send_otlp_span.test.cjs`: `it("redacts span attribute values whose keys match sensitive patterns", ...)`, `it("redacts sensitive keys in span event attributes", ...)` |
 | Non-fatal export | `actions/setup/js/send_otlp_span.test.cjs`: `it("warns (does not throw) when server returns non-2xx status on all retries", ...)`, `it("warns (does not throw) when fetch rejects on all retries", ...)`, `it("does not throw when appendFileSync fails", ...)` |
 | Resource and instrumentation invariants | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_CustomAttributesResourceAttributesIndependent`, `TestFormal_MergePrecedenceBaseWinsOverOverride`, `TestFormal_MergeOfEmptyMapsYieldsNil`; `actions/setup/js/otlp_metrics.test.cjs`: `keeps metric resource attributes to stable low-cardinality identity`, `rejects unbounded custom metric attributes without throwing`, `caps unique custom metric series per process`. |
-| Built-in metrics | `actions/setup/js/otlp_metrics.test.cjs`: `builds the opt-in duration, error, token, tool-call, and safe-output metrics`, `counts cancelled conclusions as job errors`, `records metric endpoint failures locally and exports the failure counter to healthy endpoints`; `actions/setup/js/send_otlp_span.test.cjs`: `emits built-in metrics only when GH_AW_OTEL_METRICS is enabled`. |
+| Built-in metrics | `actions/setup/js/otlp_metrics.test.cjs`: `builds the duration, error, token, tool-call, and safe-output metrics`, `counts cancelled conclusions as job errors`, `records metric endpoint failures locally and exports the failure counter to healthy endpoints`; `actions/setup/js/send_otlp_span.test.cjs`: `emits built-in metrics only when GH_AW_OTEL_METRICS is enabled`. |
 
 The repository enforcement entry point for these checks is `make validate-otel-contract`. This target MUST remain focused on the customer-facing compatibility contract rather than all possible OTEL-related tests.
 

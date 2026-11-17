@@ -943,14 +943,9 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 		ifMissingMode = "ignore"
 	}
 
-	// 2. Inject OTEL env vars into the workflow-level env: block.
-	//    OTEL_EXPORTER_OTLP_ENDPOINT is set to the first endpoint for backward
-	//    compatibility (MCP gateway, legacy scripts). OTEL_SERVICE_NAME is
-	//    workflow-specific when WorkflowID is available.
-	//    existingEnv captures the user's env: block as it stood before this function
-	//    started appending lines, so every key below is checked against user-authored
-	//    content only. If the user has already defined any of these keys in their env
-	//    block, we respect their value and skip injection to avoid duplicate key errors.
+	// 2. Inject OTEL environment variables, preserving user-authored keys.
+	//    The endpoint remains for backward compatibility with the MCP gateway and
+	//    legacy scripts. Existing env captures only the user's original env block.
 	existingEnv := workflowData.Env
 	var envKeyLines []string
 	addEnvLine := func(key, line string) {
@@ -962,6 +957,7 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 	}
 	addEnvLine("OTEL_EXPORTER_OTLP_ENDPOINT", "  OTEL_EXPORTER_OTLP_ENDPOINT: "+firstEndpoint)
 	addEnvLine(compilerenv.OTLPProtocol, fmt.Sprintf("  %s: ${{ vars.%s }}", compilerenv.OTLPProtocol, compilerenv.OTLPProtocol))
+	addEnvLine(compilerenv.OTLPMetrics, fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics))
 	addEnvLine("OTEL_SERVICE_NAME", "  OTEL_SERVICE_NAME: "+serviceName)
 	addEnvLine("OTEL_RESOURCE_ATTRIBUTES", "  OTEL_RESOURCE_ATTRIBUTES: '"+escapeYAMLSingleQuoted(otelResourceAttributes(workflowData))+"'")
 	otlpEnvLines := strings.Join(envKeyLines, "\n")

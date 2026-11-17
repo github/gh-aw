@@ -385,14 +385,14 @@ await sendOTLPSpan(endpoint, buildOTLPPayload({
 
 ## Metrics
 
-Set `GH_AW_OTEL_METRICS` to the literal value `true` in the workflow `env:` block to export built-in per-job metrics and enable custom metrics:
+Metrics are enabled by default for workflows with OTLP configured. Set `GH_AW_OTEL_METRICS` to the literal value `false` in workflow `env:` to opt out:
 
 ```yaml wrap
 env:
-  GH_AW_OTEL_METRICS: "true"
+  GH_AW_OTEL_METRICS: "false"
 ```
 
-The compiler does not currently inject this opt-in from Actions variables. The metrics mirror is included in the unified artifact only when the compiler can confirm the explicit `true` value; this preserves the artifact-path guard against uploading an agent-created file when metrics are disabled. The opt-in is otherwise a no-op: neither built-in nor custom metrics are emitted. Metrics are sent to `/v1/metrics` as OTLP/HTTP JSON by default, or as protobuf when `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` or `OTEL_EXPORTER_OTLP_PROTOCOL` selects `http/protobuf` (see [Protobuf encoding](#protobuf-encoding-and-azure-monitor)), using the configured OTLP endpoints and their per-endpoint headers, and are mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before export. The uploaded mirror contains metrics recorded in the agent job before artifact upload, including that job's built-in metrics; built-in metrics from other jobs are exported at post-job time and are not included in an artifact.
+The compiler injects `${{ vars.GH_AW_OTEL_METRICS || 'true' }}` unless the workflow defines `GH_AW_OTEL_METRICS` itself. To manage the Actions variable by repository, organization, or enterprise scope, use `gh aw env get` and `gh aw env update` with `default_otel_metrics: false`; deleting the variable restores the default-on behavior. Only the literal value `true` enables metrics. When enabled, metrics are sent to `/v1/metrics` as OTLP/HTTP JSON by default, or as protobuf when `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` or `OTEL_EXPORTER_OTLP_PROTOCOL` selects `http/protobuf` (see [Protobuf encoding](#protobuf-encoding-and-azure-monitor)), using the configured OTLP endpoints and their per-endpoint headers, and are mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before export. The unified artifact includes the metrics mirror only when the effective runtime value is `true`. It contains metrics recorded in the agent job before artifact upload, including that job's built-in metrics; built-in metrics from other jobs are exported at post-job time and are not included in an artifact.
 
 The built-ins include `gh_aw.job.duration` (histogram, `s`) and `gh_aw.job.errors` (counter, `{job}` for failed, timed-out, and cancelled jobs), `gen_ai.client.token.usage` (counter, `{token}`, by `gen_ai.token.type` for input, output, cache-read, and cache-write tokens), `gh_aw.agent.turns` (histogram, `{turn}`), `gh_aw.tool_calls` (counter, `{call}`, by `gh-aw.tool.status`), and `gh_aw.workflow.output.items` (counter, `{item}`, by `gh-aw.safe_output.type`). AI-credit limit and rate-limit errors and OTLP export failures are also counted when known.
 

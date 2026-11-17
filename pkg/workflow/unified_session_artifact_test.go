@@ -42,29 +42,16 @@ func TestUnifiedSessionAgentArtifactPaths(t *testing.T) {
 	}
 }
 
-func TestUnifiedArtifactIncludesOTLPMetricsMirrorOnlyWhenEnabled(t *testing.T) {
+func TestUnifiedArtifactConditionallyIncludesOTLPMetricsMirror(t *testing.T) {
 	for _, tt := range []struct {
 		name        string
 		env         string
 		wantMetrics bool
 	}{
-		{
-			name:        "enabled",
-			env:         "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'true'\n",
-			wantMetrics: true,
-		},
-		{
-			name: "disabled",
-			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'false'\n",
-		},
-		{
-			name: "case mismatch",
-			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'TRUE'\n",
-		},
-		{
-			name: "not configured",
-			env:  "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n",
-		},
+		{name: "enabled by default", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n", wantMetrics: true},
+		{name: "explicitly enabled", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'true'\n", wantMetrics: true},
+		{name: "runtime opt out", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'false'\n", wantMetrics: true},
+		{name: "not configured", env: ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			compiler := NewCompiler()
@@ -75,25 +62,28 @@ func TestUnifiedArtifactIncludesOTLPMetricsMirrorOnlyWhenEnabled(t *testing.T) {
 			paths := compiler.collectArtifactPaths(data, engine, constants.AgentStdioLogPath, nil)
 
 			if tt.wantMetrics {
-				assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+				assert.Contains(t, paths, conditionalOTLPMetricsArtifactPath)
+				assert.NotContains(t, recoveryArtifactScanRoots(paths), constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+				assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
+				assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
 			} else {
-				assert.NotContains(t, paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
+				assert.NotContains(t, paths, conditionalOTLPMetricsArtifactPath)
+				assert.NotContains(t, paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
+				assert.NotContains(t, paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
 			}
-			assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
-			assert.Contains(t, paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
 		})
 	}
 }
 
-func TestOTLPMetricsConclusionRunsBeforeArtifactUploadOnlyWhenEnabled(t *testing.T) {
+func TestOTLPMetricsConclusionRunsBeforeArtifactUploadWithRuntimeGuard(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		env  string
 		want bool
 	}{
-		{name: "enabled", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'true'\n", want: true},
-		{name: "case mismatch", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'TRUE'\n"},
-		{name: "disabled", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'false'\n"},
+		{name: "enabled by default", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n", want: true},
+		{name: "runtime opt out", env: "env:\n  GH_AW_OTLP_ENDPOINTS: '[]'\n  GH_AW_OTEL_METRICS: 'false'\n", want: true},
+		{name: "not configured", env: ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var yaml strings.Builder
@@ -101,6 +91,7 @@ func TestOTLPMetricsConclusionRunsBeforeArtifactUploadOnlyWhenEnabled(t *testing
 
 			if tt.want {
 				assert.Contains(t, yaml.String(), "action_conclusion_otlp.cjs")
+				assert.Contains(t, yaml.String(), "if: always() && env.GH_AW_OTEL_METRICS == 'true'")
 				assert.Contains(t, yaml.String(), "GH_AW_JOB_RESULT: ${{ job.status }}")
 			} else {
 				assert.Empty(t, yaml.String())
@@ -109,15 +100,13 @@ func TestOTLPMetricsConclusionRunsBeforeArtifactUploadOnlyWhenEnabled(t *testing
 	}
 }
 
-func TestOTLPMetricsEnabledWorkflowCompilesWithConclusionBeforeUpload(t *testing.T) {
+func TestOTLPMetricsDefaultWorkflowCompilesWithConclusionBeforeUpload(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), ".github", "workflows")
 	require.NoError(t, os.MkdirAll(dir, 0755))
 	path := filepath.Join(dir, "metrics.md")
 	require.NoError(t, os.WriteFile(path, []byte(`---
 on: workflow_dispatch
 engine: copilot
-env:
-  GH_AW_OTEL_METRICS: "true"
 observability:
   otlp:
     endpoint: https://otel.example.com
@@ -131,6 +120,8 @@ Test metrics.
 	require.NoError(t, err)
 	compiled := string(content)
 
+	assert.Contains(t, compiled, "GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}")
+	assert.Contains(t, compiled, "if: always() && env.GH_AW_OTEL_METRICS == 'true'")
 	emit := strings.Index(compiled, "Emit OTLP job conclusion before artifacts")
 	upload := strings.Index(compiled, "Upload agent artifacts")
 	require.NotEqual(t, -1, emit)

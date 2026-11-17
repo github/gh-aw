@@ -103,6 +103,9 @@ func recoveryArtifactScanRoots(paths []string) []string {
 		if strings.HasPrefix(artifactPath, "!") {
 			continue
 		}
+		if artifactPath == conditionalOTLPMetricsArtifactPath {
+			continue
+		}
 		if wildcard := strings.IndexAny(artifactPath, "*?["); wildcard >= 0 {
 			artifactPath = path.Dir(artifactPath[:wildcard])
 		}

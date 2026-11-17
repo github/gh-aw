@@ -7,6 +7,8 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+const conditionalOTLPMetricsArtifactPath = "${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}"
+
 // collectArtifactPaths gathers all paths for the unified artifact upload.
 // It starts from the initial paths already accumulated by generateAgentRunSteps and appends
 // engine-declared output paths, log directories, observability files, safe-outputs files,
@@ -86,9 +88,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Only included when OTLP is configured for this workflow.
 	if isOTLPEnabled(data) {
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
-		if fmt.Sprint(parseEnvYAMLSection(data.Env)["GH_AW_OTEL_METRICS"]) == "true" {
-			paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelMetricsJsonlFilename.String())
-		}
+		paths = append(paths, conditionalOTLPMetricsArtifactPath)
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
 	}
 
@@ -221,7 +221,7 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 }
 
 func (c *Compiler) generateOTLPMetricsConclusionStep(yaml *strings.Builder, data *WorkflowData) {
-	if !isOTLPEnabled(data) || fmt.Sprint(parseEnvYAMLSection(data.Env)["GH_AW_OTEL_METRICS"]) != "true" {
+	if !isOTLPEnabled(data) {
 		return
 	}
 	yaml.WriteString("      - name: Emit OTLP job conclusion before artifacts\n")
