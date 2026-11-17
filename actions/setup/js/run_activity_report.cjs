@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const { getErrorMessage, isRateLimitError } = require("./error_helpers.cjs");
@@ -149,7 +150,7 @@ async function main() {
       owner,
       repo,
       title: ISSUE_TITLE,
-      labels: ["agentic-workflows"],
+      labels: [getIssueLabel()],
     },
     report
   );

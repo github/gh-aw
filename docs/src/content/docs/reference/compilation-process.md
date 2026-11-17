@@ -38,6 +38,7 @@ Container digest resolution uses registry metadata only (`docker buildx imagetoo
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `lock_file_logo` | boolean | `true` | Include the ASCII logo in generated workflow headers, including companion workflows. Set to `false` to omit only the logo. |
+| `issue_label` | string | `"agentic-workflows"` | Label used to create and find gh-aw's own issues, including detection trackers, failure issues, and maintenance reports. |
 
 ```json title=".github/workflows/aw.json"
 {
@@ -46,6 +47,8 @@ Container digest resolution uses registry metadata only (`docker buildx imagetoo
 ```
 
 `gh aw compile --no-logo` disables the logo for a single invocation, even when `lock_file_logo` is `true`. Omitting the flag does not override `lock_file_logo: false`. Metadata, manifests, the “DO NOT EDIT” notice, and regeneration instructions are unchanged.
+
+For repositories with prefixed routing labels, set `"issue_label": "area:agentic-workflows"`. The value must be a nonblank label name of at most 50 characters, without control characters or GitHub Actions expressions. Recompile workflows after changing it. Existing issues must carry the configured label to be found by label-based lookups and cleanup; gh-aw does not relabel them automatically. Per-output `labels` remain additive. Command labels such as `agentic-workflows:disable` are unchanged.
 
 ## Compilation Phases
 
