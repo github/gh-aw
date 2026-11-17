@@ -1151,6 +1151,62 @@ Test workflow`, tt.provider, network, tt.provider)
 	}
 }
 
+func TestCompiledCopilotDetectionNpmRegistryOptIn(t *testing.T) {
+	for _, external := range []bool{false, true} {
+		for _, optIn := range []bool{false, true} {
+			t.Run(fmt.Sprintf("external=%t/opt-in=%t", external, optIn), func(t *testing.T) {
+				network := "  allowed: []\n"
+				if optIn {
+					network = "  allowed: [node]\n  blocked: [npmjs.org]\n"
+				}
+				content := fmt.Sprintf(`---
+on: push
+engine: copilot
+network:
+%spermissions:
+  contents: read
+  copilot-requests: write
+safe-outputs:
+  create-issue:
+features:
+  gh-aw-detection: %t
+---
+Test workflow
+`, network, external)
+				path := filepath.Join(testutil.TempDir(t, "detection-registry-*"), "test.md")
+				if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+					t.Fatal(err)
+				}
+				if err := NewCompiler().CompileWorkflow(path); err != nil {
+					t.Fatal(err)
+				}
+				lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+				if err != nil {
+					t.Fatal(err)
+				}
+				job := extractJobSection(string(lock), "detection")
+				if job == "" {
+					t.Fatal("missing detection job")
+				}
+				var rules []string
+				if strings.Contains(job, "allowDomains") {
+					rules = firewallDomainRules(t, job, "allowDomains")
+				}
+				allowed := false
+				for _, rule := range rules {
+					allowed = allowed || awfDomainAllowsHost(rule, "registry.npmjs.org")
+				}
+				if allowed != optIn {
+					t.Fatalf("registry allowed = %t, want %t; rules: %v", allowed, optIn, rules)
+				}
+				if optIn && !slices.Contains(firewallDomainRules(t, job, "blockDomains"), "npmjs.org") {
+					t.Fatal("expected registry parent block in detection AWF config")
+				}
+			})
+		}
+	}
+}
+
 // TestDetectionAndEvalsSidecarOutputUnchanged pins the sidecar-related output for
 // detection and evals runs. These runs have no MCP sidecars, so the MCP gateway
 // host, DIFC/CLI proxy host, and AWF network section must stay on the

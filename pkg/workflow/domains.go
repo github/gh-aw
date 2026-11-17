@@ -85,17 +85,13 @@ func getLoadedEcosystemDomains() map[string][]string {
 // a deliberate exception: github.com is needed for repository access and AWF also permits
 // its package subdomains. TestGitHubTransportPackageRegistryException documents this limit;
 // callers can explicitly block pkg.github.com when that capability is unwanted.
-// Copilot threat detection is another exception: its dedicated detection allow-list includes
-// registry.npmjs.org for read-only lockfile validation, outside normal agent engine defaults.
 
 // engineDefaultDomainSets centralizes every engine allow-list. These sets are
 // user-selectable domain lists: workflows opt into them through network.allowed
 // the same way they opt into ecosystem domain lists.
 //
 // Runtime engine default domain lists intentionally exclude package registries
-// (npm, PyPI, and similar). The threat-detection set is the exception because
-// Copilot threat detection uses the npm registry. See the package-registry
-// invariant above.
+// (npm, PyPI, and similar). See the package-registry invariant above.
 var engineDefaultDomainSets = getLoadedDomainSets().EngineDefaults
 
 func copyEngineDefaultDomainSet(domains []string) []string {
@@ -712,11 +708,9 @@ func GetAllowedDomainsForEngine(engine constants.EngineName, network *NetworkPer
 
 // GetThreatDetectionAllowedDomains returns the minimal set of domains allowed for a Copilot
 // detection run. The "threat-detection" engine domain set includes the Copilot API endpoints
-// needed for read-only threat analysis plus registry.npmjs.org
-// for read-only npm package validation (e.g. verifying lockfile integrity hashes). It intentionally
-// excludes raw.githubusercontent.com (not needed when MCP servers are disabled and the CLI binary
-// is pre-installed). npm registry access is read-only metadata lookup only — installs are not
-// permitted during detection runs.
+// needed for threat analysis. It intentionally excludes package registries and
+// raw.githubusercontent.com. Registry metadata validation requires explicit opt-in;
+// an allowed hostname is not restricted to read-only requests.
 // Any additional user-specified network.allowed entries are merged in (typically empty for detection).
 // Returns a deduplicated, sorted, comma-separated string suitable for AWF's --allow-domains flag.
 func GetThreatDetectionAllowedDomains(network *NetworkPermissions) string {

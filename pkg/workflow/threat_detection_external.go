@@ -620,6 +620,8 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		// inference adds CopilotDefaultDomains), which GetAllowedDomainsForEngine's static
 		// defaults do not account for. Avoid OpenAI access for GitHub-hosted detection.
 		allowedDomains = mergeDomainsWithNetworkToolsAndRuntimes(NewCodexEngine().defaultDomains(threatDetectionData), threatDetectionData.NetworkPermissions, data.Tools, data.Runtimes)
+	} else if engineID == string(constants.CopilotEngine) {
+		allowedDomains = GetAllowedDomainsForEngine(constants.CopilotEngine, threatDetectionData.NetworkPermissions, nil, nil)
 	} else {
 		allowedDomains = GetAllowedDomainsForEngine(constants.EngineName(engineID), threatDetectionData.NetworkPermissions, data.Tools, data.Runtimes)
 	}

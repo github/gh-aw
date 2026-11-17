@@ -100,10 +100,14 @@ func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData, engineID str
 		if entry == "" || strings.Contains(entry, "${{") {
 			continue
 		}
+		if engineID == string(constants.CopilotEngine) && (entry == "node" || entry == "registry.npmjs.org") {
+			entry = "registry.npmjs.org"
+		}
 		if _, exists := seen[entry]; exists {
 			continue
 		}
-		if entry == "copilot-vendor" || (entry == "codex-vendor" && engineID == string(constants.CodexEngine)) {
+		if entry == "copilot-vendor" || (entry == "codex-vendor" && engineID == string(constants.CodexEngine)) ||
+			(entry == "registry.npmjs.org" && engineID == string(constants.CopilotEngine)) {
 			seen[entry] = struct{}{}
 			additional = append(additional, entry)
 			continue
