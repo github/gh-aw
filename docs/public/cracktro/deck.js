@@ -1853,6 +1853,7 @@
   .tv-take h3 { margin: 0; font-size: 46px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 95; color: #f0f6fc; }
   .tv-take h3 .a { color: #79c0ff; }
   .tv-take h3 .b { color: #d2a8ff; }
+  .tv-take h3 small { display: block; margin-bottom: 12px; font: 600 20px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9198a1; }
   .tv-take div { margin-left: auto; padding: 14px 24px; border-radius: 14px; border: 2px dashed #d29922; font: 600 26px/1 "Mona Sans"; color: #e3b341; }
   .tv-take.done div { animation: tvpulse 1.6s ease-in-out 2; }
   .tv-cap { position: absolute; left: 110px; right: 110px; top: 950px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
@@ -3502,7 +3503,7 @@
     });
   }
 
-  // Turn Automation into Value: one primary repository outcome, a four-step contribution lifecycle beside it, read together as association
+  // Turn Automation into Value: evidence contract frozen first, one primary repository outcome, a four-step lifecycle whose evidence is evaluated into attributed contribution, read together as association
   {
     resetIndex();
     // synthetic weekly outcome in native units (line coverage %, higher is better); null = missing
@@ -3537,7 +3538,7 @@
     chart.innerHTML = g;
     const clip = chart.querySelector("clipPath rect");
     const num = h("span", {}, "--");
-    const contract = h("div", { class: "tv-fz" }, h("small", {}, "Frozen before results"), h("div", {}, ...["outcome", "metric", "cadence", "evidence"].flatMap((s, i) => (i ? [h("i", {}, "·"), s] : [s])))),
+    const contract = h("div", { class: "tv-fz" }, h("small", {}, "Evidence contract · frozen first"), h("div", {}, ...["outcome", "metric", "cadence", "evidence rules"].flatMap((s, i) => (i ? [h("i", {}, "·"), s] : [s])))),
       outcome = h(
         "div",
         { class: "tv-out" },
@@ -3550,7 +3551,7 @@
         ),
         chart
       ),
-      lane = h("div", { class: "tv-lane" }, "Contribution evidence", h("span", {}, "per safe output · a diagnostic, never added to the outcome")),
+      lane = h("div", { class: "tv-lane" }, "Lifecycle evidence", h("span", {}, "per safe output · collected as input, never added to the outcome")),
       step = (cls, c, t, d) => h("div", { class: `tv-s ${cls}`, "--c": c }, h("h4", {}, t), h("p", {}, ...[].concat(d))),
       flow = h(
         "div",
@@ -3558,9 +3559,14 @@
         step("", "#ab7df8", "Delivery", "output applied"),
         step("", "#ab7df8", "Adoption", "a human accepts it"),
         step("gate", "#db6d28", "Survival", ["revert / reopen / delete", h("br"), h("b", {}, "= no credit")]),
-        step("", "#ab7df8", "Contribution", "where it helped")
+        step("", "#ab7df8", "Contribution", "evaluated last")
       ),
-      take = h("div", { class: "tv-take" }, h("h3", {}, h("span", { class: "a" }, "Outcome trend"), " + ", h("span", { class: "b" }, "contribution evidence")), h("div", {}, "≈ association, not causation"));
+      take = h(
+        "div",
+        { class: "tv-take" },
+        h("h3", {}, h("small", {}, "Repository + lifecycle evidence →"), h("span", { class: "a" }, "Outcome trend"), " + ", h("span", { class: "b" }, "attributed contribution")),
+        h("div", {}, "≈ association, not causation")
+      );
     // [element, seconds after enter, plays a step sound]; onNext jumps to the next stop
     const BEATS = [
       [contract, 0.2, false],
@@ -3578,7 +3584,7 @@
     slides.push({
       group: "platform",
       notes:
-        "Turn Automation into Value: an illustrative dashboard with synthetic data for a sample repository. Before any result is inspected, the measurement contract is frozen: the intended outcome, one native metric with unit and direction, the cadence and the evidence rule, together with the eligible population, maturation and coverage. The primary Operational Value is that repository outcome, here weekly line coverage, measured in native units at a fixed cadence whoever caused it, including weeks with no delivered or accepted output, so it also sees independent change, deterioration and recovery. Missing is not zero, and the latest period stays interim until it matures. Below it, each safe output earns contribution evidence through a lifecycle. Delivery means the effect was created or applied. Adoption is the authoritative human decision under a versioned rule, or reviewed delivery where no human decision channel exists. Survival requires the adopted effect to last through the post-adoption window: a revert, deletion, reopening, rejected parent, downstream failure or coverage gap earns no positive credit. Attributed contribution evaluates the same frozen function around the adoption after maturation and keeps zero and negative effects. Contribution evidence explains where adopted outputs helped; it is a diagnostic shown beside the outcome trend, not exclusive causation, and it is never added into the primary value. Delivery and adoption use different clocks and cohorts, so they are not a conversion rate and not Operational Value. Outcome and contribution are compared only over complete, mature, compatible periods as observed association, and collection health and coverage are reported apart from results. Run counts and the agent's own assessment are not value.",
+        "Turn Automation into Value: an illustrative dashboard with synthetic data for a sample repository. Evidence comes first. Before any result is inspected, the evidence contract is frozen: the intended outcome, one native metric with unit and direction, the cadence and the evidence rules, together with the eligible population, maturation and coverage. Repository facts and lifecycle facts are then collected as inputs under that contract, and only afterwards scored and evaluated. The primary Operational Value is that repository outcome, here weekly line coverage, measured in native units at a fixed cadence whoever caused it, including weeks with no delivered or accepted output, so it also sees independent change, deterioration and recovery. Missing is not zero, and the latest period stays interim until it matures. Below it, each safe output accumulates lifecycle evidence. Delivery means the effect was created or applied. Adoption is the authoritative human decision under a versioned rule, or reviewed delivery where no human decision channel exists. Survival requires the adopted effect to last through the post-adoption window: a revert, deletion, reopening, rejected parent, downstream failure or coverage gap earns no positive credit. Only after delivery, adoption, survival and maturation is the attributed contribution evaluated, using the same frozen function around the adoption, keeping zero and negative effects; it is the evaluated result, not the evidence itself. Attributed contribution explains where adopted outputs helped; it is a diagnostic shown beside the outcome trend, not exclusive causation, and it is never added into the primary value. Delivery and adoption use different clocks and cohorts, so they are not a conversion rate and not Operational Value. Outcome and contribution are compared only over complete, mature, compatible periods as observed association, and collection health and coverage are reported apart from results. Run counts and the agent's own assessment are not value.",
       enter() {
         t0 = 0;
         seen = -1;
