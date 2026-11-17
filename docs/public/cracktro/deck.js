@@ -544,19 +544,23 @@
   .fv-rs { fill: #9198a1; font: 500 18px var(--mono); }
   .fv-tr { fill: #c9d1d9; font: 500 19px var(--mono); }
   .fv-chip { opacity: .35; transition: opacity .3s; } .fv-chip.on { opacity: 1; }
+  .tso { --lg: #79c0ff; }
   .tso-svg { left: 60px; top: 290px; width: 1800px; height: 700px; }
   .tso-svg .cb, .wqm-svg .cb { fill: #79c0ff; } .tso-svg .co, .wqm-svg .co { fill: #ffa657; } .tso-svg .cp, .wqm-svg .cp { fill: #d2a8ff; }
   .tso-sw { opacity: 0; transition: opacity .35s; } .tso-sw.on { opacity: 1; }
-  .tso-job { opacity: .3; transition: opacity .4s; } .tso-job.on { opacity: 1; } .tso-job.on.skip { opacity: .4; }
-  .tso-job rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, filter .3s; }
-  .tso-job.on rect { stroke: #4493f8; } .tso-job.bad rect { stroke: #ffa657; stroke-dasharray: 10 6; filter: drop-shadow(0 0 10px #db6d2866); }
-  .tso-jn { fill: #f0f6fc; font: 700 22px var(--mono); letter-spacing: .08em; }
-  .tso-jd { fill: #9198a1; font: 500 19px "Mona Sans"; }
-  .tso-chip rect { fill: #161b22; stroke: #3d444d; stroke-width: 1.5; } .tso-chip text { fill: #c9d1d9; font: 500 15px var(--mono); text-anchor: middle; }
-  .tso-tg { font: 700 17px var(--mono); text-anchor: end; }
-  .tso-w { stroke: #4493f8; stroke-width: 3; opacity: 0; transition: opacity .4s; } .tso-w.on { opacity: .8; }
-  .tso-skip { fill: none; stroke: #ffa657; stroke-width: 3; stroke-dasharray: 9 7; }
-  .tso-dot { fill: #ffa657; opacity: 0; filter: drop-shadow(0 0 8px #ffa657); }
+  .tso-lh { opacity: .3; transition: opacity .4s; } .tso-lh.on { opacity: 1; }
+  .tso-lh rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
+  .tso-ln { fill: #f0f6fc; font: 700 15px var(--mono); letter-spacing: .06em; }
+  .tso-lp { fill: #9198a1; font: 500 13px var(--mono); }
+  .tso-lg { stroke: #30363d; stroke-width: 1.5; stroke-dasharray: 2 6; }
+  .tso-te { fill: none; stroke: #3d444d; stroke-width: 2; opacity: 0; transition: opacity .3s, stroke .25s; } .tso-te.on { opacity: .9; }
+  .tso-te.ok { stroke: #4493f888; } .tso-te.bad { stroke: #ffa657; stroke-width: 3; stroke-dasharray: 6 4; } .tso-te.wit { stroke: #ab7df8; stroke-width: 3; }
+  .tso-td { fill: #161b22; stroke: #6e7681; stroke-width: 2; opacity: 0; transition: opacity .3s, fill .25s, stroke .25s; } .tso-td.on { opacity: 1; }
+  .tso-td.ok { stroke: #4493f8; } .tso-td.bad { fill: #db6d28; stroke: #ffa657; } .tso-td.wit { fill: #ab7df8; stroke: #d2a8ff; }
+  .tso-rl { fill: #6e7681; font: 500 14px var(--mono); opacity: 0; transition: opacity .3s, fill .25s; } .tso-rl.on { opacity: 1; }
+  .tso-rl.ok { fill: #9198a1; } .tso-rl.bad { fill: #ffa657; } .tso-rl.wit { fill: #d2a8ff; }
+  .tso-mk { font: 700 15px var(--mono); }
+  .tso-dot { fill: #ffa657; opacity: 0; filter: drop-shadow(0 0 8px #db6d2855); } .tso-dot.wit { fill: #d2a8ff; filter: drop-shadow(0 0 8px #ab7df855); }
   .tso-k rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .3s; }
   .tso-k.bad rect { stroke: #ffa657; stroke-dasharray: 10 6; } .tso-k.wit rect { stroke: #ab7df8; }
   .tso-k text { fill: #9198a1; font: 600 21px var(--mono); } .tso-k .n { fill: #d2a8ff; }
@@ -566,7 +570,7 @@
   .tso-inv { opacity: .25; transition: opacity .4s; } .tso-inv.on { opacity: 1; }
   .tso-inv rect { fill: transparent; stroke: transparent; stroke-width: 2; transition: all .3s; }
   .tso-inv.ok rect { fill: #4493f814; stroke: #4493f866; }
-  .tso-inv.bad rect { fill: #db6d2826; stroke: #ffa657; stroke-dasharray: 8 5; filter: drop-shadow(0 0 8px #db6d2866); }
+  .tso-inv.bad rect { fill: #db6d2826; stroke: #ffa657; stroke-dasharray: 8 5; filter: drop-shadow(0 0 8px #db6d2844); }
   .tso-in { fill: #f0f6fc; font: 700 19px var(--mono); }
   .tso-ig { fill: #9198a1; font: 500 16px "Mona Sans"; }
   .tso-gl { font: 700 24px var(--mono); text-anchor: end; }
@@ -575,8 +579,8 @@
   .tso-n { fill: #161b22; stroke: #6e7681; stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; transition: fill .3s, stroke .3s, opacity .2s; }
   .tso-n.on { opacity: 1; animation: fm-pop .4s cubic-bezier(.3,1.6,.4,1); }
   .tso-n.ok { stroke: #79c0ff; fill: #1f6feb55; }
-  .tso-n.bad { fill: #db6d28; stroke: #ffa657; filter: drop-shadow(0 0 8px #db6d28); }
-  .tso-n.wit { fill: #ab7df8; stroke: #d2a8ff; filter: drop-shadow(0 0 8px #8957e5); }
+  .tso-n.bad { fill: #db6d28; stroke: #ffa657; filter: drop-shadow(0 0 8px #db6d2855); }
+  .tso-n.wit { fill: #ab7df8; stroke: #d2a8ff; filter: drop-shadow(0 0 8px #ab7df855); }
   .tso-cnt { fill: #9198a1; font: 700 19px var(--mono); text-anchor: middle; }
   .tso-tr { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
   .tso-res { opacity: 0; transform: translateX(30px); transition: opacity .5s, transform .5s cubic-bezier(.2,.9,.2,1); } .tso-res.on { opacity: 1; transform: none; }
@@ -584,6 +588,7 @@
   .tso-res.b rect { stroke: #4493f8; } .tso-res.o rect { stroke: #ffa657; stroke-dasharray: 10 6; } .tso-res.p rect { stroke: #ab7df8; }
   .tso-rh { font: 700 16px var(--mono); letter-spacing: .08em; }
   .tso-rt { fill: #f0f6fc; font: 600 22px "Mona Sans"; }
+  .wqm { --lg: #79c0ff; }
   .wqm-svg { left: 60px; top: 290px; width: 1800px; height: 710px; }
   .wqm-pan rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .wqm-pan.hot rect { stroke: #4493f8; filter: drop-shadow(0 0 12px #1f6feb55); }
@@ -594,12 +599,12 @@
   .wqm-sw { opacity: 0; transition: opacity .35s; } .wqm-sw.on { opacity: 1; }
   .wqm-st rect { fill: #161b22; stroke: #6e7681; stroke-width: 2; transition: stroke .3s, fill .3s, filter .3s; }
   .wqm-st rect.in { fill: none; stroke-width: 1.5; }
-  .wqm-st.hot rect { stroke: #4493f8; fill: #1f6feb33; filter: drop-shadow(0 0 8px #1f6feb66); } .wqm-st.hot rect.in { fill: none; filter: none; }
+  .wqm-st.hot rect { stroke: #4493f8; fill: #1f6feb33; filter: drop-shadow(0 0 8px #1f6feb44); } .wqm-st.hot rect.in { fill: none; filter: none; }
   .wqm-st.bad rect { stroke: #ffa657; stroke-dasharray: 8 5; fill: #db6d2822; }
   .wqm-sn { fill: #f0f6fc; font: 700 19px var(--mono); text-anchor: middle; }
   .wqm-ss { fill: #9198a1; font: 500 15px var(--mono); text-anchor: middle; }
   .wqm-el { fill: #9198a1; font: 600 15px var(--mono); text-anchor: middle; }
-  .wqm-inv { fill: #d2a8ff; font: 600 16px var(--mono); }
+  .wqm-inv { fill: #c9d1d9; font: 600 16px var(--mono); }
   .wqm-e { fill: none; stroke: #6e7681; stroke-width: 2; opacity: .5; transition: stroke .3s, opacity .3s; }
   .wqm-e.hot { stroke: #4493f8; stroke-width: 3; opacity: 1; }
   .wqm-e.bad { stroke: #ffa657; stroke-width: 3; stroke-dasharray: 8 6; opacity: 1; }
@@ -615,7 +620,7 @@
   .wqm-row.bad rect { fill: #db6d2814; stroke: #ffa65788; stroke-dasharray: 6 4; } .wqm-row.wit rect { fill: #8957e51a; stroke: #ab7df888; }
   .wqm-rn { fill: #f0f6fc; font: 600 17px var(--mono); } .wqm-ri { fill: #c9d1d9; font: 500 17px var(--mono); }
   .wqm-rs { font: 700 17px var(--mono); text-anchor: end; }
-  .wqm-dot { fill: #79c0ff; opacity: 0; filter: drop-shadow(0 0 8px #4493f8); }
+  .wqm-dot { fill: #79c0ff; opacity: 0; filter: drop-shadow(0 0 8px #4493f855); }
   .smt-led { position: absolute; right: 60px; top: 50px; width: 640px; padding: 16px 24px 12px; border: 2px solid #3d444d; border-radius: 16px; background: #0d1117d9; font: 500 17px var(--mono); color: #9198a1; }
   .active .smt-led { animation: mra-in .8s .2s both; }
   .smt-h { font-weight: 600; letter-spacing: .1em; color: #ab7df8; }
@@ -5374,7 +5379,7 @@
     });
   }
 
-  // Model-checked: the compiled workflow's jobs, tokens and artifacts become a TLA+ model; TLC checks every schedule against security invariants, a seeded fault must break exactly one, and a witness proves a validated write is still reachable
+  // Model-checked: the compiled workflow becomes a TLA+ model; TLC checks every schedule against security invariants, a seeded fault must break exactly one, a witness proves a validated write is still reachable, and both traces replay as a transition diagram
   {
     resetIndex();
     const VW = 1800,
@@ -5385,13 +5390,23 @@
       WSEEN = T.wit + 2900;
     const K = (...s) => ((s = s.filter(Boolean)).length ? ` data-k="${s.join(",")}"` : "");
     // job, invariant and fault names are real (specs/workflow-security/CompiledWorkflow.tla); glosses are simplified
-    const JOBS = [
-      ["ACTIVATION", "admits the trigger, trusted config", "contents: read"],
-      ["AGENT", "sandboxed; writes a request artifact", "engine token only"],
-      ["DETECTION", "scans the request: allow or deny", "no tools"],
-      ["SAFE OUTPUTS", "validates, then writes the effect", "scoped app token"],
+    // lanes are the compiled jobs; the rows replay the checker's representative traces (specs/workflow-security/examples.json)
+    const LANES = [
+      ["ACTIVATION", "contents: read"],
+      ["AGENT", "engine token"],
+      ["DETECTION", "no tools"],
+      ["SAFE OUTPUTS", "app token"],
     ];
-    const JY = [84, 204, 324, 444];
+    const LX = [8, 172, 336, 500];
+    const TRACE = [
+      [0, "Init"], [0, "Start"], [0, "Activate"], [0, "Finish"],
+      [1, "Start"], [1, "Checkout:main"], [1, "Checkout:private_dependency"], [1, "CheckoutComplete"], [1, "Git:diff:main"], [1, "ToolCall:inference"], [1, "AgentRequest"], [1, "Fail"],
+      [2, "Start"], [2, "Consume"], [2, "Detect"], [2, "Finish"],
+      [3, "Start"], [3, "Validate"], [3, "MintAppToken"], [3, "PrepareEffect:issue"], [3, "Execute"],
+    ];
+    const DETECT = 14,
+      PTS = TRACE.map(([l], i) => ({ x: LX[l] + 12, y: 146 + i * 20 }));
+    const stepK = i => [`ok:${T.check + 300 + i * 60}:${T.fault}`, `bad:${T.fault + 300 + i * 90}:${T.wit}`, `wit:${T.wit + 400 + i * 110}:${CYC}`];
     const INV = [
       ["JobIsolation", "the agent holds no write grant"],
       ["DetectionGate", "every write passed threat detection"],
@@ -5446,20 +5461,28 @@
       g += `<text class="fm-lane-t mra-lane"${K(`on:${at}`)} x="${(x0 + x1) / 2}" y="40">${t}</text>`;
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="640"/>`;
     });
-    // the four compiled jobs, top to bottom
-    JOBS.forEach(([n, d, chip], i) => {
-      const y = JY[i];
-      if (i) g += `<line class="tso-w"${K(`on:${200 + i * 600}`)} x1="250" y1="${JY[i - 1] + 96}" x2="250" y2="${y - 2}" marker-end="url(#tsoB)"/>`;
-      g += `<g class="tso-job"${K(`on:${200 + i * 600}`, i === 2 && `skip:${T.fault + 600}:${T.wit}`, i === 3 && `bad:${T.fault + 2000}:${T.wit}`)}><rect x="40" y="${y}" width="420" height="96" rx="14"/><text class="tso-jn" x="64" y="${y + 38}">${n}</text><text class="tso-jd" x="64" y="${y + 74}">${d}</text></g>`;
-      g += `<g class="tso-chip"><rect x="480" y="${y + 28}" width="200" height="40" rx="20"/><text x="580" y="${y + 54}">${chip}</text></g>`;
+    // one model-checked trace as a transition diagram: a row per state, a lane per job
+    LANES.forEach(([n, perm], l) => {
+      const x = LX[l];
+      g += `<line class="tso-lg" x1="${x + 12}" y1="128" x2="${x + 12}" y2="556"/>`;
+      g += `<g class="tso-lh"${K(`on:${200 + l * 600}`)}><rect x="${x}" y="72" width="156" height="50" rx="10"/><text class="tso-ln" x="${x + 12}" y="94">${n}</text><text class="tso-lp" x="${x + 12}" y="114">${perm}</text></g>`;
     });
-    const tag = (cls, y, txt, ...k) => `<text class="tso-sw tso-tg ${cls}"${K(...k)} x="444" y="${y}">${txt}</text>`;
-    g += tag("cb", JY[2] + 38, "✓ allow", `on:1900:${T.fault}`, `on:${T.wit + 1000}:${CYC}`);
-    g += tag("co", JY[2] + 38, "✗ deny · skipped", `on:${T.fault + 600}:${T.wit}`);
-    g += tag("cb", JY[3] + 38, "✓ written", `on:2500:${T.fault}`, `on:${T.wit + 1600}:${CYC}`);
-    g += tag("co", JY[3] + 38, "✗ unchecked write", `on:${T.fault + 2000}:${T.wit}`);
-    // the seeded fault: publish despite a deny verdict
-    g += `<g class="tso-sw"${K(`on:${T.fault + 600}:${T.wit}`)}><path class="tso-skip" id="tsoSkip" d="M40 252 C -34 252 -34 492 40 492" marker-end="url(#tsoO)"/><text class="tso-tg co" x="-26" y="372" text-anchor="middle" transform="rotate(-90 -26 372)" style="text-anchor:middle">skip</text></g>`;
+    TRACE.forEach(([l, ev], i) => {
+      const p = PTS[i],
+        at = `on:${200 + l * 600}`;
+      const q = PTS[i - 1];
+      if (i) g += `<path class="tso-te"${K(at, ...stepK(i))} d="M${q.x} ${q.y}${q.x === p.x ? "" : ` V${q.y + 11} H${p.x}`} V${p.y}"/>`;
+      if (i === DETECT) {
+        g += `<text class="tso-rl"${K(`${at}:${T.fault + 300}`, `ok:${T.check + 300 + i * 60}:${T.fault}`)} x="${p.x + 14}" y="${p.y + 5}">Detect:verdict</text>`;
+        g += `<text class="tso-sw tso-rl bad"${K(`on:${T.fault + 300}:${T.wit}`)} x="${p.x + 14}" y="${p.y + 5}">Detect:deny</text>`;
+        g += `<text class="tso-sw tso-rl wit"${K(`on:${T.wit}:${CYC}`)} x="${p.x + 14}" y="${p.y + 5}">Detect:pass</text>`;
+        g += `<text class="tso-sw tso-mk co"${K(`on:${T.fault + 300 + i * 90}:${T.wit}`)} x="${LX[3]}" y="${p.y + 5}">← fault ignores it</text>`;
+      } else g += `<text class="tso-rl"${K(at, ...stepK(i))} x="${p.x + 14}" y="${p.y + 5}">${ev}</text>`;
+    });
+    PTS.forEach((p, i) => (g += `<circle class="tso-td"${K(`on:${200 + TRACE[i][0] * 600}`, ...stepK(i))} cx="${p.x}" cy="${p.y}" r="6"/>`));
+    const last = PTS[PTS.length - 1];
+    g += `<text class="tso-sw tso-mk co"${K(`on:${FOUND}:${T.wit}`)} x="${last.x + 84}" y="${last.y + 5}">✗ unchecked</text>`;
+    g += `<text class="tso-sw tso-mk cp"${K(`on:${WSEEN}:${CYC}`)} x="${last.x + 84}" y="${last.y + 5}">◆ validated</text>`;
     g += `<circle class="tso-dot" id="tsoDot" r="8"/>`;
     g += `<g class="tso-k"${K(`bad:${T.fault + 300}:${T.wit}`, `wit:${T.wit}:${CYC}`)}><rect x="40" y="572" width="640" height="54" rx="12"/><text x="62" y="607"><tspan class="n">Fault</tspan> =</text></g>`;
     g += `<text class="tso-sw tso-kv cb"${K(`on:0:${T.fault + 300}`, `on:${T.wit}:${CYC}`)} x="176" y="607">"none"</text>`;
@@ -5497,8 +5520,8 @@
       ["is a validated write reachable?", "", T.wit + 200, WSEEN],
       ["◆ witness reached · NoSuccessfulWrite fails", "cp", WSEEN, CYC],
     ].forEach(([txt, cls, a, b]) => (g += `<text class="tso-sw tso-cnt ${cls}"${K(`on:${a}:${b}`)} x="1495" y="98">${txt}</text>`));
-    g += `<text class="tso-sw tso-tr co"${K(`on:${FOUND}:${T.wit}`)} x="1495" y="332">trace: Activate → Agent → Detect(deny) → Write ✗</text>`;
-    g += `<text class="tso-sw tso-tr cp"${K(`on:${WSEEN}:${CYC}`)} x="1495" y="332">trace: Activate → Agent → Detect(allow) → Write ◆</text>`;
+    g += `<text class="tso-sw tso-tr co"${K(`on:${FOUND}:${T.wit}`)} x="1495" y="332">← counterexample trace · 21 states · Detect:deny</text>`;
+    g += `<text class="tso-sw tso-tr cp"${K(`on:${WSEEN}:${CYC}`)} x="1495" y="332">← witness trace · 21 states · Detect:pass</text>`;
     [
       ["b", 356, "cb", "SECURE PROFILE · exit 0", "✓ every invariant, every schedule", T.check + 2700],
       ["o", 448, "co", "NEGATIVE CONTROL · skip-detection", "✗ DetectionGate breaks, as it must", T.fault + 2800],
@@ -5526,8 +5549,20 @@
         for (const c in want) if (it.st[c] !== want[c]) it.el.classList.toggle(c, (it.st[c] = want[c]));
       }
     };
-    const skip = svg.querySelector("#tsoSkip"),
-      dot = svg.querySelector("#tsoDot");
+    const dot = svg.querySelector("#tsoDot");
+    // move the trace head between consecutive states
+    const head = (u, start, step, wit) => {
+      const f = (u - start) / step;
+      if (f < 0 || f > PTS.length - 1) return false;
+      const i = Math.floor(f),
+        r = f - i,
+        a = PTS[i],
+        b = PTS[Math.min(PTS.length - 1, i + 1)];
+      dot.setAttribute("cx", a.x + (b.x - a.x) * r);
+      dot.setAttribute("cy", a.y + (b.y - a.y) * r);
+      dot.classList.toggle("wit", wit);
+      return true;
+    };
     const EV = [
       [200, () => sfx.pop(0)],
       [800, () => sfx.pop(1)],
@@ -5537,7 +5572,7 @@
       [T.check, () => sfx.route(2)],
       [T.check + 2500, () => sfx.compile()],
       [T.fault + 300, () => sfx.key(0.7)],
-      [T.fault + 900, () => sfx.block()],
+      [T.fault + 300 + DETECT * 90, () => sfx.block()],
       [FOUND, () => sfx.bug()],
       [WSEEN, () => sfx.pop(5)],
       [T.loop, () => sfx.review()],
@@ -5549,7 +5584,7 @@
       under: "safe-outputs",
       group: "security",
       notes:
-        "Model-checked: gh-aw keeps a bounded TLA+ model of the compiled workflow (CompiledWorkflow in specs/workflow-security): the activation, agent, threat detection and safe-output jobs with their permissions, tokens, artifacts and network egress. The TLC model checker explores every interleaving of job starts, skips, failures and hostile inputs, and checks security invariants such as JobIsolation, DetectionGate, ValidatedEffects, ArtifactProvenance, SecretConfinement, TokenLifetime, NetworkPolicy and PrivateSinkPolicy. Each secure configuration must exhaust its state space and exit 0. Negative controls seed one fault at a time, such as skip-detection (publish an effect despite a deny verdict), and must fail with exit 12 on exactly the expected invariant, so a model that checks nothing cannot pass. Witness configurations negate a goal such as NoSuccessfulWrite to prove a validated write is still reachable, so the model is not secure by doing nothing. A compiled-profile verifier derives the model's constants from real compiled lock files, and a daily agentic workflow rotates one trust boundary, proposes model refinements and files credible gaps. Illustrative: the job boxes, invariant glosses, state graph and timing are simplified; the module, invariant, fault and witness names are real. A bounded model is strong evidence, not a proof, and a synthetic counterexample is not a product vulnerability.",
+        "Model-checked: gh-aw keeps a bounded TLA+ model of the compiled workflow (CompiledWorkflow in specs/workflow-security): the activation, agent, threat detection and safe-output jobs with their permissions, tokens, artifacts and network egress. The TLC model checker explores every interleaving of job starts, skips, failures and hostile inputs, and checks security invariants such as JobIsolation, DetectionGate, ValidatedEffects, ArtifactProvenance, SecretConfinement, TokenLifetime, NetworkPolicy and PrivateSinkPolicy. Each secure configuration must exhaust its state space and exit 0. Negative controls seed one fault at a time, such as skip-detection (publish an effect despite a deny verdict), and must fail with exit 12 on exactly the expected invariant, so a model that checks nothing cannot pass. Witness configurations negate a goal such as NoSuccessfulWrite to prove a validated write is still reachable, so the model is not secure by doing nothing. The left column replays the checker's representative traces (specs/workflow-security/examples.json) as a transition diagram, one row per state and one lane per job: the skip-detection counterexample and the successful-write witness differ in a single event, Detect:deny versus Detect:pass, yet both reach Execute. A compiled-profile verifier derives the model's constants from real compiled lock files, and a daily agentic workflow rotates one trust boundary, proposes model refinements and files credible gaps. Illustrative: the lane layout, invariant glosses, right-hand state graph and timing are simplified; the module, trace event, invariant, fault and witness names are real. A bounded model is strong evidence, not a proof, and a synthetic counterexample is not a product vulnerability.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -5570,15 +5605,9 @@
             fn();
           }
         });
-        const f = (u - T.fault - 900) / 1000;
-        if (f >= 0 && f <= 1) {
-          const p = skip.getPointAtLength(skip.getTotalLength() * f);
-          dot.setAttribute("cx", p.x);
-          dot.setAttribute("cy", p.y);
-          dot.style.opacity = 1;
-        } else dot.style.opacity = 0;
+        dot.style.opacity = head(u, T.fault + 300, 90, false) || head(u, T.wit + 400, 110, true) ? 1 : 0;
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "TLA+ and TLC check every schedule of the compiled workflow"), h("h2", {}, letters("Model-"), letters("checked", "l-grad"))), svg),
+      el: h("section", { class: "slide tso" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "TLA+ and TLC check every schedule of the compiled workflow"), h("h2", {}, letters("Model-"), letters("checked", "l-grad"))), svg),
     });
   }
 
@@ -19547,7 +19576,7 @@
           dot.style.opacity = 1;
         } else dot.style.opacity = 0;
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One git-backed log; TLC checks every interleaving"), h("h2", {}, letters("Work queue, "), letters("modeled", "l-grad"))), svg),
+      el: h("section", { class: "slide wqm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One git-backed log; TLC checks every interleaving"), h("h2", {}, letters("Work queue, "), letters("modeled", "l-grad"))), svg),
     });
   }
 
