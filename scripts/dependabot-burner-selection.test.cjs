@@ -94,8 +94,7 @@ test("safe outputs are executable while GitHub reads stay off the shell", () => 
   assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
   assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
   assert.ok(
-    /GitHub MCP tools only for PR comments, reviews, and maintainer\s+metadata\.[\s\S]*Call tools directly, never through Bash/.test(workflow) ||
-      /GitHub tools are not shell commands: never\s+invoke them through Bash/.test(workflow)
+    /GitHub MCP tools only for PR comments, reviews, and maintainer\s+metadata\.[\s\S]*Call tools directly, never through Bash/.test(workflow) || /GitHub tools are not shell commands: never\s+invoke them through Bash/.test(workflow)
   );
 });
 
