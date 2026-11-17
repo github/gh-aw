@@ -131,18 +131,19 @@ func TestConvertToFloat(t *testing.T) {
 		input    any
 		expected float64
 		isNaN    bool
+		isInf    bool
 	}{
-		{"float64", 123.45, 123.45, false},
-		{"int", 100, 100.0, false},
-		{"int64", int64(200), 200.0, false},
-		{"string", "99.99", 99.99, false},
-		{"scientific notation string", "1e3", 1000, false},
-		{"NaN string", "NaN", 0, true},
-		{"infinity string", "Inf", math.Inf(1), false},
-		{"invalid string", "not a number", 0.0, false},
-		{"unsupported float32", float32(1.5), 0.0, false},
-		{"nil", nil, 0.0, false},
-		{"bool", true, 0.0, false},
+		{"float64", 123.45, 123.45, false, false},
+		{"int", 100, 100.0, false, false},
+		{"int64", int64(200), 200.0, false, false},
+		{"string", "99.99", 99.99, false, false},
+		{"scientific notation string", "1e3", 1000, false, false},
+		{"NaN string", "NaN", 0, true, false},
+		{"infinity string", "Inf", math.Inf(1), false, true},
+		{"invalid string", "not a number", 0.0, false, false},
+		{"unsupported float32", float32(1.5), 0.0, false, false},
+		{"nil", nil, 0.0, false, false},
+		{"bool", true, 0.0, false, false},
 	}
 
 	for _, tt := range tests {
@@ -151,8 +152,10 @@ func TestConvertToFloat(t *testing.T) {
 			result := ConvertToFloat(tt.input)
 			if tt.isNaN {
 				assert.True(t, math.IsNaN(result), "ConvertToFloat(%v) should return NaN", tt.input)
+			} else if tt.isInf {
+				assert.True(t, math.IsInf(result, 1), "ConvertToFloat(%v) should return positive infinity", tt.input)
 			} else {
-				assert.Equal(t, tt.expected, result, "ConvertToFloat(%v) result mismatch", tt.input)
+				assert.InDelta(t, tt.expected, result, 0, "ConvertToFloat(%v) result mismatch", tt.input)
 			}
 		})
 	}
