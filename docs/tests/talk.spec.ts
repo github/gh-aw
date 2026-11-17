@@ -351,7 +351,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#1$/);
 
-  const assets = ["deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["runtime.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -378,7 +378,8 @@ test("publishes synthetic examples without profile assets or private source refe
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
     expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
   }
-  const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
+  // index.html loads runtime.js before deck.js; check both, in load order.
+  const source = (await Promise.all(["runtime.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
   expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://github.com/chrizbo/agentics-beyond-code"]);
@@ -664,4 +665,95 @@ test("opens every slide from its metadata #N link", async ({ page, request }) =>
     await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(part.position));
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(part.name);
   }
+});
+
+// A tiny second deck on runtime.js alone: no talk content, themes, solo labels or sound service.
+const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tiny deck</title></head><body>
+<script src="./runtime.js"></script>
+<script>
+  window.hooks = [];
+  let steps = 0;
+  const last = new URLSearchParams(location.search).get("last");
+  window.CracktroDeck.create({
+    slides: ({ h, letters, current }) => {
+      const slide = (group, title, extra = {}) => ({ group, notes: title + " notes", el: h("section", { class: "slide" }, h("h2", {}, letters(title))), ...extra });
+      return [
+        slide("intro", "Hello", {
+          enter: d => hooks.push("enter:" + d),
+          onNext: () => steps++ < 1 && hooks.push("step") > 0,
+          onKey: e => e.key === "x" && hooks.push("key:" + current().notes) > 0,
+        }),
+        slide("outro", "Goodbye"),
+        slide("part", "Alpha"),
+        slide("part", "Beta"),
+      ];
+    },
+    bands: { part: ["Part one", "The only band"] },
+    last: last === "none" ? null : last || "outro",
+  });
+</script></body></html>`;
+
+test.describe("reusable runtime", () => {
+  const open = async (page: Page, path: string) => {
+    const requests: string[] = [];
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    page.on("request", request => requests.push(new URL(request.url()).pathname));
+    await page.route("**/gh-aw/cracktro/tiny.html*", route => route.fulfill({ contentType: "text/html", body: TINY_DECK }));
+    await page.goto(path);
+    return { requests, errors };
+  };
+  const heading = (page: Page) => page.locator(".slide.active h2");
+
+  test("runs a second deck without the talk's content, theme or sound", async ({ page }) => {
+    const { requests, errors } = await open(page, "/gh-aw/cracktro/tiny.html#2");
+    await expect(page.locator(".slide")).toHaveCount(5);
+    await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(2));
+    await expect(heading(page)).toHaveText("Part one");
+    await expect(page.locator(".snd")).toHaveCount(0);
+    await expect(page.locator(".stage")).not.toContainText(/agentic|github/i);
+    expect(await page.locator(".dots .drow").evaluateAll(rows => rows.map(r => r.getAttribute("title")))).toEqual(["intro", "Part one", "outro"]);
+    expect(requests.filter(p => /\/(?:deck|ops-visuals)\.js$/.test(p))).toEqual([]);
+    expect(await page.evaluate(() => typeof (window as unknown as { sfx?: unknown }).sfx)).toBe("undefined");
+
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/#3$/);
+    await expect(heading(page)).toHaveText("Alpha");
+    await page.keyboard.press("End");
+    await expect(page).toHaveURL(/#5$/);
+    await expect(heading(page)).toHaveText("Goodbye");
+    await page.keyboard.press("m");
+    await expect(page).toHaveURL(/#5$/);
+    expect(errors).toEqual([]);
+  });
+
+  test("calls slide hooks and follows the URL hash", async ({ page }) => {
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html");
+    await expect(heading(page)).toHaveText("Hello");
+    await page.keyboard.press("x");
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/#1$/);
+    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toEqual(["enter:1", "key:Hello notes", "step"]);
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/#2$/);
+    await page.evaluate(() => (location.hash = "#4"));
+    await expect(heading(page)).toHaveText("Beta");
+    await page.keyboard.press("PageUp");
+    await expect(heading(page)).toHaveText("Hello");
+    await page.keyboard.press("PageDown");
+    await expect(heading(page)).toHaveText("Part one");
+    await page.keyboard.press("Home");
+    await expect(heading(page)).toHaveText("Hello");
+    expect(errors).toEqual([]);
+  });
+
+  test("keeps rows in first-appearance order when the last group is absent", async ({ page }) => {
+    for (const last of ["none", "finale"]) {
+      const { errors } = await open(page, `/gh-aw/cracktro/tiny.html?last=${last}#2`);
+      await expect(heading(page)).toHaveText("Goodbye");
+      await page.keyboard.press("End");
+      await expect(heading(page)).toHaveText("Beta");
+      expect(errors).toEqual([]);
+    }
+  });
 });

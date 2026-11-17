@@ -9,7 +9,7 @@
     "dev": "astro dev",
     "predev": "npm run build:slides",
     "start": "astro dev",
-    "prebuild": "node scripts/check-reading-measure.mjs && node scripts/check-redirects.mjs && npm run generate-agent-factory && npm run generate-model-tables && npm run build:slides",
+    "prebuild": "npm run check:cracktro && node scripts/check-reading-measure.mjs && node scripts/check-redirects.mjs && npm run generate-agent-factory && npm run generate-model-tables && npm run build:slides",
     "build": "rm -rf dist && astro build",
     "build:slides": "node ../scripts/ensure-docs-slide-pdf.js",
     "preview": "astro preview",
@@ -18,6 +18,7 @@
     "og": "node scripts/capture-og.mjs",
     "generate-agent-factory": "cd .. && node scripts/generate-agent-factory.js",
     "generate-model-tables": "cd .. && node scripts/generate-model-tables.js",
+    "check:cracktro": "tsc -p tsconfig.cracktro.json",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug"
@@ -43,7 +44,8 @@
     "http-server": "^14.1.1",
     "postcss": "8.5.32",
     "satori": "^0.63.2",
-    "starlight-github-alerts": "^0.5.0"
+    "starlight-github-alerts": "^0.5.0",
+    "typescript": "^5.9.3"
   },
   "overrides": {
     "@astrojs/markdown-remark": "7.3.6",
