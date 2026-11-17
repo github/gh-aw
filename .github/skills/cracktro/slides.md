@@ -17,6 +17,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | GitHubAgenticWorkflows |  | Title slide: GitHub Agentic Workflows are coding agents that run in GitHub Actions, written in Markdown, with guardrails. |
 | Agentic Workflows |  | Band header (Agentic Workflows): what agentic workflows are, how they are written and why they pay off. |
 | CI/CD meetsContinuous AI | illustrative | Agentic steps run inside the GitHub Actions pipelines teams already use, on the same runners, logs and checks. |
+| Continuous AI | illustrative | Continuous AI, named after CI/CD, is any automated AI that supports software collaboration, such as documentation, triage, fault analysis and quality, kept auditable, event-triggered and under the team's control. |
 | Anatomy of a workflow | illustrative | A workflow is one Markdown file: front matter declares triggers, tools, permissions, steps and safe outputs, and the body is the agent prompt. |
 | Turn Intent to Automation |  | Describe a job in plain language, an agent writes the Markdown workflow, and gh aw compile deterministically turns it into a hardened Actions lock file. |
 | Turn Automation into Value | illustrative | Track outcomes such as backlog burndown, quality and delivery speed to show what agentic workflows are worth. |
@@ -24,6 +25,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Security |  | Band header (Security): design every workflow as if the agent is already compromised. |
 | Agentic attacks | illustrative | Common agent attacks, from prompt injection to secret exfiltration and destructive commands, are each stopped by one or more layered defenses. |
 | Safety and control |  | Inputs are filtered, the agent runs sandboxed with a read-only token behind a firewall and gateway, and writes happen only through scanned safe outputs. |
+| Integrity filtering | illustrative | Malicious comments on a public pull request never reach the agent: the MCP gateway rates each item by its author's trust and drops everything below the configured minimum integrity before the model sees it. |
 | Zero-secret agents | illustrative | The agent runs in an isolated sandbox, here the experimental micro-VM runtime, holding no credentials; every key stays on the host behind the MCP gateway, API proxy and egress firewall. |
 | Supply chain hardening | illustrative | The compiler applies layered static checks, including trigger admission, expression safety, pinned actions, least privilege and secret scans, before any workflow runs. |
 | Safe outputs | illustrative | Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs. |
@@ -33,7 +35,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Human agent processes |  | Band header (Human agent processes): engineer processes, not code, with patterns that pair people and agents, some with a column of worked examples below. |
 | Event-driven Hand-offs | illustrative | Event-driven hand-off patterns such as IssueOps, DailyOps, ReviewOps and LabelOps let agents do the work while people make the decisions. |
 | Pull Request Review² | illustrative | Marking a pull request ready starts agentic reviewers, and Copilot is nudged to fix their findings so the human reviewer sees a clean pull request. |
-| Ponytail Reviewer | illustrative | A read-only agentic reviewer reads each ready pull request only for unnecessary complexity, posts one-line findings with the lines each saves, and says ship once nothing is left to cut. |
+| Ponytail Reviewer | illustrative | A read-only agentic reviewer reads each ready pull request only for unnecessary complexity, posts one-line findings with the lines each saves, and says ship once nothing is left to cut; measured on gh-aw, most ready pull requests are already lean and most findings get acted on. |
 | Issue Monster | illustrative | Issue Monster loves cookie issues: agents file their follow-ups into a cookie-labelled issue queue; a scheduler runs cheap deterministic gates and filters every few minutes and only wakes an agent to assign the best few issues to Copilot. |
 | Decide · Draft · Record | illustrative | When a ready pull request carries an architecture decision with no record, an agent drafts an ADR that people finalize and merge with the code, and later agents read it to learn why the feature works that way. |
 | PR Sous Chef | illustrative | PR Sous Chef regularly finds pull requests that sit idle with work waiting, such as unresolved review comments or failing CI, and nudges Copilot to pick them back up, while humans still review and merge. |

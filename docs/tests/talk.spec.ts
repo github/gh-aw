@@ -184,6 +184,9 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
+  // down walks the Continuous AI column first, then leaves for the next band
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
   await page.keyboard.press("ArrowDown");
@@ -287,8 +290,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
   // from an interior slide, next band lands on the header below and previous band on the header above
-  await page.goto("/gh-aw/cracktro/#3");
-  await expect(count).toHaveAttribute("aria-label", at(3));
+  const interior = slideNo("Anatomy of a workflow");
+  await page.goto(`/gh-aw/cracktro/#${interior}`);
+  await expect(count).toHaveAttribute("aria-label", at(interior));
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
   await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
@@ -333,7 +337,7 @@ test.describe("compact navigation on touch screens", () => {
     await page.goto("/gh-aw/cracktro/#3");
     await expect(count).toHaveAttribute("aria-label", at(3));
     await page.getByRole("button", { name: "Next slide", exact: true }).tap();
-    await expect(count).toHaveAttribute("aria-label", at(4));
+    await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
     await page.getByRole("button", { name: "Next band", exact: true }).tap();
     await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
 
@@ -402,7 +406,7 @@ test("publishes synthetic examples without profile assets or private source refe
   const source = (await Promise.all(["runtime.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
-  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://github.com/chrizbo/agentics-beyond-code"]);
+  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://api.github.com/repositories/", "https://github.com/chrizbo/agentics-beyond-code"]);
 
   const externalRequests: string[] = [];
   const errors: string[] = [];
