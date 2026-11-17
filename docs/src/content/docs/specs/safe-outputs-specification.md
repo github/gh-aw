@@ -4980,9 +4980,46 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "add_reviewer",
+  "description": "Add reviewers (users or teams) to a GitHub pull request. Use 'copilot' as a reviewer name to request the Copilot PR review bot. Provide at least one of 'reviewers' or 'team_reviewers'.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "reviewers": {"type": "array", "items": {"type": "string"}},
+      "team_reviewers": {"type": "array", "items": {"type": "string"}},
+      "pull_request_number": {"type": ["number", "string"]}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` items have been processed the handler MUST fail further items with a `Max count` error without calling the GitHub API.
+2. **Target Resolution**: The pull request is resolved per the Target Authorization rules below. A target that cannot be resolved fails the item before any API call.
+3. **Repository Validation**: The target repository MUST be the configured `target-repo` (or the current repository) or appear in `allowed-repos`; otherwise the item fails.
+4. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the pull request and skip the operation (without error) when it does not satisfy every filter.
+5. **Reviewer Selection**: Requested `reviewers` and `team_reviewers` are sanitized, de-duplicated, and checked against `allowed-reviewers` and `allowed-team-reviewers` respectively. The combined number of reviewers and team reviewers MUST NOT exceed `max`; team reviewers only use the slots left after user reviewers.
+6. **Empty Result**: When no reviewer remains after selection, the item succeeds as skipped with no API mutation.
+7. **Staged Mode**: In staged mode the handler previews the selected reviewers and performs no mutation.
+8. **Reviewer Request**: User and team reviewers are requested with a single REST `requestReviewers` call.
+9. **Copilot Reviewer**: The reviewer name `copilot` is separated from other reviewers and requested through the GraphQL `requestReviews` mutation using the Copilot bot node ID (resolved at runtime with a built-in fallback). A failure to request Copilot MUST be logged as a warning and MUST NOT fail the item.
+10. **Execution Metadata**: The review state of the pull request is captured before and after the mutation and attached to the result.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 3)
+- `allowed-reviewers`: Allowlist of reviewer logins that MAY be requested
+- `allowed-team-reviewers`: Allowlist of team slugs that MAY be requested
+- `required-labels`: Labels that must ALL be present on the pull request for the operation to proceed
+- `required-title-prefix`: Title prefix the pull request MUST have for the operation to proceed
 - `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
@@ -4998,6 +5035,14 @@ or review bodies to returned or persisted decision evidence.
 **ARV-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
 
 **ARV-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Security Requirements**:
+
+- The pull request number MUST be derived only as described in Target Authorization (ARV-001 to ARV-005); agent-supplied numbers MUST NOT override `triggering` or fixed targets.
+- Reviewer logins and team slugs MUST be sanitized and, when an allowlist is configured, MUST be rejected if absent from it.
+- The reviewer count limit MUST be enforced before any API call and MUST NOT be exceeded by silently combining user and team reviewers.
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call.
+- Mutations MUST NOT be performed in staged mode.
 
 **Required Permissions**:
 
@@ -5025,6 +5070,46 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "assign_milestone",
+  "description": "Assign an issue to a milestone for release planning and progress tracking. Milestones can be specified by number or title.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["issue_number"],
+    "properties": {
+      "issue_number": {"type": ["number", "string"]},
+      "milestone_number": {"type": ["number", "string"]},
+      "milestone_title": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` items have been processed the handler MUST fail further items with a `Max count` error without calling the GitHub API.
+2. **Repository Validation**: The target repository MUST be the configured `target-repo` (or the current repository) or appear in `allowed-repos`; otherwise the item fails.
+3. **Target Resolution**: With `target: "*"`, an agent-supplied `issue_number` that is a temporary ID is resolved from the run's temporary-ID map; an unresolved temporary ID defers the item. The issue is then resolved per the Target Authorization rules below.
+4. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the issue and skip the operation (without error) when it does not satisfy every filter.
+5. **Milestone Identification**: At least one of a positive `milestone_number` or a `milestone_title` MUST be provided; otherwise the item fails. When `milestone_number` is valid it takes precedence over `milestone_title`.
+6. **Title Resolution**: A `milestone_title` is resolved by a paginated, per-repository cached search over open and closed milestones. When no milestone matches and `auto_create` is `true`, the milestone is created; otherwise the item fails.
+7. **Allowlist Check**: When `allowed` is configured, the resolved milestone MUST be fetched and its title or number MUST appear in `allowed`; otherwise the item fails. This check applies to auto-created and number-identified milestones alike.
+8. **Staged Mode**: In staged mode the handler previews the assignment and performs no mutation.
+9. **Assignment**: The milestone is applied with the REST issue update endpoint.
+
+**Security Requirements**:
+
+- The issue number MUST be derived only as described in Target Authorization; agent-supplied identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+- The `allowed` list MUST be enforced against the resolved milestone before any assignment, regardless of whether it was identified by number or title.
+- Milestones MUST be created only when `auto_create` is `true`, and never in staged mode.
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call, and milestone lookup caches MUST be scoped per repository.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -5036,7 +5121,7 @@ or review bodies to returned or persisted decision evidence.
 - `issues: write` - Milestone assignment operations
 - `metadata: read` - Repository metadata (automatically granted)
 
-**Configuration Options**:
+**Configuration Parameters**:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -5136,8 +5221,52 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
-**Configuration Options**:
+**MCP Tool Schema**:
 
+```json
+{
+  "name": "assign_to_user",
+  "description": "Assign one or more GitHub users to an issue. Users must have access to the repository.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["issue_number"],
+    "properties": {
+      "issue_number": {"type": ["number", "string"]},
+      "assignees": {"type": "array", "items": {"type": "string"}},
+      "assignee": {"type": "string"},
+      "rationale": {"type": "string", "maxLength": 280},
+      "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+      "suggest": {"type": "boolean"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` items have been processed the handler MUST fail further items with a `Max count` error without calling the GitHub API.
+2. **Repository Validation**: The target repository MUST be the configured `target-repo` (or the current repository) or appear in `allowed-repos`; otherwise the item fails.
+3. **Target Resolution**: The issue or pull request is resolved per the Target Authorization rules below. Temporary IDs are not accepted for this type.
+4. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the target and skip the operation (without error) when it does not satisfy every filter.
+5. **Assignee Selection**: Assignees come from `assignees` and `assignee`. They are sanitized, de-duplicated, checked against `allowed` and `blocked`, and limited to `max`.
+6. **Empty Result**: When no assignee remains after selection, the item succeeds with no assignees added and no API mutation.
+7. **Staged Mode**: In staged mode the handler previews the assignment (and the `unassign-first` step when enabled) and performs no mutation.
+8. **Unassign First**: When `unassign-first` is `true`, the current assignees are fetched and removed before the new assignees are added.
+9. **Assignment**: Assignees are added with the REST add-assignees endpoint. When issue intent is not disabled, normalized `rationale`, `confidence`, and `suggest` metadata are forwarded with the request.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `allowed`: Allowlist of logins that MAY be assigned
+- `blocked`: Glob patterns of logins that MUST NOT be assigned
+- `required-labels`: Labels that must ALL be present on the target for the operation to proceed
+- `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repository allowlist
+- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
 - `unassign-first` (boolean, default: false): If true, unassigns all current assignees before assigning new ones. Useful for reassigning issues from one user to another.
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
 
@@ -5152,6 +5281,14 @@ or review bodies to returned or persisted decision evidence.
 **ATU-004**: Only `target: "*"` MAY select an issue or pull request from the agent-supplied identifier.
 
 **ATU-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Security Requirements**:
+
+- The target number MUST be derived only as described in Target Authorization (ATU-001 to ATU-005).
+- Assignee logins MUST be sanitized and checked against `allowed` and `blocked` before any API call; `blocked` entries MUST take precedence.
+- The assignee count MUST NOT exceed `max`.
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call.
+- When `unassign-first` is enabled, current assignees MUST NOT be removed in staged mode or when no valid new assignee remains.
 
 **Required Permissions**:
 
@@ -5181,9 +5318,45 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "unassign_from_user",
+  "description": "Remove one or more assignees from an issue.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "issue_number": {"type": ["number", "string"]},
+      "assignees": {"type": "array", "items": {"type": "string"}},
+      "assignee": {"type": "string"},
+      "repo": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` items have been processed the handler MUST fail further items with a `Max count` error without calling the GitHub API.
+2. **Target Resolution**: The issue or pull request is resolved per the Target Authorization rules below.
+3. **Assignee Selection**: Assignees come from `assignees` and `assignee`. They are sanitized, de-duplicated, checked against `allowed` and `blocked`, and limited to `max`.
+4. **Empty Result**: When no assignee remains after selection, the item succeeds with no assignees removed and no API mutation.
+5. **Repository Validation**: The target repository MUST be the configured `target-repo` (or the current repository) or appear in `allowed-repos`; otherwise the item fails.
+6. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the target and skip the operation (without error) when it does not satisfy every filter.
+7. **Staged Mode**: In staged mode the handler previews the removal and performs no mutation.
+8. **Removal**: Assignees are removed with the REST remove-assignees endpoint.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
+- `allowed`: Allowlist of logins that MAY be unassigned
+- `blocked`: Glob patterns of logins that MUST NOT be unassigned
+- `required-labels`: Labels that must ALL be present on the target for the operation to proceed
+- `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
@@ -5199,6 +5372,14 @@ or review bodies to returned or persisted decision evidence.
 **UFU-004**: Only `target: "*"` MAY select an issue or pull request from the agent-supplied identifier.
 
 **UFU-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Security Requirements**:
+
+- The target number MUST be derived only as described in Target Authorization (UFU-001 to UFU-005).
+- Assignee logins MUST be sanitized and checked against `allowed` and `blocked` before any API call; `blocked` entries MUST take precedence.
+- The assignee count MUST NOT exceed `max`.
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call.
+- Mutations MUST NOT be performed in staged mode.
 
 **Required Permissions**:
 
@@ -5221,9 +5402,46 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "set_issue_type",
+  "description": "Set the type of a GitHub issue. Pass an empty string to clear the issue type.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["issue_type"],
+    "properties": {
+      "issue_number": {"type": ["number", "string"]},
+      "issue_type": {"type": "string"},
+      "rationale": {"type": "string", "maxLength": 280},
+      "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+      "suggest": {"type": "boolean"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` items have been processed the handler MUST fail further items with a `Max count` error without calling the GitHub API.
+2. **Repository Validation**: The target repository MUST be the configured `target-repo` (or the current repository) or appear in `allowed-repos`; otherwise the item fails.
+3. **Target Resolution**: With `target: "*"`, an agent-supplied `issue_number` (including a temporary ID resolved from the run) selects the issue. The issue is resolved per the Target Authorization rules below.
+4. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the issue and skip the operation (without error) when it does not satisfy every filter.
+5. **Clearing**: An empty `issue_type` clears the issue type and bypasses the `allowed` list.
+6. **Allowlist Check**: When `allowed` is configured, a non-empty `issue_type` MUST match an entry case-insensitively; otherwise the item fails. The configured spelling is used for the mutation.
+7. **Staged Mode**: In staged mode the handler previews the change and performs no mutation.
+8. **Issue-Intent Path**: Unless issue intent is disabled, the handler resolves the issue node ID and the repository issue type by case-insensitive name, then applies the type with the GraphQL `updateIssue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata. An unknown type fails with the list of available types.
+9. **REST Path**: When issue intent is disabled, or when clearing, the type is applied with the REST issue update endpoint.
+10. **Error Mapping**: A 422 response for a non-empty type is mapped to an actionable error naming the type and, when reported, the available types.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
+- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
 - `allowed`: Optional allowlist of issue type names
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `required-labels`: Labels that must all be present on the issue
@@ -5242,6 +5460,13 @@ or review bodies to returned or persisted decision evidence.
 **SIT-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
 
 **SIT-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Security Requirements**:
+
+- The issue number MUST be derived only as described in Target Authorization (SIT-001 to SIT-005).
+- When `allowed` is configured, a non-empty issue type MUST be rejected before any mutation unless it matches an entry.
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call.
+- Mutations MUST NOT be performed in staged mode.
 
 **Required Permissions**:
 
@@ -5264,9 +5489,48 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "set_issue_field",
+  "description": "Set a single GitHub issue custom field by name and value. Use field_name for discovery by field label, or provide field_node_id to skip discovery. Does NOT support builtin issue fields such as title, body, or state.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["value"],
+    "properties": {
+      "issue_number": {"type": ["number", "string"]},
+      "field_name": {"type": "string"},
+      "field_node_id": {"type": "string"},
+      "value": {"type": "string"},
+      "rationale": {"type": "string", "maxLength": 280},
+      "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+      "suggest": {"type": "boolean"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` items have been processed the handler MUST fail further items with a `Max count` error without calling the GitHub API.
+2. **Repository Validation**: The target repository MUST be the configured `target-repo` (or the current repository) or appear in `allowed-repos`; otherwise the item fails.
+3. **Target Resolution**: With `target: "*"`, an agent-supplied `issue_number` (including a temporary ID resolved from the run) selects the issue. The issue is resolved per the Target Authorization rules below.
+4. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the issue and skip the operation (without error) when it does not satisfy every filter.
+5. **Input Validation**: `value` MUST be present and at least one of `field_name` or `field_node_id` MUST be provided. A `field_name` naming a builtin issue field (for example `title`, `body`, or `state`) MUST be rejected with guidance to use `update_issue`.
+6. **Staged Mode**: In staged mode the handler previews the change and performs no mutation.
+7. **Field Discovery**: The handler fetches the repository issue fields. When none are visible, the item is skipped with a warning. A `field_name` is matched case-insensitively; a `field_node_id` MUST match a discovered field. When both are supplied they MUST resolve to the same field.
+8. **Allowlist Check**: The resolved field name MUST satisfy `allowed-fields` (when configured and not `["*"]`) before any mutation.
+9. **Value Typing**: The value is converted according to the field type: single-select values MUST match an option name (case-insensitive), number values MUST be finite numbers, date values MUST use `YYYY-MM-DD`, and other fields are set as text.
+10. **Mutation**: The value is applied with the GraphQL `setIssueFieldValue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata unless issue intent is disabled.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
+- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
 - `allowed-fields`: Optional allowlist of custom issue field names
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `required-labels`: Labels that must all be present on the issue
@@ -5285,6 +5549,14 @@ or review bodies to returned or persisted decision evidence.
 **SIF-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
 
 **SIF-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Security Requirements**:
+
+- The issue number MUST be derived only as described in Target Authorization (SIF-001 to SIF-005).
+- The resolved field name MUST be checked against `allowed-fields` before any mutation, including when the field is identified by `field_node_id`.
+- Builtin issue fields MUST NOT be writable through this type.
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call.
+- Mutations MUST NOT be performed in staged mode.
 
 **Required Permissions**:
 

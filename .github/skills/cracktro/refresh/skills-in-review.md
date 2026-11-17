@@ -84,7 +84,7 @@ Use the actual run dates (`run.json` `createdAt`) for the window text, not the r
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # async
 # browser canvas: http://127.0.0.1:4329/cracktro/#60, wait ~5 s for the sweep, screenshot .sir-svg
-grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code'   # must be empty
+grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code\|api.github.com/repositories/\|www.w3.org/2000/svg'   # must be empty
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```
 
