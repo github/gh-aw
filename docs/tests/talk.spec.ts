@@ -58,9 +58,9 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   expect(await page.evaluate(() => localStorage.getItem("aw-mute"))).toBe("0");
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
-  // Space follows the main line, past the Issue Monster example hanging below Event-driven Hand-offs
+  // Space follows the main line from Event-driven Hand-offs to Repo Commands
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Pull Request Review²")}$`));
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Repo Commands")}$`));
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
