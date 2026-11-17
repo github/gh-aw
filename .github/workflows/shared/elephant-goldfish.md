@@ -37,7 +37,7 @@ import-schema:
 
 checkout:
   - repository: google/elephant-goldfish-model
-    ref: ${{ github.aw.import-inputs.ref }}
+    ref: 72d06f52a2482885d9a64bd24b291c6e8628942c
     path: .egm
     data-only: true
 
