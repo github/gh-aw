@@ -19,12 +19,14 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 		expectedOwner string
 		expectedRepo  string
 		expectError   bool
+		expectedError string
 	}{
 		{
-			name:        "bare run ID requires repo flag",
-			repoFlag:    "",
-			components:  parser.GitHubURLComponents{},
-			expectError: true,
+			name:          "bare run ID requires repo flag",
+			repoFlag:      "",
+			components:    parser.GitHubURLComponents{},
+			expectError:   true,
+			expectedError: "--repo is required for bare run IDs; use --repo owner/repo",
 		},
 		{
 			name:          "owner already resolved from URL wins",
@@ -67,6 +69,9 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 			err := applyAuditRepoFlag(tt.repoFlag, &components)
 			if tt.expectError {
 				require.Error(t, err)
+				if tt.expectedError != "" {
+					assert.EqualError(t, err, tt.expectedError)
+				}
 				return
 			}
 			require.NoError(t, err)
