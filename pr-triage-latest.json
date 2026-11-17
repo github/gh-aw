@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-17T12:33:20Z",
-  "run_id": "pr-triage-2026-11-17T12:23:27Z",
+  "generated_at": "2026-11-17T18:23:29Z",
+  "run_id": "pr-triage-2026-11-17T18:23:29Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "eligible_total": 0,
@@ -13,7 +13,7 @@
   "batches": [],
   "skipped_prs": [],
   "notes": [
-    "No open PRs were authored by app/github-copilot; triage scope is empty."
+    "No open pull requests are authored by app/github-copilot in github/gh-aw."
   ],
   "review_status": "no_eligible_prs"
 }
