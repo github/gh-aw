@@ -573,13 +573,15 @@ test.describe("agentic engineering slides", () => {
 test("places the enterprise tracing, access and event slides beside their neighbours", async ({ page }) => {
   expect(slideNo("Distributed tracing")).toBe(slideNo("OpenTelemetry") + 1);
   expect(slideNo("GitHub App permissions")).toBe(slideNo("Operator-owned infrastructure") + 1);
-  expect(slideNo("OIDC token broker")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("Multi-repo PRs")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("OIDC token broker")).toBe(slideNo("Multi-repo PRs") + 1);
   expect(slideNo("Webhook gateway")).toBe(slideNo("Connectors") + 1);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   const NEW: [string, string | null][] = [
     ["Distributed tracing", null],
     ["GitHub App permissions", null],
+    ["Multi-repo PRs", null],
     ["OIDC token broker", "Experimental"],
     ["Webhook gateway", "Experimental"],
   ];

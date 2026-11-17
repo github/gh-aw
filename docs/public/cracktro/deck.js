@@ -2630,6 +2630,7 @@
   .otb .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #d29922, #79c0ff); }
   .whg .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #56d4dd, #ab7df8, #f0883e, #56d4dd); }
   .xsv .ttl { transform-box: fill-box; transform-origin: left center; }
+  .xsv .mrp-c { fill: #e6edf3; font: 500 15.5px var(--mono); }
   .gap .cell.probe rect { stroke: #f0f6fc; stroke-width: 3; }
 
   /* --- enterprise ready --- */
@@ -12797,6 +12798,139 @@
         const e = stage.tick(t),
           u = Math.min(1, e / (N * EVERY + HOLD));
         ttl.forEach((r, i) => (r.style.transform = `scaleX(${Math.max(0.04, 1 - u * (i ? 1.4 : 0.9))})`));
+      },
+      el,
+    });
+  }
+
+  // Multi-repo PRs: one run checks out two repositories with a read-only GitHub App, the agent edits both without a
+  // token, and the safe-outputs job uses a second, write-capable App to open one pull request in each repository
+  {
+    resetIndex();
+    const BLUE = "#4493f8",
+      BLUE2 = "#79c0ff",
+      ORANGE = "#db6d28",
+      ORANGE2 = "#ffa657";
+    // [text, role (r read · w write · p pull requests · "" none)]; the front matter compiles as shown
+    const YAML = [
+      ["checkout:", ""],
+      ["  - repository: octo-org/api", "r"],
+      ["    path: repos/api", "r"],
+      ["    github-app: &read", "r"],
+      ["      client-id: ${{ vars.READ_APP_ID }}", "r"],
+      ["      private-key: ${{ secrets.READ_APP_KEY }}", "r"],
+      ["      owner: octo-org", "r"],
+      ["      repositories: [api, web]", "r"],
+      ["    safe-outputs-github-app: &write", "w"],
+      ["      client-id: ${{ vars.WRITE_APP_ID }}", "w"],
+      ["      private-key: ${{ secrets.WRITE_APP_KEY }}", "w"],
+      ["      owner: octo-org", "w"],
+      ["      repositories: [api, web]", "w"],
+      ["  - repository: octo-org/web", "r"],
+      ["    path: repos/web", "r"],
+      ["    github-app: *read", "r"],
+      ["    safe-outputs-github-app: *write", "w"],
+      ["tools:", ""],
+      ["  github:", "r"],
+      ["    toolsets: [repos, pull_requests]", "r"],
+      ["    github-app: *read", "r"],
+      ["    allowed-repos: [octo-org/api, octo-org/web]", "r"],
+      ["    min-integrity: approved", "r"],
+      ["safe-outputs:", ""],
+      ["  github-app: *write", "w"],
+      ["  create-pull-request:", "p"],
+      ["    target-repo: octo-org/api", "p"],
+      ["    allowed-repos: [octo-org/web]", "p"],
+      ["    max: 2", "p"],
+    ];
+    const ROLE = { r: [BLUE, BLUE2, 1, 3], w: [ORANGE, ORANGE2, 4, 6], p: ["#ab7df8", "#d2a8ff", 3, 4] };
+    const LH = 21.6,
+      TOP = 74;
+    const yamlLine = (l, y) => {
+      const [, ind, key, val] = l.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
+      const v = xEsc(val).replace(/([&*])(read|write)\b/, (m, s, n) => `<tspan style="fill:${n === "read" ? BLUE2 : ORANGE2};font-weight:700">${s}${n}</tspan>`);
+      return `<text class="mrp-c" x="34" y="${y}" xml:space="preserve">${ind.replace(/ /g, "\u00a0")}<tspan style="fill:${ind ? "#7ee787" : "#d2a8ff"}">${key}</tspan><tspan style="fill:#a5d6ff">${v}</tspan></text>`;
+    };
+    let g = "";
+    // front matter card with role bars and step highlights
+    g += `<rect class="card" x="0" y="0" width="640" height="700" rx="16"/><text class="k" x="24" y="34">workflow.md · front matter</text><line x1="0" y1="50" x2="640" y2="50" stroke="#3d444d"/>`;
+    YAML.forEach(([l, r], i) => {
+      const y = TOP + i * LH;
+      if (r) {
+        const [c, , s, e] = ROLE[r];
+        g += `<rect x="14" y="${y - 15}" width="4" height="${LH}" fill="${c}"/>`;
+        g += `<rect class="x" data-s="${s}" data-e="${e}" x="18" y="${y - 15}" width="606" height="${LH}" fill="${c}26"/>`;
+      }
+      g += yamlLine(l, y);
+    });
+    g += `<text x="612" y="${TOP + 3 * LH}" text-anchor="end" style="fill:${BLUE2};font-size:13px">READ APP</text><text x="612" y="${TOP + 8 * LH}" text-anchor="end" style="fill:${ORANGE2};font-size:13px">WRITE APP</text>`;
+    // the two GitHub Apps
+    const app = (y, h, c, c2, title, lines, s) =>
+      `<g data-s="${s}" style="--hc:${c}"><rect class="card" x="690" y="${y}" width="270" height="${h}" rx="14" style="stroke:${c};stroke-width:2"/><text class="k" x="712" y="${y + 34}" style="fill:${c2}">GitHub App</text><text class="t" x="712" y="${y + 70}">${title}</text>` +
+      lines.map((l, j) => `<text class="m" x="712" y="${y + 108 + j * 30}" style="font-size:15px">${l}</text>`).join("") +
+      `</g>`;
+    g += app(0, 330, BLUE, BLUE2, "read · &amp;read", ["contents: read", "pull-requests: read", "repos: api, web", "checkouts + GitHub tools"], 0);
+    g += app(380, 320, ORANGE, ORANGE2, "write · &amp;write", ["contents: write", "pull-requests: write", "repos: api, web", "safe-outputs job only"], 0);
+    // agent job: two checkouts and a token-free agent
+    g += `<g data-s="1" style="--hc:${BLUE}"><rect class="card" x="1010" y="0" width="690" height="330" rx="14" style="stroke:${BLUE}"/><text class="k" x="1034" y="34" style="fill:${BLUE2}">agent job · read token</text>`;
+    [
+      [1034, "octo-org/api", "→ repos/api"],
+      [1372, "octo-org/web", "→ repos/web"],
+    ].forEach(([x, r, p]) => (g += `<rect x="${x}" y="54" width="304" height="86" rx="10" fill="#0d1117" stroke="${BLUE}88"/><text class="m" x="${x + 20}" y="88">${r}</text><text x="${x + 20}" y="120">${p}</text>`));
+    g += `</g>`;
+    g += `<g data-s="2" style="--hc:#f0f6fc"><rect x="1034" y="166" width="642" height="146" rx="10" fill="#0d1117" stroke="#9198a1" stroke-dasharray="8 6"/><text class="t" x="1056" y="202">sandboxed agent · holds no token</text><text x="1056" y="232">edits both checkouts · reads via GitHub tools</text></g>`;
+    [
+      [1056, "create_pull_request · repo: api"],
+      [1366, "create_pull_request · repo: web"],
+    ].forEach(
+      ([x, t]) =>
+        (g += `<g data-s="3" style="--hc:#ab7df8"><rect x="${x}" y="254" width="296" height="40" rx="8" fill="#ab7df822" stroke="#ab7df8"/><text x="${x + 148}" y="280" text-anchor="middle" style="fill:#d2a8ff;font-size:14px">${t}</text></g>`)
+    );
+    // safe-outputs job: one pull request per repository
+    g += `<g data-s="4" style="--hc:${ORANGE}"><rect class="card" x="1010" y="380" width="690" height="320" rx="14" style="stroke:${ORANGE}"/><text class="k" x="1034" y="414" style="fill:${ORANGE2}">safe-outputs job · write token</text><text x="1034" y="446">threat detection passed · max: 2</text></g>`;
+    [
+      [1034, "PR #1", "octo-org/api", "from repos/api", 4],
+      [1372, "PR #2", "octo-org/web", "from repos/web", 5],
+    ].forEach(
+      ([x, n, r, p, s]) =>
+        (g += `<g data-s="${s}" style="--hc:${ORANGE}"><rect x="${x}" y="470" width="304" height="200" rx="10" fill="#0d1117" stroke="${ORANGE}"/><g transform="translate(${x + 20},${494}) scale(1.4)" fill="${ORANGE2}">${OCTI.pr.map(d => `<path d="${d}"/>`).join("")}</g><text class="t" x="${x + 66}" y="518">${n}</text><text class="m" x="${x + 20}" y="566">${r}</text><text x="${x + 20}" y="598">${p}</text><text x="${x + 20}" y="640" style="fill:${ORANGE2}">✓ opened by write App</text></g>`)
+    );
+    // wiring and packets
+    g += `<path class="ln" d="M960 97 H1034"/><path class="ln" d="M960 425 H1010"/><path class="ln dash" d="M1355 312 V380"/>`;
+    g += `<path data-p="1" data-c="${BLUE2}" d="M960 97 H1034" fill="none"/>`;
+    g += `<path data-p="2" data-c="#f0f6fc" d="M1186 140 V166" fill="none"/><path data-p="2" data-c="#f0f6fc" d="M1524 140 V166" fill="none"/>`;
+    g += `<path data-p="3" data-c="#d2a8ff" d="M1355 312 V380" fill="none"/>`;
+    g += `<path data-p="4" data-c="${ORANGE2}" d="M960 425 H1186 V470" fill="none"/>`;
+    g += `<path data-p="5" data-c="${ORANGE2}" d="M960 425 H1524 V470" fill="none"/>`;
+    const svg = xSvg(g);
+    const N = 6,
+      EVERY = 1300,
+      HOLD = 4600;
+    const stage = xStage(svg, N, EVERY, HOLD, k => sfx.pop(k));
+    const el = h(
+      "section",
+      { class: "slide gap" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One run · two repositories · two GitHub Apps"), h("h2", {}, letters("Multi-repo "), letters("PRs", "l-grad"))),
+      svg,
+      h(
+        "div",
+        { class: "xcap" },
+        h("b", {}, "Split the keys:"),
+        h("span", {}, "read App → checkouts + GitHub tools"),
+        h("span", {}, "agent holds no token"),
+        h("span", {}, "write App → safe outputs only"),
+        h("span", {}, "allowed-repos + max: 2 → one PR per repo")
+      )
+    );
+    slides.push({
+      group: "enterprise",
+      notes:
+        "Multi-repo PRs. One workflow run changes two repositories and opens one pull request in each, using two GitHub Apps with different jobs. The read App, anchored as read in the front matter, checks out octo-org/api and octo-org/web side by side under repos/ and backs the agent's GitHub tools, limited by allowed-repos and min-integrity. Its tokens are minted for the agent job with read permissions only, and the checkouts are scrubbed of credentials before the sandboxed agent starts, so the agent edits both working trees while holding no token at all. It then emits two create_pull_request requests, one naming each repository. target-repo plus allowed-repos is the allowlist the agent may pick from, and max: 2 lets one run open two pull requests. After threat detection, the safe-outputs job mints a token from the second, write-capable App, anchored as write, both globally and per checkout through safe-outputs-github-app, re-creates the same checkout layout, applies each patch in its repository and opens the pull requests. The agent never sees either App's key, and only the safe-outputs job can write. The YAML anchors keep the front matter short, and this front matter compiles as shown. Repositories, apps and pull requests are synthetic and illustrative.",
+      enter() {
+        stage.enter();
+      },
+      tick(t) {
+        stage.tick(t);
       },
       el,
     });
