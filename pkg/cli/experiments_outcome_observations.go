@@ -8,12 +8,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/workflow"
-	"github.com/sourcegraph/conc/pool"
 )
 
 const defaultExperimentOutcomeWindow = 72 * time.Hour
@@ -213,20 +211,7 @@ func loadOutcomeRunData(ctx context.Context, runs []ExperimentRunRecord, windows
 			break
 		}
 	}
-	result := make(map[string]outcomeRunData, len(runIDs))
-	var mu sync.Mutex
-	p := pool.New().WithContext(ctx).WithMaxGoroutines(getMaxConcurrentDownloads())
-	for runID := range runIDs {
-		p.Go(func(ctx context.Context) error {
-			data := source.Load(ctx, runID)
-			mu.Lock()
-			result[runID] = data
-			mu.Unlock()
-			return nil
-		})
-	}
-	_ = p.Wait()
-	return result
+	return loadRunsConcurrently(ctx, runIDs, source.Load)
 }
 
 func loadOutcomeObservationSetsForAnalysis(
