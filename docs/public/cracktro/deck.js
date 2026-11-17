@@ -1056,7 +1056,7 @@
   .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
   .dto-big { fill: #e3b341; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
-  .isa .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #ffa657, #ab7df8); }
+  .isa { --lg: #d2a8ff; }
   .isa-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, opacity .6s, filter .4s; }
   .isa-box.on .isa-card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
   .isa-svg.s1 .isa-mono .isa-card { stroke-dasharray: 8 8; opacity: .45; }
@@ -1725,7 +1725,7 @@
   .ade .sfl-row .ok { fill: #79c0ff; } .ade .sfl-row .ko { fill: #ffa657; }
   .ade .mc-tag.e2 { fill: #c9d1d9; } .ade .mc-chip.on rect { filter: drop-shadow(0 0 12px #ab7df855); }
   /* Fuzzy schedules: a fixed-cron spike scatters into hashed daily times; All You Can Eat serves one plate at a time */
-  .fzs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #79c0ff, #ab7df8, #ffa657); }
+  .fzs { --lg: #d2a8ff; }
   .fzs-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
   .fzs-code { font: 600 26px var(--mono); transition: opacity .5s; } .fzs-code.fix { fill: #ffa657; } .fzs-code.fuz { fill: #79c0ff; opacity: 0; }
   .fzs-mode { font: 600 15px var(--mono); text-anchor: end; transition: opacity .5s; } .fzs-mode.fix { fill: #ffa657; } .fzs-mode.fuz { fill: #79c0ff; opacity: 0; }
@@ -1765,7 +1765,7 @@
   .fzs-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
   .active .fzs-cap { animation: rise .6s ease-out both 2s; }
   /* Week of daily runs: measured heat map of daily workflows by weekday and UTC hour */
-  .fzw .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
+  .fzw { --lg: #d2a8ff; }
   .fzw-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
   .fzw-day { fill: #c9d1d9; font: 600 18px var(--mono); text-anchor: end; } .fzw-day.we { fill: #9198a1; }
   .fzw-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
