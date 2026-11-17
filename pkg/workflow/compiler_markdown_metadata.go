@@ -9,7 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -33,6 +33,15 @@ type GHAWMarkdownMetadata struct {
 // The source is an exact lookup key, so stale repository files cannot acquire
 // metadata by matching only a name or path.
 func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMetadata {
+	full, _ := c.collectMarkdownMetadataCatalogs(data)
+	return full
+}
+
+// collectMarkdownMetadataCatalogs scans workflow content once and returns the
+// full catalog and the workflow-only catalog. The workflow-only catalog omits
+// repository agents that the workflow does not reference; they live in the
+// checkout and its compiled lock headers.
+func (c *Compiler) collectMarkdownMetadataCatalogs(data *WorkflowData) (full, workflow *GHAWMarkdownMetadata) {
 	records := map[string]GHAWMarkdownMetadataRecord{}
 	scan := func(content, documentKind string) {
 		scanMarkdownMetadata(records, content, documentKind)
@@ -50,12 +59,19 @@ func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMeta
 	root := markdownMetadataRoot(c.markdownPath)
 	scanRuntimeImportMetadata(root, data, scan)
 	scanImportedDocumentMetadata(root, c.markdownPath, data, scan)
+	workflow = sortedMarkdownMetadata(records)
+	// Records are keyed by kind and digest and the first entry wins, so adding
+	// repository records afterwards matches a single combined scan.
 	scanRepositoryArtifactMetadata(root, scan)
+	return sortedMarkdownMetadata(records), workflow
+}
+
+func sortedMarkdownMetadata(records map[string]GHAWMarkdownMetadataRecord) *GHAWMarkdownMetadata {
 	keys := make([]string, 0, len(records))
 	for key := range records {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	result := &GHAWMarkdownMetadata{Version: 2, Records: make([]GHAWMarkdownMetadataRecord, 0, len(keys))}
 	for _, key := range keys {
 		result.Records = append(result.Records, records[key])

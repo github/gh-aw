@@ -1,4 +1,4 @@
-const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, loadMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
+const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, readLocalMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
 
 it("discards inline skill descriptions without requiring metadata or interpreting YAML", () => {
   installMarkdownMetadata({ version: 2, records: [] });
@@ -107,10 +107,10 @@ describe("compiler-owned Markdown metadata", () => {
     const { execFileSync } = require("node:child_process");
     const directory = path.resolve(`.metadata-cache-${require("node:crypto").randomUUID()}`);
     const source = "model: small\ndescription: TOKEN\ntools: [Read]";
-    const previous = process.env.GH_AW_TMP_DIR;
+    const previous = process.env.GH_AW_RUNTIME_DIR;
     try {
       fs.mkdirSync(directory);
-      process.env.GH_AW_TMP_DIR = directory;
+      process.env.GH_AW_RUNTIME_DIR = directory;
       fs.writeFileSync(path.join(directory, "aw_info.json"), '{"run_id":123}');
       installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", description: "TOKEN", tools: ["Read"] })] });
       const literal = createLiteralValues();
@@ -130,8 +130,8 @@ describe("compiler-owned Markdown metadata", () => {
       expect(JSON.parse(run(rendered.replace('"small"', '"forged"')))).toEqual({});
       expect(JSON.parse(fs.readFileSync(path.join(directory, "aw_info.json"), "utf8")).run_id).toBe(123);
     } finally {
-      if (previous === undefined) delete process.env.GH_AW_TMP_DIR;
-      else process.env.GH_AW_TMP_DIR = previous;
+      if (previous === undefined) delete process.env.GH_AW_RUNTIME_DIR;
+      else process.env.GH_AW_RUNTIME_DIR = previous;
       fs.rmSync(directory, { recursive: true, force: true });
     }
   });
@@ -185,11 +185,6 @@ describe("compiler-owned Markdown metadata", () => {
     }
   });
 
-  it("requires an exact executing lock identity when loading records", async () => {
-    await expect(loadMarkdownMetadata("wrong", process.cwd())).rejects.toThrow(/identity/);
-    await expect(loadMarkdownMetadata("owner/repo/../../other.lock.yml@main", process.cwd())).rejects.toThrow(/path/);
-  });
-
   it("materializes metadata solely from JSON headers, ignoring invalid YAML in the body", async () => {
     const fs = require("node:fs");
     const path = require("node:path");
@@ -199,10 +194,12 @@ describe("compiler-owned Markdown metadata", () => {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...require("./markdown_metadata.cjs").metadataManifestFields(metadata) })}\n# compiled fixture\ninvalid: [yaml\n`);
-      expect(await loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).toEqual({ version: 2, records: metadata.records.map(record => ({ ...record, sha256: record.sha256.slice(0, 20) })) });
+      const loaded = readLocalMarkdownMetadata(file, workspace);
+      installMarkdownMetadata(loaded);
+      expect(loaded).toEqual({ version: 2, records: metadata.records.map(record => ({ ...record, sha256: record.sha256.slice(0, 20) })) });
       expect(readDocumentMetadata("rate: 0.25").value).toEqual({ rate: 0.25 });
       fs.writeFileSync(file, "# gh-aw-manifest: {}\n# gh-aw-manifest: {}\n# compiled fixture\n");
-      await expect(loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).rejects.toThrow(/lacks compiler Markdown metadata/);
+      expect(readLocalMarkdownMetadata(file, workspace)).toBeUndefined();
     } finally {
       fs.rmSync(workspace, { recursive: true, force: true });
     }
