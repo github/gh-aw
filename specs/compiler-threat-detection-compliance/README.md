@@ -83,9 +83,9 @@ These annotations are verified against the specification artifacts by `pkg/workf
 |---------|------|
 | T-CTR-024 | Suppression validation requires `rule` and a non-empty `reason`. |
 | T-CTR-025 | Active suppressions retain `rule`, `reason`, and `expires` for audit. |
-| T-CTR-026 | MUST-level suppressions have a 10-business-day resolution SLA. |
+| T-CTR-026 | False-positive suppressions affecting non-strict rejection controls MUST be resolved within 10 business days. |
 | T-CTR-027 | SLA breaches include `rule`, `reason`, `age_business_days`, `owner`, and `expires`. |
-| T-CTR-028 | MUST-level suppressions older than 20 business days create a follow-up sync action. |
+| T-CTR-028 | Unresolved false-positive suppressions affecting non-strict rejection controls older than 20 business days MUST create a follow-up sync action. |
 | T-CTR-029 | Expired suppressions are re-evaluated and treated as absent. |
 
 ## Section 6.6 Optimizer Failure Safeguards
