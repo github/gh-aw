@@ -1737,8 +1737,6 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 	})
 }
 
-// TestBuildAWFConfigJSON_APIProxyCACert verifies that sandbox.agent.ca-cert is
-// mapped to apiProxy.caCert and gated to AWF versions that support the field.
 func TestBuildAWFConfigJSON_ProxiedEngineTransportDoesNotGrantDirectModelAPI(t *testing.T) {
 	tests := []struct {
 		engine   constants.EngineName
@@ -1790,6 +1788,8 @@ func TestBuildAWFConfigJSON_ProxiedEngineTransportDoesNotGrantDirectModelAPI(t *
 	}
 }
 
+// TestBuildAWFConfigJSON_APIProxyCACert verifies that sandbox.agent.ca-cert is
+// mapped to apiProxy.caCert and gated to AWF versions that support the field.
 func TestBuildAWFConfigJSON_APIProxyCACert(t *testing.T) {
 	t.Run("apiProxy.caCert is emitted when configured and AWF supports it", func(t *testing.T) {
 		config := AWFCommandConfig{

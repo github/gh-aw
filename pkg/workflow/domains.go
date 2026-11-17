@@ -25,6 +25,7 @@ var domainSetsJSON []byte
 type domainSets struct {
 	Ecosystems           map[string][]string `json:"ecosystems"`
 	EngineDefaults       map[string][]string `json:"engine-defaults"`
+	PiProviderDomains    map[string]string   `json:"pi-provider-domains"`
 	SanitizationDefaults []string            `json:"sanitization-defaults"`
 }
 
@@ -129,6 +130,11 @@ var AgyDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["agy"
 // independent of the chosen LLM provider.
 var PiBaseDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["pi-base"])
 
+// piProviderDomains maps Pi provider prefixes to their API endpoints. This metadata
+// is used to describe provider routing and does not grant those endpoints through
+// the selectable engine transport bundles.
+var piProviderDomains = getLoadedDomainSets().PiProviderDomains
+
 // PiDefaultDomains are the static default domains for backward compatibility when
 // no model provider prefix is given. Direct provider APIs require an explicit
 // vendor set or literal-domain opt-in.
@@ -156,14 +162,21 @@ func extractProviderFromModel(model string) (string, error) {
 	return provider, nil
 }
 
-// getPiDefaultDomains returns Pi's gateway/GitHub transport baseline. Provider API
-// domains are not added because model inference uses the AWF LLM gateway.
+// getPiDefaultDomains returns Pi's baseline and model-specific provider endpoint
+// metadata. These domains are not automatically granted by the network allow-list.
 // Returns an error if the model string is malformed (e.g. a leading slash).
 func getPiDefaultDomains(model string) ([]string, error) {
-	if _, err := extractProviderFromModel(model); err != nil {
+	provider, err := extractProviderFromModel(model)
+	if err != nil {
 		return nil, err
 	}
-	return copyEngineDefaultDomainSet(PiBaseDefaultDomains), nil
+	domains := append([]string(nil), PiBaseDefaultDomains...)
+	if domain, ok := piProviderDomains[provider]; ok {
+		domains = append(domains, domain)
+	} else if provider == "" {
+		domains = append(domains, piProviderDomains["copilot"])
+	}
+	return domains, nil
 }
 
 // compoundEcosystems defines ecosystem identifiers that expand to the union of multiple

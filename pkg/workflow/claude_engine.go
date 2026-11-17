@@ -449,6 +449,8 @@ func (e *ClaudeEngine) claudeAllowedDomains(data *WorkflowData) string {
 	if !data.CachedAllowedDomainsComputed {
 		domains = GetAllowedDomainsForEngine(constants.ClaudeEngine, data.NetworkPermissions, data.Tools, data.Runtimes)
 	}
+	// The default Anthropic target is reached through the AWF proxy; only an
+	// explicitly configured target is added by mergeAPITargetDomains below.
 	if data.EngineConfig != nil && data.EngineConfig.APITarget != "" {
 		domains = mergeAPITargetDomains(domains, data.EngineConfig.APITarget)
 	}

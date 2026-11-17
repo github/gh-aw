@@ -99,9 +99,25 @@ func TestPiEngineNativeProvidersAndFederation(t *testing.T) {
 	assert.Contains(t, engine.GetRequiredSecretNames(google), "GEMINI_API_KEY")
 	assert.Equal(t, "google", engine.ResolveLLMProvider(google).String())
 	assert.Equal(t, "google", piConfiguredProvider(google))
-	domains, err := getPiDefaultDomains(google.Model)
+	domains, err := GetDefaultDomainsForEngine(constants.PiEngine, google.Model)
 	require.NoError(t, err)
-	assert.NotContains(t, domains, "generativelanguage.googleapis.com")
+	assert.Contains(t, domains, "generativelanguage.googleapis.com")
+	transportDomains, err := GetAllowedDomainsForEngineWithModel(constants.PiEngine, google.Model,
+		&NetworkPermissions{Allowed: []string{"pi"}}, nil, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, transportDomains, "generativelanguage.googleapis.com")
+	for _, tt := range []struct {
+		model, domain string
+	}{
+		{"copilot/claude-sonnet-4", "api.githubcopilot.com"},
+		{"anthropic/claude-sonnet-4", "api.anthropic.com"},
+		{"openai/gpt-4.1", "api.openai.com"},
+		{"google/gemini-2.5-pro", "generativelanguage.googleapis.com"},
+	} {
+		providerDomains, err := GetDefaultDomainsForEngine(constants.PiEngine, tt.model)
+		require.NoError(t, err)
+		assert.Contains(t, providerDomains, tt.domain, "provider endpoint metadata for %s", tt.model)
+	}
 	for _, tt := range []struct {
 		model, optIn, domain string
 	}{

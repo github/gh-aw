@@ -271,5 +271,14 @@
     "pi-base": ["host.docker.internal", "github.com", "raw.githubusercontent.com"],
     "threat-detection": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.github.com", "api.githubcopilot.com", "api.individual.githubcopilot.com", "github.com", "host.docker.internal", "registry.npmjs.org"]
   },
+  "pi-provider-domains": {
+    "copilot": "api.githubcopilot.com",
+    "github-copilot": "api.githubcopilot.com",
+    "anthropic": "api.anthropic.com",
+    "openai": "api.openai.com",
+    "codex": "api.openai.com",
+    "google": "generativelanguage.googleapis.com",
+    "gemini": "generativelanguage.googleapis.com"
+  },
   "sanitization-defaults": ["github.com", "localhost"]
 }

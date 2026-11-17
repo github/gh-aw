@@ -178,7 +178,7 @@ Engine domain sets are named allowlist bundles for gateway/GitHub transport. The
 | `codex-vendor` | Direct OpenAI API and optional authentication/telemetry: `api.openai.com`, `auth.openai.com`, `ab.chatgpt.com` |
 | `gemini` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com` |
 | `gemini-vendor` | Direct Gemini API: `generativelanguage.googleapis.com` |
-| `pi` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; provider-scoped models use the gateway but do not grant the provider API host |
+| `pi` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; provider endpoint metadata remains model-aware, but the selectable bundle does not grant the provider API host |
 | `pi-base` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; applied before a provider prefix selects a gateway route |
 | `threat-detection` | Applied automatically only to Copilot threat-detection runs and available as a compatibility alias: Copilot API hosts, `api.github.com`, `github.com`, `host.docker.internal`, and `registry.npmjs.org` for read-only lockfile validation. Telemetry requires an explicit `copilot-vendor` opt-in. |
 

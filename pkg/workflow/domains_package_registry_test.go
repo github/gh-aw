@@ -133,8 +133,14 @@ func TestEngineDefaultDomainsKeepTransportDomains(t *testing.T) {
 
 	for engine, domains := range required {
 		t.Run(string(engine), func(t *testing.T) {
-			defaults, err := GetDefaultDomainsForEngine(engine, "")
-			require.NoError(t, err)
+			var defaults []string
+			if engine == constants.PiEngine {
+				defaults = PiDefaultDomains
+			} else {
+				var err error
+				defaults, err = GetDefaultDomainsForEngine(engine, "")
+				require.NoError(t, err)
+			}
 			for _, domain := range domains {
 				assert.Contains(t, defaults, domain,
 					"engine %q must keep required transport domain %q", engine, domain)

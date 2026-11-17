@@ -472,7 +472,6 @@ func (e *CodexEngine) defaultDomains(workflowData *WorkflowData) []string {
 	case LLMProviderGitHub:
 		// GitHub-hosted inference does not need direct OpenAI API access.
 		defaults = append(defaults, CopilotDefaultDomains...)
-		defaults = append(defaults, "api.githubcopilot.com")
 	}
 	return defaults
 }
