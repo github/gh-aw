@@ -188,6 +188,26 @@ Code in the expanded view is editable as plain text for live demonstrations.
 Edits affect only the expanded copy and are discarded when it closes; opening
 the snippet again restores its original contents.
 
+## Redirect fragments
+
+Moved pages use the `redirects` map in `astro.config.mjs`. After a production
+build, `src/lib/redirect-fragments.js` adds a script before each verified
+meta refresh so `/gh-aw/workshop/#x` redirects to
+`/gh-aw/guides/workshop/#x`. A destination's own fragment takes precedence:
+`/gh-aw/reference/servicenow-connector/#other` redirects to
+`/gh-aw/reference/connectors/#servicenow`.
+
+The integration supports static string redirects to root-relative paths or
+absolute HTTP(S) URLs. Object-form and dynamic redirects, protocol-relative
+destinations, and destinations containing whitespace, control characters or
+backslashes fail the build. Missing or mismatched meta refreshes also fail
+the build rather than patching an unverified page.
+
+This enhancement applies to built static pages, not the dev server. Without
+JavaScript, the original meta refresh still redirects but loses the incoming
+fragment. Run the rewrite unit tests from the repository root with
+`make test-docs-redirect-fragments`.
+
 ## ⚠️ Known Dev-Mode Limitations
 
 ### Sitemap behavior in dev and production
