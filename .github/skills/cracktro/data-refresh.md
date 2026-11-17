@@ -43,5 +43,6 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | Findings that land | `refresh/findings-that-land.md` |
 | Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
 | Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+| CLI vs MCP | `refresh/cli-vs-mcp.md` |
 | Skills in review | `refresh/skills-in-review.md` |
 

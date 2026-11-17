@@ -1001,7 +1001,7 @@
   .cvm-chip.s1 rect { fill: #8957e51a; stroke: #ab7df8; } .cvm-chip.s2 rect { fill: #1f6feb1a; stroke: #4493f8; }
   .cvm-ln { opacity: 0; transition: opacity .3s; } .cvm-ln.on { opacity: 1; } .cvm-ln.gone { opacity: .15; }
   .cvm-ln text { fill: #9198a1; font: 500 15px var(--mono); white-space: pre; }
-  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #3fb950; } .cvm-ln .ed { fill: #d29922; } .cvm-ln .jq { fill: #ffa657; font-weight: 700; }
+  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #3fb950; } .cvm-ln .ed { fill: #d29922; } .cvm-ln .jq { fill: #ffa657; font-weight: 700; } .cvm-ln .fl { fill: #79c0ff; font-weight: 700; }
   .cvm-yaml text { fill: #e6edf3; font: 500 20px var(--mono); white-space: pre; }
   .cvm-yaml .k { fill: #79c0ff; } .cvm-yaml .v { fill: #d29922; transition: fill .3s; } .cvm-yaml .v.on { fill: #3fb950; }
   .cvm-hl { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .3s, stroke .3s; } .cvm-hl.on { fill: #3fb9501a; stroke: #3fb950; }
@@ -1010,6 +1010,7 @@
   .cvm-bin .n { fill: #f0f6fc; font: 600 19px var(--mono); } .cvm-bin .d { fill: #9198a1; font: 500 14px var(--mono); }
   .cvm-ctx { opacity: 0; transition: opacity .4s; } .cvm-ctx.on { opacity: 1; }
   .cvm-ctx rect { fill: #ffffff08; stroke-width: 1.5; } .cvm-ctx text { font: 500 16px var(--mono); white-space: pre; }
+  .cvm-cap { text-anchor: middle; font-size: 13px; letter-spacing: .04em; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -8037,11 +8038,11 @@
     });
   }
 
-  // CLI vs MCP: MCP tool schemas fill the context before the agent thinks; gh-proxy and cli-proxy put gh and every MCP server on PATH as CLIs, read with --help on demand and filtered in the shell, so the same task spends far fewer tokens
+  // CLI vs MCP: MCP schemas and every page of results land in the context; gh-proxy and cli-proxy put gh and every MCP server on PATH, so output goes to files and through pipes, which scale to any size and leave only the answer in context
   {
     resetIndex();
     const VW = 1620,
-      VH = 648;
+      VH = 684;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     // synthetic tool schemas: [server class, tool name]
     const TOOLS = [
@@ -8050,28 +8051,30 @@
       ...["search", "get_page"].map(n => [2, n]),
     ];
     const CALL = [
-      ["cmd", '→ list_pull_requests {"state":"open"}'],
-      ["ed", "← 30 pull requests · full JSON objects"],
+      ["cmd", '→ list_pull_requests {"perPage":100}'],
+      ["ed", "← 100 pull requests · full JSON in context"],
       ["", "  body, user, labels, head, base, links…"],
+      ["ed", "→ page 2 … page 5 · every page in context"],
     ];
     const BINS = [
       ["gh", "gh-proxy · no GitHub MCP server"],
       ["safeoutputs", "cli-proxy · via the MCP gateway"],
       ["docs-search", "cli-proxy · via the MCP gateway"],
     ];
+    // output goes to a file; pipes pull out only the answer
     const SHELL = [
-      ["cmd", "$ gh pr list --json number,title \\"],
-      ["cmd", "    | jq -r '.[].title' | head -3"],
+      ["cmd", "$ gh pr list --limit 500 --json number,title,labels \\"],
+      ["cmd", "    > prs.json"],
+      ["ok", "✓ 500 pull requests on disk · 0 lines in context"],
+      ["cmd", "$ jq '[.[] | select(.labels == [])] | length' prs.json"],
+      ["", "37"],
+      ["cmd", "$ jq -r '.[] | select(.labels == []) | .title' \\"],
+      ["cmd", "    prs.json | head -2"],
       ["", "Fix flaky retry in cache step"],
       ["", "Add dark mode to settings"],
-      ["", "Bump parser to v2"],
-      ["cmd", "$ docs-search --help"],
-      ["", "search  get_page   ← schema on demand"],
-      ["cmd", '$ docs-search search --query "retry" \\'],
-      ["cmd", "    | jq -c '.hits[] | {path, line}'"],
+      ["cmd", "$ docs-search search --query retry > hits.json"],
+      ["cmd", "$ jq -c '.hits[0] | {path, line}' hits.json"],
       ["ok", '{"path":"docs/cache.md","line":42}'],
-      ["cmd", "$ safeoutputs add_comment '{\"item_number\":42,…}'"],
-      ["ok", "✓ queued for the safe-output job"],
     ];
     let g = `<defs><marker id="cvmG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
       <marker id="cvmC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
@@ -8086,9 +8089,9 @@
     });
     g += `<path class="fm-wire" id="cvmW0" d="M584 450 C 606 450, 594 230, 614 230" stroke="#d29922" marker-end="url(#cvmG)"/>`;
     g += `<path class="fm-wire" id="cvmW1" d="M1004 400 C 1026 400, 1014 180, 1034 180" stroke="#3fb950" marker-end="url(#cvmC)"/>`;
-    // what rides in the context: qualitative only, no measured token figures exist
+    // measured (refresh/cli-vs-mcp.md): median first model request of one workflow, same model, 15 runs per side
     const ctx = (x, id, col, txt) =>
-      `<g class="cvm-ctx" id="${id}"><text class="cvm-k" x="${x + 16}" y="556">IN CONTEXT</text>` +
+      `<g class="cvm-ctx" id="${id}"><text class="cvm-k" x="${x + 16}" y="556">MEASURED · FIRST REQUEST · MEDIAN</text>` +
       `<rect x="${x + 16}" y="568" width="536" height="40" rx="8" stroke="${col}"/><text x="${x + 32}" y="594" fill="${col}">${esc(txt)}</text></g>`;
     // MCP: every server's tool schemas ride along in every model request
     g += `<g class="sfl-box" id="cvmMcp"><rect class="sfl-card" x="16" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="32" y="104">agent context · github: local + 2 MCP servers</text>`;
@@ -8100,7 +8103,7 @@
     });
     g += `<text class="cvm-k" x="32" y="414">TOOL CALL</text>`;
     CALL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmC${i}"><text class="${c}" x="32" y="${444 + i * 26}">${esc(t)}</text></g>`));
-    g += ctx(16, "cvmXm", "#d29922", "every schema, every request · whole JSON") + `</g>`;
+    g += ctx(16, "cvmXm", "#d29922", "16 GitHub tool schemas · 16.7k tokens") + `</g>`;
     // front matter: two lines move GitHub reads to gh and mount every MCP server as a CLI
     g += `<g class="sfl-box" id="cvmFm"><rect class="sfl-card" x="616" y="76" width="388" height="556" rx="12"/><text class="sfl-title" x="632" y="104">.github/workflows/triage.md</text>`;
     g += `<rect class="cvm-hl" id="cvmH0" x="626" y="186" width="368" height="30" rx="6"/><rect class="cvm-hl" id="cvmH1" x="626" y="218" width="368" height="30" rx="6"/>`;
@@ -8116,15 +8119,17 @@
     // CLI: one prompt line per tool; schemas and data enter context only when asked for, already filtered
     g += `<g class="sfl-box" id="cvmCli"><rect class="sfl-card" x="1036" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="1052" y="104">agent context · gh-proxy + cli-proxy</text>`;
     g += `<text class="cvm-k" x="1052" y="136">PROMPT · ONE LINE PER CLI</text>`;
-    g += `<g class="cvm-ln" id="cvmP"><text x="1052" y="164">gh · safeoutputs · docs-search → <tspan class="cmd">--help</tspan></text></g>`;
-    g += `<text class="cvm-k" x="1052" y="206">SHELL · PIPE THROUGH JQ BEFORE CONTEXT</text>`;
-    // highlight the jq stage of each pipe
-    const pipe = t => {
-      const k = t.indexOf("| jq");
-      return k < 0 ? esc(t) : `${esc(t.slice(0, k))}<tspan class="jq">${esc(t.slice(k))}</tspan>`;
-    };
+    g += `<g class="cvm-ln" id="cvmP"><text x="1052" y="164">gh · safeoutputs · docs-search · <tspan class="cmd">--help</tspan> on demand</text></g>`;
+    g += `<text class="cvm-k" x="1052" y="206">SHELL · OUTPUT TO FILES · PIPES PICK THE ANSWER</text>`;
+    // highlight files and pipe stages
+    const pipe = t =>
+      esc(t)
+        .replace(/(&gt; )?[\w-]+\.json/g, m => `<tspan class="fl">${m}</tspan>`)
+        .replace(/\b(jq|head)\b/g, m => `<tspan class="jq">${m}</tspan>`)
+        .replace(/ \| /g, ` <tspan class="jq">|</tspan> `);
     SHELL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmS${i}"><text class="${c}" x="1052" y="${236 + i * 26}">${pipe(t)}</text></g>`));
-    g += ctx(1036, "cvmXc", "#3fb950", "one line per CLI · --help on demand · jq output") + `</g>`;
+    g += ctx(1036, "cvmXc", "#3fb950", "gh on PATH · 12.8k tokens · −23%") + `</g>`;
+    g += `<text class="cvm-k cvm-cap" x="${VW / 2}" y="672">MEASURED · one gh-aw workflow, MCP → gh-proxy + cli-proxy, same model · 15 runs per side, 23 Aug – 3 Sep 2026 · snapshot 17 Nov 2026 · whole-run cost: no consistent change</text>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg ao-svg");
@@ -8175,7 +8180,7 @@
     slides.push({
       group: "cost",
       notes:
-        "CLI vs MCP: the workflow, servers and pull requests on this slide are illustrative and synthetic, and it shows no token figures because none have been measured. An MCP server costs tokens before the agent does anything: every tool it exposes sends its name, description and JSON schema with every model request, and the GitHub MCP server alone exposes dozens of tools. Each call then returns whole JSON objects straight into the context. Two front matter lines change the surface without changing the servers. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a read-only command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. The prompt now carries one line per command; the agent runs --help only for the tool it needs and pipes every result through jq, picking just the fields it wants, then grep or head, so only those lines enter the context. Same task, same servers: the schemas and raw JSON no longer ride along, which can reduce token use. Both modes need bash; strict workflows with bash disabled stay on MCP.",
+        "CLI vs MCP: the workflow, servers, tool calls and pull requests in the flow are illustrative and synthetic; only the two boxes at the bottom and the caption are measured. An MCP server costs tokens before the agent does anything: every tool it exposes sends its name, description and JSON schema with the model request, and each call returns whole JSON objects into the context. Two front matter lines change the surface without changing the servers. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. That is what makes pipes and files possible, and they scale where MCP cannot. An MCP result has nowhere to go but the context, page after page, so a bigger task means a fuller context. A command's output can go to a file instead: five hundred pull requests land on disk and nothing enters the context. Then jq, grep and head pull out only the answer, a count or two titles, and the agent can query the same file again without fetching it again. The data grows on disk, not in the context. The prompt carries one line per command, and the agent reads --help only for the tool it needs. What we measured, from the usage artifact of gh-aw's own runs: one workflow switched from the GitHub MCP server, with its 16 tool schemas loaded up front, to gh-proxy plus cli-proxy, with the same model and nothing else changed. Over 15 runs on each side, between 23 August and 3 September 2026, the median first model request fell from 16,690 to 12,766 tokens, 23 percent. But prompt caching makes that fixed overhead cheap: the whole run's prompt tokens and AI credits did not fall, they were within a few percent. A larger natural experiment, 21 workflows switched in one commit that also changed the sandbox runtime, showed lower median AI credits on the gh-proxy side, against almost no drift in unchanged workflows, but individual workflows swung from minus 78 to plus 123 percent, so we do not put a number on it. Engines that defer MCP tool schemas, and MCP servers already behind cli-proxy, carried a median of about 400 extra first-request tokens. Snapshot taken 17 November 2026. Both modes need bash; strict workflows with bash disabled stay on MCP.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -8244,7 +8249,7 @@
             sfx.pop(7);
           });
       },
-      el: h("section", { class: "slide cvm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · MCP servers behind CLI surfaces"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))), svg),
+      el: h("section", { class: "slide cvm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · pipes and files, not context"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))), svg),
     });
   }
 
