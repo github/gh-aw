@@ -18,6 +18,26 @@ and mixed edits continue to require write-or-higher repository permission.
 
 ### Breaking changes
 
+Safe-output lifecycle reporting now uses `logs --delivery` and `logs --adoption`,
+with the same evaluator available in single-run `audit` and episode retrieval.
+Replace `--outcomes`, `--outcomes-dir`, and `GH_AW_OUTCOMES_DIR` with `--adoption`,
+`--adoption-dir`, and `GH_AW_ADOPTION_DIR`; use the `delivery` artifact selector.
+JSON fields use `delivery`, `adoption`, `adoption_summary`, `adoption_status`,
+and `episode_adoption`. Experiment metrics use `adoption:accepted` and
+`adoption:zero_touch`, with `adoption_window` and `analyze --adoption`.
+No aliases remain. Adoption separates verified human decisions from explicit
+delivery-time fallback; neither an adoption count nor a current survival snapshot
+establishes measured attributed value. See the delivery/adoption reference for
+retention, coverage, and the complete migration.
+
+Standalone reporting, historical repository scoring, and the separate offline
+episode-join command are removed. Use `logs --episodes --adoption` for recorded
+episode membership and joined adoption summaries.
+
+Safe-output execution facts now use `safe_output.execution` and
+`safe-output-executions.jsonl`; update consumers of the removed generic event and
+artifact names and recompile workflows. Existing sessions remain immutable.
+
 Eligible workflows that select neither a model nor routing now default to
 `goal: cost`, `mode: auto` model routing on GitHub Copilot inference. If task
 classification is unavailable or returns `unknown`, `auto` falls back to
@@ -59,14 +79,6 @@ admission is allowed. Actor authorization and trusted-checkout restrictions rema
 mandatory in strict mode; `acknowledge-risk`, disabled checkout, and trusted checkout
 policies do not bypass fork-pattern validation or suppress the unrestricted-forks warning.
 
-The `gh aw outcomes` command has been removed. Use `gh aw logs --outcomes`
-to evaluate selected runs, or pipe a run ID to
-`gh aw logs --stdin --repo owner/repo --outcomes`. JSON reports now carry
-per-run observations in `.outcomes[]` and episode rollups in `.episode_outcomes`.
-Historical repository scoring and the separate offline episode-join command have
-also been removed. Use `gh aw logs --episodes --outcomes` for episode summaries.
-`--outcomes-dir` remains available for JSONL export.
-
 `compile --dry-run` accepts workflow `steps` and `post-steps` but omits their
 code and credentials from emitted locks, so separate dispatch cannot execute
 them. It rejects `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP
@@ -78,6 +90,12 @@ unsupported declarations in a separate diagnostic workflow, reviewing omitted
 steps and skipped dependencies, and resolving actionable findings before live
 testing. Ordinary compilation is unchanged; dry-run is still not a hosted
 execution sandbox.
+
+The local compiler now rejects `tools.github.roles` and
+`tools.github.private-repos` instead of silently ignoring these unsupported
+GitHub MCP access-control fields. Remove them to restore compilation; they were
+not enforced before, and no local-compiler replacement is available while
+support remains deferred. Do not rely on them for authorization.
 
 AWF and downloaded Copilot CLI releases now require a reviewed checksum-manifest
 digest bundled in the trusted setup action or supplied as literal

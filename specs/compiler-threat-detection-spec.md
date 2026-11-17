@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.102
+**Version**: 1.0.103
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,9 +32,10 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.102` | Unreleased |
-| `1.0.44`–`1.0.57` | Unreleased |
+| `1.0.60`–`1.0.103` | Unreleased |
+| `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
+| `1.0.39` | `v0.87.9` |
 | `1.0.29`–`1.0.38` | `v0.87.9` |
 | `1.0.26`–`1.0.28` | `v0.87.4` |
 | `1.0.23`–`1.0.25` | `v0.87.1` |
@@ -444,9 +445,9 @@ Removing a rule dependency MUST deprecate—not delete—the catalog and mapping
 
 The current mappings identify one Section 5 MUST-level test obligation without a direct regression reference:
 
-| Requirement | Unreferenced test obligation | Follow-up |
-|---|---|---|
-| Section 5.1.1, CTR-032 | Tests MUST simulate destination API filtering and inspect the persisted or returned body. Section 7.1 records this destination-filtering coverage as outstanding. | Add publisher API-boundary regressions for issue comments, PR descriptions, and individual review comments/replies; then update the CTR-032 evidence mapping in Section 7.1. |
+| Requirement | Owner | Target test ID | Unreferenced test obligation | Follow-up |
+|---|---|---|---|---|
+| Section 5.1.1, CTR-032 | Safe Outputs maintainers | T-CTR-047 | Tests MUST simulate destination API filtering and inspect the persisted or returned body. Section 7.1 records this destination-filtering coverage as outstanding. | Add publisher API-boundary regressions for issue comments, PR descriptions, and individual review comments/replies; then update the CTR-032 evidence mapping in Section 7.1. |
 
 Other Section 5 requirements have test targets or explicit evidence mappings in Sections 7 and 8. This list records a test-reference gap, not a claim that the current implementation is nonconforming.
 
@@ -458,7 +459,7 @@ The daily optimizer MUST review recent compiler changes, related validation path
 
 `threat-detection-suppress` entries MUST provide a rule and non-empty reason; `expires` is optional ISO 8601. Active entries MUST retain rule, reason, and expiry in the lock-file manifest. Expired entries do not suppress a rule.
 
-The optimizer SHOULD resolve false positives affecting non-strict rejection controls within 10 business days. It MUST report older suppressions as `SLA_BREACH` with rule, reason, age, owner, and expiry, and MUST create a follow-up action after 20 business days. The mechanically-verified norms for suppression handling are cataloged as `T-CTR-024`–`T-CTR-029` in `specs/compiler-threat-detection-compliance/README.md` (Section 6.4 False-Positive Handling Norms).
+The optimizer MUST resolve a false-positive suppression affecting a non-strict rejection control within 10 business days. It MUST report suppressions unresolved after that period as `SLA_BREACH` with rule, reason, age, owner, and expiry, and MUST create a follow-up action after 20 business days. In this section, a false-positive suppression is an active `threat-detection-suppress` entry affecting a non-strict rejection control. The mechanically verified norms for suppression handling are cataloged as `T-CTR-024`–`T-CTR-029` in `specs/compiler-threat-detection-compliance/README.md` (Section 6.4 False-Positive Handling Norms); these are test IDs, not `CTR-*` rule identifiers, and there is no cataloged `CTR-024` rule.
 
 ### 6.2 Failure Safeguards
 

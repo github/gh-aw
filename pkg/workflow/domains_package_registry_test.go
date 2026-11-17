@@ -175,9 +175,6 @@ func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []
 					if rule == "github.com" && slices.Contains(githubPackageRegistryDomains, domain) {
 						continue
 					}
-					if engine == "threat-detection" && rule == "registry.npmjs.org" {
-						continue // Detection intentionally permits read-only npm lockfile validation.
-					}
 					if awfDomainRulesOverlap(rule, domain) {
 						overlaps = append(overlaps, engineEcosystemDomainOverlap{engine, rule, ecosystem, domain})
 					}
@@ -247,6 +244,7 @@ func TestEngineDefaultEcosystemOverlapGuard(t *testing.T) {
 		{"threat-detection", "*.docker.io", "containers", "*.docker.io"},
 		{"threat-detection", "*.debian.org", "linux-distros", "deb.debian.org"},
 		{"threat-detection", "*.npmjs.org", "node", "registry.npmjs.org"},
+		{"threat-detection", "registry.npmjs.org", "node", "registry.npmjs.org"},
 		{"threat-detection", "pypi.org", "python", "pypi.org"},
 		{"copilot", "registry.npmjs.org", "node", "registry.npmjs.org"},
 		{"copilot", "*.github.com", "node", "npm.pkg.github.com"},
@@ -277,7 +275,7 @@ func TestEngineDefaultEcosystemOverlapGuard(t *testing.T) {
 	t.Run("exact exceptions remain allowed", func(t *testing.T) {
 		defaults := map[string][]string{
 			"copilot":          {"github.com"},
-			"threat-detection": {"github.com", "registry.npmjs.org"},
+			"threat-detection": {"github.com"},
 		}
 		assert.Empty(t, engineDefaultEcosystemOverlaps(getLoadedDomainSets().Ecosystems, defaults))
 	})

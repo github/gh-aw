@@ -55,6 +55,46 @@ describe("essential unified session payloads", () => {
     }
   });
 
+  it("preserves supplemental lifecycle adoption observations as distinct delivery and adoption facts", () => {
+    const event = {
+      ...normalizeUnifiedSessionEvent({
+        type: "lifecycle.adoption",
+        data: {
+          sourceRunId: "123",
+          sourceWorkflow: "workflow.yml",
+          repository: "owner/repo",
+          outputType: "create_issue",
+          deliveryState: "delivered",
+          deliverySignal: "effect_applied",
+          deliveryAt: "2026-05-12T00:00:00Z",
+          deliveryObservedAt: "2026-05-12T01:00:00Z",
+          deliverySource: "safe-output-execution",
+          adoptionState: "accepted",
+          adoptionSignal: "delivered",
+          adoptionAt: "2026-05-12T00:00:00Z",
+          adoptionObservedAt: "2026-05-12T01:00:00Z",
+          adoptionSource: "delivery-rule",
+          adoptionRuleVersion: "1",
+          acceptanceKind: "fallback_delivery",
+          humanVerified: false,
+          adoptionCoverage: "available",
+          survivalState: "unknown",
+          survivalCoverage: "unsupported",
+          targetUrl: "https://github.com/owner/repo/issues/42",
+        },
+      }),
+      provenance: { component: "lifecycle", phase: "adoption", path: "adoption-123.jsonl", index: 1 },
+    };
+    expect(event.data).toMatchObject({
+      deliveryState: "delivered",
+      adoptionState: "accepted",
+      acceptanceKind: "fallback_delivery",
+      humanVerified: false,
+    });
+    expect(event.data).not.toHaveProperty("targetUrl");
+    expect(createSessionValidator("unified").event(event)).toBe(true);
+  });
+
   it.each(["yesterday", "2026-11-09T00:27:23.729", "2026-02-30T00:00:00Z", 8640000000000001, Infinity, { value: 0 }])("does not promote invalid native or archived message clocks %j", timestamp => {
     for (const original of [
       { type: "tool.execution_start", data: { toolCallId: "call", messageMetadata: { timestamp } } },

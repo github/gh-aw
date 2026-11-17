@@ -181,11 +181,13 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 	opts = ensureWorkQueueLogs(ctx, opts)
 
 	// Check if artifacts already exist on disk (since they're immutable)
+	hasCachedRequestedArtifacts := false
 	if fileutil.DirExists(opts.outputDir) && !fileutil.IsDirEmpty(opts.outputDir) {
 		filter, done := resolveCachedArtifacts(ctx, opts, shouldLogProgress)
 		if done {
 			return nil
 		}
+		hasCachedRequestedArtifacts = len(filter) < len(opts.artifactFilter)
 		opts.artifactFilter = filter
 	}
 
@@ -203,8 +205,22 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 		}
 		return err
 	}
+	if len(downloadableNames) == 0 && hasCachedRequestedArtifacts {
+		logsDownloadLog.Printf("No additional requested artifacts available; retaining cached artifacts: run_id=%d, missing=%v", opts.runID, opts.artifactFilter)
+		if shouldLogProgress {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No additional requested artifacts available for run %d; using cached artifacts", opts.runID)))
+		}
+		return nil
+	}
 
-	// Start spinner for network operation
+	if err := downloadPlannedArtifacts(ctx, opts, downloadableNames, individualDownload); err != nil {
+		return err
+	}
+
+	return finalizeArtifactDownload(ctx, opts)
+}
+
+func downloadPlannedArtifacts(ctx context.Context, opts downloadArtifactsOptions, downloadableNames []string, individualDownload bool) error {
 	spinner := console.NewSpinner(fmt.Sprintf("Downloading artifacts for run %d...", opts.runID))
 	if !opts.verbose {
 		spinner.Start()
@@ -235,7 +251,7 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 		spinner.StopWithMessage(fmt.Sprintf("✓ Downloaded artifacts for run %d", opts.runID))
 	}
 
-	return finalizeArtifactDownload(ctx, opts)
+	return nil
 }
 
 // planArtifactDownload determines which artifacts must be downloaded and whether they have

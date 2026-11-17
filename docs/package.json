@@ -21,6 +21,7 @@
     "check:cracktro": "tsc -p tsconfig.cracktro.json",
     "test": "playwright test",
     "test:jsonld": "ASTRO_TELEMETRY_DISABLED=1 node --test tests/jsonld-security.test.mjs",
+    "test:titles": "ASTRO_TELEMETRY_DISABLED=1 node --test tests/page-titles.test.mjs src/lib/rehype/deduplicateTitle.test.mjs",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug"
   },

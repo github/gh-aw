@@ -7,7 +7,7 @@ import { classifySafeOutputResult, computeSafeOutputsStatus } from "./safe_outpu
 import { main as createActionHandler } from "./safe_output_action_handler.cjs";
 import { main as createCallWorkflowHandler } from "./call_workflow.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
-import { buildSafeOutputOutcomes, finalizeBufferedReviewOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
+import { buildSafeOutputExecutions, finalizeBufferedReviewExecutions, projectSafeOutputData } from "./safe_output_execution.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -239,7 +239,7 @@ describe("safe-output runtime dependencies", () => {
       if (!results.some(result => result.result?.deferred_manifest)) return;
       calls.push("submit");
       expect(check).not.toHaveBeenCalled();
-      finalizeBufferedReviewOutcomes(results, "owner/repo", 42, {
+      finalizeBufferedReviewExecutions(results, "owner/repo", 42, {
         success: true,
         review_url: "https://github.com/owner/repo/pull/42#pullrequestreview-1",
         comment_count: 1,
@@ -328,7 +328,7 @@ describe("safe-output runtime dependencies", () => {
     const record = { messageIndex: 0, success: true, result: { deferred_manifest: true } };
     expect(classifySafeOutputResult(record)).toBe("deferred");
     expect(computeSafeOutputsStatus([record])).toMatchObject({ itemsApplied: 0, itemsDeferred: 1, status: "deferred" });
-    expect(buildSafeOutputOutcomes([record])[0].status).toBe("deferred");
+    expect(buildSafeOutputExecutions([record])[0].status).toBe("deferred");
   });
 
   it("only provisionally accepts a valid buffered comment for its own review", () => {
@@ -581,7 +581,7 @@ describe("safe-output runtime dependencies", () => {
   it("preserves server output IDs and dependency error codes in manifest outcomes", async () => {
     const handler = vi.fn(async () => ({ success: false }));
     const result = await processMessages(new Map([["add_comment", handler]]), [message(1), message(2, id(1))]);
-    const outcomes = buildSafeOutputOutcomes(result.results);
+    const outcomes = buildSafeOutputExecutions(result.results);
     expect(outcomes).toEqual([expect.objectContaining({ output_id: id(1), status: "failed" }), expect.objectContaining({ output_id: id(2), status: "failed", errorCode: "safe_output_dependency_failed" })]);
     expect(projectSafeOutputData(outcomes[1])).toMatchObject({ output_id: id(2), errorCode: "safe_output_dependency_failed" });
     expect(projectSafeOutputData({ output_id: "PRIVATE_CONTENT" })).not.toHaveProperty("output_id");
@@ -591,13 +591,13 @@ describe("safe-output runtime dependencies", () => {
       validator.event({
         type: "safe_output.result",
         data: projectSafeOutputData(outcomes[1]),
-        provenance: { component: "safe_outputs", phase: "safe_outputs", path: "safe-output-outcomes.jsonl", index: 0 },
+        provenance: { component: "safe_outputs", phase: "safe_outputs", path: "safe-output-executions.jsonl", index: 0 },
       })
     ).toBe(true);
   });
 
   it("retains one correlation ID across fanout execution outcomes", () => {
-    const outcomes = buildSafeOutputOutcomes([{ output_id: id(1), type: "add_comment", success: true, result: [{ success: true }, { success: false }] }]);
+    const outcomes = buildSafeOutputExecutions([{ output_id: id(1), type: "add_comment", success: true, result: [{ success: true }, { success: false }] }]);
     expect(outcomes.map(outcome => [outcome.output_id, outcome.status])).toEqual([
       [id(1), "success"],
       [id(1), "failed"],

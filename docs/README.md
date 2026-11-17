@@ -19,6 +19,12 @@ Inside of your Astro + Starlight project, you'll see the following folders and f
 
 Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
 
+Starlight renders the frontmatter `title` automatically. An opening Markdown
+`#` heading with the same text is deduplicated at build time, ignoring inline
+formatting, capitalization, and whitespace. Its anchor remains available for
+existing links. Distinct headings and headings after body content are preserved.
+Run `npm run test:titles` to check this behavior for Markdown and MDX pages.
+
 Images can be added to `src/assets/` and embedded in Markdown with a relative link.
 
 Static assets, like favicons, can be placed in the `public/` directory.

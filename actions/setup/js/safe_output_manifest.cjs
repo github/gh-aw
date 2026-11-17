@@ -5,13 +5,13 @@ const fs = require("fs");
 const nodePath = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
-const { buildSafeOutputOutcomes } = require("./safe_output_outcomes.cjs");
+const { buildSafeOutputExecutions } = require("./safe_output_execution.cjs");
 const { MANIFEST_FILE_PATH, TEMPORARY_ID_MAP_FILE_PATH, SAFE_OUTPUT_ERRORS_FILE_PATH } = require("./constants.cjs");
 const { redactBuiltInPatterns, redactSecrets, extractMCPGatewayTokens, MCP_GATEWAY_CONFIG_PATHS } = require("./redact_secrets.cjs");
 const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentity, assertClaimArtifactDirectory, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
 
 const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
-const SAFE_OUTPUT_OUTCOMES_FILE_NAME = "safe-output-outcomes.jsonl";
+const SAFE_OUTPUT_EXECUTIONS_FILE_NAME = "safe-output-executions.jsonl";
 const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
 const MERGE_PRODUCER_FAILURE_CODES = new Set(["required_check_producer_missing", "required_check_producer_mismatch", "required_check_producer_ambiguous"]);
 const MERGE_FAILURE_CODES = new Set([
@@ -152,12 +152,12 @@ function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath
 }
 
 /** @param {any[]} results @param {boolean} staged @param {string} [filePath] */
-function writeSafeOutputOutcomes(results, staged, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), SAFE_OUTPUT_OUTCOMES_FILE_NAME)) {
+function writeSafeOutputExecutions(results, staged, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), SAFE_OUTPUT_EXECUTIONS_FILE_NAME)) {
   try {
     const destination = scopedArtifactFile(filePath);
     fs.mkdirSync(nodePath.dirname(destination), { recursive: true });
     const secretValues = collectArtifactSecretValues();
-    const entries = buildSafeOutputOutcomes(results, staged).map(entry => redactManifestValue(entry, secretValues));
+    const entries = buildSafeOutputExecutions(results, staged).map(entry => redactManifestValue(entry, secretValues));
     fs.appendFileSync(destination, entries.map(entry => JSON.stringify(entry)).join("\n") + (entries.length ? "\n" : ""), { mode: 0o600 });
   } catch (error) {
     throw new Error(`${ERR_SYSTEM}: Failed to persist safe-output application outcomes`, { cause: error });
@@ -579,6 +579,6 @@ module.exports = {
   extractCreatedItemFromResult,
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
-  writeSafeOutputOutcomes,
+  writeSafeOutputExecutions,
   writeMergePullRequestDecision,
 };

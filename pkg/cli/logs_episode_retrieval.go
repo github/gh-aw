@@ -27,6 +27,7 @@ type EpisodeRetrievalOptions struct {
 	OutputDir         string
 	Refresh           bool
 	Outcomes          bool
+	Delivery          bool
 }
 
 // EpisodeRetrieval records collection bounds and evidence gaps, not completeness.
