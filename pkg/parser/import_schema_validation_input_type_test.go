@@ -33,6 +33,33 @@ func TestValidateImportInputType_NumberAllTypes(t *testing.T) {
 	err := validateImportInputType("count", "not-a-number", "number", nil, "owner/repo/import.md")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "must be a number")
+
+	bounded := map[string]any{"minimum": 1, "maximum": 5}
+	require.NoError(t, validateImportInputType("count", 1.5, "number", bounded, "owner/repo/import.md"))
+	err = validateImportInputType("count", 6, "number", bounded, "owner/repo/import.md")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be at most 5")
+}
+
+func TestValidateImportInputType_IntegerBounds(t *testing.T) {
+	paramDef := map[string]any{"minimum": 1, "maximum": 5}
+	for _, value := range []any{1, int64(3), float64(5)} {
+		require.NoError(t, validateImportInputType("count", value, "integer", paramDef, "owner/repo/import.md"))
+	}
+
+	for _, test := range []struct {
+		value any
+		error string
+	}{
+		{0, "must be at least 1"},
+		{6, "must be at most 5"},
+		{2.5, "must be an integer"},
+		{"3", "must be an integer"},
+	} {
+		err := validateImportInputType("count", test.value, "integer", paramDef, "owner/repo/import.md")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), test.error)
+	}
 }
 
 // TestValidateImportInputType_Boolean covers valid and invalid boolean inputs.

@@ -6,6 +6,7 @@ package parser
 import (
 	"fmt"
 	"maps"
+	"math/big"
 )
 
 // validateWithImportSchema validates the provided 'with'/'inputs' values against
@@ -13,8 +14,9 @@ import (
 // It checks that:
 //   - all required parameters declared in import-schema are present in 'with'
 //   - no unknown parameters are provided (i.e., not declared in import-schema)
-//   - provided values match the declared type (string, number, boolean, choice)
+//   - provided values match the declared type (string, number, integer, boolean, choice)
 //   - choice values are within the allowed options list
+//   - numeric values satisfy declared minimum and maximum bounds
 //
 // If the imported workflow has no 'import-schema', all provided 'with' values are
 // accepted without validation (backward compatibility with 'inputs' form).
@@ -125,14 +127,17 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 		}
 	case "number":
 		// Accept all numeric types that YAML parsers may produce
-		switch value.(type) {
-		case int, int8, int16, int32, int64,
-			uint, uint8, uint16, uint32, uint64,
-			float32, float64:
-			// OK
-		default:
+		number, ok := importInputNumber(value)
+		if !ok {
 			return fmt.Errorf("import '%s': 'with' input %q must be a number (got %T)", importPath, name, value)
 		}
+		return validateImportNumberBounds(name, number, paramDef, importPath)
+	case "integer":
+		number, ok := importInputNumber(value)
+		if !ok || !number.IsInt() {
+			return fmt.Errorf("import '%s': 'with' input %q must be an integer (got %T)", importPath, name, value)
+		}
+		return validateImportNumberBounds(name, number, paramDef, importPath)
 	case "boolean":
 		if _, ok := value.(bool); !ok {
 			return fmt.Errorf("import '%s': 'with' input %q must be a boolean (got %T)", importPath, name, value)
@@ -175,6 +180,63 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 		}
 	case "object":
 		return validateObjectInput(name, value, paramDef, importPath)
+	}
+	return nil
+}
+
+func importInputNumber(value any) (*big.Rat, bool) {
+	switch number := value.(type) {
+	case int:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int8:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int16:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int32:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int64:
+		return new(big.Rat).SetInt64(number), true
+	case uint:
+		return new(big.Rat).SetInt(new(big.Int).SetUint64(uint64(number))), true
+	case uint8:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case uint16:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case uint32:
+		return new(big.Rat).SetInt(new(big.Int).SetUint64(uint64(number))), true
+	case uint64:
+		return new(big.Rat).SetInt(new(big.Int).SetUint64(number)), true
+	case float32:
+		rational := new(big.Rat).SetFloat64(float64(number))
+		return rational, rational != nil
+	case float64:
+		rational := new(big.Rat).SetFloat64(number)
+		return rational, rational != nil
+	default:
+		return nil, false
+	}
+}
+
+func validateImportNumberBounds(name string, value *big.Rat, paramDef map[string]any, importPath string) error {
+	for _, bound := range []struct {
+		key     string
+		message string
+	}{
+		{"minimum", "must be at least"},
+		{"maximum", "must be at most"},
+	} {
+		rawLimit, exists := paramDef[bound.key]
+		if !exists {
+			continue
+		}
+		limit, ok := importInputNumber(rawLimit)
+		if !ok {
+			return fmt.Errorf("import '%s': import-schema %q must be a finite number", importPath, bound.key)
+		}
+		comparison := value.Cmp(limit)
+		if (bound.key == "minimum" && comparison < 0) || (bound.key == "maximum" && comparison > 0) {
+			return fmt.Errorf("import '%s': 'with' input %q %s %v", importPath, name, bound.message, rawLimit)
+		}
 	}
 	return nil
 }

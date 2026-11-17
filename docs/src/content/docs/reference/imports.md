@@ -156,12 +156,14 @@ Languages: ${{ github.aw.import-inputs.languages }}.
 |------|-------------|--------------|
 | `string` | Plain text value | — |
 | `number` | Numeric value | — |
+| `integer` | Whole numeric value | `minimum`, `maximum` |
 | `boolean` | `true`/`false` | — |
 | `choice` | One of a fixed set of strings | `options: [...]` |
 | `array` | Ordered list of values | `items.type` (element type) |
 | `object` | Key/value map | `properties` (one level deep) |
 
-Each field supports `required: true` and an optional `default` value.
+Each field supports `required: true` and an optional `default` value. Numeric
+and integer fields may set inclusive `minimum` and `maximum` bounds.
 
 ### Accessing inputs in shared workflows
 
