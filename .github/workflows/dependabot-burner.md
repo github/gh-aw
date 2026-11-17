@@ -85,10 +85,12 @@ tools:
     - "cd .github/workflows && npm install --package-lock-only --ignore-scripts"
     - "npm --prefix docs install --package-lock-only --ignore-scripts"
     - "npm --prefix actions/setup/js install --package-lock-only --ignore-scripts"
-    - "npm --prefix docs run build"
+    - "npm --prefix docs ci --ignore-scripts --legacy-peer-deps"
+    - "npm --prefix actions/setup/js ci --ignore-scripts"
     - "npm --prefix actions/setup/js run test:js -- *"
     - "go mod tidy"
     - "go mod verify"
+    - "go build ./..."
     - "go test *"
     - "uv pip compile *"
     - "python -m pip download --require-hashes --only-binary=:all: *"
@@ -531,9 +533,17 @@ and the downstream safe-output job determines whether publication succeeds.
 Validate the touched ecosystems, not unrelated manifests:
 
 - Workflow sources: `make dependabot && make build`; refresh generated npm locks if needed.
-- Docs/action npm: `npm --prefix <directory> install --package-lock-only --ignore-scripts`,
-  then the declared docs build or focused action tests.
-- Root Go: `go mod tidy`, `go mod verify`, focused dependency tests.
+- Docs npm: `npm --prefix docs install --package-lock-only --ignore-scripts`, then
+  `npm --prefix docs ci --ignore-scripts --legacy-peer-deps` to prove the manifest
+  and lock install cleanly. Do not run the docs site build here; it needs the WASM
+  bundle and GitHub API access, and repository CI builds docs on the replacement PR.
+- Action npm: `npm --prefix actions/setup/js install --package-lock-only --ignore-scripts`,
+  `npm --prefix actions/setup/js ci --ignore-scripts`, then focused tests with exactly
+  `npm --prefix actions/setup/js run test:js -- <test files>`. Never run `npm test`.
+- Root Go: `go mod tidy`, `go mod verify`, `go build ./...`, then `go test -short`
+  only for packages that import the updated module. Do not run `go test ./...`:
+  wall-clock budget tests such as `TestLintPerformanceBudget` are not dependency
+  validation and are unreliable under sandbox load.
 - Named Python requirements: follow lock-header generator/platform constraints;
   verify hashes with wheel-only `python -m pip download --require-hashes --only-binary=:all:`
   into a disposable directory. Do not install or execute downloaded packages.
