@@ -66,6 +66,10 @@ When asked to calm or re-brand the deck:
 4. Leave runtime chrome (`runtime.js`: progress bar, dots) neutral or single-hue too.
 5. Preview each changed slide (SKILL.md Preview loop) and check contrast: body ≥ 7:1, muted ≥ 4.5:1 on the slide background.
 
+## Title gradient hook
+
+`runtime.js` renders `.l-grad` as solid `#f0f6fc` by default. For a single-hue shimmer, set `--lg` to the slide accent on the slide or heading (e.g. `.atk-title { --lg: #79c0ff; }`); do not write new multi-stop `.l-grad` gradients.
+
 ## Generated brand assets
 
 For social cards, wallpapers, charts or a PowerPoint companion, use the `asset-generator` MCP; see `asset-generator.md`. Never embed its output in slides.
