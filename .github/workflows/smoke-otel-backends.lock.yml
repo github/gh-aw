@@ -77,7 +77,7 @@
 name: "Smoke OTEL"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "6 9 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:

@@ -68,7 +68,7 @@ on:
     types:
       - labeled
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "41 22 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:

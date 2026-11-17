@@ -54,7 +54,7 @@
 name: "Smoke Copilot Sub Agents"
 on:
   schedule:
-    - cron: "0 0 */2 * *"  # Friendly format: every 2 days
+    - cron: "8 19 */2 * *"  # Friendly format: every 2 days (scattered)
   workflow_dispatch:
     inputs:
       aw_context:

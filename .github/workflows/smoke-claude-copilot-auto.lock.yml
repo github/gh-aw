@@ -51,7 +51,7 @@
 name: "Smoke Claude Copilot Auto"
 on:
   schedule:
-    - cron: "0 0 */2 * *"  # Friendly format: every 2 days
+    - cron: "20 3 */2 * *"  # Friendly format: every 2 days (scattered)
   workflow_dispatch:
     inputs:
       aw_context:

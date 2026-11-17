@@ -59,7 +59,7 @@
 name: "Smoke Workflow Call"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "8 9 */2 * *"
   workflow_call:
     inputs:
       aw_context:

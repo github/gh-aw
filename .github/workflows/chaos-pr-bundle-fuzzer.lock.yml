@@ -65,7 +65,7 @@
 name: "Chaos PR Bundle Fuzzer"
 on:
   schedule:
-    - cron: "0 0 */7 * *"  # Friendly format: every 7 days
+    - cron: "53 20 */7 * *"  # Friendly format: every 7 days (scattered)
   workflow_dispatch:
     inputs:
       aw_context:

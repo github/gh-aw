@@ -59,7 +59,7 @@ on:
   # bots: # Bots processed as bot check in pre-activation job
   # - Copilot # Bots processed as bot check in pre-activation job
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "40 2 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:

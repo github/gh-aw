@@ -55,7 +55,7 @@
 name: "Smoke Claude on Copilot"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "49 2 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:

@@ -59,7 +59,7 @@
 name: "Smoke Service Ports"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "26 17 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:
