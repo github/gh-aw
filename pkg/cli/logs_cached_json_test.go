@@ -514,14 +514,14 @@ func TestFinalizeCachedLogsJSONLDeletesExpiredWildcardShards(t *testing.T) {
 
 func TestCachedLogsJSONLWriterFiltersAppendedContentByDateRange(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	oldRun := `{"schema_version":6,"kind":"run","run":{"run_id":1,"created_at":"2026-08-31T23:59:59Z","future_field":"preserved"}}`
-	firstIncludedRun := `{"schema_version":6,"kind":"run","run":{"run_id":2,"created_at":"2026-09-01T00:00:00Z"}}`
-	lastIncludedRun := `{"schema_version":6,"kind":"run","run":{"run_id":3,"created_at":"2026-09-10T23:59:59Z"}}`
-	futureRun := `{"schema_version":6,"kind":"run","run":{"run_id":4,"created_at":"2026-09-11T00:00:00Z"}}`
+	oldRun := `{"schema_version":7,"kind":"run","run":{"run_id":1,"created_at":"2026-08-31T23:59:59Z","future_field":"preserved"}}`
+	firstIncludedRun := `{"schema_version":7,"kind":"run","run":{"run_id":2,"created_at":"2026-09-01T00:00:00Z"}}`
+	lastIncludedRun := `{"schema_version":7,"kind":"run","run":{"run_id":3,"created_at":"2026-09-10T23:59:59Z"}}`
+	futureRun := `{"schema_version":7,"kind":"run","run":{"run_id":4,"created_at":"2026-09-11T00:00:00Z"}}`
 	workflowRuns := `{"schema_version":6,"kind":"workflow_runs","request":{"host":"github.com","repository":"github/gh-aw","args":["run","list"]},"payload":[{"databaseId":1}]}`
 	rateLimit := `{"schema_version":6,"kind":"github_api_rate_limit","rate_limit":{"host":"github.com"}}`
 	unknown := `{"schema_version":99,"kind":"future","value":"preserved"}`
-	withoutCreatedAt := `{"schema_version":6,"kind":"run","run":{"run_id":5}}`
+	withoutCreatedAt := `{"schema_version":7,"kind":"run","run":{"run_id":5}}`
 	futureSchemaRun := `{"schema_version":99,"kind":"run","run":{"run_id":7,"created_at":"2026-08-31T00:00:00Z"}}`
 	olderSchemaRun := `{"schema_version":1,"kind":"run","run":{"run_id":8,"created_at":"2026-08-31T00:00:00Z"}}`
 	previous := strings.Join([]string{oldRun, firstIncludedRun, lastIncludedRun, futureRun, workflowRuns, rateLimit, unknown, withoutCreatedAt, futureSchemaRun, olderSchemaRun}, "\n") + "\n"
