@@ -51,6 +51,28 @@ func TestDefaultCopilotChecksumsSHA256(t *testing.T) {
 	}
 }
 
+func TestDefaultCopilotVersionOutsideCooldownWindow(t *testing.T) {
+	t.Parallel()
+	const (
+		expectedVersion    Version = "1.0.103"
+		publishedAtRFC3339         = "2026-10-22T16:21:56Z"
+		minReleaseAge              = 72 * time.Hour
+	)
+
+	if DefaultCopilotVersion != expectedVersion {
+		t.Fatalf("DefaultCopilotVersion = %q, want %q; update this test metadata when changing the pinned default", DefaultCopilotVersion, expectedVersion)
+	}
+
+	publishedAt, err := time.Parse(time.RFC3339, publishedAtRFC3339)
+	if err != nil {
+		t.Fatalf("parse publishedAtRFC3339: %v", err)
+	}
+
+	if age := time.Since(publishedAt); age < minReleaseAge {
+		t.Fatalf("Copilot CLI %s is only %s old; the pinned default must be at least %s old before building gh-aw", DefaultCopilotVersion, age.Round(time.Second), minReleaseAge)
+	}
+}
+
 func TestDefaultThreatDetectReleasePins(t *testing.T) {
 	t.Parallel()
 

@@ -265,6 +265,8 @@ Specifies which AI engine interprets the markdown section. See [AI Engines](/gh-
 engine: copilot
 ```
 
+`engine.cooldown` sets the minimum release age for npm engine installs (default: `3` days). The pinned Copilot CLI default is checked statically in gh-aw's build-time tests instead; installation does not query release metadata or need a github.com token, including on Enterprise (`ghe.com`). The setting still applies to Copilot SDK npm installs. See [Engine release-age cooldown](/gh-aw/reference/engines/#engine-release-age-cooldown).
+
 Harness retry and post-result watchdog settings live under `engine.harness` for built-in Copilot, Claude, and Codex harnesses:
 
 ```yaml wrap

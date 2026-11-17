@@ -64,7 +64,7 @@ engine:
 | `id` | Built-in ID, or the ID of an [imported definition](/gh-aw/reference/third-party-agent/). |
 | `model` | Exact model ID, alias, or provider-prefixed selection; may also be top-level `model`. |
 | `version` | Override the compiler-pinned CLI version. |
-| `cooldown` | Minimum release age in nonnegative integer days; defaults to `3`. Explicit `0` is rejected in strict mode. |
+| `cooldown` | Minimum release age for npm installs in nonnegative integer days; defaults to `3`. Explicit `0` is rejected in strict mode. Copilot CLI uses a static build-time check instead. |
 | `env` | Engine-only runtime values; use top-level `env` for all steps. [Scope and precedence](/gh-aw/reference/environment-variables/) apply. |
 | `args` | Ordered native CLI arguments placed before the prompt. Agy rejects it. |
 | `command` | Replacement executable that skips the engine installer, not AWF installation. Provision it in setup steps; Agy checks the verified version, and Copilot checksum pins cannot be combined with it. |
@@ -129,17 +129,19 @@ Versions may use Actions expressions, passed through environment variables rathe
 
 ### Engine release-age cooldown
 
-Compiler-managed engine installs require releases to be at least **3 days** old by default. Configure a different age with `engine.cooldown`:
+Compiler-managed npm engine installs require releases to be at least **3 days** old by default. Configure a different age with `engine.cooldown`:
 
 ```aw
 engine:
-  id: copilot
+  id: codex
   cooldown: 7
 ```
 
 The value must be a nonnegative integer number of days; booleans, strings, durations, and expressions are rejected. `cooldown: 0` disables the check only with `strict: false`. Omitting the field keeps the default.
 
-Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass the age to npm via `NPM_CONFIG_MIN_RELEASE_AGE`, including microVM staging. npm enforces it with its built-in `min-release-age` setting, so runtime overrides need npm **11.10.0 or later**. Copilot's installer checks GitHub release publication metadata before activating a cached CLI or downloading an archive; missing or invalid metadata fails the install. The cooldown does not replace checksum verification or pins.
+Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass the age to npm via `NPM_CONFIG_MIN_RELEASE_AGE`, including microVM staging. npm enforces it with its built-in `min-release-age` setting, so runtime overrides need npm **11.10.0 or later**.
+
+The pinned Copilot CLI default has a static **3-day** release-age check in gh-aw's build-time tests. Its installer does not query release metadata or require a github.com token, so Enterprise (`ghe.com`) job tokens do not cause release-age authentication failures. `engine.cooldown` applies to Copilot SDK npm installs, not the CLI binary or custom CLI versions. Checksum verification and release pins remain independent and unchanged.
 
 The policy does not cover shell installers, `engine.command` executables, pre-agent steps, or extensions. Runtime dependency cooldowns use `runtimes.<id>.cooldown` (a boolean). Imported definitions that set `behaviors.installation.cooldown` are ignored; set `engine.cooldown` in the workflow instead.
 

@@ -11,85 +11,35 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestInstallCopilotCLIReleaseAgeRequiresJQ(t *testing.T) {
-	root, err := os.Getwd()
-	require.NoError(t, err)
-	installer := filepath.Join(root, "..", "..", "actions", "setup", "sh", "install_copilot_cli.sh")
-	bash, err := exec.LookPath("bash")
-	require.NoError(t, err)
-
-	for _, version := range []string{"1.2.3", "latest"} {
-		t.Run(version, func(t *testing.T) {
-			dir := t.TempDir()
-			binDir := filepath.Join(dir, "bin")
-			runnerTemp := filepath.Join(dir, "runner-temp")
-			prepareCopilotInstallerTestBin(t, binDir)
-			// Restrict PATH to installer prerequisites, deliberately excluding jq.
-			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "stat", "rm"} {
-				path, err := exec.LookPath(name)
-				require.NoError(t, err)
-				require.NoError(t, os.Symlink(path, filepath.Join(binDir, name)))
-			}
-			logPath := filepath.Join(dir, "curl.log")
-			require.NoError(t, os.WriteFile(filepath.Join(binDir, "curl"), []byte(`#!/usr/bin/env bash
-echo called >> "$CURL_LOG"
-exit 97
-`), 0o755))
-			cmd := exec.Command(bash, installer, version, "--rootless", "--cooldown-days", "3")
-			cmd.Env = append(os.Environ(), "HOME="+dir, "PATH="+binDir,
-				"TMPDIR="+dir, "RUNNER_TEMP="+runnerTemp, "CURL_LOG="+logPath, "GITHUB_TOKEN=test-token")
-			output, err := cmd.CombinedOutput()
-			require.Error(t, err, "%s", output)
-			assert.Contains(t, string(output), "jq is required for Copilot release-age validation")
-			assert.Contains(t, string(output), "Install jq from https://jqlang.github.io/jq/download/")
-			assert.NotContains(t, string(output), "release metadata is invalid")
-			assert.NoFileExists(t, logPath, "missing jq must fail before fetching metadata")
-			assert.NoFileExists(t, filepath.Join(runnerTemp, "gh-aw", "bin", "copilot"))
-		})
-	}
-}
-
-func TestInstallCopilotCLIReleaseAgeCooldown(t *testing.T) {
+func TestInstallCopilotCLIWithoutReleaseMetadata(t *testing.T) {
 	root, err := os.Getwd()
 	require.NoError(t, err)
 	root = filepath.Join(root, "..", "..")
-	recent := time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
-	fourDays := time.Now().UTC().Add(-4 * 24 * time.Hour).Format(time.RFC3339)
-	release := func(published string) string {
-		return fmt.Sprintf(`{"draft":false,"tag_name":"v1.2.3","published_at":%q}`, published)
-	}
 	for _, test := range []struct {
 		name      string
 		cached    bool
 		days      string
-		version   string
-		metadata  string
+		token     string
 		wantError string
 		tamper    bool
 	}{
-		{"cached-old", true, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "", false},
-		{"cached-recent", true, "3", "1.2.3", release(recent), "at least 3 days old", false},
-		{"cached-longer-cooldown", true, "7", "1.2.3", release(fourDays), "at least 7 days old", false},
-		{"cached-missing-time", true, "3", "1.2.3", `{"draft":false,"tag_name":"v1.2.3"}`, "metadata is invalid", false},
-		{"cached-invalid-time", true, "3", "1.2.3", release("not-a-date"), "metadata is invalid", false},
-		{"cached-wrong-tag", true, "3", "1.2.3", `{"draft":false,"tag_name":"v9.9.9","published_at":"2000-01-01T00:00:00Z"}`, "metadata is invalid", false},
-		{"cached-unavailable", true, "3", "1.2.3", "", "metadata is unavailable", false},
-		{"cached-disabled", true, "0", "1.2.3", "", "", false},
-		{"download-recent", false, "3", "1.2.3", release(recent), "at least 3 days old", false},
-		{"download-old", false, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "", false},
-		{"download-latest", false, "3", "latest", release("2000-01-01T00:00:00Z"), "", false},
-		{"download-tampered-manifest", false, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "SHA256", true},
-		{"negative-days", true, "-1", "1.2.3", "", "nonnegative integer", false},
-		{"boolean-days", true, "false", "1.2.3", "", "nonnegative integer", false},
-		{"fractional-days", true, "1.5", "1.2.3", "", "nonnegative integer", false},
+		{"cached-enterprise-token", true, "", "ghe-test-token", "", false},
+		{"download-enterprise-token", false, "", "ghe-test-token", "", false},
+		{"cached-no-token", true, "", "", "", false},
+		{"download-no-token", false, "", "", "", false},
+		{"cached-legacy-cooldown", true, "3", "ghe-test-token", "", false},
+		{"download-legacy-cooldown", false, "7", "ghe-test-token", "", false},
+		{"cached-legacy-disabled", true, "0", "", "", false},
+		{"download-tampered-manifest", false, "3", "ghe-test-token", "SHA256", true},
+		{"negative-days", true, "-1", "", "nonnegative integer", false},
+		{"boolean-days", true, "false", "", "nonnegative integer", false},
+		{"fractional-days", true, "1.5", "", "nonnegative integer", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -117,8 +67,6 @@ func TestInstallCopilotCLIReleaseAgeCooldown(t *testing.T) {
 			}
 			manifestPath := filepath.Join(dir, "SHA256SUMS.txt")
 			require.NoError(t, os.WriteFile(manifestPath, manifest, 0o644))
-			metadataPath := filepath.Join(dir, "release.json")
-			require.NoError(t, os.WriteFile(metadataPath, []byte(test.metadata), 0o644))
 			installer, err := os.ReadFile(filepath.Join(root, "actions/setup/sh/install_copilot_cli.sh"))
 			require.NoError(t, err)
 			installerPath := filepath.Join(dir, "install_copilot_cli.sh")
@@ -156,8 +104,8 @@ done
 echo "$authorization $url" >> "$CURL_LOG"
 case "$url" in
   https://api.github.com/repos/github/copilot-cli/releases/*)
-    [ -s "$MOCK_RELEASE" ] || exit 97
-    cp "$MOCK_RELEASE" "$output" ;;
+    echo "curl: (22) The requested URL returned error: 401" >&2
+    exit 22 ;;
   */SHA256SUMS.txt) cp "$MOCK_MANIFEST" "$output" ;;
   */copilot-linux-x64.tar.gz) cp "$MOCK_ARCHIVE" "$output" ;;
   *) echo "unexpected URL: $url" >&2; exit 97 ;;
@@ -168,7 +116,10 @@ esac
 			require.NoError(t, os.MkdirAll(installDir, 0o755))
 			runnerTemp := filepath.Join(dir, "runner-temp")
 			require.NoError(t, os.MkdirAll(runnerTemp, 0o700))
-			args := []string{installerPath, test.version, "--cooldown-days", test.days}
+			args := []string{installerPath, "1.2.3"}
+			if test.days != "" {
+				args = append(args, "--cooldown-days", test.days)
+			}
 			if test.cached {
 				args = append(args, "--checksums-sha256", pin, "--prefer-toolcache")
 			}
@@ -178,8 +129,8 @@ esac
 				"RUNNER_TEMP="+runnerTemp,
 				"COPILOT_INSTALL_DIR="+installDir, "GITHUB_PATH="+filepath.Join(dir, "github-path"),
 				"PATH="+binDir+":"+os.Getenv("PATH"), "CURL_LOG="+logPath,
-				"MOCK_RELEASE="+metadataPath, "MOCK_MANIFEST="+manifestPath, "MOCK_ARCHIVE="+archivePath,
-				"GITHUB_TOKEN=test-token",
+				"MOCK_MANIFEST="+manifestPath, "MOCK_ARCHIVE="+archivePath,
+				"GITHUB_TOKEN="+test.token, "GH_HOST=github.com", "GITHUB_SERVER_URL=https://test.ghe.com",
 			)
 			output, err := cmd.CombinedOutput()
 			if test.wantError != "" {
@@ -191,22 +142,12 @@ esac
 				assert.FileExists(t, filepath.Join(installDir, "copilot"))
 			}
 			log, _ := os.ReadFile(logPath)
-			if test.days == "0" {
-				assert.Empty(t, log, "explicit zero must not query release metadata")
-			} else if strings.Contains(string(log), "api.github.com") {
-				assert.Contains(t, string(log), strings.Join([]string{"Authorization:", "Bearer", "test-token"}, " "))
-			}
-			if test.days != "0" && test.wantError == "" {
-				assert.Contains(t, string(log), "https://api.github.com/repos/github/copilot-cli/releases/")
-				if test.version == "latest" {
-					assert.Contains(t, string(log), "/releases/latest")
-					assert.Contains(t, string(log), "/releases/download/v1.2.3/", "bind downloads to the release whose age was checked")
-				}
-			} else if !test.tamper {
-				assert.NotContains(t, string(log), "/SHA256SUMS.txt", "age rejection must precede archive verification")
-			}
+			assert.NotContains(t, string(log), "api.github.com", "release metadata must not be requested at runtime")
+			assert.NotContains(t, string(log), "Authorization:", "the Enterprise token must not be sent to github.com")
 			if test.cached {
-				assert.NotContains(t, string(log), ".tar.gz", "cached installs should only need release metadata")
+				assert.Empty(t, log, "an exact toolcache hit must not need network access")
+			} else {
+				assert.Contains(t, string(log), "/SHA256SUMS.txt", "downloads must still verify the pinned manifest")
 			}
 		})
 	}

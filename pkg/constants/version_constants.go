@@ -39,6 +39,7 @@ const DefaultClaudeCodeVersion Version = "2.1.319"
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
+//   - The release is at least 3 days old (TestDefaultCopilotVersionOutsideCooldownWindow)
 const DefaultCopilotVersion Version = "1.0.103"
 
 // DefaultCopilotChecksumsSHA256 authenticates DefaultCopilotVersion's SHA256SUMS.txt.
