@@ -456,9 +456,6 @@ func generateAWFInstallationStep(version string, agentConfig *AgentSandboxConfig
 
 	stepLines := []string{
 		"      - name: Install AWF binary",
-		"        env:",
-		"          GH_TOKEN: ${{ github.token }}",
-		"          GH_HOST: github.com",
 		"        run: " + installCmd,
 	}
 
@@ -484,8 +481,6 @@ func generateDockerEnclaveStorageHelperInstallStep(version string, agentConfig *
 		"      - name: Install authenticated Docker enclave storage helper",
 		"        shell: bash",
 		"        env:",
-		"          GH_TOKEN: ${{ github.token }}",
-		"          GH_HOST: github.com",
 		"          AWF_HELPER_VERSION: " + version,
 	}
 	if agentConfig != nil && agentConfig.ChecksumsSHA256 != "" {

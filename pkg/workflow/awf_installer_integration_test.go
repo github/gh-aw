@@ -36,7 +36,7 @@ func TestDefaultFirewallReleaseHasReviewedPin(t *testing.T) {
 	}
 }
 
-func TestAWFInstallerAuthenticationIsStepLocal(t *testing.T) {
+func TestAWFInstallerDoesNotReceiveGitHubToken(t *testing.T) {
 	t.Parallel()
 	data := &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF}}}
 	steps := map[string]string{
@@ -46,7 +46,6 @@ func TestAWFInstallerAuthenticationIsStepLocal(t *testing.T) {
 	for name, step := range steps {
 		t.Run(name, func(t *testing.T) {
 			for _, required := range []string{
-				"        env:\n          GH_TOKEN: ${{ github.token }}\n          GH_HOST: github.com\n",
 				"install_awf_binary.sh",
 				"--rootless",
 			} {
@@ -54,8 +53,10 @@ func TestAWFInstallerAuthenticationIsStepLocal(t *testing.T) {
 					t.Errorf("installer lacks %q:\n%s", required, step)
 				}
 			}
-			if strings.Contains(step, "secrets.") || strings.Contains(step, "sudo -E") {
-				t.Fatal("installer must use only its own public GitHub Actions token")
+			for _, forbidden := range []string{"secrets.", "sudo -E", "github.token", "GH_TOKEN", "GH_HOST"} {
+				if strings.Contains(step, forbidden) {
+					t.Errorf("installer must not receive credentials or gh CLI configuration, found %q:\n%s", forbidden, step)
+				}
 			}
 		})
 	}
@@ -156,7 +157,6 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			step := generateDockerEnclaveStorageHelperInstallStep(version, &AgentSandboxConfig{ChecksumsSHA256: pin})
 			text := strings.Join(step, "\n")
 			for _, required := range []string{
-				"GH_TOKEN: ${{ github.token }}", "GH_HOST: github.com",
 				"AWF_HELPER_CHECKSUMS_SHA256: " + pin,
 				`verify_release_digest "$install_dir/checksums.txt" "$checksums_sha256"`,
 				`$2 == "enclave-storage-helper.py"`,
@@ -187,7 +187,7 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 				"curl |", "| bash", "--rootless", "install.sh", "AWF_FORCE_BINARY",
 				"<<'PY'",
 				"verify_release_attestation", "verify_release_identity", "release-identity.txt",
-				"gh attestation", "gh api",
+				"gh attestation", "gh api", "github.token", "GH_TOKEN", "GH_HOST",
 			} {
 				if strings.Contains(text, forbidden) {
 					t.Errorf("helper setup must not grant broad privileges: %s", forbidden)
