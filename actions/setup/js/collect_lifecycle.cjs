@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const { isDeepStrictEqual } = require("node:util");
 const { ERR_API, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
@@ -279,7 +280,7 @@ function collectLifecycle({ memoryDir, metricsDir, repository, now = new Date(),
     state.observed_at = now.toISOString();
     const partial = state.window !== null || discoveryDeferred || unavailable.size > 0 || errors.length > 0 || refreshed.coverage !== "complete";
     const summary = {
-      schema_version: 1,
+      schema_version: 2,
       repository,
       observed_at: now.toISOString(),
       scope: "retained_deliveries",
@@ -293,6 +294,15 @@ function collectLifecycle({ memoryDir, metricsDir, repository, now = new Date(),
       totals: emptyCounts(),
       /** @type {Record<string, Record<string, number>>} */
       workflows: Object.create(null),
+      ledger: {
+        memory_id: "lifecycle",
+        branch: "memory/output-lifecycle",
+        path: "lifecycle.jsonl",
+        schema_version: 7,
+        sha256: crypto.createHash("sha256").update(content).digest("hex"),
+        bytes: Buffer.byteLength(content),
+        records: finalRows.size,
+      },
     };
     for (const record of refreshed.records) {
       if (typeof record.workflow !== "string" || record.workflow.length === 0) throw new Error(`${ERR_VALIDATION}: Retained delivery has no source workflow`);
@@ -319,6 +329,7 @@ function collectLifecycle({ memoryDir, metricsDir, repository, now = new Date(),
     writeAtomic(ledgerFile, content);
     writeAtomic(stateFile, stateJSON);
     writeAtomic(path.join(metricsDir, "lifecycle.json"), summaryJSON);
+    writeAtomic(path.join(metricsDir, "lifecycle", "daily", `${now.toISOString().slice(0, 10)}.json`), summaryJSON);
     for (const error of errors) console.error(`${ERR_API}: ${error}`);
     return summary;
   } finally {

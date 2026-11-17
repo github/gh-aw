@@ -16,10 +16,12 @@ const frontmatter = source.split("---")[1];
 const maxFileBytes = Number(frontmatter.match(/max-file-size: (\d+)/)[1]);
 const maxPatchBytes = Number(frontmatter.match(/max-patch-size: (\d+)/)[1]);
 const gate = source.match(/    validation:\n      script: \|\n([\s\S]*?)\n  - id: lifecycle/)[1].replace(/^        /gm, "");
-const prune = source.match(/node <<'NODE'\n([\s\S]*?)\nNODE/)[1];
 const example = JSON.parse(source.match(/Create a JSON object following this schema:\n\n```json\n([\s\S]*?)\n```/)[1]);
+const { loadWorkflowInventory, pruneUploadHistory } = require("./workflow_value_report.cjs");
+const workflowIds = loadWorkflowInventory(repoRoot).workflows.map(workflow => workflow.id);
+const firstWorkflow = workflowIds[0];
 const tempDirs = [];
-const migratedSnapshotBytes = 460000;
+const migratedSnapshotBytes = 500000;
 
 function temporaryDirectory() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "metrics-contract-"));
@@ -31,8 +33,8 @@ function snapshot(bytes = migratedSnapshotBytes, timestamp = "2026-10-14T02:00:0
   const data = {
     ...example,
     timestamp,
-    workflows: Object.fromEntries(Array.from({ length: 344 }, (_, index) => [`workflow-${index}`, example.workflows["workflow-name"]])),
-    ecosystem: { ...example.ecosystem, total_workflows: 344 },
+    workflows: Object.fromEntries(workflowIds.map(id => [id, structuredClone(example.workflows["workflow-name"])])),
+    ecosystem: { ...example.ecosystem, total_workflows: workflowIds.length },
     collection_note: "",
   };
   const initialBytes = Buffer.byteLength(JSON.stringify(data, null, 2) + "\n");
@@ -46,6 +48,46 @@ function writeSnapshot(root, content = snapshot()) {
   fs.writeFileSync(path.join(root, "latest.json"), content);
   const day = JSON.parse(content).timestamp.slice(0, 10);
   fs.writeFileSync(path.join(root, "daily", `${day}.json`), content);
+  const lifecycle =
+    JSON.stringify({
+      schema_version: 2,
+      repository: "owner/repo",
+      observed_at: JSON.parse(content).timestamp,
+      scope: "retained_deliveries",
+      coverage: "complete",
+      discovery_complete: true,
+      discovery_completed_until: JSON.parse(content).timestamp,
+      unavailable_runs: 0,
+      refreshed: 0,
+      deferred: 0,
+      errors: [],
+      totals: {
+        delivered: 0,
+        accepted_human: 0,
+        accepted_delivery_fallback: 0,
+        rejected: 0,
+        pending: 0,
+        lifecycle: 0,
+        not_applicable: 0,
+        unknown: 0,
+        survival_observed: 0,
+        survival_reversed: 0,
+        survival_unknown: 0,
+      },
+      workflows: {},
+      ledger: {
+        memory_id: "lifecycle",
+        branch: "memory/output-lifecycle",
+        path: "lifecycle.jsonl",
+        schema_version: 7,
+        sha256: "0".repeat(64),
+        bytes: 0,
+        records: 0,
+      },
+    }) + "\n";
+  fs.mkdirSync(path.join(root, "lifecycle", "daily"), { recursive: true });
+  fs.writeFileSync(path.join(root, "lifecycle.json"), lifecycle);
+  fs.writeFileSync(path.join(root, "lifecycle", "daily", `${day}.json`), lifecycle);
   return content;
 }
 
@@ -69,15 +111,21 @@ function runGate(root, script = gate, phase = "upload") {
     Buffer,
     memoryPhase: phase,
     Date: FixtureDate,
+    process: { env: { GITHUB_REPOSITORY: "owner/repo" } },
   });
 }
 
 function runPrune(root) {
-  vm.runInNewContext(prune.replace('"/tmp/gh-aw/repo-memory/default/metrics"', JSON.stringify(root)), { require });
+  const timestamp = JSON.parse(fs.readFileSync(path.join(root, "latest.json"), "utf8")).timestamp;
+  pruneUploadHistory(root, timestamp.slice(0, 10));
 }
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: "pipe" });
+}
+
+function commit(root, message, extra = []) {
+  git(root, ["commit", "--quiet", ...extra, "-m", message, "-m", "Co-authored-by: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>"]);
 }
 
 function initializeRepository() {
@@ -86,8 +134,9 @@ function initializeRepository() {
   git(root, ["config", "user.name", "Metrics test"]);
   git(root, ["config", "user.email", "metrics-test@example.invalid"]);
   git(root, ["config", "core.hooksPath", "/dev/null"]);
+  git(root, ["config", "commit.gpgsign", "false"]);
   git(root, ["remote", "add", "origin", path.join(root, "unused-local-remote")]);
-  git(root, ["commit", "--quiet", "--allow-empty", "-m", "Fixture baseline"]);
+  commit(root, "Fixture baseline", ["--allow-empty"]);
   return root;
 }
 
@@ -118,24 +167,30 @@ describe("Metrics Collector serialized storage contract", () => {
     expect(upload).toContain("steps.validate_repo_memory_64656661756c74.outcome == 'success'");
     expect(lock).toContain("ALLOWED_EXTENSIONS: '[\".json\"]'");
     expect(lock).toContain('FILE_GLOB_FILTER: "metrics/**"');
+    expect(source).toContain("node actions/setup/js/workflow_value_report.cjs");
+    expect(source).toContain("node actions/setup/js/workflow_value_report_verify.cjs");
+    expect(source).toContain("name: workflow-value-report");
+    expect(lock).toContain("actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9");
+    expect(lock).toContain("path: /tmp/gh-aw/workflow-value-report");
+    expect(lock).toContain("run: node actions/setup/js/workflow_value_report_verify.cjs");
   });
 
-  it("fits the complete migrated 344-workflow schema without dropping fields", () => {
+  it("fits the complete repository-derived workflow schema without dropping fields", () => {
     const root = temporaryDirectory();
     const content = writeSnapshot(root);
     expect(Buffer.byteLength(content)).toBe(migratedSnapshotBytes);
     expect(Buffer.byteLength(content)).toBeGreaterThan(102400);
     expect(Buffer.byteLength(JSON.stringify(JSON.parse(content)))).toBeGreaterThan(131072);
     expect(Buffer.byteLength(content)).toBeLessThan(maxFileBytes);
-    expect(Object.keys(JSON.parse(content).workflows)).toHaveLength(344);
+    expect(Object.keys(JSON.parse(content).workflows)).toHaveLength(workflowIds.length);
     runGate(root);
     expect(fs.readFileSync(path.join(root, "latest.json"), "utf8")).toBe(content);
     expect(fs.readFileSync(path.join(root, "daily/2026-10-14.json"), "utf8")).toBe(content);
   });
 
   it("rejects workflow totals that do not match outcome counts", () => {
-    const root = snapshotWithMutation(data => data.workflows["workflow-0"].workflow_runs.total++);
-    expect(() => runGate(root)).toThrow("Workflow run total does not match outcome counts: workflow-0.");
+    const root = snapshotWithMutation(data => data.workflows[firstWorkflow].workflow_runs.total++);
+    expect(() => runGate(root)).toThrow(`Workflow run total does not match outcome counts: ${firstWorkflow}.`);
   });
 
   it.each([
@@ -158,32 +213,32 @@ describe("Metrics Collector serialized storage contract", () => {
       },
     ],
   ])("rejects %s", (_, mutate) => {
-    const root = snapshotWithMutation(data => mutate(data.workflows["workflow-0"].workflow_runs));
-    expect(() => runGate(root)).toThrow("Workflow run counts must be non-negative integers: workflow-0.");
+    const root = snapshotWithMutation(data => mutate(data.workflows[firstWorkflow].workflow_runs));
+    expect(() => runGate(root)).toThrow(`Workflow run counts must be non-negative integers: ${firstWorkflow}.`);
   });
 
   it.each([
     [
       "a null workflow",
       data => {
-        data.workflows["workflow-0"] = null;
+        data.workflows[firstWorkflow] = null;
       },
     ],
     [
       "null workflow runs",
       data => {
-        data.workflows["workflow-0"].workflow_runs = null;
+        data.workflows[firstWorkflow].workflow_runs = null;
       },
     ],
     [
       "missing workflow runs",
       data => {
-        delete data.workflows["workflow-0"].workflow_runs;
+        delete data.workflows[firstWorkflow].workflow_runs;
       },
     ],
   ])("rejects %s with a clear count validation error", (_, mutate) => {
     const root = snapshotWithMutation(mutate);
-    expect(() => runGate(root)).toThrow("Workflow run counts must be non-negative integers: workflow-0.");
+    expect(() => runGate(root)).toThrow(`Workflow run counts must be non-negative integers: ${firstWorkflow}.`);
   });
 
   it.each([
@@ -206,13 +261,13 @@ describe("Metrics Collector serialized storage contract", () => {
       },
     ],
   ])("rejects an inconsistent %s", (_, mutate) => {
-    const root = snapshotWithMutation(data => mutate(data.workflows["workflow-0"].workflow_runs));
-    expect(() => runGate(root)).toThrow("Workflow executed count or success rate is inconsistent: workflow-0.");
+    const root = snapshotWithMutation(data => mutate(data.workflows[firstWorkflow].workflow_runs));
+    expect(() => runGate(root)).toThrow(`Workflow executed count or success rate is inconsistent: ${firstWorkflow}.`);
   });
 
   it("accepts zero executions only with a null success rate", () => {
     const root = snapshotWithMutation(data => {
-      Object.assign(data.workflows["workflow-0"].workflow_runs, {
+      Object.assign(data.workflows[firstWorkflow].workflow_runs, {
         total: 0,
         successful: 0,
         failed: 0,
@@ -227,7 +282,7 @@ describe("Metrics Collector serialized storage contract", () => {
 
   it("rejects a numeric success rate when there were zero executions", () => {
     const root = snapshotWithMutation(data => {
-      Object.assign(data.workflows["workflow-0"].workflow_runs, {
+      Object.assign(data.workflows[firstWorkflow].workflow_runs, {
         total: 0,
         successful: 0,
         failed: 0,
@@ -237,33 +292,33 @@ describe("Metrics Collector serialized storage contract", () => {
         success_rate: 0,
       });
     });
-    expect(() => runGate(root)).toThrow("Workflow executed count or success rate is inconsistent: workflow-0.");
+    expect(() => runGate(root)).toThrow(`Workflow executed count or success rate is inconsistent: ${firstWorkflow}.`);
   });
 
   it("requires a partial status and note for unclassified conclusions", () => {
     const validRoot = snapshotWithMutation(data => {
       data.collection_status = "partial";
-      data.collection_note = "workflow-0 (neutral: 1)";
-      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+      data.collection_note = `${firstWorkflow} (neutral: 1)`;
+      data.unclassified_conclusions = [{ workflow: firstWorkflow, conclusion: "neutral", count: 1 }];
     });
     expect(() => runGate(validRoot)).not.toThrow();
 
     const invalidRoot = snapshotWithMutation(data => {
-      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+      data.unclassified_conclusions = [{ workflow: firstWorkflow, conclusion: "neutral", count: 1 }];
     });
     expect(() => runGate(invalidRoot)).toThrow("Unclassified conclusions require partial collection status.");
 
     const missingNoteRoot = snapshotWithMutation(data => {
       data.collection_status = "partial";
       data.collection_note = "";
-      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+      data.unclassified_conclusions = [{ workflow: firstWorkflow, conclusion: "neutral", count: 1 }];
     });
     expect(() => runGate(missingNoteRoot)).toThrow("Partial metrics must include a collection note.");
 
     const vagueNoteRoot = snapshotWithMutation(data => {
       data.collection_status = "partial";
       data.collection_note = "There was an unclassified conclusion.";
-      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+      data.unclassified_conclusions = [{ workflow: firstWorkflow, conclusion: "neutral", count: 1 }];
     });
     expect(() => runGate(vagueNoteRoot)).toThrow("Collection note must identify each unclassified conclusion and count.");
   });
@@ -279,14 +334,15 @@ describe("Metrics Collector serialized storage contract", () => {
     if (mode !== "bootstrap") {
       writeSnapshot(metrics, snapshot(migratedSnapshotBytes, mode === "next-day" ? "2026-10-13T02:00:00Z" : "2026-10-14T01:00:00Z"));
       git(root, ["add", "."]);
-      git(root, ["commit", "--quiet", "-m", "Previous metrics"]);
+      commit(root, "Previous metrics");
     }
-    const content = writeSnapshot(metrics, snapshot(480000));
+    const content = writeSnapshot(metrics, snapshot(500000));
     runGate(metrics);
     git(root, ["add", "."]);
     const diff = git(root, ["diff", "--cached", "--no-renames"]);
     const enforcedBytes = getPatchDiffSizeBytes(diff);
-    expect(enforcedBytes).toBeGreaterThan(0);
+    if (mode === "both-replaced") expect(enforcedBytes).toBe(0);
+    else expect(enforcedBytes).toBeGreaterThan(0);
     expect(enforcedBytes).toBeLessThan(maxPatchBytes);
     // Headers/context are not charged by the runtime's net-byte helper, but still fit.
     expect(Buffer.byteLength(diff)).toBeLessThan(maxPatchBytes);
@@ -423,6 +479,7 @@ describe("Metrics Collector serialized storage contract", () => {
     vi.stubEnv("MEMORY_ID", memoryId);
     vi.stubEnv("ALLOWED_EXTENSIONS", '[".json"]');
     vi.stubEnv("FILE_GLOB_FILTER", "metrics/**");
+    vi.stubEnv("GITHUB_REPOSITORY", "owner/repo");
     vi.stubEnv("VALIDATION_SCRIPT_B64", Buffer.from(script).toString("base64"));
     const core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
     const baselinePath = getRepoMemoryBaselinePath(memoryId);
@@ -454,7 +511,7 @@ describe("Metrics Collector serialized storage contract", () => {
     fs.mkdirSync(path.join(workspace, "metrics/daily"), { recursive: true });
     fs.writeFileSync(path.join(workspace, "metrics/daily/2020-01-01.json"), "{}");
     git(workspace, ["add", "."]);
-    git(workspace, ["commit", "--quiet", "-m", "Backing branch history"]);
+    commit(workspace, "Backing branch history");
     if (mode === "invalid-pair") {
       const day = JSON.parse(current).timestamp.slice(0, 10);
       fs.writeFileSync(path.join(artifact, "metrics/daily", `${day}.json`), "{}");
@@ -463,6 +520,9 @@ describe("Metrics Collector serialized storage contract", () => {
     const pushSignedCommits = vi.fn().mockResolvedValue(undefined);
     const execGitSync = (args, options = {}) => {
       if (args[0] === "fetch" || args[0] === "checkout") return "";
+      if (args[0] === "commit") {
+        return git(options.cwd || workspace, [...args, "-m", "Co-authored-by: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>"]);
+      }
       return git(options.cwd || workspace, args);
     };
     const mocks = { "./git_helpers.cjs": { execGitSync }, "./push_signed_commits.cjs": { pushSignedCommits } };
@@ -480,6 +540,7 @@ describe("Metrics Collector serialized storage contract", () => {
           GITHUB_WORKSPACE: workspace,
           MEMORY_ID: "default",
           TARGET_REPO: "owner/repo",
+          GITHUB_REPOSITORY: "owner/repo",
           BRANCH_NAME: "memory/meta-orchestrators",
           GH_TOKEN: "fixture-token",
           FILE_GLOB_FILTER: "metrics/**",

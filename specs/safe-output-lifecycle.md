@@ -110,6 +110,12 @@ execution MUST NOT reset discovery to a rolling 24-hour cohort. Bounded or faile
 work MUST remain retryable and visible as partial coverage. Provider failures
 MUST NOT become fabricated adoption decisions. The metrics collector's prepared
 `metrics/lifecycle.json` is a projection, not the authoritative per-item store.
+Prospective `metrics/lifecycle/daily/YYYY-MM-DD.json` snapshots MAY preserve
+that projection for bounded trend reporting. A derived portfolio MUST reference
+the canonical ledger identity and clocks, distinguish retained-population
+snapshots from selected-run windows, select the latest observation before
+aggregation, and leave historical gaps unavailable. It MUST NOT introduce a
+second adoption classifier or infer longitudinal attributed value.
 No webhook delivery or agent classification is required for reconciliation.
 
 ## Verification

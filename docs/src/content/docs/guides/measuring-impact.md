@@ -55,6 +55,18 @@ For a specific run, pipe its ID to `gh aw logs --stdin --repo owner/repo --adopt
 The command downloads safe-output manifests and checks the current state of the affected objects. See [Delivery and adoption](/gh-aw/reference/delivery-adoption/)
 for evaluation timing, result interpretation, and telemetry export.
 
+For the repository-wide deterministic portfolio, run:
+
+```bash
+bash scripts/workflow-value-report.sh
+```
+
+This produces current per-workflow delivery/adoption evidence, retained-history
+coverage, Markdown and SVG plots, and explicit attributed-value availability.
+It does not derive a universal score. See the
+[workflow value portfolio reference](/gh-aw/reference/delivery-adoption/#workflow-value-portfolio)
+for artifact paths and reconstruction semantics.
+
 Use built-in records first. Repeated collection preserves later observations
 without rewriting original sessions or historical grader results. A current
 survival snapshot does not establish survival through an entire measurement window.

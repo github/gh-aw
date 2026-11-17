@@ -136,9 +136,10 @@ This repository's Metrics Collector runs deterministic collection with its
 source-built CLI before the agent starts. A separate repo-memory branch,
 `memory/output-lifecycle`, retains the per-item ledger and discovery checkpoint.
 The existing shared metrics branch
-receives `metrics/lifecycle.json`, a compact fleet/per-workflow snapshot keyed by
-source workflow path. Performance reports read that snapshot without maintaining
-another adoption classifier.
+receives `metrics/lifecycle.json` plus prospective
+`metrics/lifecycle/daily/YYYY-MM-DD.json` snapshots keyed by source workflow
+path. Performance reports read those snapshots without maintaining another
+adoption classifier.
 
 Initial discovery covers the previous day. Subsequent executions resume saved
 windows and pagination, then catch up from the completed window with a one-hour
@@ -161,6 +162,51 @@ watermark. It describes the retained population, not all decisions occurring
 that day, and must not be added to recent-run cohort counts. Repo-memory's
 persistence job remains separate from the read-only agent job. Cache-memory is
 not the authoritative ledger, and webhooks are not required.
+
+### Workflow value portfolio
+
+The Metrics Collector deterministically generates a `workflow-value-report`
+Actions artifact after the daily metrics snapshot is complete. The generator
+derives the inventory from paired top-level
+`.github/workflows/<id>.md` and `<id>.lock.yml` files and fails on missing,
+extra, or duplicate identities.
+
+The artifact contains:
+
+| Path | Contents |
+| --- | --- |
+| `workflow-value-portfolio.json` | Current workflow identities, source/lock digests, selected-window and retained-population observations, canonical ledger reference, optional run-scoped operational-value declarations, and attributed-value evidence states. |
+| `workflow-value-history.json` | Retained period inventory, coverage, exact-window comparability, and compact per-workflow default/override observations. |
+| `workflow-value-report.md` | Human-readable portfolio covering every current workflow. |
+| `plots/*.svg` | Inventory, selected lifecycle, retained lifecycle, and attributed-value evidence-state time series. |
+
+History selection chooses the latest observation for each UTC date before
+aggregation. The current selected window is calculated from canonical ledger
+deliveries inside the exact 24-hour metrics window, using their current adoption
+snapshot. Historical selected-window points require explicitly recorded daily
+lifecycle fields. Legacy placeholders, legacy `safe_output_outcomes`, partial
+inventories, and missing lifecycle fields remain unavailable instead of becoming
+zero. Retained lifecycle history begins prospectively unless exact retained
+evidence supports a bounded backfill.
+
+The current repository has no repository-local reviewed longitudinal value
+definitions. The portfolio therefore reports `needs_definition` rather than
+deriving value from delivery, adoption, run success, labels, merge rates, grader
+scores, or agent claims. A declared
+`graders.operational-value.script` remains labeled as optional run-scoped
+evidence.
+
+Generate the same report locally:
+
+```bash
+bash scripts/workflow-value-report.sh
+```
+
+The command fetches `memory/meta-orchestrators` and
+`memory/output-lifecycle` read-only from `origin`, writes
+`./workflow-value-report/`, and fails if either evidence branch is unavailable.
+Set `WORKFLOW_VALUE_REMOTE`, `WORKFLOW_VALUE_REPOSITORY`, or
+`WORKFLOW_VALUE_OUTPUT_DIR` to override those defaults.
 
 ## Survival, attributed value, and cost
 

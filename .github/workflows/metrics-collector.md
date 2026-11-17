@@ -28,7 +28,7 @@ tools:
     branch-name: memory/meta-orchestrators
     file-glob: "metrics/**"
     allowed-extensions: [".json"]
-    max-file-size: 524288 # 512KiB per complete snapshot (observed: 447189 bytes for 344 workflows)
+    max-file-size: 524288 # 512KiB per complete snapshot; never truncate the derived repository inventory
     max-patch-size: 1048576 # 1MiB for both daily and latest, including a first collection
     validation:
       script: |
@@ -89,6 +89,32 @@ tools:
         if (!fs.existsSync(dailyPath) || !fs.readFileSync(dailyPath).equals(latest)) {
           throw new Error("Latest metrics must exactly match the daily snapshot for its UTC timestamp.");
         }
+        const lifecyclePath = path.join(root, "lifecycle.json");
+        const lifecycle = fs.readFileSync(lifecyclePath);
+        const lifecycleSnapshot = JSON.parse(lifecycle);
+        const lifecycleTimestamp = new Date(lifecycleSnapshot.observed_at);
+        if (lifecycleSnapshot.schema_version !== 2 ||
+            typeof lifecycleSnapshot.repository !== "string" ||
+            !/^(?:[A-Za-z0-9.-]+\/)?[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(lifecycleSnapshot.repository) ||
+            lifecycleSnapshot.scope !== "retained_deliveries" ||
+            !["complete", "partial"].includes(lifecycleSnapshot.coverage) ||
+            !Number.isFinite(lifecycleTimestamp.getTime()) ||
+            lifecycleTimestamp.getTime() > timestamp.getTime() + 3600000 ||
+            timestamp.getTime() - lifecycleTimestamp.getTime() > 86400000 ||
+            !lifecycleSnapshot.ledger ||
+            lifecycleSnapshot.ledger.schema_version !== 7 ||
+            !/^[a-f0-9]{64}$/.test(lifecycleSnapshot.ledger.sha256) ||
+            !Number.isSafeInteger(lifecycleSnapshot.ledger.records) ||
+            lifecycleSnapshot.ledger.records < 0 ||
+            !Number.isSafeInteger(lifecycleSnapshot.ledger.bytes) ||
+            lifecycleSnapshot.ledger.bytes < 0) {
+          throw new Error("Retained lifecycle snapshot is missing required coverage, ledger, or timestamp evidence.");
+        }
+        const lifecycleDay = lifecycleTimestamp.toISOString().slice(0, 10);
+        const lifecycleDailyPath = path.join(root, "lifecycle", "daily", `${lifecycleDay}.json`);
+        if (!fs.existsSync(lifecycleDailyPath) || !fs.readFileSync(lifecycleDailyPath).equals(lifecycle)) {
+          throw new Error("Latest retained lifecycle metrics must exactly match their daily snapshot.");
+        }
         const maxFileBytes = 524288;
         const maxPatchBytes = 1048576;
         const maxArtifactBytes = 16777216;
@@ -103,16 +129,18 @@ tools:
         const cutoff = new Date(`${day}T00:00:00Z`);
         cutoff.setUTCDate(cutoff.getUTCDate() - 29);
         const oldestDay = cutoff.toISOString().slice(0, 10);
-        for (const name of fs.readdirSync(path.join(root, "daily"))) {
-          if (!/^\d{4}-\d{2}-\d{2}\.json$/i.test(name)) continue;
-          if (!name.endsWith(".json")) throw new Error("Dated daily metrics must use lowercase .json filenames.");
-          const date = name.slice(0, 10);
-          const parsed = new Date(`${date}T00:00:00Z`);
-          if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
-            throw new Error("Dated daily metrics must use valid calendar dates.");
-          }
-          if (date < oldestDay || date > day) {
-            throw new Error("Prune dated daily metrics outside the 30-day upload window before persistence.");
+        for (const directory of [path.join(root, "daily"), path.join(root, "lifecycle", "daily")]) {
+          for (const name of fs.readdirSync(directory)) {
+            if (!/^\d{4}-\d{2}-\d{2}\.json$/i.test(name)) continue;
+            if (!name.endsWith(".json")) throw new Error("Dated daily metrics must use lowercase .json filenames.");
+            const date = name.slice(0, 10);
+            const parsed = new Date(`${date}T00:00:00Z`);
+            if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+              throw new Error("Dated daily metrics must use valid calendar dates.");
+            }
+            if (date < oldestDay || date > day) {
+              throw new Error("Prune dated daily metrics outside the 30-day upload window before persistence.");
+            }
           }
         }
         let artifactBytes = 0;
@@ -217,6 +245,15 @@ post-steps:
       fi
 
       echo "Metrics collection verified: timestamp ${new_timestamp}, ${workflow_count} workflow(s), ${daily_count} daily file(s)."
+  - name: Verify deterministic workflow value portfolio
+    run: node actions/setup/js/workflow_value_report_verify.cjs
+  - name: Upload workflow value report
+    uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+    with:
+      name: workflow-value-report
+      path: /tmp/gh-aw/workflow-value-report
+      if-no-files-found: error
+      retention-days: 90
 timeout-minutes: 30
 safe-outputs:
   noop:
@@ -246,19 +283,29 @@ As an infrastructure agent, you collect and persist performance data that enable
 
 #### Retained lifecycle snapshot
 
-The deterministic pre-agent collector prepares `metrics/lifecycle.json` before
-you start. Preserve it unchanged. It contains per-workflow and fleet delivery,
-human/fallback adoption, and snapshot-survival counts for retained deliveries,
-including outputs from older runs. Workflow keys are source workflow paths.
-Read its `coverage`, discovery checkpoint, deferred count, and errors before
-interpreting it. This retained population is separate from the recent-run cohort
-below; do not add its counts to that cohort or call them attributed value.
+The deterministic pre-agent collector prepares `metrics/lifecycle.json` and the
+matching `metrics/lifecycle/daily/YYYY-MM-DD.json` before you start. Preserve
+both unchanged. They contain per-workflow and fleet delivery, human/fallback
+adoption, and snapshot-survival counts for retained deliveries, including
+outputs from older runs. Workflow keys are source workflow paths. Read their
+`coverage`, discovery checkpoint, deferred count, and errors before interpreting
+them. This retained population is separate from the recent-run cohort below; do
+not add its counts to that cohort or call them attributed value.
 
 The separate `/tmp/gh-aw/repo-memory/lifecycle/` memory holds the authoritative
 per-item ledger and discovery checkpoint. Do not edit that directory. Collection
 resumes saved windows after missed runs and retries unavailable execution evidence;
 bounded or incomplete work stays explicit. No webhooks or agent classification
 are required for this refresh.
+
+After writing the metrics snapshot and before calling `noop`, run the mandatory
+deterministic generator in the pre-noop validation below. It scans the exact
+paired top-level workflow inventory and all restored daily history, generates
+the machine-readable portfolio, Markdown report, and SVG plots under
+`/tmp/gh-aw/workflow-value-report/`, appends the report to the step summary, and
+prunes only the bounded upload copy. Post-steps verify and upload the
+`workflow-value-report` artifact. Do not calculate or write those derived files
+yourself.
 
 #### Pre-flight: Clean Memory Directory
 
@@ -512,14 +559,13 @@ Create a JSON object following this schema:
 - This provides quick access to most recent data without date calculations
 - Keep both files byte-identical and retain every workflow and collected field. The storage
   contract allows 512KiB per file and 1MiB per push for both copies, including first collection.
-  The observed 344-workflow snapshot is 447189 bytes (299336 even when compacted), so the old
-  100KiB file / 128KiB patch budgets cannot store it. Do not drop data to meet a budget.
+  Current complete fleet snapshots approach that budget. Do not drop workflows or fields to fit;
+  fail explicitly when the complete snapshot cannot be persisted.
 - Repo-memory uploads the retained directory as one Actions artifact, not a safe-output
-  `upload-artifact` operation. Its dated-snapshot portion is at most 31 files
-  and 15.5MiB at the file cap, below the default 100-changed-file persistence limit.
-  Supplemental JSON is preserved and remains subject to file/count/patch checks; it is not a
-  dated snapshot. The complete eligible metrics upload is capped at 16MiB and 100 files by the
-  validator.
+  `upload-artifact` operation. The deterministic post-step retains at most 30 selected-window
+  and 30 lifecycle daily snapshots in each upload. Supplemental JSON is preserved and remains
+  subject to file/count/patch checks. The complete eligible metrics upload is capped at 16MiB
+  and 100 files by the validator.
 
 **Create Directory Structure**:
 ```bash
@@ -545,35 +591,13 @@ jq . /tmp/gh-aw/repo-memory/default/metrics/latest.json >/dev/null && echo "JSON
 
 ### 4. Bound the Upload Artifact
 
-**Upload Retention Policy**:
-- Include the last 30 days of daily metrics in this run's upload artifact
-- Remove daily files before the snapshot's UTC date minus 29 days (today included) from the upload directory
-- Preserve `latest.json` (always keep)
-
-Run this cleanup before calling `push_repo_memory` or finishing collection:
-
-```bash
-node <<'NODE'
-const fs = require("fs");
-const path = require("path");
-const root = "/tmp/gh-aw/repo-memory/default/metrics";
-const timestamp = JSON.parse(fs.readFileSync(path.join(root, "latest.json"), "utf8")).timestamp;
-const cutoff = new Date(timestamp);
-cutoff.setUTCDate(cutoff.getUTCDate() - 29);
-const oldestDay = cutoff.toISOString().slice(0, 10);
-for (const name of fs.readdirSync(path.join(root, "daily"))) {
-  if (/^\d{4}-\d{2}-\d{2}\.json$/.test(name) && name.slice(0, 10) < oldestDay) {
-    fs.unlinkSync(path.join(root, "daily", name));
-  }
-}
-NODE
-```
-
-The repo-memory validator rejects an unpruned upload before artifact creation. Do not use
-`find -mtime`: checkout resets file modification times and would retain old snapshots forever.
-Repo-memory overlays uploaded files on the backing branch; omitted files are not deleted there.
-This bounds the current upload, not the historical files or Git history on the backing branch.
-Consumers can still read older backing-branch snapshots; branch cleanup is a separate operation.
+Do not prune retained history yourself. The mandatory deterministic generator in
+the pre-noop validation reads every restored dated metrics and lifecycle snapshot,
+selects the latest observation for each UTC date, generates the complete report
+artifact, and then prunes both upload directories to the latest 30 dates. It uses
+calendar filenames rather than checkout mtimes. Repo-memory overlays uploaded
+files on the backing branch, so older branch history remains available to the
+next report even though it is omitted from the bounded upload.
 
 ### 5. Calculate Ecosystem Aggregates
 
@@ -636,40 +660,10 @@ separate aggregate file in place of the dated snapshots.
   incomplete or any completed run has an unclassified conclusion, even if time coverage is complete.
   Include a precise `collection_note` and list each unclassified workflow, conclusion, and count in
   `unclassified_conclusions`.
-- **NEVER write a partial stub file like `{"date": "...", "status": "no-data"}`** — if you can't collect data, write a minimal valid metrics JSON with zeros instead:
-  ```json
-  {
-    "timestamp": "YYYY-MM-DDTHH:MM:SSZ",
-    "period": "daily",
-    "collection_status": "partial",
-    "collection_note": "Description of what could not be collected",
-    "unclassified_conclusions": [],
-    "workflows": {},
-    "ecosystem": {
-      "total_workflows": 0,
-      "active_workflows": 0,
-      "total_safe_outputs": 0,
-      "safe_output_delivery": {
-        "delivered": null,
-        "coverage": "unavailable"
-      },
-      "safe_output_adoption": {
-        "coverage": "unavailable",
-        "accepted": null,
-        "accepted_human": null,
-        "accepted_delivery_fallback": null,
-        "rejected": null,
-        "not_applicable": null,
-        "pending": null,
-        "lifecycle": null,
-        "unknown": null
-      },
-      "overall_success_rate": 0,
-      "total_tokens": 0,
-      "total_cost_usd": 0
-    }
-  }
-  ```
+- Never write a success-shaped stub such as `{"date": "...", "status": "no-data"}` or an
+  empty `workflows` object. If the exact repository inventory cannot be represented, leave the
+  run failing. For individual unavailable measures, retain every workflow and use explicit
+  `null` counts plus unavailable coverage.
 
 ### Workflow Name Extraction
 
@@ -766,7 +760,7 @@ At the end of collection:
 
 ✅ Daily metrics file created in correct location
 ✅ Latest metrics snapshot updated
-✅ Old metrics cleaned up (>30 days)
+✅ Deterministic pre-noop generator produced the full report before pruning the upload to 30 days
 ✅ Valid JSON format (validated with jq)
 ✅ All workflows included in metrics
 ✅ Ecosystem aggregates calculated correctly
@@ -828,7 +822,11 @@ jq -e '
   exit 1
 }
 
-# Step 6: List all metrics files that will be committed
+# Step 6: Generate and verify the deterministic value portfolio before repo-memory validation
+node actions/setup/js/workflow_value_report.cjs
+node actions/setup/js/workflow_value_report_verify.cjs
+
+# Step 7: List all metrics files that will be committed
 echo "Files to be committed:"
 find /tmp/gh-aw/repo-memory/default/metrics -type f | sort
 ```
@@ -839,11 +837,13 @@ If the validation passes, proceed with the `noop` call.
 
 Repo-memory validation runs before artifact upload and again before committing eligible uploaded
 files. It rejects missing/invalid snapshots, empty workflows, stale/future timestamps, unequal
-daily/latest copies and exceeded file/two-copy patch budgets in both phases. Before upload it also
-checks the complete artifact budget and rejects unpruned or invalid dated history. Push-phase
-validation does not impose upload retention on historical files already on the backing branch.
-A separate post-step checks freshness against the pre-agent baseline; it is not the
-pre-upload persistence gate. The run fails if any of the following is true:
+daily/latest copies, unequal lifecycle latest/daily copies, and exceeded file/two-copy patch
+budgets in both phases. Before upload it also checks the complete artifact budget and rejects
+unpruned or invalid dated history. Push-phase validation does not impose upload retention on
+historical files already on the backing branch. The mandatory pre-noop generator reads the full
+restored history, writes the deterministic workflow-value artifact, and prunes the upload copy.
+Post-steps check freshness, verify the generated files, and upload the report artifact. The run
+fails if any of the following is true:
 
 - `metrics/latest.json` was not written, or is not valid JSON
 - its `timestamp` field is missing, unparseable, or unchanged from the value present on the
@@ -852,14 +852,19 @@ pre-upload persistence gate. The run fails if any of the following is true:
 - no file was written under `metrics/daily/`
 - `workflows` is empty
 - the timestamp's daily snapshot is missing or not byte-identical to `latest.json`
+- `metrics/lifecycle.json` is missing required ledger/coverage evidence or is not byte-identical
+  to `metrics/lifecycle/daily/YYYY-MM-DD.json`
+- the current metrics inventory differs from the paired top-level workflow source/lock inventory
+- the complete workflow value portfolio, Markdown report, or plots exceed their bounded artifact budgets
 - the complete snapshot exceeds 512KiB, or both copies with diff-line prefixes exceed 1MiB
 - dated daily files are outside the 30-day upload window or use invalid calendar dates
 - any retained JSON exceeds 512KiB, or the complete eligible upload exceeds 16MiB or 100 files
 
-The validator is read-only: run the cleanup command yourself before persistence. The push job
-overlays eligible uploaded files without deleting older backing-branch files. Its generic file,
-changed-file count, and patch checks remain fail-closed; its 20% patch overhead allowance is not
-needed for a valid first collection. Consumer paths and the JSON schema are unchanged.
+The repo-memory validator is read-only; only the deterministic generator performs date-based
+upload pruning. The push job overlays eligible uploaded files without deleting older
+backing-branch files. Its generic file, changed-file count, and patch checks remain fail-closed;
+its 20% patch overhead allowance is not needed for a valid first collection. Consumer paths and
+the JSON schema are unchanged.
 
 This means an early exit after a couple of exploratory tool calls is reported as a failure instead
 of a green run with stale data. Always run the full collection loop described above.

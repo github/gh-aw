@@ -89,7 +89,20 @@ describe("deterministic retained lifecycle collection", () => {
     expect(retained.id).toBe(original.id);
     expect(retained.delivery).toEqual(original.delivery);
     expect(fs.readdirSync(options.memoryDir).sort()).toEqual(["collection.json", "lifecycle.jsonl"]);
-    expect(JSON.parse(fs.readFileSync(path.join(options.metricsDir, "lifecycle.json"), "utf8"))).toEqual(result);
+    expect(result).toMatchObject({
+      schema_version: 2,
+      ledger: {
+        memory_id: "lifecycle",
+        branch: "memory/output-lifecycle",
+        path: "lifecycle.jsonl",
+        schema_version: 7,
+        records: 1,
+      },
+    });
+    expect(result.ledger.sha256).toMatch(/^[a-f0-9]{64}$/);
+    const latest = fs.readFileSync(path.join(options.metricsDir, "lifecycle.json"), "utf8");
+    expect(JSON.parse(latest)).toEqual(result);
+    expect(fs.readFileSync(path.join(options.metricsDir, "lifecycle/daily/2026-11-17.json"), "utf8")).toBe(latest);
     expect(collect.mock.calls.at(-1)[0]).toContain("--retained");
   });
 
