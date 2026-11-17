@@ -91,7 +91,7 @@ test("safe outputs are executable while GitHub reads stay off the shell", () => 
   const allowed = compiledBashPolicy();
   assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
   assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
-  assert.match(workflow, /GitHub tools are not shell commands: never\s+invoke them through Bash/);
+  assert.match(workflow, /Never invoke GitHub tools through Bash|GitHub tools are not shell commands: never\s+invoke them through Bash/);
 });
 
 test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
@@ -156,9 +156,10 @@ async function select(pulls, trigger = null, fallback = null) {
         writeFileSync(filename, data) {
           if (filename === "/tmp/gh-aw/agent/dependabot-burner/context.json") {
             payload = JSON.parse(data);
-          } else {
-            assert.match(filename, /^\/tmp\/gh-aw\/agent\/dependabot-burner\/diffs\/\d+\.diff$/);
+            return;
           }
+          assert.match(filename, /^\/tmp\/gh-aw\/agent\/dependabot-burner\/diffs\/\d+\.diff$/);
+          assert.equal(typeof data, "string");
         },
       };
     },

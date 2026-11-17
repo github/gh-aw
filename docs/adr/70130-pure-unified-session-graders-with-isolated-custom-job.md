@@ -4,6 +4,9 @@
 **Status**: Draft
 **Deciders**: pelikhan, [TODO: verify additional reviewers]
 
+> **Partially superseded (2026-11-16):** The isolated JavaScript grader job
+> remains current. The Bash compatibility decision below has been removed.
+
 ---
 
 ### Context

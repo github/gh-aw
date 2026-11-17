@@ -5,6 +5,9 @@
 **Deciders**: pelikhan, Copilot (PR #70851)
 **Amended**: 2026-11-08 (PR #75978): accept `steps` and `post-steps` only with their code and credentials omitted from dry-run locks.
 
+> **Partially superseded (2026-11-16):** `graders.operational-value.run` is no
+> longer a dry-run-specific rejection because the syntax is invalid everywhere.
+
 ---
 
 ## Context

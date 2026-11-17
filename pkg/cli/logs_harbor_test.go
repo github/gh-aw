@@ -76,6 +76,22 @@ func TestExportHarborOwnerOnlyPermissions(t *testing.T) {
 	}))
 }
 
+func TestHarborOperationalValueMappingUsesPrimaryValue(t *testing.T) {
+	source := t.TempDir()
+	const recorded = `{"version":2,"results":[{"id":"operational-value","status":"pass","value":0.75,"source":"operational-value","metrics":[{"id":"accepted-change","value":0.75},{"id":"diagnostic-count","value":2}]}]}`
+	writeSessionTestFile(t, source, "graders/grader_results.json", recorded)
+	graders := extractGradersData(source)
+	require.NotNil(t, graders)
+	// External CAO/Harbor adapters consume the stable top-level primary value;
+	// ordered diagnostics remain in the preserved evidence artifact.
+	rewards, mapping, err := harborRecordedRewards(source, graders)
+	require.NoError(t, err)
+	require.Equal(t, map[string]json.Number{"gh-aw.operational-value": "0.75"}, rewards)
+	metrics := mapping["metrics"].(map[string]any)
+	require.Contains(t, metrics, "gh-aw.operational-value")
+	require.NotContains(t, metrics, "gh-aw.diagnostic-count")
+}
+
 func TestExportHarborMissingSessionUnknownRewards(t *testing.T) {
 	for _, conclusion := range []string{"success", "failure", "cancelled", ""} {
 		t.Run(conclusion, func(t *testing.T) {

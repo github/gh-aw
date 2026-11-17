@@ -53,7 +53,8 @@ func TestParseGradersRejectsExecutableConfiguration(t *testing.T) {
 		{"custom": nil},
 		{"custom": map[string]any{"enabled": false}},
 		{"operational-value": map[string]any{"run": "../evaluator.sh"}},
-		{"operational-value": map[string]any{"script": "#!/bin/bash\necho 1"}},
+		{"operational-value": map[string]any{"enabled": false}},
+		{"operational-value": map[string]any{"script": "return []", "run": ".github/graders/score.sh"}},
 		{"loops": map[string]any{"script": "return 1"}},
 		{"loops": map[string]any{"run": "evaluator.sh"}},
 		{"loops": map[string]any{"unsupported": true}},
@@ -63,18 +64,27 @@ func TestParseGradersRejectsExecutableConfiguration(t *testing.T) {
 	}
 }
 
-func TestParseOperationalValueShellGrader(t *testing.T) {
+func TestParseOperationalValueJavaScriptGrader(t *testing.T) {
+	const source = `return [{id: "accepted", value: 1}, {id: "diagnostic", value: null}]`
 	cfg, err := ParseGradersFromFrontmatter(map[string]any{"graders": map[string]any{
-		"operational-value": map[string]any{"run": ".github/graders/score.sh"},
+		"operational-value": map[string]any{"script": source},
 	}})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"operational-value"}, cfg.CustomGraderIDs())
+	assert.Equal(t, source, cfg.Graders["operational-value"].Script)
 	assert.Equal(t, "higher_is_better", cfg.Graders["operational-value"].Direction)
-	builtin, err := graderEnvironment(cfg)
-	require.NoError(t, err)
-	assert.Contains(t, builtin, `"customGraders":["operational-value"]`)
-	assert.NotContains(t, builtin, "score.sh")
-	assert.NotContains(t, builtin, "shellScript")
+	custom := buildGraderManifest(cfg, true)
+	require.Len(t, custom.Graders, 1)
+	assert.Equal(t, "operational-value", custom.Graders[0].Source)
+	assert.Equal(t, source, custom.Graders[0].Script)
+}
+
+func TestParseOperationalValueRunRejected(t *testing.T) {
+	_, err := ParseGradersFromFrontmatter(map[string]any{"graders": map[string]any{
+		"operational-value": map[string]any{"run": ".github/graders/score.sh"},
+	}})
+	require.ErrorContains(t, err, "graders.operational-value.run has been removed")
+	assert.Contains(t, err.Error(), "graders.operational-value.script")
 }
 
 func TestParseGradersInvalidFields(t *testing.T) {
@@ -205,6 +215,26 @@ func TestCustomGraderManifestPartition(t *testing.T) {
 	assert.NotContains(t, custom, "${{")
 	assert.Contains(t, custom, "GH_AW_CUSTOM_GRADER_MANIFEST")
 	assert.Len(t, buildGraderManifest(cfg, true).Graders, 2)
+}
+
+func TestAuthoredOperationalValueMergesImportedMetadata(t *testing.T) {
+	merged, err := mergeImportedGradersFrontmatter(map[string]any{
+		"graders": map[string]any{"operational-value": map[string]any{"threshold": 1}},
+	}, `{"operational-value":{"script":"return [{id: 'score', value: 1}]","direction":"higher_is_better"}}`)
+	require.NoError(t, err)
+	cfg, err := ParseGradersFromFrontmatter(merged)
+	require.NoError(t, err)
+	assert.Equal(t, "return [{id: 'score', value: 1}]", cfg.Graders["operational-value"].Script)
+	assert.NotNil(t, cfg.Graders["operational-value"].Threshold)
+}
+
+func TestAuthoredOperationalValueDoesNotSilentlyOverrideImportedRun(t *testing.T) {
+	merged, err := mergeImportedGradersFrontmatter(map[string]any{
+		"graders": map[string]any{"operational-value": map[string]any{"script": "return [{id: 'score', value: 1}]"}},
+	}, `{"operational-value":{"run":"./score.sh","threshold":1}}`)
+	require.NoError(t, err)
+	_, err = ParseGradersFromFrontmatter(merged)
+	require.ErrorContains(t, err, "graders.operational-value.run has been removed")
 }
 
 func TestCustomGradersRunAfterConclusionWithoutCredentials(t *testing.T) {

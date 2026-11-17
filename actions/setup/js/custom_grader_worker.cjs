@@ -5,6 +5,7 @@ const vm = require("vm");
 
 function main() {
   const input = JSON.parse(fs.readFileSync(0, "utf8"));
+  if (input.contract !== undefined && input.contract !== "operational-value") throw new Error("unsupported custom grader contract");
   const sandbox = Object.assign(Object.create(null), {
     __input: JSON.stringify(input.data),
     Date: undefined,
@@ -64,13 +65,37 @@ function main() {
     { timeout: 5000, filename: "grader:bootstrap" }
   );
   context.__grader = vm.compileFunction(`"use strict";\n${input.script}`, ["session", "config", "helpers"], { parsingContext: context, filename: `grader:${input.id}` });
+  const validateResult =
+    input.contract === "operational-value"
+      ? `if (!arrayIsArray(value) || value.length === 0) throw new Error("operational-value script must return a nonempty metric array");
+        const ids = new SetCtor();
+        for (const metric of value) {
+          if (!metric || typeof metric !== "object" ||
+              reflectApply(arrayJoin, reflectApply(arraySort, objectKeys(metric), []), [","]) !== "id,value" ||
+              typeof metric.id !== "string" || !reflectApply(stringTrim, metric.id, []) || reflectApply(setHas, ids, [metric.id]) ||
+              (metric.value !== null && (typeof metric.value !== "number" || !numberIsFinite(metric.value)))) {
+            throw new Error("operational-value metrics must contain unique nonempty ids and finite numeric or null values");
+          }
+          reflectApply(setAdd, ids, [metric.id]);
+        }`
+      : `const metric = value && typeof value === "object" ? value.value : value;
+        if (metric !== null && (typeof metric !== "number" || !numberIsFinite(metric))) throw new Error("custom grader must return a finite numeric value or null");`;
   const result = vm.runInContext(
     `(() => {
       try {
+        const arrayIsArray = Array.isArray;
+        const objectKeys = Object.keys;
+        const numberIsFinite = Number.isFinite;
+        const stringTrim = String.prototype.trim;
+        const arraySort = Array.prototype.sort;
+        const arrayJoin = Array.prototype.join;
+        const reflectApply = Reflect.apply;
+        const SetCtor = Set;
+        const setHas = Set.prototype.has;
+        const setAdd = Set.prototype.add;
         const value = __grader(session, config, helpers);
         if (value && typeof value.then === "function") throw new Error("custom graders must be synchronous");
-        const metric = value && typeof value === "object" ? value.value : value;
-        if (metric !== null && (typeof metric !== "number" || !Number.isFinite(metric))) throw new Error("custom grader must return a finite numeric value or null");
+        ${validateResult}
         return JSON.stringify({ ok: true, value });
       } catch (error) {
         return JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) });

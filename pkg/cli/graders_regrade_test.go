@@ -222,12 +222,11 @@ func TestRegradeSessionResultRejectsUnknownStatus(t *testing.T) {
 	}
 }
 
-func TestRegradeRejectsBashAndUnsafeDefinitionsBeforeEvidence(t *testing.T) {
+func TestRegradeRejectsUnsafeDefinitionsBeforeEvidence(t *testing.T) {
 	for _, definition := range []graderRunDefinition{
 		{ID: "shell", Source: "operational-value"},
-		{ID: "shell", Source: "inline", Run: "script.sh"},
-		{ID: "shell", Source: "inline", ShellScript: "echo unsafe"},
 		{ID: "loops", Source: "builtin", Script: "return 1"},
+		{ID: "operational-value", Source: "inline", Script: "return []"},
 		{ID: "unknown", Source: "unknown"},
 	} {
 		_, err := regradeProcessedRuns(t.Context(), "not-present", nil, []graderRunDefinition{definition})
@@ -239,6 +238,9 @@ func TestRegradeRejectsBashAndUnsafeDefinitionsBeforeEvidence(t *testing.T) {
 	cancel()
 	_, err = regradeProcessedRuns(ctx, ".", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 1}}}, nil)
 	require.ErrorIs(t, err, context.Canceled)
+	require.NoError(t, validateRegradeDefinition(graderRunDefinition{
+		ID: "operational-value", Source: "operational-value", Script: `return [{id: "primary", value: 1}]`,
+	}))
 }
 
 func TestRegradeRuntimeFailureIsExplicit(t *testing.T) {

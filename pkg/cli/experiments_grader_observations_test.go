@@ -252,13 +252,16 @@ func TestReadGraderResultsArtifact(t *testing.T) {
 		require.NoError(t, os.MkdirAll(resultsDir, 0o755))
 		require.NoError(t, os.WriteFile(
 			filepath.Join(resultsDir, "grader_results.json"),
-			[]byte(`{"version":1,"results":[{"id":"score","status":"pass","value":0.75}]}`),
+			[]byte(`{"version":2,"results":[{"id":"operational-value","status":"pass","value":0.75,"source":"operational-value","metrics":[{"id":"primary","value":0.75},{"id":"diagnostic","value":2}]}]}`),
 			0o644,
 		))
 
 		data := readGraderResultsArtifact(runDir)
 		require.NotNil(t, data.Artifact)
 		assert.Empty(t, data.ExclusionReason)
+		observation, reason := extractGraderObservation(data.Artifact, "42", "candidate", "operational-value")
+		assert.Empty(t, reason)
+		assert.InDelta(t, 0.75, observation.Value, 0)
 	})
 
 	t.Run("loads fallback artifact grader results", func(t *testing.T) {

@@ -41,7 +41,6 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 | `firewall-ssl-bump` | `CTR-011` | AW | A nonempty literal `--allow-urls` in `sandbox.agent.args` requires `--ssl-bump` in the same list. Legacy `network.firewall` blocks require migration, even with `ssl-bump: true`. |
 | `custom-job-detection` | `CTR-005` | AW, Actions | Custom jobs run before `agent` or after successful `detection`, including transitive dependencies. Every `||` branch is checked when a status function overrides the implicit success gate. Leaf jobs with `detection-gate: status-only` may report after detection failure. |
 | `grader-file-io` | — | AW | Custom `graders.<id>.script` JavaScript accesses no filesystem or host capabilities and loads no modules. Requires the optional native JavaScript parser; without it, a coverage warning is shown. |
-| `grader-shell-file-write` | — | AW | Repository-owned `graders.operational-value.run` Bash avoids detected file writes and unchecked shell execution. The source is analyzed, not executed. |
 | `artipacked` | — | AW, Actions | `actions/checkout` explicitly disables credential persistence. Omitted, enabled, or dynamic persistence produces a review warning. Compiler-generated blocks can exempt trusted PR checkouts and credential-cleanup patterns when their paths are statically known and at most 13 directory components deep. |
 | `cache-poisoning` | — | AW, Actions | `cache-mode` values are literal `read`, `write`, `write-only`, or `none`; omit the key for defaults. Release and tag workflows avoid cache restoration through `actions/cache`, `actions/cache/restore`, `actions/setup-go`, and `actions/setup-node`. Save-only and lookup-only actions are exempt. Effective `cache-mode: write` or `write-only` on events outside GitHub's write allowlist warns. Job names do not establish publisher trust. |
 | `excessive-permissions` | `CTR-001` | Actions | Workflow-wide write grants are moved to the jobs that need them. |
@@ -174,16 +173,6 @@ All executable grader script bodies are checked, including disabled definitions,
 
 Without `--javascript-module`, each custom script gets a coverage warning rather than a pass. With a parser configured, unavailable or malformed ASTs fail lint. The rule does not prove reflection or generated code safe, and it does not replace the isolated grader worker's filesystem, process, and code-generation restrictions. Graders may use only the immutable in-memory `session`, `config`, and `helpers`.
 
-### Operational-value shell file writes
-
-`grader-shell-file-write` is a default AW error rule in strict mode. It loads `graders.operational-value.run` from a confined repository `.sh` file and parses Bash ASTs without executing source, including disabled definitions. Invalid paths, missing files, and unanalyzable source fail explicitly. `./` paths resolve from the declaring workflow file:
-
-```bash
-gh aw lint --rules grader-shell-file-write .github/workflows/example.md
-```
-
-The checker walks branches, functions, substitutions, and static nested commands. It detects file-writing redirections, destination-bearing `tee`, common mutation commands, and in-place `sed` or `perl`. Stdout and stderr duplication, `/dev/null`, comments, quoted text, and read-only `jq` filters are not writes. Dynamic shell execution and sourced helpers are rejected as unchecked. Compiler validation shares this checker, so bypassing lint does not permit detected writes. Diagnostics never include source contents. The analysis does not model arbitrary interpreter programs or prove isolation, and Bash graders remain trusted code in the separate job. microVM isolation is future work.
-
 ## Secret-flow analysis
 
 `secret-leak` tracks symbolic secret references, `github.token`, and known app-token action outputs through environment scopes, shell assignments, step outputs, and dependent job outputs. It detects disclosures to logs, step summaries, workflow outputs, request URLs and bodies, known publication inputs, cache keys, and artifacts containing modeled secret-bearing files. Authentication headers, token inputs, credential use in [safe-output integration jobs](#safe-output-integration-credentials), and the reusable workflow `secrets:` channel are not disclosure sinks. Boolean comparisons and predicates filter secret values. Formatting, JSON serialization, encoding, and `add-mask` registration do not sanitize later uses.
@@ -309,10 +298,9 @@ Script hooks are checked at executable schema locations, not by matching every k
 |---|---|
 | `mcp-scripts.<tool>.script` / `.run` | JavaScript tool body or Bash; JavaScript returns become agent outputs. Tools inherit the shared server environment; tool env mappings merge in sorted tool-name order, with later values winning. Python and Go keep unsupported-language warnings. |
 | `safe-outputs.scripts.<handler>.script` | Invoked handler body and returned output, with `safe-outputs.env` overriding workflow env. |
-| `graders.<grader>.script` | Pure JavaScript over immutable session data in an isolated downstream job, with no filesystem, process, or Node environment access. Encoded payloads are not Actions-interpolated. |
-| `graders.operational-value.run` | Trusted repository Bash in the separate graders job. Reads session JSONL from `$1` / `GH_AW_SESSION_FILE`, JSON config from `GH_AW_GRADER_CONFIG`, and emits legacy metric arrays. Bash write checking is independent of JavaScript analysis. Not yet microVM-isolated. |
-| Memory-tool validation hooks | Object or string `validation` and legacy aliases, including list configurations. Only the validator's sanitized environment is inherited. Encoded payloads are not Actions-interpolated. |
-| `engine.driver` | Inline Node source or available JavaScript driver files, with `engine.env` then `sandbox.agent.env` overriding workflow env. Repository driver files are not Actions-interpolated. Other languages and unavailable files keep warnings. |
+| `graders.<grader>.script` | Pure custom JavaScript over immutable session data in an isolated downstream job, without filesystem, process, or Node environment access. Encoded grader payloads are not Actions-interpolated. |
+| Memory-tool validation hooks | Object/string `validation` and legacy aliases, including list configurations; only the validator's sanitized environment is inherited. Encoded script payloads are not Actions-interpolated. |
+| `engine.driver` | Inline Node source or available JavaScript driver files, with `engine.env` and then `sandbox.agent.env` overriding workflow env. Repository driver files are not Actions-interpolated. Other languages and unavailable files retain warnings. |
 | `engine.behaviors` | Node harness, invoked `parseLog` function, and MCP configuration adapter. The harness inherits engine execution env; log parsing and MCP configuration run in separate steps without `engine.env`. |
 
 Inline hook expressions use the script-writing step's workflow env. Agent inputs, grader payload data, memory contents, imported configuration, and generated runtime configuration are not inferred, and these boundaries keep explicit coverage warnings.

@@ -3,12 +3,11 @@ title: Graders
 description: Pure deterministic metrics from the unified agent session
 ---
 
-Built-in and JavaScript graders compute metrics without model calls, file reads, subprocesses, or
-network access. Built-ins run in the **conclusion job**, after observations from
-agent execution, safe outputs, experiments, and evals have been collected and
-redacted in memory. Custom JavaScript runs only in a separate **graders job**
-after conclusion publishes that session. Repository-owned operational-value Bash
-evaluators also run only in that separate job, using a session-file interface.
+Built-in and JavaScript graders compute metrics without model calls, file reads,
+subprocesses, or network access. Built-ins run in the **conclusion job**, after
+observations have been collected and redacted in memory. Custom JavaScript,
+including reserved operational-value JavaScript, runs only in a separate
+**graders job** after conclusion publishes that session.
 
 :::caution[Experimental]
 Graders and their result format are experimental.
@@ -57,8 +56,9 @@ graders:
 Supported fields are `enabled`, `name`, `description`, `unit`, `direction`,
 `threshold`, `min`, `max`, and `config`. Disabling every default is valid.
 Custom IDs additionally require `script`. Built-in implementations cannot be
-overridden. Only the reserved `operational-value` ID accepts a Bash `run` path
-instead of JavaScript `script`.
+overridden. Reserved `operational-value` accepts restricted JavaScript `script`
+with an ordered metric-array contract. Removed `run` declarations fail with
+migration guidance to `script`.
 
 ## Custom JavaScript
 
@@ -94,49 +94,47 @@ cannot register custom graders.
 Conclusion receives only custom IDs, never executable grader source.
 User-provided conclusion steps and customization of `jobs.graders` are rejected.
 
-## Operational-value Bash
+## Operational value
 
-Reuse a repository-owned evaluator after replacing its old stdin request with
-the unified-session JSONL file:
+Use restricted JavaScript over the recorded session:
 
 ```yaml
 graders:
   operational-value:
-    run: .github/graders/score.sh
+    direction: higher_is_better
+    threshold: 1
+    script: |
+      const outcomes = helpers.createSessionLookups(session)
+        .eventsOfType("safe_output.outcome");
+      if (!outcomes.length) return [{id: "handler-success-recorded", value: null}];
+      return [{id: "handler-success-recorded", value:
+        outcomes.some(({data}) => data?.status === "success") ? 1 : 0}];
 ```
 
-```bash title=".github/graders/score.sh"
-#!/usr/bin/env bash
-set -euo pipefail
-session_file=$1 # Also available as GH_AW_SESSION_FILE.
-jq -s '[{id: "recorded-tool-failures", value:
-  ([.[] | select(.type == "tool.execution_complete" and .data.success == false)] | length)
-}]' "$session_file"
-```
+Return a nonempty ordered array of unique `{id,value}` objects with finite
+numeric or null values. The first metric becomes top-level
+`operational-value.value`; subsequent metrics become diagnostics; the full
+ordered `metrics` array remains in schema-v2 artifacts and events. Inputs,
+capability restrictions, size limits, digesting, and time limits are the same
+as other restricted custom JavaScript. The stable top-level
+`id/source/status/value` projection remains compatible with gh-cao JSONL and
+other existing adapters.
 
-This diagnostic example measures recorded failures, not semantic task success.
-Configuration is JSON in `GH_AW_GRADER_CONFIG`. Stdin is empty. Keep existing
-nonempty `[{id,value}, ...]` output: the first metric becomes the primary
-`operational-value` value; subsequent metrics remain diagnostics. Use `null`
-when required evidence is absent.
+`safe_output.outcome` proves handler application status at the run boundary; it
+does not prove human adoption or later object survival. gh-aw owns this direct
+run snapshot, episode identity, grader artifacts/events, and replay. GitHub is
+authoritative for later object disposition. githubnext/gh-cao owns provider
+refresh, adoption/rejection/reversal/survival lifecycle, longitudinal
+repository/window/campaign Value, canonical storage/querying, and presentation.
 
-`run` is a repository-root-relative `.sh` file path, not an inline shell command.
-`./` paths are relative to the declaring workflow. Source must be UTF-8, have a
-Bash shebang, and fit within 64 KiB. The compiler freezes it into the separate
-job, so runtime checkout is unnecessary. `gh aw add` and packages install the
-referenced evaluator resource.
-
-The runtime starts Bash without profiles or inherited credentials, in a temporary
-working directory, with a 120-second deadline and 1 MiB output limit. Compilation
-and the default `grader-shell-file-write` linter reject detected file writes and
-unchecked dynamic execution. Read the session, compute in memory, and print metrics;
-remove temporary-file writes, checkout/API fetches, and mutation commands.
-
-> [!CAUTION]
-> Shell evaluators are trusted repository code, not a filesystem/network sandbox.
-> Static write detection cannot prove arbitrary shell safety. MicroVM isolation
-> is future work. Never evaluate session text as shell code or claim missing
-> evidence was observed.
+Standalone workflows publish longitudinal Value without a campaign. Use
+githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME` without
+`--campaign`. The optional `--campaign` flag only scopes ownership and rolls up
+directly included worker Value; it does not create campaign-specific metric
+semantics. Delivery, adoption, reversal, and survival apply independently of
+campaign membership and Value configuration. The restricted-JavaScript
+operational-value grader is optional run-scoped evidence, not a prerequisite or
+substitute for CAO longitudinal Value.
 
 ## Opt-in trajectory graders
 
@@ -182,7 +180,8 @@ manifest registers custom IDs, including for `--artifacts usage` and cached
 reports. If it is not available, audit retains built-in results. Download
 failures are reported rather than hidden.
 
-Replay one enabled built-in or custom grader using the same implementation:
+Replay one enabled built-in or custom grader using the same implementation,
+including reserved operational-value JavaScript:
 
 ```bash
 gh aw graders run weekly-research loops 123456789

@@ -59,9 +59,9 @@ and tests; configure supporting lifecycle permissions, not just Playwright.
 - prefer `toolsets:` for GitHub tools
 - require `update-release` for agent-generated release notes or release-description changes; never use direct `gh`, API, or GitHub write-tool mutations from the agent
 - when the user asks for specific skills or agent plugins, add them to the top-level `skills:` / `plugins:` frontmatter fields; never add on-the-fly install steps or prompt instructions to install them at run time (see [skills.md](skills.md))
-- migrate custom graders to `graders.<distinct-id>.script`: synchronous JavaScript over immutable `session`, `config`, and `helpers`; reuse `helpers.createSessionLookups(session)` and return a finite number, `null`, or an object with `value`, not a metric array
-- existing repository-owned Bash may retain `graders.operational-value.run`: replace stdin requests with the unified-session JSONL path in `$1` / `GH_AW_SESSION_FILE`, JSON config in `GH_AW_GRADER_CONFIG`, and preserve metric arrays; remove file writes, live fetches, and checkout scans; shell runs only in the separate job and is not yet microVM-isolated
-- never translate legacy Bash/file evaluators by wrapping them in JavaScript I/O; capture evidence before grading and use the compiler-owned isolated `graders` job, never user steps in conclusion
+- migrate run-scoped outcome grading to `graders.operational-value.script`: synchronous restricted JavaScript over immutable `session`, `config`, and `helpers`; return a nonempty ordered array of unique `{id,value}` metrics whose first value is primary
+- use `graders.<distinct-id>.script` for other custom metrics; return one finite number, `null`, or an object with `value`
+- reject removed `graders.operational-value.run` declarations with migration guidance; never ignore or translate shell automatically or wrap file/API behavior in JavaScript
 
 See [workflow-constraints.md](workflow-constraints.md) for the read-only security posture (keep the agent job read-only, route writes through `safe-outputs:`).
 

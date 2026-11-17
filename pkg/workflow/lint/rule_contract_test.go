@@ -22,8 +22,6 @@ type ruleContract struct {
 	javaScript    bool
 	unsafePrompt  string
 	safePrompt    string
-	unsafeShell   string
-	safeShell     string
 	actionsUnsafe string
 	actionsSafe   string
 	actionsPath   string
@@ -93,14 +91,6 @@ func builtInRuleContracts() map[string]ruleContract {
 			unsafe: contractJob + "    outputs: {comment_id: \"${{ '' }}\"}\n" + contractSafeSteps,
 			safe:   contractJob + "    outputs: {comment_id: ''}\n" + contractSafeSteps,
 			path:   "jobs.check.outputs.comment_id",
-		},
-		"grader-shell-file-write": {
-			targets:     AWAST,
-			unsafe:      "graders:\n  operational-value:\n    run: ./check.sh\n",
-			safe:        "graders:\n  operational-value:\n    run: ./check.sh\n",
-			unsafeShell: "#!/bin/bash\nprintf 1 > PRIVATE_FILE\n",
-			safeShell:   "#!/bin/bash\njq '.events | length' \"$GH_AW_SESSION\"\n",
-			path:        "graders.operational-value.run",
 		},
 		"grader-file-io": {
 			targets: AWAST, javaScript: true,
@@ -340,13 +330,6 @@ func runRuleContractPair(t *testing.T, id string, contract ruleContract, target 
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input := ruleContractInput(t, test.source, target, nonstrict)
-			if contract.safeShell != "" {
-				source := contract.safeShell
-				if test.finding {
-					source = contract.unsafeShell
-				}
-				input = prepareGraderShellFixture(t, input, source)
-			}
 			if contract.javaScript {
 				input.JavaScript = nativeGraderJavaScriptOptions(t)
 			}

@@ -33,12 +33,12 @@ func TestStepOrderTracker_ValidateOrdering_SecretRedactionBeforeUploads(t *testi
 	}
 }
 
-func TestStepOrderTracker_ValidateOrdering_RejectsExecutableGraderArtifact(t *testing.T) {
+func TestStepOrderTracker_ValidateOrdering_RejectsUnscannedExecutableArtifact(t *testing.T) {
 	tracker := NewStepOrderTracker()
 	tracker.MarkAgentExecutionComplete()
-	tracker.RecordSecretRedaction("Redact grader outputs")
+	tracker.RecordSecretRedaction("Redact outputs")
 	tracker.RecordArtifactUpload("Upload agent artifacts", []string{
-		"/tmp/gh-aw/agent/graders/operational_value_evaluator.sh",
+		"/tmp/gh-aw/agent/unscanned-helper.sh",
 	})
 
 	if err := tracker.ValidateStepOrdering(); err == nil {
@@ -270,8 +270,8 @@ func TestIsKnownUnscannedButAllowedForUpload_WindowsStyle(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "Windows-style operational-value evaluator under approved root",
-			path:     `\tmp\gh-aw\agent\graders\operational_value_evaluator.sh`,
+			name:     "Windows-style unscanned executable under approved root",
+			path:     `\tmp\gh-aw\agent\unscanned-helper.sh`,
 			expected: false,
 		},
 		{

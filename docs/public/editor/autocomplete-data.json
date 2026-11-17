@@ -1475,7 +1475,7 @@
           "array": true
         },
         "model-routing": {
-          "type": "object",
+          "type": "object|boolean",
           "desc": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engin...",
           "children": {
             "goal": {
@@ -2015,6 +2015,12 @@
                   "type": "string",
                   "desc": "Permission level for secret scanning alerts (read/none).",
                   "enum": ["read", "none"],
+                  "leaf": true
+                },
+                "repository-advisories": {
+                  "type": "string",
+                  "desc": "Repository security advisories permission.",
+                  "enum": ["read", "none", "write"],
                   "leaf": true
                 },
                 "repository-hooks": {
@@ -2623,8 +2629,14 @@
         },
         "ledger": {
           "type": "object",
-          "desc": "Standalone Git-backed ledger configuration.",
+          "desc": "Standalone ledger configuration.",
           "children": {
+            "storage": {
+              "type": "string|object",
+              "desc": "Persistence backend, or a named object-valued ledger.",
+              "enum": ["git", "comment-memory"],
+              "leaf": true
+            },
             "type": {
               "type": "string|object",
               "desc": "Built-in ledger reducer type, or a named object-valued ledger.",
@@ -2744,7 +2756,7 @@
             },
             "ledger": {
               "type": "object|null",
-              "desc": "Experimental.",
+              "desc": "Enable the ledger projection, optionally validated against a repository-relative JSON schema.",
               "children": {
                 "schema": {
                   "type": "string",
@@ -3219,9 +3231,25 @@
           "desc": "Enable AI agents to upload a code coverage report (e.g.",
           "leaf": true
         },
+        "add-security-advisory-comment": {
+          "type": "object|null",
+          "desc": "Experimental.",
+          "leaf": true
+        },
+        "create-security-advisory": {
+          "type": "object|null",
+          "desc": "Experimental.",
+          "leaf": true
+        },
         "update-release": {
           "type": "object|null",
           "desc": "Enable AI agents to edit and update GitHub release content, including release notes, assets, and metadata.",
+          "leaf": true
+        },
+        "require-agent-success": {
+          "type": "boolean",
+          "desc": "When true, require the agent job to succeed before running detection or processing safe outputs",
+          "enum": [true, false],
           "leaf": true
         },
         "staged": {
@@ -3546,6 +3574,12 @@
       "desc": "Checkout configuration for the agent job.",
       "enum": [false],
       "children": {
+        "data-only": {
+          "type": "boolean",
+          "desc": "Acknowledge that host steps consume a separate checkout only as data, not executable scripts, hooks, or configuration.",
+          "enum": [true, false],
+          "leaf": true
+        },
         "multi": {
           "type": "boolean",
           "desc": "Explicitly enable runtime repository-list expansion and its allowlist, visibility, path, and secondary-fetch restrict...",
@@ -3828,6 +3862,12 @@
                   "enum": ["read", "none"],
                   "leaf": true
                 },
+                "repository-advisories": {
+                  "type": "string",
+                  "desc": "Repository security advisories permission.",
+                  "enum": ["read", "none", "write"],
+                  "leaf": true
+                },
                 "repository-hooks": {
                   "type": "string",
                   "desc": "Permission level for repository webhooks (read/none; \"write\" is rejected by the compiler).",
@@ -4055,6 +4095,12 @@
                   "type": "string",
                   "desc": "Permission level for secret scanning alerts (read/none).",
                   "enum": ["read", "none"],
+                  "leaf": true
+                },
+                "repository-advisories": {
+                  "type": "string",
+                  "desc": "Repository security advisories permission.",
+                  "enum": ["read", "none", "write"],
                   "leaf": true
                 },
                 "repository-hooks": {
@@ -4313,6 +4359,12 @@
               "enum": ["read", "none"],
               "leaf": true
             },
+            "repository-advisories": {
+              "type": "string",
+              "desc": "Repository security advisories permission.",
+              "enum": ["read", "none", "write"],
+              "leaf": true
+            },
             "repository-hooks": {
               "type": "string",
               "desc": "Permission level for repository webhooks (read/none; \"write\" is rejected by the compiler).",
@@ -4358,7 +4410,7 @@
     },
     "graders": {
       "type": "object",
-      "desc": "Graders over the unified session."
+      "desc": "Graders over the unified session, including reserved operational-value JavaScript."
     },
     "evals": {
       "type": "array|object",

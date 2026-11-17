@@ -24,17 +24,17 @@ func newGradersRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run <workflow-id> <grader-id> [run-id]",
 		Short: "Run workflow graders on a session or downloaded logs",
-		Long: `Run one enabled built-in, JavaScript, or operational-value Bash grader from a local workflow. When run-id is provided,
+		Long: `Run one enabled built-in, JavaScript, or operational-value grader from a local workflow. When run-id is provided,
 the unified session is downloaded from the run's usage artifact. Otherwise,
 read the unified session from standard input as JSONL or a JSON event array.
-Built-ins and JavaScript compute over the session in memory. Repository-owned
-operational-value Bash reads a staged session file and emits legacy metric arrays.
-Shell is trusted code, not yet microVM-isolated; detected file writes are rejected.
+Built-ins and JavaScript compute over the session in memory. The reserved
+operational-value JavaScript grader returns an ordered metric array.
 
 With --logs-dir, regrade existing downloaded runs offline and emit a JSON collection
 containing original scores and separate additional results with provenance.
 Select graders with workflow-id grader-id, --additional-grader workflow:grader, or both.
-Collection regrading supports only built-ins and isolated JavaScript, never Bash.
+Collection regrading supports built-ins and isolated JavaScript, including
+operational-value JavaScript.
 Downloaded evidence is not changed; exported Harbor bundles are not accepted.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` graders run weekly-research loops 123456789
   cat aw_session.jsonl | ` + string(constants.CLIExtensionPrefix) + ` graders run weekly-research loops
@@ -97,6 +97,5 @@ func executeGradersRun(cmd *cobra.Command, args []string, logsDir string, additi
 		Repo:     repoOverride,
 		Input:    cmd.InOrStdin(),
 		Output:   cmd.OutOrStdout(),
-		Path:     os.Getenv("PATH"), //nolint:osgetenvlibrary // CLI boundary supplies executable search paths, not credentials.
 	})
 }

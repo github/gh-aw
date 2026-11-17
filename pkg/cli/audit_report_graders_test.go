@@ -126,6 +126,36 @@ func TestExtractGradersDataFromAgentArtifact(t *testing.T) {
 	}
 }
 
+func TestExtractOperationalValueGradersDataUsesPrimaryValue(t *testing.T) {
+	t.Parallel()
+	runDir := t.TempDir()
+	writeGraderFiles(t,
+		filepath.Join(runDir, constants.GradersArtifactName.String()),
+		map[string]any{
+			"version": 2,
+			"results": []map[string]any{{
+				"id": "operational-value", "name": "Operational Value", "source": "operational-value",
+				"status": "pass", "value": 0.75,
+				"metrics": []map[string]any{
+					{"id": "accepted-change", "value": 0.75},
+					{"id": "diagnostic-count", "value": 2},
+				},
+			}},
+		},
+		map[string]any{"graders": []map[string]any{{
+			"id": "operational-value", "direction": "higher_is_better", "threshold": 0.5,
+		}}},
+	)
+	graders := extractGradersData(runDir)
+	if graders == nil || len(graders.Results) != 1 {
+		t.Fatalf("expected one operational-value result, got %+v", graders)
+	}
+	result := graders.Results[0]
+	if result.ID != "operational-value" || result.Value == nil || *result.Value != 0.75 {
+		t.Fatalf("expected top-level operational-value primary 0.75, got %+v", result)
+	}
+}
+
 func TestExtractGradersDataMissingAndMalformed(t *testing.T) {
 	t.Parallel()
 	empty := t.TempDir()

@@ -82,24 +82,33 @@ Ten fast built-ins run by default in conclusion after session collection.
 Configure them with `graders.<builtin-id>.threshold`, `enabled`, or data-only
 `config`; expensive built-ins require opt-in.
 
-For custom outcomes, use `graders.<distinct-id>.script` with a synchronous
-JavaScript body over immutable `session`, `config`, and `helpers` inputs.
-Reuse `helpers.createSessionLookups(session)` for stats and event/tool lookups.
-Return a finite number, `null` for unavailable evidence, or an object with
-`value`; do not emit legacy metric arrays. The script limit is 256 KiB.
+For run-scoped operational outcomes, use `graders.operational-value.script`.
+It receives immutable `session`, `config`, and `helpers` inputs through the
+restricted custom-grader worker. Return a nonempty ordered array of unique
+`{id,value}` metrics; the first value is primary and remaining values are
+diagnostics. Use finite numbers or `null`. The script limit is 256 KiB.
 
-For repository-owned Bash compatibility, use `graders.operational-value.run`
-with a confined `.sh` path. Read session JSONL from `$1` / `GH_AW_SESSION_FILE`
-and JSON config from `GH_AW_GRADER_CONFIG`; retain `[{id,value}, ...]` output.
-Remove file writes and live API/checkout reads; compile/lint rejects detected
-writes. This trusted shell path is not yet microVM-isolated.
+Other custom IDs use `graders.<distinct-id>.script` and return one finite number,
+`null`, or an object with `value`. Reuse
+`helpers.createSessionLookups(session)` for stats and event/tool lookups.
 
-The compiler owns the isolated downstream `graders` job for both custom forms.
+`graders.operational-value.run` is removed. Reject it with migration guidance to
+`graders.operational-value.script`; never ignore or translate shell automatically.
+
+The compiler owns the isolated downstream `graders` job for custom JavaScript.
 Never override built-in implementations, customize `jobs.graders`, or inject
 user code or steps into `jobs.conclusion`.
 Collect required evidence before session publication; graders cannot fetch it.
 Use [operational-value-designer](../skills/operational-value-designer/SKILL.md)
 for executable examples and evidence/fixture design.
+
+gh-aw owns run facts and optional run-scoped grading; GitHub owns later object
+disposition. Give every standalone workflow CAO Value with githubnext/gh-cao
+`add-operational-value OWNER/REPO WORKFLOW-NAME` and no `--campaign`.
+`--campaign` only scopes ownership and rolls up directly included worker Value;
+it adds no campaign-specific metric. Delivery/adoption/reversal/survival applies
+independently of campaign and Value configuration. The restricted-JS operational
+grader is optional evidence, not a prerequisite or substitute for CAO Value.
 
 Audit optionally retrieves registered custom results from the `graders`
 artifact; `logs --graders` and `--artifacts graders` include both it and `usage`.
