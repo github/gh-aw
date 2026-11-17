@@ -183,6 +183,9 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
+  // down walks the Continuous AI column first, then leaves for the next band
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last slide of the band above
@@ -280,8 +283,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
   // from an interior slide, next band lands on the header below and previous band on the header above
-  await page.goto("/gh-aw/cracktro/#3");
-  await expect(count).toHaveAttribute("aria-label", at(3));
+  const interior = slideNo("Anatomy of a workflow");
+  await page.goto(`/gh-aw/cracktro/#${interior}`);
+  await expect(count).toHaveAttribute("aria-label", at(interior));
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
@@ -324,7 +328,7 @@ test.describe("compact navigation on touch screens", () => {
     await page.goto("/gh-aw/cracktro/#3");
     await expect(count).toHaveAttribute("aria-label", at(3));
     await page.getByRole("button", { name: "Next slide", exact: true }).tap();
-    await expect(count).toHaveAttribute("aria-label", at(4));
+    await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
     await page.getByRole("button", { name: "Next band", exact: true }).tap();
     await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 
