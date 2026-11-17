@@ -78,13 +78,13 @@ func TestOutputSchemasValidateHistoricalOutcomeEvidence(t *testing.T) {
 					for _, record := range records {
 						delete(record, "zero_touch_evidence_complete")
 					}
-					require.NoError(t, resolved.Validate(value), "historical outcomes must remain valid")
+					require.NoError(t, resolved.Validate(value), "historical adoption must remain valid")
 
 					records[0]["zero_touch_evidence_complete"] = "true"
 					require.Error(t, resolved.Validate(value), "completeness must still be a boolean")
 					delete(records[0], "zero_touch_evidence_complete")
 					delete(records[0], "type")
-					require.Error(t, resolved.Validate(value), "other required outcome fields must stay required")
+					require.Error(t, resolved.Validate(value), "other required adoption fields must stay required")
 				})
 			}
 		})

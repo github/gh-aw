@@ -66,8 +66,12 @@ func TestEpisodeRetrievalCommandAndMCPArguments(t *testing.T) {
 	require.Equal(t, []string{"123"}, cmd.Flags().Args())
 	require.Contains(t, cmd.Long, "not")
 	args.Refresh = true
+	args.Delivery, args.Adoption = true, true
+	require.NoError(t, validateMCPEpisodeLogsArgs(args))
 	cmdArgs, _, _ = buildLogsCommandArgs(context.Background(), args)
 	require.Contains(t, cmdArgs, "--refresh")
+	require.Contains(t, cmdArgs, "--delivery")
+	require.Contains(t, cmdArgs, "--adoption")
 }
 
 func TestEpisodeRetrievalMCPRejectsUnsupportedOptions(t *testing.T) {

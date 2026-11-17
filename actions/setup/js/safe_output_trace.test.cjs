@@ -3,7 +3,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 const { withExecutionTrace, MAX_EXECUTION_TRACE_LENGTH } = require("./safe_output_trace.cjs");
 const { withTransportIntegrity, TransportIntegrityError } = require("./transport_integrity.cjs");
 const { processMessages } = require("./safe_output_handler_manager.cjs");
-const { buildSafeOutputOutcomes } = require("./safe_output_outcomes.cjs");
+const { buildSafeOutputExecutions } = require("./safe_output_execution.cjs");
 const terminal = { success: "done", failure: "fail", error: "thrw" };
 
 afterEach(() => {
@@ -29,7 +29,7 @@ describe("safe-output execution traces", () => {
     expect(result.execution_trace).toBe("init_bund_push_done");
     expect({ ...result }).toEqual({ success: true });
     expect(JSON.parse(JSON.stringify(result))).toEqual({ success: true });
-    expect(buildSafeOutputOutcomes([{ type: "create_pull_request", success: true, result }])[0].execution_trace).toBe("init_bund_push_done");
+    expect(buildSafeOutputExecutions([{ type: "create_pull_request", success: true, result }])[0].execution_trace).toBe("init_bund_push_done");
   });
 
   it.each([false, true])("keeps tracing in a fixed position when the temporary-ID map is supplied: %s", async includeMap => {
@@ -59,7 +59,7 @@ describe("safe-output execution traces", () => {
       return { success: scenario !== "failed", ...(scenario === "skipped" ? { skipped: true } : {}) };
     });
     const processing = await processMessages(new Map([["create_pull_request", handler]]), [{ type: "create_pull_request" }]);
-    expect(buildSafeOutputOutcomes(processing.results)[0]).toMatchObject({
+    expect(buildSafeOutputExecutions(processing.results)[0]).toMatchObject({
       status: scenario === "thrown" ? "failed" : scenario,
       execution_trace: `init_${scenario === "success" ? "done" : scenario === "thrown" ? "thrw" : "fail"}`,
     });
@@ -83,7 +83,7 @@ describe("safe-output execution traces", () => {
     const processing = await processMessages(new Map([["create_pull_request", handler]]), [{ type: "create_pull_request" }]);
     expect(handler).toHaveBeenCalledTimes(2);
     expect(processing.results[0]).toMatchObject({ success: false, deferred: false, execution_trace: "init_push_fail" });
-    expect(buildSafeOutputOutcomes(processing.results)[0]).toMatchObject({ status: "failed", execution_trace: "init_push_fail" });
+    expect(buildSafeOutputExecutions(processing.results)[0]).toMatchObject({ status: "failed", execution_trace: "init_push_fail" });
   });
 
   it.each([{ success: false }, { skipped: true }, { success: true, skipped: true }])("marks unsuccessful/skipped returns: %j", async result => {

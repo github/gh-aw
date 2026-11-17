@@ -3857,6 +3857,9 @@
           "items": {
             "type": "object",
             "properties": {
+              "status": {
+                "type": "string"
+              },
               "type": {
                 "type": "string"
               },
@@ -3962,7 +3965,125 @@
             "additionalProperties": false
           }
         },
-        "outcomes": {
+        "delivery": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "run_id": {
+              "type": "integer"
+            },
+            "workflow": {
+              "type": "string"
+            },
+            "items": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "host": {
+                    "type": "string"
+                  },
+                  "repository": {
+                    "type": "string"
+                  },
+                  "workflow": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "integer"
+                  },
+                  "run_attempt": {
+                    "type": "integer"
+                  },
+                  "invocation_id": {
+                    "type": "string"
+                  },
+                  "evidence_id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "target_url": {
+                    "type": "string"
+                  },
+                  "target_repository": {
+                    "type": "string"
+                  },
+                  "delivery": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string"
+                      },
+                      "observed_at": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "signal",
+                      "at",
+                      "observed_at",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "id",
+                  "host",
+                  "repository",
+                  "run_id",
+                  "run_attempt",
+                  "invocation_id",
+                  "evidence_id",
+                  "type",
+                  "delivery"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "delivered": {
+              "type": "integer"
+            },
+            "coverage": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "retention_days": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "run_id",
+            "items",
+            "delivered",
+            "coverage",
+            "retention_days"
+          ],
+          "additionalProperties": false
+        },
+        "adoption": {
           "type": [
             "null",
             "array"
@@ -3970,13 +4091,95 @@
           "items": {
             "type": "object",
             "properties": {
-              "outcome_status": {
+              "adoption_status": {
                 "type": "string"
               },
               "evidence_strength": {
                 "type": "string"
               },
               "signal": {
+                "type": "string"
+              },
+              "adoption": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "state": {
+                    "type": "string"
+                  },
+                  "signal": {
+                    "type": "string"
+                  },
+                  "at": {
+                    "type": "string"
+                  },
+                  "observed_at": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "string"
+                  },
+                  "acceptance_kind": {
+                    "type": "string"
+                  },
+                  "human_verified": {
+                    "type": "boolean"
+                  },
+                  "coverage": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "signal",
+                  "observed_at",
+                  "source",
+                  "rule_version",
+                  "human_verified",
+                  "coverage"
+                ],
+                "additionalProperties": false
+              },
+              "survival": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "state": {
+                    "type": "string"
+                  },
+                  "signal": {
+                    "type": "string"
+                  },
+                  "observed_at": {
+                    "type": "string"
+                  },
+                  "coverage": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "coverage"
+                ],
+                "additionalProperties": false
+              },
+              "reversal_signal": {
+                "type": "string"
+              },
+              "reversed_at": {
                 "type": "string"
               },
               "item_id": {
@@ -4006,7 +4209,7 @@
               "detail": {
                 "type": "string"
               },
-              "time_to_outcome_hours": {
+              "time_to_adoption_hours": {
                 "type": "number"
               },
               "human_comments": {
@@ -4047,7 +4250,7 @@
               }
             },
             "required": [
-              "outcome_status",
+              "adoption_status",
               "evidence_strength",
               "type",
               "created_at",
@@ -4056,7 +4259,7 @@
             "additionalProperties": false
           }
         },
-        "outcome_summary": {
+        "adoption_summary": {
           "type": [
             "null",
             "object"
@@ -4068,10 +4271,16 @@
             "accepted": {
               "type": "integer"
             },
+            "accepted_human": {
+              "type": "integer"
+            },
+            "accepted_delivery_fallback": {
+              "type": "integer"
+            },
             "rejected": {
               "type": "integer"
             },
-            "ignored": {
+            "not_applicable": {
               "type": "integer"
             },
             "pending": {
@@ -4110,10 +4319,10 @@
             "zero_touch_rate": {
               "type": "number"
             },
-            "median_time_to_outcome_hours": {
+            "median_time_to_adoption_hours": {
               "type": "number"
             },
-            "cost_per_accepted_outcome": {
+            "cost_per_adopted_output": {
               "type": "number"
             },
             "total_objective_value": {
@@ -4177,8 +4386,10 @@
           "required": [
             "total",
             "accepted",
+            "accepted_human",
+            "accepted_delivery_fallback",
             "rejected",
-            "ignored",
+            "not_applicable",
             "pending",
             "unknown",
             "lifecycle",

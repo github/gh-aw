@@ -17,17 +17,19 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/lifecycle"
 )
 
 type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
-const cachedLogsJSONLSchemaVersion = 6
+const cachedLogsJSONLSchemaVersion = 7
 
 const (
 	cachedLogsJSONLKindRun          = "run"
 	cachedLogsJSONLKindWorkflowRuns = "workflow_runs"
 	cachedLogsJSONLKindRateLimit    = "github_api_rate_limit"
 	cachedLogsJSONLKindSafeOutput   = "safe_output_item"
+	cachedLogsJSONLKindLifecycle    = "output_lifecycle"
 )
 
 type cachedWorkflowRunsRequest struct {
@@ -82,6 +84,7 @@ type cachedLogsJSONLMCPToolCall struct {
 }
 
 type cachedLogsJSONLRecord struct {
+	Lifecycle     *lifecycle.Record             `json:"lifecycle,omitempty"`
 	SchemaVersion int                           `json:"schema_version"`
 	Kind          string                        `json:"kind,omitempty"`
 	Run           *cachedLogsJSONLRunData       `json:"run,omitempty"`
@@ -103,6 +106,7 @@ type cachedLogsJSONLSafeOutputRow struct {
 type cachedLogsJSONLCache struct {
 	runs             cachedLogsRuns
 	workflowRunLists map[string]json.RawMessage
+	lifecycles       map[string]lifecycle.Record
 }
 
 type preparedCachedLogsJSONL struct {
@@ -192,6 +196,13 @@ func loadCachedLogsJSONLFiles(paths []string) (*cachedLogsJSONLCache, error) {
 				warnDuplicateCachedLogsJSONLRecord(fmt.Sprintf("Duplicate cached workflow runs JSONL record in %s; newer cache file wins", path))
 			}
 			merged.workflowRunLists[key] = append(json.RawMessage(nil), payload...)
+		}
+		for _, record := range cache.lifecycles {
+			if err := merged.addRecord(cachedLogsJSONLRecord{
+				SchemaVersion: cachedLogsJSONLSchemaVersion, Kind: cachedLogsJSONLKindLifecycle, Lifecycle: &record,
+			}, 0); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return merged, nil
@@ -404,6 +415,19 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		return nil
 	}
 	switch record.Kind {
+	case cachedLogsJSONLKindLifecycle:
+		if record.Lifecycle == nil {
+			return fmt.Errorf("missing lifecycle evidence in cached record %d", recordNumber)
+		}
+		if cache.lifecycles == nil {
+			cache.lifecycles = make(map[string]lifecycle.Record)
+		}
+		merged, err := lifecycle.Merge(cache.lifecycles[record.Lifecycle.ID], *record.Lifecycle)
+		if err != nil {
+			return fmt.Errorf("invalid cached lifecycle record %d: %w", recordNumber, err)
+		}
+		cache.lifecycles[merged.ID] = merged
+		return nil
 	case cachedLogsJSONLKindWorkflowRuns:
 		if record.Request == nil || len(record.Payload) == 0 {
 			return nil

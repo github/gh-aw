@@ -43,8 +43,9 @@ type CrossRunAuditReport struct {
 	ModelRouting         *ModelRoutingLogsSummary    `json:"model_routing,omitempty"`
 	Episodes             []EpisodeData               `json:"episodes,omitempty"`
 	Edges                []EpisodeEdge               `json:"edges,omitempty"`
-	Outcomes             []OutcomesData              `json:"outcomes,omitempty"`
-	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_outcomes,omitempty"`
+	Delivery             []DeliveryData              `json:"delivery,omitempty"`
+	Outcomes             []OutcomesData              `json:"adoption,omitempty"`
+	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_adoption,omitempty"`
 }
 
 // CrossRunSummary provides top-level statistics across all analyzed runs.

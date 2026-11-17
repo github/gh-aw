@@ -23,12 +23,12 @@ func TestExperimentOutcomeSchema(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			experiment := map[string]any{
 				"variants":          []string{"control", "candidate"},
-				"metric":            "outcome:accepted",
-				"secondary_metrics": []string{"outcome:zero_touch"},
-				"guardrail_metrics": []any{map[string]any{"name": "outcome:accepted", "threshold": ">=0.9"}},
+				"metric":            "adoption:accepted",
+				"secondary_metrics": []string{"adoption:zero_touch"},
+				"guardrail_metrics": []any{map[string]any{"name": "adoption:accepted", "threshold": ">=0.9"}},
 			}
 			if tt.window != nil {
-				experiment["outcome_window"] = tt.window
+				experiment["adoption_window"] = tt.window
 			}
 			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 				"on":          "workflow_dispatch",

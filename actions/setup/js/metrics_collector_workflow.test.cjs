@@ -15,10 +15,11 @@ const source = fs.readFileSync(path.join(repoRoot, ".github/workflows/metrics-co
 const frontmatter = source.split("---")[1];
 const maxFileBytes = Number(frontmatter.match(/max-file-size: (\d+)/)[1]);
 const maxPatchBytes = Number(frontmatter.match(/max-patch-size: (\d+)/)[1]);
-const gate = source.match(/    validation:\n      script: \|\n([\s\S]*?)\npre-agent-steps:/)[1].replace(/^        /gm, "");
+const gate = source.match(/    validation:\n      script: \|\n([\s\S]*?)\n  - id: lifecycle/)[1].replace(/^        /gm, "");
 const prune = source.match(/node <<'NODE'\n([\s\S]*?)\nNODE/)[1];
 const example = JSON.parse(source.match(/Create a JSON object following this schema:\n\n```json\n([\s\S]*?)\n```/)[1]);
 const tempDirs = [];
+const migratedSnapshotBytes = 460000;
 
 function temporaryDirectory() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "metrics-contract-"));
@@ -26,7 +27,7 @@ function temporaryDirectory() {
   return dir;
 }
 
-function snapshot(bytes = 447189, timestamp = "2026-10-14T02:00:00Z") {
+function snapshot(bytes = migratedSnapshotBytes, timestamp = "2026-10-14T02:00:00Z") {
   const data = {
     ...example,
     timestamp,
@@ -119,10 +120,10 @@ describe("Metrics Collector serialized storage contract", () => {
     expect(lock).toContain('FILE_GLOB_FILTER: "metrics/**"');
   });
 
-  it("fits a full measured-size 344-workflow snapshot without dropping fields", () => {
+  it("fits the complete migrated 344-workflow schema without dropping fields", () => {
     const root = temporaryDirectory();
     const content = writeSnapshot(root);
-    expect(Buffer.byteLength(content)).toBe(447189);
+    expect(Buffer.byteLength(content)).toBe(migratedSnapshotBytes);
     expect(Buffer.byteLength(content)).toBeGreaterThan(102400);
     expect(Buffer.byteLength(JSON.stringify(JSON.parse(content)))).toBeGreaterThan(131072);
     expect(Buffer.byteLength(content)).toBeLessThan(maxFileBytes);
@@ -276,7 +277,7 @@ describe("Metrics Collector serialized storage contract", () => {
     const root = initializeRepository();
     const metrics = path.join(root, "metrics");
     if (mode !== "bootstrap") {
-      writeSnapshot(metrics, snapshot(447189, mode === "next-day" ? "2026-10-13T02:00:00Z" : "2026-10-14T01:00:00Z"));
+      writeSnapshot(metrics, snapshot(migratedSnapshotBytes, mode === "next-day" ? "2026-10-13T02:00:00Z" : "2026-10-14T01:00:00Z"));
       git(root, ["add", "."]);
       git(root, ["commit", "--quiet", "-m", "Previous metrics"]);
     }
@@ -343,7 +344,7 @@ describe("Metrics Collector serialized storage contract", () => {
     expect(files).toHaveLength(31);
     expect(files.length).toBeLessThan(100); // Default changed-file limit.
     const artifactBytes = files.reduce((total, file) => total + fs.statSync(file).size, 0);
-    expect(artifactBytes).toBe(31 * 447189);
+    expect(artifactBytes).toBe(31 * migratedSnapshotBytes);
     expect(artifactBytes).toBeLessThanOrEqual(31 * maxFileBytes);
   });
 
@@ -415,7 +416,7 @@ describe("Metrics Collector serialized storage contract", () => {
 
   it.each(["upload", "baseline"])("wires the actual %s validation entry point and fails closed before upload", phase => {
     const root = temporaryDirectory();
-    writeSnapshot(path.join(root, "metrics"), snapshot(447189, new Date().toISOString()));
+    writeSnapshot(path.join(root, "metrics"), snapshot(migratedSnapshotBytes, new Date().toISOString()));
     const memoryId = path.basename(root);
     const script = `if (memoryPhase !== ${JSON.stringify(phase)}) throw new Error("incorrect entry-point phase");\n${gate}`;
     vi.stubEnv("MEMORY_DIR", root);
@@ -448,7 +449,7 @@ describe("Metrics Collector serialized storage contract", () => {
   it.each(["current", "old-file-cap", "old-patch-cap", "invalid-pair"])("exercises the real push validator with %s budgets and mocked external effects", async mode => {
     const workspace = initializeRepository();
     const artifact = temporaryDirectory();
-    const current = snapshot(447189, new Date().toISOString());
+    const current = snapshot(migratedSnapshotBytes, new Date().toISOString());
     writeSnapshot(path.join(artifact, "metrics"), current);
     fs.mkdirSync(path.join(workspace, "metrics/daily"), { recursive: true });
     fs.writeFileSync(path.join(workspace, "metrics/daily/2020-01-01.json"), "{}");

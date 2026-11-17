@@ -33,6 +33,8 @@ func TestBuildLogsCommandArgsPreservesWorkflowPositionals(t *testing.T) {
 				NoFirewall:            workflowName == "-nightly",
 				FilteredIntegrity:     true,
 				Graders:               true,
+				Delivery:              true,
+				Adoption:              true,
 				Branch:                "main",
 				AfterRunID:            123,
 				BeforeRunID:           456,
@@ -70,6 +72,8 @@ func TestBuildLogsCommandArgsPreservesWorkflowPositionals(t *testing.T) {
 			assert.Equal(t, args.NoFirewall, getBoolFlag(cmd, "no-firewall"))
 			assert.True(t, getBoolFlag(cmd, "filtered-integrity"))
 			assert.True(t, getBoolFlag(cmd, "graders"))
+			assert.True(t, getBoolFlag(cmd, "delivery"))
+			assert.True(t, getBoolFlag(cmd, "adoption"))
 			assert.Equal(t, args.Branch, getStringFlag(cmd, "ref"))
 			assert.Equal(t, args.AfterRunID, getInt64Flag(cmd, "after-run-id"))
 			assert.Equal(t, args.BeforeRunID, getInt64Flag(cmd, "before-run-id"))

@@ -84,8 +84,8 @@ When `graders` are configured, `metric` can reference a grader result using
 `grader:<id>` (for example `grader:tool-success-rate`) or
 `graders.<id>.value`.
 
-Use `outcome:accepted` or `outcome:zero_touch` to measure live GitHub outcomes
-with `gh aw experiments analyze <workflow> --outcome`. These references also work in `secondary_metrics` and
+Use `adoption:accepted` or `adoption:zero_touch` to measure live GitHub adopted outputs
+with `gh aw experiments analyze <workflow> --adoption`. These references also work in `secondary_metrics` and
 `guardrail_metrics`, without declaring a grader or eval.
 
 `gh aw experiments analyze <workflow>` resolves the referenced eval question and, when
@@ -294,7 +294,7 @@ The `🧪 A/B Experiments` section of the audit report shows the variant chosen 
   • style = concise (cumulative: concise:5, detailed:4)
 ```
 
-### Analyze an outcome-backed metric
+### Analyze an adoption-backed metric
 
 Measure whether a workflow's safe outputs were accepted after a maturity window:
 
@@ -303,10 +303,10 @@ Measure whether a workflow's safe outputs were accepted after a maturity window:
 experiments:
   prompt_v2:
     variants: [control, candidate]
-    metric: outcome:accepted
-    outcome_window: auto
+    metric: adoption:accepted
+    adoption_window: auto
     guardrail_metrics:
-      - name: outcome:zero_touch
+      - name: adoption:zero_touch
         threshold: ">=0.8"
     min_samples: 20
 ---
@@ -314,12 +314,12 @@ experiments:
 Follow the **${{ experiments.prompt_v2 }}** instructions.
 ```
 
-Run `gh aw experiments analyze <workflow> --outcome` to evaluate outcomes on demand;
-no scheduled collector is needed. Live outcome collection is opt-in because it
-downloads artifacts and makes additional GitHub API requests. Without `--outcome`,
-analysis of an outcome-backed primary, secondary, or guardrail metric returns an
-error explaining how to enable collection; no outcome evidence is fetched.
-`outcome_window` defaults to `auto`: analysis estimates the
+Run `gh aw experiments analyze <workflow> --adoption` to evaluate adopted outputs on demand;
+no scheduled collector is needed. Live adoption collection is opt-in because it
+downloads artifacts and makes additional GitHub API requests. Without `--adoption`,
+analysis of an adoption-backed primary, secondary, or guardrail metric returns an
+error explaining how to enable collection; no adoption evidence is fetched.
+`adoption_window` defaults to `auto`: analysis estimates the
 pooled 95th-percentile decision time from this experiment's outputs across variants
 with Kaplan–Meier censoring
 for still-open outputs, clamps the window to 24 hours–30 days, and uses `72h`
@@ -332,13 +332,13 @@ pending after the window. Stale pending outputs score zero.
 
 Zero-touch means a merged PR with no non-bot comments, reviews, or commits after
 creation. Accepted PR outputs without complete zero-touch evidence are excluded
-from that metric rather than scored zero. Unknown or errored outcomes are also
+from that metric rather than scored zero. Unknown or errored adopted outputs are also
 excluded. Historical records without `zero_touch_evidence_complete` remain valid,
 but do not establish complete zero-touch evidence. Lifecycle, lifecycle-close,
-ignored, and skipped outputs do not contribute; runs with no outcome-bearing
+ignored, and skipped outputs do not contribute; runs with no adoption-bearing
 outputs are no-ops, not successes.
 Other resolved output types remain in the denominator and score zero for
-`outcome:zero_touch`.
+`adoption:zero_touch`.
 
 Text and `--json` reports include per-variant run coverage: `immature`,
 `stale_pending`, `unavailable`, and `no_op`. A run with some usable outputs can
@@ -347,16 +347,16 @@ run observations count toward `min_samples`. When `analysis_type` is omitted,
 the analyzer uses a two-proportion test if every observed run value is 0 or 1,
 otherwise Welch's t-test (for example, when a run creates several PRs).
 Explicit `proportion_test` or `bayesian_ab` analysis requires binary per-run
-values and cannot analyze fractional outcomes.
+values and cannot analyze fractional adopted outputs.
 The report includes the effective window, its source, and the sample size used for
-learning or the cold-start fallback. Outcome-backed secondary metrics include
+learning or the cold-start fallback. Adoption-backed secondary metrics include
 per-variant observations, coverage, and statistical comparisons in text and JSON.
-Prefer `outcome:zero_touch` when acceptance is already high and reducing human
+Prefer `adoption:zero_touch` when acceptance is already high and reducing human
 intervention is the goal.
 
 ### Analyze a grader-backed metric
 
-Use a deterministic grader as the primary outcome metric:
+Use a deterministic grader as the primary adoption metric:
 
 ```aw wrap
 ---
@@ -401,7 +401,7 @@ The decision layer treats grader observations like any other resolved numeric me
 
 ### Analyze an eval-backed metric
 
-Use a BinEval question as the primary outcome metric:
+Use a BinEval question as the primary adoption metric:
 
 ```aw wrap
 ---
@@ -425,7 +425,7 @@ Follow the **${{ experiments.prompt_v2 }}** instructions.
 excluded YES/NO observations per variant. Runs missing an eval answer, or with an
 `UNKNOWN`/unrecognized answer, are excluded rather than counted as zero. Only usable
 observations count toward `min_samples`, and the same t-test, Mann–Whitney, proportion, or
-Bayesian comparisons available for grader-backed metrics are applied to the YES/NO outcomes.
+Bayesian comparisons available for grader-backed metrics are applied to the YES/NO adopted outputs.
 `UNKNOWN` answers remain excluded. They are not treated as `NO`.
 
 The evals job batches 1–400 binary questions into a single OpenAI-compatible
@@ -469,7 +469,7 @@ variant assignment
 → deterministic decision
 ```
 
-Assignment identifies the treatment (`control` or `candidate`); it is not an outcome. Observation
+Assignment identifies the treatment (`control` or `candidate`); it is not an adoption. Observation
 records what happened during that assigned run. Analysis estimates the effect and evidence.
 Readiness only answers whether every variant has reached `min_samples`: usable primary-metric
 observations for observation-backed metrics, or assignment counts when no supported observation
@@ -527,7 +527,7 @@ The decision portion of the default CLI output uses these fields:
 ```text
   Readiness  : READY
 
-  READY FOR ANALYSIS — all 2 variants have reached min_samples (20); outcome metric analysis is available
+  READY FOR ANALYSIS — all 2 variants have reached min_samples (20); adoption metric analysis is available
 
   Decision   : PROMOTE candidate
   Reason     : candidate materially improves the primary metric with sufficient evidence and all guardrails pass (candidate_improved)
@@ -538,7 +538,7 @@ An adequately sampled result without sufficient evidence remains distinct:
 ```text
   Readiness  : READY
 
-  READY FOR ANALYSIS — all 2 variants have reached min_samples (20); outcome metric analysis is available
+  READY FOR ANALYSIS — all 2 variants have reached min_samples (20); adoption metric analysis is available
 
   Decision   : INCONCLUSIVE
   Reason     : minimum samples are available but the configured evidence threshold is not satisfied (evidence_insufficient)
@@ -641,7 +641,7 @@ The core CLI supports all four analysis methods (`t_test`, `mann_whitney`, `prop
 most `1-confidence`, and it is never described as a p-value.
 
 The daily experiment report consumes this structured core decision. It does not independently
-recompute the decision policy. Its only additional outcome handling is the interaction safety hold
+recompute the decision policy. Its only additional adoption handling is the interaction safety hold
 described above. Older reporting terminology such as `ABANDON`, and guardrail statuses such as
 `GUARDRAIL_FAILED`, are not core decision values.
 
@@ -751,6 +751,6 @@ The activation job advances the ramp after each `min_samples` candidate assignme
 and stores the current stage on the experiment branch, leaving the workflow source
 immutable. The logs show the stage, assignment counts, weights, and selected variant.
 
-The ramp does not evaluate outcomes or promote a winner. Use the existing experiment
+The ramp does not evaluate adopted outputs or promote a winner. Use the existing experiment
 analysis commands and configured metrics to decide whether to stop the experiment
 or make a variant permanent.
