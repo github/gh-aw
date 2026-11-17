@@ -105,6 +105,7 @@ Test protected publication.
 			redactionPosition := strings.Index(workflow, "      - name: Redact secrets in logs\n")
 			ingestPosition := strings.Index(workflow, "      - name: Ingest agent output\n")
 			if protected {
+				assert.Contains(t, parserStep, "        if: always() && steps.agentic_execution.outcome != 'skipped'\n")
 				assert.Less(t, parserPosition, redactionPosition)
 				assert.Less(t, parserPosition, ingestPosition)
 				assert.Contains(t, parserStep, "GH_AW_SECRET_NAMES: 'CAPTURE_GLOBAL_SECRET,CAPTURE_TEST_SECRET,")
@@ -115,6 +116,7 @@ Test protected publication.
 					assert.Contains(t, step, "steps.parse_agent_logs.outcome == 'success'")
 				}
 			} else {
+				assert.Contains(t, parserStep, "        if: always()\n")
 				assert.Less(t, redactionPosition, ingestPosition)
 				assert.Less(t, ingestPosition, parserPosition)
 				assert.NotContains(t, parserStep, "SECRET_CAPTURE_TEST_SECRET:")

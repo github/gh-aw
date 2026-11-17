@@ -250,7 +250,11 @@ func (c *Compiler) generateLogParsing(yaml *strings.Builder, data *WorkflowData,
 		logFileForParsing = strings.ReplaceAll(logFileForParsing, constants.TmpGhAwDir, constants.GhAwRootDir)
 	}
 	yaml.WriteString("      - name: Parse agent logs for step summary\n")
-	yaml.WriteString("        if: always()\n")
+	if protectedSessionCaptureParserID(engine) != "" {
+		yaml.WriteString("        if: always() && steps.agentic_execution.outcome != 'skipped'\n")
+	} else {
+		yaml.WriteString("        if: always()\n")
+	}
 	yaml.WriteString(protectedSessionCaptureParserID(engine))
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        env:\n")
