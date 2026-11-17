@@ -11,7 +11,7 @@ const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const GIT_COMMAND_TIMEOUT_MS = getSetupTimeoutMs("gitBranch");
-const GH_COMMAND_TIMEOUT_MS = getSetupTimeoutMs("outcomeGh");
+const GH_COMMAND_TIMEOUT_MS = getSetupTimeoutMs("adoptionGh");
 
 function parseManifestEntries(entriesJSON = process.env.GH_AW_CHECKOUT_MANIFEST_ENTRIES || "[]") {
   let parsed;

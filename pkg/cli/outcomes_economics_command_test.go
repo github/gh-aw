@@ -50,7 +50,7 @@ func TestRunOutcomesSupplementaryAIC(t *testing.T) {
 				},
 			}
 			require.NoError(t, saveRunSummary(runDir, cached, false))
-			item := "{\"type\":\"assign_milestone\",\"number\":1,\"repo\":\"acme/repo\",\"metadata\":{\"milestone_number\":2}}\n"
+			item := "{\"type\":\"assign_milestone\",\"number\":1,\"repo\":\"acme/repo\",\"metadata\":{\"milestone_number\":2},\"timestamp\":\"2026-10-01T00:00:00Z\"}\n"
 			manifest := item + strings.Replace(item, `"number":1`, `"number":2`, 1)
 			require.NoError(t, os.WriteFile(filepath.Join(runDir, safeOutputItemsManifestFilename), []byte(manifest), 0o600))
 
@@ -65,13 +65,13 @@ func TestRunOutcomesSupplementaryAIC(t *testing.T) {
 				require.NoError(t, os.Symlink(usageDir, filepath.Join(usageDir, "agent_usage.jsonl")))
 			}
 
-			outcomesDir := filepath.Join(dir, "outcomes")
+			outcomesDir := filepath.Join(dir, "adoption")
 			var runErr error
 			var reports []OutcomesData
 			stderr := testutil.CaptureStderr(t, func() {
-				reports, runErr = collectLogsOutcomes(context.Background(), []ProcessedRun{{Run: WorkflowRun{
-					DatabaseID: 42, Repository: "acme/repo", LogsPath: runDir,
-				}}}, outcomesDir, false)
+				reports, runErr = collectLogsLifecycles(context.Background(), []ProcessedRun{{Run: WorkflowRun{
+					DatabaseID: 42, Attempt: 1, WorkflowPath: ".github/workflows/test.lock.yml", Repository: "acme/repo", LogsPath: runDir,
+				}}}, outcomesDir, false, true)
 			})
 			require.NoError(t, runErr)
 			require.Len(t, reports, 1)
@@ -82,23 +82,23 @@ func TestRunOutcomesSupplementaryAIC(t *testing.T) {
 			assert.Equal(t, 2, data.Summary.Accepted)
 			assert.InDelta(t, tc.cost, data.Summary.CostPerAcceptedOutcome, 1e-9)
 			if tc.cost == 0 {
-				assert.NotContains(t, string(output), "cost_per_accepted_outcome")
+				assert.NotContains(t, string(output), "cost_per_adopted_output")
 			}
 			if tc.warning != "" {
-				assert.Contains(t, stderr, "Failed to compute outcome AI Credits; cost per accepted outcome omitted")
+				assert.Contains(t, stderr, "Failed to compute adoption AI Credits; cost per accepted adoption omitted")
 				assert.Contains(t, stderr, tc.warning)
 			} else {
-				assert.NotContains(t, stderr, "Failed to compute outcome AI Credits")
+				assert.NotContains(t, stderr, "Failed to compute adoption AI Credits")
 			}
 
-			jsonl, err := os.ReadFile(filepath.Join(outcomesDir, "outcomes-42.jsonl"))
+			jsonl, err := os.ReadFile(filepath.Join(outcomesDir, "adoption-42.jsonl"))
 			require.NoError(t, err)
 			lines := strings.Split(strings.TrimSpace(string(jsonl)), "\n")
 			require.Len(t, lines, 2)
 			for _, line := range lines {
 				var report map[string]any
 				require.NoError(t, json.Unmarshal([]byte(line), &report))
-				assert.Equal(t, string(OutcomeStatusAccepted), report["outcome_status"])
+				assert.Equal(t, string(OutcomeStatusAccepted), report["adoption_status"])
 				assert.InDelta(t, 42, report["run_id"], 0)
 				assert.NotEmpty(t, report["item_id"])
 				assert.InDelta(t, 2, report["run_item_count"], 0)

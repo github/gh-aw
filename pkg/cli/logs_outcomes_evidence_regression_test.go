@@ -40,6 +40,7 @@ func installAssignmentOutcomeFixture(t *testing.T) string {
 	return installOutcomeAPIFixture(t, `case "$2" in
 repos/org/one/issues/100) printf '%s' '{"state":"open","labels":[]}' ;;
 repos/org/one/issues/100/timeline) printf '%s' '[[{"event":"cross-referenced","created_at":"2026-10-02T00:00:00Z","source":{"issue":{"number":200,"repository_url":"https://api.github.com/repos/org/one","user":{"login":"copilot-swe-agent"},"pull_request":{}}}}]]' ;;
+repos/org/one/issues/100/timeline?*) printf '%s' '[{"event":"cross-referenced","created_at":"2026-10-02T00:00:00Z","source":{"issue":{"number":200,"repository_url":"https://api.github.com/repos/org/one","user":{"login":"copilot-swe-agent"},"pull_request":{}}}}]' ;;
 repos/org/one/pulls/200) printf '%s' '{"state":"closed","merged":true,"labels":[]}' ;;
 *) printf 'unexpected endpoint: %s\n' "$2" >&2; exit 1 ;;
 esac
@@ -58,7 +59,7 @@ func TestLogsOutcomeDefaultArtifactsRecoverAssignment(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(fallbackDir, "safeoutputs.jsonl"),
 		[]byte("{\"type\":\"assign_to_agent\",\"issue_number\":100}\n"), 0o600))
 	report, err := collectRunOutcomes(withOutcomeAPICache(context.Background()),
-		ProcessedRun{Run: WorkflowRun{DatabaseID: 2, Repository: "org/one", LogsPath: dir}}, nil, false)
+		ProcessedRun{Run: WorkflowRun{Attempt: 1, DatabaseID: 2, Repository: "org/one", LogsPath: dir}}, nil, false)
 	require.NoError(t, err)
 	require.Len(t, report.Items, 1)
 	assert.Equal(t, OutcomeStatusAccepted, report.Items[0].OutcomeStatus)
@@ -96,7 +97,7 @@ func TestEpisodeOutcomeCompactAssignmentEvidence(t *testing.T) {
 	data, err := retrieveCachedEpisodeLogs(context.Background(), options, request)
 	require.NoError(t, err)
 	require.Len(t, data.Runs, 1)
-	require.NoError(t, collectEpisodeOutcomes(context.Background(), &data, "", false))
+	require.NoError(t, collectEpisodeLifecycles(context.Background(), &data, "", false, true))
 	require.Len(t, data.Outcomes, 1)
 	require.Len(t, data.Outcomes[0].Items, 1)
 	assert.Equal(t, OutcomeStatusAccepted, data.Outcomes[0].Items[0].OutcomeStatus)
@@ -122,24 +123,24 @@ func TestLogsOutcomeAggregatesInvocationManifests(t *testing.T) {
 		name, first, second string
 		count               int
 	}{
-		{"distinct", `{"type":"unsupported_a"}`, `{"type":"unsupported_b"}`, 2},
-		{"empty first", "", `{"type":"unsupported_b"}`, 1},
-		{"identical invocations", `{"type":"unsupported_a"}`, `{"type":"unsupported_a"}`, 2},
+		{"distinct", `{"type":"unsupported_a","timestamp":"2026-10-01T00:00:00Z"}`, `{"type":"unsupported_b","timestamp":"2026-10-01T00:00:00Z"}`, 2},
+		{"empty first", "", `{"type":"unsupported_b","timestamp":"2026-10-01T00:00:00Z"}`, 1},
+		{"identical invocations", `{"type":"unsupported_a","timestamp":"2026-10-01T00:00:00Z"}`, `{"type":"unsupported_a","timestamp":"2026-10-01T00:00:00Z"}`, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			parent := t.TempDir()
 			dir := filepath.Join(parent, "collection-test")
 			require.NoError(t, os.Mkdir(dir, 0o700))
 			inventory := []string{
-				writeOutcomeInvocationManifest(t, parent, "21-outcomes", tc.first),
-				writeOutcomeInvocationManifest(t, parent, "22-outcomes", tc.second),
+				writeOutcomeInvocationManifest(t, parent, "21-adoption", tc.first),
+				writeOutcomeInvocationManifest(t, parent, "22-adoption", tc.second),
 			}
 			encoded, err := json.Marshal(inventory)
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, ".episode-artifacts.json"), encoded, 0o600))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(tc.first), 0o600))
 			report, err := collectRunOutcomes(context.Background(),
-				ProcessedRun{Run: WorkflowRun{DatabaseID: 2, Repository: "org/one", LogsPath: dir}}, nil, false)
+				ProcessedRun{Run: WorkflowRun{Attempt: 1, DatabaseID: 2, Repository: "org/one", LogsPath: dir}}, nil, false)
 			require.NoError(t, err)
 			require.Len(t, report.Items, tc.count)
 			if tc.count == 2 {
@@ -206,7 +207,7 @@ func TestLogsOutcomeEmptyManifestsEstablishEpisodeCoverage(t *testing.T) {
 		complete       bool
 	}{
 		{"empty", "\n", true},
-		{"all skipped", "{\"type\":\"noop\"}\n", true},
+		{"all skipped", "{\"type\":\"noop\",\"status\":\"skipped\"}\n", true},
 		{"missing", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -215,7 +216,7 @@ func TestLogsOutcomeEmptyManifestsEstablishEpisodeCoverage(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(tc.manifest), 0o600))
 			}
 			report, err := collectRunOutcomes(context.Background(),
-				ProcessedRun{Run: WorkflowRun{DatabaseID: 2, Repository: "org/one", LogsPath: dir}}, nil, false)
+				ProcessedRun{Run: WorkflowRun{Attempt: 1, DatabaseID: 2, Repository: "org/one", LogsPath: dir}}, nil, false)
 			require.NoError(t, err)
 			require.Empty(t, report.Items)
 			accepted := episodeObservation(1, "stable-action", OutcomeStatusAccepted).OutcomeReport

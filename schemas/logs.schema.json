@@ -3,6 +3,366 @@
     {
       "type": "object",
       "properties": {
+        "retained_adoption": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "observed_at": {
+              "type": "string"
+            },
+            "delivered": {
+              "type": "integer"
+            },
+            "refreshed": {
+              "type": "integer"
+            },
+            "deferred": {
+              "type": "integer"
+            },
+            "coverage": {
+              "type": "string"
+            },
+            "records": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "host": {
+                    "type": "string"
+                  },
+                  "repository": {
+                    "type": "string"
+                  },
+                  "workflow": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "integer"
+                  },
+                  "run_attempt": {
+                    "type": "integer"
+                  },
+                  "invocation_id": {
+                    "type": "string"
+                  },
+                  "evidence_id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "target_url": {
+                    "type": "string"
+                  },
+                  "target_repository": {
+                    "type": "string"
+                  },
+                  "delivery": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string"
+                      },
+                      "observed_at": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "signal",
+                      "at",
+                      "observed_at",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "adoption": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string"
+                      },
+                      "observed_at": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "rule_version": {
+                        "type": "string"
+                      },
+                      "acceptance_kind": {
+                        "type": "string"
+                      },
+                      "human_verified": {
+                        "type": "boolean"
+                      },
+                      "coverage": {
+                        "type": "string"
+                      },
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "signal",
+                      "observed_at",
+                      "source",
+                      "rule_version",
+                      "human_verified",
+                      "coverage"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "survival": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "observed_at": {
+                        "type": "string"
+                      },
+                      "coverage": {
+                        "type": "string"
+                      },
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "coverage"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "reversal_signal": {
+                    "type": "string"
+                  },
+                  "reversed_at": {
+                    "type": "string"
+                  },
+                  "execution": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "number": {
+                        "type": "integer"
+                      },
+                      "labels_before": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "labels_added": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "before_state": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "after_state": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    },
+                    "required": [
+                      "labels_before"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "id",
+                  "host",
+                  "repository",
+                  "run_id",
+                  "run_attempt",
+                  "invocation_id",
+                  "evidence_id",
+                  "type",
+                  "delivery",
+                  "adoption",
+                  "survival"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "observed_at",
+            "delivered",
+            "refreshed",
+            "deferred",
+            "coverage",
+            "records"
+          ],
+          "additionalProperties": false
+        },
+        "delivery": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "workflow": {
+                "type": "string"
+              },
+              "items": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "host": {
+                      "type": "string"
+                    },
+                    "repository": {
+                      "type": "string"
+                    },
+                    "workflow": {
+                      "type": "string"
+                    },
+                    "run_id": {
+                      "type": "integer"
+                    },
+                    "run_attempt": {
+                      "type": "integer"
+                    },
+                    "invocation_id": {
+                      "type": "string"
+                    },
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "target_url": {
+                      "type": "string"
+                    },
+                    "target_repository": {
+                      "type": "string"
+                    },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string"
+                        },
+                        "signal": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "observed_at": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "signal",
+                        "at",
+                        "observed_at",
+                        "source"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "host",
+                    "repository",
+                    "run_id",
+                    "run_attempt",
+                    "invocation_id",
+                    "evidence_id",
+                    "type",
+                    "delivery"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "delivered": {
+                "type": "integer"
+              },
+              "coverage": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "retention_days": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "run_id",
+              "items",
+              "delivered",
+              "coverage",
+              "retention_days"
+            ],
+            "additionalProperties": false
+          }
+        },
         "failure_investigation": {
           "type": [
             "null",
@@ -452,25 +812,25 @@
             "intentional_failure_runs": {
               "type": "integer"
             },
-            "outcome_accepted": {
+            "adoption_accepted": {
               "type": "integer"
             },
-            "outcome_rejected": {
+            "adoption_rejected": {
               "type": "integer"
             },
-            "outcome_ignored": {
+            "adoption_not_applicable": {
               "type": "integer"
             },
-            "outcome_pending": {
+            "adoption_pending": {
               "type": "integer"
             },
-            "outcome_acceptance_rate": {
+            "adoption_acceptance_rate": {
               "type": "number"
             },
-            "outcome_waste_rate": {
+            "adoption_rejection_rate": {
               "type": "number"
             },
-            "outcome_zero_touch_rate": {
+            "adoption_zero_touch_rate": {
               "type": "number"
             }
           },
@@ -4426,6 +4786,9 @@
                 "items": {
                   "type": "object",
                   "properties": {
+                    "status": {
+                      "type": "string"
+                    },
                     "type": {
                       "type": "string"
                     },
@@ -5170,7 +5533,7 @@
           ],
           "additionalProperties": false
         },
-        "outcomes": {
+        "adoption": {
           "type": [
             "null",
             "array"
@@ -5192,13 +5555,95 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "outcome_status": {
+                    "adoption_status": {
                       "type": "string"
                     },
                     "evidence_strength": {
                       "type": "string"
                     },
                     "signal": {
+                      "type": "string"
+                    },
+                    "adoption": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "state": {
+                          "type": "string"
+                        },
+                        "signal": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "observed_at": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "rule_version": {
+                          "type": "string"
+                        },
+                        "acceptance_kind": {
+                          "type": "string"
+                        },
+                        "human_verified": {
+                          "type": "boolean"
+                        },
+                        "coverage": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "signal",
+                        "observed_at",
+                        "source",
+                        "rule_version",
+                        "human_verified",
+                        "coverage"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "survival": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "state": {
+                          "type": "string"
+                        },
+                        "signal": {
+                          "type": "string"
+                        },
+                        "observed_at": {
+                          "type": "string"
+                        },
+                        "coverage": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "coverage"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reversal_signal": {
+                      "type": "string"
+                    },
+                    "reversed_at": {
                       "type": "string"
                     },
                     "item_id": {
@@ -5228,7 +5673,7 @@
                     "detail": {
                       "type": "string"
                     },
-                    "time_to_outcome_hours": {
+                    "time_to_adoption_hours": {
                       "type": "number"
                     },
                     "human_comments": {
@@ -5269,7 +5714,7 @@
                     }
                   },
                   "required": [
-                    "outcome_status",
+                    "adoption_status",
                     "evidence_strength",
                     "type",
                     "created_at",
@@ -5287,10 +5732,16 @@
                   "accepted": {
                     "type": "integer"
                   },
+                  "accepted_human": {
+                    "type": "integer"
+                  },
+                  "accepted_delivery_fallback": {
+                    "type": "integer"
+                  },
                   "rejected": {
                     "type": "integer"
                   },
-                  "ignored": {
+                  "not_applicable": {
                     "type": "integer"
                   },
                   "pending": {
@@ -5329,10 +5780,10 @@
                   "zero_touch_rate": {
                     "type": "number"
                   },
-                  "median_time_to_outcome_hours": {
+                  "median_time_to_adoption_hours": {
                     "type": "number"
                   },
-                  "cost_per_accepted_outcome": {
+                  "cost_per_adopted_output": {
                     "type": "number"
                   },
                   "total_objective_value": {
@@ -5396,8 +5847,10 @@
                 "required": [
                   "total",
                   "accepted",
+                  "accepted_human",
+                  "accepted_delivery_fallback",
                   "rejected",
-                  "ignored",
+                  "not_applicable",
                   "pending",
                   "unknown",
                   "lifecycle",
@@ -5411,17 +5864,21 @@
               },
               "eval_error": {
                 "type": "string"
+              },
+              "coverage": {
+                "type": "string"
               }
             },
             "required": [
               "run_id",
               "items",
-              "summary"
+              "summary",
+              "coverage"
             ],
             "additionalProperties": false
           }
         },
-        "episode_outcomes": {
+        "episode_adoption": {
           "type": [
             "null",
             "object"
@@ -5476,7 +5933,7 @@
                         "type": "boolean"
                       }
                     },
-                    "description": "Optional lineage and collection coverage copied from logs, separate from outcome and cost coverage",
+                    "description": "Optional lineage and collection coverage copied from logs, separate from adoption and cost coverage",
                     "required": [
                       "scope",
                       "status"
@@ -5497,13 +5954,95 @@
                         "run_item_count": {
                           "type": "integer"
                         },
-                        "outcome_status": {
+                        "adoption_status": {
                           "type": "string"
                         },
                         "evidence_strength": {
                           "type": "string"
                         },
                         "signal": {
+                          "type": "string"
+                        },
+                        "adoption": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": "string"
+                            },
+                            "signal": {
+                              "type": "string"
+                            },
+                            "at": {
+                              "type": "string"
+                            },
+                            "observed_at": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "rule_version": {
+                              "type": "string"
+                            },
+                            "acceptance_kind": {
+                              "type": "string"
+                            },
+                            "human_verified": {
+                              "type": "boolean"
+                            },
+                            "coverage": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "signal",
+                            "observed_at",
+                            "source",
+                            "rule_version",
+                            "human_verified",
+                            "coverage"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "survival": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": "string"
+                            },
+                            "signal": {
+                              "type": "string"
+                            },
+                            "observed_at": {
+                              "type": "string"
+                            },
+                            "coverage": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "coverage"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "reversal_signal": {
+                          "type": "string"
+                        },
+                        "reversed_at": {
                           "type": "string"
                         },
                         "item_id": {
@@ -5533,7 +6072,7 @@
                         "detail": {
                           "type": "string"
                         },
-                        "time_to_outcome_hours": {
+                        "time_to_adoption_hours": {
                           "type": "number"
                         },
                         "human_comments": {
@@ -5575,7 +6114,7 @@
                       },
                       "required": [
                         "run_id",
-                        "outcome_status",
+                        "adoption_status",
                         "evidence_strength",
                         "type",
                         "created_at",
@@ -5593,10 +6132,16 @@
                       "accepted": {
                         "type": "integer"
                       },
+                      "accepted_human": {
+                        "type": "integer"
+                      },
+                      "accepted_delivery_fallback": {
+                        "type": "integer"
+                      },
                       "rejected": {
                         "type": "integer"
                       },
-                      "ignored": {
+                      "not_applicable": {
                         "type": "integer"
                       },
                       "pending": {
@@ -5635,10 +6180,10 @@
                       "zero_touch_rate": {
                         "type": "number"
                       },
-                      "median_time_to_outcome_hours": {
+                      "median_time_to_adoption_hours": {
                         "type": "number"
                       },
-                      "cost_per_accepted_outcome": {
+                      "cost_per_adopted_output": {
                         "type": "number"
                       },
                       "total_objective_value": {
@@ -5702,8 +6247,10 @@
                     "required": [
                       "total",
                       "accepted",
+                      "accepted_human",
+                      "accepted_delivery_fallback",
                       "rejected",
-                      "ignored",
+                      "not_applicable",
                       "pending",
                       "unknown",
                       "lifecycle",
@@ -5722,7 +6269,7 @@
                     ],
                     "description": "Sum of available selected-run AIC, including detection usage; null when no cost is available"
                   },
-                  "cost_per_accepted_outcome": {
+                  "cost_per_adopted_output": {
                     "type": [
                       "null",
                       "number"
@@ -5733,11 +6280,11 @@
                     "type": "string",
                     "description": "available, partial, or unavailable for selected run IDs"
                   },
-                  "outcome_coverage": {
+                  "adoption_coverage": {
                     "type": "string",
                     "description": "complete or partial for selected runs only, not full-episode membership"
                   },
-                  "outcome_run_ids": {
+                  "adoption_run_ids": {
                     "type": [
                       "null",
                       "array"
@@ -5746,7 +6293,7 @@
                       "type": "integer"
                     }
                   },
-                  "missing_outcome_run_ids": {
+                  "missing_adoption_run_ids": {
                     "type": [
                       "null",
                       "array"
@@ -5799,11 +6346,11 @@
                   "items",
                   "summary",
                   "observed_aic",
-                  "cost_per_accepted_outcome",
+                  "cost_per_adopted_output",
                   "cost_coverage",
-                  "outcome_coverage",
-                  "outcome_run_ids",
-                  "missing_outcome_run_ids",
+                  "adoption_coverage",
+                  "adoption_run_ids",
+                  "missing_adoption_run_ids",
                   "cost_run_ids",
                   "missing_cost_run_ids",
                   "missing_run_ids",
@@ -5812,7 +6359,7 @@
                 "additionalProperties": false
               }
             },
-            "unmatched_outcome_run_ids": {
+            "unmatched_adoption_run_ids": {
               "type": [
                 "null",
                 "array"
@@ -5824,7 +6371,7 @@
           },
           "required": [
             "episodes",
-            "unmatched_outcome_run_ids"
+            "unmatched_adoption_run_ids"
           ],
           "additionalProperties": false
         },
@@ -8778,7 +9325,7 @@
             "additionalProperties": false
           }
         },
-        "outcomes": {
+        "delivery": {
           "type": [
             "null",
             "array"
@@ -8800,13 +9347,216 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "outcome_status": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "host": {
+                      "type": "string"
+                    },
+                    "repository": {
+                      "type": "string"
+                    },
+                    "workflow": {
+                      "type": "string"
+                    },
+                    "run_id": {
+                      "type": "integer"
+                    },
+                    "run_attempt": {
+                      "type": "integer"
+                    },
+                    "invocation_id": {
+                      "type": "string"
+                    },
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "target_url": {
+                      "type": "string"
+                    },
+                    "target_repository": {
+                      "type": "string"
+                    },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string"
+                        },
+                        "signal": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "observed_at": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "signal",
+                        "at",
+                        "observed_at",
+                        "source"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "host",
+                    "repository",
+                    "run_id",
+                    "run_attempt",
+                    "invocation_id",
+                    "evidence_id",
+                    "type",
+                    "delivery"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "delivered": {
+                "type": "integer"
+              },
+              "coverage": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "retention_days": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "run_id",
+              "items",
+              "delivered",
+              "coverage",
+              "retention_days"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "adoption": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "workflow": {
+                "type": "string"
+              },
+              "items": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "adoption_status": {
                       "type": "string"
                     },
                     "evidence_strength": {
                       "type": "string"
                     },
                     "signal": {
+                      "type": "string"
+                    },
+                    "adoption": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "state": {
+                          "type": "string"
+                        },
+                        "signal": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "observed_at": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "rule_version": {
+                          "type": "string"
+                        },
+                        "acceptance_kind": {
+                          "type": "string"
+                        },
+                        "human_verified": {
+                          "type": "boolean"
+                        },
+                        "coverage": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "signal",
+                        "observed_at",
+                        "source",
+                        "rule_version",
+                        "human_verified",
+                        "coverage"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "survival": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "state": {
+                          "type": "string"
+                        },
+                        "signal": {
+                          "type": "string"
+                        },
+                        "observed_at": {
+                          "type": "string"
+                        },
+                        "coverage": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "coverage"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reversal_signal": {
+                      "type": "string"
+                    },
+                    "reversed_at": {
                       "type": "string"
                     },
                     "item_id": {
@@ -8836,7 +9586,7 @@
                     "detail": {
                       "type": "string"
                     },
-                    "time_to_outcome_hours": {
+                    "time_to_adoption_hours": {
                       "type": "number"
                     },
                     "human_comments": {
@@ -8877,7 +9627,7 @@
                     }
                   },
                   "required": [
-                    "outcome_status",
+                    "adoption_status",
                     "evidence_strength",
                     "type",
                     "created_at",
@@ -8895,10 +9645,16 @@
                   "accepted": {
                     "type": "integer"
                   },
+                  "accepted_human": {
+                    "type": "integer"
+                  },
+                  "accepted_delivery_fallback": {
+                    "type": "integer"
+                  },
                   "rejected": {
                     "type": "integer"
                   },
-                  "ignored": {
+                  "not_applicable": {
                     "type": "integer"
                   },
                   "pending": {
@@ -8937,10 +9693,10 @@
                   "zero_touch_rate": {
                     "type": "number"
                   },
-                  "median_time_to_outcome_hours": {
+                  "median_time_to_adoption_hours": {
                     "type": "number"
                   },
-                  "cost_per_accepted_outcome": {
+                  "cost_per_adopted_output": {
                     "type": "number"
                   },
                   "total_objective_value": {
@@ -9004,8 +9760,10 @@
                 "required": [
                   "total",
                   "accepted",
+                  "accepted_human",
+                  "accepted_delivery_fallback",
                   "rejected",
-                  "ignored",
+                  "not_applicable",
                   "pending",
                   "unknown",
                   "lifecycle",
@@ -9019,17 +9777,21 @@
               },
               "eval_error": {
                 "type": "string"
+              },
+              "coverage": {
+                "type": "string"
               }
             },
             "required": [
               "run_id",
               "items",
-              "summary"
+              "summary",
+              "coverage"
             ],
             "additionalProperties": false
           }
         },
-        "episode_outcomes": {
+        "episode_adoption": {
           "type": [
             "null",
             "object"
@@ -9084,7 +9846,7 @@
                         "type": "boolean"
                       }
                     },
-                    "description": "Optional lineage and collection coverage copied from logs, separate from outcome and cost coverage",
+                    "description": "Optional lineage and collection coverage copied from logs, separate from adoption and cost coverage",
                     "required": [
                       "scope",
                       "status"
@@ -9105,13 +9867,95 @@
                         "run_item_count": {
                           "type": "integer"
                         },
-                        "outcome_status": {
+                        "adoption_status": {
                           "type": "string"
                         },
                         "evidence_strength": {
                           "type": "string"
                         },
                         "signal": {
+                          "type": "string"
+                        },
+                        "adoption": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": "string"
+                            },
+                            "signal": {
+                              "type": "string"
+                            },
+                            "at": {
+                              "type": "string"
+                            },
+                            "observed_at": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "rule_version": {
+                              "type": "string"
+                            },
+                            "acceptance_kind": {
+                              "type": "string"
+                            },
+                            "human_verified": {
+                              "type": "boolean"
+                            },
+                            "coverage": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "signal",
+                            "observed_at",
+                            "source",
+                            "rule_version",
+                            "human_verified",
+                            "coverage"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "survival": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": "string"
+                            },
+                            "signal": {
+                              "type": "string"
+                            },
+                            "observed_at": {
+                              "type": "string"
+                            },
+                            "coverage": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "coverage"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "reversal_signal": {
+                          "type": "string"
+                        },
+                        "reversed_at": {
                           "type": "string"
                         },
                         "item_id": {
@@ -9141,7 +9985,7 @@
                         "detail": {
                           "type": "string"
                         },
-                        "time_to_outcome_hours": {
+                        "time_to_adoption_hours": {
                           "type": "number"
                         },
                         "human_comments": {
@@ -9183,7 +10027,7 @@
                       },
                       "required": [
                         "run_id",
-                        "outcome_status",
+                        "adoption_status",
                         "evidence_strength",
                         "type",
                         "created_at",
@@ -9201,10 +10045,16 @@
                       "accepted": {
                         "type": "integer"
                       },
+                      "accepted_human": {
+                        "type": "integer"
+                      },
+                      "accepted_delivery_fallback": {
+                        "type": "integer"
+                      },
                       "rejected": {
                         "type": "integer"
                       },
-                      "ignored": {
+                      "not_applicable": {
                         "type": "integer"
                       },
                       "pending": {
@@ -9243,10 +10093,10 @@
                       "zero_touch_rate": {
                         "type": "number"
                       },
-                      "median_time_to_outcome_hours": {
+                      "median_time_to_adoption_hours": {
                         "type": "number"
                       },
-                      "cost_per_accepted_outcome": {
+                      "cost_per_adopted_output": {
                         "type": "number"
                       },
                       "total_objective_value": {
@@ -9310,8 +10160,10 @@
                     "required": [
                       "total",
                       "accepted",
+                      "accepted_human",
+                      "accepted_delivery_fallback",
                       "rejected",
-                      "ignored",
+                      "not_applicable",
                       "pending",
                       "unknown",
                       "lifecycle",
@@ -9330,7 +10182,7 @@
                     ],
                     "description": "Sum of available selected-run AIC, including detection usage; null when no cost is available"
                   },
-                  "cost_per_accepted_outcome": {
+                  "cost_per_adopted_output": {
                     "type": [
                       "null",
                       "number"
@@ -9341,11 +10193,11 @@
                     "type": "string",
                     "description": "available, partial, or unavailable for selected run IDs"
                   },
-                  "outcome_coverage": {
+                  "adoption_coverage": {
                     "type": "string",
                     "description": "complete or partial for selected runs only, not full-episode membership"
                   },
-                  "outcome_run_ids": {
+                  "adoption_run_ids": {
                     "type": [
                       "null",
                       "array"
@@ -9354,7 +10206,7 @@
                       "type": "integer"
                     }
                   },
-                  "missing_outcome_run_ids": {
+                  "missing_adoption_run_ids": {
                     "type": [
                       "null",
                       "array"
@@ -9407,11 +10259,11 @@
                   "items",
                   "summary",
                   "observed_aic",
-                  "cost_per_accepted_outcome",
+                  "cost_per_adopted_output",
                   "cost_coverage",
-                  "outcome_coverage",
-                  "outcome_run_ids",
-                  "missing_outcome_run_ids",
+                  "adoption_coverage",
+                  "adoption_run_ids",
+                  "missing_adoption_run_ids",
                   "cost_run_ids",
                   "missing_cost_run_ids",
                   "missing_run_ids",
@@ -9420,7 +10272,7 @@
                 "additionalProperties": false
               }
             },
-            "unmatched_outcome_run_ids": {
+            "unmatched_adoption_run_ids": {
               "type": [
                 "null",
                 "array"
@@ -9432,7 +10284,7 @@
           },
           "required": [
             "episodes",
-            "unmatched_outcome_run_ids"
+            "unmatched_adoption_run_ids"
           ],
           "additionalProperties": false
         }

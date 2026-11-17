@@ -110,17 +110,17 @@ prefix, e.g., "my-workflow" for the "experiments/my-workflow" branch).
 Reads the state.jsonl/state.json file from the branch and shows per-variant counts, total
 runs, and the most recent run assignments.
 
-Outcome-backed metrics require --outcome to opt into additional GitHub API requests
+Adoption-backed metrics require --adoption to opt into additional GitHub API requests
 for live safe-output evidence.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow              # Analyze experiments/my-workflow
   ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow --json       # Output in JSON format
-  ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow --outcome    # Evaluate live outcome metrics
+  ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow --adoption    # Evaluate live adoption metrics
   ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow --repo owner/repo  # Analyze in a specific repository`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 			repoOverride, _ := cmd.Flags().GetString("repo")
-			outcome, _ := cmd.Flags().GetBool("outcome")
+			outcome, _ := cmd.Flags().GetBool("adoption")
 			return runExperimentsAnalyze(cmd.Context(), ExperimentsAnalyzeConfig{
 				ExperimentName: args[0],
 				RepoOverride:   repoOverride,
@@ -132,7 +132,7 @@ for live safe-output evidence.`,
 
 	addJSONFlag(cmd)
 	addRepoFlag(cmd)
-	cmd.Flags().Bool("outcome", false, "Evaluate live outcome-backed metrics (additional GitHub API requests)")
+	cmd.Flags().Bool("adoption", false, "Evaluate live adoption-backed metrics (additional GitHub API requests)")
 
 	return cmd
 }
@@ -180,11 +180,6 @@ func RunExperimentsList(config ExperimentsListConfig) error {
 	}))
 
 	return nil
-}
-
-// RunExperimentsAnalyze analyzes a specific experiment branch.
-func RunExperimentsAnalyze(config ExperimentsAnalyzeConfig) error {
-	return runExperimentsAnalyze(context.Background(), config)
 }
 
 func runExperimentsAnalyze(ctx context.Context, config ExperimentsAnalyzeConfig) error {
@@ -288,7 +283,7 @@ func reconcileExperimentDetailsWithConfigs(details *ExperimentDetails, configs m
 	}
 }
 
-// loadMetricObservationSetsForAnalysis resolves grader-, eval-, and outcome-backed experiment
+// loadMetricObservationSetsForAnalysis resolves grader-, eval-, and adoption-backed experiment
 // metrics and attributes their per-run measurements to variants using the persisted
 // assignment history, returning one merged map of observation sets and a single cleanup
 // closure. Each metric references exactly one source, so the resolved maps never collide.
@@ -311,7 +306,7 @@ func loadMetricObservationSetsForAnalysis(
 			return nil, func() {}, err
 		}
 		if len(windows) > 0 {
-			return nil, func() {}, errors.New("outcome-backed experiment metrics require --outcome to enable additional GitHub API requests. Example: gh aw experiments analyze <workflow> --outcome")
+			return nil, func() {}, errors.New("adoption-backed experiment metrics require --adoption to enable additional GitHub API requests. Example: gh aw experiments analyze <workflow> --adoption")
 		}
 	}
 	graderSets, graderGuardrails, cleanup, err := loadGraderObservationSetsForAnalysis(

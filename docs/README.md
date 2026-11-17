@@ -19,6 +19,12 @@ Inside of your Astro + Starlight project, you'll see the following folders and f
 
 Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
 
+Starlight renders the frontmatter `title` automatically. An opening Markdown
+`#` heading with the same text is deduplicated at build time, ignoring inline
+formatting, capitalization, and whitespace. Its anchor remains available for
+existing links. Distinct headings and headings after body content are preserved.
+Run `npm run test:titles` to check this behavior for Markdown and MDX pages.
+
 Images can be added to `src/assets/` and embedded in Markdown with a relative link.
 
 Static assets, like favicons, can be placed in the `public/` directory.
@@ -79,7 +85,10 @@ Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
 jump directly to a slide (on narrow screens they become previous/next slide arrows
 flanked by track-style previous/next band buttons); `#N` hashes are shareable slide links. Clicking the left third
 goes back; clicking elsewhere advances. On touch screens, swipe left or right
-within a band and up or down between bands. Slides within a band push left, and
+within a band and up or down between bands. On phones the toolbar dims after a
+few idle seconds and brightens on any touch, key or focus. iPhone Safari offers no
+page fullscreen; to present without the browser bars, use
+Share → Add to Home Screen and open the talk from that icon. Slides within a band push left, and
 moving to a later band slides up (reversed when going back). Slides built on a gh-aw
 workflow show its original `/agentic-workflows` prompt along the top; click it to
 open the full prompt in a phone-style dialog (Escape or Done closes it).
@@ -187,6 +196,14 @@ close button returns focus to the snippet without changing slides.
 Code in the expanded view is editable as plain text for live demonstrations.
 Edits affect only the expanded copy and are discarded when it closes; opening
 the snippet again restores its original contents.
+
+## Structured data
+
+`src/components/CustomHead.astro` emits the homepage graph and a `TechArticle`
+for docs pages. Blog pages get a single `BlogPosting` and breadcrumbs from
+`starlight-blog`; do not add another `BlogPosting`. `CustomHead.astro` enriches
+the plugin entry with the site `publisher` and, when `dateModified` is absent,
+uses `lastUpdated` or falls back to `datePublished`. Breadcrumbs are preserved.
 
 ## Redirect fragments
 

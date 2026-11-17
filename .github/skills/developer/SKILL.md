@@ -19,6 +19,30 @@ Use this reference for gh-aw technical specs and development guidelines across c
 
 Use this section for the detailed day-to-day command flow that was intentionally removed from `AGENTS.md` to keep first-run ambient context small.
 
+### Sandbox-compatible commands
+
+- Run commands from the active worktree, never the main checkout or a sibling
+  worktree. Each shell starts fresh; specify the working directory in each
+  command. From the repository root, use `npm --prefix docs run <script>` for
+  docs scripts, not bare `npm run <script>`.
+- Use literal `$TMPDIR` paths for scratch files and writable caches, not
+  `/tmp`, resolved macOS temp paths, or system directories. When cache writes
+  need isolation, prefix npm commands with
+  `npm_config_cache="$TMPDIR/gh-aw-npm-cache"` and Go commands with
+  `GOCACHE="$TMPDIR/gh-aw-go-build" GOMODCACHE="$TMPDIR/gh-aw-go-mod"`.
+  Restore local dependencies only after a manifest change or missing-tool
+  failure; do not install tools globally.
+- Prefer the smallest focused check. Docs title changes use
+  `npm --prefix docs run test:titles`. Full docs builds also require the
+  `githubnext/agentics` workflow sources: set `AGENTICS_WORKFLOWS_DIR` to an
+  explicitly available dependency directory rather than relying on the
+  default sibling path outside the worktree. Missing sources are a dependency
+  blocker, not a sandbox denial; do not fabricate replacement workflows.
+- Attempt commands inside the sandbox. On a path denial, stop operations on
+  that path, report the sandbox restriction, and request a policy update.
+  Do not retry through another tool, change permissions, or rerun outside the
+  sandbox. Missing approvals and ordinary build errors are not path denials.
+
 ### Validation checkpoints
 
 Run validation in tiers. Keep formatting and focused tests in the inner loop;

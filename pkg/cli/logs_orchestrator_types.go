@@ -28,6 +28,7 @@ type LogsDownloadOptions struct {
 	Parse              bool
 	JSONOutput         bool
 	Episodes           bool
+	Delivery           bool
 	Outcomes           bool
 	Harbor             bool
 	AdditionalGraders  []string
@@ -118,6 +119,7 @@ type StdinLogsOptions struct {
 	Parse             bool
 	JSONOutput        bool
 	Episodes          bool
+	Delivery          bool
 	Outcomes          bool
 	Harbor            bool
 	AdditionalGraders []string

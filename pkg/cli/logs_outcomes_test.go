@@ -21,11 +21,11 @@ func TestLogsOutcomeSubcommands(t *testing.T) {
 	t.Parallel()
 	cmd := NewLogsCommand()
 	for _, subcommand := range cmd.Commands() {
-		assert.NotEqual(t, "outcomes-history", subcommand.Name())
-		assert.NotEqual(t, "outcomes-episodes", subcommand.Name())
+		assert.NotEqual(t, "adoption-history", subcommand.Name())
+		assert.NotEqual(t, "adoption-episodes", subcommand.Name())
 	}
-	assert.NotContains(t, cmd.UsageString(), "outcomes-history")
-	assert.NotContains(t, cmd.UsageString(), "outcomes-episodes")
+	assert.NotContains(t, cmd.UsageString(), "adoption-history")
+	assert.NotContains(t, cmd.UsageString(), "adoption-episodes")
 
 	episode, _, err := cmd.Find([]string{"episode"})
 	require.NoError(t, err)
@@ -36,14 +36,14 @@ func TestLogsOutcomeOptions(t *testing.T) {
 	t.Parallel()
 	cmd := NewLogsCommand()
 	require.NoError(t, cmd.Flags().Set("episodes", "true"))
-	require.NoError(t, cmd.Flags().Set("outcomes", "true"))
-	require.NoError(t, cmd.Flags().Set("outcomes-dir", "observations"))
+	require.NoError(t, cmd.Flags().Set("adoption", "true"))
+	require.NoError(t, cmd.Flags().Set("adoption-dir", "observations"))
 	options, err := loadCommonLogsOptions(cmd)
 	require.NoError(t, err)
 	assert.True(t, options.Episodes)
 	assert.True(t, options.Outcomes)
 	assert.Equal(t, "observations", options.OutcomesDir)
-	assert.Equal(t, []string{"usage", "outcomes"}, options.ArtifactSets)
+	assert.Equal(t, []string{"usage", "delivery"}, options.ArtifactSets)
 	assert.Equal(t, []string{"usage", "safe-outputs-items", "agent-output-fallback"}, ResolveArtifactFilter(options.ArtifactSets))
 	assert.False(t, shouldDownloadWorkflowRunLogs(ResolveArtifactFilter(options.ArtifactSets)))
 	assert.False(t, cachedJSONLCanSatisfy(ResolveArtifactFilter(options.ArtifactSets), false, false, false))
@@ -55,25 +55,25 @@ func TestLogsOutcomeOptions(t *testing.T) {
 	assert.Equal(t, options.ArtifactSets, stdin.ArtifactSets)
 
 	cmd = NewLogsCommand()
-	require.NoError(t, cmd.Flags().Set("outcomes-dir", "observations"))
+	require.NoError(t, cmd.Flags().Set("adoption-dir", "observations"))
 	_, err = loadCommonLogsOptions(cmd)
-	require.ErrorContains(t, err, "--outcomes-dir requires --outcomes")
+	require.ErrorContains(t, err, "--adoption-dir requires --adoption")
 
 	episode := newLogsEpisodeCommand()
-	assert.NotNil(t, episode.Flags().Lookup("outcomes"))
-	assert.NotNil(t, episode.Flags().Lookup("outcomes-dir"))
+	assert.NotNil(t, episode.Flags().Lookup("adoption"))
+	assert.NotNil(t, episode.Flags().Lookup("adoption-dir"))
 }
 
 func TestLogsOutcomeArtifactSets(t *testing.T) {
 	t.Parallel()
 	sets := []string{"usage"}
-	assert.Equal(t, []string{"usage", "outcomes"}, logsOutcomeArtifactSets(sets, true))
+	assert.Equal(t, []string{"usage", "delivery"}, logsOutcomeArtifactSets(sets, true))
 	assert.Equal(t, []string{"usage"}, sets, "do not mutate the caller's artifact selection")
 	assert.Nil(t, logsOutcomeArtifactSets(nil, true), "unfiltered downloads already include manifests")
 	assert.Equal(t, []string{"all"}, logsOutcomeArtifactSets([]string{"all"}, true))
 	assert.Equal(t, []string{"usage"}, logsOutcomeArtifactSets(sets, false))
-	assert.Equal(t, []string{"usage", "outcomes"}, normalizeLogsDownloadOptions(LogsDownloadOptions{Outcomes: true, ArtifactSets: sets}).ArtifactSets)
-	assert.Equal(t, []string{"usage", "outcomes"}, normalizeStdinLogsOptions(StdinLogsOptions{Outcomes: true, ArtifactSets: sets}).ArtifactSets)
+	assert.Equal(t, []string{"usage", "delivery"}, normalizeLogsDownloadOptions(LogsDownloadOptions{Outcomes: true, ArtifactSets: sets}).ArtifactSets)
+	assert.Equal(t, []string{"usage", "delivery"}, normalizeStdinLogsOptions(StdinLogsOptions{Outcomes: true, ArtifactSets: sets}).ArtifactSets)
 }
 
 func TestLogsOutcomeRepository(t *testing.T) {
@@ -104,14 +104,14 @@ func TestLogsOutcomeManifestEvidence(t *testing.T) {
 		{name: "empty", manifest: "\n", found: true},
 		{name: "corrupt", manifest: "{", wantErr: "unexpected EOF"},
 		{name: "missing type", manifest: "{}", wantErr: "no type"},
-		{name: "valid", manifest: "{\"type\":\"noop\"}\n", found: true},
+		{name: "valid", manifest: "{\"type\":\"noop\",\"timestamp\":\"2026-10-01T00:00:00Z\"}\n", found: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			if tc.manifest != "" {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(tc.manifest), 0o600))
 			}
-			run := ProcessedRun{Run: WorkflowRun{DatabaseID: 42, Repository: "acme/repo", LogsPath: dir}}
+			run := ProcessedRun{Run: WorkflowRun{Attempt: 1, DatabaseID: 42, Repository: "acme/repo", LogsPath: dir}}
 			items, found, err := readLogsOutcomeItems(run)
 			if tc.wantErr != "" {
 				require.ErrorContains(t, err, tc.wantErr)
@@ -121,7 +121,12 @@ func TestLogsOutcomeManifestEvidence(t *testing.T) {
 			assert.Equal(t, tc.found, found)
 			report, err := collectRunOutcomes(context.Background(), run, nil, false)
 			require.NoError(t, err)
-			assert.Empty(t, report.Items)
+			if len(items) == 0 {
+				assert.Empty(t, report.Items)
+			} else {
+				require.Len(t, report.Items, 1)
+				assert.Equal(t, OutcomeStatusNotApplicable, report.Items[0].OutcomeStatus)
+			}
 			if tc.found {
 				assert.Empty(t, report.EvalError)
 			} else {
@@ -138,10 +143,10 @@ func TestLogsOutcomePersistenceErrorsAndCancellation(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "file")
 	require.NoError(t, os.WriteFile(path, nil, 0o600))
-	require.ErrorContains(t, writeOutcomeJSONL(path, 42, nil), "create outcomes directory")
+	require.ErrorContains(t, writeOutcomeJSONL(path, 42, nil), "create adoption directory")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := collectLogsOutcomes(ctx, []ProcessedRun{{Run: WorkflowRun{DatabaseID: 42}}}, "", false)
+	_, err := collectLogsLifecycles(ctx, []ProcessedRun{{Run: WorkflowRun{Attempt: 1, DatabaseID: 42}}}, "", false, true)
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -152,7 +157,7 @@ func TestLogsOutcomeReportAndEpisodeJoin(t *testing.T) {
 	require.NoError(t, os.MkdirAll(usageDir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(usageDir, "agent_usage.jsonl"), []byte("{\"aic\":2.5}\n"), 0o600))
 	run := ProcessedRun{
-		Run:       WorkflowRun{DatabaseID: 1, Repository: "org/repo", WorkflowName: "producer", LogsPath: filepath.Dir(usageDir)},
+		Run:       WorkflowRun{Attempt: 1, DatabaseID: 1, Repository: "org/repo", WorkflowName: "producer", LogsPath: filepath.Dir(usageDir)},
 		AwContext: &AwContext{EpisodeID: "ep-1"},
 	}
 	item := episodeObservation(1, "item-1", OutcomeStatusAccepted).OutcomeReport
@@ -179,8 +184,8 @@ func TestLogsOutcomeReportAndEpisodeJoin(t *testing.T) {
 	assert.Contains(t, rendered.String(), "1 accepted")
 	saved, err := os.ReadFile(filepath.Join(dir, "summary.json"))
 	require.NoError(t, err)
-	assert.Contains(t, string(saved), "\"outcomes\"")
-	assert.Contains(t, string(saved), "\"episode_outcomes\"")
+	assert.Contains(t, string(saved), "\"adoption\"")
+	assert.Contains(t, string(saved), "\"episode_adoption\"")
 	without, err := prepareLogsData([]ProcessedRun{run}, renderLogsOutputOptions{outputDir: dir})
 	require.NoError(t, err)
 	assert.Nil(t, without.Outcomes)
@@ -192,7 +197,7 @@ func TestLogsOutcomeReportAndEpisodeJoin(t *testing.T) {
 	}))
 	markdown, err := os.ReadFile(reportPath)
 	require.NoError(t, err)
-	assert.Contains(t, string(markdown), "Outcomes for producer")
+	assert.Contains(t, string(markdown), "Adoption for producer")
 	assert.Contains(t, string(markdown), "1 accepted")
 }
 
