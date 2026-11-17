@@ -210,35 +210,46 @@
   body.light .fz-st, body.light .fz-b { color: #59636e; }
   body.light .fz mark { background: #8250df33; }
 
-  /* --- slide map (full-screen overview: one row per band, one tile per slide) --- */
+  /* --- slide map (full-screen overview: a header per band above a grid with one tile per slide) --- */
   .smp { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
     background: #0d1117f7; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #f0f6fc; font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; z-index: 20; }
   .smp[open] { display: flex; flex-direction: column; }
   .smp::backdrop { background: transparent; }
   .smp-bar { display: flex; align-items: center; gap: 12px; padding: 16px 24px 8px; }
   .smp-h { flex: 1; margin: 0; font: 600 14px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9198a1; }
-  .smp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
-  .smp-row { display: grid; grid-template-columns: 170px 1fr; gap: 12px; align-items: start; }
-  .smp-l { font: 600 13px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); padding-top: 10px; }
-  .smp-tiles { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
-  .smp-col { flex: 0 0 100%; display: flex; align-items: flex-start; gap: 6px; }
-  .smp-kids { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding-left: 10px; border-left: 2px dotted var(--c); }
-  .smp-t { width: 168px; min-height: 58px; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 10px; border: 1px solid #3d444d;
+  .smp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .smp-row { display: flex; flex-direction: column; gap: 8px; }
+  .smp-l { display: flex; align-items: baseline; gap: 10px; margin: 0; padding-bottom: 6px; border-bottom: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+    font: 600 13px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+  .smp-l small { font: 500 11px/1 var(--mono); letter-spacing: .04em; text-transform: none; color: #9198a1; }
+  /* tiles fill the width: as many 150px+ columns as fit; a pattern's block reuses the same tracks (subgrid) so its examples align */
+  .smp-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; align-items: stretch; }
+  .smp-col { grid-column: var(--gc, 1 / -1); display: grid; grid-template-columns: subgrid; gap: 6px; align-items: start; }
+  .smp-kids { grid-column: 2 / -1; display: grid; grid-template-columns: subgrid; gap: 6px; align-items: stretch; padding-left: 8px; border-left: 2px dotted var(--c); }
+  .smp-t { min-width: 0; min-height: 58px; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 10px; border: 1px solid #3d444d;
     border-left: 3px solid var(--c); border-radius: 8px; background: #151b23; color: inherit; cursor: pointer; font: 500 13px/1.3 "Mona Sans", sans-serif; }
   .smp-t b { display: flex; font: 600 11px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
   .smp-t b i { margin-left: auto; font-style: normal; color: var(--c); }
   .smp-t span { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .smp-t.hd { background: transparent; border-style: dashed; border-left-style: solid; }
-  .smp-t.sub { width: 146px; min-height: 44px; font-size: 12px; border-left-style: dotted; opacity: .85; }
+  .smp-t.sub { min-height: 44px; font-size: 12px; border-left-style: dotted; opacity: .85; }
   .smp-t:hover { background: #1f2630; border-color: #9198a1; border-left-color: var(--c); }
   .smp-t.on { box-shadow: 0 0 0 2px var(--c); }
   .smp-t:focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
-  @media (max-width: 640px) { .smp-row { grid-template-columns: 1fr; gap: 6px; } .smp-l { padding-top: 0; } .smp-t { width: calc(50% - 3px); } .smp-col { flex-direction: column; } .smp-col > .smp-t { width: calc(50% - 3px); } .smp-kids { width: 100%; box-sizing: border-box; } .smp-kids .smp-t.sub { width: calc(50% - 3px); } }
+  /* staggered entrance: the dialog is display:none while closed, so every open replays it; --d is set per tile, header and rule on open */
+  @keyframes smp-in { from { opacity: 0; transform: translateY(16px) scale(.94); } }
+  @keyframes smp-hd { from { opacity: 0; transform: translateX(-24px); } }
+  @keyframes smp-fade { from { border-left-color: transparent; } }
+  .smp[open] .smp-t { animation: smp-in .42s cubic-bezier(.2, .8, .2, 1) var(--d, 0ms) backwards; }
+  .smp[open] .smp-l { animation: smp-hd .42s cubic-bezier(.2, .8, .2, 1) var(--d, 0ms) backwards; }
+  .smp[open] .smp-kids { animation: smp-fade .42s ease-out var(--d, 0ms) backwards; }
+  @media (prefers-reduced-motion: reduce) { .smp[open] .smp-t, .smp[open] .smp-l, .smp[open] .smp-kids { animation: none; } }
+  @media (max-width: 640px) { .smp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smp-kids { grid-column: 1 / -1; } }
   body.light .smp { background: #f6f8faf5; color: #1f2328; }
   body.light .smp-t { background: #ffffff; border-color: #9ea7b3; border-left-color: var(--c); }
   body.light .smp-t.hd { background: transparent; }
   body.light .smp-t:hover { background: #eaeef2; }
-  body.light .smp-h, body.light .smp-t b { color: #59636e; }
+  body.light .smp-h, body.light .smp-t b, body.light .smp-l small { color: #59636e; }
   body.light .smp-l { color: #1f2328; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
@@ -918,9 +929,10 @@
     for (const t of ["touchstart", "touchend"]) fz.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
     // ---------- slide map ----------
-    // G (or the dock's map button) opens a full-screen overview: one row per band, one tile per slide, the current one ringed.
+    // G (or the dock's map button) opens a full-screen overview: per band a header (title and slide range) above a grid of tiles,
+    // one per slide, the current one ringed. Tiles fade in staggered by band and position (skipped under prefers-reduced-motion).
     // Click or Enter opens a slide; Left/Right step in slide order, Up/Down move to the nearest tile on the line above/below.
-    // A column (a pattern slide with `kids`) gets its own line: the pattern tile, then its examples in a horizontal row behind a dotted rule.
+    // A column (a pattern slide with `kids`) gets its own grid line: the pattern tile, then its examples behind a dotted rule.
     const smpBody = h("div", { class: "smp-body" });
     const smp = h(
       "dialog",
@@ -933,22 +945,28 @@
     const smpBuild = () => {
       smpTiles = [];
       smpBody.replaceChildren(
-        ...rows.map(r => {
+        ...rows.map((r, b) => {
           const c = THEME[r.group].accent[0],
-            all = slides
-              .filter(s => s.band === slides[r.start].band)
-              .map(s => {
-                const n = slides.indexOf(s),
-                  t = h(
-                    "button",
-                    { class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || rowName(r.group)}`, onclick: () => (smp.close(), go(n)) },
-                    h("b", {}, String(n + 1).padStart(2, "0"), s.kids ? h("i", { title: `${s.kids.length} examples below` }, `↓${s.kids.length}`) : null),
-                    h("span", {}, label(s) || rowName(r.group))
-                  );
-                smpTiles[n] = t;
-                return t;
-              });
-          // a column (pattern + its examples) takes its own line, the examples in a row after the pattern tile
+            band = slides.filter(s => s.band === slides[r.start].band),
+            first = slides.indexOf(band[0]) + 1,
+            last = slides.indexOf(band[band.length - 1]) + 1,
+            all = band.map(s => {
+              const n = slides.indexOf(s),
+                t = h(
+                  "button",
+                  {
+                    class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`,
+                    type: "button",
+                    "aria-label": `Go to slide ${n + 1}: ${label(s) || rowName(r.group)}`,
+                    onclick: () => (smp.close(), go(n)),
+                  },
+                  h("b", {}, String(n + 1).padStart(2, "0"), s.kids ? h("i", { title: `${s.kids.length} examples below` }, `↓${s.kids.length}`) : null),
+                  h("span", {}, label(s) || rowName(r.group))
+                );
+              smpTiles[n] = t;
+              return t;
+            });
+          // a column (pattern + its examples) takes its own grid line, the examples after the pattern tile
           const tiles = all.flatMap(t => {
             const s = slides[smpTiles.indexOf(t)];
             if (s.parent) return [];
@@ -956,7 +974,7 @@
             return [
               h(
                 "div",
-                { class: "smp-col" },
+                { class: "smp-col", "data-n": s.kids.length + 1 },
                 t,
                 h(
                   "div",
@@ -966,7 +984,13 @@
               ),
             ];
           });
-          return h("section", { class: "smp-row", "--c": c }, h("div", { class: "smp-l" }, rowName(r.group)), h("div", { class: "smp-tiles" }, tiles));
+          const id = `smp-b${b}`;
+          return h(
+            "section",
+            { class: "smp-row", "--c": c, "aria-labelledby": id },
+            h("h3", { class: "smp-l", id, "data-n": r.start }, rowName(r.group), " ", h("small", {}, first === last ? `#${first}` : `#${first}–${last}`)),
+            h("div", { class: "smp-tiles" }, tiles)
+          );
         })
       );
     };
@@ -986,6 +1010,16 @@
       }
       return best;
     };
+    // a column spans its pattern plus examples, capped at the grid's track count, so short columns share a line with other tiles
+    const smpFit = () => {
+      const grid = smpBody.querySelector(".smp-tiles");
+      if (!grid || !smp.open) return;
+      const cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
+      for (const c of smpBody.querySelectorAll(".smp-col")) c.style.setProperty("--gc", `span ${Math.min(cols, +c.dataset.n)}`);
+    };
+    new ResizeObserver(smpFit).observe(smpBody);
+    // staggered entrance rippling out from the current slide, capped so far tiles do not lag
+    const smpDelay = n => `${Math.min(600, Math.abs(n - cur) * 18)}ms`;
     function openMap() {
       if (smp.open) return;
       if (fz.open) fz.close();
@@ -994,13 +1028,20 @@
         t.classList.toggle("on", i === cur);
         if (i === cur) t.setAttribute("aria-current", "true");
         else t.removeAttribute("aria-current");
+        t.style.setProperty("--d", smpDelay(i));
       });
+      // band headers enter with their first tile; a column's dotted rule with its first example
+      for (const l of smpBody.querySelectorAll(".smp-l")) l.style.setProperty("--d", smpDelay(+l.dataset.n));
+      for (const k of smpBody.querySelectorAll(".smp-kids")) k.style.setProperty("--d", k.firstChild.style.getPropertyValue("--d"));
       smp.showModal();
+      smpFit();
       const t = smpTiles[cur];
       t?.focus({ preventScroll: true });
       t?.scrollIntoView({ block: "center" });
     }
     smp.addEventListener("keydown", e => {
+      // settle the entrance so Up/Down measure final tile positions
+      for (const a of smp.getAnimations?.({ subtree: true }) || []) a.finish();
       const i = smpTiles.indexOf(document.activeElement);
       let to = null;
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") to = smpTiles[Math.min(slides.length - 1, Math.max(0, (i < 0 ? cur : i) + (e.key === "ArrowRight" ? 1 : -1)))];
