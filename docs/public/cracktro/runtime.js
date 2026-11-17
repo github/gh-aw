@@ -206,6 +206,7 @@
   .fz-n { grid-row: span 2; font: 600 18px/1.4 var(--mono); color: #ab7df8; letter-spacing: .06em; }
   .fz-t { font-size: 20px; font-weight: 600; line-height: 1.3; }
   .fz-b { font: 500 13px/1 var(--mono); color: #9198a1; margin-left: 10px; letter-spacing: .04em; }
+  .fz-k { font: 500 13px/1 var(--mono); color: #9198a1; margin-left: 8px; padding: 3px 6px; border: 1px solid #3d444d; border-radius: 6px; letter-spacing: .02em; white-space: nowrap; }
   .fz-s { font-size: 15px; line-height: 1.4; color: #c9d1d9; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .fz mark { background: #ab7df859; color: inherit; border-radius: 3px; }
   body.light .fz { background: #f6f8faf5; color: #1f2328; }
@@ -214,7 +215,8 @@
   body.light .fz-list li[aria-selected="true"] { background: #ffffff; border-color: #8250df; }
   body.light .fz-n { color: #8250df; }
   body.light .fz-s { color: #424a53; }
-  body.light .fz-st, body.light .fz-b { color: #59636e; }
+  body.light .fz-st, body.light .fz-b, body.light .fz-k { color: #59636e; }
+  body.light .fz-k { border-color: #d1d9e0; }
   body.light .fz mark { background: #8250df33; }
 
   /* --- slide map (full-screen overview: a header per band above a grid with one tile per slide) --- */
@@ -755,8 +757,8 @@
 
     // ---------- search ----------
     // "/" (or Ctrl/Cmd+K, or the dock's search button) opens a full-screen dialog that fuzzy-searches every slide.
-    // The index is precomputed once: each slide's title, its slides.md summary (the JSON-LD hasPart description the
-    // docs build injects; absent on a plain static preview) and its body text plus speaker notes.
+    // The index is precomputed once: each slide's title, its slides.md summary and keywords (the JSON-LD hasPart
+    // description and keywords the docs build injects; absent on a plain static preview) and its body text plus speaker notes.
     // Matching is bounds-based: each query term must occur, letters in order, inside one window of a field, and the
     // window is bounded (at most one and a half times the term), so letters scattered through long notes never match.
     // The tightest window wins: forward from each occurrence of the first letter to the earliest end, then backward to
@@ -764,6 +766,7 @@
     /** @type {[string, number][]} */
     const FZ_FIELDS = [
       ["title", 3],
+      ["keywords", 2.5],
       ["summary", 2],
       ["body", 1],
     ];
@@ -792,8 +795,18 @@
         const part = parts.find(p => p.position === i + 1),
           title = headingText(s) || part?.name || `Slide ${i + 1}`,
           summary = fzNorm(part?.description || ""),
+          keywords = fzNorm(typeof part?.keywords === "string" ? part.keywords : ""),
           body = fzNorm(`${fzText(s.el)} ${s.notes || ""}`);
-        return { n: i, band: BANDS[s.group]?.[0] || "", title, summary, body, notes: fzNorm(s.notes || ""), lc: { title: title.toLowerCase(), summary: summary.toLowerCase(), body: body.toLowerCase() } };
+        return {
+          n: i,
+          band: BANDS[s.group]?.[0] || "",
+          title,
+          summary,
+          keywords,
+          body,
+          notes: fzNorm(s.notes || ""),
+          lc: { title: title.toLowerCase(), keywords: keywords.toLowerCase(), summary: summary.toLowerCase(), body: body.toLowerCase() },
+        };
       });
     };
     // Tightest bounded window [start, end) of `text` holding the characters of `term` in order, or null.
@@ -826,7 +839,7 @@
       const hits = [];
       for (const r of fzIndex) {
         let score = 0;
-        const marks = { title: [], summary: [], body: [] };
+        const marks = { title: [], keywords: [], summary: [], body: [] };
         for (const term of terms) {
           let best = 0;
           for (const [f, w] of FZ_FIELDS) {
@@ -870,6 +883,19 @@
       const inner = marks.body.filter(([b, e]) => b >= from && e <= to).map(([b, e]) => [b - from, e - from]);
       return [from ? "…" : "", ...fzMark(r.body.slice(from, to), inner), to < r.body.length ? "…" : ""];
     };
+    // one tag per keyword that holds a match, with the match marked; keywords are joined by ", " in the index
+    const fzKeys = ({ r, marks }) => {
+      const out = [];
+      if (!marks.keywords?.length) return out;
+      let at = 0;
+      for (const key of r.keywords.split(", ")) {
+        const end = at + key.length,
+          inner = marks.keywords.filter(([b, e]) => b >= at && e <= end).map(([b, e]) => [b - at, e - at]);
+        if (inner.length) out.push(h("span", { class: "fz-k" }, ...fzMark(key, inner)));
+        at = end + 2;
+      }
+      return out;
+    };
     const fzIn = h("input", {
       type: "search",
       class: "fz-in",
@@ -907,7 +933,14 @@
             "li",
             { id: `fz-o-${i}`, role: "option", onclick: () => fzPick(i), onmousemove: () => fzSel !== i && ((fzSel = i), fzPaint()) },
             h("span", { class: "fz-n" }, String(hit.r.n + 1).padStart(2, "0")),
-            h("div", { class: "fz-t" }, ...fzMark(hit.r.title, hit.marks.title || []), hit.r.band && hit.r.band !== hit.r.title ? h("span", { class: "fz-b" }, hit.r.band) : null),
+            h(
+              "div",
+              { class: "fz-t" },
+              ...fzMark(hit.r.title, hit.marks.title || []),
+              hit.r.band && hit.r.band !== hit.r.title ? h("span", { class: "fz-b" }, hit.r.band) : null,
+              // matched keywords explain hits whose title, summary and text do not show the query
+              ...fzKeys(hit)
+            ),
             h("div", { class: "fz-s" }, fzLine(hit))
           )
         )
@@ -916,7 +949,7 @@
         ? fzHits.length
           ? `${fzHits.length} matching slide${fzHits.length === 1 ? "" : "s"} · ↑↓ to choose, Enter to open`
           : "No slides match"
-        : `${fzHits.length} slides · type to search titles, summaries and slide text`;
+        : `${fzHits.length} slides · type to search titles, keywords, summaries and slide text`;
       fzPaint();
     };
     function fzPick(i) {
