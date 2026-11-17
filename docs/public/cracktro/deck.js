@@ -1717,17 +1717,16 @@
   .fzw-day { fill: #c9d1d9; font: 600 18px var(--mono); text-anchor: end; } .fzw-day.we { fill: #9198a1; }
   .fzw-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
   .fzw-c rect { stroke: #30363d; stroke-width: 1; } .fzw-c text { font: 600 15px var(--mono); text-anchor: middle; fill: #c9d1d9; } .fzw-c.hi text { fill: #0d1117; }
-  .fzw-c { opacity: 0; } .active .fzw-c { animation: fzwIn .45s ease-out both; animation-delay: var(--d); }
-  @keyframes fzwIn { from { opacity: 0; } to { opacity: 1; } }
-  .fzw-band, .fzw-sum, .fzw-top, .fzw-key { opacity: 0; } .active .fzw-band, .active .fzw-sum, .active .fzw-top, .active .fzw-key { animation: fzwIn .6s ease-out both 2.3s; }
+  .fzw-c, .fzw-band, .fzw-top, .fzw-key, .fzw-ph { visibility: hidden; } .fzw-c.on, .fzw-band.on, .fzw-top.on, .fzw-key.on, .fzw-ph.on { visibility: visible; }
+  .fzw-c.now rect { stroke: #f0f6fc; stroke-width: 2; }
+  .fzw-ph rect { fill: #f0f6fc0f; stroke: #f0f6fc; stroke-width: 2; } .fzw-ph text { fill: #f0f6fc; font: 600 15px var(--mono); text-anchor: middle; }
   .fzw-band.no rect { fill: url(#fzwHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
   .fzw-band.best rect { fill: none; stroke: #4493f8; stroke-width: 2.5; }
   .fzw-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzw-band.no text { fill: #ffa657; } .fzw-band.best text { fill: #79c0ff; }
   .fzw-sum rect { fill: #4493f8; } .fzw-sum.we rect { fill: #4493f899; } .fzw-sum text { fill: #c9d1d9; font: 600 16px var(--mono); }
   .fzw-top rect { fill: none; stroke: #f0f6fc; stroke-width: 3; } .fzw-top text { fill: #f0f6fc; font: 600 15px var(--mono); }
   .fzw-key text { fill: #9198a1; font: 500 15px var(--mono); } .fzw-key text.b { fill: #c9d1d9; font-weight: 600; }
-  .fzw-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
-  .active .fzw-cap { animation: rise .6s ease-out both 2s; }
+  .fzw-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; visibility: hidden; } .fzw-cap.on { visibility: visible; }
 
   /* --- index & search: a non-agentic indexing job writes the index; the agent job only searches a read-only copy --- */
   .ix .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8); }
@@ -10398,10 +10397,9 @@
       g += `<text class="fzw-day${d > 4 ? " we" : ""}" x="${X0 - 14}" y="${ry(d) + RH / 2 + 6}">${DAYS[d]}</text>`;
       row.forEach((v, hr) => {
         const a = v ? 0.12 + 0.88 * (v / MAX) : 0;
-        g += `<g class="fzw-c${v / MAX > 0.55 ? " hi" : ""}" style="--d:${(0.15 + hr * 0.07 + d * 0.03).toFixed(2)}s"><rect x="${cx(hr) + 2}" y="${ry(d) + 2}" width="${CW - 4}" height="${RH - 4}" rx="6" fill="${v ? `rgba(68,147,248,${a.toFixed(2)})` : "#0d1117"}"/>${v ? `<text x="${cx(hr) + CW / 2}" y="${ry(d) + RH / 2 + 6}">${v}</text>` : ""}</g>`;
+        g += `<g class="fzw-c${v / MAX > 0.55 ? " hi" : ""}" data-h="${hr}"><rect x="${cx(hr) + 2}" y="${ry(d) + 2}" width="${CW - 4}" height="${RH - 4}" rx="6" fill="${v ? `rgba(68,147,248,${a.toFixed(2)})` : "#0d1117"}"/>${v ? `<text x="${cx(hr) + CW / 2}" y="${ry(d) + RH / 2 + 6}">${v}</text>` : ""}</g>`;
       });
-      const bw = (TOT[d] / Math.max(...TOT)) * 150;
-      g += `<g class="fzw-sum${d > 4 ? " we" : ""}"><rect x="${VW - 210}" y="${ry(d) + 14}" width="${bw}" height="${RH - 28}" rx="4"/><text x="${VW - 210 + bw + 10}" y="${ry(d) + RH / 2 + 6}">${TOT[d]}</text></g>`;
+      g += `<g class="fzw-sum${d > 4 ? " we" : ""}"><rect x="${VW - 210}" y="${ry(d) + 14}" width="0" height="${RH - 28}" rx="4"/><text x="${VW - 200}" y="${ry(d) + RH / 2 + 6}">0</text></g>`;
     });
     const GB = ry(7);
     for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzw-hr" x="${cx(hr) + CW / 2}" y="${GB + 24}">${String(hr).padStart(2, "0")}</text>`;
@@ -10410,14 +10408,63 @@
     g += `<g class="fzw-band no"><rect x="${cx(0) + 1}" y="${Y0}" width="${2 * CW - 2}" height="${7 * RH}" rx="6"/><text x="${cx(1)}" y="${Y0 - 12}">00–01 never</text></g>`;
     g += `<g class="fzw-band best"><rect x="${cx(2)}" y="${Y0 - 2}" width="${4 * CW}" height="${7 * RH + 4}" rx="8"/><text x="${cx(4)}" y="${Y0 - 12}">02–05 preferred ×3</text></g>`;
     g += `<g class="fzw-top"><rect x="${cx(top) - 1}" y="${ry(0) - 1}" width="${CW + 2}" height="${5 * RH + 2}" rx="8"/></g>`;
+    g += `<g class="fzw-ph"><rect x="${X0}" y="${Y0 - 4}" width="${CW}" height="${7 * RH + 8}" rx="8"/><text x="${X0 + CW / 2}" y="${Y0 - 12}">00</text></g>`;
     g += `<g class="fzw-key"><text class="b" x="0" y="${GB + 74}">${RUNS} runs a week · busiest hour ${String(top).padStart(2, "0")} UTC: ${MAX} runs · 0 at 00–01 UTC</text><text x="0" y="${GB + 104}">weekends: ${TOT[0]} → ${TOT[5]} runs a day · ${WKD} workflows say daily on weekdays · lighter blue = fewer runs, blank = none</text></g>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg aex-svg fzw-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.innerHTML = g;
+    // a playhead steps one UTC hour at a time: that column switches on and every day's total bar and counter advance by the same hour
+    const STEP = 110,
+      LEAD = 450,
+      POST = 320,
+      BMAX = Math.max(...TOT),
+      cols = [...Array(24)].map((_, hr) => [...svg.querySelectorAll(`.fzw-c[data-h="${hr}"]`)]),
+      sums = [...svg.querySelectorAll(".fzw-sum")].map(s => [s.querySelector("rect"), s.querySelector("text")]),
+      ph = svg.querySelector(".fzw-ph"),
+      phText = ph.querySelector("text"),
+      cap = h("div", { class: "fzw-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${W} workflows with a daily schedule (plain, on weekdays, around) · first compiled cron · UTC`),
+      after = [".fzw-band.no", ".fzw-band.best", ".fzw-top", ".fzw-key"].map(s => svg.querySelector(s)).concat(cap);
+    let t0 = 0,
+      shown = -1,
+      revealed = 0;
+    const setHour = hr => {
+      cols.forEach((c, i) => c.forEach(e => (e.classList.toggle("on", i <= hr), e.classList.toggle("now", i === hr))));
+      GRID.forEach((row, d) => {
+        const n = row.slice(0, hr + 1).reduce((a, b) => a + b, 0),
+          bw = (n / BMAX) * 150;
+        sums[d][0].setAttribute("width", bw);
+        sums[d][1].setAttribute("x", VW - 200 + bw);
+        sums[d][1].textContent = n;
+      });
+      ph.setAttribute("transform", `translate(${Math.max(hr, 0) * CW} 0)`);
+      phText.textContent = String(Math.max(hr, 0)).padStart(2, "0");
+      ph.classList.toggle("on", hr >= 0 && hr < 24);
+      shown = hr;
+    };
+    const reveal = k => (after.forEach((e, i) => e.classList.toggle("on", i < k)), (revealed = k));
     slides.push({
       group: "engineering",
       under: "schedules",
+      enter(dir) {
+        t0 = 0;
+        if (dir < 0) (setHour(23), cols[23].forEach(e => e.classList.remove("now")), ph.classList.remove("on"), reveal(after.length), (shown = 24));
+        else (setHour(-1), reveal(0));
+      },
+      tick(t) {
+        if (shown >= 24 && revealed >= after.length) return;
+        if (!t0) t0 = t;
+        const s = t - t0 - LEAD,
+          hr = Math.min(24, Math.floor(s / STEP));
+        if (hr > shown && hr >= 0) {
+          if (hr < 24) (setHour(hr), sfx.key(0.5));
+          else (cols[23].forEach(e => e.classList.remove("now")), ph.classList.remove("on"), (shown = 24));
+        }
+        if (shown >= 24) {
+          const k = Math.min(after.length, 1 + Math.floor((s - 24 * STEP) / POST));
+          if (k > revealed) (reveal(k), sfx.step());
+        }
+      },
       notes: `Week of daily runs. Measured on gh-aw itself, snapshot 17 Nov 2026: every one of the ${W} workflows whose schedule starts with daily, plain, on weekdays or around a time, placed by its compiled cron on a week grid of weekday by UTC hour. Each cell counts runs. ${RUNS} runs a week and not one at 00 or 01 UTC: the fuzzy scatter never picks those hours. The 02 to 05 UTC columns are the busiest, ${MAX} runs at ${String(top).padStart(2, "0")} UTC on weekdays, because the scatter weights the quiet hours three times. Weekends drop from ${TOT[0]} to ${TOT[5]} runs a day: ${WKD} workflows say daily on weekdays, many of them daytime reports around a set hour, so Saturday and Sunday keep only the background work. No cell carries more than ${MAX} of ${W}: the fleet is spread across the day instead of firing in the same minute.`,
       el: h(
         "section",
@@ -10425,7 +10472,7 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · 7 days × 24 UTC hours · measured"), h("h2", {}, letters("Week of "), letters("daily runs", "l-grad"))),
         svg,
         h("div", { class: "aex-foot" }, h("b", {}, "No midnight, no stampede"), ` · ${W} daily workflows · at most ${MAX} in any hour · 00–01 UTC empty`),
-        h("div", { class: "fzw-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${W} workflows with a daily schedule (plain, on weekdays, around) · first compiled cron · UTC`)
+        cap
       ),
     });
   }
