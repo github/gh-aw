@@ -116,7 +116,7 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 | `gemini` | Gemini gateway/GitHub transport (GitHub web, `host.docker.internal`, `raw.githubusercontent.com`) |
 | `pi` | Pi gateway/GitHub transport (GitHub web, `host.docker.internal`, `raw.githubusercontent.com`) |
 | `pi-base` | Pi provider-independent gateway baseline (`github.com`, `host.docker.internal`, `raw.githubusercontent.com`) |
-| `threat-detection` | Compatibility alias for Copilot threat-detection network access (`api.githubcopilot.com`, Copilot plan APIs, `api.github.com`, `github.com`, `host.docker.internal`, `registry.npmjs.org`) |
+| `threat-detection` | Compatibility alias for Copilot threat-detection network access (`api.githubcopilot.com`, Copilot plan APIs, `api.github.com`, `github.com`, `host.docker.internal`) |
 | `dart` | Dart/Flutter packages (`pub.dev`, `storage.googleapis.com`) |
 | `deno` | Deno runtime (`deno.land`, `jsr.io`, `googleapis.deno.dev`) |
 | `dotnet` | NuGet packages and .NET SDK |
@@ -180,7 +180,9 @@ Engine domain sets are named allowlist bundles for gateway/GitHub transport. The
 | `gemini-vendor` | Direct Gemini API: `generativelanguage.googleapis.com` |
 | `pi` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; provider endpoint metadata remains model-aware, but the selectable bundle does not grant the provider API host |
 | `pi-base` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; applied before a provider prefix selects a gateway route |
-| `threat-detection` | Applied automatically only to Copilot threat-detection runs and available as a compatibility alias: Copilot API hosts, `api.github.com`, `github.com`, `host.docker.internal`, and `registry.npmjs.org` for read-only lockfile validation. Telemetry requires an explicit `copilot-vendor` opt-in. |
+| `threat-detection` | Applied automatically only to inline Copilot threat-detection runs and available as a compatibility alias: Copilot API hosts, `api.github.com`, `github.com`, and `host.docker.internal`. Telemetry requires an explicit `copilot-vendor` opt-in. |
+
+Inline Copilot detection no longer automatically allows `registry.npmjs.org`, including through the `threat-detection` compatibility alias. To retain its npm lockfile metadata validation, set `features.gh-aw-detection: false`, add `node` or `registry.npmjs.org` to `network.allowed`, and recompile the workflow. Inline detection inherits only the registry host from the `node` set, not its other hosts; runtime configuration alone does not opt it in. This grants the sandbox direct access to the host, not a read-only capability. Explicit `network.blocked` rules still take precedence. Without access, registry verification is unavailable. The default external detector uses its own prompt and does not provide this metadata verification.
 
 Gemini's default upstream remains available to the AWF API proxy without granting the agent direct access to `generativelanguage.googleapis.com`. Add `gemini-vendor` or that hostname to `network.allowed` for direct access. An explicitly configured `GEMINI_API_BASE_URL` retains custom-target egress; it does not automatically allow the default hostname.
 

@@ -95,7 +95,7 @@ Keywords expanding to curated domain lists:
 | `agy` | Agy (Antigravity CLI) engine transport (experimental) | `github.com`, `api.github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `host.docker.internal` |
 | `pi` | Pi gateway/GitHub transport | GitHub web, `host.docker.internal`, `raw.githubusercontent.com` |
 | `pi-base` | Pi provider-independent baseline | `github.com`, `host.docker.internal`, `raw.githubusercontent.com` |
-| `threat-detection` | Compatibility alias for Copilot threat detection | Copilot API hosts, GitHub API/web, `host.docker.internal`, `registry.npmjs.org` |
+| `threat-detection` | Compatibility alias for Copilot threat detection | Copilot API hosts, GitHub API/web, `host.docker.internal` |
 
 ## Engine Domain Sets
 
@@ -114,7 +114,9 @@ API proxy.
 | `gemini` | `generativelanguage.googleapis.com`, `github.com`, `host.docker.internal`, `raw.githubusercontent.com` |
 | `pi` | `api.githubcopilot.com`, `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; provider-scoped models replace the API host with the selected provider endpoint |
 | `pi-base` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; applied as the provider-independent baseline before a provider prefix is resolved |
-| `threat-detection` | Applied automatically only to Copilot threat-detection runs and available as a compatibility alias: Copilot API hosts, `api.github.com`, `github.com`, `host.docker.internal`, and `registry.npmjs.org` for read-only lockfile validation. Vendor telemetry is available only when `copilot-vendor` is explicitly added to `network.allowed`. |
+| `threat-detection` | Applied automatically only to inline Copilot threat-detection runs and available as a compatibility alias: Copilot API hosts, `api.github.com`, `github.com`, and `host.docker.internal`. Vendor telemetry requires an explicit `copilot-vendor` opt-in. |
+
+Inline Copilot detection no longer automatically allows `registry.npmjs.org`, including through the compatibility alias. To retain its npm lockfile metadata validation, set `features.gh-aw-detection: false`, add `node` or `registry.npmjs.org` to `network.allowed`, and recompile. Inline detection inherits only the registry host from `node`; runtime configuration alone does not opt it in. Host access is not read-only, and explicit `network.blocked` rules take precedence. Without access, registry verification is unavailable. The default external detector uses its own prompt and does not provide this metadata verification.
 
 The `copilot`, `codex`, and `gemini` sets exclude direct provider API hosts. Add the matching `*-vendor` identifier for intentional direct access; any other required vendor host needs its own explicit domain. External Codex detection with the OpenAI provider retains its `api.openai.com` transport; GitHub-hosted detection uses GitHub transport without direct Copilot API access. The `gemini` set excludes `*.googleapis.com`; package downloads such as `storage.googleapis.com` require an ecosystem opt-in such as `dart`, or an explicit domain.
 

@@ -175,6 +175,7 @@ func TestThreatDetectionTemplate_IncludesNpmValidationGuidance(t *testing.T) {
 	assert.Contains(t, templateContent, "Confirm `resolved` matches npm's official tarball URL for that exact version", "template should require validating resolved tarball URL")
 	assert.Contains(t, templateContent, "Confirm `integrity` matches npm's official integrity hash for that exact version", "template should require validating integrity hash")
 	assert.Contains(t, templateContent, "Treat stale-version claims as false positives", "template should avoid stale metadata false positives")
+	assert.Contains(t, templateContent, "report the verification as unavailable", "unavailable registry metadata must not be treated as evidence")
 }
 
 // TestBuildThreatDetectionAnalysisStep_ConfiguresEnvironment tests threat analysis step generation
