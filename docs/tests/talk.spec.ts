@@ -58,9 +58,9 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   expect(await page.evaluate(() => localStorage.getItem("aw-mute"))).toBe("0");
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
-  // Space follows the main line, past the Issue Monster example hanging below Event-driven Hand-offs
+  // Space follows the main line from Event-driven Hand-offs to Repo Commands
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Pull Request Review²")}$`));
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Repo Commands")}$`));
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
@@ -202,6 +202,33 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.keyboard.press("PageUp");
   await expect(count).toHaveAttribute("aria-label", at(2));
+});
+
+test("hangs CI reuse below workflow anatomy", async ({ page }) => {
+  const parent = slideNo("Anatomy of a workflow");
+  const child = slideNo("Reuse your CI");
+  const count = page.locator(CURRENT);
+  await page.goto(`/gh-aw/cracktro/#${parent}`);
+  await expect(page.getByRole("button", { name: "1 example below", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Reuse your CI");
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.locator(".vnb").click();
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await page.getByRole("button", { name: "Back to the pattern", exact: true }).click();
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.getByRole("button", { name: "Slide map (G)", exact: true }).click();
+  const kids = page.getByRole("group", { name: "Anatomy of a workflow examples", exact: true });
+  await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${child}:`) })).toBeVisible();
+});
+
+test("keeps the CI reuse workflow inside its code panel", async ({ page }) => {
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Reuse your CI")}`);
+  await page.evaluate(() => document.fonts.ready);
+  const overflowing = await page.locator(".cwa-ln").evaluateAll(lines => lines.filter(line => line.scrollWidth > line.clientWidth).map(line => line.textContent));
+  expect(overflowing).toEqual([]);
 });
 
 test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
@@ -573,13 +600,15 @@ test.describe("agentic engineering slides", () => {
 test("places the enterprise tracing, access and event slides beside their neighbours", async ({ page }) => {
   expect(slideNo("Distributed tracing")).toBe(slideNo("OpenTelemetry") + 1);
   expect(slideNo("GitHub App permissions")).toBe(slideNo("Operator-owned infrastructure") + 1);
-  expect(slideNo("OIDC token broker")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("Multi-repo PRs")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("OIDC token broker")).toBe(slideNo("Multi-repo PRs") + 1);
   expect(slideNo("Webhook gateway")).toBe(slideNo("Connectors") + 1);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   const NEW: [string, string | null][] = [
     ["Distributed tracing", null],
     ["GitHub App permissions", null],
+    ["Multi-repo PRs", null],
     ["OIDC token broker", "Experimental"],
     ["Webhook gateway", "Experimental"],
   ];
