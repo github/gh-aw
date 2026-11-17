@@ -1893,20 +1893,21 @@
   .aov-xc span + span { color: #9198a1; }
   .aov-cand { left: 1450px; top: 320px; width: 360px; height: 310px; --c: #ab7df8; padding: 12px 16px; display: flex; flex-direction: column; gap: 5px; }
   .aov-cand .hd { display: flex; align-items: center; justify-content: space-between; }
-  .aov-cand h4, .aov-seal h4, .avm-fn h4 { margin: 0; font-size: 26px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
+  .aov-cand h4, .avm-fn h4 { margin: 0; font-size: 26px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
   .aov-pill { padding: 5px 10px; border-radius: 99px; border: 1px solid var(--pc, #ab7df8); font: 600 13px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--pt, #d2a8ff); }
   .aov-cand .sub { margin-bottom: 3px; font: 500 14px/1.2 var(--mono); color: #9198a1; }
   .aov-m { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 28px; flex: none; padding: 0 4px 0 10px; border-radius: 8px; border: 1px dashed #3d444d; font: 500 15px/1 var(--mono); color: #d1d7e0; opacity: 0; transform: translateX(-10px); transition: opacity .4s, transform .5s, background .4s, border-color .4s, color .4s; }
   .aov-m.on { opacity: 1; transform: none; }
   .aov-m i { margin-left: 6px; font-style: normal; color: #9198a1; }
   .aov-m u { padding: 4px 8px; border-radius: 99px; border: 1px dashed #656c76; font: 600 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; text-decoration: none; color: #9198a1; white-space: nowrap; transition: all .4s; }
-  .aov-m u .f, .aov-gate .f { display: none; }
-  .aov-cand.ok .aov-m u .c, .aov-gate.ok .c { display: none; }
-  .aov-cand.ok .aov-m u .f, .aov-gate.ok .f { display: inline; }
-  .aov-cand.ok .aov-m { border-style: solid; }
-  .aov-cand.ok .aov-m.p { background: #4493f82e; border-color: #4493f8; color: #f0f6fc; }
+  .aov-m u .f, .aov-gate .f, .aov-cand .sub .f { display: none; }
+  .aov-cand.ok .aov-m u .c, .aov-gate.ok .c, .aov-cand.ok .sub .c { display: none; }
+  .aov-cand.ok .aov-m u .f, .aov-gate.ok .f, .aov-cand.ok .sub .f { display: inline; }
+  .aov-cand.ok .aov-m.d { color: #9198a1; }
+  .aov-cand.ok .sub .f { color: #79c0ff; }
+  .aov-cand.ok .aov-m.p { background: #4493f82e; border: 1px solid #4493f8; color: #f0f6fc; }
   .aov-cand.ok .aov-m.p u { background: #4493f8; border: 1px solid #4493f8; color: #fff; }
-  .aov-cand.ok .aov-m.d u { border: 1px solid #79c0ff; color: #79c0ff; }
+  .aov-cand.ok .aov-m.d u { border: 1px dashed #79c0ff; color: #79c0ff; }
   .aov-m.x { color: #9198a1; }
   .aov-m.x span { text-decoration: line-through 2px #db6d28; }
   .aov-m.x u, .aov-cand.ok .aov-m.x u { border: 1px dashed #db6d28; color: #ffa657; }
@@ -1921,22 +1922,29 @@
   .aov-down { position: absolute; left: 1789px; top: 638px; width: 3px; height: 84px; background: linear-gradient(#4493f8, #db6d28); transform-origin: top; transform: scaleY(0); transition: transform .6s cubic-bezier(.2,.9,.2,1); }
   .aov-down::after { content: ""; position: absolute; left: -8px; bottom: -4px; border: 9px solid transparent; border-top: 12px solid #db6d28; border-bottom: 0; }
   .aov-down.on { transform: none; }
-  .aov-code { left: 610px; top: 730px; width: 1200px; height: 280px; --c: #db6d28; border: 2px dashed #db6d28; border-top: 5px solid #db6d28; display: grid; grid-template-columns: 1fr 330px; }
+  .aov-code { left: 610px; top: 730px; width: 1200px; height: 280px; --c: #db6d28; padding: 14px 20px 0; border: 2px dashed #db6d28; border-top: 5px solid #db6d28; display: flex; flex-direction: column; gap: 12px; }
   .aov-code.on { box-shadow: 0 30px 80px -40px #db6d28; }
-  .aov-src { border-right: 1px solid #30363d; }
-  .aov-src .fn { padding: 9px 20px; margin-bottom: 8px; font: 500 14px/1 var(--mono); color: #9198a1; border-bottom: 1px solid #30363d; }
-  .aov-cl { padding: 0 20px; font: 500 16px/24px var(--mono); color: #d1d7e0; white-space: pre; opacity: 0; transform: translateX(-14px); transition: opacity .35s, transform .45s cubic-bezier(.2,.9,.2,1); }
+  .aov-eq { display: grid; grid-template-columns: 1fr 40px .95fr 40px 1.3fr; }
+  .aov-eq > b { align-self: center; text-align: center; font: 700 40px/1 var(--mono); color: #9198a1; opacity: 0; transition: opacity .4s; }
+  .aov-eq > b.on { opacity: 1; }
+  .aov-t { display: flex; flex-direction: column; justify-content: center; gap: 7px; padding: 10px 18px; border-radius: 14px; border: 2px solid var(--t); background: #0d1117; opacity: 0; transform: scale(.9); transition: opacity .4s, transform .5s cubic-bezier(.2,.9,.2,1.3); }
+  .aov-t.on { opacity: 1; transform: none; }
+  .aov-t small { font: 700 14px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--tt); }
+  .aov-t strong { font-size: 30px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
+  .aov-t span { font: 500 14px/1.2 var(--mono); color: #9198a1; }
+  .aov-t.p { --t: #4493f8; --tt: #79c0ff; background: #4493f826; }
+  .aov-t.d { --t: #656c76; --tt: #9198a1; border-style: dashed; }
+  .aov-t.d strong { font: 500 16px/1.25 var(--mono); color: #d1d7e0; }
+  .aov-t.f strong { white-space: nowrap; }
+  .aov-t.f { --t: #db6d28; --tt: #ffa657; background: #db6d281f; box-shadow: 0 0 40px -16px #db6d28; }
+  .aov-src { padding: 6px 0 0; border-top: 1px solid #30363d; }
+  .aov-cl { padding: 0 12px; font: 500 15px/21px var(--mono); color: #d1d7e0; white-space: pre; opacity: 0; transform: translateX(-14px); transition: opacity .35s, transform .45s cubic-bezier(.2,.9,.2,1); }
   .aov-cl.on { opacity: 1; transform: none; }
   .aov-cl.a { background: #ab7df81f; box-shadow: inset 4px 0 #ab7df8; }
   .aov-cl.b { background: #4493f81f; box-shadow: inset 4px 0 #4493f8; }
   .aov-cl.c3 { background: #e3b3411a; box-shadow: inset 4px 0 #e3b341; }
+  .aov-cl.dg { color: #9198a1; box-shadow: inset 4px 0 #656c76; }
   .aov-cl .k { color: #d2a8ff; } .aov-cl .p { color: #79c0ff; } .aov-cl .s { color: #a5d6ff; } .aov-cl .c { color: #8b949e; }
-  .aov-seal { padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
-  .aov-seal h4 { margin-bottom: 4px; }
-  .aov-seal span { padding: 10px 14px; border-radius: 12px; border: 1px solid #3d444d; font: 600 16px/1 var(--mono); color: #d1d7e0; opacity: 0; transform: scale(.9); transition: opacity .4s, transform .5s cubic-bezier(.2,.9,.2,1.4); }
-  .aov-seal span.on { opacity: 1; transform: none; }
-  .aov-seal .v { border-color: #4493f8; color: #79c0ff; }
-  .aov-seal .f { border: 1px dashed #db6d28; color: #ffa657; }
   .aov-foot, .avm-foot { position: absolute; left: 610px; right: 110px; top: 1030px; font: 500 17px/1.3 var(--mono); color: #9198a1; }
 
   /* --- add operational value: measure repeatedly --- */
@@ -3787,7 +3795,7 @@
     });
   }
 
-  // Define once: one standalone workflow; /add-operational-value prompt → adoption-time Markdown bands extracted into intent, evidence and guardrails → design agent proposes native measures → a human confirms the contract once → verified, frozen deterministic value-function code
+  // Define once: one standalone workflow; /add-operational-value prompt → adoption-time Markdown bands extracted into intent, evidence and guardrails → design agent proposes native measures → a human confirms the contract once → 1 primary measure + optional diagnostics → one verified, frozen deterministic value function
   {
     resetIndex();
     // the real skill syntax with synthetic coordinates; [text, class] per line
@@ -3802,13 +3810,13 @@
         "div",
         { class: "aov-bub ai" },
         h("b", {}, "Proposed value contract"),
-        h("div", {}, h("strong", {}, "Primary"), " · p95 dashboard load (s)"),
-        h("div", {}, h("strong", {}, "Diagnostics"), " · over budget, regressions, coverage, contribution"),
+        h("div", {}, h("strong", {}, "1 primary"), " · p95 dashboard load (s)"),
+        h("div", {}, h("strong", {}, "Optional diagnostics"), " · over budget, regressions, coverage, contribution"),
         h("div", {}, h("strong", {}, "Baseline"), " · pre-adoption probe ✓"),
         h("div", {}, h("strong", {}, "Confirm this design?"))
       ),
       yes = h("div", { class: "aov-bub me" }, "✓ Confirm"),
-      done = h("div", { class: "aov-bub ai" }, h("b", {}, "✓ Verified and frozen"), h("div", {}, "deterministic value function ready"));
+      done = h("div", { class: "aov-bub ai" }, h("b", {}, "✓ Deterministic value function"), h("div", {}, "1 primary + optional diagnostics · verified · frozen"));
     const phone = h("div", { class: "pf-card pf-prompt aov-phone" }, h("div", { class: "cap" }, "01 · Prompt"), h("div", { class: "sb" }, "9:41", h("span", {}, "▂▄▆ ▮")), h("div", { class: "you" }, "Copilot"), msg, ask, yes, done);
     // synthetic workflow excerpt; band a = intent, b = precompute and opportunities, c3 = safe outputs and guardrails
     const MD = [
@@ -3852,11 +3860,11 @@
     const xbox = h("div", { class: "aov-x" }, h("div", { class: "aov-cap" }, "03 · Extract"), xcs);
     // [class, measure, unit, role while proposed, role once confirmed]
     const MEAS = [
-      ["p", "p95 dashboard load", "s", "primary?", "primary"],
-      ["d", "over budget", "pages", "primary?", "diagnostic"],
-      ["d", "regressions", "count", "diagnostic?", "diagnostic"],
-      ["d", "accepted contribution", "", "diagnostic?", "diagnostic"],
-      ["d", "evidence coverage", "wk", "diagnostic?", "diagnostic"],
+      ["p", "p95 dashboard load", "s", "primary?", "1× primary"],
+      ["d", "over budget", "pages", "primary?", "optional"],
+      ["d", "regressions", "count", "diagnostic?", "optional"],
+      ["d", "accepted contribution", "", "diagnostic?", "optional"],
+      ["d", "evidence coverage", "wk", "diagnostic?", "optional"],
       ["x", "PRs opened · runs", "", "✗ proxy", "✗ proxy"],
     ];
     const meas = MEAS.map(([c, n, u, p, f]) => h("div", { class: `aov-m ${c}` }, h("span", {}, n, u ? h("i", {}, u) : null), h("u", {}, h("span", { class: "c" }, p), h("span", { class: "f" }, f))));
@@ -3866,32 +3874,30 @@
       { class: "aov-box aov-cand" },
       h("div", { class: "aov-cap" }, "04 · Propose"),
       h("div", { class: "hd" }, h("h4", {}, "Design agent"), h("em", { class: "aov-pill" }, "LLM · once")),
-      h("div", { class: "sub" }, "repository-native measures"),
+      h("div", { class: "sub" }, h("span", { class: "c" }, "repository-native measures"), h("span", { class: "f" }, "1 primary · optional diagnostics")),
       meas,
       probe
     );
     const gate = h("div", { class: "aov-gate" }, h("img", { src: "assets/avatars/mona.jpg", alt: "" }), h("span", { class: "c" }, "human confirms once?"), h("span", { class: "f" }, "✓ confirmed once"));
     const down = h("div", { class: "aov-down" });
-    // the climax: Markdown intent, precompute and guardrails become one frozen, deterministic value function (bands keep their colours)
-    const SRC = [
-      ["", [["export const ", "k"], ["contract = {"]]],
-      ["a", [["  primary: ", "p"], ['"p95_load_s"', "s"], [",          "], ["// intent · seconds, lower is better", "c"]]],
-      ["b", [["  opportunities: ", "p"], ['"lighthouse_pages"', "s"], [", "], ["// precompute · daily", "c"]]],
-      ["c3", [["  accepted: ", "p"], ['"perf_ci_passed"', "s"], [",       "], ["// safe-output guardrail", "c"]]],
-      ["", [["  diagnostics: ", "p"], ['["over_budget", "regressions", "coverage", "contribution"]', "s"], [","]]],
-      ["", [["  baseline: ", "p"], ['"pre-adoption"', "s"], [", "], ["missing: ", "p"], ["null", "k"], [", "], ["cadence: ", "p"], ['"weekly"', "s"]]],
-      ["", [["};"]]],
-      ["", [["export const ", "k"], ["evaluate = pages => "], ["p95", "p"], ["(pages.map(p => p.loadSeconds));"]]],
+    // the climax: 1 primary measure + optional diagnostics → one deterministic value function; code lines keep their Markdown band colours
+    const tile = (c, k, t, d) => h("div", { class: `aov-t ${c}` }, h("small", {}, k), h("strong", {}, t), h("span", {}, d));
+    const tiles = [
+      tile("p", "1× primary · exactly one", "p95 dashboard load", "native unit: seconds"),
+      tile("d", "0..n diagnostics · optional", ["over budget · regressions", h("br"), "coverage · contribution"], "separate · never added in"),
+      tile("f", "🔒 frozen · ✓ verified", "Deterministic value function", "dashboard-performance.mjs · no LLM"),
     ];
+    const ops = ["+", "→"].map(o => h("b", {}, o));
+    // [band, keyword, name, rest, comment]; comments align in one column
+    const SRC = [
+      ["a", "const ", "primary", ' = "p95_load_s";', "// exactly 1 · seconds"],
+      ["dg", "const ", "diagnostics", ' = ["over_budget", "regressions", "coverage", "contribution"];', "// optional · never added"],
+      ["b", "const ", "opportunities", ' = "lighthouse_pages";', "// precompute · daily"],
+      ["c3", "const ", "accepted", ' = "perf_ci_passed";', "// safe-output guardrail"],
+      ["", "export const ", "evaluate", " = pages => ({ primary: p95(pages), diagnostics: diag(pages) });", "// deterministic · no LLM"],
+    ].map(([b, k, n, r, c]) => [b, [[k, "k"], [n, "p"], [r.padEnd(90 - k.length - n.length)], [c, "c"]]]);
     const cls = SRC.map(([b, parts]) => line("aov-cl", b, parts));
-    const seals = [h("span", { class: "v" }, "✓ verified · probe passed"), h("span", { class: "f" }, "🔒 frozen at confirmation"), h("span", {}, "no LLM from here on")];
-    const code = h(
-      "div",
-      { class: "aov-box aov-code" },
-      h("div", { class: "aov-cap" }, "05 · Deterministic code"),
-      h("div", { class: "aov-src" }, h("div", { class: "fn" }, "operational-value/dashboard-performance.mjs"), cls),
-      h("div", { class: "aov-seal" }, h("h4", {}, "Value function"), seals)
-    );
+    const code = h("div", { class: "aov-box aov-code" }, h("div", { class: "aov-cap" }, "05 · Output"), h("div", { class: "aov-eq" }, tiles[0], ops[0], tiles[1], ops[1], tiles[2]), h("div", { class: "aov-src" }, cls));
     const ars = [1, 2].map(i => h("div", { class: `aov-ar a${i}` }, "→"));
     const caret = () => h("span", { class: "pf-caret" });
     const renderCmd = k => {
@@ -3916,8 +3922,8 @@
       T_ASK = 8.4,
       T_OK = 9.8,
       T_CODE = 10.6,
-      T_SEAL = T_CODE + 0.6 + cls.length * 0.18,
-      T_END = T_SEAL + 1.2,
+      T_FN = T_CODE + 1.7,
+      T_END = T_FN + 0.5 + cls.length * 0.15 + 0.6,
       BEATS = [
         [phone, 0.3],
         [md, T_MD],
@@ -3938,19 +3944,23 @@
         [cand, T_OK, "ok"],
         [down, T_CODE],
         [code, T_CODE + 0.3],
-        ...cls.map((l, i) => [l, T_CODE + 0.6 + i * 0.18]),
-        ...seals.map((s, i) => [s, T_SEAL + i * 0.3]),
-        [done, T_SEAL + 0.3],
+        [tiles[0], T_CODE + 0.6],
+        [ops[0], T_CODE + 0.9],
+        [tiles[1], T_CODE + 1.1],
+        [ops[1], T_CODE + 1.4],
+        [tiles[2], T_FN],
+        [done, T_FN],
+        ...cls.map((l, i) => [l, T_FN + 0.5 + i * 0.15]),
       ],
       STAGES = [T_EXT, T_CAND, T_ASK, T_OK, T_CODE, T_END];
-    const POPS = [phone, md, ...xcs, cand, yes, code, ...seals];
+    const POPS = [phone, md, ...xcs, cand, yes, ...tiles];
     let t0 = 0,
       now = 0,
       snd = {};
     slides.push({
       group: "platform",
       notes:
-        "Define once. Illustrative: the repository, workflow, measures and code are synthetic. This example intentionally shows the standalone workflow path: /add-operational-value OWNER/REPO WORKFLOW-NAME designs exactly one workflow's Operational Value, and this design is the only LLM step. The design agent recovers the workflow as it was adopted, its Markdown, imports, deterministic precompute steps, triggers, skip rules and safe outputs, and extracts three things: the intent and the pre-existing repository problem behind it, the eligible opportunities and evidence the precompute already produces, and the guardrails and acceptance checks its outputs must pass. It inventories repository-native measures of that problem, ones a maintainer or any other tool could move too, and probes a pre-adoption baseline whenever history can reconstruct it. Workflow-native signals such as opened pull requests or runs are rejected as mechanism proxies. It forms one provisional contract and presents it once: one primary measure in native units, actionable diagnostics, the evidence rule, cadence and maturation. The human confirms or corrects that whole design in a single exchange; there is no repeated approval loop. Only after confirmation does it implement the value function, verify it and freeze it. The natural-language intent and the workflow Markdown end as deterministic code: from here on no model chooses, scores or reinterprets anything.",
+        "Define once. Illustrative: the repository, workflow, measures and code are synthetic. This example intentionally shows the standalone workflow path: /add-operational-value OWNER/REPO WORKFLOW-NAME designs exactly one workflow's Operational Value, and this design is the only LLM step. The design agent recovers the workflow as it was adopted, its Markdown, imports, deterministic precompute steps, triggers, skip rules and safe outputs, and extracts three things: the intent and the pre-existing repository problem behind it, the eligible opportunities and evidence the precompute already produces, and the guardrails and acceptance checks its outputs must pass. It inventories repository-native measures of that problem, ones a maintainer or any other tool could move too, and probes a pre-adoption baseline whenever history can reconstruct it. Workflow-native signals such as opened pull requests or runs are rejected as mechanism proxies. It forms one provisional contract and presents it once: exactly one primary measure in native units, any optional diagnostics, the evidence rule, cadence and maturation. The human confirms or corrects that whole design in a single exchange; there is no repeated approval loop. Only after confirmation does it generate, verify and freeze the output: one deterministic value function made of exactly one primary measure plus zero or more optional diagnostics. Diagnostics are reported beside the primary measure and are never averaged or added into it. The natural-language intent and the workflow Markdown end as that deterministic code: from here on no model chooses, scores or reinterprets anything.",
       enter() {
         t0 = 0;
         snd = { p: 0, beat: new Set() };
