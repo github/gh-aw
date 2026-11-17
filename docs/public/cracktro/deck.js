@@ -1004,6 +1004,14 @@
   .ao-bar.seen.m { fill: #8957e5; } .ao-bar.seen.t { fill: #1f6feb; } .ao-bar.seen.x { fill: #f85149; } .ao-bar.seen.r, .ao-bar.seen.f { fill: #d29922; }
   .ao-leg { font: 500 14px var(--mono); }
   .ao-axis { stroke: #3d444d; stroke-width: 2; }
+  .ao .slide-head h2 { --lg: #e3b341; }
+  .ao .ao-svg .sfl-row .ok, .ao .ao-stat.ok, .ao .ao-sc.ok, .ao .ao-run.good .ao-v, .ao .ao-delta, .ao .ao-diff .add text, .ao .ao-diff .ok text { fill: #79c0ff; }
+  .ao .ao-svg .sfl-row .ko, .ao .ao-stat.ko, .ao .ao-sc.ko { fill: #ffa657; }
+  .ao .ao-run.bad .sfl-card { stroke: #db6d28; filter: drop-shadow(0 0 10px #db6d2855); }
+  .ao .ao-run.good .sfl-card { stroke: #4493f8; filter: drop-shadow(0 0 14px #4493f855); }
+  .ao .ao-pick.on rect { fill: #db6d2822; stroke: #db6d28; }
+  .ao .ao-diff .add rect { fill: #4493f81f; }
+  .ao .ao-bar.seen.x { fill: #db6d28; }
   .mc-sub { fill: #f0f6fc; font: 600 20px var(--mono); text-anchor: middle; }
   .mc-eng { fill: #9198a1; font: 500 17px var(--mono); text-anchor: middle; }
   .mc-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
@@ -12049,7 +12057,7 @@
     [
       ["#8957e5", "model"],
       ["#1f6feb", "tool"],
-      ["#f85149", "denied"],
+      ["#db6d28", "denied"],
       ["#d29922", "waste"],
     ].forEach(([c, t], i) => (sess += `<text class="ao-leg" x="${BX + i * 98}" y="${BASE + 28}" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
     FIND.forEach(([c], i) => (sess += `<g class="sfl-row ao-find"><text class="${c}" id="aoF${i}" x="854" y="${330 + i * 34}"></text></g>`));
@@ -12259,7 +12267,7 @@
       },
       el: h(
         "section",
-        { class: "slide" },
+        { class: "slide ao" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))),
         svg
       ),
