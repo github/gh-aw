@@ -78,6 +78,8 @@ slides.push({
 
 Core rules (`content-rules.md`): everything is public; no real people; no 40-hex SHAs or private repos; the only URLs are `https://github.github.com/gh-aw/introduction/overview/` and the For PMs source link `https://github.com/chrizbo/agentics-beyond-code`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
 
+Colour accessibility: never use red/green as the only pair for opposing states (pass/fail, allowed/blocked); colour-blind viewers cannot tell them apart. Use blue (`#4493f8`/`#79c0ff`) vs orange (`#db6d28`/`#ffa657`) and add a non-colour cue (label, icon, dash or strike).
+
 ## Preview loop
 
 No build step (static page lacks injected JSON-LD). Serve and open in the browser canvas:
