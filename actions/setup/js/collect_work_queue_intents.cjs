@@ -51,9 +51,7 @@ function main(options = {}) {
   const core = options.core || global.core;
   let sourceDir = options.sourceDir;
   if (!sourceDir) {
-    const runnerTemp = process.env.RUNNER_TEMP;
-    if (!runnerTemp) throw new Error("work_queue_collection_runner_temp_missing");
-    sourceDir = path.join(runnerTemp, "gh-aw", "safeoutputs", "work-queue");
+    sourceDir = require("./runtime_paths.cjs").runtimePath("safeoutputs/work-queue");
   }
   const outputDir = options.outputDir || require("./runtime_paths.cjs").runtimeRoot();
   fs.mkdirSync(outputDir, { recursive: true });

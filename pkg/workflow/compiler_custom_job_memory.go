@@ -65,9 +65,9 @@ func (c *Compiler) buildRestoreMemorySteps(cfg *restoreMemoryConfig, jobName str
 
 	customJobMemoryLog.Printf("Building restore-memory steps for job %s", jobName)
 
-	// repo-memory and comment-memory rely on scripts installed by the gh-aw setup action.
-	// Inject the setup step before any memory steps so those scripts are available.
-	if cfg.DriveMemory || cfg.RepoMemory || cfg.CommentMemory {
+	// Memory paths are lowered into the private runtime, so every custom job that
+	// restores memory must allocate that runtime before its restore steps.
+	if cfg.CacheMemory || cfg.DriveMemory || cfg.RepoMemory || cfg.CommentMemory {
 		setupActionRef := c.resolveActionReference("./actions/setup", data)
 		if setupActionRef == "" && !c.actionMode.IsScript() {
 			return nil, nil, fmt.Errorf("jobs.%s.restore-memory: drive-memory/repo-memory/comment-memory require the setup action but no action ref was found", jobName)
@@ -155,6 +155,9 @@ func generateCacheMemoryRestoreLines(data *WorkflowData) []string {
 		lines = append(lines, fmt.Sprintf("      - name: Create cache-memory directory (%s)\n", cache.ID))
 		lines = append(lines, "        run: |\n")
 		lines = append(lines, fmt.Sprintf("          mkdir -p %s\n", cacheDir))
+		lines = append(lines, fmt.Sprintf("          mkdir -p \"$RUNNER_TEMP/gh-aw-cache-memory-%s\"\n", cache.ID))
+		lines = append(lines, fmt.Sprintf("          find \"$RUNNER_TEMP/gh-aw-cache-memory-%s\" -mindepth 1 -delete\n", cache.ID))
+		lines = append(lines, fmt.Sprintf("          chmod 700 \"$RUNNER_TEMP/gh-aw-cache-memory-%s\"\n", cache.ID))
 
 		// Compute the same integrity-aware cache key as the agent job uses.
 		cacheKey := computeIntegrityCacheKey(cache, githubConfig)
@@ -165,7 +168,7 @@ func generateCacheMemoryRestoreLines(data *WorkflowData) []string {
 		lines = append(lines, fmt.Sprintf("        uses: %s\n", getActionPin("actions/cache/restore")))
 		lines = append(lines, "        with:\n")
 		lines = append(lines, fmt.Sprintf("          key: %s\n", cacheKey))
-		lines = append(lines, fmt.Sprintf("          path: %s\n", cacheDir))
+		lines = append(lines, fmt.Sprintf("          path: %s\n", cacheMemoryActionDirFor(cache.ID)))
 
 		// Build restore keys using the shared helper (same semantics as the agent job).
 		// Only emit the restore-keys block when there is at least one key; an empty
@@ -175,6 +178,10 @@ func generateCacheMemoryRestoreLines(data *WorkflowData) []string {
 			for _, key := range restoreKeys {
 				lines = append(lines, fmt.Sprintf("            %s\n", key))
 			}
+
+			var copyStep strings.Builder
+			generateCacheMemoryCopyStep(&copyStep, cache, false, "Restore cache-memory into private runtime")
+			lines = append(lines, copyStep.String())
 		}
 	}
 

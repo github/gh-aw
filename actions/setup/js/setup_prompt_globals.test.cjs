@@ -21,6 +21,7 @@ describe("setupPromptGlobals", () => {
       RUNNER_TEMP: "/tmp/runner",
       GITHUB_OUTPUT: "/tmp/output",
       GH_AW_ACTIONS_DIR: "/tmp/actions",
+      GH_AW_RUNTIME_DIR: "/tmp/gh-aw-job-private",
       GITHUB_TOKEN: "inherited-token",
       NODE_OPTIONS: "--require=injected.cjs",
       UNSELECTED: "inherited-value",
@@ -35,6 +36,7 @@ describe("setupPromptGlobals", () => {
       RUNNER_TEMP: "/tmp/runner",
       GITHUB_OUTPUT: "/tmp/output",
       GH_AW_ACTIONS_DIR: "/tmp/actions",
+      GH_AW_RUNTIME_DIR: "/tmp/gh-aw-job-private",
     });
     expect(global.core).toBe(core);
     expect(global.context).toBe(context);

@@ -39,11 +39,14 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		if useBackwardCompatiblePaths {
 			// For single default cache, use the original directory for backward compatibility
 			builder.WriteString("      - name: Create cache-memory directory\n")
-			builder.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/create_cache_memory_dir.sh\"\n")
+			builder.WriteString("        run: |\n")
+			builder.WriteString("          bash \"${RUNNER_TEMP}/gh-aw/actions/create_cache_memory_dir.sh\"\n")
+			writeCacheMemoryActionDirSetup(builder, cache)
 		} else {
 			fmt.Fprintf(builder, "      - name: Create cache-memory directory (%s)\n", cache.ID)
 			builder.WriteString("        run: |\n")
 			fmt.Fprintf(builder, "          mkdir -p %s\n", cacheDir)
+			writeCacheMemoryActionDirSetup(builder, cache)
 		}
 
 		// Use integrity-aware cache key (includes integrity level + policy hash prefix).
@@ -88,12 +91,14 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		fmt.Fprintf(builder, "          key: %s\n", cacheKey)
 
 		// Path - always use the new cache directory format
-		fmt.Fprintf(builder, "          path: %s\n", cacheDir)
+		fmt.Fprintf(builder, "          path: %s\n", cacheMemoryActionDirFor(cache.ID))
 
 		builder.WriteString("          restore-keys: |\n")
 		for _, key := range restoreKeys {
 			fmt.Fprintf(builder, "            %s\n", key)
 		}
+
+		generateCacheMemoryCopyStep(builder, cache, false, "Restore cache-memory into private runtime")
 
 		// Add git setup step after cache restore.
 		// This initialises (or migrates) the git repository used for integrity branching,
@@ -101,6 +106,35 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		generateCacheMemoryGitSetupStep(builder, cache, cacheDir, integrityLevel, useBackwardCompatiblePaths)
 	}
 
+}
+
+func writeCacheMemoryActionDirSetup(builder *strings.Builder, cache CacheMemoryEntry) {
+	fmt.Fprintf(builder, "          mkdir -p \"$RUNNER_TEMP/gh-aw-cache-memory-%s\"\n", cache.ID)
+	fmt.Fprintf(builder, "          find \"$RUNNER_TEMP/gh-aw-cache-memory-%s\" -mindepth 1 -delete\n", cache.ID)
+	fmt.Fprintf(builder, "          chmod 700 \"$RUNNER_TEMP/gh-aw-cache-memory-%s\"\n", cache.ID)
+}
+
+func generateCacheMemoryCopyStep(builder *strings.Builder, cache CacheMemoryEntry, toActionDir bool, name string) {
+	direction := "into"
+	if toActionDir {
+		direction = "to"
+	}
+	fmt.Fprintf(builder, "      - name: %s %s private cache-memory (%s)\n", name, direction, cache.ID)
+	builder.WriteString("        if: always()\n")
+	builder.WriteString("        env:\n")
+	fmt.Fprintf(builder, "          GH_AW_CACHE_DIR: %s\n", cacheMemoryDirFor(cache.ID))
+	fmt.Fprintf(builder, "          GH_AW_CACHE_ACTION_DIR: %s\n", cacheMemoryActionDirFor(cache.ID))
+	builder.WriteString("        run: |\n")
+	builder.WriteString("          set -euo pipefail\n")
+	builder.WriteString("          mkdir -p \"$GH_AW_CACHE_DIR\"\n")
+	builder.WriteString("          mkdir -p \"$GH_AW_CACHE_ACTION_DIR\"\n")
+	builder.WriteString("          if [[ -L \"$GH_AW_CACHE_ACTION_DIR\" || ! -d \"$GH_AW_CACHE_ACTION_DIR\" ]]; then echo \"Invalid cache-memory staging directory\" >&2; exit 1; fi\n")
+	if toActionDir {
+		builder.WriteString("          find \"$GH_AW_CACHE_ACTION_DIR\" -mindepth 1 -delete\n")
+		builder.WriteString("          cp -a \"$GH_AW_CACHE_DIR/.\" \"$GH_AW_CACHE_ACTION_DIR/\"\n")
+	} else {
+		builder.WriteString("          cp -a \"$GH_AW_CACHE_ACTION_DIR/.\" \"$GH_AW_CACHE_DIR/\"\n")
+	}
 }
 
 // generateCacheMemoryGitSetupStep emits a pre-agent step that sets up the git-backed integrity
@@ -229,6 +263,11 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 	// Only upload artifacts when threat detection is enabled (needed for update_cache_memory job)
 	// When threat detection is disabled, cache is saved automatically by actions/cache post-action
 	threatDetectionEnabled := IsDetectionJobEnabled(data.SafeOutputs)
+	for _, cache := range data.CacheMemoryConfig.Caches {
+		if !cache.RestoreOnly {
+			generateCacheMemoryCopyStep(builder, cache, true, "Stage cache-memory for action cache")
+		}
+	}
 	if !threatDetectionEnabled {
 		cacheLog.Print("Skipping cache-memory artifact upload (threat detection disabled)")
 		return
@@ -504,6 +543,10 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 			steps = append(steps, validationStep.String())
 		}
 
+		var stagingStep strings.Builder
+		generateCacheMemoryCopyStep(&stagingStep, cache, true, "Stage downloaded cache-memory for action cache")
+		steps = append(steps, stagingStep.String())
+
 		// Generate cache key using integrity-aware format (matches generateCacheMemorySteps)
 		var githubConfig *GitHubToolConfig
 		if data.ParsedTools != nil {
@@ -528,7 +571,7 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		fmt.Fprintf(&saveStep, "        uses: %s\n", getActionPin("actions/cache/save"))
 		saveStep.WriteString("        with:\n")
 		fmt.Fprintf(&saveStep, "          key: %s\n", cacheKey)
-		fmt.Fprintf(&saveStep, "          path: %s\n", cacheDir)
+		fmt.Fprintf(&saveStep, "          path: %s\n", cacheMemoryActionDirFor(cache.ID))
 		steps = append(steps, saveStep.String())
 		hasCacheSaveStep = true
 	}

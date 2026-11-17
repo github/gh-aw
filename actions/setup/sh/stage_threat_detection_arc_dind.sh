@@ -29,8 +29,12 @@ case "$MODE" in
     mkdir -p "$STAGED_INPUT_DIR"
     # Clear optional inputs too, including nested files and dotfiles. Do not
     # follow symlinks when clearing this dedicated, validated staging directory.
-    find "$STAGED_DIR" -mindepth 1 -delete
-    find "$STAGED_INPUT_DIR" -mindepth 1 -delete
+    if [[ "$STAGED_DIR" != "$DETECTION_DIR" ]]; then
+      find "$STAGED_DIR" -mindepth 1 -delete
+    fi
+    if [[ "$STAGED_INPUT_DIR" != "$DETECTION_INPUT_DIR" ]]; then
+      find "$STAGED_INPUT_DIR" -mindepth 1 -delete
+    fi
     ;;
 esac
 

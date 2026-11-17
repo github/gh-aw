@@ -34,7 +34,7 @@ describe("engine-declared durable files", () => {
     fs.writeFileSync(path.join(options.sessions, "session.db"), binary);
     stageFiles(options);
     const manifest = JSON.parse(fs.readFileSync(path.join(options.bundle, "manifest.json"), "utf8"));
-    expect(manifest.version).toBe(2);
+    expect(manifest.version).toBe(3);
     expect(manifest.entries.map(entry => entry.path).sort()).toEqual(["0/session.db", "0/session.jsonl"]);
     for (const entry of manifest.entries) {
       expect(fs.readFileSync(path.join(options.bundle, createHash("sha256").update(entry.path).digest("hex") + ".json"))).toEqual(fs.readFileSync(path.join(options.sessions, path.basename(entry.path))));
@@ -57,6 +57,22 @@ describe("engine-declared durable files", () => {
     fs.unlinkSync(checkpoint);
     restoreFiles(options);
     expect(fs.readFileSync(checkpoint, "utf8")).toBe('{"native":"checkpoint"}');
+  });
+
+  it("restores relative declarations into a different runtime allocation", () => {
+    const previous = fixture();
+    stageFiles(previous);
+    const nextRoot = fs.mkdtempSync(path.join(process.cwd(), ".durable-files-next-"));
+    directories.push(nextRoot);
+    const nextSessions = path.join(nextRoot, "example/sessions");
+    const nextBundle = path.join(nextRoot, "durable/bundle");
+    fs.mkdirSync(path.dirname(nextSessions), { recursive: true });
+    fs.cpSync(previous.bundle, nextBundle, { recursive: true });
+    vi.stubEnv("GH_AW_DURABLE_FILES", JSON.stringify([nextSessions]));
+
+    restoreFiles({ ...previous, root: nextRoot, sessions: nextSessions, bundle: nextBundle });
+
+    expect(fs.readFileSync(path.join(nextSessions, "session.jsonl"), "utf8")).toContain("Continue this task");
   });
 
   it("preserves file and directory names that would collide with JSON wrapper suffixes", () => {

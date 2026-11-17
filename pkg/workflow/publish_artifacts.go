@@ -21,7 +21,7 @@ const defaultArtifactMaxSizeBytes int64 = 104857600
 // artifactStagingDirExpr is the GitHub Actions expression form of the staging directory.
 // `actions/upload-artifact` and `actions/download-artifact` do not expand shell variables
 // in their `path:` inputs, so we must use ${{ runner.temp }} here.
-const artifactStagingDirExpr = "${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts/"
+const artifactStagingDirExpr = "${{ env.GH_AW_RUNTIME_DIR }}/safeoutputs/upload-artifacts/"
 
 // SafeOutputsUploadArtifactStagingArtifactName is the artifact that carries the staging directory
 // from the main agent job to the upload_artifact job.

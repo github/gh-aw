@@ -102,6 +102,10 @@ func configureCredentialFreePromptAction(step *WorkflowStep) error {
 	if !ok || !strings.HasPrefix(step.Uses, "actions/github-script@") {
 		return fmt.Errorf("prompt step %q requires an unsupported action", step.Name)
 	}
+	if step.Env == nil {
+		step.Env = make(map[string]string)
+	}
+	step.Env["GH_AW_RUNTIME_DIR"] = "${{ env.GH_AW_RUNTIME_DIR }}"
 	encoded, err := json.Marshal(sliceutil.SortedKeys(step.Env))
 	if err != nil {
 		return fmt.Errorf("encode prompt environment allowlist: %w", err)

@@ -29,7 +29,7 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 		yaml.WriteString("          [mcp_servers." + serverName + "]\n")
 		yaml.WriteString("          container = \"" + image + "\"\n")
 		yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
-		yaml.WriteString("          env_vars = [\"GITHUB_SERVER_URL\", \"RUNNER_TEMP\"]\n")
+		yaml.WriteString("          env_vars = [\"GITHUB_SERVER_URL\", \"GH_AW_RUNTIME_DIR\", \"GH_AW_RUNTIME_ID\", \"RUNNER_TEMP\"]\n")
 		fmt.Fprintf(yaml, "          env = { GH_AW_WORK_QUEUE_ROLE = %q }\n", role) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		yaml.WriteString("          entrypoint = \"node\"\n")
 		yaml.WriteString("          entrypointArgs = [\"" + workQueueMCPServerEntrypoint + "\"]\n")
@@ -46,6 +46,8 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 	yaml.WriteString("                \"env\": {\n")
 	yaml.WriteString("                  \"RUNNER_TEMP\": \"\\${RUNNER_TEMP}\",\n")
 	yaml.WriteString("                  \"GITHUB_SERVER_URL\": \"\\${GITHUB_SERVER_URL}\",\n")
+	yaml.WriteString("                  \"GH_AW_RUNTIME_DIR\": \"\\${GH_AW_RUNTIME_DIR}\",\n")
+	yaml.WriteString("                  \"GH_AW_RUNTIME_ID\": \"\\${GH_AW_RUNTIME_ID}\",\n")
 	fmt.Fprintf(yaml, "                  \"GH_AW_WORK_QUEUE_ROLE\": %q\n", role) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("                },\n")
 	yaml.WriteString("                \"entrypoint\": \"node\",\n")
@@ -155,6 +157,7 @@ func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, 
 	// safe-outputs config so the nested container can resolve ${GH_AW_INPUT_…} placeholders.
 	safeOutputsEnvVars := []string{
 		"DEBUG", "DEFAULT_BRANCH",
+		"GH_AW_RUNTIME_DIR", "GH_AW_RUNTIME_ID",
 		"GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB",
 		"GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS", "GH_AW_SAFE_OUTPUTS_CONFIG_PATH",
 		"GH_AW_SAFE_OUTPUTS_TOOLS_PATH", "GH_AW_TARGET_REPO_SLUG", "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST",
@@ -339,6 +342,8 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 	}{
 		{"DEBUG", "DEBUG", false},
 		{"DEFAULT_BRANCH", "DEFAULT_BRANCH", false},
+		{"GH_AW_RUNTIME_DIR", "GH_AW_RUNTIME_DIR", false},
+		{"GH_AW_RUNTIME_ID", "GH_AW_RUNTIME_ID", false},
 		{"GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_ALLOWED_EXTS", false},
 		{"GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_BRANCH", false},
 		{"GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_ASSETS_MAX_SIZE_KB", false},

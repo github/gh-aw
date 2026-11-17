@@ -70,15 +70,19 @@ function registerTests({ describe, it }) {
       assert.equal(fs.existsSync(root), false);
     });
 
-    it("reports missing runtime temporary-directory configuration before touching artifacts", () => {
+    it("defaults to the private runtime work-queue intent directory", () => {
       fixture(options => {
-        const previous = process.env.RUNNER_TEMP;
-        delete process.env.RUNNER_TEMP;
+        const previous = process.env.GH_AW_RUNTIME_DIR;
+        const sourceDir = path.join(options.root, "safeoutputs", "work-queue");
+        fs.mkdirSync(sourceDir, { recursive: true });
+        fs.writeFileSync(path.join(sourceDir, "work-queue.intents.jsonl"), "{}\n");
+        process.env.GH_AW_RUNTIME_DIR = options.root;
         try {
-          assert.throws(() => main({ ...options, sourceDir: undefined }), /work_queue_collection_runner_temp_missing/);
+          assert.deepEqual(main({ ...options, sourceDir: undefined }).map(value => value.status), ["collected"]);
+          assert.equal(fs.readFileSync(path.join(options.outputDir, "work-queue.intents.jsonl"), "utf8"), "{}\n");
         } finally {
-          if (previous === undefined) delete process.env.RUNNER_TEMP;
-          else process.env.RUNNER_TEMP = previous;
+          if (previous === undefined) delete process.env.GH_AW_RUNTIME_DIR;
+          else process.env.GH_AW_RUNTIME_DIR = previous;
         }
       });
     });

@@ -175,6 +175,22 @@ function stopHostServices() {
     if (matches(record)) process.kill(record.pid, "SIGKILL");
   }
 }
+if (process.argv[2] === "stop-services") {
+  try {
+    if (!root) process.exit(0);
+    stopHostServices();
+    const file = path.join(root, ".gh-aw-processes.jsonl");
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink() || String(stat.uid) !== uid || stat.nlink !== 1) {
+      fail("unsafe host service identity record");
+    }
+    fs.unlinkSync(file);
+  } catch (error) {
+    console.warn(`::warning::Unable to stop WSL gh-aw services: ${error.message}`);
+    process.exitCode = 1;
+  }
+  process.exit();
+}
 try {
   try { fs.lstatSync(root); } catch (error) { if (error.code === "ENOENT") process.exit(0); throw error; }
   validateRoot();

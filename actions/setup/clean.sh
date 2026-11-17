@@ -41,4 +41,6 @@ fi
 cleanup_status=0
 cleanup_gh_aw_runtime || cleanup_status=$?
 
-exit "$cleanup_status"
+if [[ "$cleanup_status" -ne 0 ]]; then
+  echo "::warning::Private gh-aw runtime cleanup failed; leaving it untouched"
+fi

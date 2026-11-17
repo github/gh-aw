@@ -29,6 +29,7 @@ const (
 	awfArcDindHomePathExpr        = "${GH_AW_RUNTIME_DIR}/home"
 	awfArcDindProxyLogsDirExpr    = "${GH_AW_RUNTIME_DIR}/sandbox/firewall/logs"
 	awfArcDindAuditDirExpr        = "${GH_AW_RUNTIME_DIR}/sandbox/firewall/audit"
+	awfArcDindPromptFileExpr      = "${GH_AW_RUNTIME_DIR}/aw-prompts/prompt.txt"
 	// Bash regex used in [[ ... =~ ... ]] to detect TCP Docker hosts (ARC/DinD).
 	// Any tcp:// DOCKER_HOST indicates the Docker daemon runs on a separate filesystem,
 	// requiring --docker-host so AWF connects to the correct daemon.

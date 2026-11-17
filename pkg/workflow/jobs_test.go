@@ -3,10 +3,6 @@
 package workflow
 
 import (
-	"bytes"
-	"compress/flate"
-	"encoding/base64"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -407,31 +403,6 @@ func TestRenderStepForRunnerPreservesWorkingDirectoryAndExplicitEnvironment(t *t
 			t.Errorf("Windows WSL wrapper unexpectedly forwards %q:\n%s", excluded, got)
 		}
 	}
-}
-
-func decodeWindowsWSLRunScript(t *testing.T, rendered string) string {
-	t.Helper()
-	const start = "FromBase64String('"
-	index := strings.Index(rendered, start)
-	if index < 0 {
-		t.Fatalf("WSL run wrapper does not contain its encoded script:\n%s", rendered)
-	}
-	encoded := rendered[index+len(start):]
-	end := strings.IndexByte(encoded, '\'')
-	if end < 0 {
-		t.Fatalf("WSL run wrapper has an unterminated encoded script:\n%s", rendered)
-	}
-	compressed, err := base64.StdEncoding.DecodeString(encoded[:end])
-	if err != nil {
-		t.Fatalf("decode compressed WSL run script: %v", err)
-	}
-	reader := flate.NewReader(bytes.NewReader(compressed))
-	defer reader.Close()
-	script, err := io.ReadAll(reader)
-	if err != nil {
-		t.Fatalf("decompress WSL run script: %v", err)
-	}
-	return string(script)
 }
 
 func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {

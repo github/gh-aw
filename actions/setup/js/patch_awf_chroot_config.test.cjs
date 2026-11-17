@@ -9,10 +9,13 @@ const { patchAWFChrootConfig } = require("./patch_awf_chroot_config.cjs");
 describe("patchAWFChrootConfig", () => {
   let tempDir;
   let binariesDir;
+  let runtimeDir;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "patch-awf-chroot-"));
     binariesDir = fs.mkdtempSync(path.join(os.tmpdir(), "patch-awf-binaries-"));
+    runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), "patch-awf-runtime-"));
+    vi.stubEnv("GH_AW_RUNTIME_DIR", runtimeDir);
     fs.mkdirSync(path.join(tempDir, "gh-aw"), { recursive: true });
     fs.writeFileSync(path.join(tempDir, "gh-aw", "awf-config.json"), JSON.stringify({ apiProxy: { enabled: true } }));
   });
@@ -21,6 +24,7 @@ describe("patchAWFChrootConfig", () => {
     vi.restoreAllMocks();
     fs.rmSync(tempDir, { recursive: true, force: true });
     fs.rmSync(binariesDir, { recursive: true, force: true });
+    fs.rmSync(runtimeDir, { recursive: true, force: true });
   });
 
   it("patches both AWF config locations with chroot settings", () => {

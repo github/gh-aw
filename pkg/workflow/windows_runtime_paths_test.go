@@ -1,6 +1,10 @@
 package workflow
 
 import (
+	"bytes"
+	"compress/flate"
+	"encoding/base64"
+	"io"
 	"strings"
 	"testing"
 
@@ -40,7 +44,44 @@ func TestWindowsPrivateRuntimePaths(t *testing.T) {
 	assert.NotContains(t, script, runtimeDirectoryExpression)
 	// Rewrite before Bash parsing, including single-quoted strings and heredocs.
 	assert.Contains(t, rendered, "$scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)")
+	assert.Contains(t, rendered, "$runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'")
 	assert.Contains(t, rendered, "$wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$'")
+}
+
+func decodeWindowsWSLRunScript(t *testing.T, rendered string) string {
+	t.Helper()
+	const start = "FromBase64String('"
+	index := strings.Index(rendered, start)
+	if index < 0 {
+		t.Fatalf("WSL run wrapper does not contain its encoded script:\n%s", rendered)
+	}
+	encoded := rendered[index+len(start):]
+	end := strings.IndexByte(encoded, '\'')
+	if end < 0 {
+		t.Fatalf("WSL run wrapper has an unterminated encoded script:\n%s", rendered)
+	}
+	compressed, err := base64.StdEncoding.DecodeString(encoded[:end])
+	if err != nil {
+		t.Fatalf("decode compressed WSL run script: %v", err)
+	}
+	reader := flate.NewReader(bytes.NewReader(compressed))
+	defer reader.Close()
+	script, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("decompress WSL run script: %v", err)
+	}
+	return string(script)
+}
+
+func TestWindowsGatewayRuntimeIdentityIsLoweredBeforeExecution(t *testing.T) {
+	job := `    steps:
+      - name: Start gateway
+        run: docker run --name awmg-mcpg-${{ env.GH_AW_RUNTIME_ID }} --label gh-aw.runtime-id=${{ env.GH_AW_RUNTIME_ID }} image
+`
+	rendered := renderStepForRunner(job, "runs-on: windows-latest", "agent")
+	script := decodeWindowsWSLRunScript(t, rendered)
+	assert.Contains(t, script, "awmg-mcpg-${{ env.GH_AW_RUNTIME_ID }}")
+	assert.Contains(t, rendered, "$scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)")
 }
 
 func TestWindowsPrivateRuntimeEnvironment(t *testing.T) {

@@ -729,10 +729,14 @@ func appendLegacyHostPortsArgs(workflowData *WorkflowData, firewallConfig *Firew
 	if awfSupportsAllowHostPorts(firewallConfig) {
 		hostPortsValue := joinPorts(hostPorts)
 		if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.MCP != nil && workflowData.SandboxConfig.MCP.AutoPort {
-			parts := strings.Split(hostPortsValue, ",")
-			for i, port := range parts {
-				if port == strconv.Itoa(int(DefaultMCPGatewayPort)) {
-					parts[i] = "${{ env.GH_AW_MCP_GATEWAY_PORT }}"
+			parts := make([]string, 0, len(hostPorts)+1)
+			for _, port := range hostPorts {
+				if port != int(DefaultMCPGatewayPort) {
+					parts = append(parts, strconv.Itoa(port))
+				} else if agentConfig != nil && slices.Contains(agentConfig.AllowHostPorts, port) {
+					parts = append(parts, strconv.Itoa(port), "${{ env.GH_AW_MCP_GATEWAY_PORT }}")
+				} else {
+					parts = append(parts, "${{ env.GH_AW_MCP_GATEWAY_PORT }}")
 				}
 			}
 			hostPortsValue = strings.Join(parts, ",")

@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const os = require("os");
+const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
@@ -21,7 +22,7 @@ function patchAWFChrootConfig(options = {}) {
 
   const binariesSourcePath = options.binariesSourcePath || process.env.GH_AW_CHROOT_BINARIES_SOURCE_PATH || require("./runtime_paths.cjs").runtimeRoot();
   const identityHome = options.identityHome || process.env.GH_AW_CHROOT_IDENTITY_HOME || require("./runtime_paths.cjs").runtimePath("home");
-  const configPath = process.env.GH_AW_AWF_CONFIG_PATH || require("./runtime_paths.cjs").runtimePath("awf-config.json");
+  const configPath = process.env.GH_AW_AWF_CONFIG_PATH || path.join(runnerTemp, "gh-aw", "awf-config.json");
   const artifactConfigPath = require("./runtime_paths.cjs").runtimePath("awf-config.json");
   let config;
   try {

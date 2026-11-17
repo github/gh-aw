@@ -516,6 +516,7 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 	if payloadDir != "" {
 		containerCmd.WriteString(" -v " + payloadDir + ":" + payloadDir + ":rw")
 	}
+	containerCmd.WriteString(" -v ${GH_AW_RUNTIME_DIR:?}/mcp-logs:${GH_AW_RUNTIME_DIR:?}/mcp-logs:rw")
 	if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
 		// Protected, persistent mount for mcpg delegation controller state so that it
 		// survives an in-run restart; restricted to owner-only permissions on the host.
@@ -641,6 +642,7 @@ func buildMCPGatewayAllowedMountRoots(tools map[string]any, gatewayConfig *MCPGa
 	addRoot("${GITHUB_WORKSPACE}", "rw")
 	addRoot(constants.GhAwRootDirShell, "ro")
 	addRoot(constants.GhAwRootDirShell+"/safeoutputs", "rw")
+	addRoot("${GH_AW_RUNTIME_DIR}", "rw")
 	addRoot("/tmp", "rw")
 	addRoot(constants.GhCLIPath, "ro")
 

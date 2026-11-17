@@ -613,11 +613,14 @@ func windowsWSLScriptSetup(encodedScript string) []string {
 		"try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }",
 		"if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }",
 		"if ($env:GH_AW_RUNTIME_DIR) {",
+		"  if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }",
 		"  $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()",
 		"  if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }",
 		// Lower before Bash parses the script so quoted JSON and heredocs receive
 		// the same Linux path as shell arguments, not a literal variable reference.
 		"  $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)",
+		"  $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'",
+		"  $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)",
 		"}",
 		"$scriptContent = 'unset GH_AW_NODE_BIN; export PATH=\"/usr/local/lib/nodejs/current/bin:$PATH\"; cd \"$GH_AW_WSL_WORKING_DIRECTORY\"' + \"`n\" + $scriptContent",
 		"$scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }",

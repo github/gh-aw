@@ -20,10 +20,11 @@ function assertNoSecrets(value, env = process.env) {
 }
 
 function configuration(root) {
-  const files = JSON.parse(process.env.GH_AW_DURABLE_FILES || "[]");
+  const declaredFiles = JSON.parse(process.env.GH_AW_DURABLE_FILES || "[]");
   const bundle = path.join(root, "durable/bundle");
-  if (!Array.isArray(files) || !files.length || !process.env.GH_AW_DURABLE_ENGINE) throw new Error("Durable execution requires engine-declared files");
-  for (const [index, file] of files.entries()) {
+  if (!Array.isArray(declaredFiles) || !declaredFiles.length || !process.env.GH_AW_DURABLE_ENGINE) throw new Error("Durable execution requires engine-declared files");
+  const files = [];
+  for (const [index, file] of declaredFiles.entries()) {
     if (
       typeof file !== "string" ||
       !file.startsWith(root + path.sep) ||
@@ -35,8 +36,9 @@ function configuration(root) {
     ) {
       throw new Error("Unsafe or overlapping durable file declaration");
     }
+    files.push(path.relative(root, file));
   }
-  return { files, bundle, engine: process.env.GH_AW_DURABLE_ENGINE };
+  return { files, paths: declaredFiles, bundle, engine: process.env.GH_AW_DURABLE_ENGINE };
 }
 
 function noSymlinks(file, root) {
@@ -89,7 +91,7 @@ function stageFiles({ core, root = require("./runtime_paths.cjs").runtimePath("a
     core.info("The engine did not produce durable session files");
     return;
   }
-  fs.writeFileSync(path.join(bundle, "manifest.json"), JSON.stringify({ version: 2, engine, files, entries }) + "\n", { mode: 0o600 });
+  fs.writeFileSync(path.join(bundle, "manifest.json"), JSON.stringify({ version: 3, engine, files, entries }) + "\n", { mode: 0o600 });
   core.setOutput("present", "true");
 }
 
@@ -99,7 +101,7 @@ function readBundle(root) {
   const manifestFile = path.join(config.bundle, "manifest.json");
   if (!fs.lstatSync(manifestFile).isFile()) throw new Error("Durable artifact manifest must be a regular file");
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
-  if (manifest.version !== 2 || manifest.engine !== config.engine || !isDeepStrictEqual(manifest.files, config.files) || !Array.isArray(manifest.entries) || !manifest.entries.length) {
+  if (manifest.version !== 3 || manifest.engine !== config.engine || !isDeepStrictEqual(manifest.files, config.files) || !Array.isArray(manifest.entries) || !manifest.entries.length) {
     throw new Error("Durable artifact is incompatible with the engine's declared files");
   }
   const entries = new Map();
@@ -130,10 +132,10 @@ function readBundle(root) {
 
 /** Validate every file before copying any untrusted artifact content. */
 function restoreFiles({ core, root = require("./runtime_paths.cjs").runtimePath("agent") }) {
-  const { files, entries } = readBundle(root);
+  const { paths, entries } = readBundle(root);
   const targets = [...entries.entries()].map(([relative, entry]) => {
     const [index, ...suffix] = relative.split("/");
-    const target = path.join(files[Number(index)], ...suffix);
+    const target = path.join(paths[Number(index)], ...suffix);
     noSymlinks(target, root);
     if (fs.existsSync(target) && !fs.lstatSync(target).isFile()) throw new Error("Durable restore destination must be a regular file");
     return { bytes: entry.bytes, target };

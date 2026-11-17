@@ -81,7 +81,7 @@ for i in $(seq 1 30); do
   if [ -f "$PROXY_LOG_DIR/proxy-tls/ca.crt" ]; then
     if curl -sf --cacert "$PROXY_LOG_DIR/proxy-tls/ca.crt" "https://localhost:${PROXY_PORT}/api/v3/health" -o /dev/null 2>/dev/null; then
       echo "DIFC proxy ready on port ${PROXY_PORT}"
-      git config --local "http.https://localhost:${PROXY_PORT}/.sslCAInfo" "$PROXY_LOG_DIR/proxy-tls/ca.crt"
+      git config --local "http.https://localhost:${PROXY_PORT}/.sslCAInfo" "$PROXY_LOG_DIR/proxy-tls/ca.crt" || true
       git remote add proxy "https://localhost:${PROXY_PORT}/${GITHUB_REPOSITORY}.git" || true
       PROXY_READY=true
       break

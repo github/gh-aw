@@ -31,9 +31,9 @@ func TestResolveRuntimeStepPaths(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, got, resolveRuntimeStepPaths(got), "lowering must be idempotent")
 			spans, err := actionslanguageservice.ExtractExpressions(got)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			for _, span := range spans {
-				assert.NoError(t, actionslanguageservice.ValidateExpression(span.Content))
+				require.NoError(t, actionslanguageservice.ValidateExpression(span.Content))
 			}
 		})
 	}
@@ -50,7 +50,7 @@ func TestResolveJobRuntimePaths(t *testing.T) {
 				"      - run: cat '/tmp/gh-aw/awf-config.json'\n",
 			},
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 	compiler.resolveJobRuntimePaths()
 	for _, job := range compiler.jobManager.GetAllJobs() {

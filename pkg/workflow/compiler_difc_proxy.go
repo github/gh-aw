@@ -333,7 +333,10 @@ func proxyEnvVars() map[string]string {
 		"GH_REPO":             "${{ github.repository }}",
 		"GITHUB_API_URL":      "https://localhost:${{ env.GH_AW_CLI_PROXY_PORT }}/api/v3",
 		"GITHUB_GRAPHQL_URL":  "https://localhost:${{ env.GH_AW_CLI_PROXY_PORT }}/api/graphql",
+		"CURL_CA_BUNDLE":      constants.TmpProxyTLSCACert,
+		"GIT_SSL_CAINFO":      constants.TmpProxyTLSCACert,
 		"NODE_EXTRA_CA_CERTS": constants.TmpProxyTLSCACert,
+		"SSL_CERT_FILE":       constants.TmpProxyTLSCACert,
 	}
 }
 

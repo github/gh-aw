@@ -20,12 +20,12 @@ const defaultCodeCoverageWaitForProcessingTimeout = 160
 // codeCoverageStagingDirExpr is the GitHub Actions expression form of the staging directory
 // where the agent stages the coverage report file before calling the upload_code_coverage tool.
 // actions/upload-artifact and actions/download-artifact do not expand shell variables in
-// their `path:` inputs, so we must use ${{ runner.temp }} here (mirrors artifactStagingDirExpr).
-const codeCoverageStagingDirExpr = "${{ runner.temp }}/gh-aw/safeoutputs/upload-code-coverage/"
+// their `path:` inputs, so use the job's private runtime expression.
+const codeCoverageStagingDirExpr = "${{ env.GH_AW_RUNTIME_DIR }}/safeoutputs/upload-code-coverage/"
 
 // codeCoverageDownloadPath is the location where the upload_code_coverage job
 // downloads the staging artifact before invoking actions/upload-code-coverage.
-const codeCoverageDownloadPath = "/tmp/gh-aw/upload-code-coverage/"
+const codeCoverageDownloadPath = "${{ env.GH_AW_RUNTIME_DIR }}/safeoutputs/upload-code-coverage/"
 
 // SafeOutputsUploadCodeCoverageStagingArtifactName is the artifact that carries the staging
 // directory (containing the staged coverage report file) from the agent job to the

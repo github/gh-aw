@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
@@ -52,7 +53,7 @@ func resolveRuntimeExpression(expression string) string {
 	if err != nil {
 		return expression
 	}
-	for i := len(tokens) - 1; i >= 0; i-- {
+	for i := range slices.Backward(tokens) {
 		token := tokens[i]
 		if token.Kind != "string" {
 			continue

@@ -573,7 +573,7 @@ const WorkQueueAuthorizationPath = TmpGhAwDir + "/work-queue.authorizations.json
 const WorkQueueDeliveryReceiptPath = TmpGhAwDir + "/work-queue.deliveries.json"
 const WorkQueueIntentPath = TmpGhAwDir + "/work-queue.intents.jsonl"
 const WorkQueueClaimArtifactsPath = TmpGhAwDir + "/claims"
-const WorkQueueFinishIntentDir = GhAwRootDirShell + "/safeoutputs/work-queue"
+const WorkQueueFinishIntentDir = TmpGhAwDir + "/safeoutputs/work-queue"
 const WorkQueueFinishIntentMount = WorkQueueFinishIntentDir + ":" + WorkQueueFinishIntentDir + ":rw"
 
 // WorkQueueSnapshotMount exposes the activation snapshot read-only to the queue MCP server.
