@@ -16,6 +16,8 @@ import (
 )
 
 func TestConnectorsValidateCLI(t *testing.T) {
+	t.Parallel()
+
 	directory := t.TempDir()
 	name := "gh-aw"
 	if runtime.GOOS == "windows" {
@@ -59,6 +61,8 @@ func TestConnectorsValidateCLI(t *testing.T) {
 		{name: "requires files", fail: true, messages: []string{"requires at least 1 arg"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			args := append([]string{"connectors", "validate"}, test.args...)
 			command := exec.CommandContext(t.Context(), binary, args...)
 			command.Dir = directory
