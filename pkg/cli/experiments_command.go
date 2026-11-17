@@ -182,11 +182,6 @@ func RunExperimentsList(config ExperimentsListConfig) error {
 	return nil
 }
 
-// RunExperimentsAnalyze analyzes a specific experiment branch.
-func RunExperimentsAnalyze(config ExperimentsAnalyzeConfig) error {
-	return runExperimentsAnalyze(context.Background(), config)
-}
-
 func runExperimentsAnalyze(ctx context.Context, config ExperimentsAnalyzeConfig) error {
 	experimentsLog.Printf("Analyzing experiment: name=%s, repo=%s, json=%v",
 		config.ExperimentName, config.RepoOverride, config.JSONOutput)

@@ -59,7 +59,7 @@ esac
 		require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(manifest), 0o600))
 		runs = append(runs, ProcessedRun{Run: WorkflowRun{Attempt: 1, DatabaseID: int64(i + 1), Repository: "acme/repo", LogsPath: dir}})
 	}
-	reports, err := collectLogsOutcomes(context.Background(), runs, "", false)
+	reports, err := collectLogsLifecycles(context.Background(), runs, "", false, true)
 	require.NoError(t, err)
 	require.Len(t, reports, 2)
 	for _, report := range reports {
@@ -73,7 +73,7 @@ esac
 	assert.Len(t, outcomeAPICalls(t, calls), 5, "resource, actor permission, comments, reviews, and commits are each read once")
 
 	require.NoError(t, os.WriteFile(response, []byte(`{"html_url":"https://github.com/acme/repo/pull/42","state":"closed","merged":false,"closed_at":"2026-10-05T00:00:00Z","closed_by":{"login":"alice","type":"User"},"labels":[]}`), 0o600))
-	reports, err = collectLogsOutcomes(context.Background(), runs, "", false)
+	reports, err = collectLogsLifecycles(context.Background(), runs, "", false, true)
 	require.NoError(t, err)
 	assert.Equal(t, OutcomeStatusRejected, reports[0].Items[0].OutcomeStatus)
 	assert.Len(t, outcomeAPICalls(t, calls), 10, "later collections must check current state again")
@@ -110,9 +110,9 @@ esac
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename),
 		[]byte("{\"type\":\"create_issue\",\"number\":42,\"timestamp\":\"2026-10-01T00:00:00Z\"}\n"), 0o600))
-	reports, err := collectLogsOutcomes(context.Background(), []ProcessedRun{{
+	reports, err := collectLogsLifecycles(context.Background(), []ProcessedRun{{
 		Run: WorkflowRun{Attempt: 1, DatabaseID: 1, Repository: "acme/repo", LogsPath: dir},
-	}}, "", false)
+	}}, "", false, true)
 	require.NoError(t, err)
 	require.Len(t, reports, 1)
 	assert.Equal(t, 1, reports[0].Summary.Accepted)

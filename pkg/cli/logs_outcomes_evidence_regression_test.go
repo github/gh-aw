@@ -97,7 +97,7 @@ func TestEpisodeOutcomeCompactAssignmentEvidence(t *testing.T) {
 	data, err := retrieveCachedEpisodeLogs(context.Background(), options, request)
 	require.NoError(t, err)
 	require.Len(t, data.Runs, 1)
-	require.NoError(t, collectEpisodeOutcomes(context.Background(), &data, "", false))
+	require.NoError(t, collectEpisodeLifecycles(context.Background(), &data, "", false, true))
 	require.Len(t, data.Outcomes, 1)
 	require.Len(t, data.Outcomes[0].Items, 1)
 	assert.Equal(t, OutcomeStatusAccepted, data.Outcomes[0].Items[0].OutcomeStatus)

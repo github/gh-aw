@@ -65,10 +65,6 @@ func logsOutcomeArtifactSets(sets []string, outcomes bool) []string {
 	return append(slices.Clone(sets), string(ArtifactSetOutcomes))
 }
 
-func collectLogsOutcomes(ctx context.Context, runs []ProcessedRun, dir string, verbose bool) ([]OutcomesData, error) {
-	return collectLogsLifecycles(ctx, runs, dir, verbose, true)
-}
-
 func collectLogsLifecycles(ctx context.Context, runs []ProcessedRun, dir string, verbose, live bool, caches ...*cachedLogsJSONLCache) ([]OutcomesData, error) {
 	ctx = withOutcomeAPICache(ctx)
 	if len(caches) > 0 && caches[0] != nil { //nolint:uncheckedsliceindex // The length guard protects the optional first cache.
@@ -295,10 +291,6 @@ func readLogsOutcomeManifest(path string) (items []CreatedItemReport, returnErr 
 		}
 	}()
 	return decodeLogsOutcomeItems(file)
-}
-
-func collectEpisodeOutcomes(ctx context.Context, data *LogsData, outcomesDir string, verbose bool) error {
-	return collectEpisodeLifecycles(ctx, data, outcomesDir, verbose, true)
 }
 
 func collectEpisodeLifecycles(ctx context.Context, data *LogsData, outcomesDir string, verbose, live bool) error {
