@@ -91,6 +91,57 @@ This is a test workflow.
 	}
 }
 
+func TestCompileWorkflowRejectsUnsupportedGitHubAccessControlFromImport(t *testing.T) {
+	tests := []struct {
+		name          string
+		field         string
+		configuration string
+	}{
+		{name: "roles", field: "roles", configuration: "roles: [write]"},
+		{name: "private-repos", field: "private-repos", configuration: "private-repos: false"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := testutil.TempDir(t, "test-unsupported-github-import-*")
+
+			sharedToolPath := filepath.Join(tempDir, "shared-tool.md")
+			sharedToolContent := "---\ntools:\n  github:\n    " + tt.configuration + "\n---\n"
+			if err := os.WriteFile(sharedToolPath, []byte(sharedToolContent), 0644); err != nil {
+				t.Fatalf("Failed to write shared tool file: %v", err)
+			}
+
+			workflowPath := filepath.Join(tempDir, "test-workflow.md")
+			workflowContent := `---
+on: issues
+permissions:
+  contents: read
+  issues: read
+engine: copilot
+strict: false
+imports:
+  - shared-tool.md
+---
+
+# Test Workflow
+
+This workflow imports shared GitHub tool configuration.
+`
+			if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+				t.Fatalf("Failed to write workflow file: %v", err)
+			}
+
+			err := workflow.NewCompiler().CompileWorkflow(workflowPath)
+			if err == nil {
+				t.Fatal("Expected compilation to reject unsupported GitHub access-control fields")
+			}
+			if !strings.Contains(err.Error(), "'tools.github."+tt.field+"' is not supported by the local compiler") {
+				t.Fatalf("Expected unsupported access-control validation error, got: %v", err)
+			}
+		})
+	}
+}
+
 func TestCompileWorkflowWithMultipleImports(t *testing.T) {
 	// Create a temporary directory for test files
 	tempDir := testutil.TempDir(t, "test-*")

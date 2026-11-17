@@ -116,17 +116,18 @@ To add a fixture covering a specific compliance scenario:
 2. Name the fixture descriptively (e.g., `run_summary_zero_aic.json` for T-FC-022).
 3. Document the fixture purpose and the test IDs it covers in this README.
 
-### Available Additional Fixtures
+### Available Fixtures
 
 | Fixture Name | Purpose | Test IDs |
 |---|---|---|
+| `run_summary_minimal.json` | Baseline successful run used by Monte Carlo engine compliance tests | T-FC-031–T-FC-040 |
 | `run_summary_zero_aic.json` | Run with missing/zero AIC (artifact not downloaded) | [T-FC-022](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
 | `run_summary_failed.json` | Run with `conclusion: "failure"` for Bernoulli sampling | [T-FC-035](../../docs/src/content/docs/specs/forecast-specification.md#1214-monte-carlo-engine-tests) |
 | `run_summary_high_aic.json` | Run with very high AIC (≥ 1,000,000) for overflow checks | [T-AIC-006](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
 | `run_summary_cancelled.json` | Run with `conclusion: "cancelled"` (included in sample but not a Bernoulli success; AIC is zero because the run did not complete) | [T-FC-035](../../docs/src/content/docs/specs/forecast-specification.md#1214-monte-carlo-engine-tests) |
 | `run_summary_partial_aic.json` | In-progress run with a non-zero token usage snapshot | [T-FC-024](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
 
-Sync note: `T-FC-022`, `T-FC-024`, `T-FC-035`, and `T-AIC-006` still point to the canonical forecast specification anchors for §12.1.3 Data Sampling Tests and §12.1.4 Monte Carlo Engine Tests. Their fixture assertions are covered by `TestMonteCarloFixtureVariantsAreAvailable` in `pkg/cli/forecast_montecarlo_test.go`, alongside the `TestForecast*` command-path coverage in `pkg/cli/forecast_test.go`. `TestFormal_ForecastSpecSyncNoteAnchorsExist` in `pkg/cli/forecast_compliance_fixtures_formal_test.go` mechanically fails if either anchor heading moves or is renamed in `forecast-specification.md`, so this note no longer needs manual re-dating.
+Sync note (2026-11-16): the table lists the six `run_summary_*.json` fixtures in this directory. `TestFormal_FixtureCountConsistency` verifies the README table, on-disk files, and test inventory match. `T-FC-022`, `T-FC-024`, `T-FC-035`, and `T-AIC-006` point to the canonical forecast specification anchors for §12.1.3 Data Sampling Tests and §12.1.4 Monte Carlo Engine Tests; `TestFormal_ForecastSpecSyncNoteAnchorsExist` verifies those headings remain present.
 
 ## Norms
 

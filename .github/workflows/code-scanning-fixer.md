@@ -6,6 +6,24 @@ description: Automatically fixes code scanning alerts by creating pull requests 
 on:
   schedule: every 6h
   workflow_dispatch:
+    inputs:
+      level:
+        description: Routing level for a manual run
+        type: choice
+        options: [router/economy, router/balanced, router/robust]
+        default: router/balanced
+  steps:
+    # Scheduled runs have no inputs and keep balanced.
+    - id: pick-level
+      env:
+        LEVEL: ${{ inputs.level }}
+      run: echo "level=${LEVEL:-router/balanced}" >> "$GITHUB_OUTPUT"
+jobs:
+  pre-activation:
+    outputs:
+      level: ${{ steps.pick-level.outputs.level }}
+concurrency:
+  job-discriminator: ${{ github.run_id }}
 max-daily-ai-credits: 10000
 permissions:
   contents: read
@@ -21,9 +39,7 @@ network:
 engine:
   id: copilot
   copilot-sdk: true
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: ${{ needs.pre_activation.outputs.level }}
 max-tool-denials: 3
 imports:
   - shared/reporting.md
