@@ -250,23 +250,22 @@
   body.light .ecu-copy h2::before { background: linear-gradient(#d0d7de, #0969da 35%, #8250df 65%, #d0d7de); opacity: .6; }
   body.light .ecu-src { color: #57606a; }
   body.light .ecu-src i { color: #1f2328; }
-  .active .ecu-copy > .kicker, .active .ecu-s:first-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
-  .active .ecu-copy h2::before { animation: ecu-rail 1.2s cubic-bezier(.2,.9,.25,1) both .2s; }
-  .active .ecu-on { animation: ecu-pop 1s cubic-bezier(.2,1.3,.3,1) both .45s; }
-  .active .ecu-on .ecu-t { animation: ecu-shine 4s linear infinite 1.5s; }
-  .active .ecu-on .ecu-ring { animation: ecu-ping 2.4s ease-out infinite 1.4s; }
-  .active .ecu-s:last-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both .9s; }
-  .active .ecu-src { animation: ecu-fade .8s ease both 1.5s; }
+  /* gravity easing: elements drop in from above (ease-in) and fall away below on leave */
+  .active .ecu-copy > .kicker, .active .ecu-s, .active .ecu-src { animation: ecu-drop .6s cubic-bezier(.55,0,1,.45) both; }
+  .active .ecu-s:nth-child(2) { animation-delay: .1s; }
+  .active .ecu-s:nth-child(3), .active .ecu-src { animation-delay: .2s; }
+  .active .ecu-copy h2::before { animation: ecu-rail .6s cubic-bezier(.55,0,1,.45) both .1s; }
+  .active .ecu-on .ecu-t { animation: ecu-shine 4s linear infinite 1s; }
+  .active .ecu-on .ecu-ring { animation: ecu-ping 2.4s ease-out infinite 1s; }
+  @keyframes ecu-drop { from { opacity: 0; transform: translateY(-120px); } }
   @keyframes ecu-rail { from { transform: scaleY(0); } }
-  @keyframes ecu-pop { from { opacity: 0; transform: translateX(-60px) scale(.6); } }
   @keyframes ecu-ping { 0% { opacity: .9; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(1.45); } }
-  @keyframes ecu-fade { from { opacity: 0; transform: translateY(20px); } }
   @keyframes ecu-shine { to { background-position: 300% 0; } }
   .slide.ecu.up-in, .slide.ecu.down-in, .slide.ecu.leaving { animation: none; }
   .slide.ecu.fadeout { opacity: 1; }
-  .ecu:is(.fadeout, .leaving) .ecu-copy > .kicker, .ecu:is(.fadeout, .leaving) .ecu-s:not(.ecu-on) { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
-  .ecu:is(.fadeout, .leaving) .ecu-on, .ecu:is(.fadeout, .leaving) .ecu-src, .ecu:is(.fadeout, .leaving) .ecu-copy h2::before { animation: ecu-out .5s cubic-bezier(.6,0,.85,.3) both !important; }
-  @keyframes ecu-out { to { opacity: 0; transform: scale(.6); } }
+  .ecu:is(.fadeout, .leaving) :is(.ecu-copy > .kicker, .ecu-s, .ecu-src) { animation: ecu-fall .45s cubic-bezier(.55,0,1,.45) both !important; }
+  .ecu:is(.fadeout, .leaving) .ecu-copy h2::before { animation: ecu-fall .45s cubic-bezier(.55,0,1,.45) both !important; }
+  @keyframes ecu-fall { to { opacity: 0; transform: translateY(160px); } }
   .tp { display: grid; place-items: center; }
   .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
   .tp-copy h2 { margin: 0; font-variation-settings: "wght" 520, "wdth" 100; letter-spacing: -.02em; }
