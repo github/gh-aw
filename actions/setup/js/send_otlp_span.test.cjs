@@ -17,6 +17,7 @@ beforeEach(() => {
   const files = new Map();
   let nextFd = -100;
   vi.spyOn(fs, "openSync").mockImplementation((file, flags, mode) => {
+    if (String(file) === "/tmp/gh-aw/otel-metrics.jsonl") return nextFd--;
     if (!vi.isMockFunction(fs.readFileSync)) return originalOpenSync(file, flags, mode);
     const content = Buffer.from(fs.readFileSync(file, "utf8"));
     const fd = nextFd--;
