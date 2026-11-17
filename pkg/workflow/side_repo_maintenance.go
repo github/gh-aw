@@ -274,6 +274,7 @@ func generateSideRepoMaintenanceWorkflow(
 	if err != nil {
 		return fmt.Errorf("failed to finalize side-repo maintenance workflow YAML: %w", err)
 	}
+	content += opts.repoConfig.issueLabelEnvYAML()
 	if opts.repoConfig != nil {
 		content, err = mapPinnedUsesInYAML(content, opts.repoConfig.ActionPins, opts.repoConfig.ActionPinPrefixes, opts.pinWarnings, opts.resolver)
 		if err != nil {
@@ -680,7 +681,7 @@ func buildActivityReportIssueStep(renderCtx sideRepoMaintenanceRenderContext) st
               repo,
               title: '[aw] agentic status report',
               body,
-              labels: ['agentic-workflows'],
+              labels: [process.env.GH_AW_ISSUE_LABEL || 'agentic-workflows'],
             });
             core.info('Created issue #' + createdIssue.data.number + ': ' + createdIssue.data.html_url);
 `

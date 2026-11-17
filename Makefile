@@ -1311,6 +1311,12 @@ test-docs-remark:
 	@node docs/src/lib/remark/inlineMarkdownInHtml.test.js
 	@echo "✓ Docs remark plugin unit tests passed"
 
+.PHONY: test-docs-redirect-fragments
+test-docs-redirect-fragments:
+	@echo "Running docs redirect fragment unit tests..."
+	@cd docs && node --test src/lib/redirect-fragments.test.js
+	@echo "✓ Docs redirect fragment unit tests passed"
+
 .PHONY: test-docs-wizard-model
 test-docs-wizard-model:
 	@echo "Running AW wizard data model unit tests..."
