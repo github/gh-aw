@@ -141,7 +141,7 @@
   .cao-step b { font-size: 40px; font-variation-settings: "wght" 700, "wdth" 100; }
   .cao-step span { font-size: 22px; color: #9198a1; line-height: 1.35; }
   .cao-canvas { position: absolute; left: 700px; top: 262px; width: 1180px; height: 690px; }
-  .psd .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8, #f778ba); }
+  .psd { --lg: #d2a8ff; }
   .psd-tag { position: absolute; left: 110px; top: 300px; font-size: 30px; color: #9198a1; }
   .psd-tag b { color: #f0f6fc; }
   .psd-task { position: absolute; left: 110px; top: 380px; width: 520px; padding: 26px 30px; box-sizing: border-box; background: #161b22e6; border: 1px solid #3d444d; border-radius: 18px; opacity: 0; }
@@ -154,7 +154,7 @@
   .psd-lb span { font: 500 16px/1 var(--mono); padding: 6px 12px; border-radius: 999px; border: 1px solid #3d444d; color: #9198a1; }
   .psd-sq { margin-top: 20px; padding-top: 16px; border-top: 1px dashed #3d444d; }
   .psd-sq > i { display: block; font: 600 15px/1 var(--mono); letter-spacing: .14em; color: #9198a1; font-style: normal; margin-bottom: 8px; }
-  .psd-sq > i b { color: #f778ba; }
+  .psd-sq > i b { color: #d2a8ff; }
   .psd-m { display: grid; grid-template-columns: 40px 1fr; column-gap: 14px; align-items: center; padding: 6px 0; opacity: .35; transition: opacity .4s; }
   .psd-m.on { opacity: 1; }
   .psd-m em { grid-row: span 2; width: 40px; height: 40px; border-radius: 50%; background: var(--c); display: grid; place-items: center; font: 800 20px/1 "Mona Sans"; color: #0d1117; font-style: normal; }
@@ -163,19 +163,19 @@
   .psd-arrow { position: absolute; left: 650px; top: 590px; width: 150px; text-align: center; font: 600 20px/1 var(--mono); color: #656c76; transition: color .4s; }
   .psd-arrow svg { display: block; width: 150px; height: 40px; margin: 6px 0; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
   .psd-arrow small { font-size: 16px; }
-  .psd-arrow.on { color: #f778ba; }
-  .psd-pkg { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 14px; background: #f778ba; box-shadow: 0 0 30px #f778ba; opacity: 0; display: grid; place-items: center; font: 800 13px/1 var(--mono); color: #0d1117; z-index: 2; }
+  .psd-arrow.on { color: #d2a8ff; }
+  .psd-pkg { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 14px; background: #d2a8ff; box-shadow: 0 0 30px #d2a8ff55; opacity: 0; display: grid; place-items: center; font: 800 13px/1 var(--mono); color: #0d1117; z-index: 2; }
   .psd-repo { position: absolute; left: 820px; top: 380px; width: 990px; height: 560px; background: #0d1117e6; border: 1px solid #3d444d; border-radius: 18px; overflow: hidden; opacity: 0; }
   .active .psd-repo { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
   .psd-rh { display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid #3d444d; font: 600 20px/1 var(--mono); color: #f0f6fc; background: #161b22; }
   .psd-rh svg { width: 22px; height: 22px; fill: #9198a1; }
   .psd-rh span { margin-left: auto; color: #9198a1; font-size: 16px; transition: color .4s; }
-  .psd-rh span.on { color: #f778ba; }
+  .psd-rh span.on { color: #d2a8ff; }
   .psd-files { position: absolute; left: 24px; top: 84px; width: 290px; font: 500 18px/1 var(--mono); }
   .psd-f { padding: 8px 10px; border-radius: 8px; color: #9198a1; white-space: nowrap; transition: opacity .4s, transform .4s, color .4s, background .4s; }
-  .psd-f.sq { opacity: 0; transform: translateX(-12px); color: #f778ba; }
+  .psd-f.sq { opacity: 0; transform: translateX(-12px); color: #d2a8ff; }
   .psd-f.sq.in { opacity: 1; transform: none; }
-  .psd-f.hot { background: #f778ba22; }
+  .psd-f.hot { background: #ab7df822; }
   .psd-f.sq.gone { opacity: .25; text-decoration: line-through; }
   .psd-f.sq.kept { color: #3fb950; background: #3fb95018; }
   .psd-f.new { color: #4493f8; }
@@ -188,7 +188,7 @@
   .psd-ag.up, .psd-dev { opacity: 1; }
   .psd-ag.up.out { opacity: .12; }
   .psd-ag circle, .psd-dev circle { fill: #161b22; stroke: var(--c); stroke-width: 3; transition: fill .3s, filter .3s; }
-  .psd-ag.on circle, .psd-dev.on circle { fill: color-mix(in srgb, var(--c) 30%, #161b22); filter: drop-shadow(0 0 14px var(--c)); }
+  .psd-ag.on circle, .psd-dev.on circle { fill: color-mix(in srgb, var(--c) 30%, #161b22); filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c) 33%, transparent)); }
   .psd-ring text { fill: #f0f6fc; font: 700 18px "Mona Sans"; text-anchor: middle; }
   .psd-ring .psd-in { fill: var(--c); font-size: 28px; }
   .psd-todo { position: absolute; left: 680px; top: 84px; width: 290px; }
@@ -198,13 +198,13 @@
   .psd-t b { font-size: 21px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
   .psd-t span { font: 500 15px/1.3 var(--mono); color: var(--c); }
   .psd-t.doing, .psd-t.done { opacity: 1; }
-  .psd-t.doing s { border-color: var(--c); box-shadow: 0 0 12px var(--c); }
+  .psd-t.doing s { border-color: var(--c); box-shadow: 0 0 12px color-mix(in srgb, var(--c) 33%, transparent); }
   .psd-t.done s { background: var(--c); border-color: var(--c); }
   .psd-t.done s::after { content: "✓"; }
   .psd-pr { position: absolute; right: 28px; bottom: 24px; white-space: nowrap; display: flex; gap: 10px; align-items: center; font: 600 18px/1 var(--mono); padding: 10px 16px; border-radius: 999px; border: 1px solid #3d444d; color: #9198a1; opacity: 0; transition: all .4s; }
   .psd-pr svg { width: 18px; height: 18px; fill: currentColor; }
   .psd-pr.draft { opacity: 1; }
-  .psd-pr.merged { opacity: 1; background: #3fb950; border-color: #3fb950; color: #0d1117; box-shadow: 0 0 24px #3fb95080; }
+  .psd-pr.merged { opacity: 1; background: #3fb950; border-color: #3fb950; color: #0d1117; box-shadow: 0 0 24px #3fb95055; }
   .fm-quote { position: absolute; left: 114px; top: 318px; width: 600px; font: 700 44px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; opacity: 0; }
   .fm-quote em { font-style: normal; color: #79c0ff; }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
@@ -2454,8 +2454,7 @@
   .active .ae-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.1s; }
 
   /* --- connectors --- */
-  .cn { --r: #3fb950; --w: #ab7df8; }
-  .cn .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #ab7df8, #79c0ff); }
+  .cn { --r: #79c0ff; --w: #ffa657; --lg: #79c0ff; }
   .cn-col { position: absolute; top: 290px; opacity: 0; }
   .active .cn-col { animation: rise .8s cubic-bezier(.2,.9,.2,1) both var(--d); }
   .cn-col b { display: flex; align-items: center; gap: 14px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
@@ -2480,19 +2479,19 @@
   .cn-chip { padding: 6px 11px; border-radius: 99px; border: 1.5px solid #3d444d; font: 500 14px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .35s calc(var(--i, 0) * .15s); }
   .cn-chip.more { border-style: dashed; }
   .cn-chip.r { --k: var(--r); } .cn-chip.w { --k: var(--w); }
-  .lit .cn-chip.pick { color: var(--k); border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); box-shadow: 0 0 22px -6px var(--k); }
+  .lit .cn-chip.pick { color: var(--k); border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); box-shadow: 0 0 22px -6px color-mix(in srgb, var(--k) 33%, transparent); }
   .lit .cn-chip.pick::before { content: "✓ "; }
   .cn-code { padding: 12px 0 16px; font: 500 19px/33px var(--mono); }
   .cn-row { display: flex; white-space: pre; }
   .cn-row .no { width: 62px; padding-right: 22px; text-align: right; color: #656c76; flex: none; }
   .cn-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 20%, transparent), transparent 80%); }
-  .cn-v { color: var(--k); text-shadow: 0 0 16px var(--k); }
+  .cn-v { color: var(--k); text-shadow: 0 0 16px color-mix(in srgb, var(--k) 33%, transparent); }
   .cn-rt { position: absolute; left: 1360px; top: 380px; width: 450px; height: 520px; overflow: visible; opacity: 0; }
   .active .cn-rt { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .8s; }
   .cn-rt .box { fill: #0d1117; stroke-width: 2.5; transition: filter .3s; }
   .cn-rt .box.pv { stroke: var(--pc); transition: stroke .4s; }
   .cn-rt .box.ag { stroke: var(--r); } .cn-rt .box.so { stroke: var(--w); }
-  .cn-rt .box.hot { filter: drop-shadow(0 0 16px var(--k)); }
+  .cn-rt .box.hot { filter: drop-shadow(0 0 16px color-mix(in srgb, var(--k) 33%, transparent)); }
   .cn-rt .t { font: 700 26px/1 "Mona Sans"; fill: #f0f6fc; }
   .cn-rt .s { font: 500 15px/1 var(--mono); fill: #9198a1; }
   .cn-rt .m { font: 500 15px/1 var(--mono); }
@@ -2504,7 +2503,7 @@
   .active .cn-cat { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
   .cn-cat small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
   .cn-p { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .4s; }
-  .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px var(--pc); }
+  .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px color-mix(in srgb, var(--pc) 33%, transparent); }
 
   /* --- Imports & reuse: shared components imported by a workflow, merged and hashed into its lock --- */
   .imp { --lg: #d2a8ff; }
@@ -2629,7 +2628,7 @@
   .sir-cap { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .06em; }
 
   /* --- enterprise operations: OpenTelemetry, governance, infrastructure (shared static visuals from ops-visuals.js) --- */
-  .ops .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--oc), #a5d6ff, var(--oc)); }
+  .ops { --lg: #79c0ff; }
   .ops-tag { position: absolute; left: 110px; right: 110px; top: 252px; font: 500 28px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
   .ops-tag b { color: #f0f6fc; font-weight: 700; }
   .active .ops-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
@@ -2656,7 +2655,7 @@
   .ops-facts i { display: block; font: normal 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--oc); }
   .ops-facts span { display: block; margin-top: 10px; font: 500 23px/1.3 "Mona Sans"; color: #c9d1d9; }
   .ops-own { position: absolute; left: 110px; right: 110px; top: 990px; font: 500 21px/1.3 var(--mono); color: #9198a1; opacity: 0; }
-  .ops-own b { color: #d29922; font-weight: 600; }
+  .ops-own b { color: #f0f6fc; font-weight: 600; }
   .active .ops-own { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.3s; }
   /* --- enterprise diagrams: distributed tracing, App permissions, token broker, webhook gateway (shared xsv vocabulary) --- */
   .xsv { position: absolute; left: 110px; top: 290px; width: 1700px; height: 700px; overflow: visible; opacity: 0; }
@@ -2673,16 +2672,13 @@
   .xsv [data-s] { opacity: .2; transition: opacity .45s, filter .45s; }
   .xsv [data-s].x { opacity: 0; }
   .xsv [data-s].on { opacity: 1; }
-  .xsv [data-s].on.now { filter: drop-shadow(0 0 10px var(--hc, #f0f6fc)); }
+  .xsv [data-s].on.now { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--hc, #f0f6fc) 33%, transparent)); }
   .xcap { position: absolute; left: 110px; right: 110px; top: 1006px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font: 500 20px/1.3 var(--mono); color: #9198a1; opacity: 0; }
-  .xcap b { color: #d29922; font-weight: 600; margin-right: 4px; }
+  .xcap b { color: #f0f6fc; font-weight: 600; margin-right: 4px; }
   .xcap span { padding: 6px 12px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font-size: 16px; color: #c9d1d9; white-space: nowrap; }
   .active .xcap { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.2s; }
-  .dtr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #f0883e, #ab7df8, #79c0ff, #f0883e); }
+  .dtr, .gap, .otb, .whg { --lg: #79c0ff; }
   .gap .slide-head h2 { font-size: 100px; }
-  .gap .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #d29922, #ff7b72, #3fb950); }
-  .otb .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #d29922, #79c0ff); }
-  .whg .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #56d4dd, #ab7df8, #f0883e, #56d4dd); }
   .xsv .ttl { transform-box: fill-box; transform-origin: left center; }
   .xsv .mrp-c { fill: #e6edf3; font: 500 22px var(--mono); }
   .xsv .mrp-t { fill: #f0f6fc; font: 700 36px "Mona Sans", sans-serif; }
@@ -2690,8 +2686,7 @@
   .gap .cell.probe rect { stroke: #f0f6fc; stroke-width: 3; }
 
   /* --- enterprise ready --- */
-  .er { --ec: #4493f8; }
-  .er .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #a5d6ff, #d29922, #4493f8); }
+  .er { --ec: #4493f8; --lg: #79c0ff; }
   .er .slide-head h2 { font-size: 96px; }
   .er-tag { position: absolute; left: 110px; right: 110px; top: 250px; font: 500 30px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
   .er-tag b { color: #f0f6fc; font-weight: 700; }
@@ -2701,18 +2696,18 @@
   .er-ed .ae-code { font-size: 21px; line-height: 26px; }
   .er-ed .ae-row { transition: background .4s; }
   .er-ed .ae-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--ec) 24%, transparent), transparent 85%); }
-  .er-ed .ae-row.lit { background: linear-gradient(90deg, #d2992255, transparent 85%); box-shadow: inset 4px 0 0 #d29922; }
+  .er-ed .ae-row.lit { background: linear-gradient(90deg, #4493f840, transparent 85%); box-shadow: inset 4px 0 0 #4493f8; }
   .er-arrow { position: absolute; left: 846px; top: 430px; width: 150px; text-align: center; font: 500 17px/1 var(--mono); color: #9198a1; opacity: 0; }
   .er-arrow svg { display: block; width: 150px; height: 40px; margin-top: 12px; overflow: visible; }
   .er-arrow path { fill: none; stroke: #9198a1; stroke-width: 3; stroke-dasharray: 10 8; animation: ae-flow .8s linear infinite; }
-  .er-arrow small { display: block; margin-top: 10px; white-space: nowrap; font: 600 15px/1 var(--mono); color: #3fb950; letter-spacing: .06em; }
+  .er-arrow small { display: block; margin-top: 10px; white-space: nowrap; font: 600 15px/1 var(--mono); color: #79c0ff; letter-spacing: .06em; }
   .active .er-arrow { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
   .er-card { position: absolute; width: 390px; height: 230px; padding: 24px 26px; border-radius: 20px; background: #161b22e8; border: 2px solid #3d444d; opacity: 0;
     transition: border-color .4s, box-shadow .4s, background .4s; }
   .active .er-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(.5s + var(--i) * 120ms); }
-  .er-card.on { border-color: var(--rc); background: color-mix(in srgb, var(--rc) 9%, #0d1117f0); box-shadow: 0 0 60px -14px var(--rc), inset 0 0 40px -24px var(--rc); }
+  .er-card.on { border-color: var(--rc); background: color-mix(in srgb, var(--rc) 9%, #0d1117f0); box-shadow: 0 0 60px -14px color-mix(in srgb, var(--rc) 33%, transparent), inset 0 0 40px -24px color-mix(in srgb, var(--rc) 33%, transparent); }
   .er-card svg.ic { position: absolute; right: 24px; top: 22px; width: 56px; height: 56px; fill: none; stroke: #656c76; stroke-width: 2; stroke-linejoin: round; transition: stroke .4s; }
-  .er-card.on svg.ic { stroke: var(--rc); filter: drop-shadow(0 0 10px var(--rc)); }
+  .er-card.on svg.ic { stroke: var(--rc); filter: drop-shadow(0 0 10px color-mix(in srgb, var(--rc) 33%, transparent)); }
   .er-card i { display: block; font: normal 600 16px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: #9198a1; }
   .er-card.on i { color: var(--rc); }
   .er-card h3 { margin: 14px 56px 0 0; font: 700 34px/1 "Mona Sans"; white-space: nowrap; color: #f0f6fc; }
@@ -2727,27 +2722,27 @@
   .er-card.fw.run .er-st::before { content: "● agent sandboxed"; color: var(--rc); }
   .er-fw { position: absolute; left: 26px; top: 138px; display: flex; gap: 6px; }
   .er-fw b { padding: 6px 9px; border-radius: 8px; border: 1.5px solid #3d444d; font: 500 15px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .3s; }
-  .er-card.fw.run .er-fw b { border-color: #3fb950; color: #f0f6fc; background: #3fb95022; }
-  .er-card.fw.run .er-fw b.no { border-color: var(--rc); color: var(--rc); background: color-mix(in srgb, var(--rc) 18%, transparent); text-decoration: line-through; }
+  .er-card.fw.run .er-fw b { border-color: #4493f8; color: #f0f6fc; background: #4493f822; }
+  .er-card.fw.run .er-fw b.no { border-color: #ffa657; color: #ffa657; background: #ffa65718; text-decoration: line-through; }
   .er-steps { position: absolute; left: 26px; right: 26px; bottom: 20px; display: flex; gap: 6px; }
   .er-steps b { padding: 7px 8px; border-radius: 8px; border: 1.5px solid #3d444d; font: 500 14px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .3s; }
   .er-steps b::before { content: "○ "; }
-  .er-steps b.up { border-color: var(--rc); color: #f0f6fc; background: color-mix(in srgb, var(--rc) 30%, transparent); box-shadow: 0 0 14px -2px var(--rc); }
+  .er-steps b.up { border-color: var(--rc); color: #f0f6fc; background: color-mix(in srgb, var(--rc) 30%, transparent); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--rc) 33%, transparent); }
   .er-steps b.up::before { content: "✓ "; color: var(--rc); }
   .er-card.otel .er-st::before { content: "○ waiting for spans"; color: #656c76; }
   .er-card.otel.run .er-st::before { content: "● trace exported"; color: var(--rc); }
   .er-spans { position: absolute; right: 26px; bottom: 20px; width: 150px; display: flex; flex-direction: column; gap: 5px; }
   .er-spans b { display: block; height: 9px; margin-left: var(--x); width: var(--w); border-radius: 3px; background: #3d444d; transform-origin: left; }
-  .er-card.otel.run .er-spans b { background: var(--rc); box-shadow: 0 0 10px var(--rc); animation: er-span .5s cubic-bezier(.2,.9,.2,1) both calc(var(--j) * 140ms); }
+  .er-card.otel.run .er-spans b { background: var(--rc); box-shadow: 0 0 10px color-mix(in srgb, var(--rc) 33%, transparent); animation: er-span .5s cubic-bezier(.2,.9,.2,1) both calc(var(--j) * 140ms); }
   @keyframes er-span { from { transform: scaleX(0); } to { transform: none; } }
-  .er-job.er-trace { width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #f0883e; box-shadow: 0 0 22px #f0883e, 0 0 4px #fff; }
-  .er-job { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 8px; background: var(--ec); box-shadow: 0 0 26px var(--ec), 0 0 6px #fff; opacity: 0; z-index: 3; pointer-events: none; }
+  .er-job.er-trace { width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #79c0ff; box-shadow: 0 0 22px #79c0ff55, 0 0 4px #fff; }
+  .er-job { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 8px; background: var(--ec); box-shadow: 0 0 26px color-mix(in srgb, var(--ec) 33%, transparent), 0 0 6px #fff; opacity: 0; z-index: 3; pointer-events: none; }
   .er-chips { position: absolute; left: 110px; right: 110px; top: 880px; display: flex; align-items: center; gap: 12px; }
-  .er-chips > i { font: normal 600 17px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #d29922; margin-right: 6px; white-space: nowrap; opacity: 0; }
+  .er-chips > i { font: normal 600 17px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #4493f8; margin-right: 6px; white-space: nowrap; opacity: 0; }
   .active .er-chips > i { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1s; }
-  .er-chip { padding: 10px 16px; border-radius: 99px; border: 1.5px solid #d2992255; background: #d2992210; font: 500 19px/1 var(--mono); color: #c9d1d9; white-space: nowrap; opacity: 0; transition: all .35s; }
+  .er-chip { padding: 10px 16px; border-radius: 99px; border: 1.5px solid #4493f855; background: #4493f810; font: 500 19px/1 var(--mono); color: #c9d1d9; white-space: nowrap; opacity: 0; transition: all .35s; }
   .active .er-chip { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(1.1s + var(--i) * 90ms); }
-  .er-chip.lit { border-color: #d29922; background: #d2992230; color: #f0f6fc; box-shadow: 0 0 30px -6px #d29922; }
+  .er-chip.lit { border-color: #4493f8; background: #4493f830; color: #f0f6fc; box-shadow: 0 0 30px -6px #4493f855; }
 
   /* --- first commit to GA (measured history) --- */
   .hist-tiles { position: absolute; left: 110px; top: 300px; width: 640px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
@@ -12689,16 +12684,16 @@
   {
     resetIndex();
     const RUN = [
-      { k: "[self-hosted, linux]", c: "#d29922" },
-      { k: "[self-hosted, arm64]", c: "#ab7df8" },
-      { k: "[self-hosted, gpu]", c: "#4493f8" },
+      { k: "[self-hosted, linux]", c: "#4493f8" },
+      { k: "[self-hosted, arm64]", c: "#79c0ff" },
+      { k: "[self-hosted, gpu]", c: "#a5d6ff" },
     ];
-    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const OTEL = { c: "#79c0ff", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
     const SRV =
       '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
-    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
+    const FW = { c: "#4493f8", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
     const ECO = {
-      c: "#3fb950",
+      c: "#a5d6ff",
       ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>',
     };
     const STEPS = ["checkout", "setup-node", "cache"];
@@ -13023,15 +13018,15 @@
       rowY = i => 112 + i * 38;
     // [indent, label, start, end, colour, step, attribute, attribute side]
     const ROWS = [
-      [0, "run · triage.lock.yml", 0, 100, "#f0883e", 0],
+      [0, "run · triage.lock.yml", 0, 100, "#4493f8", 0],
       [1, "activation job", 0, 8, "#79c0ff", 1],
       [1, "agent job", 8, 72, "#79c0ff", 1],
       [2, "agent session", 10, 70, "#ab7df8", 2, "gh-aw.aic 3.4", 1],
-      [3, "mcp · search_issues", 16, 28, "#3fb950", 3],
-      [3, "mcp · get_file_contents", 34, 46, "#3fb950", 3],
-      [3, "firewall · allowed egress", 52, 56, "#d29922", 3],
+      [3, "mcp · search_issues", 16, 28, "#a5d6ff", 3],
+      [3, "mcp · get_file_contents", 34, 46, "#a5d6ff", 3],
+      [3, "firewall · allowed egress", 52, 56, "#9198a1", 3],
       [1, "safe_outputs job", 72, 90, "#79c0ff", 4, "dispatch-workflow ×2", -1],
-      [1, "conclusion · gh-aw.outcome.*", 90, 100, "#f0883e", 5, "", -1],
+      [1, "conclusion · gh-aw.outcome.*", 90, 100, "#4493f8", 5, "", -1],
     ];
     const parentOf = i => {
       for (let j = i - 1; j >= 0; j--) if (ROWS[j][0] < ROWS[i][0]) return j;
@@ -13040,10 +13035,10 @@
     let g = "";
     // legend
     g += `<path class="ln" d="M0 14 h52" style="stroke:#e6edf3"/><text x="64" y="20">parent → child span · inside one execution</text>`;
-    g += `<path class="ln dash" d="M560 14 h52" style="stroke:#f0883e"/><text x="624" y="20">linked execution · same episode, hop.parent_id names the caller</text>`;
+    g += `<path class="ln dash" d="M560 14 h52" style="stroke:#4493f8"/><text x="624" y="20">linked execution · same episode, hop.parent_id names the caller</text>`;
     // the trace waterfall
     g += `<rect class="card" x="0" y="44" width="1110" height="410" rx="14"/>`;
-    g += `<text class="k" x="24" y="78" style="fill:#f0883e">trace 4bf9e2c1 · octo-org/ops · root hop</text>`;
+    g += `<text class="k" x="24" y="78" style="fill:#4493f8">trace 4bf9e2c1 · octo-org/ops · root hop</text>`;
     ROWS.forEach(([ind, label, a, b, c, s, attr, side], i) => {
       const y = rowY(i),
         lx = 24 + ind * 30,
@@ -13062,9 +13057,9 @@
     });
     // independent executions in the same episode
     const EX = [
-      [0, "octo-org/api · fix.lock.yml", ["hop.parent_id → triage", "PR opened · aic 2.1"], "#3fb950", 6],
-      [380, "octo-org/web · fix.lock.yml", ["hop.parent_id → triage", "attempt 1 · timed out · aic 1.8"], "#ff7b72", 6],
-      [760, "octo-org/web · rerun", ["github.run_attempt 2", "session resumes · PR · aic 1.2"], "#d29922", 7],
+      [0, "octo-org/api · fix.lock.yml", ["hop.parent_id → triage", "PR opened · aic 2.1"], "#79c0ff", 6],
+      [380, "octo-org/web · fix.lock.yml", ["hop.parent_id → triage", "attempt 1 · timed out · aic 1.8"], "#ffa657", 6],
+      [760, "octo-org/web · rerun", ["github.run_attempt 2", "session resumes · PR · aic 1.2"], "#a5d6ff", 7],
     ];
     g += `<text class="k" x="1110" y="520" text-anchor="end">independent runs · own repo and token</text>`;
     EX.forEach(([x, t, lines, c, s]) => {
@@ -13073,13 +13068,13 @@
         .join("")}</g>`;
     });
     const so = X0 + 81 * SC;
-    g += `<path class="ln dash" data-p="6" data-c="#f0883e" d="M${so} ${rowY(7) + 6} C${so} 500 175 470 175 540" style="stroke:#f0883e"/>`;
-    g += `<path class="ln dash" data-p="6" data-c="#f0883e" d="M${so} ${rowY(7) + 6} C${so} 500 555 480 555 540" style="stroke:#f0883e"/>`;
-    g += `<path class="ln dash" data-p="7" data-c="#d29922" d="M730 610 H760" style="stroke:#d29922"/>`;
+    g += `<path class="ln dash" data-p="6" data-c="#4493f8" d="M${so} ${rowY(7) + 6} C${so} 500 175 470 175 540" style="stroke:#4493f8"/>`;
+    g += `<path class="ln dash" data-p="6" data-c="#4493f8" d="M${so} ${rowY(7) + 6} C${so} 500 555 480 555 540" style="stroke:#4493f8"/>`;
+    g += `<path class="ln dash" data-p="7" data-c="#9198a1" d="M730 610 H760" style="stroke:#9198a1"/>`;
     // episode rollup
     const R = 1170;
-    let r = `<rect class="card" x="${R}" y="44" width="530" height="636" rx="14" style="stroke:#f0883e"/>`;
-    r += `<text class="k" x="${R + 28}" y="82" style="fill:#f0883e">episode rollup</text><text class="m" x="${R + 28}" y="114">gh-aw.episode.id ep-7c2</text>`;
+    let r = `<rect class="card" x="${R}" y="44" width="530" height="636" rx="14" style="stroke:#4493f8"/>`;
+    r += `<text class="k" x="${R + 28}" y="82" style="fill:#4493f8">episode rollup</text><text class="m" x="${R + 28}" y="114">gh-aw.episode.id ep-7c2</text>`;
     [
       ["root.repo", "octo-org/ops"],
       ["repositories", "3"],
@@ -13088,10 +13083,10 @@
     ].forEach(([k, v], j) => (r += `<text x="${R + 28}" y="${160 + j * 34}">${k}</text><text class="m" x="${R + 502}" y="${160 + j * 34}" text-anchor="end">${v}</text>`));
     r += `<text class="big" x="${R + 24}" y="378">8.5</text><text class="m" x="${R + 200}" y="378">aic across hops</text>`;
     const COST = [
-      [3.4, "#f0883e"],
-      [2.1, "#3fb950"],
-      [1.8, "#ff7b72"],
-      [1.2, "#d29922"],
+      [3.4, "#4493f8"],
+      [2.1, "#79c0ff"],
+      [1.8, "#ffa657"],
+      [1.2, "#a5d6ff"],
     ];
     let cx = R + 28;
     COST.forEach(([v, c]) => {
@@ -13099,10 +13094,10 @@
       r += `<rect x="${cx}" y="400" width="${w - 4}" height="20" rx="4" fill="${c}"/>`;
       cx += w;
     });
-    r += `<text class="k" x="${R + 28}" y="476" style="fill:#3fb950">outcomes</text>`;
+    r += `<text class="k" x="${R + 28}" y="476" style="fill:#4493f8">outcomes</text>`;
     r += `<text class="m" x="${R + 28}" y="514">✓ 2 pull requests opened</text><text class="m" x="${R + 28}" y="550">↻ 1 rerun · session resumed</text><text class="m" x="${R + 28}" y="586">✗ 1 attempt timed out</text>`;
     r += `<text x="${R + 28}" y="640">grouped by episode, hop and run attempt</text>`;
-    g += `<g data-s="8" style="--hc:#f0883e">${r}</g>`;
+    g += `<g data-s="8" style="--hc:#4493f8">${r}</g>`;
     const svg = xSvg(g);
     const stage = xStage(svg, 9, 900, 5200, k => (k === 6 || k === 7 ? sfx.route(k - 5) : sfx.pop(k)));
     const el = h(
@@ -13135,7 +13130,7 @@
   for (const s of [
     {
       key: "observability",
-      color: "#f0883e",
+      color: "#4493f8",
       kicker: "Observability",
       head: [["OpenTelemetry", "l-grad"]],
       tag: ["Traces and ", h("b", {}, "AI credit burn"), " stream to your OTLP backend."],
@@ -13150,7 +13145,7 @@
     },
     {
       key: "governance",
-      color: "#ab7df8",
+      color: "#4493f8",
       kicker: "Governance stays in GitHub",
       head: [["GitHub-native "], ["governance", "l-grad"]],
       tag: ["The rules you already enforce in GitHub ", h("b", {}, "apply to every agentic job"), "."],
@@ -13166,7 +13161,7 @@
     },
     {
       key: "infrastructure",
-      color: "#3fb950",
+      color: "#4493f8",
       kicker: "Your runners, mirrors and registries",
       head: [["Operator-owned "], ["infrastructure", "l-grad"]],
       tag: ["Compile-time substitutions ", h("b", {}, "point every pin at infrastructure you run"), "."],
@@ -13226,21 +13221,21 @@
       ["writer", "octo-org/web", "xxxx", "token: api only", 338],
       ["writer", "octo-org/billing", "xxxx", "app not installed", 382],
     ];
-    const CELL = { r: ["read", "#3fb950"], w: ["write", "#d29922"], "-": ["—", "#656c76"], x: ["✗", "#ff7b72"] };
+    const CELL = { r: ["read", "#79c0ff"], w: ["write", "#d29922"], "-": ["—", "#656c76"], x: ["✗", "#ffa657"] };
     let g = "";
     // installation and tokens
-    g += `<g data-s="0" style="--hc:#3fb950"><rect class="card" x="0" y="20" width="460" height="280" rx="16" style="stroke:#3fb950;stroke-width:2"/>`;
-    g += `<text class="k" x="24" y="58" style="fill:#3fb950">GitHub App · octo-org</text><text class="t" x="24" y="94">installed on selected repos</text>`;
+    g += `<g data-s="0" style="--hc:#4493f8"><rect class="card" x="0" y="20" width="460" height="280" rx="16" style="stroke:#4493f8;stroke-width:2"/>`;
+    g += `<text class="k" x="24" y="58" style="fill:#4493f8">GitHub App · octo-org</text><text class="t" x="24" y="94">installed on selected repos</text>`;
     g += [
-      ["✓ octo-org/api", "#3fb950"],
-      ["✓ octo-org/web", "#3fb950"],
-      ["✗ octo-org/billing · not selected", "#ff7b72"],
+      ["✓ octo-org/api", "#79c0ff"],
+      ["✓ octo-org/web", "#79c0ff"],
+      ["✗ octo-org/billing · not selected", "#ffa657"],
     ]
       .map(([l, c], j) => `<text class="m" x="24" y="${140 + j * 36}" style="fill:${c}">${l}</text>`)
       .join("");
     g += `<text x="24" y="268">client-id + private-key in secrets</text></g>`;
     const TOK = [
-      [330, "agent job · tools.github", "#3fb950", "read: contents, issues, PRs", "repositories: [api, web]"],
+      [330, "agent job · tools.github", "#79c0ff", "read: contents, issues, PRs", "repositories: [api, web]"],
       [510, "safe-outputs job · writer", "#d29922", "write: contents, issues, PRs", "repositories: [api]"],
     ];
     TOK.forEach(([y, k, c, a, b], i) => {
@@ -13249,14 +13244,14 @@
     });
     // permission matrix
     g += `<g data-s="0">${COLS.map((c, j) => `<text class="k" x="${CX(j)}" y="40" text-anchor="middle">${c}</text>`).join("")}<text class="k" x="1530" y="40">gate</text></g>`;
-    g += `<text class="k" data-s="1" x="520" y="76" style="fill:#3fb950">agent · read-only</text><text class="k" data-s="1" x="520" y="258" style="fill:#d29922">safe outputs · writer</text>`;
+    g += `<text class="k" data-s="1" x="520" y="76" style="fill:#79c0ff">agent · read-only</text><text class="k" data-s="1" x="520" y="258" style="fill:#d29922">safe outputs · writer</text>`;
     ROWS.forEach(([who, repo, cells, why, y], i) => {
       let row = `<text class="m" x="540" y="${y + 6}">${repo}</text>`;
       [...cells].forEach((v, j) => {
         const [t, c] = CELL[v];
         row += `<g class="cell" data-cell="${i}-${j}"><rect x="${CX(j) - 65}" y="${y - 18}" width="130" height="36" rx="8" fill="${c}22" stroke="${c}66"/><text x="${CX(j)}" y="${y + 6}" text-anchor="middle" style="fill:${c}">${t}</text></g>`;
       });
-      row += `<text x="1530" y="${y + 6}" style="fill:${why === "allowed" ? "#9198a1" : "#ff7b72"}">${why}</text>`;
+      row += `<text x="1530" y="${y + 6}" style="fill:${why === "allowed" ? "#9198a1" : "#ffa657"}">${why}</text>`;
       g += `<g data-s="1">${row}</g>`;
     });
     // requests checked against the matrix
@@ -13269,8 +13264,8 @@
     g += `<g data-s="1"><rect class="card" x="520" y="424" width="1180" height="266" rx="14"/><text class="k" x="548" y="460">requests</text></g>`;
     LOG.forEach(([who, op, ok, why], j) => {
       const y = 506 + j * 48,
-        c = ok ? "#3fb950" : "#ff7b72";
-      g += `<g class="x" data-s="${j + 2}" style="--hc:${c}"><text class="m" x="548" y="${y}" style="fill:${who === "agent" ? "#3fb950" : "#d29922"}">${who}</text><text class="m" x="660" y="${y}">${op}</text><text class="m" x="930" y="${y}" style="fill:${c};font-weight:700">${ok ? "✓" : "✗"}</text><text class="m" x="970" y="${y}" style="fill:${c}">${why}</text></g>`;
+        c = ok ? "#79c0ff" : "#ffa657";
+      g += `<g class="x" data-s="${j + 2}" style="--hc:${c}"><text class="m" x="548" y="${y}" style="fill:${who === "agent" ? "#79c0ff" : "#d29922"}">${who}</text><text class="m" x="660" y="${y}">${op}</text><text class="m" x="930" y="${y}" style="fill:${c};font-weight:700">${ok ? "✓" : "✗"}</text><text class="m" x="970" y="${y}" style="fill:${c}">${why}</text></g>`;
     });
     const svg = xSvg(g);
     const ttl = [...svg.querySelectorAll("[data-ttl]")];
@@ -13421,25 +13416,25 @@
       }${lines.map((l, j) => `<text class="m" x="${x + 24}" y="${y + (title ? 116 : 80) + j * 34}" xml:space="preserve">${l}</text>`).join("")}</g>`;
     g += card(0, 60, 320, 300, "#79c0ff", 0, "threat-detection job", "opts in", ["token-broker:", "  copilot-request: true", "permissions:", "  id-token: write"]);
     g += card(400, 60, 360, 300, "#79c0ff", 1, "GitHub OIDC token", "", ["iss  GitHub Actions", "aud  the broker URL", "repo octo-org/api", "workflow scan.lock.yml", "run  id · attempt", "exp  minutes"]);
-    g += `<g data-s="2" style="--hc:#d29922"><rect class="card" x="840" y="40" width="440" height="340" rx="16" style="stroke:#d29922;stroke-width:2.5"/><text class="k" x="864" y="78" style="fill:#d29922">token broker · you run it</text><text x="864" y="108">GH_AW_TOKEN_BROKER_URL</text></g>`;
+    g += `<g data-s="2" style="--hc:#4493f8"><rect class="card" x="840" y="40" width="440" height="340" rx="16" style="stroke:#4493f8;stroke-width:2.5"/><text class="k" x="864" y="78" style="fill:#4493f8">token broker · you run it</text><text x="864" y="108">GH_AW_TOKEN_BROKER_URL</text></g>`;
     ["GitHub signature", "issuer", "expiry", "audience = broker URL", "repo · workflow · run enrolled"].forEach((l, j) => {
-      g += `<g class="x" data-s="${2 + j}" style="--hc:#3fb950"><text class="m" x="864" y="${160 + j * 44}"><tspan style="fill:#3fb950;font-weight:700">✓ </tspan>${l}</text></g>`;
+      g += `<g class="x" data-s="${2 + j}" style="--hc:#79c0ff"><text class="m" x="864" y="${160 + j * 44}"><tspan style="fill:#79c0ff;font-weight:700">✓ </tspan>${l}</text></g>`;
     });
-    g += `<g data-s="7" style="--hc:#3fb950"><rect class="card" x="1360" y="60" width="340" height="300" rx="16" style="stroke:#3fb950;stroke-width:2"/><text class="k" x="1384" y="98" style="fill:#3fb950">short-lived credential</text><text class="t" x="1384" y="136">copilot-request</text><text class="m" x="1384" y="176">inference for this job</text>`;
-    g += `<rect x="1384" y="206" width="292" height="10" rx="5" fill="#30363d"/><rect class="ttl" x="1384" y="206" width="292" height="10" rx="5" fill="#3fb950"/><text x="1384" y="244" style="font-size:14px">expires in minutes</text></g>`;
-    g += `<g class="x" data-s="8" style="--hc:#d29922"><text class="m" x="1384" y="300" style="fill:#d29922">post-step: invalidate</text><text x="1384" y="330" style="font-size:14px">scoped to the verified job</text></g>`;
+    g += `<g data-s="7" style="--hc:#79c0ff"><rect class="card" x="1360" y="60" width="340" height="300" rx="16" style="stroke:#79c0ff;stroke-width:2"/><text class="k" x="1384" y="98" style="fill:#79c0ff">short-lived credential</text><text class="t" x="1384" y="136">copilot-request</text><text class="m" x="1384" y="176">inference for this job</text>`;
+    g += `<rect x="1384" y="206" width="292" height="10" rx="5" fill="#30363d"/><rect class="ttl" x="1384" y="206" width="292" height="10" rx="5" fill="#79c0ff"/><text x="1384" y="244" style="font-size:14px">expires in minutes</text></g>`;
+    g += `<g class="x" data-s="8" style="--hc:#9198a1"><text class="m" x="1384" y="300" style="fill:#9198a1">post-step: invalidate</text><text x="1384" y="330" style="font-size:14px">scoped to the verified job</text></g>`;
     g += `<path class="ln" data-s="1" data-p="1" data-c="#79c0ff" d="M320 210 H400" style="stroke:#79c0ff"/>`;
     g += `<path class="ln" data-s="2" data-p="2" data-c="#79c0ff" d="M760 210 H840" style="stroke:#79c0ff"/>`;
-    g += `<path class="ln" data-s="7" data-p="7" data-c="#3fb950" d="M1280 210 H1360" style="stroke:#3fb950"/>`;
+    g += `<path class="ln" data-s="7" data-p="7" data-c="#79c0ff" d="M1280 210 H1360" style="stroke:#79c0ff"/>`;
     // the refused path: no fallback
-    g += `<g class="x" data-s="9" style="--hc:#ff7b72"><rect x="0" y="420" width="1700" height="110" rx="16" fill="#ff7b7214" stroke="#ff7b72" stroke-width="2" stroke-dasharray="10 8"/>`;
-    g += `<text class="k" x="28" y="460" style="fill:#ff7b72">refused</text><text class="m" x="28" y="500">workflow not enrolled</text><path class="ln" d="M330 492 H420" style="stroke:#ff7b72"/><text class="m" x="440" y="500" style="fill:#ff7b72">✗ no credential</text><path class="ln" d="M640 492 H730" style="stroke:#ff7b72"/><text class="m" x="750" y="500">job fails · never falls back to a PAT, App token or GITHUB_TOKEN</text></g>`;
+    g += `<g class="x" data-s="9" style="--hc:#ffa657"><rect x="0" y="420" width="1700" height="110" rx="16" fill="#ffa65714" stroke="#ffa657" stroke-width="2" stroke-dasharray="10 8"/>`;
+    g += `<text class="k" x="28" y="460" style="fill:#ffa657">refused</text><text class="m" x="28" y="500">workflow not enrolled</text><path class="ln" d="M330 492 H420" style="stroke:#ffa657"/><text class="m" x="440" y="500" style="fill:#ffa657">✗ no credential</text><path class="ln" d="M640 492 H730" style="stroke:#ffa657"/><text class="m" x="750" y="500">job fails · never falls back to a PAT, App token or GITHUB_TOKEN</text></g>`;
     // where it works today
     g += `<g data-s="0"><text class="k" x="0" y="600">brokered inference today</text>`;
     [
-      ["✓ threat-detection job", "#3fb950", 0],
-      ["✓ evals job", "#3fb950", 330],
-      ["✗ main agent · awaits a renewable AWF provider", "#d29922", 560],
+      ["✓ threat-detection job", "#79c0ff", 0],
+      ["✓ evals job", "#79c0ff", 330],
+      ["✗ main agent · awaits a renewable AWF provider", "#ffa657", 560],
     ].forEach(([t, c, x]) => (g += `<rect x="${x}" y="622" width="${t.length * 10.4 + 36}" height="48" rx="24" fill="#161b22" stroke="${c}"/><text class="m" x="${x + 18}" y="653" style="fill:${c}">${xEsc(t)}</text>`));
     g += `</g>`;
     const svg = xSvg(g);
@@ -14762,10 +14757,10 @@
     const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     // [initial, role, what it does on this task, colour, ring position, label dy]
     const SQUAD = [
-      ["D", "Designer", "picks tokens and contrast", "#ab7df8", [170, 70], -46],
-      ["F", "Frontend", "builds the toggle", "#4493f8", [300, 230], 58],
-      ["A", "A11y", "checks screen readers", "#3fb950", [170, 390], 58],
-      ["S", "Scribe", "records the decisions", "#d29922", [40, 230], 58],
+      ["D", "Designer", "picks tokens and contrast", "#d2a8ff", [170, 70], -46],
+      ["F", "Frontend", "builds the toggle", "#ab7df8", [300, 230], 58],
+      ["A", "A11y", "checks screen readers", "#bc8cff", [170, 390], 58],
+      ["S", "Scribe", "records the decisions", "#e2c5ff", [40, 230], 58],
     ];
     const DEV = [170, 230];
     // [task, owner index (4 = developer), file it touches]
@@ -14962,7 +14957,7 @@
         id: "linear",
         name: "Linear",
         host: "api.linear.app",
-        c: "#79c0ff",
+        c: "#e6edf3",
         trig: [["issue-created"], ["+6 more", "+"]],
         tools: [
           ["get-issue", 1],
@@ -14978,7 +14973,7 @@
         id: "jira",
         name: "Jira",
         host: "<site>.atlassian.net",
-        c: "#4c9aff",
+        c: "#e6edf3",
         trig: [["issue-created"], ["+6 more", "+"]],
         tools: [["getJiraIssue", 1], ["get-issue-remote-links"], ["+ MCP readers", "+"]],
         safe: [["add-comment", 1], ["add-label"], ["+4 more", "+"]],
@@ -14990,7 +14985,7 @@
         id: "azure-devops",
         name: "Azure DevOps",
         host: "dev.azure.com",
-        c: "#39c5cf",
+        c: "#e6edf3",
         trig: [["work-item-created"], ["+7 more", "+"]],
         tools: [["get-work-item-description", 1], ["get-work-item"], ["+10 more", "+"]],
         safe: [["comment-on-work-item", 1], ["create-work-item"], ["+21 more", "+"]],
@@ -15002,7 +14997,7 @@
         id: "gitlab",
         name: "GitLab",
         host: "gitlab.com · self-managed",
-        c: "#f0883e",
+        c: "#e6edf3",
         trig: [["merge-request-opened"], ["pipeline-updated"]],
         tools: [["get-merge-request", 1], ["get-pipeline"]],
         safe: [["add-merge-request-note", 1]],
@@ -15106,17 +15101,17 @@
       <text class="m tl" x="20" y="404" style="fill:var(--r)"></text>
       <text class="m tl" x="20" y="430" style="fill:var(--r)"></text>
       <text class="s cnt" x="20" y="472"></text>
-      <text class="s" x="20" y="500" style="fill:#ff7b72">no writer secret</text>
+      <text class="s" x="20" y="500">no writer secret</text>
       <rect class="box so" x="255" y="300" width="195" height="220" rx="18" style="--k:var(--w)"/>
       <text class="t" x="275" y="340">Safe outputs</text>
       <text class="s" x="275" y="366">separate job</text>
       <text class="m fx" x="275" y="404" style="fill:var(--w)"></text>
       <text class="m fx" x="275" y="430" style="fill:var(--w)"></text>
       <text class="s" x="275" y="472">writer secret</text>
-      <text class="s" x="275" y="500" style="fill:#d29922">staged · max 1</text>
-      <circle class="pk" r="9" style="fill:var(--r);filter:drop-shadow(0 0 8px var(--r))"/>
-      <circle class="pk" r="9" style="fill:#f0f6fc;filter:drop-shadow(0 0 8px #f0f6fc)"/>
-      <circle class="pk" r="9" style="fill:var(--w);filter:drop-shadow(0 0 8px var(--w))"/>`;
+      <text class="s" x="275" y="500" style="fill:var(--w)">staged · max 1</text>
+      <circle class="pk" r="9" style="fill:var(--r);filter:drop-shadow(0 0 8px color-mix(in srgb, var(--r) 33%, transparent))"/>
+      <circle class="pk" r="9" style="fill:#f0f6fc;filter:drop-shadow(0 0 8px #f0f6fc55)"/>
+      <circle class="pk" r="9" style="fill:var(--w);filter:drop-shadow(0 0 8px color-mix(in srgb, var(--w) 33%, transparent))"/>`;
     const [pvName, pvHost] = rt.querySelectorAll("text");
     const toolEls = rt.querySelectorAll(".tl"),
       fxEls = rt.querySelectorAll(".fx"),
@@ -15260,10 +15255,10 @@
     resetIndex();
     const SRC = [
       ["Jira issue", "#79c0ff", 1],
-      ["Linear issue", "#ab7df8", 1],
-      ["Projects v2 item", "#3fb950", 0],
-      ["code scanning alert", "#f0883e", 1],
-      ["unsigned delivery", "#ff7b72", 2],
+      ["Linear issue", "#79c0ff", 1],
+      ["Projects v2 item", "#9198a1", 0],
+      ["code scanning alert", "#79c0ff", 1],
+      ["unsigned delivery", "#ffa657", 2],
     ];
     let g = "";
     SRC.forEach(([t, c, kind], j) => {
@@ -15271,20 +15266,20 @@
       g += `<g data-s="0"><rect x="0" y="${y}" width="280" height="56" rx="28" fill="#161b22" stroke="${c}" stroke-width="2"${kind === 2 ? ` stroke-dasharray="8 6"` : ""}/><text class="m" x="24" y="${y + 34}" style="fill:${c}">${t}</text></g>`;
       g += `<path class="ln" data-s="1" data-p="1" data-c="${c}" d="M280 ${y + 28} C330 ${y + 28} 330 230 380 230" style="stroke:${c}66;stroke-width:2"/>`;
     });
-    g += `<g data-s="0" style="--hc:#ab7df8"><rect class="card" x="380" y="40" width="440" height="380" rx="16" style="stroke:#ab7df8;stroke-width:2.5"/><text class="k" x="404" y="78" style="fill:#ab7df8">hosted CAO receiver</text><text x="404" y="106">deployment-owned, not in gh-aw</text></g>`;
+    g += `<g data-s="0" style="--hc:#4493f8"><rect class="card" x="380" y="40" width="440" height="380" rx="16" style="stroke:#4493f8;stroke-width:2.5"/><text class="k" x="404" y="78" style="fill:#4493f8">hosted CAO receiver</text><text x="404" y="106">deployment-owned, not in gh-aw</text></g>`;
     [
       ["authenticate each delivery", 2],
       ["match compiled subscriptions", 3],
       ["batch events of one kind", 4],
-    ].forEach(([t, s], j) => (g += `<g class="x" data-s="${s}" style="--hc:#3fb950"><text class="m" x="404" y="${160 + j * 44}"><tspan style="fill:#3fb950;font-weight:700">✓ </tspan>${t}</text></g>`));
-    g += `<g class="x" data-s="2" style="--hc:#ff7b72"><text class="m" x="404" y="300" style="fill:#ff7b72">✗ unsigned delivery dropped</text></g>`;
-    g += `<g class="x" data-s="3" style="--hc:#d29922"><text class="m" x="404" y="336" style="fill:#d29922">· Projects item: no subscription</text></g>`;
+    ].forEach(([t, s], j) => (g += `<g class="x" data-s="${s}" style="--hc:#79c0ff"><text class="m" x="404" y="${160 + j * 44}"><tspan style="fill:#79c0ff;font-weight:700">✓ </tspan>${t}</text></g>`));
+    g += `<g class="x" data-s="2" style="--hc:#ffa657"><text class="m" x="404" y="300" style="fill:#ffa657">✗ unsigned delivery dropped</text></g>`;
+    g += `<g class="x" data-s="3" style="--hc:#9198a1"><text class="m" x="404" y="336" style="fill:#9198a1">· Projects item: no subscription</text></g>`;
     [0, 1, 2].forEach(i => (g += `<rect class="x" data-s="4" x="${404 + i * 46}" y="364" width="36" height="36" rx="6" fill="${SRC[[0, 1, 3][i]][1]}"/>`));
     g += `<text class="x" data-s="4" x="550" y="388">one batch, one dispatch</text>`;
     const STEP = [
-      [880, "restricted", "repository_dispatch", ["one batch per kind"], "#ab7df8", 5],
-      [1200, "gateway_provenance", "verify sender", ["approved CAO App", "then OIDC admission"], "#d29922", 6],
-      [1520, "agent", "context.items", ["untrusted", "input"], "#3fb950", 7],
+      [880, "restricted", "repository_dispatch", ["one batch per kind"], "#4493f8", 5],
+      [1200, "gateway_provenance", "verify sender", ["approved CAO App", "then OIDC admission"], "#79c0ff", 6],
+      [1520, "agent", "context.items", ["untrusted", "input"], "#a5d6ff", 7],
     ];
     STEP.forEach(([x, k, t, lines, c, s], i) => {
       const w = i === 2 ? 180 : 270;
@@ -15297,9 +15292,9 @@
     // declaration: opt-in, literal subscription, exclusivity
     g += `<g data-s="0"><rect class="card" x="0" y="470" width="760" height="220" rx="16"/><text class="k" x="24" y="504">workflow.md</text>`;
     ["on:", "  bots: [cao-gateway]", "  gateway-dispatch:", "    code-scanning-alert:", "      types: [created]", "      severity: error"].forEach(
-      (l, j) => (g += `<text class="m" x="24" y="${540 + j * 26}" xml:space="preserve" style="fill:${j === 2 ? "#ab7df8" : "#e6edf3"}">${l}</text>`)
+      (l, j) => (g += `<text class="m" x="24" y="${540 + j * 26}" xml:space="preserve" style="fill:${j === 2 ? "#79c0ff" : "#e6edf3"}">${l}</text>`)
     );
-    g += `<rect class="card" x="800" y="470" width="400" height="220" rx="16"/><text class="k" x="824" y="504">.github/workflows/aw.json</text><text class="m" x="824" y="548" style="fill:#ab7df8">{ "gateway-dispatch": true }</text><text x="824" y="596">repository opt-in to compile</text><text x="824" y="626">literal values only</text>`;
+    g += `<rect class="card" x="800" y="470" width="400" height="220" rx="16"/><text class="k" x="824" y="504">.github/workflows/aw.json</text><text class="m" x="824" y="548" style="fill:#79c0ff">{ "gateway-dispatch": true }</text><text x="824" y="596">repository opt-in to compile</text><text x="824" y="626">literal values only</text>`;
     g += `<rect class="card" x="1240" y="470" width="460" height="220" rx="16"/><text class="k" x="1264" y="504">rules</text>`;
     ["exclusive: no other trigger", "roles: write or higher", "items read as untrusted", "not the MCP gateway"].forEach((l, j) => (g += `<text class="m" x="1264" y="${548 + j * 36}">${l}</text>`));
     g += `</g>`;
