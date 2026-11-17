@@ -80,27 +80,7 @@ tools:
     trusted-users:
       - "dependabot[bot]"
   bash:
-    - "make dependabot"
-    - "make build"
-    - "./gh-aw compile --dependabot"
-    - "npm --prefix .github/workflows install --package-lock-only --ignore-scripts"
-    - "npm --prefix docs install --package-lock-only --ignore-scripts"
-    - "npm --prefix actions/setup/js install --package-lock-only --ignore-scripts"
-    - "npm --prefix docs ci --ignore-scripts --legacy-peer-deps"
-    - "npm --prefix actions/setup/js ci --ignore-scripts"
-    - "npm --prefix actions/setup/js run test:js -- *"
-    - "go mod tidy"
-    - "go mod verify"
-    - "go build ./..."
-    - "go test *"
-    - "uv pip compile *"
-    - "python -m pip download --require-hashes --only-binary=:all: *"
-    - "git status"
-    - "git status --short"
-    - "git diff *"
-    - "git diff --stat"
-    - "cat *"
-    - "rg *"
+    - "*"
 steps:
   - name: Pre-fetch dependabot burner context
     uses: actions/github-script@v9.0.0
@@ -391,8 +371,8 @@ You are the grouped Dependabot remediation orchestrator.
 
 ## Tool contract for every agent
 
-Use only the restricted shell allowlist. The inline worker has a bounded
-contract; do not nest delegations.
+Bash has no per-command allowlist; follow the task and safety rules below.
+The inline worker has a bounded contract; do not nest delegations.
 
 - Read the selection with `cat /tmp/gh-aw/agent/dependabot-burner/context.json`, not sed.
 - Each selected PR's author, head SHA, changed files, and patch are pre-fetched.

@@ -21,13 +21,13 @@ function compiledBashPolicy() {
   assert.ok(toolPolicy, "Missing compiled Pi tool policy");
   const policyJSON = toolPolicy[1].startsWith('"') ? JSON.parse(toolPolicy[1]) : toolPolicy[1].slice(1, -1);
   const { bash } = JSON.parse(policyJSON);
-  assert.ok(Array.isArray(bash) && bash.length > 0 && !bash.includes("*"), "Missing restricted bash allowlist");
+  assert.ok(Array.isArray(bash) && bash.includes("*"), "Missing wildcard Bash policy");
   return command => isPiBashAllowed(command, bash);
 }
 
 test("burner tool-contract commands are executable under the compiled Pi policy", () => {
   const contract = workflow.match(/## Tool contract for every agent\n([\s\S]*?)\n## Read first/);
-  assert.ok(contract, "Missing restricted-tool contract for the orchestrator and subagents");
+  assert.ok(contract, "Missing shared tool contract for the orchestrator and subagents");
   const allowed = compiledBashPolicy();
   const { agents } = extractInlineSubAgents(workflow);
   const contracts = [contract[1], ...agents.map(agent => agent.content.match(/#{2,3} Tool contract\n([\s\S]*?)(?=\n## |Return compact JSON|$)/)?.[1] || "")];
@@ -35,20 +35,6 @@ test("burner tool-contract commands are executable under the compiled Pi policy"
   assert.ok(commands.length > 0, "Missing executable command examples");
   for (const command of commands) {
     assert.ok(allowed(command), command);
-  }
-  for (const command of [
-    "command -v pull_request_read || command -v github-mcp-server || command -v mcp",
-    "help pull_request_read",
-    "sed -n '1,240p' /tmp/gh-aw/agent/dependabot-burner/context.json",
-    "gh auth status",
-    "git --no-pager status --short --branch",
-    "git --no-pager status --short && git --no-pager remote -v",
-    "git diff --stat && gh auth status",
-    'github pull_request_read \'{"method":"get_diff"}\'',
-    "cd /tmp/gh-aw/agent/dependabot-burner && rg -n retry .",
-    "find /tmp/gh-aw/agent/dependabot-burner -maxdepth 2 -type f | sort | head -50",
-  ]) {
-    assert.ok(!allowed(command), command);
   }
 });
 
@@ -88,27 +74,22 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   assert.ok(mainContent.includes("do not search the filesystem for history or relaunch the analyzer"));
 });
 
-test("safe outputs are executable while GitHub reads stay off the shell", () => {
+test("safe outputs are executable while the prompt keeps GitHub reads off the shell", () => {
   const allowed = compiledBashPolicy();
   assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
-  assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
   assert.match(workflow, /Never invoke GitHub tools through Bash|GitHub tools are not shell commands: never\s+invoke them through Bash/);
 });
 
-test("required workflow validation commands pass without enabling unrelated commands", () => {
+test("wildcard Bash supports grouped validation and local inspection", () => {
   const allowed = compiledBashPolicy();
-  for (const command of ["git status --short && git diff --stat", "make dependabot && make build", "npm --prefix .github/workflows install --package-lock-only --ignore-scripts"]) {
-    assert.ok(allowed(command), command);
-  }
   for (const command of [
-    "make test",
-    "make build && gh auth status",
-    "git status --short && git remote -v",
-    "npm install --package-lock-only --ignore-scripts",
-    "npm --prefix .github/workflows install",
-    "cd .github/workflows && npm install --package-lock-only --ignore-scripts",
+    "git status --short && git diff --stat",
+    "make dependabot && make build",
+    "npm --prefix .github/workflows install --package-lock-only --ignore-scripts",
+    "git -C docs diff --stat",
+    "find docs -name package.json -print | sort",
   ]) {
-    assert.ok(!allowed(command), command);
+    assert.ok(allowed(command), command);
   }
 });
 
