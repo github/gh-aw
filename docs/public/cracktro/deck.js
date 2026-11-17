@@ -346,6 +346,73 @@
   .mra-svg { left: 60px; top: 290px; width: 1800px; height: 566px; }
   .mra .mra-svg { top: 272px; }
   .mra-svg .fm-pill text { font-size: 26px; }
+  .drm-svg { position: absolute; left: 60px; top: 300px; width: 1800px; height: 566px; overflow: visible; font-family: "Mona Sans"; }
+  .drm-lane { font: 600 20px/1 var(--mono); letter-spacing: .2em; fill: #9198a1; text-anchor: middle; }
+  .drm-r { opacity: .14; transition: opacity .5s; }
+  .drm-r.on { opacity: 1; }
+  .drm-r text { font-size: 23px; fill: #e6edf3; }
+  .drm-w { fill: none; stroke: #a371f7; stroke-width: 2.5; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: .8; transition: stroke-dashoffset .7s ease-out; }
+  .drm-w.g { stroke: #3fb950; }
+  .drm-w.on { stroke-dashoffset: 0; }
+  .drm-core { fill: #161b22; stroke: #a371f7; stroke-width: 3; transition: filter .6s; }
+  .drm-hot .drm-core { filter: drop-shadow(0 0 28px #a371f7); }
+  .drm-z { font: 700 26px/1 var(--mono); fill: #d2a8ff; opacity: 0; }
+  .drm-hot .drm-z { animation: drm-z 2.4s ease-out infinite; }
+  .drm-hot .drm-z.b { animation-delay: .8s; }
+  .drm-hot .drm-z.c { animation-delay: 1.6s; }
+  @keyframes drm-z { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(26px, -60px); } }
+  .drm-star { fill: #d2a8ff; animation: drm-tw 2.6s ease-in-out infinite; }
+  @keyframes drm-tw { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+  .drm-cap { font-size: 22px; fill: #c9d1d9; text-anchor: middle; }
+  .drm-t { opacity: 0; transform: translateY(12px); transition: opacity .4s, transform .4s; }
+  .drm-t.on { opacity: 1; transform: none; }
+  .drm-t rect { fill: #24173f; stroke: #a371f7; stroke-width: 2; }
+  .drm-t text { font: 500 19px/1 var(--mono); fill: #d2a8ff; text-anchor: middle; }
+  .drm-c { opacity: .25; transition: opacity .5s; }
+  .drm-c rect { fill: #0d1117; stroke: #30363d; stroke-width: 2; transition: stroke .5s, filter .5s; }
+  .drm-c.on { opacity: 1; }
+  .drm-c.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px rgba(63,185,80,.45)); }
+  .drm-c .ttl { font-size: 26px; font-weight: 600; fill: #f0f6fc; }
+  .drm-c .sub { font: 500 17px/1 var(--mono); fill: #9198a1; }
+  .drm-loop { fill: none; stroke: #4493f8; stroke-width: 2.5; stroke-dasharray: 8 8; opacity: .2; transition: opacity .6s; }
+  .drm-loop.on { opacity: .9; animation: drm-dash 1.2s linear infinite; }
+  @keyframes drm-dash { to { stroke-dashoffset: -32; } }
+  .drm-lt { font-size: 22px; fill: #79c0ff; text-anchor: middle; opacity: .3; transition: opacity .6s; }
+  .drm-lt.on { opacity: 1; }
+  .drm-ex { position: absolute; left: 150px; right: 150px; top: 900px; display: flex; gap: 22px; align-items: center; font: 500 22px/1 var(--mono); color: #9198a1; }
+  .drm-ex b { font: 600 24px/1 "Mona Sans"; color: #f0f6fc; padding: 12px 20px; border: 1px solid #30363d; border-radius: 999px; background: #161b22; }
+  .drm .ct-src { top: 990px; }
+  .pnt-flow { position: absolute; left: 110px; right: 110px; top: 292px; display: flex; gap: 14px; align-items: center; font: 500 20px/1 var(--mono); color: #6e7681; }
+  .pnt-flow span { padding: 10px 16px; border: 1px solid #30363d; border-radius: 999px; transition: color .4s, border-color .4s, background .4s; }
+  .pnt-flow i { font-style: normal; color: #30363d; }
+  .pnt-flow span.on { color: #f0f6fc; border-color: #a371f7; background: #24173f; }
+  .pnt-flow span.ok.on { border-color: #3fb950; background: #12261e; }
+  .pnt-diff { position: absolute; left: 110px; top: 370px; width: 860px; height: 540px; background: #0d1117; border: 1px solid #30363d; border-radius: 16px; overflow: hidden; font: 500 20px/29px var(--mono); }
+  .pnt-fh { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #30363d; background: #161b22; color: #9198a1; }
+  .pnt-fh b { color: #3fb950; font-weight: 600; }
+  .pnt-body { position: relative; padding-top: 8px; }
+  .pnt-l { height: 29px; max-height: 29px; padding: 0 20px 0 16px; border-left: 4px solid transparent; white-space: pre; color: #e6edf3; background: rgba(46,160,67,.10); overflow: hidden; transition: max-height .5s, opacity .5s, background .4s, border-color .4s, color .4s; }
+  .pnt-l .s { color: #3fb950; }
+  .pnt-l.hot { background: rgba(248,81,73,.16); border-left-color: #f85149; color: #ffa198; }
+  .pnt-l.cut { max-height: 0; opacity: 0; }
+  .pnt-l.fix { max-height: 0; opacity: 0; }
+  .pnt-l.fix.on { max-height: 29px; opacity: 1; background: rgba(46,160,67,.24); }
+  .pnt-scan { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: #d2a8ff; box-shadow: 0 0 18px #a371f7; opacity: 0; }
+  .pnt-scan.go { opacity: 1; top: 440px; transition: top 2s linear; }
+  .pnt-scan.end { opacity: 0; top: 440px; transition: opacity .4s; }
+  .pnt-cm { position: absolute; left: 1010px; width: 800px; padding: 16px 22px; background: #161b22; border: 1px solid #a371f7; border-radius: 14px; opacity: 0; transform: translateX(24px); transition: opacity .45s, transform .45s, border-color .5s; }
+  .pnt-cm.on { opacity: 1; transform: none; }
+  .pnt-cm.dim { opacity: .35; border-color: #30363d; }
+  .pnt-who { display: flex; align-items: center; gap: 12px; font: 500 18px/1 var(--mono); color: #d2a8ff; }
+  .pnt-who svg { width: 30px; height: 30px; padding: 5px; border-radius: 50%; background: #8957e5; }
+  .pnt-who em { margin-left: auto; font-style: normal; font-weight: 600; color: #3fb950; }
+  .pnt-who .n { color: #f0f6fc; }
+  .pnt-cm p { margin: 10px 0 0; font-size: 24px; line-height: 1.3; color: #e6edf3; }
+  .pnt-cm code { font: 500 21px var(--mono); color: #79c0ff; }
+  .pnt-v { position: absolute; left: 1010px; top: 806px; width: 800px; padding: 18px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
+  .pnt-v.on { opacity: 1; color: #f0f6fc; border-color: #a371f7; }
+  .pnt-v.ok { opacity: 1; color: #3fb950; border-color: #3fb950; background: #12261e; }
+  .pnt .ct-src { top: 1000px; }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
@@ -5097,7 +5164,6 @@
     };
     slides.push({
       group: "process",
-      key: "handoffs",
       notes:
         "Event-driven Hand-offs: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself over a 30-day window, 15 October to 14 November 2026 (snapshot taken 14 November 2026): auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed 935 runs on 906 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals are a snapshot of the triggers in gh-aw's own workflow files on 14 November 2026, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
       enter() {
@@ -5301,6 +5367,119 @@
       });
     }
 
+    // Ponytail Reviewer (ready → lean-only review → trim → ship): a read-only reviewer reads each ready pull request only for unnecessary complexity, posts one-line lean findings with the lines each saves, and Copilot trims until it says "Lean already. Ship."
+    {
+      resetIndex();
+      const svgIco = (n, fill = "#f0f6fc") => `<svg viewBox="0 0 24 24" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+      // illustrative, synthetic Go file: [group, text]; k = kept, f = the fix Copilot adds, a/b/c = the lines each finding cuts
+      const SRC = [
+        ["k", "func loadSettings(env map[string]string) Settings {"],
+        ["a", "\tf := newLoaderFactory()"],
+        ["a", "\treturn f.NewLoader().Load(env)"],
+        ["f", "\treturn loader{}.Load(env)"],
+        ["k", "}"],
+        ["a", "type LoaderFactory interface{ NewLoader() Loader }"],
+        ["a", "type defaultFactory struct{}"],
+        ["a", "func newLoaderFactory() LoaderFactory { return defaultFactory{} }"],
+        ["a", "func (defaultFactory) NewLoader() Loader { return loader{} }"],
+        ["b", "func parseFlag(s string) bool {"],
+        ["b", "\treturn s == \"1\" || strings.EqualFold(s, \"true\")"],
+        ["b", "}"],
+        ["c", "func hasTag(tags []string, t string) bool {"],
+        ["c", "\tfor _, x := range tags { if x == t { return true } }"],
+        ["c", "\treturn false"],
+        ["c", "}"],
+      ];
+      // findings in the reviewer's one-line form: [group, kind, text, lines saved]
+      const FIND = [
+        ["a", "yagni", "<code>LoaderFactory</code> has one implementation. Call <code>loader{}.Load(env)</code>.", 5],
+        ["b", "delete", "<code>parseFlag</code> is never called.", 3],
+        ["c", "stdlib", "<code>slices.Contains(tags, t)</code> already does this.", 4],
+      ];
+      const lines = SRC.map(([grp, txt]) => {
+        const el = h("div", { class: "pnt-l" + (grp === "f" ? " fix" : "") });
+        el.innerHTML = `<span class="s">+ </span>${txt.replace(/\t/g, "    ").replace(/</g, "&lt;")}`;
+        el.dataset.g = grp;
+        return el;
+      });
+      const added = h("b", {}, "+15");
+      const scan = h("div", { class: "pnt-scan" });
+      const diff = h("div", { class: "pnt-diff" }, h("div", { class: "pnt-fh" }, h("span", {}, "pkg/config/settings.go"), added), h("div", { class: "pnt-body" }, scan, ...lines));
+      const cards = FIND.map(([, kind, txt, n], i) => {
+        const el = h("div", { class: "pnt-cm", style: `top:${370 + i * 142}px` });
+        el.innerHTML = `<div class="pnt-who">${svgIco("copilot")}<span class="n">${i + 1}</span> Ponytail Reviewer · ${kind}<em>−${n} lines</em></div><p>${txt}</p>`;
+        return el;
+      });
+      const verdict = h("div", { class: "pnt-v" });
+      const STEP = ["ready for review", "reads the diff, lean only", "one-line findings", "@copilot trims", "Lean already. Ship."];
+      const steps = STEP.map((s, i) => h("span", { class: i === STEP.length - 1 ? "ok" : "" }, s));
+      const flow = h("div", { class: "pnt-flow" }, ...steps.flatMap((s, i) => (i ? [h("i", {}, "→"), s] : [s])));
+      const grp = g => lines.filter(l => l.dataset.g === g);
+      const CYC = 13000;
+      // [ms into the cycle, action]
+      const T = [
+        [300, () => (steps[0].classList.add("on"), sfx.pop(0))],
+        [900, () => (steps[1].classList.add("on"), scan.classList.add("go"))],
+        [2950, () => (scan.classList.remove("go"), scan.classList.add("end"))],
+        ...FIND.map(([g], i) => [3000 + i * 700, () => (i || steps[2].classList.add("on"), grp(g).forEach(l => l.classList.add("hot")), cards[i].classList.add("on"), sfx.pop(i + 1))]),
+        [5300, () => ((verdict.textContent = "COMMENT review · Lean: −12 lines possible."), verdict.classList.add("on"), sfx.notify(false))],
+        [6900, () => {
+          steps[3].classList.add("on");
+          lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
+          added.textContent = "+3";
+          sfx.pop(5);
+        }],
+        [8700, () => {
+          steps[4].classList.add("on");
+          cards.forEach(c => c.classList.add("dim"));
+          verdict.textContent = "/ponytail · Lean already. Ship.";
+          verdict.classList.add("ok");
+          sfx.pop(6);
+        }],
+      ];
+      let t0 = 0,
+        cyc = -1,
+        done = new Set();
+      const reset = () => {
+        [...lines, ...cards, ...steps, verdict, scan].forEach(el => el.classList.remove("on", "hot", "cut", "dim", "ok", "go", "end"));
+        added.textContent = "+15";
+        verdict.textContent = "";
+        done = new Set();
+      };
+      slides.push({
+        group: "process",
+        under: "prr",
+        notes:
+          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship.",
+        enter() {
+          t0 = 0;
+          cyc = -1;
+          reset();
+        },
+        tick(t) {
+          if (!t0) t0 = t;
+          const e = t - t0,
+            c = Math.floor(e / CYC),
+            u = e % CYC;
+          if (c !== cyc) {
+            cyc = c;
+            reset();
+          }
+          T.forEach(([at, fn], k) => u >= at && !done.has(k) && (done.add(k), fn()));
+        },
+        el: h(
+          "section",
+          { class: "slide pnt" },
+          h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "An agentic reviewer for unnecessary complexity"), h("h2", {}, letters("Ponytail "), letters("Reviewer", "l-grad"))),
+          flow,
+          diff,
+          ...cards,
+          verdict,
+          h("div", { class: "ct-src" }, "illustrative · synthetic diff and findings · workflow: ponytail-reviewer.md")
+        ),
+      });
+    }
+
     const raSvg = newSvg("fm-svg ra-flow");
     const raFlow = makeFlow(raSvg, raCap, [0]);
     const bdSvg = newSvg("fm-svg ra-chart");
@@ -5486,7 +5665,7 @@
     resetIndex();
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "improvers",
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
       enter() {
@@ -5517,7 +5696,7 @@
     });
   }
 
-  // Daily Unsloppers (research → assign → refine): deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
+  // Daily Improvers (research → assign → refine): deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
     resetIndex();
     const VW = 1700,
@@ -5682,9 +5861,9 @@
     };
     slides.push({
       group: "process",
-      key: "unsloppers",
+      key: "improvers",
       notes:
-        "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Duplicate Code Detector, Daily Test Improver and Daily Perf Improver. The flow is illustrative, with synthetic files; the panel in the middle is measured on gh-aw itself. From 7 October 2025 to 26 October 2026 the Duplicate Code Detector filed 211 issues titled duplicate-code, 144 of them assigned to Copilot; 115 were closed by merged pull requests, 112 of them opened by Copilot, with a median of 3.8 hours from issue to merge. The data window, 7 October 2025 to 26 October 2026, 385 days, is printed on the panel. The bars show issues filed and pull requests merged per month; empty months are months it filed nothing. Since 27 October 2026 the detector opens its pull requests directly. Snapshot taken 14 November 2026 from GitHub issue search and each issue's closing event. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
+        "Daily improvers: research, assign, refine, the pattern behind workflows such as Duplicate Code Detector, Daily Test Improver and Daily Perf Improver. The flow is illustrative, with synthetic files; the panel in the middle is measured on gh-aw itself. From 7 October 2025 to 26 October 2026 the Duplicate Code Detector filed 211 issues titled duplicate-code, 144 of them assigned to Copilot; 115 were closed by merged pull requests, 112 of them opened by Copilot, with a median of 3.8 hours from issue to merge. The data window, 7 October 2025 to 26 October 2026, 385 days, is printed on the panel. The bars show issues filed and pull requests merged per month; empty months are months it filed nothing. Since 27 October 2026 the detector opens its pull requests directly. Snapshot taken 14 November 2026 from GitHub issue search and each issue's closing event. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -5736,11 +5915,11 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Duplicate Code Detector · Daily Test Improver · …"), h("h2", {}, letters("Daily "), letters("Unsloppers", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Duplicate Code Detector · Daily Test Improver · …"), h("h2", {}, letters("Daily "), letters("Improvers", "l-grad"))), svg),
     });
   }
 
-  // Merge fast, unslop daily: three slow pull requests polished through many nit rounds (each still merging slop) vs many fast pull requests, agentic reviewers and background unsloppers that eat the slop
+  // Merge fast, unslop daily: three slow pull requests polished through many nit rounds (each still merging slop) vs many fast pull requests, agentic reviewers and background improvers that eat the slop
   {
     resetIndex();
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
@@ -5771,7 +5950,7 @@
       SWEEP_D = 1200,
       LA = 230,
       LB = 560;
-    // measured on gh-aw (snapshot 14 Nov 2026): merged clean-up PRs per unslopper, all time, by title prefix
+    // measured on gh-aw (snapshot 14 Nov 2026): merged clean-up PRs per improver, all time, by title prefix
     const UNSLOP = [
       ["jsweep", 144],
       ["dead-code-remover", 117],
@@ -5780,7 +5959,7 @@
       ["daily-file-diet", 7],
       ["duplicate-code-detector", 4],
     ];
-    // measured: merged PRs per UTC day, 15 Oct to 13 Nov 2026, and how many of them came from the unsloppers above
+    // measured: merged PRs per UTC day, 15 Oct to 13 Nov 2026, and how many of them came from the improvers above
     const DAY_ALL = [31, 77, 25, 31, 42, 41, 51, 49, 17, 36, 41, 24, 35, 12, 26, 32, 28, 38, 38, 69, 72, 37, 37, 64, 63, 60, 46, 63, 31, 47],
       DAY_UN = [1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 0, 3, 0, 1, 2, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 1, 0];
     const panel = document.createElement("div");
@@ -5813,9 +5992,9 @@
       g += `<circle class="us-commit" id="usC${i}" cx="${x}" cy="${LB}" r="11"/>`;
       SPECKS[i].forEach(([dx, dy], j) => (g += `<circle class="us-slop" id="usS${i}_${j}" cx="${x + dx}" cy="${LB + dy}" r="5"/>`));
     }
-    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily unsloppers</text></g>
+    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily improvers</text></g>
       <text class="us-bots" x="0" y="${LB + 100}">${UNSLOP.map(([n, c]) => `${n} <tspan class="n">${c}</tspan>`).join(" · ")}</text>
-      <text class="us-meas" x="0" y="${LB + 132}">MEASURED · unslopper PRs, all time · 26 Sep 2025 – 12 Nov 2026 · 427 merged, +34,691 −44,700 · lanes illustrative</text>
+      <text class="us-meas" x="0" y="${LB + 132}">MEASURED · improver PRs, all time · 26 Sep 2025 – 12 Nov 2026 · 427 merged, +34,691 −44,700 · lanes illustrative</text>
       <text class="us-num" id="usNA" x="1620" y="${LA - 50}">0%</text><text class="us-cap" x="1620" y="${LA - 16}">of feature</text><text class="us-cap" id="usMA" x="1620" y="${LA + 16}"></text><text class="us-cap bad" id="usCA" x="1620" y="${LA + 44}"></text>
       <text class="us-num" id="usNB" x="1620" y="${LB - 50}">0%</text><text class="us-cap" x="1620" y="${LB - 16}">of feature</text><text class="us-cap" id="usMB" x="1620" y="${LB + 16}"></text><text class="us-cap ok" id="usCB" x="1620" y="${LB + 44}"></text>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -5836,9 +6015,9 @@
     const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "improvers",
       notes:
-        "Merge fast, unslop daily. The two lanes are an illustrative, synthetic timeline; the panel at the top right is measured on gh-aw's merged pull requests over a 30-day window, 15 October to 13 November 2026, and the counts along the bottom are all-time merged unslopper pull requests from 26 September 2025 to 12 November 2026; both are a snapshot of 14 November 2026. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. In the illustration the feature ships a slice at a time, so its percentage climbs with every merge and it is complete while the polished lane is still in review. The measured panel shows what that looks like: in the thirty days from 15 October to 13 November 2026, 1,263 pull requests merged, about 42 a day, with a median of 166 lines changed and a median of one hour fifty-four minutes from opening to merge; the bars are merged pull requests per day. The slop that gets through is eaten by background unsloppers, daily workflows that open their own small clean-up pull requests. The purple dots mark days on which an unslopper pull request merged: 25 of those 30 days. Along the bottom are their all-time merged clean-up pull requests, counted by title prefix: jsweep 144, dead code remover 117, code simplifier 89, tidy 66, daily file diet 7 and duplicate code detector 4, which mostly files issues instead. Together that is 427 merged clean-up pull requests, adding 34,691 lines and removing 44,700, on 261 different days between 26 September 2025 and 12 November 2026. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
+        "Merge fast, unslop daily. The two lanes are an illustrative, synthetic timeline; the panel at the top right is measured on gh-aw's merged pull requests over a 30-day window, 15 October to 13 November 2026, and the counts along the bottom are all-time merged improver pull requests from 26 September 2025 to 12 November 2026; both are a snapshot of 14 November 2026. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. In the illustration the feature ships a slice at a time, so its percentage climbs with every merge and it is complete while the polished lane is still in review. The measured panel shows what that looks like: in the thirty days from 15 October to 13 November 2026, 1,263 pull requests merged, about 42 a day, with a median of 166 lines changed and a median of one hour fifty-four minutes from opening to merge; the bars are merged pull requests per day. The slop that gets through is eaten by background improvers, daily workflows that open their own small clean-up pull requests. The purple dots mark days on which an improver pull request merged: 25 of those 30 days. Along the bottom are their all-time merged clean-up pull requests, counted by title prefix: jsweep 144, dead code remover 117, code simplifier 89, tidy 66, daily file diet 7 and duplicate code detector 4, which mostly files issues instead. Together that is 427 merged clean-up pull requests, adding 34,691 lines and removing 44,700, on 261 different days between 26 September 2025 and 12 November 2026. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -5916,529 +6095,9 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background improvers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))),
         panel,
         svg
-      ),
-    });
-  }
-
-  // Speech To Agent (speak → map → grep): a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
-  {
-    resetIndex();
-    const VW = 1800,
-      VH = 620;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const pill = (x, y, w, label) => `<g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
-    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    // illustrative: misheard speech-to-text, the glossary identifier it maps to, and synthetic grep counts
-    const EX = [
-      ["cash memory", "cache-memory", 214, 31],
-      ["depend a bot", "Dependabot", 57, 12],
-      ["fire wall", "firewall", 163, 27],
-      ["A W dot Y M L", "aw.yml", 42, 9],
-    ];
-    // synthetic renames: [old, new, how it is spoken, glossary identifier]
-    const REN = [
-      ["procSO()", "parseSafeOutputs()", "parse safe outputs", "parseSafeOutputs"],
-      ["doCfg()", "loadConfig()", "load config", "loadConfig"],
-      ["hndl()", "handleComment()", "handle comment", "handleComment"],
-      ["chk()", "checkPermissions()", "check permissions", "checkPermissions"],
-    ];
-    // [edge id, path, color, label, lx, ly, anchor]; b = the speaker, p = agents, g = keeping names and glossary in sync
-    const EDGES = [
-      ["e0", "M106 190 H142", "b", [], 0, 0, "start"],
-      ["e1", "M476 190 H556", "b", ["maps"], 516, 162, "middle"],
-      ["e2", "M1112 190 H1198", "p", ["prompt"], 1155, 162, "middle"],
-      ["e3", "M1236 226 V272", "p", ["greps"], 1252, 256, "start"],
-      ["e4", "M1290 422 V502", "g", ["rename for", "findability"], 1306, 452, "start"],
-      ["e5", "M1254 540 H1094", "g", ["proposes"], 1174, 512, "middle"],
-      ["e6", "M698 540 H488", "g", ["new name"], 593, 512, "middle"],
-      ["e7", "M200 504 V390", "g", ["opens PR"], 216, 456, "start"],
-      ["e8", "M454 350 H556", "g", ["merges"], 505, 322, "middle"],
-    ];
-    const SEQ = [
-      ["e0", "nRaw", 900],
-      ["e1", "nDict"],
-      ["e2", "nAgent"],
-      ["e3", "nGrep", 1200],
-      ["e4", "nNamer", 1200],
-      ["e5", "nRen"],
-      ["e6", "nDP"],
-      ["e7", "nMaint", 1200],
-      ["e8", "dgNew", 1200],
-    ];
-    const LANE = { nMic: 0, nRaw: 0, nMaint: 0, nDict: 1, nAgent: 2, nGrep: 2 };
-    const MK = { g: ["dgG", "#3fb950"], b: ["dgB", "#4493f8"], p: ["dgP", "#ab7df8"] };
-    let g = `<defs>`;
-    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
-    g += `<clipPath id="dgClip"><circle cx="200" cy="350" r="31"/></clipPath>`;
-    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/><rect class="dg-band" x="0" y="470" width="${VW}" height="150"/>`;
-    g += `<text class="fm-lane-t" x="1680" y="546">KEEP IN SYNC</text>`;
-    [
-      [0, 520, "SPEAK"],
-      [520, 1150, "MAP"],
-      [1150, VW, "GREP"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="dgLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="430"/>`;
-    });
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
-      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    g += `<g class="dg-mic" id="nMic"><circle class="dg-ring" cx="70" cy="190" r="34"/><circle cx="70" cy="190" r="34" fill="#1f6feb"/><rect x="62" y="170" width="16" height="26" rx="8" fill="#f0f6fc"/><path d="M57 190a13 13 0 0 0 26 0M70 203v9M63 212h14" fill="none" stroke="#f0f6fc" stroke-width="3" stroke-linecap="round"/></g>`;
-    g += `<text class="dg-cap" x="70" y="254">voice</text>`;
-    g += `<g class="fm-out" id="nRaw"><rect x="146" y="120" width="328" height="142" rx="14"/><text class="dg-hd" x="166" y="156">SPEECH-TO-TEXT</text><text class="dg-raw" x="166" y="206" id="dgRaw"></text><text class="dg-miss" x="166" y="242">grep → 0 matches</text></g>`;
-    g += `<g class="dg-dict" id="nDict"><rect class="dg-card" x="560" y="84" width="550" height="326" rx="16"/>${ico("tasklist", 590, 116, 22, "#9198a1")}<text class="dg-hd" x="610" y="122">DICTATION.md</text><text class="dg-hd" x="1090" y="122" text-anchor="end">SPOKEN → CODE</text>`;
-    const row = (cls, id, y, spoken, ident, sid = "", iid = "") =>
-      `<g class="${cls}" id="${id}"><rect x="570" y="${y - 22}" width="530" height="44" rx="10"/><text x="590" y="${y + 7}"${sid}>${spoken}</text><text x="870" y="${y + 7}" text-anchor="middle">→</text><text class="dg-id" x="894" y="${y + 7}"${iid}>${ident}</text></g>`;
-    EX.forEach(([s, id], i) => (g += row("dg-row", "dgRow" + i, 168 + i * 50, `"${s}"`, id)));
-    g += row("dg-new", "dgNew", 372, "", "", ' id="dgNewS"', ' id="dgNewI"') + `</g>`;
-    g += agent("nAgent", 1236, 190, 160, "Agent");
-    g += `<text class="dg-ident" id="dgIdent" x="1424" y="198"><tspan class="dg-k">uses </tspan><tspan id="dgIdentV"></tspan></text>`;
-    g += `<g class="fm-out dg-term" id="nGrep"><rect class="dg-tb" x="1180" y="276" width="600" height="144" rx="14"/>${["#f85149", "#d29922", "#3fb950"].map((c, k) => `<circle cx="${1204 + k * 22}" cy="298" r="6" fill="${c}"/>`).join("")}<text class="dg-hd" x="1272" y="304">bash</text><text class="dg-cmd dg-tl" x="1204" y="352" id="dgCmd"></text><text class="dg-hit dg-tl" x="1204" y="396" id="dgHit"></text></g>`;
-    g += agent("nNamer", 1290, 540, 250, "Function Namer") + `<text class="dg-cap" x="1290" y="604">daily</text>`;
-    g += `<g class="fm-out dg-chip" id="nRen"><rect x="700" y="512" width="390" height="56" rx="14"/><text x="895" y="548"><tspan class="dg-old" id="dgOld"></tspan> → <tspan class="dg-nn" id="dgNN"></tspan></text></g>`;
-    g += agent("nDP", 200, 540, 280, "Dictation Prompt") + `<text class="dg-cap" x="200" y="604">weekly</text>`;
-    g += `<g class="fm-task mra-dev" id="nMaint"><g class="fm-pill b"><rect x="200" y="325" width="250" height="50" rx="25"/><text x="343" y="358">Maintainer</text></g><circle cx="200" cy="350" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="169" y="319" width="62" height="62" clip-path="url(#dgClip)"/></g>`;
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg dg-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      "Speech To Agent: a misheard speech-to-text phrase is mapped by the DICTATION.md glossary to the exact identifier, the agent greps it and finds matches; a daily namer agent proposes clearer API names, a weekly dictation agent opens a pull request adding them to the glossary, and the maintainer reviews and merges it"
-    );
-    svg.style.setProperty("--c", "#4493f8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot");
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 1000,
-      START = 900,
-      HOLD = 2000,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1;
-    const light = nid => {
-      $(nid).classList.add("on");
-      if (nid in LANE) $("dgLane" + LANE[nid]).classList.add("on");
-      if (nid === "nDict") $("dgRow" + (cyc % EX.length)).classList.add("pick");
-      if (nid === "nAgent") $("dgIdent").classList.add("on");
-    };
-    const fill = c => {
-      const [s, id, n, f] = EX[c % EX.length],
-        [old, nn, rs, ri] = REN[c % REN.length];
-      $("dgRaw").textContent = `"${s}"`;
-      $("dgIdentV").textContent = id;
-      $("dgCmd").textContent = `$ grep -rn "${id}" .`;
-      $("dgHit").textContent = `✓ ${n} matches in ${f} files`;
-      $("dgOld").textContent = old;
-      $("dgNN").textContent = nn;
-      $("dgNewS").textContent = `+ "${rs}"`;
-      $("dgNewI").textContent = ri;
-    };
-    slides.push({
-      group: "process",
-      notes:
-        "Speech To Agent: talking to agents instead of typing. The run is illustrative; the phrases and corrections come from gh-aw's real DICTATION.md, while the grep counts and the renamed functions are synthetic. When you dictate a prompt, speech-to-text hears words, not identifiers: you say cache-memory and it writes cash memory, you say Dependabot and it writes depend a bot. Agents search the codebase with grep, which matches exact tokens, so cash memory finds nothing. DICTATION.md is a prompt you paste into your voice dictation app: a project glossary plus a list of spoken forms and the exact identifiers they map to, hyphens, dots and casing included. The app's model rewrites the transcript, the agent receives cache-memory, and grep lands on every definition and call site. Two agentic workflows keep it true. A daily namer agent reviews one package at a time and proposes renames so functions say what they do, procSO becomes parseSafeOutputs, which is also how you would say it out loud; Copilot implements the rename. A weekly dictation prompt agent re-reads the docs and code, extracts the vocabulary and opens a pull request that adds the new terms to DICTATION.md; the maintainer, the same person who dictates, reviews and merges it, so the glossary only holds words they actually say. Names you can say map to names you can grep.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          svg.querySelectorAll(".on, .hot, .pick").forEach(x => x.classList.remove("on", "hot", "pick"));
-          fill(c);
-          light("nMic");
-          popK = -1;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP] = SEQ[k],
-          fr = (u - T[k]) / dur,
-          p = $(eid),
-          n = p.getTotalLength(),
-          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
-        p.classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", MK[p.classList[1]][1]);
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
-        if (fr >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          light(nid);
-        }
-      },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Dictate to agents · say the word, hit the symbol"), h("h2", {}, letters("Speech To "), letters("Agent", "l-grad"))),
-        svg,
-        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["DICTATION.md", "dictation-prompt", "daily-function-namer"].map(n => h("span", {}, n)))
-      ),
-    });
-  }
-
-  // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
-  {
-    resetIndex();
-    const VW = 1700,
-      VH = 680;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const maint = (
-      id,
-      x,
-      y,
-      avatar = "assets/avatars/mona.jpg"
-    ) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
-    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
-    // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
-    const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
-    const FAIL = [1, 3, 4],
-      KIND = ["test hang", "assertion failure", "build break"];
-    const ROW0 = 284,
-      ROWH = 26;
-    let pipes = `<g class="sfl-box" id="sflPipes"><rect class="sfl-card" x="24" y="220" width="460" height="232" rx="12"/><text class="sfl-title" x="40" y="246">OUTER-LOOP PIPELINES</text>`;
-    PIPES.forEach((p, i) => (pipes += `<g class="sfl-row sfl-pipe" data-y="${ROW0 + i * ROWH}"><text x="40" y="${ROW0 + i * ROWH}">${p}</text><circle cx="462" cy="${ROW0 + i * ROWH - 6}" r="7"/></g>`));
-    pipes += `<text class="sfl-badge" id="sflBadge" x="40" y="440"></text>`;
-    pipes += `<g class="sfl-scan" id="sflBeam"><rect x="24" y="-28" width="460" height="28" fill="url(#sflBeamG)"/><line x1="24" y1="0" x2="484" y2="0"/></g></g>`;
-    const RUB = [
-      ["ok", "✓ signature is specific"],
-      ["ok", "✓ known-error data is valid"],
-      ["ok", "✓ fixed, never muted"],
-      ["ko", "✗ owner pinged wrongly"],
-      ["ed", "+ prompt edit proposed"],
-    ];
-    let rubric = `<g class="sfl-box" id="sflRubric"><rect class="sfl-card" x="1316" y="270" width="364" height="190" rx="12"/><text class="sfl-title" x="1332" y="296">KPI TRACKER · RUBRIC</text>`;
-    RUB.forEach(([c, t], i) => (rubric += `<g class="sfl-row sfl-rub"><text class="${c}" x="1332" y="${330 + i * 27}">${t}</text></g>`));
-    rubric += `</g>`;
-    const scanPipes = (f, c) => {
-      const s = $("sflBeam"),
-        y = 262 + Math.min(1, f / 0.75) * 166;
-      s.setAttribute("transform", `translate(0,${y})`);
-      s.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
-      svg.querySelectorAll(".sfl-pipe").forEach(r => r.classList.toggle("seen", +r.dataset.y <= y));
-      if (ROW0 + FAIL[c % 3] * ROWH <= y && !$("sflBadge").classList.contains("on")) {
-        $("sflBadge").classList.add("on");
-        sfx.pop(5);
-      }
-    };
-    const readRubric = f => svg.querySelectorAll(".sfl-rub").forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.5) / (RUB.length + 0.5)));
-    // [edge id, path, color, label, lx, ly, anchor, extra label class]
-    const EDGES = [
-      ["sflE0", "M110 174 V212", "p", ["scans failing runs"], 132, 200, "start"],
-      ["sflE1", "M492 340 H596", "p", ["files Known", "Build Error"], 640, 404, "middle"],
-      ["sflE2", "M640 304 V140 H818", "p", ["picks up", "open errors"], 662, 222, "start"],
-      ["sflO0", "M860 174 V274 H760 V320", "p", ["small and build-validated:", "draft fix PR"], 880, 222, "start", "sfl-ol"],
-      ["sflO1", "M860 174 V274 H900 V320", "p", ["plausible, unverified:", "help-wanted PR"], 880, 222, "start", "sfl-ol"],
-      ["sflO2", "M860 174 V274 H1040 V320", "p", ["no code change possible:", "root-cause comment"], 880, 222, "start", "sfl-ol"],
-      ["sflR0", "M760 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
-      ["sflR1", "M900 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
-      ["sflR2", "M1040 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
-      ["sflE3", "M1072 580 H1190 V140 H1214", "b", ["reactions & reviews"], 1140, 622, "middle"],
-      ["sflE4", "M1252 174 V292", "p", ["scores both", "against rubrics"], 1274, 222, "start"],
-      ["sflE5", "M1252 366 V542", "p", ["proposes", "prompt edits"], 1274, 494, "start"],
-      ["sflE6", "M1464 580 H1640 V655 H10 V140 H72", "b day", ["sharper prompts · the loop runs again"], 700, 642, "middle"],
-    ];
-    // the token's journey: [edge, node lit on arrival, duration]; SCAN and RUBRIC are in-place steps, {o} is this cycle's outcome
-    const SEQ = [
-      ["sflE0", "sflPipes"],
-      ["SCAN", "sflPipes", 2600],
-      ["sflE1", "sflKbe"],
-      ["sflE2", "sflFixer"],
-      ["sflO{o}", "sflOut{o}"],
-      ["sflR{o}", "sflDev"],
-      ["sflE3", "sflFeed"],
-      ["sflE4", "sflKpi"],
-      ["RUBRIC", "sflRubric", 2400],
-      ["sflE5", "sflDev2"],
-      ["sflE6", "sflScan", 1800],
-    ];
-    const LANE = { sflScan: 0, sflPipes: 0, sflKbe: 1, sflFixer: 1, sflOut0: 1, sflOut1: 1, sflOut2: 1, sflDev: 1, sflFeed: 2, sflKpi: 2, sflRubric: 2, sflDev2: 2 };
-    let g = `<defs><clipPath id="sflClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
-      <marker id="sflP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <linearGradient id="sflBeamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
-      <marker id="sflB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    [
-      [0, 520, "SCAN · EVERY 12H"],
-      [520, 1160, "FIX · WEEKDAYS"],
-      [1160, VW, "LEARN · BI-WEEKLY"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="sflLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
-    });
-    for (const [id, d, c, lab, lx, ly, an, extra = ""] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#sfl${c.startsWith("p") ? "P" : "B"})"/>`;
-      g += `<text class="mra-l ${c} ${extra}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    g += agent("sflScan", 110, 140, 230, "CI Scanner") + agent("sflFixer", 860, 140, 200, "CI Fixer") + agent("sflFeed", 1252, 140, 210, "Feedback");
-    g += pipes + box("sflKbe", 640, 340, "issue");
-    g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
-    g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
-    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580, "assets/avatars/mona.jpg");
-    g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg sfl-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot");
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 1050,
-      START = 900,
-      HOLD = 900,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1;
-    const at = (s, o) => s.replace("{o}", o);
-    const light = nid => {
-      $(nid).classList.add("on");
-      $("sflLane" + LANE[nid]).classList.add("on");
-    };
-    // measured: the public .NET runtime repo's three CI workflows, 5 May to 14 Nov 2026 (scanner issues per month; Nov is partial)
-    const KBE_MONTHS = [
-      ["May", 65],
-      ["Jun", 56],
-      ["Jul", 36],
-      ["Aug", 54],
-      ["Sep", 71],
-      ["Oct", 4],
-      ["Nov", 19],
-    ];
-    const KPIS = [
-      ["305", "issues filed", "270 closed"],
-      ["22", "fixer PRs", "5 merged"],
-      ["12", "prompt edits", "merged"],
-      ["882", "workflow runs", "3 workflows"],
-    ];
-    const measured = h(
-      "div",
-      { class: "sfm" },
-      h("div", { class: "sfm-t" }, "MEASURED · .NET RUNTIME · 5 MAY – 14 NOV 2026 · 193 DAYS"),
-      h("div", { class: "sfm-k" }, ...KPIS.map(([n, l, s]) => h("div", {}, h("b", {}, n), l, h("br"), h("em", {}, s)))),
-      h("div", { class: "sfm-m" }, ...KBE_MONTHS.map(([m, n]) => h("div", {}, h("i", { style: `height:${Math.max(2, Math.round((n / 71) * 24))}px` }), m))),
-      h("div", { class: "sfm-c" }, "totals over the window · bars: issues/month · snapshot 14 Nov · flow illustrative")
-    );
-    slides.push({
-      group: "process",
-      notes:
-        "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three public agentic workflows, ci-failure-scan, ci-failure-fix and ci-failure-scan-feedback. The panel at the top right is measured from the public .NET runtime repository over a 193-day window, 5 May to 14 November 2026 (the snapshot date); every count is cumulative over that window: since 5 May the scanner filed 305 issues, 280 of them labelled Known Build Error, and 270 are closed, with a median of four days open; per month that is 65, 56, 36, 54, 71, 4 and 19 so far in November. Since 10 June the fixer opened 22 pull requests, 19 of them help-wanted ones that ask the owners for help, and 5 were merged. The feedback loop produced 12 merged prompt-edit pull requests, 7 of them by the Copilot coding agent, and the three workflows ran 882 times: 429 scans, 292 fix passes and 161 feedback ticks. The pipelines, failures and rubric results in the animated loop are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC,
-          o = c % 3;
-        if (c !== cyc) {
-          cyc = c;
-          $("sflCycle").textContent = `CYCLE ${c + 1}`;
-          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
-          svg.querySelectorAll(".sfl-pipe").forEach((r, i) => r.classList.toggle("bad", i === FAIL[o]));
-          $("sflBadge").textContent = `✕ ${PIPES[FAIL[o]]}: ${KIND[o]}`;
-          $("sflBeam").style.opacity = 0;
-          light("sflScan");
-          popK = -1;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP] = SEQ[k],
-          f = (u - T[k]) / dur;
-        if (eid === "SCAN" || eid === "RUBRIC") {
-          dot.style.opacity = 0;
-          for (let j = 0; j <= k; j++) light(at(SEQ[j][1], o));
-          if (eid === "SCAN") scanPipes(f, c);
-          else readRubric(f);
-          return;
-        }
-        const p = $(at(eid, o)),
-          n = p.getTotalLength(),
-          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
-        p.classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        for (let j = 0; j < k; j++) light(at(SEQ[j][1], o));
-        if (f >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          light(at(nid, o));
-        }
-      },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))),
-        svg,
-        measured
-      ),
-    });
-  }
-
-  // For PMs: two clickable PM processes (feature intake, launch readiness) from the public chrizbo/agentics-beyond-code repo (MIT): habit → agent → artifact → human, with a synthetic artifact
-  {
-    resetIndex();
-    const icon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
-    const COLS = ["#d29922", "#ab7df8", "#3fb950", "#4493f8"];
-    const KINDS = ["HABIT", "AGENT", "ARTIFACT", "HUMAN"];
-    // steps: [title, detail, icon] × 4; doc lines: [mark, label, value, cls]
-    const PROCS = [
-      {
-        tab: ["Feature intake", "a Slack reaction becomes a scored issue"],
-        steps: [
-          ["React 📥 in Slack", "on any message · no form", "comment"],
-          ["intake-triage", "scores it against strategy.md", "copilot"],
-          ["Scored intake issue", "RICE · Kano · strategy fit", "issue"],
-          ["PM decides", "accept · ask for more · park", "person"],
-        ],
-        doc: ["issue", "Intake: bulk export for workspace admins", "opened by the agent"],
-        lines: [
-          ["→", "Source", "Slack · #customer-feedback · 3 reactions", ""],
-          ["R", "Reach", "~340 admins / quarter", ""],
-          ["I", "Impact · Confidence", "2 (high) · 80%", ""],
-          ["E", "Effort", "3 person-weeks", ""],
-          ["=", "RICE score", "181 · top 10% of the backlog", "hl"],
-          ["✓", "Kano · strategy fit", "Performance · pillar 2, admin self-serve", "ok"],
-        ],
-        idea: ["Your habits are already triggers", "Nobody fills in a form. The emoji the team already uses is the trigger; the agent does the paperwork and the PM keeps the decision."],
-      },
-      {
-        tab: ["Launch readiness", "every Monday, against the policy"],
-        steps: [
-          ["Monday morning", "every launch in flight", "calendar"],
-          ["launch-readiness", "reads launch-ready.md", "copilot"],
-          ["Readiness report", "blockers · risk · sign-offs", "tasklist"],
-          ["DRI unblocks", "chases the one missing sign-off", "person"],
-        ],
-        doc: ["tasklist", "Readiness: bulk export · GA in 2 weeks", "posted Monday"],
-        lines: [
-          ["✓", "Docs", "published to staging", "ok"],
-          ["✓", "Security review", "approved", "ok"],
-          ["!", "Support runbook", "draft · no owner yet", "warn"],
-          ["✗", "Legal sign-off", "missing · blocks GA", "bad"],
-          ["✓", "Metrics dashboard", "live", "ok"],
-          ["=", "Overall risk", "medium · 1 blocker, 1 at risk", "hl"],
-        ],
-        idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
-      },
-    ];
-    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
-    const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
-    const docIco = h("span", {}),
-      docT = h("div", {}),
-      docS = h("span", { class: "pm-when" }),
-      docLines = h("div", {});
-    const ideaB = h("b", {}),
-      ideaP = h("p", {});
-    const STEP = 650;
-    let sel = 0,
-      t0 = 0,
-      shown = -1;
-    function pick(i) {
-      sel = i;
-      const p = PROCS[i];
-      tabs.forEach((t, j) => (t.classList.toggle("on", j === i), t.setAttribute("aria-pressed", String(j === i))));
-      stepEls.forEach((el, j) => {
-        const [b, em, ic] = p.steps[j];
-        el.classList.remove("lit");
-        el.querySelector("small span").replaceWith(h("span", {}, icon(ic)));
-        el.querySelector("b").textContent = b;
-        el.querySelector("em").textContent = em;
-      });
-      docIco.replaceChildren(icon(p.doc[0]));
-      docT.textContent = p.doc[1];
-      docS.textContent = p.doc[2];
-      docLines.replaceChildren(...p.lines.map(([m, l, v, c]) => h("div", { class: `pm-ln ${c}` }, h("i", {}, m), h("b", {}, l), h("span", {}, v))));
-      ideaB.textContent = p.idea[0];
-      ideaP.textContent = p.idea[1];
-      t0 = 0;
-      shown = -1;
-    }
-    slides.push({
-      group: "process",
-      notes:
-        "For PMs. Agentic workflows are not only for code. These two processes come from the public, MIT-licensed agentics-beyond-code repository (chrizbo/agentics-beyond-code), a collection of gh-aw workflows for product managers, DRIs and leaders; the workflow names, inputs, outputs and ideas are taken from it. The issue and report contents are synthetic and illustrative. Click a process, or press right, to switch. Each one has the same shape: a habit the team already has, an agent, an artifact left in the repo, and a human who decides. One, feature intake: someone reacts with an inbox emoji on a Slack message; the intake triage agent turns it into an issue scored with RICE and Kano against the strategy doc, and the PM accepts it, asks for more or parks it. The repo's idea: your habits are already triggers. Two, launch readiness: every Monday the agent reads the launch-ready policy, itself a Markdown file, checks every launch in flight and reports blockers, risk and sign-offs; the DRI chases the one missing sign-off. The idea: process as code. The repo has more, a decision log, an adversarial PM, a Friday leadership post and a process analyzer that opens a pull request when the team drifts from how-we-work.md.",
-      enter(dir) {
-        pick(dir < 0 ? 1 : 0);
-      },
-      onNext() {
-        if (sel === 0) return (pick(1), sfx.step(), true);
-      },
-      onPrev() {
-        if (sel === 1) return (pick(0), sfx.step(), true);
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const n = Math.floor((t - t0 - 500) / STEP);
-        if (n < 0 || n === shown || n > 4 + PROCS[sel].lines.length) return;
-        shown = n;
-        if (n < 4) (stepEls[n].classList.add("lit"), sfx.pop(n));
-        else if (n > 4) docLines.children[n - 5]?.classList.add("on");
-      },
-      el: h(
-        "section",
-        { class: "slide pm" },
-        h(
-          "div",
-          { class: "slide-head" },
-          h("div", { class: "kicker" }, "Agentics beyond code · patterns from ", h("a", { class: "pm-src", href: "https://github.com/chrizbo/agentics-beyond-code", target: "_blank", rel: "noopener" }, "chrizbo/agentics-beyond-code")),
-          h("h2", {}, letters("For "), letters("PMs", "l-grad"))
-        ),
-        h("div", { class: "pm-tabs" }, ...tabs),
-        h("div", { class: "pm-flow" }, ...stepEls),
-        h("div", { class: "pm-doc" }, h("div", { class: "pm-doc-h" }, docIco, docT, docS), docLines),
-        h("div", { class: "pm-idea" }, h("small", {}, "THE IDEA · FROM THE REPO"), ideaB, ideaP),
-        h("div", { class: "pm-cap" }, "Workflows and ideas from chrizbo/agentics-beyond-code (MIT) · issue and report contents synthetic")
       ),
     });
   }
@@ -14943,7 +14602,7 @@
     );
     slides.push({
       group: "process",
-      under: "handoffs",
+      under: "prr",
       notes:
         "Issue Monster loves cookie issues. In gh-aw many agentic workflows, such as deep reports, failure investigators, linters and refactoring scans, file their follow-ups as issues labelled cookie. That label is a queue. Issue Monster drains it on a schedule every 15 minutes, and most of its work is deterministic. Before any agent starts, pre-activation gates check that fewer than five Copilot pull requests are open, that build, test and lint are green, and that no Copilot pull request hit a rate limit in the last hour. If a gate blocks, the run ends there and costs no tokens. Otherwise a script filters the queue: it drops issues that are already assigned, already have a pull request, are superseded by a newer issue on the same topic, or whose topic already had two Copilot pull requests closed without merging. It then scores the rest by label and age. Only then does the agent read the top candidates, pick up to three independent ones, and assign them to Copilot with a comment explaining why. Merged pull requests close the issues; closed ones count toward the topic's retry limit. The bottom strip is measured on gh-aw (snapshot 16 November 2026). From 19 April to 16 November 2026 (211 days), Issue Monster picked 2,630 issues. 1,416 of them (54%) were closed by merged pull requests from the Copilot coding agent, with a median of 8.1 hours from issue to merge, and 1,126 merged within a day. The bars group picks by the month each issue was created. In June most picks got no pull request. In September the special token that assign-to-agent needs expired, and the maintainer, busy with other work, did not refresh it, so through October Issue Monster kept picking issues but almost none reached Copilot; the cheap gates do not check that token. From 9 to 15 November the workflow ran 615 times, and 567 of those runs (92%) ended in pre-activation, at a gate or with nothing left after filtering, before the agent started. The issues, scores, gate values and pull requests in the animated loop are illustrative and simplified.",
       enter() {
@@ -15248,7 +14907,7 @@
     let prevT = 0;
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "improvers",
       notes:
         "Research, assign, observe: an agentic feedback loop. Measured: the green panel and caption are gh-aw's own daily-cli-performance data, 13 Mar to 25 Oct 2026. The workflow benchmarks the compiler every day, keeps its history in repo memory (101 daily snapshots, 5 Apr to 13 Nov) and files '[performance] Regression in ...' issues labelled cookie: 116 of them. 101 were assigned to Copilot, 72 picked by Issue Monster, and 62 were closed by merged Copilot fixes, with a median of 6.8 hours from issue to merge (55 within a day); the next daily run re-benchmarks and observes the result. The five rows are real regressions with their slowdown and hours to fix. Illustrative: the production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
       enter() {
@@ -15558,7 +15217,7 @@
     );
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "improvers",
       notes:
         "Hunt, falsify, fix: gh-aw runs a daily vulnerability hunt on its own code with the vulnhunt skill from Capital One's open-source VulnHunter. A deterministic job, not the agent, picks the scope: it snapshots the repository, keeps only source files without tests, ranks them by risky patterns such as process execution, HTTP, tokens and file access, and hands the agent the 20 riskiest files plus a 20-file window of the ranked tail that rotates every day, so the whole codebase is covered over time. Inside the sandbox the agent hunts for injection-class bugs and then tries to falsify every candidate: is the code reachable, is the input attacker-controlled, and does exploiting it give the attacker a capability they did not already have? Only a survivor becomes a single issue, with its CWE; on most days nothing survives and the run ends with noop. The issue is assigned to Copilot, whose pull request fixes it with a regression test, and a maintainer reviews and merges it. The bottom strip is measured on gh-aw (snapshot 15 November 2026): 12 findings from 22 July to 15 November 2026 (116 days), six of them CWE-88 argument injection. Ten were fixed by merged pull requests, all opened by the Copilot coding agent, with a median of 9.6 hours from issue to merge; the other two were superseded. The workflow ran 122 times since 21 July and 108 succeeded; the early failures were cost caps and runtime issues, and the last 56 runs succeeded in a row. The files, candidates, finding and fix in the animated loop are illustrative and simplified.",
       enter() {
@@ -15788,7 +15447,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "improvers",
       notes:
         "Query, ask, grow: how gh-aw's OpenTelemetry support was built. The loop at the top is illustrative; the timeline at the bottom is measured from gh-aw's own issues. OTLP export landed on 4 April 2026. From 5 April a daily OTel Instrumentation Advisor, prompted as a senior DevOps engineer, read live gh-aw spans through the Sentry MCP server, and from 4 May a second advisor did the same through the Grafana MCP server. Each run asked one question: do these spans hold enough data to answer operational questions, such as why did this run fail, which release, which environment, how slow is the agent, what did it cost? It filed the single most impactful gap as one issue for Copilot, so the feature grew one small, reviewable increment at a time, the feature grower pattern. Measured: 89 advisor issues between 5 April and 9 June 2026, 17 from the Grafana advisor; 62 were closed by merged pull requests and 25 as not planned. When two weeks of findings stopped landing, the advisors were retired; a smoke workflow still checks that both backends accept spans and can be queried.",
       enter() {
@@ -15833,6 +15492,117 @@
     });
   }
 
+  // Dreaming (mine → cluster → design): a nightly agent mines the activity between people and agents (review threads, sessions, reopened issues, failed runs, token spend) and turns recurring patterns into new workflows, tighter prompts, linters and skills; the examples below are gh-aw's own dreams
+  {
+    resetIndex();
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const CX = 900,
+      CY = 240,
+      CR = 116;
+    // illustrative, synthetic activity: [icon, ring colour, text]; people in blue, agents in purple
+    const ACT = [
+      ["person", "#4493f8", "review: “use slices.SortFunc” ×12"],
+      ["copilot", "#8957e5", "session: 40 turns to fix one test"],
+      ["issue", "#ab7df8", "issue reopened: same flaky test"],
+      ["comment", "#4493f8", "“@copilot add the permission” ×7"],
+      ["xCircle", "#f85149", "run failed: same lint, 9th time"],
+      ["stopwatch", "#d29922", "agent run: 2.1M tokens, one diff"],
+    ];
+    // mined patterns (synthetic)
+    const PAT = [
+      [680, "repeated nit"],
+      [900, "recurring failure"],
+      [1120, "wasted turns"],
+    ];
+    // designs the dream proposes: [icon, title, detail]
+    const OUT = [
+      ["shieldCheck", "New linter", "analyzer: prefer slices.SortFunc"],
+      ["file", "New agentic workflow", "flaky-test-quarantine.md"],
+      ["stopwatch", "Optimized prompt", "fewer turns, fewer tokens"],
+      ["tasklist", "Sharper skill", "permissions guidance for agents"],
+    ];
+    const RY = i => 92 + i * 66,
+      OY = i => 76 + i * 112;
+    let g = `<text class="drm-lane" x="250" y="30">ACTIVITY</text><text class="drm-lane" x="${CX}" y="30">DREAM</text><text class="drm-lane" x="1530" y="30">DESIGN</text>`;
+    ACT.forEach(([ic, col, txt], i) => {
+      const y = RY(i);
+      g += `<path class="drm-w" id="drmIn${i}" pathLength="1" d="M520 ${y} C640 ${y}, 680 ${CY}, ${CX - CR - 6} ${CY}"/>`;
+      g += `<g class="drm-r" id="drmR${i}"><circle cx="40" cy="${y}" r="24" fill="#0d1117" stroke="${col}" stroke-width="2.5"/>${ico(ic, 40, y, 26, col)}<text x="78" y="${y + 8}">${txt}</text></g>`;
+    });
+    OUT.forEach(([, , ], i) => {
+      const y = OY(i) + 44;
+      g += `<path class="drm-w g" id="drmOut${i}" pathLength="1" d="M${CX + CR + 6} ${CY} C1140 ${CY}, 1170 ${y}, 1262 ${y}"/>`;
+    });
+    g += `<g id="drmCore"><circle class="drm-core" cx="${CX}" cy="${CY}" r="${CR}"/>${ico("copilot", CX, CY + 6, 96, "#d2a8ff")}
+      <circle cx="${CX + 58}" cy="${CY - 62}" r="24" fill="#d2a8ff"/><circle cx="${CX + 70}" cy="${CY - 72}" r="21" fill="#161b22"/>
+      <text class="drm-z" x="${CX + 82}" y="${CY - 96}">z</text><text class="drm-z b" x="${CX + 98}" y="${CY - 120}">z</text><text class="drm-z c" x="${CX + 114}" y="${CY - 144}">Z</text></g>`;
+    [[760, 120, 0], [1040, 108, 0.7], [742, 330, 1.3], [1062, 352, 0.4], [830, 90, 1.9], [985, 390, 1.1]].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
+    g += `<text class="drm-cap" x="${CX}" y="${CY + CR + 34}">nightly: mine · cluster · design</text>`;
+    PAT.forEach(([x, txt], i) => (g += `<g class="drm-t" id="drmT${i}"><rect x="${x - 100}" y="410" width="200" height="44" rx="22"/><text x="${x}" y="438">${txt}</text></g>`));
+    OUT.forEach(([ic, ttl, sub], i) => {
+      const y = OY(i);
+      g += `<g class="drm-c" id="drmC${i}"><rect x="1270" y="${y}" width="520" height="88" rx="16"/>${ico(ic, 1316, y + 44, 30, "#3fb950")}<text class="ttl" x="1354" y="${y + 38}">${ttl}</text><text class="sub" x="1354" y="${y + 68}">${sub}</text></g>`;
+    });
+    g += `<path class="drm-loop" id="drmLoop" d="M1530 524 V536 H250 V${RY(5) + 30}"/><text class="drm-lt" id="drmLt" x="${CX}" y="526">tomorrow, people and agents work with what the dream designed</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "drm-svg");
+    svg.setAttribute("viewBox", "0 0 1800 566");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id);
+    // [ms into the cycle, element ids to light, sound]
+    const CYC = 11500;
+    const STEPS = [
+      ...ACT.map((_, i) => [300 + i * 520, [`drmR${i}`], () => sfx.pop(i)]),
+      ...ACT.map((_, i) => [600 + i * 520, [`drmIn${i}`], null]),
+      [1000, ["drmCore"], null],
+      ...PAT.map((_, i) => [3900 + i * 650, [`drmT${i}`], () => sfx.key(0.7)]),
+      ...OUT.map((_, i) => [6000 + i * 650, [`drmOut${i}`, `drmC${i}`], () => sfx.pop(i + 2)]),
+      [8900, ["drmLoop", "drmLt"], () => sfx.notify(false)],
+    ];
+    let t0 = 0,
+      cyc = -1,
+      done = new Set();
+    const reset = () => {
+      svg.querySelectorAll(".on").forEach(x => x.classList.remove("on"));
+      svg.classList.remove("drm-hot");
+      done = new Set();
+    };
+    slides.push({
+      group: "process",
+      key: "dreaming",
+      notes:
+        "Dreaming: mining the activity between people and agents to design and optimize agentic workflows, prompts, skills and linters. The diagram is illustrative, with synthetic activity, patterns and proposals. During the day, people and agents leave a trail: review threads, Copilot sessions, reopened issues, comments asking an agent for the same fix again, failed runs and token spend. At night a dreaming agent reads that trail, clusters what keeps recurring, a nit made twelve times, a failure seen nine times, a session that needed forty turns, and designs something that removes it: a deterministic linter for the nit, a new agentic workflow for the failure, a tighter prompt for the wasted turns, or a sharper skill for the guidance agents keep missing. Each proposal lands as a pull request that people review. The next day, people and agents work with what the dream designed, and their activity feeds the next dream. The column below shows real dreams from gh-aw and beyond: Mine, Refine, Apply turns recurring review corrections into Go linters; Explore, Reuse, Lint caches what Sergo learned so each run explores further; and Scan, Fix, Learn feeds maintainer feedback on CI fixes back into the agent's own prompt.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+        reset();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        STEPS.forEach(([at, ids, snd], k) => {
+          if (u < at || done.has(k)) return;
+          done.add(k);
+          ids.forEach(id => (id === "drmCore" ? svg.classList.add("drm-hot") : $(id).classList.add("on")));
+          if (snd) snd();
+        });
+      },
+      el: h(
+        "section",
+        { class: "slide drm" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Mining human ↔ agent activity to design agentic workflows"), h("h2", {}, letters("Dreaming", "l-grad"))),
+        svg,
+        h("div", { class: "drm-ex" }, "dreams we run ↓", h("b", {}, "Mine · Refine · Apply"), h("b", {}, "Explore · Reuse · Lint"), h("b", {}, "Scan · Fix · Learn")),
+        h("div", { class: "ct-src" }, "illustrative · synthetic activity, patterns and designs")
+      ),
+    });
+  }
   // Mine → Refine → Apply: Linter Miner turns recurring patterns into analyzers, review refines them, LintMonster applies them across the repo. Feed events and counts are mined from gh-aw's history
   {
     resetIndex();
@@ -16004,7 +15774,7 @@
     const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "dreaming",
       notes:
         "Mine, refine, apply: harvesting recurring corrections into Go linters. The loop is illustrative of three of gh-aw's own workflows; the feed and numbers are mined from gh-aw's history, 15 May to 11 November 2026. Mine: every day Linter Miner reads recent issues, discussions and the Go code, picks one pattern no existing analyzer catches, and opens a draft pull request with a go/analysis analyzer and its tests under pkg/linters. It opened 73 such pull requests; 65 merged and 8 were closed. Refine: Copilot code review and a maintainer leave review threads, and Copilot pushes fixes; 58 of the 65 needed follow-up commits, 376 reviews in all, and the median analyzer merged about two hours after it was opened. Apply: once merged the analyzer runs in make golint-custom. Every day LintMonster runs it, groups the findings by root cause and keeps one tracking issue per category, 235 so far, some counting thousands of findings, such as 3,561 unchecked errors on 4 October. Maintainers assign them to Copilot, and 92 merged Copilot pull requests closed them, changing 54,128 lines. For example, the sortslice analyzer merged on 8 June and the next day a Copilot pull request moved every sort.Slice call to slices.SortFunc. Human corrections become deterministic checks.",
       enter() {
@@ -16359,7 +16129,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "dreaming",
       notes:
         "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces. The strip at the bottom is measured, not illustrative, over 16 April to 14 November 2026 (213 days, snapshot 14 November 2026); each panel is labelled with its own window. It comes from Sergo's repo memory in gh-aw (the memory/sergo branch: its run statistics and the history of its strategy cache) and from gh-aw issues and pull requests labelled sergo, 16 April to 14 November 2026. Over 128 cached runs, 6 May to 14 November, Sergo logged 667 findings, and findings per run fell from 8.3 in May to 3.3 in October: the easy patterns run out, which is the exhaustion the grid shows. No runs were cached in August. It filed 287 issues, 16 April to 29 October; 164 merged pull requests closed 172 of them, 158 of those authored by Copilot. Since late October Sergo opens its own pull requests: 17 merged. Thirteen of them, 31 October to 12 November, came from one cached strategy, paren_unwrap_gap, linters that missed calls wrapped in parentheses: each day's cache entry reads cached: paren_unwrap_gap plus new: some untried corner, reuse and explore in the same run. The three cache lines are real entries, shortened.",
       enter() {
@@ -16513,7 +16283,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "improvers",
       notes:
         "Semantic clustering: instead of matching text, an agent reads what each function is for and groups functions by intent. This is a real report from gh-aw's Semantic Function Refactoring workflow, issue 30711 of 7 May 2026. It catalogued 762 non-test Go files and 3,727 functions in pkg/ using naming patterns, Serena LSP analysis and code review, and found 0 true duplicates. Clustering by intent still exposed misplaced code: env.go held only YAML-writing helpers, and five public validation functions sat in parser, checker and helper files. The Copilot coding agent merged PR 30770 the same day (+149 −142, 8 files), renaming env.go to yaml_env_helpers.go and moving the validators into *_validation.go files. Function names, signatures, files and counts are real; the scan, beams and chip animation are illustrative. The workflow now reviews a small rotating slice of functions each day rather than the whole package tree.",
       enter() {
@@ -16705,7 +16475,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "specs",
       notes:
         "Spec, model, test: formal methods as the backbone of spec-driven development, on gh-aw's own work queue. Measured, data window 2 Oct to 14 Nov 2026 (43 days), snapshot taken 14 Nov 2026: the top-right ledger counts the repository's specs/work-queue folder (16 TLA+ modules, 218 TLC configurations, of which 99 are Broken mutants and 55 are witnesses) and the 35 merged pull requests that changed it between 2 Oct and 14 Nov 2026 (file counts are as of the 14 Nov snapshot). The Daily Work Queue Formal Verification workflow re-runs the two expensive configurations every day; on its 11 Nov run FairDAGGitHub exhausted 1,055,182 distinct states at depth 20 in 16 min 33 s with Safety holding, while QueueOrdering was still open after 4 h 40 m with 178.9 million distinct states at depth 20, so it is reported as not established, not as a pass. The BrokenCAS mutant must fail TerminalPersistence (735 states) and the WeakOrderingWitness must reach an out-of-order Claim (756 states), from the 7 Oct 2026 verification record; that witness is why the spec says oldest-first is best effort, not strict FIFO. Shared fixtures replay against the real Go and JavaScript engines. Illustrative: the requirement wording, the abridged TLA+ excerpt, the small state graph and its animation are simplified; the invariant, mutant and witness names are real. Bounded checks are strong evidence, not a proof.",
       enter() {
@@ -16961,7 +16731,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "improvers",
       notes:
         "Go Fan: learning the libraries you depend on and keeping up with their releases. The loop is illustrative of what the Go Fan workflow does. Every weekday it reads go.mod, picks the next direct dependency, most recently updated upstream first and skipping the ones it remembers reviewing in cache memory, then studies the module's README, release notes and changelog and compares them with how our code actually uses it: new APIs we ignore, deprecated calls we still make, defaults that changed. It files one review issue; a maintainer assigns the good ones to Copilot, which opens a pull request that a maintainer reviews and merges. Dependabot bumps the version; Go Fan teaches you what changed and how to use it. The numbers and pull request titles are mined from gh-aw's own history, February to November 2026: 121 daily review issues covering 28 modules, most often the MCP Go SDK (22) and x/tools (15); 43 merged pull requests closed those reviews, all authored by Copilot, changing 16,372 lines. Titles are shortened. Before February the reviews were posted as discussions and are not counted.",
       enter() {
@@ -17445,7 +17215,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      key: "specs",
       notes:
         "Spec-driven testing, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt in the flow is an illustrative, simplified view of gh-aw's ctxutil package. The strip below is measured on gh-aw's public history over the whole life of these workflows, 30 March to 14 November 2026 (229 days, snapshot 14 November 2026): 83 merged spec-extractor pull requests updating package README specs; 69 merged spec-enforcer pull requests adding 12,731 lines of spec tests; 68 spec-librarian audit issues, which led to 38 merged Copilot fix pull requests; 22 merged pull requests from the weekly safe outputs spec review; and TestSpec functions in pkg on main growing from 0 at the start of April to 415 across 48 spec test files. The real ctxutil helper followed this path too: added on 3 August, spec tests on 14 August after a librarian audit, enforced on 6 October. Counts come from pull requests and issues matched by each workflow's title prefix, and from git history on main. pr-specification-reviewer and the W3C specification writer agent also take part.",
       enter() {
@@ -17730,7 +17500,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      key: "docs",
       notes:
         "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, from the first one on 10 October 2025 to 14 November 2026 (400 days): 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026 (246 days): 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
       enter() {
@@ -18073,7 +17843,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "docs",
       notes:
         "Multi-device tester, as gh-aw tests its own documentation site. Every day the Multi-Device Docs Tester workflow builds the docs, starts a preview server inside the sandbox and drives a real browser with the Playwright CLI across ten viewports: four phones, three tablets and three desktops. On each one it checks layout (overflow, truncation, broken grids), accessibility, and interactions such as navigation, search and the responsive header menu. If everything passes it calls noop; otherwise it files one report issue that groups findings by severity, critical first, with the details folded away. Reports expire after two days, so only the ones a maintainer acts on survive: they are assigned to Copilot, whose pull request fixes the site or the tester itself and usually adds a regression test; a developer reviews and merges it, and the next daily run checks the fix. The bottom strip is measured on gh-aw (snapshot 15 November 2026): all 61 daily report issues from the first on 7 December 2025 to 15 November 2026 (343 days). 39 were closed by merged pull requests, 35 of them opened by Copilot: 28 changed the docs site (touch targets, skip links, headings, table overflow, header breakpoints), 9 hardened the tester workflow (browser startup, preview server, navigation selectors) and 2 changed something else. The median from report to merged fix was 6.5 hours. The other 22 closed without a merged fix, 19 of them expiring unaddressed. The devices, report, fix and review in the loop above are an illustrative, simplified example.",
       enter() {
@@ -18172,7 +17942,7 @@
     );
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "docs",
       notes:
         "Findings that land. Eight gh-aw workflows audit the documentation and file what they find as issues: a persona walking the enterprise docs, the spec librarian, the multi-device tester, the CLI consistency checker, the doc healer, a spec coverage check, an SEO optimizer for the docs and a designer drift audit. The table is measured on gh-aw (snapshot 15 November 2026): every issue each auditor filed, matched by its title prefix, from the first on 12 November 2025 to 15 November 2026 (368 days), excluding the workflows' own failure reports. 583 findings were filed and 273 were closed by merged pull requests, 255 of those opened by Copilot. What separates the top five from the bottom three is not the auditor but the hand-off: 323 findings were assigned to Copilot, by the workflow itself or by a maintainer triaging it, and 256 of them, 79 percent, were fixed by a merged pull request; of the 260 left unassigned only 17, 7 percent, were. Read this as correlation, not proof: maintainers assign the findings they judge worth fixing, and the unassigned auditors post rolling reports that close the previous one and expire after two to seven days by design. The lesson for auditors is to file one checkable defect per issue and route it to an agent that can fix it. The two issue cards on the right are an illustrative, simplified example.",
       el: h(
@@ -18433,7 +18203,7 @@
     };
     slides.push({
       group: "process",
-      under: "unsloppers",
+      under: "docs",
       notes:
         "Personas, probe, patch: how gh-aw tests the agent that writes its workflows. Every day the Agent Persona Explorer workflow rotates through nine software personas (backend, frontend, DevOps, QA, product manager, program manager, designer, legal and compliance, information worker), picks three, and invents realistic automation requests for each. A sub-agent role-plays the agentic-workflows custom agent and answers them; the explorer scores every answer from 1 to 5 on trigger choice, tools, security, prompt clarity and completeness. Then comes the probe: it re-runs one scenario with only the first 8,000 bytes of each guidance file, because that is all some prompt-file loaders expose, and reports any rule that sits past the cut. The findings go into one report issue; a maintainer can assign it to Copilot, whose pull request moves the rule up or tightens the guidance, and the next run scores again. The bottom strip is measured on gh-aw (snapshot 15 November 2026): all 133 daily report issues from 8 June 2026, when the report moved from discussions to issues, to 15 November 2026 (160 days). 25 were closed by merged pull requests, 22 of them opened by Copilot and one by a bot: 23 changed the agent's guidance files and 2 changed something else. The other 108 were closed without a merged fix when the next report replaced them. The agentic-workflows agent file is 17,035 bytes, so the probe sees less than half of it. The personas, scores, rule and fix in the loop above are an illustrative, simplified example.",
       enter() {
@@ -18473,6 +18243,527 @@
         svg,
         ppm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 8 Jun–15 Nov 2026 (160 d) · loop illustrative")
+      ),
+    });
+  }
+
+  // Speech To Agent (speak → map → grep): a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const pill = (x, y, w, label) => `<g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    // illustrative: misheard speech-to-text, the glossary identifier it maps to, and synthetic grep counts
+    const EX = [
+      ["cash memory", "cache-memory", 214, 31],
+      ["depend a bot", "Dependabot", 57, 12],
+      ["fire wall", "firewall", 163, 27],
+      ["A W dot Y M L", "aw.yml", 42, 9],
+    ];
+    // synthetic renames: [old, new, how it is spoken, glossary identifier]
+    const REN = [
+      ["procSO()", "parseSafeOutputs()", "parse safe outputs", "parseSafeOutputs"],
+      ["doCfg()", "loadConfig()", "load config", "loadConfig"],
+      ["hndl()", "handleComment()", "handle comment", "handleComment"],
+      ["chk()", "checkPermissions()", "check permissions", "checkPermissions"],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]; b = the speaker, p = agents, g = keeping names and glossary in sync
+    const EDGES = [
+      ["e0", "M106 190 H142", "b", [], 0, 0, "start"],
+      ["e1", "M476 190 H556", "b", ["maps"], 516, 162, "middle"],
+      ["e2", "M1112 190 H1198", "p", ["prompt"], 1155, 162, "middle"],
+      ["e3", "M1236 226 V272", "p", ["greps"], 1252, 256, "start"],
+      ["e4", "M1290 422 V502", "g", ["rename for", "findability"], 1306, 452, "start"],
+      ["e5", "M1254 540 H1094", "g", ["proposes"], 1174, 512, "middle"],
+      ["e6", "M698 540 H488", "g", ["new name"], 593, 512, "middle"],
+      ["e7", "M200 504 V390", "g", ["opens PR"], 216, 456, "start"],
+      ["e8", "M454 350 H556", "g", ["merges"], 505, 322, "middle"],
+    ];
+    const SEQ = [
+      ["e0", "nRaw", 900],
+      ["e1", "nDict"],
+      ["e2", "nAgent"],
+      ["e3", "nGrep", 1200],
+      ["e4", "nNamer", 1200],
+      ["e5", "nRen"],
+      ["e6", "nDP"],
+      ["e7", "nMaint", 1200],
+      ["e8", "dgNew", 1200],
+    ];
+    const LANE = { nMic: 0, nRaw: 0, nMaint: 0, nDict: 1, nAgent: 2, nGrep: 2 };
+    const MK = { g: ["dgG", "#3fb950"], b: ["dgB", "#4493f8"], p: ["dgP", "#ab7df8"] };
+    let g = `<defs>`;
+    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+    g += `<clipPath id="dgClip"><circle cx="200" cy="350" r="31"/></clipPath>`;
+    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/><rect class="dg-band" x="0" y="470" width="${VW}" height="150"/>`;
+    g += `<text class="fm-lane-t" x="1680" y="546">KEEP IN SYNC</text>`;
+    [
+      [0, 520, "SPEAK"],
+      [520, 1150, "MAP"],
+      [1150, VW, "GREP"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dgLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="430"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += `<g class="dg-mic" id="nMic"><circle class="dg-ring" cx="70" cy="190" r="34"/><circle cx="70" cy="190" r="34" fill="#1f6feb"/><rect x="62" y="170" width="16" height="26" rx="8" fill="#f0f6fc"/><path d="M57 190a13 13 0 0 0 26 0M70 203v9M63 212h14" fill="none" stroke="#f0f6fc" stroke-width="3" stroke-linecap="round"/></g>`;
+    g += `<text class="dg-cap" x="70" y="254">voice</text>`;
+    g += `<g class="fm-out" id="nRaw"><rect x="146" y="120" width="328" height="142" rx="14"/><text class="dg-hd" x="166" y="156">SPEECH-TO-TEXT</text><text class="dg-raw" x="166" y="206" id="dgRaw"></text><text class="dg-miss" x="166" y="242">grep → 0 matches</text></g>`;
+    g += `<g class="dg-dict" id="nDict"><rect class="dg-card" x="560" y="84" width="550" height="326" rx="16"/>${ico("tasklist", 590, 116, 22, "#9198a1")}<text class="dg-hd" x="610" y="122">DICTATION.md</text><text class="dg-hd" x="1090" y="122" text-anchor="end">SPOKEN → CODE</text>`;
+    const row = (cls, id, y, spoken, ident, sid = "", iid = "") =>
+      `<g class="${cls}" id="${id}"><rect x="570" y="${y - 22}" width="530" height="44" rx="10"/><text x="590" y="${y + 7}"${sid}>${spoken}</text><text x="870" y="${y + 7}" text-anchor="middle">→</text><text class="dg-id" x="894" y="${y + 7}"${iid}>${ident}</text></g>`;
+    EX.forEach(([s, id], i) => (g += row("dg-row", "dgRow" + i, 168 + i * 50, `"${s}"`, id)));
+    g += row("dg-new", "dgNew", 372, "", "", ' id="dgNewS"', ' id="dgNewI"') + `</g>`;
+    g += agent("nAgent", 1236, 190, 160, "Agent");
+    g += `<text class="dg-ident" id="dgIdent" x="1424" y="198"><tspan class="dg-k">uses </tspan><tspan id="dgIdentV"></tspan></text>`;
+    g += `<g class="fm-out dg-term" id="nGrep"><rect class="dg-tb" x="1180" y="276" width="600" height="144" rx="14"/>${["#f85149", "#d29922", "#3fb950"].map((c, k) => `<circle cx="${1204 + k * 22}" cy="298" r="6" fill="${c}"/>`).join("")}<text class="dg-hd" x="1272" y="304">bash</text><text class="dg-cmd dg-tl" x="1204" y="352" id="dgCmd"></text><text class="dg-hit dg-tl" x="1204" y="396" id="dgHit"></text></g>`;
+    g += agent("nNamer", 1290, 540, 250, "Function Namer") + `<text class="dg-cap" x="1290" y="604">daily</text>`;
+    g += `<g class="fm-out dg-chip" id="nRen"><rect x="700" y="512" width="390" height="56" rx="14"/><text x="895" y="548"><tspan class="dg-old" id="dgOld"></tspan> → <tspan class="dg-nn" id="dgNN"></tspan></text></g>`;
+    g += agent("nDP", 200, 540, 280, "Dictation Prompt") + `<text class="dg-cap" x="200" y="604">weekly</text>`;
+    g += `<g class="fm-task mra-dev" id="nMaint"><g class="fm-pill b"><rect x="200" y="325" width="250" height="50" rx="25"/><text x="343" y="358">Maintainer</text></g><circle cx="200" cy="350" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="169" y="319" width="62" height="62" clip-path="url(#dgClip)"/></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg dg-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "Speech To Agent: a misheard speech-to-text phrase is mapped by the DICTATION.md glossary to the exact identifier, the agent greps it and finds matches; a daily namer agent proposes clearer API names, a weekly dictation agent opens a pull request adding them to the glossary, and the maintainer reviews and merges it"
+    );
+    svg.style.setProperty("--c", "#4493f8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1000,
+      START = 900,
+      HOLD = 2000,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      if (nid in LANE) $("dgLane" + LANE[nid]).classList.add("on");
+      if (nid === "nDict") $("dgRow" + (cyc % EX.length)).classList.add("pick");
+      if (nid === "nAgent") $("dgIdent").classList.add("on");
+    };
+    const fill = c => {
+      const [s, id, n, f] = EX[c % EX.length],
+        [old, nn, rs, ri] = REN[c % REN.length];
+      $("dgRaw").textContent = `"${s}"`;
+      $("dgIdentV").textContent = id;
+      $("dgCmd").textContent = `$ grep -rn "${id}" .`;
+      $("dgHit").textContent = `✓ ${n} matches in ${f} files`;
+      $("dgOld").textContent = old;
+      $("dgNN").textContent = nn;
+      $("dgNewS").textContent = `+ "${rs}"`;
+      $("dgNewI").textContent = ri;
+    };
+    slides.push({
+      group: "process",
+      notes:
+        "Speech To Agent: talking to agents instead of typing. The run is illustrative; the phrases and corrections come from gh-aw's real DICTATION.md, while the grep counts and the renamed functions are synthetic. When you dictate a prompt, speech-to-text hears words, not identifiers: you say cache-memory and it writes cash memory, you say Dependabot and it writes depend a bot. Agents search the codebase with grep, which matches exact tokens, so cash memory finds nothing. DICTATION.md is a prompt you paste into your voice dictation app: a project glossary plus a list of spoken forms and the exact identifiers they map to, hyphens, dots and casing included. The app's model rewrites the transcript, the agent receives cache-memory, and grep lands on every definition and call site. Two agentic workflows keep it true. A daily namer agent reviews one package at a time and proposes renames so functions say what they do, procSO becomes parseSafeOutputs, which is also how you would say it out loud; Copilot implements the rename. A weekly dictation prompt agent re-reads the docs and code, extracts the vocabulary and opens a pull request that adds the new terms to DICTATION.md; the maintainer, the same person who dictates, reviews and merges it, so the glossary only holds words they actually say. Names you can say map to names you can grep.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .pick").forEach(x => x.classList.remove("on", "hot", "pick"));
+          fill(c);
+          light("nMic");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          fr = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", MK[p.classList[1]][1]);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (fr >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Dictate to agents · say the word, hit the symbol"), h("h2", {}, letters("Speech To "), letters("Agent", "l-grad"))),
+        svg,
+        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["DICTATION.md", "dictation-prompt", "daily-function-namer"].map(n => h("span", {}, n)))
+      ),
+    });
+  }
+
+  // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#8957e5"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const maint = (
+      id,
+      x,
+      y,
+      avatar = "assets/avatars/mona.jpg"
+    ) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
+    const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
+    const FAIL = [1, 3, 4],
+      KIND = ["test hang", "assertion failure", "build break"];
+    const ROW0 = 284,
+      ROWH = 26;
+    let pipes = `<g class="sfl-box" id="sflPipes"><rect class="sfl-card" x="24" y="220" width="460" height="232" rx="12"/><text class="sfl-title" x="40" y="246">OUTER-LOOP PIPELINES</text>`;
+    PIPES.forEach((p, i) => (pipes += `<g class="sfl-row sfl-pipe" data-y="${ROW0 + i * ROWH}"><text x="40" y="${ROW0 + i * ROWH}">${p}</text><circle cx="462" cy="${ROW0 + i * ROWH - 6}" r="7"/></g>`));
+    pipes += `<text class="sfl-badge" id="sflBadge" x="40" y="440"></text>`;
+    pipes += `<g class="sfl-scan" id="sflBeam"><rect x="24" y="-28" width="460" height="28" fill="url(#sflBeamG)"/><line x1="24" y1="0" x2="484" y2="0"/></g></g>`;
+    const RUB = [
+      ["ok", "✓ signature is specific"],
+      ["ok", "✓ known-error data is valid"],
+      ["ok", "✓ fixed, never muted"],
+      ["ko", "✗ owner pinged wrongly"],
+      ["ed", "+ prompt edit proposed"],
+    ];
+    let rubric = `<g class="sfl-box" id="sflRubric"><rect class="sfl-card" x="1316" y="270" width="364" height="190" rx="12"/><text class="sfl-title" x="1332" y="296">KPI TRACKER · RUBRIC</text>`;
+    RUB.forEach(([c, t], i) => (rubric += `<g class="sfl-row sfl-rub"><text class="${c}" x="1332" y="${330 + i * 27}">${t}</text></g>`));
+    rubric += `</g>`;
+    const scanPipes = (f, c) => {
+      const s = $("sflBeam"),
+        y = 262 + Math.min(1, f / 0.75) * 166;
+      s.setAttribute("transform", `translate(0,${y})`);
+      s.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      svg.querySelectorAll(".sfl-pipe").forEach(r => r.classList.toggle("seen", +r.dataset.y <= y));
+      if (ROW0 + FAIL[c % 3] * ROWH <= y && !$("sflBadge").classList.contains("on")) {
+        $("sflBadge").classList.add("on");
+        sfx.pop(5);
+      }
+    };
+    const readRubric = f => svg.querySelectorAll(".sfl-rub").forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.5) / (RUB.length + 0.5)));
+    // [edge id, path, color, label, lx, ly, anchor, extra label class]
+    const EDGES = [
+      ["sflE0", "M110 174 V212", "p", ["scans failing runs"], 132, 200, "start"],
+      ["sflE1", "M492 340 H596", "p", ["files Known", "Build Error"], 640, 404, "middle"],
+      ["sflE2", "M640 304 V140 H818", "p", ["picks up", "open errors"], 662, 222, "start"],
+      ["sflO0", "M860 174 V274 H760 V320", "p", ["small and build-validated:", "draft fix PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO1", "M860 174 V274 H900 V320", "p", ["plausible, unverified:", "help-wanted PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO2", "M860 174 V274 H1040 V320", "p", ["no code change possible:", "root-cause comment"], 880, 222, "start", "sfl-ol"],
+      ["sflR0", "M760 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR1", "M900 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR2", "M1040 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflE3", "M1072 580 H1190 V140 H1214", "b", ["reactions & reviews"], 1140, 622, "middle"],
+      ["sflE4", "M1252 174 V292", "p", ["scores both", "against rubrics"], 1274, 222, "start"],
+      ["sflE5", "M1252 366 V542", "p", ["proposes", "prompt edits"], 1274, 494, "start"],
+      ["sflE6", "M1464 580 H1640 V655 H10 V140 H72", "b day", ["sharper prompts · the loop runs again"], 700, 642, "middle"],
+    ];
+    // the token's journey: [edge, node lit on arrival, duration]; SCAN and RUBRIC are in-place steps, {o} is this cycle's outcome
+    const SEQ = [
+      ["sflE0", "sflPipes"],
+      ["SCAN", "sflPipes", 2600],
+      ["sflE1", "sflKbe"],
+      ["sflE2", "sflFixer"],
+      ["sflO{o}", "sflOut{o}"],
+      ["sflR{o}", "sflDev"],
+      ["sflE3", "sflFeed"],
+      ["sflE4", "sflKpi"],
+      ["RUBRIC", "sflRubric", 2400],
+      ["sflE5", "sflDev2"],
+      ["sflE6", "sflScan", 1800],
+    ];
+    const LANE = { sflScan: 0, sflPipes: 0, sflKbe: 1, sflFixer: 1, sflOut0: 1, sflOut1: 1, sflOut2: 1, sflDev: 1, sflFeed: 2, sflKpi: 2, sflRubric: 2, sflDev2: 2 };
+    let g = `<defs><clipPath id="sflClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="sflP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="sflBeamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
+      <marker id="sflB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "SCAN · EVERY 12H"],
+      [520, 1160, "FIX · WEEKDAYS"],
+      [1160, VW, "LEARN · BI-WEEKLY"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="sflLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an, extra = ""] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#sfl${c.startsWith("p") ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c} ${extra}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += agent("sflScan", 110, 140, 230, "CI Scanner") + agent("sflFixer", 860, 140, 200, "CI Fixer") + agent("sflFeed", 1252, 140, 210, "Feedback");
+    g += pipes + box("sflKbe", 640, 340, "issue");
+    g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
+    g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
+    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580, "assets/avatars/mona.jpg");
+    g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg sfl-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 900,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const at = (s, o) => s.replace("{o}", o);
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("sflLane" + LANE[nid]).classList.add("on");
+    };
+    // measured: the public .NET runtime repo's three CI workflows, 5 May to 14 Nov 2026 (scanner issues per month; Nov is partial)
+    const KBE_MONTHS = [
+      ["May", 65],
+      ["Jun", 56],
+      ["Jul", 36],
+      ["Aug", 54],
+      ["Sep", 71],
+      ["Oct", 4],
+      ["Nov", 19],
+    ];
+    const KPIS = [
+      ["305", "issues filed", "270 closed"],
+      ["22", "fixer PRs", "5 merged"],
+      ["12", "prompt edits", "merged"],
+      ["882", "workflow runs", "3 workflows"],
+    ];
+    const measured = h(
+      "div",
+      { class: "sfm" },
+      h("div", { class: "sfm-t" }, "MEASURED · .NET RUNTIME · 5 MAY – 14 NOV 2026 · 193 DAYS"),
+      h("div", { class: "sfm-k" }, ...KPIS.map(([n, l, s]) => h("div", {}, h("b", {}, n), l, h("br"), h("em", {}, s)))),
+      h("div", { class: "sfm-m" }, ...KBE_MONTHS.map(([m, n]) => h("div", {}, h("i", { style: `height:${Math.max(2, Math.round((n / 71) * 24))}px` }), m))),
+      h("div", { class: "sfm-c" }, "totals over the window · bars: issues/month · snapshot 14 Nov · flow illustrative")
+    );
+    slides.push({
+      group: "process",
+      under: "dreaming",
+      notes:
+        "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three public agentic workflows, ci-failure-scan, ci-failure-fix and ci-failure-scan-feedback. The panel at the top right is measured from the public .NET runtime repository over a 193-day window, 5 May to 14 November 2026 (the snapshot date); every count is cumulative over that window: since 5 May the scanner filed 305 issues, 280 of them labelled Known Build Error, and 270 are closed, with a median of four days open; per month that is 65, 56, 36, 54, 71, 4 and 19 so far in November. Since 10 June the fixer opened 22 pull requests, 19 of them help-wanted ones that ask the owners for help, and 5 were merged. The feedback loop produced 12 merged prompt-edit pull requests, 7 of them by the Copilot coding agent, and the three workflows ran 882 times: 429 scans, 292 fix passes and 161 feedback ticks. The pipelines, failures and rubric results in the animated loop are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          o = c % 3;
+        if (c !== cyc) {
+          cyc = c;
+          $("sflCycle").textContent = `CYCLE ${c + 1}`;
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          svg.querySelectorAll(".sfl-pipe").forEach((r, i) => r.classList.toggle("bad", i === FAIL[o]));
+          $("sflBadge").textContent = `✕ ${PIPES[FAIL[o]]}: ${KIND[o]}`;
+          $("sflBeam").style.opacity = 0;
+          light("sflScan");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (eid === "SCAN" || eid === "RUBRIC") {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(at(SEQ[j][1], o));
+          if (eid === "SCAN") scanPipes(f, c);
+          else readRubric(f);
+          return;
+        }
+        const p = $(at(eid, o)),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(at(SEQ[j][1], o));
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(at(nid, o));
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))),
+        svg,
+        measured
+      ),
+    });
+  }
+
+  // For PMs: two clickable PM processes (feature intake, launch readiness) from the public chrizbo/agentics-beyond-code repo (MIT): habit → agent → artifact → human, with a synthetic artifact
+  {
+    resetIndex();
+    const icon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    const COLS = ["#d29922", "#ab7df8", "#3fb950", "#4493f8"];
+    const KINDS = ["HABIT", "AGENT", "ARTIFACT", "HUMAN"];
+    // steps: [title, detail, icon] × 4; doc lines: [mark, label, value, cls]
+    const PROCS = [
+      {
+        tab: ["Feature intake", "a Slack reaction becomes a scored issue"],
+        steps: [
+          ["React 📥 in Slack", "on any message · no form", "comment"],
+          ["intake-triage", "scores it against strategy.md", "copilot"],
+          ["Scored intake issue", "RICE · Kano · strategy fit", "issue"],
+          ["PM decides", "accept · ask for more · park", "person"],
+        ],
+        doc: ["issue", "Intake: bulk export for workspace admins", "opened by the agent"],
+        lines: [
+          ["→", "Source", "Slack · #customer-feedback · 3 reactions", ""],
+          ["R", "Reach", "~340 admins / quarter", ""],
+          ["I", "Impact · Confidence", "2 (high) · 80%", ""],
+          ["E", "Effort", "3 person-weeks", ""],
+          ["=", "RICE score", "181 · top 10% of the backlog", "hl"],
+          ["✓", "Kano · strategy fit", "Performance · pillar 2, admin self-serve", "ok"],
+        ],
+        idea: ["Your habits are already triggers", "Nobody fills in a form. The emoji the team already uses is the trigger; the agent does the paperwork and the PM keeps the decision."],
+      },
+      {
+        tab: ["Launch readiness", "every Monday, against the policy"],
+        steps: [
+          ["Monday morning", "every launch in flight", "calendar"],
+          ["launch-readiness", "reads launch-ready.md", "copilot"],
+          ["Readiness report", "blockers · risk · sign-offs", "tasklist"],
+          ["DRI unblocks", "chases the one missing sign-off", "person"],
+        ],
+        doc: ["tasklist", "Readiness: bulk export · GA in 2 weeks", "posted Monday"],
+        lines: [
+          ["✓", "Docs", "published to staging", "ok"],
+          ["✓", "Security review", "approved", "ok"],
+          ["!", "Support runbook", "draft · no owner yet", "warn"],
+          ["✗", "Legal sign-off", "missing · blocks GA", "bad"],
+          ["✓", "Metrics dashboard", "live", "ok"],
+          ["=", "Overall risk", "medium · 1 blocker, 1 at risk", "hl"],
+        ],
+        idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
+      },
+    ];
+    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
+    const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
+    const docIco = h("span", {}),
+      docT = h("div", {}),
+      docS = h("span", { class: "pm-when" }),
+      docLines = h("div", {});
+    const ideaB = h("b", {}),
+      ideaP = h("p", {});
+    const STEP = 650;
+    let sel = 0,
+      t0 = 0,
+      shown = -1;
+    function pick(i) {
+      sel = i;
+      const p = PROCS[i];
+      tabs.forEach((t, j) => (t.classList.toggle("on", j === i), t.setAttribute("aria-pressed", String(j === i))));
+      stepEls.forEach((el, j) => {
+        const [b, em, ic] = p.steps[j];
+        el.classList.remove("lit");
+        el.querySelector("small span").replaceWith(h("span", {}, icon(ic)));
+        el.querySelector("b").textContent = b;
+        el.querySelector("em").textContent = em;
+      });
+      docIco.replaceChildren(icon(p.doc[0]));
+      docT.textContent = p.doc[1];
+      docS.textContent = p.doc[2];
+      docLines.replaceChildren(...p.lines.map(([m, l, v, c]) => h("div", { class: `pm-ln ${c}` }, h("i", {}, m), h("b", {}, l), h("span", {}, v))));
+      ideaB.textContent = p.idea[0];
+      ideaP.textContent = p.idea[1];
+      t0 = 0;
+      shown = -1;
+    }
+    slides.push({
+      group: "process",
+      notes:
+        "For PMs. Agentic workflows are not only for code. These two processes come from the public, MIT-licensed agentics-beyond-code repository (chrizbo/agentics-beyond-code), a collection of gh-aw workflows for product managers, DRIs and leaders; the workflow names, inputs, outputs and ideas are taken from it. The issue and report contents are synthetic and illustrative. Click a process, or press right, to switch. Each one has the same shape: a habit the team already has, an agent, an artifact left in the repo, and a human who decides. One, feature intake: someone reacts with an inbox emoji on a Slack message; the intake triage agent turns it into an issue scored with RICE and Kano against the strategy doc, and the PM accepts it, asks for more or parks it. The repo's idea: your habits are already triggers. Two, launch readiness: every Monday the agent reads the launch-ready policy, itself a Markdown file, checks every launch in flight and reports blockers, risk and sign-offs; the DRI chases the one missing sign-off. The idea: process as code. The repo has more, a decision log, an adversarial PM, a Friday leadership post and a process analyzer that opens a pull request when the team drifts from how-we-work.md.",
+      enter(dir) {
+        pick(dir < 0 ? 1 : 0);
+      },
+      onNext() {
+        if (sel === 0) return (pick(1), sfx.step(), true);
+      },
+      onPrev() {
+        if (sel === 1) return (pick(0), sfx.step(), true);
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const n = Math.floor((t - t0 - 500) / STEP);
+        if (n < 0 || n === shown || n > 4 + PROCS[sel].lines.length) return;
+        shown = n;
+        if (n < 4) (stepEls[n].classList.add("lit"), sfx.pop(n));
+        else if (n > 4) docLines.children[n - 5]?.classList.add("on");
+      },
+      el: h(
+        "section",
+        { class: "slide pm" },
+        h(
+          "div",
+          { class: "slide-head" },
+          h("div", { class: "kicker" }, "Agentics beyond code · patterns from ", h("a", { class: "pm-src", href: "https://github.com/chrizbo/agentics-beyond-code", target: "_blank", rel: "noopener" }, "chrizbo/agentics-beyond-code")),
+          h("h2", {}, letters("For "), letters("PMs", "l-grad"))
+        ),
+        h("div", { class: "pm-tabs" }, ...tabs),
+        h("div", { class: "pm-flow" }, ...stepEls),
+        h("div", { class: "pm-doc" }, h("div", { class: "pm-doc-h" }, docIco, docT, docS), docLines),
+        h("div", { class: "pm-idea" }, h("small", {}, "THE IDEA · FROM THE REPO"), ideaB, ideaP),
+        h("div", { class: "pm-cap" }, "Workflows and ideas from chrizbo/agentics-beyond-code (MIT) · issue and report contents synthetic")
       ),
     });
   }
@@ -18679,7 +18970,7 @@
       "Create a PR that adds a new scheduled agentic workflow, pr-sous-chef, which is in charge of finishing the PR … runs every 15min",
       'Create a PR that adds a new scheduled agentic workflow, pr-sous-chef, which is in charge of finishing the PR up to a state where the maintainer should\nInvestigate.\n\nThe pr-sous-chef runs every 15min uses copilot gpt-mini size models\n\n- skip if no PR opened (non-draft)\n- skip PRs that have checks/actions running on the branch\n- skip if the last comment is from pr-sous-chef itself\n\nNudges:\n- update PR branch if possible\n- if the PR has pull request review comments that are still active or not commented, nudge copilot to work on the by posting "@copilot review all comments"\n- implement any other strategy to move PR forward\n\nGuidance:\n- Use subagent to process individual PR\n- maximize token efficiency',
     ],
-    "Daily Unsloppers": [
+    "Daily Improvers": [
       "duplicate-code-detector",
       "Add agentic workflow that uses Serena MCP docker … to analyze the changes in commits to main and detect duplicated code.",
       "Add agentic workflow that uses Serena MCP docker (using container feature) to analyze the changes in commits to main and detect duplicated code.",
