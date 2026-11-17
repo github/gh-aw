@@ -39,12 +39,12 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Issues as intent | illustrative | Contributors run a debug agent on their own failures and file anonymized issues that state intent, which maintainers plan and assign to Copilot. |
 | Daily Improvers | illustrative | Scheduled research agents find problems such as duplicated code, assign them to Copilot, and developers refine the resulting pull requests. |
 | Repo Assist | illustrative | A scheduled assistant picks maintenance tasks such as triage and stale pull requests, a maintainer reviews every result, and backlogs shrink. |
-| Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily improvers clean up, instead of polishing each one through endless nit rounds. |
 | Research · Assign · Observe | illustrative | A daily benchmark agent files performance regressions, Copilot fixes them, and the next run observes the result to close the loop. |
 | Hunt · Falsify · Fix | illustrative | A daily agent hunts for vulnerabilities in deterministically scoped, rotating files, discards every lead it can falsify, and files only the survivors as issues that Copilot fixes. |
 | Query · Ask · Grow | illustrative | An expert DevOps agent read live telemetry through observability MCP servers and filed the most important instrumentation gap each day, growing OpenTelemetry support. |
 | Semantic clustering | illustrative | Grouping functions by intent rather than by text exposes misplaced code that duplicate detection misses, and Copilot moves it. |
 | Go Fan | illustrative | A daily agent compares each Go dependency's releases with how the code uses it and files review issues that Copilot turns into fixes. |
+| Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily improvers clean up, instead of polishing each one through endless nit rounds. |
 | Dreaming | illustrative | Dreaming agents mine the activity between people and agents, such as review threads, sessions and failed runs, to design and optimize agentic workflows, prompts, skills and linters. |
 | Mine · Refine · Apply | illustrative | Recurring review corrections are mined into Go linters, refined through review, and applied across the repository. |
 | Explore · Reuse · Lint | illustrative | A daily code-analysis agent keeps a strategy cache to balance reusing proven strategies with exploring new ones, and every pattern it finds becomes a linter. |
