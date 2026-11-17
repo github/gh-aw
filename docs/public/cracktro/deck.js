@@ -1711,6 +1711,23 @@
   .fzs-tick.now circle { stroke-width: 4; }
   .fzs-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
   .active .fzs-cap { animation: rise .6s ease-out both 2s; }
+  /* Week of daily runs: measured heat map of daily workflows by weekday and UTC hour */
+  .fzw .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
+  .fzw-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
+  .fzw-day { fill: #c9d1d9; font: 600 18px var(--mono); text-anchor: end; } .fzw-day.we { fill: #9198a1; }
+  .fzw-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
+  .fzw-c rect { stroke: #30363d; stroke-width: 1; } .fzw-c text { font: 600 15px var(--mono); text-anchor: middle; fill: #c9d1d9; } .fzw-c.hi text { fill: #0d1117; }
+  .fzw-c { opacity: 0; } .active .fzw-c { animation: fzwIn .45s ease-out both; animation-delay: var(--d); }
+  @keyframes fzwIn { from { opacity: 0; } to { opacity: 1; } }
+  .fzw-band, .fzw-sum, .fzw-top, .fzw-key { opacity: 0; } .active .fzw-band, .active .fzw-sum, .active .fzw-top, .active .fzw-key { animation: fzwIn .6s ease-out both 2.3s; }
+  .fzw-band.no rect { fill: url(#fzwHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .fzw-band.best rect { fill: none; stroke: #4493f8; stroke-width: 2.5; }
+  .fzw-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzw-band.no text { fill: #ffa657; } .fzw-band.best text { fill: #79c0ff; }
+  .fzw-sum rect { fill: #4493f8; } .fzw-sum.we rect { fill: #4493f899; } .fzw-sum text { fill: #c9d1d9; font: 600 16px var(--mono); }
+  .fzw-top rect { fill: none; stroke: #f0f6fc; stroke-width: 3; } .fzw-top text { fill: #f0f6fc; font: 600 15px var(--mono); }
+  .fzw-key text { fill: #9198a1; font: 500 15px var(--mono); } .fzw-key text.b { fill: #c9d1d9; font-weight: 600; }
+  .fzw-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
+  .active .fzw-cap { animation: rise .6s ease-out both 2s; }
 
   /* --- index & search: a non-agentic indexing job writes the index; the agent job only searches a read-only copy --- */
   .ix .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8); }
@@ -10256,6 +10273,7 @@
     };
     slides.push({
       group: "engineering",
+      key: "schedules",
       notes:
         "Fuzzy schedules. The left half is measured on gh-aw itself, snapshot 17 Nov 2026: the compiled cron of the 111 workflows written as schedule: daily or daily on weekdays, by UTC hour and minute. The spike is illustrative: the same 111 workflows if each were pinned to 0 0 * * *. Fixed crons collide: every repo that copies a midnight schedule fires in the same minute, which bursts the token API, hits rate limits, queues runners and, in gh-aw's own history, silently lost safe-output writes. gh-aw compiles daily to a stable time per workflow: two hashes of the workflow path pick the hour and the minute, so each workflow keeps its time across recompiles while the fleet spreads out. Hours 00 and 01 UTC are never chosen; 02 to 05 UTC are weighted three times as likely, the quiet hours for most teams; minutes avoid the hour edges, the US :15 and :45 and the EU :30 peaks. Measured: 45 of 111 land in 02 to 05, none at 00 or 01, none within three minutes of a quarter hour, 98 distinct times. Variants: daily around 14:00 picks inside a one-hour window, daily between 9:00 and 17:00 a custom window, on weekdays adds Monday to Friday; the table shows real compiled crons from gh-aw lock files: every 30 minutes scatters its start minute, hourly and every 6h scatter the minute, daily on weekdays adds Monday to Friday, daily around 10:00 stays within an hour of ten, weekly on monday scatters the time; only every N days and raw cron stay fixed, every 7 days still fires at midnight. The right half is an illustrative All You Can Eat loop with synthetic issues. The workflow wakes every 30 minutes, but skip-if-match searches for its own open issue by the gh-aw-workflow-id marker in pre-activation, so a tick with a plate on the table costs no tokens. When Mona closes the plate, the next tick serves one more. The close reason is the feedback: completed means more like it, not planned means never again, kept in cache-memory for the next run. max: 1 keeps one plate at a time, and expires: 7 closes a forgotten plate so the loop never stalls.",
       enter() {
@@ -10352,6 +10370,65 @@
     });
   }
 
+  // Week of daily runs: measured heat map of every daily-schedule workflow by weekday and compiled UTC hour; 00–01 empty, 02–05 busiest, weekends lighter
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    // MEASURED: runs per weekday (Mon..Sun) and UTC hour of gh-aw's 144 workflows whose schedule starts with `daily`, snapshot 17 Nov 2026 (refresh/week-of-daily-runs.sh)
+    const WD = [0, 0, 8, 13, 8, 17, 4, 7, 9, 7, 7, 11, 6, 5, 11, 6, 0, 3, 5, 3, 6, 1, 3, 4],
+      WE = [0, 0, 7, 11, 8, 15, 4, 5, 7, 6, 4, 7, 4, 2, 4, 4, 0, 3, 5, 3, 6, 1, 1, 4];
+    const GRID = [WD, WD, WD, WD, WD, WE, WE],
+      DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      W = 144,
+      WKD = 33;
+    const MAX = Math.max(...GRID.flat()),
+      RUNS = GRID.flat().reduce((a, b) => a + b, 0),
+      TOT = GRID.map(r => r.reduce((a, b) => a + b, 0)),
+      top = WD.indexOf(MAX);
+    const X0 = 80,
+      Y0 = 70,
+      CW = 52,
+      RH = 56,
+      cx = hr => X0 + hr * CW,
+      ry = d => Y0 + d * RH;
+    let g = `<defs><pattern id="fzwHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2814"/><line x1="0" y1="0" x2="0" y2="8" stroke="#db6d28" stroke-width="2" opacity=".55"/></pattern></defs>`;
+    g += `<text class="fzw-lbl" x="0" y="16">${W} DAILY WORKFLOWS · RUNS BY WEEKDAY AND UTC HOUR</text><text class="fzw-lbl" x="${VW}" y="16" text-anchor="end">RUNS / DAY</text>`;
+    GRID.forEach((row, d) => {
+      g += `<text class="fzw-day${d > 4 ? " we" : ""}" x="${X0 - 14}" y="${ry(d) + RH / 2 + 6}">${DAYS[d]}</text>`;
+      row.forEach((v, hr) => {
+        const a = v ? 0.12 + 0.88 * (v / MAX) : 0;
+        g += `<g class="fzw-c${v / MAX > 0.55 ? " hi" : ""}" style="--d:${(0.15 + hr * 0.07 + d * 0.03).toFixed(2)}s"><rect x="${cx(hr) + 2}" y="${ry(d) + 2}" width="${CW - 4}" height="${RH - 4}" rx="6" fill="${v ? `rgba(68,147,248,${a.toFixed(2)})` : "#0d1117"}"/>${v ? `<text x="${cx(hr) + CW / 2}" y="${ry(d) + RH / 2 + 6}">${v}</text>` : ""}</g>`;
+      });
+      const bw = (TOT[d] / Math.max(...TOT)) * 150;
+      g += `<g class="fzw-sum${d > 4 ? " we" : ""}"><rect x="${VW - 210}" y="${ry(d) + 14}" width="${bw}" height="${RH - 28}" rx="4"/><text x="${VW - 210 + bw + 10}" y="${ry(d) + RH / 2 + 6}">${TOT[d]}</text></g>`;
+    });
+    const GB = ry(7);
+    for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzw-hr" x="${cx(hr) + CW / 2}" y="${GB + 24}">${String(hr).padStart(2, "0")}</text>`;
+    g += `<text class="fzw-hr" x="${cx(23) + CW / 2}" y="${GB + 24}">UTC</text>`;
+    // fuzzy windows from schedule_fuzzy_scatter.go: 00–01 never chosen, 02–05 weighted ×3
+    g += `<g class="fzw-band no"><rect x="${cx(0) + 1}" y="${Y0}" width="${2 * CW - 2}" height="${7 * RH}" rx="6"/><text x="${cx(1)}" y="${Y0 - 12}">00–01 never</text></g>`;
+    g += `<g class="fzw-band best"><rect x="${cx(2)}" y="${Y0 - 2}" width="${4 * CW}" height="${7 * RH + 4}" rx="8"/><text x="${cx(4)}" y="${Y0 - 12}">02–05 preferred ×3</text></g>`;
+    g += `<g class="fzw-top"><rect x="${cx(top) - 1}" y="${ry(0) - 1}" width="${CW + 2}" height="${5 * RH + 2}" rx="8"/></g>`;
+    g += `<g class="fzw-key"><text class="b" x="0" y="${GB + 74}">${RUNS} runs a week · busiest hour ${String(top).padStart(2, "0")} UTC: ${MAX} runs · 0 at 00–01 UTC</text><text x="0" y="${GB + 104}">weekends: ${TOT[0]} → ${TOT[5]} runs a day · ${WKD} workflows say daily on weekdays · lighter blue = fewer runs, blank = none</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg fzw-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    slides.push({
+      group: "engineering",
+      under: "schedules",
+      notes: `Week of daily runs. Measured on gh-aw itself, snapshot 17 Nov 2026: every one of the ${W} workflows whose schedule starts with daily, plain, on weekdays or around a time, placed by its compiled cron on a week grid of weekday by UTC hour. Each cell counts runs. ${RUNS} runs a week and not one at 00 or 01 UTC: the fuzzy scatter never picks those hours. The 02 to 05 UTC columns are the busiest, ${MAX} runs at ${String(top).padStart(2, "0")} UTC on weekdays, because the scatter weights the quiet hours three times. Weekends drop from ${TOT[0]} to ${TOT[5]} runs a day: ${WKD} workflows say daily on weekdays, many of them daytime reports around a set hour, so Saturday and Sunday keep only the background work. No cell carries more than ${MAX} of ${W}: the fleet is spread across the day instead of firing in the same minute.`,
+      el: h(
+        "section",
+        { class: "slide fzw" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · 7 days × 24 UTC hours · measured"), h("h2", {}, letters("Week of "), letters("daily runs", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "No midnight, no stampede"), ` · ${W} daily workflows · at most ${MAX} in any hour · 00–01 UTC empty`),
+        h("div", { class: "fzw-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${W} workflows with a daily schedule (plain, on weekdays, around) · first compiled cron · UTC`)
+      ),
+    });
+  }
   // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
   {
     const AG = pickAgent();
