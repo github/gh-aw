@@ -183,6 +183,9 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
+  // down walks the Continuous AI column first, then leaves for the next band
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last slide of the band above
@@ -280,8 +283,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
   // from an interior slide, next band lands on the header below and previous band on the header above
-  await page.goto("/gh-aw/cracktro/#3");
-  await expect(count).toHaveAttribute("aria-label", at(3));
+  const interior = slideNo("Anatomy of a workflow");
+  await page.goto(`/gh-aw/cracktro/#${interior}`);
+  await expect(count).toHaveAttribute("aria-label", at(interior));
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
@@ -324,7 +328,7 @@ test.describe("compact navigation on touch screens", () => {
     await page.goto("/gh-aw/cracktro/#3");
     await expect(count).toHaveAttribute("aria-label", at(3));
     await page.getByRole("button", { name: "Next slide", exact: true }).tap();
-    await expect(count).toHaveAttribute("aria-label", at(4));
+    await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
     await page.getByRole("button", { name: "Next band", exact: true }).tap();
     await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 
@@ -381,6 +385,28 @@ test("publishes a social card for link previews", async ({ page, request }) => {
   const response = await request.get("/gh-aw/cracktro/og-image.png");
   expect(response.ok()).toBe(true);
   expect(response.headers()["content-type"]).toContain("image/png");
+});
+
+test("keeps the measured Ponytail caption clear of the slide chrome", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Ponytail Reviewer")}`);
+  const { caption, controls } = await page.evaluate(() => {
+    const box = (el: Element) => {
+      const { left, right, top, bottom } = el.getBoundingClientRect();
+      return { left, right, top, bottom };
+    };
+    return {
+      caption: box(document.querySelector(".slide.active .dhm-cap")!),
+      controls: [...document.querySelectorAll(".smb, .fzb, .snd")].map(box),
+    };
+  });
+  expect(caption.left).toBeGreaterThanOrEqual(470);
+  expect(caption.right).toBeLessThan(1600);
+  expect(caption.bottom).toBeLessThanOrEqual(1080);
+  expect(controls).toHaveLength(3);
+  for (const control of controls) {
+    expect(caption.left < control.right && caption.right > control.left && caption.top < control.bottom && caption.bottom > control.top).toBe(false);
+  }
 });
 
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
