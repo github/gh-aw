@@ -3336,7 +3336,7 @@
       ["app", "#ab7df8", "GitHub Apps", "create-github-app-token", "Short-lived, scoped installation tokens instead of PATs."],
       ["mkt", "#79c0ff", "Marketplace actions", "uses:", "Any existing action: setup, cache, scan, sign, deploy."],
       ["job", "#f778ba", "Custom jobs", "jobs: + needs:", "Build, deploy or gate around the agent in extra jobs."],
-      ["bot", "#d2a8ff", "Bots & ChatOps", "post-steps:", "Notify Slack or Teams and hand off to the bots you run."],
+      ["bot", "#d2a8ff", "Workflow calls", "uses: reusable workflow", "Call existing workflows for Slack, Teams and other bots."],
     ];
     const K = "#ff7b72",
       D = "#656c76",
@@ -3350,16 +3350,14 @@
       [[["runs-on: ", K], ["[self-hosted, linux]", V]], 1],
       [[["permissions:", K]], -1],
       [[["  id-token: ", K], ["write", V]], 2],
-      [[["pre-steps:", K]], -1],
+      [[["steps:", K]], -1],
       [[["  - uses: ", K], ["azure/login@v2", V]], 2],
       [[["  - uses: ", K], ["hashicorp/vault-action@v3", V]], 3],
       [[["  - uses: ", K], ["actions/create-github-app-token@v2", V]], 4],
-      [[["steps:", K]], -1],
       [[["  - uses: ", K], ["actions/setup-node@v4", V]], 5],
       [[["jobs:", K]], -1],
       [[["  deploy-preview: ", K], ["{ needs: detection }", V]], 6],
-      [[["post-steps:", K]], -1],
-      [[["  - uses: ", K], ["slackapi/slack-github-action@v2", V]], 7],
+      [[["  notify: ", K], ["{ needs: deploy-preview, uses: ./.github/workflows/chatops.yml }", V]], 7],
       [[["---", D]], -1],
       [[["# Review the preview deployment and comment", T]], -1],
     ];
@@ -3396,13 +3394,13 @@
     slides.push({
       group: "platform",
       notes:
-        "Compatible with Actions, using an illustrative synthetic workflow. An agentic workflow compiles to a plain GitHub Actions workflow, so everything a team already runs on Actions keeps working: deployment environments with required reviewers and environment secrets, GitHub-hosted, larger or self-hosted runners, OIDC federation into Microsoft Entra ID with azure/login, secrets from HashiCorp Vault with vault-action, short-lived GitHub App installation tokens, any marketplace action in steps, extra custom jobs wired with needs, and post-steps that notify Slack, Teams or existing bots. Custom steps and jobs run outside the agent's sandbox with standard Actions security, so credentials stay out of the agent's reach. The message: no new platform to adopt; all the Actions infrastructure is reused.",
+        "Compatible with Actions, using an illustrative synthetic workflow. An agentic workflow compiles to a plain GitHub Actions workflow, so everything a team already runs on Actions keeps working: deployment environments with required reviewers and environment secrets, GitHub-hosted, larger or self-hosted runners, OIDC federation into Microsoft Entra ID with azure/login, secrets from HashiCorp Vault with vault-action, short-lived GitHub App installation tokens, any marketplace action in steps, extra custom jobs wired with needs, and reusable workflow calls that hand off to Slack, Teams or existing bots. Custom steps and jobs run outside the agent's sandbox with standard Actions security, so credentials stay out of the agent's reach. The message: no new platform to adopt; all the Actions infrastructure is reused.",
       enter() {
         t0 = 0;
         seen = -1;
         skip = false;
         [...lines, ...bands, ...tiles, msg].forEach(e => e.classList.remove("on", "hot"));
-        [0, 1, 4, 6, 10, 12, 14, 16, 17].forEach(i => lines[i].classList.add("on"));
+        [0, 1, 4, 6, 11, 14, 15].forEach(i => lines[i].classList.add("on"));
       },
       onNext() {
         if (seen >= N) return false;
