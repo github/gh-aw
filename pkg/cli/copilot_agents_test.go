@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -351,6 +352,76 @@ func TestBuildAgenticWorkflowsSkillContent(t *testing.T) {
 	assert.NotContains(t, content, "local-debug.md")
 	assert.NotContains(t, content, "Debug, audit, or investigate workflows: `.github/aw/debug-agentic-workflow.md`")
 	assert.Contains(t, content, agenticWorkflowsOTELSkillParagraph)
+}
+
+func TestAgenticWorkflowsGuidanceVersion(t *testing.T) {
+	originalVersion, originalRelease := GetVersion(), workflow.IsRelease()
+	t.Cleanup(func() {
+		SetVersionInfo(originalVersion)
+		workflow.SetIsRelease(originalRelease)
+	})
+
+	for _, tt := range []struct {
+		name      string
+		version   string
+		release   bool
+		wantRef   string
+		wantFetch bool
+	}{
+		{name: "stable release", version: "v1.0.1", release: true, wantRef: "v1.0.1"},
+		{name: "prerelease", version: "v1.2.0-rc.1", release: true, wantRef: "v1.2.0-rc.1"},
+		{name: "development", version: "dev", wantRef: "main", wantFetch: true},
+		{name: "development with tag", version: "v1.0.1", wantRef: "main", wantFetch: true},
+		{name: "development with commit", version: "v1.0.1-5-gabcdef", wantRef: "main", wantFetch: true},
+		{name: "empty release version", release: true, wantRef: "main", wantFetch: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			SetVersionInfo(tt.version)
+			workflow.SetIsRelease(tt.release)
+			assert.Equal(t, tt.wantRef, agenticWorkflowsGuidanceRef())
+
+			previous := listAgenticWorkflowsMarkdownFiles
+			t.Cleanup(func() { listAgenticWorkflowsMarkdownFiles = previous })
+			fetchCount := 0
+			listAgenticWorkflowsMarkdownFiles = func(context.Context) ([]string, error) {
+				fetchCount++
+				if fetchCount == 1 {
+					return []string{"new-on-main.md"}, nil
+				}
+				return []string{"another-new-on-main.md"}, nil
+			}
+
+			skill, err := buildAgenticWorkflowsSkillContent()
+			require.NoError(t, err)
+			agent, err := buildAgenticWorkflowsAgentContent(t.TempDir())
+			require.NoError(t, err)
+			pinnedPrefix := "https://raw.githubusercontent.com/github/gh-aw/" + tt.wantRef + "/"
+			for name, content := range map[string]string{"skill": skill, "agent": agent} {
+				assert.Contains(t, content, pinnedPrefix+".github/aw/debug-bootstrap.md", name)
+				assert.Contains(t, content, pinnedPrefix+"<path>", name)
+				assert.Contains(t, content, pinnedPrefix+".github/aw/create-agentic-workflow.md", name)
+				assert.Contains(t, content, "URLs showing `"+tt.wantRef+"`", name)
+				if tt.wantRef != "main" {
+					assert.NotContains(t, content, "https://raw.githubusercontent.com/github/gh-aw/main/", name)
+				}
+			}
+
+			repeated, err := buildAgenticWorkflowsSkillContent()
+			require.NoError(t, err)
+			if tt.wantFetch {
+				assert.Equal(t, 2, fetchCount)
+				assert.Contains(t, skill, "- `.github/aw/new-on-main.md`\n")
+				assert.Contains(t, repeated, "- `.github/aw/another-new-on-main.md`\n")
+			} else {
+				assert.Zero(t, fetchCount, "release guidance must not depend on a remote catalog")
+				assert.Equal(t, skill, repeated, "the same release must generate identical guidance")
+				assert.NotContains(t, skill, "new-on-main.md")
+				for _, file := range embeddedFallbackAWMarkdownFiles() {
+					assert.Contains(t, skill, "- `.github/aw/"+file+"`\n")
+				}
+			}
+		})
+	}
 }
 
 func TestUnifiedDebuggingInstructions(t *testing.T) {

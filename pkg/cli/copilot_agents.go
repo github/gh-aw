@@ -18,6 +18,7 @@ import (
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 var copilotAgentsLog = logger.New("cli:copilot_agents")
@@ -196,14 +197,37 @@ func readExistingRepositoryInstructionFile(targetPath string, artifactDescriptio
 }
 
 func buildAgenticWorkflowsAgentContent(gitRoot string) (string, error) {
-	return agenticWorkflowsAgentTemplate, nil
+	return renderAgenticWorkflowsGuidance(agenticWorkflowsAgentTemplate), nil
+}
+
+func agenticWorkflowsGuidanceRef() string {
+	version := GetVersion()
+	if workflow.IsReleasedVersion(version) && version != "" {
+		return version
+	}
+	return "main"
+}
+
+func renderAgenticWorkflowsGuidance(content string) string {
+	ref := agenticWorkflowsGuidanceRef()
+	// Embedded templates default to main; pin both links and their ref labels.
+	return strings.NewReplacer(
+		"https://raw.githubusercontent.com/github/gh-aw/main/", "https://raw.githubusercontent.com/github/gh-aw/"+ref+"/",
+		"`main`", "`"+ref+"`",
+	).Replace(content)
 }
 
 func buildAgenticWorkflowsSkillContent() (string, error) {
-	awFiles, err := listAgenticWorkflowsMarkdownFiles(context.Background())
-	if err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch .github/aw markdown file list from github/gh-aw: %v. Falling back to embedded list.", err)))
+	var awFiles []string
+	if agenticWorkflowsGuidanceRef() != "main" {
 		awFiles = embeddedFallbackAWMarkdownFiles()
+	} else {
+		var err error
+		awFiles, err = listAgenticWorkflowsMarkdownFiles(context.Background())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch .github/aw markdown file list from github/gh-aw: %v. Falling back to embedded list.", err)))
+			awFiles = embeddedFallbackAWMarkdownFiles()
+		}
 	}
 	return renderAgenticWorkflowsSkillContent(awFiles)
 }
@@ -227,7 +251,7 @@ func renderAgenticWorkflowsSkillContent(awFiles []string) (string, error) {
 	if !strings.Contains(content, agenticWorkflowsOTELSkillParagraph) {
 		content = strings.TrimRight(content, "\n") + "\n\n" + agenticWorkflowsOTELSkillParagraph + "\n"
 	}
-	return content, nil
+	return renderAgenticWorkflowsGuidance(content), nil
 }
 
 type gitHubRepositoryContentEntry struct {
