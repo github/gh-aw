@@ -64,14 +64,34 @@ See [evals.md](evals.md) for BinEval syntax and question constraints.
 
 ## Infer Operational Value from Intent
 
-Operational value is the degree to which the workflow's intended repository outcome is attained for the opportunity assigned to a run, demonstrated by accepted repository evidence. Infer it from the IntentSpec rather than from execution quality, output volume, or the agent's own assessment:
+Infer one per-run attainment metric from IntentSpec, not activity, output volume,
+or the agent's assessment:
 
-1. Turn the actors, subject, and activation conditions into a stable per-run opportunity.
-2. Turn the required effects and success conditions into accepted recorded evidence and one direct attainment metric in its native unit and scale.
-3. Turn no-op conditions into the zero rule, and uncertainties into explicit missing-evidence behavior.
-4. Define when evidence matures and which repositories and matching rules are accepted.
+1. Bind actors, subject, and activation to one applicable run opportunity.
+2. Map required effects to accepted recorded evidence and a native-scale metric.
+3. Map observed misses to zero and absent/uncertain evidence to `null`.
+4. Declare noop, maturity, repository, and target-matching rules.
 
-Evals and operational value answer different questions. PromptPex evals test whether output follows the intended behavior for representative scenarios; operational value measures whether the intended repository outcome was attained for a real run. Use the [operational-value-designer skill](../skills/operational-value-designer/SKILL.md) to freeze the evidence and metric contract. A custom metric uses `graders.<distinct-id>.script`, a synchronous body receiving `session`, `config`, and `helpers`. Reuse `helpers.createSessionLookups(session)` and return a finite number, `null`, or an object with `value`, not a metric array. All evidence must already be in the unified session; missing observations require `null`, not live file/API evidence. Built-ins run in conclusion; custom JavaScript runs only in the isolated downstream graders job. Repository-owned Bash compatibility uses `graders.operational-value.run`, session JSONL in `$1` / `GH_AW_SESSION_FILE`, config JSON in `GH_AW_GRADER_CONFIG`, and legacy metric-array output. Detected file writes are rejected. Shell remains trusted repository code, not yet microVM-isolated, and never runs in conclusion.
+Evals test representative output behavior; operational value measures the
+strongest attributable recorded effect for a real run. Follow the
+[operational-value-designer skill](../skills/operational-value-designer/SKILL.md).
+`graders.operational-value.script` receives immutable session inputs downstream
+and returns ordered `{id,value}` metrics; the first is primary. Never fetch
+missing evidence. Removed `graders.operational-value.run` declarations must fail
+with migration guidance and must not be translated automatically.
+
+gh-aw owns facts knowable at conclusion; GitHub owns later object disposition.
+For every standalone workflow, use githubnext/gh-cao
+`add-operational-value OWNER/REPO WORKFLOW-NAME` without `--campaign`.
+`--campaign` only scopes ownership and rolls up directly included worker Value;
+it defines no separate campaign metric. Delivery/adoption/reversal/survival
+applies independently of campaign and Value configuration.
+`graders.operational-value.script` remains optional run-scoped evidence, not a
+prerequisite or substitute for CAO longitudinal Value.
+
+For execution-quality diagnostics, follow [Infer Trace Graders](#infer-trace-graders-from-intent).
+
+<!-- instruction-prefix-end -->
 
 ## Infer Trace Graders from Intent
 

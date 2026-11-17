@@ -113,26 +113,40 @@ func TestEngineDefaultDomainsExcludePackageRegistries(t *testing.T) {
 	}
 }
 
-// TestEngineDefaultDomainsKeepTransportDomains verifies that removing package registries did
-// not remove the transport domains each engine genuinely requires in its static defaults.
-// Claude's Anthropic API host is added dynamically when Anthropic is the effective provider.
+// TestEngineDefaultDomainsKeepTransportDomains verifies that the static engine sets retain
+// gateway/GitHub transport without granting direct vendor model API egress.
 func TestEngineDefaultDomainsKeepTransportDomains(t *testing.T) {
 	required := map[constants.EngineName][]string{
-		constants.CopilotEngine: {"api.githubcopilot.com", "host.docker.internal"},
+		constants.CopilotEngine: {"host.docker.internal"},
 		constants.ClaudeEngine:  {"host.docker.internal"},
-		constants.CodexEngine:   {"api.openai.com", "host.docker.internal"},
-		constants.GeminiEngine:  {"generativelanguage.googleapis.com", "host.docker.internal"},
-		constants.PiEngine:      {"api.githubcopilot.com", "host.docker.internal"},
+		constants.CodexEngine:   {"host.docker.internal"},
+		constants.GeminiEngine:  {"host.docker.internal"},
+		constants.PiEngine:      {"host.docker.internal"},
+	}
+	directAPIs := map[constants.EngineName]string{
+		constants.CopilotEngine: "api.githubcopilot.com",
+		constants.ClaudeEngine:  "api.anthropic.com",
+		constants.CodexEngine:   "api.openai.com",
+		constants.GeminiEngine:  "generativelanguage.googleapis.com",
+		constants.PiEngine:      "api.githubcopilot.com",
 	}
 
 	for engine, domains := range required {
 		t.Run(string(engine), func(t *testing.T) {
-			defaults, err := GetDefaultDomainsForEngine(engine, "")
-			require.NoError(t, err)
+			var defaults []string
+			if engine == constants.PiEngine {
+				defaults = PiDefaultDomains
+			} else {
+				var err error
+				defaults, err = GetDefaultDomainsForEngine(engine, "")
+				require.NoError(t, err)
+			}
 			for _, domain := range domains {
 				assert.Contains(t, defaults, domain,
 					"engine %q must keep required transport domain %q", engine, domain)
 			}
+			assert.NotContains(t, defaults, directAPIs[engine],
+				"engine %q transport defaults must not grant direct model API egress", engine)
 		})
 	}
 }
@@ -146,7 +160,7 @@ func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []
 	// gated package ecosystems. Chrome's broad Google vendor rules also cover
 	// Gemini's inference API.
 	excludedEcosystems := []string{
-		"chrome", "codex-vendor", "copilot-vendor", "defaults", "dev-tools",
+		"chrome", "codex-vendor", "copilot-vendor", "defaults", "dev-tools", "gemini-vendor",
 		"fonts", "gh-aw", "github", "github-actions", "local", "threat-detection",
 	}
 

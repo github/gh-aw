@@ -171,7 +171,7 @@ it does not run graders or evaluate outcomes unless explicitly requested.
 Use repeatable --additional-grader WORKFLOW:GRADER to compute additional built-in
 or isolated JavaScript results over recorded unified sessions before Harbor export.
 Recorded scores remain unchanged; additional results have separate provenance and
-reward keys. Bash graders are not supported in this offline collection pipeline.
+reward keys.
 The normal logs report is preserved.
 
 Use --episodes to include recorded episode membership and hops in text reports.

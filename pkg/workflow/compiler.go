@@ -105,9 +105,6 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 	if err := c.validateWebhookWorkflow(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
-	if err := prepareOperationalValueGrader(workflowData, markdownPath); err != nil {
-		return formatCompilerError(markdownPath, "error", err.Error(), err)
-	}
 	if err := validateRuntimeCheckoutConfigs(workflowData.CheckoutConfigs); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
@@ -294,7 +291,7 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 			// the source frontmatter so the error is IDE-navigable.
 			fieldLine := 1
 			if fieldName := extractSchemaErrorField(schemaErr); fieldName != "" {
-				frontmatterLines := strings.Split(workflowData.FrontmatterYAML, "\n")
+				frontmatterLines := strings.Split(strings.ReplaceAll(workflowData.FrontmatterYAML, "\r\n", "\n"), "\n") //nolint:splitlinesonnewline // Normalize CRLF while preserving source line coordinates.
 				if line := findFrontmatterFieldLine(frontmatterLines, 2, fieldName); line > 0 {
 					fieldLine = line
 				}

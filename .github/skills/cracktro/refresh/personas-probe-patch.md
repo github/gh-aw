@@ -16,7 +16,7 @@ Recompute with `personas-probe-patch.mjs`, then patch `deck.js`. Read-only on Gi
 
 ## 1. Slide
 
-- Heading: **Personas · Probe · Patch** (`group: "process"`).
+- Heading: **Personas · Probe · Patch** (`group: "data"`, AW factory band).
 - Marker: `grep -n "// Personas · Probe · Patch" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
 - CSS prefix: `ppx-` (persona chips, guidance file, cut line, rule, stamps, timeline colours). The strip reuses `.dhm`, `.dhm-k`, `.dhm-tl` and `.dhm-cap` from Docs that heal; panels reuse `sdd-`.
 - Data lives in the slide block:

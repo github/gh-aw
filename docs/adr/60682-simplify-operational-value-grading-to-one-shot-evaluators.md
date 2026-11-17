@@ -4,6 +4,9 @@
 **Status**: Draft
 **Deciders**: gh-aw maintainers
 
+> **Superseded (2026-11-16):** One-shot operational value now uses restricted
+> inline JavaScript only; file-backed Bash evaluator details below are historical.
+
 ---
 
 ### Context

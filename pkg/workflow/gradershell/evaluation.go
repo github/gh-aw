@@ -1,3 +1,5 @@
+// Package gradershell provides shared Bash AST helpers used to detect shell
+// code evaluation in authored run steps.
 package gradershell
 
 import (
@@ -852,4 +854,16 @@ func scriptUsesStandardInput(value string) bool {
 		}
 		return isDeviceFD && numericFD(fd)
 	}
+}
+
+func numericFD(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, c := range value {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

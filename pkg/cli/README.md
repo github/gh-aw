@@ -817,7 +817,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | `file_tracker.go` | `(*FileTracker).TrackModified` | `func (*FileTracker).TrackModified(filePath string)` | TrackModified adds a file to the modified files list and stores its original content |
 | `file_tracker.go` | `NewFileTracker` | `func NewFileTracker() *FileTracker` | NewFileTracker creates a new file tracker |
 | `firewall_log.go` | `(*FirewallAnalysis).AddMetrics` | `func (*FirewallAnalysis).AddMetrics(other LogAnalysis)` | AddMetrics adds metrics from another analysis |
-| `fix_codemods.go` | `(*GuidedError).Unwrap` | `func (*GuidedError).Unwrap() error` | Exported function or method declared in `fix_codemods.go`. |
+| `fix_codemods.go` | `(*GuidedError).Unwrap` | `func (*GuidedError).Unwrap() error` | Returns the underlying cause for error-chain inspection with `errors.Is` and `errors.As`. |
 | `fix_codemods.go` | `GetCodemods` | `func GetCodemods(disabledIDs []string) ([]Codemod, error)` | GetCodemods returns all codemods except any explicitly disabled by ID. |
 | `frontmatter_editor.go` | `RemoveTopLevelFieldFromFrontmatter` | `func RemoveTopLevelFieldFromFrontmatter(content, fieldName string) (string, error)` | RemoveTopLevelFieldFromFrontmatter removes a root-level frontmatter key while preserving YAML structure. |
 | `gateway_logs_timeline.go` | `BuildUnifiedTimeline` | `func BuildUnifiedTimeline(logDir string, verbose bool) ([]UnifiedTimelineEvent, error)` | BuildUnifiedTimeline collects all JSONL events from the MCP Gateway, the AWF firewall, the agent session, and the AWF API proxy in logDir, merges them into a single slice, and sorts the slice in ascending wall-clock ord… |

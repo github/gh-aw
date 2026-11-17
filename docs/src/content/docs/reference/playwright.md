@@ -92,20 +92,27 @@ Named sessions (`-s=<name>`) isolate cookies and storage, which helps when compa
 
 ### Publishing Screenshots
 
-Files under `/tmp` are ephemeral. To let users retrieve a screenshot, configure an artifact safe output and have the agent publish the file:
+To let users retrieve a screenshot, save it in the workspace and publish it with an artifact safe output:
 
 ```aw wrap
 ---
+on:
+  workflow_dispatch:
+tools:
+  playwright:
 safe-outputs:
   upload-artifact:
-    allowed-paths: ["/tmp/*.png"]
+    allowed-paths: ["*.png"]
     max-uploads: 1
     retention-days: 7
 ---
 
-Capture `/tmp/home.png`, then call `upload_artifact` with
-`name: "home-screenshot"` and `path: "/tmp/home.png"`.
+Create the `output` directory in the workspace and capture `output/home.png`,
+then call `upload_artifact` with `name: "home-screenshot"` and
+`path: "output/home.png"`.
 ```
+
+For an existing screenshot under `/tmp`, copy it into the workspace first. See [Artifact Uploads](/gh-aw/reference/safe-outputs/#artifact-uploads-upload-artifact) for source-path restrictions and staging behavior.
 
 ## Migrate from Playwright MCP
 

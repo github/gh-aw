@@ -25,6 +25,9 @@ import (
 // coolDown specifies the minimum age a release must have before it is applied. Repos under the
 // "actions/" and "github/" namespaces are always exempt from the cooldown.
 //
+// The gh-aw setup action is always pinned to exactly the running compiler version (when it is
+// a release build), regardless of allowMajor or disableReleaseBump.
+//
 // The ActionCache helpers from pkg/workflow are used so that cached inputs and descriptions
 // for safe-outputs.actions entries are preserved when their SHA is unchanged, and cleared
 // when the SHA changes (prompting a re-fetch on the next compile).
@@ -77,7 +80,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		jobs = append(jobs, func() {
 			allow := !disableReleaseBump || allowMajor || isCoreAction(s.entry.Repo)
 			resolutions[i].version, resolutions[i].sha, resolutions[i].err =
-				deps.getLatestRelease(ctx, s.entry.Repo, s.entry.Version, allow, verbose)
+				resolveActionUpdateTarget(ctx, deps, s.entry.Repo, s.entry.Version, allow, verbose)
 		})
 	}
 	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
@@ -90,6 +93,9 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		}
 		entry := s.entry
 		refreshingCurrentVersion := false
+		// The setup action must match the compiler version exactly, so it may move
+		// up or down and bypasses the release-based capping and downgrade checks.
+		compilerPinned := compilerPinnedActionTag(entry.Repo) != ""
 		updateLog.Printf("Checking action: %s@%s", entry.Repo, entry.Version)
 
 		// By default all actions are force-updated to the latest major version.
@@ -110,7 +116,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		// versions are published in lock-step with the CLI. Never update these actions beyond
 		// the version of the currently running CLI — doing so would pin a newer (possibly
 		// pre-release) action that may be incompatible with the user's installed CLI.
-		if isGhAwNativeAction(entry.Repo) {
+		if !compilerPinned && isGhAwNativeAction(entry.Repo) {
 			cliVersion := GetVersion()
 			cliVer := parseVersion(cliVersion)
 			latestVer := parseVersion(latestVersion)
@@ -141,7 +147,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		// Release, so the Releases API only returns v1.1.0 as the latest).
 		currentVer := parseVersion(entry.Version)
 		latestVer := parseVersion(latestVersion)
-		if currentVer != nil && latestVer != nil && currentVer.IsNewer(latestVer) {
+		if !compilerPinned && currentVer != nil && latestVer != nil && currentVer.IsNewer(latestVer) {
 			updateLog.Printf("Proposed version %s for %s is older than current %s; refreshing the current tag SHA instead", latestVersion, entry.Repo, entry.Version)
 			currentSHA, shaErr := deps.getActionSHAForTag(ctx, gitutil.ExtractBaseRepo(entry.Repo), entry.Version)
 			if shaErr != nil {
@@ -153,6 +159,9 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 			}
 			latestVersion = entry.Version
 			latestSHA = currentSHA
+			refreshingCurrentVersion = true
+		}
+		if compilerPinned && latestVersion == entry.Version {
 			refreshingCurrentVersion = true
 		}
 
@@ -222,6 +231,9 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		if refreshingCurrentVersion {
 			updateLog.Printf("Refreshing %s@%s SHA from %s to %s", entry.Repo, entry.Version, oldSHAStr, newSHAStr)
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Refreshed %s@%s SHA", entry.Repo, entry.Version)))
+		} else if compilerPinned {
+			updateLog.Printf("Pinning %s from %s (%s) to compiler version %s (%s)", entry.Repo, entry.Version, oldSHAStr, latestVersion, newSHAStr)
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Pinned %s from %s to compiler version %s", entry.Repo, entry.Version, latestVersion)))
 		} else {
 			updateLog.Printf("Updating %s from %s (%s) to %s (%s)", entry.Repo, entry.Version, oldSHAStr, latestVersion, newSHAStr)
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %s from %s to %s", entry.Repo, entry.Version, latestVersion)))

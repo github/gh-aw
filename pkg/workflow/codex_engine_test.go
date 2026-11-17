@@ -23,6 +23,22 @@ func TestCodexEngine_ResolveLLMProvider_DefaultOpenAI(t *testing.T) {
 	}
 }
 
+func TestCodexDefaultDomainsForProvider(t *testing.T) {
+	engine := NewCodexEngine()
+
+	githubDomains := engine.defaultDomains(&WorkflowData{
+		Model:        "copilot/auto",
+		EngineConfig: &EngineConfig{ID: "codex"},
+	})
+	assert.NotContains(t, githubDomains, "api.githubcopilot.com")
+
+	openAIDomains := engine.defaultDomains(&WorkflowData{
+		Model:        "openai/gpt-5.4",
+		EngineConfig: &EngineConfig{ID: "codex"},
+	})
+	assert.Contains(t, openAIDomains, "api.openai.com")
+}
+
 func TestCodexEngine_ResolveLLMProviderFromModel(t *testing.T) {
 	engine := NewCodexEngine()
 

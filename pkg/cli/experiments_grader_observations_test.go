@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/workflow"
@@ -251,13 +252,16 @@ func TestReadGraderResultsArtifact(t *testing.T) {
 		require.NoError(t, os.MkdirAll(resultsDir, 0o755))
 		require.NoError(t, os.WriteFile(
 			filepath.Join(resultsDir, "grader_results.json"),
-			[]byte(`{"version":1,"results":[{"id":"score","status":"pass","value":0.75}]}`),
+			[]byte(`{"version":2,"results":[{"id":"operational-value","status":"pass","value":0.75,"source":"operational-value","metrics":[{"id":"primary","value":0.75},{"id":"diagnostic","value":2}]}]}`),
 			0o644,
 		))
 
 		data := readGraderResultsArtifact(runDir)
 		require.NotNil(t, data.Artifact)
 		assert.Empty(t, data.ExclusionReason)
+		observation, reason := extractGraderObservation(data.Artifact, "42", "candidate", "operational-value")
+		assert.Empty(t, reason)
+		assert.InDelta(t, 0.75, observation.Value, 0)
 	})
 
 	t.Run("loads fallback artifact grader results", func(t *testing.T) {
@@ -625,6 +629,63 @@ func TestLoadGraderRunDataDeduplicatesRunIDs(t *testing.T) {
 	result := loadGraderRunData(context.Background(), runs, map[string]struct{}{"prompt": {}}, source)
 	require.Contains(t, result, "1")
 	assert.Equal(t, 1, source.loads["1"])
+}
+
+type cancellationProbeGraderSource struct {
+	started  chan struct{}
+	canceled chan bool
+}
+
+func (s *cancellationProbeGraderSource) Load(ctx context.Context, _ string) graderRunData {
+	close(s.started)
+	select {
+	case <-ctx.Done():
+		s.canceled <- true
+	case <-time.After(time.Second):
+		s.canceled <- false
+	}
+	return graderRunData{}
+}
+
+func TestLoadGraderObservationSetsPropagatesCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	source := &cancellationProbeGraderSource{
+		started: make(chan struct{}), canceled: make(chan bool, 1),
+	}
+	enabled := true
+	details := &ExperimentDetails{
+		Runs: []ExperimentRunRecord{{RunID: "1", Assignments: map[string]string{"prompt": "control"}}},
+	}
+	frontmatter := experimentFrontmatterResult{
+		ExperimentConfigs: map[string]*workflow.ExperimentConfig{"prompt": {Metric: "grader:score"}},
+		Graders: &workflow.GradersConfig{Graders: map[string]*workflow.GraderDefinition{
+			"score": {ID: "score", Enabled: &enabled},
+		}},
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, _, cleanup, err := loadGraderObservationSetsForAnalysis(
+			ctx, details, frontmatter, "acme/repo",
+			func(string, string) graderRunArtifactSource { return source },
+		)
+		cleanup()
+		result <- err
+	}()
+
+	select {
+	case <-source.started:
+		cancel()
+	case <-time.After(time.Second):
+		cancel()
+		t.Fatal("grader source was not called")
+	}
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("grader observation loading did not stop after cancellation")
+	}
+	assert.True(t, <-source.canceled, "grader source should receive the canceled context")
 }
 
 func TestGraderStatisticalMethods(t *testing.T) {

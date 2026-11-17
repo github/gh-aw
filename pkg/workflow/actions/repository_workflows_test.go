@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,9 +16,13 @@ func TestRepositoryWorkflowGraphs(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("..", "..", "..", ".github", "workflows", "*.yml"))
 	require.NoError(t, err)
 	require.NotEmpty(t, files, "must discover repository workflows, including generated .lock.yml files")
-	var jobs, edges int
+	var jobs, edges atomic.Int64
+	t.Cleanup(func() {
+		t.Logf("Built Actions graphs for %d workflow files: %d jobs, %d dependency edges", len(files), jobs.Load(), edges.Load())
+	})
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
+			t.Parallel()
 			content, err := os.ReadFile(file)
 			require.NoError(t, err)
 			input, err := Parse(content)
@@ -32,8 +37,8 @@ func TestRepositoryWorkflowGraphs(t *testing.T) {
 				assert.Equal(t, slices.Compact(expected), job.Needs)
 				assert.Equal(t, input.Jobs[i].ID, job.ID)
 				assert.Len(t, job.Steps, len(input.Jobs[i].Steps))
-				jobs++
-				edges += len(job.Needs)
+				jobs.Add(1)
+				edges.Add(int64(len(job.Needs)))
 			}
 			_, err = Lower(input)
 			require.NoError(t, err, "all authored steps must also lower as native GitHub Actions")
@@ -42,7 +47,6 @@ func TestRepositoryWorkflowGraphs(t *testing.T) {
 			assert.Equal(t, string(content), emitted, "parsed/resolved workflows must round-trip every source byte, including comments")
 		})
 	}
-	t.Logf("Built Actions graphs for %d workflow files: %d jobs, %d dependency edges", len(files), jobs, edges)
 }
 
 func TestAuthoredWorkflowGraphValidation(t *testing.T) {

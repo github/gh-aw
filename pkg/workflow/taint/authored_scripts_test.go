@@ -55,7 +55,7 @@ graders:
   custom:
     script: return trace.token;
   operational-value:
-    script: echo "$TOKEN"
+    script: 'return [{id: "restricted", value: typeof process === "undefined" ? trace.token : 0}];'
 tools:
   cache-memory:
     validation:
@@ -102,6 +102,7 @@ Prompt
 		"mcp-scripts.js.script.javascript",
 		"mcp-scripts.shell.run",
 		"graders.custom.script.javascript",
+		"graders.operational-value.script.javascript",
 		"tools.cache-memory.validation.script.javascript",
 		"tools.drive-memory[0].validation.javascript",
 		"tools.repo-memory[0].validation-script.javascript",

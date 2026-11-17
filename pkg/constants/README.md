@@ -51,6 +51,7 @@ The package also acts as the authoritative source for the generated workflow con
 | `ExpressionBreakThreshold` | `LineLength` | `100` | Preferred break point for wrapping long expressions. |
 | `MaxExpressionLineLength` | `LineLength` | `120` | Maximum single-line expression length before wrapping. |
 | `DefaultEngine` | `EngineName` | `CopilotEngine` | Default engine when workflows do not specify one. |
+| `DefaultCopilotVersion` | `Version` | `"1.0.103"` | Default pinned version of the GitHub Copilot CLI. |
 | `CopilotEngine` | `EngineName` | `"copilot"` | GitHub Copilot engine identifier. |
 | `ClaudeEngine` | `EngineName` | `"claude"` | Claude engine identifier. |
 | `CodexEngine` | `EngineName` | `"codex"` | Codex engine identifier. |
@@ -72,6 +73,7 @@ The package also acts as the authoritative source for the generated workflow con
 | `ActivationJobName` | `JobName` | `"activation"` | Built-in activation job identifier. |
 | `PreActivationJobName` | `JobName` | `"pre_activation"` | Built-in pre-activation job identifier. |
 | `PreActivationHyphenJobName` | `JobName` | `"pre-activation"` | Hyphenated compatibility alias for the pre-activation job. |
+| `CheckMembershipStepID` | `StepID` | `"check_membership"` | Step identifier for checking workflow membership during pre-activation. |
 | `DetectionJobName` | `JobName` | `"detection"` | Built-in detection job identifier. |
 | `EvalsJobName` | `JobName` | `"evals"` | Built-in evals job identifier. |
 | `SafeOutputsJobName` | `JobName` | `"safe_outputs"` | Built-in safe-outputs job identifier. |
@@ -136,7 +138,7 @@ and workspace mounts:
 
 `DefaultActivationJobRunnerImage`, `DefaultAgentJobTimeout`,
 `DefaultAgenticWorkflowTimeout`, `DefaultAgyVersion`, `DefaultAlpineImage`,
-`DefaultBunVersion`, `DefaultClaudeCodeVersion`,
+`DefaultBunVersion`, `DefaultClaudeCodeVersion`, `DefaultCopilotVersion`,
 `DefaultCloudHypervisorMemoryMiB`, `DefaultCloudHypervisorVCPUs`,
 `DefaultCodexVersion`, `DefaultCopilotChecksumsSHA256`,
 `DefaultCopilotSDKPort`, `DefaultCopilotSDKVersion`, `DefaultDenoVersion`,
@@ -174,7 +176,8 @@ contract values and should remain stable:
 `AnthropicAPIKey`, `ArtifactPrefixOutputName`, `AwPromptsFile`,
 `AwPromptsFileExpr`, `AwPromptsFileShell`, `AwPromptsUserFile`,
 `AwPromptsUserFileExpr`, `BashCompletionDir`, `BashCompletionGhAwPath`,
-`CheckCommandPositionStepID`, `CheckCooldownStepID`, `CheckRateLimitStepID`,
+`CheckCommandPositionStepID`, `CheckCooldownStepID`, `CheckMembershipStepID`,
+`CheckRateLimitStepID`,
 `CheckSkipBotsStepID`, `CheckSkipIfCheckFailingStepID`, `CheckSkipIfMatchStepID`,
 `CheckSkipIfNoMatchStepID`, `CheckSkipRolesStepID`, `CheckStopTimeStepID`,
 `ClaudeCLIModelEnvVar`, `ClaudeLLMGatewayPort`, `CodexAPIKey`, `CodexDefaultModel`,

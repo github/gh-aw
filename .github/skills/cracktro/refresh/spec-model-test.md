@@ -15,7 +15,7 @@ Plan only. Recompute, then edit `docs/public/cracktro/deck.js` per the `cracktro
 
 ## 1. Slide
 
-- Heading: `Spec · Model · Test` (process band).
+- Heading: `Spec · Model · Test` (AW factory band, `group: "data"`).
 - Marker: `// Spec → Model → Test: spec requirements become TLA+ invariants`.
 - CSS prefixes: `fv-` (flow, cards), `smt-` (measured ledger).
 - Data strings, all inside the slide block:

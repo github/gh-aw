@@ -31,6 +31,7 @@ Slides built on a gh-aw agentic workflow show, at `top: 30px`, the first user me
 | Pull Request Review² | pr-sous-chef | #31911 | task `a70501b3-515a-4256-b691-e77b75eb8394`, session `4e5f906c-6ef8-407f-9c87-90e1bf7a7bd4` |
 | Daily Unsloppers | duplicate-code-detector | #1293 | PR body "Original prompt" (Serena DOCKER.md URL stripped) |
 | Merge fast, unslop daily | jsweep | #6854 | PR body |
+| Issue Monster | issue-monster | #4684 | PR body "Original prompt" |
 | Query · Ask · Grow | daily-otel-instrumentation-advisor | #24655 | task `4f75f9b3-462c-4143-ae1d-0dae11684d5a`, session `2b0febeb-53b8-4f19-83d4-471aed9ce7d9` |
 | Mine · Refine · Apply | linter-miner | #32263 | task `414cf3c4-ff06-4015-92ec-2c9eec136b3e`, session `3e5e3881-fdf1-4f74-8c10-674d786224d3` |
 | Explore · Reuse · Lint | sergo | #10063 | PR body |
@@ -38,7 +39,8 @@ Slides built on a gh-aw agentic workflow show, at `top: 30px`, the first user me
 | Go Fan | go-fan | #5092 | PR body |
 | Spec-driven testing | spec-extractor / enforcer / librarian | #26083 | task `fca20c82-56ce-4da2-bfc3-629bc47c120f`, session `1b7312fb-2292-4227-84ea-2d170e3906be` |
 | Docs that heal | daily-doc-updater | #1861 | PR body |
-| Speak · Map · Grep | dictation-prompt | #2147 | PR body |
+| Hunt · Falsify · Fix | daily-vulnhunter-scan | #46742 | task `47b76064-1f05-4c71-b671-c2939ad34ef1`, session `5287d715-09be-492d-ba81-44e6b8175b31` (VulnHunter URL replaced by the `capitalone/VulnHunter` slug) |
+| Speech To Agent | dictation-prompt | #2147 | PR body |
 
 Alternates that were not used:
 - lint-monster: #32687, task `906f95f4-b0fb-4743-a58d-44bcc5693072`, session `57e5e168-24eb-4ba4-8dcc-15bf71e21dd5`.

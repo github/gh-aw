@@ -467,7 +467,7 @@ Compile-time lint is Actions/AW AST-only and does not require a native JavaScrip
 
 **`--no-logo` flag:** Omit the ASCII logo from generated workflow headers without removing metadata or regeneration instructions. To persist this setting for all compiles, including upgrades, set [`"lock_file_logo": false` in `.github/workflows/aw.json`](/gh-aw/reference/compilation-process/#repository-configuration-awjson). Either opt-out disables the logo; `--banner` only controls terminal output.
 
-**`--dry-run` flag:** Compile with strict source validation, staged safe outputs, shellcheck, and model checks. Existing and added medium-or-higher or unclassified scanner findings fail; baseline counts remain available for comparison. Low-severity findings and zizmor's `secrets-outside-env` rule do not fail the gate. Docker-based image validation and scanners are opt-in; native shellcheck provides required run-step linting without Docker. Missing required checks or model inventory block compilation. Compiler-managed GitHub mutations and authored custom jobs are disabled. Custom jobs and custom safe-output jobs become credential-free placeholders, including reusable calls with inherited secrets. Workflow `steps` and `post-steps` are accepted but their code and credentials are omitted from the emitted lock, so they cannot execute when that lock is separately dispatched. Omitted setup and cleanup reduce live-test coverage; dry-run locks still execute the agent and compiler-owned steps when dispatched under separate authorization. `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP servers, `mcp-scripts`, custom safe-output scripts, enabled Bash graders, and authored OIDC permissions are rejected, including imported declarations. Remove unsupported declarations in a separate diagnostic workflow. Emitted locks remove telemetry environment variables and automatic OTLP authentication. Agent shell commands, custom engine execution, custom credentials, and hosted identities still require review; dry-run is not a hosted sandbox. Explicitly disabling a required check is rejected; `--no-emit`, `--watch`, `--approve`, and `--allow-action-refs` are incompatible. This flag does not upload or execute workflows and is distinct from `--action-mode dev`. The compile MCP input is `dry_run`; `validate_images: true` opts into required image validation. See [Development Testing Mode](/gh-aw/reference/compilation-process/#development-testing-mode).
+**`--dry-run` flag:** Compile with strict source validation, staged safe outputs, shellcheck, and model checks. Existing and added medium-or-higher or unclassified scanner findings fail; baseline counts remain available for comparison. Low-severity findings and zizmor's `secrets-outside-env` rule do not fail the gate. Docker-based image validation and scanners are opt-in; native shellcheck provides required run-step linting without Docker. Missing required checks or model inventory block compilation. Compiler-managed GitHub mutations and authored custom jobs are disabled. Custom jobs and custom safe-output jobs become credential-free placeholders, including reusable calls with inherited secrets. Workflow `steps` and `post-steps` are accepted but their code and credentials are omitted from the emitted lock, so they cannot execute when that lock is separately dispatched. Omitted setup and cleanup reduce live-test coverage; dry-run locks still execute the agent and compiler-owned steps when dispatched under separate authorization. `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP servers, `mcp-scripts`, custom safe-output scripts, and authored OIDC permissions are rejected, including imported declarations. Remove unsupported declarations in a separate diagnostic workflow. Emitted locks remove telemetry environment variables and automatic OTLP authentication. Agent shell commands, custom engine execution, custom credentials, and hosted identities still require review; dry-run is not a hosted sandbox. Explicitly disabling a required check is rejected; `--no-emit`, `--watch`, `--approve`, and `--allow-action-refs` are incompatible. This flag does not upload or execute workflows and is distinct from `--action-mode dev`. The compile MCP input is `dry_run`; `validate_images: true` opts into required image validation. See [Development Testing Mode](/gh-aw/reference/compilation-process/#development-testing-mode).
 
 Dry-run locks also omit daily credit accounting, retain existing per-run caps or promote configured/imported daily limits, and add manual dispatch restricted to maintainer/admin actors without bot exemptions. `DEBUG=workflow:compiler_development,cli:compile_development` reports mutations without configuration values.
 
@@ -1040,21 +1040,15 @@ The command and its output formats may change.
 
 #### `graders`
 
-Run one enabled built-in, custom JavaScript, or operational-value Bash grader against a unified session from a saved run's
-`usage` artifact or from standard input. Input accepts unified-session JSONL
-or a JSON event array. The ten fast built-ins are available without explicit
-frontmatter configuration. Custom JavaScript uses a separate restricted worker
-with the same in-memory interface as the downstream graders job. Repository-owned
-`graders.operational-value.run` Bash uses that job's session-file compatibility
-runtime: session JSONL in `$1` / `GH_AW_SESSION_FILE`, config JSON in
-`GH_AW_GRADER_CONFIG`, and legacy metric-array output.
+Run one enabled built-in, custom JavaScript, or operational-value grader against
+a unified session from a saved run's `usage` artifact or standard input. Input
+accepts unified-session JSONL or a JSON event array. Reserved
+`graders.operational-value.script` uses the restricted JavaScript worker and
+returns ordered metrics whose first value is primary. Custom JavaScript uses a separate restricted worker.
 
 Pure built-in/JavaScript replay requires Node.js 20+ with the permission model. The CLI picks
 `--permission` or `--experimental-permission` as supported, restricts reads to
 the staged runtime modules, and passes the session in memory to the grader.
-Bash replay requires Node.js and Bash with the same bounded, stripped-environment
-runtime as the separate job. It is trusted code, not a filesystem/network sandbox
-or microVM; compilation and lint reject detected file writes.
 
 ```bash wrap
 gh aw graders run weekly-research loops 123456789
@@ -1073,9 +1067,9 @@ Collection mode emits a JSON report, preserves original grader artifacts without
 rewriting them, and records the selected definitions, implementation identities,
 and session digests separately from historical scores. It uses only GH-AW logs
 and unified sessions, never Harbor bundles. Missing sessions and grader errors
-are explicit per-run results. Collection mode and `logs --harbor` additional
-grading support only in-memory built-ins and isolated JavaScript, not Bash.
-The existing single-session Bash replay behavior is unchanged.
+are explicit per-run results. Collection mode and `logs --harbor` additional grading support in-memory
+built-ins, isolated custom JavaScript, and operational-value JavaScript, not
+Bash. Single-session legacy Bash replay remains available with a warning.
 
 **Options:** `--additional-grader`, `--logs-dir`, `--repo/-r`
 
@@ -1296,9 +1290,9 @@ Merge conflicts leave the existing workflow and lock file unchanged by default. 
 
 Before updating action, skill, and plugin pins, `update` scans workflow Markdown files for conflict markers. A missing workflow directory is treated as empty. Other scan errors, including unreadable files or broken symlinks inside an existing directory, fail the command and skip these pin updates because the absence of conflict markers cannot be verified.
 
-By default, `update` also force-updates all GitHub Actions referenced in your workflows (both in `actions-lock.json` and workflow files) to their latest major version. Use `--no-release-bump` to restrict force-updates to core `actions/*` actions only.
+By default, `update` also force-updates all GitHub Actions referenced in your workflows (both in `actions-lock.json` and workflow files) to their latest major version. Use `--no-release-bump` to restrict force-updates to core `actions/*` actions only. The `github/gh-aw-actions/setup` runtime action is always pinned to the installed gh-aw version, not the latest release.
 
-Container digest pins are refreshed on a best-effort basis using Docker Buildx or `crane`. If a lookup fails, `update` prints one short informational message with the reason and preserves existing pins. Set `DEBUG=cli:update_container_pins` for per-image diagnostics.
+Container digest pins are refreshed on a best-effort basis using Docker Buildx or `crane`. Built-in containers (firewall, MCP gateway, router, `gh-aw-node`, GitHub MCP server) use the digests bundled with the installed gh-aw version instead of the registry. If a lookup fails, `update` prints one short informational message with the reason and preserves existing pins. Set `DEBUG=cli:update_container_pins` for per-image diagnostics.
 
 If no workflows in the repository contain a `source` field, the command exits gracefully with an informational message rather than an error. This is expected behavior for repositories that have not yet added updatable workflows.
 

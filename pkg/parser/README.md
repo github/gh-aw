@@ -405,7 +405,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | `import_cache.go` | `(*ImportCache).Set` | `func (*ImportCache).Set(owner, repo, path, sha string, content []byte) (string, error)` | Set stores a new cache entry by saving the content to the cache directory sha parameter should be the resolved commit SHA |
 | `import_error.go` | `(*ImportCycleError).Error` | `func (*ImportCycleError).Error() string` | Implements the `error` interface for `ImportCycleError`. |
 | `import_error.go` | `(*FormattedParserError).Error` | `func (*FormattedParserError).Error() string` | Implements the `error` interface for `FormattedParserError`, returning the pre-formatted message. |
-| `import_error.go` | `(*FormattedParserError).Unwrap` | `func (*FormattedParserError).Unwrap() error` | Exported function or method declared in `import_error.go`. |
+| `import_error.go` | `(*FormattedParserError).Unwrap` | `func (*FormattedParserError).Unwrap() error` | Returns the optional underlying cause for error-chain inspection with `errors.Is` and `errors.As`. |
 | `validation_error.go` | `(*ValidationError).Error` | `func (*ValidationError).Error() string` | Implements the `error` interface for `ValidationError`, formatting field/reason/suggestion into a message. |
 | `schema_validation.go` | `IsImportSafeSharedWorkflowOn` | `func IsImportSafeSharedWorkflowOn(onValue any) bool` | IsImportSafeSharedWorkflowOn validates whether an imported `on:` block is restricted to safe shared-workflow triggers. |
 

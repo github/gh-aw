@@ -27,17 +27,21 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 
 | Slide | Refresh skill |
 |---|---|
-| 16 Human Agent Processes | `refresh/human-agent-processes.md` |
-| 17 Pull Request Review² | `refresh/pr-review-squared.md` |
-| 20 Daily Unsloppers | `refresh/daily-unsloppers.md` |
-| 21 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
-| 22 Research · Assign · Observe | `refresh/research-assign-observe.md` |
-| 25 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
-| 27 Spec · Model · Test | `refresh/spec-model-test.md` |
-| 29 Spec-driven testing | `refresh/spec-driven-testing.md` |
-| 30 Docs that heal | `refresh/docs-that-heal.md` |
-| 32 Multi-device tester | `refresh/multi-device-tester.md` |
-| 33 Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
-| 35 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
-| 56 Skills in review | `refresh/skills-in-review.md` |
+| Human Agent Processes | `refresh/human-agent-processes.md` |
+| Pull Request Review² | `refresh/pr-review-squared.md` |
+| Daily Unsloppers | `refresh/daily-unsloppers.md` |
+| Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
+| Issue Monster | `refresh/issue-monster.md` |
+| Research · Assign · Observe | `refresh/research-assign-observe.md` |
+| Hunt · Falsify · Fix | `refresh/hunt-falsify-fix.md` |
+| Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
+| Spec · Model · Test | `refresh/spec-model-test.md` |
+| Decide · Draft · Record | `refresh/decide-draft-record.md` |
+| Spec-driven testing | `refresh/spec-driven-testing.md` |
+| Docs that heal | `refresh/docs-that-heal.md` |
+| Multi-device tester | `refresh/multi-device-tester.md` |
+| Findings that land | `refresh/findings-that-land.md` |
+| Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
+| Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+| Skills in review | `refresh/skills-in-review.md` |
 

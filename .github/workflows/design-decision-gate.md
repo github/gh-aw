@@ -26,6 +26,53 @@ on:
       pr_number:
         description: "Pull request number to check"
         required: false
+  permissions:
+    contents: read
+    pull-requests: read
+  steps:
+    # Skip pull_request runs before the agent starts when the outcome is already a noop:
+    # the PR is no longer open, or it has no `implementation` label and ≤100 business-logic additions.
+    # Slash commands and manual dispatches always run; API errors fail open.
+    - name: Check whether the pull request needs ADR enforcement
+      id: adr_gate
+      uses: actions/github-script@v9.0.0
+      with:
+        script: |
+          const run = (needed, reason) => {
+            core.info(`ADR gate ${needed ? 'needed' : 'not needed'}: ${reason}`);
+            if (!needed) core.notice(`Skipping Design Decision Gate: ${reason}`);
+            core.setOutput('needed', needed ? 'true' : 'false');
+          };
+          if (context.eventName !== 'pull_request') {
+            return run(true, `event ${context.eventName} always runs`);
+          }
+          const { owner, repo } = context.repo;
+          const pull_number = context.payload.pull_request.number;
+          if (context.payload.action === 'labeled' && context.payload.label?.name !== 'implementation') {
+            return run(false, `label ${context.payload.label?.name} is not implementation`);
+          }
+          try {
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
+            if (pr.state !== 'open' || pr.merged) {
+              return run(false, `pull request #${pull_number} is ${pr.merged ? 'merged' : pr.state}`);
+            }
+            if (pr.labels.some(l => l.name === 'implementation')) {
+              return run(true, `pull request #${pull_number} has the implementation label`);
+            }
+            try {
+              await github.rest.repos.getContent({ owner, repo, path: '.design-gate.yml', ref: pr.head.sha });
+              return run(true, '.design-gate.yml present; the agent applies the custom thresholds');
+            } catch (err) {
+              if (err.status !== 404) throw err;
+            }
+            const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number, per_page: 100 });
+            const additions = files
+              .filter(f => /^(src|lib|pkg|internal|app|core|domain|services|api)\//.test(f.filename))
+              .reduce((sum, f) => sum + f.additions, 0);
+            return run(additions > 100, `${additions} new lines in business-logic directories (threshold 100)`);
+          } catch (err) {
+            return run(true, `pre-check failed (${err.message}); deferring to the agent`);
+          }
 permissions:
   contents: read
   pull-requests: read
@@ -73,6 +120,11 @@ tools:
     toolsets: [default, repos]
   edit:
   bash: ["*"]
+jobs:
+  pre-activation:
+    outputs:
+      adr_gate_needed: ${{ steps.adr_gate.outputs.needed }}
+if: needs.pre_activation.outputs.adr_gate_needed == 'true'
 steps:
   - name: Pre-fetch ADR gate PR context
     env:

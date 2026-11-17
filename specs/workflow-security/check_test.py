@@ -666,5 +666,46 @@ class ConclusionModelTest(unittest.TestCase):
             self.assertEqual(report["additional_models"], [])
 
 
+class P1BacklogModulesTest(unittest.TestCase):
+    def write_readme(self, root, *rows):
+        table = [
+            "| Boundary | Priority | Owner | Target TLA+ module | Evidence |",
+            "|---|---|---|---|---|",
+            *rows,
+        ]
+        (root / "README.md").write_text("\n".join(table))
+
+    def test_checks_every_p1_module_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_readme(
+                root,
+                "| First boundary | P1 | Owner | `Existing.tla` | Evidence |",
+                "| Second boundary | P1 | Owner | `Missing.tla` | Evidence |",
+            )
+            (root / "Existing.tla").touch()
+
+            with patch.object(check, "ROOT", root):
+                with self.assertRaisesRegex(RuntimeError, "Missing.tla"):
+                    check.check_p1_backlog_modules()
+
+    def test_rejects_malformed_or_empty_target_cells(self):
+        rows = [
+            ("| Boundary | P1 | Owner |  | Evidence |", "backticked .tla module target"),
+            ("| Boundary | P1 | Owner | MissingBackticks.tla | Evidence |",
+             "backticked .tla module target"),
+            ("Boundary | P1 | Owner | `MissingStartPipe.tla` | Evidence |",
+             "pipe-delimited table row"),
+        ]
+        for row, expected_error in rows:
+            with self.subTest(row=row), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write_readme(root, row)
+
+                with patch.object(check, "ROOT", root):
+                    with self.assertRaisesRegex(RuntimeError, expected_error):
+                        check.check_p1_backlog_modules()
+
+
 if __name__ == "__main__":
     unittest.main()

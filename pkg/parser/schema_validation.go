@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -79,7 +79,7 @@ func validateSharedWorkflowFields(frontmatter map[string]any) error {
 	}
 
 	if len(forbiddenFound) > 0 {
-		sort.Strings(forbiddenFound)
+		slices.Sort(forbiddenFound)
 		schemaValidationLog.Printf("Found %d forbidden field(s) in shared workflow: %v", len(forbiddenFound), forbiddenFound)
 		if len(forbiddenFound) == 1 {
 			return fmt.Errorf("field '%s' cannot be used in shared workflows (only allowed in main workflows with 'on' trigger); shared workflows may use import-safe 'on' fields: %s", forbiddenFound[0], strings.Join(sharedWorkflowAllowedOnFieldList, ", "))
@@ -182,6 +182,9 @@ func ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter map[string
 	schemaValidationLog.Printf("Validating main workflow frontmatter: file=%s, fields=%d", filePath, len(frontmatter))
 	// Filter out ignored fields before validation
 	filtered := filterIgnoredFields(frontmatter)
+	if err := validateRemovedOperationalValueRun(filtered); err != nil {
+		return err
+	}
 
 	// First run custom validation for command trigger conflicts (provides better error messages)
 	if err := validateCommandTriggerConflicts(filtered); err != nil {
@@ -193,7 +196,6 @@ func ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter map[string
 	if err := validateMetadataDocs(filtered); err != nil {
 		return err
 	}
-
 	// Then run the standard schema validation with location
 	if err := validateWithSchemaAndLocation(filtered, mainWorkflowSchema, "main workflow file", filePath); err != nil {
 		return err
@@ -238,6 +240,9 @@ func ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter map[string
 
 	// Filter out ignored fields before validation
 	filtered := filterIgnoredFields(frontmatter)
+	if err := validateRemovedOperationalValueRun(filtered); err != nil {
+		return err
+	}
 
 	if err := validateSharedConnectorFields(filtered); err != nil {
 		return err
@@ -264,6 +269,21 @@ func ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter map[string
 
 	// Run custom validation for engine-specific rules
 	return validateEngineSpecificRules(filtered)
+}
+
+func validateRemovedOperationalValueRun(frontmatter map[string]any) error {
+	graders, ok := frontmatter["graders"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	operationalValue, ok := graders["operational-value"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	if _, exists := operationalValue["run"]; exists {
+		return errors.New("graders.operational-value.run has been removed; use graders.operational-value.script with restricted JavaScript")
+	}
+	return nil
 }
 
 // ValidateMCPConfigWithSchema validates MCP configuration using JSON schema.

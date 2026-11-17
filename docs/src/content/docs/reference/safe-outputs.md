@@ -372,10 +372,10 @@ The unprivileged safeoutputs MCP backend reads the file and replaces `path` with
 
 Paths must be literal absolute paths within the workspace or `/tmp/gh-aw/agent`; general temporary runtime files are not allowed. The shared file-upload denylist rejects any `.git` path component, system directories, and HOME credential/config locations such as `.ssh`, `.aws`, `.config`, `.npmrc`, and `.git-credentials`, even when they overlap an allowed root. Variables and globs are not expanded. Guarded reads on the Linux workflow runtime reject symlinks (including directory links), hard links, non-regular files, invalid UTF-8, empty content, and files exceeding `max-issue-artifact-size`. Unsupported platforms fail closed. A read or validation failure records no issue request. Do not specify both `body` and `path`. Passing a pathname as `body` still attaches that pathname as text.
 
-For an image, binary file, or downloadable original, use [upload-artifact](#artifact-uploads-upload-artifact) with a literal file path:
+For an image, binary file, or downloadable original, save or copy the file into the workspace and use [upload-artifact](#artifact-uploads-upload-artifact) with its workspace-relative path:
 
 ```json
-{"type": "upload_artifact", "path": "/tmp/gh-aw/agent/chart.png"}
+{"type": "upload_artifact", "path": "output/chart.png"}
 ```
 
 This creates a run-scoped GitHub Actions artifact, not an issue artifact. Use [upload-asset](#asset-uploads-upload-asset) with `path` when a persistent repository-branch URL is required, then reference the published URL in the issue body or a `link` artifact. Upload retention, path authorization, and file-size policies are separate from the issue artifact count and body-size limits.
@@ -1355,7 +1355,11 @@ safe-outputs:
     github-token: ${{ secrets.SOME_CUSTOM_TOKEN }}
 ```
 
-Agent calls `upload_artifact` with a `path` (file or directory) or `filters` (glob-based file selection). Artifacts are available via `gh run download` during the workflow run retention period.
+Agent calls `upload_artifact` with exactly one of `path` (file or directory) or `filters` (glob-based file selection). Artifacts are available via `gh run download` during the workflow run retention period.
+
+Source files must be inside the workspace or the upload staging directory (by default, `/tmp/gh-aw/safeoutputs/upload-artifacts/`). Workspace-relative paths such as `output/chart.png` are copied into staging automatically; absolute workspace paths are also accepted. Absolute paths elsewhere, including `/tmp/gh-aw/agent/`, are rejected with `path is outside allowed source roots`. Copy those files into the workspace before calling the tool. JSON path values are literal; shell variables are not expanded.
+
+`filters` selects files already in staging. The `allowed-paths` patterns match staging-relative paths and can further restrict uploads; they do not authorize additional source directories.
 
 The repository's `artifact_retention_days` setting in `aw.json`, or the
 `GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS` Actions variable when that setting is

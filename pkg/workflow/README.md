@@ -27,6 +27,26 @@ The package is intentionally large (~520 source files) because it encodes all Gi
 | `WorkflowData` | struct | Complete in-memory representation of a compiled workflow |
 | `FileCreationTracker` | interface | Abstraction for tracking written files |
 
+### Experimental Feature Catalog
+
+`pkg/workflow/data/experimental_features.json` is the single source of truth for
+experimental feature metadata. The catalog is embedded in the binary and drives
+compiler notices and the feature lookup API.
+
+#### Types
+
+| Type | Kind | Description |
+|------|------|-------------|
+| `ExperimentalFeature` | struct | Metadata for one experimental feature catalog entry. |
+| `ExperimentalCracktroSlide` | struct | A talk-deck slide and badge associated with an experimental feature. |
+
+#### Functions
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `ExperimentalFeatures` | `func ExperimentalFeatures() []ExperimentalFeature` | Returns the embedded feature entries in JSON file order. |
+| `LookupExperimentalFeature` | `func LookupExperimentalFeature(id string) (ExperimentalFeature, bool)` | Looks up a feature by ID and reports whether it exists. |
+
 #### `Compiler` Methods
 
 | Method | Signature | Description |
@@ -719,6 +739,7 @@ pkg/workflow ── FrontmatterConfig (typed structs)
 
 **Internal**:
 - `github.com/github/gh-aw/pkg/parser` — frontmatter extraction and import processing
+- `github.com/github/gh-aw/pkg/connectors` — connector declarations and capability resolution
 - `github.com/github/gh-aw/pkg/constants` — engine names, feature flags, job/step IDs
 - `github.com/github/gh-aw/pkg/console` — terminal formatting
 - `github.com/github/gh-aw/pkg/logger` — debug logging
@@ -733,8 +754,11 @@ pkg/workflow ── FrontmatterConfig (typed structs)
 - `github.com/github/gh-aw/pkg/types` — shared MCP types
 - `github.com/github/gh-aw/pkg/importinpututil` — input-value resolution and formatting for `@import` directives
 - `github.com/github/gh-aw/pkg/repoutil` — repository slug parsing and normalization
+- `github.com/github/gh-aw/pkg/scanfindings` — security scanner finding data
 - `github.com/github/gh-aw/pkg/setutil` — set operations backed by `map[K]struct{}`
 - `github.com/github/gh-aw/pkg/ctxutil` — non-nil `context.Context` fallback for optional context options
+- `github.com/github/gh-aw/pkg/validationerror` — structured validation errors
+- `github.com/github/gh-aw/pkg/workqueue` — native work-queue workflow contracts
 
 **Test-only**:
 - `github.com/github/gh-aw/pkg/testutil` — shared test fixtures and assertion helpers used by workflow package tests
@@ -1163,7 +1187,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | `agentic_engine.go` | `(*BaseEngine).GetDefaultDetectionModel` | `func (*BaseEngine).GetDefaultDetectionModel() string` | GetDefaultDetectionModel returns empty string by default (no default model) Engines can override this to provide a cost-effective default for detection jobs |
 | `agentic_engine.go` | `(*BaseEngine).GetErrorDetectionScriptId` | `func (*BaseEngine).GetErrorDetectionScriptId() string` | GetErrorDetectionScriptId returns empty string by default (no post-execution error detection) Engines can override this to provide a host-runner script that detects errors in the agent stdio log and writes them as GITHU… |
 | `agentic_engine.go` | `(*BaseEngine).GetFirewallLogsCollectionStep` | `func (*BaseEngine).GetFirewallLogsCollectionStep(workflowData *WorkflowData) []GitHubActionStep` | GetFirewallLogsCollectionStep returns an empty slice by default. |
-| `agentic_engine.go` | `(*BaseEngine).GetGHSkillAgentName` | `func (*BaseEngine).GetGHSkillAgentName() string` | Exported function or method declared in `agentic_engine.go`. |
+| `agentic_engine.go` | `(*BaseEngine).GetGHSkillAgentName` | `func (*BaseEngine).GetGHSkillAgentName() string` | Returns the configured `gh skill --agent` value, or an empty string when none is set. |
 | `agentic_engine.go` | `(*BaseEngine).GetLogFileForParsing` | `func (*BaseEngine).GetLogFileForParsing() string` | GetLogFileForParsing returns the default log file path for parsing Engines can override this to use engine-specific log files |
 | `agentic_engine.go` | `(*BaseEngine).GetLogParserScriptId` | `func (*BaseEngine).GetLogParserScriptId() string` | GetLogParserScriptId returns empty string by default (no JavaScript parser) Engines can override this to provide a JavaScript parser for log analysis |
 | `agentic_engine.go` | `(*BaseEngine).GetModelEnvVarName` | `func (*BaseEngine).GetModelEnvVarName() string` | GetModelEnvVarName returns empty string by default (no native model env var). |
@@ -1186,14 +1210,14 @@ This appendix is generated from the current non-test Go source files in this pac
 | `artifact_manager.go` | `NewArtifactManager` | `func NewArtifactManager() *ArtifactManager` | NewArtifactManager creates a new artifact manager |
 | `auto_update_workflow.go` | `GenerateAutoUpdateWorkflow` | `func GenerateAutoUpdateWorkflow(opts GenerateAutoUpdateWorkflowOptions) error` | GenerateAutoUpdateWorkflow generates or removes the agentic-auto-upgrade. |
 | `awf_config_build.go` | `BuildAWFConfigJSON` | `func BuildAWFConfigJSON(config AWFCommandConfig) (string, error)` | BuildAWFConfigJSON generates a compact JSON config file for AWF from the provided command configuration. |
-| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetAgentManifestFiles` | `func (*BehaviorDefinedEngine).GetAgentManifestFiles() []string` | Exported function or method declared in `behavior_defined_engine.go`. |
-| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetAgentManifestPathPrefixes` | `func (*BehaviorDefinedEngine).GetAgentManifestPathPrefixes() []string` | Exported function or method declared in `behavior_defined_engine.go`. |
-| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetModelEnvVarName` | `func (*BehaviorDefinedEngine).GetModelEnvVarName() string` | Exported function or method declared in `behavior_defined_engine.go`. |
-| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetRequiredSecretNames` | `func (*BehaviorDefinedEngine).GetRequiredSecretNames(workflowData *WorkflowData) []string` | Exported function or method declared in `behavior_defined_engine.go`. |
-| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetSecretValidationStep` | `func (*BehaviorDefinedEngine).GetSecretValidationStep(workflowData *WorkflowData) GitHubActionStep` | Exported function or method declared in `behavior_defined_engine.go`. |
-| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetSupportedEnvVarKeys` | `func (*BehaviorDefinedEngine).GetSupportedEnvVarKeys() []string` | Exported function or method declared in `behavior_defined_engine.go`. |
-| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).RenderMCPConfig` | `func (*BehaviorDefinedEngine).RenderMCPConfig(sb *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) error` | Exported function or method declared in `behavior_defined_engine.go`. |
-| `behavior_defined_engine.go` | `NewBehaviorDefinedEngine` | `func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, error)` | Exported function or method declared in `behavior_defined_engine.go`. |
+| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetAgentManifestFiles` | `func (*BehaviorDefinedEngine).GetAgentManifestFiles() []string` | Returns the agent manifest file paths declared by the engine, or nil when no manifest is configured. |
+| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetAgentManifestPathPrefixes` | `func (*BehaviorDefinedEngine).GetAgentManifestPathPrefixes() []string` | Returns the agent manifest path prefixes declared by the engine, or nil when no manifest is configured. |
+| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetModelEnvVarName` | `func (*BehaviorDefinedEngine).GetModelEnvVarName() string` | Returns the model environment variable configured for execution, or an empty string when absent. |
+| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetRequiredSecretNames` | `func (*BehaviorDefinedEngine).GetRequiredSecretNames(workflowData *WorkflowData) []string` | Returns the authentication, MCP, and provider secret names required by the engine and workflow. |
+| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetSecretValidationStep` | `func (*BehaviorDefinedEngine).GetSecretValidationStep(workflowData *WorkflowData) GitHubActionStep` | Builds the GitHub Actions secret-validation step for the engine's authentication requirements. |
+| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).GetSupportedEnvVarKeys` | `func (*BehaviorDefinedEngine).GetSupportedEnvVarKeys() []string` | Returns the declared supported environment-variable keys or the sorted unique authentication secret names. |
+| `behavior_defined_engine.go` | `(*BehaviorDefinedEngine).RenderMCPConfig` | `func (*BehaviorDefinedEngine).RenderMCPConfig(sb *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) error` | Writes the MCP gateway configuration using the engine's configured path or the default path. |
+| `behavior_defined_engine.go` | `NewBehaviorDefinedEngine` | `func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, error)` | Validates an engine definition and constructs its behavior-defined runtime engine. |
 | `central_slash_command_workflow.go` | `GenerateCentralSlashCommandWorkflow` | `func GenerateCentralSlashCommandWorkflow(ctx context.Context, workflowDataList []*WorkflowData, workflowDir string, repoConfig *RepoConfig) error` | GenerateCentralSlashCommandWorkflow generates a single centralized slash-command trigger workflow for workflows that opt into on. |
 | `checkout_manager.go` | `(*CheckoutManager).GetCrossRepoTargetRef` | `func (*CheckoutManager).GetCrossRepoTargetRef() string` | GetCrossRepoTargetRef returns the platform ref expression previously set by SetCrossRepoTargetRef, or an empty string if no cross-repo ref was set. |
 | `checkout_manager.go` | `(*CheckoutManager).GetCrossRepoTargetRepo` | `func (*CheckoutManager).GetCrossRepoTargetRepo() string` | GetCrossRepoTargetRepo returns the platform repo expression previously set by SetCrossRepoTargetRepo, or an empty string if no cross-repo target was set (same-repo invocation or inlined imports). |
@@ -1355,7 +1379,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | `expression_builder.go` | `BuildOr` | `func BuildOr(left ConditionNode, right ConditionNode) ConditionNode` | BuildOr creates an OR node combining two conditions |
 | `expression_builder.go` | `BuildPropertyAccess` | `func BuildPropertyAccess(path string) *PropertyAccessNode` | BuildPropertyAccess creates a property access node for GitHub context properties |
 | `expression_builder.go` | `BuildReactionConditionForTargets` | `func BuildReactionConditionForTargets(includeIssues bool, includePullRequests bool, includeDiscussions bool, includeWorkflowDispatch bool) ConditionNode` | BuildReactionConditionForTargets creates a condition tree for reactions scoped to target groups. |
-| `expression_builder.go` | `BuildSafeOutputType` | `func BuildSafeOutputType(outputType string) ConditionNode` | Exported function or method declared in `expression_builder.go`. |
+| `expression_builder.go` | `BuildSafeOutputType` | `func BuildSafeOutputType(outputType string) ConditionNode` | Builds a condition requiring a non-cancelled run, a non-skipped agent job, and the requested output type. |
 | `expression_builder.go` | `BuildStatusCommentCondition` | `func BuildStatusCommentCondition(includeIssues bool, includePullRequests bool, includeDiscussions bool, includeWorkflowDispatch bool) ConditionNode` | BuildStatusCommentCondition creates a condition tree for activation status comments. |
 | `expression_builder.go` | `BuildStringLiteral` | `func BuildStringLiteral(value string) *StringLiteralNode` | BuildStringLiteral creates a string literal node |
 | `expression_builder.go` | `RenderCondition` | `func RenderCondition(node ConditionNode) string` | RenderCondition optimises a ConditionNode and renders it to a string. |
@@ -1365,17 +1389,17 @@ This appendix is generated from the current non-test Go source files in this pac
 | `expression_extraction.go` | `ExperimentEnvVarName` | `func ExperimentEnvVarName(experimentName string) string` | ExperimentEnvVarName returns the env-var name used for the given experiment. |
 | `expression_extraction.go` | `NewExpressionExtractor` | `func NewExpressionExtractor() *ExpressionExtractor` | NewExpressionExtractor creates a new ExpressionExtractor |
 | `expression_extraction.go` | `SubstituteImportInputs` | `func SubstituteImportInputs(content string, importInputs map[string]any) string` | SubstituteImportInputs replaces ${{ github. |
-| `expression_nodes.go` | `(*AndNode).Render` | `func (*AndNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
-| `expression_nodes.go` | `(*BooleanLiteralNode).Render` | `func (*BooleanLiteralNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
-| `expression_nodes.go` | `(*ComparisonNode).Render` | `func (*ComparisonNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
-| `expression_nodes.go` | `(*DisjunctionNode).Render` | `func (*DisjunctionNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
+| `expression_nodes.go` | `(*AndNode).Render` | `func (*AndNode).Render() string` | Renders both operands joined by `&&`, adding parentheses where needed to preserve precedence. |
+| `expression_nodes.go` | `(*BooleanLiteralNode).Render` | `func (*BooleanLiteralNode).Render() string` | Renders the boolean value as `true` or `false`. |
+| `expression_nodes.go` | `(*ComparisonNode).Render` | `func (*ComparisonNode).Render() string` | Renders the left and right expressions with the configured comparison operator. |
+| `expression_nodes.go` | `(*DisjunctionNode).Render` | `func (*DisjunctionNode).Render() string` | Renders the terms joined by `||`, inline or on separate lines when multiline mode is enabled. |
 | `expression_nodes.go` | `(*DisjunctionNode).RenderMultiline` | `func (*DisjunctionNode).RenderMultiline() string` | RenderMultiline renders the disjunction with each term on a separate line, including comments for expressions that have descriptions |
-| `expression_nodes.go` | `(*ExpressionNode).Render` | `func (*ExpressionNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
-| `expression_nodes.go` | `(*FunctionCallNode).Render` | `func (*FunctionCallNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
-| `expression_nodes.go` | `(*NotNode).Render` | `func (*NotNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
+| `expression_nodes.go` | `(*ExpressionNode).Render` | `func (*ExpressionNode).Render() string` | Returns the stored expression string. |
+| `expression_nodes.go` | `(*FunctionCallNode).Render` | `func (*FunctionCallNode).Render() string` | Renders a function name and its comma-separated argument expressions. |
+| `expression_nodes.go` | `(*NotNode).Render` | `func (*NotNode).Render() string` | Renders the child expression with logical negation and necessary parentheses. |
 | `expression_nodes.go` | `(*OrNode).Render` | `func (*OrNode).Render() string` | \|\| has the lowest precedence of any boolean operator, so no child of an OR expression ever needs explicit parentheses to preserve evaluation order. |
-| `expression_nodes.go` | `(*PropertyAccessNode).Render` | `func (*PropertyAccessNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
-| `expression_nodes.go` | `(*StringLiteralNode).Render` | `func (*StringLiteralNode).Render() string` | Exported function or method declared in `expression_nodes.go`. |
+| `expression_nodes.go` | `(*PropertyAccessNode).Render` | `func (*PropertyAccessNode).Render() string` | Returns the stored property path. |
+| `expression_nodes.go` | `(*StringLiteralNode).Render` | `func (*StringLiteralNode).Render() string` | Renders a single-quoted string literal, doubling embedded single quotes. |
 | `expression_optimizer.go` | `OptimizeExpression` | `func OptimizeExpression(node ConditionNode) ConditionNode` | OptimizeExpression applies boolean algebra simplifications to a ConditionNode tree, returning an equivalent but potentially simpler and shorter expression. |
 | `expression_parser.go` | `BreakAtParentheses` | `func BreakAtParentheses(expression string) []string` | BreakAtParentheses attempts to break long lines at parentheses for function calls |
 | `expression_parser.go` | `BreakLongExpression` | `func BreakLongExpression(expression string) []string` | BreakLongExpression breaks a long expression into multiple lines at logical points such as after \|\| and && operators for better readability |
@@ -1406,7 +1430,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | `github_cli.go` | `RunGHInputContext` | `func RunGHInputContext(ctx context.Context, spinnerMessage string, input io.Reader, args ...string) ([]byte, error)` | RunGHInputContext executes a gh CLI command with context, a spinner, and an io. |
 | `github_cli.go` | `SetDefaultGHHost` | `func SetDefaultGHHost(host string)` | SetDefaultGHHost sets the default host used by gh CLI helper commands when GH_HOST is not set in the process environment. |
 | `github_cli.go` | `SetGHHostEnv` | `func SetGHHostEnv(cmd *exec.Cmd, host string)` | SetGHHostEnv sets the GH_HOST environment variable on the command for non-github. |
-| `github_cli_wasm.go` | `ExecGHWithOutput` | `func ExecGHWithOutput(args ...string) (stdout, stderr bytes.Buffer, err error)` | Exported function or method declared in `github_cli_wasm.go`. |
+| `github_cli_wasm.go` | `ExecGHWithOutput` | `func ExecGHWithOutput(args ...string) (stdout, stderr bytes.Buffer, err error)` | Returns empty output buffers and an error because the GitHub CLI is unavailable in Wasm. |
 | `github_toolset_validation_error.go` | `NewGitHubToolsetValidationError` | `func NewGitHubToolsetValidationError(missingToolsets map[string][]string) *GitHubToolsetValidationError` | NewGitHubToolsetValidationError creates a new validation error |
 | `github_toolsets.go` | `ParseGitHubToolsets` | `func ParseGitHubToolsets(toolsetsStr string) []string` | ParseGitHubToolsets parses the toolsets string and expands "default" and "all" into their constituent toolsets. |
 | `imports.go` | `(*Compiler).MergeFeatures` | `func (*Compiler).MergeFeatures(topFeatures map[string]any, importedFeatures []map[string]any) (map[string]any, error)` | MergeFeatures merges features configurations from imports with top-level features Features from top-level take precedence over imported features |
@@ -1424,17 +1448,17 @@ This appendix is generated from the current non-test Go source files in this pac
 | `jobs_validation.go` | `(*JobManager).ValidateDependencies` | `func (*JobManager).ValidateDependencies() error` | ValidateDependencies checks that all job dependencies exist and there are no cycles |
 | `jobs_validation.go` | `(*JobManager).ValidateDuplicateSteps` | `func (*JobManager).ValidateDuplicateSteps() error` | ValidateDuplicateSteps checks that no job has duplicate steps. |
 | `js.go` | `FormatJavaScriptForYAML` | `func FormatJavaScriptForYAML(script string) []string` | FormatJavaScriptForYAML formats a JavaScript script with proper indentation for embedding in YAML |
-| `js.go` | `GetJavaScriptSources` | `func GetJavaScriptSources() map[string]string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetLogParserScript` | `func GetLogParserScript(name string) string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPHTTPTransportScript` | `func GetMCPHTTPTransportScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPHandlerPythonScript` | `func GetMCPHandlerPythonScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPHandlerShellScript` | `func GetMCPHandlerShellScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPLoggerScript` | `func GetMCPLoggerScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPScriptsConfigLoaderScript` | `func GetMCPScriptsConfigLoaderScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPScriptsMCPServerHTTPScript` | `func GetMCPScriptsMCPServerHTTPScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPScriptsValidationScript` | `func GetMCPScriptsValidationScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetMCPServerCoreScript` | `func GetMCPServerCoreScript() string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetReadBufferScript` | `func GetReadBufferScript() string` | Exported function or method declared in `js.go`. |
+| `js.go` | `GetJavaScriptSources` | `func GetJavaScriptSources() map[string]string` | Returns an empty map because JavaScript sources are no longer embedded. |
+| `js.go` | `GetLogParserScript` | `func GetLogParserScript(name string) string` | Returns the external-script sentinel; the named parser is loaded from the runner's actions directory. |
+| `js.go` | `GetMCPHTTPTransportScript` | `func GetMCPHTTPTransportScript() string` | Returns an empty string because the MCP HTTP transport script is no longer embedded. |
+| `js.go` | `GetMCPHandlerPythonScript` | `func GetMCPHandlerPythonScript() string` | Returns an empty string because the Python MCP handler script is no longer embedded. |
+| `js.go` | `GetMCPHandlerShellScript` | `func GetMCPHandlerShellScript() string` | Returns an empty string because the shell MCP handler script is no longer embedded. |
+| `js.go` | `GetMCPLoggerScript` | `func GetMCPLoggerScript() string` | Returns an empty string because the MCP logger script is no longer embedded. |
+| `js.go` | `GetMCPScriptsConfigLoaderScript` | `func GetMCPScriptsConfigLoaderScript() string` | Returns an empty string because the MCP scripts config loader is no longer embedded. |
+| `js.go` | `GetMCPScriptsMCPServerHTTPScript` | `func GetMCPScriptsMCPServerHTTPScript() string` | Returns an empty string because the MCP server HTTP script is no longer embedded. |
+| `js.go` | `GetMCPScriptsValidationScript` | `func GetMCPScriptsValidationScript() string` | Returns an empty string because the MCP scripts validation script is no longer embedded. |
+| `js.go` | `GetMCPServerCoreScript` | `func GetMCPServerCoreScript() string` | Returns an empty string because the MCP server core script is no longer embedded. |
+| `js.go` | `GetReadBufferScript` | `func GetReadBufferScript() string` | Returns an empty string because the read-buffer script is no longer embedded. |
 | `js.go` | `WriteJavaScriptToYAML` | `func WriteJavaScriptToYAML(yaml *strings.Builder, script string)` | WriteJavaScriptToYAML writes a JavaScript script with proper indentation to a strings. |
 | `known_action_credentials.go` | `DetectKnownCredentialLeakingActions` | `func DetectKnownCredentialLeakingActions(steps []any) map[string]struct { }` | DetectKnownCredentialLeakingActions scans a list of workflow steps and returns a map of environment variable names to true for each known credential-leaking action found. |
 | `known_action_credentials.go` | `DetectKnownCredentialLeakingActionsFromWorkflowData` | `func DetectKnownCredentialLeakingActionsFromWorkflowData(workflowData *WorkflowData) map[string]struct { }` | DetectKnownCredentialLeakingActionsFromWorkflowData scans all step collections in workflowData (custom steps, pre-steps, pre-agent-steps) and returns the merged set of environment variables required for the known-action… |
@@ -1444,20 +1468,20 @@ This appendix is generated from the current non-test Go source files in this pac
 | `lock_schema.go` | `GenerateLockMetadata` | `func GenerateLockMetadata(hashInfo LockHashInfo, stopTime string, strict bool, agentInfo AgentMetadataInfo) *LockMetadata` | GenerateLockMetadata creates a LockMetadata struct for embedding in lock files For release builds, the compiler version is included in the metadata |
 | `lock_schema.go` | `IsSchemaVersionSupported` | `func IsSchemaVersionSupported(version LockSchemaVersion) bool` | IsSchemaVersionSupported checks if a schema version is supported |
 | `lock_validation.go` | `ValidateLockSchemaCompatibility` | `func ValidateLockSchemaCompatibility(content string, lockFilePath string) error` | ValidateLockSchemaCompatibility validates that a lock file's schema is compatible. |
-| `lsp_manager.go` | `(*LSPManager).CopilotLSPServers` | `func (*LSPManager).CopilotLSPServers() map[string]LSPServerConfig` | Exported function or method declared in `lsp_manager.go`. |
+| `lsp_manager.go` | `(*LSPManager).CopilotLSPServers` | `func (*LSPManager).CopilotLSPServers() map[string]LSPServerConfig` | Returns a copy of the configured LSP servers for Copilot, or nil when there are none. |
 | `lsp_manager.go` | `(*LSPManager).GenerateInstallSteps` | `func (*LSPManager).GenerateInstallSteps(workflowData *WorkflowData) []GitHubActionStep` | GenerateInstallSteps generates GitHub Actions steps that install the LSP server binary dependencies for all configured LSP servers. |
-| `lsp_manager.go` | `(*LSPManager).HasServers` | `func (*LSPManager).HasServers() bool` | Exported function or method declared in `lsp_manager.go`. |
+| `lsp_manager.go` | `(*LSPManager).HasServers` | `func (*LSPManager).HasServers() bool` | Reports whether the manager contains any configured LSP servers. |
 | `lsp_manager.go` | `(*LSPManager).RuntimeRequirements` | `func (*LSPManager).RuntimeRequirements() []RuntimeRequirement` | RuntimeRequirements returns the set of runtime requirements for all configured LSP servers. |
-| `lsp_manager.go` | `NewLSPManager` | `func NewLSPManager(servers map[string]LSPServerConfig) *LSPManager` | Exported function or method declared in `lsp_manager.go`. |
+| `lsp_manager.go` | `NewLSPManager` | `func NewLSPManager(servers map[string]LSPServerConfig) *LSPManager` | Normalizes language keys and commands and discards empty or duplicate language keys. |
 | `maintenance_workflow.go` | `FetchDefaultBranch` | `func FetchDefaultBranch(slug string) string` | FetchDefaultBranch queries the GitHub API to determine the default branch of the given repository slug (owner/repo). |
 | `maintenance_workflow.go` | `GenerateMaintenanceWorkflow` | `func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWorkflowOptions) error` | GenerateMaintenanceWorkflow generates the agentics-maintenance. |
 | `markdown_security_scanner.go` | `FormatSecurityFindings` | `func FormatSecurityFindings(findings []SecurityFinding, filePath string) string` | FormatSecurityFindings formats a list of findings into a human-readable error message filePath: the workflow file path to include in error messages |
 | `resource_security_scanner.go` | `FormatResourceSecurityFindings` | `func FormatResourceSecurityFindings(findings []SecurityFinding, filePath string) string` | Formats resource findings without Markdown-specific wording |
 | `mcp_cli_mount.go` | `GetMCPCLIPathSetup` | `func GetMCPCLIPathSetup(data *WorkflowData) string` | GetMCPCLIPathSetup returns a shell command that adds the MCP CLI bin directory to PATH inside the AWF container. |
-| `mcp_config_types.go` | `(MapToolConfig).GetAny` | `func (MapToolConfig).GetAny(key string) (any, bool)` | Exported function or method declared in `mcp_config_types.go`. |
-| `mcp_config_types.go` | `(MapToolConfig).GetString` | `func (MapToolConfig).GetString(key string) (string, bool)` | Exported function or method declared in `mcp_config_types.go`. |
-| `mcp_config_types.go` | `(MapToolConfig).GetStringArray` | `func (MapToolConfig).GetStringArray(key string) ([]string, bool)` | Exported function or method declared in `mcp_config_types.go`. |
-| `mcp_config_types.go` | `(MapToolConfig).GetStringMap` | `func (MapToolConfig).GetStringMap(key string) (map[string]string, bool)` | Exported function or method declared in `mcp_config_types.go`. |
+| `mcp_config_types.go` | `(MapToolConfig).GetAny` | `func (MapToolConfig).GetAny(key string) (any, bool)` | Returns the raw value for a key and whether it is present. |
+| `mcp_config_types.go` | `(MapToolConfig).GetString` | `func (MapToolConfig).GetString(key string) (string, bool)` | Returns a string value when the key exists and has string type. |
+| `mcp_config_types.go` | `(MapToolConfig).GetStringArray` | `func (MapToolConfig).GetStringArray(key string) ([]string, bool)` | Returns a string slice or extracts string elements from an `[]any` value. |
+| `mcp_config_types.go` | `(MapToolConfig).GetStringMap` | `func (MapToolConfig).GetStringMap(key string) (map[string]string, bool)` | Returns a string map or extracts string-valued entries from a `map[string]any` value. |
 | `mcp_config_validation.go` | `ValidateToolsSection` | `func ValidateToolsSection(tools map[string]any) error` | ValidateToolsSection validates that all entries in the user-facing tools: frontmatter section are recognized built-in tool names. |
 | `mcp_detection.go` | `HasMCPServers` | `func HasMCPServers(workflowData *WorkflowData) bool` | HasMCPServers checks if the workflow has any MCP servers configured |
 | `mcp_renderer.go` | `HandleCustomMCPToolInSwitch` | `func HandleCustomMCPToolInSwitch( yaml *strings.Builder, toolName string, tools map[string]any, isLast bool, renderFunc RenderCustomMCPToolConfigHandler, ) bool` | HandleCustomMCPToolInSwitch processes custom MCP tools in the default case of a switch statement. |
@@ -1594,10 +1618,10 @@ This appendix is generated from the current non-test Go source files in this pac
 | `tools_types.go` | `(GitHubAllowedTools).ToStringSlice` | `func (GitHubAllowedTools).ToStringSlice() []string` | ToStringSlice converts GitHubAllowedTools to []string |
 | `tools_types.go` | `(GitHubToolsets).ToStringSlice` | `func (GitHubToolsets).ToStringSlice() []string` | ToStringSlice converts GitHubToolsets to []string |
 | `trigger_parser.go` | `(*TriggerIR).ToYAMLMap` | `func (*TriggerIR).ToYAMLMap() map[string]any` | ToYAMLMap converts a TriggerIR to a map structure suitable for YAML generation |
-| `universal_llm_consumer_engine.go` | `(*UniversalLLMConsumerEngine).ApplyUniversalProviderEnv` | `func (*UniversalLLMConsumerEngine).ApplyUniversalProviderEnv(env map[string]string, workflowData *WorkflowData, firewallEnabled bool)` | Exported function or method declared in `universal_llm_consumer_engine.go`. |
+| `universal_llm_consumer_engine.go` | `(*UniversalLLMConsumerEngine).ApplyUniversalProviderEnv` | `func (*UniversalLLMConsumerEngine).ApplyUniversalProviderEnv(env map[string]string, workflowData *WorkflowData, firewallEnabled bool)` | Populates provider environment variables and, when enabled, the API gateway URL variables. |
 | `universal_llm_consumer_engine.go` | `(*UniversalLLMConsumerEngine).BuildCLIEngineExecutionSteps` | `func (*UniversalLLMConsumerEngine).BuildCLIEngineExecutionSteps( workflowData *WorkflowData, logFile string, cfg UniversalCLIEngineExecutionConfig, ) []GitHubActionStep` | BuildCLIEngineExecutionSteps generates the GitHub Actions execution steps for a universal CLI engine (e. |
-| `universal_llm_consumer_engine.go` | `(*UniversalLLMConsumerEngine).GetUniversalRequiredSecretNames` | `func (*UniversalLLMConsumerEngine).GetUniversalRequiredSecretNames(workflowData *WorkflowData) []string` | Exported function or method declared in `universal_llm_consumer_engine.go`. |
-| `universal_llm_consumer_engine.go` | `(*UniversalLLMConsumerEngine).GetUniversalSecretValidationStep` | `func (*UniversalLLMConsumerEngine).GetUniversalSecretValidationStep(workflowData *WorkflowData, engineName, docsURL string) GitHubActionStep` | Exported function or method declared in `universal_llm_consumer_engine.go`. |
+| `universal_llm_consumer_engine.go` | `(*UniversalLLMConsumerEngine).GetUniversalRequiredSecretNames` | `func (*UniversalLLMConsumerEngine).GetUniversalRequiredSecretNames(workflowData *WorkflowData) []string` | Returns the backend's required secrets plus API-key, MCP, GitHub, and HTTP-header secrets used by the workflow. |
+| `universal_llm_consumer_engine.go` | `(*UniversalLLMConsumerEngine).GetUniversalSecretValidationStep` | `func (*UniversalLLMConsumerEngine).GetUniversalSecretValidationStep(workflowData *WorkflowData, engineName, docsURL string) GitHubActionStep` | Builds a GitHub Actions validation step for the resolved backend's core secrets. |
 | `utc_offset.go` | `NormalizeUTCOffset` | `func NormalizeUTCOffset(raw string) (string, error)` | NormalizeUTCOffset validates and normalizes a numeric UTC offset. |
 | `utc_offset.go` | `ParseUTCOffsetLocation` | `func ParseUTCOffsetLocation(raw string) (*time.Location, error)` | ParseUTCOffsetLocation converts a numeric UTC offset to a fixed time. |
 | `workflow_data.go` | `(*WorkflowData).PinContext` | `func (*WorkflowData).PinContext() *actionpins.PinContext` | PinContext returns an actionpins. |
@@ -1663,7 +1687,7 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | Connector declarations and credentials | `DevelopmentConnector`, `LoadDevelopmentConnector`, `ConnectorWebhookSource`, `ConnectorGitHubApp`, `ConnectorToken`, `ConnectorGitHubOIDC`, `ConnectorOperationOptions`, `ConnectorRegistration`, `WorkflowConnector` | Compiler-resolved connector declarations, source policy, credential adapters, and workflow-owned operation controls. Selection remains phase-scoped. |
 | Durable and engine helpers | `DurableExecutionProvider`, `GetDurableExecutionPlan`, `GetInternalLogsDir`, `GetPluginInstallationSteps`, `GetLogParserScriptSource`, `GetPostConfigPluginInstallationSteps`, `EngineDurableDefinition`, `DurableConfig`, `DurableExecutionPlan`, `DurableRestoreStepName`, `PiSessionDirectory`, `DynamicWorkflowsEnabled`, `ResolveEffectiveEngineConfig` | Engine capabilities and helpers for durable execution, plugin setup, log capture, session restoration, and resolving effective engine configuration. |
 | Compiler controls | `SetSkipDefaultCheckout`, `SetDefaultPushToken`, `SetDynamicPushToken`, `SetRequireSelfHostedRunners`, `SetLockFileLogo`, `DefaultModelRoutingWorkflowCount`, `IsNoEmit`, `SetReadOnly`, `SetDryRun`, `SetEnvironmentOverride`, `IncrementExperimentalWarningCount`, `GetExperimentalWarningCount`, `SetConfiguredModelValidator` | Compiler mutators and accessors for checkout credentials, runner requirements, output mode, environment overrides, dry-run state, and optional model validation. |
-| Grader and security configuration | `BuiltinGraderRegistry`, `BuiltinGraderIDs`, `HasGraders`, `EnabledGraderIDs`, `CustomGraderIDs`, `DefaultGraderIDs`, `PrepareShellScript`, `AddSecurityAdvisoryCommentConfig`, `CreateSecurityAdvisoryConfig`, `ContentsIsNone`, `RepoProtectedFilesConfig`, `TokenBrokerConfig`, `IsReportAsIssueEnabled`, `IsLockFileLogoEnabled` | Grader registry and selection helpers, security safe-output configuration, protected-file settings, token-broker selection, and permission or reporting checks. |
+| Grader and security configuration | `BuiltinGraderRegistry`, `BuiltinGraderIDs`, `HasGraders`, `EnabledGraderIDs`, `CustomGraderIDs`, `DefaultGraderIDs`, `AddSecurityAdvisoryCommentConfig`, `CreateSecurityAdvisoryConfig`, `ContentsIsNone`, `RepoProtectedFilesConfig`, `TokenBrokerConfig`, `IsReportAsIssueEnabled`, `IsLockFileLogoEnabled` | Grader registry and selection helpers, security safe-output configuration, protected-file settings, token-broker selection, and permission or reporting checks. |
 | Workflow metadata and webhooks | `GHAWManifestWorkQueue`, `GHAWMarkdownMetadata`, `GHAWMarkdownMetadataRecord`, `WebhookDispatch`, `WebhookFilter`, `WebhookCondition`, `WebhookContext`, `WebhookBatch`, `WebhookPayloadProjection`, `WebhookPayloadProjectionPolicy`, `WebhookCommandFilter`, `WebhookActivityNormalization` | Manifest and authored-metadata records plus bounded webhook matching, projection, batching, and activity-normalization declarations. |
 | Work-queue and MCP integration | `WorkQueueAssignmentInputName`, `WorkQueueClaimInputName`, `RenderWorkQueueMCP`, `RenderLedgerMCP`, `MCPScriptParamItems` | Agent input names and MCP rendering helpers for immutable queue snapshots and participant-scoped intent. |
 | Other package helpers | `AgyDefaultDomains`, `FindNewestEntryForRepo`, `ToFinding`, `ShellScriptResources`, `SafeOutputsUploadCodeCoverageStagingArtifactName`, `ParseError`, `MarshalYAML` | Engine defaults, scanner conversion, embedded-script discovery, cache lookup, and parsing/serialization helpers. |

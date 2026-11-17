@@ -526,19 +526,22 @@ describe("essential unified session payloads", () => {
 
   it("preserves grader attribution and unavailable diagnostics without executable payloads", () => {
     const result = {
-      id: "coverage",
-      source: "builtin",
+      id: "operational-value",
+      source: "operational-value",
       status: "unavailable",
       value: null,
       passed: null,
       message: "No trajectory evidence available",
       severity: "warning",
       implementation: { id: "gh-aw/graders", version: 1, digest: "", script: "PRIVATE_SCRIPT" },
-      metrics: [{ id: "observed", value: 0, trace: "PRIVATE_TRACE" }],
+      metrics: [
+        { id: "primary", value: 0, trace: "PRIVATE_TRACE" },
+        { id: "diagnostic", value: null, trace: "PRIVATE_TRACE" },
+      ],
       diagnostics: { private: "PRIVATE_DIAGNOSTICS" },
       script: "PRIVATE_SCRIPT",
     };
-    const manifest = { version: 1, graders: [{ id: "coverage", source: "builtin", enabled: false, min: 0, max: 1, digest: "", script: "PRIVATE_SCRIPT" }] };
+    const manifest = { version: 1, graders: [{ id: "operational-value", source: "operational-value", enabled: false, min: 0, max: 1, digest: "", script: "PRIVATE_SCRIPT" }] };
     const run = { id: "123", attempt: 2, graderCount: 1, passed: 0, failed: 0, errors: 0 };
     const records = [
       { type: "grader.manifest", data: manifest },
@@ -548,17 +551,20 @@ describe("essential unified session payloads", () => {
     ];
     const original = structuredClone(records);
     const unified = mergeSessionSources([{ component: "grader", phase: "agent", path: "agent/graders/grader_results.json", events: records }]);
-    expect(unified[0].data).toEqual({ version: 1, graders: [{ id: "coverage", source: "builtin", enabled: false, min: 0, max: 1, digest: "" }] });
+    expect(unified[0].data).toEqual({ version: 1, graders: [{ id: "operational-value", source: "operational-value", enabled: false, min: 0, max: 1, digest: "" }] });
     const expected = {
-      id: "coverage",
-      source: "builtin",
+      id: "operational-value",
+      source: "operational-value",
       status: "unavailable",
       value: null,
       passed: null,
       message: result.message,
       severity: "warning",
       implementation: { id: "gh-aw/graders", version: 1, digest: "" },
-      metrics: [{ id: "observed", value: 0 }],
+      metrics: [
+        { id: "primary", value: 0 },
+        { id: "diagnostic", value: null },
+      ],
     };
     expect(unified[1].data).toEqual({ version: 1, run, results: [expected] });
     expect(unified[2].data).toEqual({ ...expected, implementation: null, metrics: [] });

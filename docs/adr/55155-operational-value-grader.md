@@ -4,6 +4,9 @@
 **Status**: Draft
 **Deciders**: gh-aw maintainers
 
+> **Superseded (2026-11-16):** Operational value is now JavaScript-only through
+> `graders.operational-value.script`; the Bash design below is historical.
+
 ---
 
 ### Context

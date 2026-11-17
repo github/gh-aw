@@ -16,7 +16,7 @@ Recompute → compare with the baseline → edit constants → validate. Never r
 
 ## 1. Slide
 
-- Heading `Explore · Reuse · Lint` (process band). Find it with `grep -n "// Explore → Reuse → Lint" docs/public/cracktro/deck.js`.
+- Heading `Explore · Reuse · Lint` (AW factory band, `group: "data"`). Find it with `grep -n "// Explore → Reuse → Lint" docs/public/cracktro/deck.js`.
 - CSS prefixes: `exr-` for the illustrative grid (do not touch it) and `exm-` for the measured strip (the `.exm-svg` bottom panel).
 - The data lives in the slide block after `svg.innerHTML = g;`:
   - `FPR`: `[month, findingsPerRun]`. Bar height is `v * 12`, so 0 means no runs that month (shown as `·`).

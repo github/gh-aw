@@ -1,6 +1,11 @@
 package cli
 
-import "github.com/github/gh-aw/pkg/workflow"
+import (
+	"path/filepath"
+
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow"
+)
 
 // CompileConfig holds configuration options for compiling workflows
 type CompileConfig struct {
@@ -66,6 +71,13 @@ type CompileConfig struct {
 
 func (c CompileConfig) shellcheckEnabled() bool {
 	return c.Shellcheck
+}
+
+// usesDefaultWorkflowDir reports whether the config targets the default workflow
+// directory, either implicitly (empty) or by explicitly naming it (e.g. --dir
+// .github/workflows), so both forms produce identical compile output.
+func (c CompileConfig) usesDefaultWorkflowDir() bool {
+	return c.WorkflowDir == "" || filepath.Clean(c.WorkflowDir) == filepath.Clean(constants.GetWorkflowDir())
 }
 
 // ValidationResult represents workflow validation or a batch-scoped compiler/scanner diagnostic.

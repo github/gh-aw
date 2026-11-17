@@ -156,8 +156,8 @@ func TestSpec_PublicAPI_ExtractExpressions(t *testing.T) {
 	}
 }
 
-// SPEC_AMBIGUITY: Pattern and ReferencePattern flag/filter semantics are not
-// documented. Their behavioral tests need a more precise README contract.
+// SPEC_AMBIGUITY: Pattern and ReferencePattern flag/filter and capture semantics
+// are not documented. The no-match tests below avoid assuming those semantics.
 
 // TestSpec_PublicAPI_ParseWorkflow follows README.md's per-YAML-node expression
 // recording contract.
@@ -211,3 +211,71 @@ func TestSpec_PublicAPI_ValidateWorkflowWithCacheMode(t *testing.T) {
 	err := actionslanguageservice.ValidateWorkflowWithCacheMode("spec.yml", source)
 	require.NoError(t, err, "a native workflow with no explicit cache policy must validate")
 }
+
+// TestSpec_PublicAPI_ExpressionChild follows README.md / Public API: Child
+// returns a child node by index. Only valid indices are specified.
+func TestSpec_PublicAPI_ExpressionChild(t *testing.T) {
+	t.Parallel()
+
+	expression, err := actionslanguageservice.ParseSyntax("github.ref == inputs.branch")
+	require.NoError(t, err, "a comparison must parse before inspecting its children")
+	require.NotEmpty(t, expression.Children, "a comparison must expose its expression children")
+	for index, child := range expression.Children {
+		assert.Equal(t, child, expression.Child(index), "Child(%d) must return the child at that index", index)
+	}
+}
+
+// TestSpec_Types_Diagnostic follows README.md / Public API: Diagnostic
+// implements Error. Exact diagnostic text and formatting are not specified.
+func TestSpec_Types_Diagnostic(t *testing.T) {
+	t.Parallel()
+
+	diagnostic := &actionslanguageservice.Diagnostic{
+		File: "spec.yml", Line: 1, Column: 1, Message: "Invalid expression",
+	}
+	var err error = diagnostic
+	assert.Equal(t, diagnostic.Error(), err.Error(), "Diagnostic must be usable through Go's error interface")
+}
+
+// TestSpec_PublicAPI_ReferencePatternNoMatches follows README.md / Public API:
+// searches find expression references and rewrites preserve unaffected source.
+// SPEC_AMBIGUITY: flag meanings and capture layouts are unspecified, so every
+// flag combination is checked on text containing no expression references.
+func TestSpec_PublicAPI_ReferencePatternNoMatches(t *testing.T) {
+	t.Parallel()
+
+	const source = "  Plain text without expressions.\r\n"
+	for _, tt := range []struct {
+		name      string
+		whole     bool
+		unwrapped bool
+	}{
+		{name: "both flags false"},
+		{name: "whole flag", whole: true},
+		{name: "unwrapped flag", unwrapped: true},
+		{name: "both flags true", whole: true, unwrapped: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			pattern := actionslanguageservice.ReferencePattern(tt.whole, tt.unwrapped, func(path []string) []string {
+				return path
+			})
+			assert.False(t, pattern.MatchString(source), "plain text must not match an expression reference")
+			assert.Empty(t, pattern.FindAllString(source, 1), "search must find no reference strings in plain text")
+			assert.Empty(t, pattern.FindAllStringSubmatch(source, 1), "plain text must have no reference captures")
+			assert.Empty(t, pattern.FindAllStringSubmatchIndex(source, 1), "plain text must have no reference capture offsets")
+			assert.Empty(t, pattern.FindStringSubmatch(source), "a single-match search must find no reference in plain text")
+			assert.Equal(t, source, pattern.ReplaceAllString(source, "replacement"), "rewriting must preserve all unmatched source bytes")
+			calls := 0
+			rewritten := pattern.ReplaceAllStringFunc(source, func(string) string {
+				calls++
+				return "replacement"
+			})
+			assert.Zero(t, calls, "a replacement callback must not run when no references match")
+			assert.Equal(t, source, rewritten, "callback rewriting must preserve all unmatched source bytes")
+		})
+	}
+}
+
+// SPEC_AMBIGUITY: README.md documents a schema property's UnmarshalJSON method,
+// but that property type is unexported and cannot be named by external tests.

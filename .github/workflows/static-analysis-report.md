@@ -6,6 +6,14 @@ features:
 on:
   schedule: daily
   workflow_dispatch:
+    inputs:
+      level:
+        description: Routing level for a manual run
+        type: choice
+        options: [router/economy, router/balanced, router/robust]
+        default: router/balanced
+concurrency:
+  job-discriminator: ${{ github.run_id }}
 permissions:
   contents: read
   actions: read
@@ -15,9 +23,8 @@ permissions:
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  # Scheduled runs have no inputs and keep balanced.
+  model: ${{ inputs.level || 'router/balanced' }}
 network:
   allowed: [defaults, go]
 tools:

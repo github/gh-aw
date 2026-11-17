@@ -20,6 +20,40 @@ func newActionUpdateDepsWithLatestRelease(fn func(context.Context, string, strin
 	deps.getLatestRelease = fn
 	return deps
 }
+
+func TestResolveActionUpdateTarget_CompilerPinnedTagFallsBackToGitForAuthError(t *testing.T) {
+	setReleaseVersionForTest(t, "v0.68.3-beta.1", true)
+
+	const wantSHA = "abcdef0123456789abcdef0123456789abcdef01"
+	deps := newTestActionUpdateDeps()
+	apiCalls, gitCalls := 0, 0
+	deps.getActionSHAForTag = func(_ context.Context, repo, tag string) (string, error) {
+		apiCalls++
+		if repo != "github/gh-aw-actions" || tag != "v0.68.3-beta.1" {
+			t.Errorf("unexpected API tag lookup %s@%s", repo, tag)
+		}
+		return "", errors.New("HTTP 401 Unauthorized")
+	}
+	deps.getActionSHAForTagViaGit = func(_ context.Context, repo, tag string) (string, error) {
+		gitCalls++
+		if repo != "github/gh-aw-actions" || tag != "v0.68.3-beta.1" {
+			t.Errorf("unexpected Git tag lookup %s@%s", repo, tag)
+		}
+		return wantSHA, nil
+	}
+
+	version, sha, err := resolveActionUpdateTarget(context.Background(), deps, "github/gh-aw-actions/setup", "v0.67.0", false, false)
+	if err != nil {
+		t.Fatalf("resolveActionUpdateTarget() error = %v", err)
+	}
+	if version != "v0.68.3-beta.1" || sha != wantSHA {
+		t.Errorf("resolveActionUpdateTarget() = (%q, %q), want (%q, %q)", version, sha, "v0.68.3-beta.1", wantSHA)
+	}
+	if apiCalls != 1 || gitCalls != 1 {
+		t.Errorf("tag lookup calls = API:%d Git:%d, want one each", apiCalls, gitCalls)
+	}
+}
+
 func TestExtractBaseRepo(t *testing.T) {
 	tests := []struct {
 		name       string

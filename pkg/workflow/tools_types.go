@@ -421,8 +421,9 @@ type GitHubToolConfig struct {
 	// Supports: "all", "public", or an array of patterns ["owner/repo", "owner/*"] (lowercase)
 	AllowedRepos GitHubReposScope `yaml:"allowed-repos,omitempty"`
 	// Repos is deprecated. Use AllowedRepos (yaml:"allowed-repos") instead.
-	Repos         GitHubReposScope `yaml:"repos,omitempty"`
-	reposParseErr error
+	Repos                          GitHubReposScope `yaml:"repos,omitempty"`
+	reposParseErr                  error
+	unsupportedAccessControlFields []string
 	// MinIntegrity defines the minimum integrity level required: "none", "unapproved", "approved", "merged"
 	MinIntegrity GitHubIntegrityLevel `yaml:"min-integrity,omitempty"`
 	// BlockedUsers is an optional list of GitHub usernames whose content is unconditionally blocked.

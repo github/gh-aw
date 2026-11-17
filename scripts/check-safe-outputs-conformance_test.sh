@@ -7,6 +7,49 @@ OUTPUT=$(mktemp)
 FIXTURE_ROOT=$(mktemp -d)
 trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
 
+# Exercise TYPE-020 against the live handler and fixtures with weakened file-count and duplicate-filename guards.
+(
+    fixture="$FIXTURE_ROOT/type020"
+    mkdir -p "$fixture/actions/setup/js" "$fixture/pkg/workflow"
+    cp "$REPO_ROOT/actions/setup/js/merge_pull_request.cjs" "$fixture/actions/setup/js/merge_pull_request.cjs"
+    printf "must be 'blocked', 'allowed'\n" >"$fixture/pkg/workflow/merge_pull_request.go"
+    printf 'AddDefault("protected_files_policy", "blocked")\n' >"$fixture/pkg/workflow/safe_outputs_handler_registry_pull_requests.go"
+    cd "$fixture"
+
+    log_high() { echo "HIGH: $1"; }
+    log_critical() { echo "CRITICAL: $1"; }
+    log_pass() { echo "PASS: $1"; }
+    eval "$(sed -n '/^check_merge_pull_request_protected_files() {/,/^}/p' "$SCRIPT_DIR/check-safe-outputs-conformance.sh")"
+
+    check_merge_pull_request_protected_files >"$OUTPUT"
+    if ! grep -q '^PASS: TYPE-020:' "$OUTPUT" || grep -q '^HIGH:' "$OUTPUT"; then
+        echo "FAIL: TYPE-020 must pass when both changed-file safeguards are present"
+        cat "$OUTPUT"
+        exit 1
+    fi
+
+    sed 's/pr\.changed_files > 3000/pr.changed_files > 4000/' actions/setup/js/merge_pull_request.cjs >"$OUTPUT"
+    cp "$OUTPUT" actions/setup/js/merge_pull_request.cjs
+    check_merge_pull_request_protected_files >"$OUTPUT"
+    if ! grep -q "HIGH: TYPE-020: Changed-file counts above GitHub's 3000-file listing limit are not rejected" "$OUTPUT" ||
+        grep -q '^PASS:' "$OUTPUT"; then
+        echo "FAIL: TYPE-020 must reject a weakened changed-file upper bound"
+        cat "$OUTPUT"
+        exit 1
+    fi
+
+    cp "$REPO_ROOT/actions/setup/js/merge_pull_request.cjs" actions/setup/js/merge_pull_request.cjs
+    grep -vF 'new Set(files.map(file => file.filename)).size !== files.length' actions/setup/js/merge_pull_request.cjs >"$OUTPUT"
+    cp "$OUTPUT" actions/setup/js/merge_pull_request.cjs
+    check_merge_pull_request_protected_files >"$OUTPUT"
+    if ! grep -q 'HIGH: TYPE-020: Incomplete or duplicate changed-file evidence is not rejected' "$OUTPUT" ||
+        grep -q '^PASS:' "$OUTPUT"; then
+        echo "FAIL: TYPE-020 must reject removed duplicate-filename validation"
+        cat "$OUTPUT"
+        exit 1
+    fi
+)
+
 # Exercise SEC-005 independently so unsafe production handlers must still be reported.
 (
     cd "$FIXTURE_ROOT"

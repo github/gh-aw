@@ -3,7 +3,6 @@ package workflow
 import (
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -450,12 +449,8 @@ func (e *ClaudeEngine) claudeAllowedDomains(data *WorkflowData) string {
 	if !data.CachedAllowedDomainsComputed {
 		domains = GetAllowedDomainsForEngine(constants.ClaudeEngine, data.NetworkPermissions, data.Tools, data.Runtimes)
 	}
-	if data.NetworkPermissions != nil &&
-		slices.Contains(data.NetworkPermissions.Allowed, "claude") &&
-		e.ResolveLLMProvider(data) == LLMProviderAnthropic &&
-		!engineEnvHasNonEmptyValue(data, "ANTHROPIC_BASE_URL") {
-		domains = mergeAllowedDomainList(domains, "api.anthropic.com")
-	}
+	// The default Anthropic target is reached through the AWF proxy; only an
+	// explicitly configured target is added by mergeAPITargetDomains below.
 	if data.EngineConfig != nil && data.EngineConfig.APITarget != "" {
 		domains = mergeAPITargetDomains(domains, data.EngineConfig.APITarget)
 	}
