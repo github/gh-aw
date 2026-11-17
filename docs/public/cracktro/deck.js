@@ -1815,17 +1815,25 @@
   .tv-live::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #3fb950; box-shadow: 0 0 12px #3fb950; animation: tvpulse 1.6s ease-in-out infinite; }
   .tv-live b { color: #f0f6fc; font-variant-numeric: tabular-nums; }
   @keyframes tvpulse { 50% { opacity: .35; } }
-  .tv-kpis { position: absolute; left: 110px; right: 110px; top: 290px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 30px; }
-  .tv-kpi { height: 150px; padding: 22px 26px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid var(--c); display: flex; flex-direction: column; justify-content: space-between; }
-  .active .tv-kpi { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .3s); }
-  .tv-kpi div { display: flex; justify-content: space-between; align-items: center; }
-  .tv-kpi i { font: 600 16px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #9198a1; font-style: normal; }
-  .tv-kpi em { font: 700 22px/1 var(--mono); font-style: normal; color: var(--c); padding: 7px 12px; border-radius: 8px; background: #ffffff0d; opacity: 0; transform: scale(.8); transition: opacity .4s, transform .5s cubic-bezier(.2,1.6,.4,1); }
-  .tv-kpi.done em { opacity: 1; transform: none; }
-  .tv-kpi b { font: 700 62px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-  .tv-kpi small { font: 500 24px/1 var(--mono); color: #9198a1; margin-left: 10px; }
-  .tv-panels { position: absolute; left: 110px; right: 110px; top: 470px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
-  .tv-p { height: 440px; padding: 24px 26px 14px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; }
+  .tv-stages { position: absolute; left: 110px; right: 110px; top: 258px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 72px; }
+  .tv-st { position: relative; height: 212px; padding: 20px 26px 22px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid #3d444d; display: flex; flex-direction: column; justify-content: space-between; transition: border-color .5s, box-shadow .5s; }
+  .active .tv-st { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .3s); }
+  .tv-st > * { opacity: .4; transition: opacity .5s; }
+  .tv-st.on { border-top-color: var(--c); box-shadow: 0 18px 50px -24px var(--c); }
+  .tv-st.on > * { opacity: 1; }
+  .tv-st:not(:first-child)::before { content: "→"; position: absolute; left: -62px; top: 50%; transform: translateY(-50%); font: 700 46px/1 var(--mono); color: #3d444d; transition: color .5s; }
+  .tv-st.on:not(:first-child)::before { color: var(--c); }
+  .tv-st div { display: flex; justify-content: space-between; align-items: center; }
+  .tv-st h4 { margin: 0; display: flex; align-items: center; gap: 14px; font-size: 34px; font-variation-settings: "wght" 650, "wdth" 100; color: #f0f6fc; }
+  .tv-st h4 i { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--c); color: #0d1117; font: 700 22px/1 var(--mono); font-style: normal; }
+  .tv-st em { font: 600 14px/1 var(--mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase; color: var(--c); border: 1px solid var(--c); border-radius: 99px; padding: 7px 12px; }
+  .tv-st span { display: flex; align-items: baseline; gap: 12px; }
+  .tv-st b { font: 700 54px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+  .tv-st small { font: 500 20px/1.2 var(--mono); color: #9198a1; }
+  .tv-st p { margin: 0; font: 500 21px/1.3 "Mona Sans"; color: #c9d1d9; }
+  .tv-panels { position: absolute; left: 110px; right: 110px; top: 494px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 72px; }
+  .tv-p { height: 440px; padding: 24px 26px 14px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid #3d444d; transition: border-color .5s; }
+  .tv-p.on { border-top-color: var(--c); }
   .active .tv-p { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 110ms + .6s); }
   .tv-p h4 { margin: 0; font-size: 30px; font-variation-settings: "wght" 650, "wdth" 100; color: #f0f6fc; }
   .tv-p svg { display: block; width: 100%; height: 360px; margin-top: 8px; overflow: visible; }
@@ -3074,16 +3082,41 @@
     resetIndex();
     // Primer Octicons 24px paths (© GitHub, Inc., MIT license); the shared OCTI table is declared later in this file.
     const CAI_ICON = {
-      book: ["M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.495 4.495 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.752.752 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a2.996 2.996 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.503 4.503 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z"],
-      sparkle: ["M11.296 1.924c.24-.656 1.168-.656 1.408 0l.717 1.958a11.25 11.25 0 0 0 6.697 6.697l1.958.717c.657.24.657 1.168 0 1.408l-1.958.717a11.25 11.25 0 0 0-6.697 6.697l-.717 1.958c-.24.657-1.168.657-1.408 0l-.717-1.958a11.25 11.25 0 0 0-6.697-6.697l-1.958-.717c-.656-.24-.656-1.168 0-1.408l1.958-.717a11.25 11.25 0 0 0 6.697-6.697l.717-1.958Z"],
-      tag: ["M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z", "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z"],
-      note: ["M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z", "M5 8.75A.75.75 0 0 1 5.75 8h11.5a.75.75 0 0 1 0 1.5H5.75A.75.75 0 0 1 5 8.75Zm0 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z"],
-      alert: ["M13 17.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-.25-8.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5Z", "M9.836 3.244c.963-1.665 3.365-1.665 4.328 0l8.967 15.504c.963 1.667-.24 3.752-2.165 3.752H3.034c-1.926 0-3.128-2.085-2.165-3.752Zm3.03.751a1.002 1.002 0 0 0-1.732 0L2.168 19.499A1.002 1.002 0 0 0 3.034 21h17.932a1.002 1.002 0 0 0 .866-1.5L12.866 3.994Z"],
-      shield: ["M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z", "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z"],
-      heart: ["m12 20.703.343.667a.748.748 0 0 1-.686 0l-.003-.002-.007-.003-.025-.013a31.138 31.138 0 0 1-5.233-3.576C3.8 15.573 1 12.332 1 8.514v-.001C1 5.053 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262a31.148 31.148 0 0 1-5.233 3.576l-.025.013-.007.003-.002.001ZM6.736 4C4.657 4 2.5 5.88 2.5 8.514c0 3.107 2.324 5.96 4.861 8.12a29.655 29.655 0 0 0 4.566 3.175l.073.041.073-.04c.271-.153.661-.38 1.13-.674.94-.588 2.19-1.441 3.436-2.502 2.537-2.16 4.861-5.013 4.861-8.12C21.5 5.88 19.343 4 17.264 4c-2.106 0-3.801 1.389-4.553 3.643a.751.751 0 0 1-1.422 0C10.537 5.389 8.841 4 6.736 4Z"],
-      a11y: ["M13.974 8.114a3.573 3.573 0 1 0-3.947 0c-.302.21-.57.467-.79.762H3.708a.75.75 0 1 0 0 1.5h4.885a2.93 2.93 0 0 0-.026.188l-.814 7.267-.499 4.142a.75.75 0 1 0 1.49.18l.42-3.486h5.67l.42 3.485a.75.75 0 0 0 1.49-.18l-.5-4.142-.813-7.266a3.502 3.502 0 0 0-.026-.188h4.885a.75.75 0 1 0 0-1.5h-5.527a3.466 3.466 0 0 0-.79-.762Zm.099-2.979a2.073 2.073 0 1 1-4.146 0 2.073 2.073 0 0 1 4.146 0Zm-.131 5.596.72 6.436H9.338l.72-6.436a1.954 1.954 0 0 1 3.884 0Z"],
-      people: ["M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z"],
-      sliders: ["M11 18.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75Zm-8-12a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 3 6.25Zm13 6a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.75 16a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z", "M3 18.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Zm0-6a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM16.75 10a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75ZM14 6.25a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75ZM11.25 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"],
+      book: [
+        "M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.495 4.495 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.752.752 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a2.996 2.996 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.503 4.503 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z",
+      ],
+      sparkle: [
+        "M11.296 1.924c.24-.656 1.168-.656 1.408 0l.717 1.958a11.25 11.25 0 0 0 6.697 6.697l1.958.717c.657.24.657 1.168 0 1.408l-1.958.717a11.25 11.25 0 0 0-6.697 6.697l-.717 1.958c-.24.657-1.168.657-1.408 0l-.717-1.958a11.25 11.25 0 0 0-6.697-6.697l-1.958-.717c-.656-.24-.656-1.168 0-1.408l1.958-.717a11.25 11.25 0 0 0 6.697-6.697l.717-1.958Z",
+      ],
+      tag: [
+        "M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z",
+        "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z",
+      ],
+      note: [
+        "M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z",
+        "M5 8.75A.75.75 0 0 1 5.75 8h11.5a.75.75 0 0 1 0 1.5H5.75A.75.75 0 0 1 5 8.75Zm0 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z",
+      ],
+      alert: [
+        "M13 17.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-.25-8.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5Z",
+        "M9.836 3.244c.963-1.665 3.365-1.665 4.328 0l8.967 15.504c.963 1.667-.24 3.752-2.165 3.752H3.034c-1.926 0-3.128-2.085-2.165-3.752Zm3.03.751a1.002 1.002 0 0 0-1.732 0L2.168 19.499A1.002 1.002 0 0 0 3.034 21h17.932a1.002 1.002 0 0 0 .866-1.5L12.866 3.994Z",
+      ],
+      shield: [
+        "M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z",
+        "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z",
+      ],
+      heart: [
+        "m12 20.703.343.667a.748.748 0 0 1-.686 0l-.003-.002-.007-.003-.025-.013a31.138 31.138 0 0 1-5.233-3.576C3.8 15.573 1 12.332 1 8.514v-.001C1 5.053 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262a31.148 31.148 0 0 1-5.233 3.576l-.025.013-.007.003-.002.001ZM6.736 4C4.657 4 2.5 5.88 2.5 8.514c0 3.107 2.324 5.96 4.861 8.12a29.655 29.655 0 0 0 4.566 3.175l.073.041.073-.04c.271-.153.661-.38 1.13-.674.94-.588 2.19-1.441 3.436-2.502 2.537-2.16 4.861-5.013 4.861-8.12C21.5 5.88 19.343 4 17.264 4c-2.106 0-3.801 1.389-4.553 3.643a.751.751 0 0 1-1.422 0C10.537 5.389 8.841 4 6.736 4Z",
+      ],
+      a11y: [
+        "M13.974 8.114a3.573 3.573 0 1 0-3.947 0c-.302.21-.57.467-.79.762H3.708a.75.75 0 1 0 0 1.5h4.885a2.93 2.93 0 0 0-.026.188l-.814 7.267-.499 4.142a.75.75 0 1 0 1.49.18l.42-3.486h5.67l.42 3.485a.75.75 0 0 0 1.49-.18l-.5-4.142-.813-7.266a3.502 3.502 0 0 0-.026-.188h4.885a.75.75 0 1 0 0-1.5h-5.527a3.466 3.466 0 0 0-.79-.762Zm.099-2.979a2.073 2.073 0 1 1-4.146 0 2.073 2.073 0 0 1 4.146 0Zm-.131 5.596.72 6.436H9.338l.72-6.436a1.954 1.954 0 0 1 3.884 0Z",
+      ],
+      people: [
+        "M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z",
+      ],
+      sliders: [
+        "M11 18.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75Zm-8-12a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 3 6.25Zm13 6a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.75 16a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z",
+        "M3 18.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Zm0-6a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM16.75 10a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75ZM14 6.25a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75ZM11.25 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z",
+      ],
     };
     const caiIcon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${CAI_ICON[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
     // [name, icon, colour, illustrative trigger]
@@ -3135,11 +3168,7 @@
           h("div", { class: "cai-step now", "--i": 4 }, h("b", {}, "Continuous AI"), h("span", {}, "collaborate"))
         ),
         h("div", { class: "cai-years" }, "a 30+ year story, like CI/CD"),
-        h(
-          "div",
-          { class: "cai-def" },
-          h("p", {}, "Any use of ", h("b", {}, "automated AI"), " to support ", h("b", {}, "software collaboration"), ".")
-        ),
+        h("div", { class: "cai-def" }, h("p", {}, "Any use of ", h("b", {}, "automated AI"), " to support ", h("b", {}, "software collaboration"), ".")),
         h("div", { class: "cai-grid" }, caiCards),
         h(
           "div",
@@ -3147,12 +3176,7 @@
           h("span", {}, "What they share"),
           TRAITS.map((t, i) => h("em", { "--i": i }, t))
         ),
-        h(
-          "div",
-          { class: "cai-foot" },
-          h("div", { "--i": 0 }, caiIcon("people"), "For the team, not the individual"),
-          h("div", { "--i": 1 }, caiIcon("sliders"), "Teams stay in control")
-        )
+        h("div", { class: "cai-foot" }, h("div", { "--i": 0 }, caiIcon("people"), "For the team, not the individual"), h("div", { "--i": 1 }, caiIcon("sliders"), "Teams stay in control"))
       ),
     });
   }
@@ -3464,7 +3488,7 @@
     });
   }
 
-  // Turn Automation into Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
+  // Turn Automation into Value: the AW lifecycle (Delivery → Adoption → Attribute value) over a synthetic twelve-week dashboard
   {
     resetIndex();
     const N = 12,
@@ -3481,16 +3505,43 @@
         j = Math.min(N - 1, i + 1);
       return d[i] + (d[j] - d[i]) * (w - i);
     };
-    const BACKLOG = [412, 398, 371, 352, 318, 291, 262, 230, 204, 181, 157, 138],
+    const RUNS = [8, 11, 13, 15, 16, 18, 19, 20, 21, 22, 23, 24],
+      DELIV = [6, 9, 11, 13, 14, 16, 17, 18, 19, 20, 21, 22],
+      ADOPT = [48, 52, 57, 60, 63, 66, 68, 70, 72, 73, 74, 75],
+      REVERT = [3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1],
+      BACKLOG = [412, 398, 371, 352, 318, 291, 262, 230, 204, 181, 157, 138],
       TREND = [412, 418, 423, 431, 436, 441, 447, 452, 458, 463, 470, 476],
-      COVER = [61, 62, 64, 66, 69, 71, 74, 76, 78, 80, 82, 84],
-      BUGS = [9, 8, 8, 7, 6, 5, 5, 4, 3, 3, 2, 2],
-      LEAD = [52, 47, 41, 33, 28, 22, 18, 14, 11, 9, 8, 7],
-      DEPLOY = [4, 5, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19];
+      SHIPPED = DELIV.map((_, i) => DELIV.slice(0, i + 1).reduce((a, b) => a + b, 0)),
+      CREDIT = TREND.map((v, i) => v - BACKLOG[i]);
     // series: [data, lo, hi, kind, color, end label]; the last line series carries the cursor
     const PANELS = [
       [
-        "Backlog burndown",
+        "Outputs delivered",
+        "#ab7df8",
+        [
+          ["outputs / wk", "#ab7df8"],
+          ["runs / wk", "#656c76"],
+        ],
+        [
+          [RUNS, 0, 30, "bar", "#656c76", "24"],
+          [DELIV, 0, 30, "area", "#ab7df8", "22"],
+        ],
+      ],
+      [
+        "Kept by people",
+        "#4493f8",
+        [
+          ["adopted %", "#4493f8"],
+          ["reverted / wk", "#db6d28"],
+        ],
+        [
+          [REVERT, 0, 10, "bar", "#db6d28", "1"],
+          [ADOPT, 0, 100, "area", "#4493f8", "75%"],
+        ],
+      ],
+      [
+        "Backlog vs trend",
+        "#3fb950",
         [
           ["with agents", "#3fb950"],
           ["without, trend", "#656c76", 1],
@@ -3500,32 +3551,10 @@
           [BACKLOG, 0, 500, "area", "#3fb950", "138"],
         ],
       ],
-      [
-        "Quality up",
-        [
-          ["test coverage", "#4493f8"],
-          ["escaped bugs / wk", "#f85149"],
-        ],
-        [
-          [BUGS, 0, 12, "bar", "#f85149", "2"],
-          [COVER, 50, 90, "area", "#4493f8", "84%"],
-        ],
-      ],
-      [
-        "Faster delivery",
-        [
-          ["deploys / wk", "#d29922"],
-          ["PR lead time", "#ab7df8"],
-        ],
-        [
-          [LEAD, 0, 60, "bar", "#ab7df8", "7h"],
-          [DEPLOY, 0, 20, "area", "#d29922", "19"],
-        ],
-      ],
     ];
     const clips = [],
       cursors = [],
-      panels = PANELS.map(([title, legend, series], n) => {
+      panels = PANELS.map(([title, pc, legend, series], n) => {
         let g = `<defs><clipPath id="tv-c${n}"><rect x="0" y="0" width="0" height="360"/></clipPath>`;
         series.forEach(
           ([, , , , c], k) => (g += `<linearGradient id="tv-g${n}${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".35"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient>`)
@@ -3557,17 +3586,18 @@
         svg.innerHTML = g;
         clips.push(svg.querySelector("clipPath rect"));
         cursors.push([svg.querySelector("circle"), svg.querySelector(".tv-gd"), d, lo, hi]);
-        return h("div", { class: "tv-p", "--i": n }, h("h4", {}, title), svg);
+        return h("div", { class: "tv-p", "--c": pc, "--i": n }, h("h4", {}, title), svg);
       });
-    // [label, color, series, unit, delta]
-    const KPIS = [
-      ["Open backlog", "#3fb950", BACKLOG, " issues", "−67%"],
-      ["Test coverage", "#4493f8", COVER, "%", "+23 pts"],
-      ["PR lead time", "#ab7df8", LEAD, "h", "−87%"],
-      ["Deploys / week", "#d29922", DEPLOY, "", "4.8×"],
+    // lifecycle stages: [name, color, series, unit, recorded, explanation, lights up at p]
+    const STAGES = [
+      ["Delivery", "#ab7df8", SHIPPED, "outputs applied", "at run end", "Runs apply their safe outputs: pull requests, issues and comments.", 0],
+      ["Adoption", "#4493f8", ADOPT, "% kept", "on GitHub", "People merge, close or keep them; rejections and reverts count against.", 0.3],
+      ["Attribute value", "#3fb950", CREDIT, "issues below trend", "over weeks", "Credit only adopted work, against the trend without agents.", 0.6],
     ];
-    const vals = KPIS.map(() => h("b", {}, "0")),
-      kpis = KPIS.map(([l, c, , unit, delta], i) => h("div", { class: "tv-kpi", "--c": c, "--i": i }, h("div", {}, h("i", {}, l), h("em", {}, delta)), h("span", {}, vals[i], unit ? h("small", {}, unit.trim()) : null)));
+    const vals = STAGES.map(() => h("b", {}, "0")),
+      stages = STAGES.map(([name, c, , unit, rec, txt], i) =>
+        h("div", { class: "tv-st", "--c": c, "--i": i }, h("div", {}, h("h4", {}, h("i", {}, i + 1), name), h("em", {}, rec)), h("span", {}, vals[i], h("small", {}, unit)), h("p", {}, txt))
+      );
     const wk = h("b", {}, "01");
     let t0 = 0,
       now = 0,
@@ -3576,12 +3606,12 @@
     slides.push({
       group: "platform",
       notes:
-        "Turn Automation into Value: an illustrative dashboard with synthetic data for a sample repository, twelve weeks after switching on agentic workflows. The backlog burns down instead of following its growing trend, test coverage climbs while escaped bugs fall, and PR lead time drops as deploys per week rise. These numbers are not measured on a real repository; they show the kind of outcomes worth tracking. The AW factory band later shows gh-aw's own measured history.",
+        "Turn Automation into Value: the agentic workflow lifecycle, shown on an illustrative dashboard with synthetic data for a sample repository over twelve weeks. One, Delivery: a run applies its safe outputs, such as pull requests, issues and comments, and gh-aw records each outcome at the end of the run. Delivered is not yet valuable. Two, Adoption: people decide later on GitHub; merged, closed or kept outputs count for the workflow, rejected or reverted ones count against it. Three, Attribute value: only adopted work that survives earns credit, measured over weeks against the trend without agents, here the backlog burning down instead of growing. These numbers are not measured on a real repository; they show the kind of outcomes worth tracking. The AW factory band later shows gh-aw's own measured history.",
       enter() {
         t0 = 0;
         seen = -1;
         done = false;
-        [...kpis, ...panels].forEach(e => e.classList.remove("done"));
+        [...stages, ...panels].forEach(e => e.classList.remove("on", "done"));
       },
       onNext() {
         if (!t0 || done) return false;
@@ -3602,7 +3632,14 @@
           gd.setAttribute("x1", x);
           gd.setAttribute("x2", x);
         });
-        KPIS.forEach(([, , d], i) => (vals[i].textContent = Math.round(at(d, w))));
+        STAGES.forEach(([, , d, , , , from], i) => {
+          vals[i].textContent = Math.round(at(d, w));
+          if (t - t0 >= START * 1000 && p >= from && !stages[i].classList.contains("on")) {
+            stages[i].classList.add("on");
+            panels[i].classList.add("on");
+            if (i) sfx.step();
+          }
+        });
         const week = Math.round(w);
         wk.textContent = String(week + 1).padStart(2, "0");
         if (week > seen) {
@@ -3611,18 +3648,18 @@
         }
         if (p >= 1 && !done) {
           done = true;
-          [...kpis, ...panels].forEach(e => e.classList.add("done"));
+          [...stages, ...panels].forEach(e => e.classList.add("on", "done"));
           sfx.review();
         }
       },
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "AW lifecycle"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
         h("div", { class: "tv-live" }, "acme/app · week ", wk, " / 12"),
-        h("div", { class: "tv-kpis" }, kpis),
+        h("div", { class: "tv-stages" }, stages),
         h("div", { class: "tv-panels" }, panels),
-        h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
+        h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository · delivered is not adopted, and only adopted work earns value")
       ),
     });
   }
@@ -5682,7 +5719,7 @@
         ["a", "func newLoaderFactory() LoaderFactory { return defaultFactory{} }"],
         ["a", "func (defaultFactory) NewLoader() Loader { return loader{} }"],
         ["b", "func parseFlag(s string) bool {"],
-        ["b", "\treturn s == \"1\" || strings.EqualFold(s, \"true\")"],
+        ["b", '\treturn s == "1" || strings.EqualFold(s, "true")'],
         ["b", "}"],
         ["c", "func hasTag(tags []string, t string) bool {"],
         ["c", "\tfor _, x := range tags { if x == t { return true } }"],
@@ -5742,7 +5779,10 @@
         290,
         122,
         `<text class="t" x="0" y="16">FINDINGS BY KIND</text>` +
-          KINDS.map(([n, c, v], i) => `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`).join("")
+          KINDS.map(
+            ([n, c, v], i) =>
+              `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`
+          ).join("")
       );
       const aicSvg = svgEl(
         190,
@@ -5778,19 +5818,25 @@
         [2950, () => (scan.classList.remove("go"), scan.classList.add("end"))],
         ...FIND.map(([g], i) => [3000 + i * 700, () => (i || steps[2].classList.add("on"), grp(g).forEach(l => l.classList.add("hot")), cards[i].classList.add("on"), sfx.pop(i + 1))]),
         [5300, () => ((verdict.textContent = "COMMENT review · Lean: −12 lines possible."), verdict.classList.add("on"), sfx.notify(false))],
-        [6900, () => {
-          steps[3].classList.add("on");
-          lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
-          added.textContent = "+3";
-          sfx.pop(5);
-        }],
-        [8700, () => {
-          steps[4].classList.add("on");
-          cards.forEach(c => c.classList.add("dim"));
-          verdict.textContent = "/ponytail · Lean already. Ship.";
-          verdict.classList.add("ok");
-          sfx.pop(6);
-        }],
+        [
+          6900,
+          () => {
+            steps[3].classList.add("on");
+            lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
+            added.textContent = "+3";
+            sfx.pop(5);
+          },
+        ],
+        [
+          8700,
+          () => {
+            steps[4].classList.add("on");
+            cards.forEach(c => c.classList.add("dim"));
+            verdict.textContent = "/ponytail · Lean already. Ship.";
+            verdict.classList.add("ok");
+            sfx.pop(6);
+          },
+        ],
       ];
       let t0 = 0,
         cyc = -1,
@@ -16308,14 +16354,21 @@
       g += `<path class="drm-w" id="drmIn${i}" pathLength="1" d="M520 ${y} C640 ${y}, 680 ${CY}, ${CX - CR - 6} ${CY}"/>`;
       g += `<g class="drm-r" id="drmR${i}"><circle cx="40" cy="${y}" r="24" fill="#0d1117" stroke="${col}" stroke-width="2.5"/>${ico(ic, 40, y, 26, col)}<text x="78" y="${y + 8}">${txt}</text></g>`;
     });
-    OUT.forEach(([, , ], i) => {
+    OUT.forEach(([, ,], i) => {
       const y = OY(i) + 44;
       g += `<path class="drm-w g" id="drmOut${i}" pathLength="1" d="M${CX + CR + 6} ${CY} C1140 ${CY}, 1170 ${y}, 1262 ${y}"/>`;
     });
     g += `<g id="drmCore"><circle class="drm-core" cx="${CX}" cy="${CY}" r="${CR}"/>${ico("copilot", CX, CY + 6, 96, "#d2a8ff")}
       <circle cx="${CX + 58}" cy="${CY - 62}" r="24" fill="#d2a8ff"/><circle cx="${CX + 70}" cy="${CY - 72}" r="21" fill="#161b22"/>
       <text class="drm-z" x="${CX + 82}" y="${CY - 96}">z</text><text class="drm-z b" x="${CX + 98}" y="${CY - 120}">z</text><text class="drm-z c" x="${CX + 114}" y="${CY - 144}">Z</text></g>`;
-    [[760, 120, 0], [1040, 108, 0.7], [742, 330, 1.3], [1062, 352, 0.4], [830, 90, 1.9], [985, 390, 1.1]].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
+    [
+      [760, 120, 0],
+      [1040, 108, 0.7],
+      [742, 330, 1.3],
+      [1062, 352, 0.4],
+      [830, 90, 1.9],
+      [985, 390, 1.1],
+    ].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
     g += `<text class="drm-cap" x="${CX}" y="${CY + CR + 34}">nightly: mine · cluster · design</text>`;
     PAT.forEach(([x, txt], i) => (g += `<g class="drm-t" id="drmT${i}"><rect x="${x - 100}" y="410" width="200" height="44" rx="22"/><text x="${x}" y="438">${txt}</text></g>`));
     OUT.forEach(([ic, ttl, sub], i) => {
