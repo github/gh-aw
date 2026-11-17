@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { buildMissingIssueHandler } = require("./missing_issue_helpers.cjs");
 const { getPromptPath } = require("./messages_core.cjs");
 
@@ -19,7 +20,7 @@ const HANDLER_TYPE = "create_missing_data_issue";
 const main = buildMissingIssueHandler({
   handlerType: HANDLER_TYPE,
   defaultTitlePrefix: "[missing data]",
-  defaultLabels: ["agentic-workflows"],
+  defaultLabels: [getIssueLabel()],
   itemsField: "missing_data",
   templatePath: getPromptPath("missing_data_issue.md"),
   templateListKey: "missing_data_list",

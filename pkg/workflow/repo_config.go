@@ -12,6 +12,7 @@
 //		  "require_self_hosted_runners": true, // requires self-hosted runners for every generated job
 //		  "lock_file_logo": false,    // omits the ASCII logo from generated workflow headers
 //		  "utc": "-08:00", // project home UTC offset for rendered local times
+//		  "issue_label": "area:agentic-workflows", // label for gh-aw's own issues
 //		  "auto_upgrade": true, // set to true to generate agentic-auto-upgrade.yml with weekly schedule
 //		  "auto_upgrade": { "cron": "0 9 * * 1", "options": ["--pre-releases"] }, // or object form: configure schedule and upgrade options
 //		  "action_pins": {            // redirect action references to internal mirrors
@@ -156,6 +157,9 @@ func (m *MaintenanceConfig) IsJobDisabled(jobName string) bool {
 
 // RepoConfig is the parsed representation of aw.json.
 type RepoConfig struct {
+	// IssueLabel overrides the agentic-workflows label on gh-aw's own issues.
+	IssueLabel string
+
 	// ProtectedFiles configures repository-wide exceptions to safe-output file protection.
 	ProtectedFiles RepoProtectedFilesConfig
 
@@ -239,6 +243,13 @@ type RepoConfig struct {
 	ContainerPins map[string]ContainerPinTarget
 }
 
+func (r *RepoConfig) issueLabelEnvYAML() string {
+	if r == nil || r.IssueLabel == "" {
+		return ""
+	}
+	return fmt.Sprintf("\nenv:\n  GH_AW_ISSUE_LABEL: %q\n", r.IssueLabel)
+}
+
 // RepoProtectedFilesConfig holds repository-root path globs exempt from file protection.
 type RepoProtectedFilesConfig struct {
 	Exclude []string `json:"exclude,omitempty"`
@@ -297,6 +308,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 		ArtifactRetentionDays    *TemplatableInt32             `json:"artifact_retention_days,omitempty"`
 		HelpCommand              *bool                         `json:"help_command,omitempty"` // nil = use default (enabled)
 		UTC                      string                        `json:"utc,omitempty"`
+		IssueLabel               string                        `json:"issue_label,omitempty"`
 		AutoUpgrade              json.RawMessage               `json:"auto_upgrade,omitempty"`
 		Maintenance              json.RawMessage               `json:"maintenance,omitempty"`
 		ActionPins               map[string]string             `json:"action_pins,omitempty"`
@@ -321,6 +333,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	r.ArtifactRetentionDays = raw.ArtifactRetentionDays
 	r.HelpCommand = raw.HelpCommand
 	r.UTC = strings.TrimSpace(raw.UTC)
+	r.IssueLabel = raw.IssueLabel
 	r.ActionPins = raw.ActionPins
 	r.ActionPinPrefixes = raw.ActionPinPrefixes
 	r.ContainerPins = raw.ContainerPins
