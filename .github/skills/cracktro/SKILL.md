@@ -50,8 +50,8 @@ slides.push({
   notes: "...",           // speaker notes (N key); public text
   group: "security",      // band id; picks the THEME; crossing groups slides up
   experimental: "lsp",    // optional .xbadge; label only from the feature's `cracktro` entry in pkg/workflow/data/experimental_features.json (test-enforced)
-  key: "unsloppers",      // optional; pattern slide heading a column of examples
-  under: "unsloppers",    // optional; hangs below the same-group slide with that key (mechanics.md)
+  key: "improvers",      // optional; pattern slide heading a column of examples
+  under: "improvers",    // optional; hangs below the same-group slide with that key (mechanics.md)
   techno: 1,              // optional techno layer level
   el: h("section", { class: "slide" }, ...),
   enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back
@@ -77,6 +77,8 @@ slides.push({
 - Never generate or redraw mascots. Avatars are 160x160 clips of brand.github.com 3D art (`mona.jpg`: dark-mode purple Mona, `mona-2026-versions.png`; `ducky.jpg`: middle Ducky, `mascots-03.png`), background `#0d1117`, never white.
 
 Core rules (`content-rules.md`): everything is public; no real people; no 40-hex SHAs or private repos; the only URLs are `https://github.github.com/gh-aw/introduction/overview/` and the For PMs source link `https://github.com/chrizbo/agentics-beyond-code`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
+
+Colour accessibility: never use red/green as the only pair for opposing states (pass/fail, allowed/blocked); colour-blind viewers cannot tell them apart. Use blue (`#4493f8`/`#79c0ff`) vs orange (`#db6d28`/`#ffa657`) and add a non-colour cue (label, icon, dash or strike).
 
 ## Preview loop
 

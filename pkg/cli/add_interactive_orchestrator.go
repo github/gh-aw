@@ -251,7 +251,7 @@ func (c *AddInteractiveConfig) prepareAndConfirmAddInteractive() (workflowFiles 
 		return workflowFiles, nil, "", "", false, nil
 	}
 
-	initFiles, err = applyAddRepositoryInitialization(initializationPlan, c.EngineOverride, c.Verbose, c.NoGitattributes)
+	initFiles, err = applyAddRepositoryInitialization(c.Ctx, initializationPlan, c.EngineOverride, c.Verbose, c.NoGitattributes)
 	if err != nil {
 		return nil, nil, "", "", false, err
 	}

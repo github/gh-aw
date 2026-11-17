@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { buildMissingIssueHandler } = require("./missing_issue_helpers.cjs");
 const { getPromptPath } = require("./messages_core.cjs");
 
@@ -22,7 +23,7 @@ const DEFAULT_INCOMPLETE_SIGNAL_REASON = "incomplete_signal_not_provided";
 const main = buildMissingIssueHandler({
   handlerType: HANDLER_TYPE,
   defaultTitlePrefix: "[incomplete]",
-  defaultLabels: ["agentic-workflows"],
+  defaultLabels: [getIssueLabel()],
   itemsField: "incomplete_signals",
   fallbackItems: () => [
     {

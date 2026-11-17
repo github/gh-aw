@@ -75,6 +75,9 @@ jobs:
         working-directory: ./docs
         run: npm ci --legacy-peer-deps
 
+      - name: Test redirect fragment rewriting
+        run: make test-docs-redirect-fragments
+
       - name: Build documentation
         working-directory: ./docs
         env:

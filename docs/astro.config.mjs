@@ -14,6 +14,7 @@ import remarkInlineMarkdownInHtml from "./src/lib/remark/inlineMarkdownInHtml.js
 import remarkAgenticsWorkflow from "./src/lib/remark/agenticsWorkflow.js";
 import rehypeTableWrapper from "./src/lib/rehype/tableWrapper.js";
 import cracktroMetadata from "./src/lib/cracktro/integration.js";
+import redirectFragments from "./src/lib/redirect-fragments.js";
 
 const agenticsWorkflowsDirectory = process.env.AGENTICS_WORKFLOWS_DIR ?? fileURLToPath(new URL("../../agentics/workflows/", import.meta.url));
 
@@ -294,6 +295,7 @@ export default defineConfig({
     },
     // Adds the slide list from .github/skills/cracktro/slides.md to the talk page's JSON-LD.
     cracktroMetadata(),
+    redirectFragments(),
     sitemap(),
     mermaid({
       mermaidConfig: {

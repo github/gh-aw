@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { createReportIssue, buildIssueReport } = require("./issue_report.cjs");
 const { extractExpirationDate } = require("./ephemerals.cjs");
 const { appendReportExecutionProvenance } = require("./execution_provenance.cjs");
@@ -1101,7 +1102,7 @@ async function main(config = {}) {
                 owner: repoParts.owner,
                 repo: repoParts.repo,
                 title: issueTitle,
-                labels: ["agentic-workflows", "pull-request-fallback"],
+                labels: [getIssueLabel(), "pull-request-fallback"],
               },
               issueReport
             );

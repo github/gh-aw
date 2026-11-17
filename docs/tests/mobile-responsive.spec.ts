@@ -31,7 +31,7 @@ test.describe('Mobile and Responsive Layout', () => {
 
     const firstTableCell = page.locator('.sl-markdown-content table tbody td').first();
     await expect(firstTableCell).toBeVisible();
-    await expect(firstTableCell).toHaveAttribute('data-label', 'AI engine');
+    await expect(firstTableCell).toHaveAttribute('data-label', 'Engine');
 
     await context.close();
   });
