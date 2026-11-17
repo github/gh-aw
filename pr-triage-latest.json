@@ -1,13 +1,13 @@
 {
-  "generated_at": "2026-11-16T18:22:44Z",
-  "run_id": "pr-triage-2026-11-16T18:22Z",
+  "generated_at": "2026-11-17T06:31:06Z",
+  "run_id": "pr-triage-2026-11-17T06:00:00Z",
   "source": "pr-triage",
-  "open_copilot_prs": 1,
-  "eligible_total": 0,
-  "cooldown_skipped": [78413],
+  "open_copilot_prs": 16,
+  "eligible_total": 16,
+  "cooldown_skipped": [],
   "category_counts": {
-    "bug": 0,
-    "chore": 0,
+    "bug": 1,
+    "chore": 15,
     "feature": 0,
     "test": 0,
     "docs": 0,
@@ -15,31 +15,176 @@
     "refactor": 0
   },
   "risk_counts": {
-    "low": 0,
+    "low": 15,
     "medium": 0,
-    "high": 0
+    "high": 1
   },
   "priority_counts": {
-    "low": 0,
+    "low": 15,
     "medium": 0,
-    "high": 0
+    "high": 1
   },
   "action_counts": {
     "auto_merge": 0,
-    "fast_track": 0,
-    "batch_review": 0,
+    "fast_track": 1,
+    "batch_review": 15,
     "defer": 0,
     "close": 0
   },
-  "selected_candidates": [],
-  "batches": [],
-  "skipped_prs": [
+  "selected_candidates": [
     {
-      "number": 78413,
-      "title": "Align spec compliance checks and reject unsupported GitHub MCP controls",
-      "author": "gh-aw-bot",
-      "updated_at": "2026-11-16T18:03:15Z",
-      "reason": "cooldown: updated < 1 hour ago"
+      "number": 76477,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76479,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76481,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76482,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76483,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76485,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76486,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76487,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76488,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76489,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76492,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76614,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76615,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 77319,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 77544,
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "batch_review",
+      "score": 42,
+      "batch": "dependency-bumps"
+    },
+    {
+      "number": 76957,
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 81,
+      "batch": "security-review"
     }
-  ]
+  ],
+  "batches": [
+    {
+      "id": "dependency-bumps",
+      "count": 15,
+      "type": "chore",
+      "risk": "low",
+      "action": "batch_review"
+    }
+  ],
+  "skipped_prs": []
 }
