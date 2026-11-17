@@ -5335,7 +5335,7 @@
         ["a", "func newLoaderFactory() LoaderFactory { return defaultFactory{} }"],
         ["a", "func (defaultFactory) NewLoader() Loader { return loader{} }"],
         ["b", "func parseFlag(s string) bool {"],
-        ["b", "\treturn s == \"1\" || strings.EqualFold(s, \"true\")"],
+        ["b", '\treturn s == "1" || strings.EqualFold(s, "true")'],
         ["b", "}"],
         ["c", "func hasTag(tags []string, t string) bool {"],
         ["c", "\tfor _, x := range tags { if x == t { return true } }"],
@@ -5395,7 +5395,10 @@
         290,
         122,
         `<text class="t" x="0" y="16">FINDINGS BY KIND</text>` +
-          KINDS.map(([n, c, v], i) => `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`).join("")
+          KINDS.map(
+            ([n, c, v], i) =>
+              `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`
+          ).join("")
       );
       const aicSvg = svgEl(
         190,
@@ -5431,19 +5434,25 @@
         [2950, () => (scan.classList.remove("go"), scan.classList.add("end"))],
         ...FIND.map(([g], i) => [3000 + i * 700, () => (i || steps[2].classList.add("on"), grp(g).forEach(l => l.classList.add("hot")), cards[i].classList.add("on"), sfx.pop(i + 1))]),
         [5300, () => ((verdict.textContent = "COMMENT review · Lean: −12 lines possible."), verdict.classList.add("on"), sfx.notify(false))],
-        [6900, () => {
-          steps[3].classList.add("on");
-          lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
-          added.textContent = "+3";
-          sfx.pop(5);
-        }],
-        [8700, () => {
-          steps[4].classList.add("on");
-          cards.forEach(c => c.classList.add("dim"));
-          verdict.textContent = "/ponytail · Lean already. Ship.";
-          verdict.classList.add("ok");
-          sfx.pop(6);
-        }],
+        [
+          6900,
+          () => {
+            steps[3].classList.add("on");
+            lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
+            added.textContent = "+3";
+            sfx.pop(5);
+          },
+        ],
+        [
+          8700,
+          () => {
+            steps[4].classList.add("on");
+            cards.forEach(c => c.classList.add("dim"));
+            verdict.textContent = "/ponytail · Lean already. Ship.";
+            verdict.classList.add("ok");
+            sfx.pop(6);
+          },
+        ],
       ];
       let t0 = 0,
         cyc = -1,
@@ -15958,14 +15967,21 @@
       g += `<path class="drm-w" id="drmIn${i}" pathLength="1" d="M520 ${y} C640 ${y}, 680 ${CY}, ${CX - CR - 6} ${CY}"/>`;
       g += `<g class="drm-r" id="drmR${i}"><circle cx="40" cy="${y}" r="24" fill="#0d1117" stroke="${col}" stroke-width="2.5"/>${ico(ic, 40, y, 26, col)}<text x="78" y="${y + 8}">${txt}</text></g>`;
     });
-    OUT.forEach(([, , ], i) => {
+    OUT.forEach(([, ,], i) => {
       const y = OY(i) + 44;
       g += `<path class="drm-w g" id="drmOut${i}" pathLength="1" d="M${CX + CR + 6} ${CY} C1140 ${CY}, 1170 ${y}, 1262 ${y}"/>`;
     });
     g += `<g id="drmCore"><circle class="drm-core" cx="${CX}" cy="${CY}" r="${CR}"/>${ico("copilot", CX, CY + 6, 96, "#d2a8ff")}
       <circle cx="${CX + 58}" cy="${CY - 62}" r="24" fill="#d2a8ff"/><circle cx="${CX + 70}" cy="${CY - 72}" r="21" fill="#161b22"/>
       <text class="drm-z" x="${CX + 82}" y="${CY - 96}">z</text><text class="drm-z b" x="${CX + 98}" y="${CY - 120}">z</text><text class="drm-z c" x="${CX + 114}" y="${CY - 144}">Z</text></g>`;
-    [[760, 120, 0], [1040, 108, 0.7], [742, 330, 1.3], [1062, 352, 0.4], [830, 90, 1.9], [985, 390, 1.1]].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
+    [
+      [760, 120, 0],
+      [1040, 108, 0.7],
+      [742, 330, 1.3],
+      [1062, 352, 0.4],
+      [830, 90, 1.9],
+      [985, 390, 1.1],
+    ].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
     g += `<text class="drm-cap" x="${CX}" y="${CY + CR + 34}">nightly: mine · cluster · design</text>`;
     PAT.forEach(([x, txt], i) => (g += `<g class="drm-t" id="drmT${i}"><rect x="${x - 100}" y="410" width="200" height="44" rx="22"/><text x="${x}" y="438">${txt}</text></g>`));
     OUT.forEach(([ic, ttl, sub], i) => {
