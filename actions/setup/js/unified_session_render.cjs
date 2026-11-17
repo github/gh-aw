@@ -41,6 +41,7 @@ const RUNTIME_TYPES = new Set([
   "safe_output.request",
   "safe_output.result",
   "safe_output.execution",
+  "lifecycle.adoption",
   "safe_output.error",
   "experiment.state",
   "experiment.assignment",
@@ -246,6 +247,8 @@ function eventDetail(event) {
       return `${fields(data, ["type", "status", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
     case "safe_output.execution":
       return fields(data, ["type", "messageIndex", "status", "staged", "operation_outcome", "url"]);
+    case "lifecycle.adoption":
+      return fields(data, ["sourceRunId", "sourceWorkflow", "repository", "outputType", "deliveryState", "adoptionState", "adoptionSignal", "acceptanceKind", "humanVerified", "adoptionCoverage", "survivalState", "survivalCoverage"]);
     case "safe_output.error":
       return `${fields(data, ["type", "status", "errorCode", "message", "error"])}${Array.isArray(data.errors) ? ` errors=${data.errors.length} [${data.errors.map(error => fields(error, ["type", "errorCode"])).join("; ")}]` : ""}`;
     case "experiment.assignment":

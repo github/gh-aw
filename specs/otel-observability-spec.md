@@ -753,8 +753,9 @@ of `/v1/traces`. A trailing signal path MUST be replaced, not duplicated.
 The serialized UTF-8 JSON request MUST NOT exceed `GH_AW_OTLP_LOGS_MAX_BYTES`
 per endpoint. Whole low-priority records MUST be omitted to meet the limit,
 using the same retention ranking as the compact serializer: format/workflow
-metadata, final outcomes and promoted failures, guardrail/grader results,
-retry diagnostics, per-step usage, then successful memory updates.
+metadata, final outcomes, safe-output execution evidence and promoted failures,
+guardrail/grader results, retry diagnostics, per-step usage, then successful
+memory updates.
 Equal-priority records MUST prefer earlier evidence, and retained records MUST
 remain in source order. The source serializer MUST consider late essential
 records within its scan budget even after compact output limits are reached.
@@ -772,13 +773,13 @@ MUST NOT be retried after authorization failures.
 
 ### 13.1 Separate Evaluation Execution
 
-Outcome evaluation runs through `gh aw logs --adoption` after the source workflow. The command returns JSON and optional JSONL; it does not emit outcome spans. A downstream exporter that converts these records to OpenTelemetry SHOULD create its own trace.
+Outcome evaluation runs through `gh aw logs --adoption` after the source workflow. With `--adoption-dir`, the command writes its existing observation JSONL and a separate unified-session supplement, `adoption-session-<runID>.jsonl`, containing `lifecycle.adoption` events. Delivery, adoption, and survival remain separate fields; `acceptanceKind: fallback_delivery` is not a verified human decision. The command does not emit outcome spans. A downstream exporter that converts these events to OpenTelemetry SHOULD create its own trace.
 
 It MUST NOT extend the original workflow trace across hours or days when doing so would create false temporal containment.
 
 ### 13.2 Source Correlation
 
-Each outcome-evaluation span SHOULD contain a span link to the originating workflow root context when that context was persisted.
+The source workflow's compact OTLP session logs include allowlisted `safe_output.execution` delivery-time evidence. A downstream exporter processing `lifecycle.adoption` events SHOULD create a distinct `gh-aw.adoption.evaluate` span and MUST NOT extend the source workflow trace across the later evaluation. Each outcome-evaluation span SHOULD contain a span link to the originating workflow root context when that context was persisted.
 
 When a full span context is unavailable, the evaluation span SHOULD include `gh-aw.adoption.source_run_id`, `gh-aw.adoption.source_workflow`, and `gh-aw.adoption.repo`.
 
@@ -789,6 +790,8 @@ Use `gh-aw.adoption.repo`; no generic lifecycle attribute aliases are defined.
 The span SHOULD be named `gh-aw.adoption.evaluate` and use `INTERNAL` span kind.
 
 It SHOULD include `gh-aw.adoption.type`, `gh-aw.adoption.result`, `gh-aw.adoption.source_run_id`, `gh-aw.adoption.source_workflow`, and `gh-aw.adoption.repo`.
+
+Map `outputType`, `adoptionState`, `sourceRunId`, `sourceWorkflow`, and `repository` from `lifecycle.adoption.data` to those corresponding attributes. `adoptionCoverage`, `acceptanceKind`, and `humanVerified` MAY be separate span attributes; delivery fields MUST remain distinct and MUST NOT be substituted for `gh-aw.adoption.result`.
 
 `gh-aw.adoption.result` SHOULD use the lifecycle taxonomy in
 `specs/safe-output-lifecycle.md`: `accepted`, `rejected`, `pending`, `lifecycle`,

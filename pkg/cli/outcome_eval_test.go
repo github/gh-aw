@@ -12,8 +12,10 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/github"
+	"github.com/github/gh-aw/pkg/lifecycle"
 	"github.com/github/gh-aw/pkg/repoutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -627,6 +629,8 @@ func TestOutcomeSummaryCountsEvalErrorsFromNormalizedStatus(t *testing.T) {
 
 func TestWriteOutcomeJSONLEmitsNormalizedFields(t *testing.T) {
 	dir := t.TempDir()
+	deliveredAt := time.Date(2026, 5, 12, 0, 0, 0, 0, time.UTC)
+	observedAt := deliveredAt.Add(time.Hour)
 	reports := []OutcomeReport{
 		{
 			Type: "add_labels",
@@ -637,6 +641,12 @@ func TestWriteOutcomeJSONLEmitsNormalizedFields(t *testing.T) {
 			},
 			CreatedAt: "2026-05-12T00:00:00Z",
 			CheckedAt: "2026-05-12T01:00:00Z",
+			Lifecycle: &lifecycle.Record{
+				Identity: lifecycle.Identity{RunID: 123, Workflow: "workflow.yml", Repository: "owner/repo", Type: "add_labels"},
+				Delivery: lifecycle.Delivery{State: "delivered", Signal: "effect_applied", At: deliveredAt, ObservedAt: observedAt, Source: "safe-output-execution"},
+				Adoption: lifecycle.Adoption{State: "accepted", Signal: "delivered", At: deliveredAt, ObservedAt: observedAt, Source: "delivery-rule", RuleVersion: lifecycle.RuleVersion, AcceptanceKind: "fallback_delivery", Coverage: "available"},
+				Survival: lifecycle.Survival{State: "unknown", Coverage: "unsupported", ObservedAt: observedAt},
+			},
 		},
 	}
 
@@ -651,6 +661,23 @@ func TestWriteOutcomeJSONLEmitsNormalizedFields(t *testing.T) {
 	assert.Equal(t, "weak", entry["evidence_strength"])
 	assert.Equal(t, "target_exists_only", entry["signal"])
 	assert.NotContains(t, entry, "result")
+
+	sessionData, err := os.ReadFile(filepath.Join(dir, "adoption-session-123.jsonl"))
+	require.NoError(t, err)
+	var sessionLines []map[string]any
+	for _, line := range bytes.Split(bytes.TrimSpace(sessionData), []byte("\n")) {
+		var event map[string]any
+		require.NoError(t, json.Unmarshal(line, &event))
+		sessionLines = append(sessionLines, event)
+	}
+	require.Len(t, sessionLines, 2)
+	assert.Equal(t, "session.format", sessionLines[0]["type"])
+	assert.Equal(t, "lifecycle.adoption", sessionLines[1]["type"])
+	assert.Equal(t, "delivered", sessionLines[1]["data"].(map[string]any)["deliveryState"])
+	assert.Equal(t, "accepted", sessionLines[1]["data"].(map[string]any)["adoptionState"])
+	assert.Equal(t, "fallback_delivery", sessionLines[1]["data"].(map[string]any)["acceptanceKind"])
+	assert.Equal(t, false, sessionLines[1]["data"].(map[string]any)["humanVerified"])
+	assert.Equal(t, "lifecycle", sessionLines[1]["provenance"].(map[string]any)["component"])
 }
 
 func TestEvalAddReviewerAcceptedWithApproval(t *testing.T) {
