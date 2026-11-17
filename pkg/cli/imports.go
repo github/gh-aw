@@ -474,6 +474,9 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 				queue = append(queue, nestedFilePath)
 			}
 		}
+		if err := nestedScanner.Err(); err != nil {
+			return "", fmt.Errorf("failed to scan nested includes in %s: %w", fullSourcePath, err)
+		}
 	}
 
 	return result.String(), nil

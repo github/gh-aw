@@ -171,6 +171,8 @@ func ExtractBodyLevelImportPaths(content, baseDir string) []BodyLevelImport {
 
 	var results []BodyLevelImport
 	scanner := bufio.NewScanner(strings.NewReader(content))
+	// A long markdown line should not prevent directives on later lines from being found.
+	scanner.Buffer(make([]byte, 0, 64*1024), max(64*1024, len(content)+1))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
@@ -216,6 +218,10 @@ func ExtractBodyLevelImportPaths(content, baseDir string) []BodyLevelImport {
 			Path:     filepath.ToSlash(importPath),
 			Optional: false, // optional directives are skipped above; only required imports are promoted
 		})
+	}
+	if err := scanner.Err(); err != nil {
+		includeExpanderLog.Printf("Failed to scan body-level runtime imports: %v", err)
+		return nil
 	}
 	return results
 }
@@ -302,6 +308,9 @@ func processIncludesForField(content, baseDir string, extractFunc func(string) (
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, "", fmt.Errorf("failed to scan includes for frontmatter field: %w", err)
+	}
 	return results, result.String(), nil
 }
 

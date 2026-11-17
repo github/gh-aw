@@ -14,10 +14,13 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/errorutil"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var experimentsFetchLog = logger.New("cli:experiments_fetch")
 
 type evalResultRecord struct {
 	ID        string `json:"id"`
@@ -87,11 +90,17 @@ func parseEvalResultRecords(data []byte) []evalResultRecord {
 		return nil
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
+	// Eval answers can exceed Scanner's default 64 KiB token limit.
+	scanner.Buffer(make([]byte, 0, 64*1024), max(64*1024, len(data)+1))
 	var records []evalResultRecord
 	for scanner.Scan() {
 		if record, ok := parseEvalResultRecordLine(scanner.Bytes()); ok {
 			records = append(records, record)
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		experimentsFetchLog.Printf("Failed to scan eval result records: %v", err)
+		return nil
 	}
 	return records
 }
