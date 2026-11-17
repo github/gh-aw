@@ -38,7 +38,7 @@ var typeutilLog = logger.New("typeutil:convert")
 
 // ParseIntValue strictly parses numeric types (int, int64, uint64, float64) to int,
 // returning (value, true) on success and (0, false) for any unrecognized or
-// non-numeric type.
+// non-numeric type. Float values that are NaN or outside the int range are invalid.
 //
 // Use this when the caller needs to distinguish a missing/invalid value from a
 // legitimate zero, or when string inputs are not expected (e.g. YAML config field
@@ -61,6 +61,10 @@ func ParseIntValue(value any) (int, bool) {
 		}
 		return int(v), true
 	case float64:
+		intLimit := math.Ldexp(1, strconv.IntSize-1)
+		if math.IsNaN(v) || v < -intLimit || v >= intLimit {
+			return 0, false
+		}
 		intVal := int(v)
 		// Warn if truncation occurs (value has fractional part)
 		if v != float64(intVal) {
