@@ -1056,6 +1056,49 @@
   .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
   .dto-big { fill: #e3b341; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  .isa .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #ffa657, #ab7df8); }
+  .isa-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, opacity .6s, filter .4s; }
+  .isa-box.on .isa-card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .isa-svg.s1 .isa-mono .isa-card { stroke-dasharray: 8 8; opacity: .45; }
+  .isa-t { fill: #9198a1; font: 500 15px var(--mono); letter-spacing: .08em; }
+  .isa-chip { fill: #c297ff; font: 600 14px var(--mono); letter-spacing: .06em; text-anchor: end; }
+  .isa-cap { fill: #9198a1; font: 500 15px var(--mono); text-anchor: middle; transition: opacity .5s; }
+  .isa-svg.s1 .isa-mono .isa-cap { opacity: 0; }
+  .isa-gh { fill: none; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; opacity: 0; transition: opacity .6s; }
+  .isa-svg.s1 .isa-gh { opacity: .7; } .isa-svg.s2 .isa-gh { opacity: .35; }
+  .isa-blk { color: #6e7681; }
+  .isa-blk rect.b { fill: #161b22; stroke: #6e7681; stroke-width: 2; transition: fill .5s, stroke .5s, filter .3s, stroke-width .3s; }
+  .isa-blk .ln { fill: #ffffff1f; }
+  .isa-blk .n { fill: #e6edf3; font: 600 16px var(--mono); }
+  .isa-blk .tg { fill: currentColor; font: 600 13px var(--mono); letter-spacing: .08em; text-anchor: end; }
+  .isa-svg.s1 .isa-blk.core { color: #c297ff; } .isa-svg.s1 .isa-blk.core rect.b { fill: #8957e522; stroke: #ab7df8; }
+  .isa-svg.s1 .isa-blk.skill { color: #79c0ff; } .isa-svg.s1 .isa-blk.skill rect.b { fill: #1f6feb22; stroke: #4493f8; }
+  .isa-svg.s1 .isa-blk.agent { color: #ffa657; } .isa-svg.s1 .isa-blk.agent rect.b { fill: #db6d2822; stroke: #ffa657; stroke-dasharray: 8 5; }
+  .isa-blk.hot rect.b { stroke-width: 3; filter: drop-shadow(0 0 12px currentColor); }
+  .isa-blk.hot .tg { fill: #f0f6fc; }
+  .isa-sec rect { fill: transparent; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; }
+  .isa-sec text { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .08em; }
+  .isa-sec { opacity: .25; transition: opacity .6s; } .isa-svg.s1 .isa-sec { opacity: 1; }
+  .isa-svg.s1 .isa-sec.core text { fill: #c297ff; } .isa-svg.s1 .isa-sec.skill text { fill: #79c0ff; } .isa-svg.s1 .isa-sec.agent text { fill: #ffa657; }
+  .isa-seg { fill: #6e768166; stroke: #0d1117; stroke-width: 1.5; transition: fill .5s; }
+  .isa-svg.s1 .isa-seg.core { fill: #8957e5; } .isa-svg.s1 .isa-seg.skill { fill: #1f6feb; } .isa-svg.s1 .isa-seg.agent { fill: #db6d28; }
+  .isa-svg .isa-seg.agent.sm { fill: url(#isaH); stroke: #ffa657; }
+  .isa-ghost { fill: none; stroke: #6e7681; stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .6; }
+  .isa-ml { fill: #9198a1; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; } .isa-ml.on { opacity: 1; } .isa-ml.sm { fill: #ffa657; }
+  .isa-take { opacity: 0; transition: opacity .6s; } .isa-take.on { opacity: 1; }
+  .isa-take .b { fill: #f0f6fc; font: 700 32px "Mona Sans"; text-anchor: middle; }
+  .isa-take .s { font: 600 17px var(--mono); text-anchor: middle; }
+  .isa-svg { left: 225px; top: 260px; width: 1470px; height: 588px; }
+  .isa-measured { position: absolute; left: 470px; top: 865px; width: 1350px; display: grid; grid-template-columns: 220px repeat(3, 1fr); gap: 20px; font-family: var(--mono); }
+  .isa-inventory, .isa-example { border-top: 2px solid #3d444d; padding-top: 12px; }
+  .isa-inventory b { display: block; font-size: 28px; color: #f0f6fc; white-space: nowrap; }
+  .isa-measured p { margin: 6px 0 0; font-size: 15px; color: #9198a1; }
+  .isa-inventory em { color: #c297ff; font-style: normal; }
+  .isa-example h3 { margin: 0 0 10px; font: 600 17px var(--mono); color: #f0f6fc; }
+  .isa-example .skills { color: #79c0ff; } .isa-example .agents { color: #ffa657; }
+  .isa-example .runs { display: block; margin-top: 8px; color: #f0f6fc; font-size: 23px; }
+  .isa-example .runs small { color: #9198a1; font-size: 13px; font-weight: 500; }
+  .isa-caption { position: absolute; left: 470px; top: 1030px; margin: 0; font: 500 13px/1.35 var(--mono); color: #9198a1; }
   /* --- cli vs mcp --- */
   .cvm .slide-head h2 { --lg: #e3b341; }
   .cvm-k { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
@@ -1681,6 +1724,62 @@
   .ade .ao-bar.seen.x { fill: #db6d28; } .ade .ao-bar.seen.r, .ade .ao-bar.seen.f { fill: #8b949e; }
   .ade .sfl-row .ok { fill: #79c0ff; } .ade .sfl-row .ko { fill: #ffa657; }
   .ade .mc-tag.e2 { fill: #c9d1d9; } .ade .mc-chip.on rect { filter: drop-shadow(0 0 12px #ab7df855); }
+  /* Fuzzy schedules: a fixed-cron spike scatters into hashed daily times; All You Can Eat serves one plate at a time */
+  .fzs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #79c0ff, #ab7df8, #ffa657); }
+  .fzs-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
+  .fzs-code { font: 600 26px var(--mono); transition: opacity .5s; } .fzs-code.fix { fill: #ffa657; } .fzs-code.fuz { fill: #79c0ff; opacity: 0; }
+  .fzs-mode { font: 600 15px var(--mono); text-anchor: end; transition: opacity .5s; } .fzs-mode.fix { fill: #ffa657; } .fzs-mode.fuz { fill: #79c0ff; opacity: 0; }
+  .fzs-svg.fuz .fzs-code.fix, .fzs-svg.fuz .fzs-mode.fix { opacity: 0; } .fzs-svg.fuz .fzs-code.fuz, .fzs-svg.fuz .fzs-mode.fuz { opacity: 1; }
+  .fzs-band { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-band { opacity: 1; transition: opacity .6s .3s; }
+  .fzs-band.no rect { fill: url(#fzsHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .fzs-band.best rect { fill: #4493f81f; stroke: #4493f8; stroke-width: 1.5; }
+  .fzs-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzs-band.no text { fill: #ffa657; } .fzs-band.best text { fill: #79c0ff; }
+  .fzs-hash { fill: #c9d1d9; font: 500 16px var(--mono); opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-hash { opacity: 1; transition: opacity .5s .4s; }
+  .fzs-syn { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-syn { opacity: 1; transition: opacity .6s 1.1s; }
+  .fzs-syn text { font: 500 15px var(--mono); fill: #79c0ff; } .fzs-syn text.h { fill: #9198a1; font-weight: 600; font-size: 13px; letter-spacing: .1em; }
+  .fzs-syn text.s { fill: #f0f6fc; } .fzs-syn text.a { fill: #6e7681; } .fzs-syn text.t { text-anchor: end; font-weight: 600; font-size: 13px; letter-spacing: .08em; }
+  .fzs-syn .fix text { fill: #ffa657; } .fzs-syn .fix text.s { text-decoration: line-through; text-decoration-color: #db6d28; }
+  .fzs-axis { stroke: #3d444d; stroke-width: 2; } .fzs-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
+  .fzs-dot { fill: #ffa657; transition: fill .6s; } .fzs-svg.fuz .fzs-dot { fill: #79c0ff; }
+  .fzs-n { fill: #c9d1d9; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-n { opacity: 1; transition: opacity .4s 1.6s; }
+  .fzs-spike { opacity: 0; transition: opacity .4s; } .fzs-spike.on { opacity: 1; } .fzs-svg.fuz .fzs-spike { opacity: 0; }
+  .fzs-spike line { stroke: #ffa657; stroke-width: 2; stroke-dasharray: 5 5; } .fzs-spike text { fill: #ffa657; font: 600 17px var(--mono); }
+  .fzs-spike text.d { fill: #c9d1d9; font-weight: 500; font-size: 15px; }
+  .fzs-min { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-min { opacity: 1; transition: opacity .6s 1.8s; }
+  .fzs-min .no { fill: url(#fzsHatch); stroke: #db6d28; stroke-width: 1; stroke-dasharray: 3 3; } .fzs-min .b { fill: #79c0ff; }
+  .fzs-min text { fill: #6e7681; font: 500 13px var(--mono); }
+  .fzs-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; }
+  .fzs-yaml { fill: #c9d1d9; font: 500 18px var(--mono); white-space: pre; } .fzs-yaml .k { fill: #79c0ff; } .fzs-yaml .s { fill: #a5d6ff; } .fzs-yaml .h { fill: #ffa657; font-weight: 600; }
+  .fzs-plate { opacity: 0; transition: opacity .35s; } .fzs-plate.on { opacity: 1; }
+  .fzs-plate rect { fill: #161b22; stroke: var(--c, #79c0ff); stroke-width: 2; transition: stroke .35s; }
+  .fzs-pt { fill: #f0f6fc; font: 600 19px var(--mono); } .fzs-ps { fill: var(--c, #79c0ff); font: 600 15px var(--mono); }
+  .fzs-plate.done .fzs-pt { fill: #8b949e; text-decoration: line-through; }
+  .fzs-learn { fill: #e3b341; font: 600 15px var(--mono); opacity: 0; transition: opacity .4s; } .fzs-learn.on { opacity: 1; }
+  .fzs-mona { opacity: 0; transition: opacity .3s; } .fzs-mona.on { opacity: 1; }
+  .fzs-line { stroke: #3d444d; stroke-width: 3; stroke-dasharray: 8 8; }
+  .fzs-tick circle { fill: #0d1117; stroke: #3d444d; stroke-width: 2; transition: fill .3s, stroke .3s, filter .3s; }
+  .fzs-tick text { fill: #6e7681; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; }
+  .fzs-tick.run circle { fill: #4493f8; stroke: #79c0ff; filter: drop-shadow(0 0 10px #4493f8); } .fzs-tick.run text { fill: #79c0ff; opacity: 1; }
+  .fzs-tick.skip circle { stroke: #9198a1; stroke-dasharray: 4 3; } .fzs-tick.skip text { opacity: 1; }
+  .fzs-tick.now circle { stroke-width: 4; }
+  .fzs-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
+  .active .fzs-cap { animation: rise .6s ease-out both 2s; }
+  /* Week of daily runs: measured heat map of daily workflows by weekday and UTC hour */
+  .fzw .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
+  .fzw-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
+  .fzw-day { fill: #c9d1d9; font: 600 18px var(--mono); text-anchor: end; } .fzw-day.we { fill: #9198a1; }
+  .fzw-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
+  .fzw-c rect { stroke: #30363d; stroke-width: 1; } .fzw-c text { font: 600 15px var(--mono); text-anchor: middle; fill: #c9d1d9; } .fzw-c.hi text { fill: #0d1117; }
+  .fzw-c, .fzw-band, .fzw-top, .fzw-key, .fzw-ph { visibility: hidden; } .fzw-c.on, .fzw-band.on, .fzw-top.on, .fzw-key.on, .fzw-ph.on { visibility: visible; }
+  .fzw-c.now rect { stroke: #f0f6fc; stroke-width: 2; }
+  .fzw-ph rect { fill: #f0f6fc0f; stroke: #f0f6fc; stroke-width: 2; } .fzw-ph text { fill: #f0f6fc; font: 600 15px var(--mono); text-anchor: middle; }
+  .fzw-band.no rect { fill: url(#fzwHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .fzw-band.best rect { fill: none; stroke: #4493f8; stroke-width: 2.5; }
+  .fzw-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzw-band.no text { fill: #ffa657; } .fzw-band.best text { fill: #79c0ff; }
+  .fzw-sum rect { fill: #4493f8; } .fzw-sum.we rect { fill: #4493f899; } .fzw-sum text { fill: #c9d1d9; font: 600 16px var(--mono); }
+  .fzw-top rect { fill: none; stroke: #f0f6fc; stroke-width: 3; } .fzw-top text { fill: #f0f6fc; font: 600 15px var(--mono); }
+  .fzw-key text { fill: #9198a1; font: 500 15px var(--mono); } .fzw-key text.b { fill: #c9d1d9; font-weight: 600; }
+  .fzw-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; visibility: hidden; } .fzw-cap.on { visibility: visible; }
 
   /* --- index & search: a non-agentic indexing job writes the index; the agent job only searches a read-only copy --- */
   .ix { --lg: #d2a8ff; }
@@ -9428,6 +9527,242 @@
     });
   }
 
+  // Inlined Skills & Agents: split a monolithic prompt into a short plan, deferred skills and focused agents on smaller models
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 648;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const clamp = u => Math.max(0, Math.min(1, u));
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // synthetic issue-triage prompt: [role, monolith label, inlined label, height in the monolith, y once inlined]
+    const BLK = [
+      ["core", "Plan · read the issue, decide, report", "plan · read, decide, report", 52, 112],
+      ["skill", "Label taxonomy · every label explained", "## skill: `labels`", 92, 228],
+      ["skill", "Triage checklist · bug, feature, question", "## skill: `triage-rules`", 84, 288],
+      ["skill", "Report template · sections and tone", "## skill: `report-template`", 76, 348],
+      ["agent", "Summarize every linked pull request", "## agent: `summarizer`", 76, 464],
+      ["agent", "Search for duplicate issues", "## agent: `dedup`", 68, 524],
+    ];
+    const TAG = { core: "ALWAYS", skill: "ON DEMAND", agent: "SMALL MODEL" },
+      HOT = { core: "ALWAYS", skill: "LOADED", agent: "RUNNING" };
+    // Loaded skills remain in the main context; delegated jobs have separate contexts.
+    const TURNS = [
+      [[0], 0],
+      [[0, 2], 0],
+      [[4], 1],
+      [[5], 1],
+      [[0, 2, 1], 0],
+      [[0, 2, 1, 3], 0],
+    ];
+    const AX = 36,
+      AW = 448,
+      BX = 556,
+      BW = 488,
+      BH = 48,
+      AY = [];
+    BLK.reduce((y, b) => (AY.push(y), y + b[3] + 6), 122);
+    const S = 180 / BLK.reduce((s, b) => s + b[3], 0),
+      barX = i => 1130 + i * 78,
+      BASE = [300, 588];
+    let g = `<defs><pattern id="isaH" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2840"/><rect width="3" height="8" fill="#ffa657"/></pattern></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "MONOLITHIC PROMPT"],
+      [520, 1080, "INLINED SKILLS & AGENTS"],
+      [1080, VW, "CONTEXT PER TURN"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="isaLane${i}" x="${(x0 + x1) / 2}" y="40">${esc(t)}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    // the monolith: one file, every section in context on every turn
+    g += `<g class="isa-box isa-mono" id="isaMono"><rect class="isa-card" x="16" y="76" width="488" height="560" rx="12"/><text class="isa-t" x="32" y="104">issue-triage.md</text><text class="isa-chip" x="488" y="104">model: large</text>`;
+    BLK.forEach((b, i) => (g += `<rect class="isa-gh" x="${AX}" y="${AY[i]}" width="${AW}" height="${b[3]}" rx="8"/>`));
+    g += `<text class="isa-cap" x="260" y="624">all of it · in context · every turn</text></g>`;
+    // the same file, inlined: a short plan, skills on demand, agents on a smaller model
+    [
+      ["core", 76, 100, "PROMPT · ALWAYS LOADED"],
+      ["skill", 192, 220, "## skill: · BODY LOADS WHEN INVOKED"],
+      ["agent", 428, 160, "## agent: · OWN CONTEXT · SMALLER MODEL"],
+    ].forEach(([r, y, ht, t]) => (g += `<g class="isa-sec ${r}"><rect x="540" y="${y}" width="520" height="${ht}" rx="10"/><text x="556" y="${y + 24}">${esc(t)}</text></g>`));
+    g += `<text class="isa-cap" x="800" y="624">one Markdown file · blocks extracted at runtime</text>`;
+    BLK.forEach(([r, a, b, ht], i) => {
+      g += `<g class="isa-blk ${r}" id="isaB${i}" transform="translate(${AX} ${AY[i]})"><rect class="b" x="0" y="0" width="${AW}" height="${ht}" rx="8"/>`;
+      for (let j = 0; 44 + j * 12 < ht - 6; j++) g += `<rect class="ln" x="16" y="${40 + j * 12}" width="${Math.round((AW - 32) * (0.55 + ((i * 3 + j * 5) % 9) / 22))}" height="5" rx="2.5"/>`;
+      g += `<text class="n a" x="16" y="30">${esc(a)}</text><text class="n b" x="16" y="30" opacity="0">${esc(b)}</text><text class="tg" x="${BW - 16}" y="30" opacity="0">${TAG[r]}</text></g>`;
+    });
+    // context per turn: the whole prompt on a large model, then core plus what each turn needs
+    [
+      [76, 270, "BEFORE · whole prompt, every turn"],
+      [362, 274, "AFTER · defer skills, delegate jobs"],
+    ].forEach(([y, ht, t]) => (g += `<g class="isa-box"><rect class="isa-card" x="1100" y="${y}" width="504" height="${ht}" rx="12"/><text class="isa-t" x="1116" y="${y + 28}">${esc(t)}</text></g>`));
+    const stack = (blocks, base, sm) => {
+      let y = base,
+        s = "";
+      blocks.forEach(k => {
+        const ht = BLK[k][3] * S;
+        y -= ht;
+        s += `<rect class="isa-seg ${BLK[k][0]}${sm ? " sm" : ""}" x="0" y="${y.toFixed(1)}" width="50" height="${ht.toFixed(1)}"/>`;
+      });
+      return s;
+    };
+    TURNS.forEach(([blocks, sm], i) => {
+      const x = barX(i);
+      g += `<g class="isa-bar bef" id="isaPb${i}" transform="translate(${x} ${BASE[0]}) scale(1 0)"><g transform="translate(0 ${-BASE[0]})">${stack([0, 1, 2, 3, 4, 5], BASE[0], 0)}</g></g>`;
+      g += `<text class="isa-ml bef" id="isaMb${i}" x="${x + 25}" y="${BASE[0] + 24}">large</text>`;
+      g += `<rect class="isa-ghost" x="${x}" y="${BASE[1] - 180}" width="50" height="180"/>`;
+      g += `<g class="isa-bar aft" id="isaPa${i}" transform="translate(${x} ${BASE[1]}) scale(1 0)"><g transform="translate(0 ${-BASE[1]})">${stack(blocks, BASE[1], sm)}</g></g>`;
+      g += `<text class="isa-ml aft${sm ? " sm" : ""}" id="isaMa${i}" x="${x + 25}" y="${BASE[1] + 24}">${sm ? "small" : "large"}</text>`;
+    });
+    g += `<g class="isa-take" id="isaTake"><rect x="28" y="260" width="464" height="216" rx="12" fill="#0d1117"/><text class="b" x="260" y="318">Less upfront context.</text><text class="b" x="260" y="358">Right-sized models.</text>`;
+    g += `<text class="s" x="260" y="412" fill="#79c0ff">skills load when needed</text><text class="s" x="260" y="442" fill="#ffa657">small models handle narrow jobs</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg isa-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id);
+    const blks = BLK.map((_, i) => {
+      const el = $("isaB" + i);
+      return { el, rect: el.querySelector("rect.b"), lines: el.querySelectorAll(".ln"), a: el.querySelector(".n.a"), b: el.querySelector(".n.b"), tg: el.querySelector(".tg") };
+    });
+    const bef = TURNS.map((_, i) => [$("isaPb" + i), $("isaMb" + i)]),
+      aft = TURNS.map((_, i) => [$("isaPa" + i), $("isaMa" + i)]);
+    const grow = ([bar, label], i, f, base) => {
+      bar.setAttribute("transform", `translate(${barX(i)} ${base}) scale(1 ${f.toFixed(3)})`);
+      label.classList.toggle("on", f > 0.5);
+    };
+    // step 0: the monolith on every turn; 1: the same file inlined; 2: one run, turn by turn
+    const SPLIT = 1300,
+      T_AFT = 900,
+      T_TURN = 800;
+    let step = 0,
+      at = null,
+      last = 0,
+      q = 0,
+      instant = false,
+      played = new Set();
+    const once = (k, fn) => {
+      if (!played.has(k)) {
+        played.add(k);
+        fn();
+      }
+    };
+    // Measured on gh-aw; refresh/inlined-skills-agents.mjs reproduces this snapshot.
+    const EXAMPLES = [
+      ["code-simplifier", 4, 2, "Haiku 4.5", 28, 30],
+      ["pr-code-quality-reviewer", 1, 1, "model: small", 948, 1093],
+      ["github-mcp-tools-report", 1, 2, "model: small", 6, 6],
+    ];
+    const measured = h(
+      "div",
+      { class: "isa-measured", role: "region", "aria-label": "Measured inline skills and agents usage on gh-aw" },
+      h("div", { class: "isa-inventory" }, h("b", {}, "41 / 291 AWs"), h("p", {}, "with inline blocks"), h("p", {}, "21 skills · 62 agents"), h("p", {}, h("em", {}, "5 workflows use both"))),
+      EXAMPLES.map(([name, skills, agents, model, succeeded, total]) =>
+        h(
+          "div",
+          { class: "isa-example" },
+          h("h3", {}, name),
+          h("p", {}, h("span", { class: "skills" }, `${skills} skill${skills === 1 ? "" : "s"}`), " · ", h("span", { class: "agents" }, `${agents} agent${agents === 1 ? "" : "s"}`)),
+          h("p", {}, model),
+          h("b", { class: "runs" }, `${succeeded.toLocaleString("en-US")} / ${total.toLocaleString("en-US")}`, " ", h("small", {}, "runs succeeded"))
+        )
+      )
+    );
+    slides.push({
+      group: "cost",
+      notes:
+        "Inlined skills and agents: the workflow, prompt sections, turns and bar heights in the diagram are illustrative and synthetic, not measured savings. The bars show instruction context only, omitting conversation history, tool results and skill descriptions; they are not a billing estimate. A monolithic prompt puts every instruction in context from the start: the plan, label taxonomy, triage checklist, report template and instructions for side jobs. Split the same Markdown file without creating new files. Keep the main prompt as a short plan. Move verbose checklists, taxonomies and templates into ## skill: blocks: at runtime they are extracted to the engine's skill folder, so the agent sees a short description up front and loads a body only when needed. Loaded skill instructions remain in the conversation; they are not automatically unloaded after a turn. Move narrow jobs into ## agent: blocks with their own context and model front matter. Explicitly select a smaller model for suitable jobs while the main model keeps the decisions. Deferred skills reduce upfront context and delegation can lower inference cost; actual savings depend on pricing, caching and delegation overhead. The bottom strip is measured on gh-aw, snapshot 17 November 2026: 41 of 291 top-level non-smoke workflow Markdown files on main directly declare inline blocks, 13 with skills, 33 with agents, 5 with both; 21 skill blocks and 62 agent blocks. Shared imports and smoke tests are excluded. Code Simplifier declares four language skills and two Haiku 4.5 agents, scope-filter and simplification-scout. PR Code Quality Reviewer declares the review-publication skill and the grumpy-coder agent with model: small. GitHub MCP Tools Report declares its guidelines skill and two model: small agents, tool-list-diff and tool-doc-writer. In the 30 complete UTC days from 18 October to 16 November 2026, their Actions runs succeeded 28 of 30, 948 of 1,093 and 6 of 6 respectively. These are whole-workflow conclusions, not skill or sub-agent invocation counts or evidence of measured savings. Current declarations were not necessarily present in every historical run. Keys: → split the prompt, → run the turns.",
+      enter(dir) {
+        step = dir < 0 ? 2 : 0;
+        instant = dir < 0;
+        q = instant ? 1 : 0;
+        at = null;
+        last = 0;
+        played = new Set();
+      },
+      onNext() {
+        if (step >= 2) return false;
+        step++;
+        instant = false;
+        at = null;
+        if (step === 1) sfx.compile();
+        return true;
+      },
+      onPrev() {
+        if (!step) return false;
+        step--;
+        instant = true;
+        at = null;
+        return true;
+      },
+      tick(t) {
+        if (at === null) at = t;
+        const dt = last ? Math.min(50, t - last) : 0,
+          e = t - at;
+        last = t;
+        svg.classList.toggle("s1", step >= 1);
+        svg.classList.toggle("s2", step >= 2);
+        $("isaMono").classList.toggle("on", step === 0);
+        $("isaLane0").classList.toggle("on", step === 0);
+        $("isaLane1").classList.toggle("on", step >= 1);
+        $("isaLane2").classList.add("on");
+        // the blocks glide between the monolith and their inlined sections
+        q = clamp(q + ((step >= 1 ? 1 : -1) * dt) / SPLIT);
+        blks.forEach((b, i) => {
+          const p = ease(clamp((q * SPLIT - i * 90) / (SPLIT - 5 * 90))),
+            x = AX + (BX - AX) * p,
+            y = AY[i] + (BLK[i][4] - AY[i]) * p;
+          b.el.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+          b.rect.setAttribute("width", (AW + (BW - AW) * p).toFixed(1));
+          b.rect.setAttribute("height", (BLK[i][3] + (BH - BLK[i][3]) * p).toFixed(1));
+          const fade = clamp(1 - p * 2);
+          b.lines.forEach(l => l.setAttribute("opacity", fade));
+          b.a.setAttribute("opacity", clamp(1 - p * 1.6));
+          b.b.setAttribute("opacity", clamp(p * 1.6 - 0.6));
+          b.tg.setAttribute("opacity", clamp(p * 1.6 - 0.6));
+        });
+        // before: the whole prompt rides along on every turn
+        bef.forEach((x, i) => {
+          const f = step >= 1 || instant ? 1 : ease(clamp((e - 300 - i * 450) / 350));
+          grow(x, i, f, BASE[0]);
+          if (f > 0 && !instant && step === 0) once("b" + i, () => sfx.pop(i));
+        });
+        // after: separate sub-agent contexts, with skills accumulating in the main conversation
+        const k = step === 2 && !instant ? Math.floor((e - T_AFT) / T_TURN) : -1;
+        aft.forEach((x, i) => {
+          const f = step < 2 ? 0 : instant ? 1 : ease(clamp((e - T_AFT - i * T_TURN) / 400));
+          grow(x, i, f, BASE[1]);
+          if (f > 0 && !instant) once("a" + i, () => sfx.pop(2 + i));
+        });
+        const hot = new Set(k >= 0 && k < TURNS.length ? TURNS[k][0] : []);
+        blks.forEach((b, i) => {
+          const on = hot.has(i);
+          if (b.el.classList.contains("hot") !== on) {
+            b.el.classList.toggle("hot", on);
+            b.tg.textContent = (on ? HOT : TAG)[BLK[i][0]];
+          }
+        });
+        const take = step === 2 && (instant || e >= T_AFT + TURNS.length * T_TURN);
+        if (take && !$("isaTake").classList.contains("on") && !instant) sfx.key();
+        $("isaTake").classList.toggle("on", take);
+      },
+      el: h(
+        "section",
+        { class: "slide isa" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Progressive disclosure · right-sized models"), h("h2", {}, letters("Inlined", "l-grad"), " ", letters("Skills & Agents"))),
+        svg,
+        measured,
+        h(
+          "p",
+          { class: "isa-caption" },
+          "MEASURED · runs 18 Oct–16 Nov 2026 UTC (30 d) · source snapshot 17 Nov · direct declarations; smoke tests & imports excluded",
+          h("br"),
+          "Workflow success ≠ skill invocation or measured savings · diagram illustrative"
+        )
+      ),
+    });
+  }
+
   // Agents that debug agents: any agent calls the agentic-workflows MCP server; logs, audit and audit-diff read runs as unified sessions to debug, audit and optimize other agents
   {
     const AG = pickAgent();
@@ -10092,6 +10427,339 @@
     });
   }
 
+  // Fuzzy schedules: 111 daily workflows pinned to 0 0 * * * spike in one minute, then scatter to their measured hashed times (hours 00–01 skipped, 02–05 preferred, quarter-hour minutes avoided); All You Can Eat wakes every 30 minutes and skips while its one plate is open
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // MEASURED: compiled UTC hour and minute of gh-aw's 111 `daily` / `daily on weekdays` workflows, snapshot 17 Nov 2026 (refresh/fuzzy-schedules.sh)
+    const HOURS = [0, 0, 7, 13, 8, 17, 4, 3, 7, 4, 3, 6, 3, 2, 4, 5, 0, 3, 5, 3, 6, 1, 3, 4];
+    const MINS = [0, 0, 0, 0, 0, 2, 4, 7, 3, 4, 0, 6, 0, 0, 0, 0, 0, 0, 0, 5, 5, 6, 1, 5, 4, 2, 8, 0, 0, 0, 0, 0, 0, 0, 1, 3, 4, 5, 5, 4, 5, 5, 0, 0, 0, 0, 0, 0, 0, 4, 3, 4, 1, 2, 3, 0, 0, 0, 0, 0];
+    const N = HOURS.reduce((a, b) => a + b, 0);
+    const X0 = 30,
+      CW = 34,
+      AX = 470,
+      MW = 13.6,
+      MB = 580,
+      cx = hr => X0 + hr * CW + CW / 2;
+    // spike: every dot in the 00:00 column; fuzzy: each dot in its measured hour column
+    const SPOT = [],
+      FPOT = [];
+    HOURS.forEach((n, hr) => {
+      for (let j = 0; j < n; j++) FPOT.push([cx(hr) + (j % 2 ? 6.5 : -6.5), AX - 9 - Math.floor(j / 2) * 13]);
+    });
+    for (let k = 0; k < N; k++) SPOT.push([cx(0) + ((k % 3) - 1) * 10, AX - 8 - Math.floor(k / 3) * 10]);
+    let g = `<defs><pattern id="fzsHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2814"/><line x1="0" y1="0" x2="0" y2="8" stroke="#db6d28" stroke-width="2" opacity=".55"/></pattern>
+      <clipPath id="fzsClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
+    // left: the schedule line, its mode, and the hash that picks a stable time
+    g += `<text class="fzs-lbl" x="0" y="16">SCHEDULE · ${N} DAILY WORKFLOWS</text>`;
+    g += `<text class="fzs-code fix" x="0" y="58">schedule: "0 0 * * *"</text><text class="fzs-code fuz" x="0" y="58">schedule: daily</text>`;
+    g += `<text class="fzs-mode fix" x="846" y="56">FIXED · one minute for all</text><text class="fzs-mode fuz" x="846" y="56">FUZZY · hashed per workflow</text>`;
+    g += `<text class="fzs-hash" x="0" y="98">hash(owner/repo/.github/workflows/x.md) → 04:37 UTC · stable</text>`;
+    // fuzzy windows: 00–01 never chosen, 02–05 weighted ×3
+    g += `<g class="fzs-band no"><rect x="${X0}" y="128" width="${2 * CW}" height="${AX - 124}" rx="6"/><text x="${X0 + CW}" y="150">00–01</text><text x="${X0 + CW}" y="168">skipped</text></g>`;
+    g += `<g class="fzs-band best"><rect x="${X0 + 2 * CW}" y="128" width="${4 * CW}" height="${AX - 124}" rx="6"/><text x="${X0 + 4 * CW}" y="150">02–05 UTC</text><text x="${X0 + 4 * CW}" y="168">preferred ×3</text></g>`;
+    // more syntaxes, each with a real compiled cron from a gh-aw lock file; only `every N days` and raw cron stay fixed
+    const SYN = [
+      ["every 30 minutes", "27/30 * * * *", "start minute"],
+      ["hourly", "24 */1 * * *", "minute"],
+      ["every 6h", "25 */6 * * *", "minute"],
+      ["daily on weekdays", "11 14 * * 1-5", "time · Mon–Fri"],
+      ["daily around 10:00", "22 10 * * *", "±1 h window"],
+      ["weekly on monday", "22 3 * * 1", "time"],
+      ["every 7 days", "0 0 */7 * *", "FIXED", 1],
+    ];
+    g += `<g class="fzs-syn"><text class="h" x="290" y="150">MORE SYNTAX → COMPILED</text><text class="h t" x="846" y="150">SCATTERED</text>`;
+    SYN.forEach(([src, cron, what, fix], i) => {
+      const y = 178 + i * 25;
+      g += `<g${fix ? ' class="fix"' : ""}><text class="s" x="290" y="${y}">${src}</text><text class="a" x="474" y="${y}">→</text><text x="498" y="${y}">${cron}</text><text class="t" x="846" y="${y}">${what}</text></g>`;
+    });
+    g += `</g>`;
+    g += `<line class="fzs-axis" x1="${X0}" y1="${AX + 4}" x2="${X0 + 24 * CW}" y2="${AX + 4}"/>`;
+    for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzs-hr" x="${cx(hr)}" y="494">${String(hr).padStart(2, "0")}</text>`;
+    g += `<text class="fzs-hr" x="${X0 + 24 * CW}" y="494" text-anchor="end">UTC hour</text>`;
+    HOURS.forEach((n, hr) => {
+      if (n) g += `<text class="fzs-n" x="${cx(hr)}" y="${AX - 9 - (Math.ceil(n / 2) - 1) * 13 - 14}">${n}</text>`;
+    });
+    for (let k = 0; k < N; k++) g += `<circle class="fzs-dot" r="4.5" cx="${SPOT[k][0]}" cy="${SPOT[k][1]}" opacity="0"/>`;
+    g += `<g class="fzs-spike" id="fzsS"><line x1="${cx(0) + 20}" y1="104" x2="104" y2="104"/><text x="112" y="110">${N} runs · 00:00 UTC · the same minute</text><text class="d" x="112" y="136">→ token-API bursts · rate limits · queued runners</text></g>`;
+    // minute ruler: avoided zones hatched, measured minutes as bars
+    g += `<g class="fzs-min"><text x="${X0 + 24 * CW}" y="520" text-anchor="end">minute · hatched = avoided: hour edges · US :15 :45 · EU :30</text>`;
+    for (const [a, b] of [[0, 4], [12, 18], [27, 33], [42, 48], [55, 59]]) g += `<rect class="no" x="${X0 + a * MW}" y="530" width="${(b - a + 1) * MW}" height="${MB - 530}" rx="3"/>`;
+    MINS.forEach((n, m) => {
+      if (n) g += `<rect class="b" x="${X0 + m * MW + 2}" y="${MB - n * 6}" width="${MW - 4}" height="${n * 6}" rx="2"/>`;
+    });
+    g += `<line class="fzs-axis" x1="${X0}" y1="${MB + 2}" x2="${X0 + 60 * MW}" y2="${MB + 2}"/>`;
+    for (const m of [0, 15, 30, 45]) g += `<text x="${X0 + m * MW + MW / 2}" y="602" text-anchor="middle">:${String(m).padStart(2, "0")}</text>`;
+    g += `</g>`;
+    // right: the All You Can Eat loop
+    const RX = 950,
+      CH = 10.8;
+    g += `<text class="fzs-lbl" x="${RX}" y="16">ALL YOU CAN EAT · ONE PLATE AT A TIME</text>`;
+    g += `<rect class="fzs-card" x="${RX - 20}" y="34" width="670" height="184" rx="14"/>`;
+    const Y = [
+      [0, `<tspan class="k">on:</tspan>`],
+      [2, `<tspan class="k">schedule:</tspan> every 30 minutes`],
+      [2, `<tspan class="k">skip-if-match:</tspan> <tspan class="s">'is:issue is:open</tspan>`],
+      [4, `<tspan class="s">"gh-aw-workflow-id: ideas" in:body'</tspan>`],
+      [0, `<tspan class="k">safe-outputs:</tspan>`],
+      [2, `<tspan class="k">create-issue:</tspan> { <tspan class="h">max: 1</tspan>, <tspan class="h">expires: 7</tspan> }`],
+    ];
+    Y.forEach(([ind, s], i) => (g += `<text class="fzs-yaml" x="${RX + ind * CH}" y="${66 + i * 27}">${s}</text>`));
+    g += `<g class="fzs-plate" id="fzsP"><rect x="${RX - 20}" y="248" width="590" height="92" rx="12"/><g id="fzsPi"></g><text class="fzs-pt" id="fzsPt" x="${RX + 30}" y="286"></text><text class="fzs-ps" id="fzsPs" x="${RX + 30}" y="318"></text></g>`;
+    g += `<g class="fzs-mona" id="fzsM"><circle cx="1572" cy="294" r="30" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="1545" y="267" width="54" height="54" clip-path="url(#fzsClip)"/></g>`;
+    g += `<text class="fzs-learn" id="fzsL" x="${RX - 20}" y="374"></text>`;
+    // timeline: a tick every 30 minutes; runs only when no plate is open
+    const TX = i => RX + 10 + i * 56,
+      TY = 440;
+    g += `<text class="aex-d" x="${RX - 20}" y="${TY - 30}">every 30 min</text><line class="fzs-line" x1="${RX - 20}" y1="${TY}" x2="1610" y2="${TY}"/>`;
+    for (let i = 0; i < 12; i++) g += `<g class="fzs-tick" id="fzsT${i}"><circle cx="${TX(i)}" cy="${TY}" r="12"/><text x="${TX(i)}" y="${TY + 34}"></text></g>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="530"><tspan fill="#79c0ff">● run</tspan> → serve one plate · <tspan fill="#9198a1">◌ skip</tspan> → pre-activation, 0 tokens</text>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="560"><tspan fill="#ab7df8">completed</tspan> → more like it · <tspan fill="#9198a1">not planned</tspan> → never again</text>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="590"><tspan class="h" fill="#ffa657">expires: 7</tspan> → a forgotten plate never stalls the loop</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg fzs-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dots = [...svg.querySelectorAll(".fzs-dot")];
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2),
+      clamp = u => Math.max(0, Math.min(1, u));
+    // [title, run tick, close tick, outcome]; illustrative plates served one at a time
+    const PLATES = [
+      ["Cache search results", 0, 2, "done"],
+      ["Retry every fetch three times", 3, 6, "np"],
+      ["Split the 2,000-line parser", 7, 9, "done"],
+      ["Index docs headings", 10, 99, ""],
+    ];
+    const LEARN = { done: "", np: "learned · cache-memory: no blanket retries" };
+    const T = i => 800 + i * 1050,
+      CLOSE = i => T(i) + 500,
+      FUZ = 4200,
+      CYC = 15000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      shown = -1;
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      shown = -1;
+      svg.classList.remove("fuz");
+      svg.querySelectorAll(".on, .run, .skip, .now, .done").forEach(x => x.classList.remove("on", "run", "skip", "now", "done"));
+      svg.querySelectorAll(".fzs-tick text").forEach(x => (x.textContent = ""));
+    };
+    slides.push({
+      group: "engineering",
+      key: "schedules",
+      notes:
+        "Fuzzy schedules. The left half is measured on gh-aw itself, snapshot 17 Nov 2026: the compiled cron of the 111 workflows written as schedule: daily or daily on weekdays, by UTC hour and minute. The spike is illustrative: the same 111 workflows if each were pinned to 0 0 * * *. Fixed crons collide: every repo that copies a midnight schedule fires in the same minute, which bursts the token API, hits rate limits, queues runners and, in gh-aw's own history, silently lost safe-output writes. gh-aw compiles daily to a stable time per workflow: two hashes of the workflow path pick the hour and the minute, so each workflow keeps its time across recompiles while the fleet spreads out. Hours 00 and 01 UTC are never chosen; 02 to 05 UTC are weighted three times as likely, the quiet hours for most teams; minutes avoid the hour edges, the US :15 and :45 and the EU :30 peaks. Measured: 45 of 111 land in 02 to 05, none at 00 or 01, none within three minutes of a quarter hour, 98 distinct times. Variants: daily around 14:00 picks inside a one-hour window, daily between 9:00 and 17:00 a custom window, on weekdays adds Monday to Friday; the table shows real compiled crons from gh-aw lock files: every 30 minutes scatters its start minute, hourly and every 6h scatter the minute, daily on weekdays adds Monday to Friday, daily around 10:00 stays within an hour of ten, weekly on monday scatters the time; only every N days and raw cron stay fixed, every 7 days still fires at midnight. The right half is an illustrative All You Can Eat loop with synthetic issues. The workflow wakes every 30 minutes, but skip-if-match searches for its own open issue by the gh-aw-workflow-id marker in pre-activation, so a tick with a plate on the table costs no tokens. When Mona closes the plate, the next tick serves one more. The close reason is the feedback: completed means more like it, not planned means never again, kept in cache-memory for the next run. max: 1 keeps one plate at a time, and expires: 7 closes a forgotten plate so the loop never stalls.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        // left: drop into the spike, then fly to the hashed hours
+        const fz = u >= FUZ;
+        for (let k = 0; k < N; k++) {
+          const d = dots[k];
+          if (!fz) {
+            const p = clamp((u - k * 5) / 300);
+            d.setAttribute("cx", SPOT[k][0]);
+            d.setAttribute("cy", SPOT[k][1] - (1 - ease(p)) * 60);
+            d.setAttribute("opacity", p);
+          } else {
+            const p = ease(clamp((u - FUZ - k * 8) / 900));
+            d.setAttribute("cx", SPOT[k][0] + (FPOT[k][0] - SPOT[k][0]) * p);
+            d.setAttribute("cy", SPOT[k][1] + (FPOT[k][1] - SPOT[k][1]) * p);
+            d.setAttribute("opacity", 1);
+          }
+        }
+        if (u >= 1200)
+          fire("spike", () => {
+            $("fzsS").classList.add("on");
+            sfx.block();
+          });
+        if (fz)
+          fire("fuz", () => {
+            svg.classList.add("fuz");
+            sfx.compile();
+          });
+        // right: ticks run only when no plate is open
+        let open = -1,
+          last = -1;
+        for (let i = 0; i < 12; i++) {
+          if (u < T(i)) break;
+          last = i;
+          const p = PLATES.findIndex(([, r]) => r === i);
+          const el = $("fzsT" + i);
+          if (!el.classList.contains("run") && !el.classList.contains("skip")) {
+            el.classList.add(p >= 0 ? "run" : "skip");
+            el.querySelector("text").textContent = p >= 0 ? "run" : "skip";
+            fire("t" + i, () => (p >= 0 ? sfx.key(0.6) : sfx.step()));
+          }
+          if (p >= 0) open = p;
+        }
+        svg.querySelectorAll(".fzs-tick.now").forEach(x => x.classList.remove("now"));
+        if (last >= 0) $("fzsT" + last).classList.add("now");
+        if (open >= 0) {
+          const [title, , cl, out] = PLATES[open];
+          const closed = u >= CLOSE(cl);
+          const st = closed ? out : "open";
+          const key = open + st;
+          if (shown !== key) {
+            shown = key;
+            const P = $("fzsP"),
+              col = { open: "#79c0ff", done: "#ab7df8", np: "#9198a1" }[st];
+            P.classList.add("on");
+            P.classList.toggle("done", closed);
+            P.style.setProperty("--c", col);
+            $("fzsPi").innerHTML = ico(st === "np" ? "xCircle" : "issue", RX + 4, 294, 26, col);
+            $("fzsPt").textContent = "[ideas] " + title;
+            $("fzsPs").textContent = { open: "open · the next ticks skip", done: "closed · completed → serve more like it", np: "closed · not planned → never again" }[st];
+            $("fzsM").classList.toggle("on", closed);
+            if (closed) {
+              const L = $("fzsL");
+              if (LEARN[out]) {
+                L.textContent = LEARN[out];
+                L.classList.add("on");
+              }
+              sfx.pop(open);
+            }
+          }
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide fzs" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · hashed scatter · skip-if-match · All You Can Eat"), h("h2", {}, letters("Fuzzy "), letters("schedules", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "Spread the load, serve on demand"), " · daily → a stable hashed time · skip-if-match → one open plate"),
+        h("div", { class: "fzs-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${N} fuzzy daily workflows by compiled UTC hour and minute · spike and plates illustrative`)
+      ),
+    });
+  }
+
+  // Week of daily runs: measured heat map of every daily-schedule workflow by weekday and compiled UTC hour; 00–01 empty, 02–05 busiest, weekends lighter
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    // MEASURED: runs per weekday (Mon..Sun) and UTC hour of gh-aw's 144 workflows whose schedule starts with `daily`, snapshot 17 Nov 2026 (refresh/week-of-daily-runs.sh)
+    const WD = [0, 0, 8, 13, 8, 17, 4, 7, 9, 7, 7, 11, 6, 5, 11, 6, 0, 3, 5, 3, 6, 1, 3, 4],
+      WE = [0, 0, 7, 11, 8, 15, 4, 5, 7, 6, 4, 7, 4, 2, 4, 4, 0, 3, 5, 3, 6, 1, 1, 4];
+    const GRID = [WD, WD, WD, WD, WD, WE, WE],
+      DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      W = 144,
+      WKD = 33;
+    const MAX = Math.max(...GRID.flat()),
+      RUNS = GRID.flat().reduce((a, b) => a + b, 0),
+      TOT = GRID.map(r => r.reduce((a, b) => a + b, 0)),
+      top = WD.indexOf(MAX);
+    const X0 = 80,
+      Y0 = 70,
+      CW = 52,
+      RH = 56,
+      cx = hr => X0 + hr * CW,
+      ry = d => Y0 + d * RH;
+    let g = `<defs><pattern id="fzwHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2814"/><line x1="0" y1="0" x2="0" y2="8" stroke="#db6d28" stroke-width="2" opacity=".55"/></pattern></defs>`;
+    g += `<text class="fzw-lbl" x="0" y="16">${W} DAILY WORKFLOWS · RUNS BY WEEKDAY AND UTC HOUR</text><text class="fzw-lbl" x="${VW}" y="16" text-anchor="end">RUNS / DAY</text>`;
+    GRID.forEach((row, d) => {
+      g += `<text class="fzw-day${d > 4 ? " we" : ""}" x="${X0 - 14}" y="${ry(d) + RH / 2 + 6}">${DAYS[d]}</text>`;
+      row.forEach((v, hr) => {
+        const a = v ? 0.12 + 0.88 * (v / MAX) : 0;
+        g += `<g class="fzw-c${v / MAX > 0.55 ? " hi" : ""}" data-h="${hr}"><rect x="${cx(hr) + 2}" y="${ry(d) + 2}" width="${CW - 4}" height="${RH - 4}" rx="6" fill="${v ? `rgba(68,147,248,${a.toFixed(2)})` : "#0d1117"}"/>${v ? `<text x="${cx(hr) + CW / 2}" y="${ry(d) + RH / 2 + 6}">${v}</text>` : ""}</g>`;
+      });
+      g += `<g class="fzw-sum${d > 4 ? " we" : ""}"><rect x="${VW - 210}" y="${ry(d) + 14}" width="0" height="${RH - 28}" rx="4"/><text x="${VW - 200}" y="${ry(d) + RH / 2 + 6}">0</text></g>`;
+    });
+    const GB = ry(7);
+    for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzw-hr" x="${cx(hr) + CW / 2}" y="${GB + 24}">${String(hr).padStart(2, "0")}</text>`;
+    g += `<text class="fzw-hr" x="${cx(23) + CW / 2}" y="${GB + 24}">UTC</text>`;
+    // fuzzy windows from schedule_fuzzy_scatter.go: 00–01 never chosen, 02–05 weighted ×3
+    g += `<g class="fzw-band no"><rect x="${cx(0) + 1}" y="${Y0}" width="${2 * CW - 2}" height="${7 * RH}" rx="6"/><text x="${cx(1)}" y="${Y0 - 12}">00–01 never</text></g>`;
+    g += `<g class="fzw-band best"><rect x="${cx(2)}" y="${Y0 - 2}" width="${4 * CW}" height="${7 * RH + 4}" rx="8"/><text x="${cx(4)}" y="${Y0 - 12}">02–05 preferred ×3</text></g>`;
+    g += `<g class="fzw-top"><rect x="${cx(top) - 1}" y="${ry(0) - 1}" width="${CW + 2}" height="${5 * RH + 2}" rx="8"/></g>`;
+    g += `<g class="fzw-ph"><rect x="${X0}" y="${Y0 - 4}" width="${CW}" height="${7 * RH + 8}" rx="8"/><text x="${X0 + CW / 2}" y="${Y0 - 12}">00</text></g>`;
+    g += `<g class="fzw-key"><text class="b" x="0" y="${GB + 74}">${RUNS} runs a week · busiest hour ${String(top).padStart(2, "0")} UTC: ${MAX} runs · 0 at 00–01 UTC</text><text x="0" y="${GB + 104}">weekends: ${TOT[0]} → ${TOT[5]} runs a day · ${WKD} workflows say daily on weekdays · lighter blue = fewer runs, blank = none</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg fzw-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    // a playhead steps one UTC hour at a time: that column switches on and every day's total bar and counter advance by the same hour
+    const STEP = 110,
+      LEAD = 450,
+      POST = 320,
+      BMAX = Math.max(...TOT),
+      cols = [...Array(24)].map((_, hr) => [...svg.querySelectorAll(`.fzw-c[data-h="${hr}"]`)]),
+      sums = [...svg.querySelectorAll(".fzw-sum")].map(s => [s.querySelector("rect"), s.querySelector("text")]),
+      ph = svg.querySelector(".fzw-ph"),
+      phText = ph.querySelector("text"),
+      cap = h("div", { class: "fzw-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${W} workflows with a daily schedule (plain, on weekdays, around) · first compiled cron · UTC`),
+      after = [".fzw-band.no", ".fzw-band.best", ".fzw-top", ".fzw-key"].map(s => svg.querySelector(s)).concat(cap);
+    let t0 = 0,
+      shown = -1,
+      revealed = 0;
+    const setHour = hr => {
+      cols.forEach((c, i) => c.forEach(e => (e.classList.toggle("on", i <= hr), e.classList.toggle("now", i === hr))));
+      GRID.forEach((row, d) => {
+        const n = row.slice(0, hr + 1).reduce((a, b) => a + b, 0),
+          bw = (n / BMAX) * 150;
+        sums[d][0].setAttribute("width", bw);
+        sums[d][1].setAttribute("x", VW - 200 + bw);
+        sums[d][1].textContent = n;
+      });
+      ph.setAttribute("transform", `translate(${Math.max(hr, 0) * CW} 0)`);
+      phText.textContent = String(Math.max(hr, 0)).padStart(2, "0");
+      ph.classList.toggle("on", hr >= 0 && hr < 24);
+      shown = hr;
+    };
+    const reveal = k => (after.forEach((e, i) => e.classList.toggle("on", i < k)), (revealed = k));
+    slides.push({
+      group: "engineering",
+      under: "schedules",
+      enter(dir) {
+        t0 = 0;
+        if (dir < 0) (setHour(23), cols[23].forEach(e => e.classList.remove("now")), ph.classList.remove("on"), reveal(after.length), (shown = 24));
+        else (setHour(-1), reveal(0));
+      },
+      tick(t) {
+        if (shown >= 24 && revealed >= after.length) return;
+        if (!t0) t0 = t;
+        const s = t - t0 - LEAD,
+          hr = Math.min(24, Math.floor(s / STEP));
+        if (hr > shown && hr >= 0) {
+          if (hr < 24) (setHour(hr), sfx.key(0.5));
+          else (cols[23].forEach(e => e.classList.remove("now")), ph.classList.remove("on"), (shown = 24));
+        }
+        if (shown >= 24) {
+          const k = Math.min(after.length, 1 + Math.floor((s - 24 * STEP) / POST));
+          if (k > revealed) (reveal(k), sfx.step());
+        }
+      },
+      notes: `Week of daily runs. Measured on gh-aw itself, snapshot 17 Nov 2026: every one of the ${W} workflows whose schedule starts with daily, plain, on weekdays or around a time, placed by its compiled cron on a week grid of weekday by UTC hour. Each cell counts runs. ${RUNS} runs a week and not one at 00 or 01 UTC: the fuzzy scatter never picks those hours. The 02 to 05 UTC columns are the busiest, ${MAX} runs at ${String(top).padStart(2, "0")} UTC on weekdays, because the scatter weights the quiet hours three times. Weekends drop from ${TOT[0]} to ${TOT[5]} runs a day: ${WKD} workflows say daily on weekdays, many of them daytime reports around a set hour, so Saturday and Sunday keep only the background work. No cell carries more than ${MAX} of ${W}: the fleet is spread across the day instead of firing in the same minute.`,
+      el: h(
+        "section",
+        { class: "slide fzw" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · 7 days × 24 UTC hours · measured"), h("h2", {}, letters("Week of "), letters("daily runs", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "No midnight, no stampede"), ` · ${W} daily workflows · at most ${MAX} in any hour · 00–01 UTC empty`),
+        cap
+      ),
+    });
+  }
   // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
   {
     const AG = pickAgent();
