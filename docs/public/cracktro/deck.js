@@ -3795,7 +3795,7 @@
     });
   }
 
-  // Define once: one standalone workflow; /add-operational-value prompt → adoption-time Markdown bands extracted into intent, evidence and guardrails → design agent proposes native measures → a human confirms the contract once → 1 primary measure + optional diagnostics → one verified, frozen deterministic value function
+  // Turn intent into measurement: adoption-time natural-language workflow intent becomes a frozen deterministic value function, defined once. One standalone workflow; /add-operational-value prompt → adoption-time Markdown bands extracted into intent, evidence and guardrails → design agent proposes native measures → a human confirms the contract once → 1 primary measure + optional diagnostics → one verified, frozen deterministic value function
   {
     resetIndex();
     // the real skill syntax with synthetic coordinates; [text, class] per line
@@ -3960,7 +3960,7 @@
     slides.push({
       group: "platform",
       notes:
-        "Define once. Illustrative: the repository, workflow, measures and code are synthetic. This example intentionally shows the standalone workflow path: /add-operational-value OWNER/REPO WORKFLOW-NAME designs exactly one workflow's Operational Value, and this design is the only LLM step. The design agent recovers the workflow as it was adopted, its Markdown, imports, deterministic precompute steps, triggers, skip rules and safe outputs, and extracts three things: the intent and the pre-existing repository problem behind it, the eligible opportunities and evidence the precompute already produces, and the guardrails and acceptance checks its outputs must pass. It inventories repository-native measures of that problem, ones a maintainer or any other tool could move too, and probes a pre-adoption baseline whenever history can reconstruct it. Workflow-native signals such as opened pull requests or runs are rejected as mechanism proxies. It forms one provisional contract and presents it once: exactly one primary measure in native units, any optional diagnostics, the evidence rule, cadence and maturation. The human confirms or corrects that whole design in a single exchange; there is no repeated approval loop. Only after confirmation does it generate, verify and freeze the output: one deterministic value function made of exactly one primary measure plus zero or more optional diagnostics. Diagnostics are reported beside the primary measure and are never averaged or added into it. The natural-language intent and the workflow Markdown end as that deterministic code: from here on no model chooses, scores or reinterprets anything.",
+        "Turn intent into measurement. Defined once, at adoption: the workflow's natural-language intent becomes a frozen, deterministic value function. Illustrative: the repository, workflow, measures and code are synthetic. This example intentionally shows the standalone workflow path: /add-operational-value OWNER/REPO WORKFLOW-NAME designs exactly one workflow's Operational Value, and this design is the only LLM step. The design agent recovers the workflow as it was adopted, its Markdown, imports, deterministic precompute steps, triggers, skip rules and safe outputs, and extracts three things: the intent and the pre-existing repository problem behind it, the eligible opportunities and evidence the precompute already produces, and the guardrails and acceptance checks its outputs must pass. It inventories repository-native measures of that problem, ones a maintainer or any other tool could move too, and probes a pre-adoption baseline whenever history can reconstruct it. Workflow-native signals such as opened pull requests or runs are rejected as mechanism proxies. It forms one provisional contract and presents it once: exactly one primary measure in native units, any optional diagnostics, the evidence rule, cadence and maturation. The human confirms or corrects that whole design in a single exchange; there is no repeated approval loop. Only after confirmation does it generate, verify and freeze the output: one deterministic value function made of exactly one primary measure plus zero or more optional diagnostics. Diagnostics are reported beside the primary measure and are never averaged or added into it. The natural-language intent and the workflow Markdown end as that deterministic code: from here on no model chooses, scores or reinterprets anything.",
       enter() {
         t0 = 0;
         snd = { p: 0, beat: new Set() };
@@ -4002,7 +4002,7 @@
       el: h(
         "section",
         { class: "slide aov" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Add Operational Value"), h("h2", { class: "pf-h" }, letters("Define "), letters("once.", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Define once · Add Operational Value"), h("h2", { class: "pf-h" }, letters("Turn intent into "), letters("measurement.", "l-grad"))),
         phone,
         md,
         xbox,
@@ -4016,7 +4016,7 @@
     });
   }
 
-  // Measure repeatedly: the frozen value function from Define once runs on cadence in a deterministic, LLM-free loop (window, collect evidence, evaluate the same code, publish) and each pass adds one repository outcome to CAO Value, diagnostics beside it
+  // Measure repeatedly: the frozen value function from Turn intent into measurement runs on cadence in a deterministic, LLM-free loop (window, collect evidence, evaluate the same code, publish) and each pass adds one repository outcome to CAO Value, diagnostics beside it
   {
     resetIndex();
     const fn = h(
