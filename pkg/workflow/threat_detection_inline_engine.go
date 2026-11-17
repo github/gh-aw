@@ -116,8 +116,14 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	if threatDetectionData.NetworkPermissions != nil {
 		detectionFirewall = threatDetectionData.NetworkPermissions.Firewall
 	}
+	allowed := getThreatDetectionAdditionalAllowedDomains(data, engineSetting)
+	if engineSetting == string(constants.CopilotEngine) && data.NetworkPermissions != nil &&
+		(slices.Contains(data.NetworkPermissions.Allowed, "node") || slices.Contains(data.NetworkPermissions.Allowed, "registry.npmjs.org")) &&
+		!slices.Contains(allowed, "registry.npmjs.org") {
+		allowed = append(allowed, "registry.npmjs.org")
+	}
 	threatDetectionData.NetworkPermissions = &NetworkPermissions{
-		Allowed:  getThreatDetectionAdditionalAllowedDomains(data, engineSetting),
+		Allowed:  allowed,
 		Firewall: detectionFirewall,
 	}
 	if data.NetworkPermissions != nil {
