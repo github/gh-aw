@@ -19,6 +19,7 @@ const slideNo = (heading: string) => {
 const CURRENT = '.dots button.on[aria-label^="Slide "]';
 const at = (n: number) => `Slide ${n}`;
 const SECURITY = slideNo("Security");
+const UNLOCK = slideNo("Enable experimentation. Contain the risk. Unlock transformation.");
 const HANDOFFS = slideNo("Event-driven Hand-offs");
 
 test.use({ reducedMotion: "reduce" });
@@ -184,10 +185,14 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
   await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
+  await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last slide of the band above
   await page.keyboard.press("ArrowLeft");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY - 1));
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(2));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("ArrowUp");
@@ -196,9 +201,11 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await page.keyboard.press("PageDown");
   await expect(count).toHaveAttribute("aria-label", at(2));
   await page.keyboard.press("PageDown");
+  await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
+  await page.keyboard.press("PageDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.keyboard.press("PageUp");
-  await expect(count).toHaveAttribute("aria-label", at(2));
+  await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
 });
 
 test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
@@ -279,9 +286,11 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await page.goto("/gh-aw/cracktro/#3");
   await expect(count).toHaveAttribute("aria-label", at(3));
   await nextBand.click();
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
   await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
   await expect(count).toHaveAttribute("aria-label", at(SECURITY + 2));
+  await prevBand.click();
+  await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
   await prevBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
   await prevBand.click();
@@ -297,7 +306,7 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await expect(count).toHaveAttribute("aria-label", at(3));
   await nextBand.focus();
   await page.keyboard.press("Enter");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
 
   // at 320px the four buttons, slide map, search and the sound toggle fit on one row without overlapping
   const boxes = await page.evaluate(() =>
@@ -322,7 +331,7 @@ test.describe("compact navigation on touch screens", () => {
     await page.getByRole("button", { name: "Next slide", exact: true }).tap();
     await expect(count).toHaveAttribute("aria-label", at(4));
     await page.getByRole("button", { name: "Next band", exact: true }).tap();
-    await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+    await expect(count).toHaveAttribute("aria-label", at(UNLOCK));
 
     // rapid taps: every touchend is cancelled (no synthetic click, no double-tap zoom), never reaches
     // the window swipe handlers, and moves exactly one band per tap

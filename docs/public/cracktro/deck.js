@@ -221,6 +221,30 @@
   .slide.fmm.fadeout { opacity: 1; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-copy > * { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-grid { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  /* Enable · Contain · Unlock: light concept band like trust/mindset; lines enter and leave alternately from the sides */
+  .ecu-copy { position: absolute; left: 0; right: 0; top: 190px; text-align: center; }
+  .ecu-copy h2 { margin: 34px 0 0; font-size: 120px; line-height: 1.12; color: #f0f6fc; letter-spacing: -.02em; font-variation-settings: "wght" 640, "wdth" 100; }
+  .ecu-l { display: block; }
+  .ecu-l b { position: relative; font-weight: inherit; }
+  .ecu-a b { color: #3fb950; }
+  .ecu-b b { margin: 0 .1em 0 .02em; padding: 0 .12em; color: #ff7b72; }
+  .ecu-b b::after { content: ""; position: absolute; inset: 14px 0 -2px; border: 5px solid currentColor; border-radius: 20px; }
+  .ecu-c b { background: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950) 0 0 / 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+  body.light .ecu-copy h2 { color: #1f2328; }
+  body.light .ecu-a b { color: #116329; }
+  body.light .ecu-b b { color: #cf222e; }
+  body.light .ecu-c b { background-image: linear-gradient(90deg, #116329, #0550ae, #8250df, #116329); }
+  .active .ecu-copy > .kicker, .active .ecu-l:nth-child(odd) { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .active .ecu-l:nth-child(even) { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both .5s; }
+  .active .ecu-l:nth-child(3) { animation-delay: 1s; }
+  .active .ecu-b b::after { animation: ecu-box .6s cubic-bezier(.3,1.5,.4,1) both 1.2s; }
+  .active .ecu-c b { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both 1s, ecu-shine 4s linear infinite 1.9s; }
+  @keyframes ecu-box { from { opacity: 0; transform: scale(1.7); } }
+  @keyframes ecu-shine { to { background-position: 300% 0; } }
+  .slide.ecu.up-in, .slide.ecu.down-in, .slide.ecu.leaving { animation: none; }
+  .slide.ecu.fadeout { opacity: 1; }
+  .ecu:is(.fadeout, .leaving) .ecu-copy > .kicker, .ecu:is(.fadeout, .leaving) .ecu-l:nth-child(odd) { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .ecu:is(.fadeout, .leaving) .ecu-l:nth-child(even) { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
   .tp { display: grid; place-items: center; }
   .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
   .tp-copy h2 { margin: 0; font-variation-settings: "wght" 520, "wdth" 100; letter-spacing: -.02em; }
@@ -3349,6 +3373,27 @@
         h("div", { class: "tv-kpis" }, kpis),
         h("div", { class: "tv-panels" }, panels),
         h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
+      ),
+    });
+  }
+
+  // Enable experimentation. Contain the risk. Unlock transformation.: the bridge from value to security, on the light concept-band background
+  {
+    resetIndex();
+    const line = (lead, key, tail, cls) => h("span", { class: `ecu-l ${cls}` }, lead, h("b", {}, key), tail);
+    slides.push({
+      group: "unlock",
+      notes:
+        "Enable experimentation. Contain the risk. Unlock transformation. Agentic workflows let every team try agents on real repository work, guardrails keep each experiment contained so a misbehaving agent cannot do damage, and the experiments that pay off can scale into how the organization builds software. Next: how the risk is contained.",
+      el: h(
+        "section",
+        { class: "slide ecu" },
+        h(
+          "div",
+          { class: "ecu-copy" },
+          h("div", { class: "kicker" }, "GitHub Agentic Workflows"),
+          h("h2", {}, line("Enable ", "experimentation", ".", "ecu-a"), " ", line("Contain the ", "risk", ".", "ecu-b"), " ", line("Unlock ", "transformation", ".", "ecu-c"))
+        )
       ),
     });
   }
@@ -19082,6 +19127,8 @@
       music: "platform",
       prog: [0, 5, 7, 2, -3],
     },
+    // Enable · Contain · Unlock: a concept slide, plain soft grey with no grid (light) like trust and mindset; rising chords into a bell cascade.
+    unlock: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: 0, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#8250df"], music: "transform", prog: [0] },
     // Security: the red wash, grid turned 45°, a dark drone and alarm.
     security: {
       base: [16, 2, 4],
@@ -19164,7 +19211,7 @@
     data: ["AW factory", "How gh-aw builds gh-aw"],
   };
   // Header-less rows of a single slide.
-  const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
+  const SOLO = { intro: "Title", unlock: "Unlock transformation", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
   // Bands that are not shipped product: every slide (header included) carries a corner badge.
   const PROTO = { cao: "gh cao" };
 
@@ -19398,6 +19445,22 @@
           osc("sine", 90 - i * 20, t + 1.5 + d, 0.25, 0.25, { f1: 40 });
         });
         bell(86, t + 1.62, 0.025, 1.4);
+      },
+      // enable · contain · unlock: one rising chord per line, a bolt shutting on "risk", then a bright unlocking cascade
+      transform: t => {
+        [
+          [48, 55, 64],
+          [50, 57, 65],
+          [53, 60, 69],
+        ].forEach((c, i) => {
+          tone(c[0] - 12, t + 0.3 + i * 0.6, { type: "sine", dur: 0.6, vol: 0.14, cutoff: 500 });
+          pad(c, t + 0.3 + i * 0.6, 0.9, 0.03, "triangle", 2200);
+        });
+        click(t + 1.25, 900, 0.12, 5);
+        osc("sine", 90, t + 1.25, 0.25, 0.22, { f1: 40 });
+        click(t + 1.55, 4200, 0.08, 3);
+        [72, 76, 79, 84, 88, 91].forEach((m, i) => bell(m, t + 1.6 + i * 0.07, 0.035, 1.4));
+        pad([48, 55, 64, 71, 76], t + 1.6, 2.4, 0.025, "triangle", 2600);
       },
       // factory mindset: rhythmic metallic machinery
       factory: t => {
