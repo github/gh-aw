@@ -146,7 +146,7 @@ func TestLogsOutcomePersistenceErrorsAndCancellation(t *testing.T) {
 	require.ErrorContains(t, writeOutcomeJSONL(path, 42, nil), "create adoption directory")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := collectLogsOutcomes(ctx, []ProcessedRun{{Run: WorkflowRun{Attempt: 1, DatabaseID: 42}}}, "", false)
+	_, err := collectLogsLifecycles(ctx, []ProcessedRun{{Run: WorkflowRun{Attempt: 1, DatabaseID: 42}}}, "", false, true)
 	require.ErrorIs(t, err, context.Canceled)
 }
 
