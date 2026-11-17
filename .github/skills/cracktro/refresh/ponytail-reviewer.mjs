@@ -31,8 +31,13 @@ const gh = async (args, tries = 5) => {
     }
   }
 };
-const pool = async (items, n, fn) => Promise.all(Array.from({ length: n }, async () => { while (items.length) await fn(items.shift()); }));
-const med = v => (v = v.filter(x => x != null).sort((x, y) => x - y)).length ? v[Math.floor((v.length - 1) / 2)] : null;
+const pool = async (items, n, fn) =>
+  Promise.all(
+    Array.from({ length: n }, async () => {
+      while (items.length) await fn(items.shift());
+    })
+  );
+const med = v => ((v = v.filter(x => x != null).sort((x, y) => x - y)).length ? v[Math.floor((v.length - 1) / 2)] : null);
 const inc = (o, k, n = 1) => (o[k] = (o[k] || 0) + n);
 
 // 1. Workflow runs (Actions API). A `created=` filter caps results at 1,000, so page newest-first and filter here.
@@ -76,7 +81,10 @@ await pool(windows, 4, async w => {
 const reviews = prs.flatMap(p => p.reviews);
 const threads = prs.flatMap(p => p.threads);
 const month = s => s.slice(0, 7);
-const lines = reviews.map(r => LINES.exec(r.body)).filter(Boolean).map(m => +m[1].replace(/,/g, ""));
+const lines = reviews
+  .map(r => LINES.exec(r.body))
+  .filter(Boolean)
+  .map(m => +m[1].replace(/,/g, ""));
 const aicByMonth = {};
 const modelByMonth = {};
 for (const r of reviews) {
@@ -99,7 +107,19 @@ const out = {
   reviewedMerged: prs.filter(p => p.merged).length,
   reviews: { total: reviews.length, byState: {}, byMonth: {} },
   linesClaimed: { reviews: lines.length, total: lines.reduce((s, x) => s + x, 0), median: med(lines) },
-  aicPerReview: { total: Math.round(reviews.map(r => AIC.exec(r.body)).filter(Boolean).reduce((s, m) => s + +m[1], 0)), medianByMonth: Object.fromEntries(Object.entries(aicByMonth).sort().map(([k, v]) => [k, med(v)])) },
+  aicPerReview: {
+    total: Math.round(
+      reviews
+        .map(r => AIC.exec(r.body))
+        .filter(Boolean)
+        .reduce((s, m) => s + +m[1], 0)
+    ),
+    medianByMonth: Object.fromEntries(
+      Object.entries(aicByMonth)
+        .sort()
+        .map(([k, v]) => [k, med(v)])
+    ),
+  },
   modelByMonth,
   findings: {
     total: threads.length,
