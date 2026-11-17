@@ -29,6 +29,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Zero-secret agents | illustrative | The agent runs in an isolated sandbox, here the experimental micro-VM runtime, holding no credentials; every key stays on the host behind the MCP gateway, API proxy and egress firewall. |
 | Supply chain hardening | illustrative | The compiler applies layered static checks, including trigger admission, expression safety, pinned actions, least privilege and secret scans, before any workflow runs. |
 | Safe outputs | illustrative | Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs. |
+| Model-checked | illustrative | A bounded TLA+ model of the compiled workflow lets TLC check every job schedule against security invariants; seeded faults must break exactly one invariant, and witnesses prove validated writes still happen, shown as a replayed counterexample and witness trace across the job lanes. |
 | Need-to-know enclaves | illustrative | Experimental: single-use, isolated enclave agents read private repositories and return only schema-constrained values, so private data cannot leak into public replies. |
 | Continuous Red Teaming | illustrative | A daily red-team agent keeps trying new ways to escape the agent firewall, and each escape it finds is turned into a firewall fix. |
 | Stop manually translating intent into code. |  | The factory mindset: engineer processes that create trusted features instead of hand-translating intent into code. |
@@ -56,6 +57,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Scan · Fix · Learn | illustrative | The .NET runtime team's CI health loop: a scanner files known build errors, a fixer attempts fixes, and a feedback agent tunes both. |
 | Spec-driven testing | illustrative | Agents keep specifications current from human intent and code changes, and an enforcer turns the specification into tests that guard the next change. |
 | Spec · Model · Test | illustrative | Specification requirements become TLA+ invariants; model checking explores every state, and its traces become conformance tests. |
+| Work queue, modeled | illustrative | The work queue is specified as TLA+ modules covering lifecycle, compare-and-swap publication on a git log, DAG and external gates; mutants must fail and witnesses must be reached. |
 | Docs that heal | illustrative | Small agents update, simplify and test documentation the way a newcomer reads it, then fix the gaps and teach the updater new rules. |
 | Multi-device tester | illustrative | A daily agent browses the documentation on phone, tablet and desktop viewports and files what breaks; Copilot fixes it, a developer reviews the pull request and the next run re-tests. |
 | Findings that land | illustrative | Docs auditor agents file what they find as issues; the findings handed to Copilot as one checkable defect get fixed by merged pull requests, while unassigned rolling reports mostly expire. |

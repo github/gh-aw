@@ -544,6 +544,83 @@
   .fv-rs { fill: #9198a1; font: 500 18px var(--mono); }
   .fv-tr { fill: #c9d1d9; font: 500 19px var(--mono); }
   .fv-chip { opacity: .35; transition: opacity .3s; } .fv-chip.on { opacity: 1; }
+  .tso { --lg: #79c0ff; }
+  .tso-svg { left: 60px; top: 290px; width: 1800px; height: 700px; }
+  .tso-svg .cb, .wqm-svg .cb { fill: #79c0ff; } .tso-svg .co, .wqm-svg .co { fill: #ffa657; } .tso-svg .cp, .wqm-svg .cp { fill: #d2a8ff; }
+  .tso-sw { opacity: 0; transition: opacity .35s; } .tso-sw.on { opacity: 1; }
+  .tso-lh { opacity: .3; transition: opacity .4s; } .tso-lh.on { opacity: 1; }
+  .tso-lh rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
+  .tso-ln { fill: #f0f6fc; font: 700 15px var(--mono); letter-spacing: .06em; }
+  .tso-lp { fill: #9198a1; font: 500 13px var(--mono); }
+  .tso-lg { stroke: #30363d; stroke-width: 1.5; stroke-dasharray: 2 6; }
+  .tso-te { fill: none; stroke: #3d444d; stroke-width: 2; opacity: 0; transition: opacity .3s, stroke .25s; } .tso-te.on { opacity: .9; }
+  .tso-te.ok { stroke: #4493f888; } .tso-te.bad { stroke: #ffa657; stroke-width: 3; stroke-dasharray: 6 4; } .tso-te.wit { stroke: #ab7df8; stroke-width: 3; }
+  .tso-td { fill: #161b22; stroke: #6e7681; stroke-width: 2; opacity: 0; transition: opacity .3s, fill .25s, stroke .25s; } .tso-td.on { opacity: 1; }
+  .tso-td.ok { stroke: #4493f8; } .tso-td.bad { fill: #db6d28; stroke: #ffa657; } .tso-td.wit { fill: #ab7df8; stroke: #d2a8ff; }
+  .tso-rl { fill: #6e7681; font: 500 14px var(--mono); opacity: 0; transition: opacity .3s, fill .25s; } .tso-rl.on { opacity: 1; }
+  .tso-rl.ok { fill: #9198a1; } .tso-rl.bad { fill: #ffa657; } .tso-rl.wit { fill: #d2a8ff; }
+  .tso-mk { font: 700 15px var(--mono); }
+  .tso-dot { fill: #ffa657; opacity: 0; filter: drop-shadow(0 0 8px #db6d2855); } .tso-dot.wit { fill: #d2a8ff; filter: drop-shadow(0 0 8px #ab7df855); }
+  .tso-k rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .3s; }
+  .tso-k.bad rect { stroke: #ffa657; stroke-dasharray: 10 6; } .tso-k.wit rect { stroke: #ab7df8; }
+  .tso-k text { fill: #9198a1; font: 600 21px var(--mono); } .tso-k .n { fill: #d2a8ff; }
+  .tso-kv { font: 700 21px var(--mono); }
+  .tso-fl { font: 600 16px var(--mono); letter-spacing: .08em; text-anchor: end; fill: #9198a1; }
+  .tso-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
+  .tso-inv { opacity: .25; transition: opacity .4s; } .tso-inv.on { opacity: 1; }
+  .tso-inv rect { fill: transparent; stroke: transparent; stroke-width: 2; transition: all .3s; }
+  .tso-inv.ok rect { fill: #4493f814; stroke: #4493f866; }
+  .tso-inv.bad rect { fill: #db6d2826; stroke: #ffa657; stroke-dasharray: 8 5; filter: drop-shadow(0 0 8px #db6d2844); }
+  .tso-in { fill: #f0f6fc; font: 700 19px var(--mono); }
+  .tso-ig { fill: #9198a1; font: 500 16px "Mona Sans"; }
+  .tso-gl { font: 700 24px var(--mono); text-anchor: end; }
+  .tso-e { stroke: #3d444d; stroke-width: 1.5; opacity: 0; transition: opacity .3s, stroke .3s; } .tso-e.on { opacity: .9; }
+  .tso-e.bad { stroke: #ffa657; stroke-width: 4; stroke-dasharray: 6 4; } .tso-e.wit { stroke: #ab7df8; stroke-width: 4; }
+  .tso-n { fill: #161b22; stroke: #6e7681; stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; transition: fill .3s, stroke .3s, opacity .2s; }
+  .tso-n.on { opacity: 1; animation: fm-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  .tso-n.ok { stroke: #79c0ff; fill: #1f6feb55; }
+  .tso-n.bad { fill: #db6d28; stroke: #ffa657; filter: drop-shadow(0 0 8px #db6d2855); }
+  .tso-n.wit { fill: #ab7df8; stroke: #d2a8ff; filter: drop-shadow(0 0 8px #ab7df855); }
+  .tso-cnt { fill: #9198a1; font: 700 19px var(--mono); text-anchor: middle; }
+  .tso-tr { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  .tso-res { opacity: 0; transform: translateX(30px); transition: opacity .5s, transform .5s cubic-bezier(.2,.9,.2,1); } .tso-res.on { opacity: 1; transform: none; }
+  .tso-res rect { fill: #0d1117d9; stroke-width: 2; }
+  .tso-res.b rect { stroke: #4493f8; } .tso-res.o rect { stroke: #ffa657; stroke-dasharray: 10 6; } .tso-res.p rect { stroke: #ab7df8; }
+  .tso-rh { font: 700 16px var(--mono); letter-spacing: .08em; }
+  .tso-rt { fill: #f0f6fc; font: 600 22px "Mona Sans"; }
+  .wqm { --lg: #79c0ff; }
+  .wqm-svg { left: 60px; top: 290px; width: 1800px; height: 710px; }
+  .wqm-pan rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
+  .wqm-pan.hot rect { stroke: #4493f8; filter: drop-shadow(0 0 12px #1f6feb55); }
+  .wqm-pt { fill: #9198a1; font: 700 17px var(--mono); letter-spacing: .1em; transition: fill .4s; } .wqm-pan.hot .wqm-pt { fill: #f0f6fc; }
+  .wqm-ps { fill: #9198a1; font: 500 17px "Mona Sans"; }
+  .wqm-gh { fill: #6e7681; font: 700 13px var(--mono); letter-spacing: .14em; }
+  .wqm-m { fill: #6e7681; font: 500 18px var(--mono); transition: fill .3s; } .wqm-m.hot { fill: #79c0ff; font-weight: 700; }
+  .wqm-sw { opacity: 0; transition: opacity .35s; } .wqm-sw.on { opacity: 1; }
+  .wqm-st rect { fill: #161b22; stroke: #6e7681; stroke-width: 2; transition: stroke .3s, fill .3s, filter .3s; }
+  .wqm-st rect.in { fill: none; stroke-width: 1.5; }
+  .wqm-st.hot rect { stroke: #4493f8; fill: #1f6feb33; filter: drop-shadow(0 0 8px #1f6feb44); } .wqm-st.hot rect.in { fill: none; filter: none; }
+  .wqm-st.bad rect { stroke: #ffa657; stroke-dasharray: 8 5; fill: #db6d2822; }
+  .wqm-sn { fill: #f0f6fc; font: 700 19px var(--mono); text-anchor: middle; }
+  .wqm-ss { fill: #9198a1; font: 500 15px var(--mono); text-anchor: middle; }
+  .wqm-el { fill: #9198a1; font: 600 15px var(--mono); text-anchor: middle; }
+  .wqm-inv { fill: #c9d1d9; font: 600 16px var(--mono); }
+  .wqm-e { fill: none; stroke: #6e7681; stroke-width: 2; opacity: .5; transition: stroke .3s, opacity .3s; }
+  .wqm-e.hot { stroke: #4493f8; stroke-width: 3; opacity: 1; }
+  .wqm-e.bad { stroke: #ffa657; stroke-width: 3; stroke-dasharray: 8 6; opacity: 1; }
+  .wqm-e.wqm-h { opacity: 0; } .wqm-e.wqm-h.hot { opacity: 1; }
+  .wqm-c { fill: #161b22; stroke: #4493f8; stroke-width: 2; }
+  .wqm-cl { fill: #f0f6fc; font: 700 14px var(--mono); text-anchor: middle; }
+  .wqm-new { opacity: 0; transition: opacity .3s; } .wqm-new.on { opacity: 1; }
+  .wqm-ghost { fill: #db6d2822; stroke: #ffa657; stroke-width: 2; stroke-dasharray: 5 4; }
+  .wqm-snap { stroke: #9198a1; stroke-width: 1.5; stroke-dasharray: 4 5; opacity: 0; transition: opacity .3s; } .wqm-snap.on { opacity: .7; }
+  .wqm-pr rect { stroke-width: 2; }
+  .wqm-row { opacity: 0; transition: opacity .3s; } .wqm-row.on { opacity: 1; }
+  .wqm-row rect { fill: transparent; stroke: transparent; stroke-width: 1.5; transition: all .3s; }
+  .wqm-row.bad rect { fill: #db6d2814; stroke: #ffa65788; stroke-dasharray: 6 4; } .wqm-row.wit rect { fill: #8957e51a; stroke: #ab7df888; }
+  .wqm-rn { fill: #f0f6fc; font: 600 17px var(--mono); } .wqm-ri { fill: #c9d1d9; font: 500 17px var(--mono); }
+  .wqm-rs { font: 700 17px var(--mono); text-anchor: end; }
+  .wqm-dot { fill: #79c0ff; opacity: 0; filter: drop-shadow(0 0 8px #4493f855); }
   .smt-led { position: absolute; right: 60px; top: 50px; width: 640px; padding: 16px 24px 12px; border: 2px solid #3d444d; border-radius: 16px; background: #0d1117d9; font: 500 17px var(--mono); color: #9198a1; }
   .active .smt-led { animation: mra-in .8s .2s both; }
   .smt-h { font-weight: 600; letter-spacing: .1em; color: #ab7df8; }
@@ -5226,6 +5303,7 @@
       fn();
     };
     slides.push({
+      key: "safe-outputs",
       group: "security",
       notes:
         "Safe outputs, an illustrative run with a synthetic issue. The agent runs boxed in: its token is read-only, so when it tries to create an issue directly the call is refused. Instead it calls the create-issue safe output, which only records a proposal. A separate threat detection job, an isolated agent with no tools, reads the proposed issue and looks for prompt injection, leaked secrets, malicious links and harmful code. Only when the verdict is clean does a third job, the only one holding issues: write, apply the declared output and actually create the issue. The agent never holds write credentials, and every write is limited to the outputs declared in the front matter.",
@@ -5298,6 +5376,238 @@
           });
       },
       el,
+    });
+  }
+
+  // Model-checked: the compiled workflow becomes a TLA+ model; TLC checks every schedule against security invariants, a seeded fault must break exactly one, a witness proves a validated write is still reachable, and both traces replay as a transition diagram
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 700,
+      CYC = 17400,
+      T = { check: 2800, fault: 6800, wit: 11000, loop: 14400 },
+      FOUND = T.fault + 2300,
+      WSEEN = T.wit + 2900;
+    const K = (...s) => ((s = s.filter(Boolean)).length ? ` data-k="${s.join(",")}"` : "");
+    // job, invariant and fault names are real (specs/workflow-security/CompiledWorkflow.tla); glosses are simplified
+    // lanes are the compiled jobs; the rows replay the checker's representative traces (specs/workflow-security/examples.json)
+    const LANES = [
+      ["ACTIVATION", "contents: read"],
+      ["AGENT", "engine token"],
+      ["DETECTION", "no tools"],
+      ["SAFE OUTPUTS", "app token"],
+    ];
+    const LX = [8, 172, 336, 500];
+    const TRACE = [
+      [0, "Init"], [0, "Start"], [0, "Activate"], [0, "Finish"],
+      [1, "Start"], [1, "Checkout:main"], [1, "Checkout:private_dependency"], [1, "CheckoutComplete"], [1, "Git:diff:main"], [1, "ToolCall:inference"], [1, "AgentRequest"], [1, "Fail"],
+      [2, "Start"], [2, "Consume"], [2, "Detect"], [2, "Finish"],
+      [3, "Start"], [3, "Validate"], [3, "MintAppToken"], [3, "PrepareEffect:issue"], [3, "Execute"],
+    ];
+    const DETECT = 14,
+      PTS = TRACE.map(([l], i) => ({ x: LX[l] + 12, y: 146 + i * 20 }));
+    const stepK = i => [`ok:${T.check + 300 + i * 60}:${T.fault}`, `bad:${T.fault + 300 + i * 90}:${T.wit}`, `wit:${T.wit + 400 + i * 110}:${CYC}`];
+    const INV = [
+      ["JobIsolation", "the agent holds no write grant"],
+      ["DetectionGate", "every write passed threat detection"],
+      ["ValidatedEffects", "only safe outputs write, validated"],
+      ["ArtifactProvenance", "the request came from this run's agent"],
+      ["SecretConfinement", "the agent sees only its engine token"],
+      ["TokenLifetime", "the write token is revoked after use"],
+      ["NetworkPolicy", "egress stays on the allowlist"],
+      ["PrivateSinkPolicy", "private data stays out of public sinks"],
+    ];
+    // a small, deterministic state graph explored breadth-first
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const SIZES = [1, 2, 3, 4, 5, 5, 4, 3, 2],
+      NODES = [],
+      GEDGES = [];
+    SIZES.forEach((n, L) => {
+      const prev = NODES.filter(q => q.L === L - 1);
+      for (let j = 0; j < n; j++) {
+        const q = { L, j, id: NODES.length, x: 1218 + L * 70, y: 212 + (j - (n - 1) / 2) * 40 + (L ? (rnd() - 0.5) * 14 : 0) };
+        if (L) {
+          const pi = n > 1 ? Math.round((j * (prev.length - 1)) / (n - 1)) : 0,
+            ai = Math.min(prev.length - 1, Math.max(0, pi + (rnd() < 0.5 ? -1 : 1)));
+          q.p = prev[pi].id;
+          GEDGES.push([q.p, q.id]);
+          if (ai !== pi && rnd() < 0.6) GEDGES.push([prev[ai].id, q.id]);
+        }
+        NODES.push(q);
+      }
+    });
+    const pathTo = id => {
+      const p = [];
+      for (let q = NODES[id]; q; q = q.p === undefined ? null : NODES[q.p]) p.unshift(q.id);
+      return p;
+    };
+    const BAD = pathTo(NODES.find(q => q.L === 6 && q.j === 1).id),
+      WIT = pathTo(NODES.find(q => q.L === 8 && q.j === 1).id);
+    const linked = (path, a, b) => {
+      const i = path.indexOf(a);
+      return i >= 0 && path[i + 1] === b;
+    };
+    const onK = q => [`on:${T.check + q.L * 250 + q.j * 30}:${T.fault}`, q.L <= 6 && `on:${T.fault + 300 + q.L * 230 + q.j * 20}:${T.wit}`, `on:${T.wit + 200 + q.L * 50}:${CYC}`, `ok:${T.check + 2500}:${T.fault}`];
+    const witAt = id => T.wit + 900 + WIT.indexOf(id) * 230;
+    const mk = c => `<marker id="tso${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${{ B: "#4493f8", O: "#ffa657", P: "#ab7df8" }[c]}"/></marker>`;
+    let g = `<defs>${mk("B")}${mk("O")}${mk("P")}</defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 700, "COMPILED WORKFLOW", 0],
+      [700, 1180, "TLA+ INVARIANTS", 300],
+      [1180, 1800, "TLC MODEL CHECKER", T.check],
+    ].forEach(([x0, x1, t, at]) => {
+      g += `<text class="fm-lane-t mra-lane"${K(`on:${at}`)} x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="640"/>`;
+    });
+    // one model-checked trace as a transition diagram: a row per state, a lane per job
+    LANES.forEach(([n, perm], l) => {
+      const x = LX[l];
+      g += `<line class="tso-lg" x1="${x + 12}" y1="128" x2="${x + 12}" y2="556"/>`;
+      g += `<g class="tso-lh"${K(`on:${200 + l * 600}`)}><rect x="${x}" y="72" width="156" height="50" rx="10"/><text class="tso-ln" x="${x + 12}" y="94">${n}</text><text class="tso-lp" x="${x + 12}" y="114">${perm}</text></g>`;
+    });
+    TRACE.forEach(([l, ev], i) => {
+      const p = PTS[i],
+        at = `on:${200 + l * 600}`;
+      const q = PTS[i - 1];
+      if (i) g += `<path class="tso-te"${K(at, ...stepK(i))} d="M${q.x} ${q.y}${q.x === p.x ? "" : ` V${q.y + 11} H${p.x}`} V${p.y}"/>`;
+      if (i === DETECT) {
+        g += `<text class="tso-rl"${K(`${at}:${T.fault + 300}`, `ok:${T.check + 300 + i * 60}:${T.fault}`)} x="${p.x + 14}" y="${p.y + 5}">Detect:verdict</text>`;
+        g += `<text class="tso-sw tso-rl bad"${K(`on:${T.fault + 300}:${T.wit}`)} x="${p.x + 14}" y="${p.y + 5}">Detect:deny</text>`;
+        g += `<text class="tso-sw tso-rl wit"${K(`on:${T.wit}:${CYC}`)} x="${p.x + 14}" y="${p.y + 5}">Detect:pass</text>`;
+        g += `<text class="tso-sw tso-mk co"${K(`on:${T.fault + 300 + i * 90}:${T.wit}`)} x="${LX[3]}" y="${p.y + 5}">← fault ignores it</text>`;
+      } else g += `<text class="tso-rl"${K(at, ...stepK(i))} x="${p.x + 14}" y="${p.y + 5}">${ev}</text>`;
+    });
+    PTS.forEach((p, i) => (g += `<circle class="tso-td"${K(`on:${200 + TRACE[i][0] * 600}`, ...stepK(i))} cx="${p.x}" cy="${p.y}" r="6"/>`));
+    const last = PTS[PTS.length - 1];
+    g += `<text class="tso-sw tso-mk co"${K(`on:${FOUND}:${T.wit}`)} x="${last.x + 84}" y="${last.y + 5}">✗ unchecked</text>`;
+    g += `<text class="tso-sw tso-mk cp"${K(`on:${WSEEN}:${CYC}`)} x="${last.x + 84}" y="${last.y + 5}">◆ validated</text>`;
+    g += `<circle class="tso-dot" id="tsoDot" r="8"/>`;
+    g += `<g class="tso-k"${K(`bad:${T.fault + 300}:${T.wit}`, `wit:${T.wit}:${CYC}`)}><rect x="40" y="572" width="640" height="54" rx="12"/><text x="62" y="607"><tspan class="n">Fault</tspan> =</text></g>`;
+    g += `<text class="tso-sw tso-kv cb"${K(`on:0:${T.fault + 300}`, `on:${T.wit}:${CYC}`)} x="176" y="607">"none"</text>`;
+    g += `<text class="tso-sw tso-kv co"${K(`on:${T.fault + 300}:${T.wit}`)} x="176" y="607">"skip-detection"</text>`;
+    [
+      ["secure profile", "", `on:0:${T.fault + 300}`],
+      ["negative control", "co", `on:${T.fault + 300}:${T.wit}`],
+      ["witness run", "cp", `on:${T.wit}:${CYC}`],
+    ].forEach(([txt, cls, k]) => (g += `<text class="tso-sw tso-fl ${cls}"${K(k)} x="664" y="605">${txt}</text>`));
+    // invariants of the model
+    g += `<rect class="tso-card" x="720" y="80" width="440" height="560" rx="16"/><text class="fv-t" x="742" y="116">COMPILEDWORKFLOW.TLA</text>`;
+    INV.forEach(([n, d], i) => {
+      const y = 158 + i * 60,
+        ok = [`ok:${T.check + 500 + i * 240}:${T.fault}`, `ok:${T.wit + 400}:${CYC}`],
+        bad = i === 1 ? [`bad:${FOUND}:${T.wit}`] : [];
+      g += `<g class="tso-inv"${K(`on:${300 + i * 110}`, ...ok, ...bad)}><rect x="730" y="${y - 30}" width="420" height="56" rx="10"/><text class="tso-in" x="748" y="${y - 3}">${n}</text><text class="tso-ig" x="748" y="${y + 19}">${d}</text></g>`;
+      g += `<text class="tso-sw tso-gl cb"${K(...ok.map(s => s.replace("ok", "on")))} x="1138" y="${y + 6}">✓</text>`;
+      if (bad.length) g += `<text class="tso-sw tso-gl co"${K(`on:${FOUND}:${T.wit}`)} x="1138" y="${y + 6}">✗</text>`;
+    });
+    // TLC: breadth-first exploration, a counterexample and a witness
+    for (const [a, b] of GEDGES) {
+      const q = NODES[b];
+      g += `<line class="tso-e"${K(...onK(q), linked(BAD, a, b) && `bad:${FOUND}:${T.wit}`, linked(WIT, a, b) && `wit:${witAt(b)}:${CYC}`)} x1="${NODES[a].x}" y1="${NODES[a].y}" x2="${q.x}" y2="${q.y}"/>`;
+    }
+    for (const q of NODES) g += `<circle class="tso-n"${K(...onK(q), BAD.includes(q.id) && `bad:${FOUND}:${T.wit}`, WIT.includes(q.id) && `wit:${witAt(q.id)}:${CYC}`)} cx="${q.x}" cy="${q.y}" r="9"/>`;
+    const bn = NODES[BAD[BAD.length - 1]],
+      wn = NODES[WIT[WIT.length - 1]];
+    g += `<text class="tso-sw tso-gl co"${K(`on:${FOUND}:${T.wit}`)} x="${bn.x + 30}" y="${bn.y + 8}">✗</text>`;
+    g += `<text class="tso-sw tso-gl cp"${K(`on:${WSEEN}:${CYC}`)} x="${wn.x + 2}" y="${wn.y - 16}">◆</text>`;
+    [
+      ["exploring every schedule…", "", T.check, T.check + 2500],
+      ["✓ state space exhausted · exit 0", "cb", T.check + 2500, T.fault],
+      ["seeded fault · re-checking…", "", T.fault + 300, FOUND],
+      ["✗ counterexample · exit 12, as expected", "co", FOUND, T.wit],
+      ["is a validated write reachable?", "", T.wit + 200, WSEEN],
+      ["◆ witness reached · NoSuccessfulWrite fails", "cp", WSEEN, CYC],
+    ].forEach(([txt, cls, a, b]) => (g += `<text class="tso-sw tso-cnt ${cls}"${K(`on:${a}:${b}`)} x="1495" y="98">${txt}</text>`));
+    g += `<text class="tso-sw tso-tr co"${K(`on:${FOUND}:${T.wit}`)} x="1495" y="332">← counterexample trace · 21 states · Detect:deny</text>`;
+    g += `<text class="tso-sw tso-tr cp"${K(`on:${WSEEN}:${CYC}`)} x="1495" y="332">← witness trace · 21 states · Detect:pass</text>`;
+    [
+      ["b", 356, "cb", "SECURE PROFILE · exit 0", "✓ every invariant, every schedule", T.check + 2700],
+      ["o", 448, "co", "NEGATIVE CONTROL · skip-detection", "✗ DetectionGate breaks, as it must", T.fault + 2800],
+      ["p", 540, "cp", "WITNESS · NoSuccessfulWrite", "◆ a validated write is still reachable", T.wit + 3200],
+    ].forEach(([k, y, c, head, txt, at]) => {
+      g += `<g class="tso-res ${k}"${K(`on:${at}:${CYC}`)}><rect x="1200" y="${y}" width="588" height="84" rx="14"/><text class="tso-rh ${c}" x="1222" y="${y + 32}">${head}</text><text class="tso-rt" x="1222" y="${y + 66}">${txt}</text></g>`;
+    });
+    g += `<path class="fm-wire p"${K(`hot:${T.loop}:${CYC}`)} d="M1494 624 V660 H360 V632" marker-end="url(#tsoP)"/><text class="mra-l" x="927" y="692" text-anchor="middle">daily agent: rotate one trust boundary · refine the model · seed a new fault · file credible gaps</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg tso-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const items = [...svg.querySelectorAll("[data-k]")].map(el => ({
+      el,
+      ks: el.dataset.k.split(",").map(s => {
+        const [c, a, b] = s.split(":");
+        return [c, +a, b === undefined ? Infinity : +b];
+      }),
+      st: {},
+    }));
+    const apply = u => {
+      for (const it of items) {
+        const want = {};
+        for (const [c, a, b] of it.ks) want[c] = want[c] || (u >= a && u < b);
+        for (const c in want) if (it.st[c] !== want[c]) it.el.classList.toggle(c, (it.st[c] = want[c]));
+      }
+    };
+    const dot = svg.querySelector("#tsoDot");
+    // move the trace head between consecutive states
+    const head = (u, start, step, wit) => {
+      const f = (u - start) / step;
+      if (f < 0 || f > PTS.length - 1) return false;
+      const i = Math.floor(f),
+        r = f - i,
+        a = PTS[i],
+        b = PTS[Math.min(PTS.length - 1, i + 1)];
+      dot.setAttribute("cx", a.x + (b.x - a.x) * r);
+      dot.setAttribute("cy", a.y + (b.y - a.y) * r);
+      dot.classList.toggle("wit", wit);
+      return true;
+    };
+    const EV = [
+      [200, () => sfx.pop(0)],
+      [800, () => sfx.pop(1)],
+      [1400, () => sfx.pop(2)],
+      [2000, () => sfx.pop(3)],
+      [2500, () => sfx.notify(false)],
+      [T.check, () => sfx.route(2)],
+      [T.check + 2500, () => sfx.compile()],
+      [T.fault + 300, () => sfx.key(0.7)],
+      [T.fault + 300 + DETECT * 90, () => sfx.block()],
+      [FOUND, () => sfx.bug()],
+      [WSEEN, () => sfx.pop(5)],
+      [T.loop, () => sfx.review()],
+    ];
+    let t0 = 0,
+      cyc = -1,
+      fired = new Set();
+    slides.push({
+      under: "safe-outputs",
+      group: "security",
+      notes:
+        "Model-checked: gh-aw keeps a bounded TLA+ model of the compiled workflow (CompiledWorkflow in specs/workflow-security): the activation, agent, threat detection and safe-output jobs with their permissions, tokens, artifacts and network egress. The TLC model checker explores every interleaving of job starts, skips, failures and hostile inputs, and checks security invariants such as JobIsolation, DetectionGate, ValidatedEffects, ArtifactProvenance, SecretConfinement, TokenLifetime, NetworkPolicy and PrivateSinkPolicy. Each secure configuration must exhaust its state space and exit 0. Negative controls seed one fault at a time, such as skip-detection (publish an effect despite a deny verdict), and must fail with exit 12 on exactly the expected invariant, so a model that checks nothing cannot pass. Witness configurations negate a goal such as NoSuccessfulWrite to prove a validated write is still reachable, so the model is not secure by doing nothing. The left column replays the checker's representative traces (specs/workflow-security/examples.json) as a transition diagram, one row per state and one lane per job: the skip-detection counterexample and the successful-write witness differ in a single event, Detect:deny versus Detect:pass, yet both reach Execute. A compiled-profile verifier derives the model's constants from real compiled lock files, and a daily agentic workflow rotates one trust boundary, proposes model refinements and files credible gaps. Illustrative: the lane layout, invariant glosses, right-hand state graph and timing are simplified; the module, trace event, invariant, fault and witness names are real. A bounded model is strong evidence, not a proof, and a synthetic counterexample is not a product vulnerability.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          fired = new Set();
+        }
+        apply(u);
+        EV.forEach(([at, fn], i) => {
+          if (u >= at && !fired.has(i)) {
+            fired.add(i);
+            fn();
+          }
+        });
+        dot.style.opacity = head(u, T.fault + 300, 90, false) || head(u, T.wit + 400, 110, true) ? 1 : 0;
+      },
+      el: h("section", { class: "slide tso" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "TLA+ and TLC check every schedule of the compiled workflow"), h("h2", {}, letters("Model-"), letters("checked", "l-grad"))), svg),
     });
   }
 
@@ -19057,6 +19367,216 @@
         ),
         svg
       ),
+    });
+  }
+
+  // Work queue models: the work queue's TLA+ modules grouped by concern, then four animated diagrams: the Work lifecycle, compare-and-swap on the git log, DAG and external gates, and mutants that must fail beside witnesses that must be reached
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 710,
+      S = [300, 4500, 8700, 12900],
+      END = 17100,
+      CYC = 19000;
+    const K = (...s) => ((s = s.filter(Boolean)).length ? ` data-k="${s.join(",")}"` : "");
+    // module, invariant, mutant and witness names are real (specs/work-queue); the grouping and diagrams are simplified
+    const GROUPS = [
+      ["PROTOCOL", ["WorkQueue", "FairWorkQueue", "QueueService"]],
+      ["LIFECYCLE", ["QueueLifecycle", "QueueBootstrap", "QueuePoolInstall"]],
+      ["WORKERS", ["ClaimScopedWorker", "WorkerEvolution", "WorkerDeploymentBoundary"]],
+      ["DELIVERY", ["DispatchReservationRecovery", "ClaimDeliveryHealth", "ClaimDeliveryRecovery"]],
+      ["RETIREMENT", ["WorkExpiration", "ObsoleteWorkRetirement", "IssueClosureCancellation", "IssueProjection"]],
+    ];
+    const FOCUS = [
+      ["QueueService", "QueueLifecycle", "ClaimScopedWorker", "WorkExpiration", "ObsoleteWorkRetirement", "IssueClosureCancellation"],
+      ["WorkQueue", "QueueService", "DispatchReservationRecovery", "ClaimDeliveryHealth", "ClaimDeliveryRecovery"],
+      ["FairWorkQueue", "IssueProjection", "IssueClosureCancellation"],
+    ];
+    const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+    let g = `<defs>${mk("wqmA", "#9198a1")}${mk("wqmO", "#ffa657")}</defs>`;
+    // module map
+    g += `<g class="wqm-pan"${K(`hot:${END}:${CYC}`)}><rect x="0" y="0" width="380" height="${VH}" rx="16"/><text class="wqm-pt" x="22" y="36">MODULES · BY CONCERN</text></g>`;
+    let y = 78;
+    GROUPS.forEach(([head, mods]) => {
+      g += `<text class="wqm-gh" x="22" y="${y}">${head}</text>`;
+      mods.forEach((m, k) => {
+        const hot = FOCUS.map((f, i) => f.includes(m) && `hot:${S[i]}:${S[i] + 4200}`);
+        g += `<text class="wqm-m"${K(...hot, `hot:${S[3]}:${CYC}`)} x="40" y="${y + 27 * (k + 1)}">${m}</text>`;
+      });
+      y += 27 * (mods.length + 1) + 10;
+    });
+    // four panels
+    [
+      [400, 0, "01 · LIFECYCLE", "one Claim wins; terminal Work is frozen"],
+      [1110, 0, "02 · COMPARE-AND-SWAP", "only safe outputs publish to the git log"],
+      [400, 365, "03 · DAG AND EXTERNAL GATES", "a successor waits for verified Results"],
+      [1110, 365, "04 · MUTANTS AND WITNESSES", "every mutant must fail, every witness be reached"],
+    ].forEach(([x, py, t, s], i) => {
+      g += `<g class="wqm-pan"${K(`hot:${S[i]}:${S[i] + 4200}`)}><rect x="${x}" y="${py}" width="690" height="345" rx="16"/><text class="wqm-pt" x="${x + 22}" y="${py + 36}">${t}</text><text class="wqm-ps" x="${x + 22}" y="${py + 62}">${s}</text></g>`;
+    });
+    const sw = (cls, x, yy, txt, ...k) => `<text class="wqm-sw ${cls}"${K(...k)} x="${x}" y="${yy}">${txt}</text>`;
+    const state = (x, yy, w, hh, name, sub, term, ...k) =>
+      `<g class="wqm-st"${K(...k)}><rect x="${x}" y="${yy}" width="${w}" height="${hh}" rx="12"/>${term ? `<rect class="in" x="${x + 5}" y="${yy + 5}" width="${w - 10}" height="${hh - 10}" rx="8"/>` : ""}<text class="wqm-sn" x="${x + w / 2}" y="${yy + (sub === "" ? 24 : sub ? 26 : 30)}">${name}</text>${sub ? `<text class="wqm-ss" x="${x + w / 2}" y="${yy + 48}">${sub}</text>` : ""}</g>`;
+    const edge = (id, d, ...k) => `<path class="wqm-e"${id ? ` id="${id}"` : ""}${K(...k)} d="${d}" marker-end="url(#wqmA)"/>`;
+    // 01 lifecycle: Available → Claimed → Completed → Effect, with release and cancellation
+    let r = S[0];
+    g += edge("wqT0", "M570 152 H658", `hot:${r + 600}:${CYC}`) + `<text class="wqm-el" x="614" y="142">claim</text>`;
+    g += edge("wqT1", "M810 152 H898", `hot:${r + 1900}:${CYC}`) + `<text class="wqm-el" x="854" y="142">complete</text>`;
+    g += edge("wqT2", "M975 184 V248", `hot:${r + 2900}:${CYC}`) + `<text class="wqm-el" x="987" y="222" style="text-anchor:start">authorize</text>`;
+    g += edge("", "M495 184 V248") + `<text class="wqm-el" x="485" y="222" style="text-anchor:end">cancel</text>`;
+    g += edge("", "M712 184 L574 250");
+    g += edge("", "M735 120 C 715 80 515 80 497 118") + `<text class="wqm-el" x="615" y="84">release</text>`;
+    g += state(420, 120, 150, 64, "Available", "open", false, `hot:${r + 400}:${r + 1100}`);
+    g += state(660, 120, 150, 64, "Claimed", "one winner", false, `hot:${r + 1100}:${r + 2400}`);
+    g += state(900, 120, 150, 64, "Completed", "terminal", true, `hot:${r + 2400}:${CYC}`);
+    g += state(420, 250, 150, 64, "Cancelled", "terminal", true);
+    g += `<g class="wqm-st"${K(`hot:${r + 3300}:${CYC}`)}><rect x="900" y="250" width="150" height="64" rx="12" style="stroke-dasharray:6 5"/><text class="wqm-sn" x="975" y="276">Effect</text></g>`;
+    g += sw("wqm-ss", 975, 298, "needs Completion", `on:0:${r + 3300}`) + sw("wqm-ss cb", 975, 298, "authorized ✓", `on:${r + 3300}:${CYC}`);
+    g += sw("wqm-el co", 790, 236, "rival Claim ✗ loses", `on:${r + 1300}:${CYC}`);
+    g += sw("wqm-inv", 424, 336, "TerminalFreeze · SingleEffectiveClaim · EffectAuthorization", `on:${r + 3400}:${CYC}`);
+    // 02 compare-and-swap: two workers act on the same stale snapshot; only one append wins, the other replays and retries
+    r = S[1];
+    g += `<line class="wqm-e" x1="1186" y1="124" x2="1234" y2="124"/><line class="wqm-e" x1="1266" y1="124" x2="1314" y2="124"/>`;
+    g += `<line class="wqm-e wqm-h"${K(`hot:${r + 1600}:${CYC}`)} x1="1346" y1="124" x2="1454" y2="124"/>`;
+    g += `<line class="wqm-e wqm-h"${K(`hot:${r + 3000}:${CYC}`)} x1="1486" y1="124" x2="1604" y2="124"/>`;
+    [
+      [1170, "c0"],
+      [1250, "c1"],
+      [1330, "c2"],
+    ].forEach(([x, n]) => (g += `<circle class="wqm-c on" cx="${x}" cy="124" r="16"/><text class="wqm-cl" x="${x}" y="129">${n}</text>`));
+    g += `<g class="wqm-new"${K(`on:${r + 1600}:${CYC}`)}><circle class="wqm-c on" cx="1470" cy="124" r="16"/><text class="wqm-cl" x="1470" y="129">c3</text></g>`;
+    g += `<g class="wqm-new"${K(`on:${r + 3000}:${CYC}`)}><circle class="wqm-c on" cx="1620" cy="124" r="16"/><text class="wqm-cl" x="1620" y="129">c4</text></g>`;
+    g += sw("wqm-el", 1330, 96, "head ▾", `on:0:${r + 1600}`) + sw("wqm-el", 1470, 96, "head ▾", `on:${r + 1600}:${r + 3000}`) + sw("wqm-el", 1620, 96, "head ▾", `on:${r + 3000}:${CYC}`);
+    g += `<line class="wqm-snap"${K(`on:${r + 400}:${CYC}`)} x1="1322" y1="140" x2="1282" y2="186"/><line class="wqm-snap"${K(`on:${r + 400}:${CYC}`)} x1="1328" y1="140" x2="1282" y2="266"/>`;
+    g += state(1130, 176, 150, 54, "worker A", "snapshot: c2", false, `hot:${r + 400}:${r + 1600}`);
+    g += state(1130, 256, 150, 54, "worker B", "snapshot: c2", false, `hot:${r + 400}:${r + 3000}`);
+    g += edge("wqA", "M1280 203 C 1400 203 1470 190 1470 142", `hot:${r + 1000}:${CYC}`) + sw("wqm-el cb", 1350, 193, "CAS ✓", `on:${r + 1600}:${CYC}`);
+    g += `<path class="wqm-e" id="wqB"${K(`bad:${r + 1900}:${CYC}`)} d="M1280 283 H1450" marker-end="url(#wqmO)"/>` + sw("wqm-el co", 1366, 273, "CAS ✗ stale base", `on:${r + 2300}:${CYC}`);
+    g += `<g class="wqm-sw"${K(`on:${r + 2300}:${CYC}`)}><circle class="wqm-ghost" cx="1470" cy="283" r="16"/><text class="wqm-cl co" x="1470" y="289">✗</text></g>`;
+    g += edge("wqR", "M1486 283 C 1580 283 1620 220 1620 142", `hot:${r + 2700}:${CYC}`) + sw("wqm-el cb", 1632, 236, "replay, retry ✓", `on:${r + 3000}:${CYC}`).replace('class="wqm-sw wqm-el cb"', 'class="wqm-sw wqm-el cb" style="text-anchor:start"');
+    g += sw("wqm-inv", 1134, 336, "SingleEffectiveClaim · BrokenCAS breaks TerminalPersistence", `on:${r + 3300}:${CYC}`);
+    // 03 DAG and external gates: C joins on A and B; D also waits for a merged pull request
+    r = S[2];
+    g += edge("", "M570 470 C 610 470 610 515 648 515", `hot:${r + 700}:${CYC}`);
+    g += edge("", "M570 560 C 610 560 610 515 648 515", `hot:${r + 1400}:${CYC}`);
+    g += edge("", "M790 515 C 835 515 835 570 878 570", `hot:${r + 2200}:${CYC}`);
+    g += `<path class="wqm-e"${K(`bad:${r + 2400}:${r + 3200}`, `hot:${r + 3200}:${CYC}`)} d="M810 622 C 845 622 845 580 878 580" marker-end="url(#wqmA)"/>`;
+    g += state(430, 445, 140, 56, "Work A", "", false, `hot:${r + 300}:${r + 700}`);
+    g += state(430, 535, 140, 56, "Work B", "", false, `hot:${r + 300}:${r + 1400}`);
+    g += state(650, 490, 140, 56, "Work C", "", false, `hot:${r + 1800}:${r + 2200}`);
+    g += state(880, 545, 140, 56, "Work D", "", false, `hot:${r + 3500}:${CYC}`);
+    g += `<g class="wqm-st wqm-pr"${K(`bad:${r + 2400}:${r + 3200}`, `hot:${r + 3200}:${CYC}`)}><rect x="640" y="600" width="170" height="44" rx="22"/></g>`;
+    g += sw("wqm-ss", 725, 628, "PR: open", `on:0:${r + 2400}`) + sw("wqm-ss co", 725, 628, "PR: closed ✗", `on:${r + 2400}:${r + 3200}`) + sw("wqm-ss cb", 725, 628, "PR: merged ✓", `on:${r + 3200}:${CYC}`);
+    const sub = (x, yy, steps) => steps.map(([txt, cls, a, b]) => sw(`wqm-ss ${cls}`, x, yy, txt, `on:${a}:${b}`)).join("");
+    g += sub(500, 491, [["running", "", 0, r + 700], ["Result ✓", "cb", r + 700, CYC]]);
+    g += sub(500, 581, [["running", "", 0, r + 1400], ["Result ✓", "cb", r + 1400, CYC]]);
+    g += sub(720, 536, [["waits: A, B", "", 0, r + 1800], ["join claimed ◆", "cp", r + 1800, r + 2200], ["Result ✓", "cb", r + 2200, CYC]]);
+    g += sub(950, 591, [["gated", "", 0, r + 2400], ["gated: not merged", "co", r + 2400, r + 3500], ["admitted ✓", "cb", r + 3500, CYC]]);
+    g += sw("wqm-el cp", 720, 480, "DAGJoinWitness", `on:${r + 1800}:${CYC}`);
+    g += sw("wqm-inv", 424, 694, "DependencyAuthorization · ExternalTruth: closed ≠ merged", `on:${r + 3500}:${CYC}`);
+    // 04 mutants must fail their invariant; witnesses must reach a negated goal
+    r = S[3];
+    g += `<text class="wqm-gh" x="1134" y="452">MUTANT / WITNESS</text><text class="wqm-gh" x="1420" y="452">MUST BREAK / REACH</text>`;
+    [
+      ["BrokenCAS", "TerminalPersistence"],
+      ["BrokenClaimEffects", "EffectAuthorization"],
+      ["BrokenBatchRelease", "RunReleaseAuthority"],
+      ["BrokenDAGDependency", "DependencyAuthorization"],
+      ["BrokenPRClosedAsMerged", "ExternalTruth"],
+      ["WeakOrderingWitness", "NoOutOfOrderClaim", 1],
+      ["DAGJoinWitness", "NoJoinClaim", 1],
+    ].forEach(([m, inv, w], i) => {
+      const yy = 484 + i * 32,
+        at = r + 600 + i * 420;
+      g += `<g class="wqm-row"${K(`on:${r + 200 + i * 60}:${CYC}`, `${w ? "wit" : "bad"}:${at}:${CYC}`)}><rect x="1124" y="${yy - 23}" width="662" height="30" rx="6"/><text class="wqm-rn" x="1134" y="${yy}">${m}</text><text class="wqm-el" x="1400" y="${yy}">→</text><text class="wqm-ri" x="1420" y="${yy}">${inv}</text></g>`;
+      g += sw(`wqm-rs ${w ? "cp" : "co"}`, 1778, yy, w ? "◆ reached" : "✗ caught", `on:${at}:${CYC}`);
+    });
+    g += `<circle class="wqm-dot" id="wqDot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg wqm-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const items = [...svg.querySelectorAll("[data-k]")].map(el => ({
+      el,
+      ks: el.dataset.k.split(",").map(s => {
+        const [c, a, b] = s.split(":");
+        return [c, +a, b === undefined ? Infinity : +b];
+      }),
+      st: {},
+    }));
+    const apply = u => {
+      for (const it of items) {
+        const want = {};
+        for (const [c, a, b] of it.ks) want[c] = want[c] || (u >= a && u < b);
+        for (const c in want) if (it.st[c] !== want[c]) it.el.classList.toggle(c, (it.st[c] = want[c]));
+      }
+    };
+    const $ = id => svg.querySelector("#" + id),
+      dot = $("wqDot");
+    // the token rides one path at a time
+    const RIDES = [
+      [S[0] + 600, S[0] + 1100, $("wqT0")],
+      [S[0] + 1900, S[0] + 2400, $("wqT1")],
+      [S[0] + 2900, S[0] + 3300, $("wqT2")],
+      [S[1] + 1000, S[1] + 1600, $("wqA")],
+      [S[1] + 1900, S[1] + 2300, $("wqB")],
+      [S[1] + 2700, S[1] + 3000, $("wqR")],
+    ];
+    const EV = [
+      [S[0] + 1100, () => sfx.pop(1)],
+      [S[0] + 1300, () => sfx.block()],
+      [S[0] + 2400, () => sfx.pop(3)],
+      [S[0] + 3300, () => sfx.compile()],
+      [S[1] + 1600, () => sfx.pop(2)],
+      [S[1] + 2300, () => sfx.block()],
+      [S[1] + 3000, () => sfx.compile()],
+      [S[2] + 700, () => sfx.pop(1)],
+      [S[2] + 1400, () => sfx.pop(2)],
+      [S[2] + 1800, () => sfx.notify(false)],
+      [S[2] + 2400, () => sfx.block()],
+      [S[2] + 3500, () => sfx.compile()],
+      ...[0, 1, 2, 3, 4].map(i => [S[3] + 600 + i * 420, () => sfx.bug()]),
+      ...[5, 6].map(i => [S[3] + 600 + i * 420, () => sfx.pop(i)]),
+      [END, () => sfx.review()],
+    ];
+    let t0 = 0,
+      cyc = -1,
+      fired = new Set();
+    slides.push({
+      group: "process",
+      under: "specs",
+      notes:
+        "Work queue models: gh-aw's work queue is specified as a family of TLA+ modules in specs/work-queue, grouped here by concern, and TLC checks every interleaving of each. One, lifecycle: Work stays open until one Claim wins; a Completion or a cancellation makes it terminal and frozen, a released Claim returns it, and an effect needs authorization from a durable Completion (TerminalFreeze, SingleEffectiveClaim, EffectAuthorization). Two, compare-and-swap: the git log on the queue branch is the only authority; workers act on a possibly stale activation snapshot, and only safe outputs publish, appending only if the snapshot base still equals the head, otherwise replaying the log and retrying; the BrokenCAS mutant must break TerminalPersistence. Three, FairWorkQueue adds DAG dependencies, where a successor is admitted only after verified Results of its predecessors (the DAGJoinWitness reaches a join Claim), and external Issue and pull request gates, where a closed but unmerged pull request is not merged (DependencyAuthorization, ExternalTruth). Four, every Broken mutant must fail its invariant and every witness must be reached; WeakOrderingWitness finds an out-of-order Claim, which is why ordering is oldest-first best effort, not strict FIFO. Illustrative: the grouping, diagrams and timing are simplified; the module, invariant, mutant and witness names are real. Bounded checks are strong evidence, not a proof.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          fired = new Set();
+        }
+        apply(u);
+        EV.forEach(([at, fn], i) => {
+          if (u >= at && !fired.has(i)) {
+            fired.add(i);
+            fn();
+          }
+        });
+        const ride = RIDES.find(([a, b]) => u >= a && u <= b);
+        if (ride) {
+          const [a, b, p] = ride,
+            q = p.getPointAtLength(p.getTotalLength() * ((u - a) / (b - a)));
+          dot.setAttribute("cx", q.x);
+          dot.setAttribute("cy", q.y);
+          dot.style.opacity = 1;
+        } else dot.style.opacity = 0;
+      },
+      el: h("section", { class: "slide wqm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One git-backed log; TLC checks every interleaving"), h("h2", {}, letters("Work queue, "), letters("modeled", "l-grad"))), svg),
     });
   }
 
