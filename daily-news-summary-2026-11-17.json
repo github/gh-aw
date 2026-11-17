@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-17",
+  "headline": "v1.3.0's first full morning: 42 commits by 08:44 UTC, community install and activation bugs already have PRs.",
+  "highlights": [
+    "v1.3.0 published 2026-11-16 07:31 UTC (connectors, ledgers, cost routing)",
+    "28 human commits today from Peli, Ryan Beckett, Mara Nikola Kiefer",
+    "Mara merged JS-only operational value grading (#78452)",
+    "15 of 26 open PRs are Dependabot",
+    "29 cascade-suspected open issues; Auditor and smoke failures dominate"
+  ],
+  "open_prs": 26,
+  "commits_30d": 1395,
+  "human_commits_30d": 568
+}
