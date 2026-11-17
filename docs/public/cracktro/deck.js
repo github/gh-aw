@@ -1018,7 +1018,8 @@
   .mc-tok { fill: #e6edf3; font: 600 16px var(--mono); text-anchor: end; opacity: 0; transition: opacity .3s; } .mc-run.seen .mc-tok { opacity: 1; }
   .sfl-row.mc-find { opacity: 0; } .sfl-row.mc-find.seen { opacity: 1; } .mc-find .k { fill: #9198a1; }
   /* --- deterministic ops --- */
-  .dto .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #4493f8, #3fb950, #d29922); }
+  .dto .slide-head h2 { --lg: #e3b341; }
+  .dto .sfl-row .ok { fill: #e3b341; }
   .dto-band { fill: #d2992214; stroke: #d29922; stroke-width: 2; stroke-dasharray: 8 6; opacity: 0; transition: opacity .5s; } .dto-band.on { opacity: 1; }
   .dto-sec rect { fill: transparent; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; transition: all .4s; }
   .dto-sec text { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .08em; }
@@ -1045,7 +1046,7 @@
   .dto-mlab { fill: #9198a1; font: 500 16px var(--mono); }
   .dto-mv { fill: #f0f6fc; font: 700 20px var(--mono); text-anchor: end; }
   .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
-  .dto-big { fill: #3fb950; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
+  .dto-big { fill: #e3b341; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
   /* --- cli vs mcp --- */
   .cvm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
