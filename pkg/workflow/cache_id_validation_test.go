@@ -85,12 +85,10 @@ func TestCacheMemoryDirFor_ValidIDs(t *testing.T) {
 	assert.Equal(t, "/tmp/gh-aw/cache-memory-my-cache", cacheMemoryDirFor("my-cache"))
 }
 
-func TestCacheMemoryDirFor_InvalidIDPanics(t *testing.T) {
-	assert.Panics(t, func() {
-		cacheMemoryDirFor("../../etc")
-	}, "Should panic for path-traversal cache ID")
-
-	assert.Panics(t, func() {
-		cacheMemoryDirFor("bad/id")
-	}, "Should panic for slash-containing cache ID")
+func TestCacheMemoryPathHelpersRejectInvalidIDs(t *testing.T) {
+	for _, invalidID := range []string{"../../etc", "bad/id"} {
+		assert.Empty(t, cacheMemoryDirFor(invalidID))
+		assert.Empty(t, cacheMemoryActionDirFor(invalidID))
+		assert.Empty(t, cacheMemoryPromptDirFor(invalidID))
+	}
 }

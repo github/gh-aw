@@ -18,6 +18,8 @@ func TestResolveRuntimeStepPaths(t *testing.T) {
 		{"mount", "-v /tmp/gh-aw:/tmp/gh-aw:rw", "-v " + runtimeDirectoryExpression + ":" + runtimeDirectoryExpression + ":rw"},
 		{"config", `{"logs":"/tmp/gh-aw/logs","allowWrite":["/tmp/gh-aw/agent"]}`, `{"logs":"` + runtimeDirectoryExpression + `/logs","allowWrite":["` + runtimeDirectoryExpression + `/agent"]}`},
 		{"artifact", "path: |\n  /tmp/gh-aw/detection/result.json\n  /tmp/gh-aw/mcp-logs/", "path: |\n  " + runtimeDirectoryExpression + "/detection/result.json\n  " + runtimeDirectoryExpression + "/mcp-logs/"},
+		{"run", "run: |\n  cat '/tmp/gh-aw/awf-config.json'\n  docker rm awmg-mcpg\n", "run: |\n  cat \"$GH_AW_RUNTIME_DIR/awf-config.json\"\n  docker rm awmg-mcpg-$GH_AW_RUNTIME_ID\n"},
+		{"PowerShell run", "shell: pwsh\nrun: |\n  Write-Output '/tmp/gh-aw/awf-config.json'\n", "shell: pwsh\nrun: |\n  Write-Output \"$env:GH_AW_RUNTIME_DIR/awf-config.json\"\n"},
 		{"private scratch", "/tmp/gh-aw-runtime-abc /tmp/gh-aw-nvx.abc", "/tmp/gh-aw-runtime-abc /tmp/gh-aw-nvx.abc"},
 		{"setup assets", "${RUNNER_TEMP}/gh-aw/actions/x.cjs", "${RUNNER_TEMP}/gh-aw/actions/x.cjs"},
 		{"containers", `{"topologyAttach":["awmg-mcpg","awmg-cli-proxy"]}`, `{"topologyAttach":["awmg-mcpg-` + runtimeIdentityExpression + `","awmg-cli-proxy-` + runtimeIdentityExpression + `"]}`},
@@ -34,6 +36,9 @@ func TestResolveRuntimeStepPaths(t *testing.T) {
 			require.NoError(t, err)
 			for _, span := range spans {
 				require.NoError(t, actionslanguageservice.ValidateExpression(span.Content))
+			}
+			if strings.Contains(tt.name, "run") {
+				assert.NotContains(t, got, "${{", "runtime paths in run scripts must use the runtime environment")
 			}
 		})
 	}
@@ -55,10 +60,10 @@ func TestResolveJobRuntimePaths(t *testing.T) {
 	compiler.resolveJobRuntimePaths()
 	for _, job := range compiler.jobManager.GetAllJobs() {
 		assert.Equal(t, "${{ runner.temp }}/gh-aw", job.Env["UNCHANGED"])
-		for _, step := range job.Steps {
-			assert.NotContains(t, step, "/tmp/gh-aw")
-			assert.Contains(t, step, runtimeDirectoryExpression)
-		}
+		assert.NotContains(t, job.Steps[0], "/tmp/gh-aw")
+		assert.Contains(t, job.Steps[0], runtimeDirectoryExpression)
+		assert.NotContains(t, job.Steps[1], "/tmp/gh-aw")
+		assert.Contains(t, job.Steps[1], "$GH_AW_RUNTIME_DIR")
 	}
 }
 

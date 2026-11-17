@@ -177,9 +177,16 @@ func TestConnectorContentGeneratedFactory(t *testing.T) {
 			require.NoError(t, err)
 			driver := fmt.Sprintf(`
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const options = %s;
+const runtimeDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-connector-test-"));
+process.on("exit", () => fs.rmSync(runtimeDirectory, {recursive:true, force:true}));
 process.env = {
+  GH_AW_RUNTIME_DIR: runtimeDirectory,
+  GH_AW_RUNTIME_ID: "connector-test",
+  RUNNER_TEMP: runtimeDirectory,
   GH_AW_SAFE_OUTPUTS_STAGED: String(options.global),
   GH_AW_WORKFLOW_NAME: "Trusted workflow",
   GITHUB_REPOSITORY: "owner/original-workflow",

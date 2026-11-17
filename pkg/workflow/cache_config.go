@@ -32,25 +32,21 @@ const cacheMemoryDirPrefix = "/tmp/gh-aw/cache-memory-"
 // should always provide a non-empty ID.
 //
 // Non-default IDs must have already been validated by isValidCacheID before reaching
-// this function. This function panics on invalid IDs as a defence-in-depth measure
-// (the parser should have rejected them first).
+// this function.
 func cacheMemoryDirFor(cacheID string) string {
 	if cacheID == "default" || cacheID == "" {
 		return defaultCacheMemoryDir
 	}
 
 	if !isValidCacheID(cacheID) {
-		// This should never happen: parseCacheMemoryEntry validates IDs at parse time.
-		// Panic here to surface a clear programming error rather than silently producing
-		// a dangerous path.
-		panic(fmt.Sprintf("cacheMemoryDirFor called with invalid cache ID %q; IDs must match [A-Za-z0-9_-]{1,64}", cacheID))
+		return ""
 	}
 	return cacheMemoryDirPrefix + cacheID
 }
 
 func cacheMemoryActionDirFor(cacheID string) string {
 	if !isValidCacheID(cacheID) {
-		panic(fmt.Sprintf("cacheMemoryActionDirFor called with invalid cache ID %q", cacheID))
+		return ""
 	}
 	return "${{ runner.temp }}/gh-aw-cache-memory-" + cacheID
 }
@@ -60,7 +56,7 @@ func cacheMemoryPromptDirFor(cacheID string) string {
 		return "$GH_AW_RUNTIME_DIR/cache-memory"
 	}
 	if !isValidCacheID(cacheID) {
-		panic(fmt.Sprintf("cacheMemoryPromptDirFor called with invalid cache ID %q", cacheID))
+		return ""
 	}
 	return "$GH_AW_RUNTIME_DIR/cache-memory-" + cacheID
 }

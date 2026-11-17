@@ -90,10 +90,13 @@ function registerRuntimeProcess(pid, role, env = process.env) {
   if (!start || !/^[0-9]+$/.test(start)) throw new Error(`Could not read runtime process identity for PID ${pid}`);
   const uid = fs.statSync(proc).uid;
   const record = JSON.stringify({ pid, start, uid, role }) + "\n";
-  fs.writeFileSync(path.join(runtimeRoot(env), ".gh-aw-processes.jsonl"), record, {
-    flag: fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW,
-    mode: 0o600,
-  });
+  const file = path.join(runtimeRoot(env), ".gh-aw-processes.jsonl");
+  const descriptor = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW, 0o600);
+  try {
+    fs.writeFileSync(descriptor, record);
+  } finally {
+    fs.closeSync(descriptor);
+  }
 }
 
 module.exports = { runtimeRoot, runtimePath, setupRoot, runtimeId, runtimeContainerName, runtimePort, registerRuntimeProcess };

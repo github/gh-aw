@@ -41,6 +41,7 @@ function environment(root, extra = {}) {
   return {
     ...process.env,
     RUNNER_TEMP: root,
+    GH_AW_RUNTIME_DIR: root,
     GITHUB_RUN_ID: "123",
     GITHUB_RUN_ATTEMPT: "1",
     GITHUB_JOB: "agent",
@@ -182,7 +183,7 @@ describe("invocation-owned release staging", () => {
     const jobs = await Promise.all([allocateRuntime(root), allocateRuntime(root)]);
     expect(new Set(jobs.map(job => job.dir)).size).toBe(2);
     for (const job of jobs) {
-      expect(path.dirname(job.dir)).toBe(fs.realpathSync("/tmp"));
+      expect(path.dirname(job.dir)).toBe(root);
       expect(fs.statSync(job.dir).mode & 0o777).toBe(0o700);
       expect(job.state.TMPDIR).toBe(job.dir);
       expect(job.state.GH_AW_RUNTIME_TMP_ID).toBeTruthy();
@@ -225,7 +226,7 @@ printf '%s\\n' "$TEMP_DIR"`,
         ],
         {
           cwd: readOnlyWorkspace,
-          env: environment(root, { RUNNER_TEMP: "", TMPDIR: tempDir }),
+          env: environment(root, { GH_AW_RUNTIME_DIR: "", RUNNER_TEMP: "", TMPDIR: tempDir }),
           encoding: "utf8",
         }
       );
@@ -560,7 +561,7 @@ exit 7`,
 
   it("uses system temporary storage when RUNNER_TEMP is absent", async () => {
     const root = workspace();
-    const job = await allocate(root, { RUNNER_TEMP: "" });
+    const job = await allocate(root, { GH_AW_RUNTIME_DIR: "", RUNNER_TEMP: "" });
     expect(path.dirname(job.dir)).toBe(fs.realpathSync(process.env.TMPDIR || os.tmpdir()));
     await job.finish();
   });
@@ -582,6 +583,7 @@ exit 7`,
     fs.writeFileSync(path.join(bin, "cygpath"), '#!/bin/sh\nprintf "%s\\n" "$2" > "$CYGPATH_LOG"\nprintf "%s\\n" "$STAGING_PARENT"\n', { mode: 0o755 });
     const windowsPath = "C:\\runner\\job temp";
     const job = await allocate(root, {
+      GH_AW_RUNTIME_DIR: "",
       RUNNER_TEMP: windowsPath,
       PATH: `${bin}:${process.env.PATH}`,
       CYGPATH_LOG: log,

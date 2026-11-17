@@ -41,10 +41,12 @@ func TestNVXStagedMuslCopilotInvokesAPIProxy(t *testing.T) {
 	workspace := filepath.Join(temp, "workspace")
 	runnerTemp := filepath.Join(temp, "runner")
 	hostRoot := filepath.Join(runnerTemp, "gh-aw")
+	runtimeRoot := filepath.Join(temp, "runtime")
 	stateRoot := filepath.Join(temp, "state")
 	require.NoError(t, os.MkdirAll(filepath.Join(hostRoot, "actions"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(hostRoot, "nvx-engine"), 0o755))
 	require.NoError(t, os.MkdirAll(workspace, 0o755))
+	require.NoError(t, os.Mkdir(runtimeRoot, 0o700))
 	require.NoError(t, os.MkdirAll(stateRoot, 0o755))
 	require.NoError(t, copyFile(
 		filepath.Join("..", "..", "actions", "setup", "js", "nvx_assets.cjs"),
@@ -54,6 +56,11 @@ func TestNVXStagedMuslCopilotInvokesAPIProxy(t *testing.T) {
 	require.NoError(t, copyFile(
 		filepath.Join("..", "..", "actions", "setup", "js", "copilot_sdk_mcp_config_path.cjs"),
 		filepath.Join(hostRoot, "actions", "copilot_sdk_mcp_config_path.cjs"),
+		0o644,
+	))
+	require.NoError(t, copyFile(
+		filepath.Join("..", "..", "actions", "setup", "js", "runtime_paths.cjs"),
+		filepath.Join(hostRoot, "actions", "runtime_paths.cjs"),
 		0o644,
 	))
 
@@ -69,7 +76,11 @@ func TestNVXStagedMuslCopilotInvokesAPIProxy(t *testing.T) {
 	require.NoError(t, archive.Close())
 
 	stage := exec.Command("node", filepath.Join(hostRoot, "actions", "nvx_assets.cjs"), "stage")
-	stage.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace, "RUNNER_TEMP="+runnerTemp)
+	stage.Env = append(os.Environ(),
+		"GITHUB_WORKSPACE="+workspace,
+		"RUNNER_TEMP="+runnerTemp,
+		"GH_AW_RUNTIME_DIR="+runtimeRoot,
+	)
 	output, err := stage.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 

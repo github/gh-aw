@@ -1,15 +1,20 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { once } from "node:events";
+import fs from "node:fs";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 // CI installs the reference SDK outside the checkout; runtime dependencies stay unchanged.
 assert.ok(process.env.GH_AW_OTEL_SDK_DIR, "Set GH_AW_OTEL_SDK_DIR to the isolated SDK installation");
+const runtimeDirectory = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "gh-aw-otlp-test-"));
+process.env.GH_AW_RUNTIME_DIR = runtimeDirectory;
+after(() => fs.rmSync(runtimeDirectory, { recursive: true, force: true }));
 const sdkRequire = createRequire(path.join(process.env.GH_AW_OTEL_SDK_DIR, "package.json"));
 const require = createRequire(import.meta.url);
 const { encodeOTLPTraceRequest, encodeOTLPMetricsRequest } = require("../otlp_protobuf.cjs");
