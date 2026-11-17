@@ -97,8 +97,10 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 
 	// Create minimal WorkflowData for threat detection.
 	// SandboxConfig with AWF enabled ensures the engine runs inside the firewall.
-	// NetworkPermissions.Allowed preserves explicit vendor and npm registry opt-ins,
-	// plus literal user-specified domains for custom providers.
+	// NetworkPermissions.Allowed preserves explicit vendor opt-ins and literal
+	// user-specified domains for custom providers. The npm registry opt-in is
+	// applied below only for inline Copilot detection; external detectors do not
+	// perform this metadata verification.
 	// No MCP servers are configured for detection.
 	// bash: ["*"] allows all shell commands — AWF's network firewall is the primary
 	// constraint, so restricting individual bash commands inside the sandbox adds friction
@@ -117,6 +119,8 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 		detectionFirewall = threatDetectionData.NetworkPermissions.Firewall
 	}
 	allowed := getThreatDetectionAdditionalAllowedDomains(data, engineSetting)
+	// Only inline Copilot detection validates npm lockfile metadata. The external
+	// detector path uses a separate prompt and does not inherit the node alias.
 	if engineSetting == string(constants.CopilotEngine) && data.NetworkPermissions != nil &&
 		(slices.Contains(data.NetworkPermissions.Allowed, "node") || slices.Contains(data.NetworkPermissions.Allowed, "registry.npmjs.org")) &&
 		!slices.Contains(allowed, "registry.npmjs.org") {

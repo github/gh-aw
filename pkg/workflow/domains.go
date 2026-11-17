@@ -706,11 +706,11 @@ func GetAllowedDomainsForEngine(engine constants.EngineName, network *NetworkPer
 	return result
 }
 
-// GetThreatDetectionAllowedDomains returns the minimal set of domains allowed for a Copilot
-// detection run. The "threat-detection" engine domain set includes the Copilot API endpoints
+// GetThreatDetectionAllowedDomains returns the minimal set of domains allowed for inline Copilot
+// threat detection. The "threat-detection" engine domain set includes the Copilot API endpoints
 // needed for threat analysis. It intentionally excludes package registries and
-// raw.githubusercontent.com. Registry metadata validation requires explicit opt-in;
-// an allowed hostname is not restricted to read-only requests.
+// raw.githubusercontent.com. Inline detection handles npm registry opt-in separately; external
+// detectors do not use this metadata-validation path.
 // Any additional user-specified network.allowed entries are merged in (typically empty for detection).
 // Returns a deduplicated, sorted, comma-separated string suitable for AWF's --allow-domains flag.
 func GetThreatDetectionAllowedDomains(network *NetworkPermissions) string {

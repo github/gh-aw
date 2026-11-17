@@ -1205,6 +1205,63 @@ Test workflow
 	}
 }
 
+func TestCompiledExternalCopilotDetectionDoesNotInheritNpmRegistryOptIn(t *testing.T) {
+	content := `---
+on: push
+engine: copilot
+network:
+  allowed: [node]
+permissions:
+  contents: read
+  copilot-requests: write
+safe-outputs:
+  create-issue:
+features:
+  gh-aw-detection: true
+---
+Test workflow
+`
+	path := filepath.Join(testutil.TempDir(t, "external-detection-registry-*"), "test.md")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(path); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := extractJobSection(string(lock), "detection")
+	if job == "" {
+		t.Fatal("missing external detection job")
+	}
+	if strings.Contains(job, "registry.npm.org") {
+		t.Fatal("external detection must not inherit the node registry opt-in")
+	}
+}
+
+func TestCommittedDefaultCopilotDetectionLockfileDoesNotAllowNpmRegistry(t *testing.T) {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "smoke-copilot-small.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := extractJobSection(string(lock), "detection")
+	if job == "" {
+		t.Fatal("missing committed detection job")
+	}
+	rules := firewallDomainRules(t, job, "allowDomains")
+	for _, rule := range rules {
+		if awfDomainAllowsHost(rule, "registry.npmjs.org") {
+			t.Fatalf("committed default-network detection job allows registry.npmjs.org: %v", rules)
+		}
+	}
+}
+
 // TestDetectionAndEvalsSidecarOutputUnchanged pins the sidecar-related output for
 // detection and evals runs. These runs have no MCP sidecars, so the MCP gateway
 // host, DIFC/CLI proxy host, and AWF network section must stay on the
