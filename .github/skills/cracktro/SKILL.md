@@ -76,7 +76,7 @@ slides.push({
 - Follow https://brand.github.com/graphic-elements/mascots: mascots sparingly, never as logos or on serious topics (security, enterprise, money); use role icons there.
 - Never generate or redraw mascots. Avatars are 160x160 clips of brand.github.com 3D art (`mona.jpg`: dark-mode purple Mona, `mona-2026-versions.png`; `ducky.jpg`: middle Ducky, `mascots-03.png`), background `#0d1117`, never white.
 
-Core rules (`content-rules.md`): everything is public; no real people; no 40-hex SHAs or private repos; the only URLs are `https://github.github.com/gh-aw/introduction/overview/` and the For PMs source link `https://github.com/chrizbo/agentics-beyond-code`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
+Core rules (`content-rules.md`): everything is public; no real people; no 40-hex SHAs or private repos; the only URLs are `https://github.github.com/gh-aw/introduction/overview/`, the For PMs source link `https://github.com/chrizbo/agentics-beyond-code` and the repo-widget star endpoint `https://api.github.com/repositories/` (https pages only); speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
 
 ## Preview loop
 

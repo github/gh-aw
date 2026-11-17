@@ -360,6 +360,14 @@
   .pnt-v { position: absolute; left: 1010px; top: 724px; width: 800px; padding: 16px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
   .pnt-v.on { opacity: 1; color: #f0f6fc; border-color: #a371f7; }
   .pnt-v.ok { opacity: 1; color: #3fb950; border-color: #3fb950; background: #12261e; }
+  .rw { position: absolute; display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-radius: 999px; border: 1px solid #3d444d; background: #0d1117e6; font: 600 21px/1 var(--mono); color: #f0f6fc; white-space: nowrap; opacity: 0; }
+  .active .rw { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .rw svg { width: 24px; height: 24px; fill: #9198a1; flex: none; }
+  .rw i { display: flex; align-items: center; gap: 7px; margin-left: 6px; padding-left: 14px; border-left: 1px solid #3d444d; font-style: normal; }
+  .rw i svg { width: 22px; height: 22px; fill: #e3b341; }
+  .rw b { font-weight: 700; color: #e3b341; }
+  .pnt-rw { right: 110px; top: 118px; }
+  .skl-rw { right: 110px; top: 118px; }
   .pnt-m { width: 1420px; gap: 30px; } .pnt-m .dhm-k { gap: 26px; }
   .pnt-m .dhm-tl .y { fill: #a371f7; } .pnt-m .dhm-tl .s { fill: #d2a8ff; } .pnt-m .dhm-tl .d { fill: #ff7b72; } .pnt-m .dhm-tl .b { fill: #79c0ff; } .pnt-m .dhm-tl .x { fill: #6e7681; }
   .pnt-m .dhm-tl .v { fill: #f0f6fc; font: 600 14px var(--mono); text-anchor: middle; }
@@ -4673,6 +4681,41 @@
     file: [
       "M3 3a2 2 0 0 1 2-2h9.982a2 2 0 0 1 1.414.586l4.018 4.018A2 2 0 0 1 21 7.018V21a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm2-.5a.5.5 0 0 0-.5.5v18a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V8.5h-4a2 2 0 0 1-2-2v-4Zm10 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0-.146-.336l-4.018-4.018A.5.5 0 0 0 15 2.5Z",
     ],
+    star: [
+      "M12 .25a.75.75 0 0 1 .673.418l3.058 6.197 6.839.994a.75.75 0 0 1 .415 1.279l-4.948 4.823 1.168 6.811a.751.751 0 0 1-1.088.791L12 18.347l-6.117 3.216a.75.75 0 0 1-1.088-.79l1.168-6.812-4.948-4.823a.75.75 0 0 1 .416-1.28l6.838-.993L11.327.668A.75.75 0 0 1 12 .25Z",
+    ],
+  };
+  // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
+  // fetches the live count once per repo by numeric id (no owner handle in source) and keeps the default on failure.
+  const REPO_API = "https://api.github.com/repositories/";
+  const repoStars = new Map();
+  const fmtStars = n => (n >= 1e4 ? `${Math.round(n / 1e3)}k` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${n}`);
+  const repoWidget = (id, name, stars, cls) => {
+    const svg = n => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      s.setAttribute("viewBox", "0 0 24 24");
+      s.innerHTML = OCTI[n].map(d => `<path d="${d}"/>`).join("");
+      return s;
+    };
+    const count = h("b", {}, fmtStars(stars));
+    const el = h("div", { class: `rw ${cls}`, title: "GitHub stars" }, svg("repo"), h("span", {}, name), h("i", {}, svg("star"), count));
+    const load = () => {
+      if (location.protocol !== "https:" || typeof fetch !== "function") return;
+      if (!repoStars.has(id))
+        repoStars.set(
+          id,
+          fetch(REPO_API + id)
+            .then(r => (r.ok ? r.json() : null))
+            .then(j => (j && Number.isFinite(j.stargazers_count) ? j.stargazers_count : null))
+            .catch(() => null)
+        );
+      repoStars.get(id).then(n => {
+        if (n === null) return;
+        count.textContent = fmtStars(n);
+        el.classList.add("live");
+      });
+    };
+    return { el, load };
   };
   // Event-driven Hand-offs: trigger → agent → output → human patterns, then the Repo Assist loop
   {
@@ -5411,15 +5454,17 @@
         verdict.textContent = "";
         done = new Set();
       };
+      const repo = repoWidget(1266797999, "ponytail · ponytail-review skill", 192360, "pnt-rw");
       slides.push({
         group: "process",
         under: "prr",
         notes:
-          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship. The bottom strip is measured on gh-aw (snapshot 17 November 2026). From 8 August to 16 November 2026 (101 days) the workflow ran 2,928 times and posted 469 COMMENT reviews on 467 pull requests: 580 inline findings, mostly one per pull request, and 35 reviews with none inline. The reviews claim 10,219 lines that could go, a median of 12 per review. 57% of the findings were acted on: the code changed under them, the thread was resolved, or someone replied, usually Copilot. Until November each finding started with its kind: yagni 203, shrink 135, delete 68, stdlib or native 16; the newer prose findings carry no tag. In a one-in-five sample of runs with saved output, 76% of verdicts were Lean already. Ship. The median AI credits per review fell from about 20 in August, on the Copilot auto model, to about 5 in November after the move to Codex and economy routing; October's rise came with a larger model. The diff and findings in the animation are illustrative.",
+          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship. The bottom strip is measured on gh-aw (snapshot 17 November 2026). From 8 August to 16 November 2026 (101 days) the workflow ran 2,928 times and posted 469 COMMENT reviews on 467 pull requests: 580 inline findings, mostly one per pull request, and 35 reviews with none inline. The reviews claim 10,219 lines that could go, a median of 12 per review. 57% of the findings were acted on: the code changed under them, the thread was resolved, or someone replied, usually Copilot. Until November each finding started with its kind: yagni 203, shrink 135, delete 68, stdlib or native 16; the newer prose findings carry no tag. In a one-in-five sample of runs with saved output, 76% of verdicts were Lean already. Ship. The median AI credits per review fell from about 20 in August, on the Copilot auto model, to about 5 in November after the move to Codex and economy routing; October's rise came with a larger model. The badge top right is the skill's open-source repo and its GitHub star count, fetched live when online. The diff and findings in the animation are illustrative.",
         enter() {
           t0 = 0;
           cyc = -1;
           reset();
+          repo.load();
         },
         tick(t) {
           if (!t0) t0 = t;
@@ -5441,6 +5486,7 @@
           ...cards,
           verdict,
           strip,
+          repo.el,
           h("div", { class: "dhm-cap" }, "MEASURED · snapshot 17 Nov 2026 · reviews 8 Aug–16 Nov 2026 (101 d) · run sample 19 Aug–16 Nov · diff and findings illustrative")
         ),
       });
@@ -10084,10 +10130,12 @@
       [1270, "3", "Apply", "triage picks · comments cite skills", ".4s"],
     ].map(([x, n, t, s, d]) => h("div", { class: "skl-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
     const RULES = ["refs pinned to a commit SHA at compile time", "never installed by the agent at run time", "private skills: per-skill token or GitHub App"];
+    const repo = repoWidget(1148788086, "mattpocock/skills", 326117, "skl-rw");
     const el = h(
       "section",
       { class: "slide skl" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Expertise as a dependency · mattpocock/skills reviews gh-aw pull requests"), h("h2", {}, letters("Skills", "l-grad"))),
+      repo.el,
       cols,
       ed,
       ins,
@@ -10132,8 +10180,9 @@
       group: "engineering",
       key: "skills",
       notes:
-        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency.",
+        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency. The badge top right is the skills repo and its GitHub star count, fetched live when online.",
       enter() {
+        repo.load();
         t0 = 0;
         cyc = -1;
       },

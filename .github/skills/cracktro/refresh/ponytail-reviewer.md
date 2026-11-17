@@ -69,6 +69,7 @@ SAMPLE=5 node .github/skills/cracktro/refresh/ponytail-reviewer.mjs 2026-08-06 E
 2. Update `KINDS`, `AICM` (append a month; keep at most five bars so the SVG stays 190 px wide), and the five `kpi(...)` values.
 3. Update the caption dates and day count, every number in `notes`, and the content-rules.md Exception bullet.
 4. If the noop share is under 50%, swap the KPI colour class (`g`) for the default; never change the illustrative verdict text.
+5. Refresh the repo widget's default stars (`repoWidget(1266797999, …)`) from `gh api repositories/1266797999 --jq .stargazers_count` and its date in the content-rules bullet; the slide fetches the live count on https.
 
 ## 6. Validation
 
@@ -76,7 +77,7 @@ SAMPLE=5 node .github/skills/cracktro/refresh/ponytail-reviewer.mjs 2026-08-06 E
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4369 --bind 127.0.0.1 --directory docs/public   # async
 # browser canvas: http://127.0.0.1:4369/cracktro/#19, screenshot after ~3 s (findings) and ~10 s (end)
-grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code'   # must be empty
+grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code\|api.github.com/repositories/\|www.w3.org/2000/svg'   # must be empty
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```
 
