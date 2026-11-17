@@ -2131,7 +2131,7 @@
   @keyframes cgPop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
   /* --- budget steering --- */
-  .bst .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #e3b341, #f0883e, #e3b341); }
+  .bst .slide-head h2 { --lg: #e3b341; }
   .bst-now * { transition: none !important; }
   /* left: the API proxy that prices every request and appends notices */
   .bst-mon { position: absolute; left: 110px; top: 290px; width: 950px; height: 700px; opacity: 0; }
@@ -2140,7 +2140,7 @@
   .bst-wire { fill: none; stroke: #c9d1d9; stroke-width: 2.5; stroke-dasharray: 8 8; animation: bstFlow 1.2s linear infinite; }
   .bst-wl { font: 600 18px var(--mono); fill: #f0f6fc; text-anchor: middle; letter-spacing: .08em; }
   .bst-model { fill: #161b22; stroke: #ab7df8; stroke-width: 2.5; transition: filter .25s; }
-  .bst-mon.hit .bst-model { filter: drop-shadow(0 0 22px #ab7df8); }
+  .bst-mon.hit .bst-model { filter: drop-shadow(0 0 22px #ab7df855); }
   .bst-mn, .bst-pn { font: 700 32px "Mona Sans"; fill: #f0f6fc; }
   .bst-px { fill: #0d1117eb; stroke: #e3b341; stroke-width: 2.5; }
   .bst-bay { fill: #e3b3410f; stroke: #e3b34199; stroke-width: 1.5; stroke-dasharray: 6 6; }
@@ -2184,10 +2184,10 @@
   .bst-m.in.q { animation: none; }
   .bst-m small { display: block; margin-bottom: 6px; font: 700 13px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
   .bst-m.sys { --c: #f0f6fc; }
-  .bst-m.usr { --c: #4493f8; }
+  .bst-m.usr { --c: #c9d1d9; }
   /* assistant turns share the model's purple; tool results are cyan */
   .bst-m.ast { --c: #ab7df8; }
-  .bst-m.tool { --c: #39c5cf; background: #0d1117; }
+  .bst-m.tool { --c: #9198a1; background: #0d1117; }
   .bst-m.say > div { font: 600 20px/1.3 "Mona Sans"; }
   .bst-m.nt { --c: #e3b341; padding: 14px 16px; border: 2px solid #e3b341; border-left-width: 6px; background: #241d0c; box-shadow: 0 0 44px -12px #e3b341; transition: box-shadow .5s, background .5s; }
   .bst-nh { display: flex; align-items: center; gap: 10px; }
@@ -2201,9 +2201,9 @@
   .bst-m.nt.done p { max-height: 0; margin-top: 0; opacity: 0; }
   .bst-m.ok { --c: #ab7df8; border: 2px solid #ab7df8; border-left-width: 6px; background: #1c1530; box-shadow: 0 0 44px -12px #ab7df8; }
   .bst-m.ok b { display: block; margin-top: 6px; font: 700 21px/1.3 "Mona Sans"; color: #f0f6fc; }
-  .bst-m.ok em { display: inline-block; margin-top: 10px; padding: 6px 12px; border-radius: 99px; background: #3fb950; color: #0d1117; font: 700 14px/1 var(--mono); font-style: normal; }
+  .bst-m.ok em { display: inline-block; margin-top: 10px; padding: 6px 12px; border-radius: 99px; background: #d2a8ff; color: #0d1117; font: 700 14px/1 var(--mono); font-style: normal; }
   /* the AI-credit budget beside the conversation: green, amber past 80%, red past 90% */
-  .bst-mt { position: absolute; left: 1722px; top: 64px; width: 88px; height: 946px; opacity: 0; --c: #3fb950; }
+  .bst-mt { position: absolute; left: 1722px; top: 64px; width: 88px; height: 946px; opacity: 0; --c: #8b949e; }
   .active .bst-mt { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
   .bst-mt > b { display: block; text-align: center; font: 700 19px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #f0f6fc; }
   .bst-tr { position: absolute; left: 14px; top: 46px; width: 60px; height: 900px; box-sizing: border-box; border-radius: 16px; background: #0d1117; border: 2px solid #6e7681; }
@@ -8053,7 +8053,7 @@
   }
 
   // Budget steering: every model request passes the firewall's API proxy, which prices it; past 80% and 90% of max-ai-credits it appends a
-  // notice to the end of the agent's next request, the notice lands at the bottom of the conversation, the budget meter turns amber then red,
+  // notice to the end of the agent's next request, the notice lands at the bottom of the conversation, the budget meter turns amber then orange,
   // and the agent submits through a safe output before the hard stop
   {
     const AG = pickAgent();
@@ -8070,9 +8070,9 @@
       R1 = [930, 52];
     const LAMPS = [
       [80, 262, "#e3b341"],
-      [90, 380, "#f85149"],
-      [95, 498, "#f85149"],
-      [99, 616, "#f85149"],
+      [90, 380, "#db6d28"],
+      [95, 498, "#db6d28"],
+      [99, 616, "#db6d28"],
     ];
     const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const sparkle = (x, y, r, fill) => `<path transform="translate(${x},${y}) scale(${r / 14})" fill="${fill}" d="M0,-14 C1.5,-4 4,-1.5 14,0 C4,1.5 1.5,4 0,14 C-1.5,4 -4,1.5 -14,0 C-4,-1.5 -1.5,-4 0,-14Z"/>`;
@@ -8147,7 +8147,7 @@
     };
     const draw = () => {
       fill.style.height = `${(shown / CAP) * FH}px`;
-      meter.style.setProperty("--c", shown >= CAP * 0.9 ? "#f85149" : shown >= CAP * 0.8 ? "#e3b341" : "#3fb950");
+      meter.style.setProperty("--c", shown >= CAP * 0.9 ? "#db6d28" : shown >= CAP * 0.8 ? "#e3b341" : "#8b949e");
       meter.classList.toggle("r", shown >= CAP * 0.9);
       // a threshold lamp lights only when the meter itself crosses it
       LAMPS.forEach(([p], i) => {
@@ -8404,7 +8404,7 @@
     slides.push({
       group: "cost",
       notes:
-        "Budget steering: warn the agent before the hard stop. Illustrative: the run, conversation and numbers are synthetic; the run starts empty and its middle is fast-forwarded until the budget nears 80 percent. An agent cannot see its own budget, so on its own it keeps working until max-ai-credits or timeout-minutes cuts it off, and the unfinished work is lost. Every model request already passes through the firewall's API proxy, which prices it in AI credits. When the run crosses 80, 90, 95 or 99 percent of its AI-credit budget or of its agent time limit, the proxy appends a short notice to the end of the next request that ends with a tool result: after the last tool result, never in the system prompt, so the provider's prompt cache still hits. The notice says how much is used and about how many more requests fit at the current rate, then what to do: the agent responsible for the final output stops and submits what it has, and a sub-agent finishes its step and returns what it has to the agent that started it. The card on the slide is abridged; the first notice really reads: [AWF AI CREDIT WARNING] 402 of 500 AI credits are used; at the current rate about 12 more model requests fit. If you are responsible for this workflow's final output, stop the remaining work and submit it now with what you have. Otherwise, finish your current step and return what you have to the agent that started you. One more notice goes out when only about five requests' worth of credits, or about five minutes, remain. The harness resends its own copy of the conversation on every turn, so a notice lasts one request; the proxy therefore gives each conversation in the run, sub-agents included, the current notice once, and a conversation that missed earlier notices hears only the newest. In this run the meter turns amber at 80 percent and red at 90; after the second notice the agent opens its pull request through a safe output with credits to spare, so the hard stop never fires. Every delivery is recorded in the run's unified session, so gh aw audit and gh aw logs show which conversation heard which notice. Notices are on by default; sandbox.agent.token-steering: false turns them off. Steering never changes the model or raises the budget. Keys: → next step.",
+        "Budget steering: warn the agent before the hard stop. Illustrative: the run, conversation and numbers are synthetic; the run starts empty and its middle is fast-forwarded until the budget nears 80 percent. An agent cannot see its own budget, so on its own it keeps working until max-ai-credits or timeout-minutes cuts it off, and the unfinished work is lost. Every model request already passes through the firewall's API proxy, which prices it in AI credits. When the run crosses 80, 90, 95 or 99 percent of its AI-credit budget or of its agent time limit, the proxy appends a short notice to the end of the next request that ends with a tool result: after the last tool result, never in the system prompt, so the provider's prompt cache still hits. The notice says how much is used and about how many more requests fit at the current rate, then what to do: the agent responsible for the final output stops and submits what it has, and a sub-agent finishes its step and returns what it has to the agent that started it. The card on the slide is abridged; the first notice really reads: [AWF AI CREDIT WARNING] 402 of 500 AI credits are used; at the current rate about 12 more model requests fit. If you are responsible for this workflow's final output, stop the remaining work and submit it now with what you have. Otherwise, finish your current step and return what you have to the agent that started you. One more notice goes out when only about five requests' worth of credits, or about five minutes, remain. The harness resends its own copy of the conversation on every turn, so a notice lasts one request; the proxy therefore gives each conversation in the run, sub-agents included, the current notice once, and a conversation that missed earlier notices hears only the newest. In this run the meter turns amber at 80 percent and orange at 90; after the second notice the agent opens its pull request through a safe output with credits to spare, so the hard stop never fires. Every delivery is recorded in the run's unified session, so gh aw audit and gh aw logs show which conversation heard which notice. Notices are on by default; sandbox.agent.token-steering: false turns them off. Steering never changes the model or raises the budget. Keys: → next step.",
       enter() {
         last = 0;
         jump(0);
