@@ -100,5 +100,5 @@ chmod 600 "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"
 
 echo "Codex configuration written to ${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"
 echo ""
-echo "Converted configuration:"
-cat "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"
+echo "Converted configuration (Authorization redacted):"
+sed -E 's/(Authorization[[:space:]]*=[[:space:]]*")[^"]*(")/\1***REDACTED***\2/g' "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"
