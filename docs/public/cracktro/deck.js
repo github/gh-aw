@@ -2220,7 +2220,7 @@
   @keyframes bstGrow { from { max-height: 0; opacity: 0; transform: translateY(18px); } to { max-height: 460px; opacity: 1; transform: none; } }
 
   /* --- model routing --- */
-  .mr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #ab7df8); }
+  .mr .slide-head h2 { --lg: #e3b341; }
   /* the run card starts centred, then glides left when the results arrive */
   .mr-hero { position: absolute; left: 110px; top: 350px; width: 1040px; height: 590px; transform: translateX(330px); transition: transform 1.1s cubic-bezier(.7,0,.2,1); }
   .mr.side .mr-hero { transform: none; }
@@ -2232,13 +2232,13 @@
   .mr-wf { margin-left: 12px; }
   .mr-wf small { margin-left: 12px; font-size: 16px; color: #656c76; }
   .mr-gap { flex: 1; }
-  .mr-model { font: 600 19px/1 var(--mono); padding: 8px 14px; border-radius: 8px; background: #0d1117; border: 1px solid #ab7df8; box-shadow: 0 0 30px -6px #ab7df8; color: #ff7b72; }
+  .mr-model { font: 600 19px/1 var(--mono); padding: 8px 14px; border-radius: 8px; background: #0d1117; border: 1px solid #ab7df8; box-shadow: 0 0 30px -6px #ab7df8; color: #9198a1; }
   .mr-model b { font-weight: 600; color: #d2a8ff; text-shadow: 0 0 12px #ab7df8; }
   /* run-card transitions run at the same slower pace as the router animation (SLOW in the slide) */
   .mr-text { position: absolute; left: 36px; top: 84px; width: 572px; font: 600 36px/1.3 "Mona Sans"; color: #e6edf3; text-wrap: balance; transition: opacity .44s; }
   .mr-hide { color: transparent; }
   .mr-w { border-radius: 6px; transition: color .53s, background .53s, box-shadow .53s; }
-  .mr-w.k { --c: #f778ba; } .mr-w.s { --c: #39c5cf; } .mr-w.d { --c: #e3b341; }
+  .mr-w.k, .mr-w.s, .mr-w.d { --c: #e3b341; }
   .mr-w.on { color: #fff; background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -3px 0 var(--c), 0 0 24px -8px var(--c); }
   .mr-beam { position: absolute; left: 30px; top: 70px; width: 3px; height: 190px; border-radius: 2px; background: #e2c5ff; box-shadow: 0 0 16px 4px #ab7df8; opacity: 0; pointer-events: none; transition: opacity .27s; }
   .mr-beam::before { content: ""; position: absolute; right: 3px; top: 0; width: 150px; height: 100%; background: linear-gradient(90deg, transparent, #ab7df838); }
@@ -2280,21 +2280,21 @@
   .mr-proof.on, .mr-rep.on { opacity: 1; transform: none; }
   .mr-proof { top: 276px; padding: 24px 28px 22px; }
   .mr-pf-h { display: flex; align-items: center; gap: 14px; font: 700 26px/1 "Mona Sans"; color: #f0f6fc; }
-  .mr-pf-h em { font: 600 13px/1 var(--mono); font-style: normal; letter-spacing: .16em; text-transform: uppercase; color: #3fb950; border: 1px solid #3fb95088; border-radius: 99px; padding: 6px 10px; }
+  .mr-pf-h em { font: 600 13px/1 var(--mono); font-style: normal; letter-spacing: .16em; text-transform: uppercase; color: #e3b341; border: 1px solid #e3b34188; border-radius: 99px; padding: 6px 10px; }
   .mr-big { display: flex; align-items: center; gap: 22px; margin: 16px 0 8px; }
-  .mr-big b { min-width: 280px; font: 700 96px/1 var(--mono); letter-spacing: -.05em; color: #3fb950; text-shadow: 0 0 40px #3fb95066; font-variant-numeric: tabular-nums; }
+  .mr-big b { min-width: 280px; font: 700 96px/1 var(--mono); letter-spacing: -.05em; color: #e3b341; text-shadow: 0 0 40px #e3b34155; font-variant-numeric: tabular-nums; }
   .mr-big span { font: 600 26px/1.2 "Mona Sans"; color: #f0f6fc; }
   .mr-big small { display: block; margin-top: 8px; font: 500 18px/1 var(--mono); color: #9198a1; }
   .mr-strip { display: block; width: 544px; height: 150px; overflow: visible; }
   .mr-strip rect { transform: scaleY(0); transform-box: fill-box; transform-origin: 50% 100%; transition: transform .5s cubic-bezier(.2,.9,.2,1) calc(var(--i) * 45ms + 300ms); }
   .mr-proof.on .mr-strip rect { transform: none; }
-  .mr-strip .pre { fill: #8957e5; } .mr-strip .post { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95088); }
+  .mr-strip .pre { fill: #656c76; } .mr-strip .post { fill: #e3b341; filter: drop-shadow(0 0 6px #e3b34166); }
   .mr-strip line { stroke: #ffffff40; stroke-width: 1.5; stroke-dasharray: 4 6; }
   .mr-strip line.mk { stroke: #d2a8ff; stroke-width: 2; stroke-dasharray: 6 5; }
   .mr-strip text { font: 600 14px var(--mono); fill: #9198a1; }
   .mr-strip text.mk { fill: #d2a8ff; }
   .mr-held { display: flex; gap: 26px; margin-top: 12px; font: 500 18px/1.2 "Mona Sans"; color: #d1d7e0; }
-  .mr-held i { margin-right: 8px; font-style: normal; font-weight: 800; color: #3fb950; }
+  .mr-held i { margin-right: 8px; font-style: normal; font-weight: 800; color: #e3b341; }
   .mr-held b { margin-left: 6px; font: 600 17px var(--mono); color: #f0f6fc; white-space: nowrap; }
   /* a week of runs, one square each, filled in like a sequencer */
   .mr-rep { top: 670px; padding: 22px 28px 20px; }
@@ -2302,9 +2302,9 @@
   .mr-week { display: grid; grid-template-columns: 22px repeat(24, 17px); gap: 4px; }
   .mr-week i { font: 700 16px/17px var(--mono); color: #e6edf3; font-style: normal; }
   .mr-week b { height: 17px; border-radius: 4px; background: #ffffff10; transition: background .35s, box-shadow .35s; }
-  .mr-week b.t0 { background: #3fb950; box-shadow: 0 0 10px -3px #3fb950; }
-  .mr-week b.t1 { background: #4493f8; box-shadow: 0 0 10px -3px #4493f8; }
-  .mr-week b.t2 { background: #ab7df8; box-shadow: 0 0 10px -3px #ab7df8; }
+  .mr-week b.t0 { background: #8957e5; box-shadow: 0 0 10px -3px #8957e5; }
+  .mr-week b.t1 { background: #bc8cff; box-shadow: 0 0 10px -3px #bc8cff; }
+  .mr-week b.t2 { background: #e2c5ff; box-shadow: 0 0 10px -3px #e2c5ff; }
   .mr-week b.hot { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
   @keyframes mr-pop { from { transform: scale(.2); } }
   .mr-rf { display: flex; align-items: center; gap: 18px; margin-top: 18px; font: 600 16px/1 var(--mono); color: #d1d7e0; }
@@ -7329,9 +7329,9 @@
       ctx = cv.getContext("2d");
     const route = h("div", { class: "cm-route" }, cv, h("i", {}, "model: router"));
     const MODELS = [
-      ["robust", "#d2a8ff", 15, 70, "costly failures"],
+      ["robust", "#e2c5ff", 15, 70, "costly failures"],
       ["balanced", "#bc8cff", 3, 150, "general work"],
-      ["economy", "#a371f7", 1, 230, "triage, summaries"],
+      ["economy", "#8957e5", 1, 230, "triage, summaries"],
     ];
     const AX = 60,
       AY = 150,
@@ -8512,18 +8512,18 @@
       },
     ];
     const TIERS = [
-      ["SMALL", "#3fb950", "$", "small"],
-      ["MID-SIZE", "#4493f8", "$$", "mid-size"],
-      ["FRONTIER", "#ab7df8", "$$$", "frontier"],
+      ["SMALL", "#8957e5", "$", "small"],
+      ["MID-SIZE", "#bc8cff", "$$", "mid-size"],
+      ["FRONTIER", "#e2c5ff", "$$$", "frontier"],
     ];
     const ZONES = [
-      ["low", "economy", "#3fb950", 150],
-      ["medium", "balanced", "#4493f8", 90],
-      ["high", "robust", "#ab7df8", 30],
+      ["low", "economy", "#8957e5", 150],
+      ["medium", "balanced", "#bc8cff", 90],
+      ["high", "robust", "#e2c5ff", 30],
     ];
     const CHIPS = [
-      ["kind", "#f778ba", "k"],
-      ["scope", "#39c5cf", "s"],
+      ["kind", "#e3b341", "k"],
+      ["scope", "#e3b341", "s"],
       ["difficulty", "#e3b341", "d"],
     ];
     // Measured on gh-aw's own workflows: cost per run by day, relative to each workflow's own two weeks before routing (through 12 Nov 2026).
