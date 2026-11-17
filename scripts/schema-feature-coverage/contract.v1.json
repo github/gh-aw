@@ -1,0 +1,47 @@
+{
+  "format": "gh-aw-schema-example-measurement",
+  "version": "1.0.0",
+  "repository": "github/gh-aw",
+  "workflow": "schema-feature-coverage",
+  "outcome": "Every top-level workflow schema property has a textual Markdown example.",
+  "schema": "pkg/parser/schemas/main_workflow_schema.json",
+  "directories": [".github/workflows", "schema-demos"],
+  "accepted_evidence": "At an immutable first-parent source revision, search regular *.md Git blobs recursively in both directories for ^FIELD: with FIELD regex-escaped. Include code blocks; exclude nested/indented keys. Do not parse frontmatter or compile examples.",
+  "population": "All top-level .properties keys at each source revision, irrespective of actor.",
+  "metrics": [
+    {
+      "id": "schema-feature-coverage.covered-fields",
+      "role": "primary",
+      "unit": "fields",
+      "direction": "increase",
+      "formula": "eligible fields minus fields without a matching line"
+    },
+    {
+      "id": "schema-feature-coverage.eligible-fields",
+      "role": "diagnostic",
+      "unit": "fields",
+      "direction": "context",
+      "formula": "number of top-level .properties keys"
+    }
+  ],
+  "inventory": "Emit sorted schema_fields and missing lists with every available snapshot; retain regressions and changing populations. Never average daily coverage ratios.",
+  "grain": "snapshot",
+  "windows": {
+    "duration_days": 7,
+    "cadence_days": 1,
+    "maturation_days": 0,
+    "before": "[first_merge - 7 days, first_merge)",
+    "after": "[last_merge, last_merge + 7 days)",
+    "batch_interval": "Excluded from both windows.",
+    "endpoint": "Separate snapshot at last_merge + 7 days, not an eighth after sample.",
+    "revision_selection": "git rev-list --first-parent -1 --before=CUTOFF PINNED_TIP; day zero uses the exact last accepted merge revision.",
+    "overlap": "Shared or overlapping windows must not be independently summed as exclusive effects."
+  },
+  "merge_delta": "Compare the accepted commit with its exact first parent. Newly covered fields must exist in both populations and change from missing to represented. Report removed fields, introduced fields and lost coverage separately; retirement is not an example addition.",
+  "missing_data": "Missing schema, empty schema population or absent regular Markdown inventory yields null counts and null inventories with an explicit unavailable reason, never zero or last-known substitution. Malformed evidence, incomplete Git history and conflicting replay assertions fail explicitly.",
+  "zero": "A complete, nonempty schema and Markdown inventory with no represented fields yields covered=0.",
+  "provenance": "Full source commit IDs, per-file SHA-256 hashes, and exact-byte SHA-256 digests of contract, evaluator and replay inputs. No moving refs or wall-clock input in replay.",
+  "attribution": "Always null in this package. Accepted-merge deltas and elapsed daily windows do not prove native output identity, explicit human adoption, complete-window survival, finding lineage, exclusive attribution or causality.",
+  "freeze": "Review this version with its evaluator, semantic tests and pinned retrospective fixture. It was selected after historical outcomes were inspected, not prospectively frozen in March 2026. Preserve adopted bytes and results; semantic corrections require a new version and separately labelled replay.",
+  "integration": "Standalone offline evidence package, not a CAO schemaVersion 3 definition, collector registration, publication envelope or gh-aw run-scoped grader. No scheduled collection or deployment."
+}
