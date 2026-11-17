@@ -23,6 +23,8 @@ set +o histexpand
 #   --cooldown-days - Require the GitHub release to be at least DAYS old, including
 #                     toolcache and musl guest installs. Defaults to 0 for standalone
 #                     checksum-only callers; the workflow compiler supplies 3.
+#                     Skipped when the version equals DEFAULT_COPILOT_VERSION
+#                     (the compiler default version).
 #
 # Environment overrides (testing):
 #   COPILOT_INSTALL_DIR - Override the install directory (default: /usr/local/bin).
@@ -737,6 +739,13 @@ create_release_staging copilot
 check_copilot_release_age() {
   local version="$1"
   if [ "$COOLDOWN_DAYS" = 0 ]; then
+    printf '%s\n' "$version"
+    return 0
+  fi
+  # The compiler default is reviewed and pinned when it is bumped, so it has
+  # already cleared the cooldown review; skip the metadata request for it.
+  if [ -n "$version" ] && [ "${version#v}" = "${DEFAULT_COPILOT_VERSION#v}" ]; then
+    echo "Copilot release '${version}' matches the compiler default version; skipping release-age cooldown check." >&2
     printf '%s\n' "$version"
     return 0
   fi
