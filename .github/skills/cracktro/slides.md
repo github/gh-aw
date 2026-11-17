@@ -47,10 +47,10 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Spec · Model · Test | illustrative | Specification requirements become TLA+ invariants; model checking explores every state, and its traces become conformance tests. |
 | Go Fan | illustrative | A daily agent compares each Go dependency's releases with how the code uses it and files review issues that Copilot turns into fixes. |
 | Spec-driven testing | illustrative | Agents keep specifications current from human intent and code changes, and an enforcer turns the specification into tests that guard the next change. |
-| Docs that heal | illustrative | Small agents update, simplify and test documentation the way a newcomer reads it, then fix the gaps and teach the updater new rules. |
 | Multi-device tester | illustrative | A daily agent browses the documentation on phone, tablet and desktop viewports and files what breaks; Copilot fixes it, a developer reviews the pull request and the next run re-tests. |
 | Findings that land | illustrative | Docs auditor agents file what they find as issues; the findings handed to Copilot as one checkable defect get fixed by merged pull requests, while unassigned rolling reports mostly expire. |
 | Personas · Probe · Patch | illustrative | A daily agent role-plays software personas asking the workflow-authoring agent for automations, scores its answers, and re-runs one on a truncated guidance prefix to find rules the cut hides; Copilot moves them up and the next run re-scores. |
+| Docs that heal | illustrative | Small agents update, simplify and test documentation the way a newcomer reads it, then fix the gaps and teach the updater new rules. |
 | Speech To Agent | illustrative | A dictation glossary maps misheard speech-to-text phrases to exact identifiers, so spoken prompts produce terms agents can grep. |
 | Scan · Fix · Learn | illustrative | The .NET runtime team's CI health loop: a scanner files known build errors, a fixer attempts fixes, and a feedback agent tunes both. |
 | For PMs | illustrative | Agentic workflows also serve product managers: an existing team habit triggers an agent, which leaves an artifact for a human to decide on. |
@@ -58,6 +58,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Cost Optimization |  | Band header (Cost Optimization): debug, spend less and route smarter. |
 | Cost management | illustrative | Cut agent spend by scheduling less often, fetching data in deterministic steps, capping credits, using sub-agents and routing models with experimental model routing. |
 | Cost guardrails | illustrative | Layered guardrails stop runaway agents: execution controls, including the experimental user rate limit, throttle events, the daily budget blocks runs before activation, per-run limits hard-stop a run, and optional central admission approves or denies each run before it starts. |
+| Budget steering | illustrative | As a run nears its AI-credit or time budget, the firewall's API proxy appends a notice to the end of the agent's next model request saying what is left and what to do, once per conversation, so the agent submits what it has before the hard stop and audit records every delivery. |
 | Model routing | illustrative | Experimental: with model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
 | DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
 | Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |

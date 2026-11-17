@@ -145,6 +145,10 @@ test("jumps to any slide from the dock's full-screen slide map", async ({ page }
   await button.click();
   await expect(dialog).toBeVisible();
   await expect(tiles).toHaveCount(TOTAL);
+  // each band is a region headed by its title and slide range, above its tiles
+  const security = dialog.getByRole("region", { name: /^Security #/ });
+  await expect(security.getByRole("heading", { level: 3 })).toHaveText(new RegExp(`^Security #${SECURITY}–\\d+$`));
+  await expect(security.getByRole("button", { name: new RegExp(`^Go to slide ${SECURITY}:`) })).toBeVisible();
   // a column's examples are stacked below its pattern tile
   const kids = dialog.getByRole("group", { name: "Daily Unsloppers examples" });
   await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${slideNo("Repo Assist")}:`) })).toBeVisible();
@@ -575,6 +579,25 @@ test("steps the cost guardrails slide from execution controls to admission", asy
   await page.keyboard.press("ArrowLeft");
   await expect(slide.locator(".cg-status b")).toHaveText("ADMISSION");
   await expect(page.locator(".slide.active h2")).toHaveText("Cost guardrails");
+  expect(errors).toEqual([]);
+});
+
+test("steps the budget steering slide from the 80% notice to a submitted pull request", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Budget steering")}`);
+  const slide = page.locator(".slide.active");
+  await expect(slide.locator("h2")).toHaveText("Budget steering");
+  await expect(slide.locator(".bst-lamp.on")).toHaveCount(0);
+  await page.keyboard.press("ArrowRight");
+  await expect(slide.locator(".bst-lamp.on")).toHaveCount(1);
+  await expect(slide.locator(".bst-m.nt .big b")).toHaveText("402 / 500", { timeout: 8000 });
+  await page.keyboard.press("ArrowRight");
+  await expect(slide.locator(".bst-m.ok")).toContainText("create_pull_request", { timeout: 15000 });
+  await expect(slide.locator(".bst-lamp.on")).toHaveCount(2);
+  await page.keyboard.press("ArrowLeft");
+  await expect(slide.locator(".bst-m.ok")).toHaveCount(0);
+  await expect(page.locator(".slide.active h2")).toHaveText("Budget steering");
   expect(errors).toEqual([]);
 });
 

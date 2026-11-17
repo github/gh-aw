@@ -102,13 +102,13 @@ jobs:
         path: trusted
         fetch-depth: 1
         persist-credentials: false
-    - name: Checkout PR diff evidence
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-      with:
-        ref: ${{ github.sha }}
-        path: evidence
-        fetch-depth: 2
-        persist-credentials: false
+        sparse-checkout-cone-mode: false
+        sparse-checkout: |
+          /scripts/ci-front-door.cjs
+          /scripts/ci-front-door-diff.cjs
+          /actions/setup/js/decisions_client.cjs
+          /.github/ci/suite-catalog.json
+          /.github/ci/decision-prompt.txt
     - name: Select CI suites with GitHub Decisions
       # Never bootstrap a missing trusted selector from PR-controlled code.
       if: hashFiles('trusted/scripts/ci-front-door.cjs') != ''
@@ -117,7 +117,10 @@ jobs:
       working-directory: trusted
       env:
         CI_DECISION_TOKEN: ${{ github.token }}
-        CI_DIFF_WORKSPACE: ${{ github.workspace }}/evidence
+        # Compare immutable event SHAs without checking out PR-controlled files.
+        CI_DIFF_TOKEN: ${{ github.token }}
+        CI_DIFF_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        CI_DIFF_HEAD_SHA: ${{ github.sha }}
       run: node scripts/ci-front-door.cjs
     - name: Validate suite outputs
       id: validated
