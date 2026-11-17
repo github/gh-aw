@@ -1059,6 +1059,30 @@ func TestBuildJobLevelSafeOutputEnvVarsIncludesCompiledProjectUTC(t *testing.T) 
 	assert.Equal(t, `"-07:00"`, envVars["GH_AW_PROJECT_UTC"])
 }
 
+func TestCompiledIssueLabelEnvironments(t *testing.T) {
+	for _, label := range []string{"", "area:agentic-workflows", `area: team's "workflows"`} {
+		t.Run(label, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.repoConfigLoaded = true
+			compiler.repoConfig = &RepoConfig{IssueLabel: label}
+			data := &WorkflowData{Name: "Test", SafeOutputs: &SafeOutputsConfig{}}
+			safeOutputsEnv := compiler.buildJobLevelSafeOutputEnvVars(data, "test")
+			conclusion, err := compiler.buildConclusionJob(data, "agent", nil)
+			require.NoError(t, err)
+			require.NotNil(t, conclusion)
+			for _, env := range []map[string]string{safeOutputsEnv, conclusion.Env} {
+				if label == "" {
+					assert.NotContains(t, env, "GH_AW_ISSUE_LABEL")
+					continue
+				}
+				var parsed map[string]string
+				require.NoError(t, yaml.Unmarshal([]byte("GH_AW_ISSUE_LABEL: "+env["GH_AW_ISSUE_LABEL"]), &parsed))
+				assert.Equal(t, label, parsed["GH_AW_ISSUE_LABEL"])
+			}
+		})
+	}
+}
+
 // TestBuildDetectionSuccessCondition tests the detection condition builder
 func TestBuildDetectionSuccessCondition(t *testing.T) {
 	condition := buildDetectionSuccessCondition()
@@ -2172,7 +2196,7 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	assert.Contains(t, content, "Upload Safe Outputs Items")
 	assert.Contains(t, content, "if: always()")
 	assert.Contains(t, content, "/tmp/gh-aw/safe-output-items.jsonl")
-	assert.Contains(t, content, "/tmp/gh-aw/safe-output-outcomes.jsonl")
+	assert.Contains(t, content, "/tmp/gh-aw/safe-output-executions.jsonl")
 	assert.NotContains(t, content, "process-safe-outputs.stdout.log")
 	assert.NotContains(t, content, "process-safe-outputs.stderr.log")
 	assert.NotContains(t, content, "merge-pull-request-decisions.jsonl")
@@ -2249,7 +2273,7 @@ func TestMergePullRequestDecisionUploadsRequireRedactionInAllModes(t *testing.T)
 				suppressItems := mode == "global-staged" || mode == "trial"
 				assert.Equal(t, !suppressItems, strings.Contains(paths, "/tmp/gh-aw/safe-output-items.jsonl"))
 				if suppressItems {
-					assert.NotContains(t, paths, "safe-output-outcomes.jsonl")
+					assert.NotContains(t, paths, "safe-output-executions.jsonl")
 					assert.NotContains(t, paths, "temporary-id-map.json")
 					assert.NotContains(t, paths, "safe-output-errors.json")
 					assert.NotContains(t, paths, "claim-delivery-errors.json")
@@ -2289,7 +2313,7 @@ func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.
 			require.NotContains(t, content, "/tmp/gh-aw/claims/*/delivery-receipt.json")
 			if test.worker {
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-items.jsonl")
-				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-outcomes.jsonl")
+				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-executions.jsonl")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/temporary-id-map.json")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-errors.json")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/claim-delivery-errors.json")

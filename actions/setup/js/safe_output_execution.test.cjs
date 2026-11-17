@@ -1,0 +1,590 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { buildSafeOutputExecutions, canonicalSafeOutputUrl, projectSafeOutputData, finalizeBufferedReviewExecutions } from "./safe_output_execution.cjs";
+import { writeSafeOutputExecutions, extractCreatedItemFromResult } from "./safe_output_manifest.cjs";
+import { main as actionHandlerFactory } from "./safe_output_action_handler.cjs";
+import { computeSafeOutputsStatus } from "./safe_outputs_status.cjs";
+import { main as handlerManagerMain, processMessages, rollbackReviewResultsForPR, skipReviewResultsForPR } from "./safe_output_handler_manager.cjs";
+import { writeUnifiedSession } from "./unified_session.cjs";
+import { validateSession } from "./scripts/validate_session.cjs";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
+describe("safe-output application outcomes", () => {
+  it.each([
+    [{ success: true }, "success"],
+    [{ success: false, error: "PRIVATE_ERROR" }, "failed"],
+    [{ success: true, skipped: true }, "skipped"],
+    [{ success: true, result: { warning: "PRIVATE_WARNING" } }, "warning"],
+    [{ cancelled: true }, "cancelled"],
+    [{ deferred: true }, "deferred"],
+    [{ delegated: true, success: true }, "delegated"],
+    [{ success: true, result: { deferred_manifest: true } }, "deferred"],
+    [{ success: true, result: { staged: true } }, "staged"],
+  ])("records %j as %s without content", (result, status) => {
+    const [outcome] = buildSafeOutputExecutions([{ type: "add_comment", messageIndex: 0, body: "PRIVATE_BODY", metadata: { content: "PRIVATE_METADATA" }, ...result }]);
+    expect(outcome).toMatchObject({ type: "add_comment", messageIndex: 0, status });
+    expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
+    expect(Object.keys(outcome).sort()).toEqual(["messageIndex", "staged", "status", "timestamp", "type"]);
+  });
+
+  it("does not describe staged previews or rolled-back reviews as applied", () => {
+    const result = { type: "submit_pull_request_review", messageIndex: 0, success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true, review_url: "https://github.com/org/repo/pull/1#pullrequestreview-5" } };
+    expect(buildSafeOutputExecutions([result], true)[0]).toMatchObject({ status: "deferred", staged: true });
+    rollbackReviewResultsForPR([result], "org/repo", 1, "PRIVATE_ERROR");
+    expect(buildSafeOutputExecutions([result])[0]).toMatchObject({ status: "failed" });
+    expect(buildSafeOutputExecutions([result])[0]).not.toHaveProperty("url");
+    const skipped = { ...result, success: true };
+    skipReviewResultsForPR([skipped], "org/repo", 1, "PRIVATE_REASON");
+    expect(buildSafeOutputExecutions([skipped])[0]).toMatchObject({ status: "skipped" });
+    expect(skipped.result.deferred_manifest).toBe(false);
+    expect(skipped.skipReason).toBe("PRIVATE_REASON");
+    expect(buildSafeOutputExecutions([{ success: true }], true)[0]).toMatchObject({ status: "staged", staged: true });
+  });
+
+  it.each(["merge_pull_request", "add_comment", "create_issue"])("retains indeterminate %s outcomes while failing processing and withholding success URLs", type => {
+    const [outcome] = buildSafeOutputExecutions([{ type, messageIndex: 0, success: false, result: { operation_outcome: "indeterminate", url: "https://github.com/org/repo/issues/1" } }]);
+    expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
+    expect(outcome).not.toHaveProperty("url");
+    expect(projectSafeOutputData(outcome).operation_outcome).toBe("indeterminate");
+    expect(projectSafeOutputData({ type, operation_outcome: "private-value" })).not.toHaveProperty("operation_outcome");
+  });
+
+  it("retains operation uncertainty from top-level processing results", () => {
+    const [outcome] = buildSafeOutputExecutions([{ type: "custom_output", success: false, operation_outcome: "indeterminate" }]);
+    expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
+  });
+
+  it.each(["success", "failed", "skipped", "staged"])("retains the execution path for %s outcomes", status => {
+    const result = { success: status !== "failed", skipped: status === "skipped", staged: status === "staged", execution_trace: "init_ptch_done" };
+    const [outcome] = buildSafeOutputExecutions([{ type: "create_pull_request", success: result.success, result }]);
+    expect(outcome).toMatchObject({ status, execution_trace: "init_ptch_done" });
+    expect(projectSafeOutputData(outcome).execution_trace).toBe("init_ptch_done");
+  });
+
+  it.each(["", "push_".repeat(205) + "done", "ABc", "init_done\n", "_init", "init_", "init__done", "init_don", "init_donee", "init_d0ne", "init/done", "route=private", 123, ["init"]])(
+    "omits invalid execution traces: %j",
+    execution_trace => {
+      expect(projectSafeOutputData({ execution_trace })).not.toHaveProperty("execution_trace");
+      expect(buildSafeOutputExecutions([{ success: true, result: { execution_trace } }])[0]).not.toHaveProperty("execution_trace");
+    }
+  );
+
+  it("retains complete traces at the length limit", () => {
+    const execution_trace = "push_".repeat(204) + "done";
+    expect(execution_trace).toHaveLength(1024);
+    expect(projectSafeOutputData({ execution_trace }).execution_trace).toBe(execution_trace);
+  });
+
+  it("persists isolated handler traces through processing and unified-session collection, including failures", async () => {
+    const root = fs.mkdtempSync("/tmp/safe-output-traces-");
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    const traces = ["init_done", "init_fail", "init_thrw", "init_noop_fail", "init_stag_done"];
+    try {
+      for (const type of ["create_pull_request", "push_to_pull_request_branch"]) {
+        const handler = async message => {
+          const execution_trace = traces[message.scenario];
+          if (message.scenario === 2) throw Object.assign(new Error("PRIVATE_ERROR"), { execution_trace });
+          return {
+            success: message.scenario !== 1,
+            execution_trace,
+            ...(message.scenario === 1 ? { error: "PRIVATE_ERROR" } : {}),
+            ...(message.scenario === 3 ? { skipped: true, reason: "PRIVATE_REASON" } : {}),
+            ...(message.scenario === 4 ? { staged: true } : {}),
+          };
+        };
+        // Agent-request fields must never substitute for handler execution evidence.
+        const messages = traces.map((_, scenario) => ({ type, scenario, execution_trace: "fake_done" }));
+        const processing = await processMessages(new Map([[type, handler]]), messages);
+        writeSafeOutputExecutions(processing.results, false, path.join(root, type, "safe-output-executions.jsonl"));
+        const events = writeUnifiedSession({ rootDir: path.join(root, type), graders: [] });
+        const outcomes = events.filter(event => event.type === "safe_output.execution");
+        expect(outcomes.map(event => event.data.execution_trace)).toEqual(traces);
+        expect(outcomes.map(event => event.data.status)).toEqual(["success", "failed", "failed", "skipped", "staged"]);
+        const persisted = fs.readFileSync(path.join(root, type, "usage/aw_session.jsonl"), "utf8");
+        expect(persisted).not.toContain("fake_done");
+        expect(persisted).not.toContain("PRIVATE");
+        expect(validateSession(persisted)).toBe(events.length);
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces a deferred trace with the terminal retry failure trace", async () => {
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    const handler = vi
+      .fn()
+      .mockResolvedValueOnce({ deferred: true, execution_trace: "init_wait" })
+      .mockRejectedValueOnce(Object.assign(new Error("PRIVATE_ERROR"), { execution_trace: "init_thrw" }));
+    const processing = await processMessages(new Map([["create_pull_request", handler]]), [{ type: "create_pull_request" }]);
+    expect(buildSafeOutputExecutions(processing.results)[0]).toMatchObject({ status: "failed", execution_trace: "init_thrw" });
+  });
+
+  it("records queued ledger appends as delegated until persistence", () => {
+    const record = { type: "ledger_append", messageIndex: 0, success: true, result: { queued: true } };
+    const [outcome] = buildSafeOutputExecutions([record]);
+
+    expect(outcome).toMatchObject({ type: "ledger_append", messageIndex: 0, status: "delegated" });
+    expect(computeSafeOutputsStatus([record])).toMatchObject({ itemsApplied: 0, itemsSucceeded: 0, itemsFailed: 0 });
+  });
+
+  it("fans out array results without promoting failed, skipped, or empty results to applied", () => {
+    const outcomes = buildSafeOutputExecutions([
+      {
+        type: "add_comment",
+        messageIndex: 3,
+        success: true,
+        result: [
+          { success: true, url: "https://github.com/org/repo/issues/1#issuecomment-1", body: "PRIVATE_BODY" },
+          { success: false, error: "PRIVATE_ERROR" },
+          { skipped: true, reason: "PRIVATE_REASON" },
+        ],
+      },
+      { type: "add_comment", messageIndex: 4, success: true, result: [] },
+    ]);
+    expect(outcomes.map(outcome => outcome.status)).toEqual(["success", "failed", "skipped", "skipped"]);
+    expect(outcomes.map(outcome => outcome.messageIndex)).toEqual([3, 3, 3, 4]);
+    expect(outcomes[0].url).toBe("https://github.com/org/repo/issues/1#issuecomment-1");
+    expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
+  });
+
+  it("uses durable inline comment URLs and marks filtered comments skipped", () => {
+    const makeComment = line => ({ type: "create_pull_request_review_comment", success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true, metadata: { path: "PRIVATE_PATH", line, side: "RIGHT" } } });
+    const records = [makeComment(2), makeComment(3), { type: "submit_pull_request_review", success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true } }];
+    finalizeBufferedReviewExecutions(records, "org/repo", 1, {
+      success: true,
+      review_url: "https://github.com/org/repo/pull/1#pullrequestreview-5",
+      comment_count: 1,
+      review_comments: [{ url: "https://github.com/org/repo/pull/1#discussion_r6", metadata: { path: "PRIVATE_PATH", line: 2, side: "RIGHT" } }],
+    });
+    const outcomes = buildSafeOutputExecutions(records);
+    expect(outcomes.map(outcome => outcome.status)).toEqual(["success", "skipped", "success"]);
+    expect(outcomes[0].url).toBe("https://github.com/org/repo/pull/1#discussion_r6");
+    expect(outcomes[2].url).toBe("https://github.com/org/repo/pull/1#pullrequestreview-5");
+    expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
+  });
+
+  it("keeps incomplete review evidence deferred and staged reviews non-applied", () => {
+    const record = { type: "create_pull_request_review_comment", success: true, result: { repo: "org/repo", pull_request_number: 1, deferred_manifest: true, metadata: { path: "PRIVATE_PATH", line: 2 } } };
+    finalizeBufferedReviewExecutions([record], "org/repo", 1, { success: true, comment_count: 2, review_comments: [] });
+    expect(buildSafeOutputExecutions([record])[0].status).toBe("deferred");
+    finalizeBufferedReviewExecutions([record], "org/repo", 1, { success: true, staged: true });
+    expect(buildSafeOutputExecutions([record])[0].status).toBe("staged");
+  });
+
+  it("redacts configured secrets before JSON serialization, including quoted and multiline inputs", () => {
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-execution-test-"));
+    const secrets = ["opaque-secret", 'opaque"quoted', "opaque\nmultiline"];
+    vi.stubEnv("GH_AW_SECRET_NAMES", "PLAIN,QUOTED,MULTILINE");
+    for (const [index, name] of ["PLAIN", "QUOTED", "MULTILINE"].entries()) vi.stubEnv(`SECRET_${name}`, secrets[index]);
+    try {
+      const file = path.join(root, "safe-output-executions.jsonl");
+      writeSafeOutputExecutions(
+        secrets.map(secret => ({ type: secret, success: true, result: { url: `https://github.com/${secret}/repo/issues/1`, body: secret } })),
+        false,
+        file
+      );
+      const content = fs.readFileSync(file, "utf8");
+      for (const secret of secrets) {
+        expect(content).not.toContain(secret);
+        expect(content).not.toContain(JSON.stringify(secret).slice(1, -1));
+      }
+      expect(content).not.toContain("opaque");
+      expect(
+        content
+          .trim()
+          .split("\n")
+          .map(line => JSON.parse(line))
+          .map(entry => entry.status)
+      ).toEqual(["success", "success", "success"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["https://github.com/org/repo/issues/2?token=PRIVATE#issuecomment-9", "https://github.com/org/repo/issues/2#issuecomment-9"],
+    ["https://github.com/org/repo/pull/2?signature=PRIVATE#PRIVATE_BODY", "https://github.com/org/repo/pull/2"],
+    ["https://github.com/org/repo/pull/2#discussion_r123", "https://github.com/org/repo/pull/2#discussion_r123"],
+    ["https://github.com/org/repo/actions/runs/123", "https://github.com/org/repo/actions/runs/123"],
+    ["https://github.com/org/repo/actions/artifacts/123", "https://github.com/org/repo/actions/artifacts/123"],
+    ["https://github.com/org/repo/actions/runs/123/artifacts/456?signature=PRIVATE", "https://github.com/org/repo/actions/runs/123/artifacts/456"],
+    ["https://github.com/org/repo/actions/runs/123/job/456?token=PRIVATE#PRIVATE_LOG", "https://github.com/org/repo/actions/runs/123/job/456"],
+    ["https://github.com/org/repo/issues/123/artifacts/456", undefined],
+    ["https://github.com/org/repo/actions/runs/123/job/PRIVATE_TITLE", undefined],
+    ["https://github.com/org/repo/check-runs/123", "https://github.com/org/repo/check-runs/123"],
+    ["https://github.com/orgs/org/projects/1", "https://github.com/orgs/org/projects/1"],
+    ["******github.com/org/repo/issues/2", undefined],
+    ["http://github.com/org/repo/issues/2", undefined],
+    ["https://github.com.evil.example/org/repo/issues/2", undefined],
+    ["https://github.com/org/repo/blob/main/PRIVATE_BODY", undefined],
+    ["https://example.com/PRIVATE_BODY", undefined],
+    ["https://linear.app/team/issue/ENG-123/PRIVATE_TITLE", undefined],
+    ["https://team.atlassian.net/browse/ENG-123", undefined],
+    ["https://dev.azure.com/org/project/_workitems/edit/123", undefined],
+    ["javascript:PRIVATE", undefined],
+    [{ url: "PRIVATE" }, undefined],
+  ])("canonicalizes %s conservatively", (input, expected) => {
+    expect(canonicalSafeOutputUrl(input)).toBe(expected);
+  });
+
+  it("supports the configured GitHub Enterprise origin without accepting other hosts", () => {
+    vi.stubEnv("GITHUB_SERVER_URL", "https://github.example.com");
+    expect(canonicalSafeOutputUrl("https://github.example.com/org/repo/issues/2?secret=PRIVATE")).toBe("https://github.example.com/org/repo/issues/2");
+    expect(canonicalSafeOutputUrl("https://other.example.com/org/repo/issues/2")).toBeUndefined();
+  });
+
+  it.each([
+    ["GHSA-2345-6789-cfgh", "", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "?token=PRIVATE#advisory-comment-17", "GHSA-2345-6789-cfgh#advisory-comment-17"],
+    ["GHSA-2345-6789-cfgh", "#advisory-comment-PRIVATE", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "#advisory-comment-0", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "#advisory-comment-17-PRIVATE", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "#issuecomment-17", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "/comments/17", undefined],
+    ["GHSA-2345-6789-cfgh", "/PRIVATE", undefined],
+    ["GHSA-2345-6789-cfgh-PRIVATE", "", undefined],
+    ["GHSA-0000-6789-cfgh", "", undefined],
+    ["GHSA-2345-6789", "", undefined],
+    ["PRIVATE_TITLE", "", undefined],
+  ])("canonicalizes advisory identity %s%s without free-form content", (identifier, suffix, expected) => {
+    const base = "https://github.com/org/repo/security/advisories/";
+    expect(canonicalSafeOutputUrl(`${base}${identifier}${suffix}`)).toBe(expected ? `${base}${expected}` : undefined);
+  });
+
+  it("only retains advisory comment fragments on advisory links at allowed origins", () => {
+    vi.stubEnv("GITHUB_SERVER_URL", "https://github.example.com");
+    const resource = "/org/repo/security/advisories/GHSA-2345-6789-cfgh#advisory-comment-17";
+    expect(canonicalSafeOutputUrl(`https://github.example.com${resource}`)).toBe(`https://github.example.com${resource}`);
+    expect(canonicalSafeOutputUrl(`https://other.example.com${resource}`)).toBeUndefined();
+    expect(canonicalSafeOutputUrl("https://github.com/org/repo/issues/1#advisory-comment-17")).toBe("https://github.com/org/repo/issues/1");
+    expect(canonicalSafeOutputUrl("https://api.github.com/repos/org/repo/security-advisories/GHSA-2345-6789-cfgh/comments/17")).toBeUndefined();
+  });
+
+  it.each([
+    ["create_security_advisory", { ghsa_id: "GHSA-2345-6789-cfgh", url: "https://github.com/org/repo/security/advisories/GHSA-2345-6789-cfgh" }],
+    ["add_security_advisory_comment", { comment_id: 17, url: "https://github.com/org/repo/security/advisories/GHSA-2345-6789-cfgh#advisory-comment-17" }],
+  ])("retains %s handler result URLs only for applied outcomes", (type, result) => {
+    expect(buildSafeOutputExecutions([{ type, success: true, result: { success: true, ...result } }])[0]).toMatchObject({ type, status: "success", url: result.url });
+    expect(buildSafeOutputExecutions([{ type, success: true, result }], true)[0]).not.toHaveProperty("url");
+    expect(buildSafeOutputExecutions([{ type, success: false, result }])[0]).not.toHaveProperty("url");
+  });
+
+  it("rejects credential-bearing resource URLs", () => {
+    const url = new URL("https://github.com/org/repo/issues/2");
+    url.username = "PRIVATE_USER";
+    url.password = "PRIVATE_PASSWORD";
+    expect(canonicalSafeOutputUrl(url.toString())).toBeUndefined();
+  });
+
+  it.each([
+    "url",
+    "html_url",
+    "issue_url",
+    "pull_request_url",
+    "discussion_url",
+    "comment_url",
+    "reply_url",
+    "review_url",
+    "item_url",
+    "commit_url",
+    "check_run_url",
+    "projectUrl",
+    "autofixUrl",
+    "artifactUrl",
+    "run_url",
+    "workflow_run_url",
+  ])("retains a canonical URL from the %s result alias", field => {
+    const [outcome] = buildSafeOutputExecutions([{ type: "custom_output", success: true, result: { [field]: "https://github.com/org/repo/issues/1?secret=PRIVATE" } }]);
+    expect(outcome.url).toBe("https://github.com/org/repo/issues/1");
+  });
+
+  it("falls back to a safe result alias and accepts opaque commit/check identities", () => {
+    const [outcome] = buildSafeOutputExecutions([{ type: "create_check_run", success: true, result: { url: "https://example.com/PRIVATE", check_run_url: "https://github.com/org/repo/runs/123?secret=PRIVATE" } }]);
+    expect(outcome.url).toBe("https://github.com/org/repo/runs/123");
+    expect(canonicalSafeOutputUrl(`https://github.com/org/repo/commit/${"a".repeat(40)}?secret=PRIVATE`)).toBe(`https://github.com/org/repo/commit/${"a".repeat(40)}`);
+    expect(canonicalSafeOutputUrl("https://github.com/org/repo/commit/PRIVATE_TITLE")).toBeUndefined();
+  });
+
+  it("projects legacy evidence without raw content or object-valued identifiers", () => {
+    expect(
+      projectSafeOutputData({
+        type: "create_issue",
+        number: 1,
+        status: "success",
+        repo: { body: "PRIVATE" },
+        error: "PRIVATE",
+        message: "PRIVATE",
+        metadata: "PRIVATE",
+        title: "PRIVATE",
+        url: "https://github.com/org/repo/issues/1?auth=PRIVATE",
+      })
+    ).toEqual({
+      type: "create_issue",
+      number: 1,
+      status: "success",
+      url: "https://github.com/org/repo/issues/1",
+    });
+  });
+
+  it("records custom action payload exports as delegated, never applied", async () => {
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    const handler = await actionHandlerFactory({ action_name: "external_action" });
+    const processing = await processMessages(new Map([["external_action", handler]]), [{ type: "external_action", body: "PRIVATE_BODY", url: "https://github.com/org/repo/issues/999" }]);
+    const [outcome] = buildSafeOutputExecutions(processing.results);
+    expect(outcome).toMatchObject({ type: "external_action", messageIndex: 0, status: "delegated" });
+    expect(outcome).not.toHaveProperty("url");
+    expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
+    expect(computeSafeOutputsStatus(processing.results)).toMatchObject({ itemsApplied: 0, itemsSucceeded: 0, itemsFailed: 0 });
+    expect(extractCreatedItemFromResult("external_action", processing.results[0].result)).toBeNull();
+  });
+
+  it.each([
+    ["success", "staged"],
+    ["handler_failure", "failed"],
+    ["manager_catch", undefined],
+    ["custom_job", "delegated"],
+  ])("persists outcomes through main's finally hook on %s", async (scenario, expectedStatus) => {
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { eventName: "workflow_dispatch", repo: { owner: "org", repo: "repo" }, payload: {} });
+    vi.stubGlobal("github", { rest: { rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: 0 } } } }) } } });
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", scenario === "manager_catch" ? "invalid-json" : JSON.stringify(scenario === "custom_job" ? {} : { noop: {} }));
+    vi.stubEnv("GH_AW_SAFE_OUTPUT_JOBS", scenario === "custom_job" ? JSON.stringify({ external_job: "payload" }) : "");
+    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    const message = scenario === "custom_job" ? { type: "external_job", body: "PRIVATE_BODY" } : { type: "noop", ...(scenario === "handler_failure" ? {} : { message: "PRIVATE_MESSAGE" }) };
+    await handlerManagerMain({ messages: [message] });
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(String(append.mock.calls[0][0])).toMatch(/safe-output-executions\.jsonl$/);
+    const content = String(append.mock.calls[0][1]);
+    expect(content).not.toContain("PRIVATE");
+    if (expectedStatus) {
+      expect(JSON.parse(content)).toMatchObject({ type: message.type, messageIndex: 0, status: expectedStatus, staged: true });
+    } else {
+      expect(content).toBe("");
+    }
+    if (scenario === "handler_failure" || scenario === "manager_catch") expect(global.core.setFailed).toHaveBeenCalled();
+    else expect(global.core.setFailed).not.toHaveBeenCalled();
+  });
+
+  it("propagates handler-specific staged review finalization through main without claiming application", async () => {
+    const pullRequest = { number: 1, state: "open", head: { sha: "abc123" }, user: { login: "review-author" } };
+    const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary });
+    vi.stubGlobal("context", { eventName: "pull_request", repo: { owner: "org", repo: "repo" }, payload: { pull_request: pullRequest } });
+    const createReview = vi.fn();
+    vi.stubGlobal("github", {
+      rest: {
+        rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: 0 } } } }) },
+        pulls: { get: vi.fn().mockResolvedValue({ data: pullRequest }), createReview },
+      },
+    });
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify({ submit_pull_request_review: { staged: true } }));
+    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    await handlerManagerMain({ messages: [{ type: "submit_pull_request_review", pull_request_number: 1, body: "PRIVATE_REVIEW_BODY", event: "COMMENT" }] });
+    expect(global.core.setFailed).not.toHaveBeenCalled();
+    expect(createReview).not.toHaveBeenCalled();
+    const outcomesCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-executions.jsonl"));
+    expect(outcomesCall).toBeDefined();
+    const outcome = JSON.parse(String(outcomesCall[1]));
+    expect(outcome).toMatchObject({ type: "submit_pull_request_review", messageIndex: 0, status: "staged", staged: true });
+    expect(outcome).not.toHaveProperty("url");
+    expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
+  });
+
+  it.each(["success", "chained", "chained-comment", "chained-comment-failed", "failed", "skipped", "skipped-after-buffering", "staged"])("resolves a check depending on a buffered review after %s submission", async scenario => {
+    const pullRequest = { number: 1, state: "open", head: { sha: "abc123" }, user: { login: "review-author" } };
+    const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary });
+    vi.stubGlobal("context", { eventName: "pull_request", repo: { owner: "org", repo: "repo" }, payload: { pull_request: pullRequest } });
+    const calls = [];
+    const createReview = vi.fn(async ({ pull_number }) => {
+      calls.push("review");
+      if (scenario === "failed" || (scenario === "chained-comment-failed" && calls.length === 2)) throw Object.assign(new Error("Review rejected"), { status: 422 });
+      return { data: { id: pull_number + 4, html_url: `https://github.com/org/repo/pull/${pull_number}#pullrequestreview-${pull_number + 4}` } };
+    });
+    const createCheck = vi.fn(async () => {
+      calls.push("check");
+      return { data: { id: 6, html_url: "https://github.com/org/repo/check-runs/6" } };
+    });
+    vi.stubGlobal("github", {
+      rest: {
+        rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: 0 } } } }) },
+        pulls: {
+          get: vi.fn(async () => ({
+            data: { ...pullRequest, ...(scenario === "skipped" || (scenario === "skipped-after-buffering" && global.core.info.mock.calls.some(([text]) => String(text).includes("=== Finalizing PR Review"))) ? { state: "closed" } : {}) },
+          })),
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+          listFiles: vi.fn().mockResolvedValue({ data: [{ filename: "file.js" }] }),
+          createReview,
+        },
+        checks: { create: createCheck },
+      },
+    });
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify({ submit_pull_request_review: { max: 2, target: "*", staged: scenario === "staged" }, create_pull_request_review_comment: {}, create_check_run: {} }));
+    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    await handlerManagerMain({
+      messages: [
+        { type: "submit_pull_request_review", output_id: "so_000000000001", pull_request_number: 1, body: "PRIVATE_REVIEW_BODY", event: "COMMENT" },
+        ...(scenario === "chained" ? [{ type: "submit_pull_request_review", output_id: "so_000000000003", "depends-on": "so_000000000001", pull_request_number: 2, body: "PRIVATE_SECOND_REVIEW_BODY", event: "COMMENT" }] : []),
+        ...(scenario.startsWith("chained-comment") ? [{ type: "create_pull_request_review_comment", output_id: "so_000000000003", "depends-on": "so_000000000001", path: "file.js", line: 1, body: "PRIVATE_INLINE_COMMENT" }] : []),
+        { type: "create_check_run", output_id: "so_000000000002", "depends-on": scenario.startsWith("chained") ? "so_000000000003" : "so_000000000001", conclusion: "success", title: "Review complete", summary: "PRIVATE_CHECK_BODY" },
+      ],
+    });
+    const outcomesCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-executions.jsonl"));
+    expect(outcomesCall).toBeDefined();
+    const outcomes = String(outcomesCall[1])
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    if (scenario === "success" || scenario === "chained" || scenario === "chained-comment") {
+      expect(calls).toEqual(scenario.startsWith("chained") ? ["review", "review", "check"] : ["review", "check"]);
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+      expect(outcomes.every(outcome => outcome.status === "success")).toBe(true);
+      if (scenario === "chained-comment") {
+        expect(createReview.mock.calls[0][0]).not.toHaveProperty("comments");
+        expect(createReview.mock.calls[1][0].comments).toHaveLength(1);
+        expect(createReview.mock.calls[1][0].event).toBe("COMMENT");
+      }
+    } else {
+      expect(createCheck).not.toHaveBeenCalled();
+      expect(global.core.setFailed).toHaveBeenCalled();
+      expect(outcomes.find(outcome => outcome.type === "create_check_run").status).toBe("failed");
+      if (scenario.startsWith("skipped")) {
+        expect(outcomes.find(outcome => outcome.type === "submit_pull_request_review").status).toBe("skipped");
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Safe-output prerequisite did not complete successfully: Pull request #1 closed after this workflow was triggered"));
+      }
+      if (scenario === "chained-comment-failed") {
+        expect(calls).toEqual(["review", "review"]);
+        expect(outcomes.find(outcome => outcome.type === "submit_pull_request_review").status).toBe("success");
+        expect(outcomes.find(outcome => outcome.type === "create_pull_request_review_comment").status).toBe("failed");
+      }
+    }
+    expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
+  });
+
+  it.each(["success", "configured-target", "failed-prerequisite", "invalid-review", "missing-target", "different-pr", "publication-fails", "filtered-comment", "unresolvable-comment", "own-pr-unresolvable", "indirect"])(
+    "handles a review depending on a buffered comment: %s",
+    async scenario => {
+      const pullRequest = { number: 1, state: "open", head: { sha: "abc123" }, user: { login: "review-author" } };
+      const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
+      vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary });
+      vi.stubGlobal("context", { eventName: "pull_request", repo: { owner: "org", repo: "repo" }, payload: { pull_request: pullRequest } });
+      let attempts = 0;
+      const createReview = vi.fn(async ({ pull_number }) => {
+        attempts++;
+        if (scenario === "publication-fails") throw Object.assign(new Error("Review rejected"), { status: 422 });
+        if (scenario === "unresolvable-comment" || scenario === "own-pr-unresolvable")
+          throw Object.assign(new Error(scenario === "own-pr-unresolvable" && attempts === 1 ? "Can not approve your own pull request" : "Line could not be resolved"), { status: 422 });
+        return { data: { id: pull_number + 4, html_url: `https://github.com/org/repo/pull/${pull_number}#pullrequestreview-${pull_number + 4}` } };
+      });
+      vi.stubGlobal("github", {
+        rest: {
+          rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: 0 } } } }) },
+          pulls: {
+            get: vi.fn(async ({ pull_number }) => ({ data: { ...pullRequest, number: pull_number } })),
+            listReviews: vi.fn().mockResolvedValue({ data: [] }),
+            listFiles: vi.fn().mockResolvedValue({ data: [{ filename: scenario === "filtered-comment" ? "another.js" : "file.js" }] }),
+            createReview,
+            listCommentsForReview: vi.fn().mockResolvedValue({ data: [{ id: 20, path: "file.js", line: 1, side: "RIGHT", html_url: "https://github.com/org/repo/pull/1#discussion_r20" }] }),
+          },
+          checks: { create: vi.fn().mockResolvedValue({ data: { id: 6, html_url: "https://github.com/org/repo/check-runs/6" } }) },
+        },
+      });
+      vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
+      vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify({ submit_pull_request_review: { max: 2, target: scenario === "configured-target" ? "1" : "*" }, create_pull_request_review_comment: {}, create_check_run: {} }));
+      vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+      vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+      const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+      await handlerManagerMain({
+        messages: [
+          { type: "create_pull_request_review_comment", output_id: "so_000000000001", path: "file.js", line: 1, body: "Inline finding" },
+          ...(scenario === "indirect" ? [{ type: "create_check_run", output_id: "so_000000000003", "depends-on": "so_000000000001", conclusion: "success", title: "Check", summary: "Done" }] : []),
+          {
+            type: "submit_pull_request_review",
+            output_id: "so_000000000002",
+            "depends-on": scenario === "failed-prerequisite" ? ["so_000000000001", "so_000000000099"] : scenario === "indirect" ? "so_000000000003" : "so_000000000001",
+            ...(scenario === "missing-target" ? {} : { pull_request_number: scenario === "different-pr" || scenario === "configured-target" ? 2 : 1 }),
+            body: "Review summary",
+            event: scenario === "invalid-review" ? "INVALID" : scenario === "own-pr-unresolvable" ? "APPROVE" : "COMMENT",
+          },
+        ],
+      });
+      const outcomeCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-executions.jsonl"));
+      const outcomes = String(outcomeCall[1])
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      if (scenario === "success" || scenario === "configured-target") {
+        expect(createReview).toHaveBeenCalledOnce();
+        expect(createReview.mock.calls[0][0]).toMatchObject({ pull_number: 1, body: expect.stringContaining("Review summary"), comments: [expect.objectContaining({ path: "file.js", line: 1, body: "Inline finding" })] });
+        expect(outcomes.every(outcome => outcome.status === "success")).toBe(true);
+      } else if (scenario === "different-pr" || scenario === "indirect") {
+        expect(createReview.mock.calls.map(([args]) => args.pull_number)).toEqual(scenario === "indirect" ? [1, 1] : [1, 2]);
+        expect(createReview.mock.calls[1][0].body).toContain("Review summary");
+      } else if (scenario === "publication-fails" || scenario === "unresolvable-comment" || scenario === "own-pr-unresolvable") {
+        expect(createReview).toHaveBeenCalledTimes(scenario === "own-pr-unresolvable" ? 2 : 1);
+        expect(createReview.mock.calls[0][0].body).toContain("Review summary");
+        expect(outcomes.every(outcome => outcome.status === "failed")).toBe(true);
+      } else {
+        expect(createReview).not.toHaveBeenCalled();
+        expect(outcomes.every(outcome => outcome.status === "failed")).toBe(true);
+      }
+    }
+  );
+
+  it("persists real processing results and collects root and Claim outcomes into the unified session", async () => {
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-execution-test-"));
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    try {
+      const messages = [
+        { type: "create_issue", title: "PRIVATE_TITLE", body: "PRIVATE_BODY" },
+        { type: "add_comment", body: "PRIVATE_BODY" },
+        { type: "add_labels", labels: ["PRIVATE_LABEL"] },
+      ];
+      const handlers = new Map([
+        ["create_issue", async () => ({ success: true, url: "https://github.com/org/repo/issues/1?token=PRIVATE" })],
+        [
+          "add_comment",
+          async () => {
+            throw new Error("PRIVATE_ERROR");
+          },
+        ],
+        ["add_labels", async () => ({ skipped: true, reason: "PRIVATE_REASON" })],
+      ]);
+      const processing = await processMessages(handlers, messages);
+      writeSafeOutputExecutions([...processing.results, { type: "add_comment", messageIndex: 3, success: false, result: { operation_outcome: "indeterminate" } }], false, path.join(root, "safe-output-executions.jsonl"));
+      writeSafeOutputExecutions([{ type: "add_comment", messageIndex: 0, delegated: true }], false, path.join(root, "claims/claim-1/safe-output-executions.jsonl"));
+      const events = writeUnifiedSession({ rootDir: root, graders: [], jobResults: JSON.stringify({ external_job: { result: "failure", outputs: { body: "PRIVATE_OUTPUT" } } }) });
+      const outcomes = events.filter(event => event.type === "safe_output.execution");
+      expect(outcomes.map(event => event.data.status)).toEqual(["success", "failed", "skipped", "failed", "delegated"]);
+      expect(outcomes[3].data.operation_outcome).toBe("indeterminate");
+      expect(outcomes[0].data.url).toBe("https://github.com/org/repo/issues/1");
+      expect(outcomes.every(event => event.provenance.phase === "safe_outputs")).toBe(true);
+      expect(events.find(event => event.type === "workflow.job_result").data).toEqual({ jobId: "external_job", result: "failure" });
+      const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+      expect(persisted).not.toContain("PRIVATE");
+      expect(validateSession(persisted)).toBe(events.length);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

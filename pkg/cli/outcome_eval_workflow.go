@@ -18,7 +18,7 @@ var workflowOutcomeGHAPIGet = ghAPIGet
 
 // evalDispatchWorkflow checks whether a dispatched workflow run completed successfully.
 // It looks for a run_id in the item metadata and queries the workflow run status.
-// Spec: specs/safe-output-outcome-evaluation.md §20
+// Spec: specs/safe-output-lifecycle.md §20
 func evalDispatchWorkflow(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
 	repo := resolveItemRepo(item, repoOverride)
 	outcomeEvalWorkflowLog.Printf("Evaluating dispatch_workflow: repo=%s, url=%s", repo, item.URL)
@@ -72,7 +72,7 @@ func evalDispatchWorkflow(ctx context.Context, item CreatedItemReport, repoOverr
 // evalUpdateDiscussion checks whether a discussion edit stuck.
 // Full evaluation requires GraphQL (same pattern as evalCloseDiscussion).
 // Until implemented, absence of an evaluator is unknown, not lack of engagement.
-// Spec: specs/safe-output-outcome-evaluation.md §12
+// Spec: specs/safe-output-lifecycle.md §12
 func evalUpdateDiscussion(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
 	return unsupportedOutcome(item, repoOverride)
 }

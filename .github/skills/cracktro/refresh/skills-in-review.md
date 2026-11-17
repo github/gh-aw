@@ -83,8 +83,8 @@ Use the actual run dates (`run.json` `createdAt`) for the window text, not the r
 ```bash
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # async
-# browser canvas: http://127.0.0.1:4329/cracktro/#60, wait ~5 s for the sweep, screenshot .sir-svg
-grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code'   # must be empty
+# browser canvas: http://127.0.0.1:4329/cracktro/#skills-in-review, wait ~5 s for the sweep, screenshot .sir-svg
+grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code\|api.github.com/repositories/\|www.w3.org/2000/svg'   # must be empty
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```
 
@@ -100,4 +100,4 @@ cd docs && npx playwright test tests/talk.spec.ts                       # if nod
 - Search caps at 1,000 results per query; the script searches 3-day windows (max ~250 PRs each). If a window nears 1,000, shrink it.
 - Threads fetch the first 5 comments; `totalCount` still counts all replies, but the Copilot-reply check only sees the first four replies.
 - The reviewer can post more than one review per PR (re-review on ready for review); reviews > PRs is expected.
-- Slide numbers shift; find the slide by its marker and its `#N` by its row in `slides.md`.
+- Link the slide by its stable id `#skills-in-review` and find it in `deck.js` by its marker.

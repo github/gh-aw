@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { createReportIssue, buildIssueReport } = require("./issue_report.cjs");
 const { extractExpirationDate } = require("./ephemerals.cjs");
 const { appendReportExecutionProvenance } = require("./execution_provenance.cjs");
@@ -10,6 +11,7 @@ const { getStalePullRequestReason, StalePullRequestError } = require("./pr_lifec
 /** @type {typeof import("fs")} */
 const fs = require("fs");
 const { withTransportIntegrity } = require("./transport_integrity.cjs");
+const { withExecutionTrace } = require("./safe_output_trace.cjs");
 const path = require("path");
 const { generateStagedPreview } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
@@ -568,12 +570,29 @@ async function main(config = {}) {
    * @param {import('./types/handler-factory').ResolvedTemporaryIds} resolvedTemporaryIds - Map of temporary IDs to resolved IDs
    * @returns {Promise<import('./types/handler-factory').HandlerResult>}
    */
-  return withTransportIntegrity(async function handlePushToPullRequestBranch(message, resolvedTemporaryIds, transport) {
+  // Trace map: init invocation; limt count limit; repo invalid repo; pack object pack;
+  // miss missing patch; pgen invalid patch; size oversized patch; deny/fall protection deny/fallback;
+  // noop empty patch; stag staged; conf configured target; trig triggering target; wild wildcard target;
+  // clos closed PR; head missing head; auth unauthorized head; fork fork; bden branch protection denied;
+  // vldt title/label validation; prot protected issue; remt missing remote; ferr fetch failure;
+  // cerr checkout failure; bund bundle; bfal bundle failure; octo octopus merge;
+  // bpro/bfbk bundle protection deny/fallback; ptch patch; pfal patch failure; aadd add/add recovery;
+  // aden/afbk post-apply deny/fallback; blob blob size limit; revw review PR; rfal review failure;
+  // sqsh signed squash; scop workflow scope; push push; stal stale push; perr push failure;
+  // fbpr fallback PR; fber fallback failure; same empty-patch skip; nsha missing SHA;
+  // pshd successful push; nerr/ignr no-changes error/ignore; done successful return;
+  // fail unsuccessful/skipped return; thrw thrown error.
+  return withExecutionTrace(
+    { success: "done", failure: "fail", error: "thrw" },
+    withTransportIntegrity
+  )(async function handlePushToPullRequestBranch(trace, message, resolvedTemporaryIds, transport) {
+    trace("init");
     const exec = transport.guardExec(globalThis.exec);
     let compilationNotice = getWorkflowCompilationNotice(message, config);
     if (compilationNotice) core.warning(compilationNotice);
     // Check max count
     if (maxCount > 0 && processedCount >= maxCount) {
+      trace("limt");
       core.info(`Skipping message - max count (${maxCount}) reached`);
       return { success: false, error: `Max count (${maxCount}) reached`, skipped: true };
     }
@@ -582,6 +601,7 @@ async function main(config = {}) {
 
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "push to PR branch");
     if (!repoResult.success) {
+      trace("repo");
       return { success: false, error: repoResult.error };
     }
     const itemRepo = repoResult.repo;
@@ -595,6 +615,7 @@ async function main(config = {}) {
     transport.captureOptional(transportPaths.bundlePath);
     const objectPackRecovery = {};
     if (transportPaths.bundlePath && isObjectPack(transport.read(transportPaths.bundlePath))) {
+      trace("pack");
       const triggeringPR = context.payload?.pull_request;
       const aw = parseAwContext(context.payload?.inputs?.aw_context);
       const explicitPull = message.pull_request_number ?? message.pullRequestNumber ?? message.target ?? message.pr_number ?? message.pull_number ?? message.item_number ?? message.pr;
@@ -658,12 +679,15 @@ async function main(config = {}) {
     // the first-pass validation input; bundle transport adds an authoritative
     // pre-apply git diff check later after the bundle ref has been fetched.
     if (!hasPatchFile) {
+      trace("miss");
       const msg = "No patch file found - cannot push without changes";
 
       switch (ifNoChanges) {
         case "error":
+          trace("nerr");
           return { success: false, error: msg };
         case "ignore":
+          trace("ignr");
           return { success: false, error: msg, skipped: true };
         case "warn":
         default:
@@ -681,6 +705,7 @@ async function main(config = {}) {
 
     // Check for actual error conditions
     if (patchContent.includes("Failed to generate patch")) {
+      trace("pgen");
       const msg = "Patch file contains error message - cannot push without changes";
       core.error("Patch file generation failed");
       core.error(`Patch file location: ${patchFilePath}`);
@@ -730,6 +755,7 @@ async function main(config = {}) {
         core.info(`${sizeLabel}: ${sizeForCheckKb} KB (maximum allowed: ${maxSizeKb} KB)`);
 
         if (sizeForCheckKb > maxSizeKb) {
+          trace("size");
           const msg = `Patch size (${sizeForCheckKb} KB) exceeds maximum allowed size (${maxSizeKb} KB)${mergedBaseBaselineHint}`;
           return { error: { success: false, error: msg }, fallbackFiles };
         }
@@ -742,6 +768,7 @@ async function main(config = {}) {
       if (!isEmptyPatch) {
         const protection = checkFileProtection(patchContent, config);
         if (protection.action === "deny") {
+          trace("deny");
           const filesStr = protection.files.join(", ");
           const msg =
             protection.source === "allowlist"
@@ -751,6 +778,7 @@ async function main(config = {}) {
           return { error: { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg }, fallbackFiles };
         }
         if (protection.action === "fallback") {
+          trace("fall");
           fallbackFiles.push(...protection.files);
           core.warning(`Protected file protection triggered (fallback-to-issue): ${protection.files.join(", ")}. Will create review issue instead of pushing.`);
         }
@@ -767,12 +795,15 @@ async function main(config = {}) {
     }
 
     if (isEmpty) {
+      trace("noop");
       const msg = "Patch file is empty - no changes to apply (noop operation)";
 
       switch (ifNoChanges) {
         case "error":
+          trace("nerr");
           return { success: false, error: "No changes to push - failing as configured by if-no-changes: error" };
         case "ignore":
+          trace("ignr");
           return { success: false, error: msg, skipped: true };
         case "warn":
         default:
@@ -786,6 +817,7 @@ async function main(config = {}) {
 
     // If in staged mode, emit 🎭 Staged Mode Preview via generateStagedPreview
     if (isStaged) {
+      trace("stag");
       await generateStagedPreview({
         title: "Push to PR Branch",
         description: "The following changes would be pushed if staged mode was disabled:",
@@ -819,6 +851,7 @@ async function main(config = {}) {
 
     // Validate target configuration
     if (target !== "*" && target !== "triggering") {
+      trace("conf");
       const pullNumber = parsePositiveInteger(target);
       if (pullNumber === null) {
         return { success: false, error: 'Invalid target configuration: must be "triggering", "*", or a valid pull request number' };
@@ -828,6 +861,7 @@ async function main(config = {}) {
     // Compute the target branch name based on target configuration
     let pullNumber;
     if (target === "triggering") {
+      trace("trig");
       pullNumber = typeof context !== "undefined" ? context.payload?.pull_request?.number || context.payload?.issue?.number : undefined;
       if (!pullNumber) {
         const awContext = typeof context !== "undefined" ? parseAwContext(context.payload?.inputs?.aw_context) : null;
@@ -848,6 +882,7 @@ async function main(config = {}) {
         };
       }
     } else if (target === "*") {
+      trace("wild");
       const explicitPull = message.pull_request_number ?? message.pullRequestNumber ?? message.target ?? message.pr_number ?? message.pull_number ?? message.item_number ?? message.pr;
       if (explicitPull !== undefined && explicitPull !== null && explicitPull !== "") {
         pullNumber = parsePositiveInteger(explicitPull);
@@ -919,6 +954,7 @@ async function main(config = {}) {
       });
       pullRequest = response.data;
       if (pullRequest.state === "closed") {
+        trace("clos");
         const reason = `Pull request #${pullNumber} is closed; refusing to push to its branch`;
         core.info(reason);
         return { skipped: true, reason };
@@ -942,6 +978,7 @@ async function main(config = {}) {
     // SECURITY: When head.repo is null (likely a deleted fork) we cannot verify which
     // repository the PR head came from. Always reject to prevent writes to an unverifiable PR.
     if (pullRequest.head?.repo == null) {
+      trace("head");
       const nullHeadErr = "Cannot push to PR: head repository is null (likely a deleted fork)";
       core.error(nullHeadErr);
       return { success: false, error: nullHeadErr };
@@ -952,6 +989,7 @@ async function main(config = {}) {
     // names an automation fork, and prevents writes to a fork PR when head-repo is not set.
     const expectedHeadRepo = configuredHeadRepo || itemRepo;
     if (actualHeadRepo && actualHeadRepo.toLowerCase() !== expectedHeadRepo.toLowerCase()) {
+      trace("auth");
       const { isFork: actualIsFork } = detectForkPR(pullRequest);
       if (actualIsFork && !configuredHeadRepo) {
         core.error(`Cannot push to fork PR branch: head is '${actualHeadRepo}', not '${itemRepo}'`);
@@ -971,6 +1009,7 @@ async function main(config = {}) {
     // forks are eligible for updates.
     const { isFork, reason: forkReason } = detectForkPR(pullRequest);
     if (isFork) {
+      trace("fork");
       if (!configuredHeadRepo) {
         core.error(`Cannot push to fork PR branch: ${forkReason}`);
         core.error("Fork PRs remain blocked unless safe-outputs.push-to-pull-request-branch.head-repo is configured.");
@@ -1031,11 +1070,13 @@ async function main(config = {}) {
         },
       });
       if (blockReason) {
+        trace("bden");
         core.error(blockReason);
         return { success: false, error: blockReason };
       }
     }
 
+    trace("vldt");
     // Validate title prefix if specified
     if (titlePrefix && !prTitle.startsWith(titlePrefix)) {
       return { success: false, error: `Pull request title "${prTitle}" does not start with required prefix "${titlePrefix}"` };
@@ -1057,6 +1098,7 @@ async function main(config = {}) {
     }
 
     const createProtectedFilesFallbackIssue = async files => {
+      trace("prot");
       transport.assertUnchanged();
       const runUrl = buildWorkflowRunUrl(context, context.repo);
       const runId = context.runId;
@@ -1101,7 +1143,7 @@ async function main(config = {}) {
                 owner: repoParts.owner,
                 repo: repoParts.repo,
                 title: issueTitle,
-                labels: ["agentic-workflows", "pull-request-fallback"],
+                labels: [getIssueLabel(), "pull-request-fallback"],
               },
               issueReport
             );
@@ -1154,6 +1196,7 @@ async function main(config = {}) {
       );
 
       if (lsRemoteResult.exitCode === 2) {
+        trace("remt");
         const missingBranchError = MISSING_BRANCH_ERROR_TEMPLATE(branchName);
         if (ignoreMissingBranchFailure) {
           core.warning(`${missingBranchError} Skipping as configured by ignore-missing-branch-failure.`);
@@ -1193,6 +1236,7 @@ async function main(config = {}) {
         baseGitOpts.cwd
       );
     } catch (fetchError) {
+      trace("ferr");
       const fetchErrorMessage = getErrorMessage(fetchError);
       if (ignoreMissingBranchFailure && looksLikeMissingRemoteBranchError(fetchErrorMessage)) {
         const missingBranchError = MISSING_BRANCH_ERROR_TEMPLATE(branchName);
@@ -1219,6 +1263,7 @@ async function main(config = {}) {
       await exec.exec("git", ["checkout", "-B", branchName, branchRemoteRef], baseGitOpts);
       core.info(`Checked out existing branch from ${pushRepo}: ${branchName}`);
     } catch (checkoutError) {
+      trace("cerr");
       return { success: false, error: `Failed to checkout branch ${branchName}: ${getErrorMessage(checkoutError)}` };
     }
 
@@ -1280,6 +1325,7 @@ async function main(config = {}) {
       }
 
       if (hasBundleFile) {
+        trace("bund");
         // Bundle transport: import commits directly from the local bundle file.
         // This preserves merge commit topology and per-commit metadata.
         core.info(`Applying changes from bundle: ${bundleFilePath}`);
@@ -1340,6 +1386,7 @@ async function main(config = {}) {
             if (deferBundleValidation) {
               const octopus = await exec.getExecOutput("git", ["rev-list", "--min-parents=3", bundleRef, "--not", ...agentHistoryExclusions], bundleGitOpts);
               if (octopus.stdout.trim()) {
+                trace("octo");
                 return { success: false, error: "Cannot validate agent-created octopus merge commits in the bundle. Use two-parent merges instead." };
               }
               // Preserve changes that were later reverted. Ancestor reachability
@@ -1351,6 +1398,7 @@ async function main(config = {}) {
               core.info(`Pre-apply bundle verification: ${bundleFiles.length} file(s) detected from bundle transport`);
               const bundleProtection = checkFileProtectionPostApply(bundleFiles, config);
               if (bundleProtection.action === "deny") {
+                trace("bpro");
                 const filesStr = bundleProtection.files.join(", ");
                 const msg =
                   bundleProtection.source === "post-apply"
@@ -1360,6 +1408,7 @@ async function main(config = {}) {
                 return { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg };
               }
               if (bundleProtection.action === "fallback") {
+                trace("bfbk");
                 core.warning(`Protected file protection triggered (fallback-to-issue): ${bundleProtection.files.join(", ")}. Will create review issue instead of pushing.`);
                 return await createProtectedFilesFallbackIssue(bundleProtection.files);
               }
@@ -1386,6 +1435,7 @@ async function main(config = {}) {
             // Non-fatal cleanup
           }
         } catch (bundleError) {
+          trace("bfal");
           transport.assertUnchanged();
           core.error(`Failed to apply bundle: ${getErrorMessage(bundleError)}`);
           // Clean up temp ref if it exists
@@ -1398,6 +1448,7 @@ async function main(config = {}) {
         }
       } else {
         // Patch transport (non-default): git am --3way
+        trace("ptch");
         core.info("Applying patch...");
         try {
           if (commitTitleSuffix) {
@@ -1428,6 +1479,7 @@ async function main(config = {}) {
           await exec.exec("git", ["am", "--3way", patchFilePath], baseGitOpts);
           core.info("Patch applied successfully");
         } catch (error) {
+          trace("pfal");
           transport.assertUnchanged();
           core.warning(`Initial patch apply failed, attempting add/add recovery: ${getErrorMessage(error)}`);
           let recoveredFromAddAddConflict = false;
@@ -1469,6 +1521,7 @@ async function main(config = {}) {
           }
 
           if (recoveredFromAddAddConflict) {
+            trace("aadd");
             // Continue with normal push flow
           } else {
             core.error(`Failed to apply patch: ${getErrorMessage(error)}`);
@@ -1520,6 +1573,7 @@ async function main(config = {}) {
           core.info(`Post-apply verification: ${protectionFiles.length} file(s) actually modified`);
           const postApplyProtection = checkFileProtectionPostApply(protectionFiles, config);
           if (postApplyProtection.action === "deny") {
+            trace("aden");
             const filesStr = postApplyProtection.files.join(", ");
             const msg = `SECURITY: Post-apply file-protection check failed. ` + `The patch applied files that were not detected by the pre-apply parser: ${filesStr}. ` + `This may indicate a patch-parser bypass attempt. Aborting push.`;
             core.error(msg);
@@ -1528,6 +1582,7 @@ async function main(config = {}) {
             return { success: false, error: msg };
           }
           if (postApplyProtection.action === "fallback") {
+            trace("afbk");
             core.warning(`Post-apply: Protected file protection triggered (fallback-to-issue): ${postApplyProtection.files.join(", ")}`);
             await exec.exec("git", ["reset", "--hard", rangeBaseRef], baseGitOpts);
             return await createProtectedFilesFallbackIssue(postApplyProtection.files);
@@ -1538,6 +1593,7 @@ async function main(config = {}) {
           const changedBlobSizeKb = Math.ceil(changedBlobSizeBytes / 1024);
           core.info(`Changed content size: ${changedBlobSizeKb} KB (maximum allowed: ${maxSizeKb} KB)`);
           if (changedBlobSizeKb > maxSizeKb) {
+            trace("blob");
             const msg = `Changed content size (${changedBlobSizeKb} KB) exceeds maximum allowed size (${maxSizeKb} KB)${mergedBaseBaselineHint}`;
             await exec.exec("git", ["reset", "--hard", rangeBaseRef], baseGitOpts);
             return { success: false, error: msg };
@@ -1550,6 +1606,7 @@ async function main(config = {}) {
       // before they are merged into the target PR.
       const detectionConclusionEnv = getEffectiveDetectionConclusion(process.env.GH_AW_DETECTION_CONCLUSION, process.env.GH_AW_DETECTION_REASON);
       if (detectionConclusionEnv === "warning") {
+        trace("revw");
         core.info("⚠️ Threat detection warning: creating review PR instead of direct push");
 
         // Create a review branch name based on the original branch, using
@@ -1666,6 +1723,7 @@ async function main(config = {}) {
             pr_url: reviewPR.html_url,
           };
         } catch (reviewError) {
+          trace("rfal");
           transport.assertUnchanged();
           core.error(`Failed to create review PR: ${getErrorMessage(reviewError)}`);
           return { success: false, error: `Failed to create review PR: ${getErrorMessage(reviewError)}` };
@@ -1681,6 +1739,7 @@ async function main(config = {}) {
           const { stdout: mergeCountOut } = await exec.getExecOutput("git", ["rev-list", "--merges", "--count", `${squashBase}..HEAD`], baseGitOpts);
           const mergeCount = parseInt(mergeCountOut.trim(), 10);
           if (Number.isFinite(mergeCount) && mergeCount > 0) {
+            trace("sqsh");
             core.warning(
               `push_to_pull_request_branch: detected ${mergeCount} merge commit(s) in range ${squashBase}..HEAD. ` +
                 `Merge commits cannot be pushed as signed commits. Squashing the range into a single regular commit to preserve content. ` +
@@ -1706,6 +1765,7 @@ async function main(config = {}) {
 
       const agentWorkflowFiles = agentChangedFiles.filter(isWorkflowYamlFile);
       if (!allowWorkflows && agentWorkflowFiles.length > 0) {
+        trace("scop");
         return buildWorkflowsScopeError("Branch", core);
       }
 
@@ -1716,6 +1776,7 @@ async function main(config = {}) {
         // scope may be required." — a transient server-side condition, not a real scope problem.
         // Retry with exponential backoff before treating the push as failed.
         const pushedSha = await withTransientPushRetry(async () => {
+          trace("push");
           const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
           if (staleReason) throw new StalePullRequestError(staleReason);
           transport.assertUnchanged();
@@ -1742,10 +1803,13 @@ async function main(config = {}) {
           pushedCommitSha = pushedSha;
           core.info(`pushSignedCommits returned pushed SHA: ${pushedSha}`);
         }
+        trace("pshd");
         core.info(`Changes committed and pushed to branch: ${branchName}`);
       } catch (pushError) {
+        trace("perr");
         transport.assertUnchanged();
         if (pushError instanceof StalePullRequestError) {
+          trace("stal");
           core.info(pushError.message);
           return { skipped: true, reason: pushError.message };
         }
@@ -1785,6 +1849,7 @@ async function main(config = {}) {
         // Fallback path for diverged branches: create a new pull request so changes
         // can still be reviewed and merged into the original PR branch.
         if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest && allowGitPushFallback) {
+          trace("fbpr");
           const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
           if (staleReason) {
             if (isNonFastForward) {
@@ -1878,6 +1943,7 @@ async function main(config = {}) {
               url: fallbackPR.html_url,
             };
           } catch (fallbackError) {
+            trace("fber");
             transport.assertUnchanged();
             const fallbackErrorMessage = getErrorMessage(fallbackError);
             core.error(`Failed to create fallback pull request: ${fallbackErrorMessage}`);
@@ -1901,14 +1967,17 @@ async function main(config = {}) {
         }
       }
     } else {
+      trace("same");
       core.info("Skipping patch application (empty patch)");
 
       const msg = "No changes to apply - noop operation completed successfully";
 
       switch (ifNoChanges) {
         case "error":
+          trace("nerr");
           return { success: false, error: "No changes to apply - failing as configured by if-no-changes: error" };
         case "ignore":
+          trace("ignr");
           // Silent success
           break;
         case "warn":
@@ -1924,6 +1993,7 @@ async function main(config = {}) {
     if (!commitSha) {
       const commitShaRes = await exec.getExecOutput("git", ["rev-parse", "HEAD"], baseGitOpts);
       if (commitShaRes.exitCode !== 0) {
+        trace("nsha");
         return { success: false, error: "Failed to get commit SHA" };
       }
       commitSha = commitShaRes.stdout.trim();

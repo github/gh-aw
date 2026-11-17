@@ -20,7 +20,7 @@ const sections = [
     preview: ["FAQ", "AI Engines", "Cost Management", "Safe Outputs", "Workflows", "More..."],
     more: "/gh-aw/reference/workflow-structure/",
     other: "/gh-aw/reference/engines/copilot/",
-    count: 77,
+    count: 79,
   },
 ];
 
@@ -155,6 +155,17 @@ test("the old Workshop URL redirects to Guides and preserves bookmarks", async (
   await page.goto("/gh-aw/workshop/#j=terminal&s=daily-status&t=00-welcome");
   await expect(page).toHaveURL(/\/gh-aw\/guides\/workshop\/#j=terminal&s=daily-status&t=00-welcome$/);
   await expect(page.getByRole("heading", { name: "Workshop", exact: true })).toBeVisible();
+});
+
+test("redirects preserve a simple incoming fragment", async ({ page }) => {
+  await page.goto("/gh-aw/workshop/#x");
+  await expect(page).toHaveURL(/\/gh-aw\/guides\/workshop\/#x$/);
+});
+
+test("a redirect's own fragment wins over the requested one", async ({ page }) => {
+  await page.goto("/gh-aw/reference/servicenow-connector/#other");
+  await expect(page).toHaveURL(/\/gh-aw\/reference\/connectors\/#servicenow$/);
+  await expect(page.locator("#servicenow")).toBeVisible();
 });
 
 for (const guide of [

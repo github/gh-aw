@@ -127,17 +127,36 @@ is distinct from the passing safety checks above.
 - The model MUST NOT be cited as evidence of liveness or
   distributed-serializability. Production tests cover separate obligations.
 
-## Last synced with implementation (2026-11-06)
+## Last synced with implementation (2026-11-17)
 
-- **Go compiler wiring and tests:** `pkg/workflow/ledger.go`,
-  `pkg/workflow/ledger_job.go`, and `pkg/workflow/ledger_test.go` generate and
-  test persistence, the read-only projection, and compaction plan/apply jobs.
+- **Go compiler wiring and tests:** `pkg/workflow/compiler_main_job_ledger.go`,
+  `pkg/workflow/ledger.go`, `pkg/workflow/ledger_job.go`,
+  `pkg/workflow/ledger_test.go`,
+  `pkg/workflow/maintenance_workflow_ledger_compaction.go`,
+  `pkg/workflow/maintenance_workflow_ledger_compaction_test.go`,
+  `pkg/workflow/comment_memory_ledger_integration_test.go`,
+  `pkg/workflow/repo_memory_ledger_safe_output.go`,
+  `pkg/workflow/repo_memory_ledger_safe_output_test.go`,
+  `pkg/workflow/repo_memory_ledger_compliance_test.go`, and
+  `pkg/workflow/repo_memory_ledger_test.go` cover persistence, read-only
+  projection, compaction, and repository-memory integration.
 - **TLA+:** `LedgerProtocol.tla`, `LedgerProtocolWitness.tla`, and the `*.cfg`
   model configurations in this directory.
-- **JavaScript entry points:** `actions/setup/js/ledger_append.cjs`,
-  `ledger_replay.cjs`, `ledger_builtin.cjs`, `ledger_transactions.cjs`,
-  `push_ledger_changes.cjs`, and `ledger_compaction.cjs`.
+- **JavaScript implementation:** `actions/setup/js/ledger_append.cjs`,
+  `ledger_replay.cjs`, `ledger_builtin.cjs`, `ledger_mutation.cjs`,
+  `ledger_store.cjs`, `ledger_transactions.cjs`, `merge_ledger_transactions.cjs`,
+  `push_ledger_changes.cjs`, `ledger_mcp_server.cjs`,
+  `ledger_request_compaction.cjs`, `ledger_compaction.cjs`,
+  `ledger_compaction_plan.cjs`, `ledger_compaction_apply.cjs`,
+  `comment_memory_ledger.cjs`, `create_ledger_projection.cjs`, and
+  `daily_aic_repo_memory_ledger.cjs`.
 - **Conformance inputs and tests:** `actions/setup/js/ledger_protocol_vectors.json`,
   `ledger_protocol_model.test.cjs`, `ledger_protocol_generated.test.cjs`,
-  `ledger_builtin.test.cjs`, `push_ledger_changes.test.cjs`, and
-  `ledger_compaction.test.cjs`.
+  `ledger_append.test.cjs`, `ledger_replay.test.cjs`, `ledger_builtin.test.cjs`,
+  `ledger_mutation.test.cjs`, `ledger_store.test.cjs`,
+  `ledger_transactions.test.cjs`, `merge_ledger_transactions.test.cjs`,
+  `push_ledger_changes.test.cjs`, `ledger_mcp_server.test.cjs`,
+  `ledger_request_compaction.test.cjs`, `ledger_compaction.test.cjs`,
+  `comment_memory_ledger.test.cjs`, `create_ledger_projection.test.cjs`,
+  `daily_aic_repo_memory_ledger.test.cjs`, and
+  `repo_memory_ledger_compliance.test.cjs`.

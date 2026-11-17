@@ -17,6 +17,15 @@
     }
   },
   "properties": {
+    "issue_label": {
+      "description": "Label used to create and find gh-aw's own issues. Recompile workflows after changing this setting.",
+      "type": "string",
+      "default": "agentic-workflows",
+      "minLength": 1,
+      "maxLength": 50,
+      "allOf": [{ "pattern": "^[^\\x00-\\x1f\\x7f]+$" }, { "pattern": "\\S" }],
+      "not": { "pattern": "\\$\\{\\{" }
+    },
     "protected_files": {
       "description": "Repository-wide exceptions to safe-output protected-file checks. Does not bypass allowed-files restrictions or change the protected-files policy.",
       "type": "object",

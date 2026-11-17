@@ -355,6 +355,35 @@ describe("compact unified session OTLP logs", () => {
     expect(grader.data.run).not.toHaveProperty("attempt");
   });
 
+  it("exports safe-output delivery evidence without resource URLs", async () => {
+    write([
+      { type: "session.format", data: { version: 1 } },
+      {
+        type: "safe_output.execution",
+        data: {
+          type: "create_issue",
+          messageIndex: 0,
+          status: "success",
+          staged: false,
+          operation_outcome: "indeterminate",
+          url: "https://github.com/owner/repo/issues/42",
+        },
+      },
+    ]);
+    await sendSessionLogs({ sessionPath });
+    const execution = records()
+      .map(record => decode(record.body))
+      .find(event => event.type === "safe_output.execution");
+    expect(execution.data).toEqual({
+      type: "create_issue",
+      messageIndex: 0,
+      status: "success",
+      staged: false,
+      operation_outcome: "indeterminate",
+    });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain("/issues/42");
+  });
+
   it("skips an oversized higher-priority record without evicting a smaller failure", async () => {
     const header = { type: "session.format", data: { version: 1 } };
     const failure = { type: "execution.result", data: { outcome: "failure", exitCode: 1 } };

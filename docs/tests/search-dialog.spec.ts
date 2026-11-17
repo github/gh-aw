@@ -29,7 +29,7 @@ for (const viewport of VIEWPORTS) {
     await page.keyboard.press('Escape');
     await expect(reopenedDialog).toHaveCount(0);
 
-    await page.getByRole('link', { name: 'Get Started with CLI' }).click();
+    await page.getByRole('banner').getByRole('link', { name: 'Get started', exact: true }).click();
     await expect(page).toHaveURL(/\/gh-aw\/setup\/quick-start\//);
   });
 }

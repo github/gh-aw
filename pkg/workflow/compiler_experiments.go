@@ -191,7 +191,7 @@ func applyExperimentConfigMetadata(cfg *ExperimentConfig, raw map[string]any) {
 	if m, ok := raw["metric"].(string); ok {
 		cfg.Metric = m
 	}
-	if window, ok := raw["outcome_window"].(string); ok {
+	if window, ok := raw["adoption_window"].(string); ok {
 		cfg.OutcomeWindow = window
 	}
 	if sd, ok := raw["start_date"].(string); ok {
@@ -473,10 +473,10 @@ func ParseExperimentMetricGraderReference(metric string) (string, bool) {
 	return "", false
 }
 
-// ParseExperimentMetricOutcomeReference returns the outcome kind for a supported
-// outcome:<kind> metric. An unrecognized kind retains the prefix match with an empty kind.
+// ParseExperimentMetricOutcomeReference returns the adoption kind for a supported
+// adoption:<kind> metric. An unrecognized kind retains the prefix match with an empty kind.
 func ParseExperimentMetricOutcomeReference(metric string) (string, bool) {
-	kind, ok := strings.CutPrefix(strings.TrimSpace(metric), "outcome:")
+	kind, ok := strings.CutPrefix(strings.TrimSpace(metric), "adoption:")
 	if !ok {
 		return "", false
 	}
@@ -522,7 +522,7 @@ func validateExperimentMetricReferences(configs map[string]*ExperimentConfig, ev
 		if cfg.OutcomeWindow != "" && cfg.OutcomeWindow != "auto" {
 			window, err := time.ParseDuration(cfg.OutcomeWindow)
 			if err != nil || window <= 0 {
-				return fmt.Errorf("experiments.%s.outcome_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: outcome_window: 72h", experimentName, cfg.OutcomeWindow)
+				return fmt.Errorf("experiments.%s.adoption_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: adoption_window: 72h", experimentName, cfg.OutcomeWindow)
 			}
 		}
 		if cfg.Continual != nil {
@@ -557,8 +557,11 @@ func validateExperimentMetricReference(
 	experimentName, field, metric string,
 	evalIDs, graderIDs map[string]struct{},
 ) error {
+	if strings.HasPrefix(strings.TrimSpace(metric), "outcome:") {
+		return fmt.Errorf("experiments.%s.%s: outcome: metrics have been removed; use adoption:accepted or adoption:zero_touch", experimentName, field)
+	}
 	if kind, referencesOutcome := ParseExperimentMetricOutcomeReference(metric); referencesOutcome && kind == "" {
-		return fmt.Errorf("experiments.%s.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", experimentName, field, metric)
+		return fmt.Errorf("experiments.%s.%s: unknown adoption metric %q. Expected adoption:accepted or adoption:zero_touch. Example: metric: adoption:accepted", experimentName, field, metric)
 	}
 	referencedEvalID, referencesEval := ParseExperimentMetricEvalReference(metric)
 	if referencesEval {

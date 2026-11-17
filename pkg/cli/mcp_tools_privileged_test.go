@@ -713,7 +713,7 @@ func TestAuditTool_FailsWhenNoRunIDProvided(t *testing.T) {
 
 // TestAuditTool_ExperimentVariantFlags verifies that --experiment and --variant
 // are forwarded as CLI flags when provided via the MCP tool arguments.
-func TestAuditTool_ExperimentVariantFlags(t *testing.T) {
+func TestAuditTool_ExperimentVariantAndLifecycleFlags(t *testing.T) {
 	const expectedStdout = `{"overview":{"run_id":"1234567890"}}`
 
 	var capturedArgs []string
@@ -733,6 +733,8 @@ func TestAuditTool_ExperimentVariantFlags(t *testing.T) {
 			"run_ids_or_urls": []string{"1234567890"},
 			"experiment":      "style",
 			"variant":         "concise",
+			"delivery":        true,
+			"adoption":        true,
 		},
 	})
 	require.NoError(t, err, "audit tool should succeed with experiment/variant flags")
@@ -740,6 +742,8 @@ func TestAuditTool_ExperimentVariantFlags(t *testing.T) {
 	joined := strings.Join(capturedArgs, " ")
 	assert.Contains(t, joined, "--experiment style", "audit command should include --experiment flag")
 	assert.Contains(t, joined, "--variant concise", "audit command should include --variant flag")
+	assert.Contains(t, capturedArgs, "--delivery")
+	assert.Contains(t, capturedArgs, "--adoption")
 }
 
 func TestAuditTool_VariantWithoutExperimentFails(t *testing.T) {

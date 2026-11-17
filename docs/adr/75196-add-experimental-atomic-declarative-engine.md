@@ -1,10 +1,12 @@
 # ADR-75196: Add an Experimental Atomic Declarative Engine
 
 **Date**: 2026-11-05
-**Status**: Proposed
+**Status**: Withdrawn
 **Deciders**: gh-aw maintainers (review pending)
 
 ---
+
+The experimental Atomic integration has been removed because it is not ready for consumption. This record preserves the original proposal; the engine definition and its smoke and conformance workflows are no longer distributed.
 
 ### Context
 

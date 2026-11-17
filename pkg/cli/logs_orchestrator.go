@@ -305,6 +305,11 @@ var logsExportHarborJob = exportHarborJob
 // DownloadWorkflowLogs downloads and analyzes workflow logs with metrics
 func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err error) {
 	opts = normalizeLogsDownloadOptions(opts)
+	if opts.Delivery || opts.Outcomes {
+		var cancel context.CancelFunc
+		ctx, cancel = lifecycleLogsContext(ctx, opts.TimeoutMinutes, opts.TimeoutSeconds, opts.MaxGitHubAPIRateLimit)
+		defer cancelLogsDownload(cancel)
+	}
 	ctx, stream, finish := startLogsJSONL(ctx, opts.Format, opts.Verbose, workQueueEvidenceRequested(opts.ArtifactSets) || len(ResolveArtifactFilter(opts.ArtifactSets)) == 0)
 	defer finish(&err)
 	opts.jsonlStream = stream
@@ -334,9 +339,12 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 			return fmt.Errorf("harbor export: %w", err)
 		}
 	}
-	if opts.Outcomes {
-		outcomeReports, err = collectLogsOutcomes(ctx, result.processedRuns, opts.OutcomesDir, opts.Verbose)
+	if opts.Outcomes || opts.Delivery {
+		outcomeReports, err = collectLogsLifecycles(ctx, result.processedRuns, opts.OutcomesDir, opts.Verbose, opts.Outcomes, opts.cachedJSONLCache)
 		if err != nil {
+			return err
+		}
+		if err := cacheLogsLifecycles(opts.cachedJSONLWriter, outcomeReports); err != nil {
 			return err
 		}
 	}

@@ -75,7 +75,7 @@ jobs:
           cp "$GITHUB_WORKSPACE/actions/setup/sh/release_integrity.sh" "$trusted/actions/setup/sh/"
           printf '%s  %s\n' \
             15317bc27032f3c8160cb47fb77084683e21e3c37680db90b9bb2e57adea16e2 "$trusted/.github/scripts/install_tla_runtime.sh" \
-            79c19f7126584e3693fac6d43114b444299a245f71133b35a39f274be83b9a8e "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
+            0b0acdf23f27360e70c6524b484329e5ba8d61ab1dfb2a5aaa4f9b6118828c72 "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
           bash "$trusted/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only
       - name: Collect formal verification evidence
         id: verification

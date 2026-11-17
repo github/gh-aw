@@ -102,12 +102,12 @@ If the new numbers are lower than the baseline, suspect the query, not the data:
 
 ```bash
 node --check docs/public/cracktro/deck.js
-python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#N (N = row in slides.md) in the browser canvas
+python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#docs-that-heal in the browser canvas
 git diff -U0 docs/public/cracktro/deck.js | grep '^+' | grep -nE '[0-9a-f]{40}|github/[a-z]|https?://|who:'   # must print nothing
 cd docs && npx playwright test tests/talk.spec.ts
 ```
 
-- The slide number shifts when slides are added. Find it with `grep -n "Docs that heal" docs/tests/talk.spec.ts` (index + 1).
+- Link the slide by its stable id `#docs-that-heal`.
 - On screen, check that the strip clears the left nav-dot minimap (left ≥ 470px) and the sound button, and that the timeline bars do not overflow `TW`.
 - Use agent and role names only; never show people, issue or PR numbers, or URLs on the slide.
 - Stop the server afterwards.

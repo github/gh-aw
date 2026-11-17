@@ -3616,9 +3616,9 @@
               },
               "metric": {
                 "type": "string",
-                "description": "Primary metric to observe (e.g. 'ai_credits_total', 'outcome:accepted', or 'outcome:zero_touch')."
+                "description": "Primary metric to observe (e.g. 'ai_credits_total', 'adoption:accepted', or 'adoption:zero_touch')."
               },
-              "outcome_window": {
+              "adoption_window": {
                 "type": "string",
                 "minLength": 1,
                 "default": "auto",
@@ -3656,7 +3656,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Additional metrics to collect and report alongside the primary metric (e.g. ['duration_ms', 'outcome:accepted', 'outcome:zero_touch'])."
+                "description": "Additional metrics to collect and report alongside the primary metric (e.g. ['duration_ms', 'adoption:accepted', 'adoption:zero_touch'])."
               },
               "guardrail_metrics": {
                 "type": "array",
@@ -3666,7 +3666,7 @@
                   "properties": {
                     "name": {
                       "type": "string",
-                      "description": "Name of the guardrail metric (e.g. 'success_rate', 'outcome:accepted', or 'outcome:zero_touch')."
+                      "description": "Name of the guardrail metric (e.g. 'success_rate', 'adoption:accepted', or 'adoption:zero_touch')."
                     },
                     "direction": {
                       "type": "string",
