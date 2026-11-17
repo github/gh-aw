@@ -68,6 +68,8 @@ slides.push({
 | `content-rules.md` | Adding public text, data, avatars or images; per-slide Exception bullets for measured data. |
 | `workflow-prompts.md` | Adding or refreshing a slide's `/agentic-workflows` prompt (`PROMPTS`, phone dialog); prompt mining and PR/task/session references. |
 | `data-refresh.md` | Adding, changing or refreshing a data slide; refresh mini-skills and the slide→`refresh/<slug>.md` index. |
+| `brand.md` | Any colour, gradient, glow, title or font change; brand/Primer palette, semantic hues, regularization pass. |
+| `asset-generator.md` | Setting up or using the `asset-generator` MCP (og/social cards, wallpapers, charts, `create_slide_deck`); where outputs may live. |
 
 ## People and mascots
 
@@ -77,6 +79,8 @@ slides.push({
 - Never generate or redraw mascots. Avatars are 160x160 clips of brand.github.com 3D art (`mona.jpg`: dark-mode purple Mona, `mona-2026-versions.png`; `ducky.jpg`: middle Ducky, `mascots-03.png`), background `#0d1117`, never white.
 
 Core rules (`content-rules.md`): everything is public; no real people; no 40-hex SHAs or private repos; the only URLs are `https://github.github.com/gh-aw/introduction/overview/`, the For PMs source link `https://github.com/chrizbo/agentics-beyond-code` and the repo-widget star endpoint `https://api.github.com/repositories/` (https pages only); speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
+
+Brand (`brand.md`): neutral canvas and text with one accent hue per slide; titles solid `#f0f6fc` or a single-hue gradient, never rainbow; Mona Sans at `"wdth" 100`, Monaspace for code and labels.
 
 Colour accessibility: never use red/green as the only pair for opposing states (pass/fail, allowed/blocked); colour-blind viewers cannot tell them apart. Use blue (`#4493f8`/`#79c0ff`) vs orange (`#db6d28`/`#ffa657`) and add a non-colour cue (label, icon, dash or strike).
 

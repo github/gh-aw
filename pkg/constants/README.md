@@ -92,6 +92,7 @@ The package also acts as the authoritative source for the generated workflow con
 | `DefaultMCPRegistryURL` | `URL` | `"https://api.mcp.github.com/v0.1"` | Default MCP registry endpoint. |
 | `PublicGitHubHost` | `URL` | `"https://github.com"` | Canonical public GitHub host. |
 | `GitHubCopilotMCPDomain` | untyped `string` | `"api.githubcopilot.com"` | Hosted GitHub MCP server domain used by remote mode. |
+| `OtelMetricsJsonlFilename` | `Filename` | `"otel-metrics.jsonl"` | Filename of the OTLP metrics mirror written to `/tmp/gh-aw/`. |
 | `DocsEnginesURL` | `DocURL` | `"https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/engines.md"` | Engines reference documentation URL. |
 | `DocsToolsURL` | `DocURL` | `"https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md"` | Tools reference documentation URL. |
 | `DocsGitHubToolsURL` | `DocURL` | `"https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md#github-tools-github"` | GitHub tools subsection URL. |

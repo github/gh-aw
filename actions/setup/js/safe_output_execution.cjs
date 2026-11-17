@@ -2,7 +2,7 @@
 
 const { classifySafeOutputResult, pickOutcomeField } = require("./safe_outputs_status.cjs");
 
-const OUTCOME_STATUSES = new Set(["success", "failed", "skipped", "warning", "cancelled", "deferred", "delegated", "staged", "failure"]);
+const EXECUTION_STATUSES = new Set(["success", "failed", "skipped", "warning", "cancelled", "deferred", "delegated", "staged", "failure"]);
 const RESULT_URL_FIELDS = [
   "url",
   "html_url",
@@ -53,7 +53,7 @@ function canonicalSafeOutputUrl(value) {
 }
 
 /**
- * Project both new outcomes and legacy safe-output evidence through one allowlist.
+ * Project safe-output execution evidence through one allowlist.
  * @param {any} source
  * @returns {Record<string, any>}
  */
@@ -69,8 +69,9 @@ function projectSafeOutputData(source) {
   }
   if (typeof source.output_id === "string" && /^so_[A-Za-z0-9_-]{12}$/.test(source.output_id)) data.output_id = source.output_id;
   if (source.identifier === null) data.identifier = null;
-  if (OUTCOME_STATUSES.has(source.status)) data.status = source.status;
+  if (EXECUTION_STATUSES.has(source.status)) data.status = source.status;
   if (typeof source.staged === "boolean") data.staged = source.staged;
+  if (typeof source.execution_trace === "string" && source.execution_trace.length <= 1024 && /^[A-Za-z]{4}(?:_[A-Za-z]{4})*$/.test(source.execution_trace)) data.execution_trace = source.execution_trace;
   if (source.operation_outcome === "indeterminate") data.operation_outcome = "indeterminate";
   const url = canonicalSafeOutputUrl(source.url);
   if (url) data.url = url;
@@ -78,12 +79,12 @@ function projectSafeOutputData(source) {
 }
 
 /**
- * Only processing results, never agent requests, establish application outcomes.
+ * Only processing results, never agent requests, establish execution facts.
  * @param {any[]} results
  * @param {boolean} staged
  * @returns {Array<Record<string, any>>}
  */
-function buildSafeOutputOutcomes(results, staged = false) {
+function buildSafeOutputExecutions(results, staged = false) {
   return results.flatMap(record => {
     const fanout = Array.isArray(record.result);
     const items = fanout ? (record.result.length ? record.result : [undefined]) : [record.result];
@@ -102,6 +103,7 @@ function buildSafeOutputOutcomes(results, staged = false) {
           status: isStaged && status === "success" ? "staged" : status,
           staged: isStaged,
           operation_outcome: pickOutcomeField(item, "operation_outcome"),
+          execution_trace: pickOutcomeField(item, "execution_trace"),
           url,
         }),
       };
@@ -116,7 +118,7 @@ function buildSafeOutputOutcomes(results, staged = false) {
  * @param {number} prNumber
  * @param {any} review
  */
-function finalizeBufferedReviewOutcomes(results, repo, prNumber, review) {
+function finalizeBufferedReviewExecutions(results, repo, prNumber, review) {
   const comments = Array.isArray(review.review_comments) ? [...review.review_comments] : [];
   const completeComments = comments.length === review.comment_count;
   for (const record of results) {
@@ -142,4 +144,4 @@ function finalizeBufferedReviewOutcomes(results, repo, prNumber, review) {
   }
 }
 
-module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputOutcomes, finalizeBufferedReviewOutcomes };
+module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputExecutions, finalizeBufferedReviewExecutions };

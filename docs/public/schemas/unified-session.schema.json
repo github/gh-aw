@@ -103,6 +103,7 @@
       { "if": { "properties": { "type": { "const": "harness.attempt" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessAttemptData" } } } },
       { "if": { "properties": { "type": { "const": "harness.decision" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "harness.retry" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessRetryData" } } } },
+      { "if": { "properties": { "type": { "const": "lifecycle.adoption" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/LifecycleAdoptionData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.configuration" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpConfigurationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       {
@@ -140,7 +141,7 @@
       { "if": { "properties": { "type": { "const": "prompt.system" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "prompt.user" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputErrorData" } } } },
-      { "if": { "properties": { "type": { "const": "safe_output.outcome" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
+      { "if": { "properties": { "type": { "const": "safe_output.execution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "session.collection" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/CollectionData" } } } },
@@ -964,6 +965,53 @@
         { "type": "object", "additionalProperties": { "$ref": "#/definitions/JsonValue" } }
       ]
     },
+    "LifecycleAdoptionData": {
+      "type": "object",
+      "properties": {
+        "sourceRunId": { "type": "string" },
+        "sourceWorkflow": { "type": "string" },
+        "repository": { "type": "string" },
+        "outputType": { "type": "string" },
+        "deliveryState": { "type": "string", "const": "delivered" },
+        "deliverySignal": { "type": "string" },
+        "deliveryAt": { "type": "string" },
+        "deliveryObservedAt": { "type": "string" },
+        "deliverySource": { "type": "string" },
+        "adoptionState": { "type": "string", "enum": ["pending", "accepted", "rejected", "lifecycle", "not_applicable", "unknown"] },
+        "adoptionSignal": { "type": "string" },
+        "adoptionAt": { "type": "string" },
+        "adoptionObservedAt": { "type": "string" },
+        "adoptionSource": { "type": "string" },
+        "adoptionRuleVersion": { "type": "string" },
+        "acceptanceKind": { "type": "string", "enum": ["explicit_human", "fallback_delivery"] },
+        "humanVerified": { "type": "boolean" },
+        "adoptionCoverage": { "type": "string", "enum": ["available", "unobserved", "unsupported", "unavailable"] },
+        "survivalState": { "type": "string", "enum": ["observed", "reversed", "unknown"] },
+        "survivalSignal": { "type": "string" },
+        "survivalObservedAt": { "type": "string" },
+        "survivalCoverage": { "type": "string", "enum": ["snapshot", "unobserved", "unsupported", "unavailable"] }
+      },
+      "required": [
+        "sourceRunId",
+        "outputType",
+        "deliveryState",
+        "deliverySignal",
+        "deliveryAt",
+        "deliveryObservedAt",
+        "deliverySource",
+        "adoptionState",
+        "adoptionSignal",
+        "adoptionObservedAt",
+        "adoptionSource",
+        "adoptionRuleVersion",
+        "humanVerified",
+        "adoptionCoverage",
+        "survivalState",
+        "survivalCoverage"
+      ],
+      "additionalProperties": false,
+      "description": "Post-run lifecycle supplement; never append this event to its source run session."
+    },
     "McpConfigurationData": {
       "type": "object",
       "properties": {
@@ -1260,7 +1308,8 @@
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
-        "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." }
+        "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
+        "execution_trace": { "type": "string", "description": "Ordered four-letter branch mnemonics joined by underscores, not a correlation ID.", "pattern": "^[A-Za-z]{4}(?:_[A-Za-z]{4})*$", "minLength": 4, "maxLength": 1024 }
       },
       "additionalProperties": false
     },
@@ -1279,6 +1328,7 @@
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
+        "execution_trace": { "type": "string", "description": "Ordered four-letter branch mnemonics joined by underscores, not a correlation ID.", "pattern": "^[A-Za-z]{4}(?:_[A-Za-z]{4})*$", "minLength": 4, "maxLength": 1024 },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },
       "additionalProperties": false

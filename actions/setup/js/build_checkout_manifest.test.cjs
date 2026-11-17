@@ -130,7 +130,7 @@ describe("build_checkout_manifest.cjs", () => {
 
     expect(defaultBranch).toBe("trunk");
     expect(ghOptions?.env?.GH_TOKEN).toBe("${{ secrets.CROSS_REPO_PAT }}");
-    expect(ghOptions?.timeout).toBe(getSetupTimeoutMs("outcomeGh"));
+    expect(ghOptions?.timeout).toBe(getSetupTimeoutMs("adoptionGh"));
   });
 
   it.each([
@@ -168,7 +168,7 @@ describe("build_checkout_manifest.cjs", () => {
       }).toEqual({
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
-        timeout: getSetupTimeoutMs("outcomeGh"),
+        timeout: getSetupTimeoutMs("adoptionGh"),
       });
       expect(execOptions.env.GH_HOST).toBe(host);
       expect(execOptions.env.GH_TOKEN).toBe(checkoutToken || "ambient-token");

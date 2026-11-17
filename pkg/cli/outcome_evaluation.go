@@ -21,6 +21,7 @@ const (
 	OutcomeStatusLifecycle      OutcomeStatus = "lifecycle"
 	OutcomeStatusLifecycleClose OutcomeStatus = "lifecycle_close"
 	OutcomeStatusError          OutcomeStatus = "error"
+	OutcomeStatusNotApplicable  OutcomeStatus = "not_applicable"
 )
 
 // EvidenceStrength describes how confidently the outcome can be inferred.
@@ -35,7 +36,7 @@ const (
 
 // OutcomeEvaluation is the shared normalized outcome model.
 type OutcomeEvaluation struct {
-	OutcomeStatus    OutcomeStatus    `json:"outcome_status" console:"header:Outcome"`
+	OutcomeStatus    OutcomeStatus    `json:"adoption_status" console:"header:Outcome"`
 	EvidenceStrength EvidenceStrength `json:"evidence_strength"`
 	Signal           string           `json:"signal,omitempty"`
 }

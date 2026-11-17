@@ -15,6 +15,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/github"
 	"github.com/github/gh-aw/pkg/intent"
+	"github.com/github/gh-aw/pkg/lifecycle"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/repoutil"
 )
@@ -27,34 +28,42 @@ var objectiveMappingGHAPIGraphQL = ghAPIGraphQL
 // OutcomeReport is the result of evaluating one safe output item.
 type OutcomeReport struct {
 	OutcomeEvaluation
-	ItemID                    string   `json:"item_id,omitempty" console:"-"`
-	Type                      string   `json:"type" console:"header:Type"`
-	ObjectURL                 string   `json:"object_url,omitempty" console:"header:URL,omitempty"`
-	ObjectNumber              int      `json:"object_number,omitempty" console:"header:#,omitempty"`
-	TracedRootURL             string   `json:"traced_root_url,omitempty" console:"-"`
-	AttributionStatus         string   `json:"attribution_status,omitempty" console:"-"`
-	AttributionSource         string   `json:"attribution_source,omitempty" console:"-"`
-	Repo                      string   `json:"repo,omitempty" console:"header:Repo,omitempty"`
-	Detail                    string   `json:"detail,omitempty" console:"header:Detail,omitempty"`
-	TimeToOutcomeHours        float64  `json:"time_to_outcome_hours,omitempty" console:"header:Time,omitempty"`
-	HumanComments             int      `json:"human_comments,omitempty" console:"header:Comments,omitempty"`
-	HumanEdits                int      `json:"human_edits,omitempty" console:"header:Edits,omitempty"`
-	HumanReviews              int      `json:"human_reviews,omitempty" console:"header:Reviews,omitempty"`
-	ZeroTouch                 bool     `json:"zero_touch,omitempty" console:"header:Zero-touch,omitempty"`
-	ZeroTouchEvidenceComplete bool     `json:"zero_touch_evidence_complete" console:"-"`
-	ObjectiveValue            int      `json:"objective_value,omitempty" console:"header:Obj Value,omitempty"`
-	ObjectiveLabels           []string `json:"objective_labels,omitempty" console:"-"`
-	CreatedAt                 string   `json:"created_at" console:"-"`
-	CheckedAt                 string   `json:"checked_at" console:"-"`
-	EvalError                 string   `json:"eval_error,omitempty" console:"-"`
+	Lifecycle                 *lifecycle.Record   `json:"-" console:"-"`
+	Adoption                  *lifecycle.Adoption `json:"adoption,omitempty" console:"-"`
+	Survival                  *lifecycle.Survival `json:"survival,omitempty" console:"-"`
+	ReversalSignal            string              `json:"reversal_signal,omitempty" console:"-"`
+	ReversedAt                string              `json:"reversed_at,omitempty" console:"-"`
+	ItemID                    string              `json:"item_id,omitempty" console:"-"`
+	Type                      string              `json:"type" console:"header:Type"`
+	ObjectURL                 string              `json:"object_url,omitempty" console:"header:URL,omitempty"`
+	ObjectNumber              int                 `json:"object_number,omitempty" console:"header:#,omitempty"`
+	TracedRootURL             string              `json:"traced_root_url,omitempty" console:"-"`
+	AttributionStatus         string              `json:"attribution_status,omitempty" console:"-"`
+	AttributionSource         string              `json:"attribution_source,omitempty" console:"-"`
+	Repo                      string              `json:"repo,omitempty" console:"header:Repo,omitempty"`
+	Detail                    string              `json:"detail,omitempty" console:"header:Detail,omitempty"`
+	TimeToOutcomeHours        float64             `json:"time_to_adoption_hours,omitempty" console:"header:Time,omitempty"`
+	HumanComments             int                 `json:"human_comments,omitempty" console:"header:Comments,omitempty"`
+	HumanEdits                int                 `json:"human_edits,omitempty" console:"header:Edits,omitempty"`
+	HumanReviews              int                 `json:"human_reviews,omitempty" console:"header:Reviews,omitempty"`
+	ZeroTouch                 bool                `json:"zero_touch,omitempty" console:"header:Zero-touch,omitempty"`
+	ZeroTouchEvidenceComplete bool                `json:"zero_touch_evidence_complete" console:"-"`
+	ObjectiveValue            int                 `json:"objective_value,omitempty" console:"header:Obj Value,omitempty"`
+	ObjectiveLabels           []string            `json:"objective_labels,omitempty" console:"-"`
+	CreatedAt                 string              `json:"created_at" console:"-"`
+	CheckedAt                 string              `json:"checked_at" console:"-"`
+	EvalError                 string              `json:"eval_error,omitempty" console:"-"`
 }
 
 // OutcomeSummary aggregates outcomes across multiple safe output items.
 type OutcomeSummary struct {
 	Total                   int               `json:"total" console:"header:Total"`
 	Accepted                int               `json:"accepted" console:"header:Accepted"`
+	AcceptedHuman           int               `json:"accepted_human" console:"header:Human"`
+	AcceptedFallback        int               `json:"accepted_delivery_fallback" console:"header:Delivery fallback"`
 	Rejected                int               `json:"rejected" console:"header:Rejected"`
-	Ignored                 int               `json:"ignored" console:"header:Ignored"`
+	Ignored                 int               `json:"-" console:"-"`
+	NotApplicable           int               `json:"not_applicable" console:"header:Not applicable"`
 	Pending                 int               `json:"pending" console:"header:Pending"`
 	Unknown                 int               `json:"unknown" console:"header:Unknown"`
 	AcceptedStrong          int               `json:"accepted_strong,omitempty"`
@@ -67,8 +76,8 @@ type OutcomeSummary struct {
 	AcceptanceRate          float64           `json:"acceptance_rate" console:"header:Acceptance Rate"`
 	WasteRate               float64           `json:"waste_rate" console:"header:Waste Rate"`
 	ZeroTouchRate           float64           `json:"zero_touch_rate" console:"header:Zero-touch Rate"`
-	MedianTimeToOutcome     float64           `json:"median_time_to_outcome_hours,omitempty"`
-	CostPerAcceptedOutcome  float64           `json:"cost_per_accepted_outcome,omitempty"`
+	MedianTimeToOutcome     float64           `json:"median_time_to_adoption_hours,omitempty"`
+	CostPerAcceptedOutcome  float64           `json:"cost_per_adopted_output,omitempty"`
 	TotalObjectiveValue     int               `json:"total_objective_value,omitempty" console:"header:Total Obj Value"`
 	AcceptedObjectiveValue  int               `json:"accepted_objective_value,omitempty" console:"header:Accepted Obj Value"`
 	ObjectiveEfficiency     float64           `json:"objective_efficiency,omitempty" console:"header:Obj Efficiency"`
@@ -230,7 +239,9 @@ func ComputeOutcomeSummary(reports []OutcomeReport, mapping *github.ObjectiveMap
 	}
 
 	// Compute domain breakdowns
-	s.DomainBreakdowns = ComputeDomainBreakdowns(reports)
+	if !slices.ContainsFunc(reports, func(r OutcomeReport) bool { return r.Adoption != nil }) {
+		s.DomainBreakdowns = ComputeDomainBreakdowns(reports)
+	}
 
 	return s
 }
@@ -596,6 +607,14 @@ func (s *OutcomeSummary) countOutcome(r OutcomeReport, eval OutcomeEvaluation) {
 	switch eval.OutcomeStatus {
 	case OutcomeStatusAccepted:
 		s.Accepted++
+		if r.Adoption != nil {
+			switch r.Adoption.AcceptanceKind {
+			case "explicit_human":
+				s.AcceptedHuman++
+			case "fallback_delivery":
+				s.AcceptedFallback++
+			}
+		}
 		switch eval.EvidenceStrength {
 		case EvidenceStrong:
 			s.AcceptedStrong++
@@ -611,6 +630,8 @@ func (s *OutcomeSummary) countOutcome(r OutcomeReport, eval OutcomeEvaluation) {
 		s.Rejected++
 	case OutcomeStatusIgnored:
 		s.Ignored++
+	case OutcomeStatusNotApplicable:
+		s.NotApplicable++
 	case OutcomeStatusPending:
 		s.Pending++
 	case OutcomeStatusUnknown:

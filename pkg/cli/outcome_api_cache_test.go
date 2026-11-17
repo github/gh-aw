@@ -24,7 +24,7 @@ func installOutcomeAPIFixture(t *testing.T, script string) string {
 	dir := t.TempDir()
 	calls := filepath.Join(dir, "calls")
 	t.Setenv("GH_AW_TEST_OUTCOME_CALLS", calls)
-	t.Setenv("GH_AW_OUTCOMES_DIR", "")
+	t.Setenv("GH_AW_ADOPTION_DIR", "")
 	t.Setenv("GH_HOST", "github.com")
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"),
@@ -44,21 +44,22 @@ func TestLogsOutcomeAPIRequestReuse(t *testing.T) {
 	t.Setenv("GH_AW_TEST_OUTCOME_RESPONSE", response)
 	calls := installOutcomeAPIFixture(t, `case "$2" in
 repos/acme/repo/pulls/42) cat "$GH_AW_TEST_OUTCOME_RESPONSE" ;;
+repos/acme/repo/collaborators/alice/permission) printf '%s' '{"permission":"write"}' ;;
 repos/acme/repo/issues/42/comments) printf '%s' '[[{"user":{"login":"alice"},"created_at":"2026-10-02T00:00:00Z"}]]' ;;
 repos/acme/repo/pulls/42/reviews|repos/acme/repo/pulls/42/commits) printf '%s' '[[]]' ;;
 graphql) printf '%s' '{"data":{"repository":{"pullRequest":{"id":"PR42","closingIssuesReferences":{"nodes":[]}}}}}' ;;
 *) printf 'unexpected endpoint: %s\n' "$2" >&2; exit 1 ;;
 esac
 `)
-	require.NoError(t, os.WriteFile(response, []byte(`{"state":"closed","merged":true,"labels":[]}`), 0o600))
+	require.NoError(t, os.WriteFile(response, []byte(`{"html_url":"https://github.com/acme/repo/pull/42","state":"closed","merged":true,"merged_at":"2026-10-04T00:00:00Z","merged_by":{"login":"alice","type":"User"},"labels":[]}`), 0o600))
 	var runs []ProcessedRun
 	for i, timestamp := range []string{"2026-10-01T00:00:00Z", "2026-10-03T00:00:00Z"} {
 		dir := t.TempDir()
 		manifest := `{"type":"create_pull_request","number":42,"timestamp":"` + timestamp + `","url":"https://github.com/acme/repo/pull/42"}` + "\n"
 		require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(manifest), 0o600))
-		runs = append(runs, ProcessedRun{Run: WorkflowRun{DatabaseID: int64(i + 1), Repository: "acme/repo", LogsPath: dir}})
+		runs = append(runs, ProcessedRun{Run: WorkflowRun{Attempt: 1, DatabaseID: int64(i + 1), Repository: "acme/repo", LogsPath: dir}})
 	}
-	reports, err := collectLogsOutcomes(context.Background(), runs, "", false)
+	reports, err := collectLogsLifecycles(context.Background(), runs, "", false, true)
 	require.NoError(t, err)
 	require.Len(t, reports, 2)
 	for _, report := range reports {
@@ -69,10 +70,10 @@ esac
 	assert.False(t, reports[0].Items[0].ZeroTouch)
 	assert.Zero(t, reports[1].Items[0].HumanComments)
 	assert.True(t, reports[1].Items[0].ZeroTouch)
-	assert.Len(t, outcomeAPICalls(t, calls), 5, "four unique REST reads and one GraphQL query, without a separate label request")
+	assert.Len(t, outcomeAPICalls(t, calls), 5, "resource, actor permission, comments, reviews, and commits are each read once")
 
-	require.NoError(t, os.WriteFile(response, []byte(`{"state":"closed","merged":false,"labels":[]}`), 0o600))
-	reports, err = collectLogsOutcomes(context.Background(), runs, "", false)
+	require.NoError(t, os.WriteFile(response, []byte(`{"html_url":"https://github.com/acme/repo/pull/42","state":"closed","merged":false,"closed_at":"2026-10-05T00:00:00Z","closed_by":{"login":"alice","type":"User"},"labels":[]}`), 0o600))
+	reports, err = collectLogsLifecycles(context.Background(), runs, "", false, true)
 	require.NoError(t, err)
 	assert.Equal(t, OutcomeStatusRejected, reports[0].Items[0].OutcomeStatus)
 	assert.Len(t, outcomeAPICalls(t, calls), 10, "later collections must check current state again")
@@ -101,20 +102,21 @@ func TestOutcomeAPICacheIsolation(t *testing.T) {
 
 func TestLogsOutcomeCompletedIssueRequestCount(t *testing.T) {
 	calls := installOutcomeAPIFixture(t, `case "$2" in
-repos/acme/repo/issues/42) printf '%s' '{"state":"closed","state_reason":"completed","labels":[]}' ;;
+repos/acme/repo/issues/42) printf '%s' '{"html_url":"https://github.com/acme/repo/issues/42","state":"closed","state_reason":"completed","closed_at":"2026-10-02T00:00:00Z","closed_by":{"login":"alice","type":"User"},"labels":[]}' ;;
+repos/acme/repo/collaborators/alice/permission) printf '%s' '{"permission":"write"}' ;;
 *) printf 'unexpected endpoint: %s\n' "$2" >&2; exit 1 ;;
 esac
 `)
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename),
-		[]byte("{\"type\":\"create_issue\",\"number\":42}\n"), 0o600))
-	reports, err := collectLogsOutcomes(context.Background(), []ProcessedRun{{
-		Run: WorkflowRun{DatabaseID: 1, Repository: "acme/repo", LogsPath: dir},
-	}}, "", false)
+		[]byte("{\"type\":\"create_issue\",\"number\":42,\"timestamp\":\"2026-10-01T00:00:00Z\"}\n"), 0o600))
+	reports, err := collectLogsLifecycles(context.Background(), []ProcessedRun{{
+		Run: WorkflowRun{Attempt: 1, DatabaseID: 1, Repository: "acme/repo", LogsPath: dir},
+	}}, "", false, true)
 	require.NoError(t, err)
 	require.Len(t, reports, 1)
 	assert.Equal(t, 1, reports[0].Summary.Accepted)
-	assert.Len(t, outcomeAPICalls(t, calls), 1, "issue state and objective labels are available in the same REST response")
+	assert.Len(t, outcomeAPICalls(t, calls), 2, "adoption requires the resource and the decision actor's permission")
 }
 
 func TestOutcomeAPICacheGraphQLKeys(t *testing.T) {

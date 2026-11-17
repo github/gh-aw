@@ -102,13 +102,13 @@ Collect required evidence before session publication; graders cannot fetch it.
 Use [operational-value-designer](../skills/operational-value-designer/SKILL.md)
 for executable examples and evidence/fixture design.
 
-gh-aw owns run facts and optional run-scoped grading; GitHub owns later object
-disposition. Give every standalone workflow CAO Value with githubnext/gh-cao
-`add-operational-value OWNER/REPO WORKFLOW-NAME` and no `--campaign`.
-`--campaign` only scopes ownership and rolls up directly included worker Value;
-it adds no campaign-specific metric. Delivery/adoption/reversal/survival applies
-independently of campaign and Value configuration. The restricted-JS operational
-grader is optional evidence, not a prerequisite or substitute for CAO Value.
+gh-aw owns run facts, shared delivery/adoption/reversal/survival rules, provider
+refresh, and optional run-scoped grading. GitHub owns later object disposition.
+Every workflow can expose lifecycle evidence with `logs --delivery`,
+`logs --adoption`, or single-run `audit --adoption`, without CAO or a campaign.
+Attributed value additionally requires a declared measurement, attribution evidence,
+and complete post-adoption-window survival. CAO is an optional scheduler/consumer;
+the restricted-JS operational grader is optional evidence, not attributed value.
 
 Audit optionally retrieves registered custom results from the `graders`
 artifact; `logs --graders` and `--artifacts graders` include both it and `usage`.

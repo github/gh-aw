@@ -46,8 +46,8 @@ func TestFormal_OutcomeEvaluationUsesSeparateTrace(t *testing.T) {
 // P2_OutcomeSourceCorrelation
 // Each outcome-evaluation span SHOULD carry either a span link to the
 // originating workflow root context, or the full attribute triple
-// (gh-aw.outcome.source_run_id, gh-aw.outcome.source_workflow,
-// gh-aw.outcome.repo) when a persisted span context is unavailable.
+// (gh-aw.adoption.source_run_id, gh-aw.adoption.source_workflow,
+// gh-aw.adoption.repo) when a persisted span context is unavailable.
 // Specification reference: specs/otel-observability-spec.md §13.2.
 //
 // Pending: no outcome-evaluation span emitter exists in pkg/workflow yet.
@@ -57,9 +57,9 @@ func TestFormal_OutcomeSourceCorrelation(t *testing.T) {
 }
 
 // P3_OutcomeResultTaxonomy
-// gh-aw.outcome.result MUST be restricted to the canonical outcome taxonomy
+// gh-aw.adoption.result MUST be restricted to the canonical outcome taxonomy
 // (accepted, rejected, ignored, pending, lifecycle, lifecycle_close) defined
-// in specs/safe-output-outcome-evaluation.md.
+// in specs/safe-output-lifecycle.md.
 // Specification reference: specs/otel-observability-spec.md §13.3.
 //
 // Pending: the outcome-status taxonomy is implemented as pkg/cli.OutcomeStatus

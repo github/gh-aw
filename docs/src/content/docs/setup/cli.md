@@ -781,7 +781,7 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--outcomes`, `--outcomes-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--delivery`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--adoption`, `--adoption-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
@@ -834,7 +834,7 @@ with workflow-call-prefixed and historical agent artifacts supported.
 | `progress` | `stage`: `started`, `fetching`, `discovered`, `downloaded`, `skipped`, or `failed`. Available context includes `repository`, `workflow`, `run_id`, `cached`, `count` (runs in this discovery batch), and `message`. |
 | `run` | `run`: a processed run in the same shape as an entry in `--json`'s `runs` array, including cache hits. Emitted during collection, before the batch finishes. |
 | `warning` | `message`: a workflow target failed while other targets could still be collected. |
-| `summary` | `data`: the final `--json` report, including runs, aggregates, outcomes, warnings, and continuation cursors. This is the authoritative report; streamed run records do not yet include cross-run analysis or live outcomes. |
+| `summary` | `data`: the final `--json` report, including runs, aggregates, delivery, adoption, warnings, and continuation cursors. This is the authoritative report; streamed run records do not yet include cross-run analysis or live adoption. |
 | `complete` | Collection and finalization succeeded. The summary can still describe partial collection due to count, timeout, or resource limits. |
 | `error` | `message`: collection or finalization failed; the command exits unsuccessfully. |
 
@@ -954,9 +954,11 @@ cat run-ids.txt | gh aw audit --stdin --repo owner/repo
 gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandbox agent runtime matches
 ```
 
-**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+**Options:** `--adoption`, `--adoption-dir`, `--artifacts`, `--delivery`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
 
 `--models` adds the run's advertised model catalog, discovery completeness, and supported API endpoints alongside the recorded model selection, routing, and usage. With `--json`, the catalog is in `model_catalog`. Missing, invalid, or incomplete inventory is reported explicitly and does not establish model absence. The flag automatically includes the `agent`, `usage`, and `info` artifact sets when `--artifacts` is narrowed. It requires a single run and cannot be combined with `--group` or job/step URLs.
+
+`--delivery` adds recorded safe-output delivery evidence; `--adoption` also refreshes supported GitHub decisions. Both require a single full run, not group, diff, job, or step mode. See [Delivery and adoption](/gh-aw/reference/delivery-adoption/) for rules, coverage, retention, and `--adoption-dir`.
 
 `--search "query"` retrieves evidence from the run's redacted unified session using local BM25 ranking, without changing audit findings. `--search-limit` bounds returned evidence groups (default: `5`, range: `1–20`). Search requires a single run and cannot be combined with `--group` or job/step URLs. See [Searching session evidence](/gh-aw/reference/audit/#searching-session-evidence) for input limits and automatic repetition grouping.
 
@@ -964,7 +966,7 @@ The `--timeout` flag sets a duration such as `50s` or `5m` (default: `0`, no add
 
 The `--repo` flag accepts `owner/repo` and is required for a bare numeric run ID.
 
-The `--artifacts` flag selects which artifact sets to download (default: `all`, unlike `gh aw logs`, which defaults to `usage`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, `outcomes`, `usage`, and `work-queue`. The `work-queue` set downloads queue snapshots, worker finish intents, and workflow logs for coordinator operation reporting. The `--experiment` flag filters to runs that include the named experiment; `--variant` restricts to a variant value and requires `--experiment`. The `--output/-o` flag overrides the output directory.
+The `--artifacts` flag selects which artifact sets to download (default: `all`, unlike `gh aw logs`, which defaults to `usage`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, `delivery`, `usage`, and `work-queue`. The `work-queue` set downloads queue snapshots, worker finish intents, and workflow logs for coordinator operation reporting. The `--experiment` flag filters to runs that include the named experiment; `--variant` restricts to a variant value and requires `--experiment`. The `--output/-o` flag overrides the output directory.
 
 Logs are saved to `.github/aw/logs/run-{id}/` with filenames indicating the extraction level. Pre-agent failures (integrity filtering, missing secrets, binary install) surface the actual error in `failure_analysis.error_summary`. Invalid run IDs return a human-readable error.
 
@@ -1073,37 +1075,40 @@ Bash. Single-session legacy Bash replay remains available with a warning.
 
 **Options:** `--additional-grader`, `--logs-dir`, `--repo/-r`
 
-#### `logs --outcomes`
+#### `logs --delivery` and `logs --adoption`
 
-Check what happened to a workflow run's safe outputs (accepted, rejected, ignored, or pending).
+Report applied effects with `--delivery`. Add live, rule-based adoption observations
+with `--adoption`, which includes delivery and makes additional API requests.
 
 ```bash wrap
-gh aw logs weekly-research --outcomes --json
-gh aw logs weekly-research --episodes --outcomes --json
-printf '%s\n' 1234567890 | gh aw logs --stdin --repo owner/repo --outcomes --json
-gh aw logs episode 1234567890 --repo owner/repo --outcomes
-gh aw logs --outcomes --outcomes-dir ./otlp
+gh aw logs weekly-research --adoption --json
+gh aw logs weekly-research --delivery --json
+gh aw logs weekly-research --episodes --adoption --json
+printf '%s\n' 1234567890 | gh aw logs --stdin --repo owner/repo --adoption --json
+gh aw logs episode 1234567890 --repo owner/repo --adoption
+gh aw logs --adoption --adoption-dir ./otlp
 ```
 
-**Options:** `--json/-j`, `--repo/-r`, `--output/-o`, `--episodes`, `--outcomes`, `--outcomes-dir`
+**Options:** `--json/-j`, `--repo/-r`, `--output/-o`, `--episodes`, `--delivery`, `--adoption`, `--adoption-dir`
 
 The flag applies to selected runs in discovery, multi-workflow, stdin, and
-episode collection. JSON includes `.outcomes[]` with per-run observations and
-`.episode_outcomes` with selected-episode summaries. Outcome checks are live
+episode collection. JSON includes `.delivery[]` with applied effects, `.adoption[]`
+with decision observations, and `.episode_adoption` with selected-episode summaries.
+Adoption checks are live
 and require additional API requests even when execution artifacts are cached.
-`--outcomes-dir` requires `--outcomes` and writes JSONL observations.
-The standalone `gh aw outcomes` command has been removed.
+`--adoption-dir` requires `--adoption` and writes JSONL observations.
+Single-run `gh aw audit RUN --delivery` and `--adoption` expose the same evidence.
 
 `--episodes` adds recorded episode membership and hops to text reports. Combine
-`--episodes --outcomes` to perform the episode-outcome join in the same
+`--episodes --adoption` to perform the episode-adoption join in the same
 invocation, using collected membership, live observations, and downloaded
 usage. No separate command or JSONL export is needed.
-Standard logs JSON retains episode membership and outcome summaries with or
+Standard logs JSON retains episode membership and adoption summaries with or
 without the explicit `--episodes` flag. Membership is limited to selected runs; this flag
 does not expand discovery to all episode members.
 
-Reports are scoped to selected runs and qualify missing membership, outcomes,
-and cost. See [Episode Outcome Summaries](/gh-aw/reference/outcomes/#episode-outcome-summaries)
+Reports are scoped to selected runs and qualify missing membership, observations,
+and cost. See [Delivery and adoption](/gh-aw/reference/delivery-adoption/)
 for the JSON contract and unavailable-cost semantics.
 
 #### `models`

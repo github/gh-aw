@@ -76,7 +76,7 @@
 name: "Smoke Copilot - AOAI (apikey)"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "39 20 */2 * *"
   workflow_dispatch:
     inputs:
       aw_context:
@@ -4616,7 +4616,7 @@ jobs:
           name: safe-outputs-items
           path: |
             /tmp/gh-aw/safe-output-items.jsonl
-            /tmp/gh-aw/safe-output-outcomes.jsonl
+            /tmp/gh-aw/safe-output-executions.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore

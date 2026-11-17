@@ -193,14 +193,14 @@ func TestEpisodeAccountingPhaseSources(t *testing.T) {
 			files: map[string]string{
 				"usage/agent_usage.jsonl":           `{"ai_credits":8}`,
 				"usage/detection/token_usage.jsonl": "",
-				"usage/detection/execution.json":    `{"exit_code":0,"outcome":"success"}`,
+				"usage/detection/execution.json":    `{"exit_code":0,"adoption":"success"}`,
 			},
 			cost: 8, warning: "detection usage: no usable accounting",
 		},
 		{
 			name: "executed agent without a stream is qualified",
 			files: map[string]string{
-				"usage/agent/execution.json":  `{"exit_code":0,"outcome":"success"}`,
+				"usage/agent/execution.json":  `{"exit_code":0,"adoption":"success"}`,
 				"usage/detection_usage.jsonl": `{"ai_credits":2}`,
 			},
 			cost: 2, warning: "agent usage: no usable accounting",

@@ -23,7 +23,7 @@ func TestOutcomeSummaryAICPerAcceptedOutcome(t *testing.T) {
 		expected float64
 	}{
 		{"accepted share of full run cost", 2, 12, 6},
-		{"no accepted outcomes", 0, 12, 0},
+		{"no accepted adoption", 0, 12, 0},
 		{"missing cost", 2, 0, 0},
 		{"invalid cost", 2, -1, 0},
 		{"not a number", 2, math.NaN(), 0},
@@ -36,7 +36,7 @@ func TestOutcomeSummaryAICPerAcceptedOutcome(t *testing.T) {
 			data, err := json.Marshal(summary)
 			require.NoError(t, err)
 			if tc.expected == 0 {
-				assert.NotContains(t, string(data), "cost_per_accepted_outcome")
+				assert.NotContains(t, string(data), "cost_per_adopted_output")
 			}
 		})
 	}
@@ -88,7 +88,7 @@ func TestAuditLeavesOutcomeEvaluationToOutcomesCommand(t *testing.T) {
 	original := workflowOutcomeGHAPIGet
 	t.Cleanup(func() { workflowOutcomeGHAPIGet = original })
 	workflowOutcomeGHAPIGet = func(_ context.Context, _, _ string) (map[string]any, error) {
-		t.Fatal("audit must not query outcome evidence")
+		t.Fatal("audit must not query adoption evidence")
 		return nil, nil
 	}
 	dir := t.TempDir()
