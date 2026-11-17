@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
-const { SUITE_IDS, MANDATORY, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, postDecision, selectSuites, frontDoor } = require("./ci-front-door.cjs");
+const { SUITE_IDS, MANDATORY, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, summarizeGitHubDiff, postDecision, selectSuites, frontDoor } = require("./ci-front-door.cjs");
 const { evaluate } = require("./ci-front-door-evaluate.cjs");
 const catalog = require("../.github/ci/suite-catalog.json");
 const diff = { files: ["README.md"], patch: "+change", truncated: false, unavailable: false };
@@ -32,7 +32,7 @@ function decisionResponse({ suite_ids = ["build-wasm"], confidence = 0.99 } = {}
 function transport({ value = decisionResponse(), status = 200, raw, error, hanging = false } = {}) {
   const calls = [];
   const fetchImpl = async (url, options) => {
-    calls.push({ url, options, body: JSON.parse(options.body) });
+    calls.push({ url, options, body: options.body === undefined ? undefined : JSON.parse(options.body) });
     if (error) throw new Error(error);
     if (hanging)
       return new Promise((resolve, reject) => {
@@ -387,6 +387,140 @@ test("mandatory catalog invariants, ignored reasoning, additional mandatory suit
   assert.equal(result.metrics.estimated_test_minutes_saved, 4);
 });
 
+const baseSha = "a".repeat(40);
+const mergeSha = "b".repeat(40);
+
+function comparison(files = [{ filename: "README.md", status: "modified", additions: 1, deletions: 1, changes: 2, patch: "@@ -1 +1 @@\n-before\n+after" }]) {
+  return { status: "ahead", base_commit: { sha: baseSha }, merge_base_commit: { sha: baseSha }, files };
+}
+
+async function githubDiff(response = {}, options = {}) {
+  const mock = transport({ value: comparison(), ...response });
+  let requests = 0;
+  const summary = await summarizeGitHubDiff({ repository: "owner/repo", base: baseSha, head: mergeSha, token, fetchImpl: mock.fetchImpl, onRequest: () => requests++, ...options });
+  return { summary, calls: mock.calls, requests };
+}
+
+test("GitHub diff uses one authenticated, SHA-pinned comparison without a checkout", async () => {
+  const { summary, calls, requests } = await githubDiff();
+  assert.equal(requests, 1);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, `https://api.github.com/repos/owner/repo/compare/${baseSha}...${mergeSha}?per_page=1`);
+  assert.equal(calls[0].options.method, "GET");
+  assert.equal(calls[0].options.headers.Authorization, `Bearer ${token}`);
+  assert.equal(calls[0].options.headers.Accept, "application/vnd.github+json");
+  assert.equal(calls[0].options.redirect, "error");
+  assert.deepEqual(summary.files, ["README.md"]);
+  assert.deepEqual(summary.groups.other.files, summary.files);
+  assert.match(summary.groups.other.patch, /-before\n\+after/);
+  assert.equal(summary.unavailable, false);
+  assert.equal(summary.truncated, false);
+  assert.deepEqual((await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) })).result.suite_ids, MANDATORY);
+});
+
+test("API evidence retains renamed source paths and language groups while excluding generated locks", async () => {
+  const files = [
+    { filename: "README.md", previous_filename: "pkg/runtime.go", status: "renamed", additions: 0, deletions: 0, changes: 0 },
+    { filename: "app.cjs", status: "added", additions: 1, deletions: 0, changes: 1, patch: "@@ -0,0 +1 @@\n+module.exports = {};" },
+    { filename: "old.js", status: "removed", additions: 0, deletions: 1, changes: 1, patch: "@@ -1 +0,0 @@\n-console.log('old');" },
+    { filename: ".github/workflows/generated.lock.yml", status: "modified" },
+    { filename: "renamed.lock.yml", previous_filename: "Makefile", status: "renamed", additions: 0, deletions: 0, changes: 0 },
+  ];
+  const { summary } = await githubDiff({ value: comparison(files) });
+  assert.deepEqual(summary.files, ["Makefile", "README.md", "app.cjs", "old.js", "pkg/runtime.go"]);
+  assert.deepEqual(summary.groups.javascript.files, ["app.cjs", "old.js"]);
+  assert.deepEqual(summary.groups.go.files, ["pkg/runtime.go"]);
+  assert.deepEqual(summary.groups.other.files, ["Makefile", "README.md"]);
+  assert.match(summary.groups.go.patch, /a\/pkg\/runtime\.go/);
+  assert.match(summary.groups.other.patch, /b\/README\.md/);
+  const { result } = await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
+  assert.deepEqual(result.suite_ids, SUITE_IDS);
+});
+
+test("GitHub's 300-file cap fails open before excluding locks; complete bounded patches retain filenames", async t => {
+  const diagnostics = [];
+  t.mock.method(process.stderr, "write", message => diagnostics.push(message));
+  const files = Array.from({ length: LIMITS.compareFiles }, (_, i) => ({ filename: `generated-${i}.lock.yml`, status: "modified" }));
+  const capped = await githubDiff({ value: comparison(files) });
+  assert.equal(capped.summary.truncated, true);
+  assert.equal((await exercise({ diff: capped.summary })).result.fallback, true);
+  assert.match(diagnostics.join(""), /inventory may be truncated/);
+  const patch = "@@ -0,0 +1 @@\n+" + "a".repeat(LIMITS.groupPatch) + "\u{1f512}";
+  const bounded = await githubDiff({ value: comparison([{ filename: "README.md", status: "added", additions: 1, deletions: 0, changes: 1, patch }]) });
+  assert.equal(bounded.summary.truncated, false);
+  assert.equal(bounded.summary.unavailable, false);
+  assert.equal(bounded.summary.groups.other.patch_truncated, true);
+  assert.deepEqual(bounded.summary.files, ["README.md"]);
+  assert.ok(Buffer.byteLength(bounded.summary.groups.other.patch) <= LIMITS.groupPatch);
+  assert.ok(!bounded.summary.groups.other.patch.includes("\ufffd"));
+});
+
+test("unavailable, malformed, unpinned and incomplete API evidence cannot omit suites or disclose errors", async t => {
+  const diagnostics = [];
+  t.mock.method(process.stderr, "write", message => diagnostics.push(message));
+  const file = comparison().files[0];
+  for (const response of [
+    { status: 301 },
+    { status: 307 },
+    { status: 401 },
+    { status: 403 },
+    { status: 404 },
+    { status: 429 },
+    { status: 500 },
+    { error: "private-provider-error-do-not-log" },
+    { raw: "not JSON" },
+    { raw: "x".repeat(LIMITS.compareResponse + 1) },
+    { value: null },
+    { value: { ...comparison(), files: null } },
+    { value: { ...comparison(), base_commit: { sha: mergeSha } } },
+    { value: { ...comparison(), merge_base_commit: { sha: mergeSha } } },
+    { value: { ...comparison(), status: "diverged" } },
+    { value: comparison([null]) },
+    { value: comparison([file, file]) },
+    { value: comparison([{ ...file, status: "unknown" }]) },
+    { value: comparison([{ ...file, status: "renamed" }]) },
+    { value: comparison([{ ...file, additions: -1 }]) },
+    { value: comparison([{ ...file, changes: 99 }]) },
+    { value: comparison([{ ...file, patch: undefined }]) },
+    { value: comparison([{ ...file, patch: "@@ -1 +1 @@\n-before" }]) },
+    { value: comparison([{ ...file, patch: "-before\n+after" }]) },
+    { value: comparison([{ ...file, patch: 1 }]) },
+  ]) {
+    const { summary, calls, requests } = await githubDiff(response);
+    assert.equal(calls.length, 1);
+    assert.equal(requests, 1);
+    assert.equal(summary.unavailable, true, JSON.stringify(response.value));
+    const { result } = await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
+    assert.equal(result.fallback, true);
+    assert.deepEqual(result.suite_ids, SUITE_IDS);
+  }
+  assert.match(diagnostics.join(""), /GitHub diff unavailable or incomplete/);
+  assert.doesNotMatch(diagnostics.join(""), /private-provider-error-do-not-log|test-token/);
+});
+
+test("invalid diff API credentials, repository or revisions never send a request", async t => {
+  t.mock.method(process.stderr, "write", () => {});
+  for (const options of [{ token: "" }, { token: undefined }, { repository: "../repo" }, { repository: "evil.test/owner/repo" }, { base: "main" }, { base: "" }, { head: "refs/pull/1/merge" }]) {
+    const { summary, calls, requests } = await githubDiff({}, options);
+    assert.equal(summary.unavailable, true);
+    assert.equal(calls.length, 0);
+    assert.equal(requests, 0);
+  }
+});
+
+test("a hung comparison is bounded by the existing deadline and never retried", async t => {
+  t.mock.method(process.stderr, "write", () => {});
+  t.mock.method(AbortSignal, "timeout", milliseconds => {
+    assert.equal(milliseconds, LIMITS.timeout);
+    const controller = new AbortController();
+    queueMicrotask(() => controller.abort(new DOMException("Timed out", "TimeoutError")));
+    return controller.signal;
+  });
+  const { summary, calls } = await githubDiff({ hanging: true });
+  assert.equal(summary.unavailable, true);
+  assert.equal(calls.length, 1);
+});
+
 test("local git diff is deterministic, handles renames/deletes, bounds patches, and never fetches", t => {
   const cwd = fixtureDirectory(t);
   const git = args => execFileSync("git", args, { cwd, stdio: "pipe" });
@@ -539,6 +673,66 @@ global.fetch = async (url, options) => {
   assert.deepEqual(result.suite_ids, MANDATORY);
   assert.equal(result.fallback, false);
   assert.equal(result.metrics.decision_api_requests, 1);
+});
+
+test("the sparse trusted file set runs API selection without an evidence checkout and counts both APIs", t => {
+  const cwd = fixtureDirectory(t);
+  for (const file of ["scripts/ci-front-door.cjs", "scripts/ci-front-door-diff.cjs", "actions/setup/js/decisions_client.cjs", ".github/ci/suite-catalog.json", ".github/ci/decision-prompt.txt"]) {
+    fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
+    fs.copyFileSync(path.join(__dirname, "..", file), path.join(cwd, file));
+  }
+  const preload = path.join(cwd, "mock-fetch.cjs");
+  fs.writeFileSync(
+    preload,
+    `
+const assert = require("node:assert/strict");
+let calls = 0;
+global.fetch = async (url, options) => {
+  calls++;
+  if (calls === 1) {
+    assert.equal(url, ${JSON.stringify(`https://api.github.com/repos/owner/repo/compare/${baseSha}...${mergeSha}?per_page=1`)});
+    assert.equal(options.headers.Authorization, ${JSON.stringify(`Bearer ${token}`)});
+    return new Response(${JSON.stringify(JSON.stringify(comparison()))}, { status: Number(process.env.MOCK_COMPARE_STATUS || 200) });
+  }
+  assert.equal(calls, 2);
+  assert.equal(url, ${JSON.stringify(`${DECISIONS_BASE_URL}/decisions`)});
+  const request = JSON.parse(options.body);
+  const input = JSON.parse(request.input[1].content);
+  if (process.env.MOCK_COMPARE_STATUS === "403") assert.equal(input.diff_summary.unavailable, true);
+  else assert.deepEqual(input.diff_summary.files, ["README.md"]);
+  assert.deepEqual(input.suite_catalog, ${JSON.stringify(catalog)});
+  return new Response(${JSON.stringify(JSON.stringify(decisionResponse({ suite_ids: [], confidence: 1 })))}, { status: 200 });
+};
+`
+  );
+  for (const [event, status] of [
+    ["pull_request", "200"],
+    ["pull_request", "403"],
+    ["push", "200"],
+  ]) {
+    const stdout = execFileSync(process.execPath, ["--require", preload, path.join(cwd, "scripts/ci-front-door.cjs")], {
+      cwd,
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: "owner/repo",
+        CI_DIFF_BASE_SHA: baseSha,
+        CI_DIFF_HEAD_SHA: mergeSha,
+        CI_DIFF_TOKEN: token,
+        CI_DECISION_TOKEN: token,
+        GITHUB_EVENT_NAME: event,
+        MOCK_COMPARE_STATUS: status,
+        GITHUB_OUTPUT: "",
+        GITHUB_STEP_SUMMARY: "",
+      },
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    assert.deepEqual(result.suite_ids, event === "pull_request" && status === "200" ? MANDATORY : SUITE_IDS);
+    assert.equal(result.fallback, status === "403");
+    assert.equal(result.metrics.decision_api_requests, event === "pull_request" ? 1 : 0);
+    assert.equal(result.metrics.other_github_api_requests, event === "pull_request" ? 1 : 0);
+  }
 });
 
 test("offline replay measures misses against full controls, not missing or selected-only outcomes", async () => {
