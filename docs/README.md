@@ -205,8 +205,8 @@ the build rather than patching an unverified page.
 
 This enhancement applies to built static pages, not the dev server. Without
 JavaScript, the original meta refresh still redirects but loses the incoming
-fragment. Run the rewrite unit tests from this directory with
-`node --test src/lib/redirect-fragments.test.js`.
+fragment. Run the rewrite unit tests from the repository root with
+`make test-docs-redirect-fragments`.
 
 ## ⚠️ Known Dev-Mode Limitations
 

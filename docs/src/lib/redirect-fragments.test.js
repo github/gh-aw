@@ -60,8 +60,17 @@ test("escapes destinations so they cannot close the inline script", () => {
 });
 
 test("rejects unsupported or ambiguous destinations", () => {
-  for (const destination of ["javascript:alert(1)", " javascript:alert(1)", "java\nscript:alert(1)", "//evil.example/x", "/\\evil.example/x", "relative/path", "mailto:a@b.c", "/a b/"]) {
-    assert.throws(() => addFragmentScript("", destination));
+  for (const [destination, error] of [
+    ["javascript:alert(1)", /destinations must be root-relative paths or absolute http\(s\) URLs/],
+    [" javascript:alert(1)", /whitespace, control characters and backslashes are not supported/],
+    ["java\nscript:alert(1)", /whitespace, control characters and backslashes are not supported/],
+    ["//evil.example/x", /destinations must be root-relative paths or absolute http\(s\) URLs/],
+    ["/\\evil.example/x", /whitespace, control characters and backslashes are not supported/],
+    ["relative/path", /destinations must be root-relative paths or absolute http\(s\) URLs/],
+    ["mailto:a@b.c", /destinations must be root-relative paths or absolute http\(s\) URLs/],
+    ["/a b/", /whitespace, control characters and backslashes are not supported/],
+  ]) {
+    assert.throws(() => addFragmentScript("", destination), error, destination);
   }
 });
 
