@@ -1059,6 +1059,30 @@ func TestBuildJobLevelSafeOutputEnvVarsIncludesCompiledProjectUTC(t *testing.T) 
 	assert.Equal(t, `"-07:00"`, envVars["GH_AW_PROJECT_UTC"])
 }
 
+func TestCompiledIssueLabelEnvironments(t *testing.T) {
+	for _, label := range []string{"", "area:agentic-workflows", `area: team's "workflows"`} {
+		t.Run(label, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.repoConfigLoaded = true
+			compiler.repoConfig = &RepoConfig{IssueLabel: label}
+			data := &WorkflowData{Name: "Test", SafeOutputs: &SafeOutputsConfig{}}
+			safeOutputsEnv := compiler.buildJobLevelSafeOutputEnvVars(data, "test")
+			conclusion, err := compiler.buildConclusionJob(data, "agent", nil)
+			require.NoError(t, err)
+			require.NotNil(t, conclusion)
+			for _, env := range []map[string]string{safeOutputsEnv, conclusion.Env} {
+				if label == "" {
+					assert.NotContains(t, env, "GH_AW_ISSUE_LABEL")
+					continue
+				}
+				var parsed map[string]string
+				require.NoError(t, yaml.Unmarshal([]byte("GH_AW_ISSUE_LABEL: "+env["GH_AW_ISSUE_LABEL"]), &parsed))
+				assert.Equal(t, label, parsed["GH_AW_ISSUE_LABEL"])
+			}
+		})
+	}
+}
+
 // TestBuildDetectionSuccessCondition tests the detection condition builder
 func TestBuildDetectionSuccessCondition(t *testing.T) {
 	condition := buildDetectionSuccessCondition()

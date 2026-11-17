@@ -1,5 +1,5 @@
 // @ts-check
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockCore = {
   info: vi.fn(),
@@ -17,6 +17,8 @@ global.context = mockContext;
 
 describe("close_agentic_workflows_issues", () => {
   let mockGithub;
+
+  afterEach(() => vi.unstubAllEnvs());
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,6 +76,14 @@ describe("close_agentic_workflows_issues", () => {
 
     expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
     expect(mockGithub.graphql).not.toHaveBeenCalled();
+  });
+
+  it("uses the configured label for cleanup", async () => {
+    vi.stubEnv("GH_AW_ISSUE_LABEL", "area:agentic-workflows");
+    mockGithub.paginate.mockResolvedValueOnce([]);
+    const { main } = await import("./close_agentic_workflows_issues.cjs");
+    await main();
+    expect(mockGithub.paginate).toHaveBeenCalledWith(mockGithub.rest.issues.listForRepo, expect.objectContaining({ labels: "area:agentic-workflows" }));
   });
 
   it("sanitizes and validates the close comment body", async () => {

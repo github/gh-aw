@@ -14,7 +14,7 @@ var consolidatedSafeOutputsEnvvarsLog = logger.New("workflow:compiler_safe_outpu
 // buildJobLevelSafeOutputEnvVars builds environment variables that should be set at the job level
 // for the consolidated safe_outputs job. These are variables that are common to all safe output steps.
 func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID string) map[string]string {
-	envVars := make(map[string]string)
+	envVars := c.addIssueLabelEnv(make(map[string]string))
 	addObjectPackLimitEnv(envVars)
 	addJobLevelWorkQueueEnvVars(envVars, data)
 	c.addJobLevelWorkflowMetadata(envVars, data, workflowID)

@@ -1,9 +1,9 @@
 ---
-name: cracktro-refresh-daily-unsloppers
-description: Recompute the measured data on the cracktro "Daily Unsloppers" slide and update deck.js.
+name: cracktro-refresh-daily-improvers
+description: Recompute the measured data on the cracktro "Daily Improvers" slide and update deck.js.
 ---
 
-# Refresh: Daily Unsloppers
+# Refresh: Daily Improvers
 
 Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/deck.js` whole; use `grep -n` plus `view_range`.
 
@@ -16,7 +16,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
 
 ## 1. Slide
 
-- Marker: `grep -n "// Daily Unsloppers (research" docs/public/cracktro/deck.js`. Group `process`, CSS prefix `du-` (styles: `grep -n "\.du-" deck.js`).
+- Marker: `grep -n "// Daily Improvers (research" docs/public/cracktro/deck.js`. Group `process`, CSS prefix `du-` (styles: `grep -n "\.du-" deck.js`).
 - Data lives in the SVG builder just before `slides.push`, under the comment `// Measured: gh-aw [duplicate-code] issues ...`:
   - `const DU_MONTHS = [[filed, merged], ...]`: one pair per calendar month, oldest first (13 pairs, Oct 2025 → Oct 2026). Bars are 40 px apart from x=608; more than 13 months overflow the 552 px card.
   - Card header string: `7 Oct 2025 – 26 Oct 2026 (385 days) · snapshot 14 Nov 2026`.
@@ -25,7 +25,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
   - Comment line above `DU_MONTHS` repeats the window.
 - `notes:` repeats every number, the window (twice, in words), "112 of them opened by Copilot", the snapshot date and "Since 27 October 2026 the detector opens its pull requests directly".
 - The slide has no caption element; the panel header carries the window.
-- Also stated in `.github/skills/cracktro/content-rules.md`, "Exception: the Daily Unsloppers slide (20, ...)" bullet.
+- Also stated in `.github/skills/cracktro/content-rules.md`, "Exception: the Daily Improvers slide (20, ...)" bullet.
 
 ## 2. Window & snapshot
 
@@ -44,7 +44,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
 Run from the repo root with an authenticated `gh` (read-only, prints JSON, no secrets):
 
 ```bash
-node .github/skills/cracktro/refresh/daily-unsloppers.mjs 2025-10-07 2026-10-26
+node .github/skills/cracktro/refresh/daily-improvers.mjs 2025-10-07 2026-10-26
 ```
 
 Per month it runs this GraphQL search (≤1,000 hits per query, hence monthly paging) and keeps titles that start with `[duplicate-code]`:
@@ -80,13 +80,13 @@ Run it once on an unchanged window first; if it does not reproduce the baseline 
 3. Stat array: `filed`, `assignedToCopilot`, `closedByMergedPR`, `"<median> h"`.
 4. Panel header: `D Mon YYYY – D Mon YYYY (N days) · snapshot D Mon YYYY` (en dash, middle dot); axis labels to first/last month; update the `// Measured:` comment window.
 5. `notes:`: update every number, "112 of them opened by Copilot", both window mentions, "385 days", and "Snapshot taken ...". Keep the sentences "The flow is illustrative, with synthetic files" (must still match `/illustrative|synthetic|simulated/i`) and the 27 October switch sentence.
-6. `.github/skills/cracktro/content-rules.md`: update the Daily Unsloppers Exception bullet (window, 211/144/115/3.8 h, snapshot month).
+6. `.github/skills/cracktro/content-rules.md`: update the Daily Improvers Exception bullet (window, 211/144/115/3.8 h, snapshot month).
 7. Keep `docs/README.md` in sync only if it states these numbers (`grep -n "duplicate-code" docs/README.md`).
 
 ## 6. Validation
 
 - `node --check docs/public/cracktro/deck.js`.
-- Preview: `python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public` (async, detached), open `http://127.0.0.1:4329/cracktro/#N` (N = the Daily Unsloppers row in `slides.md`) in the browser canvas, reload, screenshot. Check the four stats fit their 138 px columns, bars stay inside the card (tallest bar ≤ ~110 px; the current max is 49), and the header fits.
+- Preview: `python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public` (async, detached), open `http://127.0.0.1:4329/cracktro/#N` (N = the Daily Improvers row in `slides.md`) in the browser canvas, reload, screenshot. Check the four stats fit their 138 px columns, bars stay inside the card (tallest bar ≤ ~110 px; the current max is 49), and the header fits.
 - Grep that old values are gone: `grep -n "211\|3.8 h\|26 Oct 2026" docs/public/cracktro/deck.js` should only show intended lines.
 - Content rules: no people, no `github/<repo>` refs, no 40-hex SHAs, no new URLs. Tests (from `docs/`, after `npm ci`): `npx playwright test tests/talk.spec.ts`; say so if not run.
 
