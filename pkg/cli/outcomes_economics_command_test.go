@@ -69,9 +69,9 @@ func TestRunOutcomesSupplementaryAIC(t *testing.T) {
 			var runErr error
 			var reports []OutcomesData
 			stderr := testutil.CaptureStderr(t, func() {
-				reports, runErr = collectLogsOutcomes(context.Background(), []ProcessedRun{{Run: WorkflowRun{
+				reports, runErr = collectLogsLifecycles(context.Background(), []ProcessedRun{{Run: WorkflowRun{
 					DatabaseID: 42, Attempt: 1, WorkflowPath: ".github/workflows/test.lock.yml", Repository: "acme/repo", LogsPath: runDir,
-				}}}, outcomesDir, false)
+				}}}, outcomesDir, false, true)
 			})
 			require.NoError(t, runErr)
 			require.Len(t, reports, 1)

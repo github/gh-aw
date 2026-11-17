@@ -60,6 +60,74 @@ describe("safe-output application outcomes", () => {
     expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
   });
 
+  it.each(["success", "failed", "skipped", "staged"])("retains the execution path for %s outcomes", status => {
+    const result = { success: status !== "failed", skipped: status === "skipped", staged: status === "staged", execution_trace: "init_ptch_done" };
+    const [outcome] = buildSafeOutputExecutions([{ type: "create_pull_request", success: result.success, result }]);
+    expect(outcome).toMatchObject({ status, execution_trace: "init_ptch_done" });
+    expect(projectSafeOutputData(outcome).execution_trace).toBe("init_ptch_done");
+  });
+
+  it.each(["", "push_".repeat(205) + "done", "ABc", "init_done\n", "_init", "init_", "init__done", "init_don", "init_donee", "init_d0ne", "init/done", "route=private", 123, ["init"]])(
+    "omits invalid execution traces: %j",
+    execution_trace => {
+      expect(projectSafeOutputData({ execution_trace })).not.toHaveProperty("execution_trace");
+      expect(buildSafeOutputExecutions([{ success: true, result: { execution_trace } }])[0]).not.toHaveProperty("execution_trace");
+    }
+  );
+
+  it("retains complete traces at the length limit", () => {
+    const execution_trace = "push_".repeat(204) + "done";
+    expect(execution_trace).toHaveLength(1024);
+    expect(projectSafeOutputData({ execution_trace }).execution_trace).toBe(execution_trace);
+  });
+
+  it("persists isolated handler traces through processing and unified-session collection, including failures", async () => {
+    const root = fs.mkdtempSync("/tmp/safe-output-traces-");
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    const traces = ["init_done", "init_fail", "init_thrw", "init_noop_fail", "init_stag_done"];
+    try {
+      for (const type of ["create_pull_request", "push_to_pull_request_branch"]) {
+        const handler = async message => {
+          const execution_trace = traces[message.scenario];
+          if (message.scenario === 2) throw Object.assign(new Error("PRIVATE_ERROR"), { execution_trace });
+          return {
+            success: message.scenario !== 1,
+            execution_trace,
+            ...(message.scenario === 1 ? { error: "PRIVATE_ERROR" } : {}),
+            ...(message.scenario === 3 ? { skipped: true, reason: "PRIVATE_REASON" } : {}),
+            ...(message.scenario === 4 ? { staged: true } : {}),
+          };
+        };
+        // Agent-request fields must never substitute for handler execution evidence.
+        const messages = traces.map((_, scenario) => ({ type, scenario, execution_trace: "fake_done" }));
+        const processing = await processMessages(new Map([[type, handler]]), messages);
+        writeSafeOutputExecutions(processing.results, false, path.join(root, type, "safe-output-executions.jsonl"));
+        const events = writeUnifiedSession({ rootDir: path.join(root, type), graders: [] });
+        const outcomes = events.filter(event => event.type === "safe_output.execution");
+        expect(outcomes.map(event => event.data.execution_trace)).toEqual(traces);
+        expect(outcomes.map(event => event.data.status)).toEqual(["success", "failed", "failed", "skipped", "staged"]);
+        const persisted = fs.readFileSync(path.join(root, type, "usage/aw_session.jsonl"), "utf8");
+        expect(persisted).not.toContain("fake_done");
+        expect(persisted).not.toContain("PRIVATE");
+        expect(validateSession(persisted)).toBe(events.length);
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces a deferred trace with the terminal retry failure trace", async () => {
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, payload: {} });
+    const handler = vi
+      .fn()
+      .mockResolvedValueOnce({ deferred: true, execution_trace: "init_wait" })
+      .mockRejectedValueOnce(Object.assign(new Error("PRIVATE_ERROR"), { execution_trace: "init_thrw" }));
+    const processing = await processMessages(new Map([["create_pull_request", handler]]), [{ type: "create_pull_request" }]);
+    expect(buildSafeOutputExecutions(processing.results)[0]).toMatchObject({ status: "failed", execution_trace: "init_thrw" });
+  });
+
   it("records queued ledger appends as delegated until persistence", () => {
     const record = { type: "ledger_append", messageIndex: 0, success: true, result: { queued: true } };
     const [outcome] = buildSafeOutputExecutions([record]);
