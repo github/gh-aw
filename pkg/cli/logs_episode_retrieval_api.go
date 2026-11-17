@@ -90,7 +90,7 @@ func (c *episodeCollector) listArtifacts(ctx context.Context, run WorkflowRun) (
 		}
 		for _, artifact := range response.Artifacts {
 			filter := []string{"info", "usage"}
-			if c.opts.Outcomes {
+			if c.opts.Outcomes || c.opts.Delivery {
 				filter = append(filter, artifactSetArtifacts[ArtifactSetOutcomes]...)
 			}
 			if artifact.ID <= 0 || !artifactMatchesFilter(artifact.Name, filter) {

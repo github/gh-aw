@@ -13,23 +13,24 @@ recorded in the unified session.
 
 ## Ownership and CAO handoff
 
-gh-aw owns execution-time producer facts, run identity, optional restricted-JS
-run-scoped grading, artifacts/events, experiments, and replay. GitHub owns later
-object disposition. githubnext/gh-cao owns provider refresh, universal
-delivery/adoption/reversal/survival lifecycle, longitudinal Value, canonical
-storage/querying, and Dashboard Language.
+gh-aw owns producer facts, run identity, restricted-JS run-scoped grading,
+artifacts/events, experiments, replay, and shared delivery/adoption/reversal/
+survival rules and provider refresh. Inspect these through `gh aw logs --delivery`,
+`gh aw logs --adoption`, or single-run `gh aw audit --adoption`.
+GitHub owns object disposition. githubnext/gh-cao may schedule refresh and consume
+gh-aw lifecycle records for longitudinal Value, storage/querying, and Dashboard
+Language; do not duplicate adoption classification in a consumer.
 
-Every standalone Agentic Workflow publishes longitudinal Value without a
-campaign: use githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME`
-and omit `--campaign`. `--campaign` only scopes ownership and rolls up the Value
-of directly included workers; it adds no separate campaign metric semantics.
-Lifecycle tracking applies whether or not a workflow joins a campaign and whether
-or not Value is configured.
+Every workflow can expose delivery and adoption without a campaign or CAO.
+Longitudinal attributed value additionally needs a declared measurement,
+attribution evidence, and complete post-adoption-window survival. CAO is an
+optional scheduler/consumer, not the owner or prerequisite of lifecycle tracking.
 
-`safe_output.result` and `safe_output.outcome` record run-time facts, not later
+`safe_output.result` and `safe_output.execution` record run-time facts, not later
 adoption. `graders.operational-value.script` is optional run-scoped evidence; it
-is neither a prerequisite nor a substitute for CAO longitudinal Value. Do not add
-CAO collectors, campaign adapters, canonical databases, or refresh logic to gh-aw.
+is neither a prerequisite nor a substitute for longitudinal Value. A current
+survival snapshot does not prove complete-window survival or attributed value.
+Do not add CAO databases, campaign adapters, or dashboard logic to gh-aw.
 
 ## Reserved grader contract
 

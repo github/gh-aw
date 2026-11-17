@@ -16,7 +16,7 @@ import (
 
 func TestLogsOutcomesPrettyUsesStderr(t *testing.T) {
 	dir := t.TempDir()
-	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 42, WorkflowName: "producer", LogsPath: dir}}
+	run := ProcessedRun{Run: WorkflowRun{Attempt: 1, DatabaseID: 42, WorkflowName: "producer", LogsPath: dir}}
 	stdout, stderr := captureOutput(t, func() error {
 		return renderLogsOutput([]ProcessedRun{run}, renderLogsOutputOptions{
 			outputDir: dir,
@@ -29,7 +29,7 @@ func TestLogsOutcomesPrettyUsesStderr(t *testing.T) {
 	})
 	assert.Empty(t, stdout)
 	assert.Contains(t, stderr, "Cross-Run Analysis")
-	assert.Contains(t, stderr, "Outcomes for producer (run 42): 1 accepted")
+	assert.Contains(t, stderr, "Adoption for producer (run 42): 1 accepted")
 }
 
 func TestMultiTargetOutcomesPreserveTimeoutResultsAndCallerCancellation(t *testing.T) {
@@ -41,7 +41,7 @@ func TestMultiTargetOutcomesPreserveTimeoutResultsAndCallerCancellation(t *testi
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			t.Chdir(dir)
-			t.Setenv("GH_AW_OUTCOMES_DIR", "")
+			t.Setenv("GH_AW_ADOPTION_DIR", "")
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			var downloadErr error
@@ -63,7 +63,7 @@ func TestMultiTargetOutcomesPreserveTimeoutResultsAndCallerCancellation(t *testi
 					downloadErr = downloadCtx.Err()
 				}
 				return workflowLogsResult{
-					processedRuns: []ProcessedRun{{Run: WorkflowRun{
+					processedRuns: []ProcessedRun{{Run: WorkflowRun{Attempt: 1,
 						DatabaseID: 42, WorkflowName: opts.WorkflowName,
 						Repository: opts.RepoOverride, LogsPath: dir, CreatedAt: time.Now(),
 					}}},

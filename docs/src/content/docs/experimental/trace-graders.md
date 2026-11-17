@@ -105,7 +105,7 @@ graders:
     threshold: 1
     script: |
       const outcomes = helpers.createSessionLookups(session)
-        .eventsOfType("safe_output.outcome");
+        .eventsOfType("safe_output.execution");
       if (!outcomes.length) return [{id: "handler-success-recorded", value: null}];
       return [{id: "handler-success-recorded", value:
         outcomes.some(({data}) => data?.status === "success") ? 1 : 0}];
@@ -120,7 +120,7 @@ as other restricted custom JavaScript. The stable top-level
 `id/source/status/value` projection remains compatible with gh-cao JSONL and
 other existing adapters.
 
-`safe_output.outcome` proves handler application status at the run boundary; it
+`safe_output.execution` proves handler application status at the run boundary; it
 does not prove human adoption or later object survival. gh-aw owns this direct
 run snapshot, episode identity, grader artifacts/events, and replay. GitHub is
 authoritative for later object disposition. githubnext/gh-cao owns provider

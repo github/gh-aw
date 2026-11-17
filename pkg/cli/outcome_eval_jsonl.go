@@ -1,69 +1,136 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-// writeOutcomeJSONL writes outcome reports as JSONL to the given directory.
-// Each line is a JSON object suitable for OTLP span conversion or downstream processing.
-func writeOutcomeJSONL(dir string, runID int64, reports []OutcomeReport) (err error) {
-	if err := os.MkdirAll(dir, constants.DirPermPublic); err != nil {
-		return fmt.Errorf("create outcomes directory: %w", err)
+type lifecycleSessionEvent struct {
+	Type       string                          `json:"type"`
+	Timestamp  string                          `json:"timestamp,omitempty"`
+	Data       lifecycleSessionEventData       `json:"data"`
+	Provenance lifecycleSessionEventProvenance `json:"provenance"`
+}
+
+type lifecycleSessionEventData struct {
+	SourceRunID         string `json:"sourceRunId"`
+	SourceWorkflow      string `json:"sourceWorkflow,omitempty"`
+	Repository          string `json:"repository,omitempty"`
+	OutputType          string `json:"outputType"`
+	DeliveryState       string `json:"deliveryState"`
+	DeliverySignal      string `json:"deliverySignal"`
+	DeliveryAt          string `json:"deliveryAt"`
+	DeliveryObservedAt  string `json:"deliveryObservedAt"`
+	DeliverySource      string `json:"deliverySource"`
+	AdoptionState       string `json:"adoptionState"`
+	AdoptionSignal      string `json:"adoptionSignal"`
+	AdoptionAt          string `json:"adoptionAt,omitempty"`
+	AdoptionObservedAt  string `json:"adoptionObservedAt"`
+	AdoptionSource      string `json:"adoptionSource"`
+	AdoptionRuleVersion string `json:"adoptionRuleVersion"`
+	AcceptanceKind      string `json:"acceptanceKind,omitempty"`
+	HumanVerified       bool   `json:"humanVerified"`
+	AdoptionCoverage    string `json:"adoptionCoverage"`
+	SurvivalState       string `json:"survivalState"`
+	SurvivalSignal      string `json:"survivalSignal,omitempty"`
+	SurvivalObservedAt  string `json:"survivalObservedAt,omitempty"`
+	SurvivalCoverage    string `json:"survivalCoverage"`
+}
+
+type lifecycleSessionEventProvenance struct {
+	Component string `json:"component"`
+	Phase     string `json:"phase"`
+	Path      string `json:"path"`
+	Index     int    `json:"index"`
+}
+
+func writeOutcomeJSONL(dir string, runID int64, reports []OutcomeReport) error {
+	if err := os.MkdirAll(dir, constants.DirPermSensitive); err != nil {
+		return fmt.Errorf("create adoption directory: %w", err)
+	}
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	for _, report := range reports {
+		report.OutcomeEvaluation = normalizeOutcomeEvaluation(report)
+		if err := encoder.Encode(EpisodeOutcomeObservation{
+			RunID: runID, RunItemCount: len(reports), OutcomeReport: report,
+		}); err != nil {
+			return fmt.Errorf("encode adoption observation: %w", err)
+		}
+	}
+	filePath := filepath.Join(dir, fmt.Sprintf("adoption-%d.jsonl", runID))
+	if err := writeSessionFileAtomically(filePath, buffer.Bytes()); err != nil {
+		return fmt.Errorf("write adoption observations: %w", err)
+	}
+	if err := writeLifecycleSessionJSONL(dir, runID, reports); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeLifecycleSessionJSONL(dir string, runID int64, reports []OutcomeReport) error {
+	events := make([]lifecycleSessionEvent, 0, len(reports))
+	for _, report := range reports {
+		if report.Lifecycle == nil {
+			continue
+		}
+		record := report.Lifecycle
+		adoption := record.Adoption
+		event := lifecycleSessionEvent{
+			Type: "lifecycle.adoption", Timestamp: adoption.ObservedAt.UTC().Format(time.RFC3339Nano),
+			Data: lifecycleSessionEventData{
+				SourceRunID: strconv.FormatInt(record.RunID, 10), SourceWorkflow: record.Workflow,
+				Repository: record.Repository, OutputType: record.Type,
+				DeliveryState: record.Delivery.State, DeliverySignal: record.Delivery.Signal,
+				DeliveryAt:         record.Delivery.At.UTC().Format(time.RFC3339Nano),
+				DeliveryObservedAt: record.Delivery.ObservedAt.UTC().Format(time.RFC3339Nano),
+				DeliverySource:     record.Delivery.Source, AdoptionState: adoption.State,
+				AdoptionSignal: adoption.Signal, AdoptionObservedAt: adoption.ObservedAt.UTC().Format(time.RFC3339Nano),
+				AdoptionSource: adoption.Source, AdoptionRuleVersion: adoption.RuleVersion,
+				AcceptanceKind: adoption.AcceptanceKind, HumanVerified: adoption.HumanVerified,
+				AdoptionCoverage: adoption.Coverage, SurvivalState: record.Survival.State,
+				SurvivalSignal: record.Survival.Signal, SurvivalCoverage: record.Survival.Coverage,
+			},
+		}
+		if !adoption.At.IsZero() {
+			event.Data.AdoptionAt = adoption.At.UTC().Format(time.RFC3339Nano)
+		}
+		if !record.Survival.ObservedAt.IsZero() {
+			event.Data.SurvivalObservedAt = record.Survival.ObservedAt.UTC().Format(time.RFC3339Nano)
+		}
+		events = append(events, event)
+	}
+	if len(events) == 0 {
+		return nil
 	}
 
-	filePath := filepath.Join(dir, fmt.Sprintf("outcomes-%d.jsonl", runID))
-	f, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("create outcomes file: %w", err)
+	fileName := fmt.Sprintf("adoption-session-%d.jsonl", runID)
+	sourcePath := fmt.Sprintf("adoption-%d.jsonl", runID)
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	if err := encoder.Encode(map[string]any{
+		"type": "session.format", "data": map[string]int{"version": 1},
+		"provenance": lifecycleSessionEventProvenance{Component: "collector", Phase: "adoption", Path: sourcePath, Index: 0},
+	}); err != nil {
+		return fmt.Errorf("encode lifecycle session header: %w", err)
 	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && err == nil {
-			err = fmt.Errorf("close outcomes file: %w", closeErr)
+	for index := range events {
+		events[index].Provenance = lifecycleSessionEventProvenance{
+			Component: "lifecycle", Phase: "adoption", Path: sourcePath, Index: index + 1,
 		}
-	}()
-
-	for _, r := range reports {
-		eval := normalizeOutcomeEvaluation(r)
-		entry := map[string]any{
-			"run_id":                       runID,
-			"item_id":                      r.ItemID,
-			"run_item_count":               len(reports),
-			"objective_value":              r.ObjectiveValue,
-			"objective_labels":             r.ObjectiveLabels,
-			"type":                         r.Type,
-			"outcome_status":               eval.OutcomeStatus,
-			"evidence_strength":            eval.EvidenceStrength,
-			"signal":                       eval.Signal,
-			"detail":                       r.Detail,
-			"object_url":                   r.ObjectURL,
-			"object_number":                r.ObjectNumber,
-			"repo":                         r.Repo,
-			"time_to_outcome_hours":        r.TimeToOutcomeHours,
-			"human_comments":               r.HumanComments,
-			"human_edits":                  r.HumanEdits,
-			"human_reviews":                r.HumanReviews,
-			"zero_touch":                   r.ZeroTouch,
-			"zero_touch_evidence_complete": r.ZeroTouchEvidenceComplete,
-			"created_at":                   r.CreatedAt,
-			"checked_at":                   r.CheckedAt,
-		}
-		line, err := json.Marshal(entry)
-		if err != nil {
-			return fmt.Errorf("encode outcome observation: %w", err)
-		}
-		if _, err := f.Write(line); err != nil {
-			return fmt.Errorf("write outcome observation: %w", err)
-		}
-		if _, err := f.WriteString("\n"); err != nil {
-			return fmt.Errorf("write outcome observation: %w", err)
+		if err := encoder.Encode(events[index]); err != nil {
+			return fmt.Errorf("encode lifecycle adoption event: %w", err)
 		}
 	}
-
-	outcomeEvalLog.Printf("Wrote %d outcome entries to %s", len(reports), filePath)
+	if err := writeSessionFileAtomically(filepath.Join(dir, fileName), buffer.Bytes()); err != nil {
+		return fmt.Errorf("write lifecycle adoption session: %w", err)
+	}
 	return nil
 }

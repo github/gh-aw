@@ -39,7 +39,7 @@ Configuration section at the top of a workflow file, enclosed between `---` mark
 
 ### Intent (`intent:`)
 
-Optional frontmatter field describing the durable outcome a workflow exists to achieve, rendered as a comment in the generated lock file. Unlike `description`, which explains what the workflow does, `intent` explains why it exists and stays implementation-independent, so it remains valid even as the workflow's implementation changes.
+Optional frontmatter field describing the durable adoption a workflow exists to achieve, rendered as a comment in the generated lock file. Unlike `description`, which explains what the workflow does, `intent` explains why it exists and stays implementation-independent, so it remains valid even as the workflow's implementation changes.
 
 ### Compilation
 
@@ -226,21 +226,34 @@ safe-outputs:
   create-issue:
 ```
 
-### Outcome
+### Delivery
 
-The observable repository state that follows a [safe output](#safe-outputs). While safe outputs record what a workflow did, outcomes record what happened afterward — whether a pull request was merged, an issue was resolved, or a comment received follow-up activity. Outcome data is based on visible repository state, not on the workflow's self-assessment. See [Outcomes](/gh-aw/reference/outcomes/).
+A successfully applied safe-output effect, established by execution evidence.
+A request, staged preview, deferred placeholder, or successful run conclusion is
+not delivery evidence. See [Delivery and adoption](/gh-aw/reference/delivery-adoption/).
 
-### Outcome State
+### Adoption
 
-The classification assigned to an evaluated safe output result. The six states are `accepted`, `rejected`, `pending`, `ignored`, `lifecycle`, and `lifecycle_close`. See [Outcomes](/gh-aw/reference/outcomes/) for the exact criteria for each state.
+The decision established by a safe-output type's versioned rule. Verified human
+adoption is distinct from an explicitly permitted delivery-time fallback.
+Neither establishes measured attributed value by itself.
+See [Delivery and adoption](/gh-aw/reference/delivery-adoption/).
 
-### Accepted Outcome
+### Adoption State
 
-The simplest useful unit for measuring workflow effectiveness. An outcome is accepted when its result was kept, merged, completed, or acted on — for example, a merged pull request, a resolved issue, or a comment that received a reaction or reply. Different output types use type-specific rules to determine acceptance. See [Outcomes](/gh-aw/reference/outcomes/).
+The classification assigned by the shared lifecycle evaluator: `accepted`,
+`rejected`, `pending`, `lifecycle`, `not_applicable`, or `unknown`. Provider
+availability is separate coverage, not an adoption decision.
 
-### Outcome Efficiency
+### Adopted Output
 
-A cost-quality metric computed as AI Credits (AIC) divided by accepted outcomes. Lower values indicate the workflow consumed fewer AI Credits per accepted result. Outcome efficiency makes the difference between cost savings from genuine efficiency gains and cost savings from doing less useful work. See [Measuring Impact](/gh-aw/guides/measuring-impact/).
+A delivered effect whose rule establishes adoption through verified human
+decision evidence or an explicit delivery-time fallback. Reports identify the
+acceptance kind rather than treating all accepted effects as human approvals.
+
+### Adoption Efficiency
+
+A cost-quality metric computed as AI Credits (AIC) divided by accepted adopted outputs. Lower values indicate the workflow consumed fewer AI Credits per accepted result. Adoption efficiency makes the difference between cost savings from genuine efficiency gains and cost savings from doing less useful work. See [Measuring Impact](/gh-aw/guides/measuring-impact/).
 
 ### Pwn Request
 
@@ -320,7 +333,7 @@ Access controls defining workflow operations. Workflows follow least privilege, 
 
 ### Safe Output Messages
 
-Customizable messages workflows can display during execution. Configured in `safe-outputs.messages` with types `run-started`, `run-success`, `run-failure`, and `footer`. Supports GitHub context variables like `{workflow_name}` and `{run_url}`, plus individual AI cost and detection variables such as `{ai_model}`, `{ai_credits}`, `{ai_credits_formatted}`, `{agent_ai_credits_formatted}`, `{evals_ai_credits_formatted}`, `{threat_detection_ai_credits_formatted}`, `{detection_conclusion}`, and `{detection_reason}` for fine-grained cost and outcome attribution in custom footer templates. See [Footers Reference](/gh-aw/reference/footers/).
+Customizable messages workflows can display during execution. Configured in `safe-outputs.messages` with types `run-started`, `run-success`, `run-failure`, and `footer`. Supports GitHub context variables like `{workflow_name}` and `{run_url}`, plus individual AI cost and detection variables such as `{ai_model}`, `{ai_credits}`, `{ai_credits_formatted}`, `{agent_ai_credits_formatted}`, `{evals_ai_credits_formatted}`, `{threat_detection_ai_credits_formatted}`, `{detection_conclusion}`, and `{detection_reason}` for fine-grained cost and adoption attribution in custom footer templates. See [Footers Reference](/gh-aw/reference/footers/).
 
 ### Egress Context Validation (MCE1)
 
