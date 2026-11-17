@@ -232,8 +232,8 @@ func TestParseIntValueOverflow(t *testing.T) {
 			name:  "MaxFloat64",
 			input: math.MaxFloat64,
 			validate: func(t *testing.T, result int, ok bool) {
-				if ok || result != 0 {
-					t.Errorf("Expected (0, false) for MaxFloat64, got (%d, %v)", result, ok)
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for MaxFloat64, got (%d, %t)", result, ok)
 				}
 			},
 		},
@@ -241,8 +241,8 @@ func TestParseIntValueOverflow(t *testing.T) {
 			name:  "positive infinity",
 			input: math.Inf(1),
 			validate: func(t *testing.T, result int, ok bool) {
-				if ok || result != 0 {
-					t.Errorf("Expected (0, false) for Inf(1), got (%d, %v)", result, ok)
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for Inf(1), got (%d, %t)", result, ok)
 				}
 			},
 		},
@@ -250,8 +250,8 @@ func TestParseIntValueOverflow(t *testing.T) {
 			name:  "negative infinity",
 			input: math.Inf(-1),
 			validate: func(t *testing.T, result int, ok bool) {
-				if ok || result != 0 {
-					t.Errorf("Expected (0, false) for Inf(-1), got (%d, %v)", result, ok)
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for Inf(-1), got (%d, %t)", result, ok)
 				}
 			},
 		},
@@ -259,8 +259,8 @@ func TestParseIntValueOverflow(t *testing.T) {
 			name:  "NaN",
 			input: math.NaN(),
 			validate: func(t *testing.T, result int, ok bool) {
-				if ok || result != 0 {
-					t.Errorf("Expected (0, false) for NaN, got (%d, %v)", result, ok)
+				if result != 0 || ok {
+					t.Errorf("Expected (0, false) for NaN, got (%d, %t)", result, ok)
 				}
 			},
 		},

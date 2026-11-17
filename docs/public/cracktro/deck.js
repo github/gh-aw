@@ -1029,7 +1029,18 @@
   .dto-sec.ag.on rect { fill: #8957e514; stroke: #ab7df8; stroke-dasharray: none; } .dto-sec.ag.on text { fill: #c297ff; }
   .dto-row { transition: transform 1s cubic-bezier(.5,0,.2,1); }
   .dto-row rect { fill: #161b22; stroke: #3d444d; stroke-width: 2; transition: fill .3s, stroke .3s; }
-  .dto-row .c { fill: #e6edf3; font: 500 16px var(--mono); }
+  .dto-row .c { fill: #e6edf3; font: 500 16px var(--mono); opacity: 0; transition: opacity .5s .35s; }
+  .dto-row .p { fill: #d1d7e0; font: 500 17px "Mona Sans"; transition: opacity .35s; }
+  .dto-row.det .c { opacity: 1; } .dto-row.det .p { opacity: 0; transition-delay: 0s; }
+  .dto-file { opacity: 0; transition: opacity .6s .6s; } .dto-file.on { opacity: 1; }
+  .dto-file rect { fill: #1f6feb14; stroke: #4493f8; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .dto-file .fp { fill: #79c0ff; font: 600 15px var(--mono); } .dto-file .fj { fill: #9198a1; font: 500 14px var(--mono); } .dto-file .tg { fill: #79c0ff; font: 600 13px var(--mono); text-anchor: end; letter-spacing: .06em; }
+  .dto-file .cap { fill: #9198a1; font: 500 15px "Mona Sans"; text-anchor: middle; }
+  .dto-dial { position: absolute; left: 1240px; top: 44px; width: 620px; height: 250px; overflow: visible; font-family: "Mona Sans"; }
+  .dto-dial .tk { stroke: #0d1117; stroke-width: 3; } .dto-dial .tk.mj { stroke-width: 4; }
+  .dto-dial .gh { opacity: 0; transition: opacity .5s; } .dto-dial .gh.on { opacity: .45; }
+  .dto-dial .end { font: 600 14px var(--mono); letter-spacing: .08em; text-anchor: middle; } .dto-dial .sub { fill: #9198a1; font: 500 14px "Mona Sans"; text-anchor: middle; }
+  .dto-dial .rv { fill: #f0f6fc; font: 700 44px "Mona Sans"; text-anchor: middle; } .dto-dial .rl { fill: #9198a1; font: 600 14px var(--mono); text-anchor: middle; letter-spacing: .1em; }
   .dto-row .tg { font: 600 13px var(--mono); text-anchor: end; letter-spacing: .06em; fill: #c297ff; }
   .dto-row.hot rect { stroke: #d29922; fill: #d2992218; } .dto-row.hot .tg { fill: #d29922; }
   .dto-row.det rect { stroke: #4493f8; fill: #1f6feb22; } .dto-row.det .tg { fill: #79c0ff; }
@@ -1039,6 +1050,64 @@
   .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
   .dto-big { fill: #3fb950; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  .isa .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #ffa657, #ab7df8); }
+  .isa-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, opacity .6s, filter .4s; }
+  .isa-box.on .isa-card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .isa-svg.s1 .isa-mono .isa-card { stroke-dasharray: 8 8; opacity: .45; }
+  .isa-t { fill: #9198a1; font: 500 15px var(--mono); letter-spacing: .08em; }
+  .isa-chip { fill: #c297ff; font: 600 14px var(--mono); letter-spacing: .06em; text-anchor: end; }
+  .isa-cap { fill: #9198a1; font: 500 15px var(--mono); text-anchor: middle; transition: opacity .5s; }
+  .isa-svg.s1 .isa-mono .isa-cap { opacity: 0; }
+  .isa-gh { fill: none; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; opacity: 0; transition: opacity .6s; }
+  .isa-svg.s1 .isa-gh { opacity: .7; } .isa-svg.s2 .isa-gh { opacity: .35; }
+  .isa-blk { color: #6e7681; }
+  .isa-blk rect.b { fill: #161b22; stroke: #6e7681; stroke-width: 2; transition: fill .5s, stroke .5s, filter .3s, stroke-width .3s; }
+  .isa-blk .ln { fill: #ffffff1f; }
+  .isa-blk .n { fill: #e6edf3; font: 600 16px var(--mono); }
+  .isa-blk .tg { fill: currentColor; font: 600 13px var(--mono); letter-spacing: .08em; text-anchor: end; }
+  .isa-svg.s1 .isa-blk.core { color: #c297ff; } .isa-svg.s1 .isa-blk.core rect.b { fill: #8957e522; stroke: #ab7df8; }
+  .isa-svg.s1 .isa-blk.skill { color: #79c0ff; } .isa-svg.s1 .isa-blk.skill rect.b { fill: #1f6feb22; stroke: #4493f8; }
+  .isa-svg.s1 .isa-blk.agent { color: #ffa657; } .isa-svg.s1 .isa-blk.agent rect.b { fill: #db6d2822; stroke: #ffa657; stroke-dasharray: 8 5; }
+  .isa-blk.hot rect.b { stroke-width: 3; filter: drop-shadow(0 0 12px currentColor); }
+  .isa-blk.hot .tg { fill: #f0f6fc; }
+  .isa-sec rect { fill: transparent; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; }
+  .isa-sec text { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .08em; }
+  .isa-sec { opacity: .25; transition: opacity .6s; } .isa-svg.s1 .isa-sec { opacity: 1; }
+  .isa-svg.s1 .isa-sec.core text { fill: #c297ff; } .isa-svg.s1 .isa-sec.skill text { fill: #79c0ff; } .isa-svg.s1 .isa-sec.agent text { fill: #ffa657; }
+  .isa-seg { fill: #6e768166; stroke: #0d1117; stroke-width: 1.5; transition: fill .5s; }
+  .isa-svg.s1 .isa-seg.core { fill: #8957e5; } .isa-svg.s1 .isa-seg.skill { fill: #1f6feb; } .isa-svg.s1 .isa-seg.agent { fill: #db6d28; }
+  .isa-svg .isa-seg.agent.sm { fill: url(#isaH); stroke: #ffa657; }
+  .isa-ghost { fill: none; stroke: #6e7681; stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .6; }
+  .isa-ml { fill: #9198a1; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; } .isa-ml.on { opacity: 1; } .isa-ml.sm { fill: #ffa657; }
+  .isa-take { opacity: 0; transition: opacity .6s; } .isa-take.on { opacity: 1; }
+  .isa-take .b { fill: #f0f6fc; font: 700 32px "Mona Sans"; text-anchor: middle; }
+  .isa-take .s { font: 600 17px var(--mono); text-anchor: middle; }
+  .isa-svg { left: 225px; top: 260px; width: 1470px; height: 588px; }
+  .isa-measured { position: absolute; left: 470px; top: 865px; width: 1350px; display: grid; grid-template-columns: 220px repeat(3, 1fr); gap: 20px; font-family: var(--mono); }
+  .isa-inventory, .isa-example { border-top: 2px solid #3d444d; padding-top: 12px; }
+  .isa-inventory b { display: block; font-size: 28px; color: #f0f6fc; white-space: nowrap; }
+  .isa-measured p { margin: 6px 0 0; font-size: 15px; color: #9198a1; }
+  .isa-inventory em { color: #c297ff; font-style: normal; }
+  .isa-example h3 { margin: 0 0 10px; font: 600 17px var(--mono); color: #f0f6fc; }
+  .isa-example .skills { color: #79c0ff; } .isa-example .agents { color: #ffa657; }
+  .isa-example .runs { display: block; margin-top: 8px; color: #f0f6fc; font-size: 23px; }
+  .isa-example .runs small { color: #9198a1; font-size: 13px; font-weight: 500; }
+  .isa-caption { position: absolute; left: 470px; top: 1030px; margin: 0; font: 500 13px/1.35 var(--mono); color: #9198a1; }
+  /* --- cli vs mcp --- */
+  .cvm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
+  .cvm-k { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
+  .cvm-ln { opacity: 0; transition: opacity .3s; } .cvm-ln.on { opacity: 1; } .cvm-ln.gone { opacity: .15; }
+  .cvm-ln text { fill: #9198a1; font: 500 15px var(--mono); white-space: pre; }
+  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #3fb950; } .cvm-ln .ed { fill: #d29922; } .cvm-ln .jq { fill: #ffa657; font-weight: 700; } .cvm-ln .fl { fill: #79c0ff; font-weight: 700; } .cvm-js text { font-size: 13px; fill: #d29922; } .cvm-js .ed { fill: #f0f6fc; }
+  .cvm-yaml text { fill: #e6edf3; font: 500 20px var(--mono); white-space: pre; }
+  .cvm-yaml .k { fill: #79c0ff; } .cvm-yaml .v { fill: #d29922; transition: fill .3s; } .cvm-yaml .v.on { fill: #3fb950; }
+  .cvm-hl { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .3s, stroke .3s; } .cvm-hl.on { fill: #3fb9501a; stroke: #3fb950; }
+  .cvm-bin { opacity: 0; transition: opacity .35s; } .cvm-bin.on { opacity: 1; }
+  .cvm-bin rect { fill: #161b22; stroke: #3fb950; stroke-width: 2; }
+  .cvm-bin .n { fill: #f0f6fc; font: 600 19px var(--mono); } .cvm-bin .d { fill: #9198a1; font: 500 14px var(--mono); }
+  .cvm-ctx { opacity: 0; transition: opacity .4s; } .cvm-ctx.on { opacity: 1; }
+  .cvm-ctx rect { fill: #ffffff08; stroke-width: 1.5; } .cvm-ctx text { font: 500 16px var(--mono); white-space: pre; }
+  .cvm-cap { text-anchor: middle; font-size: 13px; letter-spacing: .04em; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -1645,6 +1714,62 @@
   .att-edge { fill: none; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 8 8; transition: stroke .4s; }
   .att-run.on .att-edge { stroke: #ab7df8; } .att-run.done .att-edge { stroke: #3fb950; }
   .att-tag { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .04em; }
+  /* Fuzzy schedules: a fixed-cron spike scatters into hashed daily times; All You Can Eat serves one plate at a time */
+  .fzs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #79c0ff, #ab7df8, #ffa657); }
+  .fzs-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
+  .fzs-code { font: 600 26px var(--mono); transition: opacity .5s; } .fzs-code.fix { fill: #ffa657; } .fzs-code.fuz { fill: #79c0ff; opacity: 0; }
+  .fzs-mode { font: 600 15px var(--mono); text-anchor: end; transition: opacity .5s; } .fzs-mode.fix { fill: #ffa657; } .fzs-mode.fuz { fill: #79c0ff; opacity: 0; }
+  .fzs-svg.fuz .fzs-code.fix, .fzs-svg.fuz .fzs-mode.fix { opacity: 0; } .fzs-svg.fuz .fzs-code.fuz, .fzs-svg.fuz .fzs-mode.fuz { opacity: 1; }
+  .fzs-band { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-band { opacity: 1; transition: opacity .6s .3s; }
+  .fzs-band.no rect { fill: url(#fzsHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .fzs-band.best rect { fill: #4493f81f; stroke: #4493f8; stroke-width: 1.5; }
+  .fzs-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzs-band.no text { fill: #ffa657; } .fzs-band.best text { fill: #79c0ff; }
+  .fzs-hash { fill: #c9d1d9; font: 500 16px var(--mono); opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-hash { opacity: 1; transition: opacity .5s .4s; }
+  .fzs-syn { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-syn { opacity: 1; transition: opacity .6s 1.1s; }
+  .fzs-syn text { font: 500 15px var(--mono); fill: #79c0ff; } .fzs-syn text.h { fill: #9198a1; font-weight: 600; font-size: 13px; letter-spacing: .1em; }
+  .fzs-syn text.s { fill: #f0f6fc; } .fzs-syn text.a { fill: #6e7681; } .fzs-syn text.t { text-anchor: end; font-weight: 600; font-size: 13px; letter-spacing: .08em; }
+  .fzs-syn .fix text { fill: #ffa657; } .fzs-syn .fix text.s { text-decoration: line-through; text-decoration-color: #db6d28; }
+  .fzs-axis { stroke: #3d444d; stroke-width: 2; } .fzs-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
+  .fzs-dot { fill: #ffa657; transition: fill .6s; } .fzs-svg.fuz .fzs-dot { fill: #79c0ff; }
+  .fzs-n { fill: #c9d1d9; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-n { opacity: 1; transition: opacity .4s 1.6s; }
+  .fzs-spike { opacity: 0; transition: opacity .4s; } .fzs-spike.on { opacity: 1; } .fzs-svg.fuz .fzs-spike { opacity: 0; }
+  .fzs-spike line { stroke: #ffa657; stroke-width: 2; stroke-dasharray: 5 5; } .fzs-spike text { fill: #ffa657; font: 600 17px var(--mono); }
+  .fzs-spike text.d { fill: #c9d1d9; font-weight: 500; font-size: 15px; }
+  .fzs-min { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-min { opacity: 1; transition: opacity .6s 1.8s; }
+  .fzs-min .no { fill: url(#fzsHatch); stroke: #db6d28; stroke-width: 1; stroke-dasharray: 3 3; } .fzs-min .b { fill: #79c0ff; }
+  .fzs-min text { fill: #6e7681; font: 500 13px var(--mono); }
+  .fzs-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; }
+  .fzs-yaml { fill: #c9d1d9; font: 500 18px var(--mono); white-space: pre; } .fzs-yaml .k { fill: #79c0ff; } .fzs-yaml .s { fill: #a5d6ff; } .fzs-yaml .h { fill: #ffa657; font-weight: 600; }
+  .fzs-plate { opacity: 0; transition: opacity .35s; } .fzs-plate.on { opacity: 1; }
+  .fzs-plate rect { fill: #161b22; stroke: var(--c, #79c0ff); stroke-width: 2; transition: stroke .35s; }
+  .fzs-pt { fill: #f0f6fc; font: 600 19px var(--mono); } .fzs-ps { fill: var(--c, #79c0ff); font: 600 15px var(--mono); }
+  .fzs-plate.done .fzs-pt { fill: #8b949e; text-decoration: line-through; }
+  .fzs-learn { fill: #e3b341; font: 600 15px var(--mono); opacity: 0; transition: opacity .4s; } .fzs-learn.on { opacity: 1; }
+  .fzs-mona { opacity: 0; transition: opacity .3s; } .fzs-mona.on { opacity: 1; }
+  .fzs-line { stroke: #3d444d; stroke-width: 3; stroke-dasharray: 8 8; }
+  .fzs-tick circle { fill: #0d1117; stroke: #3d444d; stroke-width: 2; transition: fill .3s, stroke .3s, filter .3s; }
+  .fzs-tick text { fill: #6e7681; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; }
+  .fzs-tick.run circle { fill: #4493f8; stroke: #79c0ff; filter: drop-shadow(0 0 10px #4493f8); } .fzs-tick.run text { fill: #79c0ff; opacity: 1; }
+  .fzs-tick.skip circle { stroke: #9198a1; stroke-dasharray: 4 3; } .fzs-tick.skip text { opacity: 1; }
+  .fzs-tick.now circle { stroke-width: 4; }
+  .fzs-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
+  .active .fzs-cap { animation: rise .6s ease-out both 2s; }
+  /* Week of daily runs: measured heat map of daily workflows by weekday and UTC hour */
+  .fzw .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
+  .fzw-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
+  .fzw-day { fill: #c9d1d9; font: 600 18px var(--mono); text-anchor: end; } .fzw-day.we { fill: #9198a1; }
+  .fzw-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
+  .fzw-c rect { stroke: #30363d; stroke-width: 1; } .fzw-c text { font: 600 15px var(--mono); text-anchor: middle; fill: #c9d1d9; } .fzw-c.hi text { fill: #0d1117; }
+  .fzw-c, .fzw-band, .fzw-top, .fzw-key, .fzw-ph { visibility: hidden; } .fzw-c.on, .fzw-band.on, .fzw-top.on, .fzw-key.on, .fzw-ph.on { visibility: visible; }
+  .fzw-c.now rect { stroke: #f0f6fc; stroke-width: 2; }
+  .fzw-ph rect { fill: #f0f6fc0f; stroke: #f0f6fc; stroke-width: 2; } .fzw-ph text { fill: #f0f6fc; font: 600 15px var(--mono); text-anchor: middle; }
+  .fzw-band.no rect { fill: url(#fzwHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .fzw-band.best rect { fill: none; stroke: #4493f8; stroke-width: 2.5; }
+  .fzw-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzw-band.no text { fill: #ffa657; } .fzw-band.best text { fill: #79c0ff; }
+  .fzw-sum rect { fill: #4493f8; } .fzw-sum.we rect { fill: #4493f899; } .fzw-sum text { fill: #c9d1d9; font: 600 16px var(--mono); }
+  .fzw-top rect { fill: none; stroke: #f0f6fc; stroke-width: 3; } .fzw-top text { fill: #f0f6fc; font: 600 15px var(--mono); }
+  .fzw-key text { fill: #9198a1; font: 500 15px var(--mono); } .fzw-key text.b { fill: #c9d1d9; font-weight: 600; }
+  .fzw-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; visibility: hidden; } .fzw-cap.on { visibility: visible; }
 
   /* --- index & search: a non-agentic indexing job writes the index; the agent job only searches a read-only copy --- */
   .ix .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8); }
@@ -1935,6 +2060,33 @@
   .an-call h3 code { font: 500 16px/1 var(--mono); color: var(--c); padding: 6px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); }
   .an-call p { margin: 0; font-size: 21px; line-height: 1.3; color: #d1d7e0; }
   .an-call p code { font: 500 18px var(--mono); color: var(--c); }
+
+  /* --- compatible with actions --- */
+  .cwa .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #39c5cf, #ab7df8, #d29922, #4493f8); }
+  .cwa-file { position: absolute; left: 110px; top: 280px; width: 880px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; }
+  .cwa-file .file { height: 52px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .cwa-file .file span { margin-left: auto; color: #656c76; font-size: 15px; letter-spacing: .14em; }
+  .cwa-code { position: relative; padding: 14px 0; font: 500 20px/28px var(--mono); white-space: pre; }
+  .cwa-ln { position: relative; z-index: 1; padding: 0 26px; height: 28px; opacity: .45; transition: opacity .5s; }
+  .cwa-ln.on { opacity: 1; }
+  .cwa-ln .no { display: inline-block; width: 34px; color: #656c76; }
+  .cwa-band { position: absolute; left: 0; right: 0; height: 28px; background: color-mix(in srgb, var(--c) 10%, transparent); border-left: 4px solid var(--c); opacity: 0; transition: opacity .5s, background .5s, box-shadow .5s; }
+  .cwa-band.on { opacity: 1; }
+  .cwa-band.hot { background: color-mix(in srgb, var(--c) 26%, transparent); box-shadow: inset 0 0 40px -12px var(--c); }
+  .cwa-band b { position: absolute; right: 14px; top: 3px; min-width: 22px; height: 22px; border-radius: 99px; background: var(--c); color: #0d1117; font: 700 14px/22px var(--mono); text-align: center; }
+  .cwa-grid { position: absolute; left: 1040px; top: 280px; width: 780px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
+  .cwa-tile { position: relative; height: 140px; box-sizing: border-box; padding: 16px 18px 0 70px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d;
+    opacity: 0; transform: translateY(18px) scale(.97); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), border-color .5s, box-shadow .5s; }
+  .cwa-tile.on { opacity: 1; transform: none; }
+  .cwa-tile.hot { border-color: var(--c); box-shadow: 0 0 50px -16px var(--c); }
+  .cwa-tile .n { position: absolute; left: 18px; top: 18px; width: 36px; height: 36px; border-radius: 10px; background: var(--c); color: #0d1117; font: 700 18px/36px var(--mono); text-align: center; }
+  .cwa-tile h3 { margin: 0 0 4px; font-size: 26px; line-height: 1.15; color: #f0f6fc; }
+  .cwa-tile code { display: block; margin-bottom: 6px; font: 500 16px/1.2 var(--mono); color: var(--c); }
+  .cwa-tile p { margin: 0; font-size: 18px; line-height: 1.3; color: #d1d7e0; }
+  .cwa-msg { position: absolute; left: 110px; right: 100px; top: 908px; height: 84px; box-sizing: border-box; padding: 0 34px; display: flex; align-items: center; gap: 28px; border-radius: 18px;
+    background: linear-gradient(90deg, #4493f826, #ab7df81f); border: 1px solid #4493f8; opacity: 0; transform: translateY(16px); transition: opacity .7s, transform .8s cubic-bezier(.2,.9,.2,1); }
+  .cwa-msg.on { opacity: 1; transform: none; }
+  .cwa-msg span { font: 500 26px/1.35 var(--mono); color: #9198a1; }
 
   /* --- cost management --- */
   .cm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
@@ -2630,6 +2782,9 @@
   .otb .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #d29922, #79c0ff); }
   .whg .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #56d4dd, #ab7df8, #f0883e, #56d4dd); }
   .xsv .ttl { transform-box: fill-box; transform-origin: left center; }
+  .xsv .mrp-c { fill: #e6edf3; font: 500 22px var(--mono); }
+  .xsv .mrp-t { fill: #f0f6fc; font: 700 36px "Mona Sans", sans-serif; }
+  .xsv .mrp-m { fill: #e6edf3; font: 500 22px var(--mono); }
   .gap .cell.probe rect { stroke: #f0f6fc; stroke-width: 3; }
 
   /* --- enterprise ready --- */
@@ -2763,6 +2918,69 @@
   .psc-c.on { opacity: 1; } .psc-c.i { fill: #d29922; } .psc-c.a { fill: #79c0ff; } .psc-c.r { fill: #d2a8ff; } .psc-c.f { fill: #ff7b72; } .psc-c.n { fill: #9198a1; }
   .psc-v { text-anchor: end; font-weight: 700; } .psc-v.k { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95099); }
   .psc-m { width: 1360px; }
+  .rcm-card { position: absolute; top: 290px; left: var(--x); width: 540px; height: 540px; box-sizing: border-box; padding: 26px 30px; border: 2px solid color-mix(in srgb, var(--c) 55%, transparent); border-top-width: 6px; border-radius: 18px; background: #0d1117e6; opacity: 0; }
+    .active .rcm-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + .4s); }
+  .rcm-card > i, .lsm-card > i { display: block; font: 700 17px var(--mono); font-style: normal; letter-spacing: .14em; color: var(--c); }
+  .rcm-card h3 { margin: 12px 0 14px; font: 700 48px/1.1 var(--mono); color: #f0f6fc; }
+  .rcm-fm { font: 500 21px/1.5 var(--mono); white-space: pre; color: #c9d1d9; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 10px 16px; }
+  .rcm-fm .k { color: #ff7b72; } .rcm-fm .v { color: #a5d6ff; }
+  .rcm-thread { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .rcm-a { opacity: 0; }
+  .active .rcm-a { animation: rise .6s cubic-bezier(.2,.9,.2,1) both calc(var(--d) * 600ms + 1.4s); }
+  .rcm-msg { display: flex; align-items: center; gap: 14px; font-size: 21px; color: #e6edf3; }
+  .rcm-msg .b { flex: 1; padding: 10px 14px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
+  .rcm-msg.bot .b { border-style: dashed; color: #c9d1d9; }
+  .rcm-msg b { font-family: var(--mono); color: #79c0ff; } .rcm-msg em { color: #9198a1; } .rcm-msg s { color: #9198a1; }
+  .rcm-av { width: 46px; height: 46px; border-radius: 50%; border: 2px solid #30363d; flex: none; }
+  .rcm-gear { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 22px; background: #ab7df833; color: #d2a8ff; border: 2px solid #ab7df8; }
+  .rcm-react { align-self: flex-start; margin-left: 60px; padding: 4px 14px; border-radius: 999px; border: 1px solid #4493f8; background: #4493f81f; font-size: 19px; color: #e6edf3; }
+  .rcm-lbl { display: inline-block; padding: 2px 14px; border-radius: 999px; background: #e3b34133; border: 1px solid #e3b341; color: #f0d48a; font: 600 19px/1.4 var(--mono); }
+  .rcm-lbl.big { font-size: 40px; padding: 2px 26px; }
+  .rcm-pr { display: flex; align-items: center; gap: 12px; font-size: 21px; color: #e6edf3; padding: 10px 14px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
+  .rcm-pr .n { font: 700 16px var(--mono); padding: 2px 8px; border-radius: 6px; background: #238636; color: #fff; }
+  .rcm-pr .rcm-lbl { margin-left: auto; }
+  .active .rcm-pr .rcm-lbl.drop { animation: rcm-drop .5s ease both 3.2s; }
+  @keyframes rcm-drop { to { opacity: .35; text-decoration: line-through; } }
+  .rcm-ev { display: flex; flex-direction: column; gap: 10px; }
+  .rcm-ev > div { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 12px; padding: 5px 0 5px 14px; border-left: 3px solid #ab7df8; }
+  .rcm-ev > div.g { border-left-color: #3fb950; }
+  .rcm-ev b { font: 600 19px var(--mono); color: #e6edf3; } .rcm-ev span { font-size: 17px; color: #9198a1; }
+  .rcm-wins { position: absolute; left: 110px; top: 878px; width: 1700px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 22px; }
+  .rcm-wins > div { border-left: 4px solid #79c0ff; padding: 4px 0 4px 16px; opacity: 0; }
+  .active .rcm-wins > div { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 1.2s); }
+  .rcm-wins b { display: block; font: 700 22px/1.15 var(--mono); white-space: nowrap; color: #f0f6fc; }
+  .rcm-wins span { display: block; margin-top: 6px; font-size: 18px; line-height: 1.3; color: #c9d1d9; }
+  .lsm-board { position: absolute; left: 110px; top: 280px; width: 1100px; }
+  .lsm-svg { display: block; width: 1100px; height: 600px; overflow: visible; }
+  .lsm-n rect { fill: #161b22; stroke: #30363d; stroke-width: 2; transition: fill .35s, stroke .35s; }
+  .lsm-n text { fill: #c9d1d9; font: 600 20px var(--mono); text-anchor: middle; }
+  .lsm-n.seen rect { stroke: #8b949e; }
+  .lsm-n.on rect { fill: #e3b34126; stroke: #e3b341; stroke-width: 3; filter: drop-shadow(0 0 10px #e3b34166); }
+  .lsm-n.on text { fill: #f0f6fc; }
+  .lsm-e { fill: none; stroke-width: 3; opacity: .45; transition: opacity .35s, stroke-width .35s; }
+  .lsm-e.a { stroke: #ab7df8; } .lsm-e.h { stroke: #4493f8; } .lsm-e.x { stroke: #db6d28; stroke-dasharray: 10 8; }
+  .lsm-e.seen { opacity: .8; } .lsm-e.hot { opacity: 1; stroke-width: 5; }
+  .lsm-el { font: 600 19px var(--mono); opacity: .6; transition: opacity .35s; }
+  .lsm-el.a { fill: #d2a8ff; } .lsm-el.h { fill: #79c0ff; } .lsm-el.x { fill: #ffa657; }
+  .lsm-el.hot, .lsm-el.seen { opacity: 1; }
+  .lsm-no { opacity: 0; transition: opacity .3s; }
+  .lsm-no.on { opacity: 1; }
+  .lsm-no circle { fill: #db6d2833; stroke: #db6d28; stroke-width: 3; } .lsm-no path { stroke: #ffa657; stroke-width: 4; stroke-linecap: round; }
+  .lsm-no text { fill: #ffa657; font: 600 18px var(--mono); text-anchor: middle; }
+  .lsm-who { opacity: 0; transition: opacity .3s; }
+  .lsm-who > g { display: none; } .lsm-who.a > .a, .lsm-who.d > .d, .lsm-who.m > .m { display: inline; }
+  .lsm-who .ring { fill: #0d1117; stroke: #4493f8; stroke-width: 3; }
+  .lsm-cap { margin-top: 6px; min-height: 40px; padding: 10px 18px; border-left: 4px solid #30363d; font-size: 23px; color: #e6edf3; opacity: 0; transition: opacity .3s; }
+  .lsm-cap.on { opacity: 1; } .lsm-cap.a { border-left-color: #ab7df8; } .lsm-cap.h { border-left-color: #4493f8; } .lsm-cap.x { border-left-color: #db6d28; color: #ffa657; }
+  .lsm-card { position: absolute; left: 1260px; top: var(--y); width: 550px; box-sizing: border-box; padding: 20px 24px; border: 2px solid color-mix(in srgb, var(--c) 55%, transparent); border-top-width: 6px; border-radius: 18px; background: #0d1117e6; opacity: 0; }
+  .active .lsm-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + .5s); }
+  .lsm-card .rcm-fm { margin-top: 12px; font-size: 17px; }
+  .lsm-t { display: flex; gap: 14px; align-items: flex-start; margin-top: 14px; }
+  .lsm-t .m { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 20px var(--mono); }
+  .lsm-t.y .m { background: #4493f833; color: #79c0ff; border: 2px solid #4493f8; } .lsm-t.n .m { background: #db6d2833; color: #ffa657; border: 2px solid #db6d28; }
+  .lsm-t b { display: block; font-size: 22px; color: #f0f6fc; } .lsm-t span { display: block; font-size: 18px; color: #9198a1; }
+  .lsm-wins { top: 962px; grid-template-columns: repeat(3, 1fr); }
+  .lsm-wins b { display: inline; } .lsm-wins span { display: inline; margin: 0 0 0 10px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
 
@@ -3074,16 +3292,41 @@
     resetIndex();
     // Primer Octicons 24px paths (© GitHub, Inc., MIT license); the shared OCTI table is declared later in this file.
     const CAI_ICON = {
-      book: ["M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.495 4.495 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.752.752 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a2.996 2.996 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.503 4.503 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z"],
-      sparkle: ["M11.296 1.924c.24-.656 1.168-.656 1.408 0l.717 1.958a11.25 11.25 0 0 0 6.697 6.697l1.958.717c.657.24.657 1.168 0 1.408l-1.958.717a11.25 11.25 0 0 0-6.697 6.697l-.717 1.958c-.24.657-1.168.657-1.408 0l-.717-1.958a11.25 11.25 0 0 0-6.697-6.697l-1.958-.717c-.656-.24-.656-1.168 0-1.408l1.958-.717a11.25 11.25 0 0 0 6.697-6.697l.717-1.958Z"],
-      tag: ["M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z", "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z"],
-      note: ["M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z", "M5 8.75A.75.75 0 0 1 5.75 8h11.5a.75.75 0 0 1 0 1.5H5.75A.75.75 0 0 1 5 8.75Zm0 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z"],
-      alert: ["M13 17.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-.25-8.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5Z", "M9.836 3.244c.963-1.665 3.365-1.665 4.328 0l8.967 15.504c.963 1.667-.24 3.752-2.165 3.752H3.034c-1.926 0-3.128-2.085-2.165-3.752Zm3.03.751a1.002 1.002 0 0 0-1.732 0L2.168 19.499A1.002 1.002 0 0 0 3.034 21h17.932a1.002 1.002 0 0 0 .866-1.5L12.866 3.994Z"],
-      shield: ["M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z", "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z"],
-      heart: ["m12 20.703.343.667a.748.748 0 0 1-.686 0l-.003-.002-.007-.003-.025-.013a31.138 31.138 0 0 1-5.233-3.576C3.8 15.573 1 12.332 1 8.514v-.001C1 5.053 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262a31.148 31.148 0 0 1-5.233 3.576l-.025.013-.007.003-.002.001ZM6.736 4C4.657 4 2.5 5.88 2.5 8.514c0 3.107 2.324 5.96 4.861 8.12a29.655 29.655 0 0 0 4.566 3.175l.073.041.073-.04c.271-.153.661-.38 1.13-.674.94-.588 2.19-1.441 3.436-2.502 2.537-2.16 4.861-5.013 4.861-8.12C21.5 5.88 19.343 4 17.264 4c-2.106 0-3.801 1.389-4.553 3.643a.751.751 0 0 1-1.422 0C10.537 5.389 8.841 4 6.736 4Z"],
-      a11y: ["M13.974 8.114a3.573 3.573 0 1 0-3.947 0c-.302.21-.57.467-.79.762H3.708a.75.75 0 1 0 0 1.5h4.885a2.93 2.93 0 0 0-.026.188l-.814 7.267-.499 4.142a.75.75 0 1 0 1.49.18l.42-3.486h5.67l.42 3.485a.75.75 0 0 0 1.49-.18l-.5-4.142-.813-7.266a3.502 3.502 0 0 0-.026-.188h4.885a.75.75 0 1 0 0-1.5h-5.527a3.466 3.466 0 0 0-.79-.762Zm.099-2.979a2.073 2.073 0 1 1-4.146 0 2.073 2.073 0 0 1 4.146 0Zm-.131 5.596.72 6.436H9.338l.72-6.436a1.954 1.954 0 0 1 3.884 0Z"],
-      people: ["M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z"],
-      sliders: ["M11 18.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75Zm-8-12a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 3 6.25Zm13 6a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.75 16a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z", "M3 18.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Zm0-6a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM16.75 10a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75ZM14 6.25a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75ZM11.25 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"],
+      book: [
+        "M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.495 4.495 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.752.752 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a2.996 2.996 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.503 4.503 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z",
+      ],
+      sparkle: [
+        "M11.296 1.924c.24-.656 1.168-.656 1.408 0l.717 1.958a11.25 11.25 0 0 0 6.697 6.697l1.958.717c.657.24.657 1.168 0 1.408l-1.958.717a11.25 11.25 0 0 0-6.697 6.697l-.717 1.958c-.24.657-1.168.657-1.408 0l-.717-1.958a11.25 11.25 0 0 0-6.697-6.697l-1.958-.717c-.656-.24-.656-1.168 0-1.408l1.958-.717a11.25 11.25 0 0 0 6.697-6.697l.717-1.958Z",
+      ],
+      tag: [
+        "M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z",
+        "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z",
+      ],
+      note: [
+        "M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z",
+        "M5 8.75A.75.75 0 0 1 5.75 8h11.5a.75.75 0 0 1 0 1.5H5.75A.75.75 0 0 1 5 8.75Zm0 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z",
+      ],
+      alert: [
+        "M13 17.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-.25-8.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5Z",
+        "M9.836 3.244c.963-1.665 3.365-1.665 4.328 0l8.967 15.504c.963 1.667-.24 3.752-2.165 3.752H3.034c-1.926 0-3.128-2.085-2.165-3.752Zm3.03.751a1.002 1.002 0 0 0-1.732 0L2.168 19.499A1.002 1.002 0 0 0 3.034 21h17.932a1.002 1.002 0 0 0 .866-1.5L12.866 3.994Z",
+      ],
+      shield: [
+        "M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z",
+        "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z",
+      ],
+      heart: [
+        "m12 20.703.343.667a.748.748 0 0 1-.686 0l-.003-.002-.007-.003-.025-.013a31.138 31.138 0 0 1-5.233-3.576C3.8 15.573 1 12.332 1 8.514v-.001C1 5.053 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262a31.148 31.148 0 0 1-5.233 3.576l-.025.013-.007.003-.002.001ZM6.736 4C4.657 4 2.5 5.88 2.5 8.514c0 3.107 2.324 5.96 4.861 8.12a29.655 29.655 0 0 0 4.566 3.175l.073.041.073-.04c.271-.153.661-.38 1.13-.674.94-.588 2.19-1.441 3.436-2.502 2.537-2.16 4.861-5.013 4.861-8.12C21.5 5.88 19.343 4 17.264 4c-2.106 0-3.801 1.389-4.553 3.643a.751.751 0 0 1-1.422 0C10.537 5.389 8.841 4 6.736 4Z",
+      ],
+      a11y: [
+        "M13.974 8.114a3.573 3.573 0 1 0-3.947 0c-.302.21-.57.467-.79.762H3.708a.75.75 0 1 0 0 1.5h4.885a2.93 2.93 0 0 0-.026.188l-.814 7.267-.499 4.142a.75.75 0 1 0 1.49.18l.42-3.486h5.67l.42 3.485a.75.75 0 0 0 1.49-.18l-.5-4.142-.813-7.266a3.502 3.502 0 0 0-.026-.188h4.885a.75.75 0 1 0 0-1.5h-5.527a3.466 3.466 0 0 0-.79-.762Zm.099-2.979a2.073 2.073 0 1 1-4.146 0 2.073 2.073 0 0 1 4.146 0Zm-.131 5.596.72 6.436H9.338l.72-6.436a1.954 1.954 0 0 1 3.884 0Z",
+      ],
+      people: [
+        "M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z",
+      ],
+      sliders: [
+        "M11 18.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75Zm-8-12a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 3 6.25Zm13 6a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.75 16a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z",
+        "M3 18.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Zm0-6a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM16.75 10a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75ZM14 6.25a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75ZM11.25 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z",
+      ],
     };
     const caiIcon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${CAI_ICON[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
     // [name, icon, colour, illustrative trigger]
@@ -3135,11 +3378,7 @@
           h("div", { class: "cai-step now", "--i": 4 }, h("b", {}, "Continuous AI"), h("span", {}, "collaborate"))
         ),
         h("div", { class: "cai-years" }, "a 30+ year story, like CI/CD"),
-        h(
-          "div",
-          { class: "cai-def" },
-          h("p", {}, "Any use of ", h("b", {}, "automated AI"), " to support ", h("b", {}, "software collaboration"), ".")
-        ),
+        h("div", { class: "cai-def" }, h("p", {}, "Any use of ", h("b", {}, "automated AI"), " to support ", h("b", {}, "software collaboration"), ".")),
         h("div", { class: "cai-grid" }, caiCards),
         h(
           "div",
@@ -3147,12 +3386,7 @@
           h("span", {}, "What they share"),
           TRAITS.map((t, i) => h("em", { "--i": i }, t))
         ),
-        h(
-          "div",
-          { class: "cai-foot" },
-          h("div", { "--i": 0 }, caiIcon("people"), "For the team, not the individual"),
-          h("div", { "--i": 1 }, caiIcon("sliders"), "Teams stay in control")
-        )
+        h("div", { class: "cai-foot" }, h("div", { "--i": 0 }, caiIcon("people"), "For the team, not the individual"), h("div", { "--i": 1 }, caiIcon("sliders"), "Teams stay in control"))
       ),
     });
   }
@@ -3249,6 +3483,7 @@
     };
     slides.push({
       group: "platform",
+      key: "anatomy",
       notes:
         "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
       enter() {
@@ -3292,6 +3527,188 @@
         wires,
         calls,
         cc
+      ),
+    });
+  }
+
+  // Reuse your CI: a synthetic workflow mixes the agent with environments, self-hosted runners, Microsoft Entra ID
+  // and HashiCorp Vault through OIDC, GitHub App tokens, marketplace actions, custom jobs and chat bots; all Actions infrastructure is reused
+  {
+    resetIndex();
+    const TILES = [
+      ["env", "#d29922", "Environments", "environment: production", "Required reviewers and environment secrets gate the run."],
+      ["run", "#39c5cf", "Runners", "runs-on:", "GitHub-hosted, larger or self-hosted runners and runner groups."],
+      ["entra", "#4493f8", "Microsoft Entra ID", "azure/login", "OIDC federation into Azure: no long-lived cloud keys."],
+      ["vault", "#ffa657", "HashiCorp Vault", "hashicorp/vault-action", "Fetch secrets with the job's own OIDC identity."],
+      ["app", "#ab7df8", "GitHub Apps", "create-github-app-token", "Short-lived, scoped installation tokens instead of PATs."],
+      ["mkt", "#79c0ff", "Marketplace actions", "uses:", "Any existing action: setup, cache, scan, sign, deploy."],
+      ["job", "#f778ba", "Custom jobs", "jobs: + needs:", "Build, deploy or gate around the agent in extra jobs."],
+      ["bot", "#d2a8ff", "Workflow calls", "uses: reusable workflow", "Call existing workflows for Slack, Teams and other bots."],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      V = "#a5d6ff",
+      T = "#f0f6fc";
+    // [text parts, tile index or -1]
+    const LINES = [
+      [[["---", D]], -1],
+      [
+        [
+          ["on: ", K],
+          ["pull_request", V],
+        ],
+        -1,
+      ],
+      [
+        [
+          ["environment: ", K],
+          ["production", V],
+        ],
+        0,
+      ],
+      [
+        [
+          ["runs-on: ", K],
+          ["[self-hosted, linux]", V],
+        ],
+        1,
+      ],
+      [[["permissions:", K]], -1],
+      [
+        [
+          ["  id-token: ", K],
+          ["write", V],
+        ],
+        2,
+      ],
+      [[["steps:", K]], -1],
+      [
+        [
+          ["  - uses: ", K],
+          ["azure/login@v2", V],
+        ],
+        2,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["hashicorp/vault-action@v3", V],
+        ],
+        3,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["actions/create-github-app-token@v2", V],
+        ],
+        4,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["actions/setup-node@v4", V],
+        ],
+        5,
+      ],
+      [[["jobs:", K]], -1],
+      [
+        [
+          ["  deploy-preview: ", K],
+          ["{ needs: detection }", V],
+        ],
+        6,
+      ],
+      [[["  notify:", K]], 7],
+      [
+        [
+          ["    needs: ", K],
+          ["deploy-preview", V],
+        ],
+        7,
+      ],
+      [
+        [
+          ["    uses: ", K],
+          ["./.github/workflows/chatops.yml", V],
+        ],
+        7,
+      ],
+      [[["---", D]], -1],
+      [[["# Review the preview deployment and comment", T]], -1],
+    ];
+    const LH = 28,
+      TOP = 14;
+    const lines = LINES.map(([parts], i) =>
+      h(
+        "div",
+        { class: "cwa-ln" },
+        h("span", { class: "no" }, String(i + 1)),
+        parts.map(([t, c]) => h("span", { style: { color: c } }, t))
+      )
+    );
+    const bandsOf = TILES.map(() => []);
+    const bands = [];
+    LINES.forEach(([, k], i) => {
+      if (k < 0) return;
+      const b = h("div", { class: "cwa-band", "--c": TILES[k][1], style: { top: `${TOP + i * LH}px` } }, h("b", {}, String(k + 1)));
+      bandsOf[k].push([b, i]);
+      bands.push(b);
+    });
+    const tiles = TILES.map(([, c, title, chip, text], i) => h("div", { class: "cwa-tile", "--c": c }, h("div", { class: "n" }, String(i + 1)), h("h3", {}, title), h("code", {}, chip), h("p", {}, text)));
+    const msg = h("div", { class: "cwa-msg" }, h("span", {}, "Same runners, secrets, environments, rulesets and audit log. Custom steps and jobs run outside the agent sandbox."));
+    const N = TILES.length,
+      REVEAL = 0.6,
+      GAP = 0.9,
+      CYCLE = REVEAL + GAP * (N + 1),
+      HOT = 2;
+    let t0 = 0,
+      seen = -1,
+      skip = false;
+    const lit = (k, on) => {
+      tiles[k].classList.toggle("on", on);
+      bandsOf[k].forEach(([b, i]) => (b.classList.toggle("on", on), lines[i].classList.toggle("on", on)));
+    };
+    slides.push({
+      group: "platform",
+      under: "anatomy",
+      notes:
+        "Reuse your CI, using an illustrative synthetic workflow. An agentic workflow compiles to a plain GitHub Actions workflow, so everything a team already runs on Actions keeps working: deployment environments with required reviewers and environment secrets, GitHub-hosted, larger or self-hosted runners, OIDC federation into Microsoft Entra ID with azure/login, secrets from HashiCorp Vault with vault-action, short-lived GitHub App installation tokens, any marketplace action in steps, extra custom jobs wired with needs, and reusable workflow calls that hand off to Slack, Teams or existing bots. Custom steps and jobs run outside the agent's sandbox with standard Actions security, so credentials stay out of the agent's reach. The message: no new platform to adopt; all the Actions infrastructure is reused.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        skip = false;
+        [...lines, ...bands, ...tiles, msg].forEach(e => e.classList.remove("on", "hot"));
+        LINES.forEach(([, tile], i) => {
+          if (tile < 0) lines[i].classList.add("on");
+        });
+      },
+      onNext() {
+        if (seen >= N) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.min(N, Math.floor((e - REVEAL) / GAP));
+        while (seen < n) {
+          seen++;
+          if (seen < N) lit(seen, true);
+          else msg.classList.add("on");
+          sfx.pop(seen * 2);
+        }
+        const hot = e >= CYCLE ? Math.floor((e - CYCLE) / HOT) % N : -1;
+        tiles.forEach((el, i) => el.classList.toggle("hot", hot === i));
+        bandsOf.forEach((list, i) => list.forEach(([b]) => b.classList.toggle("hot", hot === i)));
+      },
+      el: h(
+        "section",
+        { class: "slide cwa" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring your ecosystem"), h("h2", { class: "pf-h" }, letters("Reuse your "), letters("CI", "l-grad"))),
+        h("div", { class: "cwa-file" }, h("div", { class: "file" }, "📄 .github/workflows/preview-review.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cwa-code" }, bands, lines)),
+        h("div", { class: "cwa-grid" }, tiles),
+        msg
       ),
     });
   }
@@ -5480,6 +5897,308 @@
       ),
     });
 
+    // Repo Commands: slash_command and label_command are synthetic triggers; one front matter line expands into the real
+    // issue, comment, pull request and discussion events plus a first-word guard, role check, reaction, status comment and label removal
+    {
+      resetIndex();
+      const C = { s: "#79c0ff", l: "#e3b341", x: "#ab7df8" };
+      const yaml = rows =>
+        h(
+          "div",
+          { class: "rcm-fm" },
+          rows.map(([ind, key, val]) => h("div", {}, ind, h("span", { class: "k" }, key), val ? h("span", { class: "v" }, val) : null))
+        );
+      const avatar = who => h("img", { class: "rcm-av", src: `assets/avatars/${who}.jpg`, alt: "" });
+      const slash = h(
+        "div",
+        { class: "rcm-card", "--c": C.s, "--i": 0, "--x": "110px" },
+        h("i", {}, "SLASH COMMAND"),
+        h("h3", {}, "/review"),
+        yaml([["", "on: ", "/review"]]),
+        h("div", { class: "rcm-thread" }, [
+          h("div", { class: "rcm-msg rcm-a", "--d": 0 }, avatar("mona"), h("div", { class: "b" }, h("b", {}, "/review"), " focus on the cache layer")),
+          h("div", { class: "rcm-react rcm-a", "--d": 1 }, "👀 1"),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 2 }, h("div", { class: "rcm-gear" }, "⚙"), h("div", { class: "b" }, "Agent started · ", h("u", {}, "view run"))),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 3 }, h("div", { class: "rcm-gear" }, "✓"), h("div", { class: "b" }, "Review posted · ", h("em", {}, "comment /review to run again"))),
+        ])
+      );
+      const label = h(
+        "div",
+        { class: "rcm-card", "--c": C.l, "--i": 1, "--x": "690px" },
+        h("i", {}, "LABEL COMMAND"),
+        h("h3", {}, h("span", { class: "rcm-lbl big" }, "deploy")),
+        yaml([
+          ["", "on:", ""],
+          ["  ", "label_command: ", "deploy"],
+        ]),
+        h("div", { class: "rcm-thread" }, [
+          h("div", { class: "rcm-pr rcm-a", "--d": 0 }, h("span", { class: "n" }, "PR"), " Add cache layer", h("span", { class: "rcm-lbl drop" }, "deploy")),
+          h("div", { class: "rcm-msg rcm-a", "--d": 1 }, avatar("ducky"), h("div", { class: "b" }, "added the ", h("span", { class: "rcm-lbl" }, "deploy"), " label")),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 2 }, h("div", { class: "rcm-gear" }, "⚙"), h("div", { class: "b" }, "Agent started · label ", h("s", {}, "deploy"), " removed")),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 3 }, h("div", { class: "rcm-gear" }, "↻"), h("div", { class: "b" }, h("em", {}, "apply the label again to re-run"))),
+        ])
+      );
+      const EXPAND = [
+        ["issues", "opened · edited · reopened"],
+        ["issue_comment", "created · edited"],
+        ["pull_request", "opened · edited · reopened"],
+        ["pull_request_review_comment", "created · edited"],
+        ["discussion(_comment)", "created · edited"],
+        ["labeled", "issues · pull requests · discussions"],
+        ["if:", "command is the first word"],
+        ["roles:", "admin · maintainer · write"],
+        ["activation", "👀 reaction · status comment"],
+      ];
+      const expand = h(
+        "div",
+        { class: "rcm-card rcm-x", "--c": C.x, "--i": 2, "--x": "1270px" },
+        h("i", {}, "THE COMPILER WRITES"),
+        h("h3", {}, "Real events"),
+        h(
+          "div",
+          { class: "rcm-ev" },
+          EXPAND.map(([k, v], j) => h("div", { class: `rcm-a${j > 5 ? " g" : ""}`, "--d": j * 0.45 }, h("b", {}, k), h("span", {}, v)))
+        )
+      );
+      const WINS = [
+        ["One line", "replaces a hand-written event matrix and its if: guards"],
+        ["No accidental runs", "the command must be the first word; other events stop early"],
+        ["Role-gated", "only admitted repository roles start the agent"],
+        ["Visible", "reaction, status comment and run link on the thread"],
+        ["Repeatable", "comment again or re-apply the label to re-run"],
+        ["Discoverable", "centralized routing adds a /help command"],
+      ];
+      const wins = h(
+        "div",
+        { class: "rcm-wins" },
+        WINS.map(([b, s], i) => h("div", { "--i": i }, h("b", {}, b), h("span", {}, s)))
+      );
+      slides.push({
+        group: "process",
+        key: "commands",
+        notes:
+          "Repo Commands, an illustrative example with a synthetic thread and pull request. Two triggers in gh-aw are synthetic: GitHub Actions has no slash_command or label_command event. You write one front matter line and the compiler writes the real triggers for you. on: /review expands into issues, issue comments, pull requests, review comments and discussions, plus workflow_dispatch, and an if: guard so the workflow only continues when /review is the first word, never a passing mention. label_command: deploy listens for the labeled event on issues, pull requests and discussions, and removes the label once the run starts, so a label means do this now and can simply be applied again. Both run the same activation: a role check that only admits admin, maintainer and write by default, an eyes reaction, a status comment with a run link, and the matched command as an activation output, so one workflow can serve several aliases. The benefits: one line instead of an event matrix, no accidental runs, role-gated admission, visible feedback in the thread, re-runs without cleanup, and with centralized routing a generated /help command that lists every command in the repository. Commands are how people pull an agent into a conversation exactly when they want it.",
+        el: h(
+          "section",
+          { class: "slide rcm" },
+          h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "ChatOps · LabelOps · synthetic triggers"), h("h2", {}, letters("Repo "), letters("Commands", "l-grad"))),
+          slash,
+          label,
+          expand,
+          wins
+        ),
+      });
+    }
+
+    // LabelOps state machines: labels are states on the issue; label commands let triage-role people move a state,
+    // and replace-label with allowed-transitions limits each agent to the edges it owns
+    {
+      resetIndex();
+      const AG = pickAgent();
+      const VW = 1100,
+        VH = 600,
+        NW = 290,
+        NH = 62;
+      const NODES = {
+        new: [145, 110],
+        triaged: [545, 110],
+        planned: [955, 110],
+        info: [545, 320],
+        progress: [955, 320],
+        done: [955, 520],
+      };
+      const NAME = { new: "state:new", triaged: "state:triaged", planned: "state:planned", info: "state:needs-info", progress: "state:in-progress", done: "state:done" };
+      // [id, path, kind (a agent · h human · x rejected), label, lx, ly, anchor]
+      const EDGES = [
+        ["e0", `M${145 + NW / 2} 110 H${545 - NW / 2 - 6}`, "a", "triage agent", 345, 62, "middle"],
+        ["e1", `M515 ${110 + NH / 2} V${320 - NH / 2 - 6}`, "a", "needs a repro", 501, 222, "end"],
+        ["e2", `M575 ${320 - NH / 2} V${110 + NH / 2 + 6}`, "a", "reply checked", 589, 222, "start"],
+        ["e3", `M${545 + NW / 2} 110 H${955 - NW / 2 - 6}`, "h", "🏷 plan", 750, 62, "middle"],
+        ["e4", `M955 ${110 + NH / 2} V${320 - NH / 2 - 6}`, "h", "🏷 implement", 971, 222, "start"],
+        ["e5", `M955 ${320 + NH / 2} V${520 - NH / 2 - 6}`, "h", "PR merged", 971, 432, "start"],
+        ["x0", `M145 ${110 + NH / 2} V520 H${955 - NW / 2 - 6}`, "x", "agent asks new → done", 165, 500, "start"],
+      ];
+      // [edge, node lit on arrival, who (a agent · d Ducky · m Mona), caption]
+      const SEQ = [
+        [null, "new", "a", "An issue is opened and gets state:new"],
+        ["e0", "triaged", "a", "Triage agent · replace-label state:new → state:triaged"],
+        ["e1", "info", "a", "Triage agent · no reproduction yet → state:needs-info"],
+        ["e2", "triaged", "a", "Reporter replies · triage agent moves it back → state:triaged"],
+        ["x0", null, "a", "An agent asks for state:new → state:done · not an allowed transition, rejected"],
+        ["e3", "planned", "d", "Ducky (triage role) applies plan · label removed · planner agent → state:planned"],
+        ["e4", "progress", "d", "Ducky (triage role) applies implement · Copilot is assigned → state:in-progress"],
+        ["e5", "done", "m", "Mona (maintainer) merges the pull request → state:done"],
+      ];
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      let g = `<defs>
+        <marker id="lsmArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+        <marker id="lsmArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
+        <marker id="lsmArrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#db6d28"/></marker>
+        <clipPath id="lsmClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
+      EDGES.forEach(([id, d, k, text, lx, ly, anchor]) => {
+        g += `<path class="lsm-e ${k}" id="lsm_${id}" d="${d}" marker-end="url(#lsmArr${k === "a" ? "P" : k === "h" ? "B" : "O"})"/>`;
+        g += `<text class="lsm-el ${k}" id="lsm_${id}t" x="${lx}" y="${ly}" text-anchor="${anchor}">${text}</text>`;
+      });
+      g += `<g class="lsm-no" id="lsmNo"><circle cx="560" cy="520" r="24"/><path d="M550 510l20 20M570 510l-20 20"/><text x="560" y="580">not an allowed transition</text></g>`;
+      Object.entries(NODES).forEach(([k, [x, y]]) => {
+        g += `<g class="lsm-n" id="lsm_${k}"><rect x="${x - NW / 2}" y="${y - NH / 2}" width="${NW}" height="${NH}" rx="${NH / 2}"/>${ico("tag", x - NW / 2 + 30, y, 24)}<text x="${x + 20}" y="${y + 8}">${NAME[k]}</text></g>`;
+      });
+      g += `<g class="lsm-who" id="lsmWho"><g class="a"><circle r="28" cx="0" cy="0" ${agDisc(AG)}/>${ico(AG, 0, 1, 30, agFg(AG))}</g>`;
+      g += `<g class="d"><circle r="28" cx="0" cy="0" class="ring"/><image href="assets/avatars/ducky.jpg" x="-25" y="-25" width="50" height="50" clip-path="url(#lsmClip)"/></g>`;
+      g += `<g class="m"><circle r="28" cx="0" cy="0" class="ring"/><image href="assets/avatars/mona.jpg" x="-25" y="-25" width="50" height="50" clip-path="url(#lsmClip)"/></g></g>`;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "lsm-svg");
+      svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      svg.innerHTML = g;
+      const cap = h("div", { class: "lsm-cap" });
+      const FM = [
+        ["", "on:", ""],
+        ["  ", "label_command: ", "plan"],
+        ["  ", "roles: ", "[admin, maintainer, write, triage]"],
+        ["", "safe-outputs:", ""],
+        ["  ", "replace-label:", ""],
+        ["    ", "allowed-transitions:", ""],
+        ["      - ", "from: ", "state:triaged"],
+        ["        ", "to: ", "state:planned"],
+      ];
+      const fm = h(
+        "div",
+        { class: "lsm-card", "--c": "#ab7df8", "--i": 0, "--y": "270px" },
+        h("i", {}, "PLAN.MD · ONE EDGE PER WORKFLOW"),
+        h(
+          "div",
+          { class: "rcm-fm" },
+          FM.map(([ind, key, val]) => h("div", {}, ind, h("span", { class: "k" }, key), val ? h("span", { class: "v" }, val) : null))
+        )
+      );
+      const TRIAGE = [
+        ["✓", "y", "Can apply and remove labels", "so it can drive every human edge"],
+        ["✕", "n", "Cannot push, merge or change settings", "no code or admin access to hand out"],
+        ["✓", "y", "Read-only accounts cannot label", "drive-by users cannot fire a command"],
+      ];
+      const triage = h(
+        "div",
+        { class: "lsm-card", "--c": "#4493f8", "--i": 1, "--y": "610px" },
+        h("i", {}, "TRIAGE ROLE IS ENOUGH"),
+        TRIAGE.map(([m, k, b, s]) => h("div", { class: `lsm-t ${k}` }, h("span", { class: "m" }, m), h("div", {}, h("b", {}, b), h("span", {}, s))))
+      );
+      const WINS = [
+        ["State on the issue", "visible, searchable and filterable on boards"],
+        ["Bounded agents", "replace-label moves only along declared edges"],
+        ["Small workflows", "each edge is one label command or one agent"],
+      ];
+      const wins = h(
+        "div",
+        { class: "rcm-wins lsm-wins" },
+        WINS.map(([b, s], i) => h("div", { "--i": i }, h("b", {}, b), h("span", {}, s)))
+      );
+      const STEP = 2200,
+        START = 900,
+        CYCLE = START + SEQ.length * STEP + 2600;
+      const who = svg.querySelector("#lsmWho"),
+        no = svg.querySelector("#lsmNo");
+      const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+      let t0 = 0,
+        cyc = -1,
+        seen = -1,
+        skip = false;
+      const reset = () => {
+        svg.querySelectorAll(".on, .hot, .seen").forEach(e => e.classList.remove("on", "hot", "seen"));
+        who.style.opacity = 0;
+        cap.textContent = "";
+        cap.className = "lsm-cap";
+        seen = -1;
+      };
+      const place = (x, y, k) => {
+        who.style.opacity = 1;
+        who.setAttribute("transform", `translate(${x},${y})`);
+        who.setAttribute("class", `lsm-who ${k}`);
+      };
+      slides.push({
+        group: "process",
+        under: "commands",
+        notes:
+          "LabelOps state machines, an illustrative process with synthetic labels; Ducky stands in for a community helper with the triage role and Mona for a maintainer. Labels are not only commands, they are state. Give an issue exactly one state label and every step of a process becomes a transition from one label to the next. replace-label is the safe output that performs that move in one request, removing the old label and adding the new one. With allowed-transitions an agent may only move along the edges you declare, here triaged to planned; when an agent asks for new to done, the safe outputs job rejects it. Each workflow owns one edge: a triage agent sorts new issues, a plan label command starts a planner, an implement label command assigns Copilot, and merging the pull request finishes it. The human edges are label commands, and the minimum GitHub role that can apply a label is triage. So add triage to roles, which defaults to admin, maintainer and write, and community helpers can drive the whole process without push, merge or settings access, while read-only accounts cannot fire a command at all. The state lives on the issue, where people, boards and searches can see it.",
+        enter() {
+          t0 = 0;
+          cyc = -1;
+          skip = false;
+          reset();
+        },
+        onNext() {
+          if (seen >= SEQ.length - 1) return false;
+          skip = true;
+          return true;
+        },
+        tick(t) {
+          if (!t0) t0 = t;
+          if (skip) {
+            skip = false;
+            const u = (t - t0) % CYCLE;
+            const k = Math.max(0, Math.floor((u - START) / STEP) + 1);
+            t0 -= Math.max(0, START + k * STEP - u);
+          }
+          const e = t - t0,
+            c = Math.floor(e / CYCLE),
+            u = e % CYCLE;
+          if (c !== cyc) {
+            cyc = c;
+            reset();
+          }
+          const s = Math.min(SEQ.length - 1, Math.floor((u - START) / STEP));
+          if (s < 0) return;
+          const [edge, node, k, text] = SEQ[s],
+            f = (u - START - s * STEP) / STEP;
+          if (s !== seen) {
+            for (let j = seen + 1; j < s; j++) {
+              const [pe, pn] = SEQ[j];
+              if (pe) svg.querySelector(`#lsm_${pe}`).classList.add("seen");
+              if (pn) svg.querySelector(`#lsm_${pn}`).classList.add("seen");
+            }
+            svg.querySelectorAll(".lsm-n.on, .lsm-e.hot, .lsm-el.hot").forEach(x => {
+              x.classList.remove("on", "hot");
+              x.classList.add("seen");
+            });
+            no.classList.remove("on");
+            seen = s;
+            cap.textContent = text;
+            cap.className = `lsm-cap on ${edge && edge[0] === "x" ? "x" : k === "a" ? "a" : "h"}`;
+            if (edge) {
+              svg.querySelector(`#lsm_${edge}`).classList.add("hot");
+              svg.querySelector(`#lsm_${edge}t`).classList.add("hot");
+            }
+            if (k === "a") sfx.pop(s);
+            else sfx.review();
+          }
+          if (!edge) {
+            svg.querySelector(`#lsm_${node}`).classList.add("on");
+            place(NODES[node][0], NODES[node][1] - 72, k);
+            return;
+          }
+          const p = svg.querySelector(`#lsm_${edge}`),
+            rej = edge[0] === "x",
+            len = p.getTotalLength(),
+            stop = rej ? len * 0.66 : Math.max(0, len - 34),
+            pt = p.getPointAtLength(stop * ease(Math.min(1, Math.max(0, (f - 0.1) / 0.6))));
+          place(pt.x, pt.y, k);
+          if (f > 0.72) {
+            if (rej) {
+              if (!no.classList.contains("on")) (no.classList.add("on"), sfx.step(-1));
+            } else svg.querySelector(`#lsm_${node}`).classList.add("on");
+          }
+        },
+        el: h(
+          "section",
+          { class: "slide lsm" },
+          h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "LabelOps · replace-label · triage role"), h("h2", {}, letters("LabelOps "), letters("state machines", "l-grad"))),
+          h("div", { class: "lsm-board" }, svg, cap),
+          fm,
+          triage,
+          wins
+        ),
+      });
+    }
+
     // Repo Assist: the maintenance loop next to its backlog burndown
     resetIndex();
     const raCap = h("div", { class: "fm-cap ra-cap-flow" });
@@ -5682,7 +6401,7 @@
         ["a", "func newLoaderFactory() LoaderFactory { return defaultFactory{} }"],
         ["a", "func (defaultFactory) NewLoader() Loader { return loader{} }"],
         ["b", "func parseFlag(s string) bool {"],
-        ["b", "\treturn s == \"1\" || strings.EqualFold(s, \"true\")"],
+        ["b", '\treturn s == "1" || strings.EqualFold(s, "true")'],
         ["b", "}"],
         ["c", "func hasTag(tags []string, t string) bool {"],
         ["c", "\tfor _, x := range tags { if x == t { return true } }"],
@@ -5742,7 +6461,10 @@
         290,
         122,
         `<text class="t" x="0" y="16">FINDINGS BY KIND</text>` +
-          KINDS.map(([n, c, v], i) => `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`).join("")
+          KINDS.map(
+            ([n, c, v], i) =>
+              `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`
+          ).join("")
       );
       const aicSvg = svgEl(
         190,
@@ -5778,19 +6500,25 @@
         [2950, () => (scan.classList.remove("go"), scan.classList.add("end"))],
         ...FIND.map(([g], i) => [3000 + i * 700, () => (i || steps[2].classList.add("on"), grp(g).forEach(l => l.classList.add("hot")), cards[i].classList.add("on"), sfx.pop(i + 1))]),
         [5300, () => ((verdict.textContent = "COMMENT review · Lean: −12 lines possible."), verdict.classList.add("on"), sfx.notify(false))],
-        [6900, () => {
-          steps[3].classList.add("on");
-          lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
-          added.textContent = "+3";
-          sfx.pop(5);
-        }],
-        [8700, () => {
-          steps[4].classList.add("on");
-          cards.forEach(c => c.classList.add("dim"));
-          verdict.textContent = "/ponytail · Lean already. Ship.";
-          verdict.classList.add("ok");
-          sfx.pop(6);
-        }],
+        [
+          6900,
+          () => {
+            steps[3].classList.add("on");
+            lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
+            added.textContent = "+3";
+            sfx.pop(5);
+          },
+        ],
+        [
+          8700,
+          () => {
+            steps[4].classList.add("on");
+            cards.forEach(c => c.classList.add("dim"));
+            verdict.textContent = "/ponytail · Lean already. Ship.";
+            verdict.classList.add("ok");
+            sfx.pop(6);
+          },
+        ],
       ];
       let t0 = 0,
         cyc = -1,
@@ -8304,7 +9032,7 @@
     });
   }
 
-  // DeterministicOps: run history shows the same data-gathering calls in every run; audit flags them, they move from the agentic plan into deterministic steps:, and the next run spends fewer tokens
+  // DeterministicOps: run history shows the same prompt lines turning into the same data-gathering calls in every run; audit flags them, they become commands in deterministic steps: that write a file the agent reads, a dial swings from 100% agentic toward deterministic, and the next run spends fewer tokens
   {
     resetIndex();
     const VW = 1620,
@@ -8320,14 +9048,14 @@
       ["#1829", 12, "422k"],
       ["#1830", 9, "412k"],
     ];
-    // the agentic plan: [command, moves to steps:]
+    // the prompt, line by line: [prompt line, command it always became, moves to steps:, prompt once data is pre-fetched]
     const PLAN = [
-      ["gh pr list --merged --since 1d", 1],
-      ["gh pr view #N --json files ×14", 1],
-      ["jq 'group_by(.labels[0])'", 1],
-      ["count changed lines per area", 1],
-      ["read diffs · pick highlights", 0],
-      ["write summary → create-discussion", 0],
+      ["“list yesterday’s merged PRs”", "gh pr list --state merged", 1],
+      ["“fetch the files each one changed”", "gh pr view $N --json files", 1],
+      ["“group them by label”", "jq 'group_by(.labels[0])'", 1],
+      ["“count changed lines per area”", "jq -f areas.jq > areas.json", 1],
+      ["“read the diffs, pick highlights”", "", 0, "“read areas.json, pick highlights”"],
+      ["“write the summary as a discussion”", "", 0],
     ];
     const FINDS = [
       ["ed", "⚠ Partially Reducible To Deterministic"],
@@ -8338,7 +9066,10 @@
     const rowY = r => 130 + r * 50,
       detY = i => 178 + i * 38,
       agY = i => 392 + i * 38,
-      BW = 448;
+      agMY = i => 492 + i * 38,
+      BW = 448,
+      AG0 = 100,
+      AG1 = 29;
     let g = `<defs><marker id="dtoG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
       <marker id="dtoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
@@ -8378,9 +9109,11 @@
     // the workflow: deterministic steps: on top, the agent below
     g += `<g class="sfl-box" id="dtoWf"><rect class="sfl-card" x="570" y="76" width="500" height="556" rx="12"/><text class="sfl-title" x="586" y="104">daily-pr-summary.md</text>`;
     g += `<g class="dto-sec det" id="dtoDet"><rect x="586" y="120" width="468" height="200" rx="10"/><text x="602" y="144">steps: · deterministic · 0 tokens</text></g>`;
-    g += `<g class="dto-sec ag" id="dtoAg"><rect x="586" y="336" width="468" height="282" rx="10"/><text x="602" y="360">agent · reasoning only</text></g>`;
-    PLAN.forEach(([c], i) => {
-      g += `<g class="dto-row" id="dtoP${i}" style="transform: translate(0px, ${agY(i)}px)"><rect x="600" y="-20" width="440" height="32" rx="6"/><text class="c" x="614" y="2">${esc(c)}</text><text class="tg" x="1028" y="1">AGENT</text></g>`;
+    g += `<g class="dto-sec ag" id="dtoAg"><rect x="586" y="336" width="468" height="282" rx="10"/><text id="dtoAgT" x="602" y="360">prompt · agent runs every line</text></g>`;
+    // the file steps: leave for the agent, plus the slimmer prompt that reads it
+    g += `<g class="dto-file" id="dtoFile"><rect x="600" y="376" width="440" height="72" rx="8"/><text class="fp" x="614" y="402">/tmp/gh-aw/agent/areas.json</text><text class="tg" x="1028" y="401">FILE</text><text class="fj" x="614" y="430">{"cli": 1288, "docs": 412, "ci": 96}</text><text class="cap" x="820" y="598">the prompt keeps only the judgement</text></g>`;
+    PLAN.forEach(([p, c], i) => {
+      g += `<g class="dto-row" id="dtoP${i}" style="transform: translate(0px, ${agY(i)}px)"><rect x="600" y="-20" width="440" height="32" rx="6"/><text class="p" x="614" y="2">${esc(p)}</text><text class="c" x="614" y="2">${esc(c)}</text><text class="tg" x="1028" y="1">AGENT</text></g>`;
     });
     g += `</g>`;
     // the next run: same summary, fewer tokens
@@ -8399,6 +9132,35 @@
     svg.setAttribute("class", "fm-svg ao-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.innerHTML = g;
+    // dial: share of each run that is still agentic, 100% (left) to fully deterministic (right)
+    const DX = 310,
+      DY = 168,
+      DR = 150,
+      rot = v => `rotate(${(-180 * v) / 100} ${DX} ${DY})`;
+    let dg = `<defs><linearGradient id="dtoDialG" gradientUnits="userSpaceOnUse" x1="${DX - DR}" y1="0" x2="${DX + DR}" y2="0"><stop offset="0" stop-color="#ab7df8"/><stop offset="1" stop-color="#4493f8"/></linearGradient></defs>`;
+    dg += `<path d="M${DX - DR} ${DY} A${DR} ${DR} 0 0 1 ${DX + DR} ${DY}" fill="none" stroke="url(#dtoDialG)" stroke-width="22"/>`;
+    for (let k = 0; k <= 10; k++) {
+      const a = Math.PI * (k / 10),
+        mj = k % 5 === 0,
+        r0 = DR - 11,
+        r1 = DR + (mj ? 11 : 4);
+      dg += `<line class="tk${mj ? " mj" : ""}" x1="${DX + r0 * Math.cos(a)}" y1="${DY - r0 * Math.sin(a)}" x2="${DX + r1 * Math.cos(a)}" y2="${DY - r1 * Math.sin(a)}"/>`;
+    }
+    dg += `<line class="gh" id="dtoGhost" x1="${DX}" y1="${DY}" x2="${DX + DR - 20}" y2="${DY}" stroke="#c297ff" stroke-width="4" stroke-dasharray="6 6" transform="${rot(AG0)}"/>`;
+    dg += `<line id="dtoNeedle" x1="${DX}" y1="${DY}" x2="${DX + DR - 20}" y2="${DY}" stroke="#f0f6fc" stroke-width="5" stroke-linecap="round" transform="${rot(AG0)}"/><circle cx="${DX}" cy="${DY}" r="11" fill="#f0f6fc"/><circle cx="${DX}" cy="${DY}" r="4" fill="#0d1117"/>`;
+    dg += `<text class="end" x="${DX - DR}" y="${DY + 34}" fill="#c297ff">100% AGENTIC</text><text class="sub" x="${DX - DR}" y="${DY + 54}">the prompt does it all</text>`;
+    dg += `<text class="end" x="${DX + DR}" y="${DY + 34}" fill="#79c0ff">DETERMINISTIC</text><text class="sub" x="${DX + DR}" y="${DY + 54}">steps: only · 0 tokens</text>`;
+    dg += `<text class="rv" id="dtoDialV" x="${DX}" y="${DY + 56}">${AG0}%</text><text class="rl" x="${DX}" y="${DY + 78}">AGENTIC</text>`;
+    const dial = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    dial.setAttribute("class", "dto-dial");
+    dial.setAttribute("viewBox", "0 0 620 250");
+    dial.setAttribute("role", "img");
+    dial.setAttribute("aria-label", "Dial from 100% agentic to deterministic");
+    dial.innerHTML = dg;
+    const setDial = v => {
+      dial.querySelector("#dtoNeedle").setAttribute("transform", rot(v));
+      dial.querySelector("#dtoDialV").textContent = `${Math.round(v)}%`;
+    };
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".mra-dot");
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
@@ -8417,18 +9179,23 @@
     const place = moved => {
       let a = 0,
         d = 0;
-      PLAN.forEach(([, det], i) => {
+      PLAN.forEach(([p, , det, alt], i) => {
         const row = $("dtoP" + i),
-          y = moved && det ? detY(d++) : agY(moved ? a++ : i);
+          y = moved && det ? detY(d++) : moved ? agMY(a++) : agY(i);
         row.style.transform = `translate(0px, ${y}px)`;
         row.classList.toggle("det", moved && !!det);
         row.querySelector(".tg").textContent = moved && det ? "STEPS:" : "AGENT";
+        if (alt) row.querySelector(".p").textContent = moved ? alt : p;
       });
+      $("dtoAgT").textContent = moved ? "prompt · agent reasons only" : "prompt · agent runs every line";
+      $("dtoFile").classList.toggle("on", moved);
     };
     const reset = () => {
       svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
       svg.querySelectorAll(".fx.f").forEach(b => b.classList.replace("f", "t"));
       place(false);
+      setDial(AG0);
+      dial.querySelector("#dtoGhost").classList.remove("on");
       $("dtoAfter").setAttribute("width", BW);
       $("dtoAfterV").textContent = "412k";
       $("dtoTurns").textContent = "34";
@@ -8449,7 +9216,7 @@
     slides.push({
       group: "cost",
       notes:
-        "DeterministicOps: every run, workflow, command and number on this slide is illustrative and synthetic. Agentic workflows often spend most of their turns gathering data: listing pull requests, fetching files, grouping and counting. That work is the same on every run, and it does not need a model. Because every run is recorded as a unified session, we can look at the history: in the last 30 runs of this daily summary, the same four calls run in the same order before any reasoning starts. gh aw audit flags this as Partially Reducible To Deterministic, from the share of turns that only gather data. The fix is DeterministicOps: move those calls out of the agentic plan into the workflow's steps:, plain Actions steps that run before the agent and write their results to /tmp/gh-aw/agent/. They cost no tokens and give the same answer every time. The agent keeps only the reasoning, reading the diffs and writing the summary, so the next run makes the same summary with fewer turns and far fewer tokens. Agentic first, then mine the history and make the common parts deterministic.",
+        "DeterministicOps: every run, workflow, prompt line, command, file and number on this slide is illustrative and synthetic. Think of a dial: at one end a workflow is 100% agentic, where the prompt says everything and the model does everything; at the other end it is fully deterministic, plain Actions steps with no tokens at all. Agentic workflows often start at the agentic end and spend most of their turns gathering data: listing pull requests, fetching files, grouping and counting. That work is the same on every run, and it does not need a model. Because every run is recorded as a unified session, we can look at the history: in the last 30 runs of this daily summary, the same four prompt lines turn into the same four calls, in the same order, before any reasoning starts. gh aw audit flags this as Partially Reducible To Deterministic, from the share of turns that only gather data. The fix is DeterministicOps: translate those prompt lines into the commands they always became and put them in the workflow's steps:, plain Actions steps that run before the agent and write their results to a file, here /tmp/gh-aw/agent/areas.json. They cost no tokens and give the same answer every time. The prompt shrinks to the judgement: read areas.json, pick highlights and write the summary, so the dial swings from 100% agentic to about 29% and the next run makes the same summary with fewer turns and far fewer tokens. Agentic first, then mine the history and turn the dial towards deterministic where the work is always the same.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -8507,8 +9274,11 @@
             $("dtoAg").classList.add("on");
             PLAN.forEach((_, i) => $("dtoP" + i).classList.remove("hot"));
             place(true);
+            dial.querySelector("#dtoGhost").classList.add("on");
             sfx.compile();
           });
+        // the dial swings from all agentic toward deterministic as the next run settles
+        if (u >= P.MOVE[0]) setDial(AG0 - (AG0 - AG1) * ease(Math.min(1, (u - P.MOVE[0]) / (P.RES[0] + P.RES[1] - P.MOVE[0]))));
         if (u >= P.W1[0] && u < P.RES[0]) wire("dtoW1", ph("W1"));
         if (u >= P.RES[0]) {
           once("res", () => {
@@ -8523,7 +9293,468 @@
           if (f >= 1) once("big", () => $("dtoBig").classList.add("on"));
         }
       },
-      el: h("section", { class: "slide dto" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic → deterministic · mined from run history"), h("h2", {}, letters("Deterministic"), letters("Ops", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide dto" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic → deterministic · mined from run history"), h("h2", {}, letters("Deterministic"), letters("Ops", "l-grad"))),
+        dial,
+        svg
+      ),
+    });
+  }
+
+  // CLI vs MCP: a fat MCP call like list_code_scanning_alerts dumps every field of every alert into the context; with gh-proxy and cli-proxy the agent discovers CLIs with --help, writes the response to a file and pipes out only the answer
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 684;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // synthetic list_code_scanning_alerts response: one alert of many, every field into context
+    const CALL = '→ list_code_scanning_alerts {"state":"open"}';
+    const WALL = [
+      '← [{"number":1284,"state":"open","created_at":"…",',
+      '    "url":"…","html_url":"…","instances_url":"…",',
+      '    "rule":{"id":"js/sql-injection","severity":"error",',
+      '      "security_severity_level":"high","name":"…",',
+      '      "description":"Database query built from user-…",',
+      '      "tags":["security","external/cwe/cwe-089"]},',
+      '    "tool":{"name":"CodeQL","guid":null,"version":"…"},',
+      '    "most_recent_instance":{"ref":"refs/heads/main",',
+      '      "analysis_key":"…","environment":"{}","state":"open",',
+      '      "commit_sha":"…","classifications":[],',
+      '      "message":{"text":"This query depends on a user-…"},',
+      '      "location":{"path":"src/db.js","start_line":42,',
+      '        "end_line":42,"start_column":9,"end_column":31}}},',
+      '   {"number":1283,"state":"open", … × every alert',
+      "→ page 2 · page 3 · … every page into context",
+    ];
+    const BINS = [
+      ["gh", "gh-proxy · pre-authenticated, no MCP"],
+      ["safeoutputs", "cli-proxy · via the MCP gateway"],
+      ["docs-search", "cli-proxy · via the MCP gateway"],
+    ];
+    // discover with --help, write the response to a file, pipe out only the answer
+    const SHELL = [
+      ["cmd", "$ gh help | grep api"],
+      ["", "  api:  Make an authenticated GitHub API request"],
+      ["cmd", "$ gh api --help | grep paginate"],
+      ["", "  --paginate   fetch all pages of results"],
+      ["cmd", "$ gh api --paginate \\"],
+      ["cmd", "  repos/{owner}/{repo}/code-scanning/alerts > alerts.json"],
+      ["ok", "✓ every alert, every page on disk · 0 lines in context"],
+      ["cmd", "$ jq -r '.[].rule.severity' alerts.json | sort | uniq -c"],
+      ["", "     12 error"],
+      ["", "     85 warning"],
+      ["cmd", "$ jq -r '.[].most_recent_instance.location.path' \\"],
+      ["cmd", "  alerts.json | sort | uniq -c | sort -rn | head -2"],
+      ["", "      9 src/db.js"],
+      ["", "      3 src/api/user.js"],
+    ];
+    let g = `<defs><marker id="cvmG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
+      <marker id="cvmC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 600, "MCP · RESPONSE INTO CONTEXT"],
+      [600, 1020, "FRONT MATTER"],
+      [1020, VW, "BASH · DISCOVER · FILES · PIPES"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="cvmLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    g += `<path class="fm-wire" id="cvmW0" d="M584 450 C 606 450, 594 230, 614 230" stroke="#d29922" marker-end="url(#cvmG)"/>`;
+    g += `<path class="fm-wire" id="cvmW1" d="M1004 400 C 1026 400, 1014 180, 1034 180" stroke="#3fb950" marker-end="url(#cvmC)"/>`;
+    // what ends up in the context: qualitative, synthetic
+    const ctx = (x, id, col, txt) =>
+      `<g class="cvm-ctx" id="${id}"><text class="cvm-k" x="${x + 16}" y="572">IN CONTEXT</text>` +
+      `<rect x="${x + 16}" y="582" width="536" height="38" rx="8" stroke="${col}"/><text x="${x + 32}" y="607" fill="${col}">${esc(txt)}</text></g>`;
+    // MCP: one fat call; the whole response, every page, goes straight into the context
+    g += `<g class="sfl-box" id="cvmMcp"><rect class="sfl-card" x="16" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="32" y="104">agent context · github: local</text>`;
+    g += `<text class="cvm-k" x="32" y="136">TOOL CALL</text>`;
+    g += `<g class="cvm-ln" id="cvmC0"><text class="cmd" x="32" y="162">${esc(CALL)}</text></g>`;
+    g += `<text class="cvm-k" x="32" y="196">RESPONSE · STRAIGHT INTO CONTEXT</text>`;
+    WALL.forEach((t, i) => (g += `<g class="cvm-ln cvm-js" id="cvmT${i}"><text class="${i === WALL.length - 1 ? "ed" : ""}" x="32" y="${222 + i * 22}">${esc(t)}</text></g>`));
+    g += ctx(16, "cvmXm", "#d29922", "every field of every alert, every page") + `</g>`;
+    // front matter: two lines move GitHub reads to gh and mount every MCP server as a CLI
+    g += `<g class="sfl-box" id="cvmFm"><rect class="sfl-card" x="616" y="76" width="388" height="556" rx="12"/><text class="sfl-title" x="632" y="104">.github/workflows/triage.md</text>`;
+    g += `<rect class="cvm-hl" id="cvmH0" x="626" y="186" width="368" height="30" rx="6"/><rect class="cvm-hl" id="cvmH1" x="626" y="218" width="368" height="30" rx="6"/>`;
+    g += `<g class="cvm-yaml"><text x="636" y="142"><tspan class="k">tools:</tspan></text><text x="636" y="174"><tspan class="k">  github:</tspan></text>`;
+    g += `<text x="636" y="208"><tspan class="k">    mode: </tspan><tspan class="v" id="cvmV0">local</tspan></text>`;
+    g += `<text x="636" y="240"><tspan class="k">  cli-proxy: </tspan><tspan class="v" id="cvmV1">false</tspan></text></g>`;
+    g += `<text class="cvm-k" x="632" y="292">ON PATH · SAME SERVERS</text>`;
+    BINS.forEach(([n, d], i) => {
+      const y = 306 + i * 64;
+      g += `<g class="cvm-bin" id="cvmB${i}"><rect x="632" y="${y}" width="356" height="54" rx="8"/><text class="n" x="648" y="${y + 24}">${n}</text><text class="d" x="648" y="${y + 44}">${esc(d)}</text></g>`;
+    });
+    g += `<g class="dto-big" id="cvmBig"><text x="810" y="560">--help</text><text class="dto-cap" x="810" y="600">CLIs describe themselves</text></g></g>`;
+    // bash: the agent discovers the CLI, writes the response to a file and pipes out only the answer
+    g += `<g class="sfl-box" id="cvmCli"><rect class="sfl-card" x="1036" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="1052" y="104">agent shell · gh-proxy + cli-proxy</text>`;
+    g += `<text class="cvm-k" x="1052" y="136">PROMPT · ONE LINE PER CLI</text>`;
+    g += `<g class="cvm-ln" id="cvmP"><text x="1052" y="162">gh · safeoutputs · docs-search · run <tspan class="cmd">--help</tspan></text></g>`;
+    g += `<text class="cvm-k" x="1052" y="196">SHELL · DISCOVER → FILE → PIPES</text>`;
+    // highlight files and pipe stages
+    const pipe = t =>
+      esc(t)
+        .replace(/(&gt; )?[\w-]+\.json/g, m => `<tspan class="fl">${m}</tspan>`)
+        .replace(/\b(jq|head|sort|uniq|grep)\b/g, m => `<tspan class="jq">${m}</tspan>`)
+        .replace(/ \| /g, ` <tspan class="jq">|</tspan> `);
+    SHELL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmS${i}"><text class="${c}" x="1052" y="${222 + i * 24}">${pipe(t)}</text></g>`));
+    g += ctx(1036, "cvmXc", "#3fb950", "two help lines · two counts · two paths") + `</g>`;
+    g += `<text class="cvm-k cvm-cap" x="${VW / 2}" y="672">MEASURED, schemas only · 1 workflow, MCP → gh-proxy, 15 runs/side, 23 Aug – 3 Sep 2026 · first request 16.7k → 12.8k tokens, whole run ≈ same · snapshot 17 Nov 2026</text>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const clamp = u => Math.min(1, Math.max(0, u));
+    // phases: [start ms, duration ms]
+    const P = { CALL: [400, 500], SCH: [1100, 3000], W0: [4400, 700], FLIP: [5100, 700], BIN: [5800, 1200], W1: [7100, 700], SH: [7800, 3600], BIG: [11600, 1] };
+    const CYC = 15600;
+    let t0 = 0,
+      cyc = -1,
+      done = new Set();
+    const once = (k, fn) => {
+      if (!done.has(k)) {
+        done.add(k);
+        fn();
+      }
+    };
+    const reveal = (ids, f, snd) =>
+      ids.forEach((id, i) => {
+        if (f >= (i + 0.2) / ids.length && !$(id).classList.contains("on")) {
+          $(id).classList.add("on");
+          if (snd) snd(i);
+        }
+      });
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .gone").forEach(x => x.classList.remove("on", "hot", "gone"));
+      $("cvmV0").textContent = "local";
+      $("cvmV1").textContent = "false";
+      done = new Set();
+      $("cvmLane0").classList.add("on");
+      $("cvmMcp").classList.add("on");
+    };
+    const wire = (id, f) => {
+      const path = $(id),
+        n = path.getTotalLength(),
+        q = path.getPointAtLength(n * ease(Math.min(1, f / 0.85)));
+      path.classList.add("hot");
+      dot.style.opacity = 1;
+      dot.setAttribute("cx", q.x);
+      dot.setAttribute("cy", q.y);
+      dot.setAttribute("fill", id === "cvmW0" ? "#d29922" : "#3fb950");
+    };
+    const shellIds = ["cvmP", ...SHELL.map((_, i) => "cvmS" + i)];
+    slides.push({
+      group: "cost",
+      notes:
+        "CLI vs MCP: the workflow, alerts, counts, files and paths on this slide are illustrative and synthetic; only the caption's figures are measured. Take a fat API call such as listing a repository's code scanning alerts. Through the GitHub MCP server, list_code_scanning_alerts returns every alert as a full JSON object, rule, tool, latest instance, location, message and links, and the whole response goes straight into the context, page after page. A bigger repository means a fuller context, and the agent has nowhere else to put it. Two front matter lines change the surface without changing what the agent can reach. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. Now the agent works in bash. It discovers what it needs by itself: the prompt has one line per command, and gh help, gh api --help or any server's --help explain the rest, a few lines at a time. It writes the full response to a file, every alert and every page, and none of it enters the context. Then pipes pull out only the answer: jq picks fields, sort and uniq count by severity and by file, head keeps the top two. The data grows on disk, not in the context, and the agent can query the same file again without fetching it again. The caption is the one thing we measured, and it is about tool schemas only: one gh-aw workflow that switched from the GitHub MCP server to gh-proxy plus cli-proxy, same model, 15 runs on each side between 23 August and 3 September 2026, had a median first request of 16,690 tokens before and 12,766 after, while its whole-run tokens and AI credits stayed within a few percent. A larger, confounded switch of 21 workflows swung from minus 78 to plus 123 percent per workflow, so we show no run-level number. Snapshot taken 17 November 2026. Both modes need bash; strict workflows with bash disabled stay on MCP.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        const ph = k => clamp((u - P[k][0]) / P[k][1]);
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        dot.style.opacity = 0;
+        // one fat call
+        if (u >= P.CALL[0]) once("call", () => (sfx.key(), $("cvmC0").classList.add("on")));
+        // its whole response floods the context
+        if (u >= P.SCH[0]) {
+          reveal(
+            WALL.map((_, i) => "cvmT" + i),
+            ph("SCH"),
+            i => i % 3 === 0 && sfx.pop(i / 3)
+          );
+          if (ph("SCH") >= 1) $("cvmXm").classList.add("on");
+        }
+        if (u >= P.W0[0] && u < P.FLIP[0]) wire("cvmW0", ph("W0"));
+        // two front matter lines flip the surface
+        if (u >= P.FLIP[0])
+          once("flip", () => {
+            $("cvmLane1").classList.add("on");
+            $("cvmFm").classList.add("on");
+            $("cvmV0").textContent = "gh-proxy";
+            $("cvmV1").textContent = "true";
+            ["cvmV0", "cvmV1", "cvmH0", "cvmH1"].forEach(id => $(id).classList.add("on"));
+            svg.querySelectorAll("#cvmMcp .cvm-ln").forEach(x => x.classList.add("gone"));
+            sfx.compile();
+          });
+        if (u >= P.BIN[0])
+          reveal(
+            BINS.map((_, i) => "cvmB" + i),
+            ph("BIN"),
+            i => sfx.pop(4 + i)
+          );
+        if (u >= P.W1[0] && u < P.SH[0]) wire("cvmW1", ph("W1"));
+        // discover with --help, write the file, pipe out the answer
+        if (u >= P.SH[0]) {
+          once("sh", () => {
+            $("cvmLane2").classList.add("on");
+            $("cvmCli").classList.add("on");
+          });
+          const f = ph("SH");
+          reveal(shellIds, f, i => i % 2 === 0 && sfx.pop(i / 2));
+          if (f >= 1) $("cvmXc").classList.add("on");
+        }
+        if (u >= P.BIG[0])
+          once("big", () => {
+            $("cvmBig").classList.add("on");
+            sfx.pop(7);
+          });
+      },
+      el: h(
+        "section",
+        { class: "slide cvm" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · bash, files and pipes, not context"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))),
+        svg
+      ),
+    });
+  }
+
+  // Inlined Skills & Agents: split a monolithic prompt into a short plan, deferred skills and focused agents on smaller models
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 648;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const clamp = u => Math.max(0, Math.min(1, u));
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // synthetic issue-triage prompt: [role, monolith label, inlined label, height in the monolith, y once inlined]
+    const BLK = [
+      ["core", "Plan · read the issue, decide, report", "plan · read, decide, report", 52, 112],
+      ["skill", "Label taxonomy · every label explained", "## skill: `labels`", 92, 228],
+      ["skill", "Triage checklist · bug, feature, question", "## skill: `triage-rules`", 84, 288],
+      ["skill", "Report template · sections and tone", "## skill: `report-template`", 76, 348],
+      ["agent", "Summarize every linked pull request", "## agent: `summarizer`", 76, 464],
+      ["agent", "Search for duplicate issues", "## agent: `dedup`", 68, 524],
+    ];
+    const TAG = { core: "ALWAYS", skill: "ON DEMAND", agent: "SMALL MODEL" },
+      HOT = { core: "ALWAYS", skill: "LOADED", agent: "RUNNING" };
+    // Loaded skills remain in the main context; delegated jobs have separate contexts.
+    const TURNS = [
+      [[0], 0],
+      [[0, 2], 0],
+      [[4], 1],
+      [[5], 1],
+      [[0, 2, 1], 0],
+      [[0, 2, 1, 3], 0],
+    ];
+    const AX = 36,
+      AW = 448,
+      BX = 556,
+      BW = 488,
+      BH = 48,
+      AY = [];
+    BLK.reduce((y, b) => (AY.push(y), y + b[3] + 6), 122);
+    const S = 180 / BLK.reduce((s, b) => s + b[3], 0),
+      barX = i => 1130 + i * 78,
+      BASE = [300, 588];
+    let g = `<defs><pattern id="isaH" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2840"/><rect width="3" height="8" fill="#ffa657"/></pattern></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "MONOLITHIC PROMPT"],
+      [520, 1080, "INLINED SKILLS & AGENTS"],
+      [1080, VW, "CONTEXT PER TURN"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="isaLane${i}" x="${(x0 + x1) / 2}" y="40">${esc(t)}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    // the monolith: one file, every section in context on every turn
+    g += `<g class="isa-box isa-mono" id="isaMono"><rect class="isa-card" x="16" y="76" width="488" height="560" rx="12"/><text class="isa-t" x="32" y="104">issue-triage.md</text><text class="isa-chip" x="488" y="104">model: large</text>`;
+    BLK.forEach((b, i) => (g += `<rect class="isa-gh" x="${AX}" y="${AY[i]}" width="${AW}" height="${b[3]}" rx="8"/>`));
+    g += `<text class="isa-cap" x="260" y="624">all of it · in context · every turn</text></g>`;
+    // the same file, inlined: a short plan, skills on demand, agents on a smaller model
+    [
+      ["core", 76, 100, "PROMPT · ALWAYS LOADED"],
+      ["skill", 192, 220, "## skill: · BODY LOADS WHEN INVOKED"],
+      ["agent", 428, 160, "## agent: · OWN CONTEXT · SMALLER MODEL"],
+    ].forEach(([r, y, ht, t]) => (g += `<g class="isa-sec ${r}"><rect x="540" y="${y}" width="520" height="${ht}" rx="10"/><text x="556" y="${y + 24}">${esc(t)}</text></g>`));
+    g += `<text class="isa-cap" x="800" y="624">one Markdown file · blocks extracted at runtime</text>`;
+    BLK.forEach(([r, a, b, ht], i) => {
+      g += `<g class="isa-blk ${r}" id="isaB${i}" transform="translate(${AX} ${AY[i]})"><rect class="b" x="0" y="0" width="${AW}" height="${ht}" rx="8"/>`;
+      for (let j = 0; 44 + j * 12 < ht - 6; j++) g += `<rect class="ln" x="16" y="${40 + j * 12}" width="${Math.round((AW - 32) * (0.55 + ((i * 3 + j * 5) % 9) / 22))}" height="5" rx="2.5"/>`;
+      g += `<text class="n a" x="16" y="30">${esc(a)}</text><text class="n b" x="16" y="30" opacity="0">${esc(b)}</text><text class="tg" x="${BW - 16}" y="30" opacity="0">${TAG[r]}</text></g>`;
+    });
+    // context per turn: the whole prompt on a large model, then core plus what each turn needs
+    [
+      [76, 270, "BEFORE · whole prompt, every turn"],
+      [362, 274, "AFTER · defer skills, delegate jobs"],
+    ].forEach(([y, ht, t]) => (g += `<g class="isa-box"><rect class="isa-card" x="1100" y="${y}" width="504" height="${ht}" rx="12"/><text class="isa-t" x="1116" y="${y + 28}">${esc(t)}</text></g>`));
+    const stack = (blocks, base, sm) => {
+      let y = base,
+        s = "";
+      blocks.forEach(k => {
+        const ht = BLK[k][3] * S;
+        y -= ht;
+        s += `<rect class="isa-seg ${BLK[k][0]}${sm ? " sm" : ""}" x="0" y="${y.toFixed(1)}" width="50" height="${ht.toFixed(1)}"/>`;
+      });
+      return s;
+    };
+    TURNS.forEach(([blocks, sm], i) => {
+      const x = barX(i);
+      g += `<g class="isa-bar bef" id="isaPb${i}" transform="translate(${x} ${BASE[0]}) scale(1 0)"><g transform="translate(0 ${-BASE[0]})">${stack([0, 1, 2, 3, 4, 5], BASE[0], 0)}</g></g>`;
+      g += `<text class="isa-ml bef" id="isaMb${i}" x="${x + 25}" y="${BASE[0] + 24}">large</text>`;
+      g += `<rect class="isa-ghost" x="${x}" y="${BASE[1] - 180}" width="50" height="180"/>`;
+      g += `<g class="isa-bar aft" id="isaPa${i}" transform="translate(${x} ${BASE[1]}) scale(1 0)"><g transform="translate(0 ${-BASE[1]})">${stack(blocks, BASE[1], sm)}</g></g>`;
+      g += `<text class="isa-ml aft${sm ? " sm" : ""}" id="isaMa${i}" x="${x + 25}" y="${BASE[1] + 24}">${sm ? "small" : "large"}</text>`;
+    });
+    g += `<g class="isa-take" id="isaTake"><rect x="28" y="260" width="464" height="216" rx="12" fill="#0d1117"/><text class="b" x="260" y="318">Less upfront context.</text><text class="b" x="260" y="358">Right-sized models.</text>`;
+    g += `<text class="s" x="260" y="412" fill="#79c0ff">skills load when needed</text><text class="s" x="260" y="442" fill="#ffa657">small models handle narrow jobs</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg isa-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id);
+    const blks = BLK.map((_, i) => {
+      const el = $("isaB" + i);
+      return { el, rect: el.querySelector("rect.b"), lines: el.querySelectorAll(".ln"), a: el.querySelector(".n.a"), b: el.querySelector(".n.b"), tg: el.querySelector(".tg") };
+    });
+    const bef = TURNS.map((_, i) => [$("isaPb" + i), $("isaMb" + i)]),
+      aft = TURNS.map((_, i) => [$("isaPa" + i), $("isaMa" + i)]);
+    const grow = ([bar, label], i, f, base) => {
+      bar.setAttribute("transform", `translate(${barX(i)} ${base}) scale(1 ${f.toFixed(3)})`);
+      label.classList.toggle("on", f > 0.5);
+    };
+    // step 0: the monolith on every turn; 1: the same file inlined; 2: one run, turn by turn
+    const SPLIT = 1300,
+      T_AFT = 900,
+      T_TURN = 800;
+    let step = 0,
+      at = null,
+      last = 0,
+      q = 0,
+      instant = false,
+      played = new Set();
+    const once = (k, fn) => {
+      if (!played.has(k)) {
+        played.add(k);
+        fn();
+      }
+    };
+    // Measured on gh-aw; refresh/inlined-skills-agents.mjs reproduces this snapshot.
+    const EXAMPLES = [
+      ["code-simplifier", 4, 2, "Haiku 4.5", 28, 30],
+      ["pr-code-quality-reviewer", 1, 1, "model: small", 948, 1093],
+      ["github-mcp-tools-report", 1, 2, "model: small", 6, 6],
+    ];
+    const measured = h(
+      "div",
+      { class: "isa-measured", role: "region", "aria-label": "Measured inline skills and agents usage on gh-aw" },
+      h("div", { class: "isa-inventory" }, h("b", {}, "41 / 291 AWs"), h("p", {}, "with inline blocks"), h("p", {}, "21 skills · 62 agents"), h("p", {}, h("em", {}, "5 workflows use both"))),
+      EXAMPLES.map(([name, skills, agents, model, succeeded, total]) =>
+        h(
+          "div",
+          { class: "isa-example" },
+          h("h3", {}, name),
+          h("p", {}, h("span", { class: "skills" }, `${skills} skill${skills === 1 ? "" : "s"}`), " · ", h("span", { class: "agents" }, `${agents} agent${agents === 1 ? "" : "s"}`)),
+          h("p", {}, model),
+          h("b", { class: "runs" }, `${succeeded.toLocaleString("en-US")} / ${total.toLocaleString("en-US")}`, " ", h("small", {}, "runs succeeded"))
+        )
+      )
+    );
+    slides.push({
+      group: "cost",
+      notes:
+        "Inlined skills and agents: the workflow, prompt sections, turns and bar heights in the diagram are illustrative and synthetic, not measured savings. The bars show instruction context only, omitting conversation history, tool results and skill descriptions; they are not a billing estimate. A monolithic prompt puts every instruction in context from the start: the plan, label taxonomy, triage checklist, report template and instructions for side jobs. Split the same Markdown file without creating new files. Keep the main prompt as a short plan. Move verbose checklists, taxonomies and templates into ## skill: blocks: at runtime they are extracted to the engine's skill folder, so the agent sees a short description up front and loads a body only when needed. Loaded skill instructions remain in the conversation; they are not automatically unloaded after a turn. Move narrow jobs into ## agent: blocks with their own context and model front matter. Explicitly select a smaller model for suitable jobs while the main model keeps the decisions. Deferred skills reduce upfront context and delegation can lower inference cost; actual savings depend on pricing, caching and delegation overhead. The bottom strip is measured on gh-aw, snapshot 17 November 2026: 41 of 291 top-level non-smoke workflow Markdown files on main directly declare inline blocks, 13 with skills, 33 with agents, 5 with both; 21 skill blocks and 62 agent blocks. Shared imports and smoke tests are excluded. Code Simplifier declares four language skills and two Haiku 4.5 agents, scope-filter and simplification-scout. PR Code Quality Reviewer declares the review-publication skill and the grumpy-coder agent with model: small. GitHub MCP Tools Report declares its guidelines skill and two model: small agents, tool-list-diff and tool-doc-writer. In the 30 complete UTC days from 18 October to 16 November 2026, their Actions runs succeeded 28 of 30, 948 of 1,093 and 6 of 6 respectively. These are whole-workflow conclusions, not skill or sub-agent invocation counts or evidence of measured savings. Current declarations were not necessarily present in every historical run. Keys: → split the prompt, → run the turns.",
+      enter(dir) {
+        step = dir < 0 ? 2 : 0;
+        instant = dir < 0;
+        q = instant ? 1 : 0;
+        at = null;
+        last = 0;
+        played = new Set();
+      },
+      onNext() {
+        if (step >= 2) return false;
+        step++;
+        instant = false;
+        at = null;
+        if (step === 1) sfx.compile();
+        return true;
+      },
+      onPrev() {
+        if (!step) return false;
+        step--;
+        instant = true;
+        at = null;
+        return true;
+      },
+      tick(t) {
+        if (at === null) at = t;
+        const dt = last ? Math.min(50, t - last) : 0,
+          e = t - at;
+        last = t;
+        svg.classList.toggle("s1", step >= 1);
+        svg.classList.toggle("s2", step >= 2);
+        $("isaMono").classList.toggle("on", step === 0);
+        $("isaLane0").classList.toggle("on", step === 0);
+        $("isaLane1").classList.toggle("on", step >= 1);
+        $("isaLane2").classList.add("on");
+        // the blocks glide between the monolith and their inlined sections
+        q = clamp(q + ((step >= 1 ? 1 : -1) * dt) / SPLIT);
+        blks.forEach((b, i) => {
+          const p = ease(clamp((q * SPLIT - i * 90) / (SPLIT - 5 * 90))),
+            x = AX + (BX - AX) * p,
+            y = AY[i] + (BLK[i][4] - AY[i]) * p;
+          b.el.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+          b.rect.setAttribute("width", (AW + (BW - AW) * p).toFixed(1));
+          b.rect.setAttribute("height", (BLK[i][3] + (BH - BLK[i][3]) * p).toFixed(1));
+          const fade = clamp(1 - p * 2);
+          b.lines.forEach(l => l.setAttribute("opacity", fade));
+          b.a.setAttribute("opacity", clamp(1 - p * 1.6));
+          b.b.setAttribute("opacity", clamp(p * 1.6 - 0.6));
+          b.tg.setAttribute("opacity", clamp(p * 1.6 - 0.6));
+        });
+        // before: the whole prompt rides along on every turn
+        bef.forEach((x, i) => {
+          const f = step >= 1 || instant ? 1 : ease(clamp((e - 300 - i * 450) / 350));
+          grow(x, i, f, BASE[0]);
+          if (f > 0 && !instant && step === 0) once("b" + i, () => sfx.pop(i));
+        });
+        // after: separate sub-agent contexts, with skills accumulating in the main conversation
+        const k = step === 2 && !instant ? Math.floor((e - T_AFT) / T_TURN) : -1;
+        aft.forEach((x, i) => {
+          const f = step < 2 ? 0 : instant ? 1 : ease(clamp((e - T_AFT - i * T_TURN) / 400));
+          grow(x, i, f, BASE[1]);
+          if (f > 0 && !instant) once("a" + i, () => sfx.pop(2 + i));
+        });
+        const hot = new Set(k >= 0 && k < TURNS.length ? TURNS[k][0] : []);
+        blks.forEach((b, i) => {
+          const on = hot.has(i);
+          if (b.el.classList.contains("hot") !== on) {
+            b.el.classList.toggle("hot", on);
+            b.tg.textContent = (on ? HOT : TAG)[BLK[i][0]];
+          }
+        });
+        const take = step === 2 && (instant || e >= T_AFT + TURNS.length * T_TURN);
+        if (take && !$("isaTake").classList.contains("on") && !instant) sfx.key();
+        $("isaTake").classList.toggle("on", take);
+      },
+      el: h(
+        "section",
+        { class: "slide isa" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Progressive disclosure · right-sized models"), h("h2", {}, letters("Inlined", "l-grad"), " ", letters("Skills & Agents"))),
+        svg,
+        measured,
+        h(
+          "p",
+          { class: "isa-caption" },
+          "MEASURED · runs 18 Oct–16 Nov 2026 UTC (30 d) · source snapshot 17 Nov · direct declarations; smoke tests & imports excluded",
+          h("br"),
+          "Workflow success ≠ skill invocation or measured savings · diagram illustrative"
+        )
+      ),
     });
   }
 
@@ -9191,6 +10422,339 @@
     });
   }
 
+  // Fuzzy schedules: 111 daily workflows pinned to 0 0 * * * spike in one minute, then scatter to their measured hashed times (hours 00–01 skipped, 02–05 preferred, quarter-hour minutes avoided); All You Can Eat wakes every 30 minutes and skips while its one plate is open
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // MEASURED: compiled UTC hour and minute of gh-aw's 111 `daily` / `daily on weekdays` workflows, snapshot 17 Nov 2026 (refresh/fuzzy-schedules.sh)
+    const HOURS = [0, 0, 7, 13, 8, 17, 4, 3, 7, 4, 3, 6, 3, 2, 4, 5, 0, 3, 5, 3, 6, 1, 3, 4];
+    const MINS = [0, 0, 0, 0, 0, 2, 4, 7, 3, 4, 0, 6, 0, 0, 0, 0, 0, 0, 0, 5, 5, 6, 1, 5, 4, 2, 8, 0, 0, 0, 0, 0, 0, 0, 1, 3, 4, 5, 5, 4, 5, 5, 0, 0, 0, 0, 0, 0, 0, 4, 3, 4, 1, 2, 3, 0, 0, 0, 0, 0];
+    const N = HOURS.reduce((a, b) => a + b, 0);
+    const X0 = 30,
+      CW = 34,
+      AX = 470,
+      MW = 13.6,
+      MB = 580,
+      cx = hr => X0 + hr * CW + CW / 2;
+    // spike: every dot in the 00:00 column; fuzzy: each dot in its measured hour column
+    const SPOT = [],
+      FPOT = [];
+    HOURS.forEach((n, hr) => {
+      for (let j = 0; j < n; j++) FPOT.push([cx(hr) + (j % 2 ? 6.5 : -6.5), AX - 9 - Math.floor(j / 2) * 13]);
+    });
+    for (let k = 0; k < N; k++) SPOT.push([cx(0) + ((k % 3) - 1) * 10, AX - 8 - Math.floor(k / 3) * 10]);
+    let g = `<defs><pattern id="fzsHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2814"/><line x1="0" y1="0" x2="0" y2="8" stroke="#db6d28" stroke-width="2" opacity=".55"/></pattern>
+      <clipPath id="fzsClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
+    // left: the schedule line, its mode, and the hash that picks a stable time
+    g += `<text class="fzs-lbl" x="0" y="16">SCHEDULE · ${N} DAILY WORKFLOWS</text>`;
+    g += `<text class="fzs-code fix" x="0" y="58">schedule: "0 0 * * *"</text><text class="fzs-code fuz" x="0" y="58">schedule: daily</text>`;
+    g += `<text class="fzs-mode fix" x="846" y="56">FIXED · one minute for all</text><text class="fzs-mode fuz" x="846" y="56">FUZZY · hashed per workflow</text>`;
+    g += `<text class="fzs-hash" x="0" y="98">hash(owner/repo/.github/workflows/x.md) → 04:37 UTC · stable</text>`;
+    // fuzzy windows: 00–01 never chosen, 02–05 weighted ×3
+    g += `<g class="fzs-band no"><rect x="${X0}" y="128" width="${2 * CW}" height="${AX - 124}" rx="6"/><text x="${X0 + CW}" y="150">00–01</text><text x="${X0 + CW}" y="168">skipped</text></g>`;
+    g += `<g class="fzs-band best"><rect x="${X0 + 2 * CW}" y="128" width="${4 * CW}" height="${AX - 124}" rx="6"/><text x="${X0 + 4 * CW}" y="150">02–05 UTC</text><text x="${X0 + 4 * CW}" y="168">preferred ×3</text></g>`;
+    // more syntaxes, each with a real compiled cron from a gh-aw lock file; only `every N days` and raw cron stay fixed
+    const SYN = [
+      ["every 30 minutes", "27/30 * * * *", "start minute"],
+      ["hourly", "24 */1 * * *", "minute"],
+      ["every 6h", "25 */6 * * *", "minute"],
+      ["daily on weekdays", "11 14 * * 1-5", "time · Mon–Fri"],
+      ["daily around 10:00", "22 10 * * *", "±1 h window"],
+      ["weekly on monday", "22 3 * * 1", "time"],
+      ["every 7 days", "0 0 */7 * *", "FIXED", 1],
+    ];
+    g += `<g class="fzs-syn"><text class="h" x="290" y="150">MORE SYNTAX → COMPILED</text><text class="h t" x="846" y="150">SCATTERED</text>`;
+    SYN.forEach(([src, cron, what, fix], i) => {
+      const y = 178 + i * 25;
+      g += `<g${fix ? ' class="fix"' : ""}><text class="s" x="290" y="${y}">${src}</text><text class="a" x="474" y="${y}">→</text><text x="498" y="${y}">${cron}</text><text class="t" x="846" y="${y}">${what}</text></g>`;
+    });
+    g += `</g>`;
+    g += `<line class="fzs-axis" x1="${X0}" y1="${AX + 4}" x2="${X0 + 24 * CW}" y2="${AX + 4}"/>`;
+    for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzs-hr" x="${cx(hr)}" y="494">${String(hr).padStart(2, "0")}</text>`;
+    g += `<text class="fzs-hr" x="${X0 + 24 * CW}" y="494" text-anchor="end">UTC hour</text>`;
+    HOURS.forEach((n, hr) => {
+      if (n) g += `<text class="fzs-n" x="${cx(hr)}" y="${AX - 9 - (Math.ceil(n / 2) - 1) * 13 - 14}">${n}</text>`;
+    });
+    for (let k = 0; k < N; k++) g += `<circle class="fzs-dot" r="4.5" cx="${SPOT[k][0]}" cy="${SPOT[k][1]}" opacity="0"/>`;
+    g += `<g class="fzs-spike" id="fzsS"><line x1="${cx(0) + 20}" y1="104" x2="104" y2="104"/><text x="112" y="110">${N} runs · 00:00 UTC · the same minute</text><text class="d" x="112" y="136">→ token-API bursts · rate limits · queued runners</text></g>`;
+    // minute ruler: avoided zones hatched, measured minutes as bars
+    g += `<g class="fzs-min"><text x="${X0 + 24 * CW}" y="520" text-anchor="end">minute · hatched = avoided: hour edges · US :15 :45 · EU :30</text>`;
+    for (const [a, b] of [[0, 4], [12, 18], [27, 33], [42, 48], [55, 59]]) g += `<rect class="no" x="${X0 + a * MW}" y="530" width="${(b - a + 1) * MW}" height="${MB - 530}" rx="3"/>`;
+    MINS.forEach((n, m) => {
+      if (n) g += `<rect class="b" x="${X0 + m * MW + 2}" y="${MB - n * 6}" width="${MW - 4}" height="${n * 6}" rx="2"/>`;
+    });
+    g += `<line class="fzs-axis" x1="${X0}" y1="${MB + 2}" x2="${X0 + 60 * MW}" y2="${MB + 2}"/>`;
+    for (const m of [0, 15, 30, 45]) g += `<text x="${X0 + m * MW + MW / 2}" y="602" text-anchor="middle">:${String(m).padStart(2, "0")}</text>`;
+    g += `</g>`;
+    // right: the All You Can Eat loop
+    const RX = 950,
+      CH = 10.8;
+    g += `<text class="fzs-lbl" x="${RX}" y="16">ALL YOU CAN EAT · ONE PLATE AT A TIME</text>`;
+    g += `<rect class="fzs-card" x="${RX - 20}" y="34" width="670" height="184" rx="14"/>`;
+    const Y = [
+      [0, `<tspan class="k">on:</tspan>`],
+      [2, `<tspan class="k">schedule:</tspan> every 30 minutes`],
+      [2, `<tspan class="k">skip-if-match:</tspan> <tspan class="s">'is:issue is:open</tspan>`],
+      [4, `<tspan class="s">"gh-aw-workflow-id: ideas" in:body'</tspan>`],
+      [0, `<tspan class="k">safe-outputs:</tspan>`],
+      [2, `<tspan class="k">create-issue:</tspan> { <tspan class="h">max: 1</tspan>, <tspan class="h">expires: 7</tspan> }`],
+    ];
+    Y.forEach(([ind, s], i) => (g += `<text class="fzs-yaml" x="${RX + ind * CH}" y="${66 + i * 27}">${s}</text>`));
+    g += `<g class="fzs-plate" id="fzsP"><rect x="${RX - 20}" y="248" width="590" height="92" rx="12"/><g id="fzsPi"></g><text class="fzs-pt" id="fzsPt" x="${RX + 30}" y="286"></text><text class="fzs-ps" id="fzsPs" x="${RX + 30}" y="318"></text></g>`;
+    g += `<g class="fzs-mona" id="fzsM"><circle cx="1572" cy="294" r="30" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="1545" y="267" width="54" height="54" clip-path="url(#fzsClip)"/></g>`;
+    g += `<text class="fzs-learn" id="fzsL" x="${RX - 20}" y="374"></text>`;
+    // timeline: a tick every 30 minutes; runs only when no plate is open
+    const TX = i => RX + 10 + i * 56,
+      TY = 440;
+    g += `<text class="aex-d" x="${RX - 20}" y="${TY - 30}">every 30 min</text><line class="fzs-line" x1="${RX - 20}" y1="${TY}" x2="1610" y2="${TY}"/>`;
+    for (let i = 0; i < 12; i++) g += `<g class="fzs-tick" id="fzsT${i}"><circle cx="${TX(i)}" cy="${TY}" r="12"/><text x="${TX(i)}" y="${TY + 34}"></text></g>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="530"><tspan fill="#79c0ff">● run</tspan> → serve one plate · <tspan fill="#9198a1">◌ skip</tspan> → pre-activation, 0 tokens</text>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="560"><tspan fill="#ab7df8">completed</tspan> → more like it · <tspan fill="#9198a1">not planned</tspan> → never again</text>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="590"><tspan class="h" fill="#ffa657">expires: 7</tspan> → a forgotten plate never stalls the loop</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg fzs-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dots = [...svg.querySelectorAll(".fzs-dot")];
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2),
+      clamp = u => Math.max(0, Math.min(1, u));
+    // [title, run tick, close tick, outcome]; illustrative plates served one at a time
+    const PLATES = [
+      ["Cache search results", 0, 2, "done"],
+      ["Retry every fetch three times", 3, 6, "np"],
+      ["Split the 2,000-line parser", 7, 9, "done"],
+      ["Index docs headings", 10, 99, ""],
+    ];
+    const LEARN = { done: "", np: "learned · cache-memory: no blanket retries" };
+    const T = i => 800 + i * 1050,
+      CLOSE = i => T(i) + 500,
+      FUZ = 4200,
+      CYC = 15000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      shown = -1;
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      shown = -1;
+      svg.classList.remove("fuz");
+      svg.querySelectorAll(".on, .run, .skip, .now, .done").forEach(x => x.classList.remove("on", "run", "skip", "now", "done"));
+      svg.querySelectorAll(".fzs-tick text").forEach(x => (x.textContent = ""));
+    };
+    slides.push({
+      group: "engineering",
+      key: "schedules",
+      notes:
+        "Fuzzy schedules. The left half is measured on gh-aw itself, snapshot 17 Nov 2026: the compiled cron of the 111 workflows written as schedule: daily or daily on weekdays, by UTC hour and minute. The spike is illustrative: the same 111 workflows if each were pinned to 0 0 * * *. Fixed crons collide: every repo that copies a midnight schedule fires in the same minute, which bursts the token API, hits rate limits, queues runners and, in gh-aw's own history, silently lost safe-output writes. gh-aw compiles daily to a stable time per workflow: two hashes of the workflow path pick the hour and the minute, so each workflow keeps its time across recompiles while the fleet spreads out. Hours 00 and 01 UTC are never chosen; 02 to 05 UTC are weighted three times as likely, the quiet hours for most teams; minutes avoid the hour edges, the US :15 and :45 and the EU :30 peaks. Measured: 45 of 111 land in 02 to 05, none at 00 or 01, none within three minutes of a quarter hour, 98 distinct times. Variants: daily around 14:00 picks inside a one-hour window, daily between 9:00 and 17:00 a custom window, on weekdays adds Monday to Friday; the table shows real compiled crons from gh-aw lock files: every 30 minutes scatters its start minute, hourly and every 6h scatter the minute, daily on weekdays adds Monday to Friday, daily around 10:00 stays within an hour of ten, weekly on monday scatters the time; only every N days and raw cron stay fixed, every 7 days still fires at midnight. The right half is an illustrative All You Can Eat loop with synthetic issues. The workflow wakes every 30 minutes, but skip-if-match searches for its own open issue by the gh-aw-workflow-id marker in pre-activation, so a tick with a plate on the table costs no tokens. When Mona closes the plate, the next tick serves one more. The close reason is the feedback: completed means more like it, not planned means never again, kept in cache-memory for the next run. max: 1 keeps one plate at a time, and expires: 7 closes a forgotten plate so the loop never stalls.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        // left: drop into the spike, then fly to the hashed hours
+        const fz = u >= FUZ;
+        for (let k = 0; k < N; k++) {
+          const d = dots[k];
+          if (!fz) {
+            const p = clamp((u - k * 5) / 300);
+            d.setAttribute("cx", SPOT[k][0]);
+            d.setAttribute("cy", SPOT[k][1] - (1 - ease(p)) * 60);
+            d.setAttribute("opacity", p);
+          } else {
+            const p = ease(clamp((u - FUZ - k * 8) / 900));
+            d.setAttribute("cx", SPOT[k][0] + (FPOT[k][0] - SPOT[k][0]) * p);
+            d.setAttribute("cy", SPOT[k][1] + (FPOT[k][1] - SPOT[k][1]) * p);
+            d.setAttribute("opacity", 1);
+          }
+        }
+        if (u >= 1200)
+          fire("spike", () => {
+            $("fzsS").classList.add("on");
+            sfx.block();
+          });
+        if (fz)
+          fire("fuz", () => {
+            svg.classList.add("fuz");
+            sfx.compile();
+          });
+        // right: ticks run only when no plate is open
+        let open = -1,
+          last = -1;
+        for (let i = 0; i < 12; i++) {
+          if (u < T(i)) break;
+          last = i;
+          const p = PLATES.findIndex(([, r]) => r === i);
+          const el = $("fzsT" + i);
+          if (!el.classList.contains("run") && !el.classList.contains("skip")) {
+            el.classList.add(p >= 0 ? "run" : "skip");
+            el.querySelector("text").textContent = p >= 0 ? "run" : "skip";
+            fire("t" + i, () => (p >= 0 ? sfx.key(0.6) : sfx.step()));
+          }
+          if (p >= 0) open = p;
+        }
+        svg.querySelectorAll(".fzs-tick.now").forEach(x => x.classList.remove("now"));
+        if (last >= 0) $("fzsT" + last).classList.add("now");
+        if (open >= 0) {
+          const [title, , cl, out] = PLATES[open];
+          const closed = u >= CLOSE(cl);
+          const st = closed ? out : "open";
+          const key = open + st;
+          if (shown !== key) {
+            shown = key;
+            const P = $("fzsP"),
+              col = { open: "#79c0ff", done: "#ab7df8", np: "#9198a1" }[st];
+            P.classList.add("on");
+            P.classList.toggle("done", closed);
+            P.style.setProperty("--c", col);
+            $("fzsPi").innerHTML = ico(st === "np" ? "xCircle" : "issue", RX + 4, 294, 26, col);
+            $("fzsPt").textContent = "[ideas] " + title;
+            $("fzsPs").textContent = { open: "open · the next ticks skip", done: "closed · completed → serve more like it", np: "closed · not planned → never again" }[st];
+            $("fzsM").classList.toggle("on", closed);
+            if (closed) {
+              const L = $("fzsL");
+              if (LEARN[out]) {
+                L.textContent = LEARN[out];
+                L.classList.add("on");
+              }
+              sfx.pop(open);
+            }
+          }
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide fzs" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · hashed scatter · skip-if-match · All You Can Eat"), h("h2", {}, letters("Fuzzy "), letters("schedules", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "Spread the load, serve on demand"), " · daily → a stable hashed time · skip-if-match → one open plate"),
+        h("div", { class: "fzs-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${N} fuzzy daily workflows by compiled UTC hour and minute · spike and plates illustrative`)
+      ),
+    });
+  }
+
+  // Week of daily runs: measured heat map of every daily-schedule workflow by weekday and compiled UTC hour; 00–01 empty, 02–05 busiest, weekends lighter
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    // MEASURED: runs per weekday (Mon..Sun) and UTC hour of gh-aw's 144 workflows whose schedule starts with `daily`, snapshot 17 Nov 2026 (refresh/week-of-daily-runs.sh)
+    const WD = [0, 0, 8, 13, 8, 17, 4, 7, 9, 7, 7, 11, 6, 5, 11, 6, 0, 3, 5, 3, 6, 1, 3, 4],
+      WE = [0, 0, 7, 11, 8, 15, 4, 5, 7, 6, 4, 7, 4, 2, 4, 4, 0, 3, 5, 3, 6, 1, 1, 4];
+    const GRID = [WD, WD, WD, WD, WD, WE, WE],
+      DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      W = 144,
+      WKD = 33;
+    const MAX = Math.max(...GRID.flat()),
+      RUNS = GRID.flat().reduce((a, b) => a + b, 0),
+      TOT = GRID.map(r => r.reduce((a, b) => a + b, 0)),
+      top = WD.indexOf(MAX);
+    const X0 = 80,
+      Y0 = 70,
+      CW = 52,
+      RH = 56,
+      cx = hr => X0 + hr * CW,
+      ry = d => Y0 + d * RH;
+    let g = `<defs><pattern id="fzwHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2814"/><line x1="0" y1="0" x2="0" y2="8" stroke="#db6d28" stroke-width="2" opacity=".55"/></pattern></defs>`;
+    g += `<text class="fzw-lbl" x="0" y="16">${W} DAILY WORKFLOWS · RUNS BY WEEKDAY AND UTC HOUR</text><text class="fzw-lbl" x="${VW}" y="16" text-anchor="end">RUNS / DAY</text>`;
+    GRID.forEach((row, d) => {
+      g += `<text class="fzw-day${d > 4 ? " we" : ""}" x="${X0 - 14}" y="${ry(d) + RH / 2 + 6}">${DAYS[d]}</text>`;
+      row.forEach((v, hr) => {
+        const a = v ? 0.12 + 0.88 * (v / MAX) : 0;
+        g += `<g class="fzw-c${v / MAX > 0.55 ? " hi" : ""}" data-h="${hr}"><rect x="${cx(hr) + 2}" y="${ry(d) + 2}" width="${CW - 4}" height="${RH - 4}" rx="6" fill="${v ? `rgba(68,147,248,${a.toFixed(2)})` : "#0d1117"}"/>${v ? `<text x="${cx(hr) + CW / 2}" y="${ry(d) + RH / 2 + 6}">${v}</text>` : ""}</g>`;
+      });
+      g += `<g class="fzw-sum${d > 4 ? " we" : ""}"><rect x="${VW - 210}" y="${ry(d) + 14}" width="0" height="${RH - 28}" rx="4"/><text x="${VW - 200}" y="${ry(d) + RH / 2 + 6}">0</text></g>`;
+    });
+    const GB = ry(7);
+    for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzw-hr" x="${cx(hr) + CW / 2}" y="${GB + 24}">${String(hr).padStart(2, "0")}</text>`;
+    g += `<text class="fzw-hr" x="${cx(23) + CW / 2}" y="${GB + 24}">UTC</text>`;
+    // fuzzy windows from schedule_fuzzy_scatter.go: 00–01 never chosen, 02–05 weighted ×3
+    g += `<g class="fzw-band no"><rect x="${cx(0) + 1}" y="${Y0}" width="${2 * CW - 2}" height="${7 * RH}" rx="6"/><text x="${cx(1)}" y="${Y0 - 12}">00–01 never</text></g>`;
+    g += `<g class="fzw-band best"><rect x="${cx(2)}" y="${Y0 - 2}" width="${4 * CW}" height="${7 * RH + 4}" rx="8"/><text x="${cx(4)}" y="${Y0 - 12}">02–05 preferred ×3</text></g>`;
+    g += `<g class="fzw-top"><rect x="${cx(top) - 1}" y="${ry(0) - 1}" width="${CW + 2}" height="${5 * RH + 2}" rx="8"/></g>`;
+    g += `<g class="fzw-ph"><rect x="${X0}" y="${Y0 - 4}" width="${CW}" height="${7 * RH + 8}" rx="8"/><text x="${X0 + CW / 2}" y="${Y0 - 12}">00</text></g>`;
+    g += `<g class="fzw-key"><text class="b" x="0" y="${GB + 74}">${RUNS} runs a week · busiest hour ${String(top).padStart(2, "0")} UTC: ${MAX} runs · 0 at 00–01 UTC</text><text x="0" y="${GB + 104}">weekends: ${TOT[0]} → ${TOT[5]} runs a day · ${WKD} workflows say daily on weekdays · lighter blue = fewer runs, blank = none</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg fzw-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    // a playhead steps one UTC hour at a time: that column switches on and every day's total bar and counter advance by the same hour
+    const STEP = 110,
+      LEAD = 450,
+      POST = 320,
+      BMAX = Math.max(...TOT),
+      cols = [...Array(24)].map((_, hr) => [...svg.querySelectorAll(`.fzw-c[data-h="${hr}"]`)]),
+      sums = [...svg.querySelectorAll(".fzw-sum")].map(s => [s.querySelector("rect"), s.querySelector("text")]),
+      ph = svg.querySelector(".fzw-ph"),
+      phText = ph.querySelector("text"),
+      cap = h("div", { class: "fzw-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${W} workflows with a daily schedule (plain, on weekdays, around) · first compiled cron · UTC`),
+      after = [".fzw-band.no", ".fzw-band.best", ".fzw-top", ".fzw-key"].map(s => svg.querySelector(s)).concat(cap);
+    let t0 = 0,
+      shown = -1,
+      revealed = 0;
+    const setHour = hr => {
+      cols.forEach((c, i) => c.forEach(e => (e.classList.toggle("on", i <= hr), e.classList.toggle("now", i === hr))));
+      GRID.forEach((row, d) => {
+        const n = row.slice(0, hr + 1).reduce((a, b) => a + b, 0),
+          bw = (n / BMAX) * 150;
+        sums[d][0].setAttribute("width", bw);
+        sums[d][1].setAttribute("x", VW - 200 + bw);
+        sums[d][1].textContent = n;
+      });
+      ph.setAttribute("transform", `translate(${Math.max(hr, 0) * CW} 0)`);
+      phText.textContent = String(Math.max(hr, 0)).padStart(2, "0");
+      ph.classList.toggle("on", hr >= 0 && hr < 24);
+      shown = hr;
+    };
+    const reveal = k => (after.forEach((e, i) => e.classList.toggle("on", i < k)), (revealed = k));
+    slides.push({
+      group: "engineering",
+      under: "schedules",
+      enter(dir) {
+        t0 = 0;
+        if (dir < 0) (setHour(23), cols[23].forEach(e => e.classList.remove("now")), ph.classList.remove("on"), reveal(after.length), (shown = 24));
+        else (setHour(-1), reveal(0));
+      },
+      tick(t) {
+        if (shown >= 24 && revealed >= after.length) return;
+        if (!t0) t0 = t;
+        const s = t - t0 - LEAD,
+          hr = Math.min(24, Math.floor(s / STEP));
+        if (hr > shown && hr >= 0) {
+          if (hr < 24) (setHour(hr), sfx.key(0.5));
+          else (cols[23].forEach(e => e.classList.remove("now")), ph.classList.remove("on"), (shown = 24));
+        }
+        if (shown >= 24) {
+          const k = Math.min(after.length, 1 + Math.floor((s - 24 * STEP) / POST));
+          if (k > revealed) (reveal(k), sfx.step());
+        }
+      },
+      notes: `Week of daily runs. Measured on gh-aw itself, snapshot 17 Nov 2026: every one of the ${W} workflows whose schedule starts with daily, plain, on weekdays or around a time, placed by its compiled cron on a week grid of weekday by UTC hour. Each cell counts runs. ${RUNS} runs a week and not one at 00 or 01 UTC: the fuzzy scatter never picks those hours. The 02 to 05 UTC columns are the busiest, ${MAX} runs at ${String(top).padStart(2, "0")} UTC on weekdays, because the scatter weights the quiet hours three times. Weekends drop from ${TOT[0]} to ${TOT[5]} runs a day: ${WKD} workflows say daily on weekdays, many of them daytime reports around a set hour, so Saturday and Sunday keep only the background work. No cell carries more than ${MAX} of ${W}: the fleet is spread across the day instead of firing in the same minute.`,
+      el: h(
+        "section",
+        { class: "slide fzw" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · 7 days × 24 UTC hours · measured"), h("h2", {}, letters("Week of "), letters("daily runs", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "No midnight, no stampede"), ` · ${W} daily workflows · at most ${MAX} in any hour · 00–01 UTC empty`),
+        cap
+      ),
+    });
+  }
   // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
   {
     const AG = pickAgent();
@@ -12407,6 +13971,107 @@
         const e = stage.tick(t),
           u = Math.min(1, e / (N * EVERY + HOLD));
         ttl.forEach((r, i) => (r.style.transform = `scaleX(${Math.max(0.04, 1 - u * (i ? 1.4 : 0.9))})`));
+      },
+      el,
+    });
+  }
+
+  // Multi-repo PRs: one run checks out two repositories with a read-only GitHub App, the agent edits both without a
+  // token, and the safe-outputs job uses a second, write-capable App to open one pull request in each repository
+  {
+    resetIndex();
+    const BLUE = "#4493f8",
+      BLUE2 = "#79c0ff",
+      ORANGE = "#db6d28",
+      ORANGE2 = "#ffa657";
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // abbreviated front matter: [text, role (r read · w write · p pull requests · "" none)]; "..." marks omitted details
+    const YAML = [
+      ["checkout:", ""],
+      ["  - repository: octo-org/api", "r"],
+      ["    github-app: ...", "r"],
+      ["  - ...", "r"],
+      ["safe-outputs:", ""],
+      ["  github-app: ...", "w"],
+      ["  create-pull-request:", "p"],
+      ["    allowed-repos: [...]", "p"],
+      ["    max: 2", "p"],
+    ];
+    const ROLE = { r: [BLUE, 1, 3], w: [ORANGE, 4, 6], p: ["#ab7df8", 3, 5] };
+    const LH = 36,
+      CY = 145,
+      TOP = CY + 88;
+    const yamlLine = (l, y) => {
+      const m = l.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
+      if (!m) return `<text class="mrp-c" x="34" y="${y}" xml:space="preserve" style="fill:#9198a1">${l.replace(/ /g, "\u00a0")}</text>`;
+      const [, ind, key, val] = m;
+      return `<text class="mrp-c" x="34" y="${y}" xml:space="preserve">${ind.replace(/ /g, "\u00a0")}<tspan style="fill:${ind ? "#7ee787" : "#d2a8ff"}">${key}</tspan><tspan style="fill:${val.includes("...") ? "#9198a1" : "#a5d6ff"}">${xEsc(val)}</tspan></text>`;
+    };
+    let g = "";
+    // abbreviated front matter card with role bars and step highlights
+    g += `<rect class="card" x="0" y="${CY}" width="480" height="410" rx="16"/><text class="k" x="24" y="${CY + 34}">workflow.md · front matter</text><line x1="0" y1="${CY + 50}" x2="480" y2="${CY + 50}" stroke="#3d444d"/>`;
+    YAML.forEach(([l, r], i) => {
+      const y = TOP + i * LH;
+      if (r) {
+        const [c, s, e] = ROLE[r];
+        g += `<rect x="14" y="${y - 25}" width="4" height="${LH}" fill="${c}"/>`;
+        g += `<rect class="x" data-s="${s}" data-e="${e}" x="18" y="${y - 25}" width="448" height="${LH}" fill="${c}26"/>`;
+      }
+      g += yamlLine(l, y);
+    });
+    g += `<text x="456" y="${TOP + 2 * LH}" text-anchor="end" style="fill:${BLUE2};font-size:14px">READ APP</text><text x="456" y="${TOP + 5 * LH}" text-anchor="end" style="fill:${ORANGE2};font-size:14px">WRITE APP</text>`;
+    // the two GitHub Apps
+    const app = (y, c, c2, title, lines) =>
+      `<g data-s="0" style="--hc:${c}"><rect class="card" x="530" y="${y}" width="300" height="300" rx="14" style="stroke:${c};stroke-width:2"/>${ico("key", 572, y + 46, 34, c2)}<text class="k" x="604" y="${y + 52}" style="fill:${c2}">GitHub App</text><text class="mrp-t" x="554" y="${y + 124}">${title}</text>` +
+      lines.map((l, j) => `<text class="mrp-m" x="554" y="${y + 186 + j * 40}">${l}</text>`).join("") +
+      `</g>`;
+    g += app(0, BLUE, BLUE2, "Read App", ["read-only token", "checkouts + tools"]);
+    g += app(400, ORANGE, ORANGE2, "Write App", ["write token", "safe outputs only"]);
+    // agent job: one checkout per repository and a token-free agent
+    g += `<g data-s="1" style="--hc:${BLUE}"><rect class="card" x="880" y="0" width="820" height="300" rx="14" style="stroke:${BLUE}"/><text class="k" x="904" y="36" style="fill:${BLUE2}">agent job · read token</text>`;
+    [60, 176].forEach(
+      (y, i) => (g += `<rect x="904" y="${y}" width="330" height="96" rx="10" fill="#0d1117" stroke="${BLUE}88"/>${ico("repo", 942, y + 48, 30, BLUE2)}<text class="mrp-m" x="974" y="${y + 56}">octo-org/${i ? "web" : "api"}</text>`)
+    );
+    g += `</g>`;
+    g += `<g data-s="2" style="--hc:#f0f6fc"><rect x="1295" y="60" width="386" height="212" rx="10" fill="#0d1117" stroke="#9198a1" stroke-dasharray="8 6"/>${ico("lock", 1334, 112, 34, "#f0f6fc")}<text class="mrp-t" x="1370" y="124" style="font-size:30px">Sandboxed agent</text><text class="mrp-m" x="1320" y="186" style="fill:#f0f6fc">holds no token</text><text x="1320" y="232" style="font-size:19px">edits both checkouts</text></g>`;
+    g += `<g data-s="3" style="--hc:#ab7df8"><rect x="1318" y="326" width="340" height="48" rx="10" fill="#ab7df822" stroke="#ab7df8"/><text x="1488" y="357" text-anchor="middle" style="fill:#d2a8ff;font-size:19px">2 × create_pull_request</text></g>`;
+    // safe-outputs job: one pull request per repository
+    g += `<g data-s="4" style="--hc:${ORANGE}"><rect class="card" x="880" y="400" width="820" height="300" rx="14" style="stroke:${ORANGE}"/><text class="k" x="904" y="436" style="fill:${ORANGE2}">safe-outputs job · write token</text></g>`;
+    [
+      [904, "api", 4],
+      [1300, "web", 5],
+    ].forEach(
+      ([x, r, s]) =>
+        (g += `<g data-s="${s}" style="--hc:${ORANGE}"><rect x="${x}" y="490" width="376" height="186" rx="10" fill="#0d1117" stroke="${ORANGE}"/>${ico("pr", x + 40, 534, 34, ORANGE2)}<text class="mrp-t" x="${x + 74}" y="546" style="font-size:28px">Pull request</text><text class="mrp-m" x="${x + 24}" y="604">octo-org/${r}</text><text x="${x + 24}" y="646" style="fill:${ORANGE2};font-size:19px">opened by Write App</text></g>`)
+    );
+    // wiring and packets
+    g += `<path class="ln" d="M830 108 H904 M830 224 H904 M1234 108 H1295 M1234 224 H1295"/><path class="ln dash" d="M1488 272 V400"/><path class="ln" d="M830 462 H1488 M1092 462 V490 M1488 462 V490"/>`;
+    g += `<path data-p="1" data-c="${BLUE2}" d="M830 108 H904" fill="none"/><path data-p="1" data-c="${BLUE2}" d="M830 224 H904" fill="none"/>`;
+    g += `<path data-p="2" data-c="#f0f6fc" d="M1234 108 H1295" fill="none"/><path data-p="2" data-c="#f0f6fc" d="M1234 224 H1295" fill="none"/>`;
+    g += `<path data-p="3" data-c="#d2a8ff" d="M1488 272 V326" fill="none"/>`;
+    g += `<path data-p="4" data-c="${ORANGE2}" d="M830 462 H1092 V490" fill="none"/>`;
+    g += `<path data-p="5" data-c="${ORANGE2}" d="M830 462 H1488 V490" fill="none"/>`;
+    const svg = xSvg(g);
+    const N = 6,
+      EVERY = 1300,
+      HOLD = 4600;
+    const stage = xStage(svg, N, EVERY, HOLD, k => sfx.pop(k));
+    const el = h(
+      "section",
+      { class: "slide gap" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One run · two repositories · two GitHub Apps"), h("h2", {}, letters("Multi-repo "), letters("PRs", "l-grad"))),
+      svg,
+      h("div", { class: "xcap" }, h("b", {}, "Split the keys:"), h("span", {}, "Read App → checkouts"), h("span", {}, "agent holds no token"), h("span", {}, "Write App → safe outputs"), h("span", {}, "one PR per repo"))
+    );
+    slides.push({
+      group: "enterprise",
+      notes:
+        "Multi-repo PRs. One workflow run changes two repositories and opens one pull request in each, using two GitHub Apps with different jobs. The front matter is abbreviated: one checkout entry stands for each repository, and the dots stand for the App credentials and other details. The read App checks out octo-org/api and octo-org/web side by side and backs the agent's GitHub tools. Its tokens are minted for the agent job with read permissions only, and the checkouts are scrubbed of credentials before the sandboxed agent starts, so the agent edits both working trees while holding no token at all. It then emits two create_pull_request requests, one naming each repository; allowed-repos is the allowlist the agent may pick from, and max: 2 lets one run open two pull requests. After threat detection, the safe-outputs job mints a token from the second, write-capable App, re-creates the same checkout layout, applies each patch in its repository and opens the pull requests. The agent never sees either App's key, and only the safe-outputs job can write. Repositories, apps and pull requests are synthetic and illustrative.",
+      enter() {
+        stage.enter();
+      },
+      tick(t) {
+        stage.tick(t);
       },
       el,
     });
@@ -16308,14 +17973,21 @@
       g += `<path class="drm-w" id="drmIn${i}" pathLength="1" d="M520 ${y} C640 ${y}, 680 ${CY}, ${CX - CR - 6} ${CY}"/>`;
       g += `<g class="drm-r" id="drmR${i}"><circle cx="40" cy="${y}" r="24" fill="#0d1117" stroke="${col}" stroke-width="2.5"/>${ico(ic, 40, y, 26, col)}<text x="78" y="${y + 8}">${txt}</text></g>`;
     });
-    OUT.forEach(([, , ], i) => {
+    OUT.forEach(([, ,], i) => {
       const y = OY(i) + 44;
       g += `<path class="drm-w g" id="drmOut${i}" pathLength="1" d="M${CX + CR + 6} ${CY} C1140 ${CY}, 1170 ${y}, 1262 ${y}"/>`;
     });
     g += `<g id="drmCore"><circle class="drm-core" cx="${CX}" cy="${CY}" r="${CR}"/>${ico("copilot", CX, CY + 6, 96, "#d2a8ff")}
       <circle cx="${CX + 58}" cy="${CY - 62}" r="24" fill="#d2a8ff"/><circle cx="${CX + 70}" cy="${CY - 72}" r="21" fill="#161b22"/>
       <text class="drm-z" x="${CX + 82}" y="${CY - 96}">z</text><text class="drm-z b" x="${CX + 98}" y="${CY - 120}">z</text><text class="drm-z c" x="${CX + 114}" y="${CY - 144}">Z</text></g>`;
-    [[760, 120, 0], [1040, 108, 0.7], [742, 330, 1.3], [1062, 352, 0.4], [830, 90, 1.9], [985, 390, 1.1]].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
+    [
+      [760, 120, 0],
+      [1040, 108, 0.7],
+      [742, 330, 1.3],
+      [1062, 352, 0.4],
+      [830, 90, 1.9],
+      [985, 390, 1.1],
+    ].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
     g += `<text class="drm-cap" x="${CX}" y="${CY + CR + 34}">nightly: mine · cluster · design</text>`;
     PAT.forEach(([x, txt], i) => (g += `<g class="drm-t" id="drmT${i}"><rect x="${x - 100}" y="410" width="200" height="44" rx="22"/><text x="${x}" y="438">${txt}</text></g>`));
     OUT.forEach(([ic, ttl, sub], i) => {

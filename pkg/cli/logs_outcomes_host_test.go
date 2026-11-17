@@ -4,7 +4,6 @@ package cli
 
 import (
 	"context"
-	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,14 +53,15 @@ func TestLogsOutcomeItemRepositoryHost(t *testing.T) {
 
 func TestLogsOutcomeEnterpriseManifestRepository(t *testing.T) {
 	calls := installOutcomeAPIFixture(t, `case "$*" in
-"api repos/acme/repo/issues/42 --hostname github.example.com") printf '%s' '{"state":"closed","state_reason":"completed","labels":[]}' ;;
+"api repos/acme/repo/issues/42 --hostname github.example.com") printf '%s' '{"html_url":"https://github.example.com/acme/repo/issues/42","state":"closed","state_reason":"completed","closed_at":"2026-10-02T00:00:00Z","closed_by":{"login":"alice","type":"User"},"labels":[]}' ;;
+"api repos/acme/repo/collaborators/alice/permission --hostname github.example.com") printf '%s' '{"permission":"write"}' ;;
 *) printf 'wrong host or endpoint: %s\n' "$*" >&2; exit 1 ;;
 esac
 `)
 	dir := t.TempDir()
-	manifest := "{\"type\":\"create_issue\",\"repo\":\"acme/repo\",\"number\":42}\n"
+	manifest := "{\"type\":\"create_issue\",\"repo\":\"acme/repo\",\"number\":42,\"timestamp\":\"2026-10-01T00:00:00Z\"}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(manifest), 0o600))
-	report, err := collectRunOutcomes(context.Background(), ProcessedRun{Run: WorkflowRun{
+	report, err := collectRunOutcomes(context.Background(), ProcessedRun{Run: WorkflowRun{Attempt: 1,
 		DatabaseID: 42, Repository: "acme/repo", LogsPath: dir,
 		URL: "https://github.example.com/acme/repo/actions/runs/42",
 	}}, github.DefaultObjectiveMapping(), false)
@@ -70,11 +70,8 @@ esac
 	assert.Equal(t, OutcomeStatusAccepted, report.Items[0].OutcomeStatus)
 	assert.Equal(t, "github.example.com/acme/repo", report.Items[0].Repo)
 	assert.Empty(t, report.Items[0].EvalError)
-	assert.Len(t, outcomeAPICalls(t, calls), 1)
-	items, err := decodeLogsOutcomeItems(strings.NewReader(manifest))
-	require.NoError(t, err)
-	assert.Equal(t, outcomeItemID(items[0], make(map[[sha256.Size]byte]int)), report.Items[0].ItemID,
-		"host routing must not alter source action identity")
+	assert.Len(t, outcomeAPICalls(t, calls), 2)
+	assert.Equal(t, report.Delivery.Items[0].ID, report.Items[0].ItemID)
 }
 
 func TestEvaluateOutcomesRejectsManifestHostsOutsideRunHost(t *testing.T) {
@@ -135,32 +132,35 @@ func TestExperimentOutcomeSourcePreservesTrustedHost(t *testing.T) {
 			status:     OutcomeStatusAccepted,
 		},
 		{
-			name:       "explicit trusted repository makes foreign URL inert",
+			name:       "explicit trusted repository cannot authorize a foreign URL",
 			repository: "github.example.com/acme/repo",
 			manifest:   `{"type":"create_pull_request","repo":"github.example.com/acme/repo","url":"https://attacker.example.com/acme/repo/pull/42"}`,
-			status:     OutcomeStatusAccepted,
+			status:     OutcomeStatusError,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			calls := installExperimentOutcomeFixture(t, tc.manifest+"\n")
+			manifest := strings.TrimSuffix(tc.manifest, "}") + `,"timestamp":"2026-10-01T00:00:00Z"}` + "\n"
+			calls := installExperimentOutcomeFixture(t, manifest)
 			t.Setenv("GH_HOST", "ambient.example.com")
 			source := &githubOutcomeRunSource{artifacts: newGitHubGraderRunArtifactSource(t.TempDir(), tc.repository)}
 			data := source.Load(context.Background(), "101")
-			require.Empty(t, data.ExclusionReason)
-			require.Len(t, data.Report.Items, 1)
-			report := data.Report.Items[0]
-			assert.Equal(t, tc.status, report.OutcomeStatus)
+			if tc.status == OutcomeStatusError {
+				assert.Equal(t, exclusionArtifactUnavailable, data.ExclusionReason)
+			} else {
+				require.Empty(t, data.ExclusionReason)
+				require.Len(t, data.Report.Items, 1)
+				assert.Equal(t, tc.status, data.Report.Items[0].OutcomeStatus)
+			}
 			commands, err := os.ReadFile(calls)
 			require.NoError(t, err)
 			assert.Contains(t, string(commands), "-R "+tc.repository)
 			assert.NotContains(t, string(commands), "attacker.example.com")
 			assert.NotContains(t, string(commands), "ambient.example.com")
 			if tc.status == OutcomeStatusError {
-				assert.Equal(t, "item repository host does not match workflow run host", report.EvalError)
 				assert.NotContains(t, string(commands), "repos/acme/repo/pulls/42",
-					"rejected artifacts must not trigger outcome API calls on any host")
+					"rejected artifacts must not trigger adoption API calls on any host")
 			} else {
-				assert.Empty(t, report.EvalError)
+				assert.Empty(t, data.Report.Items[0].EvalError)
 				assert.Contains(t, string(commands), "api repos/acme/repo/pulls/42 --hostname github.example.com")
 			}
 		})
@@ -170,16 +170,16 @@ func TestExperimentOutcomeSourcePreservesTrustedHost(t *testing.T) {
 func TestCollectRunOutcomesTrustsRunURLOverRepositoryHost(t *testing.T) {
 	calls := installOutcomeAPIFixture(t, "exit 1\n")
 	dir := t.TempDir()
-	manifest := "{\"type\":\"create_issue\",\"repo\":\"attacker.example.com/acme/repo\",\"number\":42}\n"
+	manifest := "{\"type\":\"create_issue\",\"repo\":\"attacker.example.com/acme/repo\",\"number\":42,\"timestamp\":\"2026-10-01T00:00:00Z\"}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(manifest), 0o600))
-	report, err := collectRunOutcomes(context.Background(), ProcessedRun{Run: WorkflowRun{
+	report, err := collectRunOutcomes(context.Background(), ProcessedRun{Run: WorkflowRun{Attempt: 1,
 		DatabaseID: 42, Repository: "attacker.example.com/acme/repo", LogsPath: dir,
 		URL: "https://github.example.com/acme/repo/actions/runs/42",
 	}}, github.DefaultObjectiveMapping(), false)
 	require.NoError(t, err)
-	require.Len(t, report.Items, 1)
-	assert.Equal(t, OutcomeStatusError, report.Items[0].OutcomeStatus)
-	assert.Equal(t, "item repository host does not match workflow run host", report.Items[0].EvalError)
+	assert.Empty(t, report.Items)
+	assert.Equal(t, "partial", report.Delivery.Coverage)
+	assert.Equal(t, "item repository host does not match workflow run host", report.EvalError)
 	_, err = os.Stat(calls)
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }

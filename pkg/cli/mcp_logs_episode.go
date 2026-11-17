@@ -22,7 +22,7 @@ func validateMCPEpisodeLogsArgs(args logsArgs) error {
 		args.Firewall || args.NoFirewall || args.FilteredIntegrity || args.Graders ||
 		args.AfterRunID != 0 || args.BeforeRunID != 0 || len(args.IgnoreWorkflowRuns) > 0 ||
 		args.MaxGitHubAPIRateLimit != 0 || args.MaxStorageMB != nil || args.PruneOlderRuns {
-		return errors.New("episode_run supports only repository allowlists, dates, count, timeout, max_api_requests, and compact info/usage artifacts; workflow discovery filters are not supported")
+		return errors.New("episode_run supports only repository allowlists, dates, count, timeout, max_api_requests, delivery, adoption, and compact info/usage artifacts; workflow discovery filters are not supported")
 	}
 	if args.Count < 0 || args.MaxAPIRequests < 0 || args.Timeout < 0 {
 		return errors.New("episode retrieval count, max_api_requests, and timeout must be positive when specified")
@@ -50,6 +50,12 @@ func buildEpisodeLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, 
 	}
 	if args.Refresh {
 		cmdArgs = append(cmdArgs, "--refresh")
+	}
+	if args.Delivery {
+		cmdArgs = append(cmdArgs, "--delivery")
+	}
+	if args.Adoption {
+		cmdArgs = append(cmdArgs, "--adoption")
 	}
 	repository := args.EpisodeRepository
 	if repository == "" && !strings.Contains(args.EpisodeRun, "/") {

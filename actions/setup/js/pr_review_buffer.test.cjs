@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import path from "path";
 import { fileURLToPath } from "url";
-import { finalizeBufferedReviewOutcomes } from "./safe_output_outcomes.cjs";
+import { finalizeBufferedReviewExecutions } from "./safe_output_execution.cjs";
 import { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } from "./safe_output_dependencies.cjs";
 
 const mockCore = {
@@ -480,7 +480,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(checkSafeOutputDependencies(plan, 2, records, true)).toEqual({ state: "waiting" });
 
       const review = await buffer.submitReview();
-      finalizeBufferedReviewOutcomes(records, "owner/repo", 42, review);
+      finalizeBufferedReviewExecutions(records, "owner/repo", 42, review);
 
       expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledOnce();
       expect(review.review_comments).toHaveLength(2);

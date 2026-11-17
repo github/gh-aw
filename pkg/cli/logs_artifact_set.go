@@ -79,7 +79,7 @@ const (
 
 	// ArtifactSetOutcomes downloads executed safe-output manifests and compact
 	// agent output used to recover references omitted from handler results.
-	ArtifactSetOutcomes ArtifactSet = "outcomes"
+	ArtifactSetOutcomes ArtifactSet = "delivery"
 
 	// ArtifactSetGraders downloads the artifacts that carry grader results
 	// (grader_results.json): built-ins in usage, combined custom results from the
@@ -114,7 +114,7 @@ var artifactSetArtifacts = map[ArtifactSet][]string{
 	ArtifactSetExperiment: {constants.ExperimentArtifactName.String(), constants.UsageArtifactName.String()},
 	// usage: compact conclusion artifact for lightweight reporting/forecasting.
 	ArtifactSetUsage:    {constants.UsageArtifactName.String()},
-	ArtifactSetOutcomes: {constants.SafeOutputItemsArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
+	ArtifactSetOutcomes: {constants.SafeOutputItemsArtifactName.String(), constants.AgentOutputFallbackArtifactName.String(), constants.UsageArtifactName.String()},
 	// evals: evals results are now included in the usage artifact.
 	ArtifactSetEvals: {constants.UsageArtifactName.String()},
 	// graders: conclusion publishes built-ins in usage; the separate graders job

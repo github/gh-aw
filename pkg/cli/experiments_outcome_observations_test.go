@@ -51,7 +51,7 @@ func TestOutcomeMetricRunValue(t *testing.T) {
 		{name: "unknown only unavailable not noop", kind: "accepted", items: []OutcomeReport{unknown}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
 		{name: "error only unavailable", kind: "accepted", items: []OutcomeReport{experimentOutcome(OutcomeStatusError, false, false)}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
 		{name: "empty noop", kind: "accepted", coverage: OutcomeMetricCoverage{NoOp: 1}},
-		{name: "non outcome statuses noop", kind: "accepted", items: []OutcomeReport{
+		{name: "non adoption statuses noop", kind: "accepted", items: []OutcomeReport{
 			experimentOutcome(OutcomeStatusIgnored, false, false), experimentOutcome(OutcomeStatusSkipped, false, false),
 			experimentOutcome(OutcomeStatusLifecycle, false, false), experimentOutcome(OutcomeStatusLifecycleClose, false, false),
 		}, coverage: OutcomeMetricCoverage{NoOp: 1}},
@@ -119,7 +119,7 @@ func TestLoadOutcomeObservationSetsPropagatesCancellation(t *testing.T) {
 		}},
 	}
 	frontmatter := experimentFrontmatterResult{
-		ExperimentConfigs: map[string]*workflow.ExperimentConfig{"prompt": {Metric: "outcome:accepted"}},
+		ExperimentConfigs: map[string]*workflow.ExperimentConfig{"prompt": {Metric: "adoption:accepted"}},
 	}
 	result := make(chan error, 1)
 	go func() {
@@ -136,15 +136,15 @@ func TestLoadOutcomeObservationSetsPropagatesCancellation(t *testing.T) {
 		cancel()
 	case <-time.After(time.Second):
 		cancel()
-		t.Fatal("outcome source was not called")
+		t.Fatal("adoption source was not called")
 	}
 	select {
 	case err := <-result:
 		require.NoError(t, err)
 	case <-time.After(2 * time.Second):
-		t.Fatal("outcome observation loading did not stop after cancellation")
+		t.Fatal("adoption observation loading did not stop after cancellation")
 	}
-	assert.True(t, <-source.canceled, "outcome source should receive the canceled context")
+	assert.True(t, <-source.canceled, "adoption source should receive the canceled context")
 }
 
 func TestOutcomeMetricMaturityAndAssignmentJoin(t *testing.T) {
@@ -203,7 +203,7 @@ func TestOutcomeMetricCoverageForMatureRuns(t *testing.T) {
 	assert.Zero(t, set.ByVariant["control"][0].Value)
 	assert.Equal(t, &OutcomeMetricCoverage{StalePending: 1, Unavailable: 3, NoOp: 1}, set.Coverage["control"])
 
-	cfg := &workflow.ExperimentConfig{Metric: "outcome:accepted", Variants: []string{"control", "candidate"}, MinSamples: 2}
+	cfg := &workflow.ExperimentConfig{Metric: "adoption:accepted", Variants: []string{"control", "candidate"}, MinSamples: 2}
 	analysis := computeExperimentAnalysisWithObservationBundle(experiments[0], cfg, nil, nil, set, nil)
 	assert.Equal(t, ExperimentReadinessCollecting, analysis.Readiness)
 	assert.Equal(t, "binary", analysis.MetricType)
@@ -218,7 +218,7 @@ func TestEmptyOutcomeMetricObservationsDoNotInferBinaryType(t *testing.T) {
 		Coverage:  map[string]*OutcomeMetricCoverage{"control": {Unavailable: 1}, "candidate": {Unavailable: 1}},
 	}
 	cfg := &workflow.ExperimentConfig{
-		Metric: "outcome:accepted", Variants: []string{"control", "candidate"}, MinSamples: 1,
+		Metric: "adoption:accepted", Variants: []string{"control", "candidate"}, MinSamples: 1,
 	}
 	exp := ExperimentVariantStats{
 		Name: "prompt", Variants: map[string]int{"control": 1, "candidate": 1}, Total: 2,
@@ -237,8 +237,8 @@ func TestOutcomeMetricPerExperimentWindowsShareCollection(t *testing.T) {
 	}
 	runs := []ExperimentRunRecord{run, run}
 	configs := map[string]*workflow.ExperimentConfig{
-		"short": {Metric: "outcome:accepted", OutcomeWindow: "24h"},
-		"long":  {Metric: "outcome:zero_touch", OutcomeWindow: "72h"},
+		"short": {Metric: "adoption:accepted", OutcomeWindow: "24h"},
+		"long":  {Metric: "adoption:zero_touch", OutcomeWindow: "72h"},
 	}
 	refs, _, windows, automatic, err := resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
@@ -269,21 +269,21 @@ func TestResolveOutcomeMetricReferences(t *testing.T) {
 	t.Parallel()
 	configs := map[string]*workflow.ExperimentConfig{
 		"prompt": {
-			Metric: "outcome:accepted", SecondaryMetrics: []string{"outcome:zero_touch"},
-			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}},
+			Metric: "adoption:accepted", SecondaryMetrics: []string{"adoption:zero_touch"},
+			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "adoption:zero_touch", Threshold: ">=0.5"}},
 		},
 	}
 	primary, guardrails, windows, automatic, err := resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"prompt": "accepted"}, primary)
-	assert.Equal(t, "zero_touch", guardrails["prompt"]["outcome:zero_touch"])
+	assert.Equal(t, "zero_touch", guardrails["prompt"]["adoption:zero_touch"])
 	assert.Equal(t, 72*time.Hour, windows["prompt"])
 	assert.Contains(t, automatic, "prompt")
 	secondary, err := resolveOutcomeSecondaryMetricReferences(map[string]*workflow.ExperimentConfig{
-		"prompt": {SecondaryMetrics: []string{"outcome:zero_touch"}},
+		"prompt": {SecondaryMetrics: []string{"adoption:zero_touch"}},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, map[string]map[string]string{"prompt": {"outcome:zero_touch": "zero_touch"}}, secondary)
+	assert.Equal(t, map[string]map[string]string{"prompt": {"adoption:zero_touch": "zero_touch"}}, secondary)
 	configs["prompt"].OutcomeWindow = "24h"
 	_, _, windows, automatic, err = resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
@@ -297,16 +297,16 @@ func TestResolveOutcomeMetricReferences(t *testing.T) {
 	for _, duration := range []string{"-1h", "0s", "bad"} {
 		configs["prompt"].OutcomeWindow = duration
 		_, _, _, _, err = resolveOutcomeMetricReferences(configs)
-		require.ErrorContains(t, err, "outcome_window")
+		require.ErrorContains(t, err, "adoption_window")
 	}
 	configs["prompt"].OutcomeWindow = ""
-	configs["prompt"].Metric = "outcome:merged"
+	configs["prompt"].Metric = "adoption:merged"
 	_, _, _, _, err = resolveOutcomeMetricReferences(configs)
-	require.ErrorContains(t, err, "Expected outcome:accepted or outcome:zero_touch")
+	require.ErrorContains(t, err, "Expected adoption:accepted or adoption:zero_touch")
 	configs["prompt"].Metric = "grader:score"
-	configs["prompt"].GuardrailMetrics[0].Name = "outcome:typo"
+	configs["prompt"].GuardrailMetrics[0].Name = "adoption:typo"
 	_, _, _, _, err = resolveOutcomeMetricReferences(configs)
-	require.ErrorContains(t, err, "outcome:typo")
+	require.ErrorContains(t, err, "adoption:typo")
 }
 
 func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {
@@ -319,7 +319,7 @@ func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			set := &graderMetricObservationSet{
-				MetricID: "outcome:accepted",
+				MetricID: "adoption:accepted",
 				ByVariant: map[string][]GraderMetricObservation{
 					"control": decisionTestObservations("control", tc.values), "candidate": decisionTestObservations("candidate", tc.values),
 				},
@@ -332,11 +332,11 @@ func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {
 				set.ByVariant[variant] = observations
 			}
 			cfg := &workflow.ExperimentConfig{
-				Metric: "outcome:accepted", Variants: []string{"control", "candidate"}, MinSamples: 2,
-				GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0"}},
+				Metric: "adoption:accepted", Variants: []string{"control", "candidate"}, MinSamples: 2,
+				GuardrailMetrics: []workflow.GuardrailMetric{{Name: "adoption:zero_touch", Threshold: ">=0"}},
 			}
 			exp := ExperimentVariantStats{Name: "prompt", Variants: map[string]int{"control": 10, "candidate": 10}, Total: 20}
-			analysis := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, set, map[string]*graderMetricObservationSet{"outcome:zero_touch": set})
+			analysis := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, set, map[string]*graderMetricObservationSet{"adoption:zero_touch": set})
 			require.Len(t, analysis.Comparisons, 1)
 			assert.Equal(t, tc.testType, analysis.Comparisons[0].AnalysisType)
 			assert.Empty(t, analysis.Comparisons[0].Error)
@@ -344,10 +344,10 @@ func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {
 			assert.Equal(t, GuardrailStatusPass, analysis.Guardrails[0].Status)
 			encoded, err := json.Marshal(analysis)
 			require.NoError(t, err)
-			assert.Contains(t, string(encoded), `"outcome_coverage":{"immature":1,"stale_pending":2,"unavailable":3,"no_op":4}`)
+			assert.Contains(t, string(encoded), `"adoption_coverage":{"immature":1,"stale_pending":2,"unavailable":3,"no_op":4}`)
 			output := captureExperimentDetailsStderr(t, &ExperimentDetails{Analyses: []ExperimentAnalysis{analysis}})
 			assert.Contains(t, output, "immature=1 stale_pending=2 unavailable=3 no_op=4")
-			assert.Contains(t, output, "outcome:zero_touch / control")
+			assert.Contains(t, output, "adoption:zero_touch / control")
 		})
 	}
 }
@@ -378,9 +378,13 @@ if [ "$1" = "run" ] && [ "$2" = "download" ]; then
 fi
 case "$*" in
   *actions/runs/101/artifacts*) printf '%s' "$GH_AW_TEST_EXPERIMENT_NAMES" ;;
-  *actions/runs/101*) printf '%s' '{"databaseId":101,"status":"completed","conclusion":"success","repository":"acme/repo"}' ;;
+  *actions/runs/101*) printf '%s' '{"databaseId":101,"attempt":1,"status":"completed","conclusion":"success","repository":"acme/repo"}' ;;
   *repos/acme/repo/pulls/42/reviews*|*repos/acme/repo/pulls/42/commits*|*repos/acme/repo/issues/42/comments*) printf '%s' '[[]]' ;;
-  *repos/acme/repo/pulls/42*) printf '%s' '{"merged":true,"state":"closed","labels":[]}' ;;
+  *repos/acme/repo/collaborators/alice/permission*) printf '%s' '{"permission":"write"}' ;;
+  *repos/acme/repo/pulls/42*)
+    host=github.com
+    case "$*" in *"--hostname github.example.com"*) host=github.example.com ;; esac
+    printf '{"html_url":"https://%s/acme/repo/pull/42","merged":true,"state":"closed","merged_at":"2026-10-04T00:00:00Z","merged_by":{"login":"alice","type":"User"},"labels":[]}' "$host" ;;
   *graphql*) printf '%s' '{"data":{"repository":{"pullRequest":{"id":"PR42","closingIssuesReferences":{"nodes":[]}}}}}' ;;
   *) printf 'unexpected command: %s\n' "$*" >&2; exit 1 ;;
 esac
@@ -392,12 +396,12 @@ func TestOutcomeMetricsRequireOptIn(t *testing.T) {
 		name   string
 		config *workflow.ExperimentConfig
 	}{
-		{name: "primary", config: &workflow.ExperimentConfig{Metric: "outcome:accepted"}},
-		{name: "secondary", config: &workflow.ExperimentConfig{SecondaryMetrics: []string{"outcome:zero_touch"}}},
+		{name: "primary", config: &workflow.ExperimentConfig{Metric: "adoption:accepted"}},
+		{name: "secondary", config: &workflow.ExperimentConfig{SecondaryMetrics: []string{"adoption:zero_touch"}}},
 		{name: "guardrail", config: &workflow.ExperimentConfig{
 			Metric: "grader:tool-success-rate",
 			GuardrailMetrics: []workflow.GuardrailMetric{
-				{Name: "outcome:accepted", Threshold: ">=0.8"},
+				{Name: "adoption:accepted", Threshold: ">=0.8"},
 			},
 		}},
 	} {
@@ -408,7 +412,7 @@ func TestOutcomeMetricsRequireOptIn(t *testing.T) {
 			}
 			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(t.Context(), &ExperimentDetails{}, frontmatter, "acme/repo", false)
 			defer cleanup()
-			require.ErrorContains(t, err, "require --outcome")
+			require.ErrorContains(t, err, "require --adoption")
 			assert.Contains(t, err.Error(), "additional GitHub API requests")
 			assert.Nil(t, bundle)
 			_, err = os.Stat(calls)
@@ -431,7 +435,7 @@ func TestOutcomeOptInWithoutOutcomeMetrics(t *testing.T) {
 			assert.Empty(t, bundle.Secondary)
 			assert.Empty(t, bundle.Guardrails)
 			_, err = os.Stat(calls)
-			assert.True(t, os.IsNotExist(err), "workflows without outcome metrics need no outcome API requests")
+			assert.True(t, os.IsNotExist(err), "workflows without adoption metrics need no adoption API requests")
 		})
 	}
 }
@@ -447,8 +451,8 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 	}
 	frontmatter := experimentFrontmatterResult{ExperimentConfigs: map[string]*workflow.ExperimentConfig{
 		"prompt": {
-			Metric: "outcome:accepted", SecondaryMetrics: []string{"outcome:zero_touch"},
-			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}},
+			Metric: "adoption:accepted", SecondaryMetrics: []string{"adoption:zero_touch"},
+			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "adoption:zero_touch", Threshold: ">=0.5"}},
 		},
 	}}
 	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(t.Context(), details, frontmatter, "acme/repo", true)
@@ -456,10 +460,10 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 	defer cleanup()
 	require.Len(t, bundle.Primary["prompt"].ByVariant["control"], 1)
 	assert.InDelta(t, 1, bundle.Primary["prompt"].ByVariant["control"][0].Value, 1e-12)
-	require.Len(t, bundle.Guardrails["prompt"]["outcome:zero_touch"].ByVariant["control"], 1)
-	assert.InDelta(t, 1, bundle.Guardrails["prompt"]["outcome:zero_touch"].ByVariant["control"][0].Value, 1e-12)
-	require.Len(t, bundle.Secondary["prompt"]["outcome:zero_touch"].ByVariant["control"], 1)
-	assert.Equal(t, "outcome:zero_touch", bundle.Secondary["prompt"]["outcome:zero_touch"].MetricID)
+	require.Len(t, bundle.Guardrails["prompt"]["adoption:zero_touch"].ByVariant["control"], 1)
+	assert.InDelta(t, 1, bundle.Guardrails["prompt"]["adoption:zero_touch"].ByVariant["control"][0].Value, 1e-12)
+	require.Len(t, bundle.Secondary["prompt"]["adoption:zero_touch"].ByVariant["control"], 1)
+	assert.Equal(t, "adoption:zero_touch", bundle.Secondary["prompt"]["adoption:zero_touch"].MetricID)
 	assert.Equal(t, 1, bundle.Primary["prompt"].Coverage["candidate"].Immature)
 	assert.Equal(t, "default", bundle.Primary["prompt"].OutcomeWindow.Source)
 	analyses := computeExperimentAnalysesWithObservationBundle(
@@ -467,7 +471,7 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 	)
 	require.Len(t, analyses, 1)
 	require.Len(t, analyses[0].SecondaryMetrics, 1)
-	assert.Equal(t, "outcome:zero_touch", analyses[0].SecondaryMetrics[0].Metric)
+	assert.Equal(t, "adoption:zero_touch", analyses[0].SecondaryMetrics[0].Metric)
 	assert.Equal(t, 1, analyses[0].SecondaryMetrics[0].Variants[1].ObservationCount)
 	assert.NotNil(t, analyses[0].OutcomeWindow)
 	commands, err := os.ReadFile(calls)
@@ -485,9 +489,9 @@ func TestOutcomeArtifactUnavailabilityIsNotNoOp(t *testing.T) {
 		downloadError         bool
 		unavailable           bool
 	}{
-		{name: "explicit noop", manifest: "{\"type\":\"noop\"}\n"},
+		{name: "explicit noop", manifest: "{\"type\":\"noop\",\"timestamp\":\"2026-10-01T00:00:00Z\"}\n"},
 		{name: "empty manifest"},
-		{name: "missing data has no outcome", manifest: "{\"type\":\"report_missing_data\"}\n"},
+		{name: "missing data has no adoption", manifest: "{\"type\":\"report_missing_data\",\"timestamp\":\"2026-10-01T00:00:00Z\"}\n"},
 		{name: "missing manifest", names: "called-agent-output-fallback", unavailable: true},
 		{name: "no artifacts", names: "usage", unavailable: true},
 		{name: "corrupt manifest", manifest: "{", unavailable: true},

@@ -25,6 +25,11 @@ import (
 // This is used when the --stdin flag is passed to the logs command.
 func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (err error) { //nolint:largefunc // Existing stdin orchestration remains centralized.
 	opts = normalizeStdinLogsOptions(opts)
+	if opts.Delivery || opts.Outcomes {
+		var cancel context.CancelFunc
+		ctx, cancel = lifecycleLogsContext(ctx, opts.Timeout, 0, 0)
+		defer cancelLogsDownload(cancel)
+	}
 	ctx, stream, finish := startLogsJSONL(ctx, opts.Format, opts.Verbose, workQueueEvidenceRequested(opts.ArtifactSets) || len(ResolveArtifactFilter(opts.ArtifactSets)) == 0)
 	defer finish(&err)
 	logsOrchestratorLog.Printf("Starting stdin log download: runs=%d, outputDir=%s", len(opts.RunURLs), opts.OutputDir)
@@ -349,9 +354,12 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	}
 	var outcomeReports []OutcomesData
-	if opts.Outcomes {
-		outcomeReports, err = collectLogsOutcomes(ctx, processedRuns, opts.OutcomesDir, opts.Verbose)
+	if opts.Outcomes || opts.Delivery {
+		outcomeReports, err = collectLogsLifecycles(ctx, processedRuns, opts.OutcomesDir, opts.Verbose, opts.Outcomes, preparedCachedJSONL.cache)
 		if err != nil {
+			return err
+		}
+		if err := cacheLogsLifecycles(cachedJSONLWriter, outcomeReports); err != nil {
 			return err
 		}
 	}
