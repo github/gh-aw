@@ -555,14 +555,14 @@
   .smt-cap { margin-top: 8px; font-size: 14px; letter-spacing: .06em; color: #6e7681; }
   .cpr-svg { position: absolute; left: 60px; top: 300px; width: 1800px; height: 680px; overflow: visible; font-family: "Mona Sans"; }
   .cpr-e { fill: none; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, opacity .3s; }
-  .cpr-e.on { stroke: var(--c); stroke-width: 3.5; filter: drop-shadow(0 0 6px var(--c)); }
+  .cpr-e.on { stroke: var(--c); stroke-width: 3.5; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 33%, transparent)); }
   .cpr-el { fill: #6e7681; font: 500 14px var(--mono); }
   .cpr-n { opacity: .5; transition: opacity .3s; }
   .cpr-n.on { opacity: 1; }
   .cpr-n rect, .cpr-n polygon { fill: #0d1117e6; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, filter .3s, fill .3s; }
   .cpr-n.d polygon { stroke-dasharray: 0; }
-  .cpr-n.on rect, .cpr-n.on polygon { stroke: var(--c); fill: #161b22; filter: drop-shadow(0 0 12px var(--c)); }
-  .cpr-n.t.g { --c: #3fb950; } .cpr-n.t.r { --c: #f85149; } .cpr-n.t.o { --c: #d29922; }
+  .cpr-n.on rect, .cpr-n.on polygon { stroke: var(--c); fill: #161b22; filter: drop-shadow(0 0 12px color-mix(in srgb, var(--c) 33%, transparent)); }
+  .cpr-n.t.g { --c: #4493f8; } .cpr-n.t.r { --c: #db6d28; } .cpr-n.t.o { --c: #d29922; }
   .cpr-n.t rect { stroke-dasharray: 6 5; }
   .cpr-n.t.on rect { stroke-dasharray: 0; }
   .cpr-n.hit { animation: cpr-hit .5s cubic-bezier(.3,1.6,.4,1); transform-box: fill-box; transform-origin: center; }
@@ -571,13 +571,13 @@
   .cpr-b { fill: #9198a1; font: 500 13px var(--mono); text-anchor: middle; }
   .cpr-n.t.on .cpr-a { fill: var(--c); }
   .cpr-k { fill: #6e7681; font: 500 13px var(--mono); text-anchor: middle; }
-  .cpr-dot { fill: #f0f6fc; filter: drop-shadow(0 0 8px #f0f6fc); transition: opacity .2s; }
+  .cpr-dot { fill: #f0f6fc; filter: drop-shadow(0 0 8px #f0f6fc55); transition: opacity .2s; }
   .cpr-cap { position: absolute; left: 1150px; top: 120px; width: 700px; font-family: "Mona Sans"; }
   .cpr-cap i { display: block; font: 600 20px/1 var(--mono); font-style: normal; letter-spacing: .14em; color: #9198a1; }
   .cpr-cap b { display: block; margin-top: 12px; font: 700 40px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; }
   .cpr-cap span { display: block; margin-top: 10px; font: 600 26px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .3s; }
   .cpr-cap span.on { opacity: 1; }
-  .cpr-cap span.g { color: #3fb950; } .cpr-cap span.r { color: #ff7b72; } .cpr-cap span.o { color: #e3b341; }
+  .cpr-cap span.g { color: #79c0ff; } .cpr-cap span.r { color: #ffa657; } .cpr-cap span.o { color: #e3b341; }
   .cpr-cap.swap b { animation: rise .6s cubic-bezier(.2,.9,.2,1) both; }
   .fv-chip rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: all .3s; }
   .fv-chip.on rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #3fb950); }
@@ -2384,7 +2384,7 @@
   /* --- finale --- */
   .fin-bg { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
   .fin-bg h1 { margin: 0; font-size: 150px; line-height: 1.1; letter-spacing: -.01em; font-variation-settings: "wght" 700, "wdth" 100; white-space: nowrap;
-    background: linear-gradient(100deg, #0fbf3e 0%, #5fed83 30%, #4493f8 65%, #ab7df8 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+    background: linear-gradient(100deg, #0fbf3e 0%, #5fed83 35%, #bfffd1 65%, #5fed83 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
     opacity: .5; animation: finShimmer 14s ease-in-out infinite alternate; }
   .fin-bg h1 + h1 { font-size: 72px; line-height: 1.2; margin-top: 36px; }
   @keyframes finShimmer { to { background-position: 100% 0; } }
@@ -2766,12 +2766,12 @@
   .hist-grid { stroke: #ffffff12; stroke-width: 1; }
   .hist-axis { stroke: #ffffff40; stroke-width: 2; }
   .hist-ax { fill: #9198a1; font: 500 17px var(--mono); }
-  .hist-ax-l { fill: #d29922; }
+  .hist-ax-l { fill: #c9d1d9; }
   .hist-yr { fill: #f0f6fc; font: 700 18px var(--mono); }
-  .hist-b-copilot { fill: #ab7df8; } .hist-b-bot { fill: #3fb950; } .hist-b-other { fill: #4493f8; }
-  .hist-b-human { fill: #db61a2; } .hist-b-none { fill: #ab7df84d; }
-  .hist-loc { fill: none; stroke: #d29922; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #d2992288); }
-  .hist-loc-dot { fill: #d29922; filter: drop-shadow(0 0 12px #d29922); }
+  .hist-b-copilot { fill: #ab7df8; } .hist-b-bot { fill: #e2c5ff; } .hist-b-other { fill: #8b949e; }
+  .hist-b-human { fill: #4493f8; } .hist-b-none { fill: #ab7df84d; }
+  .hist-loc { fill: none; stroke: #f0f6fc; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #0d111788); }
+  .hist-loc-dot { fill: #f0f6fc; filter: drop-shadow(0 0 10px #f0f6fc55); }
   .hist-head { stroke: #f0f6fc55; stroke-width: 2; stroke-dasharray: 4 6; }
   .hist-flag { opacity: 0; transition: opacity .5s; }
   .hist-flag.on { opacity: 1; }
@@ -2799,9 +2799,9 @@
   .active .evo-main, .active .evo-side { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
   .evo-svg { display: block; width: 100%; height: 440px; overflow: visible; font-family: "Mona Sans"; }
   .evo-main .hist-legend { position: static; width: auto; margin-top: 4px; opacity: 1; animation: none; }
-  .evo-wf { fill: none; stroke: #3fb950; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #3fb95088); }
-  .evo-wf-dot { fill: #3fb950; filter: drop-shadow(0 0 12px #3fb950); }
-  .evo-ax-r { fill: #3fb950; }
+  .evo-wf { fill: none; stroke: #f0f6fc; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #0d111788); }
+  .evo-wf-dot { fill: #f0f6fc; filter: drop-shadow(0 0 10px #f0f6fc55); }
+  .evo-ax-r { fill: #c9d1d9; }
   .evo-med { fill: #f0f6fc; font: 700 17px var(--mono); }
   .evo-side .evo-svg { margin-top: 34px; }
   .evo-sx { font-size: 14px; }
@@ -15330,7 +15330,7 @@
       SY = 540,
       NR = 420,
       GA = Math.PI * (3 - Math.sqrt(5));
-    const PROC = ["#3fb950", "#4493f8", "#ab7df8", "#d29922", "#db61a2", "#79c0ff"];
+    const PROC = ["#5fed83", "#8cf2a6", "#bfffd1", "#0fbf3e", "#3fb950", "#c9d1d9"];
     const repos = [],
       links = [];
     for (let i = 0; i < NR; i++) {
@@ -15625,9 +15625,9 @@
       PEND = at(TGA + DAY);
     const MILES = [
       [T0, "first commit", "12 Aug 2025", "#9198a1"],
-      [Date.UTC(2026, 1, 13), "technical preview", "13 Feb 2026", "#4493f8"],
-      [Date.UTC(2026, 5, 11), "public preview", "11 Jun 2026", "#ab7df8"],
-      [TGA, "GA · Universe", "28 Oct 2026", "#3fb950"],
+      [Date.UTC(2026, 1, 13), "technical preview", "13 Feb 2026", "#c9d1d9"],
+      [Date.UTC(2026, 5, 11), "public preview", "11 Jun 2026", "#c9d1d9"],
+      [TGA, "GA · Universe", "28 Oct 2026", "#d2a8ff"],
     ];
     // chart frame
     const CX = 70,
@@ -15710,9 +15710,9 @@
       ["days", p => Math.round(dayAt(p)), "#9198a1", "12 Aug 2025 → 28 Oct 2026"],
       ["commits", p => cum(COMMITS, p), "#f0f6fc", "on main, all authors"],
       ["pull requests", p => cum(PRS, p), "#ab7df8", "18,137 merged"],
-      ["issues", p => cum(ISSUES, p), "#4493f8", "33,441 by the workflow bot"],
-      ["releases", p => cum(RELEASES, p), "#3fb950", "v0.0.21 → v1.0.0"],
-      ["lines of Go + JS", p => snap(LOC, p), "#d29922", "incl. tests, at month end"],
+      ["issues", p => cum(ISSUES, p), "#ab7df8", "33,441 by the workflow bot"],
+      ["releases", p => cum(RELEASES, p), "#f0f6fc", "v0.0.21 → v1.0.0"],
+      ["lines of Go + JS", p => snap(LOC, p), "#f0f6fc", "incl. tests, at month end"],
     ];
     const tileVals = TILES.map(() => h("b", {}, "0"));
     const fmt = (k, v) => (k === 5 ? (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : `${Math.round(v / 1000)}k`) : nf.format(Math.round(v)));
@@ -15787,7 +15787,7 @@
       },
       el: h(
         "section",
-        { class: "slide" },
+        { class: "slide", "--lg": "#d2a8ff" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · gh-aw on GitHub"), h("h2", {}, letters("First commit "), letters("to GA", "l-grad"))),
         h(
           "div",
@@ -15799,7 +15799,7 @@
           { class: "hist-splits" },
           split("Copilot PRs from an issue written by", [
             [77.0, "#ab7df8", "an agentic workflow"],
-            [23.0, "#db61a2", "a person's account"],
+            [23.0, "#4493f8", "a person's account"],
           ]),
           split("Commits authored by", [
             [84.2, "#ab7df8", "agent & bot accounts"],
@@ -15809,12 +15809,12 @@
         h(
           "div",
           { class: "hist-legend" },
-          h("span", { "--c": "#3fb950" }, "workflow PRs"),
+          h("span", { "--c": "#e2c5ff" }, "workflow PRs"),
           h("span", { "--c": "#ab7df8" }, "Copilot ← AW issue"),
-          h("span", { "--c": "#db61a2" }, "Copilot ← human issue"),
+          h("span", { "--c": "#4493f8" }, "Copilot ← human issue"),
           h("span", { "--c": "#ab7df84d" }, "Copilot, no issue"),
-          h("span", { "--c": "#4493f8" }, "other"),
-          h("span", { "--c": "#d29922", class: "ln" }, "lines of code")
+          h("span", { "--c": "#8b949e" }, "other"),
+          h("span", { "--c": "#f0f6fc", class: "ln" }, "lines of code")
         ),
         svg
       ),
@@ -15828,11 +15828,11 @@
     const nf = new Intl.NumberFormat("en-US");
     // origins: workflow PRs, Copilot from a workflow-written issue, from a human-written issue, with no linked issue, other
     const ORIG = [
-      ["workflow PRs", "#3fb950"],
+      ["workflow PRs", "#e2c5ff"],
       ["Copilot ← AW issue", "#ab7df8"],
-      ["Copilot ← human issue", "#db61a2"],
+      ["Copilot ← human issue", "#4493f8"],
       ["Copilot, no issue", "#ab7df84d"],
-      ["other", "#4493f8"],
+      ["other", "#8b949e"],
     ];
     const CHARTS = [
       {
@@ -15951,7 +15951,7 @@
       },
       el: h(
         "section",
-        { class: "slide" },
+        { class: "slide", "--lg": "#d2a8ff" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · merged gh-aw pull requests"), h("h2", {}, letters("How PRs "), letters("land", "l-grad"))),
         h("div", { class: "land-panels" }, charts.map(panel)),
         h(
@@ -16013,7 +16013,7 @@
     };
     const barsG = main.querySelector(".evo-bars");
     const bars = MON.map((_, i) =>
-      ["hist-b-copilot", "hist-b-other"].map(cls => {
+      ["hist-b-copilot", "hist-b-human"].map(cls => {
         const r = mk(barsG, cls);
         r.setAttribute("x", xs(i + 0.5) - BW / 2);
         r.setAttribute("width", BW);
@@ -16043,7 +16043,7 @@
     side.innerHTML = `<g>${sg}</g><g class="evo-sbars"></g><line class="hist-head" x1="${mx}" x2="${mx}" y1="${TOP + 10}" y2="${BASE}"/><text x="${mx + 8}" y="${TOP + 24}" class="evo-med">median 18</text><line class="hist-axis" x1="${SX - 8}" x2="${SW}" y1="${BASE}" y2="${BASE}"/>`;
     const sbG = side.querySelector(".evo-sbars");
     const sbars = SIZE.map((_, i) => {
-      const r = mk(sbG, "", "#db61a2");
+      const r = mk(sbG, "", "#8b949e");
       r.setAttribute("x", SX + sslot * (i + 0.5) - sbw / 2);
       r.setAttribute("width", sbw);
       return r;
@@ -16081,10 +16081,10 @@
     const DUR = 4200;
     const FACTS = [
       ["ρ = −0.03", "edit size vs date · Spearman: no trend", "#f0f6fc"],
-      ["p = 0.22", "Mann–Whitney, before vs after Mar 2026 · both medians 18", "#4493f8"],
-      ["4.5 → 0.75", "commits per live workflow per month, Oct ’25 → Oct ’26", "#3fb950"],
-      ["61%", "of lines changed sit in the largest 10% of commits", "#db61a2"],
-      ["G = 0.52", "Gini of edits over 527 workflow files", "#ab7df8"],
+      ["p = 0.22", "Mann–Whitney, before vs after Mar 2026 · both medians 18", "#f0f6fc"],
+      ["4.5 → 0.75", "commits per live workflow per month, Oct ’25 → Oct ’26", "#d2a8ff"],
+      ["61%", "of lines changed sit in the largest 10% of commits", "#f0f6fc"],
+      ["G = 0.52", "Gini of edits over 527 workflow files", "#f0f6fc"],
     ];
     slides.push({
       group: "data",
@@ -16106,14 +16106,14 @@
       },
       el: h(
         "section",
-        { class: "slide" },
+        { class: "slide", "--lg": "#d2a8ff" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · workflow Markdown on gh-aw main"), h("h2", {}, letters("How workflows "), letters("evolve", "l-grad"))),
         h(
           "div",
           { class: "evo-main", "--i": 0 },
           h("div", { class: "land-t" }, "Commits per month · live workflows"),
           h("div", { class: "land-big" }, h("b", {}, "3,687"), h("span", {}, "commits changed a workflow .md · 545 created, 196 retired, 349 live")),
-          h("div", { class: "hist-legend" }, h("span", { "--c": "#ab7df8" }, "agent & bot accounts · 82%"), h("span", { "--c": "#4493f8" }, "people · 18%"), h("span", { "--c": "#3fb950", class: "ln" }, "live workflows")),
+          h("div", { class: "hist-legend" }, h("span", { "--c": "#ab7df8" }, "agent & bot accounts · 82%"), h("span", { "--c": "#4493f8" }, "people · 18%"), h("span", { "--c": "#f0f6fc", class: "ln" }, "live workflows")),
           main
         ),
         h("div", { class: "evo-side", "--i": 1 }, h("div", { class: "land-t" }, "Lines changed per commit"), h("div", { class: "land-big" }, h("b", {}, "18"), h("span", {}, "median · p90 209 · 71% touch one file")), side),
@@ -20970,7 +20970,7 @@
           dot.setAttribute("cy", p.y);
         } else dot.style.opacity = 0;
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "create-pull-request, decoded"), h("h2", {}, letters("Patch to "), letters("PR", "l-grad"))), cap, svg),
+      el: h("section", { class: "slide", "--lg": "#79c0ff" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "create-pull-request, decoded"), h("h2", {}, letters("Patch to "), letters("PR", "l-grad"))), cap, svg),
     });
   }
 
@@ -21192,8 +21192,8 @@
     // gh cao (research prototype): deep teal control room, wide grid tilted 60°, a hub ping fanning out to repos.
     cao: { base: [4, 20, 24], pal: ["#0b5560", "#073b44", "#12707a", "#04242b"], grid: [120, 220, 230, 0.03, 0.075], ang: Math.PI / 3, cell: 40, accent: ["#56d4dd", "#1b9aaa", "#b3f0f5", "#39c5cf"], music: "cao", prog: [0, 3, -2, 5, -4] },
     // AW factory (measured data): violet graph paper, a fine straight grid, a rising arpeggio.
-    data: { base: [11, 7, 26], pal: ["#3d1a7a", "#1f1650", "#5a32a3", "#0d2a5c"], grid: [171, 125, 248, 0.035, 0.09], ang: 0, cell: 20, accent: ["#bc8cff", "#8957e5", "#e2c5ff", "#79c0ff"], music: "data", prog: [0, 4, 7, 2] },
-    finale: { base: [13, 17, 23], pal: ["#0a8a2e", "#0d419d", "#5a32a3", "#196c2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "finale", prog: [0] },
+    data: { base: [11, 7, 26], pal: ["#3d1a7a", "#1f1650", "#5a32a3", "#2a1660"], grid: [171, 125, 248, 0.035, 0.09], ang: 0, cell: 20, accent: ["#bc8cff", "#8957e5", "#e2c5ff", "#a371f7"], music: "data", prog: [0, 4, 7, 2] },
+    finale: { base: [13, 17, 23], pal: ["#0a8a2e", "#104c35", "#08872b", "#196c2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "finale", prog: [0] },
   };
 
   // ---------- bands ----------
