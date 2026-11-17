@@ -434,3 +434,13 @@ if curl --proto '=https' --proto-redir '=https' -fsSL --max-time 2 http://127.0.
 fi
 grep -qi 'protocol.*disabled' "$TEMP_DIR/curl-output"
 echo "PASS: real curl refuses HTTP before connecting"
+
+# Lock files compiled by older gh-aw versions call these from inline helper steps.
+verify_release_identity "$TEMP_DIR/valid-checksums.txt" "$TEMP_DIR/release-identity.txt" \
+  github/gh-aw-firewall v0.29.11 "$manifest_digest"
+if verify_release_identity "$TEMP_DIR/valid-checksums.txt" "$TEMP_DIR/release-identity.txt" \
+  github/gh-aw-firewall v0.29.11 "$payload_digest" 2>/dev/null; then
+  echo "FAIL: legacy identity shim accepted an untrusted manifest" >&2; exit 1
+fi
+verify_release_attestation "$TEMP_DIR/payload" github/gh-aw-firewall 2>/dev/null
+echo "PASS: legacy attestation entry points remain callable and enforce the trusted manifest digest"

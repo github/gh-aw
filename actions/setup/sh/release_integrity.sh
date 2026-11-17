@@ -185,3 +185,15 @@ verify_release_digest() {
     return 1
   fi
 }
+
+# Deprecated compatibility shims for lock files compiled by older gh-aw
+# versions, whose inline helper steps still call these functions. Integrity is
+# enforced solely by the trusted SHA256 chain: the caller-supplied manifest pin
+# here, and the verify_release_digest call that follows in those steps.
+verify_release_identity() {
+  verify_release_digest "$1" "$5"
+}
+
+verify_release_attestation() {
+  echo "Notice: release attestation verification is no longer performed for $(basename "$1"); relying on trusted SHA256 verification" >&2
+}
