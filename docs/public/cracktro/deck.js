@@ -2603,6 +2603,8 @@
   .active .evo-fact { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 1.4s); }
   .evo-fact b { display: block; font: 700 40px/1 var(--mono); color: var(--c); white-space: nowrap; }
   .evo-fact span { display: block; margin-top: 8px; font-size: 19px; line-height: 1.25; color: #c9d1d9; }
+  .psc-st.k { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95099); }
+  .psc-m { width: 1360px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
 
@@ -18732,6 +18734,229 @@
         svg,
         ppm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 8 Jun–15 Nov 2026 (160 d) · loop illustrative")
+      ),
+    });
+  }
+
+  // PR Sous Chef: every five minutes a no-AI prefilter picks at most four stuck pull requests; the agent posts Copilot a deduplicated prep list, Copilot cooks, and human review and CI decide
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const node = (id, cx, y, w, label, fill, icon, cls = "") =>
+      `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${cx}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${cx + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${cx}" cy="${y}" r="34" fill="${fill}"/>${ico(icon, cx, y + 1, icon === "copilot" ? 38 : 30)}</g>`;
+    // illustrative queue: [title, reason, kept]
+    const QUEUE = [
+      ["docs: fix typo", "draft", 0],
+      ["feat: retry upload", "conflicts", 1],
+      ["chore: bump deps", "dependency bot", 0],
+      ["fix: flaky test", "agent active", 0],
+      ["feat: new flag", "failing check", 1],
+      ["refactor: parser", "broccoli", 0],
+      ["perf: cache reads", "idle < 10 min", 0],
+    ];
+    // [x, w, file, tag, lines] for the prep list and the Copilot task
+    const PANELS = [
+      [
+        700,
+        700,
+        "comment · @copilot",
+        "PREP",
+        [
+          ["h", "@copilot  a little prep"],
+          ["", "1. make merge-main"],
+          ["", "2. Review (cli.go:42): address"],
+          ["", "3. Fix failing check  lint"],
+          ["q", "no merging · no CI triggering"],
+          ["fn", "▸ Structured data  {kind, sha256}"],
+          ["add", "+ approve CI run · assign Copilot"],
+        ],
+      ],
+      [
+        1460,
+        640,
+        "Copilot task",
+        "COOK",
+        [
+          ["api", "$ make merge-main"],
+          ["add", "+ answer the review thread"],
+          ["add", "+ fix lint"],
+          ["", "push → CI runs"],
+          ["q", "stop at human review"],
+          ["pass", "✓ ready for review"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly]
+    const EDGES = [
+      ["pscE0", "M374 106 H722", "p", "≤ 4 pull requests", 548, 90],
+      ["pscE1", "M1094 106 H1462", "p", "@copilot prep list", 1278, 90],
+      ["pscE2", "M1780 544 V630 H1028", "g", "human review · CI", 1420, 614],
+      ["pscE3", "M954 630 H458", "g", "merge", 704, 614],
+    ];
+    let g = `<defs><clipPath id="pscClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="pscP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="pscG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 680, "PREFILTER · NO AI"],
+      [680, 1430, "SOUS CHEF"],
+      [1430, VW, "COPILOT"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="pscLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    g += `<g class="sdd-panel" id="pscQ"><rect class="sdd-card" x="40" y="${PY}" width="600" height="${PH}" rx="16"/>
+      <line class="sdd-hd" x1="40" y1="${PY + 50}" x2="640" y2="${PY + 50}"/>
+      <text class="sdd-file" x="62" y="${PY + 33}">open pull requests</text><text class="sdd-tag" x="618" y="${PY + 32}">QUEUE</text>`;
+    QUEUE.forEach(([t, why, k], j) => {
+      const y = PY + 88 + j * 40;
+      g += `<text class="sdd-ln" id="pscQ${j}" x="62" y="${y}">${sp(t)}</text><text class="sdd-stamp psc-st${k ? " k" : ""}" id="pscS${j}" x="618" y="${y}">${k ? "✓ " : ""}${sp(why)}</text>`;
+    });
+    g += `</g>`;
+    PANELS.forEach(([x, w, file, tag, lines], i) => {
+      g += `<g class="sdd-panel" id="pscP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${w}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + w}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + w - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => (g += `<text class="sdd-ln ${c}" id="pscL${i}_${j}" x="${x + 22}" y="${PY + 88 + j * 40}">${sp(s)}</text>`));
+      g += `</g>`;
+    });
+    for (const [id, d, c, lab, lx, ly] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#psc${c === "g" ? "G" : "P"})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab}</text>`;
+    }
+    g += node("pscTick", 88, 106, 250, "Every 5 min", "#1f6feb", "stopwatch", "b");
+    g += node("pscChef", 760, 106, 330, "PR Sous Chef", "#8957e5", "tasklist");
+    g += node("pscBot", 1500, 106, 240, "Copilot", "#8957e5", "copilot");
+    g += `<g class="fm-task" id="pscMaint"><circle cx="990" cy="630" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="959" y="599" width="62" height="62" clip-path="url(#pscClip)"/><text class="ddr-lbl" x="990" y="584">Maintainer</text></g>`;
+    g += node("pscMerged", 120, 630, 300, "Merged", "#8957e5", "merge", "g");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg psc-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    let start = 0,
+      len = 0,
+      ev = [],
+      evI = 0,
+      fly = null;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const begin = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "gone"));
+      dot.style.opacity = 0;
+      fly = null;
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, n) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(n);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("pscLane0"), on("pscTick"), on("pscQ"), sfx.key(0.6)));
+      QUEUE.forEach(([, , k], j) => {
+        at(400 + j * 260, () => (on(`pscQ${j}`), sfx.key(0.5)));
+        at(530 + j * 260, () => (on(`pscS${j}`), k ? sfx.pop(4) : on(`pscQ${j}`, "gone")));
+      });
+      at(2500, () => (on("pscQ", "ok"), sfx.pop(2)));
+      flight(2700, "pscE0", 600, "#ab7df8", 3);
+      at(3300, () => (on("pscLane1"), on("pscChef"), on("pscP0"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(3500 + j * 230, () => (on(`pscL0_${j}`), sfx.key(0.5))));
+      at(5200, () => (on("pscP0", "ok"), sfx.pop(5)));
+      flight(5400, "pscE1", 600, "#ab7df8", 6);
+      at(6000, () => (on("pscLane2"), on("pscBot"), on("pscP1"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4].forEach(j => at(6200 + j * 300, () => (on(`pscL1_${j}`), sfx.key(0.5))));
+      at(7800, () => (on("pscL1_5"), on("pscP1", "ok"), sfx.pop(8)));
+      flight(8100, "pscE2", 1400, "#3fb950", 7);
+      at(9500, () => (on("pscMaint"), sfx.review()));
+      flight(10100, "pscE3", 1000, "#3fb950", 9);
+      at(11100, () => (on("pscMerged"), sfx.pop(10)));
+      len = 14500;
+    };
+    // measured: Sous Chef nudges to Copilot on gh-aw pull requests by month (snapshot 17 Nov 2026; May starts 13 May, November is partial)
+    const MONTHS = [
+      ["May", 211],
+      ["Jun", 509],
+      ["Jul", 1414],
+      ["Aug", 1610],
+      ["Sep", 832],
+      ["Oct", 662],
+      ["Nov", 588],
+    ];
+    const TW = 440,
+      MAX = Math.max(...MONTHS.map(m => m[1]));
+    let tl = `<text class="t" x="0" y="16">NUDGES BY MONTH</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    MONTHS.forEach(([m, v], i) => {
+      const x = 14 + i * 60,
+        hh = (v * 54) / MAX;
+      tl += `<rect class="${i === MONTHS.length - 1 ? "h" : ""}" style="--i:${i}" x="${x}" y="${96 - hh}" width="38" height="${hh}" rx="2"/>`;
+      tl += `<text class="v" x="${x + 19}" y="${90 - hh}">${v.toLocaleString("en-US")}</text><text class="m" x="${x + 19}" y="118">${m}</text>`;
+    });
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl ddm-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const pscm = h(
+      "div",
+      { class: "dhm psc-m" },
+      h("div", { class: "dhm-k" }, kpi("5,826", "@copilot", "nudges"), kpi("2,623", "pull requests", "nudged"), kpi("71%", "answered", "by Copilot", "g"), kpi("90%", "merged, median", "1.8 h after a nudge", "g")),
+      tlSvg
+    );
+    slides.push({
+      group: "process",
+      under: "prr",
+      notes:
+        "PR Sous Chef keeps gh-aw's pull requests moving. It runs every five minutes, on demand and on /souschef or /cook. A deterministic prefilter job with no AI (scripts/pr-sous-chef.mjs) stops when the API rate limit is low, skips draft, stale, opted-out (the broccoli label), dependency-bot and agent-active pull requests, waits until a pull request has been idle for ten minutes and its fingerprint has changed, and hands at most four to the agent, conflicts first, then failing checks, then unresolved review feedback. The agent (the pi engine with economy model routing, read-only permissions) re-runs the script for each pull request and writes only through safe outputs: approving a pending CI run on an allowlist, dismissing a stale review once every thread is resolved, assigning Copilot, and one comment that mentions @copilot with a deduplicated prep list: update the branch with make merge-main, address each review thread, fix each failing check, plus a collapsed structured-data envelope with sha256 hashes so the same work is never requested twice. Copilot does the work and stops at human review and CI; Sous Chef never merges or triggers CI, and after a Copilot task it sends at most one CI follow-up. The bottom strip is measured from gh-aw pull request comments carrying the Sous Chef marker, 13 May to 16 November 2026 (snapshot 17 November 2026): 5,826 Copilot nudges on 2,623 pull requests; Copilot's coding agent replied before the next nudge to 71%; 90% of the nudged pull requests merged, a median 1.8 hours after the first nudge (pull requests that were going to merge anyway are included). The nudges started as free-text requests to refresh the branch and rerun checks, grew noisy in July and August, and since 4 November are the deterministic prep list: 550 lists naming 2,105 review threads and 580 failing checks. The queue, prep list and Copilot task in the flow above are an illustrative, synthetic example.",
+      enter() {
+        start = 0;
+      },
+      tick(t) {
+        if (!start) {
+          start = t;
+          begin();
+        }
+        let u = t - start;
+        if (u > len) {
+          start = t;
+          u = 0;
+          begin();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every five minutes a no-AI prefilter picks stuck pull requests; the agent hands Copilot a prep list"), h("h2", {}, letters("PR Sous "), letters("Chef", "l-grad"))),
+        svg,
+        pscm,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 17 Nov 2026 · PR comments 13 May–16 Nov 2026 (188 d) · flow illustrative")
       ),
     });
   }

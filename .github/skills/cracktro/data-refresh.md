@@ -37,6 +37,7 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
 | Spec · Model · Test | `refresh/spec-model-test.md` |
 | Decide · Draft · Record | `refresh/decide-draft-record.md` |
+| PR Sous Chef | `refresh/pr-sous-chef.md` |
 | Spec-driven testing | `refresh/spec-driven-testing.md` |
 | Docs that heal | `refresh/docs-that-heal.md` |
 | Multi-device tester | `refresh/multi-device-tester.md` |
