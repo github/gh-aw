@@ -189,6 +189,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"c2fcf2ee10b0654ae971d854b654c50547c9858240ff1a075b25b43587dfa550","kind":"artifact","value":{"name":"pr-w3c-specification-writer"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
           GH_AW_INFO_MODEL: "copilot/gpt-5"

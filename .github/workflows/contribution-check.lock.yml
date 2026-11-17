@@ -160,6 +160,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"5a7634128020bdf6bc2e2c25128504672afffb689e17ecd428d13e77650e3482","kind":"artifact","value":{"model":"gpt-6-luna"}},{"sha256":"c2f86bedfb34f6176608fb06d05b1b983094cb6784909495d324a144676a9549","kind":"artifact","value":{"model":"gpt-6-luna"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}

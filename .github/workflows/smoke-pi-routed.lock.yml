@@ -167,6 +167,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"e9a393b1fbafea7ac57ad0d0d4a63f2d6641eaca94c74bec187ea43be010d1ae","kind":"artifact","value":{"model":"copilot/gpt-5.3-codex"}},{"sha256":"fbef03350340c8b91d28b0d9d9a82beadf2e662e13637b63605e446459348750","kind":"artifact","value":{"model":"copilot/claude-haiku-4.5"}}]}'
           GH_AW_INFO_ENGINE_ID: "pi"
           GH_AW_INFO_ENGINE_NAME: "Pi"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_CUSTOM || 'agent' }}

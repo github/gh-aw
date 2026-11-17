@@ -233,6 +233,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"023cae43432cf1b38695d2d3b52f8f97e44e5dfbcf7727d8d897bec5c6373f47","kind":"artifact","value":{"model":"\u0024{{ experiments.subagent_model }}"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
           GH_AW_INFO_MODEL: "o4-mini-aw"
