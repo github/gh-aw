@@ -24,7 +24,7 @@ type EpisodeOutcomeObservation struct {
 // EpisodeOutcomesData joins selected episode members and outcomes.
 type EpisodeOutcomesData struct {
 	Episodes               []EpisodeOutcomeData `json:"episodes"`
-	UnmatchedOutcomeRunIDs []int64              `json:"unmatched_outcome_run_ids"`
+	UnmatchedOutcomeRunIDs []int64              `json:"unmatched_adoption_run_ids"`
 }
 
 // EpisodeOutcomeMembershipCoverage reads optional logs coverage without depending
@@ -39,7 +39,7 @@ type EpisodeOutcomeMembershipCoverage struct {
 type episodeOutcomesLogs struct {
 	Runs     []RunData                  `json:"runs"`
 	Episodes []episodeOutcomeMembership `json:"episodes"`
-	Outcomes []OutcomesData             `json:"outcomes,omitempty"`
+	Outcomes []OutcomesData             `json:"adoption,omitempty"`
 }
 
 type episodeOutcomeMembership struct {
@@ -52,15 +52,15 @@ type EpisodeOutcomeData struct {
 	EpisodeID              string                            `json:"episode_id"`
 	RunIDs                 []int64                           `json:"run_ids"`
 	MembershipScope        string                            `json:"membership_scope" jsonschema:"Always selected_runs; membership outside the supplied logs is not verified"`
-	MembershipCoverage     *EpisodeOutcomeMembershipCoverage `json:"membership_coverage,omitempty" jsonschema:"Optional lineage and collection coverage copied from logs, separate from outcome and cost coverage"`
+	MembershipCoverage     *EpisodeOutcomeMembershipCoverage `json:"membership_coverage,omitempty" jsonschema:"Optional lineage and collection coverage copied from logs, separate from adoption and cost coverage"`
 	Items                  []EpisodeOutcomeObservation       `json:"items"`
 	Summary                OutcomeSummary                    `json:"summary"`
 	ObservedAIC            *float64                          `json:"observed_aic" jsonschema:"Sum of available selected-run AIC, including detection usage; null when no cost is available"`
-	CostPerAcceptedOutcome *float64                          `json:"cost_per_accepted_outcome" jsonschema:"Selected-run observed AIC divided by accepted items; null for incomplete evidence or cost, ambiguous identities, or no accepted items"`
+	CostPerAcceptedOutcome *float64                          `json:"cost_per_adopted_output" jsonschema:"Selected-run observed AIC divided by accepted items; null for incomplete evidence or cost, ambiguous identities, or no accepted items"`
 	CostCoverage           string                            `json:"cost_coverage" jsonschema:"available, partial, or unavailable for selected run IDs"`
-	OutcomeCoverage        string                            `json:"outcome_coverage" jsonschema:"complete or partial for selected runs only, not full-episode membership"`
-	OutcomeRunIDs          []int64                           `json:"outcome_run_ids"`
-	MissingOutcomeRunIDs   []int64                           `json:"missing_outcome_run_ids"`
+	OutcomeCoverage        string                            `json:"adoption_coverage" jsonschema:"complete or partial for selected runs only, not full-episode membership"`
+	OutcomeRunIDs          []int64                           `json:"adoption_run_ids"`
+	MissingOutcomeRunIDs   []int64                           `json:"missing_adoption_run_ids"`
 	CostRunIDs             []int64                           `json:"cost_run_ids"`
 	MissingCostRunIDs      []int64                           `json:"missing_cost_run_ids"`
 	MissingRunIDs          []int64                           `json:"missing_run_ids"`
@@ -105,11 +105,11 @@ func selectEpisodeOutcomeSnapshots(observations []EpisodeOutcomeObservation) (ma
 	latest := make(map[string]episodeOutcomeSnapshot)
 	for _, observation := range observations {
 		if observation.RunID <= 0 || observation.Type == "" {
-			return nil, errors.New("outcome observation requires a positive run_id and nonempty type")
+			return nil, errors.New("adoption observation requires a positive run_id and nonempty type")
 		}
 		at, err := time.Parse(time.RFC3339Nano, observation.CheckedAt)
 		if err != nil {
-			return nil, fmt.Errorf("invalid checked_at for outcome in run %d: %w", observation.RunID, err)
+			return nil, fmt.Errorf("invalid checked_at for adoption in run %d: %w", observation.RunID, err)
 		}
 		observation.CheckedAt = at.UTC().Format(time.RFC3339Nano)
 		identity := observation.ItemID
@@ -136,6 +136,10 @@ func episodeOutcomeObservationsEqual(a, b EpisodeOutcomeObservation) bool {
 	return a.RunID == b.RunID &&
 		a.RunItemCount == b.RunItemCount &&
 		a.OutcomeEvaluation == b.OutcomeEvaluation &&
+		(a.Adoption == nil && b.Adoption == nil || a.Adoption != nil && b.Adoption != nil && a.Adoption.Equal(*b.Adoption)) &&
+		(a.Survival == nil && b.Survival == nil || a.Survival != nil && b.Survival != nil && a.Survival.Equal(*b.Survival)) &&
+		a.ReversalSignal == b.ReversalSignal &&
+		a.ReversedAt == b.ReversedAt &&
 		a.ItemID == b.ItemID &&
 		a.Type == b.Type &&
 		a.ObjectURL == b.ObjectURL &&
@@ -184,7 +188,7 @@ func unshadowedEpisodeOutcomeReports(latest map[string]episodeOutcomeSnapshot) (
 			if identity == "" {
 				identity = episodeOutcomeLegacyKey(item.report)
 			}
-			return nil, fmt.Errorf("conflicting outcomes for run %d item %q at %s; reevaluate the run", item.report.RunID, identity, item.report.CheckedAt)
+			return nil, fmt.Errorf("conflicting adoption for run %d item %q at %s; reevaluate the run", item.report.RunID, identity, item.report.CheckedAt)
 		}
 		reports = append(reports, item.report)
 	}
@@ -200,7 +204,7 @@ func episodeOutcomeSnapshotSuperseded(item episodeOutcomeSnapshot, preciseTimes 
 			if at, modern := preciseTimes[precision][target]; modern {
 				// A legacy row cannot identify which precise action a newer status replaces.
 				if item.at.After(at) {
-					return false, fmt.Errorf("legacy outcome for run %d is newer than precise item observations; reevaluate the run", item.report.RunID)
+					return false, fmt.Errorf("legacy adoption for run %d is newer than precise item observations; reevaluate the run", item.report.RunID)
 				}
 				shadowed = true
 				break
@@ -361,7 +365,7 @@ func qualifyEpisodeOutcomes(row *EpisodeOutcomeData, episode episodeOutcomeMembe
 		row.Qualifications = append(row.Qualifications, "Selected episode membership is incomplete or inconsistent with the supplied run records.")
 	}
 	if len(row.MissingOutcomeRunIDs) > 0 {
-		row.Qualifications = append(row.Qualifications, "Some selected runs have no outcome observations; this does not establish that they produced no outputs.")
+		row.Qualifications = append(row.Qualifications, "Some selected runs have no adoption observations; this does not establish that they produced no outputs.")
 	}
 	if legacy {
 		row.Qualifications = append(row.Qualifications, "Legacy observations lack stable action identities; indistinguishable actions may be coalesced and efficiency is unavailable. Reevaluate these runs.")
@@ -373,7 +377,7 @@ func qualifyEpisodeOutcomes(row *EpisodeOutcomeData, episode episodeOutcomeMembe
 		row.Qualifications = append(row.Qualifications, "Cost is incomplete or unavailable; observed_aic is only the sum of available usage, not an episode total.")
 	}
 	if row.Summary.Pending+row.Summary.Unknown+row.Summary.Errors > 0 {
-		row.Qualifications = append(row.Qualifications, "Pending, unknown, and error outcomes remain unresolved; accepted counts are an observation snapshot.")
+		row.Qualifications = append(row.Qualifications, "Pending, unknown, and error adoption remain unresolved; accepted counts are an observation snapshot.")
 	}
 	return incompleteMembership
 }

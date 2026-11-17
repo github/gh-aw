@@ -29,7 +29,7 @@ Most gh-aw showcases focus on a single workflow. [sabbasi3-factory-lab/factory](
 2. The agent opens one PR for that task.
 3. If CI fails, the controller starts the gh-aw `repair` workflow, at most twice per task. A repeated or persistent failure goes to a person.
 4. Depending on the tier, the PR is merged automatically, merged after strict gates and an independent review, or held for the owner.
-5. The `outcomes` workflow runs `gh aw logs --outcomes` after every agent run and publishes the results to a branch that feeds a public dashboard.
+5. The `outcomes` workflow runs `gh aw logs --adoption` after every agent run and publishes the results to a branch that feeds a public dashboard.
 
 ## Results reported by the project
 
@@ -42,7 +42,7 @@ The project is a design to learn from rather than an installable package. The mo
 - Classify PRs by risk and let policy, not the agent, decide how each tier merges.
 - Keep policies and verification code outside the agents' write scope.
 - Put budget caps and a kill switch in place before scaling up.
-- Use `gh aw logs --outcomes` to track how agent runs actually performed.
+- Use `gh aw logs --adoption` to track how agent runs actually performed.
 
 The [DESIGN.md](https://github.com/sabbasi3-factory-lab/factory/blob/main/DESIGN.md) is the source of truth, and the build journal in `docs/JOURNAL.md` records decisions and lessons learned.
 

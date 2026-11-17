@@ -30,10 +30,10 @@ func TestRenderEpisodeOutcomes(t *testing.T) {
 		value string
 		ratio string
 	}{
-		{"available", episodeCost(2.5), "2.500", "AIC per accepted outcome (selected runs): 2.500"},
-		{"explicit zero", episodeCost(0), "0.000", "AIC per accepted outcome (selected runs): 0.000"},
-		{"unavailable", episodeOutcomeCost{}, "unavailable", "AIC per accepted outcome: unavailable"},
-		{"partial", partial, "2.500", "AIC per accepted outcome: unavailable"},
+		{"available", episodeCost(2.5), "2.500", "AIC per adopted output (selected runs): 2.500"},
+		{"explicit zero", episodeCost(0), "0.000", "AIC per adopted output (selected runs): 0.000"},
+		{"unavailable", episodeOutcomeCost{}, "unavailable", "AIC per adopted output: unavailable"},
+		{"partial", partial, "2.500", "AIC per adopted output: unavailable"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -43,11 +43,11 @@ func TestRenderEpisodeOutcomes(t *testing.T) {
 			require.NoError(t, err)
 			var output bytes.Buffer
 			require.NoError(t, renderEpisodeOutcomes(&output, data))
-			assert.Contains(t, output.String(), "Observed outcomes: 1 accepted")
+			assert.Contains(t, output.String(), "Observed adoption: 1 accepted")
 			assert.Contains(t, output.String(), "Observed AIC: "+tc.value)
 			assert.Contains(t, output.String(), tc.ratio)
 			assert.Contains(t, output.String(), "full-episode membership is not verified")
-			assert.Contains(t, output.String(), "Outcome source runs outside selected membership (not counted): [2]")
+			assert.Contains(t, output.String(), "Adoption source runs outside selected membership (not counted): [2]")
 			require.ErrorIs(t, renderEpisodeOutcomes(episodeOutcomesErrorWriter{}, data), io.ErrClosedPipe)
 		})
 	}

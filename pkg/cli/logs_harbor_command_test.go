@@ -19,7 +19,7 @@ import (
 func TestLogsHarborOptions(t *testing.T) {
 	for _, args := range [][]string{
 		{"--harbor", "--output", "harbor-job"},
-		{"--harbor", "--artifacts", "detection", "--graders", "--outcomes", "--engine", "copilot"},
+		{"--harbor", "--artifacts", "detection", "--graders", "--adoption", "--engine", "copilot"},
 	} {
 		cmd := NewLogsCommand()
 		require.NoError(t, cmd.ParseFlags(args))
@@ -39,7 +39,7 @@ func TestLogsHarborOptions(t *testing.T) {
 			require.False(t, options.Outcomes)
 		} else {
 			require.Contains(t, options.ArtifactSets, "detection")
-			require.Contains(t, options.ArtifactSets, "outcomes")
+			require.Contains(t, options.ArtifactSets, "adoption")
 			require.True(t, options.GradersOnly)
 			require.True(t, options.Outcomes)
 			require.Equal(t, "copilot", options.Engine)

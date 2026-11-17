@@ -256,12 +256,13 @@ If you see any `.md` files at the root (e.g. `agent-performance-latest.md`, `sha
   - start_date: "-1d" (last 24 hours)
   - count: 20
   - timeout: 1
+  - adoption: true
   - Include all workflows (no workflow_name filter)
   ```
 - **Pagination loop (required)**: the `logs` tool returns a `continuation` field when it stops
   early (timeout or count limit). While a `continuation` field is present in the returned data,
   issue another `logs` call using the parameters it provides (notably `before_run_id`, plus the
-  original `start_date`) with `count: 20` and `timeout: 1`, and accumulate the runs from every
+  original `start_date`) with `count: 20`, `timeout: 1`, and `adoption: true`, and accumulate the runs from every
   batch. Stop only when there is no `continuation` field **and** the oldest collected run is at or
   before the 24h window start. Do not stop after a fixed number of batches if the oldest collected
   run is still newer than the window start; that produces a partial ~10h snapshot.
@@ -298,17 +299,25 @@ If you see any `.md` files at the root (e.g. `agent-performance-latest.md`, `sha
   - Comments added by workflows
   - Discussions created by workflows
 - Extract and count these for each workflow
-- Extract typed safe-output counts as well:
+- Keep execution activity, delivery, and adoption separate:
   - `safe_outputs_by_type`: aggregate usage activity `safe_outputs.items_by_type` from each run
-    (for example `create_issue`, `create_pull_request`, `add_comment`, `create_discussion`)
-  - `safe_output_outcomes`: aggregate outcome fields from logs summaries and outcome reports:
-    `accepted`, `rejected`, `ignored`, `pending`, `lifecycle`, and `lifecycle_close`
-  - Never leave these fields absent; use empty objects/zero counts only when the full data source
-    was checked and no matching items exist.
+    (for example `create_issue`, `create_pull_request`, `add_comment`, `create_discussion`).
+    Activity is not proof of delivery.
+  - `safe_output_delivery`: aggregate `.delivery[]` by workflow, counting unique delivery IDs.
+    Record `delivered` and `coverage`; only complete execution evidence establishes zero.
+  - `safe_output_adoption`: aggregate `.adoption[].summary` by workflow, deduplicating
+    the same run/attempt and delivery IDs across batches. Record `coverage`, `accepted`,
+    `accepted_human`, `accepted_delivery_fallback`, `rejected`, `not_applicable`, `pending`,
+    `lifecycle`, and `unknown`. Human and fallback counts must sum to `accepted`.
+  - Keep these lifecycle objects present at workflow and ecosystem levels. Preserve valid partial
+    observations with `coverage: "partial"`; use `null` counts and `coverage: "unavailable"` when
+    evidence is absent. Never infer pending adoption or zero delivery from missing evidence.
+  - Adoption is the observed snapshot for the selected run cohort, not a count of all decisions
+    made during the collection window. Neither adoption counts nor snapshot survival are attributed value.
 - **If the accumulated log batches still do not cover the full 24h window** (i.e. the oldest run
   collected is newer than 24h ago), do **not** report `safe_outputs`, `safe_outputs_by_type`, or
-  `safe_output_outcomes` as zero. Instead compute safe-output counts from the GitHub API fallback
-  described below and mark the source accordingly.
+  lifecycle counts as zero. The GitHub API fallback below can supply resource/activity counts,
+  but cannot replace gh-aw delivery or adoption evidence.
 
 **Safe Outputs Fallback (GitHub API)**:
 
@@ -324,8 +333,10 @@ API instead of zeroing them:
 Attribute each result to a workflow and type via its `gh-aw-workflow-call-id` footer marker and
 item shape, aggregate the counts per workflow, and set `"safe_outputs_source":
 "github_api_fallback"` alongside a `collection_note` explaining the truncation. When API fallback
-cannot determine outcome status, set those items to `"pending"` rather than omitting the
-`safe_output_outcomes` breakdown. The same fallback applies to `engagement` fields.
+cannot establish delivery or adoption, retain any gh-aw observations with partial coverage or
+set the corresponding lifecycle counts to `null` with unavailable coverage. Do not classify
+resources independently or fabricate pending adoption. The same fallback applies to `engagement`
+activity fields, not lifecycle decisions.
 
 **Workflow Runs Fallback (GitHub API)**:
 
@@ -382,13 +393,20 @@ Create a JSON object following this schema:
         "add_comment": 10,
         "create_discussion": 1
       },
-      "safe_output_outcomes": {
-        "accepted": 9,
+      "safe_output_delivery": {
+        "delivered": 18,
+        "coverage": "complete"
+      },
+      "safe_output_adoption": {
+        "coverage": "complete",
+        "accepted": 11,
+        "accepted_human": 1,
+        "accepted_delivery_fallback": 10,
         "rejected": 1,
-        "ignored": 2,
+        "not_applicable": 0,
         "pending": 6,
         "lifecycle": 0,
-        "lifecycle_close": 0
+        "unknown": 0
       },
       "workflow_runs": {
         "total": 7,
@@ -424,13 +442,20 @@ Create a JSON object following this schema:
       "add_comment": 15,
       "create_discussion": 2
     },
-    "safe_output_outcomes": {
+    "safe_output_delivery": {
+      "delivered": 45,
+      "coverage": "complete"
+    },
+    "safe_output_adoption": {
+      "coverage": "complete",
       "accepted": 24,
+      "accepted_human": 10,
+      "accepted_delivery_fallback": 14,
       "rejected": 5,
-      "ignored": 6,
-      "pending": 10,
+      "not_applicable": 0,
+      "pending": 16,
       "lifecycle": 0,
-      "lifecycle_close": 0
+      "unknown": 0
     },
     "overall_success_rate": 0.892,
     "total_tokens": 1250000,
@@ -551,12 +576,12 @@ separate aggregate file in place of the dated snapshots.
 
 **Primary data source**: Use the agentic-workflows tool for all workflow run metrics:
 1. Start with `status` tool to get workflow inventory
-2. Use `logs` tool with `start_date: "-1d"`, `count: 20`, and `timeout: 1`, then follow the
+2. Use `logs` tool with `start_date: "-1d"`, `count: 20`, `timeout: 1`, and `adoption: true`, then follow the
    `continuation` field (using its `before_run_id`) until the oldest collected run reaches the
    24h window start. On a 60-second context-deadline error, switch directly to the GitHub API
    fallback instead of retrying smaller counts.
 3. Extract metrics from the accumulated log data (success/failure/skipped/action-required, tokens,
-   costs, safe outputs, typed safe-output counts, and outcome breakdowns)
+   costs, safe-output activity, delivery evidence, and adoption breakdowns).
 
 **Secondary data source**: Use GitHub MCP server for engagement metrics only:
 - Reactions on issues/PRs created by workflows
@@ -566,7 +591,8 @@ separate aggregate file in place of the dated snapshots.
 ### Handling Missing Data
 
 - If a workflow has no runs in the last 24 hours, set all run metrics to 0
-- If a workflow has no safe outputs, set all safe output counts to 0
+- Set delivery and adoption counts to 0 only when complete gh-aw evidence establishes no
+  deliveries. Unavailable lifecycle evidence stays `null`, including when the logs tool is unavailable.
 - **Never report `safe_outputs` or `engagement` as 0 merely because the `logs` tool timed out or
   returned a truncated window** — use the GitHub API safe-outputs fallback above and set
   `"safe_outputs_source": "github_api_fallback"`. Only report 0 when the data source actually
@@ -575,7 +601,7 @@ separate aggregate file in place of the dated snapshots.
 - Always include workflows in the metrics even if they have no activity (helps detect stalled workflows)
 - **If the agentic-workflows `logs` tool is unavailable**, collect what you can from the GitHub API directly using the Workflow Runs Fallback rules above and set `"data_source": "github_api_fallback"` in the JSON
 - Set `"collection_status": "complete"` only when workflow run counts and safe-output breakdowns
-  cover the full 24h window through logs data and/or the GitHub API fallback and
+  cover the full 24h window, delivery and adoption coverage are complete, and
   `unclassified_conclusions` is empty. Set `"collection_status": "partial"` when either coverage is
   incomplete or any completed run has an unclassified conclusion, even if time coverage is complete.
   Include a precise `collection_note` and list each unclassified workflow, conclusion, and count in
@@ -593,6 +619,21 @@ separate aggregate file in place of the dated snapshots.
       "total_workflows": 0,
       "active_workflows": 0,
       "total_safe_outputs": 0,
+      "safe_output_delivery": {
+        "delivered": null,
+        "coverage": "unavailable"
+      },
+      "safe_output_adoption": {
+        "coverage": "unavailable",
+        "accepted": null,
+        "accepted_human": null,
+        "accepted_delivery_fallback": null,
+        "rejected": null,
+        "not_applicable": null,
+        "pending": null,
+        "lifecycle": null,
+        "unknown": null
+      },
       "overall_success_rate": 0,
       "total_tokens": 0,
       "total_cost_usd": 0

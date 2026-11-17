@@ -157,17 +157,17 @@ By default, only the compact usage artifact is downloaded (token usage, run meta
 Use --artifacts all to download all artifacts, or specify individual sets such as
 --artifacts agent,firewall to fetch only what you need.
 
-Use --outcomes to evaluate the current GitHub state of each selected run's safe
-outputs and include per-run and episode outcome summaries. This also downloads
+Use --adoption to evaluate the current GitHub state of each selected run's safe
+outputs and include per-run and episode adoption summaries. This also downloads
 safe-output manifests, without requiring full agent artifacts or workflow logs.
-Use --outcomes-dir to persist the observations as JSONL for downstream processing.
+Use --adoption-dir to persist the observations as JSONL for downstream processing.
 
 Available unified JSONL sessions are retained and automatically exported to
 sibling .atif trajectories, without changing the report format.
 
 Use --harbor --output DIR to also export a portable Harbor job to DIR/harbor.
 This downloads recorded usage, experiment, grader, and available agent artifacts;
-it does not run graders or evaluate outcomes unless explicitly requested.
+it does not run graders or evaluate adoption unless explicitly requested.
 Use repeatable --additional-grader WORKFLOW:GRADER to compute additional built-in
 or isolated JavaScript results over recorded unified sessions before Harbor export.
 Recorded scores remain unchanged; additional results have separate provenance and
@@ -175,7 +175,7 @@ reward keys.
 The normal logs report is preserved.
 
 Use --episodes to include recorded episode membership and hops in text reports.
-Combine --episodes --outcomes to join the selected episodes with live outcome
+Combine --episodes --adoption to join the selected episodes with live adoption
 observations and downloaded usage in the same invocation; no separate
 command or JSONL export is needed. Membership remains limited
 to the selected runs; this flag does not discover additional episode members.
@@ -276,6 +276,7 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 		Parse:             values.Parse,
 		JSONOutput:        values.JSONOutput,
 		Episodes:          values.Episodes,
+		Delivery:          values.Delivery,
 		Outcomes:          values.Outcomes,
 		Harbor:            values.Harbor,
 		AdditionalGraders: values.AdditionalGraders,
@@ -430,7 +431,7 @@ func splitCrossRepoWorkflowTarget(arg string) (string, string, bool) {
 	return strings.Join(parts[:repoParts], "/"), strings.Join(parts[repoParts:], "/"), true
 }
 
-func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
+func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) { //nolint:largefunc // Keeps shared logs flag parsing and validation in one place.
 	count, _ := cmd.Flags().GetInt("count")
 	if last, _ := cmd.Flags().GetInt("last"); last > 0 {
 		count = last
@@ -460,10 +461,11 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		Parse:                 getBoolFlag(cmd, "parse"),
 		JSONOutput:            getBoolFlag(cmd, "json"),
 		Episodes:              getBoolFlag(cmd, "episodes"),
-		Outcomes:              getBoolFlag(cmd, "outcomes"),
+		Delivery:              getBoolFlag(cmd, "delivery"),
+		Outcomes:              getBoolFlag(cmd, "adoption"),
 		Harbor:                getBoolFlag(cmd, "harbor"),
 		AdditionalGraders:     getStringSliceFlag(cmd, "additional-grader"),
-		OutcomesDir:           getStringFlag(cmd, "outcomes-dir"),
+		OutcomesDir:           getStringFlag(cmd, "adoption-dir"),
 		TimeoutMinutes:        getIntFlag(cmd, "timeout"),
 		TimeoutSeconds:        getIntFlag(cmd, "timeout-seconds"),
 		MaxGitHubAPIRateLimit: getIntFlag(cmd, "max-github-api-rate-limit"),
@@ -494,7 +496,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 }
 
 func logsCommandArtifactSets(cmd *cobra.Command) []string {
-	sets := logsOutcomeArtifactSets(getStringSliceFlag(cmd, "artifacts"), getBoolFlag(cmd, "outcomes"))
+	sets := logsOutcomeArtifactSets(getStringSliceFlag(cmd, "artifacts"), getBoolFlag(cmd, "adoption") || getBoolFlag(cmd, "delivery"))
 	if len(sets) > 0 {
 		sets = applyEvalsArtifact(sets, getBoolFlag(cmd, "evals"))
 		sets = applyGradersArtifact(sets, getBoolFlag(cmd, "graders"))
@@ -562,7 +564,7 @@ func validateLogsOptions(options LogsDownloadOptions) error {
 		return err
 	}
 	if options.OutcomesDir != "" && !options.Outcomes {
-		return errors.New("--outcomes-dir requires --outcomes")
+		return errors.New("--adoption-dir requires --adoption")
 	}
 	if len(options.AdditionalGraders) > 0 {
 		if !options.Harbor {
@@ -680,7 +682,7 @@ func resolveLogsWorkflowNameLocally(arg string) (string, error) {
 func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().IntP("count", "c", 10, "Maximum matching workflow runs to return across all targets (after applying filters)")
 	addLogsOutcomeFlags(logsCmd)
-	logsCmd.Flags().Bool("episodes", false, "Include recorded episode membership and hops; combine with --outcomes for episode outcome summaries")
+	logsCmd.Flags().Bool("episodes", false, "Include recorded episode membership and hops; combine with --adoption for episode adoption summaries")
 	logsCmd.Flags().Bool("harbor", false, "Export downloaded runs as a Harbor job in the output directory using recorded results and available sessions")
 	logsCmd.Flags().StringSlice("additional-grader", nil, "Additional in-memory grader WORKFLOW:GRADER to execute before --harbor export (repeatable)")
 	logsCmd.Flags().String("start-date", "", "Filter runs created after this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)")

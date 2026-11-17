@@ -23,6 +23,7 @@ var reportLog = logger.New("cli:logs_report")
 
 // LogsData represents the complete structured data for logs output
 type LogsData struct {
+	Delivery             []DeliveryData              `json:"delivery,omitempty" console:"-"`
 	FailureInvestigation *FailureInvestigation       `json:"failure_investigation,omitempty" console:"-"`
 	FailureClusters      []FailureCluster            `json:"failure_clusters,omitempty" console:"-"`
 	Summary              LogsSummary                 `json:"summary" console:"title:Workflow Logs Summary"`
@@ -30,8 +31,8 @@ type LogsData struct {
 	Episodes             []EpisodeData               `json:"episodes" console:"-"`
 	Edges                []EpisodeEdge               `json:"edges" console:"-"`
 	EpisodeRetrieval     *EpisodeRetrieval           `json:"episode_retrieval,omitempty" console:"-"`
-	Outcomes             []OutcomesData              `json:"outcomes,omitempty" console:"-"`
-	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_outcomes,omitempty" console:"-"`
+	Outcomes             []OutcomesData              `json:"adoption,omitempty" console:"-"`
+	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_adoption,omitempty" console:"-"`
 	ToolUsage            []ToolUsageSummary          `json:"tool_usage,omitempty" console:"title:🛠️  Tool Usage Summary,omitempty"`
 	MCPToolUsage         *MCPToolUsageSummary        `json:"mcp_tool_usage,omitempty" console:"title:🔧 MCP Tool Usage,omitempty"`
 	Observability        []ObservabilityInsight      `json:"observability_insights,omitempty" console:"-"`
@@ -157,13 +158,13 @@ type LogsSummary struct {
 	IntentionalFailureRuns int `json:"intentional_failure_runs,omitempty" console:"-"`
 
 	// Outcome metrics (populated when outcome evaluation is enabled)
-	OutcomeAccepted       int     `json:"outcome_accepted,omitempty" console:"-"`
-	OutcomeRejected       int     `json:"outcome_rejected,omitempty" console:"-"`
-	OutcomeIgnored        int     `json:"outcome_ignored,omitempty" console:"-"`
-	OutcomePending        int     `json:"outcome_pending,omitempty" console:"-"`
-	OutcomeAcceptanceRate float64 `json:"outcome_acceptance_rate,omitempty" console:"-"`
-	OutcomeWasteRate      float64 `json:"outcome_waste_rate,omitempty" console:"-"`
-	OutcomeZeroTouchRate  float64 `json:"outcome_zero_touch_rate,omitempty" console:"-"`
+	OutcomeAccepted       int     `json:"adoption_accepted,omitempty" console:"-"`
+	OutcomeRejected       int     `json:"adoption_rejected,omitempty" console:"-"`
+	OutcomeIgnored        int     `json:"adoption_not_applicable,omitempty" console:"-"`
+	OutcomePending        int     `json:"adoption_pending,omitempty" console:"-"`
+	OutcomeAcceptanceRate float64 `json:"adoption_acceptance_rate,omitempty" console:"-"`
+	OutcomeWasteRate      float64 `json:"adoption_rejection_rate,omitempty" console:"-"`
+	OutcomeZeroTouchRate  float64 `json:"adoption_zero_touch_rate,omitempty" console:"-"`
 }
 
 // RunData contains information about a single workflow run

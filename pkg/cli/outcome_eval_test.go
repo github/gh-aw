@@ -52,7 +52,7 @@ func TestComputeOutcomeSummary(t *testing.T) {
 	assert.InDelta(t, 0.5, s.ZeroTouchRate, 0.01, "zero-touch rate")
 
 	// MedianTimeToOutcome of [2.0, 8.0, 24.0] = 8.0
-	assert.InDelta(t, 8.0, s.MedianTimeToOutcome, 0.01, "median time to outcome")
+	assert.InDelta(t, 8.0, s.MedianTimeToOutcome, 0.01, "median time to adoption")
 }
 
 func TestComputeOutcomeSummaryEmpty(t *testing.T) {
@@ -606,7 +606,7 @@ func TestOutcomeReportJSONCarriesSingleOutcomeStatus(t *testing.T) {
 
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(data, &payload))
-	assert.Equal(t, "error", payload["outcome_status"])
+	assert.Equal(t, "error", payload["adoption_status"])
 	assert.NotContains(t, payload, "result")
 }
 
@@ -642,12 +642,12 @@ func TestWriteOutcomeJSONLEmitsNormalizedFields(t *testing.T) {
 
 	writeOutcomeJSONL(dir, 123, reports)
 
-	data, err := os.ReadFile(filepath.Join(dir, "outcomes-123.jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, "adoption-123.jsonl"))
 	require.NoError(t, err)
 
 	var entry map[string]any
 	require.NoError(t, json.Unmarshal(bytes.TrimSpace(data), &entry))
-	assert.Equal(t, "unknown", entry["outcome_status"])
+	assert.Equal(t, "unknown", entry["adoption_status"])
 	assert.Equal(t, "weak", entry["evidence_strength"])
 	assert.Equal(t, "target_exists_only", entry["signal"])
 	assert.NotContains(t, entry, "result")

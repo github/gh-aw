@@ -111,6 +111,8 @@ type logsArgs struct {
 	NoFirewall            bool     `json:"no_firewall,omitempty" jsonschema:"Filter to only runs without firewall enabled"`
 	FilteredIntegrity     bool     `json:"filtered_integrity,omitempty" jsonschema:"Filter to only runs that contain DIFC integrity-filtered events in gateway logs"`
 	Graders               bool     `json:"graders,omitempty" jsonschema:"Filter to only runs with deterministic grader results"`
+	Delivery              bool     `json:"delivery,omitempty" jsonschema:"Include recorded safe-output delivery evidence without later disposition queries"`
+	Adoption              bool     `json:"adoption,omitempty" jsonschema:"Include delivery and refresh supported adoption and survival observations"`
 	Branch                string   `json:"branch,omitempty" jsonschema:"Filter runs by branch name"`
 	AfterRunID            int64    `json:"after_run_id,omitempty" jsonschema:"Filter runs with database ID after this value (exclusive)"`
 	BeforeRunID           int64    `json:"before_run_id,omitempty" jsonschema:"Filter runs with database ID before this value (exclusive)"`
@@ -120,7 +122,7 @@ type logsArgs struct {
 	MaxStorageMB          *int     `json:"max_storage,omitempty" jsonschema:"Maximum logs storage in MB after pruning non-essential cache data (default: 1024 MB; 0 means unlimited)."`
 	PruneOlderRuns        bool     `json:"prune_older_runs,omitempty" jsonschema:"Remove oldest completed runs when non-essential cache pruning cannot satisfy max_storage."`
 	MaxTokens             int      `json:"max_tokens,omitempty" jsonschema:"Deprecated: accepted for backward compatibility but ignored. Output is always written to a file."`
-	Artifacts             []string `json:"artifacts,omitempty" jsonschema:"Artifact sets to download (default: info,usage). Valid sets: all, activation, agent, detection, evals, experiment, firewall, github-api, graders, info, mcp, usage, work-queue. The compact usage set is always added so per-run token_usage is populated."`
+	Artifacts             []string `json:"artifacts,omitempty" jsonschema:"Artifact sets to download (default: info,usage). Valid sets: all, activation, agent, delivery, detection, evals, experiment, firewall, github-api, graders, info, mcp, usage, work-queue. The compact usage set is always added so per-run token_usage is populated."`
 }
 
 // defaultMCPLogsToolArtifacts is the artifact selection used when the caller does
@@ -251,6 +253,10 @@ token_usage (input+output) and aic are always present per run. The usage artifac
 downloaded by default and added to explicit selections. Compact metadata is not complete
 logs; missing evidence does not prove absence of failure.
 
+Set delivery for applied safe-output evidence, or adoption to include supported
+provider refresh. Adoption separates verified human decisions from delivery-rule
+fallbacks. Missing evidence is not zero; snapshot survival is not attributed value.
+
 Set episode_run to a seed run ID or URL for bounded canonical episode retrieval.
 count then caps all candidate runs examined, not only matching members.
 allow_repositories explicitly permits additional repositories on the seed host;
@@ -360,6 +366,12 @@ func buildLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, int, in
 	cmdArgs := []string{"logs", "-o", constants.TmpAwMcpLogsDir}
 	effectiveCount := effectiveMCPLogsToolCount(args.Count)
 	cmdArgs = append(cmdArgs, "-c", strconv.Itoa(effectiveCount))
+	if args.Delivery {
+		cmdArgs = append(cmdArgs, "--delivery")
+	}
+	if args.Adoption {
+		cmdArgs = append(cmdArgs, "--adoption")
+	}
 	cmdArgs = appendLogsFilterArgs(cmdArgs, args)
 	cmdArgs = appendRepoFlagFromEnv(cmdArgs)
 
@@ -483,7 +495,9 @@ type auditArgs struct {
 	RunID        any      `json:"run_id,omitempty"          jsonschema:"Alias for run_id_or_url. Accepts run ID or run/job URL (including step anchors). String or number."`
 	RunIDOrURL   any      `json:"run_id_or_url,omitempty"   jsonschema:"Deprecated: use run_ids_or_urls instead. Accepts run ID or run/job URL (including step anchors). String or number."`
 	RunIDsOrURLs []string `json:"run_ids_or_urls,omitempty" jsonschema:"One or more workflow run IDs or URLs. Single item: detailed audit report. Multiple items: diff mode with first as base (see tool description for accepted formats)."`
-	Artifacts    []string `json:"artifacts,omitempty"        jsonschema:"Artifact sets to download (default: all). Valid sets: all, activation, agent, detection, experiment, firewall, github-api, mcp, usage, work-queue"`
+	Artifacts    []string `json:"artifacts,omitempty"        jsonschema:"Artifact sets to download (default: all). Valid sets: all, activation, agent, delivery, detection, experiment, firewall, github-api, mcp, usage, work-queue"`
+	Delivery     bool     `json:"delivery,omitempty"         jsonschema:"Include recorded safe-output delivery evidence; requires a single full run"`
+	Adoption     bool     `json:"adoption,omitempty"         jsonschema:"Include delivery and refresh supported adoption and survival observations; requires a single full run"`
 	MaxTokens    int      `json:"max_tokens,omitempty"       jsonschema:"Deprecated: accepted for backward compatibility but ignored."`
 	Experiment   string   `json:"experiment,omitempty"       jsonschema:"Filter to runs that include this experiment name. When set, runs whose experiment artifact does not contain an assignment for this experiment name are skipped."`
 	Variant      string   `json:"variant,omitempty"          jsonschema:"Filter to runs assigned this specific variant value. Requires experiment to be set."`
@@ -549,6 +563,10 @@ firewall domains, MCP tool usage, and run metrics.
 
 Single-run MCP audits skip automatic previous-run baseline discovery to avoid
 extra API and artifact downloads; use gh aw audit when baseline comparison is needed.
+
+Set delivery for recorded safe-output effects, or adoption for delivery and
+supported provider observations. These require one full run, not diff or job/step
+mode. Verified human adoption and delivery fallback remain separate.
 
 Each run accepts:
 - Numeric run ID: 1234567890
@@ -739,6 +757,12 @@ func buildAuditCommandArgs(args auditArgs, runItems []string) []string {
 	}
 	if args.Runtime != "" {
 		cmdArgs = append(cmdArgs, "--runtime", args.Runtime)
+	}
+	if args.Delivery {
+		cmdArgs = append(cmdArgs, "--delivery")
+	}
+	if args.Adoption {
+		cmdArgs = append(cmdArgs, "--adoption")
 	}
 	cmdArgs = appendRepoFlagFromEnv(cmdArgs)
 	if len(runItems) > 0 {

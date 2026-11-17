@@ -945,7 +945,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;
   "safe_output.result": SafeOutputData;
-  "safe_output.outcome": SafeOutputData;
+  "safe_output.execution": SafeOutputData;
   "safe_output.error": SafeOutputErrorData;
   "experiment.state": ExperimentStateData;
   "experiment.assignment": ExperimentAssignmentData;
