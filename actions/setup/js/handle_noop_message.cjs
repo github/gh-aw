@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel, getIssueLabelQuery } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const fs = require("fs");
@@ -59,12 +60,12 @@ function classifyNoopOutcome(agentConclusion, hasIncompleteReport = false, hasNo
 async function ensureAgentRunsIssue() {
   const { owner, repo } = context.repo;
   const parentTitle = "[aw] No-Op Runs";
-  const parentLabel = "agentic-workflows";
+  const parentLabel = getIssueLabel();
 
   core.info(`Searching for no-op runs issue: "${parentTitle}"`);
 
   // Search for existing no-op runs issue
-  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:${parentLabel} in:title "${parentTitle}"`;
+  const searchQuery = `repo:${owner}/${repo} is:issue is:open ${getIssueLabelQuery()} in:title "${parentTitle}"`;
 
   try {
     const { data } = await github.rest.search.issuesAndPullRequests({

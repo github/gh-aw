@@ -151,7 +151,7 @@ test("jumps to any slide from the dock's full-screen slide map", async ({ page }
   await expect(security.getByRole("heading", { level: 3 })).toHaveText(new RegExp(`^Security #${SECURITY}–\\d+$`));
   await expect(security.getByRole("button", { name: new RegExp(`^Go to slide ${SECURITY}:`) })).toBeVisible();
   // a column's examples are stacked below its pattern tile
-  const kids = dialog.getByRole("group", { name: "Daily Unsloppers examples" });
+  const kids = dialog.getByRole("group", { name: "Daily Improvers examples" });
   await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${slideNo("Repo Assist")}:`) })).toBeVisible();
   const current = dialog.locator('[aria-current="true"]');
   await expect(current).toHaveAccessibleName(/^Go to slide 3:/);
@@ -183,6 +183,9 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
+  // down walks the Continuous AI column first, then leaves for the next band
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last slide of the band above
@@ -204,12 +207,16 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
 test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
   const count = page.locator(CURRENT);
   const vnb = page.locator(".vnb");
-  const head = slideNo("Daily Unsloppers");
+  const head = slideNo("Daily Improvers");
   const first = slideNo("Repo Assist");
-  const last = slideNo("Personas · Probe · Patch");
+  const last = slideNo("Go Fan");
   const n = last - head;
-  await page.goto(`/gh-aw/cracktro/#${slideNo("Issues as intent")}`);
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Speech To Agent")}`);
   await expect(vnb).toBeHidden();
+  // Right from an example of the previous column continues from its pattern to the next main-line slide
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Decide · Draft · Record")}`);
+  await page.keyboard.press("ArrowRight");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Issues as intent")));
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(head));
   // the head lights a toolbar button hinting that a column of examples lies below
@@ -276,8 +283,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
   // from an interior slide, next band lands on the header below and previous band on the header above
-  await page.goto("/gh-aw/cracktro/#3");
-  await expect(count).toHaveAttribute("aria-label", at(3));
+  const interior = slideNo("Anatomy of a workflow");
+  await page.goto(`/gh-aw/cracktro/#${interior}`);
+  await expect(count).toHaveAttribute("aria-label", at(interior));
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
@@ -320,7 +328,7 @@ test.describe("compact navigation on touch screens", () => {
     await page.goto("/gh-aw/cracktro/#3");
     await expect(count).toHaveAttribute("aria-label", at(3));
     await page.getByRole("button", { name: "Next slide", exact: true }).tap();
-    await expect(count).toHaveAttribute("aria-label", at(4));
+    await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
     await page.getByRole("button", { name: "Next band", exact: true }).tap();
     await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 

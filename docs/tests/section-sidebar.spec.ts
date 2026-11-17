@@ -157,6 +157,17 @@ test("the old Workshop URL redirects to Guides and preserves bookmarks", async (
   await expect(page.getByRole("heading", { name: "Workshop", exact: true })).toBeVisible();
 });
 
+test("redirects preserve a simple incoming fragment", async ({ page }) => {
+  await page.goto("/gh-aw/workshop/#x");
+  await expect(page).toHaveURL(/\/gh-aw\/guides\/workshop\/#x$/);
+});
+
+test("a redirect's own fragment wins over the requested one", async ({ page }) => {
+  await page.goto("/gh-aw/reference/servicenow-connector/#other");
+  await expect(page).toHaveURL(/\/gh-aw\/reference\/connectors\/#servicenow$/);
+  await expect(page.locator("#servicenow")).toBeVisible();
+});
+
 for (const guide of [
   { slug: "safe-rollout", title: "Safe Rollout", label: "Safe Rollout in Organizations", anchor: "rollout-ladder" },
   { slug: "sharing-workflows", title: "Sharing Workflows in the Organization", label: "Sharing Workflows in Organizations", anchor: "sharing-layers" },

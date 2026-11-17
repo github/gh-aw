@@ -609,6 +609,7 @@ func runCompileCmd(cmd *cobra.Command, args []string) error {
 	defer finishCompileUpdateCheck()
 	if opts.fix {
 		if err := cli.RunFix(cli.FixConfig{
+			Ctx:         cmd.Context(),
 			WorkflowIDs: args,
 			Write:       true,
 			Verbose:     opts.verbose,
