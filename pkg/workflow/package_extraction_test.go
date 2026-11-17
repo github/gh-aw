@@ -78,6 +78,21 @@ npx typescript`,
 	}
 }
 
+func TestPackageExtractor_ExtractPackages_SkipsFlagValues(t *testing.T) {
+	extractor := PackageExtractor{
+		CommandNames:        []string{"npm"},
+		RequiredSubcommands: []string{"install"},
+		FlagsWithValues:     []string{"--prefix"},
+		TrimSuffixes:        "&|;",
+	}
+
+	got := extractor.ExtractPackages(`npm install --prefix "/tmp/sdk" --ignore-scripts --no-save @github/copilot-sdk@1.0.16 undici@6.28.0`)
+	want := []string{"@github/copilot-sdk@1.0.16"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ExtractPackages() = %v, want %v", got, want)
+	}
+}
+
 func TestPackageExtractor_ExtractPackages_PipPattern(t *testing.T) {
 	// Test pip pattern (required "install" subcommand)
 	extractor := PackageExtractor{

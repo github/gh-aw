@@ -116,6 +116,7 @@ var pkgLog = logger.New("workflow:package_extraction")
 //   - Set CommandNames to all variants of the command (e.g., ["pip", "pip3"])
 //   - Set RequiredSubcommand if the package manager requires a subcommand
 //     (e.g., "install" for pip, "get" for go)
+//   - Set FlagsWithValues for flags whose following argument is not a package
 //   - Set TrimSuffixes to remove shell operators from package names
 //     (typically "&|;")
 //
@@ -172,6 +173,10 @@ type PackageExtractor struct {
 	//   - [] for npx (npx <package>)
 	RequiredSubcommands []string
 
+	// FlagsWithValues lists flags whose following argument should also be skipped
+	// while searching for a package name.
+	FlagsWithValues []string
+
 	// TrimSuffixes is a string of characters to trim from the end of package names.
 	// This is useful for removing shell operators that may appear after package names
 	// in command strings.
@@ -196,7 +201,7 @@ type PackageExtractor struct {
 //  2. Split each line into words
 //  3. Find command name matches (from CommandNames)
 //  4. If RequiredSubcommand is set, look for that subcommand
-//  5. Skip flags (words starting with -)
+//  5. Skip flags (words starting with -) and configured flag values
 //  6. Extract package name and trim configured suffixes
 //  7. Return first package found per command invocation
 //
@@ -331,6 +336,9 @@ func (pe *PackageExtractor) findPackageName(words []string, startIndex int) stri
 		pkg := words[i]
 		// Skip flags (start with - or --)
 		if strings.HasPrefix(pkg, "-") {
+			if slices.Contains(pe.FlagsWithValues, pkg) && i+1 < len(words) {
+				i++
+			}
 			continue
 		}
 		// Trim configured suffixes (e.g., shell operators)
