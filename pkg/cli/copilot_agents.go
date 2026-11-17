@@ -43,7 +43,7 @@ var listAgenticWorkflowsMarkdownFiles = fetchAgenticWorkflowsMarkdownFiles
 
 // ensureAgenticWorkflowsDispatcher ensures that .github/skills/agentic-workflows/SKILL.md
 // exists and contains the routing instructions loaded by the Agentic Workflows agent.
-func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, write bool) error {
+func ensureAgenticWorkflowsDispatcher(ctx context.Context, verbose bool, skipInstructions bool, write bool) error {
 	copilotAgentsLog.Print("Ensuring agentic workflows dispatcher skill")
 
 	if skipInstructions {
@@ -59,7 +59,7 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, write
 	targetDir := filepath.Join(gitRoot, ".github", "skills", "agentic-workflows")
 	targetPath := filepath.Join(targetDir, "SKILL.md")
 
-	skillContent, err := buildAgenticWorkflowsSkillContent()
+	skillContent, err := buildAgenticWorkflowsSkillContent(ctx)
 	if err != nil {
 		copilotAgentsLog.Printf("Failed to build dispatcher skill: %v", err)
 		return fmt.Errorf("failed to build dispatcher skill: %w", err)
@@ -213,18 +213,21 @@ func renderAgenticWorkflowsGuidance(content string) string {
 	// Embedded templates default to main; pin both links and their ref labels.
 	return strings.NewReplacer(
 		"https://raw.githubusercontent.com/github/gh-aw/main/", "https://raw.githubusercontent.com/github/gh-aw/"+ref+"/",
-		"`main`", "`"+ref+"`",
+		"URLs showing `main`", "URLs showing `"+ref+"`",
 	).Replace(content)
 }
 
-func buildAgenticWorkflowsSkillContent() (string, error) {
+func buildAgenticWorkflowsSkillContent(ctx context.Context) (string, error) {
 	var awFiles []string
 	if agenticWorkflowsGuidanceRef() != "main" {
 		awFiles = embeddedFallbackAWMarkdownFiles()
 	} else {
 		var err error
-		awFiles, err = listAgenticWorkflowsMarkdownFiles(context.Background())
+		awFiles, err = listAgenticWorkflowsMarkdownFiles(ctx)
 		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return "", ctxErr
+			}
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch .github/aw markdown file list from github/gh-aw: %v. Falling back to embedded list.", err)))
 			awFiles = embeddedFallbackAWMarkdownFiles()
 		}

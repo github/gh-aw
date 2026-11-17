@@ -3,6 +3,18 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const configDir = dirname(fileURLToPath(import.meta.url));
+const clipboardTests = [
+  '**/copy-button.spec.ts',
+  '**/copy-button-layout.spec.ts',
+  '**/heading-links.spec.ts',
+  '**/homepage-links.spec.ts',
+];
+const chromiumUse = {
+  ...devices['Desktop Chrome'],
+  launchOptions: {
+    executablePath: '/usr/bin/chromium-browser',
+  },
+};
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -31,12 +43,16 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        launchOptions: {
-          executablePath: '/usr/bin/chromium-browser',
-        },
-      },
+      testIgnore: clipboardTests,
+      use: chromiumUse,
+    },
+    {
+      name: 'clipboard',
+      testMatch: clipboardTests,
+      // The OS clipboard is shared across browser instances.
+      workers: 1,
+      fullyParallel: false,
+      use: chromiumUse,
     },
   ],
 

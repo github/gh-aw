@@ -328,7 +328,7 @@ func TestCheckedInAgenticWorkflowsAgentMatchesGeneratedContent(t *testing.T) {
 func TestBuildAgenticWorkflowsSkillContent(t *testing.T) {
 	withMockAWMarkdownFileList(t, []string{"workflow-z.md", "workflow-a.md"}, nil)
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	if err != nil {
 		t.Fatalf("buildAgenticWorkflowsSkillContent() returned error: %v", err)
 	}
@@ -379,6 +379,7 @@ func TestAgenticWorkflowsGuidanceVersion(t *testing.T) {
 			SetVersionInfo(tt.version)
 			workflow.SetIsRelease(tt.release)
 			assert.Equal(t, tt.wantRef, agenticWorkflowsGuidanceRef())
+			assert.Equal(t, "URLs showing `"+tt.wantRef+"`; unrelated `main` branch", renderAgenticWorkflowsGuidance("URLs showing `main`; unrelated `main` branch"))
 
 			previous := listAgenticWorkflowsMarkdownFiles
 			t.Cleanup(func() { listAgenticWorkflowsMarkdownFiles = previous })
@@ -391,7 +392,7 @@ func TestAgenticWorkflowsGuidanceVersion(t *testing.T) {
 				return []string{"another-new-on-main.md"}, nil
 			}
 
-			skill, err := buildAgenticWorkflowsSkillContent()
+			skill, err := buildAgenticWorkflowsSkillContent(t.Context())
 			require.NoError(t, err)
 			agent, err := buildAgenticWorkflowsAgentContent(t.TempDir())
 			require.NoError(t, err)
@@ -406,7 +407,7 @@ func TestAgenticWorkflowsGuidanceVersion(t *testing.T) {
 				}
 			}
 
-			repeated, err := buildAgenticWorkflowsSkillContent()
+			repeated, err := buildAgenticWorkflowsSkillContent(t.Context())
 			require.NoError(t, err)
 			if tt.wantFetch {
 				assert.Equal(t, 2, fetchCount)
@@ -422,6 +423,30 @@ func TestAgenticWorkflowsGuidanceVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnsureAgenticWorkflowsDispatcherReturnsCancellationWithoutWriting(t *testing.T) {
+	tempDir := t.TempDir()
+	gitInit := exec.Command("git", "init")
+	gitInit.Dir = tempDir
+	require.NoError(t, gitInit.Run())
+	chdirForTest(t, tempDir)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	contextWasPreserved := false
+	originalList := listAgenticWorkflowsMarkdownFiles
+	listAgenticWorkflowsMarkdownFiles = func(c context.Context) ([]string, error) {
+		contextWasPreserved = c == ctx
+		return nil, c.Err()
+	}
+	t.Cleanup(func() { listAgenticWorkflowsMarkdownFiles = originalList })
+
+	err := ensureAgenticWorkflowsDispatcher(ctx, false, false, true)
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.True(t, contextWasPreserved)
+	assert.NoFileExists(t, filepath.Join(tempDir, ".github", "skills", "agentic-workflows", "SKILL.md"))
 }
 
 func TestUnifiedDebuggingInstructions(t *testing.T) {
@@ -488,7 +513,7 @@ func TestBuildAgenticWorkflowsSkillContentEnsuresOTELParagraph(t *testing.T) {
 	t.Cleanup(func() { agenticWorkflowsSkillTemplate = originalTemplate })
 	agenticWorkflowsSkillTemplate = strings.ReplaceAll(agenticWorkflowsSkillTemplate, "\n"+agenticWorkflowsOTELSkillParagraph, "")
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, content, agenticWorkflowsOTELSkillParagraph)
 }
@@ -496,7 +521,7 @@ func TestBuildAgenticWorkflowsSkillContentEnsuresOTELParagraph(t *testing.T) {
 func TestBuildAgenticWorkflowsSkillContentWithoutAWDirectory(t *testing.T) {
 	withMockAWMarkdownFileList(t, []string{"workflow-a.md"}, nil)
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	if err != nil {
 		t.Fatalf("buildAgenticWorkflowsSkillContent() returned error: %v", err)
 	}
@@ -516,7 +541,7 @@ func TestBuildAgenticWorkflowsSkillContentWithoutAWDirectory(t *testing.T) {
 func TestBuildAgenticWorkflowsSkillContentFallsBackToEmbeddedFileList(t *testing.T) {
 	withMockAWMarkdownFileList(t, nil, assert.AnError)
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	require.NoError(t, err, "buildAgenticWorkflowsSkillContent() returned error")
 
 	assert.NotContains(t, content, agenticWorkflowsSkillFileListPlaceholder, "expected generated skill content to replace the file-list placeholder")
@@ -548,7 +573,7 @@ func TestCheckedInAgenticWorkflowsSkillMatchesGeneratedContent(t *testing.T) {
 	sort.Strings(awFiles)
 	withMockAWMarkdownFileList(t, awFiles, nil)
 
-	expected, err := buildAgenticWorkflowsSkillContent()
+	expected, err := buildAgenticWorkflowsSkillContent(t.Context())
 	if err != nil {
 		t.Fatalf("buildAgenticWorkflowsSkillContent() returned error: %v", err)
 	}

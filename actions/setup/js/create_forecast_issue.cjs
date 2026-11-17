@@ -2,6 +2,7 @@
 // @safe-outputs-exempt SEC-004
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const fs = require("node:fs");
@@ -399,7 +400,7 @@ async function main() {
       owner: context.repo.owner,
       repo: context.repo.repo,
       title: isErrorOutcome ? FORECAST_ERROR_ISSUE_TITLE : FORECAST_ISSUE_TITLE,
-      labels: ["agentic-workflows"],
+      labels: [getIssueLabel()],
     },
     issueReport
   );

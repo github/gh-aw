@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,12 +22,12 @@ const (
 	bootstrapAgenticAgentPath = ".github/agents/agentic-workflows.md"
 )
 
-func missingBootstrapInitMarkers(baseDir string, engineOverride string) ([]string, error) {
+func missingBootstrapInitMarkers(ctx context.Context, baseDir string, engineOverride string) ([]string, error) {
 	markers := expectedBootstrapInitMarkers(engineOverride)
 	bootstrapLog.Printf("Checking %d bootstrap init markers in %s (engine=%q)", len(markers), baseDir, engineOverride)
 	missing := make([]string, 0)
 	for _, marker := range markers {
-		ok, err := isBootstrapInitMarkerSatisfied(baseDir, marker)
+		ok, err := isBootstrapInitMarkerSatisfied(ctx, baseDir, marker)
 		if err != nil {
 			bootstrapLog.Printf("Failed to inspect bootstrap marker %s: %v", marker, err)
 			return nil, err
@@ -40,7 +41,7 @@ func missingBootstrapInitMarkers(baseDir string, engineOverride string) ([]strin
 	return missing, nil
 }
 
-func isBootstrapInitMarkerSatisfied(baseDir string, marker string) (bool, error) {
+func isBootstrapInitMarkerSatisfied(ctx context.Context, baseDir string, marker string) (bool, error) {
 	markerPath := filepath.Join(baseDir, filepath.FromSlash(marker))
 	info, err := os.Stat(markerPath)
 	if err != nil {
@@ -92,7 +93,7 @@ func isBootstrapInitMarkerSatisfied(baseDir string, marker string) (bool, error)
 		hasActionInstall := strings.Contains(steps, "actions/setup-cli")
 		return hasLegacyInstall || hasActionInstall, nil
 	case bootstrapAgenticSkillPath:
-		expected, err := buildAgenticWorkflowsSkillContent()
+		expected, err := buildAgenticWorkflowsSkillContent(ctx)
 		if err != nil {
 			return false, fmt.Errorf("failed to inspect %s: %w", marker, err)
 		}

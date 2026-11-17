@@ -58,7 +58,9 @@ describe("run_activity_report", () => {
     vi.clearAllMocks();
   });
 
-  it("creates an activity report issue with 24h and 7d time ranges", async () => {
+  it.each([undefined, "area:agentic-workflows"])("creates an activity report issue with 24h and 7d time ranges (label %s)", async label => {
+    if (label) process.env.GH_AW_ISSUE_LABEL = label;
+    else delete process.env.GH_AW_ISSUE_LABEL;
     mockExec.getExecOutput.mockResolvedValueOnce({ stdout: "## 24h report\nok", stderr: "", exitCode: 0 }).mockResolvedValueOnce({ stdout: "## 7d report\nok", stderr: "", exitCode: 0 });
 
     const { main } = await import("./run_activity_report.cjs");
@@ -82,7 +84,7 @@ describe("run_activity_report", () => {
         owner: "testowner",
         repo: "testrepo",
         title: "[aw] agentic status report",
-        labels: ["agentic-workflows"],
+        labels: [label || "agentic-workflows"],
       })
     );
 

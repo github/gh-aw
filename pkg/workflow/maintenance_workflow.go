@@ -310,6 +310,10 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	)
 	copilotOrgBilling := allCopilotWorkflowsUseOrgBilling(workflowDataList)
 	hasCacheMemory := false
+	issueLabel := ""
+	if repoConfig != nil {
+		issueLabel = repoConfig.IssueLabel
+	}
 	for _, data := range workflowDataList {
 		if data != nil && data.CacheMemoryConfig != nil && len(data.CacheMemoryConfig.Caches) > 0 {
 			hasCacheMemory = true
@@ -337,6 +341,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		hasCacheMemory:      hasCacheMemory,
 		hasSteering:         hasSteering,
 		noLogo:              !shouldIncludeLockFileLogo(repoConfig, opts.NoLogo),
+		issueLabel:          issueLabel,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to finalize maintenance workflow YAML: %w", err)
