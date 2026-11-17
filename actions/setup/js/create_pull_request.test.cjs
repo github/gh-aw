@@ -160,6 +160,7 @@ describe("create_pull_request - draft policy enforcement", () => {
 
     expect(result.success).toBe(true);
     expect(result.id).toBe(555111222);
+    expect(result.execution_trace).toBe("AHIgmux");
     expect(result.metadata).toEqual({ node_id: "PR_kwDOtest456" });
   });
 
@@ -610,6 +611,7 @@ index 0000000..abc1234
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("allow-full-history-fetch: true");
+    expect(result.execution_trace).toBe("ARSy");
     expect(result.error).toContain("safe-outputs.create-pull-request");
     const directFetch = global.exec.exec.mock.calls.find(([, args]) => Array.isArray(args) && args[0] === "fetch" && args.includes("origin") && args.includes(prereq));
     expect(directFetch).toBeUndefined();
@@ -648,6 +650,7 @@ index 0000000..abc1234
 
     expect(result.success).toBe(true);
     expect(pushSignedSpy).toHaveBeenCalledWith(expect.objectContaining({ signedCommits: false }));
+    expect(result.execution_trace).toBe("ARtmux");
   });
 
   it("should create the PR when the bundle push fails once with a transient workflows-scope timeout and succeeds on retry", async () => {
@@ -685,6 +688,7 @@ index 0000000..abc1234
 
       expect(result.success).toBe(true);
       expect(result.fallback_used).not.toBe(true);
+      expect(result.execution_trace).toBe("ARttmux");
       expect(pushSignedSpy).toHaveBeenCalledTimes(2);
       expect(global.github.rest.pulls.create).toHaveBeenCalled();
       expect(global.github.rest.issues.create).not.toHaveBeenCalled();
@@ -796,6 +800,7 @@ index 0000000..abc1234
     expect(result.fallback_used).not.toBe(true);
     expect(pushSignedSpy).toHaveBeenCalledTimes(2);
     expect(global.exec.exec).toHaveBeenCalledWith("git", ["reset", "--soft", "origin/main"]);
+    expect(result.execution_trace).toBe("ARtTmux");
     expect(global.exec.exec).toHaveBeenCalledWith("git", ["commit", "-m", "bundle merge headline"]);
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
   });
@@ -2207,6 +2212,7 @@ ${diffs}
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("outside the allowed-files list");
+    expect(result.execution_trace).toBe("AMy");
     expect(result.error).toContain("src/index.js");
   });
 
@@ -2388,6 +2394,7 @@ ${diffs}
     const result = await handler({ title: "Test PR", body: "Test body", branch: "feature/protected-identical" }, {});
 
     expect(result.issue_number).toBe(76);
+    expect(result.execution_trace).toBe("ANWijx");
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
     expect(global.github.paginate).toHaveBeenCalledWith(global.github.rest.issues.listForRepo, expect.objectContaining({ owner: "test-owner", repo: "test-repo", state: "all", labels: "pull-request-fallback" }));
     const updateCall = global.github.rest.issues.update.mock.calls[0][0];
@@ -3560,6 +3567,7 @@ describe("create_pull_request - patch apply fallback to original base commit", (
 
     expect(result.success).toBe(true);
     // Should warn that the PR will show merge conflicts
+    expect(result.execution_trace).toBe("AWXZmux");
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("merge conflicts"));
   });
 
@@ -5102,6 +5110,7 @@ describe("create_pull_request - E003 file-limit fallback-to-issue", () => {
     expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
     expect(result.success).toBe(false);
     expect(result.error).toContain("SECURITY:");
+    expect(result.execution_trace).toBe("AJy");
   });
 
   it("should use the actual received file count (not maxFiles*2) as the suggested limit", async () => {
@@ -5148,6 +5157,7 @@ describe("create_pull_request - E003 file-limit fallback-to-issue", () => {
     // Staged mode: no API side effects, just a preview
     expect(result.success).toBe(true);
     expect(result.staged).toBe(true);
+    expect(result.execution_trace).toBe("AQJx");
     expect(result.fallback_used).toBeUndefined();
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
     expect(global.github.rest.pulls.create).not.toHaveBeenCalled();

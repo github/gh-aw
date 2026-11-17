@@ -867,6 +867,18 @@ source for opaque fields.
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 
+Pull-request creation and branch-push outcomes also retain `data.execution_trace`,
+an ordered sequence of source-defined branch letters (`A–Z`, `a–z`, at most
+1,024 characters, retaining the prefix and terminal outcome at the limit).
+Each instrumented route has a unique letter within its handler;
+the source comments define the mapping. Equal paths produce equal identifiers,
+not unique invocation IDs. Interpret a trace with its operation `type` and the
+handler source revision from that run to compare hot paths and diagnose recovery
+or fallback routes. Traces survive skipped, staged, and failed execution, including
+thrown errors; absent traces mean instrumentation was unavailable or the handler
+was not entered. The reusable tracing helper can instrument other safe outputs
+without recording request bodies, branch names, credentials, or error text.
+
 Job-result records cover only the conclusion job's direct dependencies, including
 custom jobs when present in `needs`. They do not imply a final workflow result
 or a result for the still-running conclusion job. Missing dependency metadata,

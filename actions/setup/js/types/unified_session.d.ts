@@ -456,6 +456,13 @@ export interface SafeOutputData {
   staged?: boolean;
   /** The operation may have applied even though processing failed to confirm it. */
   operation_outcome?: "indeterminate";
+  /**
+   * Ordered branch letters from the safe-output handler source, not a correlation ID.
+   * @pattern ^[A-Za-z]+$
+   * @minLength 1
+   * @maxLength 1024
+   */
+  execution_trace?: string;
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {

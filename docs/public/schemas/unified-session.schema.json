@@ -1260,7 +1260,8 @@
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
-        "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." }
+        "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
+        "execution_trace": { "type": "string", "description": "Ordered branch letters from the safe-output handler source, not a correlation ID.", "pattern": "^[A-Za-z]+$", "minLength": 1, "maxLength": 1024 }
       },
       "additionalProperties": false
     },
@@ -1279,6 +1280,7 @@
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
+        "execution_trace": { "type": "string", "description": "Ordered branch letters from the safe-output handler source, not a correlation ID.", "pattern": "^[A-Za-z]+$", "minLength": 1, "maxLength": 1024 },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },
       "additionalProperties": false

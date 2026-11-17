@@ -16,7 +16,7 @@ const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
-const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
+const { finalizeBufferedReviewOutcomes, projectSafeOutputData } = require("./safe_output_outcomes.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
@@ -1428,6 +1428,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
           messageIndex: i,
           success: false,
           error: errorMsg,
+          ...projectSafeOutputData({ execution_trace: result.execution_trace }),
           ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : result.operation_outcome === "indeterminate" ? { result: { operation_outcome: "indeterminate" } } : {}),
         });
         // Track code-push failures for later comment annotations and conclusion reporting.
@@ -1574,6 +1575,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
         messageIndex: i,
         success: false,
         error: errorMsg,
+        ...projectSafeOutputData({ execution_trace: error?.execution_trace }),
       });
       // Track code-push failures for later comment annotations and conclusion reporting.
       if (CODE_PUSH_TYPES.has(messageType)) {
@@ -1725,6 +1727,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
               success: false,
               deferred: false,
               error: errorMsg,
+              ...projectSafeOutputData({ execution_trace: error?.execution_trace }),
               result: { success: false, deferred: false, error: errorMsg },
             };
           }

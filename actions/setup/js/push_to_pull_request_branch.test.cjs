@@ -531,7 +531,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       const handler = await module.main({ target });
       const result = await handler({ branch }, {});
 
-      expect(result).toEqual({ success: false, error: 'Invalid target configuration: must be "triggering", "*", or a valid pull request number' });
+      expect(result).toEqual({ success: false, error: 'Invalid target configuration: must be "triggering", "*", or a valid pull request number', execution_trace: "ALy" });
       expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
     });
 
@@ -545,7 +545,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const handler = await module.main({ target: "*" });
         const result = await handler({ branch, [alias]: value }, {});
 
-        expect(result).toEqual({ success: false, error: "Pull request number is required but not found" });
+        expect(result).toEqual({ success: false, error: "Pull request number is required but not found", execution_trace: "ANy" });
         expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
       }
     );
@@ -1178,6 +1178,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.branch_name).toBe("feature-branch");
       expect(result.commit_url).toContain("test-owner/test-repo/commit/");
       expect(result.before_state).toEqual({ head_sha: "remote-head-before" });
+      expect(result.execution_trace).toBe("AMTdnux");
       expect(result.after_state).toEqual({ head_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
     });
 
@@ -1195,6 +1196,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         expect(result.success).toBe(false);
         expect(result.skipped).not.toBe(true);
         expect(result.error).toContain("Authentication failed");
+        expect(result.execution_trace).toBe("AMTdnpy");
       } finally {
         pushSignedSpy.mockRestore();
       }
@@ -1337,6 +1339,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("no longer exists on origin");
+      expect(result.execution_trace).toBe("AMTVy");
       expect(mockExec.exec).not.toHaveBeenCalled();
     });
 
@@ -1511,6 +1514,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
         expect(result.success).toBe(true);
         expect(mockCore.info).toHaveBeenCalledWith("Patch applied successfully after resolving add/add conflict(s)");
+        expect(result.execution_trace).toBe("AMTdefnux");
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "--theirs", "--", "docs/findings.md"], expect.any(Object));
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["add", "--", "docs/findings.md"], expect.any(Object));
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["am", "--continue"], expect.any(Object));
@@ -1526,6 +1530,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.fallback_used).toBe(true);
       expect(result.fallback_type).toBe("pull_request");
       expect(result.pull_request_number).toBe(999);
+      expect(result.execution_trace).toBe("AMTdnpqx");
       expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
     });
 
@@ -1583,7 +1588,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const handler = await module.main({});
         const result = await handler({ branch }, {});
 
-        expect(result).toEqual({ skipped: true, reason: expect.stringContaining("Pull request #123 closed") });
+        expect(result).toEqual({ skipped: true, reason: expect.stringContaining("Pull request #123 closed"), execution_trace: "AMTdnpqy" });
         expect(pushSignedSpy).toHaveBeenCalledTimes(1);
         expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
         expect(mockExec.exec.mock.calls.some(([, args]) => args[0] === "checkout" && args[1] === "-b")).toBe(false);
@@ -1616,7 +1621,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const handler = await module.main({});
         const result = await handler({ branch }, {});
 
-        expect(result).toEqual({ success: false, error_type: "push_failed", error: expect.stringContaining(pushError) });
+        expect(result).toEqual({ success: false, error_type: "push_failed", error: expect.stringContaining(pushError), execution_trace: pushError.includes("`workflows`") ? "AMTdnpqy" : "AMTdnpy" });
         expect(pushSignedSpy).toHaveBeenCalledTimes(1);
         expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
         expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining(pushError));
@@ -1809,7 +1814,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const result = await resultPromise;
 
         expect(pushSignedSpy).toHaveBeenCalledTimes(6);
-        expect(result).toEqual({ success: false, error_type: "push_failed", error: expect.stringContaining(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT) });
+        expect(result).toEqual({ success: false, error_type: "push_failed", error: expect.stringContaining(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT), execution_trace: "AMTdnnnnnnpqy" });
         expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
         expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT));
       } finally {
@@ -2668,6 +2673,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.success).toBe(false);
       expect(result.skipped).toBe(true);
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("noop"));
+      expect(result.execution_trace).toBe("AJy");
     });
 
     it("should error when patch is empty and if-no-changes is error", async () => {
@@ -2679,6 +2685,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("No changes");
+      expect(result.execution_trace).toBe("AvJy");
     });
 
     it("should silently skip when patch is empty and if-no-changes is ignore", async () => {
@@ -2689,6 +2696,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       const result = await handler({ branch: "should-silently-skip-when-patch-is-empty-and-if-no-changes-i" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.execution_trace).toBe("AwJy");
       expect(result.skipped).toBe(true);
     });
 
@@ -3886,6 +3894,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(true);
       expect(result.staged).toBe(true);
+      expect(result.execution_trace).toBe("AKx");
       // Should not have made any git commands
       expect(mockExec.exec).not.toHaveBeenCalled();
     });
