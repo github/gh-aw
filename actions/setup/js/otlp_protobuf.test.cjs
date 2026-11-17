@@ -382,7 +382,7 @@ describe("protobuf OTLP transport", () => {
 
   it.each(["grpc", "invalid"])("reports unsupported protocol %s without sending or losing the mirror", async protocol => {
     vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol);
-    await expect(sendOTLPSpan("https://collector.example.com", payload())).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com", payload())).resolves.toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("Unsupported OTLP traces protocol"));
     expect(fs.appendFileSync).toHaveBeenCalledWith(OTEL_JSONL_PATH, expect.any(String));
@@ -393,7 +393,7 @@ describe("protobuf OTLP transport", () => {
     vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
     const request = payload();
     request.resourceSpans[0].scopeSpans[0].spans[0].startTimeUnixNano = "invalid";
-    await expect(sendOTLPSpan("https://collector.example.com", request)).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com", request)).resolves.toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(console.warn).toHaveBeenCalledOnce();
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("OTLP export encoding failed"));
