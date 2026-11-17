@@ -163,7 +163,7 @@ type RepoConfig struct {
 	// ProtectedFiles configures repository-wide exceptions to safe-output file protection.
 	ProtectedFiles RepoProtectedFilesConfig
 
-	// Admission enables admission and conclusion_admission jobs for all workflows.
+	// Admission enables admission steps in activation and conclusion for all workflows.
 	Admission bool
 
 	// GatewayDispatch enables experimental on.gateway-dispatch triggers requiring an approved server.

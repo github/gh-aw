@@ -135,9 +135,11 @@ func (c *Compiler) buildActivationPermissions(ctx *activationJobBuildContext) (s
 }
 
 func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext) map[PermissionScope]PermissionLevel {
-	// Admission OIDC is isolated in the endpoint-gated admission job.
 	permsMap := map[PermissionScope]PermissionLevel{
 		PermissionContents: PermissionRead,
+	}
+	if ctx.data.AdmissionEnabled {
+		permsMap[PermissionIdToken] = PermissionWrite
 	}
 	if isWorkQueueWorker(ctx.data) {
 		permsMap[PermissionContents] = PermissionWrite

@@ -46,8 +46,8 @@ Decision ==
 Init ==
     \E context \in Contexts :
         s = [context |-> context, phase |-> "configure", activation |-> "pending",
-             admissionJobResult |-> "pending",
-             oidcJobs |-> {"admission", "conclusion_admission"},
+             admissionStepOutcome |-> "pending",
+             oidcJobs |-> {"activation", "conclusion"},
              admission |-> "none", attempts |-> 0, credential |-> "none",
              cached |-> NoDecision, firstDecision |-> NoDecision, reply |-> EmptyReply,
              firstReplica |-> 0, replica |-> 0, recovered |-> FALSE,
@@ -65,7 +65,7 @@ Init ==
 Configure ==
     /\ s.phase = "configure"
     /\ s' = [s EXCEPT
-        !.oidcJobs = IF Fault = "shared-activation-oidc" THEN {"admission", "conclusion_admission", "activation"} ELSE @,
+        !.oidcJobs = IF Fault = "shared-agent-oidc" THEN {"activation", "conclusion", "agent"} ELSE @,
         !.phase = IF s.context.endpoint = "valid"
                      \/ (s.context.endpoint = "absent" /\ Fault = "endpoint-bypass")
                   THEN "request"
@@ -76,7 +76,7 @@ Configure ==
         !.admission = IF s.context.endpoint = "absent" /\ Fault # "endpoint-bypass"
                       THEN "skipped"
                       ELSE IF s.context.endpoint = "invalid" THEN "blocked" ELSE @,
-        !.admissionJobResult = IF s.context.endpoint = "absent" /\ Fault # "endpoint-bypass"
+        !.admissionStepOutcome = IF s.context.endpoint = "absent" /\ Fault # "endpoint-bypass"
                               THEN "skipped"
                               ELSE IF s.context.endpoint = "invalid" THEN "failure" ELSE @,
         !.lastEvent = "Configure"]
@@ -97,7 +97,7 @@ FatalClientFailure ==
             !.phase = IF failOpen THEN "daily" ELSE "finalize",
             !.activation = IF failOpen THEN "pending" ELSE "failed",
             !.admission = IF failOpen THEN "outage" ELSE "blocked",
-            !.admissionJobResult = IF failOpen THEN "success" ELSE "failure",
+            !.admissionStepOutcome = IF failOpen THEN "success" ELSE "failure",
             !.fatal = TRUE, !.lastEvent = "FatalClientFailure"]
 
 ReturnAllow ==
@@ -146,7 +146,7 @@ EvaluateAllow ==
     /\ s.phase = "evaluate" /\ s.reply.kind = "allow"
     /\ s' = [s EXCEPT
         !.phase = IF Fault = "daily-after-admission" THEN "daily" ELSE "activate",
-        !.admissionJobResult = "success", !.admission = "admitted",
+        !.admissionStepOutcome = "success", !.admission = "admitted",
         !.approvedCap = IF Fault = "cap-not-validated" THEN 0 ELSE s.reply.cap,
         !.approvedDetectionCap = IF Fault = "optional-cap-ignored" THEN 0 ELSE s.reply.detectionCap,
         !.approvedEvalsCap = s.reply.evalsCap,
@@ -168,7 +168,7 @@ EvaluateRejection ==
             !.phase = IF failOpen THEN "daily" ELSE "finalize",
             !.activation = IF failOpen THEN "pending" ELSE "failed",
             !.admission = IF failOpen THEN "outage" ELSE "blocked",
-            !.admissionJobResult = IF failOpen THEN "success" ELSE "failure",
+            !.admissionStepOutcome = IF failOpen THEN "success" ELSE "failure",
             !.lastEvent = "BlockRejection"]
 
 EvaluateTransient ==
@@ -179,7 +179,7 @@ EvaluateTransient ==
             !.phase = IF retry THEN "request" ELSE IF failOpen THEN "daily" ELSE "finalize",
             !.activation = IF retry THEN @ ELSE IF failOpen THEN "pending" ELSE "failed",
             !.admission = IF retry THEN @ ELSE "outage",
-            !.admissionJobResult = IF retry THEN @ ELSE IF failOpen THEN "success" ELSE "failure",
+            !.admissionStepOutcome = IF retry THEN @ ELSE IF failOpen THEN "success" ELSE "failure",
             !.lastEvent = IF retry THEN "Retry" ELSE "ExhaustOutage"]
 
 DeadlineExpired ==
@@ -191,17 +191,17 @@ DeadlineExpired ==
             !.phase = IF Fault = "deadline-retry" THEN "request"
                       ELSE IF failOpen THEN "daily" ELSE "finalize",
             !.activation = IF failOpen THEN "pending" ELSE "failed",
-            !.admissionJobResult = IF failOpen THEN "success" ELSE "failure",
+            !.admissionStepOutcome = IF failOpen THEN "success" ELSE "failure",
             !.admission = "outage", !.lastEvent = "DeadlineExpired"]
 
-AdmissionJobFailure ==
-    /\ s.phase = "activate" /\ s.admissionJobResult = "success"
-    /\ s' = [s EXCEPT !.admissionJobResult = "failure", !.lastEvent = "AdmissionJobFailure"]
+AdmissionStepFailure ==
+    /\ s.phase = "activate" /\ s.admissionStepOutcome = "success"
+    /\ s' = [s EXCEPT !.admissionStepOutcome = "failure", !.lastEvent = "AdmissionStepFailure"]
 
 Activate ==
     /\ s.phase = "activate"
-    /\ LET allowed == s.admissionJobResult \in {"success", "skipped"}
-                      \/ Fault = "admission-dependency-bypass"
+    /\ LET allowed == s.admissionStepOutcome \in {"success", "skipped"}
+                      \/ Fault = "admission-step-bypass"
        IN s' = [s EXCEPT
             !.phase = IF allowed THEN "ready" ELSE "finalize",
             !.activation = IF allowed THEN "success" ELSE "failed",
@@ -210,7 +210,7 @@ Activate ==
 ValidateDailyFallback ==
     /\ s.phase = "daily"
     /\ LET allowed == (s.context.dailyResult = "allow" \/ Fault = "daily-fallback-bypass")
-                      /\ s.admissionJobResult \in {"success", "skipped"}
+                      /\ s.admissionStepOutcome \in {"success", "skipped"}
        IN s' = [s EXCEPT
             !.phase = IF allowed THEN "ready" ELSE "finalize",
             !.activation = IF allowed THEN "success" ELSE "failed",
@@ -245,7 +245,7 @@ Next ==
     \/ Configure \/ Send \/ FatalClientFailure
     \/ ReturnAllow \/ ReturnDeny \/ ReturnMalformed \/ ReturnTransient
     \/ EvaluateAllow \/ EvaluateRejection \/ EvaluateTransient
-    \/ DeadlineExpired \/ AdmissionJobFailure \/ Activate \/ ValidateDailyFallback
+    \/ DeadlineExpired \/ AdmissionStepFailure \/ Activate \/ ValidateDailyFallback
     \/ StartAgent \/ FinishAgent \/ FinishTelemetry
 
 Spec == Init /\ [][Next]_s /\ WF_s(Next)
@@ -256,8 +256,8 @@ TypeOK ==
     /\ s.phase \in {"configure", "request", "response", "evaluate", "activate", "daily", "ready",
                    "running", "finalize", "done"}
     /\ s.activation \in {"pending", "success", "failed"}
-    /\ s.admissionJobResult \in {"pending", "success", "failure", "skipped"}
-    /\ s.oidcJobs \subseteq {"admission", "conclusion_admission", "activation"}
+    /\ s.admissionStepOutcome \in {"pending", "success", "failure", "skipped"}
+    /\ s.oidcJobs \subseteq {"activation", "conclusion", "agent"}
     /\ s.admission \in {"none", "skipped", "admitted", "blocked", "outage"}
     /\ s.attempts \in 0..4 /\ s.denialAt \in 0..4
     /\ s.credential \in {"none", "oidc", "github-api"}
@@ -280,8 +280,8 @@ TypeOK ==
                     s.started, s.traceExported, s.traceSent, s.timedOut} : value \in BOOLEAN
 
 ActivationGate == s.started => s.activation = "success"
-AdmissionJobIsolation == s.oidcJobs = {"admission", "conclusion_admission"}
-AdmissionDependency == s.activation = "success" => s.admissionJobResult \in {"success", "skipped"}
+AdmissionOIDCScope == s.oidcJobs = {"activation", "conclusion"}
+AdmissionStepGate == s.activation = "success" => s.admissionStepOutcome \in {"success", "skipped"}
 NoEndpointNoRequest == s.context.endpoint = "absent" => s.attempts = 0 /\ s.credential = "none"
 InvalidConfigurationBlocks == s.context.endpoint = "invalid" => s.activation # "success" /\ s.attempts = 0
 OIDCOnly == s.credential \in {"none", "oidc"}
@@ -364,6 +364,6 @@ NoOutageDailyBlock ==
     ~(s.phase = "done" /\ s.admission = "outage" /\ s.dailyValidation = "failed" /\ ~s.started)
 NoEarlyTimeout ==
     ~(s.started /\ s.admission = "outage" /\ s.timedOut /\ s.attempts < MaxAttempts)
-NoFailedAdmissionJobBlock ==
-    ~(s.phase = "done" /\ s.admission = "admitted" /\ s.admissionJobResult = "failure" /\ ~s.started)
+NoFailedAdmissionStepBlock ==
+    ~(s.phase = "done" /\ s.admission = "admitted" /\ s.admissionStepOutcome = "failure" /\ ~s.started)
 =============================================================================

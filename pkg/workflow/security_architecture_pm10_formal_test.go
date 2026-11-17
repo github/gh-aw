@@ -52,8 +52,9 @@ permissions:
 
 	activationSection := extractJobSection(yamlOut, "activation")
 	require.NotEmpty(t, activationSection, "activation job must be present")
-	assert.Contains(t, activationSection, "      - pre_activation", "activation must depend on pre_activation")
-	assert.Contains(t, activationSection, "      - admission", "activation must depend on admission")
+	assert.Contains(t, activationSection, "needs: pre_activation", "activation must depend on pre_activation")
+	assert.NotContains(t, activationSection, "      - admission", "admission runs inside activation")
+	assert.Contains(t, activationSection, "id: admission")
 }
 
 func TestFormalPM10b_ActivatedOutputExistsAndGatesActivation(t *testing.T) {
@@ -85,10 +86,8 @@ permissions:
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(yamlOut), &rendered))
 	assert.Contains(t, rendered.Jobs["activation"].If, "needs.pre_activation.outputs.activated == 'true'", "activation must require successful pre-activation")
-	assert.Contains(t, rendered.Jobs["activation"].If, "needs.pre_activation.result == 'success'")
 	assert.Contains(t, rendered.Jobs["activation"].Needs, "pre_activation")
-	assert.Contains(t, rendered.Jobs["activation"].Needs, "admission")
-	assert.Contains(t, rendered.Jobs["activation"].If, admissionJobResultCondition)
+	assert.NotContains(t, rendered.Jobs["activation"].Needs, "admission")
 }
 
 func TestFormalPM10c_PreActivationJobHasNoWritePermissions(t *testing.T) {

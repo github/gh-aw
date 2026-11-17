@@ -1081,7 +1081,7 @@ func TestInsertPreStepsAtEarliestBoundary(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := insertPreStepsAtEarliestBoundary(tt.steps, tt.preSteps)
+			result := insertPreStepsAtEarliestBoundary(tt.steps, tt.preSteps, false)
 			assert.Len(t, result, tt.expectedLength)
 			for _, expected := range tt.expectContains {
 				assert.Contains(t, result, expected)

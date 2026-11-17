@@ -289,6 +289,7 @@ async function main(core) {
       }
     }
     core.setOutput("result", decision.result);
+    core.exportVariable("GH_AW_ADMISSION_RESULT", decision.result);
     await writeAdmissionSummary(core, decision);
   } catch {
     core.info?.("Admission: activation blocked; sensitive diagnostics withheld.");

@@ -140,10 +140,13 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	// Admission still runs in dry-run mode; record its decision without applying
 	// its budget to agent, detection, or evals execution.
 	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
-	if data.AdmissionEnabled {
-		steps = append(steps, c.buildConclusionAdmissionMetadataStep(data)...)
-	}
 	steps = append(steps, buildUsageArtifactUploadStep(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
+	if data.AdmissionEnabled {
+		if err := validateAdmissionWorkflowHashes(data); err != nil {
+			return nil, err
+		}
+		steps = append(steps, c.buildConclusionAdmissionStep(data)...)
+	}
 	if c.actionMode.IsScript() {
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
@@ -188,13 +191,13 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		if conclusionDetectionMayCreateIssue(data) {
 			conclusionPerms.Set(PermissionIssues, PermissionWrite)
 		}
-		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
+		if data.AdmissionEnabled || hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 			conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 		}
 		addReactionCleanupJobPermissions(data, conclusionPerms)
 		return conclusionPerms
 	}
-	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
+	if data.AdmissionEnabled || hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 		conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 	}
 	if isWorkQueueEnabled(data) {

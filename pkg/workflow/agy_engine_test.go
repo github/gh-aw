@@ -338,9 +338,6 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 				if entry.id == "smoke-agy" && name == "push_evals_state" {
 					allowedPermissions = map[string]string{"contents": "write"}
 				}
-				if name == string(constants.ConclusionAdmissionJobName) {
-					allowedPermissions = map[string]string{"contents": "read", "id-token": "write"}
-				}
 				if entry.id == "smoke-agy" && name == "push_evals_state" {
 					allowedPermissions = map[string]string{"contents": "write"}
 				}
@@ -360,9 +357,7 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 				if entry.id == "engine-conformance-agy" {
 					switch name {
 					case "activation", "conclusion":
-						allowedPermissions = map[string]string{"actions": "read", "contents": "write", "issues": "write"}
-					case "admission":
-						allowedPermissions = map[string]string{"contents": "read", "id-token": "write"}
+						allowedPermissions = map[string]string{"actions": "read", "contents": "write", "issues": "write", "id-token": "write"}
 					case "safe_outputs":
 						allowedPermissions = map[string]string{"actions": "write", "contents": "write", "issues": "write"}
 					}
@@ -372,14 +367,12 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 					}
 				}
 				if name == "activation" {
-					assert.NotContains(t, config.Permissions, "id-token")
-				}
-				if name == "admission" {
-					allowedPermissions = map[string]string{"contents": "read", "id-token": "write"}
+					allowedPermissions["id-token"] = "write"
+					assert.Equal(t, "write", config.Permissions["id-token"])
 				}
 				if name == "conclusion" {
 					if entry.id != "engine-conformance-agy" {
-						allowedPermissions = map[string]string{"actions": "read"}
+						allowedPermissions = map[string]string{"actions": "read", "id-token": "write"}
 					}
 					for _, step := range config.Steps {
 						if step["id"] == "mint-otlp-oidc-token" {
@@ -387,9 +380,6 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 						}
 					}
 					assert.Equal(t, allowedPermissions, config.Permissions, "conclusion must have only its required reporting permissions")
-				}
-				if name == string(constants.ConclusionAdmissionJobName) {
-					assert.Equal(t, allowedPermissions, config.Permissions, "conclusion admission must have only callback permissions")
 				}
 				for permission, level := range config.Permissions {
 					expectedLevel, allowed := allowedPermissions[permission]
@@ -409,8 +399,8 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 			assert.Contains(t, callbackWith["script"], "conclusion_admission.cjs")
 			callbackEnv, ok := callback["env"].(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, "${{ needs.conclusion.outputs.usage_artifact_id }}", callbackEnv["GH_AW_USAGE_ARTIFACT_ID"])
-			assert.Equal(t, "${{ needs.conclusion.outputs.usage_artifact_retry_id }}", callbackEnv["GH_AW_USAGE_ARTIFACT_RETRY_ID"])
+			assert.Equal(t, "${{ steps.upload-usage-artifact.outputs.artifact-id }}", callbackEnv["GH_AW_USAGE_ARTIFACT_ID"])
+			assert.Equal(t, "${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}", callbackEnv["GH_AW_USAGE_ARTIFACT_RETRY_ID"])
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
 			assert.Equal(t, 2, callee.Jobs["safe_outputs"].TimeoutMinutes)
 			assert.Contains(t, string(lock), fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="%d"`, entry.credits))
