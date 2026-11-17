@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-17",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/third-party-agent.md",
+      "docs/src/content/docs/blog/2026-06-01-agent-of-the-day-2.md"
+    ],
+    "cli": [
+      "gh aw (root help)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/technical-doc-writer.md",
+      ".github/workflows/dataflow-pr-discussion-dataset.md"
+    ],
+    "validation": [
+      "pkg/workflow/model_costs_pricing_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "Blog post thresholds (500/1000 lines, 80-line function, 10 exports, 24h cadence) match .github/workflows/architecture-guardian.md",
+    "dataflow-pr-discussion-dataset run-failure message uses the valid {status} run-outcome placeholder and gives a next step"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "pkg/workflow/model_costs_pricing_validation.go",
+      "priority": "high",
+      "issue": "Error reason (line 35) says 'pinned version' even when the AWF tag is the defaulted DefaultFirewallVersion, so the message misstates why validation failed"
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-06-01-agent-of-the-day-2.md",
+      "priority": "medium",
+      "issue": "Empty > [!NOTE] callout at line 12 renders as an empty admonition"
+    }
+  ],
+  "observations": [
+    "docs/src/content/docs/reference/third-party-agent.md: dense 'Sample-specific constraints' table and long 'Protected session capture' paragraphs; readability observation only, no task created"
+  ]
+}

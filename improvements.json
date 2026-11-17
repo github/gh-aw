@@ -1,6 +1,18 @@
 {
-  "last_updated": "2026-11-15",
+  "last_updated": "2026-11-17",
   "pending_tasks": [
+    {
+      "file": "pkg/workflow/model_costs_pricing_validation.go",
+      "created": "2026-11-17",
+      "status": "pending",
+      "issue": "Line 35 'pinned version %q' is wrong when the AWF tag is defaulted; reword to 'AWF version %q' and keep the 'drops apiProxy.defaultAiCreditsPricing' and minimum-version substrings the tests assert"
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-06-01-agent-of-the-day-2.md",
+      "created": "2026-11-17",
+      "status": "pending",
+      "issue": "Empty '> [!NOTE]' callout at lines 12-13 renders as an empty admonition; add the intended note text or remove the callout"
+    },
     {
       "file": "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-continuous-simplicity.md",
       "created": "2026-11-15",
