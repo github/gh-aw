@@ -30,7 +30,7 @@ The following test IDs cover the `DriftRecord` schema and its usage requirements
 | T-DR-008 | §7.5.1 — corrective PR embeds records | `TestDriftRecord_TDR008_CorrectivePREmbedsRecords` | The corrective PR description embeds the full record list as JSON. | `pkg/workflow/awf_config_drift_test.go` |
 | T-DR-009 | §7.5.1 — empty list is valid | `TestDriftRecord_TDR009_EmptyListValid` | An empty list does not trigger corrective PR or escalation actions. | `pkg/workflow/awf_config_drift_test.go` |
 | T-DR-010 | §7.2 Step 5 integration | `TestDriftRecord_TDR010_Step5Integration` | Step 5 produces a JSON array conforming to the §3.1 schema. | `pkg/workflow/awf_config_drift_test.go` |
-| T-DR-011 | §6 CR-06a — escalation-owner acknowledgement | `TestAWFConfigSafeguard_TDR011_EscalationOwnerAssignmentFallbackChain`; `TestAWFConfigSafeguard_TDR011_EscalationOwnerMustNotBeUnassigned`; `TestAWFConfigSafeguard_TDR011_EscalationAcknowledgementWindow` | Escalations select a non-empty owner using the fallback and require timely acknowledgement. | `pkg/workflow/awf_config_safeguards_formal_test.go` |
+| T-DR-011 | §6 CR-06a — escalation-owner acknowledgement | `TestAWFConfigSafeguard_TDR011_EscalationOwnerAssignmentFallbackChain`; `TestAWFConfigSafeguard_TDR011_EscalationOwnerMustNotBeUnassigned`; `TestAWFConfigSafeguard_TDR011_EscalationAcknowledgementWindow` | Validates normative owner selection and acknowledgement timing only; production GitHub issue assignment and comment side effects are not automated and remain out of scope. | `pkg/workflow/awf_config_safeguards_formal_test.go` |
 
 ---
 

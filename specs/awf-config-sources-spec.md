@@ -10,7 +10,7 @@ sidebar:
 **Version**: 0.1.0  
 **Status**: Working Draft  
 **Date**: 2026-05-10  
-**Last Updated**: 2026-11-11<br>
+**Last Updated**: 2026-11-17<br>
 **Editors**: GitHub gh-aw Team
 
 ---
@@ -340,6 +340,10 @@ Every invocation (scheduled, manual, or ad hoc) **MUST** attempt to refresh the 
 4. The workflow **SHOULD** open or update a tracking issue when canonical source unavailability persists from one daily scheduled cron invocation through the next. Manual reruns and ad hoc invocations still perform the refresh and freshness checks above, but do not advance this consecutive-scheduled-run threshold. This persistence threshold applies only to unavailable-source reporting; the daily cadence in §7.4 applies to the full drift check. (T-DR-SAFE-004; see the [fixture index](awf-config-sources-compliance/README.md#safeguards-conformance-tests))
 
 ## Change Log
+
+### 2026-11-17
+
+- Clarified that T-DR-011 validates the normative CR-06a owner-selection and acknowledgement requirements only; production GitHub issue assignment and comment side effects are not automated and remain out of scope.
 
 ### 2026-11-04
 
