@@ -370,32 +370,44 @@
   .pnt-flow i { font-style: normal; color: #30363d; }
   .pnt-flow span.on { color: #f0f6fc; border-color: #a371f7; background: #24173f; }
   .pnt-flow span.ok.on { border-color: #3fb950; background: #12261e; }
-  .pnt-diff { position: absolute; left: 110px; top: 370px; width: 860px; height: 540px; background: #0d1117; border: 1px solid #30363d; border-radius: 16px; overflow: hidden; font: 500 20px/29px var(--mono); }
+  .pnt-diff { position: absolute; left: 110px; top: 352px; width: 860px; height: 456px; background: #0d1117; border: 1px solid #30363d; border-radius: 16px; overflow: hidden; font: 500 18px/26px var(--mono); }
   .pnt-fh { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #30363d; background: #161b22; color: #9198a1; }
   .pnt-fh b { color: #3fb950; font-weight: 600; }
   .pnt-body { position: relative; padding-top: 8px; }
-  .pnt-l { height: 29px; max-height: 29px; padding: 0 20px 0 16px; border-left: 4px solid transparent; white-space: pre; color: #e6edf3; background: rgba(46,160,67,.10); overflow: hidden; transition: max-height .5s, opacity .5s, background .4s, border-color .4s, color .4s; }
+  .pnt-l { height: 26px; max-height: 26px; padding: 0 20px 0 16px; border-left: 4px solid transparent; white-space: pre; color: #e6edf3; background: rgba(46,160,67,.10); overflow: hidden; transition: max-height .5s, opacity .5s, background .4s, border-color .4s, color .4s; }
   .pnt-l .s { color: #3fb950; }
   .pnt-l.hot { background: rgba(248,81,73,.16); border-left-color: #f85149; color: #ffa198; }
   .pnt-l.cut { max-height: 0; opacity: 0; }
   .pnt-l.fix { max-height: 0; opacity: 0; }
-  .pnt-l.fix.on { max-height: 29px; opacity: 1; background: rgba(46,160,67,.24); }
+  .pnt-l.fix.on { max-height: 26px; opacity: 1; background: rgba(46,160,67,.24); }
   .pnt-scan { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: #d2a8ff; box-shadow: 0 0 18px #a371f7; opacity: 0; }
-  .pnt-scan.go { opacity: 1; top: 440px; transition: top 2s linear; }
-  .pnt-scan.end { opacity: 0; top: 440px; transition: opacity .4s; }
-  .pnt-cm { position: absolute; left: 1010px; width: 800px; padding: 16px 22px; background: #161b22; border: 1px solid #a371f7; border-radius: 14px; opacity: 0; transform: translateX(24px); transition: opacity .45s, transform .45s, border-color .5s; }
+  .pnt-scan.go { opacity: 1; top: 392px; transition: top 2s linear; }
+  .pnt-scan.end { opacity: 0; top: 392px; transition: opacity .4s; }
+  .pnt-cm { position: absolute; left: 1010px; width: 800px; padding: 13px 22px; background: #161b22; border: 1px solid #a371f7; border-radius: 14px; opacity: 0; transform: translateX(24px); transition: opacity .45s, transform .45s, border-color .5s; }
   .pnt-cm.on { opacity: 1; transform: none; }
   .pnt-cm.dim { opacity: .35; border-color: #30363d; }
   .pnt-who { display: flex; align-items: center; gap: 12px; font: 500 18px/1 var(--mono); color: #d2a8ff; }
   .pnt-who svg { width: 30px; height: 30px; padding: 5px; border-radius: 50%; background: #8957e5; }
   .pnt-who em { margin-left: auto; font-style: normal; font-weight: 600; color: #3fb950; }
   .pnt-who .n { color: #f0f6fc; }
-  .pnt-cm p { margin: 10px 0 0; font-size: 24px; line-height: 1.3; color: #e6edf3; }
-  .pnt-cm code { font: 500 21px var(--mono); color: #79c0ff; }
-  .pnt-v { position: absolute; left: 1010px; top: 806px; width: 800px; padding: 18px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
+  .pnt-cm p { margin: 8px 0 0; font-size: 22px; line-height: 1.3; color: #e6edf3; }
+  .pnt-cm code { font: 500 19px var(--mono); color: #79c0ff; }
+  .pnt-v { position: absolute; left: 1010px; top: 724px; width: 800px; padding: 16px 22px; border-radius: 14px; border: 1px solid #30363d; background: #0d1117; font: 600 24px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .45s, border-color .45s, color .45s, background .45s; }
   .pnt-v.on { opacity: 1; color: #f0f6fc; border-color: #a371f7; }
   .pnt-v.ok { opacity: 1; color: #3fb950; border-color: #3fb950; background: #12261e; }
-  .pnt .ct-src { top: 1000px; }
+  .rw { position: absolute; display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-radius: 999px; border: 1px solid #3d444d; background: #0d1117e6; font: 600 21px/1 var(--mono); color: #f0f6fc; white-space: nowrap; opacity: 0; }
+  .active .rw { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .rw svg { width: 24px; height: 24px; fill: #9198a1; flex: none; }
+  .rw i { display: flex; align-items: center; gap: 7px; margin-left: 6px; padding-left: 14px; border-left: 1px solid #3d444d; font-style: normal; }
+  .rw i svg { width: 22px; height: 22px; fill: #e3b341; }
+  .rw b { font-weight: 700; color: #e3b341; }
+  .pnt-rw { right: 110px; top: 118px; }
+  .skl-rw { right: 110px; top: 118px; }
+  .ix-rw { right: 110px; top: 150px; }
+  .pnt-m { width: 1420px; gap: 30px; } .pnt-m .dhm-k { gap: 26px; }
+  .pnt-m .dhm-tl .y { fill: #a371f7; } .pnt-m .dhm-tl .s { fill: #d2a8ff; } .pnt-m .dhm-tl .d { fill: #ff7b72; } .pnt-m .dhm-tl .b { fill: #79c0ff; } .pnt-m .dhm-tl .x { fill: #6e7681; }
+  .pnt-m .dhm-tl .v { fill: #f0f6fc; font: 600 14px var(--mono); text-anchor: middle; }
+  .pnt-m .dhm-tl .lg { fill: #9198a1; font: 500 14px var(--mono); }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
@@ -5016,6 +5028,41 @@
     file: [
       "M3 3a2 2 0 0 1 2-2h9.982a2 2 0 0 1 1.414.586l4.018 4.018A2 2 0 0 1 21 7.018V21a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm2-.5a.5.5 0 0 0-.5.5v18a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V8.5h-4a2 2 0 0 1-2-2v-4Zm10 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0-.146-.336l-4.018-4.018A.5.5 0 0 0 15 2.5Z",
     ],
+    star: [
+      "M12 .25a.75.75 0 0 1 .673.418l3.058 6.197 6.839.994a.75.75 0 0 1 .415 1.279l-4.948 4.823 1.168 6.811a.751.751 0 0 1-1.088.791L12 18.347l-6.117 3.216a.75.75 0 0 1-1.088-.79l1.168-6.812-4.948-4.823a.75.75 0 0 1 .416-1.28l6.838-.993L11.327.668A.75.75 0 0 1 12 .25Z",
+    ],
+  };
+  // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
+  // fetches the live count once per repo by numeric id (no owner handle in source) and keeps the default on failure.
+  const REPO_API = "https://api.github.com/repositories/";
+  const repoStars = new Map();
+  const fmtStars = n => (n >= 1e4 ? `${Math.round(n / 1e3)}k` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${n}`);
+  const repoWidget = (id, name, stars, cls) => {
+    const svg = n => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      s.setAttribute("viewBox", "0 0 24 24");
+      s.innerHTML = OCTI[n].map(d => `<path d="${d}"/>`).join("");
+      return s;
+    };
+    const count = h("b", {}, fmtStars(stars));
+    const el = h("div", { class: `rw ${cls}`, title: "GitHub stars" }, svg("repo"), h("span", {}, name), h("i", {}, svg("star"), count));
+    const load = () => {
+      if (location.protocol !== "https:" || typeof fetch !== "function") return;
+      if (!repoStars.has(id))
+        repoStars.set(
+          id,
+          fetch(REPO_API + id)
+            .then(r => (r.ok ? r.json() : null))
+            .then(j => (j && Number.isFinite(j.stargazers_count) ? j.stargazers_count : null))
+            .catch(() => null)
+        );
+      repoStars.get(id).then(n => {
+        if (n === null) return;
+        count.textContent = fmtStars(n);
+        el.classList.add("live");
+      });
+    };
+    return { el, load };
   };
   // Event-driven Hand-offs: trigger → agent → output → human patterns, then the Repo Assist loop
   {
@@ -5658,7 +5705,7 @@
       const scan = h("div", { class: "pnt-scan" });
       const diff = h("div", { class: "pnt-diff" }, h("div", { class: "pnt-fh" }, h("span", {}, "pkg/config/settings.go"), added), h("div", { class: "pnt-body" }, scan, ...lines));
       const cards = FIND.map(([, kind, txt, n], i) => {
-        const el = h("div", { class: "pnt-cm", style: `top:${370 + i * 142}px` });
+        const el = h("div", { class: "pnt-cm", style: `top:${352 + i * 122}px` });
         el.innerHTML = `<div class="pnt-who">${svgIco("copilot")}<span class="n">${i + 1}</span> Ponytail Reviewer · ${kind}<em>−${n} lines</em></div><p>${txt}</p>`;
         return el;
       });
@@ -5667,6 +5714,62 @@
       const steps = STEP.map((s, i) => h("span", { class: i === STEP.length - 1 ? "ok" : "" }, s));
       const flow = h("div", { class: "pnt-flow" }, ...steps.flatMap((s, i) => (i ? [h("i", {}, "→"), s] : [s])));
       const grp = g => lines.filter(l => l.dataset.g === g);
+      // measured on gh-aw, PRs created 6 Aug–16 Nov 2026 (refresh/ponytail-reviewer.md): inline findings by the kind tag in their first line; since November findings are prose without a tag
+      const KINDS = [
+        ["yagni", "y", 203],
+        ["shrink", "s", 135],
+        ["delete", "d", 68],
+        ["stdlib/native", "b", 16],
+        ["untagged", "x", 158],
+      ];
+      // median AI credits per review, from the review footer, by month
+      const AICM = [
+        ["Aug", 20],
+        ["Sep", 5.2],
+        ["Oct", 11.6],
+        ["Nov", 5],
+      ];
+      const svgEl = (w, hh, inner) => {
+        const e = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        e.setAttribute("class", "dhm-tl");
+        e.setAttribute("width", w);
+        e.setAttribute("height", hh);
+        e.innerHTML = inner;
+        return e;
+      };
+      const KMAX = Math.max(...KINDS.map(k => k[2]));
+      const kindsSvg = svgEl(
+        290,
+        122,
+        `<text class="t" x="0" y="16">FINDINGS BY KIND</text>` +
+          KINDS.map(([n, c, v], i) => `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`).join("")
+      );
+      const aicSvg = svgEl(
+        190,
+        122,
+        `<text class="t" x="0" y="16">MEDIAN AIC/REVIEW</text><line class="ax" x1="0" y1="96" x2="190" y2="96"/>` +
+          AICM.map(([m, v], i) => {
+            const x = 12 + i * 46,
+              hh = (v * 56) / 20;
+            return `<rect class="y" style="--i:${i}" x="${x}" y="${96 - hh}" width="30" height="${hh}" rx="2"/><text class="v" x="${x + 15}" y="${90 - hh}">${v}</text><text class="m" x="${x + 15}" y="116">${m}</text>`;
+          }).join("")
+      );
+      const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+      const strip = h(
+        "div",
+        { class: "dhm pnt-m" },
+        h(
+          "div",
+          { class: "dhm-k" },
+          kpi("469", "reviews", "on 467 PRs"),
+          kpi("580", "findings", "inline"),
+          kpi("79%", "Lean already.", ["Ship.", h("br"), "run sample"], "g"),
+          kpi("57%", "acted on", ["code changed,", h("br"), "resolved, replied"]),
+          kpi("10,219", "lines claimed", "median 12")
+        ),
+        kindsSvg,
+        aicSvg
+      );
       const CYC = 13000;
       // [ms into the cycle, action]
       const T = [
@@ -5698,15 +5801,17 @@
         verdict.textContent = "";
         done = new Set();
       };
+      const repo = repoWidget(1266797999, "ponytail · ponytail-review skill", 192360, "pnt-rw");
       slides.push({
         group: "process",
         under: "prr",
         notes:
-          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship.",
+          "Ponytail Reviewer: one of the agentic reviewers behind Pull Request Review², with a single question: is any of this more complicated than it needs to be? The file, findings and line counts are illustrative, a synthetic Go change. The workflow is real: when a pull request that changes code is marked ready for review, or when someone comments /ponytail, it runs on Codex with read-only permissions and the open-source ponytail-review skill. It reads the pre-fetched diff and ignores bugs, security and performance, which other reviewers cover; it looks only for code that should not exist or should be smaller: an abstraction with one implementation, dead code, a helper the standard library already has. Each finding is one inline comment that names the kind of cut and the lines it saves, at most ten, and the review is a comment that cannot block the merge and ends with the total lines that could go. Copilot trims, and when nothing is left to cut the reviewer just says: Lean already. Ship. The bottom strip is measured on gh-aw (snapshot 17 November 2026). From 8 August to 16 November 2026 (101 days) the workflow ran 2,928 times and posted 469 COMMENT reviews on 467 pull requests: 580 inline findings, mostly one per pull request, and 35 pull requests with none inline. The reviews claim 10,219 lines that could go, a median of 12 per review. 57% of the findings were acted on: the code changed under them, the thread was resolved, or someone replied, usually Copilot. Until November each finding started with its kind: yagni 203, shrink 135, delete 68, stdlib or native 16; the newer prose findings carry no tag. In a one-in-five sample of runs, 79% of the verdicts from runs with saved output were Lean already. Ship. The median AI credits per review fell from about 20 in August, on the Copilot auto model, to about 5 in November after the move to Codex and economy routing; October's rise came with a larger model. The badge top right is the skill's open-source repo and its GitHub star count, fetched live when online. The diff and findings in the animation are illustrative.",
         enter() {
           t0 = 0;
           cyc = -1;
           reset();
+          repo.load();
         },
         tick(t) {
           if (!t0) t0 = t;
@@ -5727,7 +5832,9 @@
           diff,
           ...cards,
           verdict,
-          h("div", { class: "ct-src" }, "illustrative · synthetic diff and findings · workflow: ponytail-reviewer.md")
+          strip,
+          repo.el,
+          h("div", { class: "dhm-cap" }, "MEASURED · snapshot 17 Nov 2026 · reviews 8 Aug–16 Nov 2026 (101 d) · run sample 19 Aug–16 Nov · diff and findings illustrative")
         ),
       });
     }
@@ -10001,6 +10108,7 @@
       ioRestore = h("div", { class: "io" }, "restore →");
     const cache = h("div", { class: "ix-cache" }, h("i", {}, "ACTIONS CACHE"), cyl, h("div", { class: "n" }, "index.sqlite"), h("div", { class: "k" }, "key: qmd-docs"), ioSave, ioRestore);
     const shared = h("div", { class: "ix-shared", "--c": "#79c0ff", "--i": 2 }, h("i", {}, "SHARED AGENTIC WORKFLOW"), h("span", {}, h("b", {}, "imports"), ": [shared/qmd.md] adds both jobs · one cache key links them, run after run"));
+    const repo = repoWidget(1112365301, "qmd", 31177, "ix-rw");
     const el = h(
       "section",
       { class: "slide ix" },
@@ -10009,7 +10117,8 @@
       wall,
       cache,
       agt,
-      shared
+      shared,
+      repo.el
     );
     // ms into the cycle when each indexing step, the handoff and each agent step light up
     const IDX_AT = [700, 1500, 2300, 3100],
@@ -10028,8 +10137,9 @@
       group: "engineering",
       experimental: "QMD search",
       notes:
-        "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs.",
+        "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs. The badge top right is the open-source qmd repo and its GitHub star count, fetched live when online.",
       enter() {
+        repo.load();
         t0 = 0;
         cyc = -1;
       },
@@ -10370,10 +10480,12 @@
       [1270, "3", "Apply", "triage picks · comments cite skills", ".4s"],
     ].map(([x, n, t, s, d]) => h("div", { class: "skl-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
     const RULES = ["refs pinned to a commit SHA at compile time", "never installed by the agent at run time", "private skills: per-skill token or GitHub App"];
+    const repo = repoWidget(1148788086, "mattpocock/skills", 326117, "skl-rw");
     const el = h(
       "section",
       { class: "slide skl" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Expertise as a dependency · mattpocock/skills reviews gh-aw pull requests"), h("h2", {}, letters("Skills", "l-grad"))),
+      repo.el,
       cols,
       ed,
       ins,
@@ -10418,8 +10530,9 @@
       group: "engineering",
       key: "skills",
       notes:
-        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency.",
+        "Skills, an illustrative example: the workflow and its skills are gh-aw's real Matt Pocock Skills Reviewer, which reviews gh-aw's own pull requests with skills from the public mattpocock/skills repository; the pull request, diff and review comment shown are synthetic. A skill is a folder with a SKILL.md file that teaches an agent a discipline. Declare skills in the skills: frontmatter as owner, repository and skill path at a ref, here three of them: diagnosing bugs, test-driven development and codebase design. The compiler resolves every ref to a commit SHA, so the skills cannot change under you, and the activation job installs them into .github/skills before the agent starts; the agent never fetches or installs a skill at run time. The prompt names each skill and when it applies. Private skill repositories get their own token or GitHub App per entry. When a pull request is marked ready for review, a small triage sub-agent defined in the same Markdown classifies it, here as a bug fix, and recommends one or two skills. The reviewer applies only those, tags every inline comment with the skill it used so the author can learn the practice, nudges Copilot to address it, and submits the review through safe outputs. Imports share configuration; skills share expertise, reviewed and pinned like any other dependency. The badge top right is the skills repo and its GitHub star count, fetched live when online.",
       enter() {
+        repo.load();
         t0 = 0;
         cyc = -1;
       },
@@ -20170,7 +20283,10 @@
         return b;
       };
     })();
+    // A GainNode passes at full gain (1) until its first scheduled event, so silence it right away:
+    // a source started before `t` must not blast an unshaped burst into the speaker.
     const env = (g, t, a, peak, rel) => {
+      g.gain.value = 0.0001;
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(peak, t + a);
       g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel);
@@ -20219,16 +20335,16 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
       src.start(t, Math.random() * 0.4);
       src.stop(t + 0.55);
-      // sub drop for weight
+      // sub drop for weight: starts silent with the envelope and swells in, so small speakers get no click
       const o = ac.createOscillator(),
         og = ac.createGain();
       o.type = "sine";
       o.frequency.setValueAtTime(dir > 0 ? 90 : 60, t + 0.12);
-      o.frequency.exponentialRampToValueAtTime(dir > 0 ? 42 : 80, t + 0.5);
+      o.frequency.exponentialRampToValueAtTime(dir > 0 ? 50 : 80, t + 0.5);
       o.connect(og);
       og.connect(out);
-      env(og, t + 0.12, 0.02, 0.224, 0.4);
-      o.start(t + 0.1);
+      env(og, t + 0.12, 0.06, 0.16, 0.36);
+      o.start(t + 0.12);
       o.stop(t + 0.6);
     };
     const osc = (type, f0, t, dur, vol, { f1 = f0, dest = out, a = 0.005 } = {}) => {

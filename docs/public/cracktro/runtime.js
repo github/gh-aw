@@ -31,9 +31,10 @@
 
   // ---------- runtime styles ----------
   const runtimeCss = (W, H) => `
-  :root { --mono: ui-monospace, Menlo, monospace; }
+  /* safe-area insets (notch, home indicator) are 0 unless the page is drawn edge to edge (viewport-fit=cover) */
+  :root { --mono: ui-monospace, Menlo, monospace; --sb: env(safe-area-inset-bottom, 0px); --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); }
   *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1117; color: #f0f6fc;
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #0d1117; color: #f0f6fc;
     font-family: -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
   canvas.bg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
   .stage { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
@@ -96,7 +97,7 @@
   .progress { position: fixed; left: 0; bottom: 0; height: 5px; width: 100%; transform-origin: 0 50%;
     background: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950); transition: transform .8s cubic-bezier(.7,0,.2,1); z-index: 5; }
   /* dot map: one row per band, header dot outlined; the band you are in is bright, others dim until hovered */
-  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; flex-direction: column; gap: 5px; z-index: 5; opacity: .25; transition: opacity .3s; }
+  .dots { position: fixed; left: calc(28px + var(--sl)); bottom: calc(22px + var(--sb)); display: flex; flex-direction: column; gap: 5px; z-index: 5; opacity: .25; transition: opacity .3s; }
   .dots:hover, .dots:focus-within { opacity: 1; }
   .dots .drow { display: flex; gap: 5px; opacity: .45; transition: opacity .3s; }
   .dots .drow.on, .dots:hover .drow { opacity: 1; }
@@ -108,7 +109,7 @@
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
   /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: 144px; bottom: 10px; height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+  .vnb { position: fixed; right: calc(144px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
   .vnb.on { display: flex; }
   .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -155,7 +156,7 @@
   .bh-row.many li { height: 150px; padding: 18px 22px; }
   .bh-row.many .bh-t { font-size: 25px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
   .bh-t { font-size: 28px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
-  .arrows { position: fixed; left: 12px; bottom: 10px; display: none; gap: 6px; z-index: 5; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+  .arrows { position: fixed; left: calc(12px + var(--sl)); bottom: calc(10px + var(--sb)); display: none; gap: 6px; z-index: 5; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
   .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
     color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .arrows button:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -163,18 +164,24 @@
   .arrows svg { width: 100%; height: 100%; display: block; }
   body.compact-nav .dots { display: none; }
   body.compact-nav .arrows { display: flex; }
-  .snd, .fzb, .smb { position: fixed; right: 24px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
+     Only opacity changes, so the first tap still lands; keyboard focus keeps its control fully readable. */
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb) { transition: none; } }
+  .snd, .fzb, .smb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
   .snd:hover, .fzb:hover, .smb:hover { color: #f0f6fc; border-color: #9198a1; }
   .snd svg, .fzb svg, .smb svg { width: 100%; height: 100%; display: block; }
-  .fzb { right: 64px; }
-  .smb { right: 104px; }
+  .fzb { right: calc(64px + var(--sr)); }
+  .smb { right: calc(104px + var(--sr)); }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
   .snd.off .x { opacity: 1; }
   .snd.flash { color: #f0f6fc; border-color: #f0f6fc; }
-  .notes { position: fixed; left: 24px; right: 24px; bottom: 50px; max-width: 900px; margin: 0 auto; padding: 18px 22px;
+  .notes { position: fixed; left: 24px; right: 24px; bottom: calc(50px + var(--sb)); max-width: 900px; margin: 0 auto; padding: 18px 22px;
     background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
   .notes.on { display: block; }
   body:not(.compact-nav) .notes { left: 330px; }
@@ -522,6 +529,27 @@
     addEventListener("resize", fit);
     fit();
 
+    // Compact dock idle fade (see body.nav-idle in the runtime styles); mouse moves count only for a real mouse,
+    // so a touch never relies on sticky hover to wake the controls.
+    let idleT = null;
+    const wake = e => {
+      if (e?.type === "pointermove" && e.pointerType !== "mouse") return;
+      document.body.classList.remove("nav-idle");
+      clearTimeout(idleT);
+      idleT = setTimeout(() => document.body.classList.add("nav-idle"), 2500);
+    };
+    for (const t of ["touchstart", "pointerdown", "pointermove", "keydown", "focusin"]) addEventListener(t, wake, { capture: true, passive: true });
+    wake();
+
+    // F toggles fullscreen where the browser allows it (standard or WebKit-prefixed API). iPhone Safari offers no
+    // page fullscreen; there the deck draws edge to edge and runs without browser bars when added to the Home Screen.
+    function toggleFullscreen() {
+      /** @type {any} */
+      const d = document;
+      const p = d.fullscreenElement || d.webkitFullscreenElement ? (d.exitFullscreen || d.webkitExitFullscreen)?.call(d) : (d.documentElement.requestFullscreen || d.documentElement.webkitRequestFullscreen)?.call(d.documentElement);
+      p?.catch?.(() => {});
+    }
+
     function toggleSound() {
       if (!config.sound) return;
       snd.classList.toggle("off", sfx.toggle());
@@ -699,7 +727,7 @@
         vstep(e.key === "ArrowDown" ? 1 : -1);
       } else if (e.key === "Home") go(0);
       else if (e.key === "End") go(slides.length - 1);
-      else if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+      else if (e.key === "f" || e.key === "F") toggleFullscreen();
       else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
       else if (e.key === "m" || e.key === "M") toggleSound();
       else if (e.key === "g" || e.key === "G") openMap();
