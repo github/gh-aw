@@ -456,6 +456,13 @@ export interface SafeOutputData {
   staged?: boolean;
   /** The operation may have applied even though processing failed to confirm it. */
   operation_outcome?: "indeterminate";
+  /**
+   * Ordered four-letter branch mnemonics joined by underscores, not a correlation ID.
+   * @pattern ^[A-Za-z]{4}(?:_[A-Za-z]{4})*$
+   * @minLength 4
+   * @maxLength 1024
+   */
+  execution_trace?: string;
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {

@@ -32,7 +32,8 @@ const iso = s => new Date(s).toISOString().replace(".000", "");
 const shift = (t, d) => iso(new Date(+new Date(t) + d * 864e5));
 const med = a => {
   if (!a.length) return null;
-  const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
+  const s = [...a].sort((x, y) => x - y),
+    m = s.length >> 1;
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 const pct = (a, b) => (a ? Math.round(((b - a) / a) * 1000) / 10 : null);
@@ -43,7 +44,14 @@ const promptOf = r => (r.input_tokens || 0) + (inclusive(r) ? 0 : (r.cache_read_
 async function pool(items, n, fn) {
   const res = [];
   let i = 0;
-  await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) { const k = i++; res[k] = await fn(items[k], k); } }));
+  await Promise.all(
+    Array.from({ length: n }, async () => {
+      while (i < items.length) {
+        const k = i++;
+        res[k] = await fn(items[k], k);
+      }
+    })
+  );
   return res;
 }
 
@@ -56,7 +64,11 @@ async function casesFor({ commit, note }) {
   let f;
   for (const l of diff.split("\n")) {
     const m = l.match(/^\+\+\+ b\/\.github\/workflows\/(.+)\.md$/);
-    if (m) { f = m[1]; files[f] = {}; continue; }
+    if (m) {
+      f = m[1];
+      files[f] = {};
+      continue;
+    }
     if (!f || f.includes("/")) continue;
     const mode = l.match(/^([-+])\s+mode: (gh-proxy|local)\s*$/);
     if (mode) files[f][mode[1]] = mode[2];
@@ -90,31 +102,61 @@ async function controls() {
 
 async function listRuns(c) {
   try {
-    const j = await out("gh", ["run", "list", "-R", REPO, "--workflow", `${c.wf}.lock.yml`, "--status", "success", "--created", `${c.before[0].slice(0, 10)}..${c.after[1].slice(0, 10)}`, "--limit", "1000", "--json", "databaseId,createdAt,event"]);
+    const j = await out("gh", [
+      "run",
+      "list",
+      "-R",
+      REPO,
+      "--workflow",
+      `${c.wf}.lock.yml`,
+      "--status",
+      "success",
+      "--created",
+      `${c.before[0].slice(0, 10)}..${c.after[1].slice(0, 10)}`,
+      "--limit",
+      "1000",
+      "--json",
+      "databaseId,createdAt,event",
+    ]);
     const runs = JSON.parse(j);
     const side = ([a, b]) => runs.filter(r => r.createdAt >= a && r.createdAt < b);
     // nearest the switch first
     return { before: side(c.before).sort((x, y) => y.createdAt.localeCompare(x.createdAt)), after: side(c.after).sort((x, y) => x.createdAt.localeCompare(y.createdAt)) };
-  } catch { return { before: [], after: [] }; }
+  } catch {
+    return { before: [], after: [] };
+  }
 }
 
 async function mine(id) {
   const file = join(CACHE, `${id}.json`);
-  try { return JSON.parse(await readFile(file, "utf8")); } catch {}
+  try {
+    return JSON.parse(await readFile(file, "utf8"));
+  } catch {}
   const dir = await mkdtemp(join(tmpdir(), "cvm-"));
   let row = null;
   try {
     await out("gh", ["run", "download", String(id), "-R", REPO, "-n", "usage", "-D", dir]);
-    const reqs = (await readFile(join(dir, "agent", "token_usage.jsonl"), "utf8")).split("\n").filter(Boolean).map(l => JSON.parse(l))
-      .filter(r => r.event === "token_usage" && r.status === 200).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    if (reqs.length) row = {
-      model: reqs[0].model, path: reqs[0].path, requests: reqs.length,
-      first: promptOf(reqs[0]), prompt: reqs.reduce((s, r) => s + promptOf(r), 0),
-      output: reqs.reduce((s, r) => s + (r.output_tokens || 0), 0),
-      aic: Math.round(reqs.reduce((s, r) => s + (r.ai_credits_this_response || 0), 0) * 100) / 100,
-    };
-  } catch {} // no usage artifact: agent skipped, or artifact expired
-  finally { await rm(dir, { recursive: true, force: true }); }
+    const reqs = (await readFile(join(dir, "agent", "token_usage.jsonl"), "utf8"))
+      .split("\n")
+      .filter(Boolean)
+      .map(l => JSON.parse(l))
+      .filter(r => r.event === "token_usage" && r.status === 200)
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    if (reqs.length)
+      row = {
+        model: reqs[0].model,
+        path: reqs[0].path,
+        requests: reqs.length,
+        first: promptOf(reqs[0]),
+        prompt: reqs.reduce((s, r) => s + promptOf(r), 0),
+        output: reqs.reduce((s, r) => s + (r.output_tokens || 0), 0),
+        aic: Math.round(reqs.reduce((s, r) => s + (r.ai_credits_this_response || 0), 0) * 100) / 100,
+      };
+  } catch {
+  } finally {
+    // no usage artifact: agent skipped, or artifact expired
+    await rm(dir, { recursive: true, force: true });
+  }
   await writeFile(file, JSON.stringify(row));
   return row;
 }
@@ -153,7 +195,10 @@ const ctrl = await controls();
 const listed = await pool([...flips, ...ctrl], 8, async c => ({ c, runs: await listRuns(c) }));
 const enough = x => x.runs.before.length >= MIN && x.runs.after.length >= MIN;
 const flipSel = listed.filter(x => !x.c.control && enough(x));
-const ctrlSel = listed.filter(x => x.c.control && enough(x)).sort((a, b) => b.runs.before.length + b.runs.after.length - (a.runs.before.length + a.runs.after.length)).slice(0, NCTRL);
+const ctrlSel = listed
+  .filter(x => x.c.control && enough(x))
+  .sort((a, b) => b.runs.before.length + b.runs.after.length - (a.runs.before.length + a.runs.after.length))
+  .slice(0, NCTRL);
 process.stderr.write(`cases: ${flipSel.length}/${flips.length} switches, ${ctrlSel.length}/${ctrl.length} controls\n`);
 const results = await pool([...flipSel, ...ctrlSel], 6, async x => {
   const r = await measure(x.c, x.runs, raw);
@@ -162,11 +207,18 @@ const results = await pool([...flipSel, ...ctrlSel], 6, async x => {
 });
 const summarize = rs => {
   const ok = rs.filter(r => r.ok);
-  return { workflows: ok.length, runs: ok.reduce((s, r) => s + r.before.n + r.after.n, 0), ...Object.fromEntries(METRICS.map(k => [k, { medianPct: med(ok.map(r => r.delta[k]).filter(v => v != null)), lower: ok.filter(r => r.delta[k] < 0).length }])) };
+  return {
+    workflows: ok.length,
+    runs: ok.reduce((s, r) => s + r.before.n + r.after.n, 0),
+    ...Object.fromEntries(METRICS.map(k => [k, { medianPct: med(ok.map(r => r.delta[k]).filter(v => v != null)), lower: ok.filter(r => r.delta[k] < 0).length }])),
+  };
 };
 const flipsOut = results.filter(r => !r.control);
 const report = {
-  repo: REPO, snapshot: new Date().toISOString().slice(0, 10), cap: CAP, days: DAYS,
+  repo: REPO,
+  snapshot: new Date().toISOString().slice(0, 10),
+  cap: CAP,
+  days: DAYS,
   metric: "per run: first = prompt tokens of request 1; prompt = sum of prompt tokens over requests; aic = AI credits. delta = % change of gh-proxy vs GitHub MCP (controls: before vs after, same orientation as the bulk switch)",
   switches: SWITCHES,
   summary: {
