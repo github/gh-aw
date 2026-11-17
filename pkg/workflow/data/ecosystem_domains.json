@@ -258,7 +258,7 @@
     "scala": ["repo.scala-sbt.org", "scala-ci.typesafe.com", "repo.typesafe.com", "jitpack.io", "dl.bintray.com", "scala.jfrog.io"],
     "swift": ["download.swift.org", "swift.org", "cocoapods.org", "cdn.cocoapods.org"],
     "terraform": ["releases.hashicorp.com", "apt.releases.hashicorp.com", "yum.releases.hashicorp.com", "registry.terraform.io"],
-    "threat-detection": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.github.com", "api.githubcopilot.com", "api.individual.githubcopilot.com", "github.com", "host.docker.internal", "registry.npmjs.org"],
+    "threat-detection": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.github.com", "api.githubcopilot.com", "api.individual.githubcopilot.com", "github.com", "host.docker.internal"],
     "zig": ["ziglang.org", "pkg.machengine.org", "deps.files.ghostty.org"]
   },
   "engine-defaults": {
@@ -269,7 +269,7 @@
     "agy": ["host.docker.internal", "github.com", "api.github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"],
     "pi": ["host.docker.internal", "github.com", "raw.githubusercontent.com"],
     "pi-base": ["host.docker.internal", "github.com", "raw.githubusercontent.com"],
-    "threat-detection": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.github.com", "api.githubcopilot.com", "api.individual.githubcopilot.com", "github.com", "host.docker.internal", "registry.npmjs.org"]
+    "threat-detection": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.github.com", "api.githubcopilot.com", "api.individual.githubcopilot.com", "github.com", "host.docker.internal"]
   },
   "pi-provider-domains": {
     "copilot": "api.githubcopilot.com",

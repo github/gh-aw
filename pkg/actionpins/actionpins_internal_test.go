@@ -116,6 +116,7 @@ func TestGHESArtifactPin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.repo, func(t *testing.T) {
+			t.Parallel()
 			got, ok := ghesArtifactPin(tt.repo)
 			assert.Equal(t, tt.ok, ok)
 			assert.Equal(t, tt.want, got)

@@ -93,7 +93,7 @@ type ExperimentAnalysis struct {
 	// Comparisons contains control-versus-variant outcome analyses for grader observations.
 	Comparisons      []MetricComparison        `json:"comparisons,omitempty"`
 	SecondaryMetrics []SecondaryMetricAnalysis `json:"secondary_metrics,omitempty"`
-	OutcomeWindow    *OutcomeWindowInfo        `json:"outcome_window,omitempty"`
+	OutcomeWindow    *OutcomeWindowInfo        `json:"adoption_window,omitempty"`
 
 	// MetricDirection is the normalized primary metric direction: max or min.
 	MetricDirection string `json:"metric_direction,omitempty"`
@@ -151,7 +151,7 @@ type VariantAnalysis struct {
 
 	// Excluded summarizes assigned runs that did not yield a usable grader measurement.
 	Excluded        []ExcludedObservationSummary `json:"excluded,omitempty"`
-	OutcomeCoverage *OutcomeMetricCoverage       `json:"outcome_coverage,omitempty"`
+	OutcomeCoverage *OutcomeMetricCoverage       `json:"adoption_coverage,omitempty"`
 }
 
 // GuardrailStatusCode is the stable machine-readable outcome of a guardrail evaluation.
@@ -183,7 +183,7 @@ type GuardrailVariantStatus struct {
 	ObservationCount int                    `json:"observation_count"`
 	Mean             *float64               `json:"mean,omitempty"`
 	Passed           *bool                  `json:"passed,omitempty"`
-	OutcomeCoverage  *OutcomeMetricCoverage `json:"outcome_coverage,omitempty"`
+	OutcomeCoverage  *OutcomeMetricCoverage `json:"adoption_coverage,omitempty"`
 }
 
 // SecondaryMetricAnalysis reports outcome-backed secondary metric observations.
@@ -199,7 +199,7 @@ type SecondaryMetricVariantAnalysis struct {
 	Variant          string                 `json:"variant"`
 	ObservationCount int                    `json:"observation_count"`
 	Mean             *float64               `json:"mean,omitempty"`
-	OutcomeCoverage  *OutcomeMetricCoverage `json:"outcome_coverage,omitempty"`
+	OutcomeCoverage  *OutcomeMetricCoverage `json:"adoption_coverage,omitempty"`
 }
 
 // MetricEvalResults summarizes observed YES/NO/UNKNOWN outcomes for an eval-backed metric.

@@ -59,7 +59,7 @@
 name: "Smoke Workflow Call"
 on:
   schedule:
-    - cron: "0 0 */2 * *"
+    - cron: "8 9 */2 * *"
   workflow_call:
     inputs:
       aw_context:
@@ -2931,7 +2931,7 @@ jobs:
           name: ${{ needs.activation.outputs.artifact_prefix }}safe-outputs-items
           path: |
             /tmp/gh-aw/safe-output-items.jsonl
-            /tmp/gh-aw/safe-output-outcomes.jsonl
+            /tmp/gh-aw/safe-output-executions.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore

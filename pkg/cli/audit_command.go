@@ -79,6 +79,8 @@ type auditCommandOptions struct {
 	search           string
 	searchLimit      int
 	models           bool
+	delivery         bool
+	adoption         bool
 }
 
 // NewAuditCommand creates the audit command
@@ -114,6 +116,8 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().String("search", "", "Retrieve relevant evidence from the unified session using local BM25 search (single-run only)")
 	cmd.Flags().Int("search-limit", defaultAuditSearchLimit, "Maximum evidence groups returned by --search (1-20)")
 	cmd.Flags().Bool("models", false, "Include the run's model catalog, discovery status, and supported endpoints (single-run only)")
+	cmd.Flags().Bool("delivery", false, "Include verified safe-output delivery evidence (single-run only)")
+	cmd.Flags().Bool("adoption", false, "Refresh safe-output adoption from GitHub; includes delivery (single-run only)")
 	RegisterDirFlagCompletion(cmd, "output")
 }
 
@@ -131,6 +135,9 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 	}
 	if opts.models && (len(args) != 1 || opts.group) {
 		return errors.New("--models requires a single run without --group")
+	}
+	if (opts.delivery || opts.adoption) && (len(args) != 1 || opts.group) {
+		return errors.New("--delivery and --adoption require a single run without --group")
 	}
 	auditCommandLog.Printf("Dispatching audit command: run_count=%d, format=%s, parse=%t, evals_only=%t", len(args), opts.format, opts.parse, opts.evalsOnly)
 	ctx := cmd.Context()
@@ -174,6 +181,8 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.search, _ = cmd.Flags().GetString("search")
 	opts.searchLimit, _ = cmd.Flags().GetInt("search-limit")
 	opts.models, _ = cmd.Flags().GetBool("models")
+	opts.delivery, _ = cmd.Flags().GetBool("delivery")
+	opts.adoption, _ = cmd.Flags().GetBool("adoption")
 	if cmd.Flags().Changed("search") || cmd.Flags().Changed("search-limit") {
 		if err := validateAuditSearch(opts.search, opts.searchLimit); err != nil {
 			return auditCommandOptions{}, err
@@ -268,6 +277,8 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		Search:           opts.search,
 		SearchLimit:      opts.searchLimit,
 		Models:           opts.models,
+		Delivery:         opts.delivery,
+		Adoption:         opts.adoption,
 	})
 	return err
 }

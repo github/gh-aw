@@ -64,7 +64,7 @@ All diagnostic output MUST go to `stderr` using `console` formatting helpers. St
 | `gh aw forecast` | `NewForecastCommand` | Forecast token usage and costs for agentic workflows |
 | `gh aw trial` | `NewTrialCommand` | Run trial workflow executions |
 | `gh aw deploy` | `NewDeployCommand` | Deploy agentic workflows to a target repository using a pull request |
-| `gh aw logs --outcomes` | `NewLogsCommand` | Check what happened to selected runs' safe outputs |
+| `gh aw logs --adoption` | `NewLogsCommand` | Check what happened to selected runs' safe outputs |
 | _No `gh aw deps` command_ | `deps_*.go` (internal utilities) | Dependency reporting/advisory helpers used by other commands |
 | `gh aw doctor` | `NewDoctorCommand` | Run diagnostics to verify CLI authentication and repository setup |
 | `gh aw version` | `versionCmd` (main.go) | Show version information |
@@ -260,6 +260,8 @@ The `cli` package exports many types used across its command implementations. Th
 | `CopilotCodingAgentDetector` | struct | Detector for Copilot coding-agent log patterns |
 | `CreatedItemReport` | struct | Report of an item created by a safe-output action (type, URL, number, repo) |
 | `CrossRunSummary` | struct | Summary of cross-run metrics across multiple workflow runs |
+| `DeliveredItem` | struct | One verified safe-output delivery with its identity and delivery evidence |
+| `DeliveryData` | struct | Delivery report for a workflow run, including items, coverage, errors, and retention |
 | `DependencyInfo` | struct | Metadata for a single dependency in `go.mod` or `package.json` |
 | `DependencyInfoWithIndirect` | struct | `DependencyInfo` extended with an `Indirect` flag |
 | `DevcontainerBuild` | struct | Build configuration section of `devcontainer.json` |
@@ -351,6 +353,7 @@ The `cli` package exports many types used across its command implementations. Th
 | `RedactedDomainsLogSummary` | struct | Summarised redacted-domain log data |
 | `Release` | struct | A GitHub release entry |
 | `Remote` | struct | A Git remote |
+| `RetainedAdoptionData` | struct | Results and coverage from refreshing retained safe-output adoption records |
 | `RepoSpec` | struct | A parsed repository specifier (`owner/repo[@ref]`) |
 | `Repository` | struct | A GitHub repository |
 | `RuleHitStats` | struct | Statistics for a single AWF firewall rule |
@@ -555,6 +558,7 @@ err := cli.AuditWorkflowRun(ctx, runID, cli.AuditOptions{
 ## Dependencies
 
 **Internal**:
+- `github.com/github/gh-aw/pkg/lifecycle` — provider-independent safe-output delivery, adoption, and survival records and rules
 - `github.com/github/gh-aw/pkg/workflow` — workflow compilation and data types
 - `github.com/github/gh-aw/pkg/parser` — markdown frontmatter parsing
 - `github.com/github/gh-aw/pkg/console` — terminal output formatting

@@ -27,7 +27,7 @@ func renderEpisodeView(out io.Writer, data LogsData, view string, jsonOutput boo
 	if retrieval := data.EpisodeRetrieval; retrieval != nil && retrieval.Cached {
 		status := "no GitHub requests"
 		if data.Outcomes != nil {
-			status = "membership reused; outcomes checked live"
+			status = "membership reused; adoption checked live"
 		}
 		if _, err := fmt.Fprintf(out, "Cached episode snapshot from %s; %s. Use --refresh to collect again.\n", retrieval.CollectedAt.Format(time.RFC3339), status); err != nil {
 			return fmt.Errorf("write episode cache status: %w", err)

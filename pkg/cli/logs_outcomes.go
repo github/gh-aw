@@ -11,9 +11,12 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/github"
+	"github.com/github/gh-aw/pkg/lifecycle"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/repoutil"
 	"github.com/spf13/cobra"
@@ -21,16 +24,38 @@ import (
 
 // OutcomesData records live outcome observations for one selected workflow run.
 type OutcomesData struct {
-	RunID     int64           `json:"run_id"`
-	Workflow  string          `json:"workflow,omitempty"`
-	Items     []OutcomeReport `json:"items"`
-	Summary   OutcomeSummary  `json:"summary"`
-	EvalError string          `json:"eval_error,omitempty"`
+	RunID     int64              `json:"run_id"`
+	Workflow  string             `json:"workflow,omitempty"`
+	Items     []OutcomeReport    `json:"items"`
+	Summary   OutcomeSummary     `json:"summary"`
+	EvalError string             `json:"eval_error,omitempty"`
+	Coverage  string             `json:"coverage"`
+	Delivery  *DeliveryData      `json:"-"`
+	Live      bool               `json:"-"`
+	Records   []lifecycle.Record `json:"-"`
+}
+
+type DeliveredItem struct {
+	ID string `json:"id"`
+	lifecycle.Identity
+	Delivery lifecycle.Delivery `json:"delivery"`
+}
+
+type DeliveryData struct {
+	RunID         int64           `json:"run_id"`
+	Workflow      string          `json:"workflow,omitempty"`
+	Items         []DeliveredItem `json:"items"`
+	Delivered     int             `json:"delivered"`
+	Coverage      string          `json:"coverage"`
+	Error         string          `json:"error,omitempty"`
+	RetentionDays int             `json:"retention_days"`
 }
 
 func addLogsOutcomeFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("outcomes", false, "Evaluate current GitHub outcomes of selected runs' safe outputs (additional API requests)")
-	cmd.Flags().String("outcomes-dir", "", "Write outcome JSONL observations to this directory (requires --outcomes)")
+	cmd.Flags().Bool("delivery", false, "Report verified safe-output delivery from selected runs' execution evidence")
+	cmd.Flags().Bool("adoption", false, "Refresh safe-output adoption from GitHub (includes delivery; additional API requests)")
+	cmd.Flags().String("adoption-dir", "", "Write adoption JSONL observations to this directory (requires --adoption)")
+	cmd.Flags().Bool("retained", false, "Refresh due retained deliveries without discovering or downloading runs (requires --adoption and --repo; --count limits delivery checks)")
 }
 
 func logsOutcomeArtifactSets(sets []string, outcomes bool) []string {
@@ -40,10 +65,13 @@ func logsOutcomeArtifactSets(sets []string, outcomes bool) []string {
 	return append(slices.Clone(sets), string(ArtifactSetOutcomes))
 }
 
-func collectLogsOutcomes(ctx context.Context, runs []ProcessedRun, dir string, verbose bool) ([]OutcomesData, error) {
+func collectLogsLifecycles(ctx context.Context, runs []ProcessedRun, dir string, verbose, live bool, caches ...*cachedLogsJSONLCache) ([]OutcomesData, error) {
 	ctx = withOutcomeAPICache(ctx)
+	if len(caches) > 0 && caches[0] != nil { //nolint:uncheckedsliceindex // The length guard protects the optional first cache.
+		ctx = context.WithValue(ctx, lifecycleCacheKey{}, caches[0])
+	}
 	if dir == "" {
-		dir = lookupEnv("GH_AW_OUTCOMES_DIR")
+		dir = lookupEnv("GH_AW_ADOPTION_DIR")
 	}
 	mapping := github.LoadObjectiveMapping()
 	reports := make([]OutcomesData, 0, len(runs))
@@ -51,11 +79,11 @@ func collectLogsOutcomes(ctx context.Context, runs []ProcessedRun, dir string, v
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		report, err := collectRunOutcomes(ctx, run, mapping, verbose)
+		report, err := collectRunLifecycle(ctx, run, mapping, verbose, live)
 		if err != nil {
-			return nil, fmt.Errorf("evaluate outcomes for run %d: %w", run.Run.DatabaseID, err)
+			return nil, fmt.Errorf("evaluate adoption for run %d: %w", run.Run.DatabaseID, err)
 		}
-		if dir != "" && report.EvalError == "" {
+		if live && dir != "" && (report.EvalError == "" || len(report.Items) > 0) {
 			if err := writeOutcomeJSONL(dir, report.RunID, report.Items); err != nil {
 				return nil, err
 			}
@@ -66,19 +94,65 @@ func collectLogsOutcomes(ctx context.Context, runs []ProcessedRun, dir string, v
 }
 
 func collectRunOutcomes(ctx context.Context, run ProcessedRun, mapping *github.ObjectiveMapping, verbose bool) (OutcomesData, error) {
+	return collectRunLifecycle(ctx, run, mapping, verbose, true)
+}
+
+func collectRunLifecycle(ctx context.Context, run ProcessedRun, mapping *github.ObjectiveMapping, verbose, live bool) (OutcomesData, error) { //nolint:largefunc // Keeps the cache lock, evidence merge, refresh, and atomic persistence in one transaction.
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Evaluating outcomes for run %d", run.Run.DatabaseID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Evaluating adoption for run %d", run.Run.DatabaseID)))
 	}
 	report := OutcomesData{
 		RunID: run.Run.DatabaseID, Workflow: run.Run.WorkflowName,
-		Items: []OutcomeReport{},
+		Items: []OutcomeReport{}, Live: live, Coverage: "complete",
+		Delivery: &DeliveryData{RunID: run.Run.DatabaseID, Workflow: run.Run.WorkflowName, Items: []DeliveredItem{}, Coverage: "complete", RetentionDays: 365},
 	}
-	items, found, err := readLogsOutcomeItems(run)
+	items, found, err := readLifecycleItems(ctx, run)
+	if errors.Is(err, errLifecycleEvidenceIncomplete) {
+		report.Coverage, report.Delivery.Coverage = "partial", "partial"
+		report.EvalError, report.Delivery.Error = err.Error(), err.Error()
+	} else if err != nil {
+		return report, err
+	}
+	if run.Run.LogsPath == "" {
+		report.EvalError = "safe-output artifact directory unavailable"
+		report.Coverage = "unavailable"
+		report.Delivery.Coverage, report.Delivery.Error = "unavailable", report.EvalError
+		return report, nil
+	}
+	unlock, err := lockLifecycleCache(ctx, run.Run.LogsPath)
 	if err != nil {
 		return report, err
 	}
+	defer unlock()
+	retained, err := loadLifecycleCache(run.Run.LogsPath)
+	if err != nil {
+		return report, err
+	}
+	if imported, ok := ctx.Value(lifecycleCacheKey{}).(*cachedLogsJSONLCache); ok {
+		for _, record := range imported.lifecycles {
+			retained[record.ID], err = lifecycle.Merge(retained[record.ID], record)
+			if err != nil {
+				return report, err
+			}
+		}
+	}
+	retainedOnly := !found
 	if !found {
-		report.EvalError = "safe-output manifest unavailable; outcome coverage is unknown"
+		sourceRepository, _ := repoutil.NormalizeRepoForAPI(logsOutcomeRepository(run.Run))
+		for _, record := range retained {
+			if record.RunID != run.Run.DatabaseID || record.RunAttempt != run.Run.Attempt ||
+				record.Workflow != run.Run.WorkflowPath || !strings.EqualFold(record.Repository, sourceRepository) ||
+				record.Host != outcomeAPIHostForRepo(logsOutcomeRepository(run.Run)) {
+				continue
+			}
+			items = append(items, retainedLifecycleItem(record))
+		}
+		found = len(items) > 0
+	}
+	if !found {
+		report.EvalError = "safe-output execution evidence unavailable; delivery and adoption coverage are unknown"
+		report.Coverage = "unavailable"
+		report.Delivery.Coverage, report.Delivery.Error = "unavailable", report.EvalError
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Run %d: %s", report.RunID, report.EvalError)))
 		return report, nil
 	}
@@ -87,7 +161,43 @@ func collectRunOutcomes(ctx context.Context, run ProcessedRun, mapping *github.O
 	if runURL, err := parser.ParseRunURLExtended(run.Run.URL); err == nil && runURL.Host != "" {
 		trustedHost = runURL.Host
 	}
-	report.Items = evaluateOutcomes(ctx, items, repository, mapping, trustedHost)
+	for _, item := range items {
+		record, err := lifecycleFromItem(run.Run, item, repository, trustedHost)
+		if err != nil {
+			report.Delivery.Coverage = "partial"
+			report.Coverage = "partial"
+			report.Delivery.Error = err.Error()
+			report.EvalError = err.Error()
+			continue
+		}
+		if retainedOnly {
+			record.Execution = retained[record.ID].Execution
+		}
+		record, err = lifecycle.Merge(retained[record.ID], record)
+		if err != nil {
+			return report, err
+		}
+		report.Delivery.Items = append(report.Delivery.Items, DeliveredItem{ID: record.ID, Identity: record.Identity, Delivery: record.Delivery})
+		if !live {
+			retained[record.ID] = record
+			report.Records = append(report.Records, record)
+			continue
+		}
+		observation, err := observeLifecycle(ctx, run.Run, item, record)
+		if err != nil {
+			return report, err
+		}
+		report.Items = append(report.Items, observation)
+		if observation.Adoption.Coverage != "available" {
+			report.Coverage = "partial"
+		}
+		retained[record.ID] = *observation.Lifecycle
+		report.Records = append(report.Records, *observation.Lifecycle)
+	}
+	report.Delivery.Delivered = len(report.Delivery.Items)
+	if err := writeLifecycleCache(run.Run.LogsPath, retained); err != nil {
+		return report, err
+	}
 	if err := ctx.Err(); err != nil {
 		return report, err
 	}
@@ -95,7 +205,7 @@ func collectRunOutcomes(ctx context.Context, run ProcessedRun, mapping *github.O
 	if report.Summary.Accepted > 0 {
 		aic, err := loadOutcomeAIC(run.Run.LogsPath)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compute outcome AI Credits; cost per accepted outcome omitted: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compute adoption AI Credits; cost per accepted adoption omitted: %v", err)))
 		} else {
 			report.Summary.addAIC(aic)
 		}
@@ -153,6 +263,11 @@ func readLogsOutcomeItems(run ProcessedRun) ([]CreatedItemReport, bool, error) {
 			continue
 		}
 		seen[digest] = struct{}{}
+		occurrences := make(map[[sha256.Size]byte]int)
+		for i := range items {
+			items[i].EvidenceID = outcomeItemID(items[i], occurrences)
+			items[i].InvocationID = nameForLifecycleInvocation(dir, run.Run.LogsPath)
+		}
 		evidenceDir, err := logsOutcomeEnrichmentDir(dir, run.Run.LogsPath)
 		if err != nil {
 			return nil, false, err
@@ -178,15 +293,22 @@ func readLogsOutcomeManifest(path string) (items []CreatedItemReport, returnErr 
 	return decodeLogsOutcomeItems(file)
 }
 
-func collectEpisodeOutcomes(ctx context.Context, data *LogsData, outcomesDir string, verbose bool) error {
+func collectEpisodeLifecycles(ctx context.Context, data *LogsData, outcomesDir string, verbose, live bool) error {
+	if data.EpisodeRetrieval != nil {
+		ctx = context.WithValue(ctx, lifecycleAPIBudgetKey{}, &lifecycleAPIBudget{report: data.EpisodeRetrieval})
+	}
 	runs := make([]ProcessedRun, 0, len(data.Runs))
 	for _, run := range data.Runs {
+		attempt, err := strconv.Atoi(run.RunAttempt)
+		if run.RunAttempt != "" && (err != nil || attempt <= 0) {
+			return fmt.Errorf("invalid recorded attempt for run %d", run.RunID)
+		}
 		runs = append(runs, ProcessedRun{Run: WorkflowRun{
 			DatabaseID: run.RunID, WorkflowName: run.WorkflowName, URL: run.URL,
-			Repository: run.Repository, LogsPath: run.LogsPath,
+			Repository: run.Repository, LogsPath: run.LogsPath, Attempt: attempt, WorkflowPath: run.WorkflowPath,
 		}})
 	}
-	reports, err := collectLogsOutcomes(ctx, runs, outcomesDir, verbose)
+	reports, err := collectLogsLifecycles(ctx, runs, outcomesDir, verbose, live)
 	if err != nil {
 		return err
 	}
@@ -212,8 +334,15 @@ func decodeLogsOutcomeItems(reader io.Reader) ([]CreatedItemReport, error) {
 }
 
 func attachLogsOutcomes(data *LogsData, reports []OutcomesData) error {
-	data.Outcomes = reports
-	if reports == nil || len(data.Episodes) == 0 {
+	for _, report := range reports {
+		if report.Delivery != nil {
+			data.Delivery = append(data.Delivery, *report.Delivery)
+		}
+		if report.Live || report.Delivery == nil {
+			data.Outcomes = append(data.Outcomes, report)
+		}
+	}
+	if len(data.Outcomes) == 0 || len(data.Episodes) == 0 {
 		return nil
 	}
 	var observations []EpisodeOutcomeObservation
@@ -251,16 +380,26 @@ func attachLogsOutcomes(data *LogsData, reports []OutcomesData) error {
 	}
 	joined, err := buildEpisodeOutcomes(logs, observations, costs)
 	if err != nil {
-		return fmt.Errorf("aggregate episode outcomes: %w", err)
+		return fmt.Errorf("aggregate episode adoption: %w", err)
 	}
 	data.EpisodeOutcomes = &joined
 	return nil
 }
 
 func renderLogsOutcomes(w io.Writer, data LogsData) error {
+	for _, delivery := range data.Delivery {
+		if _, err := fmt.Fprintf(w, "\nDelivery for %s (run %d): %d delivered; coverage: %s\n", delivery.Workflow, delivery.RunID, delivery.Delivered, delivery.Coverage); err != nil {
+			return err
+		}
+		if delivery.Error != "" {
+			if _, err := fmt.Fprintln(w, "  Missing evidence: "+delivery.Error); err != nil {
+				return err
+			}
+		}
+	}
 	for _, run := range data.Outcomes {
-		if _, err := fmt.Fprintf(w, "\nOutcomes for %s (run %d): %d accepted, %d rejected, %d ignored, %d lifecycle, %d pending, %d unknown, %d errors (%d total)\n",
-			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.Ignored, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total); err != nil {
+		if _, err := fmt.Fprintf(w, "\nAdoption for %s (run %d): %d accepted, %d rejected, %d not applicable, %d lifecycle, %d pending, %d unknown, %d errors (%d total; human: %d, delivery fallback: %d)\n",
+			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.NotApplicable, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total, run.Summary.AcceptedHuman, run.Summary.AcceptedFallback); err != nil {
 			return err
 		}
 		if run.EvalError != "" {

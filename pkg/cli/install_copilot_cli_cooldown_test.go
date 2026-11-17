@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -74,22 +75,28 @@ func TestInstallCopilotCLIReleaseAgeCooldown(t *testing.T) {
 		metadata  string
 		wantError string
 		tamper    bool
+		// matchesDefault rewrites DEFAULT_COPILOT_VERSION to the requested version.
+		matchesDefault bool
 	}{
-		{"cached-old", true, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "", false},
-		{"cached-recent", true, "3", "1.2.3", release(recent), "at least 3 days old", false},
-		{"cached-longer-cooldown", true, "7", "1.2.3", release(fourDays), "at least 7 days old", false},
-		{"cached-missing-time", true, "3", "1.2.3", `{"draft":false,"tag_name":"v1.2.3"}`, "metadata is invalid", false},
-		{"cached-invalid-time", true, "3", "1.2.3", release("not-a-date"), "metadata is invalid", false},
-		{"cached-wrong-tag", true, "3", "1.2.3", `{"draft":false,"tag_name":"v9.9.9","published_at":"2000-01-01T00:00:00Z"}`, "metadata is invalid", false},
-		{"cached-unavailable", true, "3", "1.2.3", "", "metadata is unavailable", false},
-		{"cached-disabled", true, "0", "1.2.3", "", "", false},
-		{"download-recent", false, "3", "1.2.3", release(recent), "at least 3 days old", false},
-		{"download-old", false, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "", false},
-		{"download-latest", false, "3", "latest", release("2000-01-01T00:00:00Z"), "", false},
-		{"download-tampered-manifest", false, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "SHA256", true},
-		{"negative-days", true, "-1", "1.2.3", "", "nonnegative integer", false},
-		{"boolean-days", true, "false", "1.2.3", "", "nonnegative integer", false},
-		{"fractional-days", true, "1.5", "1.2.3", "", "nonnegative integer", false},
+		{"cached-old", true, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "", false, false},
+		{"cached-recent", true, "3", "1.2.3", release(recent), "at least 3 days old", false, false},
+		{"cached-longer-cooldown", true, "7", "1.2.3", release(fourDays), "at least 7 days old", false, false},
+		{"cached-missing-time", true, "3", "1.2.3", `{"draft":false,"tag_name":"v1.2.3"}`, "metadata is invalid", false, false},
+		{"cached-invalid-time", true, "3", "1.2.3", release("not-a-date"), "metadata is invalid", false, false},
+		{"cached-wrong-tag", true, "3", "1.2.3", `{"draft":false,"tag_name":"v9.9.9","published_at":"2000-01-01T00:00:00Z"}`, "metadata is invalid", false, false},
+		{"cached-unavailable", true, "3", "1.2.3", "", "metadata is unavailable", false, false},
+		{"cached-disabled", true, "0", "1.2.3", "", "", false, false},
+		{"download-recent", false, "3", "1.2.3", release(recent), "at least 3 days old", false, false},
+		{"download-old", false, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "", false, false},
+		{"download-latest", false, "3", "latest", release("2000-01-01T00:00:00Z"), "", false, false},
+		{"download-tampered-manifest", false, "3", "1.2.3", release("2000-01-01T00:00:00Z"), "SHA256", true, false},
+		{"negative-days", true, "-1", "1.2.3", "", "nonnegative integer", false, false},
+		{"boolean-days", true, "false", "1.2.3", "", "nonnegative integer", false, false},
+		{"fractional-days", true, "1.5", "1.2.3", "", "nonnegative integer", false, false},
+		{"cached-default-recent", true, "3", "1.2.3", release(recent), "", false, true},
+		{"cached-default-unavailable", true, "3", "1.2.3", "", "", false, true},
+		{"download-default-recent", false, "3", "1.2.3", release(recent), "", false, true},
+		{"download-default-v-prefix", false, "3", "v1.2.3", release(recent), "", false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -121,6 +128,10 @@ func TestInstallCopilotCLIReleaseAgeCooldown(t *testing.T) {
 			require.NoError(t, os.WriteFile(metadataPath, []byte(test.metadata), 0o644))
 			installer, err := os.ReadFile(filepath.Join(root, "actions/setup/sh/install_copilot_cli.sh"))
 			require.NoError(t, err)
+			if test.matchesDefault {
+				installer = regexp.MustCompile(`(?m)^DEFAULT_COPILOT_VERSION="[^"]*"$`).ReplaceAll(installer, []byte(`DEFAULT_COPILOT_VERSION="1.2.3"`))
+				require.Contains(t, string(installer), `DEFAULT_COPILOT_VERSION="1.2.3"`)
+			}
 			installerPath := filepath.Join(dir, "install_copilot_cli.sh")
 			require.NoError(t, os.WriteFile(installerPath, installer, 0o755))
 			integrity, err := os.ReadFile(filepath.Join(root, "actions/setup/sh/release_integrity.sh"))
@@ -193,16 +204,19 @@ esac
 			log, _ := os.ReadFile(logPath)
 			if test.days == "0" {
 				assert.Empty(t, log, "explicit zero must not query release metadata")
+			} else if test.matchesDefault {
+				assert.NotContains(t, string(log), "api.github.com", "compiler default version must skip release metadata")
+				assert.Contains(t, string(output), "matches the compiler default version")
 			} else if strings.Contains(string(log), "api.github.com") {
 				assert.Contains(t, string(log), strings.Join([]string{"Authorization:", "Bearer", "test-token"}, " "))
 			}
-			if test.days != "0" && test.wantError == "" {
+			if test.days != "0" && test.wantError == "" && !test.matchesDefault {
 				assert.Contains(t, string(log), "https://api.github.com/repos/github/copilot-cli/releases/")
 				if test.version == "latest" {
 					assert.Contains(t, string(log), "/releases/latest")
 					assert.Contains(t, string(log), "/releases/download/v1.2.3/", "bind downloads to the release whose age was checked")
 				}
-			} else if !test.tamper {
+			} else if !test.tamper && !test.matchesDefault {
 				assert.NotContains(t, string(log), "/SHA256SUMS.txt", "age rejection must precede archive verification")
 			}
 			if test.cached {

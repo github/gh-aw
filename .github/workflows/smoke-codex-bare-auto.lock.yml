@@ -51,7 +51,7 @@
 name: "Smoke Codex Bare Auto"
 on:
   schedule:
-    - cron: "0 0 */2 * *"  # Friendly format: every 2 days
+    - cron: "19 15 */2 * *"  # Friendly format: every 2 days (scattered)
   workflow_dispatch:
     inputs:
       aw_context:
@@ -2036,7 +2036,7 @@ jobs:
           name: safe-outputs-items
           path: |
             /tmp/gh-aw/safe-output-items.jsonl
-            /tmp/gh-aw/safe-output-outcomes.jsonl
+            /tmp/gh-aw/safe-output-executions.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore

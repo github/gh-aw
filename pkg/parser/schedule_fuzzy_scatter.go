@@ -201,7 +201,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		handleDailyAround,
 		handleDailyBetween,
 		handleDailyWeekdays,
+		// handleDailyInterval must precede handleDaily, whose "FUZZY:DAILY" prefix would match it.
+		handleDailyInterval,
 		handleDaily,
+		handleMonthlyInterval,
 		handleHourlyWeekdays,
 		handleHourly,
 		handleEveryMinute,
@@ -291,6 +294,52 @@ func handleDailyWeekdays(fuzzyCron, workflowIdentifier string) (string, bool, er
 	hour, minute := weightedDailyTimeSlot(workflowIdentifier)
 	result := fmt.Sprintf("%d %d * * 1-5", minute, hour)
 	scheduleFuzzyScatterLog.Printf("FUZZY:DAILY_WEEKDAYS scattered: result=%s", result)
+	return result, true, nil
+}
+
+// handleDailyInterval scatters "FUZZY:DAILY_INTERVAL/N * * *" (every N days) to
+// "M H */N * *" with a hashed daily time slot.
+func handleDailyInterval(fuzzyCron, workflowIdentifier string) (string, bool, error) {
+	const prefix = "FUZZY:DAILY_INTERVAL/"
+	if !strings.HasPrefix(fuzzyCron, prefix) {
+		return "", false, nil
+	}
+	interval, err := parseHourlyInterval(fuzzyCron, prefix, "invalid fuzzy daily interval pattern", "invalid interval in fuzzy daily interval pattern")
+	if err != nil {
+		return "", true, err
+	}
+	if interval < 1 {
+		return "", true, fmt.Errorf("invalid interval in fuzzy daily interval pattern: interval must be >= 1, got %d", interval)
+	}
+	hour, minute := weightedDailyTimeSlot(workflowIdentifier)
+	result := fmt.Sprintf("%d %d */%d * *", minute, hour, interval)
+	scheduleFuzzyScatterLog.Printf("FUZZY:DAILY_INTERVAL/%d scattered: time=%d:%d, result=%s", interval, hour, minute, result)
+	return result, true, nil
+}
+
+// handleMonthlyInterval scatters "FUZZY:MONTHLY_INTERVAL/N * * *" (every N months) to
+// "M H D * *" (N=1) or "M H D */N *", where D is a hashed day of month in [1, 28]
+// so the schedule fires in every month, including February.
+func handleMonthlyInterval(fuzzyCron, workflowIdentifier string) (string, bool, error) {
+	const prefix = "FUZZY:MONTHLY_INTERVAL/"
+	if !strings.HasPrefix(fuzzyCron, prefix) {
+		return "", false, nil
+	}
+	interval, err := parseHourlyInterval(fuzzyCron, prefix, "invalid fuzzy monthly interval pattern", "invalid interval in fuzzy monthly interval pattern")
+	if err != nil {
+		return "", true, err
+	}
+	if interval < 1 {
+		return "", true, fmt.Errorf("invalid interval in fuzzy monthly interval pattern: interval must be >= 1, got %d", interval)
+	}
+	day := stableHash(workflowIdentifier+":day-of-month", 28) + 1
+	hour, minute := weightedDailyTimeSlot(workflowIdentifier)
+	month := "*"
+	if interval > 1 {
+		month = fmt.Sprintf("*/%d", interval)
+	}
+	result := fmt.Sprintf("%d %d %d %s *", minute, hour, day, month)
+	scheduleFuzzyScatterLog.Printf("FUZZY:MONTHLY_INTERVAL/%d scattered: day=%d, time=%d:%d, result=%s", interval, day, hour, minute, result)
 	return result, true, nil
 }
 

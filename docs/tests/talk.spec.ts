@@ -58,9 +58,9 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   expect(await page.evaluate(() => localStorage.getItem("aw-mute"))).toBe("0");
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
-  // Space follows the main line, past the Issue Monster example hanging below Event-driven Hand-offs
+  // Space follows the main line from Event-driven Hand-offs to Repo Commands
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Pull Request Review²")}$`));
+  await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideNo("Repo Commands")}$`));
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
@@ -202,6 +202,33 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.keyboard.press("PageUp");
   await expect(count).toHaveAttribute("aria-label", at(2));
+});
+
+test("hangs CI reuse below workflow anatomy", async ({ page }) => {
+  const parent = slideNo("Anatomy of a workflow");
+  const child = slideNo("Reuse your CI");
+  const count = page.locator(CURRENT);
+  await page.goto(`/gh-aw/cracktro/#${parent}`);
+  await expect(page.getByRole("button", { name: "1 example below", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Reuse your CI");
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.locator(".vnb").click();
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await page.getByRole("button", { name: "Back to the pattern", exact: true }).click();
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.getByRole("button", { name: "Slide map (G)", exact: true }).click();
+  const kids = page.getByRole("group", { name: "Anatomy of a workflow examples", exact: true });
+  await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${child}:`) })).toBeVisible();
+});
+
+test("keeps the CI reuse workflow inside its code panel", async ({ page }) => {
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Reuse your CI")}`);
+  await page.evaluate(() => document.fonts.ready);
+  const overflowing = await page.locator(".cwa-ln").evaluateAll(lines => lines.filter(line => line.scrollWidth > line.clientWidth).map(line => line.textContent));
+  expect(overflowing).toEqual([]);
 });
 
 test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
@@ -573,13 +600,15 @@ test.describe("agentic engineering slides", () => {
 test("places the enterprise tracing, access and event slides beside their neighbours", async ({ page }) => {
   expect(slideNo("Distributed tracing")).toBe(slideNo("OpenTelemetry") + 1);
   expect(slideNo("GitHub App permissions")).toBe(slideNo("Operator-owned infrastructure") + 1);
-  expect(slideNo("OIDC token broker")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("Multi-repo PRs")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("OIDC token broker")).toBe(slideNo("Multi-repo PRs") + 1);
   expect(slideNo("Webhook gateway")).toBe(slideNo("Connectors") + 1);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   const NEW: [string, string | null][] = [
     ["Distributed tracing", null],
     ["GitHub App permissions", null],
+    ["Multi-repo PRs", null],
     ["OIDC token broker", "Experimental"],
     ["Webhook gateway", "Experimental"],
   ];
@@ -680,6 +709,63 @@ test("steps the budget steering slide from the 80% notice to a submitted pull re
   await page.keyboard.press("ArrowLeft");
   await expect(slide.locator(".bst-m.ok")).toHaveCount(0);
   await expect(page.locator(".slide.active h2")).toHaveText("Budget steering");
+  expect(errors).toEqual([]);
+});
+
+test("splits inline skills and agents, defers context and preserves step navigation", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  const number = slideNo("Inlined Skills & Agents");
+  await page.goto(`/gh-aw/cracktro/#${number}`);
+  const slide = page.locator(".slide.isa");
+  const diagram = slide.locator(".isa-svg");
+  await expect(slide).toHaveClass(/active/);
+  await expect(diagram).not.toHaveClass(/\bs1\b/);
+  const measured = slide.getByRole("region", { name: "Measured inline skills and agents usage on gh-aw" });
+  await expect(measured).toBeVisible();
+  const layout = await slide.evaluate(el => {
+    const diagram = el.querySelector(".isa-svg")!.getBoundingClientRect();
+    const strip = el.querySelector(".isa-measured")!.getBoundingClientRect();
+    const caption = el.querySelector(".isa-caption")!.getBoundingClientRect();
+    return {
+      separated: diagram.bottom <= strip.top,
+      captionClear: strip.bottom <= caption.top,
+      contained: caption.bottom <= el.getBoundingClientRect().bottom,
+      labelsFit: [...el.querySelectorAll<HTMLElement>(".isa-example, .isa-inventory")].every(node => node.scrollWidth <= node.clientWidth),
+    };
+  });
+  expect(layout).toEqual({ separated: true, captionClear: true, contained: true, labelsFit: true });
+
+  await page.keyboard.press("ArrowRight");
+  await expect(diagram).toHaveClass(/\bs1\b/);
+  await expect(slide.locator(".isa-blk.skill").first()).toHaveAttribute("transform", /translate\(556\.0 /);
+  await page.keyboard.press("ArrowRight");
+  await expect(slide.locator(".isa-take")).toHaveClass(/on/, { timeout: 10_000 });
+  await expect(slide.locator(".isa-ml.aft.sm.on")).toHaveCount(2);
+  const context = await slide.evaluate(el => {
+    const height = (selector: string) => el.querySelector<SVGGraphicsElement>(selector)!.getBBox().height;
+    return {
+      first: height("#isaPa0"),
+      last: height("#isaPa5"),
+      monolith: height("#isaPb5"),
+    };
+  });
+  expect(context.first).toBeLessThan(context.last);
+  expect(context.last).toBeLessThan(context.monolith);
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(diagram).not.toHaveClass(/\bs2\b/);
+  await expect(slide.locator(".isa-take")).not.toHaveClass(/on/);
+  await page.keyboard.press("ArrowLeft");
+  await expect(diagram).not.toHaveClass(/\bs1\b/);
+  await expect(slide.locator(".isa-blk.core")).toHaveAttribute("transform", /translate\(36\.0 /);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".slide.active h2")).toHaveText("Audit & Optimize");
+  await page.keyboard.press("ArrowLeft");
+  await expect(slide).toHaveClass(/active/);
+  await expect(slide.locator(".isa-take")).toHaveClass(/on/);
   expect(errors).toEqual([]);
 });
 
