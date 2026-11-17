@@ -190,8 +190,8 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     const document = readDocumentMetadata(lock, { version: "1.2", uniqueKeys: true });
     const activation = document.value.jobs.activation;
     expect(activation.if).toContain("github.run_attempt == 1");
-    expect(activation.if).toContain("needs.admission.result == 'success' || needs.admission.result == 'skipped'");
-    expect(activation.needs).toBe("admission");
+    expect(activation.if).not.toContain("needs.admission");
+    expect(activation.needs).toBeUndefined();
     expect(lock).toContain("daily_report_portfolio.cjs");
     expect(lock).toContain("name: Restore daily AIC scan observations");
     expect(lock).toContain("name: Check daily workflow token guardrail");
