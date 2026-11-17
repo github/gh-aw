@@ -2763,6 +2763,69 @@
   .psc-c.on { opacity: 1; } .psc-c.i { fill: #d29922; } .psc-c.a { fill: #79c0ff; } .psc-c.r { fill: #d2a8ff; } .psc-c.f { fill: #ff7b72; } .psc-c.n { fill: #9198a1; }
   .psc-v { text-anchor: end; font-weight: 700; } .psc-v.k { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95099); }
   .psc-m { width: 1360px; }
+  .rcm-card { position: absolute; top: 290px; left: var(--x); width: 540px; height: 540px; box-sizing: border-box; padding: 26px 30px; border: 2px solid color-mix(in srgb, var(--c) 55%, transparent); border-top-width: 6px; border-radius: 18px; background: #0d1117e6; opacity: 0; }
+    .active .rcm-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + .4s); }
+  .rcm-card > i, .lsm-card > i { display: block; font: 700 17px var(--mono); font-style: normal; letter-spacing: .14em; color: var(--c); }
+  .rcm-card h3 { margin: 12px 0 14px; font: 700 48px/1.1 var(--mono); color: #f0f6fc; }
+  .rcm-fm { font: 500 21px/1.5 var(--mono); white-space: pre; color: #c9d1d9; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 10px 16px; }
+  .rcm-fm .k { color: #ff7b72; } .rcm-fm .v { color: #a5d6ff; }
+  .rcm-thread { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .rcm-a { opacity: 0; }
+  .active .rcm-a { animation: rise .6s cubic-bezier(.2,.9,.2,1) both calc(var(--d) * 600ms + 1.4s); }
+  .rcm-msg { display: flex; align-items: center; gap: 14px; font-size: 21px; color: #e6edf3; }
+  .rcm-msg .b { flex: 1; padding: 10px 14px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
+  .rcm-msg.bot .b { border-style: dashed; color: #c9d1d9; }
+  .rcm-msg b { font-family: var(--mono); color: #79c0ff; } .rcm-msg em { color: #9198a1; } .rcm-msg s { color: #9198a1; }
+  .rcm-av { width: 46px; height: 46px; border-radius: 50%; border: 2px solid #30363d; flex: none; }
+  .rcm-gear { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 22px; background: #ab7df833; color: #d2a8ff; border: 2px solid #ab7df8; }
+  .rcm-react { align-self: flex-start; margin-left: 60px; padding: 4px 14px; border-radius: 999px; border: 1px solid #4493f8; background: #4493f81f; font-size: 19px; color: #e6edf3; }
+  .rcm-lbl { display: inline-block; padding: 2px 14px; border-radius: 999px; background: #e3b34133; border: 1px solid #e3b341; color: #f0d48a; font: 600 19px/1.4 var(--mono); }
+  .rcm-lbl.big { font-size: 40px; padding: 2px 26px; }
+  .rcm-pr { display: flex; align-items: center; gap: 12px; font-size: 21px; color: #e6edf3; padding: 10px 14px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
+  .rcm-pr .n { font: 700 16px var(--mono); padding: 2px 8px; border-radius: 6px; background: #238636; color: #fff; }
+  .rcm-pr .rcm-lbl { margin-left: auto; }
+  .active .rcm-pr .rcm-lbl.drop { animation: rcm-drop .5s ease both 3.2s; }
+  @keyframes rcm-drop { to { opacity: .35; text-decoration: line-through; } }
+  .rcm-ev { display: flex; flex-direction: column; gap: 10px; }
+  .rcm-ev > div { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 12px; padding: 5px 0 5px 14px; border-left: 3px solid #ab7df8; }
+  .rcm-ev > div.g { border-left-color: #3fb950; }
+  .rcm-ev b { font: 600 19px var(--mono); color: #e6edf3; } .rcm-ev span { font-size: 17px; color: #9198a1; }
+  .rcm-wins { position: absolute; left: 110px; top: 878px; width: 1700px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 22px; }
+  .rcm-wins > div { border-left: 4px solid #79c0ff; padding: 4px 0 4px 16px; opacity: 0; }
+  .active .rcm-wins > div { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 1.2s); }
+  .rcm-wins b { display: block; font: 700 22px/1.15 var(--mono); white-space: nowrap; color: #f0f6fc; }
+  .rcm-wins span { display: block; margin-top: 6px; font-size: 18px; line-height: 1.3; color: #c9d1d9; }
+  .lsm-board { position: absolute; left: 110px; top: 280px; width: 1100px; }
+  .lsm-svg { display: block; width: 1100px; height: 600px; overflow: visible; }
+  .lsm-n rect { fill: #161b22; stroke: #30363d; stroke-width: 2; transition: fill .35s, stroke .35s; }
+  .lsm-n text { fill: #c9d1d9; font: 600 20px var(--mono); text-anchor: middle; }
+  .lsm-n.seen rect { stroke: #8b949e; }
+  .lsm-n.on rect { fill: #e3b34126; stroke: #e3b341; stroke-width: 3; filter: drop-shadow(0 0 10px #e3b34166); }
+  .lsm-n.on text { fill: #f0f6fc; }
+  .lsm-e { fill: none; stroke-width: 3; opacity: .45; transition: opacity .35s, stroke-width .35s; }
+  .lsm-e.a { stroke: #ab7df8; } .lsm-e.h { stroke: #4493f8; } .lsm-e.x { stroke: #db6d28; stroke-dasharray: 10 8; }
+  .lsm-e.seen { opacity: .8; } .lsm-e.hot { opacity: 1; stroke-width: 5; }
+  .lsm-el { font: 600 19px var(--mono); opacity: .6; transition: opacity .35s; }
+  .lsm-el.a { fill: #d2a8ff; } .lsm-el.h { fill: #79c0ff; } .lsm-el.x { fill: #ffa657; }
+  .lsm-el.hot, .lsm-el.seen { opacity: 1; }
+  .lsm-no { opacity: 0; transition: opacity .3s; }
+  .lsm-no.on { opacity: 1; }
+  .lsm-no circle { fill: #db6d2833; stroke: #db6d28; stroke-width: 3; } .lsm-no path { stroke: #ffa657; stroke-width: 4; stroke-linecap: round; }
+  .lsm-no text { fill: #ffa657; font: 600 18px var(--mono); text-anchor: middle; }
+  .lsm-who { opacity: 0; transition: opacity .3s; }
+  .lsm-who > g { display: none; } .lsm-who.a > .a, .lsm-who.d > .d, .lsm-who.m > .m { display: inline; }
+  .lsm-who .ring { fill: #0d1117; stroke: #4493f8; stroke-width: 3; }
+  .lsm-cap { margin-top: 6px; min-height: 40px; padding: 10px 18px; border-left: 4px solid #30363d; font-size: 23px; color: #e6edf3; opacity: 0; transition: opacity .3s; }
+  .lsm-cap.on { opacity: 1; } .lsm-cap.a { border-left-color: #ab7df8; } .lsm-cap.h { border-left-color: #4493f8; } .lsm-cap.x { border-left-color: #db6d28; color: #ffa657; }
+  .lsm-card { position: absolute; left: 1260px; top: var(--y); width: 550px; box-sizing: border-box; padding: 20px 24px; border: 2px solid color-mix(in srgb, var(--c) 55%, transparent); border-top-width: 6px; border-radius: 18px; background: #0d1117e6; opacity: 0; }
+  .active .lsm-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + .5s); }
+  .lsm-card .rcm-fm { margin-top: 12px; font-size: 17px; }
+  .lsm-t { display: flex; gap: 14px; align-items: flex-start; margin-top: 14px; }
+  .lsm-t .m { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 20px var(--mono); }
+  .lsm-t.y .m { background: #4493f833; color: #79c0ff; border: 2px solid #4493f8; } .lsm-t.n .m { background: #db6d2833; color: #ffa657; border: 2px solid #db6d28; }
+  .lsm-t b { display: block; font-size: 22px; color: #f0f6fc; } .lsm-t span { display: block; font-size: 18px; color: #9198a1; }
+  .lsm-wins { top: 962px; grid-template-columns: repeat(3, 1fr); }
+  .lsm-wins b { display: inline; } .lsm-wins span { display: inline; margin: 0 0 0 10px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
 
@@ -3074,16 +3137,41 @@
     resetIndex();
     // Primer Octicons 24px paths (© GitHub, Inc., MIT license); the shared OCTI table is declared later in this file.
     const CAI_ICON = {
-      book: ["M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.495 4.495 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.752.752 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a2.996 2.996 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.503 4.503 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z"],
-      sparkle: ["M11.296 1.924c.24-.656 1.168-.656 1.408 0l.717 1.958a11.25 11.25 0 0 0 6.697 6.697l1.958.717c.657.24.657 1.168 0 1.408l-1.958.717a11.25 11.25 0 0 0-6.697 6.697l-.717 1.958c-.24.657-1.168.657-1.408 0l-.717-1.958a11.25 11.25 0 0 0-6.697-6.697l-1.958-.717c-.656-.24-.656-1.168 0-1.408l1.958-.717a11.25 11.25 0 0 0 6.697-6.697l.717-1.958Z"],
-      tag: ["M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z", "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z"],
-      note: ["M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z", "M5 8.75A.75.75 0 0 1 5.75 8h11.5a.75.75 0 0 1 0 1.5H5.75A.75.75 0 0 1 5 8.75Zm0 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z"],
-      alert: ["M13 17.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-.25-8.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5Z", "M9.836 3.244c.963-1.665 3.365-1.665 4.328 0l8.967 15.504c.963 1.667-.24 3.752-2.165 3.752H3.034c-1.926 0-3.128-2.085-2.165-3.752Zm3.03.751a1.002 1.002 0 0 0-1.732 0L2.168 19.499A1.002 1.002 0 0 0 3.034 21h17.932a1.002 1.002 0 0 0 .866-1.5L12.866 3.994Z"],
-      shield: ["M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z", "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z"],
-      heart: ["m12 20.703.343.667a.748.748 0 0 1-.686 0l-.003-.002-.007-.003-.025-.013a31.138 31.138 0 0 1-5.233-3.576C3.8 15.573 1 12.332 1 8.514v-.001C1 5.053 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262a31.148 31.148 0 0 1-5.233 3.576l-.025.013-.007.003-.002.001ZM6.736 4C4.657 4 2.5 5.88 2.5 8.514c0 3.107 2.324 5.96 4.861 8.12a29.655 29.655 0 0 0 4.566 3.175l.073.041.073-.04c.271-.153.661-.38 1.13-.674.94-.588 2.19-1.441 3.436-2.502 2.537-2.16 4.861-5.013 4.861-8.12C21.5 5.88 19.343 4 17.264 4c-2.106 0-3.801 1.389-4.553 3.643a.751.751 0 0 1-1.422 0C10.537 5.389 8.841 4 6.736 4Z"],
-      a11y: ["M13.974 8.114a3.573 3.573 0 1 0-3.947 0c-.302.21-.57.467-.79.762H3.708a.75.75 0 1 0 0 1.5h4.885a2.93 2.93 0 0 0-.026.188l-.814 7.267-.499 4.142a.75.75 0 1 0 1.49.18l.42-3.486h5.67l.42 3.485a.75.75 0 0 0 1.49-.18l-.5-4.142-.813-7.266a3.502 3.502 0 0 0-.026-.188h4.885a.75.75 0 1 0 0-1.5h-5.527a3.466 3.466 0 0 0-.79-.762Zm.099-2.979a2.073 2.073 0 1 1-4.146 0 2.073 2.073 0 0 1 4.146 0Zm-.131 5.596.72 6.436H9.338l.72-6.436a1.954 1.954 0 0 1 3.884 0Z"],
-      people: ["M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z"],
-      sliders: ["M11 18.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75Zm-8-12a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 3 6.25Zm13 6a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.75 16a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z", "M3 18.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Zm0-6a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM16.75 10a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75ZM14 6.25a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75ZM11.25 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"],
+      book: [
+        "M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.495 4.495 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.752.752 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a2.996 2.996 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.503 4.503 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z",
+      ],
+      sparkle: [
+        "M11.296 1.924c.24-.656 1.168-.656 1.408 0l.717 1.958a11.25 11.25 0 0 0 6.697 6.697l1.958.717c.657.24.657 1.168 0 1.408l-1.958.717a11.25 11.25 0 0 0-6.697 6.697l-.717 1.958c-.24.657-1.168.657-1.408 0l-.717-1.958a11.25 11.25 0 0 0-6.697-6.697l-1.958-.717c-.656-.24-.656-1.168 0-1.408l1.958-.717a11.25 11.25 0 0 0 6.697-6.697l.717-1.958Z",
+      ],
+      tag: [
+        "M7.75 6.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z",
+        "M2.5 1h8.44a1.5 1.5 0 0 1 1.06.44l10.25 10.25a1.5 1.5 0 0 1 0 2.12l-8.44 8.44a1.5 1.5 0 0 1-2.12 0L1.44 12A1.497 1.497 0 0 1 1 10.94V2.5A1.5 1.5 0 0 1 2.5 1Zm0 1.5v8.44l10.25 10.25 8.44-8.44L10.94 2.5Z",
+      ],
+      note: [
+        "M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z",
+        "M5 8.75A.75.75 0 0 1 5.75 8h11.5a.75.75 0 0 1 0 1.5H5.75A.75.75 0 0 1 5 8.75Zm0 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z",
+      ],
+      alert: [
+        "M13 17.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-.25-8.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0v-4.5Z",
+        "M9.836 3.244c.963-1.665 3.365-1.665 4.328 0l8.967 15.504c.963 1.667-.24 3.752-2.165 3.752H3.034c-1.926 0-3.128-2.085-2.165-3.752Zm3.03.751a1.002 1.002 0 0 0-1.732 0L2.168 19.499A1.002 1.002 0 0 0 3.034 21h17.932a1.002 1.002 0 0 0 .866-1.5L12.866 3.994Z",
+      ],
+      shield: [
+        "M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z",
+        "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z",
+      ],
+      heart: [
+        "m12 20.703.343.667a.748.748 0 0 1-.686 0l-.003-.002-.007-.003-.025-.013a31.138 31.138 0 0 1-5.233-3.576C3.8 15.573 1 12.332 1 8.514v-.001C1 5.053 3.829 2.5 6.736 2.5 9.03 2.5 10.881 3.726 12 5.605 13.12 3.726 14.97 2.5 17.264 2.5 20.17 2.5 23 5.052 23 8.514c0 3.818-2.801 7.06-5.389 9.262a31.148 31.148 0 0 1-5.233 3.576l-.025.013-.007.003-.002.001ZM6.736 4C4.657 4 2.5 5.88 2.5 8.514c0 3.107 2.324 5.96 4.861 8.12a29.655 29.655 0 0 0 4.566 3.175l.073.041.073-.04c.271-.153.661-.38 1.13-.674.94-.588 2.19-1.441 3.436-2.502 2.537-2.16 4.861-5.013 4.861-8.12C21.5 5.88 19.343 4 17.264 4c-2.106 0-3.801 1.389-4.553 3.643a.751.751 0 0 1-1.422 0C10.537 5.389 8.841 4 6.736 4Z",
+      ],
+      a11y: [
+        "M13.974 8.114a3.573 3.573 0 1 0-3.947 0c-.302.21-.57.467-.79.762H3.708a.75.75 0 1 0 0 1.5h4.885a2.93 2.93 0 0 0-.026.188l-.814 7.267-.499 4.142a.75.75 0 1 0 1.49.18l.42-3.486h5.67l.42 3.485a.75.75 0 0 0 1.49-.18l-.5-4.142-.813-7.266a3.502 3.502 0 0 0-.026-.188h4.885a.75.75 0 1 0 0-1.5h-5.527a3.466 3.466 0 0 0-.79-.762Zm.099-2.979a2.073 2.073 0 1 1-4.146 0 2.073 2.073 0 0 1 4.146 0Zm-.131 5.596.72 6.436H9.338l.72-6.436a1.954 1.954 0 0 1 3.884 0Z",
+      ],
+      people: [
+        "M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z",
+      ],
+      sliders: [
+        "M11 18.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75Zm-8-12a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 3 6.25Zm13 6a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75ZM8.75 16a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z",
+        "M3 18.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Zm0-6a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM16.75 10a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75ZM14 6.25a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75ZM11.25 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z",
+      ],
     };
     const caiIcon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${CAI_ICON[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
     // [name, icon, colour, illustrative trigger]
@@ -3135,11 +3223,7 @@
           h("div", { class: "cai-step now", "--i": 4 }, h("b", {}, "Continuous AI"), h("span", {}, "collaborate"))
         ),
         h("div", { class: "cai-years" }, "a 30+ year story, like CI/CD"),
-        h(
-          "div",
-          { class: "cai-def" },
-          h("p", {}, "Any use of ", h("b", {}, "automated AI"), " to support ", h("b", {}, "software collaboration"), ".")
-        ),
+        h("div", { class: "cai-def" }, h("p", {}, "Any use of ", h("b", {}, "automated AI"), " to support ", h("b", {}, "software collaboration"), ".")),
         h("div", { class: "cai-grid" }, caiCards),
         h(
           "div",
@@ -3147,12 +3231,7 @@
           h("span", {}, "What they share"),
           TRAITS.map((t, i) => h("em", { "--i": i }, t))
         ),
-        h(
-          "div",
-          { class: "cai-foot" },
-          h("div", { "--i": 0 }, caiIcon("people"), "For the team, not the individual"),
-          h("div", { "--i": 1 }, caiIcon("sliders"), "Teams stay in control")
-        )
+        h("div", { class: "cai-foot" }, h("div", { "--i": 0 }, caiIcon("people"), "For the team, not the individual"), h("div", { "--i": 1 }, caiIcon("sliders"), "Teams stay in control"))
       ),
     });
   }
@@ -5480,6 +5559,308 @@
       ),
     });
 
+    // Repo Commands: slash_command and label_command are synthetic triggers; one front matter line expands into the real
+    // issue, comment, pull request and discussion events plus a first-word guard, role check, reaction, status comment and label removal
+    {
+      resetIndex();
+      const C = { s: "#79c0ff", l: "#e3b341", x: "#ab7df8" };
+      const yaml = rows =>
+        h(
+          "div",
+          { class: "rcm-fm" },
+          rows.map(([ind, key, val]) => h("div", {}, ind, h("span", { class: "k" }, key), val ? h("span", { class: "v" }, val) : null))
+        );
+      const avatar = who => h("img", { class: "rcm-av", src: `assets/avatars/${who}.jpg`, alt: "" });
+      const slash = h(
+        "div",
+        { class: "rcm-card", "--c": C.s, "--i": 0, "--x": "110px" },
+        h("i", {}, "SLASH COMMAND"),
+        h("h3", {}, "/review"),
+        yaml([["", "on: ", "/review"]]),
+        h("div", { class: "rcm-thread" }, [
+          h("div", { class: "rcm-msg rcm-a", "--d": 0 }, avatar("mona"), h("div", { class: "b" }, h("b", {}, "/review"), " focus on the cache layer")),
+          h("div", { class: "rcm-react rcm-a", "--d": 1 }, "👀 1"),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 2 }, h("div", { class: "rcm-gear" }, "⚙"), h("div", { class: "b" }, "Agent started · ", h("u", {}, "view run"))),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 3 }, h("div", { class: "rcm-gear" }, "✓"), h("div", { class: "b" }, "Review posted · ", h("em", {}, "comment /review to run again"))),
+        ])
+      );
+      const label = h(
+        "div",
+        { class: "rcm-card", "--c": C.l, "--i": 1, "--x": "690px" },
+        h("i", {}, "LABEL COMMAND"),
+        h("h3", {}, h("span", { class: "rcm-lbl big" }, "deploy")),
+        yaml([
+          ["", "on:", ""],
+          ["  ", "label_command: ", "deploy"],
+        ]),
+        h("div", { class: "rcm-thread" }, [
+          h("div", { class: "rcm-pr rcm-a", "--d": 0 }, h("span", { class: "n" }, "PR"), " Add cache layer", h("span", { class: "rcm-lbl drop" }, "deploy")),
+          h("div", { class: "rcm-msg rcm-a", "--d": 1 }, avatar("ducky"), h("div", { class: "b" }, "added the ", h("span", { class: "rcm-lbl" }, "deploy"), " label")),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 2 }, h("div", { class: "rcm-gear" }, "⚙"), h("div", { class: "b" }, "Agent started · label ", h("s", {}, "deploy"), " removed")),
+          h("div", { class: "rcm-msg bot rcm-a", "--d": 3 }, h("div", { class: "rcm-gear" }, "↻"), h("div", { class: "b" }, h("em", {}, "apply the label again to re-run"))),
+        ])
+      );
+      const EXPAND = [
+        ["issues", "opened · edited · reopened"],
+        ["issue_comment", "created · edited"],
+        ["pull_request", "opened · edited · reopened"],
+        ["pull_request_review_comment", "created · edited"],
+        ["discussion(_comment)", "created · edited"],
+        ["labeled", "issues · pull requests · discussions"],
+        ["if:", "command is the first word"],
+        ["roles:", "admin · maintainer · write"],
+        ["activation", "👀 reaction · status comment"],
+      ];
+      const expand = h(
+        "div",
+        { class: "rcm-card rcm-x", "--c": C.x, "--i": 2, "--x": "1270px" },
+        h("i", {}, "THE COMPILER WRITES"),
+        h("h3", {}, "Real events"),
+        h(
+          "div",
+          { class: "rcm-ev" },
+          EXPAND.map(([k, v], j) => h("div", { class: `rcm-a${j > 5 ? " g" : ""}`, "--d": j * 0.45 }, h("b", {}, k), h("span", {}, v)))
+        )
+      );
+      const WINS = [
+        ["One line", "replaces a hand-written event matrix and its if: guards"],
+        ["No accidental runs", "the command must be the first word; other events stop early"],
+        ["Role-gated", "only admitted repository roles start the agent"],
+        ["Visible", "reaction, status comment and run link on the thread"],
+        ["Repeatable", "comment again or re-apply the label to re-run"],
+        ["Discoverable", "centralized routing adds a /help command"],
+      ];
+      const wins = h(
+        "div",
+        { class: "rcm-wins" },
+        WINS.map(([b, s], i) => h("div", { "--i": i }, h("b", {}, b), h("span", {}, s)))
+      );
+      slides.push({
+        group: "process",
+        key: "commands",
+        notes:
+          "Repo Commands, an illustrative example with a synthetic thread and pull request. Two triggers in gh-aw are synthetic: GitHub Actions has no slash_command or label_command event. You write one front matter line and the compiler writes the real triggers for you. on: /review expands into issues, issue comments, pull requests, review comments and discussions, plus workflow_dispatch, and an if: guard so the workflow only continues when /review is the first word, never a passing mention. label_command: deploy listens for the labeled event on issues, pull requests and discussions, and removes the label once the run starts, so a label means do this now and can simply be applied again. Both run the same activation: a role check that only admits admin, maintainer and write by default, an eyes reaction, a status comment with a run link, and the matched command as an activation output, so one workflow can serve several aliases. The benefits: one line instead of an event matrix, no accidental runs, role-gated admission, visible feedback in the thread, re-runs without cleanup, and with centralized routing a generated /help command that lists every command in the repository. Commands are how people pull an agent into a conversation exactly when they want it.",
+        el: h(
+          "section",
+          { class: "slide rcm" },
+          h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "ChatOps · LabelOps · synthetic triggers"), h("h2", {}, letters("Repo "), letters("Commands", "l-grad"))),
+          slash,
+          label,
+          expand,
+          wins
+        ),
+      });
+    }
+
+    // LabelOps state machines: labels are states on the issue; label commands let triage-role people move a state,
+    // and replace-label with allowed-transitions limits each agent to the edges it owns
+    {
+      resetIndex();
+      const AG = pickAgent();
+      const VW = 1100,
+        VH = 600,
+        NW = 290,
+        NH = 62;
+      const NODES = {
+        new: [145, 110],
+        triaged: [545, 110],
+        planned: [955, 110],
+        info: [545, 320],
+        progress: [955, 320],
+        done: [955, 520],
+      };
+      const NAME = { new: "state:new", triaged: "state:triaged", planned: "state:planned", info: "state:needs-info", progress: "state:in-progress", done: "state:done" };
+      // [id, path, kind (a agent · h human · x rejected), label, lx, ly, anchor]
+      const EDGES = [
+        ["e0", `M${145 + NW / 2} 110 H${545 - NW / 2 - 6}`, "a", "triage agent", 345, 62, "middle"],
+        ["e1", `M515 ${110 + NH / 2} V${320 - NH / 2 - 6}`, "a", "needs a repro", 501, 222, "end"],
+        ["e2", `M575 ${320 - NH / 2} V${110 + NH / 2 + 6}`, "a", "reply checked", 589, 222, "start"],
+        ["e3", `M${545 + NW / 2} 110 H${955 - NW / 2 - 6}`, "h", "🏷 plan", 750, 62, "middle"],
+        ["e4", `M955 ${110 + NH / 2} V${320 - NH / 2 - 6}`, "h", "🏷 implement", 971, 222, "start"],
+        ["e5", `M955 ${320 + NH / 2} V${520 - NH / 2 - 6}`, "h", "PR merged", 971, 432, "start"],
+        ["x0", `M145 ${110 + NH / 2} V520 H${955 - NW / 2 - 6}`, "x", "agent asks new → done", 165, 500, "start"],
+      ];
+      // [edge, node lit on arrival, who (a agent · d Ducky · m Mona), caption]
+      const SEQ = [
+        [null, "new", "a", "An issue is opened and gets state:new"],
+        ["e0", "triaged", "a", "Triage agent · replace-label state:new → state:triaged"],
+        ["e1", "info", "a", "Triage agent · no reproduction yet → state:needs-info"],
+        ["e2", "triaged", "a", "Reporter replies · triage agent moves it back → state:triaged"],
+        ["x0", null, "a", "An agent asks for state:new → state:done · not an allowed transition, rejected"],
+        ["e3", "planned", "d", "Ducky (triage role) applies plan · label removed · planner agent → state:planned"],
+        ["e4", "progress", "d", "Ducky (triage role) applies implement · Copilot is assigned → state:in-progress"],
+        ["e5", "done", "m", "Mona (maintainer) merges the pull request → state:done"],
+      ];
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      let g = `<defs>
+        <marker id="lsmArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+        <marker id="lsmArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
+        <marker id="lsmArrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#db6d28"/></marker>
+        <clipPath id="lsmClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
+      EDGES.forEach(([id, d, k, text, lx, ly, anchor]) => {
+        g += `<path class="lsm-e ${k}" id="lsm_${id}" d="${d}" marker-end="url(#lsmArr${k === "a" ? "P" : k === "h" ? "B" : "O"})"/>`;
+        g += `<text class="lsm-el ${k}" id="lsm_${id}t" x="${lx}" y="${ly}" text-anchor="${anchor}">${text}</text>`;
+      });
+      g += `<g class="lsm-no" id="lsmNo"><circle cx="560" cy="520" r="24"/><path d="M550 510l20 20M570 510l-20 20"/><text x="560" y="580">not an allowed transition</text></g>`;
+      Object.entries(NODES).forEach(([k, [x, y]]) => {
+        g += `<g class="lsm-n" id="lsm_${k}"><rect x="${x - NW / 2}" y="${y - NH / 2}" width="${NW}" height="${NH}" rx="${NH / 2}"/>${ico("tag", x - NW / 2 + 30, y, 24)}<text x="${x + 20}" y="${y + 8}">${NAME[k]}</text></g>`;
+      });
+      g += `<g class="lsm-who" id="lsmWho"><g class="a"><circle r="28" cx="0" cy="0" ${agDisc(AG)}/>${ico(AG, 0, 1, 30, agFg(AG))}</g>`;
+      g += `<g class="d"><circle r="28" cx="0" cy="0" class="ring"/><image href="assets/avatars/ducky.jpg" x="-25" y="-25" width="50" height="50" clip-path="url(#lsmClip)"/></g>`;
+      g += `<g class="m"><circle r="28" cx="0" cy="0" class="ring"/><image href="assets/avatars/mona.jpg" x="-25" y="-25" width="50" height="50" clip-path="url(#lsmClip)"/></g></g>`;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "lsm-svg");
+      svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      svg.innerHTML = g;
+      const cap = h("div", { class: "lsm-cap" });
+      const FM = [
+        ["", "on:", ""],
+        ["  ", "label_command: ", "plan"],
+        ["  ", "roles: ", "[admin, maintainer, write, triage]"],
+        ["", "safe-outputs:", ""],
+        ["  ", "replace-label:", ""],
+        ["    ", "allowed-transitions:", ""],
+        ["      - ", "from: ", "state:triaged"],
+        ["        ", "to: ", "state:planned"],
+      ];
+      const fm = h(
+        "div",
+        { class: "lsm-card", "--c": "#ab7df8", "--i": 0, "--y": "270px" },
+        h("i", {}, "PLAN.MD · ONE EDGE PER WORKFLOW"),
+        h(
+          "div",
+          { class: "rcm-fm" },
+          FM.map(([ind, key, val]) => h("div", {}, ind, h("span", { class: "k" }, key), val ? h("span", { class: "v" }, val) : null))
+        )
+      );
+      const TRIAGE = [
+        ["✓", "y", "Can apply and remove labels", "so it can drive every human edge"],
+        ["✕", "n", "Cannot push, merge or change settings", "no code or admin access to hand out"],
+        ["✓", "y", "Read-only accounts cannot label", "drive-by users cannot fire a command"],
+      ];
+      const triage = h(
+        "div",
+        { class: "lsm-card", "--c": "#4493f8", "--i": 1, "--y": "610px" },
+        h("i", {}, "TRIAGE ROLE IS ENOUGH"),
+        TRIAGE.map(([m, k, b, s]) => h("div", { class: `lsm-t ${k}` }, h("span", { class: "m" }, m), h("div", {}, h("b", {}, b), h("span", {}, s))))
+      );
+      const WINS = [
+        ["State on the issue", "visible, searchable and filterable on boards"],
+        ["Bounded agents", "replace-label moves only along declared edges"],
+        ["Small workflows", "each edge is one label command or one agent"],
+      ];
+      const wins = h(
+        "div",
+        { class: "rcm-wins lsm-wins" },
+        WINS.map(([b, s], i) => h("div", { "--i": i }, h("b", {}, b), h("span", {}, s)))
+      );
+      const STEP = 2200,
+        START = 900,
+        CYCLE = START + SEQ.length * STEP + 2600;
+      const who = svg.querySelector("#lsmWho"),
+        no = svg.querySelector("#lsmNo");
+      const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+      let t0 = 0,
+        cyc = -1,
+        seen = -1,
+        skip = false;
+      const reset = () => {
+        svg.querySelectorAll(".on, .hot, .seen").forEach(e => e.classList.remove("on", "hot", "seen"));
+        who.style.opacity = 0;
+        cap.textContent = "";
+        cap.className = "lsm-cap";
+        seen = -1;
+      };
+      const place = (x, y, k) => {
+        who.style.opacity = 1;
+        who.setAttribute("transform", `translate(${x},${y})`);
+        who.setAttribute("class", `lsm-who ${k}`);
+      };
+      slides.push({
+        group: "process",
+        under: "commands",
+        notes:
+          "LabelOps state machines, an illustrative process with synthetic labels; Ducky stands in for a community helper with the triage role and Mona for a maintainer. Labels are not only commands, they are state. Give an issue exactly one state label and every step of a process becomes a transition from one label to the next. replace-label is the safe output that performs that move in one request, removing the old label and adding the new one. With allowed-transitions an agent may only move along the edges you declare, here triaged to planned; when an agent asks for new to done, the safe outputs job rejects it. Each workflow owns one edge: a triage agent sorts new issues, a plan label command starts a planner, an implement label command assigns Copilot, and merging the pull request finishes it. The human edges are label commands, and the minimum GitHub role that can apply a label is triage. So add triage to roles, which defaults to admin, maintainer and write, and community helpers can drive the whole process without push, merge or settings access, while read-only accounts cannot fire a command at all. The state lives on the issue, where people, boards and searches can see it.",
+        enter() {
+          t0 = 0;
+          cyc = -1;
+          skip = false;
+          reset();
+        },
+        onNext() {
+          if (seen >= SEQ.length - 1) return false;
+          skip = true;
+          return true;
+        },
+        tick(t) {
+          if (!t0) t0 = t;
+          if (skip) {
+            skip = false;
+            const u = (t - t0) % CYCLE;
+            const k = Math.max(0, Math.floor((u - START) / STEP) + 1);
+            t0 -= Math.max(0, START + k * STEP - u);
+          }
+          const e = t - t0,
+            c = Math.floor(e / CYCLE),
+            u = e % CYCLE;
+          if (c !== cyc) {
+            cyc = c;
+            reset();
+          }
+          const s = Math.min(SEQ.length - 1, Math.floor((u - START) / STEP));
+          if (s < 0) return;
+          const [edge, node, k, text] = SEQ[s],
+            f = (u - START - s * STEP) / STEP;
+          if (s !== seen) {
+            for (let j = seen + 1; j < s; j++) {
+              const [pe, pn] = SEQ[j];
+              if (pe) svg.querySelector(`#lsm_${pe}`).classList.add("seen");
+              if (pn) svg.querySelector(`#lsm_${pn}`).classList.add("seen");
+            }
+            svg.querySelectorAll(".lsm-n.on, .lsm-e.hot, .lsm-el.hot").forEach(x => {
+              x.classList.remove("on", "hot");
+              x.classList.add("seen");
+            });
+            no.classList.remove("on");
+            seen = s;
+            cap.textContent = text;
+            cap.className = `lsm-cap on ${edge && edge[0] === "x" ? "x" : k === "a" ? "a" : "h"}`;
+            if (edge) {
+              svg.querySelector(`#lsm_${edge}`).classList.add("hot");
+              svg.querySelector(`#lsm_${edge}t`).classList.add("hot");
+            }
+            if (k === "a") sfx.pop(s);
+            else sfx.review();
+          }
+          if (!edge) {
+            svg.querySelector(`#lsm_${node}`).classList.add("on");
+            place(NODES[node][0], NODES[node][1] - 72, k);
+            return;
+          }
+          const p = svg.querySelector(`#lsm_${edge}`),
+            rej = edge[0] === "x",
+            len = p.getTotalLength(),
+            stop = rej ? len * 0.66 : Math.max(0, len - 34),
+            pt = p.getPointAtLength(stop * ease(Math.min(1, Math.max(0, (f - 0.1) / 0.6))));
+          place(pt.x, pt.y, k);
+          if (f > 0.72) {
+            if (rej) {
+              if (!no.classList.contains("on")) (no.classList.add("on"), sfx.step(-1));
+            } else svg.querySelector(`#lsm_${node}`).classList.add("on");
+          }
+        },
+        el: h(
+          "section",
+          { class: "slide lsm" },
+          h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "LabelOps · replace-label · triage role"), h("h2", {}, letters("LabelOps "), letters("state machines", "l-grad"))),
+          h("div", { class: "lsm-board" }, svg, cap),
+          fm,
+          triage,
+          wins
+        ),
+      });
+    }
+
     // Repo Assist: the maintenance loop next to its backlog burndown
     resetIndex();
     const raCap = h("div", { class: "fm-cap ra-cap-flow" });
@@ -5682,7 +6063,7 @@
         ["a", "func newLoaderFactory() LoaderFactory { return defaultFactory{} }"],
         ["a", "func (defaultFactory) NewLoader() Loader { return loader{} }"],
         ["b", "func parseFlag(s string) bool {"],
-        ["b", "\treturn s == \"1\" || strings.EqualFold(s, \"true\")"],
+        ["b", '\treturn s == "1" || strings.EqualFold(s, "true")'],
         ["b", "}"],
         ["c", "func hasTag(tags []string, t string) bool {"],
         ["c", "\tfor _, x := range tags { if x == t { return true } }"],
@@ -5742,7 +6123,10 @@
         290,
         122,
         `<text class="t" x="0" y="16">FINDINGS BY KIND</text>` +
-          KINDS.map(([n, c, v], i) => `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`).join("")
+          KINDS.map(
+            ([n, c, v], i) =>
+              `<text class="lg" x="0" y="${42 + i * 19}">${n}</text><rect class="${c}" style="--i:${i}" x="124" y="${30 + i * 19}" width="${Math.max(3, (v * 120) / KMAX)}" height="14" rx="2"/><text class="lg" x="${130 + (v * 120) / KMAX}" y="${42 + i * 19}">${v}</text>`
+          ).join("")
       );
       const aicSvg = svgEl(
         190,
@@ -5778,19 +6162,25 @@
         [2950, () => (scan.classList.remove("go"), scan.classList.add("end"))],
         ...FIND.map(([g], i) => [3000 + i * 700, () => (i || steps[2].classList.add("on"), grp(g).forEach(l => l.classList.add("hot")), cards[i].classList.add("on"), sfx.pop(i + 1))]),
         [5300, () => ((verdict.textContent = "COMMENT review · Lean: −12 lines possible."), verdict.classList.add("on"), sfx.notify(false))],
-        [6900, () => {
-          steps[3].classList.add("on");
-          lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
-          added.textContent = "+3";
-          sfx.pop(5);
-        }],
-        [8700, () => {
-          steps[4].classList.add("on");
-          cards.forEach(c => c.classList.add("dim"));
-          verdict.textContent = "/ponytail · Lean already. Ship.";
-          verdict.classList.add("ok");
-          sfx.pop(6);
-        }],
+        [
+          6900,
+          () => {
+            steps[3].classList.add("on");
+            lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
+            added.textContent = "+3";
+            sfx.pop(5);
+          },
+        ],
+        [
+          8700,
+          () => {
+            steps[4].classList.add("on");
+            cards.forEach(c => c.classList.add("dim"));
+            verdict.textContent = "/ponytail · Lean already. Ship.";
+            verdict.classList.add("ok");
+            sfx.pop(6);
+          },
+        ],
       ];
       let t0 = 0,
         cyc = -1,
@@ -16308,14 +16698,21 @@
       g += `<path class="drm-w" id="drmIn${i}" pathLength="1" d="M520 ${y} C640 ${y}, 680 ${CY}, ${CX - CR - 6} ${CY}"/>`;
       g += `<g class="drm-r" id="drmR${i}"><circle cx="40" cy="${y}" r="24" fill="#0d1117" stroke="${col}" stroke-width="2.5"/>${ico(ic, 40, y, 26, col)}<text x="78" y="${y + 8}">${txt}</text></g>`;
     });
-    OUT.forEach(([, , ], i) => {
+    OUT.forEach(([, ,], i) => {
       const y = OY(i) + 44;
       g += `<path class="drm-w g" id="drmOut${i}" pathLength="1" d="M${CX + CR + 6} ${CY} C1140 ${CY}, 1170 ${y}, 1262 ${y}"/>`;
     });
     g += `<g id="drmCore"><circle class="drm-core" cx="${CX}" cy="${CY}" r="${CR}"/>${ico("copilot", CX, CY + 6, 96, "#d2a8ff")}
       <circle cx="${CX + 58}" cy="${CY - 62}" r="24" fill="#d2a8ff"/><circle cx="${CX + 70}" cy="${CY - 72}" r="21" fill="#161b22"/>
       <text class="drm-z" x="${CX + 82}" y="${CY - 96}">z</text><text class="drm-z b" x="${CX + 98}" y="${CY - 120}">z</text><text class="drm-z c" x="${CX + 114}" y="${CY - 144}">Z</text></g>`;
-    [[760, 120, 0], [1040, 108, 0.7], [742, 330, 1.3], [1062, 352, 0.4], [830, 90, 1.9], [985, 390, 1.1]].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
+    [
+      [760, 120, 0],
+      [1040, 108, 0.7],
+      [742, 330, 1.3],
+      [1062, 352, 0.4],
+      [830, 90, 1.9],
+      [985, 390, 1.1],
+    ].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
     g += `<text class="drm-cap" x="${CX}" y="${CY + CR + 34}">nightly: mine · cluster · design</text>`;
     PAT.forEach(([x, txt], i) => (g += `<g class="drm-t" id="drmT${i}"><rect x="${x - 100}" y="410" width="200" height="44" rx="22"/><text x="${x}" y="438">${txt}</text></g>`));
     OUT.forEach(([ic, ttl, sub], i) => {
