@@ -2,8 +2,8 @@
 set +o histexpand
 
 # Copy the AWF-managed Copilot session-state directory to the agent logs folder
-# for artifact collection. Fall back to the legacy host HOME path for workflows
-# compiled against AWF versions that populated it directly.
+# for artifact collection. Never fall back to the runner user's HOME, which may
+# contain historical sessions unrelated to the current job.
 #
 # Copilot CLI writes session data inside UUID-named subdirectories:
 #   <session-state-dir>/<session-uuid>/events.jsonl
@@ -14,8 +14,7 @@ set +o histexpand
 
 set -euo pipefail
 
-AWF_SESSION_STATE_DIR="${GH_AW_COPILOT_SESSION_STATE_DIR:-/tmp/gh-aw/sandbox/agent/session-state}"
-LEGACY_SESSION_STATE_DIR="${GH_AW_COPILOT_LEGACY_SESSION_STATE_DIR:-$HOME/.copilot/session-state}"
+SESSION_STATE_DIR="${GH_AW_COPILOT_SESSION_STATE_DIR:-/tmp/gh-aw/sandbox/agent/session-state}"
 LOGS_DIR="${GH_AW_COPILOT_SESSION_LOGS_DIR:-/tmp/gh-aw/sandbox/agent/logs/copilot-session-state}"
 
 is_redactable_file() {
@@ -35,15 +34,8 @@ has_redactable_files() {
   return 1
 }
 
-SESSION_STATE_DIR=""
-if [ -d "$AWF_SESSION_STATE_DIR" ] && has_redactable_files "$AWF_SESSION_STATE_DIR"; then
-  SESSION_STATE_DIR="$AWF_SESSION_STATE_DIR"
-elif [ -d "$LEGACY_SESSION_STATE_DIR" ] && has_redactable_files "$LEGACY_SESSION_STATE_DIR"; then
-  SESSION_STATE_DIR="$LEGACY_SESSION_STATE_DIR"
-fi
-
-if [ -z "$SESSION_STATE_DIR" ]; then
-  echo "::warning::No Copilot session state files found in $AWF_SESSION_STATE_DIR or $LEGACY_SESSION_STATE_DIR"
+if [ ! -d "$SESSION_STATE_DIR" ] || ! has_redactable_files "$SESSION_STATE_DIR"; then
+  echo "::warning::No Copilot session state files found in $SESSION_STATE_DIR"
   exit 0
 fi
 
