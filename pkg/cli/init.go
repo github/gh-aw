@@ -94,7 +94,7 @@ func InitRepository(opts InitOptions) error {
 	// Write dispatcher skill
 	if opts.Skill {
 		initLog.Print("Writing agentic workflows dispatcher skill")
-		if err := ensureAgenticWorkflowsDispatcher(opts.Verbose, false, true); err != nil {
+		if err := ensureAgenticWorkflowsDispatcher(ctx, opts.Verbose, false, true); err != nil {
 			initLog.Printf("Failed to write dispatcher skill: %v", err)
 			return fmt.Errorf("failed to write dispatcher skill: %w", err)
 		}
