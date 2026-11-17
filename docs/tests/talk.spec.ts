@@ -204,6 +204,33 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(2));
 });
 
+test("hangs CI reuse below workflow anatomy", async ({ page }) => {
+  const parent = slideNo("Anatomy of a workflow");
+  const child = slideNo("Reuse your CI");
+  const count = page.locator(CURRENT);
+  await page.goto(`/gh-aw/cracktro/#${parent}`);
+  await expect(page.getByRole("button", { name: "1 example below", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Reuse your CI");
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.locator(".vnb").click();
+  await expect(count).toHaveAttribute("aria-label", at(child));
+  await page.getByRole("button", { name: "Back to the pattern", exact: true }).click();
+  await expect(count).toHaveAttribute("aria-label", at(parent));
+  await page.getByRole("button", { name: "Slide map (G)", exact: true }).click();
+  const kids = page.getByRole("group", { name: "Anatomy of a workflow examples", exact: true });
+  await expect(kids.getByRole("button", { name: new RegExp(`^Go to slide ${child}:`) })).toBeVisible();
+});
+
+test("keeps the CI reuse workflow inside its code panel", async ({ page }) => {
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Reuse your CI")}`);
+  await page.evaluate(() => document.fonts.ready);
+  const overflowing = await page.locator(".cwa-ln").evaluateAll(lines => lines.filter(line => line.scrollWidth > line.clientWidth).map(line => line.textContent));
+  expect(overflowing).toEqual([]);
+});
+
 test("walks a pattern's column of examples with up/down and hints at it from the toolbar", async ({ page }) => {
   const count = page.locator(CURRENT);
   const vnb = page.locator(".vnb");

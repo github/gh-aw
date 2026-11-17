@@ -1961,8 +1961,7 @@
   .cwa-msg { position: absolute; left: 110px; right: 100px; top: 908px; height: 84px; box-sizing: border-box; padding: 0 34px; display: flex; align-items: center; gap: 28px; border-radius: 18px;
     background: linear-gradient(90deg, #4493f826, #ab7df81f); border: 1px solid #4493f8; opacity: 0; transform: translateY(16px); transition: opacity .7s, transform .8s cubic-bezier(.2,.9,.2,1); }
   .cwa-msg.on { opacity: 1; transform: none; }
-  .cwa-msg strong { font-size: 40px; color: #f0f6fc; white-space: nowrap; }
-  .cwa-msg span { font: 500 19px/1.35 var(--mono); color: #9198a1; }
+  .cwa-msg span { font: 500 26px/1.35 var(--mono); color: #9198a1; }
 
   /* --- cost management --- */
   .cm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
@@ -3277,6 +3276,7 @@
     };
     slides.push({
       group: "platform",
+      key: "anatomy",
       notes:
         "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
       enter() {
@@ -3324,7 +3324,7 @@
     });
   }
 
-  // Compatible with Actions: a synthetic workflow mixes the agent with environments, self-hosted runners, Microsoft Entra ID
+  // Reuse your CI: a synthetic workflow mixes the agent with environments, self-hosted runners, Microsoft Entra ID
   // and HashiCorp Vault through OIDC, GitHub App tokens, marketplace actions, custom jobs and chat bots; all Actions infrastructure is reused
   {
     resetIndex();
@@ -3345,25 +3345,100 @@
     // [text parts, tile index or -1]
     const LINES = [
       [[["---", D]], -1],
-      [[["on: ", K], ["pull_request", V]], -1],
-      [[["environment: ", K], ["production", V]], 0],
-      [[["runs-on: ", K], ["[self-hosted, linux]", V]], 1],
+      [
+        [
+          ["on: ", K],
+          ["pull_request", V],
+        ],
+        -1,
+      ],
+      [
+        [
+          ["environment: ", K],
+          ["production", V],
+        ],
+        0,
+      ],
+      [
+        [
+          ["runs-on: ", K],
+          ["[self-hosted, linux]", V],
+        ],
+        1,
+      ],
       [[["permissions:", K]], -1],
-      [[["  id-token: ", K], ["write", V]], 2],
+      [
+        [
+          ["  id-token: ", K],
+          ["write", V],
+        ],
+        2,
+      ],
       [[["steps:", K]], -1],
-      [[["  - uses: ", K], ["azure/login@v2", V]], 2],
-      [[["  - uses: ", K], ["hashicorp/vault-action@v3", V]], 3],
-      [[["  - uses: ", K], ["actions/create-github-app-token@v2", V]], 4],
-      [[["  - uses: ", K], ["actions/setup-node@v4", V]], 5],
+      [
+        [
+          ["  - uses: ", K],
+          ["azure/login@v2", V],
+        ],
+        2,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["hashicorp/vault-action@v3", V],
+        ],
+        3,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["actions/create-github-app-token@v2", V],
+        ],
+        4,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["actions/setup-node@v4", V],
+        ],
+        5,
+      ],
       [[["jobs:", K]], -1],
-      [[["  deploy-preview: ", K], ["{ needs: detection }", V]], 6],
-      [[["  notify: ", K], ["{ needs: deploy-preview, uses: ./.github/workflows/chatops.yml }", V]], 7],
+      [
+        [
+          ["  deploy-preview: ", K],
+          ["{ needs: detection }", V],
+        ],
+        6,
+      ],
+      [[["  notify:", K]], 7],
+      [
+        [
+          ["    needs: ", K],
+          ["deploy-preview", V],
+        ],
+        7,
+      ],
+      [
+        [
+          ["    uses: ", K],
+          ["./.github/workflows/chatops.yml", V],
+        ],
+        7,
+      ],
       [[["---", D]], -1],
       [[["# Review the preview deployment and comment", T]], -1],
     ];
     const LH = 28,
       TOP = 14;
-    const lines = LINES.map(([parts], i) => h("div", { class: "cwa-ln" }, h("span", { class: "no" }, String(i + 1)), parts.map(([t, c]) => h("span", { style: { color: c } }, t))));
+    const lines = LINES.map(([parts], i) =>
+      h(
+        "div",
+        { class: "cwa-ln" },
+        h("span", { class: "no" }, String(i + 1)),
+        parts.map(([t, c]) => h("span", { style: { color: c } }, t))
+      )
+    );
     const bandsOf = TILES.map(() => []);
     const bands = [];
     LINES.forEach(([, k], i) => {
@@ -3373,12 +3448,7 @@
       bands.push(b);
     });
     const tiles = TILES.map(([, c, title, chip, text], i) => h("div", { class: "cwa-tile", "--c": c }, h("div", { class: "n" }, String(i + 1)), h("h3", {}, title), h("code", {}, chip), h("p", {}, text)));
-    const msg = h(
-      "div",
-      { class: "cwa-msg" },
-      h("strong", {}, "All Actions infrastructure is reused"),
-      h("span", {}, "Same runners, secrets, environments, rulesets and audit log. Custom steps and jobs run outside the agent sandbox.")
-    );
+    const msg = h("div", { class: "cwa-msg" }, h("span", {}, "Same runners, secrets, environments, rulesets and audit log. Custom steps and jobs run outside the agent sandbox."));
     const N = TILES.length,
       REVEAL = 0.6,
       GAP = 0.9,
@@ -3393,14 +3463,17 @@
     };
     slides.push({
       group: "platform",
+      under: "anatomy",
       notes:
-        "Compatible with Actions, using an illustrative synthetic workflow. An agentic workflow compiles to a plain GitHub Actions workflow, so everything a team already runs on Actions keeps working: deployment environments with required reviewers and environment secrets, GitHub-hosted, larger or self-hosted runners, OIDC federation into Microsoft Entra ID with azure/login, secrets from HashiCorp Vault with vault-action, short-lived GitHub App installation tokens, any marketplace action in steps, extra custom jobs wired with needs, and reusable workflow calls that hand off to Slack, Teams or existing bots. Custom steps and jobs run outside the agent's sandbox with standard Actions security, so credentials stay out of the agent's reach. The message: no new platform to adopt; all the Actions infrastructure is reused.",
+        "Reuse your CI, using an illustrative synthetic workflow. An agentic workflow compiles to a plain GitHub Actions workflow, so everything a team already runs on Actions keeps working: deployment environments with required reviewers and environment secrets, GitHub-hosted, larger or self-hosted runners, OIDC federation into Microsoft Entra ID with azure/login, secrets from HashiCorp Vault with vault-action, short-lived GitHub App installation tokens, any marketplace action in steps, extra custom jobs wired with needs, and reusable workflow calls that hand off to Slack, Teams or existing bots. Custom steps and jobs run outside the agent's sandbox with standard Actions security, so credentials stay out of the agent's reach. The message: no new platform to adopt; all the Actions infrastructure is reused.",
       enter() {
         t0 = 0;
         seen = -1;
         skip = false;
         [...lines, ...bands, ...tiles, msg].forEach(e => e.classList.remove("on", "hot"));
-        [0, 1, 4, 6, 11, 14, 15].forEach(i => lines[i].classList.add("on"));
+        LINES.forEach(([, tile], i) => {
+          if (tile < 0) lines[i].classList.add("on");
+        });
       },
       onNext() {
         if (seen >= N) return false;
@@ -3425,7 +3498,7 @@
       el: h(
         "section",
         { class: "slide cwa" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring your ecosystem"), h("h2", { class: "pf-h" }, letters("Compatible with "), letters("Actions", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring your ecosystem"), h("h2", { class: "pf-h" }, letters("Reuse your "), letters("CI", "l-grad"))),
         h("div", { class: "cwa-file" }, h("div", { class: "file" }, "📄 .github/workflows/preview-review.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cwa-code" }, bands, lines)),
         h("div", { class: "cwa-grid" }, tiles),
         msg
