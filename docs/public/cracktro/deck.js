@@ -1858,80 +1858,149 @@
   .tv-take.done div { animation: tvpulse 1.6s ease-in-out 2; }
   .tv-cap { position: absolute; left: 110px; right: 110px; top: 950px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
 
-  /* --- add operational value: define once, measure repeatedly --- */
+  /* --- add operational value: define once --- */
   .aov .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
-  .pf-prompt.aov-phone { left: 130px; top: 318px; width: 430px; height: 600px; }
-  .aov-msg { margin-left: 22px; padding: 18px 22px; min-height: 152px; border-radius: 26px 26px 6px 26px; background: linear-gradient(135deg, #8957e5, #6e40c9); font: 500 21px/1.42 var(--mono); color: #e6dcff; white-space: pre; }
+  .pf-prompt.aov-phone { left: 110px; top: 318px; width: 440px; height: 692px; }
+  .aov-msg { margin-left: 22px; padding: 16px 20px; min-height: 116px; border-radius: 24px 24px 6px 24px; background: linear-gradient(135deg, #8957e5, #6e40c9); font: 500 20px/1.4 var(--mono); color: #e6dcff; white-space: pre; }
   .aov-msg .cmd { color: #fff; font-weight: 700; }
-  .aov-msg .opt { color: #fff; text-decoration: underline dashed #e6dcffaa; text-underline-offset: 6px; }
-  .aov-reply { margin: 16px 22px 0 0; padding: 16px 20px; border-radius: 26px 26px 26px 6px; background: #21262d; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 18px; line-height: 1.3; color: #d1d7e0; opacity: 0; transition: opacity .5s; }
-  .aov-reply.on { opacity: 1; }
-  .aov-reply li { opacity: 0; transform: translateX(-10px); transition: opacity .4s, transform .5s; }
-  .aov-reply li.on { opacity: 1; transform: none; }
-  .aov-reply b { color: #d2a8ff; margin-right: 6px; }
-  .aov-cue { position: absolute; left: 130px; top: 950px; width: 430px; box-sizing: border-box; padding: 12px 18px; border-radius: 14px; border: 2px dashed #3d444d; font: 500 16px/1.45 var(--mono); color: #9198a1; opacity: 0; transition: opacity .6s; }
-  .aov-cue.on { opacity: 1; }
-  .aov-cue code { font-family: var(--mono); color: #d2a8ff; font-weight: 700; }
-  .aov-cue b { color: #f0f6fc; font-weight: 600; }
-  .aov-cap { position: absolute; top: -44px; left: 4px; font: 600 16px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: var(--c); white-space: nowrap; }
-  .aov-design { position: absolute; left: 620px; top: 330px; width: 1190px; height: 150px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 70px; --c: #ab7df8; }
-  .aov-d { position: relative; padding: 0 26px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 5px solid var(--c); display: flex; flex-direction: column; justify-content: center; gap: 12px;
-    box-shadow: 0 0 50px -25px var(--c); opacity: 0; transform: translateY(16px); transition: opacity .5s, transform .6s cubic-bezier(.2,.9,.2,1); }
-  .aov-d.on { opacity: 1; transform: none; }
-  .aov-d + .aov-d::after { content: "→"; position: absolute; left: -54px; top: 50%; transform: translateY(-50%); font: 700 34px/1 var(--mono); color: #656c76; }
-  .aov-d h4 { margin: 0; font-size: 34px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
-  .aov-d p { margin: 0; font: 500 19px/1.2 var(--mono); color: #9198a1; }
-  .aov-d.frozen { border: 2px dashed #db6d28; border-top: 5px solid #db6d28; }
-  .aov-d.frozen p { color: #ffa657; }
-  .aov-d em { position: absolute; top: 16px; right: 18px; padding: 5px 12px; border-radius: 99px; border: 1px solid #ab7df8; font: 600 14px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: #d2a8ff; }
-  .aov-down { position: absolute; left: 1539px; top: 488px; width: 3px; height: 74px; background: linear-gradient(#db6d28, #4493f8); transform-origin: top; transform: scaleY(0); transition: transform .6s cubic-bezier(.2,.9,.2,1); }
-  .aov-down::after { content: ""; position: absolute; left: -8px; bottom: -4px; border: 9px solid transparent; border-top: 12px solid #4493f8; border-bottom: 0; }
+  .aov-bub { margin-top: 12px; padding: 13px 18px; border-radius: 22px 22px 22px 6px; background: #21262d; font-size: 16px; line-height: 1.38; color: #d1d7e0; opacity: 0; transform: translateY(8px); transition: opacity .45s, transform .5s cubic-bezier(.2,.9,.2,1); }
+  .aov-bub.on { opacity: 1; transform: none; }
+  .aov-bub.ai { margin-right: 22px; }
+  .aov-bub b { color: #d2a8ff; font-weight: 600; }
+  .aov-bub strong { color: #f0f6fc; }
+  .aov-bub.me { width: max-content; margin-left: auto; border-radius: 22px 22px 6px 22px; background: linear-gradient(135deg, #8957e5, #6e40c9); font-size: 18px; font-weight: 700; color: #fff; }
+  .aov-cap { position: absolute; top: -40px; left: 4px; font: 600 16px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: var(--c); white-space: nowrap; }
+  .aov-box { position: absolute; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 5px solid var(--c); box-shadow: 0 0 50px -25px var(--c); opacity: 0; transform: translateY(16px); transition: opacity .5s, transform .6s cubic-bezier(.2,.9,.2,1), box-shadow .5s; }
+  .aov-box.on { opacity: 1; transform: none; }
+  .aov-box > .aov-cap { top: -45px; }
+  .aov-ar { position: absolute; font: 700 30px/1 var(--mono); color: #656c76; opacity: 0; transition: opacity .5s; }
+  .aov-ar.on { opacity: 1; }
+  .aov-ar.a1 { left: 1090px; top: 460px; } .aov-ar.a2 { left: 1410px; top: 460px; }
+  .aov-md { left: 610px; top: 320px; width: 470px; height: 310px; --c: #8b949e; }
+  .aov-md .fn { padding: 9px 18px; margin-bottom: 6px; font: 500 14px/1 var(--mono); color: #9198a1; border-bottom: 1px solid #30363d; }
+  .aov-md .ln { padding: 0 18px; font: 500 16px/23px var(--mono); color: #d1d7e0; white-space: pre; transition: background .4s, box-shadow .4s; }
+  .aov-md .k { color: #79c0ff; } .aov-md .c { color: #8b949e; } .aov-md .d { color: #656c76; }
+  .aov-md.ha .ln.a { background: #ab7df82e; box-shadow: inset 4px 0 #ab7df8; }
+  .aov-md.hb .ln.b { background: #4493f82e; box-shadow: inset 4px 0 #4493f8; }
+  .aov-md.hc .ln.c3 { background: #e3b34126; box-shadow: inset 4px 0 #e3b341; }
+  .aov-x { position: absolute; left: 1130px; top: 320px; width: 270px; height: 310px; display: flex; flex-direction: column; gap: 14px; --c: #ab7df8; }
+  .aov-x > .aov-cap { opacity: 0; transition: opacity .4s; }
+  .aov-x.on > .aov-cap { opacity: 1; }
+  .aov-xc { flex: 1; padding: 10px 16px; border-radius: 14px; background: #0d1117e8; border: 1px solid #3d444d; border-left: 5px solid var(--c); display: flex; flex-direction: column; justify-content: center; gap: 6px; opacity: 0; transform: translateX(-110px) scale(.9); transition: opacity .5s, transform .7s cubic-bezier(.2,.9,.2,1); }
+  .aov-xc.on { opacity: 1; transform: none; }
+  .aov-xc small { font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--c); }
+  .aov-xc span { font: 500 16px/1.2 var(--mono); color: #f0f6fc; }
+  .aov-xc span + span { color: #9198a1; }
+  .aov-cand { left: 1450px; top: 320px; width: 360px; height: 310px; --c: #ab7df8; padding: 12px 16px; display: flex; flex-direction: column; gap: 5px; }
+  .aov-cand .hd { display: flex; align-items: center; justify-content: space-between; }
+  .aov-cand h4, .aov-seal h4, .avm-fn h4 { margin: 0; font-size: 26px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
+  .aov-pill { padding: 5px 10px; border-radius: 99px; border: 1px solid var(--pc, #ab7df8); font: 600 13px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--pt, #d2a8ff); }
+  .aov-cand .sub { margin-bottom: 3px; font: 500 14px/1.2 var(--mono); color: #9198a1; }
+  .aov-m { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 28px; flex: none; padding: 0 4px 0 10px; border-radius: 8px; border: 1px dashed #3d444d; font: 500 15px/1 var(--mono); color: #d1d7e0; opacity: 0; transform: translateX(-10px); transition: opacity .4s, transform .5s, background .4s, border-color .4s, color .4s; }
+  .aov-m.on { opacity: 1; transform: none; }
+  .aov-m i { margin-left: 6px; font-style: normal; color: #9198a1; }
+  .aov-m u { padding: 4px 8px; border-radius: 99px; border: 1px dashed #656c76; font: 600 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; text-decoration: none; color: #9198a1; white-space: nowrap; transition: all .4s; }
+  .aov-m u .f, .aov-gate .f { display: none; }
+  .aov-cand.ok .aov-m u .c, .aov-gate.ok .c { display: none; }
+  .aov-cand.ok .aov-m u .f, .aov-gate.ok .f { display: inline; }
+  .aov-cand.ok .aov-m { border-style: solid; }
+  .aov-cand.ok .aov-m.p { background: #4493f82e; border-color: #4493f8; color: #f0f6fc; }
+  .aov-cand.ok .aov-m.p u { background: #4493f8; border: 1px solid #4493f8; color: #fff; }
+  .aov-cand.ok .aov-m.d u { border: 1px solid #79c0ff; color: #79c0ff; }
+  .aov-m.x { color: #9198a1; }
+  .aov-m.x span { text-decoration: line-through 2px #db6d28; }
+  .aov-m.x u, .aov-cand.ok .aov-m.x u { border: 1px dashed #db6d28; color: #ffa657; }
+  .aov-probe { margin-top: auto; font: 500 14px/1 var(--mono); color: #9198a1; opacity: 0; transition: opacity .4s; }
+  .aov-probe.on { opacity: 1; }
+  .aov-probe b { color: #79c0ff; }
+  .aov-gate { position: absolute; left: 1470px; top: 654px; height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 20px 0 6px; border-radius: 99px; border: 2px dashed #e3b341; background: #0d1117f2; font: 600 17px/1 var(--mono); color: #e3b341; white-space: nowrap; opacity: 0; transition: opacity .4s, border-color .4s, color .4s, background .4s; }
+  .aov-gate.on { opacity: 1; animation: aovwait 1.2s ease-in-out infinite; }
+  .aov-gate img { width: 36px; height: 36px; border-radius: 50%; border: 2px solid currentColor; }
+  .aov-gate.ok { border: 2px solid #4493f8; background: #0d2340f2; color: #79c0ff; animation: none; }
+  @keyframes aovwait { 50% { box-shadow: 0 0 0 9px #e3b34124; } }
+  .aov-down { position: absolute; left: 1789px; top: 638px; width: 3px; height: 84px; background: linear-gradient(#4493f8, #db6d28); transform-origin: top; transform: scaleY(0); transition: transform .6s cubic-bezier(.2,.9,.2,1); }
+  .aov-down::after { content: ""; position: absolute; left: -8px; bottom: -4px; border: 9px solid transparent; border-top: 12px solid #db6d28; border-bottom: 0; }
   .aov-down.on { transform: none; }
-  .aov-cyc { position: absolute; left: 1280px; top: 560px; width: 520px; height: 400px; --c: #79c0ff; opacity: 0; transition: opacity .6s; }
-  .aov-cyc.on { opacity: 1; }
-  .aov-cyc .aov-cap { top: -40px; }
-  .aov-cyc svg { display: block; width: 100%; height: 100%; overflow: visible; }
-  .aov-cyc .ring { fill: none; stroke: #4493f8; stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; opacity: .8; }
-  .aov-cyc .chev { fill: #4493f8; }
-  .aov-cyc .n rect { fill: #0d1117; stroke: #4493f8; stroke-width: 2; transition: fill .3s, stroke-width .3s; }
-  .aov-cyc .n text { font: 600 22px/1 "Mona Sans"; fill: #f0f6fc; }
-  .aov-cyc .n tspan { font: 700 22px/1 var(--mono); fill: #79c0ff; }
-  .aov-cyc .n.hot rect { fill: #4493f833; stroke-width: 4; }
-  .aov-cyc .mid1 { font: 700 26px/1 "Mona Sans"; fill: #f0f6fc; }
-  .aov-cyc .mid2 { font: 700 20px/1 var(--mono); letter-spacing: .14em; fill: #79c0ff; }
-  .aov-cyc .dot { fill: #79c0ff; filter: drop-shadow(0 0 8px #79c0ff); opacity: 0; }
-  .aov-cyc.run .dot { opacity: 1; }
-  .aov-pub { position: absolute; left: 1176px; top: 759px; width: 96px; height: 3px; background: #4493f8; transform-origin: right; transform: scaleX(0); transition: transform .6s cubic-bezier(.2,.9,.2,1); }
-  .aov-pub::before { content: ""; position: absolute; left: -6px; top: -8px; border: 9px solid transparent; border-right: 12px solid #4493f8; border-left: 0; }
-  .aov-pub span { position: absolute; left: 0; right: 0; top: 16px; font: 500 15px/1.3 var(--mono); color: #9198a1; text-align: center; opacity: 0; transition: opacity .4s .3s; }
-  .aov-pub.on { transform: none; }
-  .aov-pub.on span { opacity: 1; }
-  .aov-val { position: absolute; left: 620px; top: 570px; width: 550px; height: 390px; box-sizing: border-box; padding: 24px 30px 22px; border-radius: 22px; background: #161b22e8; border: 1px solid #3d444d; border-top: 5px solid #4493f8; --c: #79c0ff;
-    display: flex; flex-direction: column; gap: 14px; opacity: 0; transform: translateY(18px); transition: opacity .6s, transform .6s cubic-bezier(.2,.9,.2,1), box-shadow .5s; }
-  .aov-val.on { opacity: 1; transform: none; box-shadow: 0 24px 60px -34px #4493f8; }
-  .aov-val.ping { animation: aovping 1s ease-out; }
-  @keyframes aovping { 0% { box-shadow: 0 0 0 0 #79c0ff99, 0 24px 60px -34px #4493f8; } 100% { box-shadow: 0 0 0 22px #79c0ff00, 0 24px 60px -34px #4493f8; } }
-  .aov-vh { display: flex; justify-content: space-between; align-items: flex-end; }
-  .aov-vh small { font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #79c0ff; }
-  .aov-vh h4 { margin: 10px 0 0; font-size: 34px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
-  .aov-vh p { margin: 8px 0 0; font: 500 17px/1 var(--mono); color: #9198a1; }
-  .aov-vh b { font: 700 64px/1 var(--mono); color: #79c0ff; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .aov-vh b i { font: 500 28px/1 var(--mono); font-style: normal; margin-left: 4px; }
-  .aov-bars { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; align-items: end; }
-  .aov-bar { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font: 500 14px/1 var(--mono); color: #9198a1; }
-  .aov-bar i { display: block; width: 100%; height: var(--h); border-radius: 8px 8px 2px 2px; background: #4493f8; transform-origin: bottom; transform: scaleY(0); transition: transform .5s cubic-bezier(.2,.9,.2,1); }
-  .aov-bar.on i { transform: none; }
-  .aov-bar span { margin-top: 8px; }
-  .aov-bar.base i { background: repeating-linear-gradient(135deg, #4493f8 0 6px, #4493f888 6px 12px); }
-  .aov-bar.miss i { background: none; border: 2px dashed #db6d28; box-sizing: border-box; }
-  .aov-bar em { position: absolute; bottom: calc(var(--h) + 30px); left: 50%; transform: translateX(-50%); font: 600 14px/1.2 var(--mono); font-style: normal; white-space: nowrap; color: #d1d7e0; opacity: 0; transition: opacity .4s; }
-  .aov-bar.miss em { color: #ffa657; }
-  .aov-bar.on em { opacity: 1; }
-  .aov-chips { display: flex; gap: 12px; font: 500 16px/1 var(--mono); white-space: nowrap; color: #d1d7e0; opacity: 0; transition: opacity .5s; }
-  .aov-chips.on { opacity: 1; }
-  .aov-chips span { padding: 9px 14px; border-radius: 99px; border: 1px solid #3d444d; background: #0d1117; }
-  .aov-chips span:last-child { border-color: #ab7df8; color: #d2a8ff; }
-  .aov-foot { position: absolute; left: 620px; right: 110px; top: 1000px; font: 500 17px/1.3 var(--mono); color: #9198a1; }
+  .aov-code { left: 610px; top: 730px; width: 1200px; height: 280px; --c: #db6d28; border: 2px dashed #db6d28; border-top: 5px solid #db6d28; display: grid; grid-template-columns: 1fr 330px; }
+  .aov-code.on { box-shadow: 0 30px 80px -40px #db6d28; }
+  .aov-src { border-right: 1px solid #30363d; }
+  .aov-src .fn { padding: 9px 20px; margin-bottom: 8px; font: 500 14px/1 var(--mono); color: #9198a1; border-bottom: 1px solid #30363d; }
+  .aov-cl { padding: 0 20px; font: 500 16px/24px var(--mono); color: #d1d7e0; white-space: pre; opacity: 0; transform: translateX(-14px); transition: opacity .35s, transform .45s cubic-bezier(.2,.9,.2,1); }
+  .aov-cl.on { opacity: 1; transform: none; }
+  .aov-cl.a { background: #ab7df81f; box-shadow: inset 4px 0 #ab7df8; }
+  .aov-cl.b { background: #4493f81f; box-shadow: inset 4px 0 #4493f8; }
+  .aov-cl.c3 { background: #e3b3411a; box-shadow: inset 4px 0 #e3b341; }
+  .aov-cl .k { color: #d2a8ff; } .aov-cl .p { color: #79c0ff; } .aov-cl .s { color: #a5d6ff; } .aov-cl .c { color: #8b949e; }
+  .aov-seal { padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+  .aov-seal h4 { margin-bottom: 4px; }
+  .aov-seal span { padding: 10px 14px; border-radius: 12px; border: 1px solid #3d444d; font: 600 16px/1 var(--mono); color: #d1d7e0; opacity: 0; transform: scale(.9); transition: opacity .4s, transform .5s cubic-bezier(.2,.9,.2,1.4); }
+  .aov-seal span.on { opacity: 1; transform: none; }
+  .aov-seal .v { border-color: #4493f8; color: #79c0ff; }
+  .aov-seal .f { border: 1px dashed #db6d28; color: #ffa657; }
+  .aov-foot, .avm-foot { position: absolute; left: 610px; right: 110px; top: 1030px; font: 500 17px/1.3 var(--mono); color: #9198a1; }
+
+  /* --- add operational value: measure repeatedly --- */
+  .avm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
+  .avm-fn { left: 110px; top: 320px; width: 420px; height: 330px; --c: #db6d28; padding: 16px 22px; border: 2px dashed #db6d28; border-top: 5px solid #db6d28; }
+  .avm-fn .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .avm-fn .fn { margin-bottom: 18px; font: 500 14px/1 var(--mono); color: #9198a1; }
+  .avm-fn dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; row-gap: 10px; font: 500 16px/1.3 var(--mono); }
+  .avm-fn dt { color: #ffa657; }
+  .avm-fn dd { margin: 0; color: #d1d7e0; }
+  .avm-ar { position: absolute; font: 700 30px/1 var(--mono); color: #656c76; opacity: 0; transition: opacity .5s; }
+  .avm-ar.on { opacity: 1; }
+  .avm-ar.a1 { left: 540px; top: 470px; } .avm-ar.a2 { left: 1140px; top: 495px; }
+  .avm-cyc { position: absolute; left: 580px; top: 300px; width: 560px; height: 420px; --c: #79c0ff; opacity: 0; transition: opacity .6s; }
+  .avm-cyc.on { opacity: 1; }
+  .avm-cyc .aov-cap { top: -20px; }
+  .avm-cyc svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .avm-cyc .ring { fill: none; stroke: #4493f8; stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; opacity: .8; }
+  .avm-cyc .chev { fill: #4493f8; }
+  .avm-cyc .n rect { fill: #0d1117; stroke: #4493f8; stroke-width: 2; transition: fill .3s, stroke-width .3s; }
+  .avm-cyc .n .t { font: 600 21px/1 "Mona Sans"; fill: #f0f6fc; }
+  .avm-cyc .n .t tspan { font: 700 21px/1 var(--mono); fill: #79c0ff; }
+  .avm-cyc .n .s { font: 500 14px/1 var(--mono); fill: #9198a1; }
+  .avm-cyc .n.hot rect { fill: #4493f833; stroke-width: 4; }
+  .avm-cyc .mid1 { font: 700 24px/1 "Mona Sans"; fill: #f0f6fc; }
+  .avm-cyc .mid2 { font: 700 18px/1 var(--mono); letter-spacing: .14em; fill: #79c0ff; }
+  .avm-cyc .dot { fill: #79c0ff; filter: drop-shadow(0 0 8px #79c0ff); opacity: 0; }
+  .avm-cyc.run .dot { opacity: 1; }
+  .avm-val { left: 1180px; top: 320px; width: 630px; height: 650px; --c: #4493f8; padding: 22px 28px; display: flex; flex-direction: column; gap: 16px; }
+  .avm-val.ping { animation: avmping 1s ease-out; }
+  @keyframes avmping { 0% { box-shadow: 0 0 0 0 #79c0ff99; } 100% { box-shadow: 0 0 0 24px #79c0ff00; } }
+  .avm-vh { display: flex; justify-content: space-between; align-items: flex-end; }
+  .avm-vh small, .avm-dl { font: 600 14px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #79c0ff; }
+  .avm-vh h4 { margin: 10px 0 0; font-size: 34px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
+  .avm-vh p { margin: 8px 0 0; font: 500 16px/1 var(--mono); color: #9198a1; }
+  .avm-vh b { font: 700 68px/1 var(--mono); color: #79c0ff; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .avm-vh b i { margin-left: 4px; font: 500 28px/1 var(--mono); font-style: normal; }
+  .avm-bars { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; align-items: end; }
+  .avm-bar { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; font: 500 14px/1 var(--mono); color: #9198a1; }
+  .avm-bar i { display: block; width: 100%; height: var(--h); border-radius: 8px 8px 2px 2px; background: #4493f8; transform-origin: bottom; transform: scaleY(0); transition: transform .5s cubic-bezier(.2,.9,.2,1); }
+  .avm-bar.on i { transform: none; }
+  .avm-bar span { margin-top: 8px; }
+  .avm-bar.base i { background: repeating-linear-gradient(135deg, #4493f8 0 6px, #4493f888 6px 12px); }
+  .avm-bar.miss i { background: none; border: 2px dashed #db6d28; }
+  .avm-bar em { position: absolute; bottom: calc(var(--h) + 30px); left: 50%; transform: translateX(-50%); font: 600 14px/1.2 var(--mono); font-style: normal; white-space: nowrap; color: #d1d7e0; opacity: 0; transition: opacity .4s; }
+  .avm-bar.miss em { color: #ffa657; }
+  .avm-bar.on em { opacity: 1; }
+  .avm-dg { padding-top: 14px; border-top: 1px solid #30363d; opacity: 0; transition: opacity .5s; }
+  .avm-dg.on { opacity: 1; }
+  .avm-dl { color: #9198a1; }
+  .avm-dg .g { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+  .avm-dg span { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px; background: #0d1117; border: 1px solid #30363d; font: 500 15px/1 var(--mono); color: #9198a1; }
+  .avm-dg span b { font-weight: 600; color: #d1d7e0; }
+  .avm-chips { display: flex; gap: 10px; font: 500 15px/1 var(--mono); white-space: nowrap; color: #d1d7e0; opacity: 0; transition: opacity .5s; }
+  .avm-chips.on { opacity: 1; }
+  .avm-chips span { padding: 9px 14px; border-radius: 99px; border: 1px solid #3d444d; background: #0d1117; }
+  .avm-chips span:first-child { border-color: #ab7df8; color: #d2a8ff; }
+  .avm-bar.miss em { text-align: center; }
+  .avm-take { position: absolute; left: 110px; top: 780px; width: 1030px; opacity: 0; transform: translateY(14px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1); }
+  .avm-take.on { opacity: 1; transform: none; }
+  .avm-take small { font: 600 16px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #79c0ff; }
+  .avm-take h3 { margin: 16px 0 14px; font-size: 68px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 90; background: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .avm-take p { margin: 0; font: 500 18px/1.4 var(--mono); color: #9198a1; }
+  .avm-foot { left: 110px; }
 
   /* --- turn intent to automation --- */
   .slide-head h2.pf-h { font-size: 100px; }
@@ -3718,7 +3787,7 @@
     });
   }
 
-  // Add Operational Value: /add-operational-value prompt → a design agent turns the workflow's adoption-time intent into verified code with a frozen measurement rule once → a deterministic, LLM-free cycle (window, collect, evaluate, publish) repeats on cadence and publishes outcome + evidence as CAO Value
+  // Define once: one standalone workflow; /add-operational-value prompt → adoption-time Markdown bands extracted into intent, evidence and guardrails → design agent proposes native measures → a human confirms the contract once → verified, frozen deterministic value-function code
   {
     resetIndex();
     // the real skill syntax with synthetic coordinates; [text, class] per line
@@ -3726,75 +3795,112 @@
       ["/add-operational-value", "cmd"],
       ["acme/app", ""],
       ["dashboard-performance", ""],
-      ["--campaign self-care", "opt"],
     ];
     const CMDLEN = CMD.reduce((n, [s]) => n + s.length + 1, 0);
     const msg = h("div", { class: "aov-msg" });
-    const REPLY = ["intent recovered at adoption", "1 outcome + evidence contract frozen", "baseline verified, if evidenced", "deterministic collector ready"];
-    const rlis = REPLY.map(s => h("li", {}, h("b", {}, "✓"), s)),
-      reply = h("ul", { class: "aov-reply" }, rlis);
-    const phone = h("div", { class: "pf-card pf-prompt aov-phone" }, h("div", { class: "cap" }, "01 · Prompt"), h("div", { class: "sb" }, "9:41", h("span", {}, "▂▄▆ ▮")), h("div", { class: "you" }, "Copilot"), msg, reply);
-    const cue = h("div", { class: "aov-cue" }, "no ", h("code", {}, "--campaign"), " → ", h("b", {}, "standalone"), h("br"), h("code", {}, "--campaign"), " → owns + rolls up this worker’s Value; ", h("b", {}, "no new campaign metric"));
-    const dcard = (cls, c, t, d, pill) => h("div", { class: `aov-d ${cls}`, "--c": c }, pill ? h("em", {}, pill) : null, h("h4", {}, t), h("p", {}, d));
-    const dcards = [dcard("", "#4493f8", "Workflow .md", "intent · guardrails"), dcard("", "#ab7df8", "Design agent", "recover · freeze · probe", "LLM · once"), dcard("frozen", "#db6d28", "Verified code", "🔒 frozen measurement rule")];
-    const design = h("div", { class: "aov-design" }, h("div", { class: "aov-cap" }, "02 · Define once"), dcards);
-    const down = h("div", { class: "aov-down" });
-    // repeat-on-cadence cycle: four nodes clockwise on an ellipse around "Deterministic · No LLM"
-    const CX = 260,
-      CY = 200,
-      RX = 190,
-      RY = 150,
-      NODES = ["Window", "Collect", "Evaluate", "Publish"],
-      at = a => [CX + RX * Math.sin(a), CY - RY * Math.cos(a)];
-    let g = `<ellipse class="ring" cx="${CX}" cy="${CY}" rx="${RX}" ry="${RY}"/>`;
-    for (let k = 0; k < 4; k++) {
-      const a = Math.PI / 4 + (k * Math.PI) / 2,
-        [x, y] = at(a),
-        deg = (Math.atan2(RY * Math.sin(a), RX * Math.cos(a)) * 180) / Math.PI;
-      g += `<path class="chev" d="M-8 -9 L8 0 L-8 9Z" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${deg.toFixed(1)})"/>`;
-    }
-    g += `<text class="mid1" x="${CX}" y="${CY - 4}" text-anchor="middle">Deterministic</text><text class="mid2" x="${CX}" y="${CY + 32}" text-anchor="middle">NO LLM</text><circle class="dot" r="9" cx="${CX}" cy="${CY - RY}"/>`;
-    NODES.forEach((n, i) => {
-      const [x, y] = at((i * Math.PI) / 2);
-      g += `<g class="n"><rect x="${x - 78}" y="${y - 29}" width="156" height="58" rx="14"/><text x="${x}" y="${y + 8}" text-anchor="middle"><tspan>${i + 1}</tspan> ${n}</text></g>`;
-    });
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 520 400");
-    svg.innerHTML = g;
-    const nodes = [...svg.querySelectorAll(".n")],
-      dot = svg.querySelector(".dot");
-    const cyc = h("div", { class: "aov-cyc" }, h("div", { class: "aov-cap" }, "03 · On cadence"), svg);
-    const pub = h("div", { class: "aov-pub" }, h("span", {}, "outcome", h("br"), "+ evidence"));
-    // synthetic weekly p95 dashboard load in seconds (lower is better); baseline is pre-adoption, null = missing
-    const VAL = [2.6, 2.4, null, 2.2, 2.0, 1.8],
-      LBL = ["baseline", "W1", "W2", "W3", "W4", "W5"];
-    const bars = VAL.map((v, i) =>
+    const ask = h(
+        "div",
+        { class: "aov-bub ai" },
+        h("b", {}, "Proposed value contract"),
+        h("div", {}, h("strong", {}, "Primary"), " · p95 dashboard load (s)"),
+        h("div", {}, h("strong", {}, "Diagnostics"), " · over budget, regressions, coverage, contribution"),
+        h("div", {}, h("strong", {}, "Baseline"), " · pre-adoption probe ✓"),
+        h("div", {}, h("strong", {}, "Confirm this design?"))
+      ),
+      yes = h("div", { class: "aov-bub me" }, "✓ Confirm"),
+      done = h("div", { class: "aov-bub ai" }, h("b", {}, "✓ Verified and frozen"), h("div", {}, "deterministic value function ready"));
+    const phone = h("div", { class: "pf-card pf-prompt aov-phone" }, h("div", { class: "cap" }, "01 · Prompt"), h("div", { class: "sb" }, "9:41", h("span", {}, "▂▄▆ ▮")), h("div", { class: "you" }, "Copilot"), msg, ask, yes, done);
+    // synthetic workflow excerpt; band a = intent, b = precompute and opportunities, c3 = safe outputs and guardrails
+    const MD = [
+      ["", [["---", "d"]]],
+      ["a", [["description: ", "k"], ["Keep dashboards fast"]]],
+      ["b", [["on: ", "k"], ["schedule: daily"]]],
+      [
+        "b",
+        [
+          ["steps: ", "k"],
+          ["# precompute", "c"],
+        ],
+      ],
+      ["b", [["  - run: ", "k"], ["lhci autorun --pages"]]],
+      ["c3", [["safe-outputs:", "k"]]],
+      ["c3", [["  create-pull-request: ", "k"], ["draft"]]],
+      ["", [["---", "d"]]],
+      ["a", [["Goal: p95 page load under 2 s."]]],
+      ["b", [["Skip pages already under budget."]]],
+      ["c3", [["Open a PR only if perf CI passes."]]],
+    ];
+    const line = (cls, b, parts) =>
       h(
         "div",
-        { class: `aov-bar${i === 0 ? " base" : ""}${v === null ? " miss" : ""}`, "--h": `${v === null ? 70 : Math.round((110 * v) / 2.6)}px` },
-        i === 0 ? h("em", {}, "evidenced") : v === null ? h("em", {}, "missing ≠ 0") : null,
-        h("i"),
-        h("span", {}, LBL[i])
-      )
-    );
-    const num = h("span", {}, "--"),
-      chips = h("div", { class: "aov-chips" }, h("span", {}, "⊘ not run success"), h("span", {}, "+ contribution: separate"));
-    const val = h(
+        { class: `${cls} ${b}` },
+        parts.map(([s, c]) => h("span", { class: c || "" }, s))
+      );
+    const md = h(
       "div",
-      { class: "aov-val" },
-      h("div", { class: "aov-cap" }, "04 · CAO Value"),
-      h("div", { class: "aov-vh" }, h("div", {}, h("small", {}, "Primary outcome"), h("h4", {}, "p95 dashboard load"), h("p", {}, "repo state · weekly · any actor")), h("b", {}, num, h("i", {}, "s"))),
-      h("div", { class: "aov-bars" }, bars),
-      chips
+      { class: "aov-box aov-md" },
+      h("div", { class: "aov-cap" }, "02 · Workflow .md"),
+      h("div", { class: "fn" }, "dashboard-performance.md · at adoption"),
+      MD.map(([b, parts]) => line("ln", b, parts))
     );
+    const xchip = (c, label, a, b) => h("div", { class: "aov-xc", "--c": c }, h("small", {}, label), h("span", {}, a), h("span", {}, b));
+    const xcs = [
+      xchip("#ab7df8", "Intent · goal", "fast dashboard pages", "p95 load under 2 s"),
+      xchip("#4493f8", "Precompute · opportunities", "daily Lighthouse runs", "skip pages under budget"),
+      xchip("#e3b341", "Safe outputs · guardrails", "draft PR per fix", "perf CI must pass"),
+    ];
+    const xbox = h("div", { class: "aov-x" }, h("div", { class: "aov-cap" }, "03 · Extract"), xcs);
+    // [class, measure, unit, role while proposed, role once confirmed]
+    const MEAS = [
+      ["p", "p95 dashboard load", "s", "primary?", "primary"],
+      ["d", "over budget", "pages", "primary?", "diagnostic"],
+      ["d", "regressions", "count", "diagnostic?", "diagnostic"],
+      ["d", "accepted contribution", "", "diagnostic?", "diagnostic"],
+      ["d", "evidence coverage", "wk", "diagnostic?", "diagnostic"],
+      ["x", "PRs opened · runs", "", "✗ proxy", "✗ proxy"],
+    ];
+    const meas = MEAS.map(([c, n, u, p, f]) => h("div", { class: `aov-m ${c}` }, h("span", {}, n, u ? h("i", {}, u) : null), h("u", {}, h("span", { class: "c" }, p), h("span", { class: "f" }, f))));
+    const probe = h("div", { class: "aov-probe" }, "baseline: ", h("b", {}, "pre-adoption probe ✓"));
+    const cand = h(
+      "div",
+      { class: "aov-box aov-cand" },
+      h("div", { class: "aov-cap" }, "04 · Propose"),
+      h("div", { class: "hd" }, h("h4", {}, "Design agent"), h("em", { class: "aov-pill" }, "LLM · once")),
+      h("div", { class: "sub" }, "repository-native measures"),
+      meas,
+      probe
+    );
+    const gate = h("div", { class: "aov-gate" }, h("img", { src: "assets/avatars/mona.jpg", alt: "" }), h("span", { class: "c" }, "human confirms once?"), h("span", { class: "f" }, "✓ confirmed once"));
+    const down = h("div", { class: "aov-down" });
+    // the climax: Markdown intent, precompute and guardrails become one frozen, deterministic value function (bands keep their colours)
+    const SRC = [
+      ["", [["export const ", "k"], ["contract = {"]]],
+      ["a", [["  primary: ", "p"], ['"p95_load_s"', "s"], [",          "], ["// intent · seconds, lower is better", "c"]]],
+      ["b", [["  opportunities: ", "p"], ['"lighthouse_pages"', "s"], [", "], ["// precompute · daily", "c"]]],
+      ["c3", [["  accepted: ", "p"], ['"perf_ci_passed"', "s"], [",       "], ["// safe-output guardrail", "c"]]],
+      ["", [["  diagnostics: ", "p"], ['["over_budget", "regressions", "coverage", "contribution"]', "s"], [","]]],
+      ["", [["  baseline: ", "p"], ['"pre-adoption"', "s"], [", "], ["missing: ", "p"], ["null", "k"], [", "], ["cadence: ", "p"], ['"weekly"', "s"]]],
+      ["", [["};"]]],
+      ["", [["export const ", "k"], ["evaluate = pages => "], ["p95", "p"], ["(pages.map(p => p.loadSeconds));"]]],
+    ];
+    const cls = SRC.map(([b, parts]) => line("aov-cl", b, parts));
+    const seals = [h("span", { class: "v" }, "✓ verified · probe passed"), h("span", { class: "f" }, "🔒 frozen at confirmation"), h("span", {}, "no LLM from here on")];
+    const code = h(
+      "div",
+      { class: "aov-box aov-code" },
+      h("div", { class: "aov-cap" }, "05 · Deterministic code"),
+      h("div", { class: "aov-src" }, h("div", { class: "fn" }, "operational-value/dashboard-performance.mjs"), cls),
+      h("div", { class: "aov-seal" }, h("h4", {}, "Value function"), seals)
+    );
+    const ars = [1, 2].map(i => h("div", { class: `aov-ar a${i}` }, "→"));
     const caret = () => h("span", { class: "pf-caret" });
     const renderCmd = k => {
       const out = [];
-      for (const [s, cls] of CMD) {
+      for (const [s, c] of CMD) {
         if (k <= 0) break;
         const part = s.slice(0, k);
         k -= part.length;
-        out.push(h("span", { class: cls }, part));
+        out.push(h("span", { class: c }, part));
         if (k > 0) {
           out.push("\n");
           k--;
@@ -3802,48 +3908,54 @@
       }
       msg.replaceChildren(...out, caret());
     };
-    // [element, seconds after enter]; ArrowRight fast-forwards to the next stage: prompt sent, design verified, cycle running, Value published
+    // [element, seconds after enter, class]; ArrowRight fast-forwards to the next stage: extract, propose, ask, confirm, code, sealed
     const T_TYPE = 0.8,
-      T_DESIGN = 3.6,
-      T_CYCLE = 6.4,
-      T_RUN = 7.0,
-      LAP = 4,
-      T_PUB = T_RUN + (LAP * 3) / 4,
+      T_MD = 2.8,
+      T_EXT = 3.6,
+      T_CAND = 6.0,
+      T_ASK = 8.4,
+      T_OK = 9.8,
+      T_CODE = 10.6,
+      T_SEAL = T_CODE + 0.6 + cls.length * 0.18,
+      T_END = T_SEAL + 1.2,
       BEATS = [
         [phone, 0.3],
-        [cue, 2.6],
-        [reply, T_DESIGN],
-        [dcards[0], T_DESIGN],
-        [rlis[0], T_DESIGN + 0.4],
-        [dcards[1], T_DESIGN + 0.6],
-        [rlis[1], T_DESIGN + 1.0],
-        [rlis[2], T_DESIGN + 1.4],
-        [dcards[2], T_DESIGN + 1.8],
-        [rlis[3], T_DESIGN + 2.2],
-        [down, T_CYCLE],
-        [cyc, T_CYCLE + 0.2],
-        [pub, T_PUB],
-        [val, T_PUB + 0.2],
-        ...bars.map((b, i) => [b, T_PUB + 0.6 + i * 0.22]),
-        [chips, T_PUB + 2.0],
+        [md, T_MD],
+        [ars[0], T_EXT],
+        [xbox, T_EXT],
+        ...["ha", "hb", "hc"].flatMap((c, i) => [
+          [md, T_EXT + i * 0.7, c],
+          [xcs[i], T_EXT + 0.2 + i * 0.7],
+        ]),
+        [ars[1], T_CAND],
+        [cand, T_CAND],
+        ...meas.map((m, i) => [m, T_CAND + 0.3 + i * 0.25]),
+        [probe, T_CAND + 1.9],
+        [ask, T_ASK],
+        [gate, T_ASK + 0.2],
+        [yes, T_OK],
+        [gate, T_OK, "ok"],
+        [cand, T_OK, "ok"],
+        [down, T_CODE],
+        [code, T_CODE + 0.3],
+        ...cls.map((l, i) => [l, T_CODE + 0.6 + i * 0.18]),
+        ...seals.map((s, i) => [s, T_SEAL + i * 0.3]),
+        [done, T_SEAL + 0.3],
       ],
-      STAGES = [T_DESIGN - 0.2, T_CYCLE, T_PUB, T_PUB + 2.2];
+      STAGES = [T_EXT, T_CAND, T_ASK, T_OK, T_CODE, T_END];
+    const POPS = [phone, md, ...xcs, cand, yes, code, ...seals];
     let t0 = 0,
       now = 0,
       snd = {};
     slides.push({
       group: "platform",
       notes:
-        "Define once. Measure repeatedly. Illustrative: the repository, workflow, campaign and values are synthetic. The CAO skill takes /add-operational-value OWNER/REPO [WORKFLOW-NAME] [--campaign CAMPAIGN-SLUG]. With only the repository it lists the workflows to pick from; with a workflow name it designs exactly one workflow's Operational Value. Without --campaign the workflow stays standalone. With --campaign the selection is limited to workers the campaign directly includes, the campaign owns the module and the shared adapter, and the campaign view rolls up each directly included worker's Value under namespaced metric ids; it never invents a separate campaign metric or merges different outcome contracts. Define once: a design agent, the only LLM step, recovers the intent the workflow had at adoption from its Markdown, guardrails, triggers and safe outputs, names the pre-existing repository problem, freezes one native primary outcome and its evidence contract before looking at any result, probes a pre-adoption baseline when history can reconstruct it, and writes deterministic collection code that must pass verification. Measure repeatedly: on every cadence a deterministic job with no LLM fixes the window, collects the evidence, evaluates the frozen rule and publishes the outcome plus its evidence as canonical CAO Value. This follows the Daily File Diet pattern: a daily agent that splits oversized source files is not valued by successful runs or opened pull requests but by the repository's own file-size state at a fixed snapshot, whoever shrank the files, a maintainer, another tool or the agent. Contribution from its accepted outputs is tracked separately and never added in. A baseline is shown only when pre-adoption evidence exists, a window with missing evidence stays missing rather than becoming zero, early windows stay interim, and any movement after adoption is association, not causation.",
+        "Define once. Illustrative: the repository, workflow, measures and code are synthetic. This example intentionally shows the standalone workflow path: /add-operational-value OWNER/REPO WORKFLOW-NAME designs exactly one workflow's Operational Value, and this design is the only LLM step. The design agent recovers the workflow as it was adopted, its Markdown, imports, deterministic precompute steps, triggers, skip rules and safe outputs, and extracts three things: the intent and the pre-existing repository problem behind it, the eligible opportunities and evidence the precompute already produces, and the guardrails and acceptance checks its outputs must pass. It inventories repository-native measures of that problem, ones a maintainer or any other tool could move too, and probes a pre-adoption baseline whenever history can reconstruct it. Workflow-native signals such as opened pull requests or runs are rejected as mechanism proxies. It forms one provisional contract and presents it once: one primary measure in native units, actionable diagnostics, the evidence rule, cadence and maturation. The human confirms or corrects that whole design in a single exchange; there is no repeated approval loop. Only after confirmation does it implement the value function, verify it and freeze it. The natural-language intent and the workflow Markdown end as deterministic code: from here on no model chooses, scores or reinterprets anything.",
       enter() {
         t0 = 0;
-        snd = { p: 0, beat: new Set(), hit: -1, lap: -1 };
-        BEATS.forEach(([e]) => e.classList.remove("on"));
-        cyc.classList.remove("run");
-        val.classList.remove("ping");
-        nodes.forEach(n => n.classList.remove("hot"));
+        snd = { p: 0, beat: new Set() };
+        BEATS.forEach(([e, , c = "on"]) => e.classList.remove(c));
         msg.replaceChildren(caret());
-        num.textContent = "--";
       },
       onNext() {
         if (!t0) return false;
@@ -3863,30 +3975,202 @@
           snd.p = pk;
         }
         renderCmd(pk);
+        BEATS.forEach(([el, s, c = "on"], i) => {
+          const on = e >= s;
+          el.classList.toggle(c, on);
+          if (on && !snd.beat.has(i)) {
+            snd.beat.add(i);
+            if (c === "on" && POPS.includes(el)) sfx.pop(snd.beat.size % 12);
+            if (c === "ok" && el === gate) sfx.review();
+          }
+        });
+        if (e >= T_END && !snd.done) {
+          snd.done = true;
+          sfx.review();
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide aov" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Add Operational Value"), h("h2", { class: "pf-h" }, letters("Define "), letters("once.", "l-grad"))),
+        phone,
+        md,
+        xbox,
+        cand,
+        gate,
+        down,
+        code,
+        ars,
+        h("div", { class: "aov-foot" }, "Illustrative · synthetic repository, workflow, measures and code")
+      ),
+    });
+  }
+
+  // Measure repeatedly: the frozen value function from Define once runs on cadence in a deterministic, LLM-free loop (window, collect evidence, evaluate the same code, publish) and each pass adds one repository outcome to CAO Value, diagnostics beside it
+  {
+    resetIndex();
+    const fn = h(
+      "div",
+      { class: "aov-box avm-fn" },
+      h("div", { class: "aov-cap" }, "01 · Frozen function"),
+      h("div", { class: "hd" }, h("h4", {}, "🔒 Value function"), h("em", { class: "aov-pill", "--pc": "#79c0ff", "--pt": "#79c0ff" }, "✓ verified")),
+      h("div", { class: "fn" }, "dashboard-performance.mjs"),
+      h(
+        "dl",
+        {},
+        [
+          ["primary", "p95 load · s"],
+          ["diagnostics", "budget · regressions · coverage · contribution"],
+          ["evidence", "Lighthouse per page"],
+          ["missing", "null, never 0"],
+          ["cadence", "weekly · 7d maturation"],
+        ].flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])
+      )
+    );
+    // repeat-on-cadence cycle: clockwise from the bottom, so Publish faces the Value card
+    const CX = 280,
+      CY = 210,
+      RX = 180,
+      RY = 150,
+      A0 = Math.PI,
+      NODES = [
+        ["Window", "fixed period"],
+        ["Collect", "evidence"],
+        ["Evaluate", "same frozen code"],
+        ["Publish", "CAO Value"],
+      ],
+      at = a => [CX + RX * Math.sin(a), CY - RY * Math.cos(a)];
+    let g = `<ellipse class="ring" cx="${CX}" cy="${CY}" rx="${RX}" ry="${RY}"/>`;
+    for (let k = 0; k < 4; k++) {
+      const a = Math.PI / 4 + (k * Math.PI) / 2,
+        [x, y] = at(a),
+        deg = (Math.atan2(RY * Math.sin(a), RX * Math.cos(a)) * 180) / Math.PI;
+      g += `<path class="chev" d="M-8 -9 L8 0 L-8 9Z" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${deg.toFixed(1)})"/>`;
+    }
+    g += `<text class="mid1" x="${CX}" y="${CY - 4}" text-anchor="middle">Deterministic</text><text class="mid2" x="${CX}" y="${CY + 28}" text-anchor="middle">NO LLM</text><circle class="dot" r="9" cx="${CX}" cy="${CY + RY}"/>`;
+    NODES.forEach(([n, s], i) => {
+      const [x, y] = at(A0 + (i * Math.PI) / 2);
+      g += `<g class="n"><rect x="${x - 95}" y="${y - 31}" width="190" height="62" rx="14"/><text class="t" x="${x}" y="${y - 3}" text-anchor="middle"><tspan>${i + 1}</tspan> ${n}</text><text class="s" x="${x}" y="${y + 19}" text-anchor="middle">${s}</text></g>`;
+    });
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 560 420");
+    svg.innerHTML = g;
+    const nodes = [...svg.querySelectorAll(".n")],
+      dot = svg.querySelector(".dot");
+    const cyc = h("div", { class: "avm-cyc" }, h("div", { class: "aov-cap" }, "02 · On cadence"), svg);
+    const ars = [1, 2].map(i => h("div", { class: `avm-ar a${i}` }, "→"));
+    // synthetic weekly p95 dashboard load in seconds (lower is better); baseline is pre-adoption, null = missing
+    const VAL = [2.6, 2.4, null, 2.2, 2.0, 1.9, 1.8],
+      LBL = ["baseline", "W1", "W2", "W3", "W4", "W5", "W6"],
+      FIRST = 4;
+    const bars = VAL.map((v, i) =>
+      h(
+        "div",
+        { class: `avm-bar${i === 0 ? " base" : ""}${v === null ? " miss" : ""}`, "--h": `${v === null ? 110 : Math.round((200 * v) / 2.6)}px` },
+        i === 0 ? h("em", {}, "evidenced") : v === null ? h("em", {}, "missing", h("br"), "≠ 0") : null,
+        h("i"),
+        h("span", {}, LBL[i])
+      )
+    );
+    const num = h("span", {}, "--"),
+      dg = h(
+        "div",
+        { class: "avm-dg" },
+        h("div", { class: "avm-dl" }, "Diagnostics · beside, never added"),
+        h(
+          "div",
+          { class: "g" },
+          [
+            ["pages over budget", "1 of 12"],
+            ["regressions", "0"],
+            ["evidence coverage", "5 / 6 wk"],
+            ["contribution", "separate"],
+          ].map(([k, v]) => h("span", {}, k, h("b", {}, v)))
+        )
+      ),
+      chips = h("div", { class: "avm-chips" }, h("span", {}, "⊘ not run success"), h("span", {}, "≈ association, not causation"));
+    const val = h(
+      "div",
+      { class: "aov-box avm-val" },
+      h("div", { class: "aov-cap" }, "03 · CAO Value"),
+      h("div", { class: "avm-vh" }, h("div", {}, h("small", {}, "Primary outcome · repository state"), h("h4", {}, "p95 dashboard load"), h("p", {}, "weekly · any actor · lower is better")), h("b", {}, num, h("i", {}, "s"))),
+      h("div", { class: "avm-bars" }, bars),
+      dg,
+      chips
+    );
+    const take = h("div", { class: "avm-take" }, h("small", {}, "Every cadence · same frozen code · no LLM"), h("h3", {}, "Outcomes, not run success."), h("p", {}, "baseline only when evidenced · missing ≠ 0 · contribution never added"));
+    // [element, seconds after enter]; ArrowRight fast-forwards: loop running, first publish, full history
+    const T_LOOP = 1.4,
+      T_RUN = 1.8,
+      LAP = 3,
+      T_PUB = T_RUN + (LAP * 3) / 4,
+      T_END = T_PUB + (VAL.length - FIRST) * LAP + 0.5,
+      BEATS = [
+        [fn, 0.3],
+        [ars[0], T_LOOP],
+        [cyc, T_LOOP],
+        [ars[1], T_PUB],
+        [val, T_PUB + 0.1],
+        // the first publish backfills the evidenced history; every later Publish pass adds one window
+        ...bars.map((b, i) => [b, i < FIRST ? T_PUB + 0.4 + i * 0.2 : T_PUB + (i - FIRST + 1) * LAP]),
+        [dg, T_PUB + 1.4],
+        [chips, T_PUB + 1.8],
+        [take, T_END],
+      ],
+      STAGES = [T_LOOP, T_PUB, T_END];
+    let t0 = 0,
+      now = 0,
+      snd = {};
+    slides.push({
+      group: "platform",
+      notes:
+        "Measure repeatedly. Illustrative: the repository, workflow and values are synthetic. The value function frozen on the previous slide is the only input; no model runs from here on. On every cadence a deterministic job fixes the observation window, collects the evidence the contract names, evaluates the same frozen code and publishes the outcome plus its evidence as canonical CAO Value, so each pass adds one observation to the history. This follows the Daily File Diet pattern: a daily agent is not valued by successful runs or opened pull requests but by the repository's own state, here p95 dashboard load, whoever improved it, a maintainer, another tool or the agent. Diagnostics such as pages over budget, regressions, evidence coverage and accepted contribution sit beside the primary outcome and are never added into it. A baseline is shown only when pre-adoption evidence exists, a window with missing evidence stays missing rather than becoming zero, early windows stay interim, and any movement after adoption is association, not causation.",
+      enter() {
+        t0 = 0;
+        snd = { beat: new Set(), hit: -1, lap: -1 };
+        BEATS.forEach(([e]) => e.classList.remove("on"));
+        cyc.classList.remove("run");
+        val.classList.remove("ping");
+        nodes.forEach(n => n.classList.remove("hot"));
+        num.textContent = "--";
+      },
+      onNext() {
+        if (!t0) return false;
+        const e = (now - t0) / 1000,
+          next = STAGES.find(s => s > e + 0.05);
+        if (next === undefined) return false;
+        t0 = now - next * 1000;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        const e = (t - t0) / 1000;
         BEATS.forEach(([el, s], i) => {
           const on = e >= s;
           el.classList.toggle("on", on);
           if (on && !snd.beat.has(i)) {
             snd.beat.add(i);
-            if (el === phone || dcards.includes(el) || el === val) sfx.pop(snd.beat.size);
+            if (el === fn || el === val || el === take) sfx.pop(snd.beat.size % 12);
           }
         });
         const running = e >= T_RUN;
         cyc.classList.toggle("run", running);
         if (running) {
-          const a = (((e - T_RUN) / LAP) % 1) * 2 * Math.PI,
+          const f = ((e - T_RUN) / LAP) % 1,
+            a = A0 + f * 2 * Math.PI,
             [x, y] = at(a),
             lap = Math.floor((e - T_RUN) / LAP);
           dot.setAttribute("cx", x.toFixed(1));
           dot.setAttribute("cy", y.toFixed(1));
           let hit = -1;
           nodes.forEach((n, i) => {
-            const d = Math.abs(((a - (i * Math.PI) / 2 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
-            const hot = d < 0.32;
+            const d = Math.abs(((f * 2 * Math.PI - (i * Math.PI) / 2 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+            const hot = d < 0.3;
             n.classList.toggle("hot", hot);
             if (hot) hit = i;
           });
-          if (hit >= 0 && hit !== snd.hit && lap === 0) sfx.pop(hit + 2);
+          if (hit >= 0 && hit !== snd.hit) sfx.pop(hit + 2);
           snd.hit = hit;
           // every later Publish pass pings the Value card
           if (hit === 3 && lap > snd.lap && lap > 0) {
@@ -3901,23 +4185,21 @@
             .filter(v => v !== null)
             .pop();
         num.textContent = last === undefined ? "--" : last.toFixed(1);
-        if (e >= STAGES[3] && !snd.done) {
+        if (e >= T_END && !snd.done) {
           snd.done = true;
           sfx.review();
         }
       },
       el: h(
         "section",
-        { class: "slide aov" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Add Operational Value"), h("h2", { class: "pf-h" }, letters("Define once. "), letters("Measure repeatedly.", "l-grad"))),
-        phone,
-        cue,
-        design,
-        down,
+        { class: "slide avm" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Add Operational Value"), h("h2", { class: "pf-h" }, letters("Measure "), letters("repeatedly.", "l-grad"))),
+        fn,
+        ars,
         cyc,
-        pub,
         val,
-        h("div", { class: "aov-foot" }, "Illustrative · synthetic repository, workflow, campaign and values")
+        take,
+        h("div", { class: "avm-foot" }, "Illustrative · synthetic repository, workflow and values")
       ),
     });
   }
