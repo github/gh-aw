@@ -12,11 +12,11 @@ test.describe("Copy entire file regressions", () => {
       const listeners = new Set<EventListenerOrEventListenerObject>();
       const add = document.addEventListener.bind(document);
       const remove = document.removeEventListener.bind(document);
-      document.addEventListener = (type, listener, options) => {
+      document.addEventListener = (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
         if (type === "keydown") listeners.add(listener);
         add(type, listener, options);
       };
-      document.removeEventListener = (type, listener, options) => {
+      document.removeEventListener = (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions) => {
         if (type === "keydown") listeners.delete(listener);
         remove(type, listener, options);
       };

@@ -58,7 +58,7 @@ const id = `copy-btn-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /* Error modal styles */
-  .error-modal-overlay {
+  :global(.error-modal-overlay) {
     position: fixed;
     top: 0;
     left: 0;
@@ -71,7 +71,7 @@ const id = `copy-btn-${Math.random().toString(36).substr(2, 9)}`;
     z-index: 9999;
   }
 
-  .error-modal {
+  :global(.error-modal) {
     background: var(--sl-color-bg);
     border: 1px solid var(--sl-color-hairline);
     border-radius: 8px;
@@ -82,7 +82,7 @@ const id = `copy-btn-${Math.random().toString(36).substr(2, 9)}`;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
 
-  .error-modal-header {
+  :global(.error-modal-header) {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -90,14 +90,14 @@ const id = `copy-btn-${Math.random().toString(36).substr(2, 9)}`;
     border-bottom: 1px solid var(--sl-color-hairline);
   }
 
-  .error-modal-title {
+  :global(.error-modal-title) {
     margin: 0;
     font-size: var(--aw-step-1);
     color: var(--sl-color-text);
     font-weight: 600;
   }
 
-  .error-modal-close {
+  :global(.error-modal-close) {
     background: none;
     border: none;
     font-size: var(--aw-step-2);
@@ -112,20 +112,20 @@ const id = `copy-btn-${Math.random().toString(36).substr(2, 9)}`;
     border-radius: 4px;
   }
 
-  .error-modal-close:hover {
+  :global(.error-modal-close:hover) {
     background: var(--sl-color-gray-6);
   }
 
-  .error-modal-body {
+  :global(.error-modal-body) {
     padding: 1.5rem;
   }
 
-  .error-modal-body p {
+  :global(.error-modal-body p) {
     margin: 0 0 1rem 0;
     color: var(--sl-color-text);
   }
 
-  .error-modal-details {
+  :global(.error-modal-details) {
     background: var(--sl-color-gray-7);
     border: 1px solid var(--sl-color-hairline);
     border-radius: 4px;
@@ -192,8 +192,16 @@ const id = `copy-btn-${Math.random().toString(36).substr(2, 9)}`;
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
     
+    // Close on Escape key
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    };
+
     // Close modal on click
     const closeModal = () => {
+      document.removeEventListener('keydown', handleEscape);
       overlay.remove();
     };
 
@@ -204,21 +212,16 @@ const id = `copy-btn-${Math.random().toString(36).substr(2, 9)}`;
       }
     });
     
-    // Close on Escape key
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        closeModal();
-        document.removeEventListener('keydown', handleEscape);
-      }
-    };
     document.addEventListener('keydown', handleEscape);
   }
 
   // Attach click handlers immediately or wait for DOM
   function attachCopyHandlers() {
     document.querySelectorAll('.copy-entire-file-btn').forEach((button) => {
+      if (button.dataset.copyHandlerAttached) return;
       const filepath = button.getAttribute('data-filepath');
       if (!filepath) return;
+      button.dataset.copyHandlerAttached = 'true';
 
       const btnText = button.querySelector('.btn-text');
       const originalText = btnText ? btnText.textContent : 'Copy instructions';
