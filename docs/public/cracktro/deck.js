@@ -221,29 +221,52 @@
   .slide.fmm.fadeout { opacity: 1; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-copy > * { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-grid { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
-  /* Enable · Contain · Unlock: light concept band like trust/mindset; lines enter and leave alternately from the sides */
-  .ecu-copy { position: absolute; left: 0; right: 0; top: 190px; text-align: center; }
-  .ecu-copy h2 { margin: 34px 0 0; font-size: 120px; line-height: 1.12; color: #f0f6fc; letter-spacing: -.02em; font-variation-settings: "wght" 640, "wdth" 100; }
-  .ecu-l { display: block; }
-  .ecu-l b { position: relative; font-weight: inherit; }
-  .ecu-a b { color: #3fb950; }
-  .ecu-b b { color: #ff7b72; }
-  .ecu-c b { background: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950) 0 0 / 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
-  body.light .ecu-copy h2 { color: #1f2328; }
-  body.light .ecu-a b { color: #116329; }
-  body.light .ecu-b b { color: #cf222e; }
-  body.light .ecu-c b { background-image: linear-gradient(90deg, #116329, #0550ae, #8250df, #116329); }
-  .active .ecu-copy > .kicker, .active .ecu-l:nth-child(odd) { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
-  .active .ecu-l:nth-child(even) { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both .5s; }
-  .active .ecu-l:nth-child(3) { animation-delay: 1s; }
-  .active .ecu-b b::after { animation: ecu-box .6s cubic-bezier(.3,1.5,.4,1) both 1.2s; }
-  .active .ecu-c b { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both 1s, ecu-shine 4s linear infinite 1.9s; }
-  @keyframes ecu-box { from { opacity: 0; transform: scale(1.7); } }
+  /* Augmentation · Automation · Transformation: light concept band like trust/mindset; brand statement layout, a stage rail with Automation in focus */
+  .ecu-copy { position: absolute; left: 230px; right: 140px; top: 0; bottom: 60px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; text-align: left; }
+  .ecu-copy h2 { position: relative; margin: 44px 0 0; display: flex; flex-direction: column; gap: 30px; line-height: 1; letter-spacing: -.02em; color: #f0f6fc; }
+  .ecu-copy h2::before { content: ""; position: absolute; left: 63px; top: 60px; bottom: 60px; width: 4px; border-radius: 2px; transform-origin: top;
+    background: linear-gradient(#8b949e, #4493f8 35%, #ab7df8 65%, #8b949e); opacity: .5; }
+  .ecu-s { position: relative; display: flex; align-items: center; gap: 56px; }
+  .ecu-i { flex: none; width: 130px; height: 130px; display: grid; place-items: center; }
+  .ecu-i svg { width: 96px; height: 96px; overflow: visible; }
+  .ecu-i circle { fill: #161b22; stroke: #30363d; stroke-width: 2; }
+  .ecu-i path { fill: #8b949e; }
+  .ecu-s:not(.ecu-on) .ecu-t { font-size: 84px; color: #8b949e; font-variation-settings: "wght" 520, "wdth" 100; }
+  .ecu-on .ecu-i svg { width: 130px; height: 130px; }
+  .ecu-on .ecu-i circle.ecu-bg { fill: url(#ecu-g); stroke: none; }
+  .ecu-on .ecu-i circle.ecu-ring { fill: none; stroke: #4493f8; stroke-width: 3; transform-origin: 50% 50%; transform-box: fill-box; }
+  .ecu-on .ecu-i path { fill: #fff; }
+  .ecu-on .ecu-t { font-size: 224px; letter-spacing: -.035em; font-variation-settings: "wght" 780, "wdth" 100; padding: 0 0 .08em;
+    background: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950) 0 0 / 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ecu-src { position: absolute; left: 230px; right: 140px; bottom: 96px; font-size: 24px; line-height: 1.4; color: #8b949e; }
+  .ecu-src b { display: block; margin-bottom: 6px; font-size: 18px; letter-spacing: .14em; text-transform: uppercase; font-variation-settings: "wght" 650; }
+  .ecu-src i { color: #c9d1d9; }
+  body.light .ecu-i circle { fill: #ffffff; stroke: #d0d7de; }
+  body.light .ecu-i path { fill: #57606a; }
+  body.light .ecu-s:not(.ecu-on) .ecu-t { color: #57606a; }
+  body.light .ecu-on .ecu-i path { fill: #ffffff; }
+  body.light .ecu-on .ecu-i circle.ecu-ring { stroke: #0969da; }
+  body.light .ecu-on .ecu-t { background-image: linear-gradient(90deg, #116329, #0550ae, #8250df, #116329); }
+  body.light .ecu-copy h2::before { background: linear-gradient(#d0d7de, #0969da 35%, #8250df 65%, #d0d7de); opacity: .6; }
+  body.light .ecu-src { color: #57606a; }
+  body.light .ecu-src i { color: #1f2328; }
+  .active .ecu-copy > .kicker, .active .ecu-s:first-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .active .ecu-copy h2::before { animation: ecu-rail 1.2s cubic-bezier(.2,.9,.25,1) both .2s; }
+  .active .ecu-on { animation: ecu-pop 1s cubic-bezier(.2,1.3,.3,1) both .45s; }
+  .active .ecu-on .ecu-t { animation: ecu-shine 4s linear infinite 1.5s; }
+  .active .ecu-on .ecu-ring { animation: ecu-ping 2.4s ease-out infinite 1.4s; }
+  .active .ecu-s:last-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both .9s; }
+  .active .ecu-src { animation: ecu-fade .8s ease both 1.5s; }
+  @keyframes ecu-rail { from { transform: scaleY(0); } }
+  @keyframes ecu-pop { from { opacity: 0; transform: translateX(-60px) scale(.6); } }
+  @keyframes ecu-ping { 0% { opacity: .9; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(1.45); } }
+  @keyframes ecu-fade { from { opacity: 0; transform: translateY(20px); } }
   @keyframes ecu-shine { to { background-position: 300% 0; } }
   .slide.ecu.up-in, .slide.ecu.down-in, .slide.ecu.leaving { animation: none; }
   .slide.ecu.fadeout { opacity: 1; }
-  .ecu:is(.fadeout, .leaving) .ecu-copy > .kicker, .ecu:is(.fadeout, .leaving) .ecu-l:nth-child(odd) { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
-  .ecu:is(.fadeout, .leaving) .ecu-l:nth-child(even) { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .ecu:is(.fadeout, .leaving) .ecu-copy > .kicker, .ecu:is(.fadeout, .leaving) .ecu-s:not(.ecu-on) { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .ecu:is(.fadeout, .leaving) .ecu-on, .ecu:is(.fadeout, .leaving) .ecu-src, .ecu:is(.fadeout, .leaving) .ecu-copy h2::before { animation: ecu-out .5s cubic-bezier(.6,0,.85,.3) both !important; }
+  @keyframes ecu-out { to { opacity: 0; transform: scale(.6); } }
   .tp { display: grid; place-items: center; }
   .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
   .tp-copy h2 { margin: 0; font-variation-settings: "wght" 520, "wdth" 100; letter-spacing: -.02em; }
@@ -3376,23 +3399,34 @@
     });
   }
 
-  // Enable experimentation. Contain the risk. Unlock transformation.: the bridge from value to security, on the light concept-band background
+  // Augmentation Automation Transformation: the bridge from value to security, with Automation in focus, on the light concept-band background
   {
     resetIndex();
-    const line = (lead, key, tail, cls) => h("span", { class: `ecu-l ${cls}` }, lead, h("b", {}, key), tail);
+    // [label, octicon path, its grid size]
+    const STAGES = [
+      ["Augmentation", "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z", 24],
+      ["Automation", OCTICONS["workflow-16"], 16],
+      ["Transformation", OCTICONS["north-star-16"], 16],
+    ];
+    const badge = (d, grid, on) => {
+      const k = 60 / grid;
+      return `<svg viewBox="0 0 120 120" aria-hidden="true">${on ? '<defs><linearGradient id="ecu-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a7f37"/><stop offset=".5" stop-color="#0969da"/><stop offset="1" stop-color="#8250df"/></linearGradient></defs><circle class="ecu-ring" cx="60" cy="60" r="58"/>' : ""}<circle class="ecu-bg" cx="60" cy="60" r="58"/><path transform="translate(30 30) scale(${k})" d="${d}"/></svg>`;
+    };
+    const stage = ([label, d, grid], i) => {
+      const on = i === 1;
+      const icon = h("span", { class: "ecu-i" });
+      icon.innerHTML = badge(d, grid, on);
+      return h("span", { class: on ? "ecu-s ecu-on" : "ecu-s" }, icon, h("span", { class: "ecu-t" }, i < 2 ? label + " " : label));
+    };
     slides.push({
       group: "unlock",
       notes:
-        "Enable experimentation. Contain the risk. Unlock transformation. Agentic workflows let every team try agents on real repository work, guardrails keep each experiment contained so a misbehaving agent cannot do damage, and the experiments that pay off can scale into how the organization builds software. Next: how the risk is contained.",
+        "Augmentation, Automation, Transformation. Agents first augment people: a developer asks, an agent helps. The step this talk is about is automation: agents run on their own as workflows, triggered by events and schedules, inside guardrails. That is what makes the third step, transforming how an organization builds software, reachable. The framing is adapted from the Microsoft Research paper From Augmentation to Reconstruction: Guiding the AI Disruption to the Good Place, May 2026, which names the third stage reconstruction. Automation only scales if its risk is contained. Next: how.",
       el: h(
         "section",
         { class: "slide ecu" },
-        h(
-          "div",
-          { class: "ecu-copy" },
-          h("div", { class: "kicker" }, "GitHub Agentic Workflows"),
-          h("h2", {}, line("Enable ", "experimentation", ".", "ecu-a"), " ", line("Contain the ", "risk", ".", "ecu-b"), " ", line("Unlock ", "transformation", ".", "ecu-c"))
-        )
+        h("div", { class: "ecu-copy" }, h("div", { class: "kicker" }, "GitHub Agentic Workflows"), h("h2", {}, ...STAGES.map(stage))),
+        h("div", { class: "ecu-src" }, h("b", {}, "Adapted from"), h("i", {}, "From Augmentation to Reconstruction: Guiding the AI Disruption to the Good Place"), " · Microsoft Research, May 2026")
       ),
     });
   }
@@ -19126,7 +19160,7 @@
       music: "platform",
       prog: [0, 5, 7, 2, -3],
     },
-    // Enable · Contain · Unlock: a concept slide, plain soft grey with no grid (light) like trust and mindset; rising chords into a bell cascade.
+    // Augmentation · Automation · Transformation: a concept slide, plain soft grey with no grid (light) like trust and mindset; rising chords into a bell cascade.
     unlock: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: 0, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#8250df"], music: "transform", prog: [0] },
     // Security: the red wash, grid turned 45°, a dark drone and alarm.
     security: {
@@ -19210,7 +19244,7 @@
     data: ["AW factory", "How gh-aw builds gh-aw"],
   };
   // Header-less rows of a single slide.
-  const SOLO = { intro: "Title", unlock: "Unlock transformation", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
+  const SOLO = { intro: "Title", unlock: "Automation", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
   // Bands that are not shipped product: every slide (header included) carries a corner badge.
   const PROTO = { cao: "gh cao" };
 
@@ -19445,7 +19479,7 @@
         });
         bell(86, t + 1.62, 0.025, 1.4);
       },
-      // enable · contain · unlock: one rising chord per line, a bolt shutting on "risk", then a bright unlocking cascade
+      // augmentation · automation · transformation: one rising chord per stage, a mechanical click as automation engages, then a bright cascade
       transform: t => {
         [
           [48, 55, 64],

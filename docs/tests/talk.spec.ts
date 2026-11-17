@@ -19,7 +19,7 @@ const slideNo = (heading: string) => {
 const CURRENT = '.dots button.on[aria-label^="Slide "]';
 const at = (n: number) => `Slide ${n}`;
 const SECURITY = slideNo("Security");
-const UNLOCK = slideNo("Enable experimentation. Contain the risk. Unlock transformation.");
+const UNLOCK = slideNo("Augmentation Automation Transformation");
 const HANDOFFS = slideNo("Event-driven Hand-offs");
 
 test.use({ reducedMotion: "reduce" });
