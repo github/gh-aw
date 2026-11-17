@@ -191,12 +191,11 @@ const timer = setInterval(() => {
 }, 1);
 setInterval(() => {}, 1000);`
 	cmd, _ := agyHarnessCommand(t, body, validReflect)
-	start := time.Now()
 	out, err := cmd.CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(out), "pending JSONL record limit (16777216 UTF-16 code units)")
 	assert.Contains(t, string(out), "session.error")
-	assert.Less(t, time.Since(start), 4*time.Second, "pending output must terminate the child before the watchdog")
+	assert.Equal(t, 1, cmd.ProcessState.ExitCode(), "pending output must terminate the harness before its context deadline")
 }
 
 func TestAgyHarnessBoundsDescendantPipes(t *testing.T) {

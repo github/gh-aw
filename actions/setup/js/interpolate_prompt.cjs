@@ -18,7 +18,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
 const { createLiteralValues, readLiteralState, restoreInlineMetadata, writeLiteralState, literalFileKey } = require("./prompt_literal_values.cjs");
-const { transformMarkdownContent } = require("./markdown_metadata.cjs");
+const { recoverCheckoutMarkdownMetadata, transformMarkdownContent } = require("./markdown_metadata.cjs");
 
 /**
  * @typedef {Object} ImportTreeNode
@@ -91,6 +91,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       core.setFailed(`${ERR_CONFIG}: GITHUB_WORKSPACE environment variable is not set`);
       return;
     }
+    recoverCheckoutMarkdownMetadata(workspaceDir);
 
     // Read the prompt file
     core.info(`[main] Reading prompt file...`);

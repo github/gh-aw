@@ -144,6 +144,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"20bd2c233372f19fbcafa0e1fc1a5905d0915cd8d5b626e0e9192538e30c34cf","kind":"artifact","value":{"model":"copilot/gpt-5.6-luna"}},{"sha256":"5537917452a68e8cb4a00608d768297f8a6a2194fa688b4216635a56f166a8c3","kind":"artifact","value":{"model":"copilot/claude-haiku-4.5"}},{"sha256":"cf31ee1096fb026d82082d58f8f24b9e2daf027f0864a9f50612ee7bd3bc37ab","kind":"artifact","value":{"model":"copilot/gpt-4o-mini"}}]}'
           GH_AW_INFO_ENGINE_ID: "pi"
           GH_AW_INFO_ENGINE_NAME: "Pi"
           GH_AW_INFO_MODEL: "copilot/gpt-5.3"
@@ -674,9 +675,6 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Install Pi CLI
         run: npm install -g @earendil-works/pi-coding-agent@1.5.2
@@ -2018,9 +2016,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Execute GitHub Copilot CLI
         if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true'
