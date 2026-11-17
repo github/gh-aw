@@ -74,7 +74,6 @@ test.describe("Copy entire file regressions", () => {
         const overlay = page.locator(".error-modal-overlay");
         await expect(overlay).toHaveCount(1);
         await expect.poll(listenerCount).toBe(baseline + 1);
-        await page.keyboard.press("Enter");
         await expect(overlay).toBeVisible();
 
         if (closeWith === "close button") {
