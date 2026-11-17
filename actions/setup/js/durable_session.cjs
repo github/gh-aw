@@ -35,13 +35,32 @@ function preparePrompt({ env = process.env, promptFile = "/tmp/gh-aw/aw-prompts/
 function captureCopilotSessions({ env = process.env, home = os.homedir() } = {}) {
   const destination = env.GH_AW_DURABLE_SESSION_DIR;
   if (!destination || !path.isAbsolute(destination)) throw new Error("Copilot durable capture requires an absolute session directory");
-  const candidates = [path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/session-state"), path.join(home, ".copilot/session-state")];
-  const source = candidates.find(directory => fs.existsSync(directory) && fs.readdirSync(directory).length);
+  const baseline = readCopilotCaptureBaseline(destination);
+  if (!baseline) {
+    console.info("Copilot did not produce native durable session files");
+    return;
+  }
+  const copilotHome = env.COPILOT_HOME || path.join(home, ".copilot");
+  const candidates = [path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/session-state", baseline.id), path.join(copilotHome, "session-state", baseline.id)];
+  const source = candidates.find(directory => {
+    try {
+      return fs.statSync(directory).isDirectory();
+    } catch {
+      return false;
+    }
+  });
   if (!source) {
     console.info("Copilot did not produce native durable session files");
     return;
   }
-  fs.cpSync(source, path.join(destination, "session-state"), { recursive: true, dereference: false });
+  const target = path.join(destination, "session-state");
+  try {
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.mkdirSync(target, { recursive: true, mode: 0o700 });
+    fs.cpSync(source, path.join(target, baseline.id), { recursive: true, dereference: false });
+  } catch (error) {
+    throw new Error("Cannot capture Copilot durable session state", { cause: error });
+  }
 }
 
 function trimCopilotLogs({ env = process.env } = {}) {

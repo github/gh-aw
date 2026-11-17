@@ -137,16 +137,41 @@ func TestCopilotSessionCopyScriptSkipsEmptyDirectories(t *testing.T) {
 	}
 }
 
+func TestCopilotSessionCopyScriptCopiesOnlyDurableDirectModeSession(t *testing.T) {
+	const sessionID = "00000000-0000-4000-8000-000000000001"
+	awfDir := filepath.Join(t.TempDir(), "session-state")
+	homeDir := t.TempDir()
+	logsDir := filepath.Join(t.TempDir(), "copilot-session-state")
+	writeSessionStateFile(t, homeDir, ".copilot/session-state/"+sessionID+"/events.jsonl", "current events")
+	writeSessionStateFile(t, homeDir, ".copilot/session-state/historical/events.jsonl", "historical events")
+
+	runCopilotSessionCopyScriptWithSessionID(t, awfDir, homeDir, logsDir, sessionID)
+
+	assertSessionStateFile(t, logsDir, sessionID+"/events.jsonl", "current events")
+	assertSessionStateFileMissing(t, logsDir, "historical/events.jsonl")
+}
+
 func runCopilotSessionCopyScript(t *testing.T, awfDir, homeDir, logsDir string) string {
+	return runCopilotSessionCopyScriptWithSessionID(t, awfDir, homeDir, logsDir, "")
+}
+
+func runCopilotSessionCopyScriptWithSessionID(t *testing.T, awfDir, homeDir, logsDir, sessionID string) string {
 	t.Helper()
 
 	scriptPath, err := filepath.Abs("../../actions/setup/sh/copy_copilot_session_state.sh")
 	if err != nil {
 		t.Fatalf("Failed to resolve Copilot session copy script path: %v", err)
 	}
+	sessionIDFile := filepath.Join(t.TempDir(), "capture-offset.json")
+	if sessionID != "" {
+		if err := os.WriteFile(sessionIDFile, []byte(`{"id":"`+sessionID+`","bytes":0}`), 0o600); err != nil {
+			t.Fatalf("Failed to write durable session capture baseline: %v", err)
+		}
+	}
 	cmd := exec.Command("bash", scriptPath)
 	overrides := map[string]string{
 		"GH_AW_COPILOT_SESSION_STATE_DIR":        awfDir,
+		"GH_AW_COPILOT_SESSION_ID_FILE":          sessionIDFile,
 		"GH_AW_COPILOT_LEGACY_SESSION_STATE_DIR": filepath.Join(homeDir, ".copilot", "session-state"),
 		"GH_AW_COPILOT_SESSION_LOGS_DIR":         logsDir,
 		"HOME":                                   homeDir,

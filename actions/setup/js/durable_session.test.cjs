@@ -135,17 +135,21 @@ describe("Copilot native session collection", () => {
   it.each(["firewall", "direct"])("collects %s sessions without exposing old sessions as current unified logs", mode => {
     const state = path.join(directory, "agent/durable-sessions/copilot");
     const home = path.join(directory, "home");
+    const id = "00000000-0000-4000-8000-000000000001";
     const source = mode === "firewall" ? path.join(directory, "sandbox/agent/session-state") : path.join(home, ".copilot/session-state");
-    fs.mkdirSync(path.join(source, "current"), { recursive: true });
-    fs.writeFileSync(path.join(source, "current/events.jsonl"), "current events");
-    fs.writeFileSync(path.join(source, "current/session.db"), Buffer.from([0, 0xff, 1]));
+    fs.mkdirSync(path.join(source, id), { recursive: true });
+    fs.writeFileSync(path.join(source, id, "events.jsonl"), "current events");
+    fs.writeFileSync(path.join(source, id, "session.db"), Buffer.from([0, 0xff, 1]));
+    fs.mkdirSync(path.join(source, "previous"), { recursive: true });
+    fs.writeFileSync(path.join(source, "previous/events.jsonl"), "unrelated historical events");
     fs.mkdirSync(path.join(state, "session-state/previous"), { recursive: true });
-    fs.writeFileSync(path.join(state, "session-state/previous/events.jsonl"), "old events");
+    fs.writeFileSync(path.join(state, "session-state/previous/events.jsonl"), "old unrelated events");
+    fs.writeFileSync(path.join(state, "capture-offset.json"), JSON.stringify({ id, bytes: 0 }));
     captureCopilotSessions({ env: { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: state }, home });
-    expect(fs.readFileSync(path.join(state, "session-state/current/events.jsonl"), "utf8")).toBe("current events");
-    expect(fs.readFileSync(path.join(state, "session-state/current/session.db"))).toEqual(Buffer.from([0, 0xff, 1]));
-    expect(fs.readFileSync(path.join(state, "session-state/previous/events.jsonl"), "utf8")).toBe("old events");
-    expect(fs.existsSync(path.join(source, "previous"))).toBe(false);
+    expect(fs.readFileSync(path.join(state, "session-state", id, "events.jsonl"), "utf8")).toBe("current events");
+    expect(fs.readFileSync(path.join(state, "session-state", id, "session.db"))).toEqual(Buffer.from([0, 0xff, 1]));
+    expect(fs.existsSync(path.join(state, "session-state/previous"))).toBe(false);
+    expect(fs.readFileSync(path.join(source, "previous/events.jsonl"), "utf8")).toBe("unrelated historical events");
   });
 
   it("reports when no native session was produced", () => {
