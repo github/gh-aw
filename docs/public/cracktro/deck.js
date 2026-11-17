@@ -4229,7 +4229,7 @@
     });
 
     const cards = SC.map((s, i) =>
-      h("button", { class: "atk-card", type: "button", "aria-pressed": "false", onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) }, h("b", {}, i + 1), h("span", { class: "h4" }, s.t), h("span", { class: "p" }, s.d))
+      h("button", { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${s.t} (← → step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) }, h("b", {}, i + 1), h("span", { class: "h4" }, s.t), h("span", { class: "p" }, s.d))
     );
     const body = h("div", { class: "atk-body" });
     const term = h("div", { class: "atk-term" }, h("header", {}, h("i"), h("i"), h("i"), h("span", {}, "agent · sandboxed · read-only token")), body);
@@ -21685,7 +21685,7 @@
         idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
       },
     ];
-    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
+    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${p.tab[0]} (← → switch process)`, onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
     const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
     const docIco = h("span", {}),
       docT = h("div", {}),

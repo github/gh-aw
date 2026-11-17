@@ -381,7 +381,7 @@
                 const n = r.first + r.items.indexOf(s);
                 return h(
                   "li",
-                  { "--i": i, "data-go": n - 1 },
+                  { "--i": i, "data-go": n - 1, title: `${label(s)} (type ${n}, Enter)` },
                   h("span", { class: "bh-n" }, String(n).padStart(2, "0"), s.kids ? h("span", { class: "bh-k", title: `${s.kids.length} examples below` }, `↓ ${s.kids.length}`) : null),
                   h("span", { class: "bh-t" }, label(s))
                 );
@@ -912,7 +912,7 @@
     const fz = h(
       "dialog",
       { class: "fz", "aria-label": "Search slides" },
-      h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
+      h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", "aria-keyshortcuts": "Escape", title: "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
     );
     document.body.append(fz);
     const fzPaint = () => {
@@ -990,7 +990,7 @@
     const smp = h(
       "dialog",
       { class: "smp", "aria-label": "Slide map" },
-      h("div", { class: "smp-bar" }, h("h2", { class: "smp-h" }, "Slide map"), h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", onclick: () => smp.close() }, "Esc")),
+      h("div", { class: "smp-bar" }, h("h2", { class: "smp-h" }, "Slide map"), h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", "aria-keyshortcuts": "Escape G", title: "Close slide map (Esc or G)", onclick: () => smp.close() }, "Esc")),
       smpBody
     );
     document.body.append(smp);
@@ -1011,6 +1011,7 @@
                     class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`,
                     type: "button",
                     "aria-label": `Go to slide ${n + 1}: ${label(s) || rowName(r.group)}`,
+                    title: `Go to slide ${n + 1}: ${label(s) || rowName(r.group)} (arrows to move, Enter)`,
                     onclick: () => (smp.close(), go(n)),
                   },
                   h("b", {}, String(n + 1).padStart(2, "0"), s.kids ? h("i", { title: `${s.kids.length} examples below` }, `↓${s.kids.length}`) : null),

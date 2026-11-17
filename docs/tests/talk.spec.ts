@@ -209,6 +209,9 @@ test("gives every navigation button a keyboard shortcut", async ({ page }) => {
   await page.goto("/gh-aw/cracktro/#3");
   for (const name of ["Previous band", "Previous slide", "Next slide", "Next band", "Slide map (G)", "Search slides (/)", "Toggle sound (M)"])
     await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-keyshortcuts", /\S/);
+  // every button (chrome, map tiles, header tiles, in-slide controls) has a title naming its shortcut
+  const untitled = await page.locator("button:not(.vnb), [data-go]").evaluateAll(els => els.filter(el => !/\(.+\)/.test(el.getAttribute("title") || "")).map(el => el.className));
+  expect(untitled).toEqual([]);
   // Shift+Down switches bands even on a column head
   await page.keyboard.press("Shift+ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
