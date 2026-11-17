@@ -320,11 +320,13 @@ An interval schedule expression SHALL take the form:
 
 ```yaml
 every <N> <unit>
+every <N><short-unit>
 ```
 
 Where:
 - `<N>` MUST be a positive integer
-- `<unit>` MUST be one of: `minutes`, `minute`, `m`, `hours`, `hour`, `h`, `days`, `day`, `d`, `weeks`, `week`, `w`
+- `<unit>` MUST be one of: `minutes`, `minute`, `hours`, `hour`, `days`, `day`
+- `<short-unit>` MUST be one of: `m`, `h`, `d`, `w`, `mo`. Weeks and months MUST use this short form (for example, `every 2w` and `every 2mo`); long-form weeks and months are not supported.
 
 An implementation MUST generate appropriate cron expressions based on the unit:
 

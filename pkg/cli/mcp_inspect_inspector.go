@@ -126,6 +126,7 @@ func spawnMCPInspector(ctx context.Context, workflowFile string, serverFilter st
 		// This automatically handles imports, merging, and validation
 		compiler := workflow.NewCompiler(
 			workflow.WithVerbose(verbose),
+			workflow.WithWorkflowIdentifier(workflowPath),
 		)
 		workflowData, err := compiler.ParseWorkflowFile(workflowPath)
 		if err != nil {

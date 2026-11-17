@@ -449,7 +449,7 @@ func TestAtomicSmokeContract(t *testing.T) {
 	assert.Contains(t, string(source), "The evals assess report completeness, not independent verification of execution.")
 	lock, err := os.ReadFile("../../.github/workflows/smoke-atomic.lock.yml")
 	require.NoError(t, err)
-	assert.Contains(t, string(lock), `- cron: "0 0 */2 * *"`)
+	assert.Contains(t, string(lock), `- cron: "51 16 */2 * *"`)
 	assert.NotContains(t, string(lock), "--cooldown-days 1")
 	for _, expected := range []string{
 		"npm install -g @bastani/atomic@" + loadAtomicSample(t).Version,

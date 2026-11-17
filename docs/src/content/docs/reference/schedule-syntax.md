@@ -205,6 +205,10 @@ on:
 
 Day, week, and month intervals use the same scattered time slots as `daily`, so many workflows on `every 2 days` no longer all fire at 00:00 UTC. For an exact time, use a cron expression such as `cron: "0 0 */2 * *"`.
 
+The crons above are illustrative: actual times, weekdays, and monthly dates depend on the workflow identifier. Weeks and months require the short forms (`every 2w`, `every 2mo`), not `every 2 weeks` or `every 2 months`.
+
+Recompiling existing workflows changes their schedule once. In particular, `every 1w` moves from Sunday to a hashed weekday, and `every 1mo` moves from the first of the month to a hashed day in 1–28. To preserve those calendar dates, use `weekly on sunday` or an explicit cron such as `cron: "0 0 1 * *"`.
+
 Valid minute intervals: `5m`, `10m`, `15m`, `20m`, `30m`
 Valid hour intervals: `1h`, `2h`, `3h`, `4h`, `6h`, `8h`, `12h`
 

@@ -561,6 +561,32 @@ func TestScatterScheduleTriWeekly(t *testing.T) {
 	}
 }
 
+func TestScatterScheduleSingleIntervals(t *testing.T) {
+	const identifier = "smoke-copilot"
+	hour, minute := weightedDailyTimeSlot(identifier)
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{"every 1w", fmt.Sprintf("%d %d * * %d", minute, hour, stableHash(identifier, 7))},
+		{"every 1mo", fmt.Sprintf("%d %d %d * *", minute, hour, stableHash(identifier+":day-of-month", 28)+1)},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			fuzzy, _, err := ParseSchedule(tt.input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := ScatterSchedule(fuzzy, identifier)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("expected %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
 func TestScatterScheduleDailyInterval(t *testing.T) {
 	// Must not be swallowed by the FUZZY:DAILY handler and must keep the */N day field.
 	result, err := ScatterSchedule("FUZZY:DAILY_INTERVAL/2 * * *", "smoke-copilot")

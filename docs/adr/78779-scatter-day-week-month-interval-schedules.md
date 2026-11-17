@@ -2,17 +2,17 @@
 
 **Date**: 2026-11-17
 **Status**: Draft
-**Deciders**: Peli de Halleux (@pelikhan, PR author); other reviewers [TODO: verify]
+**Deciders**: PR maintainers (acceptance pending)
 
 ---
 
 ### Context
 
-Natural-language interval schedules `every N days`, `every N weeks`, and `every N months` (including `every 1d`, `every 1w`, and `every 1mo`) were compiled by `pkg/parser/schedule_parser.go` into fixed midnight crons, for example `every 2 days` to `0 0 */2 * *`. The fuzzy scatter stage (`ScatterSchedule` in `pkg/parser/schedule_fuzzy_scatter.go`) never received these schedules, so every workflow using them fired at 00:00 UTC. The PR description reports 63 workflows (62 of them smoke tests) using `every 2 days` firing in the same minute. The compiled cron must stay deterministic across recompilations so lock files do not drift, and the fix should reuse the existing scatter infrastructure.
+Natural-language interval schedules `every N days`, `every Nw`, and `every Nmo` (including `every 1d`, `every 1w`, and `every 1mo`) were compiled by `pkg/parser/schedule_parser.go` into fixed midnight crons, for example `every 2 days` to `0 0 */2 * *`. The fuzzy scatter stage (`ScatterSchedule` in `pkg/parser/schedule_fuzzy_scatter.go`) never received these schedules, so every workflow using them fired at 00:00 UTC. The PR description reports 63 workflows (62 of them smoke tests) using `every 2 days` firing in the same minute. The compiled cron must stay deterministic across recompilations so lock files do not drift, and the fix should reuse the existing scatter infrastructure.
 
 ### Decision
 
-We will compile day, week, and month interval schedules to fuzzy tokens (`FUZZY:DAILY`, `FUZZY:WEEKLY`, `FUZZY:DAILY_INTERVAL/N`, and `FUZZY:MONTHLY_INTERVAL/N`) and resolve them in the scatter layer. Hour and minute come from the existing `weightedDailyTimeSlot(workflowIdentifier)`, and monthly intervals use a hashed day of month in 1-28. The primary driver is avoiding load pile-ups at 00:00 UTC. Scattering per workflow identifier keeps recompilation idempotent.
+We will compile day, week, and month interval schedules to fuzzy tokens (`FUZZY:DAILY`, `FUZZY:WEEKLY`, `FUZZY:DAILY_INTERVAL/N`, and `FUZZY:MONTHLY_INTERVAL/N`) and resolve them in the scatter layer. Hour and minute come from the existing `weightedDailyTimeSlot(workflowIdentifier)`, and monthly intervals use a hashed day of month in 1-28. The primary driver is avoiding load pile-ups at 00:00 UTC. Scattering per workflow identifier keeps recompilation idempotent. Scattering the weekday for `every 1w` and date for `every 1mo` is intentional: interval expressions distribute calendar slots, while `weekly on sunday` or raw cron preserves calendar constraints.
 
 ### Alternatives Considered
 
@@ -40,7 +40,7 @@ This is the smallest change, producing `M 0 */N * *`, and it matches how `every 
 #### Negative
 
 - Recompiling changes the cron for every existing workflow that uses these forms. This PR recompiles 64 lock files, a one-time schedule shift for affected users.
-- `every 1w` changes from a fixed Sunday to a per-workflow weekday, because `handleWeekly` hashes the weekday across 0-6. Users who depend on Sunday runs will see their run day change. [TODO: verify whether this is intended and whether the changeset should call it out.]
+- `every 1w` changes from a fixed Sunday to a per-workflow weekday, because `handleWeekly` hashes the weekday across 0-6. Users who depend on Sunday runs can use `weekly on sunday`; the changeset and schedule reference document this migration.
 - `every 1mo` changes from the 1st of the month to a hashed day in 1-28.
 - Users who need an exact time must switch to a raw `cron:` expression.
 - `ScatterSchedule` now depends on handler ordering. `handleDailyInterval` must run before `handleDaily` because `FUZZY:DAILY` is a prefix of `FUZZY:DAILY_INTERVAL`. Prefix matching makes this fragile for future token additions.
