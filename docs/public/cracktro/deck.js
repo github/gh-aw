@@ -5784,6 +5784,290 @@
     });
   }
 
+  // Docs that heal: an updater writes docs from merged code, unbloat and glossary agents simplify them, the noob tester reads them as a newcomer, and a healer fixes what was missed and teaches the updater a new rule
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372,
+      PW = 540,
+      PX = [40, 810, 1580],
+      AY = 300;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="${cls ? "#238636" : "#8957e5"}"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    };
+    // an illustrative, simplified example: the updater's own workflow, a docs page it edits and the noob tester's report
+    const PANELS = [
+      [
+        "daily-doc-updater.md",
+        "WORKFLOW",
+        [
+          ["q", "---"],
+          ["", "on: daily"],
+          ["", "safe-outputs: create-pull-request"],
+          ["q", "---"],
+          ["h", "# Daily Doc Updater"],
+          ["", "- Read PRs merged since yesterday"],
+          ["", "- Document new flags and examples"],
+          ["add", "+ - Explain value formats of flags"],
+        ],
+      ],
+      [
+        "docs/reference/frontmatter.md",
+        "DOCS",
+        [
+          ["h", "## stop-after"],
+          ["add", "+ Stop a schedule at a deadline,"],
+          ["add", "+ e.g. stop-after: +48h."],
+          ["", "  This is a really useful option"],
+          ["", "  that you can use whenever you"],
+          ["", "  want things to stop running."],
+          ["api", "  → glossary: stop-after"],
+          ["add", "+ Units: m, h, d, w (e.g. +48h)."],
+        ],
+      ],
+      [
+        "noob-tester-report.md",
+        "TEST",
+        [
+          ["fn", "walk the docs as a newcomer"],
+          ["", "  install the extension"],
+          ["", "  quick start, steps 1-3"],
+          ["", "  find stop-after"],
+          ["", "  what does +48h mean?"],
+          ["q", ""],
+          ["fail", "issue: explain the +48h format"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["dhE0", "M124 106 H232", "p", ["merged"], 178, 90, "middle"],
+      ["dhE1", `M${PX[0] + PW + 6} ${AY} H${PX[1] - 8}`, "p", ["docs PR from", "merged code"], 695, AY - 56, "middle"],
+      ["dhE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["read it as a", "newcomer would"], 1465, AY - 56, "middle"],
+      ["dhE3", `M${PX[2] + PW / 2} ${PY + PH + 4} V618 H1214`, "g", ["missed gaps"], 1560, 600, "middle"],
+      ["dhE5", `M1104 590 V${PY + PH + 10}`, "g", [], 0, 0, "middle"],
+      ["dhE4", `M950 618 H${PX[0] + PW / 2} V${PY + PH + 10}`, "g", ["fix the gap, teach the updater"], 600, 600, "middle"],
+    ];
+    let g = `<defs>
+      <marker id="dhP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="dhG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 695, "WRITE"],
+      [695, 1465, "SIMPLIFY"],
+      [1465, VW, "TEST · HEAL"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dhLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([file, tag, lines], i) => {
+      const x = PX[i];
+      g += `<g class="sdd-panel" id="dhP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${PW}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + PW}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + PW - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => {
+        const y = PY + 88 + j * 32;
+        g += `<text class="sdd-ln ${c}" id="dhL${i}_${j}" x="${x + 24}" y="${y}">${sp(s)}</text>`;
+        if (i === 2 && j >= 1 && j <= 4) g += `<text class="sdd-ck" id="dhCk${j}" x="${x + PW - 26}" y="${y + 1}">✓</text>`;
+        if (i === 2 && j === 4) g += `<text class="dh-x" id="dhX4" x="${x + PW - 26}" y="${y + 1}">✗</text>`;
+      });
+      g += `</g>`;
+    });
+    g += `<rect class="sdd-scan" id="dhScan" x="${PX[1] + 4}" y="${PY + 56}" width="${PW - 8}" height="5" rx="2"/>`;
+    g += `<text class="sdd-stamp" id="dhStamp" x="${PX[1] + PW - 24}" y="${PY + PH - 22}">Unbloat: −3 lines</text>`;
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#dh${c === "g" ? "G" : "P"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += `<g class="fm-task" id="dhMerge"><circle cx="88" cy="106" r="32" fill="#8957e5"/>${ico("merge", 88, 106, 30)}</g>`;
+    g += agent("dhUpdater", 400, 106, 240, "Doc Updater") + agent("dhUnbloat", 1080, 106, 300, "Unbloat · Glossary") + agent("dhTester", 1850, 106, 240, "Noob Tester");
+    g += agent("dhHealer", 1080, 618, 220, "Doc Healer", "g");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      scan = $("dhScan");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const CYC = 18000;
+    let t0 = 0,
+      cyc = -1,
+      ev = [],
+      evI = 0,
+      fly = null,
+      scanAt = 0;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("dhLane0"), on("dhP0"), on("dhMerge")));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(400 + j * 170, () => (on(`dhL0_${j}`), sfx.key(0.5))));
+      flight(1500, "dhE0", 500, "#ab7df8", 0);
+      at(2000, () => on("dhUpdater"));
+      flight(2200, "dhE1", 1000, "#ab7df8", 1);
+      at(3200, () => (on("dhLane1"), on("dhP1"), [0, 3, 4, 5].forEach(j => on(`dhL1_${j}`))));
+      at(3600, () => (on("dhL1_1"), sfx.key(0.6)));
+      at(3850, () => (on("dhL1_2"), sfx.key(0.6)));
+      at(4300, () => on("dhUnbloat"));
+      at(4400, () => (scanAt = 4400));
+      [3, 4, 5].forEach((j, k) => at(4800 + k * 300, () => (on(`dhL1_${j}`, "gone"), sfx.pop(2 + k))));
+      at(5800, () => ((scanAt = 0), (scan.style.opacity = 0), on("dhStamp"), on("dhL1_6"), sfx.key(0.7)));
+      at(6300, () => on("dhTester"));
+      flight(6400, "dhE2", 1000, "#ab7df8", 5);
+      at(7400, () => (on("dhLane2"), on("dhP2"), on("dhL2_0"), sfx.key(0.6)));
+      [1, 2, 3, 4].forEach((j, k) => {
+        at(7700 + k * 420, () => (on(`dhL2_${j}`), sfx.key(0.5)));
+        at(7950 + k * 420, () => (j === 4 ? (on("dhX4"), sfx.omen()) : (on(`dhCk${j}`), sfx.pop(5 + k))));
+      });
+      at(9700, () => (on("dhL2_6"), on("dhP2", "bad"), sfx.notify()));
+      flight(10000, "dhE3", 1100, "#3fb950", 6);
+      at(11100, () => (on("dhHealer"), sfx.key(0.8)));
+      flight(11300, "dhE5", 500, "#3fb950", 7);
+      at(11800, () => (on("dhL1_7"), on("dhP1", "ok"), sfx.pop(8)));
+      flight(12100, "dhE4", 1300, "#3fb950", 8);
+      at(13400, () => (on("dhL0_7"), on("dhP0", "ok"), sfx.review()));
+      at(14000, () => ($("dhX4").classList.remove("on"), on("dhCk4"), $("dhP2").classList.remove("bad"), on("dhP2", "ok"), sfx.pop(9)));
+    };
+    // measured: merged [docs] PRs per agent (Oct 2025 to 14 Nov 2026) and [doc-healer] issues by day since 26 Feb 2026;
+    // u = rule merged into the updater's prompt, h = merged elsewhere (healer prompt or docs), x = declined
+    const RULES = [
+      [0, "u"],
+      [19, "u"],
+      [32, "x"],
+      [38, "u"],
+      [44, "h"],
+      [48, "u"],
+      [52, "u"],
+      [56, "u"],
+      [77, "h"],
+      [85, "h"],
+      [93, "u"],
+      [112, "x"],
+      [115, "x"],
+      [116, "x"],
+      [117, "x"],
+      [123, "x"],
+      [125, "u"],
+      [126, "x"],
+      [132, "h"],
+      [136, "x"],
+      [144, "x"],
+      [146, "x"],
+      [149, "x"],
+      [155, "u"],
+      [195, "x"],
+      [207, "x"],
+      [243, "x"],
+      [244, "x"],
+      [246, "x"],
+    ];
+    const TW = 520,
+      TX = d => 10 + (d * (TW - 20)) / 250;
+    let tl = `<text class="t" x="0" y="16">29 HEALER RULES · 13 MERGED · 9 IN UPDATER PROMPT</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    RULES.forEach(([d, s], i) => {
+      const hh = s === "u" ? 50 : s === "h" ? 36 : 18;
+      tl += `<rect class="${s}" style="--i:${i}" x="${TX(d) - 3}" y="${96 - hh}" width="6" height="${hh}" rx="2"/>`;
+    });
+    [
+      [3, "Mar"],
+      [64, "May"],
+      [125, "Jul"],
+      [187, "Sep"],
+      [248, "Nov"],
+    ].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const dhm = h(
+      "div",
+      { class: "dhm" },
+      h(
+        "div",
+        { class: "dhm-k" },
+        kpi("189", "daily-doc-updater", "PRs merged"),
+        kpi("250", "unbloat-docs", ["PRs merged", h("br"), h("em", {}, "−22,043 net lines")]),
+        kpi("146", "glossary-maintainer", "PRs merged"),
+        kpi("64", "daily-doc-healer", "PRs merged", "g")
+      ),
+      tlSvg
+    );
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone"));
+      scan.style.opacity = 0;
+      dot.style.opacity = 0;
+      fly = null;
+      scanAt = 0;
+      script();
+    };
+    slides.push({
+      group: "process",
+      notes:
+        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, from the first one on 10 October 2025 to 14 November 2026 (400 days): 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026 (246 days): 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (scanAt) {
+          const f = Math.min(1, (u - scanAt) / 1300);
+          scan.style.opacity = 1;
+          scan.setAttribute("y", PY + 56 + f * (PH - 66));
+        }
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
+        svg,
+        dhm,
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 14 Nov 2026 · PRs 10 Oct 2025–14 Nov 2026 (400 d) · healer issues 26 Feb–30 Oct 2026 (246 d) · loop illustrative")
+      ),
+    });
+  }
+
   // Speech To Agent (speak → map → grep): a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
   {
     resetIndex();
@@ -17744,291 +18028,6 @@
         svg,
         sdmStrip,
         h("div", { class: "sdm-cap" }, h("b", {}, "MEASURED "), "all-time · 30 Mar – 14 Nov 2026 (229 days) · snapshot 14 Nov 2026 · PRs/issues by title prefix · flow illustrative")
-      ),
-    });
-  }
-
-  // Docs that heal: an updater writes docs from merged code, unbloat and glossary agents simplify them, the noob tester reads them as a newcomer, and a healer fixes what was missed and teaches the updater a new rule
-  {
-    resetIndex();
-    const VW = 2160,
-      VH = 680,
-      PY = 168,
-      PH = 372,
-      PW = 540,
-      PX = [40, 810, 1580],
-      AY = 300;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const agent = (id, c, y, w, label, cls = "") => {
-      const x = c - (w - 34) / 2;
-      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="${cls ? "#238636" : "#8957e5"}"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    };
-    // an illustrative, simplified example: the updater's own workflow, a docs page it edits and the noob tester's report
-    const PANELS = [
-      [
-        "daily-doc-updater.md",
-        "WORKFLOW",
-        [
-          ["q", "---"],
-          ["", "on: daily"],
-          ["", "safe-outputs: create-pull-request"],
-          ["q", "---"],
-          ["h", "# Daily Doc Updater"],
-          ["", "- Read PRs merged since yesterday"],
-          ["", "- Document new flags and examples"],
-          ["add", "+ - Explain value formats of flags"],
-        ],
-      ],
-      [
-        "docs/reference/frontmatter.md",
-        "DOCS",
-        [
-          ["h", "## stop-after"],
-          ["add", "+ Stop a schedule at a deadline,"],
-          ["add", "+ e.g. stop-after: +48h."],
-          ["", "  This is a really useful option"],
-          ["", "  that you can use whenever you"],
-          ["", "  want things to stop running."],
-          ["api", "  → glossary: stop-after"],
-          ["add", "+ Units: m, h, d, w (e.g. +48h)."],
-        ],
-      ],
-      [
-        "noob-tester-report.md",
-        "TEST",
-        [
-          ["fn", "walk the docs as a newcomer"],
-          ["", "  install the extension"],
-          ["", "  quick start, steps 1-3"],
-          ["", "  find stop-after"],
-          ["", "  what does +48h mean?"],
-          ["q", ""],
-          ["fail", "issue: explain the +48h format"],
-        ],
-      ],
-    ];
-    // [edge id, path, color, label, lx, ly, anchor]
-    const EDGES = [
-      ["dhE0", "M124 106 H232", "p", ["merged"], 178, 90, "middle"],
-      ["dhE1", `M${PX[0] + PW + 6} ${AY} H${PX[1] - 8}`, "p", ["docs PR from", "merged code"], 695, AY - 56, "middle"],
-      ["dhE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["read it as a", "newcomer would"], 1465, AY - 56, "middle"],
-      ["dhE3", `M${PX[2] + PW / 2} ${PY + PH + 4} V618 H1214`, "g", ["missed gaps"], 1560, 600, "middle"],
-      ["dhE5", `M1104 590 V${PY + PH + 10}`, "g", [], 0, 0, "middle"],
-      ["dhE4", `M950 618 H${PX[0] + PW / 2} V${PY + PH + 10}`, "g", ["fix the gap, teach the updater"], 600, 600, "middle"],
-    ];
-    let g = `<defs>
-      <marker id="dhP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <marker id="dhG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    [
-      [0, 695, "WRITE"],
-      [695, 1465, "SIMPLIFY"],
-      [1465, VW, "TEST · HEAL"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="dhLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
-    });
-    const sp = s => s.replace(/ /g, "\u00a0");
-    PANELS.forEach(([file, tag, lines], i) => {
-      const x = PX[i];
-      g += `<g class="sdd-panel" id="dhP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${PW}" height="${PH}" rx="16"/>
-        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + PW}" y2="${PY + 50}"/>
-        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + PW - 22}" y="${PY + 32}">${tag}</text>`;
-      lines.forEach(([c, s], j) => {
-        const y = PY + 88 + j * 32;
-        g += `<text class="sdd-ln ${c}" id="dhL${i}_${j}" x="${x + 24}" y="${y}">${sp(s)}</text>`;
-        if (i === 2 && j >= 1 && j <= 4) g += `<text class="sdd-ck" id="dhCk${j}" x="${x + PW - 26}" y="${y + 1}">✓</text>`;
-        if (i === 2 && j === 4) g += `<text class="dh-x" id="dhX4" x="${x + PW - 26}" y="${y + 1}">✗</text>`;
-      });
-      g += `</g>`;
-    });
-    g += `<rect class="sdd-scan" id="dhScan" x="${PX[1] + 4}" y="${PY + 56}" width="${PW - 8}" height="5" rx="2"/>`;
-    g += `<text class="sdd-stamp" id="dhStamp" x="${PX[1] + PW - 24}" y="${PY + PH - 22}">Unbloat: −3 lines</text>`;
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#dh${c === "g" ? "G" : "P"})"/>`;
-      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    g += `<g class="fm-task" id="dhMerge"><circle cx="88" cy="106" r="32" fill="#8957e5"/>${ico("merge", 88, 106, 30)}</g>`;
-    g += agent("dhUpdater", 400, 106, 240, "Doc Updater") + agent("dhUnbloat", 1080, 106, 300, "Unbloat · Glossary") + agent("dhTester", 1850, 106, 240, "Noob Tester");
-    g += agent("dhHealer", 1080, 618, 220, "Doc Healer", "g");
-    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".sdd-dot"),
-      scan = $("dhScan");
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const CYC = 18000;
-    let t0 = 0,
-      cyc = -1,
-      ev = [],
-      evI = 0,
-      fly = null,
-      scanAt = 0;
-    const on = (id, cls = "on") => $(id).classList.add(cls);
-    const script = () => {
-      ev = [];
-      evI = 0;
-      const at = (ms, fn) => ev.push([ms, fn]);
-      const flight = (ms, id, dur, col, k) => {
-        at(ms, () => {
-          fly = { p: $(id), start: ms, dur, col };
-          $(id).classList.add("hot");
-          sfx.pop(k);
-        });
-        at(ms + dur, () => {
-          fly = null;
-          $(id).classList.remove("hot");
-        });
-      };
-      at(200, () => (on("dhLane0"), on("dhP0"), on("dhMerge")));
-      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(400 + j * 170, () => (on(`dhL0_${j}`), sfx.key(0.5))));
-      flight(1500, "dhE0", 500, "#ab7df8", 0);
-      at(2000, () => on("dhUpdater"));
-      flight(2200, "dhE1", 1000, "#ab7df8", 1);
-      at(3200, () => (on("dhLane1"), on("dhP1"), [0, 3, 4, 5].forEach(j => on(`dhL1_${j}`))));
-      at(3600, () => (on("dhL1_1"), sfx.key(0.6)));
-      at(3850, () => (on("dhL1_2"), sfx.key(0.6)));
-      at(4300, () => on("dhUnbloat"));
-      at(4400, () => (scanAt = 4400));
-      [3, 4, 5].forEach((j, k) => at(4800 + k * 300, () => (on(`dhL1_${j}`, "gone"), sfx.pop(2 + k))));
-      at(5800, () => ((scanAt = 0), (scan.style.opacity = 0), on("dhStamp"), on("dhL1_6"), sfx.key(0.7)));
-      at(6300, () => on("dhTester"));
-      flight(6400, "dhE2", 1000, "#ab7df8", 5);
-      at(7400, () => (on("dhLane2"), on("dhP2"), on("dhL2_0"), sfx.key(0.6)));
-      [1, 2, 3, 4].forEach((j, k) => {
-        at(7700 + k * 420, () => (on(`dhL2_${j}`), sfx.key(0.5)));
-        at(7950 + k * 420, () => (j === 4 ? (on("dhX4"), sfx.omen()) : (on(`dhCk${j}`), sfx.pop(5 + k))));
-      });
-      at(9700, () => (on("dhL2_6"), on("dhP2", "bad"), sfx.notify()));
-      flight(10000, "dhE3", 1100, "#3fb950", 6);
-      at(11100, () => (on("dhHealer"), sfx.key(0.8)));
-      flight(11300, "dhE5", 500, "#3fb950", 7);
-      at(11800, () => (on("dhL1_7"), on("dhP1", "ok"), sfx.pop(8)));
-      flight(12100, "dhE4", 1300, "#3fb950", 8);
-      at(13400, () => (on("dhL0_7"), on("dhP0", "ok"), sfx.review()));
-      at(14000, () => ($("dhX4").classList.remove("on"), on("dhCk4"), $("dhP2").classList.remove("bad"), on("dhP2", "ok"), sfx.pop(9)));
-    };
-    // measured: merged [docs] PRs per agent (Oct 2025 to 14 Nov 2026) and [doc-healer] issues by day since 26 Feb 2026;
-    // u = rule merged into the updater's prompt, h = merged elsewhere (healer prompt or docs), x = declined
-    const RULES = [
-      [0, "u"],
-      [19, "u"],
-      [32, "x"],
-      [38, "u"],
-      [44, "h"],
-      [48, "u"],
-      [52, "u"],
-      [56, "u"],
-      [77, "h"],
-      [85, "h"],
-      [93, "u"],
-      [112, "x"],
-      [115, "x"],
-      [116, "x"],
-      [117, "x"],
-      [123, "x"],
-      [125, "u"],
-      [126, "x"],
-      [132, "h"],
-      [136, "x"],
-      [144, "x"],
-      [146, "x"],
-      [149, "x"],
-      [155, "u"],
-      [195, "x"],
-      [207, "x"],
-      [243, "x"],
-      [244, "x"],
-      [246, "x"],
-    ];
-    const TW = 520,
-      TX = d => 10 + (d * (TW - 20)) / 250;
-    let tl = `<text class="t" x="0" y="16">29 HEALER RULES · 13 MERGED · 9 IN UPDATER PROMPT</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
-    RULES.forEach(([d, s], i) => {
-      const hh = s === "u" ? 50 : s === "h" ? 36 : 18;
-      tl += `<rect class="${s}" style="--i:${i}" x="${TX(d) - 3}" y="${96 - hh}" width="6" height="${hh}" rx="2"/>`;
-    });
-    [
-      [3, "Mar"],
-      [64, "May"],
-      [125, "Jul"],
-      [187, "Sep"],
-      [248, "Nov"],
-    ].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
-    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    tlSvg.setAttribute("class", "dhm-tl");
-    tlSvg.setAttribute("width", TW);
-    tlSvg.setAttribute("height", 122);
-    tlSvg.innerHTML = tl;
-    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
-    const dhm = h(
-      "div",
-      { class: "dhm" },
-      h(
-        "div",
-        { class: "dhm-k" },
-        kpi("189", "daily-doc-updater", "PRs merged"),
-        kpi("250", "unbloat-docs", ["PRs merged", h("br"), h("em", {}, "−22,043 net lines")]),
-        kpi("146", "glossary-maintainer", "PRs merged"),
-        kpi("64", "daily-doc-healer", "PRs merged", "g")
-      ),
-      tlSvg
-    );
-    const reset = () => {
-      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone"));
-      scan.style.opacity = 0;
-      dot.style.opacity = 0;
-      fly = null;
-      scanAt = 0;
-      script();
-    };
-    slides.push({
-      group: "process",
-      under: "unsloppers",
-      notes:
-        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, from the first one on 10 October 2025 to 14 November 2026 (400 days): 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026 (246 days): 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          reset();
-        }
-        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
-        if (scanAt) {
-          const f = Math.min(1, (u - scanAt) / 1300);
-          scan.style.opacity = 1;
-          scan.setAttribute("y", PY + 56 + f * (PH - 66));
-        }
-        if (!fly) {
-          dot.style.opacity = 0;
-          return;
-        }
-        const n = fly.p.getTotalLength(),
-          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", fly.col);
-      },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
-        svg,
-        dhm,
-        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 14 Nov 2026 · PRs 10 Oct 2025–14 Nov 2026 (400 d) · healer issues 26 Feb–30 Oct 2026 (246 d) · loop illustrative")
       ),
     });
   }

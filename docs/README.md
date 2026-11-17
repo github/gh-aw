@@ -71,7 +71,7 @@ Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), and Left/Right from an example return to
 the main line. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
 and M to toggle sound. The slide map button (or G) opens a full-screen grid of
-every slide grouped by band, each pattern's examples in a row beside it, with the current slide focused; arrows move between
+every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
 `slides.md` summaries and slide text; arrows pick a result, Enter opens it, and
