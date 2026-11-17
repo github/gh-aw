@@ -1988,7 +1988,7 @@
   .cwa-msg span { font: 500 26px/1.35 var(--mono); color: #9198a1; }
 
   /* --- cost management --- */
-  .cm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
+  .cm .slide-head h2 { --lg: #e3b341; }
   .cm-ed { position: absolute; left: 110px; top: 290px; width: 1010px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
   .active .cm-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
   .cm-tab { display: flex; align-items: center; gap: 12px; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; }
@@ -2029,7 +2029,7 @@
   .cm-bar.on span { opacity: 1; }
   .cm-bar small { position: absolute; bottom: -26px; font: 500 14px/1 var(--mono); color: #9198a1; white-space: nowrap; }
   .cm-guard { margin-top: 38px; display: flex; align-items: center; gap: 12px; font: 500 18px/1.3 var(--mono); color: #656c76; padding: 12px 16px; border-radius: 10px; border: 1px dashed #3d444d; transition: all .5s; }
-  .cm-guard.on { color: #f0f6fc; border-color: #f85149; background: #f8514914; }
+  .cm-guard.on { color: #f0f6fc; border-color: #d29922; background: #d2992214; }
   .cm-route { position: absolute; left: 1180px; top: 730px; width: 630px; height: 264px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; overflow: hidden; opacity: 0; transition: border-color .6s, box-shadow .6s; }
   .active .cm-route { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .7s; }
   .cm-route.on { border-color: #ab7df8; box-shadow: 0 0 60px -20px #ab7df8; }
@@ -2038,7 +2038,7 @@
   .cm-route canvas { position: absolute; left: 0; top: -14px; width: 630px; height: 284px; }
 
   /* --- cost guardrails --- */
-  .cg .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #f85149, #d29922, #ab7df8, #f85149); }
+  .cg .slide-head h2 { --lg: #e3b341; }
   .cg-now * { transition: none !important; }
   .cg-modes { position: absolute; left: 1180px; top: 84px; width: 630px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; opacity: 0; }
   .active .cg-modes { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .2s; }
@@ -2060,31 +2060,31 @@
   .cg-node i { position: absolute; right: 12px; top: -14px; padding: 5px 10px; border-radius: 99px; font: 700 14px/1 var(--mono); font-style: normal; white-space: nowrap; opacity: 0; transition: opacity .3s; }
   .cg-node.on { border-color: var(--c); box-shadow: 0 0 40px -12px var(--c); }
   .cg-node.pass { border-color: var(--c); }
-  .cg-node.pass i { opacity: 1; color: #0d1117; background: #3fb950; }
+  .cg-node.pass i { opacity: 1; color: #0d1117; background: #4493f8; }
   .cg-node.skip { border-style: dashed; border-color: #3d444d; }
   .cg-node.skip b { opacity: .55; }
   .cg-node.skip i { opacity: 1; color: #d1d7e0; background: #21262d; border: 1px dashed #6e7681; }
-  .cg-node.stop { border-color: #f85149; background: #2d1215ee; box-shadow: 0 0 50px -10px #f85149; }
-  .cg-node.stop i { opacity: 1; color: #fff; background: #da3633; }
-  .cg-node.allow i { opacity: 1; color: #0d1117; background: #ab7df8; }
+  .cg-node.stop { border-color: #db6d28; background: #2d1a0dee; box-shadow: 0 0 50px -10px #db6d28; }
+  .cg-node.stop i { opacity: 1; color: #0d1117; background: #db6d28; }
+  .cg-node.allow i { opacity: 1; color: #0d1117; background: #4493f8; }
   .cg-auth { position: absolute; left: 550px; top: 0; width: 400px; height: 62px; box-sizing: border-box; padding: 10px 16px; border-radius: 12px; border: 2px dashed #3d444d; background: #0d1117d8; transition: border-color .4s, box-shadow .4s; }
   .cg-auth b { display: block; font: 700 21px/1 "Mona Sans"; color: #8b949e; transition: color .4s; }
   .cg-auth small { display: block; margin-top: 6px; font: 500 13px/1 var(--mono); color: #8b949e; }
   .cg-auth i { position: absolute; right: 14px; top: 17px; padding: 6px 10px; border-radius: 8px; font: 700 15px/1 var(--mono); font-style: normal; color: #8b949e; border: 1px solid #3d444d; transition: all .3s; }
-  .cg-auth:not(.off) { border-style: solid; border-color: #ab7df8; box-shadow: 0 0 40px -14px #ab7df8; }
-  .cg-auth:not(.off) b { color: #d2a8ff; }
-  .cg-auth.ask i { color: #d2a8ff; border-color: #ab7df8; animation: cgBlink .5s steps(2) infinite; }
-  .cg-auth.ok i { color: #0d1117; background: #3fb950; border-color: #3fb950; }
-  .cg-auth.deny i { color: #fff; background: #da3633; border-color: #da3633; }
+  .cg-auth:not(.off) { border-style: solid; border-color: #d29922; box-shadow: 0 0 40px -14px #d29922; }
+  .cg-auth:not(.off) b { color: #e3b341; }
+  .cg-auth.ask i { color: #e3b341; border-color: #d29922; animation: cgBlink .5s steps(2) infinite; }
+  .cg-auth.ok i { color: #0d1117; background: #4493f8; border-color: #4493f8; }
+  .cg-auth.deny i { color: #0d1117; background: #db6d28; border-color: #db6d28; }
   .cg-alink { position: absolute; left: 620px; top: 62px; height: 28px; border-left: 2px dashed #3d444d; }
-  .cg-alink:not(.off) { border-left: 2px solid #ab7df8; box-shadow: 0 0 12px #ab7df8; }
+  .cg-alink:not(.off) { border-left: 2px solid #d29922; box-shadow: 0 0 12px #d2992255; }
   .cg-tok { position: absolute; top: 222px; width: 36px; height: 36px; margin-left: -18px; border-radius: 99px; display: grid; place-items: center; font: 700 17px/1 var(--mono); color: #0d1117; background: #f0f6fc; box-shadow: 0 0 18px -2px #f0f6fc; opacity: 0; z-index: 2;
     transition: left .9s cubic-bezier(.5,0,.3,1), opacity .4s, background .3s, box-shadow .3s; }
-  .cg-tok.ok { background: #3fb950; box-shadow: 0 0 22px -2px #3fb950; }
+  .cg-tok.ok { background: #4493f8; box-shadow: 0 0 22px -2px #4493f8; }
   .cg-tok.q { background: #d29922; box-shadow: 0 0 22px -2px #d29922; }
-  .cg-tok.x { background: #f85149; color: #fff; box-shadow: 0 0 26px 0 #f85149; }
+  .cg-tok.x { background: #db6d28; color: #0d1117; box-shadow: 0 0 22px -2px #db6d28; }
   .cg-tok u { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); white-space: nowrap; text-decoration: none; font: 600 14px/1 var(--mono); color: #d1d7e0; }
-  .cg-tok.x u { color: #ff7b72; }
+  .cg-tok.x u { color: #ffa657; }
   .cg-tok.q u { color: #e3b341; }
   .cg-ed { position: absolute; left: 110px; top: 604px; width: 800px; height: 412px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
   .active .cg-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
@@ -2100,29 +2100,29 @@
   .cg-run { display: flex; align-items: baseline; gap: 14px; margin-top: 12px; }
   .cg-run span { align-self: center; font: 700 17px/1 var(--mono); padding: 7px 10px; border-radius: 8px; border: 1px solid #3d444d; color: #d1d7e0; }
   .cg-run b { font: 700 60px/1 var(--mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: #f0f6fc; transition: color .4s; }
-  .cg-run b.stop { color: #ff7b72; }
+  .cg-run b.stop { color: #ffa657; }
   .cg-run small { font: 500 22px/1 var(--mono); color: #9198a1; }
   .cg-run em { align-self: center; margin-left: auto; padding: 8px 12px; border-radius: 8px; font: 700 17px/1 var(--mono); letter-spacing: .12em; font-style: normal; opacity: 0; }
   .cg-run em.warn { opacity: 1; color: #0d1117; background: #d29922; animation: cgBlink .8s steps(2) infinite; }
-  .cg-run em.stop { opacity: 1; color: #fff; background: #da3633; }
+  .cg-run em.stop { opacity: 1; color: #0d1117; background: #db6d28; }
   .cg-run em.skip { opacity: 1; color: #d1d7e0; border: 1px dashed #6e7681; }
-  .cg-run em.allow { opacity: 1; color: #0d1117; background: #ab7df8; }
+  .cg-run em.allow { opacity: 1; color: #0d1117; background: #4493f8; }
   .cg-bar { position: relative; margin-top: 16px; height: 24px; border-radius: 8px; background: #0d1117; border: 1px solid #3d444d; }
-  .cg-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 7px; background: linear-gradient(90deg, #3fb950, #d29922 62%, #f85149 84%) 0 0 / 804px 100% no-repeat; }
+  .cg-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 7px; background: linear-gradient(90deg, #9e6a03, #d29922 62%, #db6d28 84%) 0 0 / 804px 100% no-repeat; }
   .cg-bar .zone { position: absolute; top: -6px; bottom: -6px; background: repeating-linear-gradient(135deg, #d2992240 0 6px, transparent 6px 12px); border-radius: 4px; transition: left .6s, width .6s; }
-  .cg-bar .cap { position: absolute; top: -10px; bottom: -10px; width: 4px; margin-left: -2px; background: #f85149; box-shadow: 0 0 12px #f85149; transition: left .6s; }
+  .cg-bar .cap { position: absolute; top: -10px; bottom: -10px; width: 4px; margin-left: -2px; background: #db6d28; box-shadow: 0 0 12px #db6d2855; transition: left .6s; }
   .cg-key { display: flex; gap: 26px; margin-top: 12px; font: 500 14px/1 var(--mono); color: #9198a1; }
   .cg-key span::before { content: ""; display: inline-block; width: 14px; height: 12px; margin-right: 8px; vertical-align: -1px; }
   .cg-key .z::before { background: repeating-linear-gradient(135deg, #d29922a0 0 3px, transparent 3px 6px); }
-  .cg-key .c::before { width: 4px; background: #f85149; }
+  .cg-key .c::before { width: 4px; background: #db6d28; }
   .cg-day { display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; font: 600 15px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #9198a1; }
   .cg-day b { font: 700 20px/1 var(--mono); letter-spacing: 0; color: #f0f6fc; font-variant-numeric: tabular-nums; transition: color .4s; }
-  .cg-day b.over { color: #ff7b72; }
+  .cg-day b.over { color: #ffa657; }
   .cg-dbar { position: relative; display: flex; margin-top: 10px; height: 24px; border-radius: 8px; background: #0d1117; border: 1px solid #3d444d; }
   .cg-dbar .seg { flex: none; height: 100%; width: 0; overflow: hidden; display: grid; place-items: center; background: var(--c); font: 700 13px/1 var(--mono); color: #0d1117; white-space: nowrap; }
   .cg-dbar .seg:first-child { border-radius: 7px 0 0 7px; }
   .cg-dbar .dcap { position: absolute; top: -10px; bottom: -10px; width: 4px; margin-left: -2px; background: #d29922; box-shadow: 0 0 12px #d29922; transition: background .4s, box-shadow .4s; }
-  .cg-dbar .dcap.over { background: #f85149; box-shadow: 0 0 16px #f85149; }
+  .cg-dbar .dcap.over { background: #db6d28; box-shadow: 0 0 16px #db6d2855; }
   .cg-status { display: flex; align-items: center; gap: 16px; margin-top: 24px; min-height: 84px; box-sizing: border-box; padding: 12px 18px; border-radius: 12px; border: 1px solid #3d444d; border-left: 6px solid var(--c, #3d444d); background: #0d1117c0; font: 600 21px/1.3 "Mona Sans"; color: #e6edf3; }
   .cg-status b { flex: none; width: 128px; font: 700 15px/1.2 var(--mono); letter-spacing: .12em; color: var(--c); }
   .cg-status.pop span { animation: cgPop .5s cubic-bezier(.2,.9,.2,1) both; }
@@ -7165,10 +7165,10 @@
     const AG = pickAgent();
     resetIndex();
     const STEPS = [
-      { id: "on", n: 1, label: "Scheduling", c: "#4493f8", aic: 700, bar: "weekly" },
+      { id: "on", n: 1, label: "Scheduling", c: "#d29922", aic: 700, bar: "weekly" },
       { id: "steps", n: 2, label: "Deterministic", c: "#d29922", aic: 420, bar: "steps" },
-      { id: "cost", n: 2, label: "Cost guard", c: "#f85149", aic: 420, bar: "caps" },
-      { id: "agent", n: 5, label: "Sub-agent", c: "#3fb950", aic: 160, bar: "haiku" },
+      { id: "cost", n: 2, label: "Cost guard", c: "#d29922", aic: 420, bar: "caps" },
+      { id: "agent", n: 5, label: "Sub-agent", c: "#d29922", aic: 160, bar: "haiku" },
       { id: "router", n: 1, label: "Model routing", c: "#ab7df8", aic: 110, bar: "routed" },
     ];
     const BASE = 2800;
@@ -7309,9 +7309,9 @@
     const num = h("b", {}, "2,800"),
       delta = h("em", {}, "−96%");
     const chips = [
-      ["Guard", "#f85149"],
-      ["Measure", "#4493f8"],
-      ["Optimize", "#3fb950"],
+      ["Guard", "#d29922"],
+      ["Measure", "#d29922"],
+      ["Optimize", "#d29922"],
     ].map(([x, c]) => h("span", { "--c": c }, x));
     const BARS = [{ bar: "daily", c: "#8b949e", aic: BASE }, ...STEPS];
     const bars = BARS.map(b => h("div", { class: "cm-bar", "--c": b.c }, h("span", {}, b.aic.toLocaleString("en-US")), h("div", {}), h("small", {}, b.bar)));
@@ -7329,9 +7329,9 @@
       ctx = cv.getContext("2d");
     const route = h("div", { class: "cm-route" }, cv, h("i", {}, "model: router"));
     const MODELS = [
-      ["robust", "#ab7df8", 15, 70, "costly failures"],
-      ["balanced", "#4493f8", 3, 150, "general work"],
-      ["economy", "#3fb950", 1, 230, "triage, summaries"],
+      ["robust", "#d2a8ff", 15, 70, "costly failures"],
+      ["balanced", "#bc8cff", 3, 150, "general work"],
+      ["economy", "#a371f7", 1, 230, "triage, summaries"],
     ];
     const AX = 60,
       AY = 150,
@@ -7525,10 +7525,10 @@
     // [id, left, width, colour, job, gate, settings, when it applies]
     const NODES = [
       ["trig", 0, 140, "#8b949e", "on:", "Events", "issues", null],
-      ["pre", 190, 340, "#4493f8", "pre_activation", "Execution controls", "user-rate-limit · concurrency", "every event · before start"],
-      ["adm", 580, 340, "#ab7df8", "admission · optional", "Admission", "on.admission · OIDC", "central · before activation"],
+      ["pre", 190, 340, "#d29922", "pre_activation", "Execution controls", "user-rate-limit · concurrency", "every event · before start"],
+      ["adm", 580, 340, "#d29922", "admission · optional", "Admission", "on.admission · OIDC", "central · before activation"],
       ["act", 970, 340, "#d29922", "activation", "Daily budget", "max-daily-ai-credits", "rolling 24 h · before start"],
-      ["agent", 1360, 340, "#f85149", "agent", "Per-run limits", "max-ai-credits · max-turns · timeout", "during the run · hard stop"],
+      ["agent", 1360, 340, "#d29922", "agent", "Per-run limits", "max-ai-credits · max-turns · timeout", "during the run · hard stop"],
     ];
     const node = {};
     const nodeEls = NODES.map(([id, x, w, c, job, title, tags, when]) => {
@@ -7570,9 +7570,9 @@
     const pipe = h("div", { class: "cg-pipe" }, h("div", { class: "cg-lane" }), auth, alink, nodeEls, tokEls);
 
     const MODES = [
-      ["OPTIMIZE", "#3fb950", "Spend less per run", "schedule · steps · routing"],
+      ["OPTIMIZE", "#d29922", "Spend less per run", "schedule · steps · routing"],
       ["BUDGET", "#d29922", "Cap what runs may spend", "per run · per 24 h · per event"],
-      ["ADMIT", "#ab7df8", "Decide if a run may start", "central authority"],
+      ["ADMIT", "#d29922", "Decide if a run may start", "central authority"],
     ];
     const modes = MODES.map(([b, c, s, d]) => h("div", { class: "cg-mode", "--c": c }, h("b", {}, b), h("span", {}, s), h("small", {}, d)));
     const mode = i => modes.forEach((m, j) => m.classList.toggle("on", j === i));
@@ -7653,8 +7653,8 @@
       zone = h("div", { class: "zone" }),
       capM = h("div", { class: "cap" });
     const capKey = h("span", { class: "c" }, "max-ai-credits hard stop");
-    const segA = h("div", { class: "seg", "--c": "#f85149" }, "A"),
-      segD = h("div", { class: "seg", "--c": "#ab7df8" }, "D");
+    const segA = h("div", { class: "seg", "--c": "#d29922" }, "A"),
+      segD = h("div", { class: "seg", "--c": "#4493f8" }, "D");
     const dcap = h("div", { class: "dcap", style: { left: `${kd(DAYCAP)}px` } });
     const dayV = h("b", {});
     const statB = h("b", {}),
@@ -7758,9 +7758,9 @@
           0,
           () => {
             mode(1);
-            hot([5, 6, 7, 8], "#4493f8");
+            hot([5, 6, 7, 8], "#d29922");
             ["A", "B", "C"].forEach((id, i) => put(id, TX.trig[i], 0));
-            say("#4493f8", "EVENTS", "Three issues open at once. Every event meets the execution controls first.");
+            say("#d29922", "EVENTS", "Three issues open at once. Every event meets the execution controls first.");
           },
         ],
         [
@@ -7779,7 +7779,7 @@
             mark("A", "ok");
             mark("B", "q", "queued");
             mark("C", "x", "rate-limited");
-            say("#4493f8", "THROTTLE", "user-rate-limit cancels the excess run; concurrency queues the next one behind run A.");
+            say("#d29922", "THROTTLE", "user-rate-limit cancels the excess run; concurrency queues the next one behind run A.");
             snd(() => sfx.block(true));
           },
         ],
@@ -7815,7 +7815,7 @@
           3100,
           () => {
             rise(380, 0.3);
-            say("#3fb950", "RUNNING", "Run A's agent spends AI credits against its 500 AIC per-run cap.");
+            say("#4493f8", "RUNNING", "Run A's agent spends AI credits against its 500 AIC per-run cap.");
           },
         ],
       ],
@@ -7823,7 +7823,7 @@
         [
           0,
           () => {
-            hot([9], "#f85149");
+            hot([9], "#d29922");
             rise(470, 0.07);
           },
         ],
@@ -7839,7 +7839,7 @@
         [
           0,
           () => {
-            hot([9, 10, 11], "#f85149");
+            hot([9, 10, 11], "#db6d28");
             rise(500, 0.04);
           },
         ],
@@ -7850,7 +7850,7 @@
             rstate = "stop";
             nset("agent", "stop", "hard stop");
             mark("A", "x", "stopped");
-            say("#f85149", "HARD STOP", "Run A ends at 500 AIC. max-turns and timeout-minutes cut a run off the same way.");
+            say("#db6d28", "HARD STOP", "Run A ends at 500 AIC. max-turns and timeout-minutes cut a run off the same way.");
             snd(() => sfx.block(false));
           },
         ],
@@ -7876,7 +7876,7 @@
             nset("agent", "skip", "skipped · 0 AIC");
             mark("B", "x", "blocked");
             rstate = "skip";
-            say("#d29922", "BLOCKED", "Run B never starts: the rolling 24 h total is over max-daily-ai-credits, so no AI credits are spent.");
+            say("#db6d28", "BLOCKED", "Run B never starts: the rolling 24 h total is over max-daily-ai-credits, so no AI credits are spent.");
             snd(() => sfx.block(false));
           },
         ],
@@ -7886,13 +7886,13 @@
           0,
           () => {
             mode(2);
-            hot([4], "#ab7df8");
+            hot([4], "#d29922");
             hide("B");
             ["pre", "adm", "act", "agent"].forEach(id => nset(id));
             authSet("on", "URL set");
             mark("D");
             put("D", TX.trig[0], 0);
-            say("#ab7df8", "ADMISSION", "The org points opted-in workflows at a central admission authority.");
+            say("#d29922", "ADMISSION", "The org points opted-in workflows at a central admission authority.");
           },
         ],
         [
@@ -7922,7 +7922,7 @@
             authSet("ok", "200 · 250 AIC");
             nset("adm", "pass", "approved");
             mark("D", "ok");
-            say("#ab7df8", "APPROVED", "Approved before activation with a 250 AIC allowance that replaces max-ai-credits; the daily check is superseded.");
+            say("#4493f8", "APPROVED", "Approved before activation with a 250 AIC allowance that replaces max-ai-credits; the daily check is superseded.");
             snd(() => sfx.review());
           },
         ],
@@ -7968,7 +7968,7 @@
             authSet("deny", "403 · denied");
             nset("adm", "stop", "denied");
             mark("E", "x", "denied");
-            say("#f85149", "DENIED", "Denied runs never activate. On an outage, ignore (the default) keeps local guardrails; block stops.");
+            say("#db6d28", "DENIED", "Denied runs never activate. On an outage, ignore (the default) keeps local guardrails; block stops.");
             snd(() => sfx.bug());
           },
         ],
