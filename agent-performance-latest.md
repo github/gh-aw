@@ -1,52 +1,66 @@
-# Agent Performance Analyzer - Latest Run (2026-11-16)
+# Agent Performance Analyzer - Latest Run (2026-11-17)
 
-Data basis: `metrics/daily/2026-11-15.json` (collection_status complete). The 2026-11-16 `latest.json` is partial (window 11-15T02:35Z to 11-16T02:35Z; safe-output outcomes all pending, quality and PR merge rate null). Scores below use executed-run success rate only. Output sampling not performed, so no quality scores.
-Totals (complete 11-15): 627 executed, 77.4% successful, 81.4M tokens. Daily overall rate: 11-13 55.3%, 11-14 72.4%, 11-15 77.4%. Older complete days: 11-03 73.9%, 11-08 86.9%.
+Data basis: `metrics/latest.json` (collection_status complete; window 2026-11-16T02:33Z to 2026-11-17T02:33Z). Quality and engagement fields are null, so scores use executed-run success rate only. No output sampling was done.
+Totals (11-17): 618 executed, 78.0% successful, 88.3M tokens, 195 safe outputs.
+Daily overall rate: 11-13 55.3%, 11-14 72.4%, 11-15 77.4%, 11-16 77.4% (partial), 11-17 78.0%.
 
-## Ranking (complete 11-15, executed >= 3)
-Top: test-quality-sentinel 63/63 (100%, 1.33M tokens), design-decision-gate 25/25 (100%, 0.28M), issue-monster 11/11, auto-triage-issues 3/3 (2.8M tokens, 3 runs), pr-triage-agent 3/3, ponytail-reviewer 48/51 (94%, 11.6M tokens).
-Middle: avenger 10/11 (91%), mattpocock-skills-reviewer 43/52 (83%, 4.74M tokens), pr-sous-chef 86/106 (81%, 1.40M tokens), pr-specification-reviewer 27/35 (77%, avg 3803s).
-Bottom: aw-failure-investigator 3/4, code-scanning-fixer 3/4, contribution-check 3/6, ai-moderator 2/10, auditor 0/21, daily-go-test-parallelizer 0/9.
-Caveat: pr-sous-chef and pr-specification-reviewer are command-triggered per frontmatter. Their executed counts may include gated runs. Not verified per run; read as a caveat.
+## Ranking (complete 11-17, executed >= 3; cmd = command-triggered, rate on executed runs)
+Top: issue-monster 70/70 (100%); ponytail-reviewer 35/37 (94.6%, cmd, 8.46M tokens); pr-sous-chef 77/83 (92.8%, cmd, 18 issues and 21 comments); test-quality-sentinel 38/41 (92.7%); pr-code-quality-reviewer 30/33 (90.9%); design-decision-gate 13/15 (86.7%, cmd, 0.16M tokens).
+Middle: contribution-check 5/6 (83.3%, 5 issues created); auto-triage-issues 4/6 (66.7%, 1.28M tokens); mattpocock-skills-reviewer 25/33 (75.8%, cmd, 2.72M tokens); pr-specification-reviewer 27/36 (75.0%, cmd, avg 4170s).
+Bottom: auditor 12/19 (63.2%); ai-moderator 5/17 (29.4%, avg 10603s); daily-go-test-parallelizer 0/8 (0%, 7.63M tokens); dependabot-burner 0/3 (cmd, 2.40M tokens).
+Small samples (<3 executed): impeccable-skills-reviewer 2/2; visual-regression-checker 1/2; ab-testing-advisor 0/1 (7.41M tokens); audit-workflows 0/1 (7.32M tokens).
 
-## Bottom-10 prompt audit (grep counts; self-check, rubric, success-criteria, example markers)
-1. daily-go-test-parallelizer 0/9. Contradictory tool guidance. Validation step requires go test, but policy forbids env enumeration. Agent-declared reason: "required Go validation cannot run without prohibited process-environment enumeration" (unverified). 5.62M tokens for 9 runs (~625K/run). Seven open incomplete-result issues (#78058 etc.). Parent #77069 closed not_planned 2026-11-14 (verified).
-2. auditor 0/21. 814-line prompt, 1 self-check marker, 0 rubric, 0 examples. Failing step "Collect failure evidence". Logs HTTP 403, so prompt deficiency NOT established. Tracker #78066 is OPEN (verified). Do not redesign prompt until root cause is confirmed.
-3. ai-moderator 2/10. timeout-minutes 5 vs avg_duration 12,140s in snapshot. Conflict may be queue time in metric. Unverified. Not a prompt finding. Route to Workflow Health.
-4. contribution-check 3/6. Prior "bad labels" alert (lgtm/needs-work) looks stale: get_label returned both names. Failure cause otherwise unverified.
-5. visual-regression-checker 2/5. 116 lines, 0 self-check, 0 rubric, 0 success-criteria markers. Missing success criteria, missing self-assessment loop, no rubric.
-6. aw-failure-investigator 3/4, code-scanning-fixer 3/4. Sample < 5. Insufficient data.
-7. pr-specification-reviewer 27/35. Failures trace to non-agent push_ledger_changes job (tracker #77383 closed completed 11-14). Not a prompt issue.
-8. pr-sous-chef 86/106. 393 lines, 0 self-check, 0 success-criteria markers, 1 TODO/legacy marker to review. Missing self-assessment loop. 1.40M tokens.
-9. mattpocock-skills-reviewer 43/52. 326 lines, 0 self-check, 0 rubric, 1 success-criteria marker, 4 example refs. Missing self-assessment loop. Output swings: 0 comments 11-13/11-14, 39 on 11-15, 49 on 11-16 (partial). Verdict: REDESIGN.
-10. auto-triage-issues 2/3. Sample too small. 2.8M tokens over 3 runs (~940K/run).
+## Trend notes
+- auditor: 0/21 (11-15), 2/21 (11-14), 12/19 (11-17). Partial recovery. Workflow Health reports 7 consecutive live failures at "Collect failure evidence" since 11-16T21:28Z.
+- ai-moderator: 9/16 (11-13), 12/18 (11-14), 2/10 (11-15), 5/17 (11-17). Not stable.
+- daily-go-test-parallelizer: 0/8 (11-17). Failures are agent-declared budget-limited incompletes (Workflow Health). Parent #77069 closed not_planned.
+- mattpocock-skills-reviewer comments: 0 (11-13), 0 (11-14), 39 (11-15), 49 (11-16 partial), 0 (11-17). Output volume is inconsistent.
+
+## Bottom-10 prompt audit (grep markers: self-check, rubric, success-criteria, examples)
+1. daily-go-test-parallelizer (133 lines; 2 self-check, 0 rubric, 0 criteria). The earlier "contradictory tool guidance" finding is STALE. The prompt now permits `go test` validation and forbids pre-screening. Remaining deficiency: budget and turn limits produce incompletes, and the prompt sets no success criteria.
+2. auditor (851 lines; 1 self-check, 0 rubric, 1 criteria). Logs return HTTP 403 (difc_forbidden), so the prompt deficiency is NOT established. Tracker #78066 is OPEN (verified 11-17).
+3. ai-moderator (315 lines; 1 self-check, 1 rubric, 0 criteria). `timeout-minutes: 5` against a 10,603s average may be queue time in the metric. Unverified. Route to Workflow Health; not a prompt finding.
+4. dependabot-burner (582 lines; 0 self-check, 0 rubric, 0 criteria, cmd). 0/3. Route to Workflow Health.
+5. mattpocock-skills-reviewer (326 lines; 0 self-check, 0 rubric, 1 criteria, 4 examples, cmd). Missing self-assessment loop. Verdict: REDESIGN.
+6. pr-specification-reviewer (326 lines; 0 self-check, 0 rubric, 1 example, cmd). Failures trace to the non-agent push_ledger_changes job (#77383 closed completed 11-14). Not a prompt issue.
+7. pr-sous-chef (393 lines; 0 self-check, 0 criteria, cmd). Missing self-assessment loop. Watch item; no baseline for over-creation.
+8. contribution-check (339 lines; 0 self-check, 0 criteria, 5 examples). 1 failed run of 6. Earlier "bad labels" alert (lgtm/needs-work) is STALE: get_label returned both names. Failure cause otherwise unverified. Sample too small.
+9. auto-triage-issues (392 lines; 0 self-check, 0 criteria, 2 examples). 2 failed runs of 6. Sample too small.
+10. visual-regression-checker (116 lines; 0 self-check, 0 rubric, 0 criteria). 1/2 executed. Missing success criteria, self-assessment loop, and rubric. Sample too small to act on.
 
 ## Named reviewer verdicts
-- Matt Pocock Skills Reviewer: REDESIGN. 82.7% success; token and comment-volume swings; no self-check or rubric in prompt.
-- Design Decision Gate: KEEP. 25/25; 284K tokens (~11K/run). Prior "trim tokens" note is not supported by 11-15 data; drop it.
-- Impeccable Skills Reviewer: KEEP. 1/1 on 11-15, 3/3 on 11-16 partial. Insufficient data.
+- Matt Pocock Skills Reviewer: REDESIGN (unchanged). 75.8% success; comment-volume swings; no self-check or rubric.
+- Design Decision Gate: KEEP. 13/15 (86.7%), 0.16M tokens (~10K/run). Earlier "trim tokens" note is not supported; drop it.
+- Impeccable Skills Reviewer: KEEP. 2/2 (100%). Insufficient data.
 
 ## Pattern labels (count-only rule; a quiet agent can be correct)
-- under-creation (>= 3 executed, 0 safe outputs in 11-15 window): auditor (0/21), daily-go-test-parallelizer (0/9), ai-moderator (0 outputs on 2/10 successful). Also aw-failure-investigator and code-scanning-fixer (0 outputs on 3/4 successful; sample too small). test-quality-sentinel (63/63 successful, 0 outputs) is excluded: it may be silent by design. Confirm intent before flagging.
-- inconsistency: mattpocock-skills-reviewer (0 -> 39 -> 49 comments).
-- over-creation, repetition, scope-creep: none detected from profile data.
+- under-creation (>= 3 executed, 0 safe outputs in the 11-17 window): auditor (12 successful, 0 outputs), ai-moderator (5 successful, 0 outputs), daily-go-test-parallelizer (0 successful, 0 outputs). Confirm intent before acting.
+- inconsistency: mattpocock-skills-reviewer (see trend notes).
+- over-creation, repetition, scope-creep: none flagged from profile data.
 
-## Resource outliers (11-15 tokens)
-spec-enforcer 11.95M (1 run); ponytail-reviewer 11.56M (51 runs, ~227K/run); daily-go-test-parallelizer 5.62M; mattpocock-skills-reviewer 4.74M; daily-doc-updater 4.69M; auto-triage-issues 2.8M.
+## Resource outliers (11-17 tokens)
+ponytail-reviewer 8.46M (37 runs, ~229K/run); daily-go-test-parallelizer 7.63M (0 successful); ab-testing-advisor 7.41M (1 run, failed); audit-workflows 7.32M (1 run, failed); mattpocock-skills-reviewer 2.72M (33 runs); dependabot-burner 2.40M (0/3).
 
-## Verified this run (2026-11-16)
-- #78066 (auditor) OPEN.
-- #77984 (aw_cj01 conversation-job pattern) CLOSED not_planned 2026-11-16T04:48Z. Earlier notes calling it open are stale. Pattern not re-verified.
-- #77641 CLOSED not_planned 2026-11-15T04:40Z. #77069 CLOSED not_planned 2026-11-14T06:40Z.
-- metrics-collector.md still has no model-provider under engine (codex, model copilot/gpt-6-luna). Whether required is unverified. Its 0 runs in the window are likely window artifacts (the snapshot is written after the window closes).
-- Search and list reads are integrity-filtered (e.g. 40 items removed). Duplicate-issue checks for prior analyzer issues are unreliable.
+## Verified this run (2026-11-17, via github issue_read)
+- #78066 (Auditor) OPEN, created 2026-11-15T12:53Z.
+- #78259 (AI Moderator) CLOSED not_planned: created 11-16T04:51Z, closed 11-17T04:58Z. Workflow Health's 11-17 note still lists it as open; that note is stale.
+- #78416 (Dependabot Burner) CLOSED not_planned: created 11-16T16:14Z, closed 11-17T04:40Z.
+- #78418 (Avenger) CLOSED not_planned: created 11-16T16:29Z, closed 11-17T04:40Z. Workflow Health's note still lists it as open; stale.
+- #78429 (Auto-Triage Issues) CLOSED not_planned: created 11-16T18:25Z, closed 11-17T06:44Z.
+- #77062 CLOSED not_planned: created 11-12T04:37Z, closed 11-13T04:40Z (~24h).
+- #77641 CLOSED not_planned: created 11-14T04:38Z, closed 11-15T04:40Z (~24h).
+- #77069 CLOSED not_planned (DGTP parent, 11-14). #77383 CLOSED completed (11-14). #77984 CLOSED not_planned (11-16; earlier notes calling it open are stale; pattern not re-verified).
+- Pattern: WH-filed trackers close not_planned 12-24h after creation while their workflows still fail. Matches `expires: 1d` (group: true) in workflow-health-manager.md, lines 27-29. The 2026-09-21 and 2026-11-14 recommendations still apply.
+- Search results are integrity-filtered (5 to 10 items removed per query). Duplicate checks are unreliable.
+- metrics-collector.md still has no model-provider under engine (codex, model copilot/gpt-6-luna). Whether this is required is unverified. Its 0 runs are likely window artifacts.
 
 ## Decision this run
-No new discussion or issues. The 2026-11-15 run already published the weekly report and filed analyzer issues (metrics: 1 discussion, 2 issues in window). Filing again would duplicate. Terminal output: noop.
+Weekly report already published 11-15; next weekly due 11-22. No new discussion or issue: the expiry-closure pattern is already recommended to maintainers (2026-09-21, 2026-11-14), and a new filing would duplicate. Terminal output: noop.
 
 ## Run log (condensed)
 - 2026-11-11: ranking from 11-08 snapshot.
 - 2026-11-12: full ranking, Pocock/Impeccable/DDG verdicts.
-- 2026-11-14: ranking from complete latest.json. Pr-spec attributed to downstream ledger job.
-- 2026-11-15: full ranking, bottom-10 audit, weekly discussion, 2 issues (via safe outputs).
-- 2026-11-16: ranking from complete 11-15 snapshot. Verified trackers. Corrected stale notes (aw_cj01, DDG tokens, labels). noop.
+- 2026-11-14: ranking from complete latest.json. pr-spec attributed to downstream ledger job.
+- 2026-11-15: full ranking, bottom-10 audit, weekly discussion, 2 issues.
+- 2026-11-16: ranking from complete 11-15 snapshot. Verified trackers. Corrected aw_cj01, DDG tokens, and labels. noop.
+- 2026-11-17: ranking from complete 11-17 snapshot. Verified trackers via github issue_read. Corrected DGTP prompt note. Recorded expiry-closure pattern. noop.

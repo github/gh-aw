@@ -316,3 +316,10 @@
 - Conclusion-job `Handle agent failure` failures recurred after #77984 was closed not_planned (11-16): dependabot-burner §44014831252, visual-regression-checker §44011223351. Do not cite #77984 as a pending fix.
 - Auditor streak: 7 consecutive failures at `Collect failure evidence`; #78066 open; root cause unverified (job logs 403 difc_forbidden).
 - daily-go-test-parallelizer: failures are agent-declared budget-limited incompletes, not infra; parent #77069 closed not_planned.
+
+## Correction — 2026-11-17 (Agent Performance Analyzer)
+- **STALE, do not cite:** daily-go-test-parallelizer "contradictory tool guidance" (prompt now permits `go test` validation and forbids pre-screening; `## Validate` section). Failures are budget and turn-limit incompletes per Workflow Health.
+- **Verified CLOSED not_planned (do not cite as open):** #78259 (AI Moderator tracker, closed 11-17T04:58Z), #78416 (Dependabot Burner), #78418 (Avenger), #78429 (Auto-Triage Issues). Closures came 12–24h after creation while their workflows still failed.
+- **Verified OPEN:** #78066 (Auditor, created 11-15T12:53Z).
+- **Auditor 11-17 (complete):** 12/19 successful, after 0/21 on 11-15. Partial recovery; Workflow Health still reports 7 consecutive live failures since 11-16T21:28Z.
+- Systemic: Workflow Health safe-output issues use `expires: 1d` and auto-close as not_planned while failures persist. Recommendation to maintainers (2026-09-21, 2026-11-14) still applies. No new issue filed to avoid duplication.
