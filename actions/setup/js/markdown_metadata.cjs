@@ -6,6 +6,7 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
 const { parseLockFileHeaders, parseMarkdownJSON } = require("./lock_file_headers.cjs");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { execFileSync } = require("node:child_process");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isRateLimitError } = require("./error_recovery.cjs");
 const { getGitHubAPIQuotaExhaustion, withGitHubAPIQuotaWait } = require("./github_api_quota.cjs");
@@ -340,8 +341,8 @@ async function readRemoteMarkdownMetadata(githubClient, identity, quotaWait = {}
   return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
 }
 
-/** @param {string} workflowId @param {string} workspace @param {{repository?: string, githubClient?: any, revision?: string, embeddedMetadata?: string, quotaWait?: {now?: () => number, sleep?: (ms: number) => Promise<void>, maxWaitMs?: number}}} [options] */
-async function loadMarkdownMetadata(workflowId, workspace, { repository, githubClient, revision, embeddedMetadata, quotaWait } = {}) {
+/** @param {string} workflowId @param {string} workspace @param {{repository?: string, githubClient?: any, revision?: string, embeddedMetadata?: string, embeddedMetadataFile?: string, quotaWait?: {now?: () => number, sleep?: (ms: number) => Promise<void>, maxWaitMs?: number}}} [options] */
+async function loadMarkdownMetadata(workflowId, workspace, { repository, githubClient, revision, embeddedMetadata, embeddedMetadataFile, quotaWait } = {}) {
   const match = /^([^/]+)\/([^/]+)\/(.+\.lock\.yml)@(.+)$/.exec(workflowId);
   if (!match) throw new Error("Compiler Markdown metadata requires the executing workflow identity");
   const workspaceRoot = path.resolve(workspace);
@@ -350,12 +351,32 @@ async function loadMarkdownMetadata(workflowId, workspace, { repository, githubC
   if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Invalid compiler Markdown metadata path");
   if (revision && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(revision) || /^0+$/.test(revision))) throw new Error("Executing workflow metadata requires an immutable workflow revision");
   let metadata;
+  if (embeddedMetadataFile !== undefined) {
+    if (embeddedMetadata !== undefined) throw new Error("Conflicting embedded compiler Markdown metadata sources");
+    const maxEncodedBytes = Math.ceil(MAX_MANIFEST_BYTES / 3) * 4;
+    const file = fs.openSync(embeddedMetadataFile, "r");
+    try {
+      const stat = fs.fstatSync(file);
+      if (!stat.isFile() || stat.size > maxEncodedBytes) throw new Error("Embedded compiler Markdown metadata exceeds the bounded input limit");
+      const buffer = Buffer.alloc(maxEncodedBytes + 1);
+      let length = 0;
+      while (length < buffer.length) {
+        const read = fs.readSync(file, buffer, length, buffer.length - length, null);
+        if (!read) break;
+        length += read;
+      }
+      if (length > maxEncodedBytes) throw new Error("Embedded compiler Markdown metadata exceeds the bounded input limit");
+      embeddedMetadata = buffer.subarray(0, length).toString("utf8");
+    } finally {
+      fs.closeSync(file);
+    }
+  }
   if (embeddedMetadata !== undefined) {
     // This catalog travels with the executing job, not the caller's checkout.
     if (embeddedMetadata.length > Math.ceil(MAX_MANIFEST_BYTES / 3) * 4) throw new Error("Embedded compiler Markdown metadata exceeds the bounded input limit");
     const bytes = Buffer.from(embeddedMetadata, "base64");
     if (bytes.length > MAX_MANIFEST_BYTES || bytes.toString("base64") !== embeddedMetadata) throw new Error("Embedded compiler Markdown metadata requires bounded canonical base64");
-    metadata = parseMarkdownJSON(new TextDecoder("utf8", { fatal: true }).decode(bytes));
+    metadata = parseStrictJSON(new TextDecoder("utf8", { fatal: true }).decode(bytes), { maxBytes: MAX_MANIFEST_BYTES });
   } else {
     const remote = revision || (repository && repository !== `${match[1]}/${match[2]}`);
     const local = revision ? readGitObjectMarkdownMetadata(workspaceRoot, revision, match[3]) : undefined;

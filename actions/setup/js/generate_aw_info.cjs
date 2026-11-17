@@ -70,6 +70,7 @@ async function main(core, ctx, githubClient, options = {}) {
       githubClient: githubClient || global.github,
       revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
       embeddedMetadata: process.env.GH_AW_INFO_MARKDOWN_METADATA,
+      embeddedMetadataFile: process.env.GH_AW_INFO_MARKDOWN_METADATA_FILE,
       quotaWait: options.quotaWait,
     });
   } catch (error) {

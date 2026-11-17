@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,9 +35,9 @@ func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal([]byte(generated), &document))
 	embedded := document.Jobs["activation"].Env["GH_AW_INFO_MARKDOWN_METADATA"]
 	require.NotEmpty(t, embedded)
-	require.NotContains(t, embedded, "${{", "compiler metadata must not evaluate authored expressions")
 	decoded, err := base64.StdEncoding.DecodeString(embedded)
 	require.NoError(t, err)
+	require.Contains(t, string(decoded), "${{ inputs.model }}", "authored expressions must survive as inert data")
 	var catalog GHAWMarkdownMetadata
 	require.NoError(t, json.Unmarshal(decoded, &catalog))
 	require.Equal(t, 2, catalog.Version)
@@ -51,6 +53,86 @@ func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
 		}
 	}
 	require.Contains(t, string(decoded), `"Read"`)
+	require.NotContains(t, generated, "model: ${{ inputs.model }}")
+}
+
+func TestCompilerEmbedsLargeActivationMarkdownMetadata(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "workflow.md")
+	var content strings.Builder
+	content.WriteString("---\non: workflow_dispatch\nstrict: false\nengine: copilot\n---\n# Work\n\n")
+	for i := range 200 {
+		fmt.Fprintf(&content, "## agent: reader-%d\n---\nmodel: model-%d-%s\ntools: [Read]\n---\nRead files.\n## end agent: reader-%d\n\n", i, i, strings.Repeat("x", 600), i)
+	}
+	require.NoError(t, os.WriteFile(source, []byte(content.String()), 0o600))
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowFile(source)
+	require.NoError(t, err)
+	generated, err := compiler.CompileToYAML(data, source)
+	require.NoError(t, err)
+	require.NoError(t, compiler.validateExpressionSizes(generated))
+	var document struct {
+		Jobs map[string]struct {
+			Env   map[string]string `yaml:"env"`
+			Steps []struct {
+				Run string `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(generated), &document))
+	activation := document.Jobs["activation"]
+	require.NotContains(t, activation.Env, "GH_AW_INFO_MARKDOWN_METADATA")
+	require.Equal(t, "${{ runner.temp }}/gh-aw-markdown-metadata.b64", activation.Env["GH_AW_INFO_MARKDOWN_METADATA_FILE"])
+	runnerTemp := t.TempDir()
+	chunks := 0
+	for _, step := range activation.Steps {
+		if !strings.HasPrefix(step.Run, "printf '%s' '") {
+			break
+		}
+		require.Less(t, len(step.Run), 21000)
+		command := exec.Command("bash", "-e", "-c", step.Run)
+		command.Env = append(os.Environ(), "RUNNER_TEMP="+runnerTemp)
+		output, err := command.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		chunks++
+	}
+	require.Greater(t, chunks, 1)
+	payload, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw-markdown-metadata.b64"))
+	require.NoError(t, err)
+	require.Greater(t, len(payload), 128*1024)
+	decoded, err := base64.StdEncoding.DecodeString(string(payload))
+	require.NoError(t, err)
+	var catalog GHAWMarkdownMetadata
+	require.NoError(t, json.Unmarshal(decoded, &catalog))
+	require.Len(t, catalog.Records, 200)
+}
+
+func TestCompilerActivationMarkdownMetadataErrors(t *testing.T) {
+	compiler := NewCompiler()
+	catalog := &GHAWMarkdownMetadata{Version: 2, Records: []GHAWMarkdownMetadataRecord{}}
+	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "activation job missing")
+	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "activation"}))
+	catalog.Records = append(catalog.Records, GHAWMarkdownMetadataRecord{
+		SHA256: strings.Repeat("a", 64),
+		Kind:   "artifact",
+		Value:  json.RawMessage(`{"model":"` + strings.Repeat("x", maxActivationMetadataBytes) + `"}`),
+	})
+	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "4194304-byte limit")
+}
+
+func TestCompilerMarkdownMetadataReusesCatalogWithoutMutation(t *testing.T) {
+	record := GHAWMarkdownMetadataRecord{
+		SHA256: strings.Repeat("a", 64),
+		Kind:   "artifact",
+		Value:  json.RawMessage(`{"model":"small"}`),
+	}
+	catalog := &GHAWMarkdownMetadata{Version: 2, Records: []GHAWMarkdownMetadataRecord{record}}
+	data := &WorkflowData{compiledMarkdownMetadata: catalog}
+	compiler := NewCompiler()
+	var header strings.Builder
+	header.WriteString("# gh-aw-metadata: {\"agent_model\":\"small\"}\n")
+	require.NoError(t, compiler.generateManifestHeader(&header, data, nil, nil))
+	require.Contains(t, header.String(), `"metadata_refs"`)
+	require.Equal(t, []GHAWMarkdownMetadataRecord{record}, catalog.Records, "manifest references must not leak into activation metadata")
 }
 
 func TestCompilerMarkdownMetadataManifest(t *testing.T) {

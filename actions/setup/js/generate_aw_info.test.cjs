@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
+import os from "node:os";
+import path from "node:path";
 import { createHash } from "node:crypto";
 
 // Mock the global objects that GitHub Actions provides
@@ -304,15 +306,33 @@ describe("generate_aw_info.cjs", () => {
     expect(info.workflow_call_id).not.toBe(info.context.workflow_call_id);
   });
 
-  it("generates run info for a private reusable workflow using embedded compiler metadata", async () => {
+  it.each(["environment", "file"])("generates run info for a private reusable workflow using embedded compiler metadata via %s", async transport => {
     const source = "model: private-model\ntools: [Read]";
     const sha256 = createHash("sha256").update(source).digest("hex");
     const value = { model: "private-model", tools: ["Read"] };
     process.env.GH_AW_INFO_WORKFLOW_ID = "private/shared/.github/workflows/worker.lock.yml@refs/heads/main";
-    process.env.GH_AW_INFO_MARKDOWN_METADATA = Buffer.from(JSON.stringify({ version: 2, records: [{ kind: "artifact", sha256, value }] })).toString("base64");
+    const payload = Buffer.from(JSON.stringify({ version: 2, records: [{ kind: "artifact", sha256, value }] })).toString("base64");
+    let directory;
+    if (transport === "file") {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-metadata-"));
+      const file = path.join(directory, "metadata.b64");
+      const descriptor = fs.openSync(file, "w");
+      try {
+        fs.writeSync(descriptor, payload);
+      } finally {
+        fs.closeSync(descriptor);
+      }
+      vi.stubEnv("GH_AW_INFO_MARKDOWN_METADATA_FILE", file);
+    } else {
+      process.env.GH_AW_INFO_MARKDOWN_METADATA = payload;
+    }
     const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 })) } } };
 
-    await main(mockCore, mockContext, githubClient);
+    try {
+      await main(mockCore, mockContext, githubClient);
+    } finally {
+      if (directory) fs.rmSync(directory, { recursive: true, force: true });
+    }
 
     const info = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
     expect(info.agent_metadata).toEqual({ [sha256.slice(0, 20)]: value });

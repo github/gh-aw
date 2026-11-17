@@ -180,6 +180,49 @@ describe("compiler metadata source acquisition", () => {
     expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
   });
 
+  it.each(["environment", "file"])("loads a large catalog with per-record rather than catalog-wide structural limits via %s", async transport => {
+    const records = Array.from({ length: 300 }, (_, index) => ({
+      sha256: crypto.createHash("sha256").update(`agent-${index}`).digest("hex"),
+      kind: "artifact",
+      value: { model: `model-${index}`, tools: Array.from({ length: 50 }, (_, tool) => `tool-${tool}`) },
+    }));
+    const embeddedMetadata = Buffer.from(JSON.stringify(catalog(records))).toString("base64");
+    expect(embeddedMetadata.length).toBeGreaterThan(128 * 1024);
+    const embeddedMetadataFile = path.join(workspace, "metadata.b64");
+    fs.writeFileSync(embeddedMetadataFile, embeddedMetadata);
+    const githubClient = { rest: { repos: { getContent: vi.fn() } } };
+    const result = await metadata.loadMarkdownMetadata("private/shared/.github/workflows/main.lock.yml@main", workspace, {
+      revision,
+      githubClient,
+      ...(transport === "file" ? { embeddedMetadataFile } : { embeddedMetadata }),
+    });
+    expect(result).toEqual(catalog(records));
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing", "malformed", "oversized", "conflicting", "invalid-record", "duplicate-keys"])("rejects %s embedded file metadata without API fallback", async scenario => {
+    const embeddedMetadataFile = path.join(workspace, "metadata.b64");
+    const valid = Buffer.from(JSON.stringify(catalog([record({ model: "small" })]))).toString("base64");
+    if (scenario !== "missing") {
+      let payload = valid;
+      if (scenario === "malformed") payload = "not-base64";
+      if (scenario === "oversized") payload = "a".repeat(Math.ceil((4 * 1024 * 1024) / 3) * 4 + 1);
+      if (scenario === "invalid-record") payload = Buffer.from(JSON.stringify(catalog([record({ tools: Array.from({ length: 10001 }, () => "Read") })]))).toString("base64");
+      if (scenario === "duplicate-keys") payload = Buffer.from('{"version":2,"version":2,"records":[]}').toString("base64");
+      fs.writeFileSync(embeddedMetadataFile, payload);
+    }
+    const githubClient = { rest: { repos: { getContent: vi.fn() } } };
+    await expect(
+      metadata.loadMarkdownMetadata("private/shared/.github/workflows/main.lock.yml@main", workspace, {
+        revision,
+        githubClient,
+        embeddedMetadataFile,
+        ...(scenario === "conflicting" ? { embeddedMetadata: valid } : {}),
+      })
+    ).rejects.toThrow();
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+  });
+
   it("never falls back to checkout metadata after a source authorization failure", async () => {
     const file = ".github/workflows/main.lock.yml";
     fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));

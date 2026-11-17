@@ -14,21 +14,43 @@ import (
 
 var compilerYamlLog = logger.New("workflow:compiler_yaml")
 
+const maxActivationMetadataBytes = 4 * 1024 * 1024
+const activationMetadataChunkSize = 16000
+
 // Embed after job construction so rewritten prompt sources are included. Base64
 // keeps authored Actions expressions inert and needs no callee repository token.
-func (c *Compiler) embedActivationMarkdownMetadata(data *WorkflowData) error {
+func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadata) error {
 	activation, ok := c.jobManager.GetJob(string(constants.ActivationJobName))
 	if !ok {
-		return nil
+		return fmt.Errorf("activation job missing: cannot embed Markdown metadata")
 	}
-	encoded, err := json.Marshal(c.collectMarkdownMetadata(data))
+	encoded, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("cannot embed activation Markdown metadata: %w", err)
+	}
+	if len(encoded) > maxActivationMetadataBytes {
+		return fmt.Errorf("activation Markdown metadata exceeds the %d-byte limit; reduce the workflow's agent metadata", maxActivationMetadataBytes)
 	}
 	if activation.Env == nil {
 		activation.Env = map[string]string{}
 	}
-	activation.Env["GH_AW_INFO_MARKDOWN_METADATA"] = base64.StdEncoding.EncodeToString(encoded)
+	payload := base64.StdEncoding.EncodeToString(encoded)
+	if len(payload) <= activationMetadataChunkSize {
+		activation.Env["GH_AW_INFO_MARKDOWN_METADATA"] = payload
+		return nil
+	}
+	// Keep both run strings and environment entries below runner limits.
+	activation.Env["GH_AW_INFO_MARKDOWN_METADATA_FILE"] = "${{ runner.temp }}/gh-aw-markdown-metadata.b64"
+	var steps []string
+	for offset := 0; offset < len(payload); offset += activationMetadataChunkSize {
+		chunk := payload[offset:min(offset+activationMetadataChunkSize, len(payload))]
+		redirect := ">>"
+		if offset == 0 {
+			redirect = ">"
+		}
+		steps = append(steps, fmt.Sprintf("      - name: Write activation metadata chunk %d\n        shell: bash\n        run: |\n          printf '%%s' '%s' %s \"$RUNNER_TEMP/gh-aw-markdown-metadata.b64\"\n", offset/activationMetadataChunkSize+1, chunk, redirect))
+	}
+	activation.Steps = append(steps, activation.Steps...)
 	return nil
 }
 
@@ -237,7 +259,8 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
 		return "", nil, nil, fmt.Errorf("workflow compilation requires valid jobs and dependencies; check job definitions and needs references: %w", err)
 	}
-	if err := c.embedActivationMarkdownMetadata(data); err != nil {
+	data.compiledMarkdownMetadata = c.collectMarkdownMetadata(data)
+	if err := c.embedActivationMarkdownMetadata(data.compiledMarkdownMetadata); err != nil {
 		return "", nil, nil, err
 	}
 	repoConfig, err = resolvedArtifactRetentionConfig(repoConfig, data)
