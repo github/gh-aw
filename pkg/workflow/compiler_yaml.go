@@ -44,7 +44,7 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 	}
 	payload := inertJSON(encoded)
 	stepIndex := slices.IndexFunc(activation.Steps, func(step string) bool { return strings.Contains(step, awInfoStepEnvAnchor) })
-	if stepIndex < 0 {
+	if stepIndex < 0 || stepIndex >= len(activation.Steps) {
 		return errors.New("activation run info step missing: cannot embed Markdown metadata")
 	}
 	env := "          GH_AW_INFO_MARKDOWN_METADATA: '" + payload + "'\n"

@@ -9,7 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -67,7 +67,7 @@ func (c *Compiler) collectMarkdownMetadataRecords(data *WorkflowData, includeRep
 	for key := range records {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	result := &GHAWMarkdownMetadata{Version: 2, Records: make([]GHAWMarkdownMetadataRecord, 0, len(keys))}
 	for _, key := range keys {
 		result.Records = append(result.Records, records[key])
