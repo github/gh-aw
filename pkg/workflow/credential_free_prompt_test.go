@@ -91,7 +91,7 @@ func TestCredentialFreePromptPreservesIndentedChunks(t *testing.T) {
 	chunks := splitContentIntoChunks(content)
 	require.Len(t, chunks, 2)
 	require.True(t, strings.HasPrefix(chunks[1], "   Continuation text\n"))
-	chunks = append(chunks, "")
+	chunks = append(chunks, "", "\n\n  - indented: after blank lines\n", "\tTabbed # not a comment\r\n\"quoted\" 'text' \\ backslash\n\n\n")
 
 	compiler := &Compiler{}
 	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
@@ -99,6 +99,7 @@ func TestCredentialFreePromptPreservesIndentedChunks(t *testing.T) {
 	_, sourceContent := compiler.generateUnifiedPromptCreationStepWithContent(&generated, nil, chunks, nil, data)
 	require.Len(t, sourceContent, len(chunks))
 	require.Equal(t, "   Continuation text\n145. Step 145: do the thing\n\n", sourceContent["GH_AW_PROMPT_CONTENT_0001"])
+	require.Equal(t, "\tTabbed # not a comment\r\n\"quoted\" 'text' \\ backslash\n\n\n", sourceContent["GH_AW_PROMPT_CONTENT_0004"])
 
 	var output strings.Builder
 	require.NoError(t, writeCredentialFreePromptSteps(&output, generated.String(), data, sourceContent))
@@ -142,6 +143,12 @@ func TestValidatePromptContentRoundTrip(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("first parse differs from source", func(t *testing.T) {
+		generated := "- name: Create prompt\n  env:\n    GH_AW_PROMPT_CONTENT_0000: continuation\n"
+		err := writeCredentialFreePromptSteps(&strings.Builder{}, generated, &WorkflowData{}, intendedContent)
+		require.ErrorContains(t, err, "preserved exactly")
+	})
 }
 
 func TestPromptRejectsSecretBackedAuthorBindings(t *testing.T) {

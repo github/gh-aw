@@ -19,6 +19,8 @@ func TestDefaultMarshalOptionsMultilineRoundTrip(t *testing.T) {
 		{"leading tab", "\tcontinuation\nnext: list item\n"},
 		{"single-line leading spaces", "   continuation"},
 		{"single-line leading tab", "\tcontinuation"},
+		{"single-line trailing space", "continuation "},
+		{"single-line trailing tab", "continuation\t"},
 		{"uniform indentation", "   first\n   second\n"},
 		{"leading newline", "\n   continuation\nnext: list item\n"},
 		{"leading blank lines", "\n\nfirst\nsecond"},
