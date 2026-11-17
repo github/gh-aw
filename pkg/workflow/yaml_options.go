@@ -30,12 +30,16 @@ func marshalYAMLWithOptions(value any, options ...yaml.EncodeOption) ([]byte, er
 	}
 	repaired := false
 	for _, candidate := range ast.Filter(ast.StringType, node) {
-		text := candidate.(*ast.StringNode)
+		text, ok := candidate.(*ast.StringNode)
+		if !ok {
+			continue
+		}
 		if !strings.ContainsAny(text.Value, "\r\n") {
 			continue
 		}
-		unsafe := strings.Contains(text.Value, "\r") || strings.HasPrefix(text.Value, " ") ||
-			strings.HasPrefix(text.Value, "\t") || strings.HasPrefix(text.Value, "\n") ||
+		firstContent := strings.TrimLeft(text.Value, "\n")
+		unsafe := firstContent == "" || strings.Contains(text.Value, "\r") || strings.HasPrefix(firstContent, " ") ||
+			strings.HasPrefix(firstContent, "\t") ||
 			strings.HasSuffix(text.Value, " ") || strings.HasSuffix(text.Value, "\t")
 		repaired = repaired || unsafe
 		// Reparsing an AST literal can also strip its final whitespace.

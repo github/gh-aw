@@ -181,7 +181,7 @@ func validatePromptContentRoundTrip(encoded []byte, steps []WorkflowStep) error 
 			if !strings.HasPrefix(key, "GH_AW_PROMPT_CONTENT_") {
 				continue
 			}
-			if actual, exists := decoded[i].Env[key]; !exists || actual != value {
+			if actual, exists := decoded[i].Env[key]; !exists || actual != value { //nolint:uncheckedsliceindex // The step counts are checked above.
 				return fmt.Errorf("YAML round trip changed %s in prompt step %q — expected prompt content to be preserved exactly", key, step.Name)
 			}
 		}

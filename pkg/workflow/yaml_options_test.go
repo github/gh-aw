@@ -22,6 +22,8 @@ func TestDefaultMarshalOptionsMultilineRoundTrip(t *testing.T) {
 		{"leading blank lines", "\n\nfirst\nsecond"},
 		{"whitespace-only first line", "   \nfirst\nsecond\n"},
 		{"only newlines", "\n\n"},
+		{"single newline", "\n"},
+		{"three newlines", "\n\n\n"},
 		{"trailing blank lines", "   first\nsecond\n\n"},
 		{"CRLF", "first\r\nsecond\r\n"},
 		{"quotes and escapes", "   \"quoted\" \\path\nnext: 'value'\n"},
@@ -29,6 +31,7 @@ func TestDefaultMarshalOptionsMultilineRoundTrip(t *testing.T) {
 		{"trailing spaces", "first\nsecond  "},
 		{"trailing tab", "first\nsecond\t"},
 		{"unindented trailing blank lines", "first\nsecond\n\n"},
+		{"multiple trailing blank lines", "first\nsecond\n\n\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -133,6 +136,7 @@ func TestDefaultMarshalOptionsConsistency(t *testing.T) {
 		"name":        "workflow",
 		"on":          "push",
 		"description": "ordinary multiline\nwith trailing blank lines\n\n",
+		"notes":       "\n\nplain first line\nlast\n",
 		"jobs": map[string]any{
 			"test": map[string]any{
 				"runs-on": "ubuntu-latest",

@@ -91,6 +91,7 @@ func TestCredentialFreePromptPreservesIndentedChunks(t *testing.T) {
 	chunks := splitContentIntoChunks(content)
 	require.Len(t, chunks, 2)
 	require.True(t, strings.HasPrefix(chunks[1], "   Continuation text\n"))
+	chunks = append(chunks, "")
 
 	compiler := &Compiler{}
 	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
