@@ -88,15 +88,15 @@ for (const kind of ["docs", "blog"]) {
       const path = kind === "blog" ? `blog/${field}` : field;
       const html = await readFile(join(root, "dist", path, "index.html"), "utf8");
       const schemas = schemasFromHtml(html);
-      const article = schemas.find(schema => schema["@type"] === (kind === "blog" ? "BlogPosting" : "TechArticle"));
-      assert.ok(article, "expected the custom head's article schema");
+      const articles = schemas.flatMap(schema => schema["@graph"] ?? [schema]).filter(schema => schema["@type"] === (kind === "blog" ? "BlogPosting" : "TechArticle"));
+      assert.equal(articles.length, 1, "expected exactly one article schema");
+      const [article] = articles;
       assert.equal(article[field === "title" ? "headline" : field], payload);
       if (kind === "blog") {
-        const pluginArticle = schemas.flatMap(schema => schema["@graph"] ?? []).find(schema => schema["@type"] === "BlogPosting");
-        assert.ok(pluginArticle, "expected the blog plugin's independent article schema");
-        assert.equal(pluginArticle[field === "title" ? "headline" : field], payload);
-        assert.equal(pluginArticle.author[0].name, payload);
-        assert.deepEqual(pluginArticle.keywords, [payload]);
+        assert.equal(article.author[0].name, payload);
+        assert.deepEqual(article.keywords, [payload]);
+        assert.equal(article.dateModified, article.datePublished);
+        assert.deepEqual(article.publisher, { "@id": "https://github.github.com/gh-aw/#organization" });
       }
     });
   }
