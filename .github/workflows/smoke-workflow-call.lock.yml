@@ -791,9 +791,6 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.325
@@ -2201,9 +2198,6 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.325
