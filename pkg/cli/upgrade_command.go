@@ -11,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
@@ -463,7 +464,7 @@ func runUpgradeCommand(opts upgradeOptions) error {
 // updateCopilotArtifacts updates the dispatcher skill and related Copilot setup artifacts.
 func updateCopilotArtifacts(opts upgradeOptions, workflowDir string) error {
 	// Update dispatcher skill
-	if err := ensureAgenticWorkflowsDispatcher(opts.ctx, opts.verbose, opts.noSkill, true); err != nil {
+	if err := ensureAgenticWorkflowsDispatcher(ctxutil.OrBackground(opts.ctx), opts.verbose, opts.noSkill, true); err != nil {
 		upgradeLog.Printf("Failed to update dispatcher skill: %v", err)
 		return fmt.Errorf("failed to update dispatcher skill: %w", err)
 	}

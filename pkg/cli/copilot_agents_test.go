@@ -353,6 +353,30 @@ func TestBuildAgenticWorkflowsSkillContent(t *testing.T) {
 	assert.Contains(t, content, agenticWorkflowsOTELSkillParagraph)
 }
 
+func TestEnsureAgenticWorkflowsDispatcherReturnsCancellationWithoutWriting(t *testing.T) {
+	tempDir := t.TempDir()
+	gitInit := exec.Command("git", "init")
+	gitInit.Dir = tempDir
+	require.NoError(t, gitInit.Run())
+	chdirForTest(t, tempDir)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	contextWasPreserved := false
+	originalList := listAgenticWorkflowsMarkdownFiles
+	listAgenticWorkflowsMarkdownFiles = func(c context.Context) ([]string, error) {
+		contextWasPreserved = c == ctx
+		return nil, c.Err()
+	}
+	t.Cleanup(func() { listAgenticWorkflowsMarkdownFiles = originalList })
+
+	err := ensureAgenticWorkflowsDispatcher(ctx, false, false, true)
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.True(t, contextWasPreserved)
+	assert.NoFileExists(t, filepath.Join(tempDir, ".github", "skills", "agentic-workflows", "SKILL.md"))
+}
+
 func TestUnifiedDebuggingInstructions(t *testing.T) {
 	t.Parallel()
 	_, file, _, ok := runtime.Caller(0)

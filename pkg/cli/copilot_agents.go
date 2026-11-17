@@ -202,6 +202,9 @@ func buildAgenticWorkflowsAgentContent(gitRoot string) (string, error) {
 func buildAgenticWorkflowsSkillContent(ctx context.Context) (string, error) {
 	awFiles, err := listAgenticWorkflowsMarkdownFiles(ctx)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", ctxErr
+		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch .github/aw markdown file list from github/gh-aw: %v. Falling back to embedded list.", err)))
 		awFiles = embeddedFallbackAWMarkdownFiles()
 	}

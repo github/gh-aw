@@ -85,14 +85,14 @@ func confirmAddRepositoryInitialization(ctx context.Context, engineOverride stri
 	return addRepositoryInitializationPlan{enabled: true, files: missingMarkers}, nil
 }
 
-func applyAddRepositoryInitialization(plan addRepositoryInitializationPlan, engineOverride string, verbose bool, noGitattributes bool) ([]addInitializedFile, error) {
+func applyAddRepositoryInitialization(ctx context.Context, plan addRepositoryInitializationPlan, engineOverride string, verbose bool, noGitattributes bool) ([]addInitializedFile, error) {
 	if !plan.enabled {
 		return nil, nil
 	}
-	return ensureAddRepositoryInitializedFromPlan(plan.files, engineOverride, verbose, noGitattributes)
+	return ensureAddRepositoryInitializedFromPlan(ctx, plan.files, engineOverride, verbose, noGitattributes)
 }
 
-func ensureAddRepositoryInitializedFromPlan(markers []string, engineOverride string, verbose bool, noGitattributes bool) ([]addInitializedFile, error) {
+func ensureAddRepositoryInitializedFromPlan(ctx context.Context, markers []string, engineOverride string, verbose bool, noGitattributes bool) ([]addInitializedFile, error) {
 	gitRoot, err := addFindGitRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine repository root for automatic initialization: %w", err)
@@ -108,7 +108,7 @@ func ensureAddRepositoryInitializedFromPlan(markers []string, engineOverride str
 			})
 		}
 		if err := addInitRepository(InitOptions{
-			Verbose: verbose, Quiet: true, Engine: engineOverride, NoGitattributes: noGitattributes,
+			Ctx: ctx, Verbose: verbose, Quiet: true, Engine: engineOverride, NoGitattributes: noGitattributes,
 			Skill: true, Agent: true, MCP: true,
 		}); err != nil {
 			return fmt.Errorf("failed to initialize repository for agentic workflows: %w", err)

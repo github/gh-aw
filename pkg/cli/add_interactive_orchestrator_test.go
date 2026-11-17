@@ -393,6 +393,7 @@ func TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSec
 		assert.Contains(t, initFiles, bootstrapAgenticSkillPath)
 		return false, nil
 	}
+
 	addConfirmAuthoringSupport = func(context.Context) (bool, error) { return true, nil }
 	addMissingInitMarkers = func(context.Context, string, string) ([]string, error) {
 		return []string{bootstrapAgenticSkillPath}, nil
@@ -459,4 +460,33 @@ func TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSec
 		assert.NotContains(t, string(logContent), "pr create", "local write path must never create a pull request")
 		assert.NotContains(t, string(logContent), "pr merge", "local write path must never merge a pull request")
 	}
+}
+
+func TestApplyAddRepositoryInitializationPassesContext(t *testing.T) {
+	tempDir := t.TempDir()
+	originalFindGitRoot := addFindGitRoot
+	originalInitRepository := addInitRepository
+	addFindGitRoot = func() (string, error) { return tempDir, nil }
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	contextWasPreserved := false
+	addInitRepository = func(opts InitOptions) error {
+		contextWasPreserved = opts.Ctx == ctx
+		return opts.Ctx.Err()
+	}
+	t.Cleanup(func() {
+		addFindGitRoot = originalFindGitRoot
+		addInitRepository = originalInitRepository
+	})
+
+	_, err := applyAddRepositoryInitialization(
+		ctx,
+		addRepositoryInitializationPlan{enabled: true, files: []string{"missing.md"}},
+		"copilot",
+		false,
+		false,
+	)
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.True(t, contextWasPreserved)
 }
