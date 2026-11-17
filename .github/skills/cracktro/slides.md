@@ -20,7 +20,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Anatomy of a workflow | illustrative | A workflow is one Markdown file: front matter declares triggers, tools, permissions, steps and safe outputs, and the body is the agent prompt. |
 | Turn Intent to Automation |  | Describe a job in plain language, an agent writes the Markdown workflow, and gh aw compile deterministically turns it into a hardened Actions lock file. |
 | Turn Automation into Value | illustrative | Track outcomes such as backlog burndown, quality and delivery speed to show what agentic workflows are worth. |
-| Augmentation Automation Transformation |  | AI adoption moves from augmenting people to automating work to transforming how software is built; agentic workflows are the automation step, adapted from a Microsoft Research paper on guiding the AI disruption. |
+| Augmentation Automation Reconstruction |  | AI adoption moves from augmenting people to automating work to reconstructing workflows around delegation; agentic workflows are the automation step, per a Microsoft Research paper on guiding the AI disruption. |
 | Security |  | Band header (Security): design every workflow as if the agent is already compromised. |
 | Agentic attacks | illustrative | Common agent attacks, from prompt injection to secret exfiltration and destructive commands, are each stopped by one or more layered defenses. |
 | Safety and control |  | Inputs are filtered, the agent runs sandboxed with a read-only token behind a firewall and gateway, and writes happen only through scanned safe outputs. |

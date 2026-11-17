@@ -221,7 +221,7 @@
   .slide.fmm.fadeout { opacity: 1; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-copy > * { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   .slide.fmm:is(.fadeout, .leaving) .fmm-grid { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
-  /* Augmentation · Automation · Transformation: light concept band; typography matches the trust-the-process slide (.tp-q / .tp-go); stage rail with Automation in focus */
+  /* Augmentation · Automation · Reconstruction: light concept band; typography matches the trust-the-process slide (.tp-q / .tp-go); stage rail with Automation in focus */
   .ecu-copy { position: absolute; left: 230px; right: 140px; top: 0; bottom: 60px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; text-align: left; }
   .ecu-copy h2 { position: relative; margin: 44px 0 0; display: flex; flex-direction: column; gap: 30px; line-height: 1.1; letter-spacing: -.02em; font-variation-settings: "wght" 520, "wdth" 100; color: #f0f6fc; }
   .ecu-copy h2::before { content: ""; position: absolute; left: 63px; top: 60px; bottom: 60px; width: 4px; border-radius: 2px; transform-origin: top;
@@ -3492,14 +3492,14 @@
     });
   }
 
-  // Augmentation Automation Transformation: the bridge from value to security, with Automation in focus, on the light concept-band background
+  // Augmentation Automation Reconstruction: the bridge from value to security, with Automation in focus, on the light concept-band background
   {
     resetIndex();
     // [label, octicon path, its grid size]
     const STAGES = [
       ["Augmentation", "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z", 24],
       ["Automation", OCTICONS["workflow-16"], 16],
-      ["Transformation", OCTICONS["north-star-16"], 16],
+      ["Reconstruction", OCTICONS["north-star-16"], 16],
     ];
     const badge = (d, grid, on) => {
       const k = 60 / grid;
@@ -3514,12 +3514,12 @@
     slides.push({
       group: "unlock",
       notes:
-        "Augmentation, Automation, Transformation. Agents first augment people: a developer asks, an agent helps. The step this talk is about is automation: agents run on their own as workflows, triggered by events and schedules, inside guardrails. That is what makes the third step, transforming how an organization builds software, reachable. The framing is adapted from the Microsoft Research paper From Augmentation to Reconstruction: Guiding the AI Disruption to the Good Place, May 2026, which names the third stage reconstruction. Automation only scales if its risk is contained. Next: how.",
+        "Augmentation, Automation, Reconstruction. Agents first augment people: a developer asks, an agent helps. The step this talk is about is automation: agents run on their own as workflows, triggered by events and schedules, inside guardrails. That is what makes the third stage, reconstruction, reachable: workflows rebuilt around delegation, continuous monitoring and auditable constraints. The three stages come from the Microsoft Research paper From Augmentation to Reconstruction: Guiding the AI Disruption to the Good Place, May 2026. Automation only scales if its risk is contained. Next: how.",
       el: h(
         "section",
         { class: "slide ecu" },
         h("div", { class: "ecu-copy" }, h("div", { class: "kicker" }, "GitHub Agentic Workflows"), h("h2", {}, ...STAGES.map(stage))),
-        h("div", { class: "ecu-src" }, h("b", {}, "Adapted from"), h("i", {}, "From Augmentation to Reconstruction: Guiding the AI Disruption to the Good Place"), " · Microsoft Research, May 2026")
+        h("div", { class: "ecu-src" }, h("b", {}, "Source"), h("i", {}, "From Augmentation to Reconstruction: Guiding the AI Disruption to the Good Place"), " · Microsoft Research, May 2026")
       ),
     });
   }
@@ -19742,7 +19742,7 @@
       music: "platform",
       prog: [0, 5, 7, 2, -3],
     },
-    // Augmentation · Automation · Transformation: a concept slide, plain soft grey with no grid (light) like trust and mindset; rising chords into a bell cascade.
+    // Augmentation · Automation · Reconstruction: a concept slide, plain soft grey with no grid (light) like trust and mindset; rising chords into a bell cascade.
     unlock: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: 0, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#8250df"], music: "transform", prog: [0] },
     // Security: the red wash, grid turned 45°, a dark drone and alarm.
     security: {
@@ -20061,7 +20061,7 @@
         });
         bell(86, t + 1.62, 0.025, 1.4);
       },
-      // augmentation · automation · transformation: one rising chord per stage, a mechanical click as automation engages, then a bright cascade
+      // augmentation · automation · reconstruction: one rising chord per stage, a mechanical click as automation engages, then a bright cascade
       transform: t => {
         [
           [48, 55, 64],
