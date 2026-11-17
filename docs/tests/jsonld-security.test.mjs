@@ -88,8 +88,7 @@ for (const kind of ["docs", "blog"]) {
       const path = kind === "blog" ? `blog/${field}` : field;
       const html = await readFile(join(root, "dist", path, "index.html"), "utf8");
       const schemas = schemasFromHtml(html);
-      const articles = schemas.flatMap(schema => schema["@graph"] ?? [schema])
-        .filter(schema => schema["@type"] === (kind === "blog" ? "BlogPosting" : "TechArticle"));
+      const articles = schemas.flatMap(schema => schema["@graph"] ?? [schema]).filter(schema => schema["@type"] === (kind === "blog" ? "BlogPosting" : "TechArticle"));
       assert.equal(articles.length, 1, "expected exactly one article schema");
       const [article] = articles;
       assert.equal(article[field === "title" ? "headline" : field], payload);
