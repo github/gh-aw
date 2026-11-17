@@ -29,7 +29,7 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 |---|---|
 | Human Agent Processes | `refresh/human-agent-processes.md` |
 | Pull Request Review² | `refresh/pr-review-squared.md` |
-| Daily Unsloppers | `refresh/daily-unsloppers.md` |
+| Daily Improvers | `refresh/daily-improvers.md` |
 | Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
 | Issue Monster | `refresh/issue-monster.md` |
 | Research · Assign · Observe | `refresh/research-assign-observe.md` |
