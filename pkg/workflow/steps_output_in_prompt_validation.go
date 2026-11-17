@@ -22,7 +22,7 @@ var stepsOutputInPromptLog = logger.New("workflow:steps_output_in_prompt_validat
 // pre-agent-steps: / post-steps: sections run inside the agent job (after
 // activation) and their outputs are not available at prompt-creation time.
 //
-// Use files (e.g. /tmp/gh-aw/agent/result.txt) to pass data from agent-job
+// Use files (e.g. $GH_AW_RUNTIME_DIR/agent/result.txt) to pass data from agent-job
 // steps into the prompt instead of step outputs.
 func validateStepsOutputsNotInPrompt(workflowData *WorkflowData) error {
 	if workflowData == nil || workflowData.MarkdownContent == "" {
@@ -68,7 +68,7 @@ func validateStepsOutputsNotInPrompt(workflowData *WorkflowData) error {
 				"their outputs are not available at prompt-creation time",
 			strings.Join(offending, ", "),
 		),
-		"Write step results to a file (e.g. /tmp/gh-aw/agent/result.txt) and reference that file path in the prompt instead of using ${{ steps.STEP_ID.outputs.* }}.",
+		"Write step results to a file (e.g. $GH_AW_RUNTIME_DIR/agent/result.txt) and reference that file path in the prompt instead of using ${{ steps.STEP_ID.outputs.* }}.",
 	)
 }
 

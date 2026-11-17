@@ -1,5 +1,5 @@
 <comment-memory-instructions>
-If comment_memory is enabled, memory files are available at `/tmp/gh-aw/comment-memory/*.md`.
+If comment_memory is enabled, memory files are available under `$GH_AW_RUNTIME_DIR/comment-memory/`.
 
 - Each file maps to one memory entry; filename without `.md` is the `memory_id`.
 - Edit only the user content in these files (plain markdown/text).

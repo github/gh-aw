@@ -86,8 +86,8 @@ tools:
 				"key: memory-none-nopolicy-memory-session-${{ github.run_id }}",
 				"path: /tmp/gh-aw/cache-memory-session",
 				"cache_memory_prompt_multi.md", // Template file reference for multiple caches
-				"- **default**: `/tmp/gh-aw/cache-memory/`",
-				"- **session**: `/tmp/gh-aw/cache-memory-session/`",
+				"- **default**: `$GH_AW_RUNTIME_DIR/cache-memory/`",
+				"- **session**: `$GH_AW_RUNTIME_DIR/cache-memory-session/`",
 			},
 			notExpectedInLock: []string{
 				// Should NOT upload artifacts when detection is disabled

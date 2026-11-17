@@ -190,7 +190,7 @@ function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_
     }
     const promptFile = resolvePromptFile(promptsDir, filename);
     try {
-      result += require("./runtime_paths.cjs").resolveRuntimePaths(fs.readFileSync(promptFile, "utf8"), env);
+      result += fs.readFileSync(promptFile, "utf8");
     } catch (error) {
       throw new Error(`${ERR_SYSTEM}: Failed to read prompt file: ${getErrorMessage(error)}`, { cause: error });
     }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const { runtimeRoot, runtimePath, setupRoot, runtimeId, runtimeContainerName, resolveRuntimePaths, runtimePort, registerRuntimeProcess } = require("./runtime_paths.cjs");
+const { runtimeRoot, runtimePath, setupRoot, runtimeId, runtimeContainerName, runtimePort, registerRuntimeProcess } = require("./runtime_paths.cjs");
 const { getGatewayStartupMarkerPath, removeRuntimeGatewayContainer } = require("./start_mcp_gateway.cjs");
 const { getBundlePathForBranch } = require("./generate_git_bundle.cjs");
 const { resolveHarnessRetryTelemetryPath } = require("./harness_retry_runner.cjs");
@@ -46,14 +46,13 @@ describe("private runtime paths", () => {
     expect(() => runtimeId({ GH_AW_RUNTIME_ID: "unsafe;name" })).toThrow("Docker-safe");
   });
 
-  it("resolves only canonical prompt paths, preserving evaluated content and similarly named directories", () => {
+  it("preserves static prompt paths and evaluated content for the consuming runtime", () => {
     const root = isolatedRuntime();
     const prompts = path.join(root, "prompts");
     fs.mkdirSync(prompts);
     fs.writeFileSync(path.join(prompts, "temp.md"), "Use /tmp/gh-aw/agent and not /tmp/gh-aw-other.");
     const rendered = renderPrompt({ items: [{ file: "temp.md" }, { content_env: "CONTEXT" }] }, { ...process.env, CONTEXT: "literal /tmp/gh-aw/from-context" }, prompts);
-    expect(rendered).toBe(`Use ${root}/agent and not /tmp/gh-aw-other.literal /tmp/gh-aw/from-context`);
-    expect(resolveRuntimePaths("root=/tmp/gh-aw")).toBe(`root=${root}`);
+    expect(rendered).toBe("Use /tmp/gh-aw/agent and not /tmp/gh-aw-other.literal /tmp/gh-aw/from-context");
   });
 
   it("uses runtime ports without overriding explicit server options", () => {

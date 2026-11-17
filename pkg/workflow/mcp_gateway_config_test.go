@@ -127,7 +127,7 @@ func TestEnsureDefaultMCPGatewayConfig(t *testing.T) {
 				assert.Contains(t, wd.SandboxConfig.MCP.Mounts, "/opt:/opt:ro", "Should have /opt mount")
 				assert.Contains(t, wd.SandboxConfig.MCP.Mounts, "/tmp:/tmp:rw", "Should have /tmp mount")
 				assert.Contains(t, wd.SandboxConfig.MCP.Mounts, "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw", "Should have GITHUB_WORKSPACE mount")
-				assert.Contains(t, wd.SandboxConfig.MCP.Mounts, "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "Should have safeoutputs mount")
+				assert.Contains(t, wd.SandboxConfig.MCP.Mounts, "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro", "Should have read-only safeoutputs mount")
 			},
 		},
 		{

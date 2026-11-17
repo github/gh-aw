@@ -46,7 +46,7 @@ func TestBuildCacheMemoryPromptSection_SingleDefaultCache(t *testing.T) {
 
 	// Verify environment variables
 	require.NotNil(t, section.EnvVars, "Should have environment variables")
-	assert.Equal(t, "/tmp/gh-aw/cache-memory/", section.EnvVars["GH_AW_CACHE_DIR"], "Should have correct cache directory")
+	assert.Equal(t, "$GH_AW_RUNTIME_DIR/cache-memory/", section.EnvVars["GH_AW_CACHE_DIR"], "Should have correct cache directory")
 	assert.Empty(t, section.EnvVars["GH_AW_CACHE_DESCRIPTION"], "Should have empty description when not provided")
 	// No file type restrictions → placeholder is replaced with empty string
 	assert.Empty(t, section.EnvVars["GH_AW_ALLOWED_EXTENSIONS"], "Should have empty allowed-extensions when none configured")
@@ -89,7 +89,7 @@ func TestBuildCacheMemoryPromptSection_SingleDefaultCacheWithDescription(t *test
 
 	// Verify environment variables include description
 	require.NotNil(t, section.EnvVars, "Should have environment variables")
-	assert.Equal(t, "/tmp/gh-aw/cache-memory/", section.EnvVars["GH_AW_CACHE_DIR"], "Should have correct cache directory")
+	assert.Equal(t, "$GH_AW_RUNTIME_DIR/cache-memory/", section.EnvVars["GH_AW_CACHE_DIR"], "Should have correct cache directory")
 	assert.Equal(t, "My custom cache", section.EnvVars["GH_AW_CACHE_DESCRIPTION"], "Description should match input")
 }
 
@@ -123,13 +123,13 @@ func TestBuildCacheMemoryPromptSection_MultipleCaches(t *testing.T) {
 
 	// Verify cache list content
 	cacheList := section.EnvVars["GH_AW_CACHE_LIST"]
-	assert.Contains(t, cacheList, "- **default**: `/tmp/gh-aw/cache-memory/`", "Should list default cache")
-	assert.Contains(t, cacheList, "- **session**: `/tmp/gh-aw/cache-memory-session/` - Session-specific cache", "Should list session cache with description")
+	assert.Contains(t, cacheList, "- **default**: `$GH_AW_RUNTIME_DIR/cache-memory/`", "Should list default cache")
+	assert.Contains(t, cacheList, "- **session**: `$GH_AW_RUNTIME_DIR/cache-memory-session/` - Session-specific cache", "Should list session cache with description")
 
 	// Verify cache examples content
 	cacheExamples := section.EnvVars["GH_AW_CACHE_EXAMPLES"]
-	assert.Contains(t, cacheExamples, "/tmp/gh-aw/cache-memory/notes.txt", "Should have examples for default cache")
-	assert.Contains(t, cacheExamples, "/tmp/gh-aw/cache-memory-session/notes.txt", "Should have examples for session cache")
+	assert.Contains(t, cacheExamples, "$GH_AW_RUNTIME_DIR/cache-memory/notes.txt", "Should have examples for default cache")
+	assert.Contains(t, cacheExamples, "$GH_AW_RUNTIME_DIR/cache-memory-session/notes.txt", "Should have examples for session cache")
 	// Neither cache has AllowedExtensions → placeholder replaced with empty string
 	assert.Empty(t, section.EnvVars["GH_AW_ALLOWED_EXTENSIONS"], "Should have empty allowed-extensions when none configured")
 }
@@ -174,7 +174,7 @@ func TestBuildCacheMemoryPromptSection_SingleNonDefaultCache(t *testing.T) {
 
 	// Verify cache list content
 	cacheList := section.EnvVars["GH_AW_CACHE_LIST"]
-	assert.Contains(t, cacheList, "- **custom**: `/tmp/gh-aw/cache-memory-custom/` - Custom cache", "Should list custom cache")
+	assert.Contains(t, cacheList, "- **custom**: `$GH_AW_RUNTIME_DIR/cache-memory-custom/` - Custom cache", "Should list custom cache")
 }
 
 func TestBuildCacheMemoryPromptSection_NilConfig(t *testing.T) {
@@ -223,13 +223,13 @@ func TestBuildCacheMemoryPromptSection_MultipleCachesWithMixedDescriptions(t *te
 
 	// Verify all caches are listed in cache list env var
 	cacheList := section.EnvVars["GH_AW_CACHE_LIST"]
-	assert.Contains(t, cacheList, "- **default**: `/tmp/gh-aw/cache-memory/` - Main cache", "Should list default with description")
-	assert.Contains(t, cacheList, "- **temp**: `/tmp/gh-aw/cache-memory-temp/`\n", "Should list temp without description")
-	assert.Contains(t, cacheList, "- **persistent**: `/tmp/gh-aw/cache-memory-persistent/` - Long-term storage", "Should list persistent with description")
+	assert.Contains(t, cacheList, "- **default**: `$GH_AW_RUNTIME_DIR/cache-memory/` - Main cache", "Should list default with description")
+	assert.Contains(t, cacheList, "- **temp**: `$GH_AW_RUNTIME_DIR/cache-memory-temp/`\n", "Should list temp without description")
+	assert.Contains(t, cacheList, "- **persistent**: `$GH_AW_RUNTIME_DIR/cache-memory-persistent/` - Long-term storage", "Should list persistent with description")
 
 	// Verify examples for all caches in cache examples env var
 	cacheExamples := section.EnvVars["GH_AW_CACHE_EXAMPLES"]
-	assert.Contains(t, cacheExamples, "/tmp/gh-aw/cache-memory/notes.txt", "Should have examples for default")
-	assert.Contains(t, cacheExamples, "/tmp/gh-aw/cache-memory-temp/notes.txt", "Should have examples for temp")
-	assert.Contains(t, cacheExamples, "/tmp/gh-aw/cache-memory-persistent/notes.txt", "Should have examples for persistent")
+	assert.Contains(t, cacheExamples, "$GH_AW_RUNTIME_DIR/cache-memory/notes.txt", "Should have examples for default")
+	assert.Contains(t, cacheExamples, "$GH_AW_RUNTIME_DIR/cache-memory-temp/notes.txt", "Should have examples for temp")
+	assert.Contains(t, cacheExamples, "$GH_AW_RUNTIME_DIR/cache-memory-persistent/notes.txt", "Should have examples for persistent")
 }

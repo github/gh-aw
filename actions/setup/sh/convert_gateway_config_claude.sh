@@ -96,5 +96,11 @@ chmod 600 "${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"
 
 echo "Claude configuration written to ${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"
 echo ""
-echo "Converted configuration:"
-cat "${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"
+echo "Converted configuration (Authorization redacted):"
+jq '(.mcpServers // {}) |= with_entries(
+  if (.value.headers | type) == "object" and (.value.headers | has("Authorization")) then
+    .value.headers.Authorization = "[REDACTED]"
+  else
+    .
+  end
+)' "${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"

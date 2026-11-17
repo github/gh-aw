@@ -331,7 +331,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_ENGINE_ID: copilot
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
           GH_AW_OTEL_METRICS: ""
@@ -375,7 +375,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""

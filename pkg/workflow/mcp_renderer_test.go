@@ -250,6 +250,11 @@ func TestRenderWorkQueueMCPUsesSnapshotAndFinishIntentMounts(t *testing.T) {
 		if !strings.Contains(rendered, `"GITHUB_SERVER_URL": "\${GITHUB_SERVER_URL}"`) {
 			t.Fatalf("expected the configured GitHub server URL in the queue MCP environment: %s", rendered)
 		}
+		for _, variable := range []string{"GH_AW_RUNTIME_DIR", "GH_AW_RUNTIME_ID"} {
+			if !strings.Contains(rendered, `"`+variable+`": "\${`+variable+`}"`) {
+				t.Fatalf("expected %s in the queue MCP environment: %s", variable, rendered)
+			}
+		}
 		if strings.Contains(rendered, "GITHUB_TOKEN") || strings.Contains(rendered, constants.DefaultWorkspaceMount) || strings.Contains(rendered, constants.DefaultTmpGhAwMount) {
 			t.Fatalf("queue MCP must not receive Git credentials or workspace mounts: %s", rendered)
 		}
@@ -269,7 +274,7 @@ func TestRenderWorkQueueMCPUsesSnapshotAndFinishIntentMounts(t *testing.T) {
 		if !strings.Contains(rendered, constants.WorkQueueFinishIntentMount) {
 			t.Fatalf("expected the safe-output intent mount: %s", rendered)
 		}
-		if !strings.Contains(rendered, `env_vars = ["GITHUB_SERVER_URL", "RUNNER_TEMP"]`) {
+		if !strings.Contains(rendered, `env_vars = ["GITHUB_SERVER_URL", "GH_AW_RUNTIME_DIR", "GH_AW_RUNTIME_ID", "RUNNER_TEMP"]`) {
 			t.Fatalf("expected the configured GitHub server URL in the queue MCP environment: %s", rendered)
 		}
 		if strings.Contains(rendered, "GITHUB_TOKEN") || strings.Contains(rendered, constants.DefaultWorkspaceMount) || strings.Contains(rendered, constants.DefaultTmpGhAwMount) {
@@ -311,8 +316,19 @@ func TestRenderWorkQueueMCPEnvironmentLoadsEnterpriseSnapshot(t *testing.T) {
 			var output strings.Builder
 			renderer := NewMCPConfigRenderer(MCPRendererOptions{Format: format, IsLast: true})
 			renderer.RenderWorkQueueMCP(&output, &WorkflowData{Tools: map[string]any{"work-queue": true}})
+			directory, err := os.MkdirTemp(".", ".work-queue-enterprise-snapshot-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(directory)
+			directory, err = filepath.Abs(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
 			source := map[string]string{
 				"GITHUB_SERVER_URL": "https://contoso.example",
+				"GH_AW_RUNTIME_DIR": directory,
+				"GH_AW_RUNTIME_ID":  "runtime-test",
 				"RUNNER_TEMP":       ".",
 			}
 			var environment map[string]string
@@ -345,11 +361,6 @@ func TestRenderWorkQueueMCPEnvironmentLoadsEnterpriseSnapshot(t *testing.T) {
 					environment[name] = source[name]
 				}
 			}
-			directory, err := os.MkdirTemp(".", ".work-queue-enterprise-snapshot-")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.RemoveAll(directory)
 			script := `
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -441,7 +452,7 @@ func TestRenderSafeOutputsMCP_JSON_Copilot(t *testing.T) {
 	if !strings.Contains(output, `"container": "`+pinnedGhAwNodeImage+`"`) {
 		t.Error("Expected gh-aw node container image")
 	}
-	if !strings.Contains(output, `"mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]`) {
+	if !strings.Contains(output, `"mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro", "/tmp/gh-aw:/tmp/gh-aw:rw"]`) {
 		t.Error("Expected workspace, safe-outputs, log, and tmp mounts")
 	}
 	if !strings.Contains(output, `"args": ["-w", "\${GITHUB_WORKSPACE}"]`) {
@@ -455,6 +466,11 @@ func TestRenderSafeOutputsMCP_JSON_Copilot(t *testing.T) {
 	}
 	if !strings.Contains(output, `"GH_AW_SAFE_OUTPUTS_CONFIG_PATH": "\${GH_AW_SAFE_OUTPUTS_CONFIG_PATH}"`) {
 		t.Error("Expected safe-outputs config path env var")
+	}
+	for _, name := range []string{"GH_AW_RUNTIME_DIR", "GH_AW_RUNTIME_ID"} {
+		if !strings.Contains(output, fmt.Sprintf(`"%s": "\${%s}"`, name, name)) {
+			t.Errorf("Expected private runtime env var %s", name)
+		}
 	}
 	if !strings.Contains(output, `"GH_AW_TARGET_REPO_SLUG": "\${GH_AW_TARGET_REPO_SLUG}"`) {
 		t.Error("Expected target repository env var")
@@ -549,7 +565,7 @@ func TestRenderSafeOutputsMCP_TOML(t *testing.T) {
 	if !strings.Contains(output, `container = "`+pinnedGhAwNodeImage+`"`) {
 		t.Error("Expected gh-aw node container image")
 	}
-	if !strings.Contains(output, `mounts = ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]`) {
+	if !strings.Contains(output, `mounts = ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro", "/tmp/gh-aw:/tmp/gh-aw:rw"]`) {
 		t.Error("Expected TOML mounts")
 	}
 	if !strings.Contains(output, `args = ["-w", "$GITHUB_WORKSPACE"]`) {
@@ -561,7 +577,7 @@ func TestRenderSafeOutputsMCP_TOML(t *testing.T) {
 	if !strings.Contains(output, `entrypointArgs = ["-c", "sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh"]`) {
 		t.Error("Expected TOML entrypointArgs to run the stdio MCP server script")
 	}
-	if !strings.Contains(output, `env_vars = ["DEBUG", "DEFAULT_BRANCH", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS", "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH", "GH_AW_TARGET_REPO_SLUG", "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST", "GH_AW_PR_HEAD_BASE_BRANCH", "GH_AW_PR_HEAD_BASE_SHA", "GH_AW_PR_HEAD_BASE_REPO", "GH_AW_PR_HEAD_BASE_PR_NUMBER", "GH_AW_PR_HEAD_BASE_REF", "GH_AW_PR_HEAD_REPO", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REPOSITORY", "GITHUB_SHA", "GITHUB_TOKEN", "GITHUB_WORKSPACE", "RUNNER_TEMP", "`+strings.Join(objectPackLimitEnvNames, `", "`)+`"]`) {
+	if !strings.Contains(output, `env_vars = ["DEBUG", "DEFAULT_BRANCH", "GH_AW_RUNTIME_DIR", "GH_AW_RUNTIME_ID", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS", "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH", "GH_AW_TARGET_REPO_SLUG", "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST", "GH_AW_PR_HEAD_BASE_BRANCH", "GH_AW_PR_HEAD_BASE_SHA", "GH_AW_PR_HEAD_BASE_REPO", "GH_AW_PR_HEAD_BASE_PR_NUMBER", "GH_AW_PR_HEAD_BASE_REF", "GH_AW_PR_HEAD_REPO", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REPOSITORY", "GITHUB_SHA", "GITHUB_TOKEN", "GITHUB_WORKSPACE", "RUNNER_TEMP", "`+strings.Join(objectPackLimitEnvNames, `", "`)+`"]`) {
 		t.Error("Expected TOML env vars")
 	}
 	if strings.Contains(output, `type = "http"`) {

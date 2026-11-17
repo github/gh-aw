@@ -96,7 +96,7 @@ NODE
 }
 
 cleanup_gh_aw_runtime() {
-  node <<'NODE'
+  node - "${1:-cleanup}" <<'NODE'
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -106,6 +106,8 @@ if (!root) process.exit(0);
 const id = state("GH_AW_RUNTIME_ID");
 const uid = state("GH_AW_RUNTIME_UID");
 const windows = process.platform === "win32";
+const mode = process.argv[2] || "cleanup";
+const wslCleanup = state("GH_AW_WSL_CLEANUP") === "true";
 const canonical = value => windows ? value.replaceAll("\\", "/") : value;
 function fail(message) { throw new Error(message); }
 function validateRoot() {
@@ -140,7 +142,7 @@ function stopHostServices() {
   let stat;
   try { stat = fs.lstatSync(file); } catch (error) { if (error.code === "ENOENT") return; throw error; }
   if (process.platform !== "linux" || !stat.isFile() || stat.isSymbolicLink() ||
-      String(stat.uid) !== uid || stat.nlink !== 1 || stat.size > 1048576) fail("unsafe host service identity record");
+      (!wslCleanup && String(stat.uid) !== uid) || stat.nlink !== 1 || stat.size > 1048576) fail("unsafe host service identity record");
   const processes = fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
   const matches = record => {
     if (!Number.isSafeInteger(record.pid) || record.pid <= 1 || record.pid === process.pid || record.pid === process.ppid) return false;
@@ -148,8 +150,9 @@ function stopHostServices() {
       const base = `/proc/${record.pid}`;
       const value = fs.readFileSync(`${base}/stat`, "utf8");
       const fields = value.slice(value.lastIndexOf(")") + 2).split(" ");
-      if (fields[0] === "Z" || fields[19] !== record.start || String(record.uid) !== uid ||
-          String(fs.statSync(base).uid) !== uid) return false;
+      const processUID = String(record.uid);
+      if (fields[0] === "Z" || fields[19] !== record.start || !/^[0-9]+$/.test(processUID) ||
+          (!wslCleanup && processUID !== uid) || String(fs.statSync(base).uid) !== processUID) return false;
       const env = fs.readFileSync(`${base}/environ`, "utf8").split("\0");
       return env.includes(`GH_AW_RUNTIME_ID=${id}`) &&
         env.includes(`GH_AW_RUNTIME_DIR=${root}`);
@@ -175,13 +178,23 @@ function stopHostServices() {
     if (matches(record)) process.kill(record.pid, "SIGKILL");
   }
 }
-if (process.argv[2] === "stop-services") {
+if (mode === "validate") {
+  try {
+    fs.lstatSync(root);
+    validateRoot();
+  } catch (error) {
+    console.warn(`::warning::Unable to validate private gh-aw runtime: ${error.message}`);
+    process.exitCode = 1;
+  }
+  process.exit();
+}
+if (mode === "stop-services") {
   try {
     if (!root) process.exit(0);
     stopHostServices();
     const file = path.join(root, ".gh-aw-processes.jsonl");
     const stat = fs.lstatSync(file);
-    if (!stat.isFile() || stat.isSymbolicLink() || String(stat.uid) !== uid || stat.nlink !== 1) {
+    if (!stat.isFile() || stat.isSymbolicLink() || (!wslCleanup && String(stat.uid) !== uid) || stat.nlink !== 1) {
       fail("unsafe host service identity record");
     }
     fs.unlinkSync(file);
@@ -225,7 +238,9 @@ NODE
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   case "${1:-}" in
     allocate) allocate_gh_aw_runtime ;;
-    cleanup) cleanup_gh_aw_runtime ;;
-    *) echo "Usage: runtime_lifecycle.sh {allocate|cleanup}" >&2; exit 1 ;;
+    validate) cleanup_gh_aw_runtime validate ;;
+    stop-services) cleanup_gh_aw_runtime stop-services ;;
+    cleanup) cleanup_gh_aw_runtime cleanup ;;
+    *) echo "Usage: runtime_lifecycle.sh {allocate|validate|stop-services|cleanup}" >&2; exit 1 ;;
   esac
 fi

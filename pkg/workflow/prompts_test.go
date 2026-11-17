@@ -79,7 +79,7 @@ This is a test workflow with cache-memory enabled.
 	if !strings.Contains(lockStr, "cache_memory_prompt.md") {
 		t.Error("Expected cache template file reference in generated workflow")
 	}
-	if !strings.Contains(lockStr, `GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory/`) {
+	if !strings.Contains(lockStr, `GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/`) {
 		t.Error("Expected GH_AW_CACHE_DIR environment variable in generated workflow")
 	}
 	if !strings.Contains(lockStr, "GH_AW_CACHE_DIR: process.env.GH_AW_CACHE_DIR") {
@@ -210,12 +210,12 @@ This is a test workflow with multiple cache-memory entries.
 	}
 
 	// Test 3: Verify both cache directories are mentioned in environment variables
-	if !strings.Contains(lockStr, "/tmp/gh-aw/cache-memory/") {
-		t.Error("Expected '/tmp/gh-aw/cache-memory/' reference for default cache")
+	if !strings.Contains(lockStr, "$GH_AW_RUNTIME_DIR/cache-memory/") {
+		t.Error("Expected private runtime path reference for default cache")
 	}
 
-	if !strings.Contains(lockStr, "/tmp/gh-aw/cache-memory-session/") {
-		t.Error("Expected '/tmp/gh-aw/cache-memory-session/' reference for session cache")
+	if !strings.Contains(lockStr, "$GH_AW_RUNTIME_DIR/cache-memory-session/") {
+		t.Error("Expected private runtime path reference for session cache")
 	}
 
 	t.Logf("Successfully verified cache memory instructions handle multiple caches")

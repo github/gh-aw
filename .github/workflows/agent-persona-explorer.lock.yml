@@ -399,7 +399,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_ENGINE_ID: claude
           GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY_PREFIX_V1: ${{ steps.pick-experiment.outputs.sub_agent_strategy_prefix_v1 }}
           GH_AW_EXPR_5092DE63: ${{ steps.pick-experiment.outputs.sub_agent_strategy_prefix_v1 == 'batch' }}
@@ -463,7 +463,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY_PREFIX_V1: ${{ steps.pick-experiment.outputs.sub_agent_strategy_prefix_v1 }}
           GH_AW_EXPR_5092DE63: ${{ steps.pick-experiment.outputs.sub_agent_strategy_prefix_v1 == 'batch' }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}

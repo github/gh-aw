@@ -28,7 +28,7 @@ func TestMCPGatewayDefaultMounts(t *testing.T) {
 		"/opt:/opt:ro",
 		"/tmp:/tmp:rw",
 		"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw",
-		"${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw",
+		"${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro",
 	}
 	assert.Equal(t, expectedMounts, workflowData.SandboxConfig.MCP.Mounts, "Default mounts should match expected values")
 }

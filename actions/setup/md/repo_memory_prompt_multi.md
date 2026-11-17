@@ -14,12 +14,12 @@ __GH_AW_MEMORY_LIST__
 - **Allowed File Types**: Only the following file extensions are allowed: `__GH_AW_MEMORY_ALLOWED_EXTENSIONS__`. Files with other extensions will be rejected during validation.
 
 Examples of what you can store:
-- `/tmp/gh-aw/repo-memory/notes.md` - general notes and observations
-- `/tmp/gh-aw/repo-memory/notes.txt` - plain text notes
-- `/tmp/gh-aw/repo-memory/state.json` - structured state data
-- `/tmp/gh-aw/repo-memory/history.jsonl` - activity history in JSON Lines format
-- `/tmp/gh-aw/repo-memory/data.csv` - tabular data
-- `/tmp/gh-aw/repo-memory/history/` - organized history files (with allowed file types)
+- `$GH_AW_RUNTIME_DIR/repo-memory/notes.md` - general notes and observations
+- `$GH_AW_RUNTIME_DIR/repo-memory/notes.txt` - plain text notes
+- `$GH_AW_RUNTIME_DIR/repo-memory/state.json` - structured state data
+- `$GH_AW_RUNTIME_DIR/repo-memory/history.jsonl` - activity history in JSON Lines format
+- `$GH_AW_RUNTIME_DIR/repo-memory/data.csv` - tabular data
+- `$GH_AW_RUNTIME_DIR/repo-memory/history/` - organized history files (with allowed file types)
 
 Feel free to create, read, update, and organize files in these folders as needed for your tasks, using only the allowed file types.
 

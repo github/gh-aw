@@ -28,7 +28,7 @@ func TestRepoMemoryPathConsistencyAcrossLayers(t *testing.T) {
 			memoryID:             "default",
 			branchName:           "memory/default",
 			expectedMemoryDir:    "/tmp/gh-aw/repo-memory/default",
-			expectedPromptPath:   "/tmp/gh-aw/repo-memory/default/",
+			expectedPromptPath:   "$GH_AW_RUNTIME_DIR/repo-memory/default/",
 			expectedArtifactName: "repo-memory-default",
 		},
 		{
@@ -36,7 +36,7 @@ func TestRepoMemoryPathConsistencyAcrossLayers(t *testing.T) {
 			memoryID:             "session",
 			branchName:           "memory/session",
 			expectedMemoryDir:    "/tmp/gh-aw/repo-memory/session",
-			expectedPromptPath:   "/tmp/gh-aw/repo-memory/session/",
+			expectedPromptPath:   "$GH_AW_RUNTIME_DIR/repo-memory/session/",
 			expectedArtifactName: "repo-memory-session",
 		},
 		{
@@ -44,7 +44,7 @@ func TestRepoMemoryPathConsistencyAcrossLayers(t *testing.T) {
 			memoryID:             "campaigns",
 			branchName:           "memory/campaigns",
 			expectedMemoryDir:    "/tmp/gh-aw/repo-memory/campaigns",
-			expectedPromptPath:   "/tmp/gh-aw/repo-memory/campaigns/",
+			expectedPromptPath:   "$GH_AW_RUNTIME_DIR/repo-memory/campaigns/",
 			expectedArtifactName: "repo-memory-campaigns",
 		},
 		{
@@ -52,7 +52,7 @@ func TestRepoMemoryPathConsistencyAcrossLayers(t *testing.T) {
 			memoryID:             "code-metrics",
 			branchName:           "memory/code-metrics",
 			expectedMemoryDir:    "/tmp/gh-aw/repo-memory/code-metrics",
-			expectedPromptPath:   "/tmp/gh-aw/repo-memory/code-metrics/",
+			expectedPromptPath:   "$GH_AW_RUNTIME_DIR/repo-memory/code-metrics/",
 			expectedArtifactName: "repo-memory-codemetrics", // Sanitized: hyphens removed
 		},
 	}
@@ -198,7 +198,7 @@ func TestRepoMemoryPromptPathTrailingSlash(t *testing.T) {
 			require.NotNil(t, section, "Should have a prompt section")
 			assert.True(t, section.IsFile, "Should use template file")
 
-			expectedPath := fmt.Sprintf("/tmp/gh-aw/repo-memory/%s/", tt.memoryID)
+			expectedPath := fmt.Sprintf("$GH_AW_RUNTIME_DIR/repo-memory/%s/", tt.memoryID)
 
 			if tt.memoryID == "default" {
 				// Single default memory uses GH_AW_MEMORY_DIR
@@ -396,9 +396,9 @@ func TestRepoMemoryMultipleMemoriesPathConsistency(t *testing.T) {
 	assert.Equal(t, repoMemoryPromptMultiFile, section.Content, "Should use multi memory template")
 
 	memoryList := section.EnvVars["GH_AW_MEMORY_LIST"]
-	assert.Contains(t, memoryList, "/tmp/gh-aw/repo-memory/session/",
+	assert.Contains(t, memoryList, "$GH_AW_RUNTIME_DIR/repo-memory/session/",
 		"Memory list should contain session memory path")
-	assert.Contains(t, memoryList, "/tmp/gh-aw/repo-memory/logs/",
+	assert.Contains(t, memoryList, "$GH_AW_RUNTIME_DIR/repo-memory/logs/",
 		"Memory list should contain logs memory path")
 
 	// Test artifact upload

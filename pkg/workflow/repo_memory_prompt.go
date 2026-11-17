@@ -20,7 +20,7 @@ func buildRepoMemoryPromptSection(config *RepoMemoryConfig) *PromptSection {
 	// Check if there's only one memory with ID "default" to use singular template
 	if len(config.Memories) == 1 && config.Memories[0].ID == "default" {
 		memory := config.Memories[0]
-		memoryDir := fmt.Sprintf("/tmp/gh-aw/repo-memory/%s/", memory.ID)
+		memoryDir := fmt.Sprintf("$GH_AW_RUNTIME_DIR/repo-memory/%s/", memory.ID)
 
 		repoMemoryPromptLog.Printf("Building single default repo memory prompt section: branch=%s", memory.BranchName)
 
@@ -90,7 +90,7 @@ func buildRepoMemoryPromptSection(config *RepoMemoryConfig) *PromptSection {
 	// Build memory list
 	var memoryList strings.Builder
 	for _, memory := range config.Memories {
-		memoryDir := fmt.Sprintf("/tmp/gh-aw/repo-memory/%s/", memory.ID)
+		memoryDir := fmt.Sprintf("$GH_AW_RUNTIME_DIR/repo-memory/%s/", memory.ID)
 		fmt.Fprintf(&memoryList, "- **%s**: `%s`", memory.ID, memoryDir)
 		if memory.Description != "" {
 			fmt.Fprintf(&memoryList, " - %s", memory.Description)

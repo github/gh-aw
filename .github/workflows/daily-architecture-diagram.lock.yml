@@ -423,7 +423,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_ENGINE_ID: codex
           GH_AW_EXPERIMENTS_DETAIL_LEVEL: ${{ steps.pick-experiment.outputs.detail_level }}
           GH_AW_EXPR_6A1E84CE: ${{ steps.pick-experiment.outputs.detail_level == 'comprehensive' }}
@@ -489,7 +489,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_EXPERIMENTS_DETAIL_LEVEL: ${{ steps.pick-experiment.outputs.detail_level }}
           GH_AW_EXPR_6A1E84CE: ${{ steps.pick-experiment.outputs.detail_level == 'comprehensive' }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}

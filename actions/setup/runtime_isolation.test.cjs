@@ -203,6 +203,36 @@ test("script-mode cleanup uses per-setup ownership outputs instead of a later se
   assert.equal(fs.existsSync(states[1].GH_AW_RUNTIME_DIR), false);
 });
 
+test("runtime validation and service-stop modes reach their Node lifecycle handlers", async t => {
+  if (process.platform !== "linux") return;
+  const f = fixture(t);
+  const env = f.invocation();
+  run(lifecycle, ["allocate"], env);
+  const state = f.record(env);
+  const ownedEnv = { ...env, ...state };
+  run(lifecycle, ["validate"], ownedEnv);
+
+  const service = spawn(
+    process.execPath,
+    ["-e", `require(${JSON.stringify(path.join(__dirname, "js/runtime_paths.cjs"))}).registerRuntimeProcess(process.pid, "test-service"); process.stdout.write("ready\\n"); setInterval(() => {}, 1000);`],
+    { env: ownedEnv }
+  );
+  await new Promise((resolve, reject) => {
+    service.stdout.once("data", resolve);
+    service.once("error", reject);
+    service.once("exit", code => reject(new Error(`service exited before registration was observed: ${code}`)));
+  });
+  const exited = new Promise(resolve => service.once("exit", resolve));
+  try {
+    run(lifecycle, ["stop-services"], { ...ownedEnv, GH_AW_WSL_CLEANUP: "true" });
+    await exited;
+    assert.equal(fs.existsSync(path.join(state.GH_AW_RUNTIME_DIR, ".gh-aw-processes.jsonl")), false);
+  } finally {
+    if (service.exitCode === null) service.kill("SIGKILL");
+    run(clean, [], ownedEnv);
+  }
+});
+
 test("interrupted invocation leaves a recorded allocation that a later clean can reclaim", async t => {
   const f = fixture(t);
   const env = f.invocation();

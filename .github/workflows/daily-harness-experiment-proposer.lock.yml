@@ -372,7 +372,7 @@ jobs:
             - **Max Patch Size**: 51200 bytes (50 KB) total per push (max: 1024 KB)
 
           GH_AW_MEMORY_DESCRIPTION: " Ledger of past harness-experiment proposals and their eventual EXTEND/PROMOTE/REJECT/INCONCLUSIVE decisions, used to avoid repeating rejected mutations and to prefer adapting promoted patterns."
-          GH_AW_MEMORY_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/
+          GH_AW_MEMORY_DIR: $GH_AW_RUNTIME_DIR/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_OTEL_METRICS: ""
@@ -447,7 +447,7 @@ jobs:
             - **Max Patch Size**: 51200 bytes (50 KB) total per push (max: 1024 KB)
 
           GH_AW_MEMORY_DESCRIPTION: " Ledger of past harness-experiment proposals and their eventual EXTEND/PROMOTE/REJECT/INCONCLUSIVE decisions, used to avoid repeating rejected mutations and to prefer adapting promoted patterns."
-          GH_AW_MEMORY_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/
+          GH_AW_MEMORY_DIR: $GH_AW_RUNTIME_DIR/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_OTEL_METRICS: ""

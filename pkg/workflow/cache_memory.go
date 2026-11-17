@@ -343,7 +343,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 	if len(config.Caches) == 1 && config.Caches[0].ID == "default" {
 		cache := config.Caches[0]
 		// Trailing slash makes the path look like a directory in prompt context.
-		cacheDir := cacheMemoryDirFor(cache.ID) + "/"
+		cacheDir := cacheMemoryPromptDirFor(cache.ID) + "/"
 
 		// Build description text
 		descriptionText := ""
@@ -380,7 +380,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 	var cacheList strings.Builder
 	for _, cache := range config.Caches {
 		// Trailing slash makes the path look like a directory in prompt context.
-		cacheDir := cacheMemoryDirFor(cache.ID) + "/"
+		cacheDir := cacheMemoryPromptDirFor(cache.ID) + "/"
 		if cache.Description != "" {
 			fmt.Fprintf(&cacheList, "- **%s**: `%s` - %s\n", cache.ID, cacheDir, cache.Description)
 		} else {
@@ -435,7 +435,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 	// Build cache examples
 	var cacheExamples strings.Builder
 	for _, cache := range config.Caches {
-		cacheDir := cacheMemoryDirFor(cache.ID)
+		cacheDir := cacheMemoryPromptDirFor(cache.ID)
 		fmt.Fprintf(&cacheExamples, "- `%s/notes.txt` - general notes and observations\n", cacheDir)
 		fmt.Fprintf(&cacheExamples, "- `%s/notes.md` - markdown formatted notes\n", cacheDir)
 		fmt.Fprintf(&cacheExamples, "- `%s/preferences.json` - user preferences and settings\n", cacheDir)

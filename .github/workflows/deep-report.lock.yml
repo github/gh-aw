@@ -426,7 +426,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_ENGINE_ID: claude
           GH_AW_EXPERIMENTS_OUTPUT_FORMAT: ${{ steps.pick-experiment.outputs.output_format }}
           GH_AW_EXPR_504E2CD2: ${{ steps.pick-experiment.outputs.output_format == 'executive_brief' }}
@@ -499,7 +499,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_EXPERIMENTS_OUTPUT_FORMAT: ${{ steps.pick-experiment.outputs.output_format }}
           GH_AW_EXPR_504E2CD2: ${{ steps.pick-experiment.outputs.output_format == 'executive_brief' }}
           GH_AW_EXPR_6BD53142: ${{ steps.pick-experiment.outputs.output_format == 'annotated_brief' }}

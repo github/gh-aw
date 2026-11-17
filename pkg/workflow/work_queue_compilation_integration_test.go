@@ -147,8 +147,9 @@ Compile each work-queue workflow phase.
 
 	agent := extractJobSection(compiled, string(constants.AgentJobName))
 	require.Contains(t, agent, `"work-queue"`)
-	require.Contains(t, agent, constants.WorkQueueFinishIntentMount)
-	require.Contains(t, agent, constants.WorkQueueFinishIntentPath)
+	runtimeIntentDir := runtimeDirectoryExpression + "/safeoutputs/work-queue"
+	require.Contains(t, agent, runtimeIntentDir+":"+runtimeIntentDir+":rw")
+	require.Contains(t, agent, runtimeDirectoryExpression+"/work-queue.finish.jsonl")
 	require.Contains(t, agent, "collect_work_queue_intents.cjs")
 	require.Contains(t, agent, "Collect work queue intents")
 	require.Equal(t, 1, strings.Count(agent, "id: redact_secrets\n"))
@@ -159,7 +160,7 @@ Compile each work-queue workflow phase.
 	require.Contains(t, safeOutputs, "contents: write")
 	require.Contains(t, safeOutputs, "actions: write")
 	require.Contains(t, safeOutputs, "work_queue_controls")
-	require.Contains(t, safeOutputs, constants.WorkQueueFinishIntentPath)
+	require.Contains(t, safeOutputs, runtimeDirectoryExpression+"/work-queue.finish.jsonl")
 	require.Contains(t, safeOutputs, constants.WorkQueueIntentPath)
 	require.Contains(t, safeOutputs, "Download activation artifact for work queue")
 	require.Contains(t, safeOutputs, "Reconcile work queue claim")

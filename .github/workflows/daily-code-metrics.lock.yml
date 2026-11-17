@@ -390,7 +390,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_ENGINE_ID: copilot
           GH_AW_EXPERIMENTS_OUTPUT_FORMAT: ${{ steps.pick-experiment.outputs.output_format }}
           GH_AW_EXPR_3FD86308: ${{ steps.pick-experiment.outputs.output_format == 'full_detail' }}
@@ -416,7 +416,7 @@ jobs:
             - **Max Patch Size**: 131072 bytes (128 KB) total per push (max: 1024 KB)
 
           GH_AW_MEMORY_DESCRIPTION: " Historical code quality and health metrics"
-          GH_AW_MEMORY_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/
+          GH_AW_MEMORY_DIR: $GH_AW_RUNTIME_DIR/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
@@ -476,7 +476,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_EXPERIMENTS_OUTPUT_FORMAT: ${{ steps.pick-experiment.outputs.output_format }}
           GH_AW_EXPR_3FD86308: ${{ steps.pick-experiment.outputs.output_format == 'full_detail' }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -501,7 +501,7 @@ jobs:
             - **Max Patch Size**: 131072 bytes (128 KB) total per push (max: 1024 KB)
 
           GH_AW_MEMORY_DESCRIPTION: " Historical code quality and health metrics"
-          GH_AW_MEMORY_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/
+          GH_AW_MEMORY_DIR: $GH_AW_RUNTIME_DIR/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""

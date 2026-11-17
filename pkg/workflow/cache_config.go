@@ -55,6 +55,16 @@ func cacheMemoryActionDirFor(cacheID string) string {
 	return "${{ runner.temp }}/gh-aw-cache-memory-" + cacheID
 }
 
+func cacheMemoryPromptDirFor(cacheID string) string {
+	if cacheID == "default" || cacheID == "" {
+		return "$GH_AW_RUNTIME_DIR/cache-memory"
+	}
+	if !isValidCacheID(cacheID) {
+		panic(fmt.Sprintf("cacheMemoryPromptDirFor called with invalid cache ID %q", cacheID))
+	}
+	return "$GH_AW_RUNTIME_DIR/cache-memory-" + cacheID
+}
+
 func cacheMemoryValidationStepID(cacheID string) string {
 	return memoryValidationStepID("validate_cache_memory", cacheID)
 }

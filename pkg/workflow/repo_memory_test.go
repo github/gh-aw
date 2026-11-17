@@ -453,7 +453,7 @@ func TestRepoMemoryPromptGeneration(t *testing.T) {
 	require.NotNil(t, section.EnvVars, "Should have environment variables")
 
 	// Check for prompt header key
-	assert.Equal(t, "/tmp/gh-aw/repo-memory/default/", section.EnvVars["GH_AW_MEMORY_DIR"], "Should have correct memory directory")
+	assert.Equal(t, "$GH_AW_RUNTIME_DIR/repo-memory/default/", section.EnvVars["GH_AW_MEMORY_DIR"], "Should have correct memory directory")
 
 	// Check for description
 	assert.Equal(t, " Persistent memory for agent state", section.EnvVars["GH_AW_MEMORY_DESCRIPTION"], "Expected custom description with leading space")

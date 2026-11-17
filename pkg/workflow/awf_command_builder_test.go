@@ -560,7 +560,7 @@ func TestBuildAWFArgsCliProxy(t *testing.T) {
 		argsStr := strings.Join(args, " ")
 
 		assert.Contains(t, argsStr, "--difc-proxy-host", "Should include --difc-proxy-host when cli-proxy is enabled")
-		assert.Contains(t, argsStr, "host.docker.internal:18443", "Should use host.docker.internal:18443 as proxy host")
+		assert.Contains(t, argsStr, "host.docker.internal:${{ env.GH_AW_CLI_PROXY_PORT }}", "Should use the dynamic host CLI proxy port")
 		assert.Contains(t, argsStr, "--difc-proxy-ca-cert", "Should include --difc-proxy-ca-cert")
 		assert.Contains(t, argsStr, "/tmp/gh-aw/difc-proxy-tls/ca.crt", "Should use the correct CA cert path")
 		assert.NotContains(t, argsStr, "--enable-cli-proxy", "Should not include deprecated --enable-cli-proxy")
@@ -594,7 +594,7 @@ func TestBuildAWFArgsCliProxy(t *testing.T) {
 		argsStr := strings.Join(args, " ")
 
 		assert.Contains(t, argsStr, "--difc-proxy-host", "Should include --difc-proxy-host when cli-proxy is enabled")
-		assert.Contains(t, argsStr, "awmg-cli-proxy:18443", "Should use internal awf-net CLI proxy address in isolation mode")
+		assert.Contains(t, argsStr, "awmg-cli-proxy:${{ env.GH_AW_CLI_PROXY_PORT }}", "Should use the internal CLI proxy with a dynamic port in isolation mode")
 		assert.NotContains(t, argsStr, "host.docker.internal:18443", "Should not use host.docker.internal in isolation mode")
 	})
 

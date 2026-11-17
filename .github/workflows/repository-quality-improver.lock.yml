@@ -373,14 +373,14 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_EXAMPLES: |
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/notes.txt` - general notes and observations
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/notes.md` - markdown formatted notes
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/preferences.json` - user preferences and settings
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/history.jsonl` - activity history in JSON Lines format
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/data.csv` - tabular data
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/state/` - organized state files in subdirectories (with allowed file types)
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/notes.txt` - general notes and observations
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/notes.md` - markdown formatted notes
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/preferences.json` - user preferences and settings
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/history.jsonl` - activity history in JSON Lines format
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/data.csv` - tabular data
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/state/` - organized state files in subdirectories (with allowed file types)
           GH_AW_CACHE_LIST: |
-            - **focus-areas**: `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/`
+            - **focus-areas**: `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/`
           GH_AW_ENGINE_ID: copilot
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
@@ -440,14 +440,14 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_EXAMPLES: |
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/notes.txt` - general notes and observations
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/notes.md` - markdown formatted notes
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/preferences.json` - user preferences and settings
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/history.jsonl` - activity history in JSON Lines format
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/data.csv` - tabular data
-            - `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/state/` - organized state files in subdirectories (with allowed file types)
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/notes.txt` - general notes and observations
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/notes.md` - markdown formatted notes
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/preferences.json` - user preferences and settings
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/history.jsonl` - activity history in JSON Lines format
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/data.csv` - tabular data
+            - `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/state/` - organized state files in subdirectories (with allowed file types)
           GH_AW_CACHE_LIST: |
-            - **focus-areas**: `${{ env.GH_AW_RUNTIME_DIR }}/cache-memory-focus-areas/`
+            - **focus-areas**: `$GH_AW_RUNTIME_DIR/cache-memory-focus-areas/`
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}

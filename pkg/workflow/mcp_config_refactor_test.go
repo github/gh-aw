@@ -29,7 +29,7 @@ func TestRenderSafeOutputsMCPConfigWithOptions(t *testing.T) {
 				`"safeoutputs": {`,
 				`"type": "stdio"`,
 				`"container": "` + pinnedGhAwNodeImage + `"`,
-				`"${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw"`,
+				`"${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro"`,
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,
 				`"entrypoint": "sh"`,
 				`"entrypointArgs": ["-c", "sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh"]`,
@@ -52,7 +52,7 @@ func TestRenderSafeOutputsMCPConfigWithOptions(t *testing.T) {
 			expectedContent: []string{
 				`"safeoutputs": {`,
 				`"container": "` + pinnedGhAwNodeImage + `"`,
-				`"${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw"`,
+				`"${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro"`,
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,
 				`"args": ["-w", "\${GITHUB_WORKSPACE}"]`,
 				`"entrypoint": "sh"`,
@@ -232,11 +232,11 @@ func TestRenderSafeOutputsMCPConfigTOML(t *testing.T) {
 	expectedContent := []string{
 		`[mcp_servers.safeoutputs]`,
 		`container = "` + resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, nil) + `"`,
-		`mounts = ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]`,
+		`mounts = ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro", "/tmp/gh-aw:/tmp/gh-aw:rw"]`,
 		`args = ["-w", "$GITHUB_WORKSPACE"]`,
 		`entrypoint = "sh"`,
 		`entrypointArgs = ["-c", "sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh"]`,
-		`env_vars = ["DEBUG", "DEFAULT_BRANCH", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS", "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH", "GH_AW_TARGET_REPO_SLUG", "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST", "GH_AW_PR_HEAD_BASE_BRANCH", "GH_AW_PR_HEAD_BASE_SHA", "GH_AW_PR_HEAD_BASE_REPO", "GH_AW_PR_HEAD_BASE_PR_NUMBER", "GH_AW_PR_HEAD_BASE_REF", "GH_AW_PR_HEAD_REPO", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REPOSITORY", "GITHUB_SHA", "GITHUB_TOKEN", "GITHUB_WORKSPACE", "RUNNER_TEMP", "` + strings.Join(objectPackLimitEnvNames, `", "`) + `"]`,
+		`env_vars = ["DEBUG", "DEFAULT_BRANCH", "GH_AW_RUNTIME_DIR", "GH_AW_RUNTIME_ID", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS", "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH", "GH_AW_TARGET_REPO_SLUG", "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST", "GH_AW_PR_HEAD_BASE_BRANCH", "GH_AW_PR_HEAD_BASE_SHA", "GH_AW_PR_HEAD_BASE_REPO", "GH_AW_PR_HEAD_BASE_PR_NUMBER", "GH_AW_PR_HEAD_BASE_REF", "GH_AW_PR_HEAD_REPO", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REPOSITORY", "GITHUB_SHA", "GITHUB_TOKEN", "GITHUB_WORKSPACE", "RUNNER_TEMP", "` + strings.Join(objectPackLimitEnvNames, `", "`) + `"]`,
 	}
 
 	unexpectedContent := []string{
@@ -302,7 +302,7 @@ func TestRenderSafeOutputsMCPConfigTOMLStableAcrossSandboxModes(t *testing.T) {
 			if !strings.Contains(result, `container = "`+resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, tt.workflowData)+`"`) {
 				t.Errorf("Expected gh-aw node container not found in output:\n%s", result)
 			}
-			if !strings.Contains(result, `mounts = ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]`) {
+			if !strings.Contains(result, `mounts = ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:ro", "/tmp/gh-aw:/tmp/gh-aw:rw"]`) {
 				t.Errorf("Expected stable safe-outputs mounts not found in output:\n%s", result)
 			}
 			if strings.Contains(result, "host.docker.internal") || strings.Contains(result, "localhost") {

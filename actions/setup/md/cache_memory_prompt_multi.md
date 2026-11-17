@@ -1,6 +1,7 @@
 <cache-memory>
 __GH_AW_CACHE_LIST__
 Persistent read/write storage across workflow runs via Actions cache. Last write wins.__GH_AW_ALLOWED_EXTENSIONS__
+Expand `$GH_AW_RUNTIME_DIR` in shell commands to use this run's private runtime.
 Examples:
 __GH_AW_CACHE_EXAMPLES__
 Cache files may be absent on first run, after eviction, or because of branch scoping. If the workflow defines initialization, a full analysis, or another fallback for absent state, follow that path and do **not** call `report_missing_data` for the expected absence. Save updated state in the cache directory for future runs.

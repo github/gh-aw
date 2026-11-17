@@ -14,7 +14,9 @@ function runCleanup(script, args = []) {
   const result = spawnSync("bash", [path.join(__dirname, "sh", script), ...args], { stdio: "inherit" });
   if (result.error || result.status !== 0) {
     console.warn(`Warning: ${script} cleanup failed: ${result.error?.message || result.status}`);
+    return false;
   }
+  return true;
 }
 
 function runWSLServiceCleanup() {
@@ -32,7 +34,21 @@ function runWSLServiceCleanup() {
   try {
     const result = spawnSync(
       "wsl.exe",
-      ["--distribution", "Ubuntu", "--user", "root", "--exec", "env", `GH_AW_RUNTIME_DIR=${toWSL(runtimeDir)}`, `GH_AW_RUNTIME_ID=${runtimeId}`, `GH_AW_RUNTIME_UID=${runtimeUid}`, "bash", toWSL(script), "stop-services"],
+      [
+        "--distribution",
+        "Ubuntu",
+        "--user",
+        "root",
+        "--exec",
+        "env",
+        `GH_AW_RUNTIME_DIR=${toWSL(runtimeDir)}`,
+        `GH_AW_RUNTIME_ID=${runtimeId}`,
+        `GH_AW_RUNTIME_UID=${runtimeUid}`,
+        "GH_AW_WSL_CLEANUP=true",
+        "bash",
+        toWSL(script),
+        "stop-services",
+      ],
       { stdio: "inherit", windowsHide: true, timeout: 30000 }
     );
     if (result.error || result.status !== 0) {
@@ -50,7 +66,9 @@ function runWSLServiceCleanup() {
   } catch {
     // Telemetry must not prevent reclamation, including after setup fails.
   }
-  runWSLServiceCleanup();
+  if (process.platform !== "win32" || runCleanup("runtime_lifecycle.sh", ["validate"])) {
+    runWSLServiceCleanup();
+  }
   runCleanup("runtime_lifecycle.sh", ["cleanup"]);
   // AWF scratch is nested in the validated root. Never follow ambient scratch
   // variables, which may belong to a later setup action in the same job.

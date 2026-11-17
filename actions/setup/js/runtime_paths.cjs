@@ -57,18 +57,6 @@ function runtimeContainerName(prefix, env = process.env) {
 }
 
 /**
- * Resolve canonical path examples in trusted prompt fragments, not executable
- * source or evaluated user content.
- * @param {string} text
- * @param {NodeJS.ProcessEnv} [env]
- * @returns {string}
- */
-function resolveRuntimePaths(text, env = process.env) {
-  const root = runtimeRoot(env);
-  return text.replace(/\/tmp\/gh-aw(?=\/|[^a-zA-Z0-9_.-]|$)/g, () => root);
-}
-
-/**
  * @param {string} name
  * @param {number} fallback
  * @param {NodeJS.ProcessEnv} [env]
@@ -108,4 +96,4 @@ function registerRuntimeProcess(pid, role, env = process.env) {
   });
 }
 
-module.exports = { runtimeRoot, runtimePath, setupRoot, runtimeId, runtimeContainerName, resolveRuntimePaths, runtimePort, registerRuntimeProcess };
+module.exports = { runtimeRoot, runtimePath, setupRoot, runtimeId, runtimeContainerName, runtimePort, registerRuntimeProcess };

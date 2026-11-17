@@ -363,8 +363,8 @@ jobs:
             - `safeoutputs` — run `safeoutputs --help` to see available tools
           GH_AW_MEMORY_ALLOWED_EXTENSIONS: .json`, `.jsonl
           GH_AW_MEMORY_LIST: |
-            - **default**: `${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/` (branch: `memory/meta-orchestrators`)
-            - **lifecycle**: `${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/lifecycle/` (branch: `memory/output-lifecycle`)
+            - **default**: `$GH_AW_RUNTIME_DIR/repo-memory/default/` (branch: `memory/meta-orchestrators`)
+            - **lifecycle**: `$GH_AW_RUNTIME_DIR/repo-memory/lifecycle/` (branch: `memory/output-lifecycle`)
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
@@ -424,8 +424,8 @@ jobs:
             - `safeoutputs` — run `safeoutputs --help` to see available tools
           GH_AW_MEMORY_ALLOWED_EXTENSIONS: .json`, `.jsonl
           GH_AW_MEMORY_LIST: |
-            - **default**: `${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/` (branch: `memory/meta-orchestrators`)
-            - **lifecycle**: `${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/lifecycle/` (branch: `memory/output-lifecycle`)
+            - **default**: `$GH_AW_RUNTIME_DIR/repo-memory/default/` (branch: `memory/meta-orchestrators`)
+            - **lifecycle**: `$GH_AW_RUNTIME_DIR/repo-memory/lifecycle/` (branch: `memory/output-lifecycle`)
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""

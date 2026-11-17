@@ -401,7 +401,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_ENGINE_ID: claude
           GH_AW_EXPERIMENTS_PROMPT_TIGHTENING_V1: ${{ steps.pick-experiment.outputs.prompt_tightening_v1 }}
           GH_AW_EXPR_4696CF0D: ${{ steps.pick-experiment.outputs.prompt_tightening_v1 == 'candidate' }}
@@ -467,7 +467,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/cache-memory/
+          GH_AW_CACHE_DIR: $GH_AW_RUNTIME_DIR/cache-memory/
           GH_AW_EXPERIMENTS_PROMPT_TIGHTENING_V1: ${{ steps.pick-experiment.outputs.prompt_tightening_v1 }}
           GH_AW_EXPR_4696CF0D: ${{ steps.pick-experiment.outputs.prompt_tightening_v1 == 'candidate' }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}

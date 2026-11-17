@@ -539,7 +539,7 @@ sandbox:
 	require.NoError(t, err)
 	lockStr := string(lockContent)
 
-	assert.Contains(t, lockStr, `\"allowWrite\":[\"/tmp/gh-aw/agent\",\"/workspace\",\"/workspace/.awf-home\",\"/tmp/gh-aw/cache-memory\"]`)
+	assert.Contains(t, lockStr, `\"allowWrite\":[\"${{ env.GH_AW_RUNTIME_DIR }}/agent\",\"/workspace\",\"/workspace/.awf-home\",\"${{ env.GH_AW_RUNTIME_DIR }}/cache-memory\"]`)
 	assert.Contains(t, lockStr, `mkdir -p "${GITHUB_WORKSPACE}/.awf-home"`)
 	assert.Contains(t, lockStr, `git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude`)
 	assert.Contains(t, lockStr, `if ! grep -qxF -- '/.awf-home/' "$GH_AW_GIT_EXCLUDE"`)

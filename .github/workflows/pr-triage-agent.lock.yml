@@ -376,7 +376,7 @@ jobs:
             - **Max Patch Size**: 10240 bytes (10 KB) total per push (max: 1024 KB)
 
           GH_AW_MEMORY_DESCRIPTION: ""
-          GH_AW_MEMORY_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/
+          GH_AW_MEMORY_DIR: $GH_AW_RUNTIME_DIR/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
@@ -451,7 +451,7 @@ jobs:
             - **Max Patch Size**: 10240 bytes (10 KB) total per push (max: 1024 KB)
 
           GH_AW_MEMORY_DESCRIPTION: ""
-          GH_AW_MEMORY_DIR: ${{ env.GH_AW_RUNTIME_DIR }}/repo-memory/default/
+          GH_AW_MEMORY_DIR: $GH_AW_RUNTIME_DIR/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
