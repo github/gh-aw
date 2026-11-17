@@ -42,6 +42,7 @@ async function fixture(t, options = {}) {
   const outputs = {};
   const warnings = [];
   const clock = { time: options.time || now };
+  let rateLimitCalls = 0;
   class FixtureDate extends Date {
     constructor(...args) {
       super(...(args.length ? args : [clock.time]));
@@ -88,9 +89,15 @@ async function fixture(t, options = {}) {
         },
       },
       rateLimit: {
-        get: async () => ({
-          data: { resources: { core: { remaining: 1000, used, reset: 9999 } } },
-        }),
+        get: async () => {
+          rateLimitCalls++;
+          if ((options.rateLimitFailures || []).includes(rateLimitCalls)) {
+            throw new Error("Rate limit unavailable");
+          }
+          return {
+            data: { resources: { core: { remaining: 1000, used, reset: 9999 } } },
+          };
+        },
       },
     },
   };
@@ -572,6 +579,50 @@ test("shared API budget interruption checkpoints a resumable evidence batch", as
   assert.equal(state.seen.length, 6);
   assert.deepEqual(state.pending, []);
   assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).clusters[0].count, 6);
+});
+
+test("initial rate-limit lookup failure does not advance the checkpoint", async t => {
+  const state = {
+    version: 1,
+    repository: "example/repo",
+    checkpoint: new Date(Date.parse(now) - 3600000).toISOString(),
+    seen: [],
+    backlog: [],
+    pending: [],
+  };
+  const f = await fixture(t, { state, rateLimitFailures: [1] });
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  assert.equal(manifest.complete, false);
+  assert.equal(manifest.evidence_complete, false);
+  assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
+});
+
+test("rate-limit lookup failure after a deferred log leaves the checkpoint unchanged", async t => {
+  const state = {
+    version: 1,
+    repository: "example/repo",
+    checkpoint: new Date(Date.parse(now) - 3600000).toISOString(),
+    seen: [],
+    backlog: [],
+    pending: [],
+  };
+  const f = await fixture(t, {
+    runs: [run(42), run(43)],
+    state,
+    logTimeouts: [{ id: 42, audit: false, kind: "cli" }],
+    rateLimitFailures: [3, 4],
+  });
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  assert.equal(manifest.complete, false);
+  assert.equal(manifest.evidence_complete, false);
+  assert.ok(f.warnings.some(message => message.includes("checkpoint unchanged")));
+  assert.equal(f.calls.filter(call => call[1] === "logs").length, 1);
 });
 
 test("tracked successful completion and superseded failure drop obsolete opportunities", async t => {
