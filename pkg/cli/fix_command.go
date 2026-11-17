@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/aw"
@@ -20,6 +22,8 @@ var fixLog = logger.New("cli:fix_command")
 
 // FixConfig contains configuration for the fix command
 type FixConfig struct {
+	// Ctx cancels network operations (e.g. fetching the .github/aw file list); nil means context.Background().
+	Ctx                        context.Context
 	WorkflowIDs                []string
 	Write                      bool
 	Verbose                    bool
@@ -32,7 +36,7 @@ type FixConfig struct {
 
 // RunFix runs the fix command with the given configuration
 func RunFix(config FixConfig) error {
-	return runFixCommandWithResults(config.WorkflowIDs, config.Write, config.Verbose, config.WorkflowDir, config.DisabledCodemodIDs, config.SkipInstructionFileUpdates, config.OnApplied)
+	return runFixCommandWithResults(ctxutil.OrBackground(config.Ctx), config.WorkflowIDs, config.Write, config.Verbose, config.WorkflowDir, config.DisabledCodemodIDs, config.SkipInstructionFileUpdates, config.OnApplied)
 }
 
 // NewFixCommand creates the fix command
@@ -82,7 +86,7 @@ all steps and additionally:
 				return listAvailableCodemods()
 			}
 
-			return runFixCommand(args, write, verbose, dir, disabledCodemods, false)
+			return runFixCommand(cmd.Context(), args, write, verbose, dir, disabledCodemods, false)
 		},
 	}
 
@@ -119,11 +123,11 @@ func listAvailableCodemods() error {
 }
 
 // runFixCommand runs the fix command on specified or all workflows
-func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir string, disabledCodemodIDs []string, skipInstructionFileUpdates bool) error {
-	return runFixCommandWithResults(workflowIDs, write, verbose, workflowDir, disabledCodemodIDs, skipInstructionFileUpdates, nil)
+func runFixCommand(ctx context.Context, workflowIDs []string, write bool, verbose bool, workflowDir string, disabledCodemodIDs []string, skipInstructionFileUpdates bool) error {
+	return runFixCommandWithResults(ctx, workflowIDs, write, verbose, workflowDir, disabledCodemodIDs, skipInstructionFileUpdates, nil)
 }
 
-func runFixCommandWithResults(workflowIDs []string, write bool, verbose bool, workflowDir string, disabledCodemodIDs []string, skipInstructionFileUpdates bool, onApplied func(string, []string)) error { //nolint:largefunc // Existing command orchestration remains centralized.
+func runFixCommandWithResults(ctx context.Context, workflowIDs []string, write bool, verbose bool, workflowDir string, disabledCodemodIDs []string, skipInstructionFileUpdates bool, onApplied func(string, []string)) error { //nolint:largefunc // Existing command orchestration remains centralized.
 	fixLog.Printf("Running fix command: workflowIDs=%v, write=%v, verbose=%v, workflowDir=%s, disabledCodemodIDs=%v", workflowIDs, write, verbose, workflowDir, disabledCodemodIDs)
 
 	// Set up workflow directory (using default if not specified)
@@ -215,7 +219,7 @@ func runFixCommandWithResults(workflowIDs []string, write bool, verbose bool, wo
 		// This ensures the latest templates are always used
 		fixLog.Print("Updating prompt and skill files")
 
-		if err := ensureAgenticWorkflowsDispatcher(verbose, false, write); err != nil {
+		if err := ensureAgenticWorkflowsDispatcher(ctx, verbose, false, write); err != nil {
 			fixLog.Printf("Failed to update dispatcher skill: %v", err)
 			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to update dispatcher skill: %v", err)))
 		}

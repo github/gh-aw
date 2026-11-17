@@ -10,9 +10,10 @@ const { tryEnforceArrayLimit } = require("./limit_enforcement_helpers.cjs");
 const { MAX_ASSIGNEES } = require("./constants.cjs");
 const { encodePathSegments, renderTemplateFromFile } = require("./messages_core.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { getIssueLabel } = require("./issue_label.cjs");
 
 /** @type {string} Label always added to fallback issues so the triage system can find them */
-const MANAGED_FALLBACK_ISSUE_LABEL = "agentic-workflows";
+const MANAGED_FALLBACK_ISSUE_LABEL = getIssueLabel();
 
 /** @type {number} Number of retry attempts for label operations */
 const LABEL_MAX_RETRIES = 5;

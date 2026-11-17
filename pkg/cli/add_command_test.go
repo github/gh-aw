@@ -141,7 +141,7 @@ func TestAddCommandAutoMergePropagation(t *testing.T) {
 				autoMergeRunGH = originalAutoMerge
 				addMissingInitMarkers = originalMissingMarkers
 			})
-			addMissingInitMarkers = func(string, string) ([]string, error) { return nil, nil }
+			addMissingInitMarkers = func(context.Context, string, string) ([]string, error) { return nil, nil }
 			const prURL = "https://github.com/octo/repo/pull/42"
 			created := false
 			createPRRunGHContextWithHost = func(_ context.Context, _, _ string, args ...string) ([]byte, error) {
@@ -590,7 +590,7 @@ func TestEnsureAddRepositoryInitialized(t *testing.T) {
 
 	t.Run("skips initialization outside a git checkout", func(t *testing.T) {
 		addFindGitRoot = func() (string, error) { return "", gitutil.ErrNotGitRepository }
-		addMissingInitMarkers = func(string, string) ([]string, error) {
+		addMissingInitMarkers = func(context.Context, string, string) ([]string, error) {
 			t.Fatal("missing init markers check should be skipped outside a git checkout")
 			return nil, nil
 		}
@@ -599,14 +599,14 @@ func TestEnsureAddRepositoryInitialized(t *testing.T) {
 			return nil
 		}
 
-		err := ensureAddRepositoryInitialized("", false, false)
+		err := ensureAddRepositoryInitialized(t.Context(), "", false, false)
 		require.NoError(t, err)
 	})
 
 	t.Run("runs init when required markers are missing", func(t *testing.T) {
 		repoDir := t.TempDir()
 		addFindGitRoot = func() (string, error) { return repoDir, nil }
-		addMissingInitMarkers = func(baseDir string, engineOverride string) ([]string, error) {
+		addMissingInitMarkers = func(_ context.Context, baseDir string, engineOverride string) ([]string, error) {
 			assert.Equal(t, ".", baseDir)
 			assert.Equal(t, "claude", engineOverride)
 			return []string{".gitattributes"}, nil
@@ -627,7 +627,7 @@ func TestEnsureAddRepositoryInitialized(t *testing.T) {
 			return nil
 		}
 
-		err := ensureAddRepositoryInitialized("claude", true, true)
+		err := ensureAddRepositoryInitialized(t.Context(), "claude", true, true)
 		require.NoError(t, err)
 		assert.True(t, called)
 	})
@@ -635,13 +635,13 @@ func TestEnsureAddRepositoryInitialized(t *testing.T) {
 	t.Run("does nothing when markers are already present", func(t *testing.T) {
 		repoDir := t.TempDir()
 		addFindGitRoot = func() (string, error) { return repoDir, nil }
-		addMissingInitMarkers = func(string, string) ([]string, error) { return nil, nil }
+		addMissingInitMarkers = func(context.Context, string, string) ([]string, error) { return nil, nil }
 		addInitRepository = func(InitOptions) error {
 			t.Fatal("InitRepository should not run when markers are already present")
 			return nil
 		}
 
-		err := ensureAddRepositoryInitialized("", false, false)
+		err := ensureAddRepositoryInitialized(t.Context(), "", false, false)
 		require.NoError(t, err)
 	})
 }
@@ -669,7 +669,7 @@ func TestEnsureAddRepositoryInitializedWithDetails_AbsolutePaths(t *testing.T) {
 	skippedMarker := ".gitattributes"
 
 	addFindGitRoot = func() (string, error) { return repoDir, nil }
-	addMissingInitMarkers = func(string, string) ([]string, error) {
+	addMissingInitMarkers = func(context.Context, string, string) ([]string, error) {
 		return []string{writtenMarker, skippedMarker}, nil
 	}
 	addInitRepository = func(InitOptions) error {
@@ -681,7 +681,7 @@ func TestEnsureAddRepositoryInitializedWithDetails_AbsolutePaths(t *testing.T) {
 		return os.WriteFile(p, []byte(`{}`), 0644)
 	}
 
-	files, err := ensureAddRepositoryInitializedWithDetails("", false, true)
+	files, err := ensureAddRepositoryInitializedWithDetails(t.Context(), "", false, true)
 	require.NoError(t, err)
 
 	// Only the actually-written file should be returned.

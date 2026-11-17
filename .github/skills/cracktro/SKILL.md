@@ -50,8 +50,8 @@ slides.push({
   notes: "...",           // speaker notes (N key); public text
   group: "security",      // band id; picks the THEME; crossing groups slides up
   experimental: "lsp",    // optional .xbadge; label only from the feature's `cracktro` entry in pkg/workflow/data/experimental_features.json (test-enforced)
-  key: "unsloppers",      // optional; pattern slide heading a column of examples
-  under: "unsloppers",    // optional; hangs below the same-group slide with that key (mechanics.md)
+  key: "improvers",      // optional; pattern slide heading a column of examples
+  under: "improvers",    // optional; hangs below the same-group slide with that key (mechanics.md)
   techno: 1,              // optional techno layer level
   el: h("section", { class: "slide" }, ...),
   enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back

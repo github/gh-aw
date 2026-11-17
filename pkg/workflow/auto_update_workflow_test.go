@@ -75,6 +75,18 @@ func TestGenerateAutoUpdateWorkflow_UpgradeOptions(t *testing.T) {
 	assert.Contains(t, string(data), `GH_AW_UPGRADE_OPTIONS: '["--pre-releases"]'`)
 }
 
+func TestGenerateAutoUpdateWorkflow_IssueLabel(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+		WorkflowDir: dir,
+		Enabled:     true,
+		RepoConfig:  &RepoConfig{IssueLabel: "area:agentic-workflows"},
+	}))
+	content, err := os.ReadFile(filepath.Join(dir, AutoUpdateWorkflowFileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "GH_AW_ISSUE_LABEL: \"area:agentic-workflows\"")
+}
+
 func TestGenerateAutoUpdateWorkflow_DisabledDeletesExistingFile(t *testing.T) {
 	dir := t.TempDir()
 
