@@ -1,24 +1,24 @@
 {
-  "last_run_date": "2026-11-16",
+  "last_run_date": "2026-11-17",
   "last_window": {
-    "start": "2026-11-15T08:02:39Z",
-    "end": "2026-11-16T08:02:39Z"
+    "start": "2026-11-16T07:55:53Z",
+    "end": "2026-11-17T07:55:53Z"
   },
   "observed_window": {
-    "coverage": "330 cached run records created 2026-11-15T23:51:05Z through 2026-11-16T08:02:39Z; count-limited, no fleet refetch. Earlier requested interval is missing. One cached run created after cutoff was excluded.",
-    "continuation_start": "2026-11-15T08:05:17Z",
-    "continuation_end": "2026-11-15T23:49:53Z",
-    "continuation_before_run_id": 43777018471
+    "coverage": "242 cached records, created 2026-11-17T03:24:47Z through 07:53:24Z; count-limited; no fleet refetch",
+    "continuation_start": "2026-11-16T07:55:53Z",
+    "continuation_end": "2026-11-17T03:24:34Z",
+    "continuation_before_run_id": 44010020995
   },
   "key_themes": [
-    "Auditor repair merged; collection jobs show success, success, failure, success afterward; agent skipped. Issue 78066 remains open.",
-    "Review startup failures across two PR groups; collaborator attributed six on PR 78232 to transient provider outage.",
-    "Three workflows failed safe-output processing after successful agent jobs, with common cause unverified."
+    "Five Auditor collection failures before targeted PR 78651 merged; post-merge behavior unverified.",
+    "Two workflows failed Process Safe Outputs after agent, detection and eval success.",
+    "Conformance PR 78649 merged before specialist review runs; later review reported potential inaccuracies."
   ],
   "carry_forward_questions": [
-    "Did Auditor achieve three consecutive scheduled passes and end-to-end agent execution after the later failure?",
-    "Were the interrupted reviews rerun and did their findings reach the PR?",
-    "Do safe-output failures share a cause and are outputs delivered?",
-    "Can the missing early portion be assessed separately?"
+    "Did Auditor achieve three consecutive collection passes and execute its agent after PR 78651?",
+    "Did the two safe-output failures have related causes and were outputs delivered?",
+    "Were the later PR 78649 review findings resolved and were the 12 remaining conformance types addressed?",
+    "Can the missing earlier part of the window be assessed separately?"
   ]
 }
