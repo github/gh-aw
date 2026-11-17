@@ -992,6 +992,23 @@
   .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
   .dto-big { fill: #3fb950; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  /* --- cli vs mcp --- */
+  .cvm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
+  .cvm-k { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
+  .cvm-chip { opacity: 0; transition: opacity .3s; } .cvm-chip.on { opacity: 1; } .cvm-chip.on.gone { opacity: .15; }
+  .cvm-chip rect { fill: #d2992214; stroke: #d29922; stroke-width: 1.5; }
+  .cvm-chip text { fill: #e6edf3; font: 500 13px var(--mono); }
+  .cvm-chip.s1 rect { fill: #8957e51a; stroke: #ab7df8; } .cvm-chip.s2 rect { fill: #1f6feb1a; stroke: #4493f8; }
+  .cvm-ln { opacity: 0; transition: opacity .3s; } .cvm-ln.on { opacity: 1; } .cvm-ln.gone { opacity: .15; }
+  .cvm-ln text { fill: #9198a1; font: 500 15px var(--mono); white-space: pre; }
+  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #3fb950; } .cvm-ln .ed { fill: #d29922; } .cvm-ln .jq { fill: #ffa657; font-weight: 700; }
+  .cvm-yaml text { fill: #e6edf3; font: 500 20px var(--mono); white-space: pre; }
+  .cvm-yaml .k { fill: #79c0ff; } .cvm-yaml .v { fill: #d29922; transition: fill .3s; } .cvm-yaml .v.on { fill: #3fb950; }
+  .cvm-hl { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .3s, stroke .3s; } .cvm-hl.on { fill: #3fb9501a; stroke: #3fb950; }
+  .cvm-bin { opacity: 0; transition: opacity .35s; } .cvm-bin.on { opacity: 1; }
+  .cvm-bin rect { fill: #161b22; stroke: #3fb950; stroke-width: 2; }
+  .cvm-bin .n { fill: #f0f6fc; font: 600 19px var(--mono); } .cvm-bin .d { fill: #9198a1; font: 500 14px var(--mono); }
+  .cvm-m { transition: width .25s linear; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -8016,6 +8033,228 @@
         }
       },
       el: h("section", { class: "slide dto" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic → deterministic · mined from run history"), h("h2", {}, letters("Deterministic"), letters("Ops", "l-grad"))), svg),
+    });
+  }
+
+  // CLI vs MCP: MCP tool schemas fill the context before the agent thinks; gh-proxy and cli-proxy put gh and every MCP server on PATH as CLIs, read with --help on demand and filtered in the shell, so the same task spends far fewer tokens
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 648;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // synthetic tool schemas: [server class, tool name]
+    const TOOLS = [
+      ...["issue_read", "list_issues", "search_issues", "pull_request_read", "list_pull_requests", "search_pull_requests", "get_file_contents", "search_code", "list_commits", "get_commit", "list_branches", "list_workflows", "list_workflow_runs", "get_job_logs", "list_discussions", "get_discussion", "list_releases", "+ more github…"].map(n => [0, n]),
+      ...["create_issue", "add_comment", "create_pull_request", "noop"].map(n => [1, n]),
+      ...["search", "get_page"].map(n => [2, n]),
+    ];
+    const CALL = [
+      ["cmd", '→ list_pull_requests {"state":"open"}'],
+      ["ed", "← 30 pull requests · full JSON objects"],
+      ["", "  body, user, labels, head, base, links…"],
+    ];
+    const BINS = [
+      ["gh", "gh-proxy · no GitHub MCP server"],
+      ["safeoutputs", "cli-proxy · via the MCP gateway"],
+      ["docs-search", "cli-proxy · via the MCP gateway"],
+    ];
+    const SHELL = [
+      ["cmd", "$ gh pr list --json number,title \\"],
+      ["cmd", "    | jq -r '.[].title' | head -3"],
+      ["", "Fix flaky retry in cache step"],
+      ["", "Add dark mode to settings"],
+      ["", "Bump parser to v2"],
+      ["cmd", "$ docs-search --help"],
+      ["", "search  get_page   ← schema on demand"],
+      ["cmd", '$ docs-search search --query "retry" \\'],
+      ["cmd", "    | jq -c '.hits[] | {path, line}'"],
+      ["ok", '{"path":"docs/cache.md","line":42}'],
+      ["cmd", "$ safeoutputs add_comment '{\"item_number\":42,…}'"],
+      ["ok", "✓ queued for the safe-output job"],
+    ];
+    const BW = 536,
+      MCP_K = 52,
+      CLI_K = 7;
+    let g = `<defs><marker id="cvmG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
+      <marker id="cvmC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 600, "MCP · SCHEMAS UP FRONT"],
+      [600, 1020, "FRONT MATTER"],
+      [1020, VW, "CLI · HELP ON DEMAND"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="cvmLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    g += `<path class="fm-wire" id="cvmW0" d="M584 450 C 606 450, 594 230, 614 230" stroke="#d29922" marker-end="url(#cvmG)"/>`;
+    g += `<path class="fm-wire" id="cvmW1" d="M1004 400 C 1026 400, 1014 180, 1034 180" stroke="#3fb950" marker-end="url(#cvmC)"/>`;
+    const meter = (x, id, lab) =>
+      `<text class="dto-mlab" x="${x + 16}" y="552">${lab}</text><text class="dto-mv" id="${id}V" x="${x + 552}" y="552">0k</text>` +
+      `<rect x="${x + 16}" y="566" width="${BW}" height="26" rx="6" fill="#ffffff0d"/><rect class="cvm-m" id="${id}" x="${x + 16}" y="566" width="0" height="26" rx="6" fill="${id === "cvmMm" ? "#d29922" : "#3fb950"}"/>`;
+    // MCP: every server's tool schemas ride along in every model request
+    g += `<g class="sfl-box" id="cvmMcp"><rect class="sfl-card" x="16" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="32" y="104">agent context · github: local + 2 MCP servers</text>`;
+    g += `<text class="cvm-k" x="32" y="136">TOOL SCHEMAS · IN EVERY REQUEST</text>`;
+    TOOLS.forEach(([s, n], i) => {
+      const x = 32 + (i % 3) * 180,
+        y = 148 + Math.floor(i / 3) * 30;
+      g += `<g class="cvm-chip s${s}" id="cvmT${i}"><rect x="${x}" y="${y}" width="172" height="24" rx="5"/><text x="${x + 8}" y="${y + 17}">${esc(n)}</text></g>`;
+    });
+    g += `<text class="cvm-k" x="32" y="414">TOOL CALL</text>`;
+    CALL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmC${i}"><text class="${c}" x="32" y="${444 + i * 26}">${esc(t)}</text></g>`));
+    g += meter(16, "cvmMm", "context tokens") + `</g>`;
+    // front matter: two lines move GitHub reads to gh and mount every MCP server as a CLI
+    g += `<g class="sfl-box" id="cvmFm"><rect class="sfl-card" x="616" y="76" width="388" height="556" rx="12"/><text class="sfl-title" x="632" y="104">.github/workflows/triage.md</text>`;
+    g += `<rect class="cvm-hl" id="cvmH0" x="626" y="186" width="368" height="30" rx="6"/><rect class="cvm-hl" id="cvmH1" x="626" y="218" width="368" height="30" rx="6"/>`;
+    g += `<g class="cvm-yaml"><text x="636" y="142"><tspan class="k">tools:</tspan></text><text x="636" y="174"><tspan class="k">  github:</tspan></text>`;
+    g += `<text x="636" y="208"><tspan class="k">    mode: </tspan><tspan class="v" id="cvmV0">local</tspan></text>`;
+    g += `<text x="636" y="240"><tspan class="k">  cli-proxy: </tspan><tspan class="v" id="cvmV1">false</tspan></text></g>`;
+    g += `<text class="cvm-k" x="632" y="292">ON PATH · SAME SERVERS</text>`;
+    BINS.forEach(([n, d], i) => {
+      const y = 306 + i * 64;
+      g += `<g class="cvm-bin" id="cvmB${i}"><rect x="632" y="${y}" width="356" height="54" rx="8"/><text class="n" x="648" y="${y + 24}">${n}</text><text class="d" x="648" y="${y + 44}">${esc(d)}</text></g>`;
+    });
+    g += `<text class="dto-big" id="cvmBig" x="810" y="560">−87%</text>`;
+    g += `<text class="dto-cap" x="810" y="600">context tokens · same task</text></g>`;
+    // CLI: one prompt line per tool; schemas and data enter context only when asked for, already filtered
+    g += `<g class="sfl-box" id="cvmCli"><rect class="sfl-card" x="1036" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="1052" y="104">agent context · gh-proxy + cli-proxy</text>`;
+    g += `<text class="cvm-k" x="1052" y="136">PROMPT · ONE LINE PER CLI</text>`;
+    g += `<g class="cvm-ln" id="cvmP"><text x="1052" y="164">gh · safeoutputs · docs-search → <tspan class="cmd">--help</tspan></text></g>`;
+    g += `<text class="cvm-k" x="1052" y="206">SHELL · PIPE THROUGH JQ BEFORE CONTEXT</text>`;
+    // highlight the jq stage of each pipe
+    const pipe = t => {
+      const k = t.indexOf("| jq");
+      return k < 0 ? esc(t) : `${esc(t.slice(0, k))}<tspan class="jq">${esc(t.slice(k))}</tspan>`;
+    };
+    SHELL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmS${i}"><text class="${c}" x="1052" y="${236 + i * 26}">${pipe(t)}</text></g>`));
+    g += meter(1036, "cvmMc", "context tokens") + `</g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const clamp = u => Math.min(1, Math.max(0, u));
+    // phases: [start ms, duration ms]
+    const P = { SCH: [400, 2400], CALL: [3000, 1200], W0: [4400, 700], FLIP: [5100, 700], BIN: [5800, 1200], W1: [7100, 700], SH: [7800, 3600], BIG: [11600, 1] };
+    const CYC = 15600;
+    let t0 = 0,
+      cyc = -1,
+      done = new Set();
+    const once = (k, fn) => {
+      if (!done.has(k)) {
+        done.add(k);
+        fn();
+      }
+    };
+    const setMeter = (id, k) => {
+      $(id).setAttribute("width", Math.round((BW * k) / MCP_K));
+      $(id + "V").textContent = `${Math.round(k)}k`;
+    };
+    const reveal = (ids, f, snd) =>
+      ids.forEach((id, i) => {
+        if (f >= (i + 0.2) / ids.length && !$(id).classList.contains("on")) {
+          $(id).classList.add("on");
+          if (snd) snd(i);
+        }
+      });
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .gone").forEach(x => x.classList.remove("on", "hot", "gone"));
+      $("cvmV0").textContent = "local";
+      $("cvmV1").textContent = "false";
+      setMeter("cvmMm", 0);
+      setMeter("cvmMc", 0);
+      done = new Set();
+      $("cvmLane0").classList.add("on");
+      $("cvmMcp").classList.add("on");
+    };
+    const wire = (id, f) => {
+      const path = $(id),
+        n = path.getTotalLength(),
+        q = path.getPointAtLength(n * ease(Math.min(1, f / 0.85)));
+      path.classList.add("hot");
+      dot.style.opacity = 1;
+      dot.setAttribute("cx", q.x);
+      dot.setAttribute("cy", q.y);
+      dot.setAttribute("fill", id === "cvmW0" ? "#d29922" : "#3fb950");
+    };
+    const shellIds = ["cvmP", ...SHELL.map((_, i) => "cvmS" + i)];
+    slides.push({
+      group: "cost",
+      notes:
+        "CLI vs MCP: the workflow, servers, pull requests and token counts on this slide are illustrative and synthetic. An MCP server costs tokens before the agent does anything: every tool it exposes sends its name, description and JSON schema with every model request, and the GitHub MCP server alone exposes dozens of tools. Each call then returns whole JSON objects straight into the context. Two front matter lines change the surface without changing the servers. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a read-only command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. The prompt now carries one line per command; the agent runs --help only for the tool it needs and pipes every result through jq, picking just the fields it wants, then grep or head, so only those lines enter the context. Same task, same servers, far fewer tokens. Both modes need bash; strict workflows with bash disabled stay on MCP.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        const ph = k => clamp((u - P[k][0]) / P[k][1]);
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        dot.style.opacity = 0;
+        // schemas load into the context before the first thought
+        if (u >= P.SCH[0]) {
+          reveal(
+            TOOLS.map((_, i) => "cvmT" + i),
+            ph("SCH"),
+            i => i % 4 === 0 && sfx.pop(i / 4),
+          );
+          if (u < P.CALL[0]) setMeter("cvmMm", 34 * ease(ph("SCH")));
+        }
+        // one call returns whole objects
+        if (u >= P.CALL[0]) {
+          once("call", () => sfx.key());
+          reveal(
+            CALL.map((_, i) => "cvmC" + i),
+            ph("CALL"),
+          );
+          if (u < P.FLIP[0]) setMeter("cvmMm", 34 + (MCP_K - 34) * ease(ph("CALL")));
+        }
+        if (u >= P.W0[0] && u < P.FLIP[0]) wire("cvmW0", ph("W0"));
+        // two front matter lines flip the surface
+        if (u >= P.FLIP[0])
+          once("flip", () => {
+            setMeter("cvmMm", MCP_K);
+            $("cvmLane1").classList.add("on");
+            $("cvmFm").classList.add("on");
+            $("cvmV0").textContent = "gh-proxy";
+            $("cvmV1").textContent = "true";
+            ["cvmV0", "cvmV1", "cvmH0", "cvmH1"].forEach(id => $(id).classList.add("on"));
+            svg.querySelectorAll("#cvmMcp .cvm-chip, #cvmMcp .cvm-ln").forEach(x => x.classList.add("gone"));
+            sfx.compile();
+          });
+        if (u >= P.BIN[0])
+          reveal(
+            BINS.map((_, i) => "cvmB" + i),
+            ph("BIN"),
+            i => sfx.pop(4 + i),
+          );
+        if (u >= P.W1[0] && u < P.SH[0]) wire("cvmW1", ph("W1"));
+        // the agent asks for help and data only when it needs them, filtered in the shell
+        if (u >= P.SH[0]) {
+          once("sh", () => {
+            $("cvmLane2").classList.add("on");
+            $("cvmCli").classList.add("on");
+          });
+          const f = ph("SH");
+          reveal(shellIds, f, i => i % 2 === 0 && sfx.pop(i / 2));
+          setMeter("cvmMc", 1 + (CLI_K - 1) * f);
+        }
+        if (u >= P.BIG[0])
+          once("big", () => {
+            $("cvmBig").classList.add("on");
+            sfx.pop(7);
+          });
+      },
+      el: h("section", { class: "slide cvm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh-proxy + cli-proxy · MCP servers behind CLI surfaces"), h("h2", {}, letters("CLI"), letters("vs", "l-out"), letters("MCP", "l-grad"))), svg),
     });
   }
 
