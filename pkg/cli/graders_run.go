@@ -77,7 +77,7 @@ func loadGraderRunDefinitionMode(workflowArg, graderID string, collection bool) 
 	if err != nil {
 		return graderRunDefinition{}, err
 	}
-	compiler := workflow.NewCompiler()
+	compiler := workflow.NewCompiler(workflow.WithWorkflowIdentifier(workflowPath))
 	if collection {
 		compiler.SetReadOnly(true)
 	}

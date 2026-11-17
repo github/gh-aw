@@ -67,7 +67,7 @@ Baseline (snapshot 2026-11-17):
 
 ## 6. Validation
 
-- `node --check docs/public/cracktro/deck.js` and the preview at `#66` (row 66 of `slides.md`): boxes fit their 536-px rects; caption stays inside the 1620-px viewBox.
+- `node --check docs/public/cracktro/deck.js` and the preview at `#cli-vs-mcp`: boxes fit their 536-px rects; caption stays inside the 1620-px viewBox.
 - The ponytail case shows `mcpSurface: "schemas"` and equal `requests` medians on both sides; controls stay near 0%.
 - No URLs, SHAs, run IDs or logins on the slide or in the notes.
 

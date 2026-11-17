@@ -113,10 +113,8 @@ test_curl_retry_all_errors() {
   local node_version="${5:-v18.0.0}"
   local platform="${6:-Linux}"
   local release_version="${7:-v0.28.62}"
-  local attestation_failure="${8:-}"
-  local identity_version="${9:-$release_version}"
-  local curl_failure_asset="${10:-}"
-  local expect_download_failure="${11:-false}"
+  local curl_failure_asset="${8:-}"
+  local expect_download_failure="${9:-false}"
   local test_dir
   local option_index
   local -a actual_options
@@ -159,22 +157,15 @@ case "${output:-}" in
 esac
 if [[ "${output}" == *checksums.txt ]]; then
   printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
-elif [[ "${output}" == *release-identity.txt ]]; then
-  printf '%s  refs/tags/%s\n' "$AWF_TEST_MANIFEST_SHA256" "$AWF_TEST_IDENTITY_VERSION" > "$output"
 else
   printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
 fi
 EOF
   cat > "${test_dir}/bin/gh" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$AWF_TEST_ATTESTATION_LOG"
-test "$1" = attestation && test "$2" = verify || exit 91
-test "$4" = --hostname && test "$5" = github.com || exit 92
-test "$6" = --repo && test "$7" = github/gh-aw-firewall || exit 93
-test "$8" = --signer-workflow && test "$9" = github/gh-aw-firewall/.github/workflows/release.yml || exit 94
-test "${10}" = --cert-oidc-issuer && test "${11}" = https://token.actions.githubusercontent.com || exit 95
-test "${12}" = --deny-self-hosted-runners || exit 96
-test "${3##*/}" != "${AWF_TEST_ATTESTATION_FAILURE:-}"
+printf '%s\n' "$*" >> "$AWF_TEST_GH_LOG"
+echo "HTTP 401: Bad credentials (https://api.github.com)" >&2
+exit 1
 EOF
   cat > "${test_dir}/bin/node" <<'EOF'
 #!/usr/bin/env bash
@@ -201,7 +192,7 @@ EOF
   local installer_exit=0
   AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall "$release_version" checksums.txt)" \
     CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
-    AWF_TEST_ATTESTATION_LOG="${test_dir}/attestations" AWF_TEST_ATTESTATION_FAILURE="$attestation_failure" AWF_TEST_IDENTITY_VERSION="$identity_version" \
+    AWF_TEST_GH_LOG="${test_dir}/gh-calls" GH_HOST=example.ghe.com GH_TOKEN=enterprise-test-token \
     AWF_TEST_CURL_FAILURE_ASSET="$curl_failure_asset" \
     AWF_TEST_NODE_VERSION="$node_version" AWF_TEST_OS="$platform" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
     RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" bash "${SCRIPT_DIR}/install_awf_binary.sh" "$release_version" --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
@@ -222,30 +213,15 @@ EOF
     rm -rf "$test_dir"
     return 0
   fi
-  if [ -n "$attestation_failure" ] || [ "$identity_version" != "$release_version" ]; then
-    if [ "$installer_exit" -eq 0 ] || [ -e "${test_dir}/home/.local/bin/awf" ]; then
-      TEST_FAILURE_REASON="unattested or version-mismatched release was installed"
-      rm -rf "$test_dir"
-      return 1
-    fi
-    if [ "$attestation_failure" = awf-bundle.js ] && grep -q '/awf-linux-' "${test_dir}"/curl-args.[0-9]*; then
-      TEST_FAILURE_REASON="bundle attestation failure attempted a platform fallback"
-      rm -rf "$test_dir"
-      return 1
-    fi
-    if { [ "$attestation_failure" = checksums.txt ] || [ "$attestation_failure" = release-identity.txt ] || [ "$identity_version" != "$release_version" ]; } &&
-      grep -qE '/awf-(bundle|linux|darwin)' "${test_dir}"/curl-args.[0-9]*; then
-      TEST_FAILURE_REASON="payload was downloaded before authenticating release metadata"
-      rm -rf "$test_dir"
-      return 1
-    fi
-    rm -rf "$test_dir"
-    return 0
-  fi
   if [ "$installer_exit" -ne 0 ]; then
     TEST_FAILURE_REASON="installer exited unsuccessfully"
     cat "${test_dir}/output"
     rm -rf "${test_dir}"
+    return 1
+  fi
+  if [ -e "${test_dir}/gh-calls" ] || [ ! -x "${test_dir}/home/.local/bin/awf" ]; then
+    TEST_FAILURE_REASON="checksum-verified installation must succeed without invoking gh"
+    rm -rf "$test_dir"
     return 1
   fi
   local curl_args
@@ -260,20 +236,6 @@ EOF
       ! grep -qF "ERROR: Failed to download ${curl_failure_asset}" "${test_dir}/output" ||
       ! grep -qF "(HTTP 000, curl exit 7)." "${test_dir}/output"; then
       TEST_FAILURE_REASON="failed curl output was not included in the installer diagnostics"
-      rm -rf "$test_dir"
-      return 1
-    fi
-  fi
-  if [ "$release_version" = v0.29.5 ] || [ "$release_version" = v0.29.6 ] || [ "$release_version" = v0.29.7 ]; then
-    expected_downloads=$((expected_downloads + 1))
-    if [ "$(wc -l < "${test_dir}/attestations")" -ne 3 ]; then
-      TEST_FAILURE_REASON="expected identity, checksums, and payload attestations"
-      rm -rf "$test_dir"
-      return 1
-    fi
-    if ! head -n 1 "${test_dir}/attestations" | grep -q release-identity.txt ||
-      ! sed -n '2p' "${test_dir}/attestations" | grep -q checksums.txt; then
-      TEST_FAILURE_REASON="release identity and manifest must be authenticated before the payload"
       rm -rf "$test_dir"
       return 1
     fi
@@ -348,217 +310,33 @@ else
   fail "macOS binary timeout options were incorrect" "${TEST_FAILURE_REASON}"
 fi
 if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5; then
-  pass "helper-capable bundle authenticates release identity, checksums, and payload"
+  pass "helper-capable bundle installs using checksums without github.com API access"
 else
   fail "modern release bundle verification failed" "$TEST_FAILURE_REASON"
 fi
 if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v18.0.0 Linux v0.29.5; then
-  pass "helper-capable binary authenticates release identity, checksums, and payload"
+  pass "helper-capable binary installs using checksums without github.com API access"
 else
   fail "modern release binary verification failed" "$TEST_FAILURE_REASON"
 fi
-for node_version in v24.0.0 v18.0.0; do
-  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.7; then
-    pass "default release authenticates release identity, checksums, and payload with $node_version"
-  else
-    fail "default release verification failed" "$TEST_FAILURE_REASON"
-  fi
+for release_version in v0.29.11 v0.29.14; do
+  for node_version in v24.0.0 v18.0.0; do
+    if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux "$release_version"; then
+      pass "$release_version installs on ghe.com without github.com API access with $node_version"
+    else
+      fail "Enterprise release installation failed" "$TEST_FAILURE_REASON"
+    fi
+  done
 done
-for rejected_asset in checksums.txt release-identity.txt awf-bundle.js awf-linux-x64; do
-  node_version=v24.0.0
-  if [ "$rejected_asset" = awf-linux-x64 ]; then node_version=v18.0.0; fi
-  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.5 "$rejected_asset"; then
-    pass "failed $rejected_asset attestation prevents installation"
-  else
-    fail "unattested $rejected_asset was accepted" "$TEST_FAILURE_REASON"
-  fi
-done
-if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 '' v0.29.4; then
-  pass "attested identity for another tag prevents installation"
-else
-  fail "mismatched release identity was accepted" "$TEST_FAILURE_REASON"
-fi
-if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 '' v0.29.5 awf-bundle.js; then
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 awf-bundle.js; then
   pass "optional bundle failure diagnostics are retained before fallback"
 else
   fail "optional bundle failure diagnostics were not preserved" "$TEST_FAILURE_REASON"
 fi
-if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.28.62 '' v0.28.62 checksums.txt true; then
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.28.62 checksums.txt true; then
   pass "required download failure diagnostics include the curl error and exit status"
 else
   fail "required download failure diagnostics were incomplete" "$TEST_FAILURE_REASON"
-fi
-
-# Test 6b: attestation verification handles GitHub API quota exhaustion
-echo "Test 6b: attestation verification waits for or reports GitHub API quota exhaustion..."
-# Public asset downloads succeed while the attestations API answers with a quota
-# 403. Uses a fake clock (date/sleep) instead of a live quota experiment.
-#   $1 scenario: quota | permission | transient (first failure carries a
-#      non-quota rate-limit message and its probe returns 200; the quota is
-#      only confirmed on the second verification)
-#   $2 number of quota failures before verification succeeds
-#   $3 reset offset in seconds from the fake clock ("" omits the reset header)
-#   $4 expected installer exit status
-#   $5 expected blocked reason ("" when the install must succeed or fail without a quota stop)
-test_attestation_quota() {
-  local scenario="$1" failures="$2" reset_offset="$3" expected_exit="$4" expected_reason="$5"
-  local test_dir installer_exit=0 reset=""
-  TEST_FAILURE_REASON=""
-  test_dir="${TEST_ROOT}/quota-${RANDOM}"
-  mkdir -m 700 "$test_dir"
-  mkdir -p "${test_dir}/bin" "${test_dir}/home"
-  printf '1000\n' > "${test_dir}/clock"
-  printf '%s\n' "$failures" > "${test_dir}/failures"
-  if [ -n "$reset_offset" ]; then reset=$((1000 + reset_offset)); fi
-  cat > "${test_dir}/bin/curl" <<'EOF'
-#!/usr/bin/env bash
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "-o" ]; then output="$2"; break; fi
-  shift
-done
-[ -n "${output:-}" ] || exit 0
-if [[ "${output}" == *checksums.txt ]]; then
-  printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
-elif [[ "${output}" == *release-identity.txt ]]; then
-  printf '%s  refs/tags/%s\n' "$AWF_TEST_MANIFEST_SHA256" v0.29.5 > "$output"
-else
-  printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
-fi
-EOF
-  cat > "${test_dir}/bin/gh" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = api ]; then
-  if [ "$AWF_TEST_SCENARIO" = transient ] && [ ! -e "${AWF_TEST_DIR}/probes" ]; then
-    printf '%s\n' "$*" >> "${AWF_TEST_DIR}/probes"
-    printf 'HTTP/2.0 200 OK\r\nx-ratelimit-resource: core\r\nx-ratelimit-limit: 15000\r\nx-ratelimit-remaining: 10\r\n\r\n[]\n'
-    exit 0
-  fi
-  printf '%s\n' "$*" >> "${AWF_TEST_DIR}/probes"
-  printf 'HTTP/2.0 403 Forbidden\r\n'
-  printf 'x-ratelimit-resource: core\r\nx-ratelimit-limit: 15000\r\nx-ratelimit-remaining: 0\r\nx-ratelimit-used: 15000\r\n'
-  [ -n "$AWF_TEST_RESET" ] && printf 'x-ratelimit-reset: %s\r\n' "$AWF_TEST_RESET"
-  printf '\r\n{"message":"API rate limit exceeded for installation."}\n'
-  exit 1
-fi
-test "$1" = attestation && test "$2" = verify || exit 91
-test "${12}" = --deny-self-hosted-runners || exit 96
-printf '%s at %s\n' "$3" "$(cat "${AWF_TEST_DIR}/clock")" >> "${AWF_TEST_DIR}/attestations"
-remaining=$(cat "${AWF_TEST_DIR}/failures")
-if [ "$remaining" -gt 0 ]; then
-  printf '%s\n' $((remaining - 1)) > "${AWF_TEST_DIR}/failures"
-  if [ "$AWF_TEST_SCENARIO" = transient ] && [ ! -e "${AWF_TEST_DIR}/probes" ]; then
-    echo "HTTP 403: You have exceeded a secondary rate limit. Please wait a few minutes before you try again." >&2
-  elif [ "$AWF_TEST_SCENARIO" = permission ]; then
-    echo "HTTP 403: Resource not accessible by integration (https://api.github.com/repos/github/gh-aw-firewall/attestations/sha256:0)" >&2
-  else
-    echo "HTTP 403: API rate limit exceeded for installation ID 1. (https://api.github.com/repos/github/gh-aw-firewall/attestations/sha256:0)" >&2
-  fi
-  exit 1
-fi
-exit 0
-EOF
-  cat > "${test_dir}/bin/date" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = +%s ]; then cat "${AWF_TEST_DIR}/clock"; exit 0; fi
-exec /bin/date "$@"
-EOF
-  cat > "${test_dir}/bin/sleep" <<'EOF'
-#!/usr/bin/env bash
-printf '%s\n' "$1" >> "${AWF_TEST_DIR}/sleeps"
-printf '%s\n' $(( $(cat "${AWF_TEST_DIR}/clock") + $1 )) > "${AWF_TEST_DIR}/clock"
-EOF
-  printf '#!/usr/bin/env bash\necho v18.0.0\n' > "${test_dir}/bin/node"
-  cat > "${test_dir}/bin/sha256sum" <<'EOF'
-#!/usr/bin/env bash
-if [[ "$1" == *checksums.txt ]]; then
-  printf '%s %s\n' "$AWF_TEST_MANIFEST_SHA256" "$1"
-else
-  printf '%064d %s\n' 0 "$1"
-fi
-EOF
-  printf '#!/usr/bin/env bash\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n' > "${test_dir}/bin/uname"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "${test_dir}/bin/sudo"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "${test_dir}/bin/find"
-  chmod +x "${test_dir}/bin/"*
-  AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall v0.29.5 checksums.txt)" \
-    AWF_TEST_DIR="$test_dir" AWF_TEST_SCENARIO="$scenario" AWF_TEST_RESET="$reset" \
-    GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS=300 GITHUB_STEP_SUMMARY="${test_dir}/summary" GITHUB_ENV="${test_dir}/github-env" \
-    HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" \
-    bash "${SCRIPT_DIR}/install_awf_binary.sh" v0.29.5 --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
-  if [ "$installer_exit" -ne "$expected_exit" ]; then
-    TEST_FAILURE_REASON="expected exit ${expected_exit}, got ${installer_exit}: $(tail -n 5 "${test_dir}/output")"
-    rm -rf "$test_dir"; return 1
-  fi
-  if [ "$expected_exit" -eq 0 ]; then
-    if [ ! -e "${test_dir}/home/.local/bin/awf" ] || [ "$(wc -l < "${test_dir}/attestations")" -ne $((3 + failures)) ]; then
-      TEST_FAILURE_REASON="AWF was not installed after every attestation was re-verified"
-      rm -rf "$test_dir"; return 1
-    fi
-    if [ "$failures" -gt 0 ]; then
-      # No verification may run before the server reset.
-      if [ "$(sed -n "$((failures + 1))p" "${test_dir}/attestations" | awk '{print $NF}')" -le "$reset" ] ||
-        [ "$(cat "${test_dir}/sleeps")" != "$((reset_offset + 1))" ]; then
-        TEST_FAILURE_REASON="verification was retried before the server reset"
-        rm -rf "$test_dir"; return 1
-      fi
-    fi
-    if grep -q GH_AW_GITHUB_API_QUOTA_BLOCKED "${test_dir}/github-env" 2>/dev/null; then
-      TEST_FAILURE_REASON="a recovered quota stop was reported as blocked"
-      rm -rf "$test_dir"; return 1
-    fi
-    rm -rf "$test_dir"; return 0
-  fi
-  if [ -e "${test_dir}/home/.local/bin/awf" ]; then
-    TEST_FAILURE_REASON="an unverified AWF release was installed"
-    rm -rf "$test_dir"; return 1
-  fi
-  if [ -n "$expected_reason" ]; then
-    if ! grep -qF "### GitHub API quota exhausted" "${test_dir}/summary" ||
-      ! grep -qF "| Remaining | 0 |" "${test_dir}/summary" ||
-      ! grep -qF "GH_AW_GITHUB_API_QUOTA_BLOCKED=resource=core; limit=15000; remaining=0; used=15000; reset=" "${test_dir}/github-env" ||
-      ! grep -qF "reason=${expected_reason}" "${test_dir}/github-env" ||
-      ! grep -qF "GitHub API quota exhausted" "${test_dir}/output"; then
-      TEST_FAILURE_REASON="quota-blocked summary or environment was incomplete: $(cat "${test_dir}/summary" "${test_dir}/github-env" 2>/dev/null)"
-      rm -rf "$test_dir"; return 1
-    fi
-  else
-    if [ -e "${test_dir}/probes" ] || [ -s "${test_dir}/summary" ] || grep -q GH_AW_GITHUB_API_QUOTA_BLOCKED "${test_dir}/github-env" 2>/dev/null; then
-      TEST_FAILURE_REASON="a non-quota attestation failure was reclassified as quota exhaustion"
-      rm -rf "$test_dir"; return 1
-    fi
-  fi
-  rm -rf "$test_dir"
-}
-
-if test_attestation_quota quota 1 120 0 ""; then
-  pass "quota 403 with reset inside the budget waits, re-verifies, and installs AWF"
-else
-  fail "quota 403 inside the wait budget did not recover" "$TEST_FAILURE_REASON"
-fi
-if test_attestation_quota quota 1 1200 75 reset_exceeds_budget; then
-  pass "quota 403 with reset beyond the budget blocks installation with a quota summary"
-else
-  fail "quota 403 beyond the wait budget was not reported as blocked" "$TEST_FAILURE_REASON"
-fi
-if test_attestation_quota quota 2 60 75 renewed_exhaustion; then
-  pass "renewed quota exhaustion after the reset blocks installation"
-else
-  fail "renewed quota exhaustion was not reported as blocked" "$TEST_FAILURE_REASON"
-fi
-if test_attestation_quota transient 2 60 0 ""; then
-  pass "first confirmed quota exhaustion after a transient rate limit waits for the reset and installs AWF"
-else
-  fail "first confirmed quota exhaustion after a transient rate limit was not waited for" "$TEST_FAILURE_REASON"
-fi
-if test_attestation_quota quota 1 "" 75 unknown_reset; then
-  pass "quota 403 without a reset blocks installation without waiting"
-else
-  fail "quota 403 without a reset was not reported as blocked" "$TEST_FAILURE_REASON"
-fi
-if test_attestation_quota permission 1 120 1 ""; then
-  pass "permission 403 from attestation verification is not reclassified as quota exhaustion"
-else
-  fail "permission 403 was treated as quota exhaustion" "$TEST_FAILURE_REASON"
 fi
 
 # Test 7: warning emitted when GITHUB_PATH is unset in rootless mode

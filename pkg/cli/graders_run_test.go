@@ -171,7 +171,7 @@ func TestRunCustomGraderFromUnifiedSession(t *testing.T) {
 }
 
 func TestLoadGraderRunDefinitionResolvesImports(t *testing.T) {
-	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\nimports:\n  - shared/graders.md\ngraders:\n  loops:\n    threshold: 9\n---\nTest.\n")
+	workflowID := writeGraderRunWorkflow(t, "---\non:\n  schedule: every 2 days\nimports:\n  - shared/graders.md\ngraders:\n  loops:\n    threshold: 9\n---\nTest.\n")
 	require.NoError(t, os.MkdirAll(".github/workflows/shared", 0o755))
 	require.NoError(t, os.WriteFile(".github/workflows/shared/graders.md", []byte("---\ngraders:\n  loops:\n    threshold: 2\n  recurrence-determinism: {}\n---\n"), 0o600))
 	loops, err := loadGraderRunDefinition(workflowID, "loops")

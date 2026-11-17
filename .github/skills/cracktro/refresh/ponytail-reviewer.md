@@ -79,7 +79,7 @@ SAMPLE=5 node .github/skills/cracktro/refresh/ponytail-reviewer.mjs 2026-08-06 2
 ```bash
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4369 --bind 127.0.0.1 --directory docs/public   # async
-# browser canvas: http://127.0.0.1:4369/cracktro/#19, screenshot after ~3 s (findings) and ~10 s (end)
+# browser canvas: http://127.0.0.1:4369/cracktro/#ponytail-reviewer, screenshot after ~3 s (findings) and ~10 s (end)
 grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview\|agentics-beyond-code\|api.github.com/repositories/\|www.w3.org/2000/svg'   # must be empty
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```
@@ -94,4 +94,4 @@ cd docs && npx playwright test tests/talk.spec.ts                       # if nod
 - Artifacts expire after ~90 days, so the run sample window starts later than the review window.
 - Bracket escaping and en/em dashes vary across months; the `LINES` and `AIC` regexes accept `-`, `−`, `–` and `\~`.
 - The reviewer can post two reviews on one PR (ready for review, then `/ponytail`), so reviews > PRs is expected.
-- Slide numbers shift; find the slide by its marker and its `#N` by its row in `slides.md`.
+- Link the slide by its stable id `#ponytail-reviewer` and find it in `deck.js` by its marker.

@@ -373,7 +373,7 @@ func sanitizeCustomStepsYAML(customSteps string) (string, []string, error) {
 
 	// Re-serialise the modified steps.
 	stepsDoc["steps"] = stepsSlice
-	out, err := yaml.MarshalWithOptions(stepsDoc, DefaultMarshalOptions...)
+	out, err := marshalYAMLWithOptions(stepsDoc, DefaultMarshalOptions...)
 	if err != nil {
 		// Serialisation failure is unexpected; return the original string to avoid
 		// silently dropping user-authored steps.

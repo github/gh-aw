@@ -320,29 +320,34 @@ An interval schedule expression SHALL take the form:
 
 ```yaml
 every <N> <unit>
+every <N><short-unit>
 ```
 
 Where:
 - `<N>` MUST be a positive integer
-- `<unit>` MUST be one of: `minutes`, `minute`, `m`, `hours`, `hour`, `h`, `days`, `day`, `d`, `weeks`, `week`, `w`
+- `<unit>` MUST be one of: `minutes`, `minute`, `hours`, `hour`, `days`, `day`
+- `<short-unit>` MUST be one of: `m`, `h`, `d`, `w`, `mo`. Weeks and months MUST use this short form (for example, `every 2w` and `every 2mo`); long-form weeks and months are not supported.
 
 An implementation MUST generate appropriate cron expressions based on the unit:
 
-- Minutes: `*/N * * * *` (minimum N=5 per GitHub Actions constraint)
-- Hours: `FUZZY:HOURLY:N * * *` (scattered minute)
-- Days: `0 0 */N * *` (fixed midnight)
-- Weeks: `0 0 */N*7 * *` (fixed Sunday midnight)
+- Minutes: `FUZZY:EVERY_MINUTE/N * * * *`, scattered to `M/N * * * *` with a hashed start minute `M` in `[0, N-1]` (minimum N=5 per GitHub Actions constraint)
+- Hours: `FUZZY:HOURLY/N * * *` (scattered minute)
+- Days: `FUZZY:DAILY * * *` for N=1; otherwise `FUZZY:DAILY_INTERVAL/N * * *`, scattered to `M H */N * *`
+- Weeks: `FUZZY:WEEKLY * * *` for N=1; otherwise `FUZZY:DAILY_INTERVAL/(N*7) * * *`, scattered to `M H */(N*7) * *`
+- Months: `FUZZY:MONTHLY_INTERVAL/N * * *`, scattered to `M H D * *` (N=1) or `M H D */N *`, with a hashed day of month `D` in `[1, 28]`
+
+Day, week, and month intervals MUST use the same weighted daily time slot as `daily` for `H` and `M`, so that workflows sharing an interval do not fire at the same time.
 
 **Example**:
 ```yaml
 every 5 minutes
-# Generates: */5 * * * *
+# Generates: FUZZY:EVERY_MINUTE/5 * * * *  → e.g. 3/5 * * * *
 
 every 6h
-# Generates: FUZZY:HOURLY:6 * * *
+# Generates: FUZZY:HOURLY/6 * * *  → e.g. 12 */6 * * *
 
 every 2 days
-# Generates: 0 0 */2 * *
+# Generates: FUZZY:DAILY_INTERVAL/2 * * *  → e.g. 43 5 */2 * *
 ```
 
 ### 3.7 Error Norms for Invalid Schedule Expressions
@@ -1035,8 +1040,8 @@ A conforming implementation MUST pass all Level 1 tests. Implementations claimin
 - **T-HOURLY-001**: Parse `hourly` to `FUZZY:HOURLY * * *`
 - **T-HOURLY-002**: Parse `every 2h` to `FUZZY:HOURLY:2 * * *`
 - **T-HOURLY-003**: Parse `every 6 hours` to `FUZZY:HOURLY:6 * * *`
-- **T-INTERVAL-001**: Parse `every 5 minutes` to `*/5 * * * *`
-- **T-INTERVAL-002**: Parse `every 2 days` to `0 0 */2 * *`
+- **T-INTERVAL-001**: Parse `every 5 minutes` to `FUZZY:EVERY_MINUTE/5 * * * *`
+- **T-INTERVAL-002**: Parse `every 2 days` to `FUZZY:DAILY_INTERVAL/2 * * *` and scatter it to `M H */2 * *`
 - **T-INTERVAL-003**: Reject `every 3 minutes` (below 5-minute minimum)
 - **T-INTERVAL-004**: Parse `bi-weekly` to `FUZZY:BI-WEEKLY * * *`
 - **T-INTERVAL-005**: Parse `tri-weekly` to `FUZZY:TRI-WEEKLY * * *`

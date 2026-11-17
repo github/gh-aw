@@ -342,36 +342,10 @@ jobs:
           GH_AW_PROMPT_CONTENT_0002: |
 
             upload_asset: provide a file path; returns a URL; assets are published after the workflow completes (safeoutputs).
+
           GH_AW_PROMPT_CONTENT_0003: |
             </safe-output-tools>
-          GH_AW_PROMPT_CONTENT_0004: |+
-            <github-context>
-            {{#if __GH_AW_GITHUB_ACTOR__ }}
-            - **actor**: __GH_AW_GITHUB_ACTOR__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_REPOSITORY__ }}
-            - **repository**: __GH_AW_GITHUB_REPOSITORY__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_WORKSPACE__ }}
-            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
-            {{/if}}
-            {{#if __GH_AW_EXPR_7C248226__ }}
-            - **issue-number**: #__GH_AW_EXPR_7C248226__
-            {{/if}}
-            {{#if __GH_AW_EXPR_C19C384F__ }}
-            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
-            {{/if}}
-            {{#if __GH_AW_EXPR_76DF9333__ }}
-            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
-            {{/if}}
-            {{#if __GH_AW_EXPR_77C1A4D2__ }}
-            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_RUN_ID__ }}
-            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
-            {{/if}}
-            </github-context>
-
+          GH_AW_PROMPT_CONTENT_0004: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0005: |
             </system>
           GH_AW_PROMPT_CONTENT_0006: |
@@ -814,9 +788,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Install GitHub Copilot SDK (Node.js)
         run: npm install --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts --no-save @github/copilot-sdk@1.0.16 undici@6.28.0
@@ -2264,9 +2235,6 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
         id: detection_awf_install
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

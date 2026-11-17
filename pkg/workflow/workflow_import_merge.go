@@ -49,7 +49,7 @@ func (c *Compiler) processAndMergeServices(frontmatter map[string]any, workflowD
 						// output matches yamllint's indent-sequences expectation, the
 						// same as the non-imported extraction path.
 						servicesWrapper := map[string]any{"services": mainServices}
-						servicesYAML, err := yaml.MarshalWithOptions(servicesWrapper, append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))...)
+						servicesYAML, err := marshalYAMLWithOptions(servicesWrapper, append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))...)
 						if err == nil {
 							workflowData.Services = string(servicesYAML)
 						}
@@ -60,7 +60,7 @@ func (c *Compiler) processAndMergeServices(frontmatter map[string]any, workflowD
 				// Indent sequence items to match yamllint's indent-sequences
 				// expectation, consistent with the other services marshaling paths.
 				servicesWrapper := map[string]any{"services": importedServices}
-				servicesYAML, err := yaml.MarshalWithOptions(servicesWrapper, append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))...)
+				servicesYAML, err := marshalYAMLWithOptions(servicesWrapper, append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))...)
 				if err == nil {
 					workflowData.Services = string(servicesYAML)
 				}

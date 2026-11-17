@@ -158,6 +158,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"9428179eaef5a54cb47578484d156981b22bc017cbf55659b0410727cf3b9888","kind":"artifact","value":{"model":"large"}}]}'
           GH_AW_INFO_ENGINE_ID: "claude"
           GH_AW_INFO_ENGINE_NAME: "Claude Code"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'agent' }}
@@ -333,53 +334,10 @@ jobs:
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
             Tools: create_issue(max:10), create_pull_request, push_to_pull_request_branch, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
-          GH_AW_PROMPT_CONTENT_0002: |+
-            <issue-steering>
-            The steering issue for this run is #__GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER__.
-
+          GH_AW_PROMPT_CONTENT_0002: "<issue-steering>\nThe steering issue for this run is #__GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER__.\n\n"
           GH_AW_PROMPT_CONTENT_0003: |
             </safe-output-tools>
-          GH_AW_PROMPT_CONTENT_0004: |+
-            <github-context>
-            {{#if __GH_AW_GITHUB_ACTOR__ }}
-            - **actor**: __GH_AW_GITHUB_ACTOR__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_REPOSITORY__ }}
-            - **repository**: __GH_AW_GITHUB_REPOSITORY__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_WORKSPACE__ }}
-            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
-            {{/if}}
-            {{#if __GH_AW_EXPR_7C248226__ }}
-            - **issue-number**: #__GH_AW_EXPR_7C248226__
-            {{/if}}
-            {{#if __GH_AW_EXPR_C19C384F__ }}
-            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
-            {{/if}}
-            {{#if __GH_AW_EXPR_76DF9333__ }}
-            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
-            {{/if}}
-            {{#if __GH_AW_EXPR_77C1A4D2__ }}
-            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_RUN_ID__ }}
-            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
-            {{/if}}
-            - **checkouts**: The following repositories have been checked out and are available in the workspace:
-              - repo `__GH_AW_GITHUB_REPOSITORY__` → `__GH_AW_GITHUB_WORKSPACE__` (cwd) [full history, all branches available as remote-tracking refs] [additional refs fetched: *]
-              - **Note**: The workspace path reported above may contain a separate shallow, credential-free checkout of the host repository. Use the exact checkout path shown for the repository you need. Before concluding that a branch is unavailable, confirm your working directory matches that path and inspect refs there. If the branch is not present in that checkout and is not listed as an additional fetched ref, it has NOT been checked out. For private repositories you cannot fetch it. If the branch is required and not available, exit with an error and ask the user to add it to the `fetch:` option of the `checkout:` configuration (e.g., `fetch: ["refs/pulls/open/*"]` for all open PR refs, or `fetch: ["main", "feature/my-branch"]` for specific branches).
-              - **Warning: No git credentials are available to the agent.** Credentials are
-                intentionally removed after the checkout step for security. This means any git
-                operation that needs to authenticate to the remote will fail. In private repositories, that includes:
-                - `git fetch`, `git pull`, `git clone`, and `git push` (direct push, not via safe-output tools)
-                - Checking out or switching to a remote branch that is not already fetched
-                - Deepening a shallow clone (`git fetch --unshallow`)
-                - On-demand blob fetches in partial/blobless clones (operations on files not in the initial checkout)
-                Do NOT attempt to configure credentials, run `git credential fill`, or modify `.gitconfig` —
-                authentication will not succeed. If you encounter credential prompts or authentication errors,
-                stop immediately and report the limitation rather than spending turns trying to work around it.
-            </github-context>
-
+          GH_AW_PROMPT_CONTENT_0004: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n- **checkouts**: The following repositories have been checked out and are available in the workspace:\n  - repo `__GH_AW_GITHUB_REPOSITORY__` → `__GH_AW_GITHUB_WORKSPACE__` (cwd) [full history, all branches available as remote-tracking refs] [additional refs fetched: *]\n  - **Note**: The workspace path reported above may contain a separate shallow, credential-free checkout of the host repository. Use the exact checkout path shown for the repository you need. Before concluding that a branch is unavailable, confirm your working directory matches that path and inspect refs there. If the branch is not present in that checkout and is not listed as an additional fetched ref, it has NOT been checked out. For private repositories you cannot fetch it. If the branch is required and not available, exit with an error and ask the user to add it to the `fetch:` option of the `checkout:` configuration (e.g., `fetch: [\"refs/pulls/open/*\"]` for all open PR refs, or `fetch: [\"main\", \"feature/my-branch\"]` for specific branches).\n  - **Warning: No git credentials are available to the agent.** Credentials are\n    intentionally removed after the checkout step for security. This means any git\n    operation that needs to authenticate to the remote will fail. In private repositories, that includes:\n    - `git fetch`, `git pull`, `git clone`, and `git push` (direct push, not via safe-output tools)\n    - Checking out or switching to a remote branch that is not already fetched\n    - Deepening a shallow clone (`git fetch --unshallow`)\n    - On-demand blob fetches in partial/blobless clones (operations on files not in the initial checkout)\n    Do NOT attempt to configure credentials, run `git credential fill`, or modify `.gitconfig` —\n    authentication will not succeed. If you encounter credential prompts or authentication errors,\n    stop immediately and report the limitation rather than spending turns trying to work around it.\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0005: |
             </system>
           GH_AW_PROMPT_CONTENT_0006: |
@@ -423,6 +381,7 @@ jobs:
             - **Max File Size**: 204800 bytes (0.20 MB) per file
             - **Max File Count**: 100 files per commit
             - **Max Patch Size**: 10240 bytes (10 KB) total per push (max: 1024 KB)
+
           GH_AW_MEMORY_DESCRIPTION: ""
           GH_AW_MEMORY_DIR: /tmp/gh-aw/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
@@ -496,6 +455,7 @@ jobs:
             - **Max File Size**: 204800 bytes (0.20 MB) per file
             - **Max File Count**: 100 files per commit
             - **Max Patch Size**: 10240 bytes (10 KB) total per push (max: 1024 KB)
+
           GH_AW_MEMORY_DESCRIPTION: ""
           GH_AW_MEMORY_DIR: /tmp/gh-aw/repo-memory/default/
           GH_AW_MEMORY_TARGET_REPO: " of the current repository"
@@ -851,9 +811,6 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.325
@@ -2470,9 +2427,6 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
         id: detection_awf_install
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

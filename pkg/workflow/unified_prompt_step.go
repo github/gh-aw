@@ -306,7 +306,12 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 //
 // The function handles chunking for large content and ensures proper environment variable handling.
 // Returns the combined expression mappings for use in the placeholder substitution step.
-func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, builtinSections []PromptSection, userPromptChunks []string, expressionMappings []*ExpressionMapping, data *WorkflowData) []*ExpressionMapping { //nolint:largefunc // Existing prompt generation preserves emitted YAML ordering.
+func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, builtinSections []PromptSection, userPromptChunks []string, expressionMappings []*ExpressionMapping, data *WorkflowData) []*ExpressionMapping {
+	mappings, _ := c.generateUnifiedPromptCreationStepWithContent(yaml, builtinSections, userPromptChunks, expressionMappings, data)
+	return mappings
+}
+
+func (c *Compiler) generateUnifiedPromptCreationStepWithContent(yaml *strings.Builder, builtinSections []PromptSection, userPromptChunks []string, expressionMappings []*ExpressionMapping, data *WorkflowData) ([]*ExpressionMapping, map[string]string) { //nolint:largefunc // Existing prompt generation preserves emitted YAML ordering.
 	unifiedPromptLog.Print("Generating unified prompt creation step")
 	unifiedPromptLog.Printf("Built-in sections: %d, User prompt chunks: %d", len(builtinSections), len(userPromptChunks))
 
@@ -490,7 +495,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 
 	// Return all expression mappings for use in the placeholder substitution step
 	// This allows the substitution to happen AFTER runtime-import processing
-	return allExpressionMappings
+	return allExpressionMappings, renderContent
 }
 
 var safeOutputsPromptLog = logger.New("workflow:safe_outputs_prompt")

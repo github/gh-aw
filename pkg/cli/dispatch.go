@@ -312,7 +312,7 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 	}
 
 	// Parse the locally-saved workflow to get the full merged safe-outputs config.
-	compiler := workflow.NewCompiler()
+	compiler := workflow.NewCompiler(workflow.WithWorkflowIdentifier(destFile))
 	data, err := compiler.ParseWorkflowFile(destFile)
 	if err != nil {
 		remoteWorkflowLog.Printf("Failed to parse workflow file %s for import-derived dispatch workflows: %v", destFile, err)
@@ -691,7 +691,7 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 		ref = "main"
 	}
 
-	compiler := workflow.NewCompiler()
+	compiler := workflow.NewCompiler(workflow.WithWorkflowIdentifier(destFile))
 	data, err := compiler.ParseWorkflowFile(destFile)
 	if err != nil {
 		remoteWorkflowLog.Printf("Failed to parse workflow file %s for import-derived call-workflow workers: %v", destFile, err)

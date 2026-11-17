@@ -195,7 +195,7 @@ setInterval(() => {}, 1000);`
 	require.Error(t, err)
 	assert.Contains(t, string(out), "pending JSONL record limit (16777216 UTF-16 code units)")
 	assert.Contains(t, string(out), "session.error")
-	assert.Equal(t, 1, cmd.ProcessState.ExitCode(), "pending output must terminate the child before the test timeout")
+	assert.Equal(t, 1, cmd.ProcessState.ExitCode(), "pending output must terminate the harness before its context deadline")
 }
 
 func TestAgyHarnessBoundsDescendantPipes(t *testing.T) {
