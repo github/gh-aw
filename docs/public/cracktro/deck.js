@@ -1039,6 +1039,49 @@
   .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
   .dto-big { fill: #3fb950; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  .isa .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #ffa657, #ab7df8); }
+  .isa-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, opacity .6s, filter .4s; }
+  .isa-box.on .isa-card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .isa-svg.s1 .isa-mono .isa-card { stroke-dasharray: 8 8; opacity: .45; }
+  .isa-t { fill: #9198a1; font: 500 15px var(--mono); letter-spacing: .08em; }
+  .isa-chip { fill: #c297ff; font: 600 14px var(--mono); letter-spacing: .06em; text-anchor: end; }
+  .isa-cap { fill: #9198a1; font: 500 15px var(--mono); text-anchor: middle; transition: opacity .5s; }
+  .isa-svg.s1 .isa-mono .isa-cap { opacity: 0; }
+  .isa-gh { fill: none; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; opacity: 0; transition: opacity .6s; }
+  .isa-svg.s1 .isa-gh { opacity: .7; } .isa-svg.s2 .isa-gh { opacity: .35; }
+  .isa-blk { color: #6e7681; }
+  .isa-blk rect.b { fill: #161b22; stroke: #6e7681; stroke-width: 2; transition: fill .5s, stroke .5s, filter .3s, stroke-width .3s; }
+  .isa-blk .ln { fill: #ffffff1f; }
+  .isa-blk .n { fill: #e6edf3; font: 600 16px var(--mono); }
+  .isa-blk .tg { fill: currentColor; font: 600 13px var(--mono); letter-spacing: .08em; text-anchor: end; }
+  .isa-svg.s1 .isa-blk.core { color: #c297ff; } .isa-svg.s1 .isa-blk.core rect.b { fill: #8957e522; stroke: #ab7df8; }
+  .isa-svg.s1 .isa-blk.skill { color: #79c0ff; } .isa-svg.s1 .isa-blk.skill rect.b { fill: #1f6feb22; stroke: #4493f8; }
+  .isa-svg.s1 .isa-blk.agent { color: #ffa657; } .isa-svg.s1 .isa-blk.agent rect.b { fill: #db6d2822; stroke: #ffa657; stroke-dasharray: 8 5; }
+  .isa-blk.hot rect.b { stroke-width: 3; filter: drop-shadow(0 0 12px currentColor); }
+  .isa-blk.hot .tg { fill: #f0f6fc; }
+  .isa-sec rect { fill: transparent; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; }
+  .isa-sec text { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .08em; }
+  .isa-sec { opacity: .25; transition: opacity .6s; } .isa-svg.s1 .isa-sec { opacity: 1; }
+  .isa-svg.s1 .isa-sec.core text { fill: #c297ff; } .isa-svg.s1 .isa-sec.skill text { fill: #79c0ff; } .isa-svg.s1 .isa-sec.agent text { fill: #ffa657; }
+  .isa-seg { fill: #6e768166; stroke: #0d1117; stroke-width: 1.5; transition: fill .5s; }
+  .isa-svg.s1 .isa-seg.core { fill: #8957e5; } .isa-svg.s1 .isa-seg.skill { fill: #1f6feb; } .isa-svg.s1 .isa-seg.agent { fill: #db6d28; }
+  .isa-svg .isa-seg.agent.sm { fill: url(#isaH); stroke: #ffa657; }
+  .isa-ghost { fill: none; stroke: #6e7681; stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .6; }
+  .isa-ml { fill: #9198a1; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; } .isa-ml.on { opacity: 1; } .isa-ml.sm { fill: #ffa657; }
+  .isa-take { opacity: 0; transition: opacity .6s; } .isa-take.on { opacity: 1; }
+  .isa-take .b { fill: #f0f6fc; font: 700 32px "Mona Sans"; text-anchor: middle; }
+  .isa-take .s { font: 600 17px var(--mono); text-anchor: middle; }
+  .isa-svg { left: 225px; top: 260px; width: 1470px; height: 588px; }
+  .isa-measured { position: absolute; left: 470px; top: 865px; width: 1350px; display: grid; grid-template-columns: 220px repeat(3, 1fr); gap: 20px; font-family: var(--mono); }
+  .isa-inventory, .isa-example { border-top: 2px solid #3d444d; padding-top: 12px; }
+  .isa-inventory b { display: block; font-size: 28px; color: #f0f6fc; white-space: nowrap; }
+  .isa-measured p { margin: 6px 0 0; font-size: 15px; color: #9198a1; }
+  .isa-inventory em { color: #c297ff; font-style: normal; }
+  .isa-example h3 { margin: 0 0 10px; font: 600 17px var(--mono); color: #f0f6fc; }
+  .isa-example .skills { color: #79c0ff; } .isa-example .agents { color: #ffa657; }
+  .isa-example .runs { display: block; margin-top: 8px; color: #f0f6fc; font-size: 23px; }
+  .isa-example .runs small { color: #9198a1; font-size: 13px; font-weight: 500; }
+  .isa-caption { position: absolute; left: 470px; top: 1030px; margin: 0; font: 500 13px/1.35 var(--mono); color: #9198a1; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -8524,6 +8567,242 @@
         }
       },
       el: h("section", { class: "slide dto" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic → deterministic · mined from run history"), h("h2", {}, letters("Deterministic"), letters("Ops", "l-grad"))), svg),
+    });
+  }
+
+  // Inlined Skills & Agents: split a monolithic prompt into a short plan, deferred skills and focused agents on smaller models
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 648;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const clamp = u => Math.max(0, Math.min(1, u));
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // synthetic issue-triage prompt: [role, monolith label, inlined label, height in the monolith, y once inlined]
+    const BLK = [
+      ["core", "Plan · read the issue, decide, report", "plan · read, decide, report", 52, 112],
+      ["skill", "Label taxonomy · every label explained", "## skill: `labels`", 92, 228],
+      ["skill", "Triage checklist · bug, feature, question", "## skill: `triage-rules`", 84, 288],
+      ["skill", "Report template · sections and tone", "## skill: `report-template`", 76, 348],
+      ["agent", "Summarize every linked pull request", "## agent: `summarizer`", 76, 464],
+      ["agent", "Search for duplicate issues", "## agent: `dedup`", 68, 524],
+    ];
+    const TAG = { core: "ALWAYS", skill: "ON DEMAND", agent: "SMALL MODEL" },
+      HOT = { core: "ALWAYS", skill: "LOADED", agent: "RUNNING" };
+    // Loaded skills remain in the main context; delegated jobs have separate contexts.
+    const TURNS = [
+      [[0], 0],
+      [[0, 2], 0],
+      [[4], 1],
+      [[5], 1],
+      [[0, 2, 1], 0],
+      [[0, 2, 1, 3], 0],
+    ];
+    const AX = 36,
+      AW = 448,
+      BX = 556,
+      BW = 488,
+      BH = 48,
+      AY = [];
+    BLK.reduce((y, b) => (AY.push(y), y + b[3] + 6), 122);
+    const S = 180 / BLK.reduce((s, b) => s + b[3], 0),
+      barX = i => 1130 + i * 78,
+      BASE = [300, 588];
+    let g = `<defs><pattern id="isaH" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2840"/><rect width="3" height="8" fill="#ffa657"/></pattern></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "MONOLITHIC PROMPT"],
+      [520, 1080, "INLINED SKILLS & AGENTS"],
+      [1080, VW, "CONTEXT PER TURN"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="isaLane${i}" x="${(x0 + x1) / 2}" y="40">${esc(t)}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    // the monolith: one file, every section in context on every turn
+    g += `<g class="isa-box isa-mono" id="isaMono"><rect class="isa-card" x="16" y="76" width="488" height="560" rx="12"/><text class="isa-t" x="32" y="104">issue-triage.md</text><text class="isa-chip" x="488" y="104">model: large</text>`;
+    BLK.forEach((b, i) => (g += `<rect class="isa-gh" x="${AX}" y="${AY[i]}" width="${AW}" height="${b[3]}" rx="8"/>`));
+    g += `<text class="isa-cap" x="260" y="624">all of it · in context · every turn</text></g>`;
+    // the same file, inlined: a short plan, skills on demand, agents on a smaller model
+    [
+      ["core", 76, 100, "PROMPT · ALWAYS LOADED"],
+      ["skill", 192, 220, "## skill: · BODY LOADS WHEN INVOKED"],
+      ["agent", 428, 160, "## agent: · OWN CONTEXT · SMALLER MODEL"],
+    ].forEach(([r, y, ht, t]) => (g += `<g class="isa-sec ${r}"><rect x="540" y="${y}" width="520" height="${ht}" rx="10"/><text x="556" y="${y + 24}">${esc(t)}</text></g>`));
+    g += `<text class="isa-cap" x="800" y="624">one Markdown file · blocks extracted at runtime</text>`;
+    BLK.forEach(([r, a, b, ht], i) => {
+      g += `<g class="isa-blk ${r}" id="isaB${i}" transform="translate(${AX} ${AY[i]})"><rect class="b" x="0" y="0" width="${AW}" height="${ht}" rx="8"/>`;
+      for (let j = 0; 44 + j * 12 < ht - 6; j++) g += `<rect class="ln" x="16" y="${40 + j * 12}" width="${Math.round((AW - 32) * (0.55 + ((i * 3 + j * 5) % 9) / 22))}" height="5" rx="2.5"/>`;
+      g += `<text class="n a" x="16" y="30">${esc(a)}</text><text class="n b" x="16" y="30" opacity="0">${esc(b)}</text><text class="tg" x="${BW - 16}" y="30" opacity="0">${TAG[r]}</text></g>`;
+    });
+    // context per turn: the whole prompt on a large model, then core plus what each turn needs
+    [
+      [76, 270, "BEFORE · whole prompt, every turn"],
+      [362, 274, "AFTER · defer skills, delegate jobs"],
+    ].forEach(([y, ht, t]) => (g += `<g class="isa-box"><rect class="isa-card" x="1100" y="${y}" width="504" height="${ht}" rx="12"/><text class="isa-t" x="1116" y="${y + 28}">${esc(t)}</text></g>`));
+    const stack = (blocks, base, sm) => {
+      let y = base,
+        s = "";
+      blocks.forEach(k => {
+        const ht = BLK[k][3] * S;
+        y -= ht;
+        s += `<rect class="isa-seg ${BLK[k][0]}${sm ? " sm" : ""}" x="0" y="${y.toFixed(1)}" width="50" height="${ht.toFixed(1)}"/>`;
+      });
+      return s;
+    };
+    TURNS.forEach(([blocks, sm], i) => {
+      const x = barX(i);
+      g += `<g class="isa-bar bef" id="isaPb${i}" transform="translate(${x} ${BASE[0]}) scale(1 0)"><g transform="translate(0 ${-BASE[0]})">${stack([0, 1, 2, 3, 4, 5], BASE[0], 0)}</g></g>`;
+      g += `<text class="isa-ml bef" id="isaMb${i}" x="${x + 25}" y="${BASE[0] + 24}">large</text>`;
+      g += `<rect class="isa-ghost" x="${x}" y="${BASE[1] - 180}" width="50" height="180"/>`;
+      g += `<g class="isa-bar aft" id="isaPa${i}" transform="translate(${x} ${BASE[1]}) scale(1 0)"><g transform="translate(0 ${-BASE[1]})">${stack(blocks, BASE[1], sm)}</g></g>`;
+      g += `<text class="isa-ml aft${sm ? " sm" : ""}" id="isaMa${i}" x="${x + 25}" y="${BASE[1] + 24}">${sm ? "small" : "large"}</text>`;
+    });
+    g += `<g class="isa-take" id="isaTake"><rect x="28" y="260" width="464" height="216" rx="12" fill="#0d1117"/><text class="b" x="260" y="318">Less upfront context.</text><text class="b" x="260" y="358">Right-sized models.</text>`;
+    g += `<text class="s" x="260" y="412" fill="#79c0ff">skills load when needed</text><text class="s" x="260" y="442" fill="#ffa657">small models handle narrow jobs</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg isa-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id);
+    const blks = BLK.map((_, i) => {
+      const el = $("isaB" + i);
+      return { el, rect: el.querySelector("rect.b"), lines: el.querySelectorAll(".ln"), a: el.querySelector(".n.a"), b: el.querySelector(".n.b"), tg: el.querySelector(".tg") };
+    });
+    const bef = TURNS.map((_, i) => [$("isaPb" + i), $("isaMb" + i)]),
+      aft = TURNS.map((_, i) => [$("isaPa" + i), $("isaMa" + i)]);
+    const grow = ([bar, label], i, f, base) => {
+      bar.setAttribute("transform", `translate(${barX(i)} ${base}) scale(1 ${f.toFixed(3)})`);
+      label.classList.toggle("on", f > 0.5);
+    };
+    // step 0: the monolith on every turn; 1: the same file inlined; 2: one run, turn by turn
+    const SPLIT = 1300,
+      T_AFT = 900,
+      T_TURN = 800;
+    let step = 0,
+      at = null,
+      last = 0,
+      q = 0,
+      instant = false,
+      played = new Set();
+    const once = (k, fn) => {
+      if (!played.has(k)) {
+        played.add(k);
+        fn();
+      }
+    };
+    // Measured on gh-aw; refresh/inlined-skills-agents.mjs reproduces this snapshot.
+    const EXAMPLES = [
+      ["code-simplifier", 4, 2, "Haiku 4.5", 28, 30],
+      ["pr-code-quality-reviewer", 1, 1, "model: small", 948, 1093],
+      ["github-mcp-tools-report", 1, 2, "model: small", 6, 6],
+    ];
+    const measured = h(
+      "div",
+      { class: "isa-measured", role: "region", "aria-label": "Measured inline skills and agents usage on gh-aw" },
+      h("div", { class: "isa-inventory" }, h("b", {}, "41 / 291 AWs"), h("p", {}, "with inline blocks"), h("p", {}, "21 skills · 62 agents"), h("p", {}, h("em", {}, "5 workflows use both"))),
+      EXAMPLES.map(([name, skills, agents, model, succeeded, total]) =>
+        h(
+          "div",
+          { class: "isa-example" },
+          h("h3", {}, name),
+          h("p", {}, h("span", { class: "skills" }, `${skills} skill${skills === 1 ? "" : "s"}`), " · ", h("span", { class: "agents" }, `${agents} agent${agents === 1 ? "" : "s"}`)),
+          h("p", {}, model),
+          h("b", { class: "runs" }, `${succeeded.toLocaleString("en-US")} / ${total.toLocaleString("en-US")}`, " ", h("small", {}, "runs succeeded"))
+        )
+      )
+    );
+    slides.push({
+      group: "cost",
+      notes:
+        "Inlined skills and agents: the workflow, prompt sections, turns and bar heights in the diagram are illustrative and synthetic, not measured savings. The bars show instruction context only, omitting conversation history, tool results and skill descriptions; they are not a billing estimate. A monolithic prompt puts every instruction in context from the start: the plan, label taxonomy, triage checklist, report template and instructions for side jobs. Split the same Markdown file without creating new files. Keep the main prompt as a short plan. Move verbose checklists, taxonomies and templates into ## skill: blocks: at runtime they are extracted to the engine's skill folder, so the agent sees a short description up front and loads a body only when needed. Loaded skill instructions remain in the conversation; they are not automatically unloaded after a turn. Move narrow jobs into ## agent: blocks with their own context and model front matter. Explicitly select a smaller model for suitable jobs while the main model keeps the decisions. Deferred skills reduce upfront context and delegation can lower inference cost; actual savings depend on pricing, caching and delegation overhead. The bottom strip is measured on gh-aw, snapshot 17 November 2026: 41 of 291 top-level non-smoke workflow Markdown files on main directly declare inline blocks, 13 with skills, 33 with agents, 5 with both; 21 skill blocks and 62 agent blocks. Shared imports and smoke tests are excluded. Code Simplifier declares four language skills and two Haiku 4.5 agents, scope-filter and simplification-scout. PR Code Quality Reviewer declares the review-publication skill and the grumpy-coder agent with model: small. GitHub MCP Tools Report declares its guidelines skill and two model: small agents, tool-list-diff and tool-doc-writer. In the 30 complete UTC days from 18 October to 16 November 2026, their Actions runs succeeded 28 of 30, 948 of 1,093 and 6 of 6 respectively. These are whole-workflow conclusions, not skill or sub-agent invocation counts or evidence of measured savings. Current declarations were not necessarily present in every historical run. Keys: → split the prompt, → run the turns.",
+      enter(dir) {
+        step = dir < 0 ? 2 : 0;
+        instant = dir < 0;
+        q = instant ? 1 : 0;
+        at = null;
+        last = 0;
+        played = new Set();
+      },
+      onNext() {
+        if (step >= 2) return false;
+        step++;
+        instant = false;
+        at = null;
+        if (step === 1) sfx.compile();
+        return true;
+      },
+      onPrev() {
+        if (!step) return false;
+        step--;
+        instant = true;
+        at = null;
+        return true;
+      },
+      tick(t) {
+        if (at === null) at = t;
+        const dt = last ? Math.min(50, t - last) : 0,
+          e = t - at;
+        last = t;
+        svg.classList.toggle("s1", step >= 1);
+        svg.classList.toggle("s2", step >= 2);
+        $("isaMono").classList.toggle("on", step === 0);
+        $("isaLane0").classList.toggle("on", step === 0);
+        $("isaLane1").classList.toggle("on", step >= 1);
+        $("isaLane2").classList.add("on");
+        // the blocks glide between the monolith and their inlined sections
+        q = clamp(q + ((step >= 1 ? 1 : -1) * dt) / SPLIT);
+        blks.forEach((b, i) => {
+          const p = ease(clamp((q * SPLIT - i * 90) / (SPLIT - 5 * 90))),
+            x = AX + (BX - AX) * p,
+            y = AY[i] + (BLK[i][4] - AY[i]) * p;
+          b.el.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+          b.rect.setAttribute("width", (AW + (BW - AW) * p).toFixed(1));
+          b.rect.setAttribute("height", (BLK[i][3] + (BH - BLK[i][3]) * p).toFixed(1));
+          const fade = clamp(1 - p * 2);
+          b.lines.forEach(l => l.setAttribute("opacity", fade));
+          b.a.setAttribute("opacity", clamp(1 - p * 1.6));
+          b.b.setAttribute("opacity", clamp(p * 1.6 - 0.6));
+          b.tg.setAttribute("opacity", clamp(p * 1.6 - 0.6));
+        });
+        // before: the whole prompt rides along on every turn
+        bef.forEach((x, i) => {
+          const f = step >= 1 || instant ? 1 : ease(clamp((e - 300 - i * 450) / 350));
+          grow(x, i, f, BASE[0]);
+          if (f > 0 && !instant && step === 0) once("b" + i, () => sfx.pop(i));
+        });
+        // after: separate sub-agent contexts, with skills accumulating in the main conversation
+        const k = step === 2 && !instant ? Math.floor((e - T_AFT) / T_TURN) : -1;
+        aft.forEach((x, i) => {
+          const f = step < 2 ? 0 : instant ? 1 : ease(clamp((e - T_AFT - i * T_TURN) / 400));
+          grow(x, i, f, BASE[1]);
+          if (f > 0 && !instant) once("a" + i, () => sfx.pop(2 + i));
+        });
+        const hot = new Set(k >= 0 && k < TURNS.length ? TURNS[k][0] : []);
+        blks.forEach((b, i) => {
+          const on = hot.has(i);
+          if (b.el.classList.contains("hot") !== on) {
+            b.el.classList.toggle("hot", on);
+            b.tg.textContent = (on ? HOT : TAG)[BLK[i][0]];
+          }
+        });
+        const take = step === 2 && (instant || e >= T_AFT + TURNS.length * T_TURN);
+        if (take && !$("isaTake").classList.contains("on") && !instant) sfx.key();
+        $("isaTake").classList.toggle("on", take);
+      },
+      el: h(
+        "section",
+        { class: "slide isa" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Progressive disclosure · right-sized models"), h("h2", {}, letters("Inlined", "l-grad"), " ", letters("Skills & Agents"))),
+        svg,
+        measured,
+        h(
+          "p",
+          { class: "isa-caption" },
+          "MEASURED · runs 18 Oct–16 Nov 2026 UTC (30 d) · source snapshot 17 Nov · direct declarations; smoke tests & imports excluded",
+          h("br"),
+          "Workflow success ≠ skill invocation or measured savings · diagram illustrative"
+        )
+      ),
     });
   }
 

@@ -66,6 +66,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Budget steering | illustrative | As a run nears its AI-credit or time budget, the firewall's API proxy appends a notice to the end of the agent's next model request saying what is left and what to do, once per conversation, so the agent submits what it has before the hard stop and audit records every delivery. |
 | Model routing | illustrative | Experimental: with model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
 | DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
+| Inlined Skills & Agents | illustrative | Defer detailed instructions into inline skills and delegate focused work to smaller-model agents, with real workflow examples showing both patterns in use. |
 | Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |
 | Agentic Engineering |  | Band header (Agentic Engineering): skip needless runs and give agents memory, hand-offs, expiry, search and measurement. |
 | Agents that debug agents | illustrative | The agentic-workflows MCP server exposes logs, audit and audit-diff so any agent can debug, audit and optimize other workflows from unified sessions. |
