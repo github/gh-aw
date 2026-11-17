@@ -99,7 +99,7 @@ node --check docs/public/cracktro/deck.js
 python3 -m http.server 4391 --bind 127.0.0.1 --directory docs/public   # async; then stop it
 ```
 
-- Open `http://127.0.0.1:4391/cracktro/#<n>`; find `<n>` from the heading order in `docs/tests/talk.spec.ts`.
+- Open `http://127.0.0.1:4391/cracktro/#human-agent-processes`.
 - Screenshot `.slide.active .hap-svg` and check that the header and caption do not clip at the right or bottom edge.
 - Content rules:
   - Workflow and role names only, no people.

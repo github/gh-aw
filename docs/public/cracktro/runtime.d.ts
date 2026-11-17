@@ -5,6 +5,8 @@ declare namespace CracktroDeck {
   interface Slide {
     group: string;
     el: HTMLElement & { _lt?: ReturnType<typeof setTimeout> };
+    /** Stable `#id` link; defaults to a slug of the heading (set it to keep a link after renaming). */
+    id?: string;
     notes?: string;
     experimental?: string;
     key?: string;
@@ -54,12 +56,22 @@ declare namespace CracktroDeck {
     current(): Slide | undefined;
   }
 
+  /** A predefined filtered view of the deck (`#<slide-id>&tour=<name>`): whole bands by group plus single slides by id. */
+  interface Tour {
+    title?: string;
+    /** One-line description shown under the title in the slide map. */
+    summary?: string;
+    bands?: string[];
+    slides?: string[];
+  }
+
   interface Config {
     slides?: Slide[] | ((services: Services) => Slide[]);
     themes?: Record<string, Partial<Theme>>;
     bands?: Record<string, [title: string, subtitle: string]>;
     solo?: Record<string, string>;
     prototypes?: Record<string, string>;
+    tours?: Record<string, Tour>;
     last?: string | null;
     sound?: Sound;
     css?: string;
@@ -83,6 +95,9 @@ declare namespace CracktroDeck {
     prev(): void;
     band(direction: number): void;
     current(): number;
+    /** Start a configured tour at its first slide, or show every slide again with `null`. */
+    tour(name: string | null): void;
+    tours(): string[];
   }
 
   interface API {

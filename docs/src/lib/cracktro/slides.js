@@ -5,16 +5,18 @@ import { readFileSync } from "node:fs";
 
 export const SLIDES_FILE = new URL("../../../../.github/skills/cracktro/slides.md", import.meta.url);
 
-const HEADER = "| Heading | Notes | Summary | Keywords |";
-const SEPARATOR = "|---|---|---|---|";
+const HEADER = "| Id | Heading | Notes | Summary | Keywords |";
+const SEPARATOR = "|---|---|---|---|---|";
 const NOTES = new Set(["", "illustrative"]);
+// A stable `#id` link anchor: lowercase kebab-case.
+const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
- * @typedef {{ heading: string, illustrative: boolean, summary: string, keywords: string[], line: number }} Slide
+ * @typedef {{ id: string, heading: string, illustrative: boolean, summary: string, keywords: string[], line: number }} Slide
  */
 
 /**
- * Parses the slide table. Throws `source:line: message` on any malformed, empty, unknown or duplicate entry.
+ * Parses the slide table. Throws `source:line: message` on any malformed, invalid, empty, unknown or duplicate entry.
  * @param {string} text
  * @param {string} [source]
  * @returns {Slide[]}
@@ -34,6 +36,8 @@ export function parseSlides(text, source = "slides.md") {
   /** @type {Slide[]} */
   const slides = [];
   /** @type {Map<string, number>} */
+  const ids = new Map();
+  /** @type {Map<string, number>} */
   const headings = new Map();
   /** @type {Map<string, number>} */
   const summaries = new Map();
@@ -45,8 +49,10 @@ export function parseSlides(text, source = "slides.md") {
       .slice(1, -1)
       .split("|")
       .map(cell => cell.trim());
-    if (cells.length !== 4) fail(index, `expected 4 cells, found ${cells.length} (cells must not contain "|"): ${line}`);
-    const [heading, notes, summary, keywordCell] = cells;
+    if (cells.length !== 5) fail(index, `expected 5 cells, found ${cells.length} (cells must not contain "|"): ${line}`);
+    const [id, heading, notes, summary, keywordCell] = cells;
+    if (!ID.test(id)) fail(index, `invalid Id "${id}" for "${heading}" (expected lowercase kebab-case)`);
+    if (ids.has(id)) fail(index, `duplicate Id "${id}" (first on line ${ids.get(id)})`);
     if (!heading) fail(index, "empty Heading");
     if (!NOTES.has(notes)) fail(index, `unknown Notes value "${notes}" (expected empty or "illustrative")`);
     if (!summary) fail(index, `empty Summary for "${heading}"`);
@@ -60,9 +66,10 @@ export function parseSlides(text, source = "slides.md") {
     const headingKey = heading.toLowerCase();
     if (headings.has(headingKey)) fail(index, `duplicate Heading "${heading}" (first on line ${headings.get(headingKey)})`);
     if (summaries.has(summary)) fail(index, `duplicate Summary for "${heading}" (first on line ${summaries.get(summary)})`);
+    ids.set(id, index + 1);
     headings.set(headingKey, index + 1);
     summaries.set(summary, index + 1);
-    slides.push({ heading, illustrative: notes === "illustrative", summary, keywords, line: index + 1 });
+    slides.push({ id, heading, illustrative: notes === "illustrative", summary, keywords, line: index + 1 });
   }
   if (!slides.length) fail(headerIndex, "slide table has no rows");
   for (; index < lines.length; index++) {
@@ -82,7 +89,7 @@ export function loadSlides(file = SLIDES_FILE) {
 }
 
 /**
- * schema.org `hasPart` entries: one per slide, in order, linking to its `#N` hash. `keywords` is the
+ * schema.org `hasPart` entries: one per slide, in order, linking to its stable `#id` hash. `keywords` is the
  * comma-separated schema.org text form; the deck's slide search reads it too.
  * @param {Slide[]} slides
  * @param {string} pageUrl
@@ -94,7 +101,7 @@ export function slideParts(slides, pageUrl) {
     name: slide.heading,
     description: slide.summary.replace(/^Band header \([^)]*\):\s*/, ""),
     keywords: slide.keywords.join(", "),
-    url: `${pageUrl}#${i + 1}`,
+    url: `${pageUrl}#${slide.id}`,
   }));
 }
 
