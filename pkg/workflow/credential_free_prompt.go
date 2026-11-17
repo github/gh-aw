@@ -155,12 +155,36 @@ func writeCredentialFreePromptSteps(output *strings.Builder, content string, dat
 		}
 	}
 	options := append([]yaml.EncodeOption{yaml.WithComment(comments)}, DefaultMarshalOptions...)
-	encoded, err := yaml.MarshalWithOptions(steps, options...)
+	encoded, err := marshalYAMLWithOptions(steps, options...)
 	if err != nil {
 		return fmt.Errorf("encode credential-free prompt steps: %w", err)
 	}
+	if err := validatePromptContentRoundTrip(encoded, steps); err != nil {
+		return err
+	}
 	for line := range strings.SplitSeq(strings.TrimRight(string(encoded), "\n"), "\n") {
 		output.WriteString("      " + line + "\n")
+	}
+	return nil
+}
+
+func validatePromptContentRoundTrip(encoded []byte, steps []WorkflowStep) error {
+	var decoded []WorkflowStep
+	if err := yaml.Unmarshal(encoded, &decoded); err != nil {
+		return fmt.Errorf("parse encoded prompt steps: %w", err)
+	}
+	if len(decoded) != len(steps) {
+		return fmt.Errorf("YAML round trip changed the prompt step count — expected %d, got %d", len(steps), len(decoded))
+	}
+	for i, step := range steps {
+		for key, value := range step.Env {
+			if !strings.HasPrefix(key, "GH_AW_PROMPT_CONTENT_") {
+				continue
+			}
+			if actual, exists := decoded[i].Env[key]; !exists || actual != value {
+				return fmt.Errorf("YAML round trip changed %s in prompt step %q — expected prompt content to be preserved exactly", key, step.Name)
+			}
+		}
 	}
 	return nil
 }

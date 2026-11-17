@@ -86,6 +86,63 @@ func TestCredentialFreePromptPreservesShellSteps(t *testing.T) {
 	assert.NotContains(t, output.String(), "GH_AW_PROMPT_SCRIPT")
 }
 
+func TestCredentialFreePromptPreservesIndentedChunks(t *testing.T) {
+	content := strings.Repeat("x", 20889) + "\n   Continuation text\n145. Step 145: do the thing\n"
+	chunks := splitContentIntoChunks(content)
+	require.Len(t, chunks, 2)
+	require.True(t, strings.HasPrefix(chunks[1], "   Continuation text\n"))
+
+	compiler := &Compiler{}
+	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+	var generated strings.Builder
+	compiler.generateUnifiedPromptCreationStep(&generated, nil, chunks, nil, data)
+	var expected []WorkflowStep
+	require.NoError(t, yaml.Unmarshal([]byte(generated.String()), &expected))
+
+	var output strings.Builder
+	require.NoError(t, writeCredentialFreePromptSteps(&output, generated.String(), data))
+	var actual []WorkflowStep
+	require.NoError(t, yaml.Unmarshal([]byte(output.String()), &actual))
+	require.Len(t, actual, len(expected))
+	promptValues := 0
+	for i, step := range expected {
+		for key, value := range step.Env {
+			if strings.HasPrefix(key, "GH_AW_PROMPT_CONTENT_") {
+				assert.Equal(t, value, actual[i].Env[key], key)
+				promptValues++
+			}
+		}
+	}
+	require.Equal(t, len(chunks), promptValues)
+}
+
+func TestValidatePromptContentRoundTrip(t *testing.T) {
+	expected := []WorkflowStep{{
+		Name: "Create prompt",
+		Env:  map[string]string{"GH_AW_PROMPT_CONTENT_0000": "   continuation\nnext\n"},
+	}}
+	for _, tt := range []struct {
+		name    string
+		encoded string
+		message string
+	}{
+		{"unchanged", "- env:\n    GH_AW_PROMPT_CONTENT_0000: \"   continuation\\nnext\\n\"\n", ""},
+		{"invalid YAML", "- env: [", "parse encoded prompt steps"},
+		{"missing step", "[]", "prompt step count"},
+		{"missing content", "- env: {}", "GH_AW_PROMPT_CONTENT_0000"},
+		{"changed content", "- env:\n    GH_AW_PROMPT_CONTENT_0000: \"continuation\\nnext\\n\"\n", "preserved exactly"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePromptContentRoundTrip([]byte(tt.encoded), expected)
+			if tt.message == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.message)
+			}
+		})
+	}
+}
+
 func TestPromptRejectsSecretBackedAuthorBindings(t *testing.T) {
 	for _, value := range []string{"${{ secrets.PRIVATE }}", "${{ secrets['PRIVATE'] || 'fallback' }}", "${{ github.token }}", "${{ github['token'] }}"} {
 		t.Run(value, func(t *testing.T) {
