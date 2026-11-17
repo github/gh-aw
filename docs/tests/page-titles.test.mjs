@@ -11,7 +11,7 @@ let root;
 const cases = [
   {
     name: "matching",
-    body: "<!-- Introductory comment -->\n\n# Page Title\n\nContent.\n\n## Page Title",
+    body: "<!-- Introductory comment -->\n\n# Page Title\n\nContent.\n\n| Column |\n| --- |\n| Cell |\n\n## Page Title",
     headings: 1,
     anchor: "page-title",
     section: "page-title-1",
@@ -53,13 +53,12 @@ before(async () => {
     join(root, "astro.config.mjs"),
     `
 import { defineConfig } from 'astro/config';
-import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
-import deduplicateTitle from ${JSON.stringify(join(docsRoot, "src/lib/rehype/deduplicateTitle.js"))};
+import productionConfig from ${JSON.stringify(join(docsRoot, "astro.config.mjs"))};
 export default defineConfig({
   site: 'https://github.github.com',
   base: '/gh-aw/',
-  markdown: { processor: unified({ rehypePlugins: [deduplicateTitle] }) },
+  markdown: productionConfig.markdown,
   integrations: [starlight({
     title: 'Docs',
     components: { PageTitle: ${JSON.stringify(join(docsRoot, "src/components/PageTitle.astro"))} },
@@ -76,11 +75,11 @@ import { docsSchema } from '@astrojs/starlight/schema';
 export const collections = { docs: defineCollection({ loader: docsLoader(), schema: docsSchema() }) };
 `
   );
-  await writeFile(join(content, "index.mdx"), "---\ntitle: Home\ntemplate: splash\n---\n<h1>Landing hero</h1>\n");
+  await writeFile(join(content, "index.md"), "---\ntitle: Home\n---\n# Home\n");
   for (const extension of ["md", "mdx"]) {
     for (const scenario of cases) {
       const imports = extension === "mdx" ? "import { Card } from '@astrojs/starlight/components';\n\n" : "";
-      const body = extension === "mdx" ? scenario.body.replace("<!-- Introductory comment -->\n\n", "") : scenario.body;
+      const body = extension === "mdx" && scenario.name === "matching" ? scenario.body.replace("<!-- Introductory comment -->\n\n", "{/* Introductory comment */}\n\n") : scenario.body;
       await writeFile(join(content, `${scenario.name}-${extension}.${extension}`), `---\ntitle: ${JSON.stringify(scenario.title ?? "Page Title")}\n${scenario.extra ?? ""}---\n${imports}${body}\n`);
     }
     await writeFile(join(content, "expression.mdx"), '---\ntitle: Page Title\n---\n# Page Title {"details"}\n');
@@ -103,6 +102,7 @@ for (const extension of ["md", "mdx"]) {
         assert.ok(html.includes(`<span id="${scenario.anchor}"></span>`), "original title anchor is preserved");
         assert.ok(!html.includes(`href="#${scenario.anchor}"`), "duplicate title is not in the table of contents");
       }
+      if (scenario.name === "matching") assert.match(html, /class="table-scroll-wrapper"/);
       if (scenario.section) assert.ok(html.includes(`id="${scenario.section}"`), "section heading keeps its original slug");
     });
   }
@@ -118,7 +118,7 @@ test("the unified session specification renders its title once", async () => {
 test("the landing page keeps its own title", async () => {
   const html = await readFile(join(root, "dist/index.html"), "utf8");
   assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
-  assert.match(html, /<h1>Landing hero<\/h1>/);
+  assert.match(html, /<h1 id="home">Home<\/h1>/);
 });
 
 test("headings with MDX expressions keep their dynamic content", async () => {

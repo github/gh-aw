@@ -14,7 +14,7 @@ export default function rehypeDeduplicateTitle() {
   return (tree, file) => {
     const frontmatter = file.data.astro?.frontmatter;
     const title = frontmatter?.hero?.title ?? frontmatter?.title;
-    if (typeof title !== "string" || !title.trim()) return;
+    if (typeof title !== "string" || !title.trim() || isLandingPage(file.path)) return;
 
     const heading = tree.children.find(isContent);
     if (heading?.type !== "element" || heading.tagName !== "h1") return;
@@ -33,12 +33,22 @@ export default function rehypeDeduplicateTitle() {
 
 /** @param {import('unist').Node} node */
 function isContent(node) {
-  if (node.type === "comment" || node.type === "mdxjsEsm") return false;
+  if (node.type === "comment" || node.type === "mdxjsEsm" || isCommentExpression(node)) return false;
   if ("value" in node && typeof node.value === "string") {
     if (node.type === "text" && !node.value.trim()) return false;
     if (node.type === "raw" && /^\s*<!--[\s\S]*-->\s*$/.test(node.value)) return false;
   }
   return true;
+}
+
+/** @param {string | undefined} filePath */
+function isLandingPage(filePath) {
+  return typeof filePath === "string" && /(?:^|[/\\])src[/\\]content[/\\]docs[/\\]index\.mdx?$/.test(filePath);
+}
+
+/** @param {import('unist').Node} node */
+function isCommentExpression(node) {
+  return node.type === "mdxFlowExpression" && "value" in node && typeof node.value === "string" && /^\s*(?:\{\s*)?\/\*[\s\S]*?\*\/(?:\s*\})?\s*$/.test(node.value);
 }
 
 /**
