@@ -69,6 +69,7 @@ slides.push({
 | `workflow-prompts.md` | Adding or refreshing a slide's `/agentic-workflows` prompt (`PROMPTS`, phone dialog); prompt mining and PR/task/session references. |
 | `data-refresh.md` | Adding, changing or refreshing a data slide; refresh mini-skills and the slide→`refresh/<slug>.md` index. |
 | `brand.md` | Any colour, gradient, glow, title or font change; brand/Primer palette, semantic hues, regularization pass. |
+| `concept-style.md` | Adding or restyling a concept slide in the style of The factory mindset and Trust the process (light header-less row, problem/answer statements, one live metaphor, horizontal split motion). |
 | `asset-generator.md` | Setting up or using the `asset-generator` MCP (og/social cards, wallpapers, charts, `create_slide_deck`); where outputs may live. |
 
 ## People and mascots
