@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 // @safe-outputs-exempt SEC-004 — PR/issue body values in this handler are static internal templates (plus allowlisted changed-file paths), not untrusted user content.
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -210,7 +211,7 @@ After merging this PR, **recompile the lock files** using one of these methods:
 
   // Create the PR using gh CLI
   core.info(`Creating PR: "${prTitle}"`);
-  const { stdout: prOutput } = await exec.getExecOutput("gh", ["pr", "create", "--title", prTitle, "--body", prBody, "--head", branchName, "--label", "agentic-workflows"], {
+  const { stdout: prOutput } = await exec.getExecOutput("gh", ["pr", "create", "--title", prTitle, "--body", prBody, "--head", branchName, "--label", getIssueLabel()], {
     env: { ...process.env, GH_TOKEN: token },
   });
 
@@ -374,7 +375,7 @@ async function mainNotifyIssue() {
         owner,
         repo,
         title: issueTitle,
-        labels: ["agentic-workflows"],
+        labels: [getIssueLabel()],
       },
       report
     );
@@ -382,7 +383,7 @@ async function mainNotifyIssue() {
     // Label may not exist when auto-upgrade is used without maintenance label creation.
     const errorAny = /** @type {any} */ error;
     if (errorAny?.status === 422) {
-      core.warning("Failed to create issue with label 'agentic-workflows'; retrying without labels");
+      core.warning(`Failed to create issue with label '${getIssueLabel()}'; retrying without labels`);
       createdIssue = await createReportIssue(
         github,
         {
