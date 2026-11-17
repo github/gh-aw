@@ -22,7 +22,7 @@ done
 jq -s 'add | unique_by(.number)' "$tmp"/w_*.json > "$tmp/window.json"
 total="$(gh api -X GET search/issues -f q="repo:$REPO is:pr is:merged merged:$START..$END" --jq .total_count)"
 
-# All-time unslopper PRs, by exact title prefix.
+# All-time improver PRs, by exact title prefix.
 for p in $(jq -r '.[]' <<<"$PREFIXES"); do
   gh pr list -R "$REPO" --state merged --search "\"[$p]\" in:title" --limit 1000 --json "$FIELDS" \
     | jq --arg p "[$p]" '[.[] | select(.title | startswith($p))]' > "$tmp/p_$p.json"
