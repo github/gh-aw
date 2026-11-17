@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { invokeDecisions } = require("../actions/setup/js/decisions_client.cjs");
-const { summarizeDiff, LIMITS: DIFF_LIMITS } = require("./ci-front-door-diff.cjs");
+const { summarizeDiff, summarizeGitHubDiff, LIMITS: DIFF_LIMITS } = require("./ci-front-door-diff.cjs");
 
 // Keep this independent of the catalog: corrupt metadata must never remove jobs.
 const SUITE_IDS = Object.freeze(["go-tests", "security", "native-javascript-tests", "build-wasm", "mcp-server-compile-test", "cross-platform-build", "alpine-container-test", "actions-build"]);
@@ -213,20 +213,33 @@ async function main() {
     catalog = null;
   }
   const fullRun = process.env.GITHUB_EVENT_NAME !== "pull_request";
+  let githubApiRequests = 0;
+  const diff = fullRun
+    ? { files: [], patch: "", truncated: false, unavailable: false }
+    : process.env.CI_DIFF_BASE_SHA !== undefined
+      ? await summarizeGitHubDiff({
+          repository: process.env.GITHUB_REPOSITORY,
+          base: process.env.CI_DIFF_BASE_SHA,
+          head: process.env.CI_DIFF_HEAD_SHA,
+          token: process.env.CI_DIFF_TOKEN,
+          onRequest: () => githubApiRequests++,
+        })
+      : summarizeDiff({ cwd: diffCwd });
   const result = await frontDoor({
     catalog,
     prompt,
-    diff: fullRun ? { files: [], patch: "", truncated: false, unavailable: false } : summarizeDiff({ cwd: diffCwd }),
+    diff,
     token: process.env.CI_DECISION_TOKEN,
     fullRun,
   });
+  result.metrics.other_github_api_requests = githubApiRequests;
   const json = JSON.stringify(result);
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `suite_ids=${JSON.stringify(result.suite_ids)}\nfallback=${result.fallback}\nmetrics=${JSON.stringify(result.metrics)}\n`);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### CI Front Door\n\n${json}\n`);
   process.stdout.write(json + "\n");
 }
 
-module.exports = { SUITE_IDS, MANDATORY, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, postDecision, selectSuites, frontDoor };
+module.exports = { SUITE_IDS, MANDATORY, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, summarizeGitHubDiff, postDecision, selectSuites, frontDoor };
 if (require.main === module)
   main().catch(() => {
     process.stderr.write("CI Front Door failed; downstream jobs must fail open.\n");

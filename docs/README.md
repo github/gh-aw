@@ -71,7 +71,7 @@ Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), and Left/Right from an example return to
 the main line. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
 and M to toggle sound. The slide map button (or G) opens a full-screen grid of
-every slide grouped by band, each pattern's examples in a row beside it, with the current slide focused; arrows move between
+every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
 `slides.md` summaries and slide text; arrows pick a result, Enter opens it, and
@@ -128,6 +128,16 @@ operator-owned infrastructure diagrams come from `public/cracktro/ops-visuals.js
 a dependency-free script that sets `window.AW_OPS_VISUALS` for the deck. The
 homepage imports the same file at build time for its matching sections, so
 edit those diagrams in one place and keep them free of external references.
+The deck engine (stage, navigation dock, band headers, search, slide map, `#N`
+hashes and animated background) lives in `public/cracktro/runtime.js`, a
+talk-agnostic classic script that sets `window.CracktroDeck`. `deck.js` holds the
+talk's slides, styles, prompts, band themes and synth, and ends with
+`CracktroDeck.create({ slides, themes, bands, ... })`; another deck can reuse the
+runtime by loading `runtime.js` and calling `create` with its own slides. The
+API is declared in `public/cracktro/runtime.d.ts`; run `npm run check:cracktro`
+from `docs/` to type-check the runtime and its contract. The docs build runs
+this check too. The page needs no build or module loader and also works when
+opened from disk.
 Mona Sans reuses `public/fonts/`; Monaspace Neon and its SIL Open Font License
 are in `public/cracktro/fonts/`.
 

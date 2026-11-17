@@ -6,6 +6,7 @@ package parser
 import (
 	"fmt"
 	"maps"
+	"math/big"
 )
 
 // validateWithImportSchema validates the provided 'with'/'inputs' values against
@@ -13,8 +14,9 @@ import (
 // It checks that:
 //   - all required parameters declared in import-schema are present in 'with'
 //   - no unknown parameters are provided (i.e., not declared in import-schema)
-//   - provided values match the declared type (string, number, boolean, choice)
+//   - provided values match the declared type (string, number, integer, boolean, choice)
 //   - choice values are within the allowed options list
+//   - numeric values satisfy declared minimum and maximum bounds
 //
 // If the imported workflow has no 'import-schema', all provided 'with' values are
 // accepted without validation (backward compatibility with 'inputs' form).
@@ -42,10 +44,13 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 
 	// Check each declared schema field
 	for paramName, paramDefRaw := range schemaMap {
-		paramDef, _ := paramDefRaw.(map[string]any)
+		paramDef, ok := paramDefRaw.(map[string]any)
+		if !ok {
+			continue
+		}
 
 		// Check required parameters
-		if req, _ := paramDef["required"].(bool); req {
+		if req, ok := paramDef["required"].(bool); ok && req {
 			if _, provided := inputs[paramName]; !provided {
 				return fmt.Errorf("import '%s': required 'with' input %q is missing (declared in import-schema)", importPath, paramName)
 			}
@@ -57,8 +62,8 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 		}
 
 		// Skip type validation when type is not specified
-		declaredType, _ := paramDef["type"].(string)
-		if declaredType == "" {
+		declaredType, ok := paramDef["type"].(string)
+		if !ok || declaredType == "" {
 			continue
 		}
 
@@ -93,9 +98,12 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 	}
 	// Validate each declared property
 	for propName, propDefRaw := range propsMap {
-		propDef, _ := propDefRaw.(map[string]any)
+		propDef, ok := propDefRaw.(map[string]any)
+		if !ok {
+			continue
+		}
 		// Check required sub-fields
-		if req, _ := propDef["required"].(bool); req {
+		if req, ok := propDef["required"].(bool); ok && req {
 			if _, provided := objMap[propName]; !provided {
 				return fmt.Errorf("import '%s': required property %q of 'with' input %q is missing", importPath, propName, name)
 			}
@@ -104,8 +112,8 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 		if !provided {
 			continue
 		}
-		propType, _ := propDef["type"].(string)
-		if propType == "" {
+		propType, ok := propDef["type"].(string)
+		if !ok || propType == "" {
 			continue
 		}
 		qualifiedName := name + "." + propName
@@ -125,33 +133,23 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 		}
 	case "number":
 		// Accept all numeric types that YAML parsers may produce
-		switch value.(type) {
-		case int, int8, int16, int32, int64,
-			uint, uint8, uint16, uint32, uint64,
-			float32, float64:
-			// OK
-		default:
+		number, ok := importInputNumber(value)
+		if !ok {
 			return fmt.Errorf("import '%s': 'with' input %q must be a number (got %T)", importPath, name, value)
 		}
+		return validateImportNumberBounds(name, number, paramDef, importPath)
+	case "integer":
+		number, ok := importInputNumber(value)
+		if !ok || !number.IsInt() {
+			return fmt.Errorf("import '%s': 'with' input %q must be an integer (got %T)", importPath, name, value)
+		}
+		return validateImportNumberBounds(name, number, paramDef, importPath)
 	case "boolean":
 		if _, ok := value.(bool); !ok {
 			return fmt.Errorf("import '%s': 'with' input %q must be a boolean (got %T)", importPath, name, value)
 		}
 	case "choice":
-		strVal, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("import '%s': 'with' input %q must be a string for choice type (got %T)", importPath, name, value)
-		}
-		if opts, hasOpts := paramDef["options"]; hasOpts {
-			if optsList, ok := opts.([]any); ok {
-				for _, opt := range optsList {
-					if optStr, ok := opt.(string); ok && optStr == strVal {
-						return nil
-					}
-				}
-				return fmt.Errorf("import '%s': 'with' input %q value %q is not in the allowed options", importPath, name, strVal)
-			}
-		}
+		return validateImportChoiceInput(name, value, paramDef, importPath)
 	case "array":
 		arr, ok := value.([]any)
 		if !ok {
@@ -162,9 +160,12 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 		if !hasItems {
 			return nil
 		}
-		itemsDef, _ := itemsDefRaw.(map[string]any)
-		itemType, _ := itemsDef["type"].(string)
-		if itemType == "" {
+		itemsDef, ok := itemsDefRaw.(map[string]any)
+		if !ok {
+			return nil
+		}
+		itemType, ok := itemsDef["type"].(string)
+		if !ok || itemType == "" {
 			return nil
 		}
 		for i, item := range arr {
@@ -175,6 +176,84 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 		}
 	case "object":
 		return validateObjectInput(name, value, paramDef, importPath)
+	}
+	return nil
+}
+
+func validateImportChoiceInput(name string, value any, paramDef map[string]any, importPath string) error {
+	strVal, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("import '%s': 'with' input %q must be a string for choice type (got %T)", importPath, name, value)
+	}
+	opts, hasOpts := paramDef["options"]
+	if !hasOpts {
+		return nil
+	}
+	optsList, ok := opts.([]any)
+	if !ok {
+		return nil
+	}
+	for _, opt := range optsList {
+		if optStr, ok := opt.(string); ok && optStr == strVal {
+			return nil
+		}
+	}
+	return fmt.Errorf("import '%s': 'with' input %q value %q is not in the allowed options", importPath, name, strVal)
+}
+
+func importInputNumber(value any) (*big.Rat, bool) {
+	switch number := value.(type) {
+	case int:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int8:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int16:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int32:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case int64:
+		return new(big.Rat).SetInt64(number), true
+	case uint:
+		return new(big.Rat).SetInt(new(big.Int).SetUint64(uint64(number))), true
+	case uint8:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case uint16:
+		return new(big.Rat).SetInt64(int64(number)), true
+	case uint32:
+		return new(big.Rat).SetInt(new(big.Int).SetUint64(uint64(number))), true
+	case uint64:
+		return new(big.Rat).SetInt(new(big.Int).SetUint64(number)), true
+	case float32:
+		rational := new(big.Rat).SetFloat64(float64(number))
+		return rational, rational != nil
+	case float64:
+		rational := new(big.Rat).SetFloat64(number)
+		return rational, rational != nil
+	default:
+		return nil, false
+	}
+}
+
+func validateImportNumberBounds(name string, value *big.Rat, paramDef map[string]any, importPath string) error {
+	for _, bound := range []struct {
+		key     string
+		message string
+	}{
+		{"minimum", "must be at least"},
+		{"maximum", "must be at most"},
+	} {
+		rawLimit, exists := paramDef[bound.key]
+		if !exists {
+			continue
+		}
+		limit, ok := importInputNumber(rawLimit)
+		if !ok {
+			return fmt.Errorf("import '%s': import-schema %q must be a finite number", importPath, bound.key)
+		}
+		comparison := value.Cmp(limit)
+		if (bound.key == "minimum" && comparison < 0) || (bound.key == "maximum" && comparison > 0) {
+			return fmt.Errorf("import '%s': 'with' input %q %s %v", importPath, name, bound.message, rawLimit)
+		}
 	}
 	return nil
 }

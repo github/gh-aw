@@ -60,6 +60,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Cost Optimization |  | Band header (Cost Optimization): debug, spend less and route smarter. |
 | Cost management | illustrative | Cut agent spend by scheduling less often, fetching data in deterministic steps, capping credits, using sub-agents and routing models with experimental model routing. |
 | Cost guardrails | illustrative | Layered guardrails stop runaway agents: execution controls, including the experimental user rate limit, throttle events, the daily budget blocks runs before activation, per-run limits hard-stop a run, and optional central admission approves or denies each run before it starts. |
+| Budget steering | illustrative | As a run nears its AI-credit or time budget, the firewall's API proxy appends a notice to the end of the agent's next model request saying what is left and what to do, once per conversation, so the agent submits what it has before the hard stop and audit records every delivery. |
 | Model routing | illustrative | Experimental: with model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
 | DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
 | Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |

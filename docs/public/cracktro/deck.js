@@ -18,60 +18,14 @@
     font-weight: 200 800; font-display: block;
   }
   :root { --mono: "Monaspace Neon", ui-monospace, Menlo, monospace; }
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1117; color: #f0f6fc;
-    font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
-  canvas.bg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
-  .stage { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
-  .slide { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
-  /* siblings in a group: reveal-style horizontal push; --dx is +100% going forward, -100% going back, 0 on first load.
-     crossing groups: vertical push, up going forward and down going back (same duration and easing) */
-  .slide.active { visibility: visible; pointer-events: auto; animation: slide-in .8s cubic-bezier(.26,.86,.44,.985) both; }
-  .slide.leaving { visibility: visible; animation: slide-out .8s cubic-bezier(.26,.86,.44,.985) both; }
-  @keyframes slide-in { from { transform: translateX(var(--dx, 100%)); } to { transform: none; } }
-  @keyframes slide-out { to { transform: translateX(calc(-1 * var(--dx, 100%))); } }
-  .slide.active.up-in { animation: up-in .8s cubic-bezier(.26,.86,.44,.985) both; }
-  .slide.leaving.up-out { animation: up-out .8s cubic-bezier(.26,.86,.44,.985) both; }
-  .slide.active.down-in { animation: down-in .8s cubic-bezier(.26,.86,.44,.985) both; }
-  .slide.fadeout { opacity: 0; transition: opacity .6s ease-in-out; }
-  .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
-  /* full-screen red wash for the security band (THEME.security.red): fades over the previous slide, then sits behind the stage */
-  .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
-    background: radial-gradient(ellipse 80% 75% at 50% 55%, #4a070c 0%, #270306 55%, #0c0102 100%); }
-  /* blueprint grid on its own layer above the wash, so it stays visible (and turns with the band theme) over the red */
-  canvas.gridc { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
-  .wash.cover + canvas.gridc { z-index: 4; }
-  .wash.on { opacity: 1; }
-  .wash::after { content: ""; position: absolute; inset: 0;
-    background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #1c0204b0 70%, #050000f0 100%); }
-  .wash.on::after { animation: omen 7s ease-in-out infinite; }
-  .wash.cover { z-index: 4; }
-  @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
-  @keyframes up-out { to { transform: translateY(-100%); } }
-  @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
-  @keyframes down-out { to { transform: translateY(100%); } }
-
-  .kicker { font: 500 24px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; font-stretch: 100%; }
-  .active .kicker { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .1s; }
-
+  html, body { font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; }
   /* --- title --- */
   .title-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; }
   .title { margin: 0; text-align: center; font-size: 210px; line-height: .9; letter-spacing: -.01em; }
   .title .line { display: block; white-space: nowrap; }
-  .ch { display: inline-block; font-variation-settings: "wght" 700, "wdth" 100; }
-  .l-grad .ch { color: transparent; -webkit-background-clip: text; background-clip: text;
-    background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #4493f8, #ab7df8);
-    background-size: 1800px 100%; background-position: var(--bx) 0;
-    padding-bottom: .14em; margin-bottom: -.14em; }
-  @keyframes settle { from { opacity: 0; transform: translateY(.25em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
-  @keyframes breathe { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
-  .l-out .ch { color: transparent; -webkit-text-stroke: 3px #f0f6fc; }
   /* Hero: GitHub brand "AI green" (brand.github.com Green 1–5) */
   .title .l-grad .ch { background-image: linear-gradient(90deg, #0fbf3e, #5fed83, #bfffd1, #8cf2a6, #0fbf3e); filter: drop-shadow(0 0 28px #5fed8355); }
   .title .l-out .ch { -webkit-text-stroke-color: #5fed83; }
-  @keyframes rise { from { opacity: 0; transform: translateY(.3em) scale(.94); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
-  @keyframes flex { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
-  @keyframes hue { from { background-position: var(--bx) 0; } to { background-position: calc(var(--bx) - 1800px) 0; } }
 
   .marquee { position: absolute; left: 0; right: 0; bottom: 70px; overflow: hidden; white-space: nowrap;
     mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent); }
@@ -283,7 +237,6 @@
   .tp-blue { --c: #4493f8; } .tp-green { --c: #3fb950; }
   .tp-go { font-size: 112px !important; line-height: 1.04; color: #3fb950; }
   /* light concept bands (THEME light): dark text and chrome on soft grey */
-  body.light .kicker { color: #424a53; }
   body.light .fmm-stop, body.light .tp-q { color: #1f2328; }
   body.light .fmm-go, body.light .tp-go { color: #116329; }
   body.light .fmm-grid { box-shadow: 0 30px 90px #1f232826, 0 0 0 1px #1f23281f; }
@@ -291,11 +244,6 @@
   body.light .tp-vs > b { color: #424a53; }
   body.light .tp-blue { --c: #0550ae; } body.light .tp-green { --c: #116329; }
   body.light .tp-pill i { opacity: .14; }
-  body.light .dots button { background: #1f232833; }
-  body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
-  body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   .active .tp-copy > :nth-child(odd):not(.tp-vs), .active .tp-vs > :first-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
   .active .tp-copy > :nth-child(even):not(.tp-vs), .active .tp-vs > :last-child { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both; }
   .active .tp-copy > :nth-child(2) { animation-delay: .15s !important; }
@@ -1113,15 +1061,6 @@
   .rollout em { font-style: normal; padding: 10px 18px; border: 1px solid #3d444d; border-radius: 999px; color: #9198a1; transition: all .4s; }
   .rollout em.on { color: #0d1117; background: #3fb950; border-color: #3fb950; }
   .rollout s { text-decoration: none; color: #3d444d; }
-  /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
-  .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
-  .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
-  .proto span { color: #56d4dd; letter-spacing: .04em; text-transform: none; padding-left: 14px; border-left: 1px solid #3d444d; }
-  @keyframes proto-blink { 50% { opacity: .25; } }
-  .bh .proto { top: 96px; right: 140px; }
-  /* experimental badge on every slide that sets experimental (same spot as .proto) */
-  .xbadge { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 12px; padding: 12px 22px; border: 2px dashed #f0883e; border-radius: 999px; background: #0d1117cc; font: 600 18px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #f0883e; z-index: 5; }
-  .xbadge span { color: #9198a1; letter-spacing: .04em; text-transform: none; padding-left: 12px; border-left: 1px solid #3d444d; }
   .cg > .xbadge, .xp > .xbadge { top: 24px; }
   .ek > .xbadge { right: 560px; }
   /* --- gh cao: hyperscale agentics --- */
@@ -2052,6 +1991,95 @@
   @keyframes cgBlink { 50% { opacity: .45; } }
   @keyframes cgPop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+  /* --- budget steering --- */
+  .bst .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #e3b341, #f0883e, #e3b341); }
+  .bst-now * { transition: none !important; }
+  /* left: the API proxy that prices every request and appends notices */
+  .bst-mon { position: absolute; left: 110px; top: 290px; width: 950px; height: 700px; opacity: 0; }
+  .active .bst-mon { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .bst-mon svg { position: absolute; left: 0; top: 0; width: 950px; height: 700px; overflow: visible; }
+  .bst-wire { fill: none; stroke: #c9d1d9; stroke-width: 2.5; stroke-dasharray: 8 8; animation: bstFlow 1.2s linear infinite; }
+  .bst-wl { font: 600 18px var(--mono); fill: #f0f6fc; text-anchor: middle; letter-spacing: .08em; }
+  .bst-model { fill: #161b22; stroke: #ab7df8; stroke-width: 2.5; transition: filter .25s; }
+  .bst-mon.hit .bst-model { filter: drop-shadow(0 0 22px #ab7df8); }
+  .bst-mn, .bst-pn { font: 700 32px "Mona Sans"; fill: #f0f6fc; }
+  .bst-px { fill: #0d1117eb; stroke: #e3b341; stroke-width: 2.5; }
+  .bst-bay { fill: #e3b3410f; stroke: #e3b34199; stroke-width: 1.5; stroke-dasharray: 6 6; }
+  .bst-beam { position: absolute; left: 240px; top: 362px; width: 4px; height: 136px; border-radius: 2px; background: #fff8e1; box-shadow: 0 0 18px 5px #e3b341; opacity: 0; pointer-events: none; }
+  .bst-mon.scan .bst-beam { animation: bstScan .5s ease-in-out both; }
+  .bst-st { position: absolute; left: 520px; top: 262px; padding: 8px 14px; border-radius: 99px; border: 2px solid #c9d1d9; font: 700 17px/1 var(--mono); letter-spacing: .08em; color: #f0f6fc; transition: background .3s, color .3s, border-color .3s, box-shadow .3s; }
+  .bst-st.on { background: #e3b341; border-color: #e3b341; color: #0d1117; box-shadow: 0 0 30px -4px #e3b341; }
+  .bst-la { position: absolute; left: 66px; top: 576px; font: 600 18px/1 var(--mono); color: #f0f6fc; }
+  .bst-lamp { position: absolute; top: 566px; width: 104px; height: 44px; margin-left: -52px; box-sizing: border-box; border-radius: 22px; border: 2px solid #6e7681; display: grid; place-items: center; font: 700 20px/1 var(--mono); color: #f0f6fc; background: #0d1117; transition: background .4s, color .4s, border-color .4s, box-shadow .4s; }
+  .bst-lamp.on { color: #0d1117; background: var(--c); border-color: var(--c); box-shadow: 0 0 34px -4px var(--c); }
+  .bst-pk, .bst-rp, .bst-chip, .bst-fly { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; transition-property: transform, opacity; transition-timing-function: cubic-bezier(.5,0,.25,1), ease; }
+  .bst-pk { width: 128px; box-sizing: border-box; padding: 10px 14px 12px; border-radius: 12px; background: #161b22; border: 2px solid #f0f6fc; box-shadow: 0 0 26px -6px #f0f6fc; z-index: 2; transition-property: transform, opacity, border-color, box-shadow; }
+  .bst-pk i { display: block; height: 7px; margin: 6px 0; border-radius: 4px; background: #c9d1d9; }
+  .bst-pk i:nth-child(2) { width: 72%; } .bst-pk i:nth-child(3) { width: 86%; } .bst-pk i:nth-child(4) { width: 58%; }
+  .bst-pk b { display: block; max-height: 0; overflow: hidden; margin: 0 -14px -12px; border-radius: 0 0 9px 9px; background: #e3b341; color: #0d1117; font: 700 15px/28px var(--mono); text-align: center; transition: max-height .35s, margin .35s; }
+  .bst-pk.n { border-color: #e3b341; box-shadow: 0 0 40px -2px #e3b341; }
+  .bst-pk.n b { max-height: 28px; margin-top: 8px; }
+  .bst-rp { width: 96px; box-sizing: border-box; padding: 8px 12px; border-radius: 10px; background: #161b22; border: 2px solid #ab7df8; box-shadow: 0 0 24px -6px #ab7df8; }
+  .bst-rp i { display: block; height: 6px; margin: 5px 0; border-radius: 3px; background: #d2a8ff; }
+  .bst-rp i + i { width: 64%; }
+  .bst-chip, .bst-fly { padding: 8px 14px; border-radius: 10px; background: #e3b341; color: #0d1117; font: 700 16px/1 var(--mono); white-space: nowrap; box-shadow: 0 0 30px -4px #e3b341; z-index: 3; }
+  .bst-fly { z-index: 6; box-shadow: 0 0 40px 4px #e3b341; }
+  .bst-cost { position: absolute; left: 600px; top: 410px; font: 700 26px/1 var(--mono); color: #f0f6fc; text-shadow: 0 0 12px #0d1117; opacity: 0; pointer-events: none; }
+  .bst-cost.go { animation: bstCost 1.2s ease-out both; }
+  .bst-aud { position: absolute; left: 40px; top: 664px; margin: 0; font: 600 19px/1.3 var(--mono); color: #f0f6fc; opacity: 0; transition: opacity .6s; }
+  .bst-aud b { color: #e3b341; }
+  .bst-aud.on { opacity: 1; }
+  /* right: the agent's conversation, where the notices land */
+  .bst-cv { position: absolute; left: 1110px; top: 64px; width: 590px; height: 946px; box-sizing: border-box; display: flex; flex-direction: column; border-radius: 18px; background: #0d1117f2; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .bst-cv { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .45s; }
+  .bst-ch { flex: none; display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; }
+  .bst-ch svg { width: 30px; height: 30px; fill: #f0f6fc; }
+  .bst-ch b { font: 700 24px/1 "Mona Sans"; color: #f0f6fc; }
+  .bst-ch span { font: 600 17px/1 var(--mono); color: #e6edf3; }
+  .bst-ff { margin-left: auto; padding: 6px 12px; border-radius: 99px; border: 2px solid #f0f6fc; font: 700 15px/1 var(--mono); font-style: normal; color: #f0f6fc; opacity: 0; transition: opacity .4s; }
+  .bst-ff.on { opacity: 1; animation: bstPulse .8s ease-in-out infinite; }
+  .bst-pin { flex: none; display: flex; flex-direction: column; gap: 10px; padding: 16px 18px 10px; }
+  .bst-msgs { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding: 0 18px 18px; overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 70px); mask-image: linear-gradient(transparent, #000 70px); }
+  .bst-m { flex: none; box-sizing: border-box; padding: 10px 14px; border-radius: 12px; background: #161b22; border: 1px solid #30363d; border-left: 4px solid var(--c); font: 500 18px/1.35 var(--mono); color: #f0f6fc; overflow: hidden; }
+  .bst-m.in { animation: bstGrow .6s cubic-bezier(.2,.9,.2,1) both; }
+  .bst-m.in.q { animation: none; }
+  .bst-m small { display: block; margin-bottom: 6px; font: 700 13px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
+  .bst-m.sys { --c: #f0f6fc; }
+  .bst-m.usr { --c: #4493f8; }
+  /* assistant turns share the model's purple; tool results are cyan */
+  .bst-m.ast { --c: #ab7df8; }
+  .bst-m.tool { --c: #39c5cf; background: #0d1117; }
+  .bst-m.say > div { font: 600 20px/1.3 "Mona Sans"; }
+  .bst-m.nt { --c: #e3b341; padding: 14px 16px; border: 2px solid #e3b341; border-left-width: 6px; background: #241d0c; box-shadow: 0 0 44px -12px #e3b341; transition: box-shadow .5s, background .5s; }
+  .bst-nh { display: flex; align-items: center; gap: 10px; }
+  .bst-nh b { font: 700 18px/1 var(--mono); color: #e3b341; }
+  .bst-nh em { margin-left: auto; padding: 6px 10px; border-radius: 99px; background: #e3b341; color: #0d1117; font: 700 13px/1 var(--mono); font-style: normal; white-space: nowrap; }
+  .bst-m.nt p { margin: 6px 0 0; max-height: 120px; font: 600 22px/1.25 "Mona Sans"; color: #f0f6fc; transition: max-height .6s, opacity .4s, margin .6s; }
+  .bst-m.nt p.big { margin-top: 12px; font: 600 22px/1.1 "Mona Sans"; color: #f0f6fc; }
+  .bst-m.nt p.big b { font: 700 40px/1 var(--mono); color: #f0f6fc; }
+  .bst-m.nt p.d1 { margin-top: 12px; font: 700 26px/1.2 "Mona Sans"; color: #e3b341; }
+  .bst-m.nt.done { box-shadow: none; background: #e3b34110; border-style: dashed; }
+  .bst-m.nt.done p { max-height: 0; margin-top: 0; opacity: 0; }
+  .bst-m.ok { --c: #ab7df8; border: 2px solid #ab7df8; border-left-width: 6px; background: #1c1530; box-shadow: 0 0 44px -12px #ab7df8; }
+  .bst-m.ok b { display: block; margin-top: 6px; font: 700 21px/1.3 "Mona Sans"; color: #f0f6fc; }
+  .bst-m.ok em { display: inline-block; margin-top: 10px; padding: 6px 12px; border-radius: 99px; background: #3fb950; color: #0d1117; font: 700 14px/1 var(--mono); font-style: normal; }
+  /* the AI-credit budget beside the conversation: green, amber past 80%, red past 90% */
+  .bst-mt { position: absolute; left: 1722px; top: 64px; width: 88px; height: 946px; opacity: 0; --c: #3fb950; }
+  .active .bst-mt { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .bst-mt > b { display: block; text-align: center; font: 700 19px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #f0f6fc; }
+  .bst-tr { position: absolute; left: 14px; top: 46px; width: 60px; height: 900px; box-sizing: border-box; border-radius: 16px; background: #0d1117; border: 2px solid #6e7681; }
+  .bst-fill { position: absolute; left: 4px; right: 4px; bottom: 4px; border-radius: 11px; background: var(--c); box-shadow: 0 0 34px -4px var(--c); transition: background .6s, box-shadow .6s, opacity .6s; }
+  .bst-mt.r .bst-fill { animation: bstPulse 1.1s ease-in-out infinite; }
+  .bst-foot { position: absolute; left: 110px; top: 1034px; margin: 0; font: 500 16px/1 "Mona Sans"; color: #e6edf3; }
+  /* the loop: the finished run fades out before the slide restarts from an empty session */
+  .bst-msgs, .bst-pin { transition: opacity .6s; }
+  .bst-out .bst-msgs, .bst-out .bst-pin, .bst-out .bst-aud, .bst-out .bst-fill { opacity: 0; }
+  @keyframes bstFlow { to { stroke-dashoffset: -32; } }
+  @keyframes bstScan { 0% { opacity: 0; transform: translateX(0); } 15%, 85% { opacity: 1; } 100% { opacity: 0; transform: translateX(256px); } }
+  @keyframes bstCost { 0% { opacity: 0; transform: translate(-50%, 10px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60px); } }
+  @keyframes bstPulse { 50% { filter: brightness(1.35); } }
+  @keyframes bstGrow { from { max-height: 0; opacity: 0; transform: translateY(18px); } to { max-height: 460px; opacity: 1; transform: none; } }
+
   /* --- model routing --- */
   .mr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #ab7df8); }
   /* the run card starts centred, then glides left when the results arrive */
@@ -2220,154 +2248,6 @@
   .fin-cap { position: absolute; left: 0; right: 0; bottom: 64px; text-align: center; font: 600 18px/1 var(--mono); letter-spacing: .3em; text-transform: uppercase; color: #9198a1; }
   .fin-cap b { color: #f0f6fc; font-weight: 700; }
 
-  /* --- chrome --- */
-  .progress { position: fixed; left: 0; bottom: 0; height: 5px; width: 100%; transform-origin: 0 50%;
-    background: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950); transition: transform .8s cubic-bezier(.7,0,.2,1); z-index: 5; }
-  /* dot map: one row per band, header dot outlined; the band you are in is bright, others dim until hovered */
-  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; flex-direction: column; gap: 5px; z-index: 5; opacity: .25; transition: opacity .3s; }
-  .dots:hover, .dots:focus-within { opacity: 1; }
-  .dots .drow { display: flex; gap: 5px; opacity: .45; transition: opacity .3s; }
-  .dots .drow.on, .dots:hover .drow { opacity: 1; }
-  .dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
-    transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
-  .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
-  .dots button.on { width: 24px; background: #f0f6fc; box-shadow: none; }
-  .dots button.col { box-shadow: 0 3px 0 -1px #ffffff80; }
-  .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
-  .dots button.sub.on { width: 12px; background: #f0f6fc; }
-  /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: 144px; bottom: 10px; height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
-    background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
-  .vnb.on { display: flex; }
-  .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .vnb svg { width: 20px; height: 20px; display: block; flex: none; }
-  .vnb.head { color: #0d1117; background: #f0f6fc; border-color: #f0f6fc; }
-  .vnb.head svg { animation: vnudge 1.6s ease-in-out infinite; }
-  @keyframes vnudge { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
-  @media (prefers-reduced-motion: reduce) { .vnb.head svg { animation: none; } }
-  body.light .vnb { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .vnb:hover { color: #1f2328; border-color: #818b98; }
-  body.light .vnb.head { color: #ffffff; background: #1f2328; border-color: #1f2328; }
-  /* --- band header --- */
-  .bh-head { position: absolute; left: 140px; top: 170px; width: 960px; }
-  .bh-head h2 { margin: 26px 0 0; font-size: 150px; line-height: .95; }
-  .bh-head h2 .line { display: inline-block; white-space: nowrap; }
-  .bh .l-grad .ch { background-image: linear-gradient(90deg, var(--bh), var(--bh2), #f0f6fc, var(--bh2), var(--bh)); }
-  .active.bh .ch { animation: settle .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 30ms + .15s); }
-  .bh-sub { margin: 34px 0 0; font-size: 40px; line-height: 1.25; color: #c9d1d9; font-variation-settings: "wght" 500, "wdth" 100; }
-  .active .bh-sub { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .45s; }
-  .bh-map { position: absolute; right: 140px; top: 182px; display: flex; flex-direction: column; gap: 9px; }
-  .bh-mrow { display: flex; align-items: center; gap: 5px; opacity: .4; }
-  .bh-mrow.on { opacity: 1; }
-  .active .bh-mrow { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 45ms + .2s); }
-  .active .bh-mrow:not(.on) { animation-name: dimrise; }
-  @keyframes dimrise { from { opacity: 0; transform: translateY(.3em); } to { opacity: .4; transform: none; } }
-  .bh-ml { width: 230px; font: 500 15px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9198a1; text-align: right; margin-right: 14px; }
-  .bh-mrow.on .bh-ml { color: #f0f6fc; }
-  .bh-mrow i { width: 16px; height: 12px; border-radius: 3px; background: #ffffff30; }
-  .bh-mrow i.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
-  .bh-mrow.on i { background: var(--bh); box-shadow: 0 0 14px var(--bh); }
-  .bh-mrow.on i.hd { background: transparent; box-shadow: inset 0 0 0 2px var(--bh2); }
-  .bh-row { position: absolute; left: 140px; right: 140px; bottom: 190px; margin: 0; padding: 0; list-style: none; display: flex; gap: 22px; }
-  .bh-row li { cursor: pointer; flex: 1; min-width: 0; height: 170px; padding: 26px 28px; border: 1px solid #3d444d; border-top: 4px solid var(--bh); border-radius: 14px;
-    background: #151b23cc; display: flex; flex-direction: column; justify-content: space-between; }
-  .bh-row li:hover { border-color: var(--bh2); background: #1f2630cc; }
-  .active .bh-row li { animation: rowin .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .5s); }
-  @keyframes rowin { from { opacity: 0; transform: translateX(120px); } to { opacity: 1; transform: none; } }
-  .bh-n { font: 600 22px/1 var(--mono); color: var(--bh2); letter-spacing: .1em; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .bh-k { font-size: .8em; letter-spacing: .02em; padding: 3px 8px; border-radius: 999px; color: #0d1117; background: var(--bh2); }
-  .bh-row.many { display: grid; grid-template-columns: repeat(7, 1fr); bottom: 140px; }
-  .bh-row.many.lots { grid-template-columns: repeat(10, 1fr); gap: 14px; }
-  .bh-row.many.lots li { padding: 16px 14px; }
-  .bh-row.many.lots .bh-t { font-size: 21px; }
-  .bh-row.many li { height: 150px; padding: 18px 22px; }
-  .bh-row.many .bh-t { font-size: 25px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
-  .bh-t { font-size: 28px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
-  .arrows { position: fixed; left: 12px; bottom: 10px; display: none; gap: 6px; z-index: 5; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-  .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
-    color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-  .arrows button:hover { color: #f0f6fc; border-color: #9198a1; }
-  .arrows button:disabled { opacity: .35; cursor: default; }
-  .arrows svg { width: 100%; height: 100%; display: block; }
-  body.compact-nav .dots { display: none; }
-  body.compact-nav .arrows { display: flex; }
-  .snd, .fzb, .smb { position: fixed; right: 24px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
-    background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg { width: 100%; height: 100%; display: block; }
-  .fzb { right: 64px; }
-  .smb { right: 104px; }
-  .snd .waves { transition: opacity .2s; }
-  .snd .x { opacity: 0; transition: opacity .2s; }
-  .snd.off .waves { opacity: 0; }
-  .snd.off .x { opacity: 1; }
-  .snd.flash { color: #f0f6fc; border-color: #f0f6fc; }
-  .notes { position: fixed; left: 24px; right: 24px; bottom: 50px; max-width: 900px; margin: 0 auto; padding: 18px 22px;
-    background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
-  .notes.on { display: block; }
-  body:not(.compact-nav) .notes { left: 330px; }
-
-  /* --- slide search (full-screen dialog) --- */
-  .fz { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
-    background: #0d1117f7; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #f0f6fc; font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; z-index: 20; }
-  .fz[open] { display: flex; justify-content: center; }
-  .fz::backdrop { background: transparent; }
-  .fz-box { width: min(980px, calc(100% - 32px)); margin-top: max(16px, 7vh); max-height: calc(100% - max(32px, 14vh)); display: flex; flex-direction: column; gap: 12px; }
-  .fz-bar { display: flex; gap: 10px; align-items: center; }
-  .fz-in { flex: 1; min-width: 0; font: 500 clamp(20px, 3vw, 30px)/1.2 "Mona Sans", sans-serif; color: inherit; background: #151b23; border: 1px solid #3d444d;
-    border-radius: 12px; padding: 14px 18px; outline: none; }
-  .fz-in:focus { border-color: #ab7df8; box-shadow: 0 0 0 3px #ab7df840; }
-  .fz-x { font: 600 14px/1 var(--mono); color: #9198a1; background: #151b23; border: 1px solid #3d444d; border-radius: 8px; padding: 10px 12px; cursor: pointer; }
-  .fz-x:hover { color: #f0f6fc; border-color: #9198a1; }
-  .fz-st { font: 500 14px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
-  .fz-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-  .fz-list li { display: grid; grid-template-columns: 3.2em 1fr; gap: 4px 12px; padding: 12px 16px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; }
-  .fz-list li:hover { background: #151b23; }
-  .fz-list li[aria-selected="true"] { background: #1f2630; border-color: #ab7df8; }
-  .fz-n { grid-row: span 2; font: 600 18px/1.4 var(--mono); color: #ab7df8; letter-spacing: .06em; }
-  .fz-t { font-size: 20px; font-weight: 600; line-height: 1.3; }
-  .fz-b { font: 500 13px/1 var(--mono); color: #9198a1; margin-left: 10px; letter-spacing: .04em; }
-  .fz-s { font-size: 15px; line-height: 1.4; color: #c9d1d9; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-  .fz mark { background: #ab7df859; color: inherit; border-radius: 3px; }
-  body.light .fz { background: #f6f8faf5; color: #1f2328; }
-  body.light .fz-in, body.light .fz-x { background: #ffffff; border-color: #9ea7b3; color: #1f2328; }
-  body.light .fz-list li:hover { background: #eaeef2; }
-  body.light .fz-list li[aria-selected="true"] { background: #ffffff; border-color: #8250df; }
-  body.light .fz-n { color: #8250df; }
-  body.light .fz-s { color: #424a53; }
-  body.light .fz-st, body.light .fz-b { color: #59636e; }
-  body.light .fz mark { background: #8250df33; }
-
-  /* --- slide map (full-screen overview: one row per band, one tile per slide) --- */
-  .smp { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
-    background: #0d1117f7; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #f0f6fc; font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; z-index: 20; }
-  .smp[open] { display: flex; flex-direction: column; }
-  .smp::backdrop { background: transparent; }
-  .smp-bar { display: flex; align-items: center; gap: 12px; padding: 16px 24px 8px; }
-  .smp-h { flex: 1; margin: 0; font: 600 14px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9198a1; }
-  .smp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
-  .smp-row { display: grid; grid-template-columns: 170px 1fr; gap: 12px; align-items: start; }
-  .smp-l { font: 600 13px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); padding-top: 10px; }
-  .smp-tiles { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
-  .smp-col { flex: 0 0 100%; display: flex; align-items: flex-start; gap: 6px; }
-  .smp-kids { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding-left: 10px; border-left: 2px dotted var(--c); }
-  .smp-t { width: 168px; min-height: 58px; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 10px; border: 1px solid #3d444d;
-    border-left: 3px solid var(--c); border-radius: 8px; background: #151b23; color: inherit; cursor: pointer; font: 500 13px/1.3 "Mona Sans", sans-serif; }
-  .smp-t b { display: flex; font: 600 11px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
-  .smp-t b i { margin-left: auto; font-style: normal; color: var(--c); }
-  .smp-t span { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-  .smp-t.hd { background: transparent; border-style: dashed; border-left-style: solid; }
-  .smp-t.sub { width: 146px; min-height: 44px; font-size: 12px; border-left-style: dotted; opacity: .85; }
-  .smp-t:hover { background: #1f2630; border-color: #9198a1; border-left-color: var(--c); }
-  .smp-t.on { box-shadow: 0 0 0 2px var(--c); }
-  .smp-t:focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
-  @media (max-width: 640px) { .smp-row { grid-template-columns: 1fr; gap: 6px; } .smp-l { padding-top: 0; } .smp-t { width: calc(50% - 3px); } .smp-col { flex-direction: column; } .smp-col > .smp-t { width: calc(50% - 3px); } .smp-kids { width: 100%; box-sizing: border-box; } .smp-kids .smp-t.sub { width: calc(50% - 3px); } }
-  body.light .smp { background: #f6f8faf5; color: #1f2328; }
-  body.light .smp-t { background: #ffffff; border-color: #9ea7b3; border-left-color: var(--c); }
-  body.light .smp-t.hd { background: transparent; }
-  body.light .smp-t:hover { background: #eaeef2; }
-  body.light .smp-h, body.light .smp-t b { color: #59636e; }
-  body.light .smp-l { color: #1f2328; }
 
   /* --- any engine --- */
   .ae .slide-head .ae-agent .ch { background-image: linear-gradient(90deg, #ab7df8, #d2b8ff, #ab7df8); }
@@ -2792,29 +2672,10 @@
   .evo-fact span { display: block; margin-top: 8px; font-size: 19px; line-height: 1.25; color: #c9d1d9; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
-  document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
 
   // ---------- helpers ----------
-  const h = (tag, attrs = {}, ...kids) => {
-    const el = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === "style" && typeof v === "object") Object.assign(el.style, v);
-      else if (k.startsWith("--")) el.style.setProperty(k, v);
-      else if (k in el && k !== "class") el[k] = v;
-      else el.setAttribute(k, v);
-    }
-    el.append(...kids.flat().filter(k => k != null));
-    return el;
-  };
-  // Split text into per-character spans so each letter can move on its own.
-  let charIndex = 0;
-  const letters = (text, cls = "") =>
-    h(
-      "span",
-      { class: `line ${cls}` },
-      [...text].map((c, j) => (c === " " ? " " : h("span", { class: "ch", "--i": charIndex++, "--bx": `${-j * 120}px` }, c)))
-    );
-  const resetIndex = () => (charIndex = 0);
+  // h, letters and resetIndex come from runtime.js; the deck's own CSS above is injected by CracktroDeck.create.
+  const { h, letters, resetIndex } = window.CracktroDeck;
 
   // Primer Octicons (© GitHub, Inc., MIT license), drawn into canvases as Path2D.
   // Keys are the octicon name plus the grid size its path is drawn on.
@@ -2858,8 +2719,6 @@
     });
   }
 
-  // ---------- stage + chrome ----------
-  const canvas = h("canvas", { class: "bg" });
   // Built on GitHub Actions
   {
     resetIndex();
@@ -3725,7 +3584,7 @@
         fly(layer);
         const g = gen;
         setTimeout(() => {
-          if (g !== gen || slides[cur] !== self) return;
+          if (g !== gen || !self.el.classList.contains("active")) return;
           const r = rows[layer];
           r.classList.remove("hit", "warn");
           void r.offsetWidth;
@@ -7054,6 +6913,404 @@
         if (stage < ACTS.length - 1 && !q.length && now - tS > DUR[stage]) {
           begin(stage + 1);
           sfx.step(1);
+        }
+      },
+      el: root,
+    });
+  }
+
+  // Budget steering: every model request passes the firewall's API proxy, which prices it; past 80% and 90% of max-ai-credits it appends a
+  // notice to the end of the agent's next request, the notice lands at the bottom of the conversation, the budget meter turns amber then red,
+  // and the agent submits through a safe output before the hard stop
+  {
+    resetIndex();
+    const CAP = 500,
+      START = 0,
+      FH = 888;
+    // positions inside the 950×700 monitor; the conversation sits to its right
+    const IN = [930, 430],
+      SCAN = [370, 430],
+      TAIL = [370, 492],
+      UP = [370, 150],
+      R0 = [600, 52],
+      R1 = [930, 52];
+    const LAMPS = [
+      [80, 262, "#e3b341"],
+      [90, 380, "#f85149"],
+      [95, 498, "#f85149"],
+      [99, 616, "#f85149"],
+    ];
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const sparkle = (x, y, r, fill) => `<path transform="translate(${x},${y}) scale(${r / 14})" fill="${fill}" d="M0,-14 C1.5,-4 4,-1.5 14,0 C4,1.5 1.5,4 0,14 C-1.5,4 -4,1.5 -14,0 C-4,-1.5 -1.5,-4 0,-14Z"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 950 700");
+    svg.innerHTML =
+      `<defs><marker id="bstArr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c9d1d9"/></marker></defs>` +
+      `<path class="bst-wire" d="M944,430 H712" marker-end="url(#bstArr)"/>` +
+      `<path class="bst-wire" d="M370,224 V112" marker-end="url(#bstArr)"/>` +
+      `<path class="bst-wire" d="M540,52 H944" marker-end="url(#bstArr)"/>` +
+      `<text class="bst-wl" x="826" y="412">request</text><text class="bst-wl" x="826" y="34">reply</text>` +
+      `<rect class="bst-model" x="210" y="4" width="320" height="96" rx="18"/>${sparkle(290, 52, 18, "#d2a8ff")}<text class="bst-mn" x="322" y="63">Model</text>` +
+      `<rect class="bst-px" x="40" y="230" width="660" height="410" rx="28"/>${ico("shieldCheck", 92, 284, 38, "#e3b341")}<text class="bst-pn" x="126" y="295">AWF API proxy</text>` +
+      `<rect class="bst-bay" x="240" y="362" width="260" height="136" rx="16"/>`;
+    const stat = h("b", { class: "bst-st" }, "forward");
+    const lamps = LAMPS.map(([p, x, c]) => h("span", { class: "bst-lamp", "--c": c, style: { left: `${x}px` } }, `${p}%`));
+    const pk = h("div", { class: "bst-pk" }, h("i", {}), h("i", {}), h("i", {}), h("i", {}), h("b", {}, "+ notice"));
+    const rp = h("div", { class: "bst-rp" }, h("i", {}), h("i", {}));
+    const chip = h("div", { class: "bst-chip" }, "⚠ notice");
+    const costEl = h("div", { class: "bst-cost" });
+    const aud = h("p", { class: "bst-aud" }, "every notice → unified session → ", h("b", {}, "gh aw audit"));
+    const mon = h("div", { class: "bst-mon" }, svg, h("i", { class: "bst-beam" }), stat, h("span", { class: "bst-la" }, "notice at"), lamps, chip, pk, rp, costEl, aud);
+    const fly = h("div", { class: "bst-fly" }, "⚠ notice");
+
+    const M = (kind, role, ...body) => h("div", { class: `bst-m ${kind}` }, role ? h("small", {}, role) : null, h("div", {}, ...body));
+    const msgs = h("div", { class: "bst-msgs" });
+    const pin = h("div", { class: "bst-pin" });
+    const ff = h("em", { class: "bst-ff" }, "▶▶ fast-forward");
+    const cvIco = h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI.copilot.map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    const cv = h("div", { class: "bst-cv" }, h("div", { class: "bst-ch" }, cvIco, h("b", {}, "agent"), h("span", {}, "conversation"), ff), pin, msgs);
+    const noticeMsg = (used, fit) =>
+      h(
+        "div",
+        { class: "bst-m nt" },
+        h("div", { class: "bst-nh" }, h("b", {}, "⚠ AWF AI CREDIT WARNING"), h("em", {}, "added by the proxy")),
+        h("p", { class: "big" }, h("b", {}, `${used} / ${CAP}`), " AI credits used"),
+        h("p", {}, `about ${fit} more requests fit`),
+        h("p", { class: "d1" }, "Stop and submit what you have.")
+      );
+
+    // the budget: one word over a bar that fills and turns amber past 80% and red past 90%
+    const fill = h("div", { class: "bst-fill" });
+    const meter = h("div", { class: "bst-mt" }, h("b", {}, "Budget"), h("div", { class: "bst-tr" }, fill));
+
+    let quiet = false,
+      aim = START,
+      shown = START,
+      lastNotice = null;
+    const snd = f => quiet || f();
+    const xy = ([x, y], dx = 0, dy = 0) => `translate(${x + dx}px, ${y + dy}px) translate(-50%, -50%)`;
+    const at = (el, p, ms, dx, dy) => {
+      el.style.transitionDuration = quiet ? "0ms, 0ms" : `${ms}ms, 300ms`;
+      el.style.transform = xy(p, dx, dy);
+    };
+    const show = (el, on) => (el.style.opacity = on ? "1" : "0");
+    const restart = (el, cls) => {
+      el.classList.remove(cls);
+      if (quiet) return;
+      void el.offsetWidth;
+      el.classList.add(cls);
+    };
+    const add = (el, to = msgs) => {
+      el.classList.add("in");
+      if (quiet) el.classList.add("q");
+      to.append(el);
+      while (msgs.children.length > 10) msgs.firstElementChild.remove();
+      return el;
+    };
+    const setStat = on => {
+      stat.textContent = on ? "+ notice" : "forward";
+      stat.classList.toggle("on", on);
+    };
+    const draw = () => {
+      fill.style.height = `${(shown / CAP) * FH}px`;
+      meter.style.setProperty("--c", shown >= CAP * 0.9 ? "#f85149" : shown >= CAP * 0.8 ? "#e3b341" : "#3fb950");
+      meter.classList.toggle("r", shown >= CAP * 0.9);
+      // a threshold lamp lights only when the meter itself crosses it
+      LAMPS.forEach(([p], i) => {
+        const on = shown >= (CAP * p) / 100;
+        if (on && !lamps[i].classList.contains("on")) snd(() => sfx.notify(false));
+        lamps[i].classList.toggle("on", on);
+      });
+    };
+
+    // One model round trip as [ms, action] pairs: the request leaves the conversation, the proxy prices it and appends any pending
+    // notice to its end (the same notice drops into the bottom of the conversation), then the model replies and the conversation grows.
+    const turn = ({ cost, notice, replies }) => {
+      const a = [];
+      let t = 0;
+      a.push([
+        t,
+        () => {
+          if (lastNotice) lastNotice.classList.add("done");
+          pk.classList.remove("n");
+          at(pk, IN, 0);
+          show(pk, true);
+          snd(() => sfx.route(2));
+        },
+      ]);
+      a.push([(t += 60), () => at(pk, SCAN, 900)]);
+      // pricing: the beam reads the request and its AI credits go on the meter (after any notice, which quotes the meter as it stands)
+      const price = () => {
+        restart(mon, "scan");
+        costEl.textContent = `+${cost} AIC`;
+        restart(costEl, "go");
+        aim += cost;
+        snd(() => sfx.pop(1));
+      };
+      t += 900;
+      if (notice) {
+        // the notice springs from the threshold lamp that was crossed and lands on the end of this request
+        const i = LAMPS.findIndex(l => l[0] === notice[2]);
+        a.push([
+          t,
+          () => {
+            at(chip, [LAMPS[i][1], 588], 0);
+            show(chip, true);
+          },
+        ]);
+        a.push([(t += 40), () => at(chip, TAIL, 550)]);
+        a.push([
+          (t += 550),
+          () => {
+            pk.classList.add("n");
+            show(chip, false);
+            setStat(true);
+            fly.style.transitionDuration = "0ms, 0ms";
+            fly.style.transform = xy(TAIL, 110, 290);
+            show(fly, !quiet);
+            void fly.offsetWidth;
+            at(fly, [1405, 940], 700);
+            snd(() => sfx.block(true));
+          },
+        ]);
+        a.push([
+          (t += 700),
+          () => {
+            show(fly, false);
+            lastNotice = add(noticeMsg(...notice));
+          },
+        ]);
+        a.push([(t += 900), price]);
+        t += 900;
+      } else {
+        a.push([t, price]);
+        t += 900;
+      }
+      a.push([t, () => at(pk, UP, 800)]);
+      a.push([
+        (t += 800),
+        () => {
+          show(pk, false);
+          setStat(false);
+          restart(mon, "hit");
+        },
+      ]);
+      a.push([
+        (t += 200),
+        () => {
+          at(rp, R0, 0);
+          show(rp, true);
+        },
+      ]);
+      a.push([(t += 40), () => at(rp, R1, 700)]);
+      replies.forEach((r, i) =>
+        a.push([
+          (t += i ? 650 : 720),
+          () => {
+            if (!i) show(rp, false);
+            add(r());
+            snd(() => sfx.key(1));
+          },
+        ])
+      );
+      return { a, len: t + 900 };
+    };
+    // A time-lapsed round trip for the fast-forward: no pricing float, the meter just climbs
+    const fastTurn = (cost, ...replies) => {
+      const a = [];
+      let t = 0;
+      a.push([
+        t,
+        () => {
+          at(pk, IN, 0);
+          show(pk, true);
+        },
+      ]);
+      a.push([(t += 40), () => at(pk, SCAN, 240)]);
+      a.push([
+        (t += 240),
+        () => {
+          restart(mon, "scan");
+          aim += cost;
+        },
+      ]);
+      a.push([(t += 60), () => at(pk, UP, 200)]);
+      a.push([
+        (t += 200),
+        () => {
+          show(pk, false);
+          restart(mon, "hit");
+          at(rp, R0, 0);
+          show(rp, true);
+        },
+      ]);
+      a.push([(t += 40), () => at(rp, R1, 200)]);
+      replies.forEach(([kind, role, text], i) =>
+        a.push([
+          (t += i ? 110 : 200),
+          () => {
+            if (!i) show(rp, false);
+            add(M(kind, role, text));
+            snd(() => sfx.key(0.6));
+          },
+        ])
+      );
+      return { a, len: t + 60 };
+    };
+    const act = (ms, f) => ({ a: [[0, f]], len: ms });
+    const chain = (...turns) => {
+      const out = [];
+      let off = 0;
+      for (const { a, len } of turns) {
+        a.forEach(([ms, f]) => out.push([off + ms, f]));
+        off += len;
+      }
+      return out;
+    };
+    const FAST = [
+      [30, "→ bash  go test ./pkg/retry/", "FAIL TestRetry (0.31s)"],
+      [40, "→ read  pkg/retry/retry.go", "func Do(ctx, fn, attempts int) error {…"],
+      [50, '→ grep  -rn "retry.Do(" pkg/', "11 call sites in pkg/sync, pkg/fetch, …"],
+      [60, "→ read  pkg/retry/retry_test.go", "func TestRetry(t *testing.T) {…"],
+      [66, "→ bash  go test -race ./pkg/retry/", "FAIL · race on attempt counter"],
+      [70, "→ edit  pkg/retry/retry.go", "ok"],
+      [78, "→ bash  go test -run TestRetry -count=20 ./pkg/retry/", "--- FAIL: TestRetry (0.31s) timeout after 3 attempts"],
+    ];
+    const STEPS = [
+      chain(
+        act(1600, () => {}),
+        act(600, () => add(M("sys", "system", "You are the workflow agent. Fix the flaky TestRetry and open a pull request."), pin)),
+        act(900, () => add(M("usr", "user", "TestRetry fails about one run in ten."), pin)),
+        act(0, () => ff.classList.add("on")),
+        ...FAST.map(([cost, call, out]) => fastTurn(cost, ["ast", "assistant", call], ["tool", "tool", out])),
+        act(900, () => ff.classList.remove("on")),
+        turn({ cost: 8, replies: [() => M("ast", "assistant", "→ edit  pkg/retry/retry.go: back off between attempts"), () => M("tool", "tool", "ok")] })
+      ),
+      chain(
+        turn({
+          cost: 16,
+          notice: [402, 12, 80],
+          replies: [() => M("ast say", "assistant", "Finishing this step, then opening the pull request."), () => M("tool", "tool", "ok  pkg/retry  212.4s · 0 of 200 runs failed")],
+        })
+      ),
+      chain(
+        turn({ cost: 34, replies: [() => M("ast", "assistant", "→ bash  git diff --stat"), () => M("tool", "tool", "pkg/retry/retry.go | 12 ++++++------")] }),
+        turn({
+          cost: 16,
+          notice: [452, 3, 90],
+          replies: [
+            () => {
+              snd(() => sfx.review());
+              return M("ok", "assistant", "→ create_pull_request", h("b", {}, "Fix TestRetry timeout under load"), h("em", {}, "safe output ✓"));
+            },
+          ],
+        })
+      ),
+      [[300, () => aud.classList.add("on")]],
+    ];
+    const HOLD = [2500, 6500, 5000, 7000];
+
+    let stage = 0,
+      tS = 0,
+      last = 0,
+      done = null,
+      fadeAt = null,
+      q = [];
+    const reset = () => {
+      aim = shown = START;
+      lastNotice = null;
+      msgs.replaceChildren();
+      pin.replaceChildren();
+      ff.classList.remove("on");
+      lamps.forEach(l => l.classList.remove("on"));
+      [pk, rp, chip, fly].forEach(el => show(el, false));
+      pk.classList.remove("n");
+      setStat(false);
+      aud.classList.remove("on");
+      mon.classList.remove("scan", "hit");
+      costEl.classList.remove("go");
+      draw();
+    };
+    const begin = s => {
+      stage = s;
+      tS = performance.now();
+      q = STEPS[s].slice();
+      done = null;
+    };
+    const root = h(
+      "section",
+      { class: "slide bst" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Warn the agent before the hard stop"), h("h2", {}, letters("Budget "), letters("steering", "l-grad"))),
+      mon,
+      cv,
+      meter,
+      fly,
+      h("p", { class: "bst-foot" }, "Illustrative: synthetic run and numbers. Notices are on by default; sandbox.agent.token-steering: false turns them off.")
+    );
+    const jump = s => {
+      root.classList.add("bst-now");
+      root.classList.remove("bst-out");
+      fadeAt = null;
+      quiet = true;
+      reset();
+      for (let k = 0; k < s; k++) STEPS[k].forEach(([, f]) => f());
+      shown = aim;
+      draw();
+      quiet = false;
+      void root.offsetWidth;
+      root.classList.remove("bst-now");
+      begin(s);
+    };
+    const flush = () => {
+      quiet = true;
+      q.forEach(([, f]) => f());
+      quiet = false;
+      q = [];
+    };
+    slides.push({
+      group: "cost",
+      notes:
+        "Budget steering: warn the agent before the hard stop. Illustrative: the run, conversation and numbers are synthetic; the run starts empty and its middle is fast-forwarded until the budget nears 80 percent. An agent cannot see its own budget, so on its own it keeps working until max-ai-credits or timeout-minutes cuts it off, and the unfinished work is lost. Every model request already passes through the firewall's API proxy, which prices it in AI credits. When the run crosses 80, 90, 95 or 99 percent of its AI-credit budget or of its agent time limit, the proxy appends a short notice to the end of the next request that ends with a tool result: after the last tool result, never in the system prompt, so the provider's prompt cache still hits. The notice says how much is used and about how many more requests fit at the current rate, then what to do: the agent responsible for the final output stops and submits what it has, and a sub-agent finishes its step and returns what it has to the agent that started it. The card on the slide is abridged; the first notice really reads: [AWF AI CREDIT WARNING] 402 of 500 AI credits are used; at the current rate about 12 more model requests fit. If you are responsible for this workflow's final output, stop the remaining work and submit it now with what you have. Otherwise, finish your current step and return what you have to the agent that started you. One more notice goes out when only about five requests' worth of credits, or about five minutes, remain. The harness resends its own copy of the conversation on every turn, so a notice lasts one request; the proxy therefore gives each conversation in the run, sub-agents included, the current notice once, and a conversation that missed earlier notices hears only the newest. In this run the meter turns amber at 80 percent and red at 90; after the second notice the agent opens its pull request through a safe output with credits to spare, so the hard stop never fires. Every delivery is recorded in the run's unified session, so gh aw audit and gh aw logs show which conversation heard which notice. Notices are on by default; sandbox.agent.token-steering: false turns them off. Steering never changes the model or raises the budget. Keys: → next step.",
+      enter() {
+        last = 0;
+        jump(0);
+      },
+      onNext() {
+        if (stage < STEPS.length - 1) {
+          flush();
+          begin(stage + 1);
+          return true;
+        }
+        return false;
+      },
+      onPrev() {
+        if (stage > 0) {
+          jump(stage - 1);
+          return true;
+        }
+        return false;
+      },
+      tick(t) {
+        const now = performance.now();
+        while (q.length && now - tS >= q[0][0]) q.shift()[1]();
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (shown < aim) {
+          shown = Math.min(aim, shown + Math.max(0.03 * dt, ((aim - shown) * dt) / 260));
+          draw();
+        }
+        if (!q.length && done === null) done = now;
+        if (stage < STEPS.length - 1 && done !== null && now - done > HOLD[stage]) {
+          begin(stage + 1);
+          sfx.step(1);
+        } else if (stage === STEPS.length - 1 && done !== null && now - done > HOLD[stage]) {
+          // loop: fade the finished run out, then start again from an empty session and an empty budget
+          if (fadeAt === null) {
+            fadeAt = now;
+            root.classList.add("bst-out");
+          } else if (now - fadeAt > 700) {
+            jump(0);
+          }
         }
       },
       el: root,
@@ -17938,7 +18195,14 @@
     const ftm = h(
       "div",
       { class: "dhm" },
-      h("div", { class: "dhm-k" }, kpi("583", "findings filed", "by 8 docs auditors"), kpi("273", "fixed by", ["merged PRs", h("br"), h("i", {}, "255 by Copilot")]), kpi("79%", "fixed when", ["assigned to Copilot", h("br"), h("i", {}, "256 of 323")], "g"), kpi("7%", "fixed when", ["left unassigned", h("br"), h("i", {}, "17 of 260")], "r"))
+      h(
+        "div",
+        { class: "dhm-k" },
+        kpi("583", "findings filed", "by 8 docs auditors"),
+        kpi("273", "fixed by", ["merged PRs", h("br"), h("i", {}, "255 by Copilot")]),
+        kpi("79%", "fixed when", ["assigned to Copilot", h("br"), h("i", {}, "256 of 323")], "g"),
+        kpi("7%", "fixed when", ["left unassigned", h("br"), h("i", {}, "17 of 260")], "r")
+      )
     );
     slides.push({
       group: "process",
@@ -17948,12 +18212,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h(
-          "div",
-          { class: "slide-head" },
-          h("div", { class: "kicker" }, "Eight agents audit the docs; the findings handed to Copilot get fixed"),
-          h("h2", {}, letters("Findings "), letters("that land", "l-grad"))
-        ),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Eight agents audit the docs; the findings handed to Copilot get fixed"), h("h2", {}, letters("Findings "), letters("that land", "l-grad"))),
         table,
         cards,
         ftm,
@@ -19200,259 +19459,6 @@
   const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
   // Bands that are not shipped product: every slide (header included) carries a corner badge.
   const PROTO = { cao: "gh cao" };
-  // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
-  const rows = [];
-  for (const s of slides) {
-    const row = rows.find(r => r.group === s.group);
-    if (row) row.items.push(s);
-    else rows.push({ group: s.group, items: [s] });
-  }
-  // The finale closes the deck, after the data band.
-  rows.push(
-    ...rows.splice(
-      rows.findIndex(r => r.group === "finale"),
-      1
-    )
-  );
-  // Columns (third level): a slide with `key` heads a vertical column of example slides that set `under: key`
-  // (same group). Examples are numbered right after their parent; Up/Down walk the column, Left/Right the band.
-  for (const r of rows) {
-    const kids = r.items.filter(s => s.under);
-    if (!kids.length) continue;
-    r.items = r.items.flatMap(s => {
-      if (s.under) return [];
-      if (!s.key) return [s];
-      const ks = kids.filter(k => k.under === s.key);
-      if (!ks.length) return [s];
-      s.kids = ks;
-      ks.forEach(k => (k.parent = s));
-      return [s, ...ks];
-    });
-    const lost = kids.find(k => !k.parent);
-    if (lost) throw new Error(`slide under "${lost.under}" has no parent with that key in group "${r.group}"`);
-  }
-  // the column a slide belongs to (its head), or null
-  const colOf = s => s.parent || (s.kids?.length ? s : null);
-  // A slide's heading as one readable line (per-letter lines joined by spaces); the search index reuses it.
-  const headingText = s => {
-    const hd = s.el.querySelector("h1, h2, h3");
-    const ls = hd ? [...hd.querySelectorAll(".line")] : [];
-    return (ls.length ? ls.map(l => l.textContent).join(" ") : hd?.textContent || "")
-      .replace(/\s+/g, " ")
-      .replace(/ ([,.])/g, "$1")
-      .trim();
-  };
-  // A short tile label: the heading, or the kicker when the heading is long; band headers and the slide map reuse it.
-  const label = s => {
-    const t = headingText(s);
-    const k = s.el.querySelector(".kicker")?.textContent.trim();
-    return t.length > 32 && k ? k : t;
-  };
-  {
-    const parts = rows.filter(r => BANDS[r.group]);
-    let num = 1;
-    for (const r of rows) {
-      if (BANDS[r.group]) num++;
-      r.first = num;
-      num += r.items.length;
-    }
-    for (const r of parts) {
-      resetIndex();
-      const [title, sub] = BANDS[r.group],
-        part = parts.indexOf(r) + 1,
-        c = THEME[r.group].accent,
-        tops = r.items.filter(s => !s.parent);
-      const map = h(
-        "div",
-        { class: "bh-map", "aria-hidden": "true" },
-        rows.map((o, i) =>
-          h(
-            "div",
-            { class: `bh-mrow${o === r ? " on" : ""}`, "--i": i },
-            h("span", { class: "bh-ml" }, BANDS[o.group]?.[0] || SOLO[o.group]),
-            BANDS[o.group] ? h("i", { class: "hd" }) : null,
-            o.items.filter(s => !s.parent).map(() => h("i"))
-          )
-        )
-      );
-      r.header = {
-        group: r.group,
-        header: true,
-        notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${tops.map(s => label(s) + (s.kids ? ` (with ${s.kids.length} example${s.kids.length > 1 ? "s" : ""} below)` : "")).join(", ")}.`,
-        el: h(
-          "section",
-          { class: "slide bh", "--bh": c[0], "--bh2": c[2] },
-          h(
-            "div",
-            { class: "bh-head" },
-            h("div", { class: "kicker" }, `Part ${String(part).padStart(2, "0")} / ${String(parts.length).padStart(2, "0")}`),
-            h(
-              "h2",
-              {},
-              title.split(" ").flatMap((w, i) => (i ? [" ", letters(w, "l-grad")] : [letters(w, "l-grad")]))
-            ),
-            h("p", { class: "bh-sub" }, sub)
-          ),
-          map,
-          h(
-            "ol",
-            { class: `bh-row${tops.length > 8 ? " many" : ""}${tops.length > 14 ? " lots" : ""}` },
-            tops.map((s, i) => {
-              const n = r.first + r.items.indexOf(s);
-              return h(
-                "li",
-                { "--i": i, "data-go": n - 1 },
-                h("span", { class: "bh-n" }, String(n).padStart(2, "0"), s.kids ? h("span", { class: "bh-k", title: `${s.kids.length} examples below` }, `↓ ${s.kids.length}`) : null),
-                h("span", { class: "bh-t" }, label(s))
-              );
-            })
-          )
-        ),
-      };
-    }
-    slides.length = 0;
-    rows.forEach((r, ri) => {
-      r.start = slides.length;
-      (r.header ? [r.header, ...r.items] : r.items).forEach((s, i) => {
-        s.band = ri;
-        s.step = i;
-        s.red = !!THEME[s.group].red;
-        if (PROTO[s.group]) s.el.append(h("div", { class: "proto", "aria-label": `Research prototype: ${PROTO[s.group]}` }, h("i"), h("b", {}, "Research prototype"), h("span", {}, PROTO[s.group])));
-        else if (s.experimental) s.el.append(h("div", { class: "xbadge", "aria-label": `Experimental: ${s.experimental}` }, "Experimental", h("span", {}, s.experimental)));
-        slides.push(s);
-      });
-    });
-  }
-
-  const stage = h(
-    "div",
-    { class: "stage" },
-    slides.map(s => s.el)
-  );
-  const progress = h("div", { class: "progress" });
-  // the dots are a mini-map of the table: one row of dots per band
-  const dotBtns = slides.map((s, i) =>
-    h("button", {
-      class: s.header ? "hd" : s.parent ? "sub" : s.kids ? "col" : "",
-      "aria-label": `Slide ${i + 1}`,
-      onclick: e => {
-        e.stopPropagation();
-        go(i);
-      },
-    })
-  );
-  const dots = h(
-    "div",
-    { class: "dots" },
-    rows.map(r => h("div", { class: "drow", title: BANDS[r.group]?.[0] || SOLO[r.group] || "" }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
-  );
-  const arrowBtn = (label, key, d, fn) => {
-    const b = h("button", {
-      "aria-label": label,
-      title: `${label} (${key})`,
-      onclick: e => {
-        e.stopPropagation();
-        fn();
-      },
-    });
-    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
-    b._nav = fn;
-    return b;
-  };
-  const bandPrevBtn = arrowBtn("Previous band", "↑", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-  const prevBtn = arrowBtn("Previous slide", "←", "M15 5l-7 7 7 7", () => prev());
-  const nextBtn = arrowBtn("Next slide", "→", "M9 5l7 7-7 7", () => next());
-  const bandNextBtn = arrowBtn("Next band", "↓", "M18 5v14M6 6l7 6-7 6", () => band(1));
-  const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
-  // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
-  // arrow and the example count, so the audience knows there is a line below; it steps down the column and,
-  // on the last example, turns into an up arrow back to the pattern.
-  const vnb = h("button", { class: "vnb" });
-  vnb.addEventListener("click", e => {
-    e.stopPropagation();
-    vnb._nav?.();
-  });
-  for (const t of ["touchstart", "touchend"]) vnb.addEventListener(t, e => e.stopPropagation(), { passive: true });
-  // Taps on the arrows navigate on touchend and cancel the default action, so Safari neither
-  // double-tap zooms nor synthesizes a second click, and the window swipe handlers never see them.
-  let arrowTouchAt = 0;
-  arrows.addEventListener("touchstart", e => e.stopPropagation(), { passive: true });
-  arrows.addEventListener("touchmove", e => e.stopPropagation(), { passive: true });
-  arrows.addEventListener("touchcancel", e => e.stopPropagation());
-  arrows.addEventListener(
-    "touchend",
-    e => {
-      e.stopPropagation();
-      if (e.cancelable) e.preventDefault();
-      arrowTouchAt = Date.now();
-      const b = e.target.closest?.("button"),
-        t = e.changedTouches[0];
-      if (!b || b.disabled || !t) return;
-      const r = b.getBoundingClientRect();
-      if (t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom) b._nav();
-    },
-    { passive: false }
-  );
-  arrows.addEventListener("click", e => Date.now() - arrowTouchAt < 700 && e.detail > 0 && (e.stopPropagation(), e.preventDefault()), true);
-  arrows.addEventListener("click", e => e.stopPropagation());
-  const snd = h("button", {
-    class: "snd",
-    "aria-label": "Toggle sound (M)",
-    title: "Sound on/off (M)",
-    onclick: e => {
-      e.stopPropagation();
-      toggleSound();
-    },
-  });
-  snd.innerHTML =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><g class="waves"><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a7.5 7.5 0 0 1 0 11"/></g>' +
-    '<g class="x"><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></g></svg>';
-  // search sits left of the sound toggle and opens the full-screen slide search (see ---------- search ----------)
-  const fzBtn = h("button", {
-    class: "fzb",
-    "aria-label": "Search slides (/)",
-    "aria-haspopup": "dialog",
-    title: "Search slides (/)",
-    onclick: e => {
-      e.stopPropagation();
-      openSearch();
-    },
-  });
-  fzBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg>';
-  // the slide map sits left of search and opens the full-screen overview of every band (see ---------- slide map ----------)
-  const smBtn = h("button", {
-    class: "smb",
-    "aria-label": "Slide map (G)",
-    "aria-haspopup": "dialog",
-    title: "Slide map (G)",
-    onclick: e => {
-      e.stopPropagation();
-      openMap();
-    },
-  });
-  smBtn.innerHTML =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="5" height="4" rx="1"/><rect x="10" y="4" width="5" height="4" rx="1"/><rect x="16.5" y="4" width="4" height="4" rx="1"/><rect x="3.5" y="10" width="5" height="4" rx="1"/><rect x="10" y="10" width="5" height="4" rx="1"/><rect x="3.5" y="16" width="5" height="4" rx="1"/><rect x="10" y="16" width="5" height="4" rx="1"/><rect x="16.5" y="16" width="4" height="4" rx="1"/></svg>';
-  const notes = h("div", { class: "notes" });
-  const wash = h("div", { class: "wash" });
-  const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, smBtn, fzBtn, snd, notes);
-
-  // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; map/search/sound need ~150px on the right.
-  const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
-  const fit = () => {
-    const s = Math.min(innerWidth / W, innerHeight / H);
-    stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 150);
-  };
-  addEventListener("resize", fit);
-  fit();
-
-  function toggleSound() {
-    snd.classList.toggle("off", sfx.toggle());
-    snd.classList.add("flash");
-    setTimeout(() => snd.classList.remove("flash"), 400);
-  }
 
   // ---------- sound: tiny WebAudio synth (M to mute) ----------
   const sfx = (() => {
@@ -20095,575 +20101,8 @@
     };
   })();
   window.sfx = sfx;
-  snd.classList.toggle("off", sfx.muted);
 
-  // ---------- navigation ----------
-  let cur = -1,
-    redT = null,
-    bgN = null; // slide whose THEME the background shows while a staged light/dark swap is pending
-  // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
-  function go(n) {
-    n = Math.max(0, Math.min(slides.length - 1, n));
-    if (n === cur || redT) return;
-    if (cur >= 0 && n > cur && slides[n].red && !slides[cur].red && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      wash.classList.add("on", "cover");
-      redT = setTimeout(() => {
-        redT = null;
-        show(n, true);
-      }, 900);
-      return;
-    }
-    // light <-> dark band: stage it so nothing overlaps; old slide fades out, then the background swaps, then the new slide enters
-    if (cur >= 0 && !!THEME[slides[n].group].light !== !!THEME[slides[cur].group].light && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const old = slides[cur].el;
-      old.classList.add("fadeout");
-      wash.style.transitionDuration = ".6s";
-      wash.classList.remove("on");
-      redT = setTimeout(() => {
-        bgN = n;
-        document.body.classList.toggle("light", !!THEME[slides[n].group].light);
-        redT = setTimeout(() => {
-          redT = null;
-          show(n, true);
-        }, 900);
-      }, 600);
-      return;
-    }
-    show(n);
-  }
-  // siblings in a group push left (right going back); crossing into another group slides up (down going back)
-  function show(n, covered) {
-    const dir = cur >= 0 && n < cur ? -1 : 1;
-    wash.classList.toggle("on", !!slides[n].red);
-    sfx.cut();
-    sfx.techno(slides[n].techno || 0);
-    const th = THEME[slides[n].group];
-    document.body.classList.toggle("light", !!th.light);
-    if (cur >= 0) sfx.slide(dir, th.music, th.prog[slides[n].step % th.prog.length]);
-    const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : cur >= 0 && colOf(slides[n]) && colOf(slides[n]) === colOf(slides[cur]) ? (dir > 0 ? "up" : "down") : null;
-    const TR = ["up-in", "up-out", "down-in", "down-out"];
-    if (cur >= 0 && covered) {
-      // already hidden under the red wash: drop it instantly so it doesn't flash back when the wash moves behind the stage
-      const old = slides[cur].el;
-      clearTimeout(old._lt);
-      old.classList.remove("active", "leaving", "fadeout", ...TR);
-    } else if (cur >= 0) {
-      const old = slides[cur].el;
-      old.classList.remove("active", ...TR);
-      old.style.setProperty("--dx", dir > 0 ? "100%" : "-100%");
-      old.classList.add("leaving");
-      if (vert) old.classList.add(vert + "-out");
-      clearTimeout(old._lt);
-      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), 800);
-    }
-    const el = slides[n].el;
-    clearTimeout(el._lt);
-    el.classList.remove(...TR);
-    if (vert) el.classList.add(vert + "-in");
-    wash.classList.remove("cover");
-    wash.style.transitionDuration = "";
-    bgN = null;
-    el.style.setProperty("--dx", cur < 0 ? "0%" : dir > 0 ? "100%" : "-100%");
-    el.classList.remove("leaving");
-    void el.offsetWidth; // restart CSS animations on re-entry
-    el.classList.add("active");
-    cur = n;
-    slides[n].enter?.(dir);
-    progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
-    dotBtns.forEach((d, i) => d.classList.toggle("on", i === n));
-    [...dots.children].forEach((r, i) => r.classList.toggle("on", i === slides[n].band));
-    prevBtn.disabled = n === 0;
-    nextBtn.disabled = nextTop(n) == null;
-    bandPrevBtn.disabled = slides[n].band === 0;
-    bandNextBtn.disabled = slides[n].band === rows.length - 1;
-    paintColumn(n);
-    notes.textContent = slides[n].notes || "";
-    history.replaceState(null, "", `#${n + 1}`);
-  }
-  // Left/right walk the main line of slides (column heads, never their examples) and wrap across bands;
-  // up/down walk a column, and past its ends (or off any column) jump to the header of the band above/below.
-  const top = n => (slides[n].parent ? slides.indexOf(slides[n].parent) : n);
-  const nextTop = n => {
-    for (let i = top(n) + 1; i < slides.length; i++) if (!slides[i].parent) return i;
-    return null;
-  };
-  const prevTop = n => {
-    for (let i = top(n) - 1; i >= 0; i--) if (!slides[i].parent) return i;
-    return null;
-  };
-  const band = d => {
-    const b = slides[cur].band + d;
-    if (b >= 0 && b < rows.length) go(rows[b].start);
-  };
-  const vstep = d => {
-    const col = colOf(slides[cur]);
-    if (!col) return band(d);
-    const list = [col, ...col.kids],
-      i = list.indexOf(slides[cur]) + d;
-    if (i >= 0 && i < list.length) go(slides.indexOf(list[i]));
-    else band(d);
-  };
-  function paintColumn(n) {
-    const col = colOf(slides[n]);
-    vnb.classList.toggle("on", !!col);
-    if (!col) return (vnb._nav = null);
-    const N = col.kids.length,
-      at = [col, ...col.kids].indexOf(slides[n]),
-      back = at === N,
-      label = at ? (back ? "Back to the pattern" : `Next example (${at + 1} of ${N})`) : `${N} example${N > 1 ? "s" : ""} below`;
-    vnb.classList.toggle("head", at === 0);
-    vnb.setAttribute("aria-label", label);
-    vnb.title = `${label} (${back ? "↑" : "↓"})`;
-    vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
-    vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
-  }
-  const next = () => {
-      if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
-      else {
-        const i = nextTop(cur);
-        if (i != null) go(i);
-      }
-    },
-    prev = () => {
-      if (slides[cur].onPrev?.()) (sfx.touch(), sfx.step(-1));
-      else {
-        const i = prevTop(cur);
-        if (i != null) go(i);
-      }
-    };
-
-  addEventListener("keydown", e => {
-    if (fz.open || smp.open) return; // the search and map dialogs handle their own keys
-    if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
-      e.preventDefault();
-      openSearch();
-      return;
-    }
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === "/" && !e.target.closest?.("input, textarea, select, [contenteditable]")) {
-      e.preventDefault();
-      openSearch();
-      return;
-    }
-    if ((e.key === "Enter" || e.key === " ") && e.target.closest?.("a, button, input, textarea, select, [contenteditable]")) return;
-    if (slides[cur].onKey?.(e)) {
-      sfx.touch();
-      e.preventDefault();
-      return;
-    }
-    if (["ArrowRight", " ", "Enter"].includes(e.key)) {
-      e.preventDefault();
-      next();
-    } else if (["ArrowLeft", "Backspace"].includes(e.key)) {
-      e.preventDefault();
-      prev();
-    } else if (e.key === "PageDown" || e.key === "PageUp") {
-      e.preventDefault();
-      band(e.key === "PageDown" ? 1 : -1);
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      vstep(e.key === "ArrowDown" ? 1 : -1);
-    } else if (e.key === "Home") go(0);
-    else if (e.key === "End") go(slides.length - 1);
-    else if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
-    else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
-    else if (e.key === "m" || e.key === "M") toggleSound();
-    else if (e.key === "g" || e.key === "G") openMap();
-  });
-  addEventListener("click", e => {
-    if (fz.open || smp.open || e.target.closest(".fz, .smp, a, button")) return;
-    const tile = e.target.closest("[data-go]");
-    if (tile) return go(+tile.dataset.go);
-    e.clientX < innerWidth / 3 ? prev() : next();
-  });
-  let tx = null,
-    ty = null;
-  addEventListener("touchstart", e => (fz.open || smp.open ? (tx = ty = null) : ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY))), { passive: true });
-  addEventListener("touchend", e => {
-    if (tx == null || fz.open || smp.open) return;
-    const dx = e.changedTouches[0].clientX - tx,
-      dy = e.changedTouches[0].clientY - ty;
-    tx = ty = null;
-    if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && vstep(dy < 0 ? 1 : -1);
-    else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
-  });
-  addEventListener("hashchange", () => go((parseInt(location.hash.slice(1), 10) || 1) - 1));
-
-  // ---------- search ----------
-  // "/" (or Ctrl/Cmd+K, or the dock's search button) opens a full-screen dialog that fuzzy-searches every slide.
-  // The index is precomputed once: each slide's title, its slides.md summary (the JSON-LD hasPart description the
-  // docs build injects; absent on a plain static preview) and its body text plus speaker notes.
-  // Matching is bounds-based: each query term must occur, letters in order, inside one window of a field, and the
-  // window is bounded (at most one and a half times the term), so letters scattered through long notes never match.
-  // The tightest window wins: forward from each occurrence of the first letter to the earliest end, then backward to
-  // the latest start. Its bounds score the match (term length / window width, word-start and field bonuses) and mark it.
-  const FZ_FIELDS = [
-    ["title", 3],
-    ["summary", 2],
-    ["body", 1],
-  ];
-  let fzIndex = null,
-    fzHits = [],
-    fzSel = 0;
-  const fzNorm = t => t.replace(/\s+/g, " ").trim();
-  // visible slide text, one space between text nodes; per-letter headings (the title) and decorative aria-hidden parts are skipped
-  const fzText = el => {
-    const out = [],
-      walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-        acceptNode: n => (n.parentElement?.closest('.line, style, script, [aria-hidden="true"]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
-      });
-    while (walk.nextNode()) out.push(walk.currentNode.nodeValue);
-    return out.join(" ");
-  };
-  const fzBuild = () => {
-    let parts = [];
-    for (const el of document.querySelectorAll('script[type="application/ld+json"]')) {
-      try {
-        const d = JSON.parse(el.textContent);
-        if (d?.["@type"] === "PresentationDigitalDocument" && Array.isArray(d.hasPart)) parts = d.hasPart;
-      } catch {}
-    }
-    return slides.map((s, i) => {
-      const part = parts.find(p => p.position === i + 1),
-        title = headingText(s) || part?.name || `Slide ${i + 1}`,
-        summary = fzNorm(part?.description || ""),
-        body = fzNorm(`${fzText(s.el)} ${s.notes || ""}`);
-      return { n: i, band: BANDS[s.group]?.[0] || "", title, summary, body, notes: fzNorm(s.notes || ""), lc: { title: title.toLowerCase(), summary: summary.toLowerCase(), body: body.toLowerCase() } };
-    });
-  };
-  // Tightest bounded window [start, end) of `text` holding the characters of `term` in order, or null.
-  const fzBounds = (text, term) => {
-    const n = term.length,
-      max = n + Math.ceil(n / 2);
-    let best = null;
-    for (let i = text.indexOf(term[0]); i >= 0; i = text.indexOf(term[0], i + 1)) {
-      let j = i,
-        k = 0;
-      for (; j < text.length && k < n && j - i < max; j++) if (text[j] === term[k]) k++;
-      if (k < n) continue;
-      let b = j - 1;
-      for (k = n - 1; k >= 0; b--) if (text[b] === term[k]) k--;
-      b++;
-      if (!best || j - b < best[1] - best[0] || (j - b === best[1] - best[0] && /\W/.test(text[b - 1] || " ") && !/\W/.test(text[best[0] - 1] || " "))) best = [b, j];
-      if (j - b === n && (b === 0 || /\W/.test(text[b - 1]))) break; // contiguous at a word start: cannot do better
-      i = Math.max(i, b);
-    }
-    return best;
-  };
-  const fzScore = (text, [b, e], n) => n / (e - b) + (b === 0 || /\W/.test(text[b - 1]) ? 0.5 : 0) + 0.25 * (1 - Math.min(b, 400) / 400);
-  const fzSearch = q => {
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
-    if (!terms.length) return fzIndex.map(r => ({ r, score: 0, marks: {} }));
-    // "#12" jumps straight to slide 12; a bare "12" also matches text and ranks slide 12 first
-    const num = /^(#?)(\d+)$/.exec(q.trim());
-    if (num?.[1]) return fzIndex.filter(r => r.n + 1 === +num[2]).map(r => ({ r, score: 1, marks: {} }));
-    const hits = [];
-    for (const r of fzIndex) {
-      let score = 0;
-      const marks = { title: [], summary: [], body: [] };
-      for (const term of terms) {
-        let best = 0;
-        for (const [f, w] of FZ_FIELDS) {
-          const bd = r.lc[f] && fzBounds(r.lc[f], term);
-          if (!bd) continue;
-          marks[f].push(bd);
-          best = Math.max(best, w * fzScore(r.lc[f], bd, term.length));
-        }
-        if (!best) {
-          score = 0;
-          break;
-        }
-        score += best;
-      }
-      if (num && +num[2] === r.n + 1) score += 100;
-      if (score) hits.push({ r, score, marks });
-    }
-    return hits.sort((a, b) => b.score - a.score || a.r.n - b.r.n).slice(0, 60);
-  };
-  // text with <mark>s over the (merged) bounds, built as DOM nodes, never as HTML
-  const fzMark = (text, bounds) => {
-    const out = [];
-    let at = 0;
-    for (const [b, e] of [...bounds].sort((x, y) => x[0] - y[0])) {
-      const s = Math.max(b, at);
-      if (e <= s) continue;
-      if (s > at) out.push(text.slice(at, s));
-      out.push(h("mark", {}, text.slice(s, e)));
-      at = e;
-    }
-    if (at < text.length) out.push(text.slice(at));
-    return out;
-  };
-  // the line under the title: the summary when it matched (or nothing else did), else a body excerpt around the first match
-  const fzLine = ({ r, marks }) => {
-    if (r.summary && (marks.summary?.length || !marks.body?.length)) return fzMark(r.summary, marks.summary || []);
-    if (!marks.body?.length) return r.notes.slice(0, 220);
-    const first = Math.min(...marks.body.map(m => m[0])),
-      from = Math.max(0, first - 60),
-      to = Math.min(r.body.length, first + 160);
-    const inner = marks.body.filter(([b, e]) => b >= from && e <= to).map(([b, e]) => [b - from, e - from]);
-    return [from ? "…" : "", ...fzMark(r.body.slice(from, to), inner), to < r.body.length ? "…" : ""];
-  };
-  const fzIn = h("input", {
-    type: "search",
-    class: "fz-in",
-    placeholder: "Search slides",
-    autocomplete: "off",
-    spellcheck: false,
-    "aria-label": "Search slides",
-    role: "combobox",
-    "aria-expanded": "true",
-    "aria-controls": "fz-list",
-    "aria-autocomplete": "list",
-  });
-  const fzList = h("ul", { class: "fz-list", id: "fz-list", role: "listbox", "aria-label": "Matching slides" });
-  const fzSt = h("div", { class: "fz-st", "aria-live": "polite" });
-  const fz = h(
-    "dialog",
-    { class: "fz", "aria-label": "Search slides" },
-    h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
-  );
-  document.body.append(fz);
-  const fzPaint = () => {
-    [...fzList.children].forEach((li, i) => li.setAttribute("aria-selected", i === fzSel ? "true" : "false"));
-    const li = fzList.children[fzSel];
-    if (li) {
-      fzIn.setAttribute("aria-activedescendant", li.id);
-      li.scrollIntoView({ block: "nearest" });
-    } else fzIn.removeAttribute("aria-activedescendant");
-  };
-  const fzRender = () => {
-    fzHits = fzSearch(fzIn.value);
-    fzSel = 0;
-    fzList.replaceChildren(
-      ...fzHits.map((hit, i) =>
-        h(
-          "li",
-          { id: `fz-o-${i}`, role: "option", onclick: () => fzPick(i), onmousemove: () => fzSel !== i && ((fzSel = i), fzPaint()) },
-          h("span", { class: "fz-n" }, String(hit.r.n + 1).padStart(2, "0")),
-          h("div", { class: "fz-t" }, ...fzMark(hit.r.title, hit.marks.title || []), hit.r.band && hit.r.band !== hit.r.title ? h("span", { class: "fz-b" }, hit.r.band) : null),
-          h("div", { class: "fz-s" }, fzLine(hit))
-        )
-      )
-    );
-    fzSt.textContent = fzIn.value.trim()
-      ? fzHits.length
-        ? `${fzHits.length} matching slide${fzHits.length === 1 ? "" : "s"} · ↑↓ to choose, Enter to open`
-        : "No slides match"
-      : `${fzHits.length} slides · type to search titles, summaries and slide text`;
-    fzPaint();
-  };
-  function fzPick(i) {
-    const hit = fzHits[i];
-    if (!hit) return;
-    fz.close();
-    go(hit.r.n);
-  }
-  function openSearch() {
-    if (fz.open) return;
-    fzIndex ??= fzBuild();
-    fz.showModal();
-    fzIn.select();
-    fzRender();
-  }
-  fzIn.addEventListener("input", fzRender);
-  fz.addEventListener("keydown", e => {
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (fzHits.length) ((fzSel = (fzSel + (e.key === "ArrowDown" ? 1 : -1) + fzHits.length) % fzHits.length), fzPaint());
-    } else if (e.key === "Enter" && e.target === fzIn) {
-      e.preventDefault();
-      fzPick(fzSel);
-    } else if (e.key === "Escape") {
-      // close explicitly: browsers may ignore a repeated Escape without fresh user activation
-      e.preventDefault();
-      fz.close();
-    }
-  });
-  // a click on the dialog's own surface (outside the search box) closes it
-  fz.addEventListener("click", e => e.target === fz && fz.close());
-  // closing returns focus to the opener; drop it so Space and Enter go back to driving the deck
-  fz.addEventListener("close", () => document.activeElement?.blur?.());
-  for (const t of ["touchstart", "touchend"]) fz.addEventListener(t, e => e.stopPropagation(), { passive: true });
-
-  // ---------- slide map ----------
-  // G (or the dock's map button) opens a full-screen overview: one row per band, one tile per slide, the current one ringed.
-  // Click or Enter opens a slide; Left/Right step in slide order, Up/Down move to the nearest tile on the line above/below.
-  // A column (a pattern slide with `kids`) gets its own line: the pattern tile, then its examples in a horizontal row behind a dotted rule.
-  const smpBody = h("div", { class: "smp-body" });
-  const smp = h(
-    "dialog",
-    { class: "smp", "aria-label": "Slide map" },
-    h("div", { class: "smp-bar" }, h("h2", { class: "smp-h" }, "Slide map"), h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", onclick: () => smp.close() }, "Esc")),
-    smpBody
-  );
-  document.body.append(smp);
-  let smpTiles = null;
-  const smpBuild = () => {
-    smpTiles = [];
-    smpBody.replaceChildren(
-      ...rows.map(r => {
-        const c = THEME[r.group].accent[0],
-          all = slides
-            .filter(s => s.band === slides[r.start].band)
-            .map(s => {
-              const n = slides.indexOf(s),
-                t = h(
-                  "button",
-                  { class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || BANDS[r.group]?.[0] || SOLO[r.group]}`, onclick: () => (smp.close(), go(n)) },
-                  h("b", {}, String(n + 1).padStart(2, "0"), s.kids ? h("i", { title: `${s.kids.length} examples below` }, `↓${s.kids.length}`) : null),
-                  h("span", {}, label(s) || BANDS[r.group]?.[0] || SOLO[r.group])
-                );
-              smpTiles[n] = t;
-              return t;
-            });
-        // a column (pattern + its examples) takes its own line, the examples in a row after the pattern tile
-        const tiles = all.flatMap(t => {
-            const s = slides[smpTiles.indexOf(t)];
-            if (s.parent) return [];
-            if (!s.kids) return [t];
-            return [h("div", { class: "smp-col" }, t, h("div", { class: "smp-kids", role: "group", "aria-label": `${label(s)} examples` }, s.kids.map(k => smpTiles[slides.indexOf(k)])))];
-          });
-        return h("section", { class: "smp-row", "--c": c }, h("div", { class: "smp-l" }, BANDS[r.group]?.[0] || SOLO[r.group]), h("div", { class: "smp-tiles" }, tiles));
-      })
-    );
-  };
-  // nearest tile on the next visual line above or below (tiles wrap, so bands can span several lines)
-  const smpVert = (from, down) => {
-    const a = from.getBoundingClientRect(),
-      cx = a.left + a.width / 2,
-      cy = a.top + a.height / 2;
-    let best = null,
-      bd = Infinity;
-    for (const t of smpTiles) {
-      const b = t.getBoundingClientRect(),
-        dy = b.top + b.height / 2 - cy;
-      if (down ? dy <= 4 : dy >= -4) continue;
-      const d = Math.abs(dy) * 100 + Math.abs(b.left + b.width / 2 - cx);
-      if (d < bd) ((bd = d), (best = t));
-    }
-    return best;
-  };
-  function openMap() {
-    if (smp.open) return;
-    if (fz.open) fz.close();
-    if (!smpTiles) smpBuild();
-    smpTiles.forEach((t, i) => {
-      t.classList.toggle("on", i === cur);
-      if (i === cur) t.setAttribute("aria-current", "true");
-      else t.removeAttribute("aria-current");
-    });
-    smp.showModal();
-    const t = smpTiles[cur];
-    t?.focus({ preventScroll: true });
-    t?.scrollIntoView({ block: "center" });
-  }
-  smp.addEventListener("keydown", e => {
-    const i = smpTiles.indexOf(document.activeElement);
-    let to = null;
-    if (e.key === "ArrowRight" || e.key === "ArrowLeft") to = smpTiles[Math.min(slides.length - 1, Math.max(0, (i < 0 ? cur : i) + (e.key === "ArrowRight" ? 1 : -1)))];
-    else if (e.key === "ArrowDown" || e.key === "ArrowUp") to = smpVert(smpTiles[i < 0 ? cur : i], e.key === "ArrowDown");
-    else if (e.key === "Home") to = smpTiles[0];
-    else if (e.key === "End") to = smpTiles[slides.length - 1];
-    else if (e.key === "Escape" || e.key === "g" || e.key === "G") {
-      e.preventDefault();
-      smp.close();
-      return;
-    } else return;
-    e.preventDefault();
-    if (to) (to.focus({ preventScroll: true }), to.scrollIntoView({ block: "nearest" }));
-  });
-  smp.addEventListener("click", e => e.target === smp && smp.close());
-  smp.addEventListener("close", () => document.activeElement?.blur?.());
-  for (const t of ["touchstart", "touchend"]) smp.addEventListener(t, e => e.stopPropagation(), { passive: true });
-
-  // ---------- animated background ----------
-  const ctx = canvas.getContext("2d");
-  const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
-  // Each band's THEME sets the base fill, glow palette, grid colour, angle and cell size; values ease between bands.
-  const bgOf = th => [...th.base, ...th.grid, th.cell];
-  let bgv = bgOf(THEME[slides[0].group]);
-  let colors = THEME[slides[0].group].pal.map(hex),
-    gAng = THEME[slides[0].group].ang;
-  const blobs = [0, 1, 2, 3].map(i => ({ a: Math.random() * 6.28, b: Math.random() * 6.28, s: 0.00007 + i * 0.00003 }));
-  const rmq = matchMedia("(prefers-reduced-motion: reduce)");
-  let REDUCED = rmq.matches;
-  rmq.addEventListener?.("change", e => {
-    REDUCED = e.matches;
-  });
-
-  function frame(t) {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    const cw = innerWidth,
-      ch = innerHeight;
-    const bw = Math.round(cw * dpr),
-      bh = Math.round(ch * dpr);
-    if (canvas.width !== bw || canvas.height !== bh) {
-      canvas.width = bw;
-      canvas.height = bh;
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const cs = slides[bgN ?? cur] || slides[0],
-      th = THEME[cs.group],
-      target = th.pal.map(hex),
-      bgt = bgOf(th);
-    // light <-> dark swaps the base quickly so text never sits on the wrong background for long
-    bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * (i < 3 && Math.abs(bgt[0] - bgv[0]) > 90 ? 0.07 : 0.04));
-    colors = REDUCED ? target : colors.map((c, i) => c.map((v, k) => v + (target[i][k] - v) * 0.03));
-
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = `rgb(${bgv[0] | 0},${bgv[1] | 0},${bgv[2] | 0})`;
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.globalCompositeOperation = "lighter";
-    const R = Math.max(cw, ch) * 0.55,
-      bt = REDUCED ? 0 : t;
-    blobs.forEach((b, i) => {
-      const x = cw * (0.5 + 0.3 * Math.sin(bt * b.s * 3 + b.a));
-      const y = ch * (0.5 + 0.26 * Math.cos(bt * b.s * 2.5 + b.b));
-      const [r, g, bl] = colors[i];
-      const grd = ctx.createRadialGradient(x, y, 0, x, y, R);
-      grd.addColorStop(0, `rgba(${r | 0},${g | 0},${bl | 0},0.1)`);
-      grd.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = grd;
-      ctx.fillRect(0, 0, cw, ch);
-    });
-
-    // Blueprint grid: `cell` px minor lines, a major line every 5, anchored centre-top, turned (around the screen centre) to the band's `ang`.
-    if (gridc.width !== bw || gridc.height !== bh) {
-      gridc.width = bw;
-      gridc.height = bh;
-    }
-    const g = gridc.getContext("2d");
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.clearRect(0, 0, cw, ch);
-    const gTarget = th.ang;
-    gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
-    if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
-    const k = Math.min(cw / W, ch / H),
-      minor = bgv[8] * k,
-      D = Math.hypot(cw, ch) / 2 + minor;
-    g.translate(cw / 2, ch / 2);
-    g.rotate(gAng);
-    const gc = `${bgv[3] | 0},${bgv[4] | 0},${bgv[5] | 0}`,
-      lmin = `rgba(${gc},${bgv[6]})`,
-      lmaj = `rgba(${gc},${bgv[7]})`;
-    const line = i => (((i % 5) + 5) % 5 ? lmin : lmaj);
-    const snap = gAng ? v => v : v => Math.round(v);
-    for (let i = -Math.ceil(D / minor); i * minor <= D; i++) {
-      g.fillStyle = line(i);
-      g.fillRect(snap(i * minor), -D, 1, 2 * D);
-    }
-    const oy = -ch / 2; // horizontal lines stay anchored to the top edge, as before
-    for (let j = Math.floor((-D - oy) / minor); j * minor + oy <= D; j++) {
-      g.fillStyle = line(j);
-      g.fillRect(-D, snap(j * minor + oy), 2 * D, 1);
-    }
-
-    slides[cur]?.tick?.(t);
-    requestAnimationFrame(frame);
-  }
-
-  go((parseInt(location.hash.slice(1), 10) || 1) - 1);
-  requestAnimationFrame(frame);
+  // ---------- start ----------
+  // runtime.js (CracktroDeck) builds the bands, chrome, navigation, search, slide map and background from this content.
+  window.CracktroDeck.create({ width: W, height: H, css, slides, themes: THEME, bands: BANDS, solo: SOLO, prototypes: PROTO, last: "finale", sound: sfx });
 })();
