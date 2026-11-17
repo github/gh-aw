@@ -140,7 +140,7 @@ func TestEngineCooldownInstalls(t *testing.T) {
 			Runtimes:     map[string]any{"node": map[string]any{"cooldown": false}},
 		}
 		content := stepsToString(NewCopilotEngine().GetInstallationSteps(data))
-		assert.NotContains(t, content, "--cooldown-days")
+		assert.Contains(t, content, fmt.Sprintf("--cooldown-days %d", days))
 		assert.Contains(t, content, `"${ENGINE_VERSION}"`)
 		assert.Contains(t, content, fmt.Sprintf("NPM_CONFIG_MIN_RELEASE_AGE: '%d'", days), "SDK npm install also follows the engine policy")
 	}
@@ -179,14 +179,14 @@ func TestEngineCooldownSecondaryJobInheritance(t *testing.T) {
 	days := 7
 	data.EngineConfig.Cooldown = &days
 	c := NewCompiler()
-	assert.NotContains(t, strings.Join(c.buildDetectionEngineExecutionStep(data), ""), "--cooldown-days")
-	assert.NotContains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days")
+	assert.Contains(t, strings.Join(c.buildDetectionEngineExecutionStep(data), ""), "--cooldown-days 7")
+	assert.Contains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days 7")
 	assert.NotContains(t, strings.Join(c.buildEvalsDecisionSteps(data), ""), "--cooldown-days")
 	cloned := cloneThreatDetectionEngineConfig("copilot", &EngineConfig{ID: "pi", Cooldown: &days})
 	assert.Equal(t, &days, cloned.Cooldown, "age policy is not specific to an engine identity")
 	zero := 0
 	data.SafeOutputs.ThreatDetection.EngineConfig = &EngineConfig{ID: "copilot", Cooldown: &zero}
-	assert.NotContains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days")
+	assert.Contains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days 0")
 }
 
 func TestEngineCooldownInheritedByCrossEngineDetection(t *testing.T) {
@@ -210,7 +210,7 @@ func TestEngineCooldownInheritedByCrossEngineDetection(t *testing.T) {
 		"external": compiler.buildInstallDetectionEngineForExternalDetectorStep,
 	} {
 		t.Run(name, func(t *testing.T) {
-			assert.NotContains(t, strings.Join(build(data), ""), "--cooldown-days")
+			assert.Contains(t, strings.Join(build(data), ""), "--cooldown-days 7")
 		})
 	}
 }
@@ -273,7 +273,8 @@ Inspect the repository.
 				require.NoError(t, err)
 				result, err := os.ReadFile(strings.TrimSuffix(path, ".md") + ".lock.yml")
 				require.NoError(t, err)
-				assert.NotContains(t, string(result), "--cooldown-days", "Copilot CLI release age is checked at build time")
+				assert.Contains(t, string(result), "--cooldown-days "+value)
+				assert.Contains(t, string(result), "--cooldown-days 3", "main engine retains default age")
 			})
 		}
 	}

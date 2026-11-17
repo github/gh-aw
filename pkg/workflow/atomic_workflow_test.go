@@ -450,11 +450,12 @@ func TestAtomicSmokeContract(t *testing.T) {
 	lock, err := os.ReadFile("../../.github/workflows/smoke-atomic.lock.yml")
 	require.NoError(t, err)
 	assert.Contains(t, string(lock), `- cron: "0 0 */2 * *"`)
-	assert.NotContains(t, string(lock), "--cooldown-days")
+	assert.NotContains(t, string(lock), "--cooldown-days 1")
 	for _, expected := range []string{
 		"npm install -g @bastani/atomic@" + loadAtomicSample(t).Version,
 		"NPM_CONFIG_IGNORE_SCRIPTS: 'true'",
 		"NPM_CONFIG_MIN_RELEASE_AGE: '1'",
+		"--cooldown-days 3",
 		"GH_AW_ENGINE_VERSION: " + loadAtomicSample(t).Version,
 		"ATOMIC_MODEL: copilot/gpt-5.3-codex",
 		"atomic_mcp_config_adapter.cjs", "atomic_log_parser.cjs", "--mode json", "--exclude-env OPENAI_API_KEY",

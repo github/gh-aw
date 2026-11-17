@@ -20,7 +20,7 @@ set +o histexpand
 #                       --prefer-toolcache is also supplied.
 #   --prefer-toolcache - Prefer a trusted cached VERSION even with a manifest pin.
 #                        The pin authenticates downloads, not the cached host binary.
-#   --cooldown-days - Accepted for compatibility with older compiled workflows.
+#   --cooldown-days - Accepted as a no-op to keep compiled workflows compatible.
 #                     Release age for the pinned default is checked at build time.
 #
 # Environment overrides (testing):
