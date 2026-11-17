@@ -45,7 +45,7 @@ network:
     - python
     - go
 cache:
-  - key: dependabot-burner-selection-43998635112
+  - key: dependabot-burner-selection-${{ github.run_id }}
     name: Dependabot burner selection context
     path: /tmp/gh-aw/agent/dependabot-burner
 safe-outputs:
@@ -60,7 +60,6 @@ safe-outputs:
     protected-files: request_review
     exclude-lock-yml: true
 timeout-minutes: 20
-max-ai-credits: 100
 imports:
   - shared/mcp-pagination.md
   - uses: shared/daily-pr-base.md
@@ -384,9 +383,10 @@ features:
 
 # Dependabot Burner
 
-Dry-run replay: ignore cached results. Fill missing `compiler_generated_files`
-from this file's exact `isCompilerGeneratedManifest` allowlist before delegation.
-Run one wave against this checkout; cached PR data is a historical snapshot.
+The AWF gate may skip only an empty, non-actionable wave with no excluded PRs;
+slash-command explanations and uncertain selection still require execution.
+
+You are the grouped Dependabot remediation orchestrator.
 
 ## Tool contract for every agent
 
