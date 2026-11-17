@@ -20,9 +20,26 @@ import (
 func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 	for _, tool := range []string{"npm", "node", "bash"} {
 		if _, err := exec.LookPath(tool); err != nil {
+			if os.Getenv("CI") == "true" {
+				t.Fatalf("%s is required for the SDK bootstrap test in CI: %v", tool, err)
+			}
 			t.Skip(tool + " is required for the SDK bootstrap test")
 		}
 	}
+
+	resolverPath, err := filepath.Abs("../../actions/setup/js/copilot_sdk_module_resolution_hooks.cjs")
+	require.NoError(t, err)
+	missingRunnerTempEnv := make([]string, 0, len(os.Environ()))
+	for _, value := range os.Environ() {
+		if !strings.HasPrefix(value, "RUNNER_TEMP=") {
+			missingRunnerTempEnv = append(missingRunnerTempEnv, value)
+		}
+	}
+	missingRunnerTemp := exec.CommandContext(t.Context(), "node", "-e", `require(process.argv[1])`, resolverPath)
+	missingRunnerTemp.Env = missingRunnerTempEnv
+	output, err := missingRunnerTemp.CombinedOutput()
+	require.Error(t, err)
+	require.Contains(t, string(output), "RUNNER_TEMP must be set for Copilot SDK module resolution")
 
 	fixtures := t.TempDir()
 	packages := map[string]string{}
@@ -95,6 +112,18 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 				"NPM_CONFIG_PREFIX="+filepath.Join(root, "different-node-global"),
 				"NPM_CONFIG_OFFLINE=true", "NPM_CONFIG_AUDIT=false", "NPM_CONFIG_FUND=false",
 			)
+			globalRootCommand := exec.CommandContext(t.Context(), "npm", "root", "-g")
+			globalRootCommand.Env = env
+			globalRoot, err := globalRootCommand.Output()
+			require.NoError(t, err)
+			for name := range packages {
+				globalPackage := filepath.Join(strings.TrimSpace(string(globalRoot)), filepath.FromSlash(name))
+				require.NoError(t, os.MkdirAll(globalPackage, 0o755))
+				manifest, err := json.Marshal(map[string]string{"name": name, "version": "0.0.0-conflict", "main": "index.cjs"})
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(globalPackage, "package.json"), manifest, 0o600))
+				require.NoError(t, os.WriteFile(filepath.Join(globalPackage, "index.cjs"), []byte(`module.exports = { bootstrapFixture: false };`), 0o600))
+			}
 			run := func(script string) []byte {
 				t.Helper()
 				cmd := exec.CommandContext(t.Context(), "bash", "-e", "-c", script)
