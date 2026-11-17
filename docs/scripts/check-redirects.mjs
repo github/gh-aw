@@ -10,7 +10,7 @@ const docsDir = fileURLToPath(new URL("..", import.meta.url));
 const contentDir = join(docsDir, "src/content/docs");
 const base = "/gh-aw/";
 
-const config = readFileSync(join(docsDir, "astro.config.mjs"), "utf8");
+const config = readFileSync(join(docsDir, "astro.config.mjs"), "utf8").replace(/\r\n/g, "\n");
 const block = config.match(/^ {2}redirects: \{\n([\s\S]*?)^ {2}\},$/m);
 if (!block) {
   console.error("Could not find the redirects map in astro.config.mjs.");

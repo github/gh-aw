@@ -30,7 +30,7 @@ const files = [...walk(join(docsDir, "src")), join(docsDir, "astro.config.mjs")]
 const declaration = new RegExp(`(${Object.keys(expected).join("|")})\\s*:\\s*([^;}"'\`]+)`, "g");
 
 for (const file of files) {
-  const rel = relative(docsDir, file);
+  const rel = relative(docsDir, file).replace(/\\/g, "/");
   for (const [, name, rawValue] of readFileSync(file, "utf8").matchAll(declaration)) {
     const value = rawValue.replace(/\/\*.*?\*\//g, "").trim();
     if (rel !== tokensFile) {

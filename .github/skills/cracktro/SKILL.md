@@ -97,7 +97,7 @@ After each edit:
 
 ## Tests
 
-Run from `docs/` after `npm ci`: `npx playwright test tests/talk.spec.ts`. The config builds and previews (`npm run build && npm run preview`, `localhost:4321`, `/gh-aw/cracktro/`, Chromium `/usr/bin/chromium-browser`), covering built JSON-LD; under `npm run dev`, check `curl -s localhost:4321/gh-aw/cracktro/ | grep hasPart`. If `node_modules` is missing, report the tests as not run.
+After `npm ci` in `docs/`, run `npx playwright test tests/talk.spec.ts`. Config builds/previews at `localhost:4321/gh-aw/cracktro/` to test JSON-LD, using `/usr/bin/chromium-browser` if present or bundled Chromium (`npx playwright install chromium`). For dev JSON-LD: `curl -s localhost:4321/gh-aw/cracktro/ | grep hasPart`. Without `node_modules`, report tests not run.
 
 ## Pull requests
 

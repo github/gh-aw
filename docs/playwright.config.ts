@@ -1,14 +1,19 @@
-import { defineConfig, devices } from '@playwright/test';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { defineConfig, devices } from "@playwright/test";
+import { existsSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const configDir = dirname(fileURLToPath(import.meta.url));
+const chromiumUse = {
+  ...devices["Desktop Chrome"],
+  launchOptions: existsSync("/usr/bin/chromium-browser") ? { executablePath: "/usr/bin/chromium-browser" } : {},
+};
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './tests',
+  testDir: "./tests",
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -18,25 +23,20 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:4321',
+    baseURL: "http://localhost:4321",
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    trace: "on-first-retry",
   },
 
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        launchOptions: {
-          executablePath: '/usr/bin/chromium-browser',
-        },
-      },
+      name: "chromium",
+      use: chromiumUse,
     },
   ],
 
@@ -47,8 +47,8 @@ export default defineConfig({
     cwd: configDir,
     // Search is only available in production builds, so run tests against a
     // built preview server.
-    command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4321',
-    url: 'http://localhost:4321/gh-aw/',
+    command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4321",
+    url: "http://localhost:4321/gh-aw/",
     reuseExistingServer: !process.env.CI,
     timeout: 180 * 1000,
   },

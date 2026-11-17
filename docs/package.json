@@ -10,7 +10,7 @@
     "predev": "npm run build:slides",
     "start": "astro dev",
     "prebuild": "npm run check:cracktro && node scripts/check-reading-measure.mjs && node scripts/check-redirects.mjs && npm run generate-agent-factory && npm run generate-model-tables && npm run build:slides",
-    "build": "rm -rf dist && astro build",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && astro build",
     "build:slides": "node ../scripts/ensure-docs-slide-pdf.js",
     "preview": "astro preview",
     "astro": "astro",
