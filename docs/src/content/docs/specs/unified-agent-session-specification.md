@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.10.0"
+version: "2.11.0"
 status: Draft
-publication_date: "2026-11-12"
+publication_date: "2026-11-17"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.10.0<br>
+**Version**: 2.11.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-12<br>
+**Publication Date**: 2026-11-17<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.8.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.11.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -868,15 +868,19 @@ source for opaque fields.
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 
 Pull-request creation and branch-push outcomes also retain `data.execution_trace`,
-an ordered sequence of source-defined branch letters (`A–Z`, `a–z`, at most
-1,024 characters, retaining the prefix and terminal outcome at the limit).
-Each instrumented route has a unique letter within its handler;
-the source comments define the mapping. Equal paths produce equal identifiers,
+an ordered sequence of self-describing four-letter branch mnemonics joined by
+underscores, such as `init_bund_push_publ_capt_done`. Traces contain at most
+1,024 characters, retaining complete prefix markers and the terminal outcome
+(`done` for success, `fail` for unsuccessful or skipped returns, `thrw` for errors).
+Each instrumented route has a unique mnemonic within its handler;
+the source comments expand abbreviations. Equal paths produce equal identifiers,
 not unique invocation IDs. Interpret a trace with its operation `type` and the
 handler source revision from that run to compare hot paths and diagnose recovery
 or fallback routes. Traces survive skipped, staged, and failed execution, including
 thrown errors; absent traces mean instrumentation was unavailable or the handler
-was not entered. The reusable tracing helper can instrument other safe outputs
+was not entered. Handlers retain traces as non-enumerable internal result/error
+metadata, explicitly projected into recorded outcomes rather than tool-response
+payloads. The reusable tracing helper can instrument other safe outputs
 without recording request bodies, branch names, credentials, or error text.
 
 Job-result records cover only the conclusion job's direct dependencies, including
@@ -2738,6 +2742,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.11.0 - Draft (2026-11-17)
+
+- Added `data.execution_trace` for pull-request creation and branch-push outcomes: underscore-separated four-letter branch mnemonics bounded to 1,024 characters, preserving complete prefix markers and terminal `done`, `fail`, or `thrw` outcomes while excluding request bodies, branch names, credentials, and error text.
+- Retained serialization-format version 1.
 
 ### Version 2.10.0 - Draft (2026-11-12)
 

@@ -1261,7 +1261,7 @@
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
-        "execution_trace": { "type": "string", "description": "Ordered branch letters from the safe-output handler source, not a correlation ID.", "pattern": "^[A-Za-z]+$", "minLength": 1, "maxLength": 1024 }
+        "execution_trace": { "type": "string", "description": "Ordered four-letter branch mnemonics joined by underscores, not a correlation ID.", "pattern": "^[A-Za-z]{4}(?:_[A-Za-z]{4})*$", "minLength": 4, "maxLength": 1024 }
       },
       "additionalProperties": false
     },
@@ -1280,7 +1280,7 @@
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
-        "execution_trace": { "type": "string", "description": "Ordered branch letters from the safe-output handler source, not a correlation ID.", "pattern": "^[A-Za-z]+$", "minLength": 1, "maxLength": 1024 },
+        "execution_trace": { "type": "string", "description": "Ordered four-letter branch mnemonics joined by underscores, not a correlation ID.", "pattern": "^[A-Za-z]{4}(?:_[A-Za-z]{4})*$", "minLength": 4, "maxLength": 1024 },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },
       "additionalProperties": false

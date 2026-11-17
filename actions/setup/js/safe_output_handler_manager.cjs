@@ -1654,6 +1654,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
                 success: false,
                 deferred: false,
                 error: errorMsg,
+                ...projectSafeOutputData({ execution_trace: result.execution_trace }),
                 result: deferred.type === "merge_pull_request" ? projectMergeFailure(result) : { ...result, success: false, deferred: false, error: errorMsg },
               };
             }

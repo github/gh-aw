@@ -531,7 +531,8 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       const handler = await module.main({ target });
       const result = await handler({ branch }, {});
 
-      expect(result).toEqual({ success: false, error: 'Invalid target configuration: must be "triggering", "*", or a valid pull request number', execution_trace: "ALy" });
+      expect(result).toEqual({ success: false, error: 'Invalid target configuration: must be "triggering", "*", or a valid pull request number' });
+      expect(result.execution_trace).toBe("init_conf_fail");
       expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
     });
 
@@ -545,7 +546,8 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const handler = await module.main({ target: "*" });
         const result = await handler({ branch, [alias]: value }, {});
 
-        expect(result).toEqual({ success: false, error: "Pull request number is required but not found", execution_trace: "ANy" });
+        expect(result).toEqual({ success: false, error: "Pull request number is required but not found" });
+        expect(result.execution_trace).toBe("init_wild_fail");
         expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
       }
     );
@@ -1162,7 +1164,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
   // ──────────────────────────────────────────────────────
 
   describe("repository state scenarios", () => {
-    it("should handle successful normal push", async () => {
+    it.each(["warn", "error", "ignore"])("should handle successful normal push with %s no-change policy", async ifNoChanges => {
       const patchPath = createPatchFile("should-handle-successful-normal-push");
       mockExec.getExecOutput
         .mockResolvedValueOnce({ exitCode: 0, stdout: "preflight-sha\trefs/heads/feature-branch\n", stderr: "" })
@@ -1171,14 +1173,14 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         .mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
 
       const module = await loadModule();
-      const handler = await module.main({});
+      const handler = await module.main({ if_no_changes: ifNoChanges });
       const result = await handler({ branch: "should-handle-successful-normal-push" }, {});
 
       expect(result.success).toBe(true);
       expect(result.branch_name).toBe("feature-branch");
       expect(result.commit_url).toContain("test-owner/test-repo/commit/");
       expect(result.before_state).toEqual({ head_sha: "remote-head-before" });
-      expect(result.execution_trace).toBe("AMTdnux");
+      expect(result.execution_trace).toBe("init_trig_vldt_ptch_push_pshd_done");
       expect(result.after_state).toEqual({ head_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
     });
 
@@ -1196,7 +1198,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         expect(result.success).toBe(false);
         expect(result.skipped).not.toBe(true);
         expect(result.error).toContain("Authentication failed");
-        expect(result.execution_trace).toBe("AMTdnpy");
+        expect(result.execution_trace).toBe("init_trig_vldt_ptch_push_perr_fail");
       } finally {
         pushSignedSpy.mockRestore();
       }
@@ -1339,7 +1341,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("no longer exists on origin");
-      expect(result.execution_trace).toBe("AMTVy");
+      expect(result.execution_trace).toBe("init_trig_vldt_remt_fail");
       expect(mockExec.exec).not.toHaveBeenCalled();
     });
 
@@ -1468,6 +1470,26 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(mockCore.info).toHaveBeenCalledWith("Investigating patch failure...");
     });
 
+    it("retains the patch-failure route when transport integrity fails", async () => {
+      const patchPath = createPatchFile("patch-apply-integrity");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+      mockExec.exec.mockImplementation(async (cmd, args) => {
+        if (cmd === "git" && args[0] === "am" && args.includes("--3way")) {
+          fs.writeFileSync(patchPath, "tampered during patch application");
+          throw new Error("patch application failed");
+        }
+        return 0;
+      });
+      const module = await loadModule();
+      const handler = await module.main({});
+
+      const result = await handler({ branch: "patch-apply-integrity" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("SECURITY:");
+      expect(result.execution_trace).toBe("init_trig_vldt_ptch_pfal_fail");
+    });
+
     it("should resolve add/add conflicts by preferring patch version and continuing git am", async () => {
       const patchPath = createPatchFile("should-resolve-add-add-conflicts-by-preferring-patch-version");
       const pushSignedCommitsModule = require("./push_signed_commits.cjs");
@@ -1514,7 +1536,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
         expect(result.success).toBe(true);
         expect(mockCore.info).toHaveBeenCalledWith("Patch applied successfully after resolving add/add conflict(s)");
-        expect(result.execution_trace).toBe("AMTdefnux");
+        expect(result.execution_trace).toBe("init_trig_vldt_ptch_pfal_aadd_push_pshd_done");
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "--theirs", "--", "docs/findings.md"], expect.any(Object));
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["add", "--", "docs/findings.md"], expect.any(Object));
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["am", "--continue"], expect.any(Object));
@@ -1530,7 +1552,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.fallback_used).toBe(true);
       expect(result.fallback_type).toBe("pull_request");
       expect(result.pull_request_number).toBe(999);
-      expect(result.execution_trace).toBe("AMTdnpqx");
+      expect(result.execution_trace).toBe("init_trig_vldt_ptch_push_perr_fbpr_done");
       expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
     });
 
@@ -1588,7 +1610,8 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const handler = await module.main({});
         const result = await handler({ branch }, {});
 
-        expect(result).toEqual({ skipped: true, reason: expect.stringContaining("Pull request #123 closed"), execution_trace: "AMTdnpqy" });
+        expect(result).toEqual({ skipped: true, reason: expect.stringContaining("Pull request #123 closed") });
+        expect(result.execution_trace).toBe("init_trig_vldt_ptch_push_perr_fbpr_fail");
         expect(pushSignedSpy).toHaveBeenCalledTimes(1);
         expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
         expect(mockExec.exec.mock.calls.some(([, args]) => args[0] === "checkout" && args[1] === "-b")).toBe(false);
@@ -1621,7 +1644,12 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const handler = await module.main({});
         const result = await handler({ branch }, {});
 
-        expect(result).toEqual({ success: false, error_type: "push_failed", error: expect.stringContaining(pushError), execution_trace: pushError.includes("`workflows`") ? "AMTdnpqy" : "AMTdnpy" });
+        expect(result).toEqual({
+          success: false,
+          error_type: "push_failed",
+          error: expect.stringContaining(pushError),
+        });
+        expect(result.execution_trace).toBe(pushError.includes("`workflows`") ? "init_trig_vldt_ptch_push_perr_fbpr_fail" : "init_trig_vldt_ptch_push_perr_fail");
         expect(pushSignedSpy).toHaveBeenCalledTimes(1);
         expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
         expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining(pushError));
@@ -1814,7 +1842,8 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         const result = await resultPromise;
 
         expect(pushSignedSpy).toHaveBeenCalledTimes(6);
-        expect(result).toEqual({ success: false, error_type: "push_failed", error: expect.stringContaining(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT), execution_trace: "AMTdnnnnnnpqy" });
+        expect(result).toEqual({ success: false, error_type: "push_failed", error: expect.stringContaining(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT) });
+        expect(result.execution_trace).toBe("init_trig_vldt_ptch_push_push_push_push_push_push_perr_fbpr_fail");
         expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
         expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT));
       } finally {
@@ -2673,7 +2702,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.success).toBe(false);
       expect(result.skipped).toBe(true);
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("noop"));
-      expect(result.execution_trace).toBe("AJy");
+      expect(result.execution_trace).toBe("init_noop_fail");
     });
 
     it("should error when patch is empty and if-no-changes is error", async () => {
@@ -2685,7 +2714,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("No changes");
-      expect(result.execution_trace).toBe("AvJy");
+      expect(result.execution_trace).toBe("init_noop_nerr_fail");
     });
 
     it("should silently skip when patch is empty and if-no-changes is ignore", async () => {
@@ -2696,17 +2725,32 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       const result = await handler({ branch: "should-silently-skip-when-patch-is-empty-and-if-no-changes-i" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.execution_trace).toBe("AwJy");
+      expect(result.execution_trace).toBe("init_noop_ignr_fail");
       expect(result.skipped).toBe(true);
     });
 
-    it("should handle missing patch file", async () => {
+    it.each([
+      ["warn", "init_miss_fail"],
+      ["error", "init_miss_nerr_fail"],
+      ["ignore", "init_miss_ignr_fail"],
+    ])("should handle missing patch file with %s no-change policy", async (ifNoChanges, expectedTrace) => {
       const module = await loadModule();
-      const handler = await module.main({});
-      const result = await handler({ branch: "should-handle-missing-patch-file" }, {});
+      const handler = await module.main({ if_no_changes: ifNoChanges });
+      const result = await handler({}, {});
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("No patch file");
+      expect(result.execution_trace).toBe(expectedTrace);
+    });
+
+    it.each(["error", "ignore"])("does not trace the %s no-change policy before repository validation", async ifNoChanges => {
+      const module = await loadModule();
+      const handler = await module.main({ if_no_changes: ifNoChanges });
+
+      const result = await handler({ repo: "other-owner/other-repo" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.execution_trace).toBe("init_repo_fail");
     });
 
     it("should handle patch file with error message", async () => {
@@ -3894,7 +3938,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(true);
       expect(result.staged).toBe(true);
-      expect(result.execution_trace).toBe("AKx");
+      expect(result.execution_trace).toBe("init_stag_done");
       // Should not have made any git commands
       expect(mockExec.exec).not.toHaveBeenCalled();
     });

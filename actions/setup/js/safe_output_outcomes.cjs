@@ -71,7 +71,7 @@ function projectSafeOutputData(source) {
   if (source.identifier === null) data.identifier = null;
   if (OUTCOME_STATUSES.has(source.status)) data.status = source.status;
   if (typeof source.staged === "boolean") data.staged = source.staged;
-  if (typeof source.execution_trace === "string" && /^[A-Za-z]{1,1024}$/.test(source.execution_trace)) data.execution_trace = source.execution_trace;
+  if (typeof source.execution_trace === "string" && source.execution_trace.length <= 1024 && /^[A-Za-z]{4}(?:_[A-Za-z]{4})*$/.test(source.execution_trace)) data.execution_trace = source.execution_trace;
   if (source.operation_outcome === "indeterminate") data.operation_outcome = "indeterminate";
   const url = canonicalSafeOutputUrl(source.url);
   if (url) data.url = url;
