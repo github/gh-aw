@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Read-only: recompute the "Daily Unsloppers" measured panel from gh-aw [duplicate-code] issues.
-// Usage: node daily-unsloppers.mjs [FROM=2025-10-07] [TO=2026-10-26]   (needs `gh auth login`; prints JSON)
+// Read-only: recompute the "Daily Improvers" measured panel from gh-aw [duplicate-code] issues.
+// Usage: node daily-improvers.mjs [FROM=2025-10-07] [TO=2026-10-26]   (needs `gh auth login`; prints JSON)
 import { execFileSync } from "node:child_process";
 const [FROM = "2025-10-07", TO = "2026-10-26"] = process.argv.slice(2);
 const REPO = "github/gh-aw", PREFIX = "[duplicate-code]", BOT = "github-actions";

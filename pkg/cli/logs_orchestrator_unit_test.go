@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -383,6 +384,166 @@ func TestHandleEmptyWorkflowRunBatch(t *testing.T) {
 		assert.True(t, shouldContinue)
 		assert.False(t, shouldStop)
 	})
+
+	t.Run("stop when no pagination cursor is available", func(t *testing.T) {
+		cursor, shouldContinue, shouldStop := handleEmptyWorkflowRunBatch(workflowRunBatch{
+			totalFetched: BatchSize,
+			batchSize:    BatchSize,
+		}, true)
+		assert.Empty(t, cursor)
+		assert.False(t, shouldContinue)
+		assert.True(t, shouldStop)
+	})
+}
+
+func TestCleanupLogsOutputDir(t *testing.T) {
+	t.Run("invalid cutoff", func(t *testing.T) {
+		err := cleanupLogsOutputDir(LogsDownloadOptions{After: "invalid"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --after value")
+	})
+
+	t.Run("removes old run folder", func(t *testing.T) {
+		outputDir := t.TempDir()
+		runDir := filepath.Join(outputDir, "run-123")
+		require.NoError(t, os.Mkdir(runDir, 0o700))
+
+		_, stderr := captureOutput(t, func() error {
+			return cleanupLogsOutputDir(LogsDownloadOptions{
+				After:     "2030-01-01",
+				OutputDir: outputDir,
+				Verbose:   true,
+			})
+		})
+		_, err := os.Stat(runDir)
+		require.ErrorIs(t, err, os.ErrNotExist)
+		assert.Contains(t, stderr, "Removed 1 cached run folder")
+	})
+}
+
+func TestHandleLogsRateLimitWaitError(t *testing.T) {
+	t.Run("deadline marks timeout", func(t *testing.T) {
+		state := logsCollectionState{}
+		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, context.DeadlineExceeded)
+		assert.True(t, stop)
+		require.NoError(t, err)
+		assert.True(t, state.timeoutReached)
+	})
+
+	t.Run("shared count cancellation stops cleanly", func(t *testing.T) {
+		limit := newLogsCountLimit(1)
+		require.True(t, limit.tryAdd())
+		state := logsCollectionState{}
+		stop, err := handleLogsRateLimitWaitError(&state, true, LogsDownloadOptions{countLimit: limit}, context.Canceled)
+		assert.True(t, stop)
+		require.NoError(t, err)
+		assert.True(t, state.countLimitReached)
+	})
+
+	t.Run("rate limit cancellation returns rate limit error", func(t *testing.T) {
+		rateLimitState := &logsRateLimitState{}
+		rateLimitState.reached.Store(true)
+		state := logsCollectionState{}
+		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{rateLimitState: rateLimitState}, context.Canceled)
+		assert.True(t, stop)
+		require.ErrorIs(t, err, errLogsAPIRateLimitReached)
+	})
+
+	t.Run("genuine cancellation clears partial state", func(t *testing.T) {
+		state := logsCollectionState{iteration: 2, beforeDate: "cursor"}
+		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, context.Canceled)
+		assert.True(t, stop)
+		require.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, logsCollectionState{}, state)
+	})
+
+	t.Run("transient error retries next iteration", func(t *testing.T) {
+		state := logsCollectionState{}
+		stop, err := handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, errors.New("temporary error"))
+		assert.False(t, stop)
+		require.NoError(t, err)
+		assert.Equal(t, 1, state.iteration)
+	})
+}
+
+func TestShouldStopLogsIteration(t *testing.T) {
+	t.Run("deadline context", func(t *testing.T) {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		defer cancel()
+		stop, timedOut, err := shouldStopLogsIteration(logsDownloadRuntime{activeCtx: ctx}, LogsDownloadOptions{})
+		assert.True(t, stop)
+		assert.True(t, timedOut)
+		assert.NoError(t, err)
+	})
+
+	t.Run("shared count cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		limit := newLogsCountLimit(1)
+		require.True(t, limit.tryAdd())
+		stop, timedOut, err := shouldStopLogsIteration(logsDownloadRuntime{activeCtx: ctx}, LogsDownloadOptions{countLimit: limit})
+		assert.False(t, stop)
+		assert.False(t, timedOut)
+		assert.NoError(t, err)
+	})
+
+	t.Run("rate limit cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		rateLimitState := &logsRateLimitState{}
+		rateLimitState.reached.Store(true)
+		stop, timedOut, err := shouldStopLogsIteration(
+			logsDownloadRuntime{activeCtx: ctx},
+			LogsDownloadOptions{rateLimitState: rateLimitState},
+		)
+		assert.True(t, stop)
+		assert.False(t, timedOut)
+		assert.ErrorIs(t, err, errLogsAPIRateLimitReached)
+	})
+
+	t.Run("caller cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		stop, timedOut, err := shouldStopLogsIteration(logsDownloadRuntime{activeCtx: ctx}, LogsDownloadOptions{})
+		assert.True(t, stop)
+		assert.False(t, timedOut)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("elapsed timeout", func(t *testing.T) {
+		stop, timedOut, err := shouldStopLogsIteration(
+			logsDownloadRuntime{
+				activeCtx:       context.Background(),
+				startTime:       time.Now().Add(-time.Second),
+				timeoutDuration: time.Nanosecond,
+			},
+			LogsDownloadOptions{},
+		)
+		assert.True(t, stop)
+		assert.True(t, timedOut)
+		assert.NoError(t, err)
+	})
+}
+
+func TestParseWorkflowRunArtifacts(t *testing.T) {
+	outputDir := t.TempDir()
+	_, stderr := captureOutput(t, func() error {
+		parseWorkflowRunArtifacts(
+			context.Background(),
+			DownloadResult{LogsPath: outputDir},
+			ProcessedRun{Run: WorkflowRun{DatabaseID: 42}},
+			true,
+			true,
+		)
+		return nil
+	})
+	assert.Contains(t, stderr, "No engine detected")
+}
+
+func TestShouldSkipProcessedWorkflowRun(t *testing.T) {
+	assert.True(t, shouldSkipProcessedWorkflowRun(DownloadResult{Skipped: true}, false))
+	assert.True(t, shouldSkipProcessedWorkflowRun(DownloadResult{Error: errors.New("download failed")}, false))
+	assert.False(t, shouldSkipProcessedWorkflowRun(DownloadResult{}, false))
 }
 
 // TestCollectProcessedWorkflowRunsAccumulatesBatches is a regression test for a bug where

@@ -23,6 +23,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Security |  | Band header (Security): design every workflow as if the agent is already compromised. |
 | Agentic attacks | illustrative | Common agent attacks, from prompt injection to secret exfiltration and destructive commands, are each stopped by one or more layered defenses. |
 | Safety and control |  | Inputs are filtered, the agent runs sandboxed with a read-only token behind a firewall and gateway, and writes happen only through scanned safe outputs. |
+| Integrity filtering | illustrative | Malicious comments on a public pull request never reach the agent: the MCP gateway rates each item by its author's trust and drops everything below the configured minimum integrity before the model sees it. |
 | Zero-secret agents | illustrative | The agent runs in an isolated sandbox, here the experimental micro-VM runtime, holding no credentials; every key stays on the host behind the MCP gateway, API proxy and egress firewall. |
 | Supply chain hardening | illustrative | The compiler applies layered static checks, including trigger admission, expression safety, pinned actions, least privilege and secret scans, before any workflow runs. |
 | Safe outputs | illustrative | Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs. |
@@ -31,28 +32,31 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Stop manually translating intent into code. |  | The factory mindset: engineer processes that create trusted features instead of hand-translating intent into code. |
 | Human agent processes |  | Band header (Human agent processes): engineer processes, not code, with patterns that pair people and agents, some with a column of worked examples below. |
 | Event-driven Hand-offs | illustrative | Event-driven hand-off patterns such as IssueOps, DailyOps, ReviewOps and LabelOps let agents do the work while people make the decisions. |
-| Issue Monster | illustrative | Issue Monster loves cookie issues: agents file their follow-ups into a cookie-labelled issue queue; a scheduler runs cheap deterministic gates and filters every few minutes and only wakes an agent to assign the best few issues to Copilot. |
 | Pull Request Review² | illustrative | Marking a pull request ready starts agentic reviewers, and Copilot is nudged to fix their findings so the human reviewer sees a clean pull request. |
+| Ponytail Reviewer | illustrative | A read-only agentic reviewer reads each ready pull request only for unnecessary complexity, posts one-line findings with the lines each saves, and says ship once nothing is left to cut. |
+| Issue Monster | illustrative | Issue Monster loves cookie issues: agents file their follow-ups into a cookie-labelled issue queue; a scheduler runs cheap deterministic gates and filters every few minutes and only wakes an agent to assign the best few issues to Copilot. |
 | Decide · Draft · Record | illustrative | When a ready pull request carries an architecture decision with no record, an agent drafts an ADR that people finalize and merge with the code, and later agents read it to learn why the feature works that way. |
+| PR Sous Chef | illustrative | PR Sous Chef regularly finds pull requests that sit idle with work waiting, such as unresolved review comments or failing CI, and nudges Copilot to pick them back up, while humans still review and merge. |
 | Issues as intent | illustrative | Contributors run a debug agent on their own failures and file anonymized issues that state intent, which maintainers plan and assign to Copilot. |
-| Daily Unsloppers | illustrative | Scheduled research agents find problems such as duplicated code, assign them to Copilot, and developers refine the resulting pull requests. |
+| Daily Improvers | illustrative | Scheduled research agents find problems such as duplicated code, assign them to Copilot, and developers refine the resulting pull requests. |
 | Repo Assist | illustrative | A scheduled assistant picks maintenance tasks such as triage and stale pull requests, a maintainer reviews every result, and backlogs shrink. |
-| Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily unsloppers clean up, instead of polishing each one through endless nit rounds. |
 | Research · Assign · Observe | illustrative | A daily benchmark agent files performance regressions, Copilot fixes them, and the next run observes the result to close the loop. |
 | Hunt · Falsify · Fix | illustrative | A daily agent hunts for vulnerabilities in deterministically scoped, rotating files, discards every lead it can falsify, and files only the survivors as issues that Copilot fixes. |
 | Query · Ask · Grow | illustrative | An expert DevOps agent read live telemetry through observability MCP servers and filed the most important instrumentation gap each day, growing OpenTelemetry support. |
+| Semantic clustering | illustrative | Grouping functions by intent rather than by text exposes misplaced code that duplicate detection misses, and Copilot moves it. |
+| Go Fan | illustrative | A daily agent compares each Go dependency's releases with how the code uses it and files review issues that Copilot turns into fixes. |
+| Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily improvers clean up, instead of polishing each one through endless nit rounds. |
+| Dreaming | illustrative | Dreaming agents mine the activity between people and agents, such as review threads, sessions and failed runs, to design and optimize agentic workflows, prompts, skills and linters. |
 | Mine · Refine · Apply | illustrative | Recurring review corrections are mined into Go linters, refined through review, and applied across the repository. |
 | Explore · Reuse · Lint | illustrative | A daily code-analysis agent keeps a strategy cache to balance reusing proven strategies with exploring new ones, and every pattern it finds becomes a linter. |
-| Semantic clustering | illustrative | Grouping functions by intent rather than by text exposes misplaced code that duplicate detection misses, and Copilot moves it. |
-| Spec · Model · Test | illustrative | Specification requirements become TLA+ invariants; model checking explores every state, and its traces become conformance tests. |
-| Go Fan | illustrative | A daily agent compares each Go dependency's releases with how the code uses it and files review issues that Copilot turns into fixes. |
+| Scan · Fix · Learn | illustrative | The .NET runtime team's CI health loop: a scanner files known build errors, a fixer attempts fixes, and a feedback agent tunes both. |
 | Spec-driven testing | illustrative | Agents keep specifications current from human intent and code changes, and an enforcer turns the specification into tests that guard the next change. |
+| Spec · Model · Test | illustrative | Specification requirements become TLA+ invariants; model checking explores every state, and its traces become conformance tests. |
+| Docs that heal | illustrative | Small agents update, simplify and test documentation the way a newcomer reads it, then fix the gaps and teach the updater new rules. |
 | Multi-device tester | illustrative | A daily agent browses the documentation on phone, tablet and desktop viewports and files what breaks; Copilot fixes it, a developer reviews the pull request and the next run re-tests. |
 | Findings that land | illustrative | Docs auditor agents file what they find as issues; the findings handed to Copilot as one checkable defect get fixed by merged pull requests, while unassigned rolling reports mostly expire. |
 | Personas · Probe · Patch | illustrative | A daily agent role-plays software personas asking the workflow-authoring agent for automations, scores its answers, and re-runs one on a truncated guidance prefix to find rules the cut hides; Copilot moves them up and the next run re-scores. |
-| Docs that heal | illustrative | Small agents update, simplify and test documentation the way a newcomer reads it, then fix the gaps and teach the updater new rules. |
 | Speech To Agent | illustrative | A dictation glossary maps misheard speech-to-text phrases to exact identifiers, so spoken prompts produce terms agents can grep. |
-| Scan · Fix · Learn | illustrative | The .NET runtime team's CI health loop: a scanner files known build errors, a fixer attempts fixes, and a feedback agent tunes both. |
 | For PMs | illustrative | Agentic workflows also serve product managers: an existing team habit triggers an agent, which leaves an artifact for a human to decide on. |
 | If every PR needs deep human review, you don’t trust your process. | illustrative | Trust the process: if every pull request needs deep human review, improve checks, agent reviewers and tests until a skim is enough. |
 | Cost Optimization |  | Band header (Cost Optimization): debug, spend less and route smarter. |
