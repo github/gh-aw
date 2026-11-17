@@ -5293,6 +5293,7 @@
       fn();
     };
     slides.push({
+      key: "safe-outputs",
       group: "security",
       notes:
         "Safe outputs, an illustrative run with a synthetic issue. The agent runs boxed in: its token is read-only, so when it tries to create an issue directly the call is refused. Instead it calls the create-issue safe output, which only records a proposal. A separate threat detection job, an isolated agent with no tools, reads the proposed issue and looks for prompt injection, leaked secrets, malicious links and harmful code. Only when the verdict is clean does a third job, the only one holding issues: write, apply the declared output and actually create the issue. The agent never holds write credentials, and every write is limited to the outputs declared in the front matter.",
@@ -5368,7 +5369,7 @@
     });
   }
 
-  // Safe outputs, model-checked: the compiled workflow's jobs, tokens and artifacts become a TLA+ model; TLC checks every schedule against security invariants, a seeded fault must break exactly one, and a witness proves a validated write is still reachable
+  // Model-checked: the compiled workflow's jobs, tokens and artifacts become a TLA+ model; TLC checks every schedule against security invariants, a seeded fault must break exactly one, and a witness proves a validated write is still reachable
   {
     resetIndex();
     const VW = 1800,
@@ -5540,9 +5541,10 @@
       cyc = -1,
       fired = new Set();
     slides.push({
+      under: "safe-outputs",
       group: "security",
       notes:
-        "Safe outputs, model-checked: gh-aw keeps a bounded TLA+ model of the compiled workflow (CompiledWorkflow in specs/workflow-security): the activation, agent, threat detection and safe-output jobs with their permissions, tokens, artifacts and network egress. The TLC model checker explores every interleaving of job starts, skips, failures and hostile inputs, and checks security invariants such as JobIsolation, DetectionGate, ValidatedEffects, ArtifactProvenance, SecretConfinement, TokenLifetime, NetworkPolicy and PrivateSinkPolicy. Each secure configuration must exhaust its state space and exit 0. Negative controls seed one fault at a time, such as skip-detection (publish an effect despite a deny verdict), and must fail with exit 12 on exactly the expected invariant, so a model that checks nothing cannot pass. Witness configurations negate a goal such as NoSuccessfulWrite to prove a validated write is still reachable, so the model is not secure by doing nothing. A compiled-profile verifier derives the model's constants from real compiled lock files, and a daily agentic workflow rotates one trust boundary, proposes model refinements and files credible gaps. Illustrative: the job boxes, invariant glosses, state graph and timing are simplified; the module, invariant, fault and witness names are real. A bounded model is strong evidence, not a proof, and a synthetic counterexample is not a product vulnerability.",
+        "Model-checked: gh-aw keeps a bounded TLA+ model of the compiled workflow (CompiledWorkflow in specs/workflow-security): the activation, agent, threat detection and safe-output jobs with their permissions, tokens, artifacts and network egress. The TLC model checker explores every interleaving of job starts, skips, failures and hostile inputs, and checks security invariants such as JobIsolation, DetectionGate, ValidatedEffects, ArtifactProvenance, SecretConfinement, TokenLifetime, NetworkPolicy and PrivateSinkPolicy. Each secure configuration must exhaust its state space and exit 0. Negative controls seed one fault at a time, such as skip-detection (publish an effect despite a deny verdict), and must fail with exit 12 on exactly the expected invariant, so a model that checks nothing cannot pass. Witness configurations negate a goal such as NoSuccessfulWrite to prove a validated write is still reachable, so the model is not secure by doing nothing. A compiled-profile verifier derives the model's constants from real compiled lock files, and a daily agentic workflow rotates one trust boundary, proposes model refinements and files credible gaps. Illustrative: the job boxes, invariant glosses, state graph and timing are simplified; the module, invariant, fault and witness names are real. A bounded model is strong evidence, not a proof, and a synthetic counterexample is not a product vulnerability.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -5571,7 +5573,7 @@
           dot.style.opacity = 1;
         } else dot.style.opacity = 0;
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "TLA+ and TLC check every schedule of the compiled workflow"), h("h2", {}, letters("Safe outputs, "), letters("model-checked", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "TLA+ and TLC check every schedule of the compiled workflow"), h("h2", {}, letters("Model-"), letters("checked", "l-grad"))), svg),
     });
   }
 
