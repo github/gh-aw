@@ -80,7 +80,7 @@ and M to toggle sound. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
-`slides.md` summaries and slide text; arrows pick a result, Enter opens it, and
+`slides.md` summaries and keywords, and slide text; arrows pick a result, Enter opens it, and
 `#N` jumps to slide N. Hovering a dock button shows its keyboard shortcut. The navigation dots form a map with one row per band and
 jump directly to a slide (on narrow screens they become previous/next slide arrows
 flanked by track-style previous/next band buttons); `#N` hashes are shareable slide links. Clicking the left third

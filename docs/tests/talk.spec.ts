@@ -73,7 +73,7 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(TOTAL));
 });
 
-test("fuzzy-searches slide titles, summaries and text from the dock's search dialog", async ({ page }) => {
+test("fuzzy-searches slide titles, keywords, summaries and text from the dock's search dialog", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   const count = page.locator(CURRENT);
@@ -113,6 +113,11 @@ test("fuzzy-searches slide titles, summaries and text from the dock's search dia
     .slice(0, 2);
   await input.fill(words.join(" "));
   await expect(options.filter({ hasText: summary.slice(0, 40) }).first()).toBeVisible();
+  // slides.md keywords match even when the slide never shows the word, and the matched keyword is displayed
+  await input.fill("dogfooding");
+  await expect(options).toHaveCount(1);
+  await expect(options.first().locator(".fz-t")).toContainText("AW factory");
+  await expect(options.first().locator(".fz-k mark")).toHaveText("dogfooding");
   await input.fill("no such slide qqqzzz");
   await expect(options).toHaveCount(0);
   await expect(dialog).toContainText("No slides match");
@@ -799,49 +804,53 @@ test("splits inline skills and agents, defers context and preserves step navigat
 });
 
 test.describe("slides.md metadata", () => {
-  const table = (...rows: string[]) => ["# Slides", "", "| Heading | Notes | Summary |", "|---|---|---|", ...rows, ""].join("\n");
+  const table = (...rows: string[]) => ["# Slides", "", "| Heading | Notes | Summary | Keywords |", "|---|---|---|---|", ...rows, ""].join("\n");
 
-  test("parses every row with a unique, public summary", () => {
+  test("parses every row with a unique, public summary and keywords", () => {
     expect(SLIDES.length).toBeGreaterThan(0);
-    expect(parseSlides(table("| A |  | First. |", "| B | illustrative | Second. |"))).toEqual([
-      { heading: "A", illustrative: false, summary: "First.", line: 5 },
-      { heading: "B", illustrative: true, summary: "Second.", line: 6 },
+    expect(parseSlides(table("| A |  | First. | one |", "| B | illustrative | Second. | two words, CI/CD ,x |"))).toEqual([
+      { heading: "A", illustrative: false, summary: "First.", keywords: ["one"], line: 5 },
+      { heading: "B", illustrative: true, summary: "Second.", keywords: ["two words", "CI/CD", "x"], line: 6 },
     ]);
     for (const slide of SLIDES) {
-      expect(`${slide.heading} ${slide.summary}`, slide.heading).not.toMatch(PRIVATE_REFS);
-      expect(slide.summary, slide.heading).not.toMatch(/https?:|@[\w-]|#\d/);
+      expect(`${slide.heading} ${slide.summary} ${slide.keywords.join(" ")}`, slide.heading).not.toMatch(PRIVATE_REFS);
+      expect(`${slide.summary} ${slide.keywords.join(" ")}`, slide.heading).not.toMatch(/https?:|@[\w-]|#\d/);
     }
   });
 
   test("rejects malformed slide lists with the offending line", () => {
     const cases: [string, RegExp][] = [
-      [table("| A | First. |"), /:5: expected 3 cells, found 2/],
-      [table("| A |  | First. | extra |"), /:5: expected 3 cells, found 4/],
-      [table("| A |  | First."), /:5: malformed row/],
-      [table("|  |  | First. |"), /:5: empty Heading/],
-      [table("| A |  |  |"), /:5: empty Summary for "A"/],
-      [table("| A | synthetic | First. |"), /:5: unknown Notes value "synthetic"/],
-      [table("| A |  | First. |", "| A |  | Second. |"), /:6: duplicate Heading "A" \(first on line 5\)/],
-      [table("| Human agent processes |  | First. |", "| Human Agent Processes |  | Second. |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
-      [table("| A |  | Same. |", "| B |  | Same. |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
-      [table("| A |  | First. |", "B | illustrative | Last slide. |"), /:6: malformed row, expected "\| Heading \| Notes \| Summary \|": B \| illustrative \| Last slide\. \|/],
-      [table("| A |  | First. |", "", "| B |  | Second. |"), /:7: table row outside the slide table/],
+      [table("| A | First. | k |"), /:5: expected 4 cells, found 3/],
+      [table("| A |  | First. | k | extra |"), /:5: expected 4 cells, found 5/],
+      [table("| A |  | First. | k"), /:5: malformed row/],
+      [table("|  |  | First. | k |"), /:5: empty Heading/],
+      [table("| A |  |  | k |"), /:5: empty Summary for "A"/],
+      [table("| A |  | First. |  |"), /:5: empty keyword for "A"/],
+      [table("| A |  | First. | k,, l |"), /:5: empty keyword for "A"/],
+      [table("| A |  | First. | Key, key |"), /:5: duplicate keyword "key" for "A"/],
+      [table("| A | synthetic | First. | k |"), /:5: unknown Notes value "synthetic"/],
+      [table("| A |  | First. | k |", "| A |  | Second. | k |"), /:6: duplicate Heading "A" \(first on line 5\)/],
+      [table("| Human agent processes |  | First. | k |", "| Human Agent Processes |  | Second. | k |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
+      [table("| A |  | Same. | k |", "| B |  | Same. | k |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
+      [table("| A |  | First. | k |", "B | illustrative | Last slide. | k |"), /:6: malformed row, expected "\| Heading \| Notes \| Summary \| Keywords \|": B \| illustrative \| Last slide\. \| k \|/],
+      [table("| A |  | First. | k |", "", "| B |  | Second. | k |"), /:7: table row outside the slide table/],
       [table(), /:3: slide table has no rows/],
-      ["| Heading | Notes |\n|---|---|\n| A |  |\n", /:1: expected table header/],
-      ["| Heading | Notes | Summary |\n|---|---|\n", /:2: expected separator/],
+      ["| Heading | Notes | Summary |\n|---|---|---|\n| A |  | First. |\n", /:1: expected table header/],
+      ["| Heading | Notes | Summary | Keywords |\n|---|---|---|\n", /:2: expected separator/],
       ["no table", /missing slide table/],
     ];
     for (const [text, error] of cases) expect(() => parseSlides(text, "slides.md"), String(error)).toThrow(error);
   });
 
   test("injects escaped, idempotent JSON-LD and leaves the rest of the page untouched", () => {
-    const hostile = parseSlides(table("| A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. |"));
+    const hostile = parseSlides(table("| A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. | </script>, a&b |"));
     const html = injectSlideMetadata(SOURCE_HTML, hostile, PAGE_URL);
     expect(html.match(/<\/script>/gi)).toHaveLength(SOURCE_HTML.match(/<\/script>/gi)!.length);
     expect(html).not.toContain("<b>");
     const [doc] = jsonLd(html);
     expect(doc.hasPart).toEqual(slideParts(hostile, PAGE_URL));
     expect(doc.hasPart[0].description).toBe("Uses $& and $1 & <b>tags</b>\u2028.");
+    expect(doc.hasPart[0].keywords).toBe("</script>, a&b");
     expect(serializeJsonLd({ s: "</script>&\u2029" })).toBe('{"s":"\\u003c/script\\u003e\\u0026\\u2029"}');
 
     const real = injectSlideMetadata(SOURCE_HTML, SLIDES, PAGE_URL);
