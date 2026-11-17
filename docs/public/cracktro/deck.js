@@ -227,8 +227,7 @@
   .ecu-l { display: block; }
   .ecu-l b { position: relative; font-weight: inherit; }
   .ecu-a b { color: #3fb950; }
-  .ecu-b b { margin: 0 .1em 0 .02em; padding: 0 .12em; color: #ff7b72; }
-  .ecu-b b::after { content: ""; position: absolute; inset: 14px 0 -2px; border: 5px solid currentColor; border-radius: 20px; }
+  .ecu-b b { color: #ff7b72; }
   .ecu-c b { background: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950) 0 0 / 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
   body.light .ecu-copy h2 { color: #1f2328; }
   body.light .ecu-a b { color: #116329; }
