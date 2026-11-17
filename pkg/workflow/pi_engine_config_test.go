@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -98,9 +99,37 @@ func TestPiEngineNativeProvidersAndFederation(t *testing.T) {
 	assert.Contains(t, engine.GetRequiredSecretNames(google), "GEMINI_API_KEY")
 	assert.Equal(t, "google", engine.ResolveLLMProvider(google).String())
 	assert.Equal(t, "google", piConfiguredProvider(google))
-	domains, err := getPiDefaultDomains(google.Model)
+	domains, err := GetDefaultDomainsForEngine(constants.PiEngine, google.Model)
 	require.NoError(t, err)
 	assert.Contains(t, domains, "generativelanguage.googleapis.com")
+	transportDomains, err := GetAllowedDomainsForEngineWithModel(constants.PiEngine, google.Model,
+		&NetworkPermissions{Allowed: []string{"pi"}}, nil, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, transportDomains, "generativelanguage.googleapis.com")
+	for _, tt := range []struct {
+		model, domain string
+	}{
+		{"copilot/claude-sonnet-4", "api.githubcopilot.com"},
+		{"anthropic/claude-sonnet-4", "api.anthropic.com"},
+		{"openai/gpt-4.1", "api.openai.com"},
+		{"google/gemini-2.5-pro", "generativelanguage.googleapis.com"},
+	} {
+		providerDomains, err := GetDefaultDomainsForEngine(constants.PiEngine, tt.model)
+		require.NoError(t, err)
+		assert.Contains(t, providerDomains, tt.domain, "provider endpoint metadata for %s", tt.model)
+	}
+	for _, tt := range []struct {
+		model, optIn, domain string
+	}{
+		{"copilot/claude-sonnet-4", "copilot-vendor", "api.githubcopilot.com"},
+		{"openai/gpt-4.1", "codex-vendor", "api.openai.com"},
+		{google.Model, "gemini-vendor", "generativelanguage.googleapis.com"},
+	} {
+		directDomains, err := GetAllowedDomainsForEngineWithModel(constants.PiEngine, tt.model,
+			&NetworkPermissions{Allowed: []string{"pi", tt.optIn}}, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, directDomains, tt.domain)
+	}
 	google.EngineConfig.Auth = &EngineAuthConfig{Type: "github-oidc", Provider: "gcp"}
 	google.NetworkPermissions = &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}}
 	assert.NotContains(t, engine.GetRequiredSecretNames(google), "GEMINI_API_KEY")

@@ -352,7 +352,6 @@ func TestCopilotDefaultDomains(t *testing.T) {
 	// Verify that expected Copilot domains are present
 	expectedDomains := []string{
 		"api.github.com",
-		"api.githubcopilot.com",
 		"github.com",
 		"host.docker.internal",
 		"raw.githubusercontent.com",
@@ -390,6 +389,7 @@ func TestCopilotVendorDomainsRequireOptIn(t *testing.T) {
 	vendorDomains := []string{
 		"api.business.githubcopilot.com",
 		"api.enterprise.githubcopilot.com",
+		"api.githubcopilot.com",
 		"api.individual.githubcopilot.com",
 		"telemetry.enterprise.githubcopilot.com",
 	}
@@ -468,8 +468,11 @@ func TestEngineDomainSetsRequireExplicitNetworkAllowedOptIn(t *testing.T) {
 		"selecting the Copilot engine must not automatically add the copilot domain set")
 
 	result = GetAllowedDomainsForEngine(constants.CopilotEngine, &NetworkPermissions{Allowed: []string{"copilot", "github"}}, nil, nil)
+	assert.NotContains(t, result, "api.githubcopilot.com",
+		"the copilot transport set must not grant direct model API egress")
+	result = GetAllowedDomainsForEngine(constants.CopilotEngine, &NetworkPermissions{Allowed: []string{"copilot-vendor"}}, nil, nil)
 	assert.Contains(t, result, "api.githubcopilot.com",
-		"the copilot domain set should expand when explicitly referenced in network.allowed")
+		"the copilot-vendor set should grant direct model API egress when explicitly referenced")
 	assert.True(t, isKnownEcosystemIdentifier("copilot"),
 		"engine domain sets should validate like other domain set identifiers")
 }
@@ -479,8 +482,9 @@ func TestEmbeddedDomainSets(t *testing.T) {
 
 	assert.Contains(t, sets.Ecosystems, "defaults")
 	assert.Contains(t, sets.Ecosystems, "threat-detection")
+	assert.Contains(t, sets.Ecosystems, "gemini-vendor")
 	assert.Contains(t, sets.EngineDefaults, "copilot")
-	assert.Equal(t, "api.githubcopilot.com", sets.PiProviderDomains["copilot"])
+	assert.NotContains(t, sets.EngineDefaults["pi"], "api.githubcopilot.com")
 	assert.Equal(t, []string{"github.com", "localhost"}, sets.SanitizationDefaults)
 	assert.Equal(t, sets.EngineDefaults["threat-detection"], sets.Ecosystems["threat-detection"],
 		"legacy network.allowed threat-detection alias must stay in sync with Copilot detection defaults")
@@ -511,7 +515,6 @@ func TestCodexDefaultDomains(t *testing.T) {
 	expectedDomains := []string{
 		"172.30.0.1", // AWF gateway IP - Codex resolves host.docker.internal to this IP
 		"api.github.com",
-		"api.openai.com",
 		"github.com",
 		"host.docker.internal",
 	}
@@ -543,7 +546,7 @@ func TestCodexVendorDomainsRequireOptIn(t *testing.T) {
 			}
 			domains := domainSet(t, GetAllowedDomainsForEngine(constants.CodexEngine,
 				&NetworkPermissions{Allowed: allowed}, nil, nil))
-			for _, host := range []string{"auth.openai.com", "ab.chatgpt.com"} {
+			for _, host := range []string{"api.openai.com", "auth.openai.com", "ab.chatgpt.com"} {
 				reachable := false
 				for rule := range domains {
 					reachable = reachable || awfDomainAllowsHost(rule, host)
@@ -566,7 +569,7 @@ func TestGeminiDomainSetRequiresPackageOptIn(t *testing.T) {
 				}
 				domains := domainSet(t, GetAllowedDomainsForEngine(constants.GeminiEngine,
 					&NetworkPermissions{Allowed: allowed}, nil, nil))
-				assert.Contains(t, domains, "generativelanguage.googleapis.com")
+				assert.NotContains(t, domains, "generativelanguage.googleapis.com")
 				host := "storage.googleapis.com"
 				if ecosystem == "java" {
 					host = "maven-central.storage-download.googleapis.com"
@@ -579,6 +582,16 @@ func TestGeminiDomainSetRequiresPackageOptIn(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGeminiVendorDomainRequiresOptIn(t *testing.T) {
+	baseline := GetAllowedDomainsForEngine(constants.GeminiEngine,
+		&NetworkPermissions{Allowed: []string{"gemini"}}, nil, nil)
+	assert.NotContains(t, baseline, "generativelanguage.googleapis.com")
+
+	direct := GetAllowedDomainsForEngine(constants.GeminiEngine,
+		&NetworkPermissions{Allowed: []string{"gemini-vendor"}}, nil, nil)
+	assert.Contains(t, direct, "generativelanguage.googleapis.com")
 }
 
 func TestClaudeDefaultDomains(t *testing.T) {
@@ -1084,9 +1097,9 @@ func TestGetCopilotAllowedDomainsWithToolsAndRuntimes(t *testing.T) {
 
 		result := GetAllowedDomainsForEngine(constants.CopilotEngine, network, nil, runtimes)
 
-		// Should contain explicitly requested Copilot domain set
-		if !strings.Contains(result, "api.githubcopilot.com") {
-			t.Error("Expected api.githubcopilot.com in result")
+		// The transport set must not grant direct Copilot API egress.
+		if strings.Contains(result, "api.githubcopilot.com") {
+			t.Error("Did not expect api.githubcopilot.com from the copilot transport set")
 		}
 		// Should contain Go ecosystem domains
 		if !strings.Contains(result, "proxy.golang.org") {
@@ -1110,9 +1123,9 @@ func TestGetCopilotAllowedDomainsWithToolsAndRuntimes(t *testing.T) {
 
 		result := GetAllowedDomainsForEngine(constants.CopilotEngine, network, tools, runtimes)
 
-		// Should contain explicitly requested Copilot domain set
-		if !strings.Contains(result, "api.githubcopilot.com") {
-			t.Error("Expected api.githubcopilot.com in result")
+		// The transport set must not grant direct Copilot API egress.
+		if strings.Contains(result, "api.githubcopilot.com") {
+			t.Error("Did not expect api.githubcopilot.com from the copilot transport set")
 		}
 		// Should contain network allowed domain
 		if !strings.Contains(result, "custom.example.com") {
@@ -1172,9 +1185,9 @@ func TestGetCodexAllowedDomainsWithToolsAndRuntimes(t *testing.T) {
 
 		result := GetAllowedDomainsForEngine(constants.CodexEngine, network, nil, runtimes)
 
-		// Should contain explicitly requested Codex domain set
-		if !strings.Contains(result, "api.openai.com") {
-			t.Error("Expected api.openai.com in result")
+		// The transport set must not grant direct OpenAI API egress.
+		if strings.Contains(result, "api.openai.com") {
+			t.Error("Did not expect api.openai.com from the codex transport set")
 		}
 		// Should contain Java ecosystem domains
 		if !strings.Contains(result, "repo.maven.apache.org") {

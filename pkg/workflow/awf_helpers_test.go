@@ -1306,7 +1306,7 @@ func TestGeminiProxyTargetDoesNotGrantAgentEgress(t *testing.T) {
 		{name: "empty network", allowed: []string{}, wantTarget: DefaultGeminiAPITarget},
 		{name: "github only", allowed: []string{"github"}, wantTarget: DefaultGeminiAPITarget},
 		{name: "defaults and github", allowed: []string{"defaults", "github"}, wantTarget: DefaultGeminiAPITarget},
-		{name: "gemini opt-in", allowed: []string{"gemini"}, wantTarget: DefaultGeminiAPITarget, wantDirect: true},
+		{name: "gemini vendor opt-in", allowed: []string{"gemini-vendor"}, wantTarget: DefaultGeminiAPITarget, wantDirect: true},
 		{name: "explicit hostname", allowed: []string{DefaultGeminiAPITarget}, wantTarget: DefaultGeminiAPITarget, wantDirect: true},
 		{name: "custom target", allowed: []string{"github"}, customURL: "https://gemini-proxy.example.com/v1", wantTarget: "gemini-proxy.example.com", wantDirect: true},
 		{name: "explicit default target", customURL: "https://" + DefaultGeminiAPITarget, wantTarget: DefaultGeminiAPITarget, wantDirect: true},

@@ -257,7 +257,6 @@ func TestClaudeEngineAllowedDomainsFollowEffectiveTarget(t *testing.T) {
 			data: &WorkflowData{
 				NetworkPermissions: &NetworkPermissions{Allowed: []string{"claude"}},
 			},
-			wantAPI: true,
 		},
 		{
 			name: "custom Anthropic base URL",
@@ -272,8 +271,14 @@ func TestClaudeEngineAllowedDomainsFollowEffectiveTarget(t *testing.T) {
 				NetworkPermissions: &NetworkPermissions{Allowed: []string{"claude"}},
 				EngineConfig:       &EngineConfig{APITarget: "relay.example.com"},
 			},
-			wantAPI:    true,
 			wantTarget: "relay.example.com",
+		},
+		{
+			name: "explicit direct Anthropic API opt-in",
+			data: &WorkflowData{
+				NetworkPermissions: &NetworkPermissions{Allowed: []string{"claude", "api.anthropic.com"}},
+			},
+			wantAPI: true,
 		},
 		{
 			name: "GitHub provider gateway",
