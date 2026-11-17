@@ -1671,6 +1671,63 @@
   .att-edge { fill: none; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 8 8; transition: stroke .4s; }
   .att-run.on .att-edge { stroke: #ab7df8; } .att-run.done .att-edge { stroke: #3fb950; }
   .att-tag { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .04em; }
+  /* Fuzzy schedules: a fixed-cron spike scatters into hashed daily times; All You Can Eat serves one plate at a time */
+  .fzs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #79c0ff, #ab7df8, #ffa657); }
+  .fzs-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
+  .fzs-code { font: 600 26px var(--mono); transition: opacity .5s; } .fzs-code.fix { fill: #ffa657; } .fzs-code.fuz { fill: #79c0ff; opacity: 0; }
+  .fzs-mode { font: 600 15px var(--mono); text-anchor: end; transition: opacity .5s; } .fzs-mode.fix { fill: #ffa657; } .fzs-mode.fuz { fill: #79c0ff; opacity: 0; }
+  .fzs-svg.fuz .fzs-code.fix, .fzs-svg.fuz .fzs-mode.fix { opacity: 0; } .fzs-svg.fuz .fzs-code.fuz, .fzs-svg.fuz .fzs-mode.fuz { opacity: 1; }
+  .fzs-band { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-band { opacity: 1; transition: opacity .6s .3s; }
+  .fzs-band.no rect { fill: url(#fzsHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .fzs-band.best rect { fill: #4493f81f; stroke: #4493f8; stroke-width: 1.5; }
+  .fzs-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzs-band.no text { fill: #ffa657; } .fzs-band.best text { fill: #79c0ff; }
+  .fzs-hash { fill: #c9d1d9; font: 500 16px var(--mono); opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-hash { opacity: 1; transition: opacity .5s .4s; }
+  .fzs-syn { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-syn { opacity: 1; transition: opacity .6s 1.1s; }
+  .fzs-syn text { font: 500 15px var(--mono); fill: #79c0ff; } .fzs-syn text.h { fill: #9198a1; font-weight: 600; font-size: 13px; letter-spacing: .1em; }
+  .fzs-syn text.s { fill: #f0f6fc; } .fzs-syn text.a { fill: #6e7681; } .fzs-syn text.t { text-anchor: end; font-weight: 600; font-size: 13px; letter-spacing: .08em; }
+  .fzs-syn .fix text { fill: #ffa657; } .fzs-syn .fix text.s { text-decoration: line-through; text-decoration-color: #db6d28; }
+  .fzs-axis { stroke: #3d444d; stroke-width: 2; } .fzs-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
+  .fzs-dot { fill: #ffa657; transition: fill .6s; } .fzs-svg.fuz .fzs-dot { fill: #79c0ff; }
+  .fzs-n { fill: #c9d1d9; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-n { opacity: 1; transition: opacity .4s 1.6s; }
+  .fzs-spike { opacity: 0; transition: opacity .4s; } .fzs-spike.on { opacity: 1; } .fzs-svg.fuz .fzs-spike { opacity: 0; }
+  .fzs-spike line { stroke: #ffa657; stroke-width: 2; stroke-dasharray: 5 5; } .fzs-spike text { fill: #ffa657; font: 600 17px var(--mono); }
+  .fzs-spike text.d { fill: #c9d1d9; font-weight: 500; font-size: 15px; }
+  .fzs-min { opacity: 0; transition: opacity .3s; } .fzs-svg.fuz .fzs-min { opacity: 1; transition: opacity .6s 1.8s; }
+  .fzs-min .no { fill: url(#fzsHatch); stroke: #db6d28; stroke-width: 1; stroke-dasharray: 3 3; } .fzs-min .b { fill: #79c0ff; }
+  .fzs-min text { fill: #6e7681; font: 500 13px var(--mono); }
+  .fzs-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; }
+  .fzs-yaml { fill: #c9d1d9; font: 500 18px var(--mono); white-space: pre; } .fzs-yaml .k { fill: #79c0ff; } .fzs-yaml .s { fill: #a5d6ff; } .fzs-yaml .h { fill: #ffa657; font-weight: 600; }
+  .fzs-plate { opacity: 0; transition: opacity .35s; } .fzs-plate.on { opacity: 1; }
+  .fzs-plate rect { fill: #161b22; stroke: var(--c, #79c0ff); stroke-width: 2; transition: stroke .35s; }
+  .fzs-pt { fill: #f0f6fc; font: 600 19px var(--mono); } .fzs-ps { fill: var(--c, #79c0ff); font: 600 15px var(--mono); }
+  .fzs-plate.done .fzs-pt { fill: #8b949e; text-decoration: line-through; }
+  .fzs-learn { fill: #e3b341; font: 600 15px var(--mono); opacity: 0; transition: opacity .4s; } .fzs-learn.on { opacity: 1; }
+  .fzs-mona { opacity: 0; transition: opacity .3s; } .fzs-mona.on { opacity: 1; }
+  .fzs-line { stroke: #3d444d; stroke-width: 3; stroke-dasharray: 8 8; }
+  .fzs-tick circle { fill: #0d1117; stroke: #3d444d; stroke-width: 2; transition: fill .3s, stroke .3s, filter .3s; }
+  .fzs-tick text { fill: #6e7681; font: 600 13px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; }
+  .fzs-tick.run circle { fill: #4493f8; stroke: #79c0ff; filter: drop-shadow(0 0 10px #4493f8); } .fzs-tick.run text { fill: #79c0ff; opacity: 1; }
+  .fzs-tick.skip circle { stroke: #9198a1; stroke-dasharray: 4 3; } .fzs-tick.skip text { opacity: 1; }
+  .fzs-tick.now circle { stroke-width: 4; }
+  .fzs-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
+  .active .fzs-cap { animation: rise .6s ease-out both 2s; }
+  /* Week of daily runs: measured heat map of daily workflows by weekday and UTC hour */
+  .fzw .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #ab7df8, #79c0ff); }
+  .fzw-lbl { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; }
+  .fzw-day { fill: #c9d1d9; font: 600 18px var(--mono); text-anchor: end; } .fzw-day.we { fill: #9198a1; }
+  .fzw-hr { fill: #6e7681; font: 500 14px var(--mono); text-anchor: middle; }
+  .fzw-c rect { stroke: #30363d; stroke-width: 1; } .fzw-c text { font: 600 15px var(--mono); text-anchor: middle; fill: #c9d1d9; } .fzw-c.hi text { fill: #0d1117; }
+  .fzw-c { opacity: 0; } .active .fzw-c { animation: fzwIn .45s ease-out both; animation-delay: var(--d); }
+  @keyframes fzwIn { from { opacity: 0; } to { opacity: 1; } }
+  .fzw-band, .fzw-sum, .fzw-top, .fzw-key { opacity: 0; } .active .fzw-band, .active .fzw-sum, .active .fzw-top, .active .fzw-key { animation: fzwIn .6s ease-out both 2.3s; }
+  .fzw-band.no rect { fill: url(#fzwHatch); stroke: #db6d28; stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .fzw-band.best rect { fill: none; stroke: #4493f8; stroke-width: 2.5; }
+  .fzw-band text { font: 600 14px var(--mono); text-anchor: middle; } .fzw-band.no text { fill: #ffa657; } .fzw-band.best text { fill: #79c0ff; }
+  .fzw-sum rect { fill: #4493f8; } .fzw-sum.we rect { fill: #4493f899; } .fzw-sum text { fill: #c9d1d9; font: 600 16px var(--mono); }
+  .fzw-top rect { fill: none; stroke: #f0f6fc; stroke-width: 3; } .fzw-top text { fill: #f0f6fc; font: 600 15px var(--mono); }
+  .fzw-key text { fill: #9198a1; font: 500 15px var(--mono); } .fzw-key text.b { fill: #c9d1d9; font-weight: 600; }
+  .fzw-cap { position: absolute; left: 150px; top: 990px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
+  .active .fzw-cap { animation: rise .6s ease-out both 2s; }
 
   /* --- index & search: a non-agentic indexing job writes the index; the agent job only searches a read-only copy --- */
   .ix .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8); }
@@ -10087,6 +10144,291 @@
     });
   }
 
+  // Fuzzy schedules: 111 daily workflows pinned to 0 0 * * * spike in one minute, then scatter to their measured hashed times (hours 00–01 skipped, 02–05 preferred, quarter-hour minutes avoided); All You Can Eat wakes every 30 minutes and skips while its one plate is open
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // MEASURED: compiled UTC hour and minute of gh-aw's 111 `daily` / `daily on weekdays` workflows, snapshot 17 Nov 2026 (refresh/fuzzy-schedules.sh)
+    const HOURS = [0, 0, 7, 13, 8, 17, 4, 3, 7, 4, 3, 6, 3, 2, 4, 5, 0, 3, 5, 3, 6, 1, 3, 4];
+    const MINS = [0, 0, 0, 0, 0, 2, 4, 7, 3, 4, 0, 6, 0, 0, 0, 0, 0, 0, 0, 5, 5, 6, 1, 5, 4, 2, 8, 0, 0, 0, 0, 0, 0, 0, 1, 3, 4, 5, 5, 4, 5, 5, 0, 0, 0, 0, 0, 0, 0, 4, 3, 4, 1, 2, 3, 0, 0, 0, 0, 0];
+    const N = HOURS.reduce((a, b) => a + b, 0);
+    const X0 = 30,
+      CW = 34,
+      AX = 470,
+      MW = 13.6,
+      MB = 580,
+      cx = hr => X0 + hr * CW + CW / 2;
+    // spike: every dot in the 00:00 column; fuzzy: each dot in its measured hour column
+    const SPOT = [],
+      FPOT = [];
+    HOURS.forEach((n, hr) => {
+      for (let j = 0; j < n; j++) FPOT.push([cx(hr) + (j % 2 ? 6.5 : -6.5), AX - 9 - Math.floor(j / 2) * 13]);
+    });
+    for (let k = 0; k < N; k++) SPOT.push([cx(0) + ((k % 3) - 1) * 10, AX - 8 - Math.floor(k / 3) * 10]);
+    let g = `<defs><pattern id="fzsHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2814"/><line x1="0" y1="0" x2="0" y2="8" stroke="#db6d28" stroke-width="2" opacity=".55"/></pattern>
+      <clipPath id="fzsClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
+    // left: the schedule line, its mode, and the hash that picks a stable time
+    g += `<text class="fzs-lbl" x="0" y="16">SCHEDULE · ${N} DAILY WORKFLOWS</text>`;
+    g += `<text class="fzs-code fix" x="0" y="58">schedule: "0 0 * * *"</text><text class="fzs-code fuz" x="0" y="58">schedule: daily</text>`;
+    g += `<text class="fzs-mode fix" x="846" y="56">FIXED · one minute for all</text><text class="fzs-mode fuz" x="846" y="56">FUZZY · hashed per workflow</text>`;
+    g += `<text class="fzs-hash" x="0" y="98">hash(owner/repo/.github/workflows/x.md) → 04:37 UTC · stable</text>`;
+    // fuzzy windows: 00–01 never chosen, 02–05 weighted ×3
+    g += `<g class="fzs-band no"><rect x="${X0}" y="128" width="${2 * CW}" height="${AX - 124}" rx="6"/><text x="${X0 + CW}" y="150">00–01</text><text x="${X0 + CW}" y="168">skipped</text></g>`;
+    g += `<g class="fzs-band best"><rect x="${X0 + 2 * CW}" y="128" width="${4 * CW}" height="${AX - 124}" rx="6"/><text x="${X0 + 4 * CW}" y="150">02–05 UTC</text><text x="${X0 + 4 * CW}" y="168">preferred ×3</text></g>`;
+    // more syntaxes, each with a real compiled cron from a gh-aw lock file; only `every N days` and raw cron stay fixed
+    const SYN = [
+      ["every 30 minutes", "27/30 * * * *", "start minute"],
+      ["hourly", "24 */1 * * *", "minute"],
+      ["every 6h", "25 */6 * * *", "minute"],
+      ["daily on weekdays", "11 14 * * 1-5", "time · Mon–Fri"],
+      ["daily around 10:00", "22 10 * * *", "±1 h window"],
+      ["weekly on monday", "22 3 * * 1", "time"],
+      ["every 7 days", "0 0 */7 * *", "FIXED", 1],
+    ];
+    g += `<g class="fzs-syn"><text class="h" x="290" y="150">MORE SYNTAX → COMPILED</text><text class="h t" x="846" y="150">SCATTERED</text>`;
+    SYN.forEach(([src, cron, what, fix], i) => {
+      const y = 178 + i * 25;
+      g += `<g${fix ? ' class="fix"' : ""}><text class="s" x="290" y="${y}">${src}</text><text class="a" x="474" y="${y}">→</text><text x="498" y="${y}">${cron}</text><text class="t" x="846" y="${y}">${what}</text></g>`;
+    });
+    g += `</g>`;
+    g += `<line class="fzs-axis" x1="${X0}" y1="${AX + 4}" x2="${X0 + 24 * CW}" y2="${AX + 4}"/>`;
+    for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzs-hr" x="${cx(hr)}" y="494">${String(hr).padStart(2, "0")}</text>`;
+    g += `<text class="fzs-hr" x="${X0 + 24 * CW}" y="494" text-anchor="end">UTC hour</text>`;
+    HOURS.forEach((n, hr) => {
+      if (n) g += `<text class="fzs-n" x="${cx(hr)}" y="${AX - 9 - (Math.ceil(n / 2) - 1) * 13 - 14}">${n}</text>`;
+    });
+    for (let k = 0; k < N; k++) g += `<circle class="fzs-dot" r="4.5" cx="${SPOT[k][0]}" cy="${SPOT[k][1]}" opacity="0"/>`;
+    g += `<g class="fzs-spike" id="fzsS"><line x1="${cx(0) + 20}" y1="104" x2="104" y2="104"/><text x="112" y="110">${N} runs · 00:00 UTC · the same minute</text><text class="d" x="112" y="136">→ token-API bursts · rate limits · queued runners</text></g>`;
+    // minute ruler: avoided zones hatched, measured minutes as bars
+    g += `<g class="fzs-min"><text x="${X0 + 24 * CW}" y="520" text-anchor="end">minute · hatched = avoided: hour edges · US :15 :45 · EU :30</text>`;
+    for (const [a, b] of [[0, 4], [12, 18], [27, 33], [42, 48], [55, 59]]) g += `<rect class="no" x="${X0 + a * MW}" y="530" width="${(b - a + 1) * MW}" height="${MB - 530}" rx="3"/>`;
+    MINS.forEach((n, m) => {
+      if (n) g += `<rect class="b" x="${X0 + m * MW + 2}" y="${MB - n * 6}" width="${MW - 4}" height="${n * 6}" rx="2"/>`;
+    });
+    g += `<line class="fzs-axis" x1="${X0}" y1="${MB + 2}" x2="${X0 + 60 * MW}" y2="${MB + 2}"/>`;
+    for (const m of [0, 15, 30, 45]) g += `<text x="${X0 + m * MW + MW / 2}" y="602" text-anchor="middle">:${String(m).padStart(2, "0")}</text>`;
+    g += `</g>`;
+    // right: the All You Can Eat loop
+    const RX = 950,
+      CH = 10.8;
+    g += `<text class="fzs-lbl" x="${RX}" y="16">ALL YOU CAN EAT · ONE PLATE AT A TIME</text>`;
+    g += `<rect class="fzs-card" x="${RX - 20}" y="34" width="670" height="184" rx="14"/>`;
+    const Y = [
+      [0, `<tspan class="k">on:</tspan>`],
+      [2, `<tspan class="k">schedule:</tspan> every 30 minutes`],
+      [2, `<tspan class="k">skip-if-match:</tspan> <tspan class="s">'is:issue is:open</tspan>`],
+      [4, `<tspan class="s">"gh-aw-workflow-id: ideas" in:body'</tspan>`],
+      [0, `<tspan class="k">safe-outputs:</tspan>`],
+      [2, `<tspan class="k">create-issue:</tspan> { <tspan class="h">max: 1</tspan>, <tspan class="h">expires: 7</tspan> }`],
+    ];
+    Y.forEach(([ind, s], i) => (g += `<text class="fzs-yaml" x="${RX + ind * CH}" y="${66 + i * 27}">${s}</text>`));
+    g += `<g class="fzs-plate" id="fzsP"><rect x="${RX - 20}" y="248" width="590" height="92" rx="12"/><g id="fzsPi"></g><text class="fzs-pt" id="fzsPt" x="${RX + 30}" y="286"></text><text class="fzs-ps" id="fzsPs" x="${RX + 30}" y="318"></text></g>`;
+    g += `<g class="fzs-mona" id="fzsM"><circle cx="1572" cy="294" r="30" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="1545" y="267" width="54" height="54" clip-path="url(#fzsClip)"/></g>`;
+    g += `<text class="fzs-learn" id="fzsL" x="${RX - 20}" y="374"></text>`;
+    // timeline: a tick every 30 minutes; runs only when no plate is open
+    const TX = i => RX + 10 + i * 56,
+      TY = 440;
+    g += `<text class="aex-d" x="${RX - 20}" y="${TY - 30}">every 30 min</text><line class="fzs-line" x1="${RX - 20}" y1="${TY}" x2="1610" y2="${TY}"/>`;
+    for (let i = 0; i < 12; i++) g += `<g class="fzs-tick" id="fzsT${i}"><circle cx="${TX(i)}" cy="${TY}" r="12"/><text x="${TX(i)}" y="${TY + 34}"></text></g>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="530"><tspan fill="#79c0ff">● run</tspan> → serve one plate · <tspan fill="#9198a1">◌ skip</tspan> → pre-activation, 0 tokens</text>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="560"><tspan fill="#ab7df8">completed</tspan> → more like it · <tspan fill="#9198a1">not planned</tspan> → never again</text>`;
+    g += `<text class="aex-c" x="${RX - 20}" y="590"><tspan class="h" fill="#ffa657">expires: 7</tspan> → a forgotten plate never stalls the loop</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg fzs-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dots = [...svg.querySelectorAll(".fzs-dot")];
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2),
+      clamp = u => Math.max(0, Math.min(1, u));
+    // [title, run tick, close tick, outcome]; illustrative plates served one at a time
+    const PLATES = [
+      ["Cache search results", 0, 2, "done"],
+      ["Retry every fetch three times", 3, 6, "np"],
+      ["Split the 2,000-line parser", 7, 9, "done"],
+      ["Index docs headings", 10, 99, ""],
+    ];
+    const LEARN = { done: "", np: "learned · cache-memory: no blanket retries" };
+    const T = i => 800 + i * 1050,
+      CLOSE = i => T(i) + 500,
+      FUZ = 4200,
+      CYC = 15000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      shown = -1;
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      shown = -1;
+      svg.classList.remove("fuz");
+      svg.querySelectorAll(".on, .run, .skip, .now, .done").forEach(x => x.classList.remove("on", "run", "skip", "now", "done"));
+      svg.querySelectorAll(".fzs-tick text").forEach(x => (x.textContent = ""));
+    };
+    slides.push({
+      group: "engineering",
+      key: "schedules",
+      notes:
+        "Fuzzy schedules. The left half is measured on gh-aw itself, snapshot 17 Nov 2026: the compiled cron of the 111 workflows written as schedule: daily or daily on weekdays, by UTC hour and minute. The spike is illustrative: the same 111 workflows if each were pinned to 0 0 * * *. Fixed crons collide: every repo that copies a midnight schedule fires in the same minute, which bursts the token API, hits rate limits, queues runners and, in gh-aw's own history, silently lost safe-output writes. gh-aw compiles daily to a stable time per workflow: two hashes of the workflow path pick the hour and the minute, so each workflow keeps its time across recompiles while the fleet spreads out. Hours 00 and 01 UTC are never chosen; 02 to 05 UTC are weighted three times as likely, the quiet hours for most teams; minutes avoid the hour edges, the US :15 and :45 and the EU :30 peaks. Measured: 45 of 111 land in 02 to 05, none at 00 or 01, none within three minutes of a quarter hour, 98 distinct times. Variants: daily around 14:00 picks inside a one-hour window, daily between 9:00 and 17:00 a custom window, on weekdays adds Monday to Friday; the table shows real compiled crons from gh-aw lock files: every 30 minutes scatters its start minute, hourly and every 6h scatter the minute, daily on weekdays adds Monday to Friday, daily around 10:00 stays within an hour of ten, weekly on monday scatters the time; only every N days and raw cron stay fixed, every 7 days still fires at midnight. The right half is an illustrative All You Can Eat loop with synthetic issues. The workflow wakes every 30 minutes, but skip-if-match searches for its own open issue by the gh-aw-workflow-id marker in pre-activation, so a tick with a plate on the table costs no tokens. When Mona closes the plate, the next tick serves one more. The close reason is the feedback: completed means more like it, not planned means never again, kept in cache-memory for the next run. max: 1 keeps one plate at a time, and expires: 7 closes a forgotten plate so the loop never stalls.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        // left: drop into the spike, then fly to the hashed hours
+        const fz = u >= FUZ;
+        for (let k = 0; k < N; k++) {
+          const d = dots[k];
+          if (!fz) {
+            const p = clamp((u - k * 5) / 300);
+            d.setAttribute("cx", SPOT[k][0]);
+            d.setAttribute("cy", SPOT[k][1] - (1 - ease(p)) * 60);
+            d.setAttribute("opacity", p);
+          } else {
+            const p = ease(clamp((u - FUZ - k * 8) / 900));
+            d.setAttribute("cx", SPOT[k][0] + (FPOT[k][0] - SPOT[k][0]) * p);
+            d.setAttribute("cy", SPOT[k][1] + (FPOT[k][1] - SPOT[k][1]) * p);
+            d.setAttribute("opacity", 1);
+          }
+        }
+        if (u >= 1200)
+          fire("spike", () => {
+            $("fzsS").classList.add("on");
+            sfx.block();
+          });
+        if (fz)
+          fire("fuz", () => {
+            svg.classList.add("fuz");
+            sfx.compile();
+          });
+        // right: ticks run only when no plate is open
+        let open = -1,
+          last = -1;
+        for (let i = 0; i < 12; i++) {
+          if (u < T(i)) break;
+          last = i;
+          const p = PLATES.findIndex(([, r]) => r === i);
+          const el = $("fzsT" + i);
+          if (!el.classList.contains("run") && !el.classList.contains("skip")) {
+            el.classList.add(p >= 0 ? "run" : "skip");
+            el.querySelector("text").textContent = p >= 0 ? "run" : "skip";
+            fire("t" + i, () => (p >= 0 ? sfx.key(0.6) : sfx.step()));
+          }
+          if (p >= 0) open = p;
+        }
+        svg.querySelectorAll(".fzs-tick.now").forEach(x => x.classList.remove("now"));
+        if (last >= 0) $("fzsT" + last).classList.add("now");
+        if (open >= 0) {
+          const [title, , cl, out] = PLATES[open];
+          const closed = u >= CLOSE(cl);
+          const st = closed ? out : "open";
+          const key = open + st;
+          if (shown !== key) {
+            shown = key;
+            const P = $("fzsP"),
+              col = { open: "#79c0ff", done: "#ab7df8", np: "#9198a1" }[st];
+            P.classList.add("on");
+            P.classList.toggle("done", closed);
+            P.style.setProperty("--c", col);
+            $("fzsPi").innerHTML = ico(st === "np" ? "xCircle" : "issue", RX + 4, 294, 26, col);
+            $("fzsPt").textContent = "[ideas] " + title;
+            $("fzsPs").textContent = { open: "open · the next ticks skip", done: "closed · completed → serve more like it", np: "closed · not planned → never again" }[st];
+            $("fzsM").classList.toggle("on", closed);
+            if (closed) {
+              const L = $("fzsL");
+              if (LEARN[out]) {
+                L.textContent = LEARN[out];
+                L.classList.add("on");
+              }
+              sfx.pop(open);
+            }
+          }
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide fzs" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · hashed scatter · skip-if-match · All You Can Eat"), h("h2", {}, letters("Fuzzy "), letters("schedules", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "Spread the load, serve on demand"), " · daily → a stable hashed time · skip-if-match → one open plate"),
+        h("div", { class: "fzs-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${N} fuzzy daily workflows by compiled UTC hour and minute · spike and plates illustrative`)
+      ),
+    });
+  }
+
+  // Week of daily runs: measured heat map of every daily-schedule workflow by weekday and compiled UTC hour; 00–01 empty, 02–05 busiest, weekends lighter
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    // MEASURED: runs per weekday (Mon..Sun) and UTC hour of gh-aw's 144 workflows whose schedule starts with `daily`, snapshot 17 Nov 2026 (refresh/week-of-daily-runs.sh)
+    const WD = [0, 0, 8, 13, 8, 17, 4, 7, 9, 7, 7, 11, 6, 5, 11, 6, 0, 3, 5, 3, 6, 1, 3, 4],
+      WE = [0, 0, 7, 11, 8, 15, 4, 5, 7, 6, 4, 7, 4, 2, 4, 4, 0, 3, 5, 3, 6, 1, 1, 4];
+    const GRID = [WD, WD, WD, WD, WD, WE, WE],
+      DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      W = 144,
+      WKD = 33;
+    const MAX = Math.max(...GRID.flat()),
+      RUNS = GRID.flat().reduce((a, b) => a + b, 0),
+      TOT = GRID.map(r => r.reduce((a, b) => a + b, 0)),
+      top = WD.indexOf(MAX);
+    const X0 = 80,
+      Y0 = 70,
+      CW = 52,
+      RH = 56,
+      cx = hr => X0 + hr * CW,
+      ry = d => Y0 + d * RH;
+    let g = `<defs><pattern id="fzwHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#db6d2814"/><line x1="0" y1="0" x2="0" y2="8" stroke="#db6d28" stroke-width="2" opacity=".55"/></pattern></defs>`;
+    g += `<text class="fzw-lbl" x="0" y="16">${W} DAILY WORKFLOWS · RUNS BY WEEKDAY AND UTC HOUR</text><text class="fzw-lbl" x="${VW}" y="16" text-anchor="end">RUNS / DAY</text>`;
+    GRID.forEach((row, d) => {
+      g += `<text class="fzw-day${d > 4 ? " we" : ""}" x="${X0 - 14}" y="${ry(d) + RH / 2 + 6}">${DAYS[d]}</text>`;
+      row.forEach((v, hr) => {
+        const a = v ? 0.12 + 0.88 * (v / MAX) : 0;
+        g += `<g class="fzw-c${v / MAX > 0.55 ? " hi" : ""}" style="--d:${(0.15 + hr * 0.07 + d * 0.03).toFixed(2)}s"><rect x="${cx(hr) + 2}" y="${ry(d) + 2}" width="${CW - 4}" height="${RH - 4}" rx="6" fill="${v ? `rgba(68,147,248,${a.toFixed(2)})` : "#0d1117"}"/>${v ? `<text x="${cx(hr) + CW / 2}" y="${ry(d) + RH / 2 + 6}">${v}</text>` : ""}</g>`;
+      });
+      const bw = (TOT[d] / Math.max(...TOT)) * 150;
+      g += `<g class="fzw-sum${d > 4 ? " we" : ""}"><rect x="${VW - 210}" y="${ry(d) + 14}" width="${bw}" height="${RH - 28}" rx="4"/><text x="${VW - 210 + bw + 10}" y="${ry(d) + RH / 2 + 6}">${TOT[d]}</text></g>`;
+    });
+    const GB = ry(7);
+    for (let hr = 0; hr < 24; hr += 3) g += `<text class="fzw-hr" x="${cx(hr) + CW / 2}" y="${GB + 24}">${String(hr).padStart(2, "0")}</text>`;
+    g += `<text class="fzw-hr" x="${cx(23) + CW / 2}" y="${GB + 24}">UTC</text>`;
+    // fuzzy windows from schedule_fuzzy_scatter.go: 00–01 never chosen, 02–05 weighted ×3
+    g += `<g class="fzw-band no"><rect x="${cx(0) + 1}" y="${Y0}" width="${2 * CW - 2}" height="${7 * RH}" rx="6"/><text x="${cx(1)}" y="${Y0 - 12}">00–01 never</text></g>`;
+    g += `<g class="fzw-band best"><rect x="${cx(2)}" y="${Y0 - 2}" width="${4 * CW}" height="${7 * RH + 4}" rx="8"/><text x="${cx(4)}" y="${Y0 - 12}">02–05 preferred ×3</text></g>`;
+    g += `<g class="fzw-top"><rect x="${cx(top) - 1}" y="${ry(0) - 1}" width="${CW + 2}" height="${5 * RH + 2}" rx="8"/></g>`;
+    g += `<g class="fzw-key"><text class="b" x="0" y="${GB + 74}">${RUNS} runs a week · busiest hour ${String(top).padStart(2, "0")} UTC: ${MAX} runs · 0 at 00–01 UTC</text><text x="0" y="${GB + 104}">weekends: ${TOT[0]} → ${TOT[5]} runs a day · ${WKD} workflows say daily on weekdays · lighter blue = fewer runs, blank = none</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg fzw-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    slides.push({
+      group: "engineering",
+      under: "schedules",
+      notes: `Week of daily runs. Measured on gh-aw itself, snapshot 17 Nov 2026: every one of the ${W} workflows whose schedule starts with daily, plain, on weekdays or around a time, placed by its compiled cron on a week grid of weekday by UTC hour. Each cell counts runs. ${RUNS} runs a week and not one at 00 or 01 UTC: the fuzzy scatter never picks those hours. The 02 to 05 UTC columns are the busiest, ${MAX} runs at ${String(top).padStart(2, "0")} UTC on weekdays, because the scatter weights the quiet hours three times. Weekends drop from ${TOT[0]} to ${TOT[5]} runs a day: ${WKD} workflows say daily on weekdays, many of them daytime reports around a set hour, so Saturday and Sunday keep only the background work. No cell carries more than ${MAX} of ${W}: the fleet is spread across the day instead of firing in the same minute.`,
+      el: h(
+        "section",
+        { class: "slide fzw" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "schedule: daily · 7 days × 24 UTC hours · measured"), h("h2", {}, letters("Week of "), letters("daily runs", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "No midnight, no stampede"), ` · ${W} daily workflows · at most ${MAX} in any hour · 00–01 UTC empty`),
+        h("div", { class: "fzw-cap" }, `MEASURED · gh-aw .github/workflows · snapshot 17 Nov 2026 · ${W} workflows with a daily schedule (plain, on weekdays, around) · first compiled cron · UTC`)
+      ),
+    });
+  }
   // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
   {
     const AG = pickAgent();
