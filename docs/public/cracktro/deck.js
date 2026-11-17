@@ -260,8 +260,8 @@
   @keyframes ecu-ping { 0% { opacity: .9; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(1.45); } }
   .slide.ecu.up-in, .slide.ecu.down-in, .slide.ecu.leaving { animation: none; }
   .slide.ecu.fadeout { opacity: 1; }
-  .ecu:is(.fadeout, .leaving) :is(.ecu-copy > .kicker, .ecu-s, .ecu-src) { animation: ecu-fall .45s cubic-bezier(.55,0,1,.45) both !important; }
-  .ecu:is(.fadeout, .leaving) .ecu-copy h2::before { animation: ecu-fall .45s cubic-bezier(.55,0,1,.45) both !important; }
+  .ecu:is(.fadeout, .leaving) :is(.ecu-copy > .kicker, .ecu-s, .ecu-src) { animation: ecu-fall .45s cubic-bezier(.55,0,1,.45) both; }
+  .ecu:is(.fadeout, .leaving) .ecu-copy h2::before { animation: ecu-fall .45s cubic-bezier(.55,0,1,.45) both; }
   @keyframes ecu-fall { to { opacity: 0; transform: translateY(160px); } }
   .tp { display: grid; place-items: center; }
   .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
@@ -3497,7 +3497,11 @@
     resetIndex();
     // [label, octicon path, its grid size]
     const STAGES = [
-      ["Augmentation", "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z", 24],
+      [
+        "Augmentation",
+        "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z",
+        24,
+      ],
       ["Automation", OCTICONS["workflow-16"], 16],
       ["Reconstruction", OCTICONS["north-star-16"], 16],
     ];
@@ -5363,7 +5367,7 @@
         ["a", "func newLoaderFactory() LoaderFactory { return defaultFactory{} }"],
         ["a", "func (defaultFactory) NewLoader() Loader { return loader{} }"],
         ["b", "func parseFlag(s string) bool {"],
-        ["b", "\treturn s == \"1\" || strings.EqualFold(s, \"true\")"],
+        ["b", '\treturn s == "1" || strings.EqualFold(s, "true")'],
         ["b", "}"],
         ["c", "func hasTag(tags []string, t string) bool {"],
         ["c", "\tfor _, x := range tags { if x == t { return true } }"],
@@ -5403,19 +5407,25 @@
         [2950, () => (scan.classList.remove("go"), scan.classList.add("end"))],
         ...FIND.map(([g], i) => [3000 + i * 700, () => (i || steps[2].classList.add("on"), grp(g).forEach(l => l.classList.add("hot")), cards[i].classList.add("on"), sfx.pop(i + 1))]),
         [5300, () => ((verdict.textContent = "COMMENT review · Lean: −12 lines possible."), verdict.classList.add("on"), sfx.notify(false))],
-        [6900, () => {
-          steps[3].classList.add("on");
-          lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
-          added.textContent = "+3";
-          sfx.pop(5);
-        }],
-        [8700, () => {
-          steps[4].classList.add("on");
-          cards.forEach(c => c.classList.add("dim"));
-          verdict.textContent = "/ponytail · Lean already. Ship.";
-          verdict.classList.add("ok");
-          sfx.pop(6);
-        }],
+        [
+          6900,
+          () => {
+            steps[3].classList.add("on");
+            lines.forEach(l => (l.dataset.g === "f" ? l.classList.add("on") : l.classList.contains("hot") && l.classList.add("cut")));
+            added.textContent = "+3";
+            sfx.pop(5);
+          },
+        ],
+        [
+          8700,
+          () => {
+            steps[4].classList.add("on");
+            cards.forEach(c => c.classList.add("dim"));
+            verdict.textContent = "/ponytail · Lean already. Ship.";
+            verdict.classList.add("ok");
+            sfx.pop(6);
+          },
+        ],
       ];
       let t0 = 0,
         cyc = -1,
@@ -15923,14 +15933,21 @@
       g += `<path class="drm-w" id="drmIn${i}" pathLength="1" d="M520 ${y} C640 ${y}, 680 ${CY}, ${CX - CR - 6} ${CY}"/>`;
       g += `<g class="drm-r" id="drmR${i}"><circle cx="40" cy="${y}" r="24" fill="#0d1117" stroke="${col}" stroke-width="2.5"/>${ico(ic, 40, y, 26, col)}<text x="78" y="${y + 8}">${txt}</text></g>`;
     });
-    OUT.forEach(([, , ], i) => {
+    OUT.forEach(([, ,], i) => {
       const y = OY(i) + 44;
       g += `<path class="drm-w g" id="drmOut${i}" pathLength="1" d="M${CX + CR + 6} ${CY} C1140 ${CY}, 1170 ${y}, 1262 ${y}"/>`;
     });
     g += `<g id="drmCore"><circle class="drm-core" cx="${CX}" cy="${CY}" r="${CR}"/>${ico("copilot", CX, CY + 6, 96, "#d2a8ff")}
       <circle cx="${CX + 58}" cy="${CY - 62}" r="24" fill="#d2a8ff"/><circle cx="${CX + 70}" cy="${CY - 72}" r="21" fill="#161b22"/>
       <text class="drm-z" x="${CX + 82}" y="${CY - 96}">z</text><text class="drm-z b" x="${CX + 98}" y="${CY - 120}">z</text><text class="drm-z c" x="${CX + 114}" y="${CY - 144}">Z</text></g>`;
-    [[760, 120, 0], [1040, 108, 0.7], [742, 330, 1.3], [1062, 352, 0.4], [830, 90, 1.9], [985, 390, 1.1]].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
+    [
+      [760, 120, 0],
+      [1040, 108, 0.7],
+      [742, 330, 1.3],
+      [1062, 352, 0.4],
+      [830, 90, 1.9],
+      [985, 390, 1.1],
+    ].forEach(([x, y, d]) => (g += `<circle class="drm-star" cx="${x}" cy="${y}" r="3.5" style="animation-delay:${d}s"/>`));
     g += `<text class="drm-cap" x="${CX}" y="${CY + CR + 34}">nightly: mine · cluster · design</text>`;
     PAT.forEach(([x, txt], i) => (g += `<g class="drm-t" id="drmT${i}"><rect x="${x - 100}" y="410" width="200" height="44" rx="22"/><text x="${x}" y="438">${txt}</text></g>`));
     OUT.forEach(([ic, ttl, sub], i) => {
