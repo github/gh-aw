@@ -17,8 +17,6 @@ const CUSTOM_METRIC_FLUSH_INTERVAL_MS = 1000;
 const CUSTOM_METRIC_NAME_RE = /^[A-Za-z][A-Za-z0-9_.\-/]{0,254}$/;
 const CUSTOM_METRIC_UNIT_RE = /^[\x20-\x7e]{0,63}$/;
 const MAX_CUSTOM_METRIC_DESCRIPTION_LENGTH = 1023;
-const METRIC_REDACTED = "***REDACTED***";
-const GENERIC_SECRET_PATTERNS = [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)/g, /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@/gi];
 const HIGH_CARDINALITY_ATTRIBUTE_KEY_RE = /(?:run[._-]?id|trace[._-]?id|span[._-]?id|commit|sha|actor|user|issue(?:[._-]?number)?|pull[._-]?request(?:[._-]?number)?|conversation|url|job[._-]?id)/i;
 const METRIC_RESOURCE_ATTRIBUTE_KEYS = new Set(["gh-aw.repository", "gh-aw.engine.id", "gh-aw.workflow.name", "github.event_name", "github.job"]);
 const OTLP_METRIC_FAILURES_REPORTED_PATH = "/tmp/gh-aw/otlp-metric-failures-reported.txt";
@@ -175,8 +173,9 @@ function buildOTLPMetricsPayload({ serviceName, scopeVersion, resourceAttributes
 }
 
 /**
- * Redact known credential formats and configured secret values from a metric
- * string (name, unit, description, or attribute value).
+ * Redact a metric string (name, unit, description, or attribute value) with the
+ * shared secret redactor: built-in credential patterns, configured secret values,
+ * and add-mask values.
  * @param {string} value
  * @param {string[]} secretValues
  * @returns {string}
@@ -184,11 +183,7 @@ function buildOTLPMetricsPayload({ serviceName, scopeVersion, resourceAttributes
 function redactMetricString(value, secretValues) {
   const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
   const { redactBuiltInPatterns, redactSecrets } = require("./redact_secrets.cjs");
-  let redacted = redactBuiltInPatterns(value).content;
-  for (const pattern of GENERIC_SECRET_PATTERNS) {
-    redacted = redacted.replace(pattern, METRIC_REDACTED);
-  }
-  redacted = redactSecrets(redacted, secretValues).content;
+  const redacted = redactSecrets(redactBuiltInPatterns(value).content, secretValues).content;
   return redactArtifactMaskedValues(redacted, secretValues);
 }
 

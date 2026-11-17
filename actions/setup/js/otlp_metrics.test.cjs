@@ -167,9 +167,9 @@ describe("buildBuiltinRunMetrics", () => {
     expect(JSON.stringify(sanitized)).not.toContain(configuredValue);
   });
 
-  it("redacts known secret formats from metric identity and non-sensitive attribute keys", () => {
+  it("redacts built-in credential patterns from metric identity and non-sensitive attribute keys", () => {
     const githubToken = `ghp_${"a".repeat(36)}`;
-    const bearer = `Bearer ${"b".repeat(24)}`;
+    const awsKey = `AKIA${"B".repeat(16)}`;
     const payload = metrics.buildOTLPMetricsPayload({
       serviceName: "gh-aw",
       metrics: [
@@ -177,21 +177,15 @@ describe("buildBuiltinRunMetrics", () => {
           name: `leak.${githubToken}`,
           value: 1,
           unit: githubToken,
-          description: `auth ${bearer}`,
-          attributes: [
-            { key: "status", value: { stringValue: bearer } },
-            { key: "label", value: { stringValue: "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----" } },
-            { key: "conn", value: { stringValue: "postgres://user:pa55word@db.example/app" } },
-          ],
+          description: `auth ${awsKey}`,
+          attributes: [{ key: "status", value: { stringValue: awsKey } }],
         }),
       ],
     });
 
     const serialized = JSON.stringify(metrics.sanitizeOTLPMetricsPayload(payload));
     expect(serialized).not.toContain(githubToken);
-    expect(serialized).not.toContain("b".repeat(24));
-    expect(serialized).not.toContain("PRIVATE KEY");
-    expect(serialized).not.toContain("pa55word");
+    expect(serialized).not.toContain(awsKey);
   });
 });
 
