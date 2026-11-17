@@ -91,6 +91,12 @@ steps and skipped dependencies, and resolving actionable findings before live
 testing. Ordinary compilation is unchanged; dry-run is still not a hosted
 execution sandbox.
 
+The local compiler now rejects `tools.github.roles` and
+`tools.github.private-repos` instead of silently ignoring these unsupported
+GitHub MCP access-control fields. Remove them to restore compilation; they were
+not enforced before, and no local-compiler replacement is available while
+support remains deferred. Do not rely on them for authorization.
+
 AWF and downloaded Copilot CLI releases now require a reviewed checksum-manifest
 digest bundled in the trusted setup action or supplied as literal
 `sandbox.agent.checksums-sha256` (AWF) / `engine.checksums-sha256` (Copilot)
