@@ -491,7 +491,7 @@ The YAML key `repos` under `tools.github` is **deprecated** as of guard-policy s
 
 **Migration path**: Use `gh aw fix` to automatically migrate `repos:` to `allowed-repos:` in workflow frontmatter.
 
-**Removal target**: The `repos` alias SHOULD be removed in a future major version of the spec; tracking is managed in issue [#44357](https://github.com/github/gh-aw/issues/44357). When the alias is removed, implementations MUST reject `repos` as an unknown field with an error message that suggests `allowed-repos`.
+**Retention decision (2026-11-16)**: Retain the `repos` alias for backward compatibility; no removal version is scheduled. Any future removal requires an explicit versioned migration decision and an update to issue [#44357](https://github.com/github/gh-aw/issues/44357). Until then, implementations MUST accept the alias and SHOULD emit a deprecation warning.
 
 ---
 
@@ -563,7 +563,7 @@ When no guard-policy fields are present on `tools.github`, the derived safe-outp
 
 This section maps normative sections of this specification to the implementation files that realise each requirement. Use this mapping to identify which files must be reviewed or updated when specification sections change.
 
-**Last verified**: 2026-11-04
+**Last verified**: 2026-11-16
 
 ### Guard Policy Validation
 
@@ -576,6 +576,13 @@ This section maps normative sections of this specification to the implementation
 | GP-11 cross-field consistency | Any explicit `allowed-repos` value without `min-integrity` MUST fail validation, including `allowed-repos: "all"` | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`), `pkg/workflow/tools_validation_test.go` (`missing min-integrity field`, `allowed-repos non-all without min-integrity fails`) |
 | GP-10 lockdown precedence | Lockdown + guard-policy conflict detection and warning | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`, `emitGitHubLockdownGuardPolicyWarning`) |
 | Strict-compilation report | Per-workflow summary of allowed repositories, integrity, user and label policies, and lockdown precedence | `pkg/cli/compile_guard_policy_report.go`, `pkg/cli/compile_guard_policy_report_test.go` |
+
+**2026-11-16 sync note**: GP-01's `allowed-repos` forms are parsed by
+`parseGitHubReposScope()` in `pkg/workflow/tools_parser.go` and validated by
+`validateReposScope()` / `validateRepoPattern()` in
+`pkg/workflow/tools_validation_github.go`. GP-11's explicit-scope requirement
+and default-scope behavior are enforced by `validateGitHubGuardPolicy()` and
+covered by `pkg/workflow/tools_validation_test.go`.
 
 ### Safe-Outputs Guard Policy Derivation
 
