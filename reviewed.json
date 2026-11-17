@@ -896,5 +896,41 @@
    "Demo-specific fleet (Spring Boot/React), 0 stars; limited reuse value for other repos"
   ],
   "blogged": false
+ },
+ "githubnext/crane": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-17",
+  "score": 7,
+  "summary": "Scheduled, planned code-migration loop with a deterministic PR-head CI gate and strong guardrails; not archived but last commit 2026-06-08 (stale), 10 stars.",
+  "highlights": [
+   "workflows/crane.md: Step 5a/5b/5c, metric is not sufficient; accept only on green PR checks; 5 fix attempts with failure-signature no-progress guard",
+   "workflows/crane.md Halting Condition: completion needs terminal-success PR-head checks; pending, missing or failing blocks completion",
+   "tests/test_crane_scheduler.py: gate and completed-label recovery tests; concurrency group crane-<repo>, cancel-in-progress false"
+  ],
+  "blogged": false
+ },
+ "githubnext/autoloop": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-17",
+  "score": 6,
+  "summary": "Ratchet-style optimization loop (Karpathy/OpenEvolve-inspired) with CI-gated acceptance and e2e scheduler tests; archived, 84 stars.",
+  "highlights": [
+   "workflows/autoloop.md: Step 5 accept only after PR checks succeed; halting via target-metric",
+   "tests/test_scheduler_e2e.py and tests/test_scheduling.py (about 50 KB of scheduling tests)",
+   "Archived per repo metadata; sibling of crane"
+  ],
+  "blogged": false
+ },
+ "githubnext/goal": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-17",
+  "score": 5,
+  "summary": "Single-issue long-running goal workflow (/goal-style) requiring an evidence-based completion contract; archived, 10 stars, small codebase.",
+  "highlights": [
+   "workflows/goal.md: scheduler output drives one branch and one draft PR per goal issue",
+   "New-goal definition quality gate: Goal, Completion Contract, Evidence, Scope, Iteration Policy, Blocked Stop Condition",
+   "tests/test_goal_scheduler.py: scheduler unit tests; archived"
+  ],
+  "blogged": false
  }
 }

@@ -219,6 +219,22 @@
   {
    "q": "gh-aw MCP server fork:false archived:false pushed:>2026-10-20",
    "last_run": "2026-11-16"
+  },
+  {
+   "q": "gh-aw shared components fork:false archived:false pushed:>2026-10-25",
+   "last_run": "2026-11-17"
+  },
+  {
+   "q": "topic:gh-aw fork:false archived:false pushed:>2026-11-01",
+   "last_run": "2026-11-17"
+  },
+  {
+   "q": "\"source: githubnext/agentic\" in:readme fork:false archived:false",
+   "last_run": "2026-11-17"
+  },
+  {
+   "q": "agentic workflows gh-aw in:description fork:false archived:false pushed:>2026-11-01",
+   "last_run": "2026-11-17"
   }
  ]
 }
