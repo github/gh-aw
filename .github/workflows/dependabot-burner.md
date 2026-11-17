@@ -96,6 +96,7 @@ tools:
     - "uv pip compile *"
     - "python -m pip download --require-hashes --only-binary=:all: *"
     - "git status"
+    - "git status --short"
     - "git diff *"
     - "git diff --stat"
     - "cat *"

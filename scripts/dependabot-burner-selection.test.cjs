@@ -97,12 +97,13 @@ test("safe outputs are executable while GitHub reads stay off the shell", () => 
 
 test("required workflow validation commands pass without enabling unrelated commands", () => {
   const allowed = compiledBashPolicy();
-  for (const command of ["make dependabot && make build", "npm --prefix .github/workflows install --package-lock-only --ignore-scripts"]) {
+  for (const command of ["git status --short && git diff --stat", "make dependabot && make build", "npm --prefix .github/workflows install --package-lock-only --ignore-scripts"]) {
     assert.ok(allowed(command), command);
   }
   for (const command of [
     "make test",
     "make build && gh auth status",
+    "git status --short && git remote -v",
     "npm install --package-lock-only --ignore-scripts",
     "npm --prefix .github/workflows install",
     "cd .github/workflows && npm install --package-lock-only --ignore-scripts",
