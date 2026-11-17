@@ -73,7 +73,7 @@ func (c *Compiler) generatePrompt(output *strings.Builder, data *WorkflowData, p
 	// workflow has a workflow_dispatch trigger with item_number.
 	applyWorkflowDispatchFallbacks(expressionMappings, data.HasDispatchItemNumber)
 
-	allExpressionMappings := c.generateUnifiedPromptCreationStep(yaml, builtinSections, userPromptChunks, expressionMappings, data)
+	allExpressionMappings, promptContent := c.generateUnifiedPromptCreationStepWithContent(yaml, builtinSections, userPromptChunks, expressionMappings, data)
 
 	// Merge all known needs.* expressions for the substitution step.
 	knownNeedsExpressions := generateKnownNeedsExpressions(data, preActivationJobCreated)
@@ -104,7 +104,7 @@ func (c *Compiler) generatePrompt(output *strings.Builder, data *WorkflowData, p
 		writePromptBashStep(yaml, "Validate prompt placeholders", "validate_prompt_placeholders.sh")
 	}
 	writePromptBashStep(yaml, "Print prompt", "print_prompt_summary.sh")
-	return writeCredentialFreePromptSteps(output, yaml.String(), data)
+	return writeCredentialFreePromptSteps(output, yaml.String(), data, promptContent)
 }
 
 // enrichExpressionMappings extracts expressions from the main workflow markdown

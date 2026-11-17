@@ -70,17 +70,17 @@ slide that lists the band's slides (click a tile to jump) and a map of all bands
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
 Left/Right (or Space) step through the slides of the main line in reading
-order and wrap between bands, and Page Up/Page Down jump to the first slide of
+order and wrap between bands, and Page Up/Page Down (or Shift+Up/Down) jump to the first slide of
 the band above or below. Some Human agent processes patterns head a column of
 worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
-they do on slides without a column), and Left/Right from an example return to
-the main line. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
+they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to
+the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
 and M to toggle sound. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
-`slides.md` summaries and slide text; arrows pick a result, Enter opens it, and
+`slides.md` summaries and keywords, and slide text; arrows pick a result, Enter opens it, and
 `#<id>` jumps to that slide. Hovering a dock button shows its keyboard shortcut. The navigation dots form a map with one row per band and
 jump directly to a slide (on narrow screens they become previous/next slide arrows
 flanked by track-style previous/next band buttons). Each slide has a stable id
@@ -88,7 +88,7 @@ flanked by track-style previous/next band buttons). Each slide has a stable id
 added or moved slides; old `#N` links redirect to the id. Tours are curated
 subsets of the deck (Overview, Security deep dive, ...), listed at the bottom of
 the slide map: picking one adds `&tour=<name>` to the hash, a pill shows the tour
-and position, navigation skips the other slides, and × leaves the tour. Examples
+and position, navigation skips the other slides, and × (or X) leaves the tour. Examples
 in a pattern's column only appear together with their pattern. "Design a view"
 in the slide map lets you tick slides or whole bands and copy a link that
 encodes the selection as `&view=<base64url>`. Clicking the left third
@@ -99,7 +99,7 @@ page fullscreen; to present without the browser bars, use
 Share → Add to Home Screen and open the talk from that icon. Slides within a band push left, and
 moving to a later band slides up (reversed when going back). Slides built on a gh-aw
 workflow show its original `/agentic-workflows` prompt along the top; click it to
-open the full prompt in a phone-style dialog (Escape or Done closes it).
+open the full prompt in a phone-style dialog (or press P; Escape or Done closes it).
 Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
 1200x630 render of the title slide; regenerate it if the title slide changes.
 The ordered slide list, with a one-sentence summary per slide, lives in

@@ -84,9 +84,9 @@ func renderRunsOnSnippet(value any) string {
 	var err error
 	if valueMap, ok := value.(map[string]any); ok {
 		orderedValue := OrderMapFields(valueMap, []string{})
-		yamlBytes, err = yaml.MarshalWithOptions(yaml.MapSlice{{Key: "runs-on", Value: orderedValue}}, runsOnMarshalOptions()...)
+		yamlBytes, err = marshalYAMLWithOptions(yaml.MapSlice{{Key: "runs-on", Value: orderedValue}}, runsOnMarshalOptions()...)
 	} else {
-		yamlBytes, err = yaml.MarshalWithOptions(map[string]any{"runs-on": value}, runsOnMarshalOptions()...)
+		yamlBytes, err = marshalYAMLWithOptions(map[string]any{"runs-on": value}, runsOnMarshalOptions()...)
 	}
 	if err != nil {
 		runsOnSnippetLog.Printf("Failed to marshal runs-on snippet: %v", err)

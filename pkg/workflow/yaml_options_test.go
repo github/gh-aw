@@ -7,7 +7,83 @@ import (
 	"testing"
 
 	"github.com/goccy/go-yaml"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
+
+func TestDefaultMarshalOptionsMultilineRoundTrip(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"leading spaces", "   continuation\nnext: list item\n"},
+		{"leading tab", "\tcontinuation\nnext: list item\n"},
+		{"single-line leading spaces", "   continuation"},
+		{"single-line leading tab", "\tcontinuation"},
+		{"single-line trailing space", "continuation "},
+		{"single-line trailing tab", "continuation\t"},
+		{"uniform indentation", "   first\n   second\n"},
+		{"leading newline", "\n   continuation\nnext: list item\n"},
+		{"leading blank lines", "\n\nfirst\nsecond"},
+		{"whitespace-only first line", "   \nfirst\nsecond\n"},
+		{"only newlines", "\n\n"},
+		{"single newline", "\n"},
+		{"three newlines", "\n\n\n"},
+		{"trailing blank lines", "   first\nsecond\n\n"},
+		{"CRLF", "first\r\nsecond\r\n"},
+		{"quotes and escapes", "   \"quoted\" \\path\nnext: 'value'\n"},
+		{"ordinary multiline", "first\n   nested\nlast\n"},
+		{"trailing spaces", "first\nsecond  "},
+		{"trailing tab", "first\nsecond\t"},
+		{"only trailing blank line", "value\n\n"},
+		{"unindented trailing blank lines", "first\nsecond\n\n"},
+		{"multiple trailing blank lines", "first\nsecond\n\n\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := map[string]any{"env": map[string]string{"CONTENT": tt.value}}
+			encoded, err := marshalYAMLWithOptions(input, DefaultMarshalOptions...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for name, unmarshal := range map[string]func([]byte, any) error{
+				"goccy":  yaml.Unmarshal,
+				"yamlv3": yamlv3.Unmarshal,
+			} {
+				t.Run(name, func(t *testing.T) {
+					var decoded map[string]map[string]string
+					if err := unmarshal(encoded, &decoded); err != nil {
+						t.Fatalf("invalid YAML: %v\n%s", err, encoded)
+					}
+					if got := decoded["env"]["CONTENT"]; got != tt.value {
+						t.Errorf("round trip changed content: got %q, want %q", got, tt.value)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestMarshalYAMLWithOptionsPreservesOtherValues(t *testing.T) {
+	input := yaml.MapSlice{
+		{Key: "unsafe", Value: "   first\nsecond\n"},
+		{Key: "ordinary", Value: "first\n   second\n"},
+		{Key: "trailing", Value: "first\nsecond  "},
+		{Key: "blank", Value: "first\nsecond\n\n"},
+	}
+	encoded, err := marshalYAMLWithOptions(input, DefaultMarshalOptions...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]string
+	if err := yamlv3.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range input {
+		if got := decoded[item.Key.(string)]; got != item.Value {
+			t.Errorf("%s changed: got %q, want %q", item.Key, got, item.Value)
+		}
+	}
+}
 
 // TestDefaultMarshalOptions verifies that the centralized marshal options
 // produce the expected YAML formatting.
@@ -45,7 +121,7 @@ nested:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := yaml.MarshalWithOptions(tt.input, DefaultMarshalOptions...)
+			result, err := marshalYAMLWithOptions(tt.input, DefaultMarshalOptions...)
 			if err != nil {
 				t.Fatalf("MarshalWithOptions failed: %v", err)
 			}
@@ -62,8 +138,9 @@ nested:
 // produces the same output as the previous inline options.
 func TestDefaultMarshalOptionsConsistency(t *testing.T) {
 	testData := map[string]any{
-		"name": "workflow",
-		"on":   "push",
+		"name":        "workflow",
+		"on":          "push",
+		"description": "ordinary multiline\nwith another line",
 		"jobs": map[string]any{
 			"test": map[string]any{
 				"runs-on": "ubuntu-latest",
@@ -75,7 +152,7 @@ func TestDefaultMarshalOptionsConsistency(t *testing.T) {
 	}
 
 	// Marshal with DefaultMarshalOptions
-	result1, err := yaml.MarshalWithOptions(testData, DefaultMarshalOptions...)
+	result1, err := marshalYAMLWithOptions(testData, DefaultMarshalOptions...)
 	if err != nil {
 		t.Fatalf("MarshalWithOptions with DefaultMarshalOptions failed: %v", err)
 	}
@@ -106,7 +183,7 @@ func TestDefaultMarshalOptionsIndentation(t *testing.T) {
 		},
 	}
 
-	result, err := yaml.MarshalWithOptions(input, DefaultMarshalOptions...)
+	result, err := marshalYAMLWithOptions(input, DefaultMarshalOptions...)
 	if err != nil {
 		t.Fatalf("MarshalWithOptions failed: %v", err)
 	}

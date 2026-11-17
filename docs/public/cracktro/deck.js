@@ -4229,7 +4229,7 @@
     });
 
     const cards = SC.map((s, i) =>
-      h("button", { class: "atk-card", type: "button", "aria-pressed": "false", onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) }, h("b", {}, i + 1), h("span", { class: "h4" }, s.t), h("span", { class: "p" }, s.d))
+      h("button", { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${s.t} (← → step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) }, h("b", {}, i + 1), h("span", { class: "h4" }, s.t), h("span", { class: "p" }, s.d))
     );
     const body = h("div", { class: "atk-body" });
     const term = h("div", { class: "atk-term" }, h("header", {}, h("i"), h("i"), h("i"), h("span", {}, "agent · sandboxed · read-only token")), body);
@@ -21687,7 +21687,7 @@
         idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
       },
     ];
-    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
+    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${p.tab[0]} (← → switch process)`, onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
     const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
     const docIco = h("span", {}),
       docT = h("div", {}),
@@ -22249,7 +22249,10 @@
           .replace(/\s+/g, " ")
           .trim()
       ];
-    if (p) s.el.append(h("div", { class: "awp" }, h("button", { type: "button", "aria-haspopup": "dialog", title: "Show the full prompt", onclick: () => openPrompt(...p) }, "/agentic-workflows"), p[1]));
+    if (!p) continue;
+    s.el.append(h("div", { class: "awp" }, h("button", { type: "button", "aria-haspopup": "dialog", "aria-keyshortcuts": "P", title: "Show the full prompt (P)", onclick: () => openPrompt(...p) }, "/agentic-workflows"), p[1]));
+    const onKey = s.onKey;
+    s.onKey = e => (e.key === "p" || e.key === "P" ? (openPrompt(...p), true) : onKey?.call(s, e));
   }
   // Full-screen phone (GitHub app) dialog showing the full prompt; isolates deck keys, clicks and swipes while open.
   const phone = h("div", { class: "awd", role: "dialog", "aria-modal": "true", "aria-label": "Original prompt" });
@@ -22257,7 +22260,7 @@
     phoneInert = [];
   function openPrompt(wf, _, full) {
     phoneBack = document.activeElement;
-    const close = h("button", { type: "button", class: "awd-x", "aria-label": "Close", onclick: closePrompt }, "Done");
+    const close = h("button", { type: "button", class: "awd-x", "aria-label": "Close", "aria-keyshortcuts": "Escape", title: "Close (Esc)", onclick: closePrompt }, "Done");
     phone.replaceChildren(
       h(
         "div",
