@@ -712,6 +712,63 @@ test("steps the budget steering slide from the 80% notice to a submitted pull re
   expect(errors).toEqual([]);
 });
 
+test("splits inline skills and agents, defers context and preserves step navigation", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  const number = slideNo("Inlined Skills & Agents");
+  await page.goto(`/gh-aw/cracktro/#${number}`);
+  const slide = page.locator(".slide.isa");
+  const diagram = slide.locator(".isa-svg");
+  await expect(slide).toHaveClass(/active/);
+  await expect(diagram).not.toHaveClass(/\bs1\b/);
+  const measured = slide.getByRole("region", { name: "Measured inline skills and agents usage on gh-aw" });
+  await expect(measured).toBeVisible();
+  const layout = await slide.evaluate(el => {
+    const diagram = el.querySelector(".isa-svg")!.getBoundingClientRect();
+    const strip = el.querySelector(".isa-measured")!.getBoundingClientRect();
+    const caption = el.querySelector(".isa-caption")!.getBoundingClientRect();
+    return {
+      separated: diagram.bottom <= strip.top,
+      captionClear: strip.bottom <= caption.top,
+      contained: caption.bottom <= el.getBoundingClientRect().bottom,
+      labelsFit: [...el.querySelectorAll<HTMLElement>(".isa-example, .isa-inventory")].every(node => node.scrollWidth <= node.clientWidth),
+    };
+  });
+  expect(layout).toEqual({ separated: true, captionClear: true, contained: true, labelsFit: true });
+
+  await page.keyboard.press("ArrowRight");
+  await expect(diagram).toHaveClass(/\bs1\b/);
+  await expect(slide.locator(".isa-blk.skill").first()).toHaveAttribute("transform", /translate\(556\.0 /);
+  await page.keyboard.press("ArrowRight");
+  await expect(slide.locator(".isa-take")).toHaveClass(/on/, { timeout: 10_000 });
+  await expect(slide.locator(".isa-ml.aft.sm.on")).toHaveCount(2);
+  const context = await slide.evaluate(el => {
+    const height = (selector: string) => el.querySelector<SVGGraphicsElement>(selector)!.getBBox().height;
+    return {
+      first: height("#isaPa0"),
+      last: height("#isaPa5"),
+      monolith: height("#isaPb5"),
+    };
+  });
+  expect(context.first).toBeLessThan(context.last);
+  expect(context.last).toBeLessThan(context.monolith);
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(diagram).not.toHaveClass(/\bs2\b/);
+  await expect(slide.locator(".isa-take")).not.toHaveClass(/on/);
+  await page.keyboard.press("ArrowLeft");
+  await expect(diagram).not.toHaveClass(/\bs1\b/);
+  await expect(slide.locator(".isa-blk.core")).toHaveAttribute("transform", /translate\(36\.0 /);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".slide.active h2")).toHaveText("Audit & Optimize");
+  await page.keyboard.press("ArrowLeft");
+  await expect(slide).toHaveClass(/active/);
+  await expect(slide.locator(".isa-take")).toHaveClass(/on/);
+  expect(errors).toEqual([]);
+});
+
 test.describe("slides.md metadata", () => {
   const table = (...rows: string[]) => ["# Slides", "", "| Heading | Notes | Summary |", "|---|---|---|", ...rows, ""].join("\n");
 

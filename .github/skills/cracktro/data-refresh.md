@@ -48,6 +48,6 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | CLI vs MCP | `refresh/cli-vs-mcp.md` |
 | Skills in review | `refresh/skills-in-review.md` |
 | Ponytail Reviewer | `refresh/ponytail-reviewer.md` |
+| Inlined Skills & Agents | `refresh/inlined-skills-agents.md` |
 | Fuzzy schedules | `refresh/fuzzy-schedules.md` |
 | Week of daily runs | `refresh/week-of-daily-runs.md` |
-
