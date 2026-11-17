@@ -5,7 +5,7 @@ package cli
 // Formal compliance tests for the safe output outcome evaluation engine.
 //
 // These tests cover predicates P1–P12, P14, and P15 derived from the formal model in
-// specs/safe-output-outcome-evaluation.md.
+// specs/safe-output-lifecycle.md.
 //
 // Formal notation cross-references:
 //   - TLA+ state-machine invariants: P1, P4, P5, P6, P9
@@ -33,7 +33,7 @@ import (
 //	    r ∈ {"accepted","rejected","ignored","pending","lifecycle","lifecycle_close"}
 //	    ∨ r ∈ {"unknown","error"}  (* internal-only; normalized before OTel emission *)
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Outcome Categories
+// Specification reference: specs/safe-output-lifecycle.md §Outcome Categories
 func TestFormalOutcomeDomainInvariant(t *testing.T) {
 	// The six externally-observable outcome categories defined by the spec.
 	specDomain := map[string]bool{
@@ -73,12 +73,12 @@ func TestFormalOutcomeDomainInvariant(t *testing.T) {
 		{Type: "close_pull_request", OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusLifecycleClose}},
 	}
 	summary := ComputeOutcomeSummary(reports, github.DefaultObjectiveMapping())
-	assert.Equal(t, 6, summary.Total, "P1: total must cover the six spec-defined non-internal outcomes")
+	assert.Equal(t, 6, summary.Total, "P1: total must cover the six spec-defined non-internal adoption")
 	assert.Equal(t, 1, summary.Accepted, "P1: one accepted")
 	assert.Equal(t, 1, summary.Rejected, "P1: one rejected")
 	assert.Equal(t, 1, summary.Ignored, "P1: one ignored")
 	assert.Equal(t, 1, summary.Pending, "P1: one pending")
-	assert.Equal(t, 2, summary.Lifecycle, "P1: lifecycle and lifecycle_close must both count as lifecycle outcomes")
+	assert.Equal(t, 2, summary.Lifecycle, "P1: lifecycle and lifecycle_close must both count as lifecycle adoption")
 }
 
 // TestFormalAPIFailurePending verifies that GitHub API 5xx and rate-limit errors
@@ -92,7 +92,7 @@ func TestFormalOutcomeDomainInvariant(t *testing.T) {
 //	  (requires apiErr.status ∈ {500, 502, 503, 429})
 //	  (ensures fun r → r.OutcomeStatus ≠ OutcomeStatusAccepted ∧ r.OutcomeStatus ≠ OutcomeStatusRejected)
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Norms (rules 2, 4)
+// Specification reference: specs/safe-output-lifecycle.md §Norms (rules 2, 4)
 func TestFormalAPIFailurePending(t *testing.T) {
 	old := closeStickyGHAPIGet
 	t.Cleanup(func() { closeStickyGHAPIGet = old })
@@ -135,7 +135,7 @@ func TestFormalAPIFailurePending(t *testing.T) {
 //	    r.status = 404 ∧ transient(r.type) ⟹ eval.OutcomeStatus = ignored ∧
 //	    r.status = 404 ⟹ eval.OutcomeStatus ≠ accepted
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Norms (rule 1)
+// Specification reference: specs/safe-output-lifecycle.md §Norms (rule 1)
 func TestFormal404Classification(t *testing.T) {
 	// Persistent object: "deleted" detail maps to rejected (persistent 404 classification).
 	t.Run("persistent object deleted → rejected", func(t *testing.T) {
@@ -186,7 +186,7 @@ func TestFormal404Classification(t *testing.T) {
 //	  ∀ login : isBotUser(login) ↔
 //	    HasSuffix(login, "[bot]") ∨ login ∈ KnownBotLogins
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Provenance Limits (rules 1–3)
+// Specification reference: specs/safe-output-lifecycle.md §Provenance Limits (rules 1–3)
 func TestFormalBotActorProvenance(t *testing.T) {
 	botLogins := []string{
 		"github-actions[bot]",  // App bot with [bot] suffix
@@ -224,7 +224,7 @@ func TestFormalBotActorProvenance(t *testing.T) {
 //	    pr.state = "closed" ∧ ¬pr.merged  ⟹ outcome = rejected ∧
 //	    pr.state = "open"                  ⟹ outcome = pending
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §1. `create_pull_request`
+// Specification reference: specs/safe-output-lifecycle.md §1. `create_pull_request`
 func TestFormalPRMergeAcceptance(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -296,7 +296,7 @@ func TestFormalAPIErrorNotTerminal(t *testing.T) {
 	}, "owner/repo")
 
 	assert.Equal(t, OutcomeStatusError, report.OutcomeStatus,
-		"P14: an API error must not produce a terminal outcome")
+		"P14: an API error must not produce a terminal adoption")
 	assert.NotEmpty(t, report.EvalError, "P14: an API error must be recorded")
 }
 
@@ -381,7 +381,7 @@ func TestFormalZeroTouchRequiresNoReviews(t *testing.T) {
 //	    issue.state = "closed" ∧ issue.stateReason = "not_planned" ∧ ¬closedByBot ⟹ result = rejected ∧
 //	    issue.state = "closed" ∧ issue.stateReason = "completed"                   ⟹ result = accepted
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §2. `create_issue`
+// Specification reference: specs/safe-output-lifecycle.md §2. `create_issue`
 func TestFormalIssueBotCloseLifecycle(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -441,7 +441,7 @@ func TestFormalIssueBotCloseLifecycle(t *testing.T) {
 //	    Subset after current ⟹ c.Retained ≠ [] ∧
 //	    ¬Subset after current ⟹ c.Reverted ≠ [] ∨ c.Replaced ≠ [])
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §4. `add_labels`
+// Specification reference: specs/safe-output-lifecycle.md §4. `add_labels`
 func TestFormalLabelStickiness(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -510,7 +510,7 @@ func TestFormalLabelStickiness(t *testing.T) {
 //	    current = before ⟹ c.Reverted = c.Changed ∧
 //	    current ≠ before ∧ current ≠ after ⟹ c.Replaced = c.Changed)
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §6. `update_issue`, §7. `update_pull_request`
+// Specification reference: specs/safe-output-lifecycle.md §6. `update_issue`, §7. `update_pull_request`
 func TestFormalUpdateSnapshotComparison(t *testing.T) {
 	before := map[string]any{"title": "Old title"}
 	after := map[string]any{"title": "New title"}
@@ -557,7 +557,7 @@ func TestFormalUpdateSnapshotComparison(t *testing.T) {
 //	    current.state = "closed" ∧ ¬closedByBot ⟹ result = rejected ∧
 //	    current.state = "open"                  ⟹ result = rejected
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §8. `close_issue`, §9. `close_pull_request`
+// Specification reference: specs/safe-output-lifecycle.md §8. `close_issue`, §9. `close_pull_request`
 func TestFormalCloseStickyReopenRejection(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -697,7 +697,7 @@ func TestFormalLifecycleNormalizationFallbacks(t *testing.T) {
 //	(assert (=> (= total 0) (= waste_rate 0.0)))
 //	(check-sat) ; sat — formulas are consistent and zero-safe
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Derived Metrics
+// Specification reference: specs/safe-output-lifecycle.md §Derived Metrics
 func TestFormalDerivedMetricsConsistency(t *testing.T) {
 	t.Run("acceptance_rate = accepted / (accepted + rejected)", func(t *testing.T) {
 		reports := []OutcomeReport{
@@ -732,7 +732,7 @@ func TestFormalDerivedMetricsConsistency(t *testing.T) {
 			"P10: waste_rate must be 0.0 when total=0 (division-by-zero safe)")
 	})
 
-	t.Run("division-by-zero safety: only pending outcomes", func(t *testing.T) {
+	t.Run("division-by-zero safety: only pending adoption", func(t *testing.T) {
 		reports := []OutcomeReport{
 			{Type: "add_labels", OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending}},
 			{Type: "add_labels", OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending}},
@@ -758,7 +758,7 @@ func TestFormalDerivedMetricsConsistency(t *testing.T) {
 //	    normalizeOutcomeEvaluation(r).OutcomeStatus ≠ "" ∧
 //	    normalizeOutcomeEvaluation(r).EvidenceStrength ≠ "")
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Norms
+// Specification reference: specs/safe-output-lifecycle.md §Norms
 func TestFormalOutcomeSurvivesAPIFailure(t *testing.T) {
 	old := closeStickyGHAPIGet
 	t.Cleanup(func() { closeStickyGHAPIGet = old })
@@ -812,7 +812,7 @@ func TestFormalOutcomeSurvivesAPIFailure(t *testing.T) {
 //	  (ensures fun ok →
 //	    ok = classAExists(evaluator) ∧ classCExists(evaluator))
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Conformance →§Conformance Safeguard Coverage Requirements
+// Specification reference: specs/safe-output-lifecycle.md §Conformance →§Conformance Safeguard Coverage Requirements
 func TestFormalConformanceClassCoverage(t *testing.T) {
 	t.Run("Class A: close_issue lifecycle_close state transition", func(t *testing.T) {
 		old := closeStickyGHAPIGet
@@ -874,7 +874,7 @@ func TestFormalConformanceClassCoverage(t *testing.T) {
 		}
 		eval := normalizeOutcomeEvaluation(report)
 		assert.Equal(t, "lifecycle", eval.Signal,
-			"P12 Class B: bot-closed outcome must carry the lifecycle signal")
+			"P12 Class B: bot-closed adoption must carry the lifecycle signal")
 	})
 
 	t.Run("Class C: API 5xx for close_issue", func(t *testing.T) {

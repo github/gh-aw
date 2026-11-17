@@ -802,7 +802,7 @@ do not change the queue's canonical Git authority.
 | `compact` | Canonically order facts and remove only identical duplicates |
 | `submit-work` | `--file work.json` (or `--file -` for stdin); derives an id from the canonical JSON object |
 | `claim` | `--run-id RUN [--work-id ID]`; defaults to the oldest available Work |
-| `finish` | `--claim-id ID --attempt-id ATTEMPT [--outcome TEXT]` |
+| `finish` | `--claim-id ID --attempt-id ATTEMPT [--adoption TEXT]` |
 | `cancel-work` | `--work-id ID` |
 | `cancel-claim` | `--claim-id ID` |
 

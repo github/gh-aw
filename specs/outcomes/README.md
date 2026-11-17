@@ -15,7 +15,7 @@ represents two observations of the same action, not two production actions.
 Evidence is immutable during this evaluation. `WF_vars(Next)` excludes indefinite
 stuttering before publication; it is an assumption, not a guarantee about the
 scheduling of later CLI evaluations. These model identities do not imply two
-production evaluators; `gh aw logs --outcomes` is the live evaluation entry point.
+production evaluators; `gh aw logs --adoption` is the live evaluation entry point.
 
 The finite universe has **2,712 distinct evidence records**. Each action family
 varies relevant state, missing/available execution evidence, API success/failure,

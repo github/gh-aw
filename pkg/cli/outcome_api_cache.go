@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/github/gh-aw/pkg/repoutil"
-	"github.com/github/gh-aw/pkg/workflow"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -44,7 +43,7 @@ func requestOutcomeJSON[T any](ctx context.Context, repo string, args []string) 
 	}
 	args = outcomeAPIArgs(repo, args)
 	fetch := func() ([]byte, error) {
-		output, err := workflow.RunGHContext(ctx, "Checking outcome...", args...)
+		output, err := requestLifecycleAPI(ctx, repo, args)
 		if err != nil {
 			return nil, err
 		}

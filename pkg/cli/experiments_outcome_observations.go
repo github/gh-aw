@@ -50,10 +50,11 @@ type githubOutcomeRunSource struct {
 }
 
 func (s *githubOutcomeRunSource) Load(ctx context.Context, runIDText string) outcomeRunData {
-	runID, reason := s.artifacts.eligibleRunID(ctx, runIDText)
+	metadata, reason := s.artifacts.eligibleRun(ctx, runIDText)
 	if reason != "" {
 		return outcomeRunData{ExclusionReason: reason}
 	}
+	runID := metadata.DatabaseID
 	runDir := filepath.Join(s.artifacts.baseDir, strconv.FormatInt(runID, 10))
 	if err := os.MkdirAll(runDir, constants.DirPermPublic); err != nil {
 		return outcomeRunData{ExclusionReason: exclusionArtifactUnavailable}
@@ -80,10 +81,9 @@ func (s *githubOutcomeRunSource) Load(ctx context.Context, runIDText string) out
 	}
 	// Preserve invocation directories: collectRunOutcomes understands immutable
 	// manifests and their matching compact enrichment artifacts.
-	run := ProcessedRun{Run: WorkflowRun{
-		DatabaseID: runID, Repository: buildRepoFlag(s.artifacts.owner, s.artifacts.repo, s.artifacts.hostname),
-		LogsPath: runDir,
-	}}
+	metadata.Repository = buildRepoFlag(s.artifacts.owner, s.artifacts.repo, s.artifacts.hostname)
+	metadata.LogsPath = runDir
+	run := ProcessedRun{Run: metadata}
 	report, err := collectRunOutcomes(ctx, run, nil, false)
 	if err != nil || report.EvalError != "" {
 		return outcomeRunData{ExclusionReason: exclusionArtifactUnavailable}
@@ -110,7 +110,7 @@ func resolveOutcomeMetricReferences(configs map[string]*workflow.ExperimentConfi
 				continue
 			}
 			if kind == "" {
-				return nil, nil, nil, nil, fmt.Errorf("experiments.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", name, ref)
+				return nil, nil, nil, nil, fmt.Errorf("experiments.%s: unknown adoption metric %q. Expected adoption:accepted or adoption:zero_touch. Example: metric: adoption:accepted", name, ref)
 			}
 			if index == 0 {
 				primary[name] = kind
@@ -135,7 +135,7 @@ func resolveOutcomeMetricReferences(configs map[string]*workflow.ExperimentConfi
 				continue
 			}
 			if kind == "" {
-				return nil, nil, nil, nil, fmt.Errorf("experiments.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", name, ref)
+				return nil, nil, nil, nil, fmt.Errorf("experiments.%s: unknown adoption metric %q. Expected adoption:accepted or adoption:zero_touch. Example: metric: adoption:accepted", name, ref)
 			}
 			window, err := experimentOutcomeWindow(name, cfg.OutcomeWindow)
 			if err != nil {
@@ -156,7 +156,7 @@ func experimentOutcomeWindow(name, configured string) (time.Duration, error) {
 	}
 	window, err := time.ParseDuration(configured)
 	if err != nil || window <= 0 {
-		return 0, fmt.Errorf("experiments.%s.outcome_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: outcome_window: 72h", name, configured)
+		return 0, fmt.Errorf("experiments.%s.adoption_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: adoption_window: 72h", name, configured)
 	}
 	return window, nil
 }
@@ -173,7 +173,7 @@ func resolveOutcomeSecondaryMetricReferences(configs map[string]*workflow.Experi
 				continue
 			}
 			if kind == "" {
-				return nil, fmt.Errorf("experiments.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", name, ref)
+				return nil, fmt.Errorf("experiments.%s: unknown adoption metric %q. Expected adoption:accepted or adoption:zero_touch. Example: metric: adoption:accepted", name, ref)
 			}
 			if refs[name] == nil {
 				refs[name] = make(map[string]string)
@@ -414,7 +414,7 @@ func clampExperimentOutcomeWindow(window time.Duration) time.Duration {
 func buildOutcomeMetricObservationSets(experiments []ExperimentVariantStats, runs []ExperimentRunRecord, refs map[string]string, windows map[string]time.Duration, now time.Time, data map[string]outcomeRunData) map[string]*graderMetricObservationSet {
 	state := initializeGraderObservationSets(experiments, refs, nil)
 	for name, set := range state.sets {
-		set.MetricID = "outcome:" + refs[name]
+		set.MetricID = "adoption:" + refs[name]
 		set.Coverage = make(map[string]*OutcomeMetricCoverage)
 		for variant := range state.assignedCounts[name] {
 			set.Coverage[variant] = &OutcomeMetricCoverage{}
@@ -507,7 +507,7 @@ func outcomeMetricRunValue(kind string, items []OutcomeReport) (float64, bool, O
 		case OutcomeStatusPending:
 			denominator++
 			coverage.StalePending = 1
-		case OutcomeStatusLifecycle, OutcomeStatusLifecycleClose, OutcomeStatusIgnored, OutcomeStatusSkipped:
+		case OutcomeStatusLifecycle, OutcomeStatusLifecycleClose, OutcomeStatusIgnored, OutcomeStatusSkipped, OutcomeStatusNotApplicable:
 		default:
 			coverage.Unavailable = 1
 		}

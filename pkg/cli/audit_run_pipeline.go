@@ -119,6 +119,12 @@ func renderIncompleteAuditIfTimedOut(cfg auditRunConfig, run WorkflowRun, result
 }
 
 func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
+	if opts.Delivery || opts.Adoption {
+		if opts.Group || opts.JobID > 0 {
+			return auditRunConfig{}, errors.New("--delivery and --adoption require a single run without --group or job selection")
+		}
+		opts.ArtifactSets = logsOutcomeArtifactSets(opts.ArtifactSets, true)
+	}
 	if opts.Models {
 		if opts.Group || opts.JobID > 0 {
 			return auditRunConfig{}, errors.New("--models requires a single run without --group or job selection")
@@ -166,6 +172,8 @@ func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
 		search:                 opts.Search,
 		searchLimit:            opts.SearchLimit,
 		models:                 opts.Models,
+		delivery:               opts.Delivery,
+		adoption:               opts.Adoption,
 		evalsArtifactRequested: isEvalsArtifactRequested(opts.EvalsOnly, opts.ArtifactSets),
 	}, nil
 }
@@ -251,6 +259,8 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 		Search:      cfg.search,
 		SearchLimit: cfg.searchLimit,
 		Models:      cfg.models,
+		Delivery:    cfg.delivery,
+		Adoption:    cfg.adoption,
 	}
 }
 
@@ -264,6 +274,9 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 		return false, false, nil
 	}
 	if cfg.models && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"agent", "usage", "info"}), cfg.outputDir)) > 0 {
+		return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
+	}
+	if (cfg.delivery || cfg.adoption) && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"delivery"}), cfg.outputDir)) > 0 {
 		return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
 	}
 	if cfg.search != "" {
