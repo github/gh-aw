@@ -22,6 +22,9 @@ set +o histexpand
 
 set -euo pipefail
 
+TMP_DIR="$(mktemp -d /tmp/gh-aw-cache-memory.XXXXXX)"
+trap 'rm -rf -- "$TMP_DIR"' EXIT
+
 CACHE_DIR="${GH_AW_CACHE_DIR:-/tmp/gh-aw/cache-memory}"
 INTEGRITY="${GH_AW_MIN_INTEGRITY:-none}"
 
@@ -187,14 +190,13 @@ else
   # If restored git metadata is corrupt (for example missing tree objects from a
   # raced or force-pushed cache branch), reset to a clean repo while preserving
   # restored files in the working tree.
-  if ! git fsck --connectivity-only --no-progress >/tmp/gh-aw-git-fsck-out 2>/tmp/gh-aw-git-fsck-err; then
+  if ! git fsck --connectivity-only --no-progress >"${TMP_DIR}/git-fsck-out" 2>"${TMP_DIR}/git-fsck-err"; then
     echo "WARNING: Detected corrupted cache-memory git repository; reinitializing git metadata"
-    cat /tmp/gh-aw-git-fsck-err 2>/dev/null || true
+    cat "${TMP_DIR}/git-fsck-err" 2>/dev/null || true
     rm -rf .git
     IS_CACHE_HIT=false
     initialize_cache_memory_git_repo
   fi
-  rm -f /tmp/gh-aw-git-fsck-out /tmp/gh-aw-git-fsck-err 2>/dev/null || true
 
   # Existing repo: disable hooks as belt-and-suspenders after the earlier
   # hook-file cleanup step in this script.
@@ -238,22 +240,21 @@ fi
 
 # --- Checkout current integrity branch ---
 # Use -q to suppress "Switched to branch" noise
-if ! git checkout -q "$INTEGRITY" 2>/tmp/gh-aw-checkout-err; then
+if ! git checkout -q "$INTEGRITY" 2>"${TMP_DIR}/checkout-err"; then
   checkout_exit=$?
-  if grep -qiE "unable to read tree|could not parse HEAD|bad object|missing tree" /tmp/gh-aw-checkout-err 2>/dev/null; then
+  if grep -qiE "unable to read tree|could not parse HEAD|bad object|missing tree" "${TMP_DIR}/checkout-err" 2>/dev/null; then
     echo "WARNING: checkout failed due to cache-memory git corruption; reinitializing git metadata"
-    cat /tmp/gh-aw-checkout-err 2>/dev/null || true
+    cat "${TMP_DIR}/checkout-err" 2>/dev/null || true
     rm -rf .git
     IS_CACHE_HIT=false
     initialize_cache_memory_git_repo
     git checkout -q "$INTEGRITY"
   else
     echo "ERROR: failed to checkout integrity branch '$INTEGRITY' (exit $checkout_exit):" >&2
-    cat /tmp/gh-aw-checkout-err >&2
+    cat "${TMP_DIR}/checkout-err" >&2
     exit "$checkout_exit"
   fi
 fi
-rm -f /tmp/gh-aw-checkout-err 2>/dev/null || true
 
 # --- Merge down from higher-integrity branches ---
 # Read semantics: lower-integrity runs see higher-integrity data via merge,
@@ -264,7 +265,7 @@ for level in "${LEVELS[@]}"; do
     break
   fi
   # Merge higher-integrity branch into the current branch
-  if git merge "$level" -X theirs --no-edit -m "merge-from-$level" -q 2>/tmp/gh-aw-merge-err; then
+  if git merge "$level" -X theirs --no-edit -m "merge-from-$level" -q 2>"${TMP_DIR}/merge-err"; then
     echo "Merged integrity branch '$level' into '$INTEGRITY'"
   else
     merge_exit=$?
@@ -272,11 +273,11 @@ for level in "${LEVELS[@]}"; do
     # pre-merge state so the agent always starts from a consistent, usable tree.
     git merge --abort 2>/dev/null || git reset --hard HEAD 2>/dev/null || true
     # Ignore "already up-to-date" and "nothing to merge" — fail fast on real errors
-    if grep -qiE "already up.to.date|nothing to merge|nothing to commit" /tmp/gh-aw-merge-err 2>/dev/null; then
+    if grep -qiE "already up.to.date|nothing to merge|nothing to commit" "${TMP_DIR}/merge-err" 2>/dev/null; then
       echo "Nothing to merge from '$level' into '$INTEGRITY' (already up-to-date)"
     else
       echo "ERROR: merge from '$level' into '$INTEGRITY' failed (exit $merge_exit):" >&2
-      cat /tmp/gh-aw-merge-err >&2
+      cat "${TMP_DIR}/merge-err" >&2
       exit "$merge_exit"
     fi
   fi

@@ -41,4 +41,10 @@ describe("start_safe_outputs_server.sh", () => {
       fs.rmSync(outputDir, { recursive: true, force: true });
     }
   });
+
+  it.each(["start_safe_outputs_server.sh", "start_mcp_scripts_server.sh"])("%s does not log the API key", script => {
+    const content = fs.readFileSync(path.join(__dirname, "../sh", script), "utf8");
+    assert.doesNotMatch(content, /API Key:/);
+    assert.doesNotMatch(content, /API_KEY:\d/);
+  });
 });
