@@ -12,6 +12,7 @@ import remarkStripEmojis from "./src/lib/remark/stripEmojis.js";
 import remarkTableDataLabels from "./src/lib/remark/tableDataLabels.js";
 import remarkInlineMarkdownInHtml from "./src/lib/remark/inlineMarkdownInHtml.js";
 import remarkAgenticsWorkflow from "./src/lib/remark/agenticsWorkflow.js";
+import rehypeDeduplicateTitle from "./src/lib/rehype/deduplicateTitle.js";
 import rehypeTableWrapper from "./src/lib/rehype/tableWrapper.js";
 import cracktroMetadata from "./src/lib/cracktro/integration.js";
 import redirectFragments from "./src/lib/redirect-fragments.js";
@@ -41,7 +42,7 @@ export default defineConfig({
   markdown: {
     processor: unified({
       remarkPlugins: [remarkStripEmojis, remarkTableDataLabels, remarkInlineMarkdownInHtml, [remarkAgenticsWorkflow, { sourceDirectory: agenticsWorkflowsDirectory }]],
-      rehypePlugins: [rehypeTableWrapper],
+      rehypePlugins: [rehypeDeduplicateTitle, rehypeTableWrapper],
     }),
   },
   vite: {
