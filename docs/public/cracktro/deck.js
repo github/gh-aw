@@ -1039,6 +1039,41 @@
   .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
   .dto-big { fill: #3fb950; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  /* --- fuzzy schedules --- */
+  .fsc .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #ab7df8, #ffa657, #79c0ff); }
+  .fsc-ed { position: absolute; left: 110px; top: 320px; width: 560px; height: 660px; box-sizing: border-box; padding: 24px 28px; border: 2px solid #3d444d; border-radius: 16px; background: #0d1117e8; font: 500 21px/1.55 var(--mono); color: #e6edf3; }
+  .fsc-ed > i { display: block; font: 600 14px/1 var(--mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase; color: #9198a1; margin: 26px 0 12px; }
+  .fsc-ed > i:first-child { margin-top: 0; }
+  .fsc-src, .fsc-lock { white-space: pre; }
+  .fsc-k { color: #ff7b72; } .fsc-v { color: #a5d6ff; } .fsc-c { color: #8b949e; } .fsc-o { color: #ffa657; } .fsc-b { color: #79c0ff; }
+  .fsc-arr { margin: 16px 0 0; color: #ab7df8; font-weight: 600; }
+  .fsc-seed { padding: 12px 14px; border-radius: 10px; background: #161b22; border: 1px solid #3d444d; font-size: 18px; line-height: 1.4; word-break: break-all; min-height: 52px; }
+  .fsc-seed b { color: #f0f6fc; }
+  .fsc-pool { margin-top: 12px; font-size: 17px; line-height: 1.5; color: #9198a1; transition: opacity .4s; }
+  .fsc.s0 .fsc-pool { opacity: .3; }
+  .fsc-lock { font-size: 24px; }
+  .fsc-badge { display: inline-block; margin-top: 22px; padding: 10px 16px; border-radius: 999px; border: 1px solid #3d444d; font: 600 18px/1 var(--mono); color: #9198a1; opacity: 0; transition: opacity .4s; }
+  .fsc.s2 .fsc-badge { opacity: 1; color: #79c0ff; border-color: #4493f8; }
+  .fsc-other { margin-top: 16px; font-size: 17px; line-height: 1.45; color: #9198a1; opacity: 0; transition: opacity .4s; word-break: break-all; }
+  .fsc.s2 .fsc-other { opacity: 1; }
+  .fsc-svg { position: absolute; left: 720px; top: 300px; width: 1100px; height: 470px; overflow: visible; }
+  .fsc-t { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .12em; }
+  .fsc-ax { fill: #9198a1; font: 500 15px var(--mono); text-anchor: middle; }
+  .fsc-base { stroke: #3d444d; stroke-width: 2; }
+  .fsc-tk { stroke: #ffffff1a; stroke-width: 1; }
+  .fsc-q { fill: #1f6feb14; stroke: #1f6feb66; stroke-dasharray: 4 6; }
+  .fsc-ql { fill: #79c0ff; font: 600 14px var(--mono); text-anchor: middle; }
+  .fsc-lim { stroke: #ffa657; stroke-width: 2; stroke-dasharray: 10 8; }
+  .fsc-liml { fill: #ffa657; font: 600 15px var(--mono); text-anchor: end; }
+  .fsc-msg { font: 700 28px "Mona Sans"; }
+  .fsc-msg.bad { fill: #ffa657; } .fsc-msg.ok { fill: #79c0ff; }
+  .fsc-sub { fill: #9198a1; font: 500 17px var(--mono); }
+  .fsc-ben { position: absolute; left: 720px; top: 812px; width: 1100px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .fsc-ben > div { padding: 16px 18px; border-radius: 14px; border: 2px solid #3d444d; background: #0d1117e8; opacity: .3; transition: opacity .4s, border-color .4s; }
+  .fsc-ben > div.on { opacity: 1; border-color: var(--c); }
+  .fsc-ben b { display: block; font: 700 24px/1.1 "Mona Sans"; color: #f0f6fc; }
+  .fsc-ben b::before { content: attr(data-i); margin-right: 8px; color: var(--c); }
+  .fsc-ben span { display: block; margin-top: 8px; font: 500 15px/1.35 var(--mono); color: #9198a1; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -6878,6 +6913,187 @@
         drawRoute(t, dt);
       },
       el: h("section", { class: "slide cm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Guard · measure · optimize"), h("h2", {}, letters("Cost "), letters("management", "l-grad"))), ed, meter, route),
+    });
+  }
+
+  // Fuzzy schedules: forty workflows on a fixed midnight cron spike every run at 00:00; with schedule: daily the compiler hashes each
+  // repository + workflow path (FNV-1a, the same pools as the Go scatter code) into a stable, peak-avoiding slot, so starts spread across the day
+  {
+    resetIndex();
+    const REPO = "acme/widgets",
+      OTHER = "acme/gadgets";
+    // synthetic workflow names
+    const NAMES = ["daily-pr-summary", "issue-triage", "repo-assist", "docs-updater", "dependency-review", "go-fan", "perf-benchmark", "security-hunter", "stale-pr-nudger", "release-notes", "test-coverage", "lint-miner", "code-simplifier", "duplicate-code", "ci-doctor", "changelog-bot", "label-sync", "weekly-digest", "spec-enforcer", "link-checker", "flaky-test-hunter", "api-diff", "license-audit", "i18n-sync", "schema-check", "metrics-report", "backlog-groomer", "doc-tester", "dead-code", "bundle-size", "a11y-check", "typo-fixer", "workflow-health", "cost-report", "audit-digest", "skill-reviewer", "otel-advisor", "smoke-test", "secret-scan", "mobile-tester"];
+    // FNV-1a and the daily slot pools mirror pkg/parser/schedule_fuzzy_scatter.go
+    const fnv = (s, m) => {
+      let x = 0x811c9dc5;
+      for (const b of new TextEncoder().encode(s)) x = Math.imul(x ^ b, 0x01000193) >>> 0;
+      return x % m;
+    };
+    const HOURS = [];
+    for (let hr = 2; hr <= 5; hr++) HOURS.push(hr, hr, hr);
+    for (let hr = 6; hr <= 23; hr++) HOURS.push(hr);
+    const MINS = [];
+    for (let m = 5; m <= 54; m++) if (!(m >= 27 && m <= 33) && !(m >= 12 && m <= 18) && !(m >= 42 && m <= 48)) MINS.push(m);
+    const slot = id => {
+      const hh = fnv(id, HOURS.length);
+      return [HOURS[hh], MINS[fnv(`${id}:${hh}`, MINS.length)]];
+    };
+    const seedOf = (repo, n) => `${repo}/.github/workflows/${n}.md`;
+    const hhmm = ([hr, m]) => `${String(hr).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const VW = 1100,
+      VH = 470,
+      X0 = 50,
+      X1 = 1080,
+      BASE = 410,
+      DS = 9,
+      LIM = 6,
+      BINS = 48,
+      BW = (X1 - X0) / BINS;
+    const xOf = b => X0 + (b + 0.5) * BW,
+      yOf = k => BASE - (k + 0.5) * DS;
+    const fill = {},
+      fixed = [],
+      fuzzy = [];
+    NAMES.forEach((n, i) => {
+      const s = slot(seedOf(REPO, n)),
+        b = Math.floor((s[0] * 60 + s[1]) / 30),
+        k = (fill[b] = (fill[b] || 0) + 1) - 1;
+      fixed.push([xOf(0), yOf(i)]);
+      fuzzy.push([xOf(b), yOf(k), s]);
+    });
+    const PEAK = Math.max(...Object.values(fill));
+    let g = `<text class="fsc-t" x="${X0}" y="20">WORKFLOW STARTS PER 30 MIN · UTC · ILLUSTRATIVE</text>`;
+    g += `<rect class="fsc-q" x="${X0 + 4 * BW}" y="40" width="${8 * BW}" height="${BASE - 40}" rx="6"/><text class="fsc-ql" x="${X0 + 8 * BW}" y="62">02–06 · quiet hours</text>`;
+    for (let hr = 0; hr <= 24; hr += 3) {
+      const x = X0 + hr * 2 * BW;
+      g += `<line class="fsc-tk" x1="${x}" y1="40" x2="${x}" y2="${BASE}"/><text class="fsc-ax" x="${x}" y="${BASE + 30}">${String(hr).padStart(2, "0")}:00</text>`;
+    }
+    g += `<line class="fsc-base" x1="${X0}" y1="${BASE}" x2="${X1}" y2="${BASE}"/>`;
+    g += `<line class="fsc-lim" x1="${X0}" y1="${BASE - LIM * DS}" x2="${X1}" y2="${BASE - LIM * DS}"/><text class="fsc-liml" x="${X1}" y="${BASE - LIM * DS - 10}">shared capacity · runners · API · model quota</text>`;
+    g += `<text class="fsc-msg" id="fscMsg" x="${X0 + 3 * BW}" y="130"></text><text class="fsc-sub" id="fscSub" x="${X0 + 3 * BW}" y="162"></text>`;
+    NAMES.forEach(() => (g += `<circle class="fsc-dot" r="4"/>`));
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fsc-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const dots = [...svg.querySelectorAll(".fsc-dot")],
+      msg = svg.querySelector("#fscMsg"),
+      sub = svg.querySelector("#fscSub");
+    const sp = (t, c) => h("span", { class: c }, t);
+    const src = h("div", { class: "fsc-src" }),
+      seed = h("div", { class: "fsc-seed" }),
+      lock = h("div", { class: "fsc-lock" }),
+      other = h("div", { class: "fsc-other" });
+    const ed = h(
+      "div",
+      { class: "fsc-ed" },
+      h("i", {}, "workflow.md · front matter"),
+      src,
+      h("div", { class: "fsc-arr" }, "↓ gh aw compile"),
+      h("i", {}, "scatter seed"),
+      seed,
+      h("div", { class: "fsc-pool" }, "FNV-1a hash → hour (02–05 UTC weighted ×3) + minute (skips :00 ±5 and busy minutes)"),
+      h("i", {}, "lock file"),
+      lock,
+      h("div", { class: "fsc-badge" }, "↻ recompile → same cron"),
+      other
+    );
+    const BEN = [
+      ["No spikes", "#79c0ff", "starts spread across the day, not all at :00", 1],
+      ["Fewer limits hit", "#ab7df8", "runners, API rate limits and model quotas see a smooth load", 1],
+      ["Stable", "#3fb950", "same seed, same slot: recompiling never moves a run", 2],
+      ["Per repository", "#d29922", "the repo is in the seed, so a shared workflow scatters across repos too", 2],
+    ];
+    const ben = BEN.map(([b, c, t], i) => h("div", { "--c": c }, h("b", { "data-i": String(i + 1).padStart(2, "0") }, b), h("span", {}, t)));
+    const el = h("section", { class: "slide fsc s0" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fuzzy schedules · deterministic scattering"), h("h2", {}, letters("Fuzzy "), letters("schedules", "l-grad"))), ed, svg, h("div", { class: "fsc-ben" }, ben));
+    let step = 0,
+      tStep = 0,
+      last = 0,
+      hi = 0,
+      tHi = 0,
+      pos = fixed.map(p => [...p]);
+    const show = () => {
+      const n = NAMES[hi],
+        s = fuzzy[hi][2];
+      if (!step) {
+        src.replaceChildren(sp("on:\n", "fsc-k"), sp("  schedule:\n", "fsc-k"), sp("    - cron: ", "fsc-k"), sp('"0 0 * * *"', "fsc-o"));
+        seed.replaceChildren(sp("none · every workflow gets the same minute", "fsc-c"));
+        lock.replaceChildren(sp("cron: ", "fsc-k"), sp('"0 0 * * *"', "fsc-o"), sp("  # all 40", "fsc-c"));
+        other.replaceChildren();
+        return;
+      }
+      src.replaceChildren(sp("on:\n", "fsc-k"), sp("  schedule: ", "fsc-k"), sp("daily", "fsc-v"));
+      seed.replaceChildren(`${REPO}/.github/workflows/`, h("b", {}, n), ".md");
+      lock.replaceChildren(sp("cron: ", "fsc-k"), sp(`"${s[1]} ${s[0]} * * *"`, "fsc-b"), sp(`  # ${hhmm(s)} UTC`, "fsc-c"));
+      const o = slot(seedOf(OTHER, n));
+      other.replaceChildren("same file in ", h("b", {}, OTHER), ` → "${o[1]} ${o[0]} * * *" (${hhmm(o)} UTC)`);
+    };
+    const setStep = s => {
+      step = s;
+      tStep = performance.now();
+      el.classList.remove("s0", "s1", "s2");
+      el.classList.add(`s${s}`);
+      ben.forEach((b, i) => b.classList.toggle("on", s >= BEN[i][3]));
+      msg.setAttribute("class", `fsc-msg ${s ? "ok" : "bad"}`);
+      msg.textContent = s ? `✓ at most ${PEAK} starts in any 30 min` : "⚠ 40 runs start at 00:00";
+      sub.textContent = s ? "deterministic: one hashed slot per workflow" : "queued runners · rate limits · quota bursts";
+      show();
+    };
+    slides.push({
+      group: "cost",
+      notes:
+        "Fuzzy schedules: the forty workflows, repository names and chart are illustrative and synthetic, but the slots are computed with the same FNV-1a hash and pools as the compiler. Step 1: a fixed cron like 0 0 * * * puts every copy of every workflow at the same minute, and top-of-the-hour, especially midnight UTC, is when GitHub Actions is busiest. Forty agentic runs start together: runners queue, API rate limits and token quotas are hit at once, and model providers see a burst. Step 2: write schedule: daily instead (or hourly, weekly, every 2h, daily around 9am, daily between 9:00 and 17:00 on weekdays). gh aw compile hashes the repository slug plus the workflow path into a slot: the hour pool favours the quiet 02 to 06 UTC window, and the minute pool skips the five minutes around each hour and other known busy minutes. The runs spread across the day. Step 3: the scattering is deterministic, not random. The same seed always gives the same cron, so recompiling never moves a run or churns the lock file, and because the repository is part of the seed, the same shared workflow installed in many repositories lands at different times too. Keys: → next step.",
+      enter() {
+        last = tHi = 0;
+        hi = 0;
+        pos = fixed.map(p => [...p]);
+        setStep(0);
+      },
+      onNext() {
+        if (step < 2) {
+          setStep(step + 1);
+          sfx.step(1);
+          return true;
+        }
+        return false;
+      },
+      onPrev() {
+        if (step > 0) {
+          setStep(step - 1);
+          return true;
+        }
+        return false;
+      },
+      tick(t) {
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        const now = performance.now();
+        if (step < 2 && now - tStep > 4200) {
+          setStep(step + 1);
+          sfx.step(1);
+        }
+        if (step && now - tHi > 1600) {
+          tHi = now;
+          hi = (hi + 7) % NAMES.length;
+          show();
+          sfx.pop(hi);
+        }
+        const tgt = step ? fuzzy : fixed;
+        dots.forEach((d, i) => {
+          if (now - tStep > i * 22) {
+            const p = pos[i];
+            p[0] += (tgt[i][0] - p[0]) * Math.min(1, dt / 160);
+            p[1] += (tgt[i][1] - p[1]) * Math.min(1, dt / 160);
+          }
+          const on = step && i === hi;
+          d.setAttribute("cx", pos[i][0].toFixed(1));
+          d.setAttribute("cy", pos[i][1].toFixed(1));
+          d.setAttribute("r", on ? 7 : 4);
+          d.setAttribute("fill", on ? "#f0f6fc" : step ? "#79c0ff" : "#ffa657");
+        });
+      },
+      el,
     });
   }
 
