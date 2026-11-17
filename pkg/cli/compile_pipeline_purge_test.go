@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -33,4 +34,29 @@ func TestCollectPurgeDataWithPatterns_ValidPatterns(t *testing.T) {
 	require.NotNil(t, data)
 	require.Empty(t, data.existingLockFiles)
 	require.Empty(t, data.existingInvalidFiles)
+}
+
+func TestCollectPurgeData(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	markdownFile := filepath.Join(dir, "workflow.md")
+	data, err := collectPurgeData(dir, []string{markdownFile}, false)
+	require.NoError(t, err)
+	require.Equal(t, []string{filepath.Join(dir, "workflow.lock.yml")}, data.expectedLockFiles)
+}
+
+func TestRunPurgeOperations(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	lockFile := filepath.Join(dir, "orphan.lock.yml")
+	invalidFile := filepath.Join(dir, "workflow.invalid.yml")
+	require.NoError(t, os.WriteFile(lockFile, []byte("lock"), 0o600))
+	require.NoError(t, os.WriteFile(invalidFile, []byte("invalid"), 0o600))
+
+	runPurgeOperations(dir, &purgeTrackingData{}, false)
+
+	_, err := os.Stat(lockFile)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(invalidFile)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
