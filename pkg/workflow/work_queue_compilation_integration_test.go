@@ -771,7 +771,7 @@ func TestWorkQueueSmokeVerification(t *testing.T) {
 	dir := testutil.TempDir(t, "work-queue-smoke-")
 	workflowPath := filepath.Join(dir, "smoke-work-queue.md")
 	require.NoError(t, os.WriteFile(workflowPath, source, 0o600))
-	require.NoError(t, NewCompiler(WithVersion("integration")).CompileWorkflow(workflowPath))
+	require.NoError(t, NewCompiler(WithVersion("integration"), WithWorkflowIdentifier("smoke-work-queue")).CompileWorkflow(workflowPath))
 
 	lock, err := os.ReadFile(filepath.Join(dir, "smoke-work-queue.lock.yml"))
 	require.NoError(t, err)

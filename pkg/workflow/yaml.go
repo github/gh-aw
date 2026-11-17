@@ -276,7 +276,7 @@ func MarshalWithFieldOrder(data map[string]any, priorityFields []string) ([]byte
 	orderedData := OrderMapFields(data, priorityFields)
 
 	// Marshal the ordered data with proper options for GitHub Actions
-	return yaml.MarshalWithOptions(orderedData, DefaultMarshalOptions...)
+	return marshalYAMLWithOptions(orderedData, DefaultMarshalOptions...)
 }
 
 // OrderMapFields converts a map to yaml.MapSlice with fields in a specific order.

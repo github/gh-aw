@@ -71,7 +71,7 @@ Baseline (14 Nov 2026): FairDAGGitHub passed, exhausted, 1,055,182 distinct, dep
 ## 6. Validation
 
 - `node --check docs/public/cracktro/deck.js`.
-- Serve `docs/public` (`python3 -m http.server <port> --bind 127.0.0.1 --directory docs/public`), open `/cracktro/#<n>` in the browser canvas, screenshot during all three phases. Check that no ledger line wraps (each `.smt-run`/`.smt-cap` `scrollWidth <= clientWidth`) and that card subtitles stay inside their cards.
+- Serve `docs/public` (`python3 -m http.server <port> --bind 127.0.0.1 --directory docs/public`), open `/cracktro/#spec-model-test` in the browser canvas, screenshot during all three phases. Check that no ledger line wraps (each `.smt-run`/`.smt-cap` `scrollWidth <= clientWidth`) and that card subtitles stay inside their cards.
 - Content rules: no 40-hex SHAs (artifacts contain `sha`; never copy it), no URLs, no `github/<repo>` strings, no people, agent/role names only.
 - `cd docs && npx playwright test tests/talk.spec.ts`.
 

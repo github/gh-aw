@@ -88,7 +88,7 @@ If the new numbers are lower than the baseline, suspect the query first: the com
 
 ```bash
 node --check docs/public/cracktro/deck.js
-python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#N (N = row in slides.md)
+python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#issue-monster
 git diff -U0 docs/public/cracktro/deck.js | grep '^+' | grep -nE '[0-9a-f]{40}|github/[a-z]|https?://|who:' | grep -v 'w3.org/2000/svg'   # must print nothing
 cd docs && npx playwright test tests/talk.spec.ts
 ```

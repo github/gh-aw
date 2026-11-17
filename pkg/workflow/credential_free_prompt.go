@@ -125,7 +125,7 @@ func configureCredentialFreePromptAction(step *WorkflowStep) error {
 }
 
 // Prompt modules receive no authenticated API client or inherited credentials.
-func writeCredentialFreePromptSteps(output *strings.Builder, content string, data *WorkflowData) error {
+func writeCredentialFreePromptSteps(output *strings.Builder, content string, data *WorkflowData, intendedPromptContent map[string]string) error {
 	var steps []WorkflowStep
 	comments := yaml.CommentMap{}
 	if err := yaml.UnmarshalWithOptions([]byte(content), &steps, yaml.CommentToMap(comments)); err != nil {
@@ -155,12 +155,50 @@ func writeCredentialFreePromptSteps(output *strings.Builder, content string, dat
 		}
 	}
 	options := append([]yaml.EncodeOption{yaml.WithComment(comments)}, DefaultMarshalOptions...)
-	encoded, err := yaml.MarshalWithOptions(steps, options...)
+	encoded, err := marshalYAMLWithOptions(steps, options...)
 	if err != nil {
 		return fmt.Errorf("encode credential-free prompt steps: %w", err)
 	}
+	if err := validatePromptContentRoundTrip(encoded, steps, intendedPromptContent); err != nil {
+		return err
+	}
 	for line := range strings.SplitSeq(strings.TrimRight(string(encoded), "\n"), "\n") {
 		output.WriteString("      " + line + "\n")
+	}
+	return nil
+}
+
+func validatePromptContentRoundTrip(encoded []byte, steps []WorkflowStep, intendedPromptContent map[string]string) error {
+	var decoded []WorkflowStep
+	if err := yaml.Unmarshal(encoded, &decoded); err != nil {
+		return fmt.Errorf("parse encoded prompt steps: %w", err)
+	}
+	if len(decoded) != len(steps) {
+		return fmt.Errorf("YAML round trip changed the prompt step count — expected %d, got %d", len(steps), len(decoded))
+	}
+	seenContent := make(map[string]struct{}, len(intendedPromptContent))
+	for _, step := range decoded {
+		for key, actual := range step.Env {
+			if !strings.HasPrefix(key, "GH_AW_PROMPT_CONTENT_") {
+				continue
+			}
+			expected, exists := intendedPromptContent[key]
+			if !exists {
+				return fmt.Errorf("YAML round trip produced unexpected %s in prompt step %q", key, step.Name)
+			}
+			if actual != expected {
+				return fmt.Errorf("YAML round trip changed %s in prompt step %q — expected prompt content to be preserved exactly", key, step.Name)
+			}
+			if _, duplicate := seenContent[key]; duplicate {
+				return fmt.Errorf("YAML round trip duplicated %s in prompt steps", key)
+			}
+			seenContent[key] = struct{}{}
+		}
+	}
+	for key := range intendedPromptContent {
+		if _, exists := seenContent[key]; !exists {
+			return fmt.Errorf("YAML round trip changed %s in prompt steps — expected prompt content to be preserved exactly", key)
+		}
 	}
 	return nil
 }

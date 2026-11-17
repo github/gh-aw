@@ -89,7 +89,7 @@ Output shape → slide field:
 ```bash
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # async + detached
-# browser canvas: http://127.0.0.1:4329/cracktro/#N (N = row in slides.md) → step to the end, screenshot the strip
+# browser canvas: http://127.0.0.1:4329/cracktro/#pull-request-review-squared → step to the end, screenshot the strip
 grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview'   # must be empty
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```
@@ -107,4 +107,4 @@ cd docs && npx playwright test tests/talk.spec.ts                       # if nod
 - Footers can change: re-read each workflow's `footer:` before running; update `REVIEWERS` in the script if it changed.
 - `truncated` PRs may undercount; spot-check them if the list grows.
 - GraphQL rate limits: the script retries 3 times with backoff; rerun if it still fails.
-- Slide numbers shift when slides are added; find the slide by its marker, and its `#N` by its row in `slides.md`.
+- Link the slide by its stable id `#pull-request-review-squared` and find it in `deck.js` by its marker.

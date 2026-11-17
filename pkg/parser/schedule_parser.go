@@ -335,25 +335,24 @@ func formatHourlyIntervalCron(interval int, hasWeekdaysSuffix bool) string {
 	return fmt.Sprintf("FUZZY:HOURLY/%d * * *", interval)
 }
 
+// Day, week, and month intervals compile to fuzzy schedules so that many workflows
+// sharing the same interval do not all fire at 00:00 UTC.
 func formatDailyIntervalCron(interval int) string {
 	if interval == 1 {
-		return "0 0 * * *"
+		return "FUZZY:DAILY * * *"
 	}
-	return fmt.Sprintf("0 0 */%d * *", interval)
+	return fmt.Sprintf("FUZZY:DAILY_INTERVAL/%d * * *", interval)
 }
 
 func formatWeeklyIntervalCron(interval int) string {
 	if interval == 1 {
-		return "0 0 * * 0"
+		return "FUZZY:WEEKLY * * *"
 	}
-	return fmt.Sprintf("0 0 */%d * *", interval*7)
+	return fmt.Sprintf("FUZZY:DAILY_INTERVAL/%d * * *", interval*7)
 }
 
 func formatMonthlyIntervalCron(interval int) string {
-	if interval == 1 {
-		return "0 0 1 * *"
-	}
-	return fmt.Sprintf("0 0 1 */%d *", interval)
+	return fmt.Sprintf("FUZZY:MONTHLY_INTERVAL/%d * * *", interval)
 }
 
 func (p *ScheduleParser) parseDailyBase(hasWeekdaysSuffix bool) (string, error) {

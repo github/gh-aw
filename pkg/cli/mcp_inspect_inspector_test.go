@@ -199,6 +199,7 @@ func writeMCPInspectorWorkflow(t *testing.T, dir string) string {
 	content := `---
 on:
   workflow_dispatch:
+  schedule: every 2 days
 
 permissions: read-all
 

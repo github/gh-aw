@@ -70,7 +70,7 @@ Sanity baseline (window 2026-05-13..2026-11-16, run 17 Nov 2026):
 
 ```bash
 node --check docs/public/cracktro/deck.js
-python3 -m http.server 4359 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4359/cracktro/#N (N = row in slides.md)
+python3 -m http.server 4359 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4359/cracktro/#pr-sous-chef
 git diff -U0 docs/public/cracktro/deck.js | grep '^+' | grep -nE '[0-9a-f]{40}|github/[a-z]|https?://|who:'   # must print nothing
 cd docs && npx playwright test tests/talk.spec.ts
 ```
