@@ -73,7 +73,7 @@ Routing supports a specific set of models, not every model an engine can run. Th
 
 This is a supported-model list, not an availability guarantee. At run time, candidates must also be available to the workflow's Copilot account or native provider account, compatible with the [engine and provider](#engines-and-providers), and permitted by the workflow's [model policy](#limiting-which-models-it-can-pick) and any [shortlist](#a-shortlist-of-models). Retired models and unsupported model-effort combinations are skipped. A prompt that exceeds a model's context capacity can also exclude it.
 
-Native OpenAI routing uses the GPT IDs above. Native Anthropic routing uses `claude-haiku-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, and `claude-opus-5-5`. Gemini and MAI models can be routed through GitHub Copilot inference with the `copilot` or `pi` engine. The `gemini` engine does not support routing.
+For native Anthropic inference, the bundled routing metadata supports `claude-sonnet-5`, `claude-sonnet-5-5`, and `claude-opus-5-5`. Native OpenAI candidates use the GPT names above, subject to the [native routing requirements](#native-anthropic-and-openai-routing). Gemini and MAI models can be routed through GitHub Copilot inference with the `copilot` or `pi` engine. The `gemini` engine does not support routing.
 
 The list comes from the [routing tables bundled with AWF v0.29.14](https://github.com/github/gh-aw-firewall/tree/v0.29.14/containers/router/routing). If you pin a different `sandbox.agent.version` or supply custom images, its catalogue may differ. Run [`gh aw upgrade`](/gh-aw/setup/working-with-workflows/#upgrading-workflows) when gh-aw updates AWF to make newly supported models candidates. Use `gh aw audit <run-url> --models` to inspect the model catalogue recorded for a particular workflow run.
 
@@ -87,7 +87,7 @@ An unavailable model is different from an unavailable task classification. If cl
 
 ## Limiting which models it can pick
 
-Use a [model policy](/gh-aw/reference/glossary/#model-policy-modelsallowed-modelsblocked) to keep a workflow within approved model families or exclude models you do not want it to use. `models.allowed` and `models.blocked` accept model names or `*` patterns and apply to every model request in the run, including sub-agents and built-in agents. The firewall rejects requests outside the policy.
+Use a [model policy](/gh-aw/reference/glossary/#model-policy-modelsallowed-modelsblocked) to keep the main agent job within approved model families or exclude models you do not want it to use. `models.allowed` and `models.blocked` accept model names or `*` patterns and apply to every model request in that job, including sub-agents and built-in agents. The firewall rejects requests outside the policy. The separate [threat-detection job](/gh-aw/reference/threat-detection/) does not inherit these rules and may use a model outside them.
 
 For example, route among GPT models only:
 
@@ -154,6 +154,8 @@ Native routing requires:
 - The provider's own HTTPS endpoint (`https://api.anthropic.com` or `https://api.openai.com`), without a custom `engine.api-target`, base URL, `sandbox.agent.targets` gateway, or `engine.auth` for another cloud such as Azure OpenAI.
 - A provider model list that includes the candidate, firewall metadata for its API and supported reasoning efforts, and router benchmark data. The policy and any shortlist must also allow it. Models without the required metadata are skipped.
 - The AWF firewall and a routing-capable version; if `sandbox.agent.version` is pinned, use v0.28.33 or later. Organizations with approved registries can replace the router image using `sandbox.agent.images.router`; see [custom infrastructure images](/gh-aw/reference/sandbox/#custom-infrastructure-images-sandboxagentimages).
+
+In AWF v0.29.14, the native GPT entries in the routing tables have no bundled reasoning-effort metadata. Native OpenAI routing needs the provider's live catalogue to supply the missing API and effort information. If it does not, no GPT candidate is eligible and routing fails before the main agent starts. Use GitHub Copilot inference or a fixed model instead.
 
 Routing never switches providers or credentials; native routing fails rather than falling back to GitHub Copilot. Native routing must be explicitly configured; the no-model default applies only to GitHub Copilot inference.
 
