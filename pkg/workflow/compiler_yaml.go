@@ -1,15 +1,36 @@
 package workflow
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 )
 
 var compilerYamlLog = logger.New("workflow:compiler_yaml")
+
+// Embed after job construction so rewritten prompt sources are included. Base64
+// keeps authored Actions expressions inert and needs no callee repository token.
+func (c *Compiler) embedActivationMarkdownMetadata(data *WorkflowData) error {
+	activation, ok := c.jobManager.GetJob(string(constants.ActivationJobName))
+	if !ok {
+		return nil
+	}
+	encoded, err := json.Marshal(c.collectMarkdownMetadata(data))
+	if err != nil {
+		return fmt.Errorf("cannot embed activation Markdown metadata: %w", err)
+	}
+	if activation.Env == nil {
+		activation.Env = map[string]string{}
+	}
+	activation.Env["GH_AW_INFO_MARKDOWN_METADATA"] = base64.StdEncoding.EncodeToString(encoded)
+	return nil
+}
 
 // buildJobsAndValidate builds all workflow jobs and validates their dependencies.
 // It resets the job manager, builds jobs from the workflow data, and performs
