@@ -1812,36 +1812,66 @@
   /* --- turn automation into value --- */
   .tv-live { position: absolute; right: 110px; top: 120px; display: flex; align-items: center; gap: 14px; padding: 16px 26px; border-radius: 99px; background: #161b22e8; border: 1px solid #3d444d;
     font: 500 20px/1 var(--mono); letter-spacing: .08em; color: #d1d7e0; text-transform: uppercase; }
-  .tv-live::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #3fb950; box-shadow: 0 0 12px #3fb950; animation: tvpulse 1.6s ease-in-out infinite; }
+  .tv-live::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #4493f8; box-shadow: 0 0 12px #4493f8; animation: tvpulse 1.6s ease-in-out infinite; }
   .tv-live b { color: #f0f6fc; font-variant-numeric: tabular-nums; }
   @keyframes tvpulse { 50% { opacity: .35; } }
-  .tv-stages { position: absolute; left: 110px; right: 110px; top: 258px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 72px; }
-  .tv-st { position: relative; height: 212px; padding: 20px 26px 22px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid #3d444d; display: flex; flex-direction: column; justify-content: space-between; transition: border-color .5s, box-shadow .5s; }
-  .active .tv-st { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .3s); }
-  .tv-st > * { opacity: .4; transition: opacity .5s; }
-  .tv-st.on { border-top-color: var(--c); box-shadow: 0 18px 50px -24px var(--c); }
-  .tv-st.on > * { opacity: 1; }
-  .tv-st:not(:first-child)::before { content: "→"; position: absolute; left: -62px; top: 50%; transform: translateY(-50%); font: 700 46px/1 var(--mono); color: #3d444d; transition: color .5s; }
-  .tv-st.on:not(:first-child)::before { color: var(--c); }
-  .tv-st div { display: flex; justify-content: space-between; align-items: center; }
-  .tv-st h4 { margin: 0; display: flex; align-items: center; gap: 14px; font-size: 34px; font-variation-settings: "wght" 650, "wdth" 100; color: #f0f6fc; }
-  .tv-st h4 i { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--c); color: #0d1117; font: 700 22px/1 var(--mono); font-style: normal; }
-  .tv-st em { font: 600 14px/1 var(--mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase; color: var(--c); border: 1px solid var(--c); border-radius: 99px; padding: 7px 12px; }
-  .tv-st span { display: flex; align-items: baseline; gap: 12px; }
-  .tv-st b { font: 700 54px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-  .tv-st small { font: 500 20px/1.2 var(--mono); color: #9198a1; }
-  .tv-st p { margin: 0; font: 500 21px/1.3 "Mona Sans"; color: #c9d1d9; }
-  .tv-panels { position: absolute; left: 110px; right: 110px; top: 494px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 72px; }
-  .tv-p { height: 440px; padding: 24px 26px 14px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid #3d444d; transition: border-color .5s; }
-  .tv-p.on { border-top-color: var(--c); }
-  .active .tv-p { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 110ms + .6s); }
-  .tv-p h4 { margin: 0; font-size: 30px; font-variation-settings: "wght" 650, "wdth" 100; color: #f0f6fc; }
-  .tv-p svg { display: block; width: 100%; height: 360px; margin-top: 8px; overflow: visible; }
-  .tv-p svg text { font: 500 15px/1 var(--mono); fill: #9198a1; }
-  .tv-p svg .grid { stroke: #ffffff12; }
-  .tv-p svg .end { opacity: 0; transition: opacity .5s; font-size: 18px; font-weight: 700; }
-  .tv-p.done svg .end { opacity: 1; }
-  .tv-cap { position: absolute; left: 110px; right: 110px; top: 952px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
+  .tv-lane { position: absolute; left: 110px; width: 1364px; display: flex; align-items: baseline; gap: 18px; font: 700 19px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--c); opacity: 0; transition: opacity .6s; }
+  .tv-lane span { font-weight: 500; letter-spacing: .02em; text-transform: none; color: #9198a1; }
+  .tv-lane::after { content: ""; flex: 1; align-self: center; height: 2px; background: linear-gradient(90deg, var(--c), transparent); opacity: .45; }
+  .tv-lane.on { opacity: 1; }
+  .tv-la { top: 244px; }
+  .tv-lb { top: 566px; }
+  .tv-row { position: absolute; left: 110px; width: 1364px; display: grid; gap: 40px; }
+  .tv-ra { top: 276px; height: 260px; grid-template-columns: 440px 1fr; }
+  .tv-rb { top: 598px; height: 290px; grid-template-columns: repeat(4, 1fr); }
+  .tv-c { position: relative; min-width: 0; padding: 18px 20px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid var(--c); display: flex; flex-direction: column; gap: 10px;
+    opacity: 0; transform: translateY(18px); transition: opacity .6s, transform .6s cubic-bezier(.2,.9,.2,1), box-shadow .6s; }
+  .tv-c.on { opacity: 1; transform: none; box-shadow: 0 18px 50px -28px var(--c); }
+  .tv-c + .tv-c::before { content: "→"; position: absolute; left: -35px; top: 50%; transform: translateY(-50%); font: 700 30px/1 var(--mono); color: var(--c); }
+  .tv-c h4 { margin: 0; font-size: 28px; line-height: 1.05; font-variation-settings: "wght" 650, "wdth" 90; color: #f0f6fc; }
+  .tv-c > b { font: 600 21px/1.25 "Mona Sans"; color: #e6edf3; }
+  .tv-c p { margin: 0; font: 500 16px/1.35 var(--mono); color: #9198a1; }
+  .tv-c em { margin-top: auto; align-self: flex-start; font: 600 13px/1 var(--mono); font-style: normal; letter-spacing: .1em; text-transform: uppercase; color: var(--c); border: 1px solid var(--c); border-radius: 99px; padding: 6px 11px; }
+  .tv-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+  .tv-tags span, .tv-tags s { font: 500 15px/1 var(--mono); border-radius: 8px; padding: 6px 8px; }
+  .tv-tags span { color: #c9d1d9; background: #ffffff0d; border: 1px solid #3d444d; }
+  .tv-gate .tv-tags s { font-size: 14px; padding: 5px 6px; }
+  .tv-tags s { color: #ffa657; background: #db6d2814; border: 1px dashed #db6d28; text-decoration-thickness: 2px; }
+  .tv-c .tv-not { margin-top: auto; color: #ffa657; }
+  .tv-vals { display: flex; gap: 8px; }
+  .tv-vals span { flex: 1; text-align: center; padding: 11px 0; border-radius: 10px; font: 700 25px/1 var(--mono); border: 1px solid; font-variant-numeric: tabular-nums; }
+  .tv-vals .pos { color: #79c0ff; border-color: #4493f8; }
+  .tv-vals .zero { color: #d1d7e0; border-color: #656c76; border-style: dashed; }
+  .tv-vals .neg { color: #ffa657; border-color: #db6d28; }
+  .tv-ch { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
+  .tv-ch small { font: 500 16px/1 var(--mono); color: #9198a1; }
+  .tv-chart svg { display: block; width: 100%; flex: 1; overflow: visible; }
+  .tv-chart svg text { font: 500 15px/1 var(--mono); fill: #9198a1; }
+  .tv-chart svg .grid { stroke: #ffffff12; }
+  .tv-chart svg .quiet { fill: #ffffff08; stroke: #656c76; stroke-dasharray: 4 5; }
+  .tv-chart svg .qt { fill: #d1d7e0; font-size: 14px; }
+  .tv-chart svg .ln { fill: none; stroke: #4493f8; stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
+  .tv-chart svg .dash { stroke-dasharray: 6 6; }
+  .tv-chart svg .hollow { fill: #0d1117; stroke: #79c0ff; stroke-width: 3; }
+  .tv-chart svg .mk { fill: #79c0ff; font-weight: 700; font-size: 14px; }
+  .tv-chart svg .note { fill: #d1d7e0; font-size: 14px; }
+  .tv-chart svg .end { fill: #79c0ff; font-size: 19px; font-weight: 700; }
+  .tv-wires { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: visible; pointer-events: none; }
+  .tv-wires .w { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .7s ease-out; }
+  .tv-wires.on .w { stroke-dashoffset: 0; }
+  .tv-ev { position: absolute; left: 1530px; top: 276px; width: 280px; height: 612px; box-sizing: border-box; padding: 22px 22px; border-radius: 18px; background: #161b22f0; border: 2px solid #3d444d; border-top: 4px solid var(--c);
+    display: flex; flex-direction: column; gap: 14px; opacity: 0; transform: translateX(20px); transition: opacity .6s, transform .6s cubic-bezier(.2,.9,.2,1), box-shadow .6s; }
+  .tv-ev.on { opacity: 1; transform: none; box-shadow: 0 24px 60px -30px var(--c); }
+  .tv-ev .kicker { font-size: 15px; color: var(--c); }
+  .tv-ev h4 { margin: 0; font-size: 30px; line-height: 1.05; font-variation-settings: "wght" 700, "wdth" 90; color: #f0f6fc; }
+  .tv-m { padding: 12px 14px; border-radius: 12px; background: #0d1117; border-left: 4px solid var(--c); display: flex; flex-direction: column; gap: 8px; }
+  .tv-m small { font: 500 14px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #9198a1; }
+  .tv-m b { font: 700 44px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+  .tv-m i { font: 500 20px/1 var(--mono); font-style: normal; color: var(--c); margin-left: 8px; }
+  .tv-as { padding: 12px 14px; border-radius: 12px; border: 2px dashed var(--c); font: 600 18px/1.3 "Mona Sans"; color: #e3b341; }
+  .tv-ev.done .tv-as { animation: tvpulse 1.6s ease-in-out 2; }
+  .tv-ev p { margin: auto 0 0; font: 500 14px/1.4 var(--mono); color: #9198a1; }
+  .tv-cap { position: absolute; left: 110px; right: 110px; top: 936px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
 
   /* --- turn intent to automation --- */
   .slide-head h2.pf-h { font-size: 100px; }
@@ -3488,117 +3518,117 @@
     });
   }
 
-  // Turn Automation into Value: the AW lifecycle (Delivery → Adoption → Attribute value) over a synthetic twelve-week dashboard
+  // Turn Automation into Value: Operational Value as two lanes, the actor-independent repository outcome and per-safe-output contribution evidence, meeting only in the presentation layer
   {
     resetIndex();
-    const N = 12,
-      X0 = 46,
-      X1 = 486,
-      Y0 = 40,
-      Y1 = 320,
-      START = 1.1,
-      DUR = 4.4;
-    const xs = i => X0 + ((X1 - X0) * i) / (N - 1);
-    const ys = (v, lo, hi) => Y1 - ((Y1 - Y0) * (v - lo)) / (hi - lo);
-    const at = (d, w) => {
-      const i = Math.min(N - 1, Math.floor(w)),
-        j = Math.min(N - 1, i + 1);
-      return d[i] + (d[j] - d[i]) * (w - i);
-    };
-    const RUNS = [8, 11, 13, 15, 16, 18, 19, 20, 21, 22, 23, 24],
-      DELIV = [6, 9, 11, 13, 14, 16, 17, 18, 19, 20, 21, 22],
-      ADOPT = [48, 52, 57, 60, 63, 66, 68, 70, 72, 73, 74, 75],
-      REVERT = [3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1],
-      BACKLOG = [412, 398, 371, 352, 318, 291, 262, 230, 204, 181, 157, 138],
-      TREND = [412, 418, 423, 431, 436, 441, 447, 452, 458, 463, 470, 476],
-      SHIPPED = DELIV.map((_, i) => DELIV.slice(0, i + 1).reduce((a, b) => a + b, 0)),
-      CREDIT = TREND.map((v, i) => v - BACKLOG[i]);
-    // series: [data, lo, hi, kind, color, end label]; the last line series carries the cursor
-    const PANELS = [
-      [
-        "Outputs delivered",
-        "#ab7df8",
-        [
-          ["outputs / wk", "#ab7df8"],
-          ["runs / wk", "#656c76"],
-        ],
-        [
-          [RUNS, 0, 30, "bar", "#656c76", "24"],
-          [DELIV, 0, 30, "area", "#ab7df8", "22"],
-        ],
-      ],
-      [
-        "Kept by people",
-        "#4493f8",
-        [
-          ["adopted %", "#4493f8"],
-          ["reverted / wk", "#db6d28"],
-        ],
-        [
-          [REVERT, 0, 10, "bar", "#db6d28", "1"],
-          [ADOPT, 0, 100, "area", "#4493f8", "75%"],
-        ],
-      ],
-      [
-        "Backlog vs trend",
-        "#3fb950",
-        [
-          ["with agents", "#3fb950"],
-          ["without, trend", "#656c76", 1],
-        ],
-        [
-          [TREND, 0, 500, "dash", "#656c76", "476"],
-          [BACKLOG, 0, 500, "area", "#3fb950", "138"],
-        ],
-      ],
-    ];
-    const clips = [],
-      cursors = [],
-      panels = PANELS.map(([title, pc, legend, series], n) => {
-        let g = `<defs><clipPath id="tv-c${n}"><rect x="0" y="0" width="0" height="360"/></clipPath>`;
-        series.forEach(
-          ([, , , , c], k) => (g += `<linearGradient id="tv-g${n}${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".35"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient>`)
-        );
-        g += "</defs>";
-        for (let k = 0; k <= 4; k++) g += `<line class="grid" x1="${X0 - 14}" x2="${X1 + 14}" y1="${Y0 + ((Y1 - Y0) * k) / 4}" y2="${Y0 + ((Y1 - Y0) * k) / 4}"/>`;
-        [0, 3, 7, 11].forEach(i => (g += `<text x="${xs(i)}" y="350" text-anchor="middle">W${i + 1}</text>`));
-        let lx = X0 - 14;
-        legend.forEach(([l, c, dash]) => {
-          g += dash ? `<line x1="${lx}" x2="${lx + 18}" y1="8" y2="8" stroke="${c}" stroke-width="3" stroke-dasharray="5 4"/>` : `<rect x="${lx}" y="2" width="18" height="12" rx="3" fill="${c}"/>`;
-          g += `<text x="${lx + 26}" y="14">${l}</text>`;
-          lx += 26 + l.length * 9.2 + 26;
-        });
-        let clipped = "",
-          ends = "";
-        series.forEach(([d, lo, hi, kind, c, end], k) => {
-          const pts = d.map((v, i) => `${xs(i).toFixed(1)} ${ys(v, lo, hi).toFixed(1)}`),
-            ey = ys(d[N - 1], lo, hi);
-          if (kind === "dash") g += `<path d="M${pts.join(" L")}" fill="none" stroke="${c}" stroke-width="3" stroke-dasharray="8 7"/>`;
-          if (kind === "bar") clipped += d.map((v, i) => `<rect x="${xs(i) - 11}" y="${ys(v, lo, hi)}" width="22" height="${Y1 - ys(v, lo, hi)}" rx="4" fill="${c}" fill-opacity=".6"/>`).join("");
-          if (kind === "area")
-            clipped += `<path d="M${pts.join(" L")} L${X1} ${Y1} L${X0} ${Y1}Z" fill="url(#tv-g${n}${k})"/><path d="M${pts.join(" L")}" fill="none" stroke="${c}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
-          ends += `<text class="end" x="${kind === "bar" ? X1 : X1 - 12}" y="${ey - 16}" text-anchor="${kind === "bar" ? "middle" : "end"}" style="fill:${c}">${end}</text>`;
-        });
-        const [d, lo, hi, , c] = series[series.length - 1];
-        g += `<g clip-path="url(#tv-c${n})">${clipped}</g><line class="tv-gd" x1="0" x2="0" y1="${Y0}" y2="${Y1}" stroke="${c}" stroke-opacity=".4" stroke-dasharray="3 5"/><circle r="8" fill="${c}" stroke="#0d1117" stroke-width="4"/>${ends}`;
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("viewBox", "0 0 500 360");
-        svg.innerHTML = g;
-        clips.push(svg.querySelector("clipPath rect"));
-        cursors.push([svg.querySelector("circle"), svg.querySelector(".tv-gd"), d, lo, hi]);
-        return h("div", { class: "tv-p", "--c": pc, "--i": n }, h("h4", {}, title), svg);
-      });
-    // lifecycle stages: [name, color, series, unit, recorded, explanation, lights up at p]
-    const STAGES = [
-      ["Delivery", "#ab7df8", SHIPPED, "outputs applied", "at run end", "Runs apply their safe outputs: pull requests, issues and comments.", 0],
-      ["Adoption", "#4493f8", ADOPT, "% kept", "on GitHub", "People merge, close or keep them; rejections and reverts count against.", 0.3],
-      ["Attribute value", "#3fb950", CREDIT, "issues below trend", "over weeks", "Credit only adopted work, against the trend without agents.", 0.6],
-    ];
-    const vals = STAGES.map(() => h("b", {}, "0")),
-      stages = STAGES.map(([name, c, , unit, rec, txt], i) =>
-        h("div", { class: "tv-st", "--c": c, "--i": i }, h("div", {}, h("h4", {}, h("i", {}, i + 1), name), h("em", {}, rec)), h("span", {}, vals[i], h("small", {}, unit)), h("p", {}, txt))
-      );
+    // synthetic weekly outcome in native units (line coverage %, higher is better); null = missing, the last week is interim
+    const OUT = [61.0, 61.4, 62.0, 61.2, 60.1, 61.8, 63.0, null, 64.2, 64.9, 65.6, 66.0],
+      N = OUT.length,
+      QUIET = [3, 4],
+      MISS = 7,
+      X0 = 34,
+      X1 = 800,
+      Y0 = 34,
+      Y1 = 138,
+      LO = 58,
+      HI = 68,
+      CH = 172;
+    const xs = i => X0 + ((X1 - X0) * i) / (N - 1),
+      ys = v => Y1 - ((Y1 - Y0) * (v - LO)) / (HI - LO),
+      pt = i => `${xs(i).toFixed(1)} ${ys(OUT[i]).toFixed(1)}`,
+      run = (a, b) => Array.from({ length: b - a + 1 }, (_, k) => pt(a + k)).join(" L"),
+      step = (X1 - X0) / (N - 1);
+    const C = { val: "#4493f8", out: "#ab7df8", gate: "#db6d28", ev: "#d29922" };
+    let g = `<defs><clipPath id="tv-clip"><rect x="0" y="-20" width="0" height="${CH + 40}"/></clipPath><linearGradient id="tv-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.val}" stop-opacity=".32"/><stop offset="1" stop-color="${C.val}" stop-opacity="0"/></linearGradient></defs>`;
+    for (let k = 0; k <= 2; k++) g += `<line class="grid" x1="${X0 - 14}" x2="${X1 + 14}" y1="${Y0 + ((Y1 - Y0) * k) / 2}" y2="${Y0 + ((Y1 - Y0) * k) / 2}"/>`;
+    const qx = xs(QUIET[0]) - step / 2;
+    g += `<rect class="quiet" x="${qx}" y="${Y0 - 30}" width="${step * QUIET.length}" height="${Y1 - Y0 + 30}" rx="8"/><text class="qt" x="${qx + step}" y="${Y0 - 14}" text-anchor="middle">no accepted output</text>`;
+    [0, 3, 7, 11].forEach(i => (g += `<text x="${xs(i)}" y="${CH - 4}" text-anchor="middle">W${i + 1}</text>`));
+    const missY = (ys(OUT[MISS - 1]) + ys(OUT[MISS + 1])) / 2;
+    let c = `<path d="M${pt(0)} L${run(0, MISS - 1)} L${xs(MISS - 1)} ${Y1} L${X0} ${Y1}Z" fill="url(#tv-fill)"/><path d="M${pt(MISS + 1)} L${run(MISS + 1, N - 2)} L${xs(N - 2)} ${Y1} L${xs(MISS + 1)} ${Y1}Z" fill="url(#tv-fill)"/>`;
+    c += `<path class="ln" d="M${run(0, MISS - 1)}"/><path class="ln" d="M${run(MISS + 1, N - 2)}"/><path class="ln dash" d="M${pt(N - 2)} L${pt(N - 1)}"/>`;
+    OUT.forEach((v, i) => {
+      if (v !== null && i < N - 1) c += `<circle cx="${xs(i)}" cy="${ys(v)}" r="6" fill="${C.val}" stroke="#0d1117" stroke-width="3"/>`;
+    });
+    c += `<circle class="hollow" cx="${xs(MISS)}" cy="${missY}" r="9"/><text class="mk" x="${xs(MISS)}" y="${missY + 5}" text-anchor="middle">?</text><text class="note" x="${xs(MISS)}" y="${missY + 34}" text-anchor="middle">missing ≠ 0</text>`;
+    c += `<circle class="hollow dash" cx="${xs(N - 1)}" cy="${ys(OUT[N - 1])}" r="9"/><text class="note" x="${xs(N - 1)}" y="${ys(OUT[N - 1]) + 32}" text-anchor="middle">interim</text>`;
+    c += `<text class="end" x="${xs(N - 2)}" y="${ys(OUT[N - 2]) - 18}" text-anchor="middle">65.6</text>`;
+    g += `<g clip-path="url(#tv-clip)">${c}</g>`;
+    const chart = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    chart.setAttribute("viewBox", `0 0 834 ${CH}`);
+    chart.innerHTML = g;
+    const clip = chart.querySelector("clipPath rect");
+    const card = (cls, color, ...kids) => h("div", { class: `tv-c ${cls}`, "--c": color }, ...kids);
+    const frozen = card(
+        "tv-fz",
+        C.val,
+        h("h4", {}, "Frozen value function"),
+        h("b", {}, "Fixed before any outcome is inspected"),
+        h(
+          "div",
+          { class: "tv-tags" },
+          ["outcome", "population", "evidence rule", "native metric", "cadence", "maturation", "coverage", "zero ≠ missing"].map(s => h("span", {}, s))
+        ),
+        h("p", { class: "tv-not" }, "not runs, outputs or self-assessment")
+      ),
+      outcome = card("tv-chart", C.val, h("div", { class: "tv-ch" }, h("h4", {}, "Repository outcome · weekly"), h("small", {}, "line coverage % · higher is better")), chart),
+      flow = [
+        card("", C.out, h("h4", {}, "Delivery"), h("b", {}, "Effect created or applied"), h("p", {}, "pull request · issue · comment"), h("em", {}, "clock: run end")),
+        card("", C.out, h("h4", {}, "Adoption"), h("b", {}, "Authoritative human decision"), h("p", {}, "versioned rule; reviewed delivery where no human channel exists"), h("em", {}, "clock: decision")),
+        card(
+          "tv-gate",
+          C.gate,
+          h("h4", {}, "Survival gate"),
+          h(
+            "div",
+            { class: "tv-tags" },
+            ["reverted", "deleted", "reopened", "parent rejected", "failed downstream", "coverage gap"].map(s => h("s", {}, s))
+          ),
+          h("p", {}, "→ no positive value"),
+          h("em", {}, "clock: post-adoption")
+        ),
+        card(
+          "tv-attr",
+          C.out,
+          h("h4", {}, "Attributed contribution"),
+          h("p", {}, "frozen function around adoption"),
+          h("div", { class: "tv-vals" }, h("span", { class: "pos" }, "+0.8"), h("span", { class: "zero" }, "0.0"), h("span", { class: "neg" }, "−0.2")),
+          h("p", {}, "pp · zero and negative kept"),
+          h("em", {}, "clock: matured")
+        ),
+      ];
+    const laneA = h("div", { class: "tv-lane tv-la", "--c": C.val }, "Primary value", h("span", {}, "repository outcome in native units, regardless of actor")),
+      laneB = h("div", { class: "tv-lane tv-lb", "--c": C.out }, "Contribution evidence", h("span", {}, "per safe output · a diagnostic, never added into the value"));
+    const wires = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    wires.setAttribute("class", "tv-wires");
+    wires.setAttribute("viewBox", "0 0 1920 1080");
+    wires.innerHTML = `<defs><marker id="tv-ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="${C.ev}"/></marker></defs><path class="w" pathLength="1" d="M1478 405 C1506 405 1500 470 1522 470" stroke="${C.val}" marker-end="url(#tv-ah)"/><path class="w" pathLength="1" d="M1478 743 C1506 743 1500 690 1522 690" stroke="${C.out}" marker-end="url(#tv-ah)"/>`;
+    const ev = h(
+      "div",
+      { class: "tv-ev", "--c": C.ev },
+      h("div", { class: "kicker" }, "Presentation layer"),
+      h("h4", {}, "Outcome + contribution evidence"),
+      h("div", { class: "tv-m", "--c": C.val }, h("small", {}, "Outcome · W11 mature"), h("b", {}, "65.6", h("i", {}, "%"))),
+      h("div", { class: "tv-m", "--c": C.out }, h("small", {}, "Contribution · net"), h("b", {}, "+0.6", h("i", {}, "pp"))),
+      h("div", { class: "tv-as" }, "≈ observed association, not exclusive causation"),
+      h("p", {}, "compares complete, mature, compatible periods · collection health shown apart")
+    );
     const wk = h("b", {}, "01");
+    // [element, seconds after enter]; onNext jumps to the next beat
+    const BEATS = [
+      [laneA, 0.3],
+      [frozen, 0.4],
+      [outcome, 1.0],
+      [laneB, 3.4],
+      [flow[0], 3.5],
+      [flow[1], 4.0],
+      [flow[2], 4.5],
+      [flow[3], 5.0],
+      [wires, 5.7],
+      [ev, 5.9],
+    ];
+    const DRAW = [1.2, 3.2],
+      STOPS = [1.0, 3.4, 5.7, 6.4];
     let t0 = 0,
       now = 0,
       seen = -1,
@@ -3606,60 +3636,60 @@
     slides.push({
       group: "platform",
       notes:
-        "Turn Automation into Value: the agentic workflow lifecycle, shown on an illustrative dashboard with synthetic data for a sample repository over twelve weeks. One, Delivery: a run applies its safe outputs, such as pull requests, issues and comments, and gh-aw records each outcome at the end of the run. Delivered is not yet valuable. Two, Adoption: people decide later on GitHub; merged, closed or kept outputs count for the workflow, rejected or reverted ones count against it. Three, Attribute value: only adopted work that survives earns credit, measured over weeks against the trend without agents, here the backlog burning down instead of growing. These numbers are not measured on a real repository; they show the kind of outcomes worth tracking. The AW factory band later shows gh-aw's own measured history.",
+        "Turn Automation into Value: Operational Value, shown as two lanes on an illustrative dashboard with synthetic data for a sample repository. Top lane, the primary value: a frozen value function is fixed before any outcome is inspected, naming the intended outcome, the eligible population, the evidence rule, one native metric with unit, direction and formula, the cadence, maturation, coverage and how zero differs from missing. The repository outcome is then measured every week in its native units, here line coverage, whoever caused it and even in weeks with no accepted output, so it also sees independent change, deterioration and recovery. Missing is not zero, and the latest week is still interim. Bottom lane, contribution evidence for each safe output: delivery means the effect was created or applied; adoption follows a versioned rule for the authoritative human decision, or reviewed delivery where no human decision channel exists; every adopted effect must then survive the post-adoption window, and a revert, deletion, reopening, rejected parent, downstream failure or coverage gap blocks positive value. Attributed contribution evaluates the same frozen function around the adoption, after maturation, and keeps zero and negative effects. It is a diagnostic, not exclusive credit, and is never added into the primary value. Delivery and adoption use different clocks and cohorts, so they are not a conversion rate and not Operational Value. The two lanes meet only in the presentation layer, compared over complete, mature, compatible periods as observed association, never causation; compact value history is kept for 365 days, and collection health is reported apart from results. Run counts and the agent's own assessment are not value.",
       enter() {
         t0 = 0;
         seen = -1;
         done = false;
-        [...stages, ...panels].forEach(e => e.classList.remove("on", "done"));
+        BEATS.forEach(([e]) => e.classList.remove("on"));
+        ev.classList.remove("done");
+        clip.setAttribute("width", 0);
       },
       onNext() {
         if (!t0 || done) return false;
-        t0 = Math.min(t0, now - (START + DUR) * 1000);
+        const e = (now - t0) / 1000,
+          next = STOPS.find(s => s > e + 0.05);
+        if (next === undefined) return false;
+        t0 = now - next * 1000;
         return true;
       },
       tick(t) {
         if (!t0) t0 = t;
         now = t;
-        const p = Math.min(1, Math.max(0, ((t - t0) / 1000 - START) / DUR)),
-          w = (1 - (1 - p) ** 2) * (N - 1),
-          x = xs(w);
-        clips.forEach(r => r.setAttribute("width", x + 12));
-        cursors.forEach(([dot, gd, d, lo, hi]) => {
-          const y = ys(at(d, w), lo, hi);
-          dot.setAttribute("cx", x);
-          dot.setAttribute("cy", y);
-          gd.setAttribute("x1", x);
-          gd.setAttribute("x2", x);
-        });
-        STAGES.forEach(([, , d, , , , from], i) => {
-          vals[i].textContent = Math.round(at(d, w));
-          if (t - t0 >= START * 1000 && p >= from && !stages[i].classList.contains("on")) {
-            stages[i].classList.add("on");
-            panels[i].classList.add("on");
-            if (i) sfx.step();
-          }
-        });
+        const e = (t - t0) / 1000,
+          p = Math.min(1, Math.max(0, (e - DRAW[0]) / (DRAW[1] - DRAW[0]))),
+          w = (1 - (1 - p) ** 2) * (N - 1);
+        clip.setAttribute("width", p < 1 ? xs(w) + 16 : 834);
         const week = Math.round(w);
         wk.textContent = String(week + 1).padStart(2, "0");
-        if (week > seen) {
+        if (p > 0 && week > seen) {
           if (seen >= 0) sfx.pop(week);
           seen = week;
         }
-        if (p >= 1 && !done) {
+        BEATS.forEach(([el, at], i) => {
+          if (e >= at && !el.classList.contains("on")) {
+            el.classList.add("on");
+            if (i > 1 && el !== wires) sfx.step();
+          }
+        });
+        if (e >= STOPS[STOPS.length - 1] && !done) {
           done = true;
-          [...stages, ...panels].forEach(e => e.classList.add("on", "done"));
+          ev.classList.add("done");
           sfx.review();
         }
       },
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "AW lifecycle"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Operational Value"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
         h("div", { class: "tv-live" }, "acme/app · week ", wk, " / 12"),
-        h("div", { class: "tv-stages" }, stages),
-        h("div", { class: "tv-panels" }, panels),
-        h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository · delivered is not adopted, and only adopted work earns value")
+        laneA,
+        h("div", { class: "tv-row tv-ra" }, frozen, outcome),
+        laneB,
+        h("div", { class: "tv-row tv-rb" }, flow),
+        wires,
+        ev,
+        h("div", { class: "tv-cap" }, "Illustrative, synthetic data · delivery and adoption use different clocks and cohorts: not a conversion rate, not Operational Value")
       ),
     });
   }
