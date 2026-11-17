@@ -1,7 +1,7 @@
 ---
 name: Daily Cracktro Maintainer
-description: Improves Cracktro daily with legendary workflows, basic concepts, or data refreshes.
-intent: Keep Cracktro accurate, approachable, and representative of proven workflows and current GitHub Agentic Workflows concepts without duplicating work.
+description: Improves Cracktro daily with workflows, concepts, or data refreshes.
+intent: Keep Cracktro accurate and approachable through proven workflows and current GitHub Agentic Workflows concepts without duplicate work.
 on:
   schedule: daily
   workflow_dispatch:
@@ -83,8 +83,8 @@ safe-outputs:
 # Daily Cracktro improvement
 
 Improve `docs/public/cracktro/`, not `docs/slides/`.
-Choose one evidenced improvement: a legendary workflow, missing basic concept,
-content correction, or data refresh. Propose one small draft PR; never invent work.
+Propose one small draft PR for a legendary workflow, missing basic concept,
+content correction, or data refresh. Never invent work.
 
 ## Rules and context
 
@@ -116,8 +116,8 @@ old data as current or invent numbers from incomplete queries.
    Inspect at most 50 default-branch merged PRs from the past 14 days;
    read relevant details only. Older workflows remain eligible.
    Never present unmerged work, roadmap ideas, or unsupported syntax as shipped.
-3. Shortlist at most three candidates with a target slide/topic, authoritative
-   source, and concrete benefit. Choose one; skip overlapping or rejected work:
+3. Shortlist at most three candidates: target slide/topic, source, and benefit.
+   Choose one; skip overlapping or rejected work:
    - Legendary workflows: established repository workflows with a distinctive,
      reusable process and useful outputs or merged fixes. Inspect source and
      public results; run volume alone is not success. Add or improve an example.
@@ -128,8 +128,10 @@ old data as current or invent numbers from incomplete queries.
    Correct false claims first. No redesign or exhaustive feature coverage.
 4. Edit only `safe-outputs.create-pull-request.allowed-files`: the listed files
    under `docs/public/cracktro/` and supporting `.github/skills/cracktro/` paths.
-   Everything else is read-only, including tests, READMEs, workflows, manifests,
-   dependencies, fonts, and avatars. Never expand the allowlist.
+   All other paths are read-only. Never expand the allowlist.
+   Before editing, inspect `docs/tests/talk.spec.ts` and
+   `pkg/workflow/data/experimental_features.json`; preserve test-coupled headings,
+   ordering, and badge mappings. Choose another task if those need outside edits.
    Update `slides.md` for additions, removals, moves, renames, or changed messages.
    Keep notes and refresh/prompt provenance consistent. If other files are
    needed, choose another candidate or call `noop`.
@@ -149,10 +151,9 @@ do not probe variants or broaden permissions.
 
 Inspect changed slides and adjacent transitions at desktop and narrow widths:
 navigation, links, notes, sound controls, content rules, console/network errors.
-Use `docs/tests/talk.spec.ts` as a read-only reference; run relevant tests only
-when dependencies exist. Distinguish browser checks from passing suites.
-Verify every added, modified, deleted, or renamed path against the allowlist;
-fix out-of-scope edits before publication. Save screenshots under
+Run relevant tests only when dependencies exist; distinguish browser checks
+from passing suites.
+Check all changed paths against the allowlist; fix violations. Save screenshots under
 `"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review/"`; publish
 with `upload_artifact` using staging-relative `path: "cracktro-review"`.
 Never upload `/tmp` sources or the staging root.
