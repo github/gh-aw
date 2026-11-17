@@ -54,28 +54,31 @@ Artifact names and checksums identify selected content, not whether that content
 
 ## Artifact Sets
 
-The `gh aw logs` and `gh aw audit` commands support `--artifacts` to download only specific artifact groups:
+The `gh aw logs` and `gh aw audit` commands support `--artifacts` to download only specific artifact groups. `logs` defaults to `usage`; `audit` defaults to `all`.
 
 | Set Name | Artifacts Downloaded | Use Case |
 |----------|---------------------|----------|
-| `all` | Everything | Full analysis (default) |
-| `agent` | `agent` | Agent logs and outputs |
+| `all` | Everything | Full analysis |
+| `agent` | `agent`, `agent-output-fallback` | Agent logs and outputs |
 | `activation` | `activation` | Activation data (`aw_info.json`, `prompt.txt`) |
-| `firewall` | `firewall-audit-logs` | Network policy and firewall audit data |
-| `mcp` | `firewall-audit-logs` | MCP gateway traffic logs |
+| `info` | `info` | Compact workflow-run information (`aw_info.json`) |
+| `firewall` | `agent` | Network policy and firewall audit data |
+| `mcp` | `agent` | MCP gateway traffic logs |
 | `detection` | `detection` | Threat detection output |
 | `experiment` | `experiment`, `usage` | A/B experiment state (only present when experiments are declared) |
 | `usage` | `usage` | Compact conclusion-job artifact for lightweight reporting and forecasting |
 | `evals` | `usage` | BinEval evaluation results (only present when `evals` are declared) |
 | `graders` | `usage`, `graders`, legacy agent artifacts | Default built-ins and optional combined custom results |
 | `github-api` | `activation`, `agent` | GitHub API rate limit logs |
-| `outcomes` | `safe-outputs-items`, `agent-output-fallback` | Executed safe-output manifests and compact agent output for recovering references omitted from handler results |
+| `delivery` | `safe-outputs-items`, `agent-output-fallback`, `usage` | Executed safe-output manifests, compact agent output, and conclusion evidence for delivery reporting |
 | `work-queue` | `activation`, `agent` | Queue snapshots, finish intents, and workflow logs for coordinator operation reporting |
 
 ```bash
 # Download agent and firewall artifacts only
 gh aw logs <run-id> --artifacts agent --artifacts firewall
 ```
+
+The former `outcomes` set was replaced by `delivery` without a compatibility alias. Use `gh aw logs <run-id> --delivery` to report execution evidence, or `--adoption` to include later resource decisions. See [Delivery and adoption](/gh-aw/reference/delivery-adoption/) for evidence and refresh semantics.
 
 ## `firewall-audit-logs`
 
@@ -153,6 +156,7 @@ The unified `agent` artifact contains agent job outputs:
 - GitHub API rate limit logs (`github_rate_limits.jsonl`)
 - Token usage summary (`agent_usage.json`) — aggregated totals only; per-request data is in `sandbox/firewall/logs/api-proxy-logs/`. When AWF records include valid `ai_credits_this_response` and `ai_credits_total` values, the summary preserves those reported values instead of repricing the tokens.
 - `otel.jsonl` — OTLP span mirror written by gh-aw's JavaScript span exporters when `observability.otlp` is configured
+- `otel-metrics.jsonl` — OTLP metrics mirror included when `observability.otlp` is configured and `GH_AW_OTEL_METRICS` is the literal value `true` (the default). It contains agent-job measurements recorded before upload; other jobs' post-job metrics are exported separately. See [Metrics](/gh-aw/reference/open-telemetry/#metrics).
 
 The AWF API proxy log directory may also contain `token-usage.jsonl` and `model-routing.jsonl`. Both are available to `gh aw audit` and `gh aw logs` in supported artifact layouts.
 
