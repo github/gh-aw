@@ -1951,6 +1951,33 @@
   .an-call p { margin: 0; font-size: 21px; line-height: 1.3; color: #d1d7e0; }
   .an-call p code { font: 500 18px var(--mono); color: var(--c); }
 
+  /* --- compatible with actions --- */
+  .cwa .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #39c5cf, #ab7df8, #d29922, #4493f8); }
+  .cwa-file { position: absolute; left: 110px; top: 280px; width: 880px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; }
+  .cwa-file .file { height: 52px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .cwa-file .file span { margin-left: auto; color: #656c76; font-size: 15px; letter-spacing: .14em; }
+  .cwa-code { position: relative; padding: 14px 0; font: 500 20px/28px var(--mono); white-space: pre; }
+  .cwa-ln { position: relative; z-index: 1; padding: 0 26px; height: 28px; opacity: .45; transition: opacity .5s; }
+  .cwa-ln.on { opacity: 1; }
+  .cwa-ln .no { display: inline-block; width: 34px; color: #656c76; }
+  .cwa-band { position: absolute; left: 0; right: 0; height: 28px; background: color-mix(in srgb, var(--c) 10%, transparent); border-left: 4px solid var(--c); opacity: 0; transition: opacity .5s, background .5s, box-shadow .5s; }
+  .cwa-band.on { opacity: 1; }
+  .cwa-band.hot { background: color-mix(in srgb, var(--c) 26%, transparent); box-shadow: inset 0 0 40px -12px var(--c); }
+  .cwa-band b { position: absolute; right: 14px; top: 3px; min-width: 22px; height: 22px; border-radius: 99px; background: var(--c); color: #0d1117; font: 700 14px/22px var(--mono); text-align: center; }
+  .cwa-grid { position: absolute; left: 1040px; top: 280px; width: 780px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
+  .cwa-tile { position: relative; height: 140px; box-sizing: border-box; padding: 16px 18px 0 70px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d;
+    opacity: 0; transform: translateY(18px) scale(.97); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), border-color .5s, box-shadow .5s; }
+  .cwa-tile.on { opacity: 1; transform: none; }
+  .cwa-tile.hot { border-color: var(--c); box-shadow: 0 0 50px -16px var(--c); }
+  .cwa-tile .n { position: absolute; left: 18px; top: 18px; width: 36px; height: 36px; border-radius: 10px; background: var(--c); color: #0d1117; font: 700 18px/36px var(--mono); text-align: center; }
+  .cwa-tile h3 { margin: 0 0 4px; font-size: 26px; line-height: 1.15; color: #f0f6fc; }
+  .cwa-tile code { display: block; margin-bottom: 6px; font: 500 16px/1.2 var(--mono); color: var(--c); }
+  .cwa-tile p { margin: 0; font-size: 18px; line-height: 1.3; color: #d1d7e0; }
+  .cwa-msg { position: absolute; left: 110px; right: 100px; top: 908px; height: 84px; box-sizing: border-box; padding: 0 34px; display: flex; align-items: center; gap: 28px; border-radius: 18px;
+    background: linear-gradient(90deg, #4493f826, #ab7df81f); border: 1px solid #4493f8; opacity: 0; transform: translateY(16px); transition: opacity .7s, transform .8s cubic-bezier(.2,.9,.2,1); }
+  .cwa-msg.on { opacity: 1; transform: none; }
+  .cwa-msg span { font: 500 26px/1.35 var(--mono); color: #9198a1; }
+
   /* --- cost management --- */
   .cm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
   .cm-ed { position: absolute; left: 110px; top: 290px; width: 1010px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
@@ -3343,6 +3370,7 @@
     };
     slides.push({
       group: "platform",
+      key: "anatomy",
       notes:
         "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
       enter() {
@@ -3386,6 +3414,188 @@
         wires,
         calls,
         cc
+      ),
+    });
+  }
+
+  // Reuse your CI: a synthetic workflow mixes the agent with environments, self-hosted runners, Microsoft Entra ID
+  // and HashiCorp Vault through OIDC, GitHub App tokens, marketplace actions, custom jobs and chat bots; all Actions infrastructure is reused
+  {
+    resetIndex();
+    const TILES = [
+      ["env", "#d29922", "Environments", "environment: production", "Required reviewers and environment secrets gate the run."],
+      ["run", "#39c5cf", "Runners", "runs-on:", "GitHub-hosted, larger or self-hosted runners and runner groups."],
+      ["entra", "#4493f8", "Microsoft Entra ID", "azure/login", "OIDC federation into Azure: no long-lived cloud keys."],
+      ["vault", "#ffa657", "HashiCorp Vault", "hashicorp/vault-action", "Fetch secrets with the job's own OIDC identity."],
+      ["app", "#ab7df8", "GitHub Apps", "create-github-app-token", "Short-lived, scoped installation tokens instead of PATs."],
+      ["mkt", "#79c0ff", "Marketplace actions", "uses:", "Any existing action: setup, cache, scan, sign, deploy."],
+      ["job", "#f778ba", "Custom jobs", "jobs: + needs:", "Build, deploy or gate around the agent in extra jobs."],
+      ["bot", "#d2a8ff", "Workflow calls", "uses: reusable workflow", "Call existing workflows for Slack, Teams and other bots."],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      V = "#a5d6ff",
+      T = "#f0f6fc";
+    // [text parts, tile index or -1]
+    const LINES = [
+      [[["---", D]], -1],
+      [
+        [
+          ["on: ", K],
+          ["pull_request", V],
+        ],
+        -1,
+      ],
+      [
+        [
+          ["environment: ", K],
+          ["production", V],
+        ],
+        0,
+      ],
+      [
+        [
+          ["runs-on: ", K],
+          ["[self-hosted, linux]", V],
+        ],
+        1,
+      ],
+      [[["permissions:", K]], -1],
+      [
+        [
+          ["  id-token: ", K],
+          ["write", V],
+        ],
+        2,
+      ],
+      [[["steps:", K]], -1],
+      [
+        [
+          ["  - uses: ", K],
+          ["azure/login@v2", V],
+        ],
+        2,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["hashicorp/vault-action@v3", V],
+        ],
+        3,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["actions/create-github-app-token@v2", V],
+        ],
+        4,
+      ],
+      [
+        [
+          ["  - uses: ", K],
+          ["actions/setup-node@v4", V],
+        ],
+        5,
+      ],
+      [[["jobs:", K]], -1],
+      [
+        [
+          ["  deploy-preview: ", K],
+          ["{ needs: detection }", V],
+        ],
+        6,
+      ],
+      [[["  notify:", K]], 7],
+      [
+        [
+          ["    needs: ", K],
+          ["deploy-preview", V],
+        ],
+        7,
+      ],
+      [
+        [
+          ["    uses: ", K],
+          ["./.github/workflows/chatops.yml", V],
+        ],
+        7,
+      ],
+      [[["---", D]], -1],
+      [[["# Review the preview deployment and comment", T]], -1],
+    ];
+    const LH = 28,
+      TOP = 14;
+    const lines = LINES.map(([parts], i) =>
+      h(
+        "div",
+        { class: "cwa-ln" },
+        h("span", { class: "no" }, String(i + 1)),
+        parts.map(([t, c]) => h("span", { style: { color: c } }, t))
+      )
+    );
+    const bandsOf = TILES.map(() => []);
+    const bands = [];
+    LINES.forEach(([, k], i) => {
+      if (k < 0) return;
+      const b = h("div", { class: "cwa-band", "--c": TILES[k][1], style: { top: `${TOP + i * LH}px` } }, h("b", {}, String(k + 1)));
+      bandsOf[k].push([b, i]);
+      bands.push(b);
+    });
+    const tiles = TILES.map(([, c, title, chip, text], i) => h("div", { class: "cwa-tile", "--c": c }, h("div", { class: "n" }, String(i + 1)), h("h3", {}, title), h("code", {}, chip), h("p", {}, text)));
+    const msg = h("div", { class: "cwa-msg" }, h("span", {}, "Same runners, secrets, environments, rulesets and audit log. Custom steps and jobs run outside the agent sandbox."));
+    const N = TILES.length,
+      REVEAL = 0.6,
+      GAP = 0.9,
+      CYCLE = REVEAL + GAP * (N + 1),
+      HOT = 2;
+    let t0 = 0,
+      seen = -1,
+      skip = false;
+    const lit = (k, on) => {
+      tiles[k].classList.toggle("on", on);
+      bandsOf[k].forEach(([b, i]) => (b.classList.toggle("on", on), lines[i].classList.toggle("on", on)));
+    };
+    slides.push({
+      group: "platform",
+      under: "anatomy",
+      notes:
+        "Reuse your CI, using an illustrative synthetic workflow. An agentic workflow compiles to a plain GitHub Actions workflow, so everything a team already runs on Actions keeps working: deployment environments with required reviewers and environment secrets, GitHub-hosted, larger or self-hosted runners, OIDC federation into Microsoft Entra ID with azure/login, secrets from HashiCorp Vault with vault-action, short-lived GitHub App installation tokens, any marketplace action in steps, extra custom jobs wired with needs, and reusable workflow calls that hand off to Slack, Teams or existing bots. Custom steps and jobs run outside the agent's sandbox with standard Actions security, so credentials stay out of the agent's reach. The message: no new platform to adopt; all the Actions infrastructure is reused.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        skip = false;
+        [...lines, ...bands, ...tiles, msg].forEach(e => e.classList.remove("on", "hot"));
+        LINES.forEach(([, tile], i) => {
+          if (tile < 0) lines[i].classList.add("on");
+        });
+      },
+      onNext() {
+        if (seen >= N) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.min(N, Math.floor((e - REVEAL) / GAP));
+        while (seen < n) {
+          seen++;
+          if (seen < N) lit(seen, true);
+          else msg.classList.add("on");
+          sfx.pop(seen * 2);
+        }
+        const hot = e >= CYCLE ? Math.floor((e - CYCLE) / HOT) % N : -1;
+        tiles.forEach((el, i) => el.classList.toggle("hot", hot === i));
+        bandsOf.forEach((list, i) => list.forEach(([b]) => b.classList.toggle("hot", hot === i)));
+      },
+      el: h(
+        "section",
+        { class: "slide cwa" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring your ecosystem"), h("h2", { class: "pf-h" }, letters("Reuse your "), letters("CI", "l-grad"))),
+        h("div", { class: "cwa-file" }, h("div", { class: "file" }, "📄 .github/workflows/preview-review.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cwa-code" }, bands, lines)),
+        h("div", { class: "cwa-grid" }, tiles),
+        msg
       ),
     });
   }
