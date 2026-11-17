@@ -170,11 +170,10 @@ func runCopilotSessionCopyScriptWithSessionID(t *testing.T, awfDir, homeDir, log
 	}
 	cmd := exec.Command("bash", scriptPath)
 	overrides := map[string]string{
-		"GH_AW_COPILOT_SESSION_STATE_DIR":        awfDir,
-		"GH_AW_COPILOT_SESSION_ID_FILE":          sessionIDFile,
-		"GH_AW_COPILOT_LEGACY_SESSION_STATE_DIR": filepath.Join(homeDir, ".copilot", "session-state"),
-		"GH_AW_COPILOT_SESSION_LOGS_DIR":         logsDir,
-		"HOME":                                   homeDir,
+		"GH_AW_COPILOT_SESSION_STATE_DIR": awfDir,
+		"GH_AW_COPILOT_SESSION_ID_FILE":   sessionIDFile,
+		"GH_AW_COPILOT_SESSION_LOGS_DIR":  logsDir,
+		"HOME":                            homeDir,
 	}
 	for _, variable := range os.Environ() {
 		key, _, _ := strings.Cut(variable, "=")
