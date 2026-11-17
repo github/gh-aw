@@ -47,6 +47,9 @@ timeout-minutes: 20
 imports:
   - shared/otlp.md
   - shared/reporting.md
+  - uses: shared/elephant-goldfish.md
+    with:
+      preset: feature_spec
 features:
   gh-aw-detection: true
 evals:
@@ -112,6 +115,12 @@ execute PR code, tests, or builds. Look for:
 
 Keep each reviewed PR's analysis to 3–5 bullet points, with file/line evidence for findings.
 Do not pad a clean review with invented findings.
+
+For the first fully reviewed PR whose accessible diff changes a document matching the
+Elephant-Goldfish import's document patterns, run the imported EGM review on at most one such
+document. Use the already inspected diff paths as the document list; do not make another content
+read just for EGM. Post its single `add_comment` to that PR with its numeric `item_number`. If no
+fully reviewed PR has a matching document, call `noop` for the EGM review.
 
 ## Step 3 — Produce report issue
 
