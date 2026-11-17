@@ -47,7 +47,7 @@ func toEngineEnvValueString(value any) (string, bool) {
 type EngineConfig struct {
 	ID                 string
 	Version            string
-	Cooldown           *int // Minimum release age in days; nil defaults to 3, zero requires a statically known engine version.
+	Cooldown           *int // Minimum release age in days; nil defaults to 3, zero requires the compiler-pinned default or a literal release version.
 	cooldownError      error
 	ChecksumsSHA256    string      // Trusted release checksum-manifest digest (Copilot CLI only)
 	LLMProvider        LLMProvider // Inference provider override for this engine (engine.provider / engine.model-provider)

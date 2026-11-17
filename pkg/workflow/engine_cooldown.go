@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"strings"
 )
 
 // resolveEngineCooldownDays applies the compiler-managed engine installation policy.
@@ -60,10 +59,10 @@ func validateEngineCooldown(config *EngineConfig) error {
 		return config.cooldownError
 	}
 	if config.Cooldown != nil && (*config.Cooldown < 0 ||
-		(*config.Cooldown == 0 && strings.Contains(config.Version, "${{"))) {
+		(*config.Cooldown == 0 && config.Version != "" && !pinnedReleaseVersionPattern.MatchString(config.Version))) {
 		return NewValidationError("engine.cooldown", strconv.Itoa(*config.Cooldown),
-			"cooldown must be nonnegative; zero requires a statically known engine version",
-			"Use a positive integer number of days, or use zero only with the compiler-pinned default or a literal engine.version; Actions expressions cannot be used with zero.")
+			"cooldown must be nonnegative; zero requires the compiler-pinned default or a literal release version",
+			"Use a positive integer number of days, or use zero only with the compiler-pinned default or a semantic engine.version such as 1.2.3; Actions expressions and unpinned versions cannot be used with zero.")
 	}
 	return nil
 }

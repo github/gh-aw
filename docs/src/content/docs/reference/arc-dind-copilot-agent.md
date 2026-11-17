@@ -120,7 +120,7 @@ ARC DinD runners need outbound HTTPS (port 443) access from the runner pod. If y
 | --- | --- |
 | `github.com` (or your GHES instance) | Git clone, API calls, Actions runtime |
 | `api.githubcopilot.com` (or your enterprise Copilot endpoint) | Copilot engine communication |
-| `api.github.com` | Copilot CLI release-age metadata (default 3-day cooldown; `engine.cooldown: 0` skips the check only with the compiler-pinned default or a literal `engine.version`, not an expression; [cooldown details](/gh-aw/reference/engines/#engine-release-age-cooldown)) |
+| `api.github.com` | Copilot CLI release-age metadata (default 3-day cooldown; with `engine.cooldown: 0`, a literal version is checked at compile time and the runner skips the metadata request; [cooldown details](/gh-aw/reference/engines/#engine-release-age-cooldown)) |
 | `raw.githubusercontent.com` (optional) | Compatibility metadata; the installer has a bundled fallback |
 | `ghcr.io` and `pkg-containers.githubusercontent.com` | Pull MCP gateway and AWF container images |
 | Domains in your workflow's `network.allowed` list | Agent egress (npm registries, PyPI, etc.) |

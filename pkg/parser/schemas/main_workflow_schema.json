@@ -15636,7 +15636,7 @@
               "type": "integer",
               "minimum": 0,
               "default": 3,
-              "description": "Minimum release age in days for compiler-managed engine installs. Zero is allowed only when the engine version is the compiler default or a literal; expressions are not allowed."
+              "description": "Minimum release age in days for compiler-managed engine installs. Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time. Expressions and unpinned versions are not allowed."
             },
             "model": {
               "type": "string",
@@ -16040,7 +16040,7 @@
               "type": "integer",
               "minimum": 0,
               "default": 3,
-              "description": "Minimum release age in days for compiler-managed engine installs. Zero is allowed only when the engine version is the compiler default or a literal; expressions are not allowed."
+              "description": "Minimum release age in days for compiler-managed engine installs. Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time. Expressions and unpinned versions are not allowed."
             },
             "runtime": {
               "type": "object",

@@ -3,14 +3,18 @@
 package workflow
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
@@ -74,7 +78,7 @@ func TestApplyEngineCooldownFieldRejectsNativeIntOverflow(t *testing.T) {
 	assert.Nil(t, config.Cooldown)
 }
 
-func TestValidateEngineCooldownZeroRequiresStaticVersion(t *testing.T) {
+func TestValidateEngineCooldownZeroRequiresPinnedReleaseVersion(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		version string
@@ -82,19 +86,129 @@ func TestValidateEngineCooldownZeroRequiresStaticVersion(t *testing.T) {
 	}{
 		{name: "compiler default"},
 		{name: "literal version", version: "1.2.3"},
+		{name: "v-prefixed literal version", version: "v1.2.3"},
 		{name: "expression version", version: "${{ inputs.engine-version }}", wantErr: true},
+		{name: "latest is not pinned", version: "latest", wantErr: true},
+		{name: "invalid release version", version: "1.2", wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			zero := 0
 			err := validateEngineCooldown(&EngineConfig{Version: test.version, Cooldown: &zero})
 			if test.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), "statically known engine version")
+				assert.Contains(t, err.Error(), "literal release version")
 				return
 			}
 			require.NoError(t, err)
 		})
 	}
+}
+
+type engineReleaseRoundTripper func(*http.Request) (*http.Response, error)
+
+func (roundTrip engineReleaseRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	return roundTrip(request)
+}
+
+func TestValidateCopilotReleaseAge(t *testing.T) {
+	now := time.Date(2026, time.November, 17, 0, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name        string
+		body        string
+		cooldown    int
+		wantErr     bool
+		errorSubstr string
+	}{
+		{
+			name:     "old release",
+			body:     `{"tag_name":"v1.2.3","draft":false,"published_at":"2026-11-10T00:00:00Z"}`,
+			cooldown: 3,
+		},
+		{
+			name:        "release is too recent",
+			body:        `{"tag_name":"v1.2.3","draft":false,"published_at":"2026-11-15T00:00:00Z"}`,
+			cooldown:    3,
+			wantErr:     true,
+			errorSubstr: "at least 3 days old",
+		},
+		{
+			name:        "release is not yet published",
+			body:        `{"tag_name":"v1.2.3","draft":false,"published_at":"2026-11-18T00:00:00Z"}`,
+			wantErr:     true,
+			errorSubstr: "at least 0 days old",
+		},
+		{
+			name:        "tag mismatch",
+			body:        `{"tag_name":"v9.9.9","draft":false,"published_at":"2026-11-10T00:00:00Z"}`,
+			wantErr:     true,
+			errorSubstr: "metadata is invalid",
+		},
+		{
+			name:        "missing publication date",
+			body:        `{"tag_name":"v1.2.3","draft":false}`,
+			wantErr:     true,
+			errorSubstr: "metadata is invalid",
+		},
+		{
+			name:        "draft release",
+			body:        `{"tag_name":"v1.2.3","draft":true,"published_at":"2026-11-10T00:00:00Z"}`,
+			wantErr:     true,
+			errorSubstr: "metadata is invalid",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client := &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
+				assert.Equal(t, "https://api.github.com/repos/github/copilot-cli/releases/tags/v1.2.3", request.URL.String())
+				assert.Empty(t, request.Header.Get("Authorization"))
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader(test.body)),
+					Request:    request,
+				}, nil
+			})}
+			err := validateCopilotReleaseAge(context.Background(), client, "1.2.3", test.cooldown, now)
+			if test.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.errorSubstr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCompilerValidatesLiteralCopilotReleaseAtZeroCooldown(t *testing.T) {
+	client := &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"tag_name":"v1.2.3","draft":false,"published_at":"2020-01-01T00:00:00Z"}`)),
+			Request:    request,
+		}, nil
+	})}
+	compiler := NewCompiler()
+	compiler.releaseMetadataClient = client
+	zero := 0
+	err := compiler.validateCopilotCooldownRelease(&WorkflowData{
+		AI:           "copilot",
+		EngineConfig: &EngineConfig{Version: "1.2.3", Cooldown: &zero},
+	})
+	require.NoError(t, err)
+}
+
+func TestValidateCopilotReleaseAgeFailsClosedWhenMetadataIsUnavailable(t *testing.T) {
+	client := &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"message":"Not Found"}`)),
+			Request:    request,
+		}, nil
+	})}
+	err := validateCopilotReleaseAge(context.Background(), client, "1.2.3", 0, time.Now())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not be verified at compile time")
 }
 
 func TestEngineCooldownInstalls(t *testing.T) {
@@ -250,7 +364,7 @@ func TestWarnLegacyBehaviorInstallationCooldown(t *testing.T) {
 	})
 	assert.Contains(t, output, `engine definition "legacy" uses deprecated behaviors.installation.cooldown, which is ignored`)
 	assert.Contains(t, output, "set workflow engine.cooldown instead")
-	assert.Contains(t, output, "zero requires a statically known engine version")
+	assert.Contains(t, output, "zero requires the compiler-pinned default or a literal release version")
 	assert.Equal(t, 1, compiler.GetWarningCount())
 
 	compiler.ResetWarningCount()
@@ -341,6 +455,6 @@ func TestCompileEngineCooldownRejectsExpressionVersion(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 		err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "statically known engine version")
+		assert.Contains(t, err.Error(), "literal release version")
 	}
 }

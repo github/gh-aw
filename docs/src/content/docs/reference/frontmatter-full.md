@@ -3248,8 +3248,8 @@ engine:
   # (optional)
   checksums-sha256: "example-value"
 
-  # Minimum release age in days for compiler-managed engine installs. Zero disables
-  # Zero requires the compiler-pinned default or a literal engine version; expressions are not allowed.
+  # Minimum release age in days for compiler-managed engine installs. Zero skips the runtime check.
+  # Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time.
   # (optional)
   cooldown: 1
 
@@ -3646,8 +3646,8 @@ engine:
 # provider settings directly in the workflow frontmatter, without requiring a
 # named catalog entry
 engine:
-  # Minimum release age in days for compiler-managed engine installs. Zero disables
-  # Zero requires the compiler-pinned default or a literal engine version; expressions are not allowed.
+  # Minimum release age in days for compiler-managed engine installs. Zero skips the runtime check.
+  # Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time.
   # (optional)
   cooldown: 1
 
@@ -4316,8 +4316,8 @@ engine:
     # (optional)
     bare: true
 
-    # Minimum release age in days for compiler-managed engine installs. Zero disables
-    # Zero requires the compiler-pinned default or a literal engine version; expressions are not allowed.
+    # Minimum release age in days for compiler-managed engine installs. Zero skips the runtime check.
+    # Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time.
     # (optional)
     cooldown: 1
 
@@ -22477,8 +22477,8 @@ safe-outputs:
       # (optional)
       checksums-sha256: "example-value"
 
-      # Minimum release age in days for compiler-managed engine installs. Zero disables
-      # Zero requires the compiler-pinned default or a literal engine version; expressions are not allowed.
+      # Minimum release age in days for compiler-managed engine installs. Zero skips the runtime check.
+      # Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time.
       # (optional)
       cooldown: 1
 
@@ -22875,8 +22875,8 @@ safe-outputs:
     # provider settings directly in the workflow frontmatter, without requiring a
     # named catalog entry
     engine-config:
-      # Minimum release age in days for compiler-managed engine installs. Zero disables
-      # Zero requires the compiler-pinned default or a literal engine version; expressions are not allowed.
+      # Minimum release age in days for compiler-managed engine installs. Zero skips the runtime check.
+      # Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time.
       # (optional)
       cooldown: 1
 
@@ -23545,8 +23545,8 @@ safe-outputs:
         # (optional)
         bare: true
 
-        # Minimum release age in days for compiler-managed engine installs. Zero disables
-        # Zero requires the compiler-pinned default or a literal engine version; expressions are not allowed.
+        # Minimum release age in days for compiler-managed engine installs. Zero skips the runtime check.
+        # Zero requires the compiler-pinned default or a literal semantic version; Copilot release metadata is checked at compile time.
         # (optional)
         cooldown: 1
 

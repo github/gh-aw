@@ -64,7 +64,7 @@ engine:
 | `id` | Built-in ID, or the ID of an [imported definition](/gh-aw/reference/third-party-agent/). |
 | `model` | Exact model ID, alias, or provider-prefixed selection; may also be top-level `model`. |
 | `version` | Override the compiler-pinned CLI version. |
-| `cooldown` | Minimum release age in nonnegative integer days; defaults to `3`. `0` is allowed only with the compiler-pinned default or a literal `engine.version`; expressions are not allowed. |
+| `cooldown` | Minimum release age in nonnegative integer days; defaults to `3`. `0` is allowed only with the compiler-pinned default or a literal semantic `engine.version`; expressions and unpinned versions are not allowed. For a literal Copilot CLI version, the compiler checks GitHub release metadata and the configured age before accepting zero. |
 | `env` | Engine-only runtime values; use top-level `env` for all steps. [Scope and precedence](/gh-aw/reference/environment-variables/) apply. |
 | `args` | Ordered native CLI arguments placed before the prompt. Agy rejects it. |
 | `command` | Replacement executable that skips the engine installer, not AWF installation. Provision it in setup steps; Agy checks the verified version, and Copilot checksum pins cannot be combined with it. |
@@ -137,7 +137,7 @@ engine:
   cooldown: 7
 ```
 
-The value must be a nonnegative integer number of days; booleans, strings, durations, and expressions are rejected. `cooldown: 0` disables the check and is allowed only when `engine.version` is omitted (using the compiler-pinned release) or set to a literal version that can be checked against releases. An Actions expression cannot be used with zero. Omitting the field keeps the default cooldown.
+The value must be a nonnegative integer number of days; booleans, strings, durations, and expressions are rejected. `cooldown: 0` skips the runtime check and is allowed only when `engine.version` is omitted (using the compiler-pinned release) or set to a literal semantic version. For a literal Copilot CLI version, the compiler checks that the matching GitHub release exists, is published, and meets the configured age before accepting zero. This compile-time check requires the compiler to access `api.github.com`; Actions expressions and unpinned versions cannot be used with zero. Omitting the field keeps the default cooldown.
 
 Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass the age to npm via `NPM_CONFIG_MIN_RELEASE_AGE`, including microVM staging. npm enforces it with its built-in `min-release-age` setting, so runtime overrides need npm **11.10.0 or later**. Copilot's installer checks GitHub release publication metadata before activating a cached CLI or downloading an archive; missing or invalid metadata fails the install. The cooldown does not replace checksum verification or pins.
 

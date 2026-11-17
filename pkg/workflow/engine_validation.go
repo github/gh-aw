@@ -39,14 +39,18 @@
 package workflow
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/githubapi"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -57,6 +61,9 @@ var engineValidationLog = logger.New("workflow:engine_validation")
 // supply chain security guarantees.
 func (c *Compiler) validateEngineVersion(workflowData *WorkflowData) error {
 	if err := c.validatePiEngineConfig(workflowData); err != nil {
+		return err
+	}
+	if err := c.validateCopilotCooldownRelease(workflowData); err != nil {
 		return err
 	}
 	if workflowData.EngineConfig == nil || workflowData.EngineConfig.Version == "" {
@@ -77,6 +84,75 @@ func (c *Compiler) validateEngineVersion(workflowData *WorkflowData) error {
 
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
 	c.IncrementWarningCount()
+	return nil
+}
+
+func (c *Compiler) validateCopilotCooldownRelease(workflowData *WorkflowData) error {
+	if workflowData == nil || workflowData.EngineConfig == nil ||
+		!strings.EqualFold(ResolveEngineID(workflowData), "copilot") ||
+		workflowData.EngineConfig.Cooldown == nil || *workflowData.EngineConfig.Cooldown != 0 ||
+		workflowData.EngineConfig.Version == "" {
+		return nil
+	}
+
+	client := c.releaseMetadataClient
+	if client == nil {
+		client = &http.Client{Timeout: constants.DefaultHTTPClientTimeout}
+	}
+	return validateCopilotReleaseAge(
+		c.ctx,
+		client,
+		workflowData.EngineConfig.Version,
+		*workflowData.EngineConfig.Cooldown,
+		time.Now(),
+	)
+}
+
+func validateCopilotReleaseAge(ctx context.Context, client *http.Client, version string, cooldownDays int, now time.Time) error {
+	if !pinnedReleaseVersionPattern.MatchString(version) {
+		return NewValidationError(
+			"engine.version",
+			version,
+			"cooldown zero requires a literal semantic Copilot CLI release version",
+			"Use a version such as 1.2.3 or omit engine.version to use the compiler-pinned release.",
+		)
+	}
+	releaseTag := "v" + strings.TrimPrefix(version, "v")
+	endpoint := "https://api.github.com/repos/github/copilot-cli/releases/tags/" + releaseTag
+	body, err := githubapi.GetPublic(ctx, client, endpoint)
+	if err != nil {
+		return NewValidationError(
+			"engine.version",
+			version,
+			"Copilot CLI release metadata could not be verified at compile time",
+			fmt.Sprintf("Allow compiler access to api.github.com and confirm that Copilot CLI release %s exists; check GitHub API availability or rate limits if the problem persists.", releaseTag),
+		)
+	}
+	var release struct {
+		TagName     string     `json:"tag_name"`
+		Draft       bool       `json:"draft"`
+		PublishedAt *time.Time `json:"published_at"`
+	}
+	if err := json.Unmarshal(body, &release); err != nil ||
+		strings.TrimPrefix(release.TagName, "v") != strings.TrimPrefix(version, "v") ||
+		release.Draft || release.PublishedAt == nil {
+		return NewValidationError(
+			"engine.version",
+			version,
+			"Copilot CLI release metadata is invalid or does not match the pinned version",
+			fmt.Sprintf("Use a published Copilot CLI release with valid metadata for %s.", releaseTag),
+		)
+	}
+
+	age := now.Sub(*release.PublishedAt)
+	if age < 0 || int64(cooldownDays) > int64(age/(24*time.Hour)) {
+		return NewValidationError(
+			"engine.cooldown",
+			strconv.Itoa(cooldownDays),
+			fmt.Sprintf("Copilot CLI release %s has not met the configured minimum release age", releaseTag),
+			fmt.Sprintf("Choose a Copilot CLI release that is at least %d days old, or use a positive engine.cooldown to enforce the check at installation time.", cooldownDays),
+		)
+	}
 	return nil
 }
 

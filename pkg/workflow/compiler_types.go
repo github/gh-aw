@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
@@ -17,6 +18,7 @@ type FileCreationTracker interface {
 // Compiler handles converting markdown workflows to GitHub Actions YAML
 type Compiler struct {
 	ctx                      context.Context // Context for network operations (e.g. SHA resolution); defaults to context.Background()
+	releaseMetadataClient    *http.Client    // Optional HTTP client override for compiler-time release metadata validation.
 	verbose                  bool
 	quiet                    bool // If true, suppress success messages (for interactive mode)
 	batchMode                bool // If true, aggregate repetitive notices across workflows
