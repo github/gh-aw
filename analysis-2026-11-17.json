@@ -1,0 +1,136 @@
+{
+ "date": "2026-11-17",
+ "window": "2026-10-18..2026-11-17",
+ "total_prs": 662,
+ "merged": 563,
+ "closed": 89,
+ "open": 10,
+ "merge_rate": 0.863,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "feature": {
+   "total": 75,
+   "merged": 66,
+   "closed": 9,
+   "open": 0,
+   "rate": 0.88
+  },
+  "bug_fix": {
+   "total": 48,
+   "merged": 41,
+   "closed": 6,
+   "open": 1,
+   "rate": 0.872
+  },
+  "security": {
+   "total": 35,
+   "merged": 26,
+   "closed": 9,
+   "open": 0,
+   "rate": 0.743
+  },
+  "testing": {
+   "total": 51,
+   "merged": 49,
+   "closed": 2,
+   "open": 0,
+   "rate": 0.961
+  },
+  "documentation": {
+   "total": 41,
+   "merged": 36,
+   "closed": 2,
+   "open": 3,
+   "rate": 0.947
+  },
+  "refactor": {
+   "total": 14,
+   "merged": 7,
+   "closed": 7,
+   "open": 0,
+   "rate": 0.5
+  },
+  "dependency": {
+   "total": 20,
+   "merged": 20,
+   "closed": 0,
+   "open": 0,
+   "rate": 1.0
+  },
+  "other": {
+   "total": 378,
+   "merged": 318,
+   "closed": 54,
+   "open": 6,
+   "rate": 0.855
+  }
+ },
+ "structural": {
+  "avg_words_merged": 155.2,
+  "avg_words_closed": 96.6
+ },
+ "length_buckets_completed": {
+  "0-100": {
+   "total": 355,
+   "merged": 295,
+   "closed": 60,
+   "open": 0,
+   "rate": 0.831
+  },
+  "100-150": {
+   "total": 171,
+   "merged": 149,
+   "closed": 22,
+   "open": 0,
+   "rate": 0.871
+  },
+  "150-250": {
+   "total": 32,
+   "merged": 28,
+   "closed": 4,
+   "open": 0,
+   "rate": 0.875
+  },
+  "250+": {
+   "total": 94,
+   "merged": 91,
+   "closed": 3,
+   "open": 0,
+   "rate": 0.968
+  }
+ },
+ "negative_titles": {
+  "wip_draft": {
+   "total": 11,
+   "merged": 3,
+   "closed": 8,
+   "open": 0,
+   "rate": 0.273
+  },
+  "triage_verify_investigate": {
+   "total": 46,
+   "merged": 26,
+   "closed": 20,
+   "open": 0,
+   "rate": 0.565
+  }
+ },
+ "last_7_days": {
+  "total": 189,
+  "merged": 150,
+  "closed": 29,
+  "open": 10,
+  "rate": 0.838
+ },
+ "category_rules": "v6-title-regex (rebuilt 2026-11-17, first-match wins, leading [tag] stripped); NOT comparable to v5 category counts; merge_rate is comparable",
+ "category_regex": {
+  "security": "\\b(security|cve|vuln|vulnerab|xss|injection|sanitiz|secret|token leak|audit)\\b",
+  "dependency": "\\b(bump|deps?|dependenc|upgrade|update .* to v?\\d|renovate)\\b",
+  "testing": "\\b(tests?|testing|coverage|spec|e2e)\\b",
+  "documentation": "\\b(docs?|documentation|readme|changelog|document)\\b",
+  "refactor": "\\b(refactor|cleanup|clean up|simplify|reorgani[sz]e|extract|rename|dedupe)\\b",
+  "bug_fix": "\\b(fix|bug|resolve|regression|crash|error|broken|correct|panic)\\b",
+  "feature": "\\b(add|implement|support|feature|introduce|create|enable|new)\\b"
+ },
+ "caveat": "PR body used as prompt proxy; bodies are often agent-written summaries. Keyword lift confounded by batch clusters from single authors; not causal. Closed review/triage PRs may reflect no-change outcomes, not bad prompts."
+}
