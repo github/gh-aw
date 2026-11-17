@@ -206,7 +206,7 @@
   .psd-pr.draft { opacity: 1; }
   .psd-pr.merged { opacity: 1; background: #3fb950; border-color: #3fb950; color: #0d1117; box-shadow: 0 0 24px #3fb95080; }
   .fm-quote { position: absolute; left: 114px; top: 318px; width: 600px; font: 700 44px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; opacity: 0; }
-  .fm-quote em { font-style: normal; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8); }
+  .fm-quote em { font-style: normal; color: #79c0ff; }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
   .hap-quote { top: 288px; width: auto; white-space: nowrap; }
   .hap-svg { position: absolute; left: 110px; top: 390px; width: 1700px; height: 625px; overflow: visible; font-family: "Mona Sans"; }
@@ -227,11 +227,11 @@
   .hap-sub { fill: #9198a1; font: 500 20px var(--mono); }
   .hap-node { opacity: .4; transition: opacity .4s; }
   .hap-node.on { opacity: 1; }
-  .hap-node.on rect { stroke: var(--c); fill: #161b22; filter: drop-shadow(0 0 16px var(--c)); }
+  .hap-node.on rect { stroke: var(--c); fill: #161b22; filter: drop-shadow(0 0 16px #79c0ff55); }
   .hap-disc { fill: #0d1117; stroke: #9198a1; stroke-width: 2.5; }
   .hap-disc.h { stroke: #4493f8; stroke-width: 3; }
-  .hap-node.on .hap-disc { stroke: var(--c); filter: drop-shadow(0 0 12px var(--c)); }
-  .hap-node.on .hap-disc.h { stroke: #4493f8; filter: drop-shadow(0 0 16px #4493f8); }
+  .hap-node.on .hap-disc { stroke: var(--c); filter: drop-shadow(0 0 12px #79c0ff55); }
+  .hap-node.on .hap-disc.h { stroke: #4493f8; filter: drop-shadow(0 0 16px #4493f855); }
   .fm-pill.g rect { stroke: #9198a1; filter: none; }
   .fmm-copy { position: absolute; left: 110px; top: 150px; width: 860px; }
   .fmm-copy h2 { margin: 0; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; }
@@ -338,7 +338,7 @@
   .drm-w.g { stroke: #3fb950; }
   .drm-w.on { stroke-dashoffset: 0; }
   .drm-core { fill: #161b22; stroke: #a371f7; stroke-width: 3; transition: filter .6s; }
-  .drm-hot .drm-core { filter: drop-shadow(0 0 28px #a371f7); }
+  .drm-hot .drm-core { filter: drop-shadow(0 0 28px #a371f755); }
   .drm-z { font: 700 26px/1 var(--mono); fill: #d2a8ff; opacity: 0; }
   .drm-hot .drm-z { animation: drm-z 2.4s ease-out infinite; }
   .drm-hot .drm-z.b { animation-delay: .8s; }
@@ -440,16 +440,16 @@
   .ct-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
   .ct-round { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
   .ct-svg .fm-wire.o { stroke: #d29922; } .ct-svg .fm-wire.r { stroke: #f85149; stroke-dasharray: 4 6; } .ct-svg .mra-l.r { fill: #ff7b72; }
-  .ct-prem { fill: #d2992208; stroke: #d29922; stroke-width: 2; stroke-dasharray: 12 8; opacity: .8; }
-  .ct-prem-t { fill: #d29922; font: 600 16px var(--mono); letter-spacing: .08em; }
-  .ct-lock path { stroke: #d29922; } .ct-lock rect { fill: #d29922; }
+  .ct-prem { fill: #9198a108; stroke: #9198a1; stroke-width: 2; stroke-dasharray: 12 8; opacity: .8; }
+  .ct-prem-t { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .08em; }
+  .ct-lock path { stroke: #9198a1; } .ct-lock rect { fill: #9198a1; }
   .ct-run .ct-x { fill: none; stroke: #f85149; stroke-width: 5; stroke-linecap: round; }
-  .ct-run.on rect { stroke: #f85149; filter: drop-shadow(0 0 14px #f85149); }
+  .ct-run.on rect { stroke: #f85149; filter: drop-shadow(0 0 14px #f8514955); }
   .ct-data { opacity: .45; transition: opacity .4s; }
   .ct-data.on { opacity: 1; }
-  .ct-data-b { fill: #0d1117; stroke: #d29922; stroke-width: 2; }
-  .ct-data.on .ct-data-b { filter: drop-shadow(0 0 14px #d2992299); }
-  .ct-data-t { fill: #d29922; font: 700 15px var(--mono); letter-spacing: .14em; }
+  .ct-data-b { fill: #0d1117; stroke: #9198a1; stroke-width: 2; }
+  .ct-data.on .ct-data-b { filter: drop-shadow(0 0 14px #9198a155); }
+  .ct-data-t { fill: #9198a1; font: 700 15px var(--mono); letter-spacing: .14em; }
   .ct-data-l { fill: #9198a1; font: 500 17px var(--mono); }
   .ct-bar { fill: #3d444d; }
   .ct-data.on .ct-bar { animation: ct-scan .9s ease-in-out infinite alternate; }
@@ -582,7 +582,6 @@
   .fv-chip rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: all .3s; }
   .fv-chip.on rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #3fb950); }
   .fv-chip text { fill: #f0f6fc; font: 600 20px "Mona Sans"; text-anchor: middle; }
-  .gf .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #ab7df8, #79c0ff); }
   .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
   .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
   .prq-svg { left: 280px; top: 262px; width: 1360px; height: 664px; }
@@ -690,7 +689,7 @@
   .exm-svg { position: absolute; left: 470px; top: 802px; width: 1400px; height: 210px; overflow: visible; }
   .exm-t { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .1em; }
   .exm-t b, .exm-t .v { fill: #c297ff; }
-  .exm-b { fill: #d29922; transform-box: fill-box; transform-origin: bottom; }
+  .exm-b { fill: #79c0ff; transform-box: fill-box; transform-origin: bottom; }
   .active .exm-b { animation: exm-grow .9s cubic-bezier(.2,.8,.2,1) both; }
   @keyframes exm-grow { from { transform: scaleY(0); } }
   .exm-bv { fill: #f0f6fc; font: 700 17px var(--mono); text-anchor: middle; }
@@ -708,23 +707,22 @@
   .exr-card-t { fill: #9198a1; font: 600 20px var(--mono); }
   .exr-cell { fill: #ffffff08; stroke: #3d444d; stroke-width: 2; transform-box: fill-box; transform-origin: center; transition: fill .4s, stroke .4s; }
   .exr-cell.miss { fill: #ffffff1c; stroke: #6e7681; }
-  .exr-cell.hit { fill: #d2992240; stroke: #d29922; filter: drop-shadow(0 0 8px #d2992299); animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
-  .exr-cell.r { stroke: #ab7df8; stroke-width: 4; filter: drop-shadow(0 0 12px #ab7df8); }
-  .exr-cell.e { stroke: #3fb950; stroke-width: 4; filter: drop-shadow(0 0 12px #3fb950); }
+  .exr-cell.hit { fill: #79c0ff40; stroke: #79c0ff; filter: drop-shadow(0 0 8px #79c0ff55); animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
+  .exr-cell.r { stroke: #ab7df8; stroke-width: 4; filter: drop-shadow(0 0 12px #ab7df855); }
+  .exr-cell.e { stroke: #3fb950; stroke-width: 4; filter: drop-shadow(0 0 12px #3fb95055); }
   .exr-rl { fill: #9198a1; font: 500 19px var(--mono); text-anchor: end; transition: fill .3s; }
   .exr-rl.on { fill: #f0f6fc; }
   .exr-leg { font: 600 19px var(--mono); }
   .exr-day { fill: #f0f6fc; font: 700 30px var(--mono); text-anchor: end; }
   .exr-log text { fill: #9198a1; font: 500 18px var(--mono); }
-  .exr-log .m-r { fill: #c297ff; } .exr-log .m-e { fill: #3fb950; } .exr-log .s { fill: #e6edf3; } .exr-log .hit { fill: #d29922; font-weight: 700; }
+  .exr-log .m-r { fill: #c297ff; } .exr-log .m-e { fill: #3fb950; } .exr-log .s { fill: #e6edf3; } .exr-log .hit { fill: #79c0ff; font-weight: 700; }
   .exr-lint text { fill: #9198a1; font: 600 19px var(--mono); transition: fill .6s; }
-  .exr-lint.hot text { fill: #d29922; }
-  .exr-n { fill: #d29922; font: 700 26px var(--mono); text-anchor: end; }
+  .exr-lint.hot text { fill: #79c0ff; }
+  .exr-n { fill: #79c0ff; font: 700 26px var(--mono); text-anchor: end; }
   .exr-bar { fill: #ffffff14; } .exr-fill { fill: url(#exrGrad); }
   .exr-cov { fill: #9198a1; font: 500 19px var(--mono); }
   .exr-done { fill: #3fb950; font: 700 19px var(--mono); text-anchor: end; opacity: 0; transition: opacity .5s; } .exr-done.on { opacity: 1; }
   #nSergo.blink circle { animation: mra-blink .7s ease-out; }
-  .exr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #3fb950, #d29922, #ab7df8); }
   .sdd-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .sdd-svg .mra-l.g { fill: #3fb950; }
   .sdd-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .sdd-panel.on .sdd-card { stroke: #ab7df8; filter: drop-shadow(0 0 14px #8957e566); }
@@ -946,8 +944,7 @@
   .sfm-m div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; color: #6e7681; font-size: 12px; }
   .sfm-m i { display: block; width: 100%; background: linear-gradient(#ab7df8, #8957e5); border-radius: 3px 3px 0 0; }
   .sfm-c { margin-top: 6px; color: #6e7681; font-size: 12.5px; white-space: nowrap; }
-  .pm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #ab7df8, #3fb950, #4493f8, #d29922); }
-  .pm-src { color: #d29922; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+  .pm-src { color: #79c0ff; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
   .pm-src:hover { color: #f0f6fc; }
   .pm-tabs { position: absolute; left: 110px; top: 262px; display: flex; gap: 20px; opacity: 0; }
   .active .pm-tabs { animation: settle .6s .3s both; }
@@ -957,8 +954,8 @@
   .pm-tab i { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 2px solid currentColor; font: 600 20px var(--mono); font-style: normal; }
   .pm-tab b { display: block; font: 600 28px/1.15 "Mona Sans"; }
   .pm-tab em { display: block; margin-top: 4px; font: normal 16px var(--mono); color: #6e7681; }
-  .pm-tab.on { border-color: #d29922; background: #161b22f0; color: #f0f6fc; box-shadow: 0 0 30px #d2992240; }
-  .pm-tab.on i { color: #d29922; }
+  .pm-tab.on { border-color: #79c0ff; background: #161b22f0; color: #f0f6fc; box-shadow: 0 0 30px #79c0ff40; }
+  .pm-tab.on i { color: #79c0ff; }
   .pm-flow { position: absolute; left: 110px; top: 400px; width: 1700px; display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 56px; }
   .pm-st { position: relative; height: 126px; padding: 16px 20px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; transition: border-color .3s, box-shadow .3s, background .3s; }
   .pm-st + .pm-st::before { content: ""; position: absolute; left: -54px; top: 50%; width: 46px; height: 2px; background: #3d444d; transition: background .3s; }
@@ -981,9 +978,9 @@
   .pm-ln.on { opacity: 1; transform: none; }
   .pm-ln i { font-style: normal; font-weight: 700; }
   .pm-ln b { color: #f0f6fc; font: 600 22px "Mona Sans"; }
-  .pm-ln.ok i { color: #3fb950; } .pm-ln.bad i, .pm-ln.bad b { color: #f85149; } .pm-ln.warn i { color: #d29922; } .pm-ln.hl b { color: #d29922; }
+  .pm-ln.ok i { color: #3fb950; } .pm-ln.bad i, .pm-ln.bad b { color: #f85149; } .pm-ln.warn i { color: #d29922; } .pm-ln.hl b { color: #79c0ff; }
   .pm-idea { position: absolute; left: 1210px; top: 580px; width: 600px; height: 420px; padding: 26px 30px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117e0; }
-  .pm-idea small { font: 500 15px var(--mono); letter-spacing: .12em; color: #d29922; }
+  .pm-idea small { font: 500 15px var(--mono); letter-spacing: .12em; color: #79c0ff; }
   .pm-idea b { display: block; margin-top: 18px; color: #f0f6fc; font: 700 44px/1.1 "Mona Sans"; }
   .pm-idea p { margin: 20px 0 0; color: #9198a1; font: 22px/1.4 "Mona Sans"; }
   .pm-cap { position: absolute; left: 110px; right: 100px; bottom: 34px; color: #6e7681; font: 15px var(--mono); }
@@ -2836,7 +2833,7 @@
   .rcm-av { width: 46px; height: 46px; border-radius: 50%; border: 2px solid #30363d; flex: none; }
   .rcm-gear { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 22px; background: #ab7df833; color: #d2a8ff; border: 2px solid #ab7df8; }
   .rcm-react { align-self: flex-start; margin-left: 60px; padding: 4px 14px; border-radius: 999px; border: 1px solid #4493f8; background: #4493f81f; font-size: 19px; color: #e6edf3; }
-  .rcm-lbl { display: inline-block; padding: 2px 14px; border-radius: 999px; background: #e3b34133; border: 1px solid #e3b341; color: #f0d48a; font: 600 19px/1.4 var(--mono); }
+  .rcm-lbl { display: inline-block; padding: 2px 14px; border-radius: 999px; background: #79c0ff26; border: 1px solid #79c0ff; color: #cae8ff; font: 600 19px/1.4 var(--mono); }
   .rcm-lbl.big { font-size: 40px; padding: 2px 26px; }
   .rcm-pr { display: flex; align-items: center; gap: 12px; font-size: 21px; color: #e6edf3; padding: 10px 14px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
   .rcm-pr .n { font: 700 16px var(--mono); padding: 2px 8px; border-radius: 6px; background: #238636; color: #fff; }
@@ -2857,7 +2854,7 @@
   .lsm-n rect { fill: #161b22; stroke: #30363d; stroke-width: 2; transition: fill .35s, stroke .35s; }
   .lsm-n text { fill: #c9d1d9; font: 600 20px var(--mono); text-anchor: middle; }
   .lsm-n.seen rect { stroke: #8b949e; }
-  .lsm-n.on rect { fill: #e3b34126; stroke: #e3b341; stroke-width: 3; filter: drop-shadow(0 0 10px #e3b34166); }
+  .lsm-n.on rect { fill: #79c0ff26; stroke: #79c0ff; stroke-width: 3; filter: drop-shadow(0 0 10px #79c0ff55); }
   .lsm-n.on text { fill: #f0f6fc; }
   .lsm-e { fill: none; stroke-width: 3; opacity: .45; transition: opacity .35s, stroke-width .35s; }
   .lsm-e.a { stroke: #ab7df8; } .lsm-e.h { stroke: #4493f8; } .lsm-e.x { stroke: #db6d28; stroke-dasharray: 10 8; }
@@ -5644,7 +5641,7 @@
       [
         "IssueOps",
         "on: issues opened",
-        "#3fb950",
+        "#79c0ff",
         [
           ["e", "issue", "Issue opened"],
           ["a", AG, "Triage"],
@@ -5656,7 +5653,7 @@
       [
         "DailyOps",
         "on: schedule",
-        "#d29922",
+        "#79c0ff",
         [
           ["e", "calendar", "Schedule"],
           ["a", AG, "Daily scan"],
@@ -5667,7 +5664,7 @@
       [
         "ReviewOps",
         "on: ready for review",
-        "#ab7df8",
+        "#79c0ff",
         [
           ["e", "pr", "Ready for review"],
           ["a", AG, "Code review"],
@@ -5679,7 +5676,7 @@
       [
         "LabelOps",
         "on: label added",
-        "#f778ba",
+        "#79c0ff",
         [
           ["e", "tag", "Label added"],
           ["a", AG, "Investigate"],
@@ -5803,7 +5800,7 @@
     // issue, comment, pull request and discussion events plus a first-word guard, role check, reaction, status comment and label removal
     {
       resetIndex();
-      const C = { s: "#79c0ff", l: "#e3b341", x: "#ab7df8" };
+      const C = { s: "#79c0ff", l: "#79c0ff", x: "#ab7df8" };
       const yaml = rows =>
         h(
           "div",
@@ -6567,10 +6564,10 @@
         dot = svg.querySelector(".mra-dot");
       // real counts for gh-aw issues labelled "community" and the merged pull requests that closed them, snapshot November 2026
       const STATS = [
-        [450, "", "people filed community issues", "#3fb950", "#79c0ff"],
-        [1383, "", "community issues closed as completed", "#79c0ff", "#4493f8"],
-        [1039, "", "pull requests merged to close them", "#4493f8", "#ab7df8"],
-        [96, "%", "of those pull requests authored by Copilot", "#ab7df8", "#d2a8ff"],
+        [450, "", "people filed community issues", "#79c0ff", "#79c0ff"],
+        [1383, "", "community issues closed as completed", "#79c0ff", "#79c0ff"],
+        [1039, "", "pull requests merged to close them", "#79c0ff", "#79c0ff"],
+        [96, "%", "of those pull requests authored by Copilot", "#79c0ff", "#79c0ff"],
       ];
       const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
       const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
@@ -17280,10 +17277,10 @@
     const ACT = [
       ["person", "#4493f8", "review: “use slices.SortFunc” ×12"],
       ["copilot", "#8957e5", "session: 40 turns to fix one test"],
-      ["issue", "#ab7df8", "issue reopened: same flaky test"],
+      ["issue", "#9198a1", "issue reopened: same flaky test"],
       ["comment", "#4493f8", "“@copilot add the permission” ×7"],
       ["xCircle", "#f85149", "run failed: same lint, 9th time"],
-      ["stopwatch", "#d29922", "agent run: 2.1M tokens, one diff"],
+      ["stopwatch", "#9198a1", "agent run: 2.1M tokens, one diff"],
     ];
     // mined patterns (synthetic)
     const PAT = [
@@ -17550,10 +17547,10 @@
     };
     // measured on gh-aw, 15 May to 11 November 2026
     const STATS = [
-      [65, "analyzers merged from 73 Linter Miner PRs", "#d29922", "#ab7df8"],
-      [376, "reviews refining them before merge", "#79c0ff", "#ab7df8"],
-      [235, "LintMonster finding issues filed", "#ab7df8", "#d2a8ff"],
-      [92, "Copilot cleanup PRs merged · 54,128 lines", "#3fb950", "#79c0ff"],
+      [65, "analyzers merged from 73 Linter Miner PRs", "#79c0ff", "#79c0ff"],
+      [376, "reviews refining them before merge", "#79c0ff", "#79c0ff"],
+      [235, "LintMonster finding issues filed", "#79c0ff", "#79c0ff"],
+      [92, "Copilot cleanup PRs merged · 54,128 lines", "#79c0ff", "#79c0ff"],
     ];
     const nums = STATS.map(() => h("div", { class: "ct-num" }, "0"));
     const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
@@ -17703,7 +17700,7 @@
       MAXLINT = 12;
     const cell = (r, c) => [GX + c * CW + CS / 2, GY + r * CH + CS / 2];
     let g = `<defs>
-      <linearGradient id="exrGrad"><stop offset="0" stop-color="#ab7df8"/><stop offset=".6" stop-color="#3fb950"/><stop offset="1" stop-color="#d29922"/></linearGradient></defs>`;
+      <linearGradient id="exrGrad"><stop offset="0" stop-color="#1f6feb"/><stop offset="1" stop-color="#79c0ff"/></linearGradient></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
       [0, 440, "CACHE"],
@@ -17717,7 +17714,7 @@
     g += `<rect class="exr-card" x="1376" y="78" width="408" height="${VH - 88}" rx="16"/><text class="exr-card-t" x="1396" y="116">▣ pkg/linters</text><text class="exr-n" id="exrN" x="1764" y="117">0</text><g class="exr-lint-l" id="exrLint"></g>`;
     g += `<g id="exrBeams"></g>`;
     g += `<g class="fm-task on" id="nSergo"><g class="fm-pill"><rect x="500" y="87" width="150" height="50" rx="25"/><text x="593" y="120">Sergo</text></g><circle cx="500" cy="112" r="34" fill="#8957e5"/>${ico("copilot", 500, 113, 38)}</g>`;
-    g += `<text class="exr-leg" x="700" y="120"><tspan fill="#c297ff">◆ reuse 50%</tspan><tspan dx="28" fill="#3fb950">◆ explore 50%</tspan><tspan dx="28" fill="#d29922">◆ pattern</tspan></text>`;
+    g += `<text class="exr-leg" x="700" y="120"><tspan fill="#c297ff">◆ reuse 50%</tspan><tspan dx="28" fill="#3fb950">◆ explore 50%</tspan><tspan dx="28" fill="#79c0ff">◆ pattern</tspan></text>`;
     g += `<text class="exr-day" id="exrDay" x="${GX + NC * CW - 11}" y="122"></text>`;
     ROWS.forEach(([lab], r) => {
       g += `<text class="exr-rl" id="exrRl${r}" x="${GX - 16}" y="${GY + r * CH + CS / 2 + 7}">${lab}</text>`;
@@ -17879,7 +17876,7 @@
         if (!hit) return;
         found++;
         const [x, y] = cell(r, c);
-        beam(`M${x} ${y} C${x + 220} ${y}, 1300 ${LINTY - 6}, 1384 ${LINTY - 6}`, "#d29922");
+        beam(`M${x} ${y} C${x + 220} ${y}, 1300 ${LINTY - 6}, 1384 ${LINTY - 6}`, "#79c0ff");
         lints.forEach(l => l.classList.remove("hot"));
         const li = mk("mra-row new exr-lint hot", `<text x="1400" y="0">+ ${lint}</text>`);
         $("exrLint").appendChild(li);
@@ -18482,10 +18479,10 @@
       dot = svg.querySelector(".mra-dot");
     // measured on gh-aw: [go-fan] review issues and the merged pull requests that closed them, February to November 2026
     const STATS = [
-      [121, "", "daily module reviews filed", "#79c0ff", "#3fb950"],
-      [28, "", "Go modules studied", "#3fb950", "#79c0ff"],
-      [43, "", "review pull requests merged, all by Copilot", "#79c0ff", "#ab7df8"],
-      [16372, "", "lines changed by those pull requests", "#ab7df8", "#d2a8ff"],
+      [121, "", "daily module reviews filed", "#79c0ff", "#79c0ff"],
+      [28, "", "Go modules studied", "#79c0ff", "#79c0ff"],
+      [43, "", "review pull requests merged, all by Copilot", "#79c0ff", "#79c0ff"],
+      [16372, "", "lines changed by those pull requests", "#79c0ff", "#79c0ff"],
     ];
     const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
     const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
