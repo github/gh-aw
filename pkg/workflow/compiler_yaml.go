@@ -39,10 +39,11 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 	if err != nil {
 		return fmt.Errorf("cannot embed activation Markdown metadata: %w", err)
 	}
-	if len(encoded) > maxActivationMetadataBytes {
+	// The runtime bounds the escaped payload it reads, not the raw JSON.
+	payload := inertJSON(encoded)
+	if len(payload) > maxActivationMetadataBytes {
 		return fmt.Errorf("activation Markdown metadata exceeds the %d-byte limit; reduce the workflow's agent metadata", maxActivationMetadataBytes)
 	}
-	payload := inertJSON(encoded)
 	stepIndex := slices.IndexFunc(activation.Steps, func(step string) bool { return strings.Contains(step, awInfoStepEnvAnchor) })
 	if stepIndex < 0 || stepIndex >= len(activation.Steps) {
 		return errors.New("activation run info step missing: cannot embed Markdown metadata")
@@ -310,8 +311,9 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
 		return "", nil, nil, fmt.Errorf("workflow compilation requires valid jobs and dependencies; check job definitions and needs references: %w", err)
 	}
-	data.compiledMarkdownMetadata = c.collectMarkdownMetadata(data)
-	if err := c.embedActivationMarkdownMetadata(c.collectWorkflowMarkdownMetadata(data)); err != nil {
+	fullMetadata, workflowMetadata := c.collectMarkdownMetadataCatalogs(data)
+	data.compiledMarkdownMetadata = fullMetadata
+	if err := c.embedActivationMarkdownMetadata(workflowMetadata); err != nil {
 		return "", nil, nil, err
 	}
 	repoConfig, err = resolvedArtifactRetentionConfig(repoConfig, data)

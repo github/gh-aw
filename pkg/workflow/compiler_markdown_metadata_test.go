@@ -60,6 +60,7 @@ func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
 	generated, data, env := compileActivationMetadataWorkflow(t, content)
 	embedded := env["GH_AW_INFO_MARKDOWN_METADATA"]
 	require.NotEmpty(t, embedded)
+	require.NotContains(t, embedded, "${{", "the embedded env value must not contain a live expression")
 	require.Contains(t, embedded, `\u0024{{ inputs.model }}`, "authored expressions must stay inert")
 	require.Contains(t, embedded, `it\u0027s-caf\u00e9`)
 	var catalog GHAWMarkdownMetadata
@@ -150,6 +151,8 @@ func TestCompilerActivationMarkdownMetadataErrors(t *testing.T) {
 	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "run info step missing")
 	catalog.Records[0].Value = json.RawMessage(`{"model":"` + strings.Repeat("x", maxActivationMetadataBytes) + `"}`)
 	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "4194304-byte limit")
+	catalog.Records[0].Value = json.RawMessage(`{"model":"` + strings.Repeat("$", maxActivationMetadataBytes/2) + `"}`)
+	require.ErrorContains(t, compiler.embedActivationMarkdownMetadata(catalog), "4194304-byte limit", "the limit applies to the escaped payload the runtime reads")
 }
 
 func TestCompilerMarkdownMetadataReusesCatalogWithoutMutation(t *testing.T) {

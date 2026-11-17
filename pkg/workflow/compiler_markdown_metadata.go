@@ -33,16 +33,15 @@ type GHAWMarkdownMetadata struct {
 // The source is an exact lookup key, so stale repository files cannot acquire
 // metadata by matching only a name or path.
 func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMetadata {
-	return c.collectMarkdownMetadataRecords(data, true)
+	full, _ := c.collectMarkdownMetadataCatalogs(data)
+	return full
 }
 
-// collectWorkflowMarkdownMetadata omits repository agents that the workflow
-// does not reference; they live in the checkout and its compiled lock headers.
-func (c *Compiler) collectWorkflowMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMetadata {
-	return c.collectMarkdownMetadataRecords(data, false)
-}
-
-func (c *Compiler) collectMarkdownMetadataRecords(data *WorkflowData, includeRepository bool) *GHAWMarkdownMetadata {
+// collectMarkdownMetadataCatalogs scans workflow content once and returns the
+// full catalog and the workflow-only catalog. The workflow-only catalog omits
+// repository agents that the workflow does not reference; they live in the
+// checkout and its compiled lock headers.
+func (c *Compiler) collectMarkdownMetadataCatalogs(data *WorkflowData) (full, workflow *GHAWMarkdownMetadata) {
 	records := map[string]GHAWMarkdownMetadataRecord{}
 	scan := func(content, documentKind string) {
 		scanMarkdownMetadata(records, content, documentKind)
@@ -60,9 +59,14 @@ func (c *Compiler) collectMarkdownMetadataRecords(data *WorkflowData, includeRep
 	root := markdownMetadataRoot(c.markdownPath)
 	scanRuntimeImportMetadata(root, data, scan)
 	scanImportedDocumentMetadata(root, c.markdownPath, data, scan)
-	if includeRepository {
-		scanRepositoryArtifactMetadata(root, scan)
-	}
+	workflow = sortedMarkdownMetadata(records)
+	// Records are keyed by kind and digest and the first entry wins, so adding
+	// repository records afterwards matches a single combined scan.
+	scanRepositoryArtifactMetadata(root, scan)
+	return sortedMarkdownMetadata(records), workflow
+}
+
+func sortedMarkdownMetadata(records map[string]GHAWMarkdownMetadataRecord) *GHAWMarkdownMetadata {
 	keys := make([]string, 0, len(records))
 	for key := range records {
 		keys = append(keys, key)
