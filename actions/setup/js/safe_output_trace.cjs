@@ -13,6 +13,7 @@ const MAX_EXECUTION_TRACE_LENGTH = 1024;
  */
 function withExecutionTrace(terminal, wrap = handler => handler) {
   return handler =>
+    /** @this {any} */
     async function (...args) {
       let path = "";
       const trace = marker => {
