@@ -423,6 +423,8 @@ For reused self-hosted runners, post-job cleanup reduces residual state but is n
 Self-hosted runners need outbound HTTPS access to:
 
 - `api.githubcopilot.com` (or your enterprise Copilot endpoint)
+- `api.github.com` for Copilot CLI release-age metadata (default 3-day cooldown; `engine.cooldown: 0` skips the check only with `strict: false`; [cooldown details](/gh-aw/reference/engines/#engine-release-age-cooldown))
+- `raw.githubusercontent.com` is optional; the installer has a bundled compatibility-metadata fallback
 - `github.com` (or your GHES instance)
 - `ghcr.io` (to pull the MCP gateway container image)
 - Any domains listed in your workflow's `network.allowed` configuration
