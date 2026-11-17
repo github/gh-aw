@@ -4,8 +4,8 @@
 const { resolveExecutionOwnerRepo } = require("./repo_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
+const { getIssueLabel } = require("./issue_label.cjs");
 
-const TARGET_LABEL = "agentic-workflows";
 // Keep a conservative, explicit upper bound for comment sanitization.
 const MAX_COMMENT_BODY_LENGTH = 65536;
 const NO_REPRO_MESSAGE = `Closing as no repro.
@@ -64,19 +64,20 @@ function getNoReproCommentBody(sanitize = sanitizeContent) {
 }
 
 /**
- * Close all open issues with the "agentic-workflows" label.
+ * Close all open issues with the configured gh-aw issue label.
  * @returns {Promise<void>}
  */
 async function main() {
   const { owner, repo } = resolveExecutionOwnerRepo();
+  const targetLabel = getIssueLabel();
   core.info(`Operating on repository: ${owner}/${repo}`);
-  core.info(`Searching for open issues labeled "${TARGET_LABEL}"`);
+  core.info(`Searching for open issues labeled "${targetLabel}"`);
 
   /** @type {Array<any>} */
   const issues = await github.paginate(github.rest.issues.listForRepo, {
     owner,
     repo,
-    labels: TARGET_LABEL,
+    labels: targetLabel,
     state: "open",
     per_page: 100,
   });

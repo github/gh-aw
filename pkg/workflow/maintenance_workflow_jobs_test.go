@@ -9,8 +9,37 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGenerateMaintenanceWorkflow_IssueLabel(t *testing.T) {
+	for _, label := range []string{"", "area:agentic-workflows", `area: team's "workflows"`} {
+		t.Run(label, func(t *testing.T) {
+			dir := t.TempDir()
+			err := GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
+				WorkflowDataList: []*WorkflowData{{
+					Name: "test",
+					SafeOutputs: &SafeOutputsConfig{
+						CreateIssues: &CreateIssuesConfig{Expires: 24},
+					},
+				}},
+				WorkflowDir: dir,
+				ActionMode:  ActionModeDev,
+				RepoConfig:  &RepoConfig{IssueLabel: label},
+			})
+			require.NoError(t, err)
+			content, err := os.ReadFile(filepath.Join(dir, "agentics-maintenance.yml"))
+			require.NoError(t, err)
+			var parsed struct {
+				Env map[string]string `yaml:"env"`
+			}
+			require.NoError(t, yaml.Unmarshal(content, &parsed))
+			require.Equal(t, label, parsed.Env["GH_AW_ISSUE_LABEL"])
+			require.Contains(t, string(content), "labels: [process.env.GH_AW_ISSUE_LABEL || 'agentic-workflows']")
+		})
+	}
+}
 
 func TestGenerateMaintenanceWorkflow_CreatesWorkflowDirRecursively(t *testing.T) {
 	tmpDir := t.TempDir()

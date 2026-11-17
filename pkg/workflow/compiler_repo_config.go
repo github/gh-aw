@@ -53,6 +53,18 @@ func (c *Compiler) getCompiledProjectUTCOffset() string {
 	return strings.TrimSpace(repoConfig.UTC)
 }
 
+func (c *Compiler) addIssueLabelEnv(env map[string]string) map[string]string {
+	config, err := c.loadRepoConfig()
+	if err != nil || config == nil || config.IssueLabel == "" {
+		return env
+	}
+	if env == nil {
+		env = make(map[string]string)
+	}
+	env["GH_AW_ISSUE_LABEL"] = fmt.Sprintf("%q", config.IssueLabel)
+	return env
+}
+
 // getContainerPinMappings returns a container-pin mapping table from aw.json,
 // or nil when the file is absent, contains no mappings, or fails to load.
 // Each ContainerPinTarget entry is combined into a single "image@digest" string
