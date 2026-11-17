@@ -158,10 +158,8 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			for _, required := range []string{
 				"GH_TOKEN: ${{ github.token }}", "GH_HOST: github.com",
 				"AWF_HELPER_CHECKSUMS_SHA256: " + pin,
-				`verify_release_identity "$install_dir/checksums.txt" "$install_dir/release-identity.txt"`,
-				`"$AWF_HELPER_VERSION" "$checksums_sha256"`,
+				`verify_release_digest "$install_dir/checksums.txt" "$checksums_sha256"`,
 				`$2 == "enclave-storage-helper.py"`,
-				`verify_release_attestation "$install_dir/enclave-storage-helper.py" github/gh-aw-firewall`,
 				`verify_release_digest "$install_dir/enclave-storage-helper.py" "$helper_sha256"`,
 				`/usr/bin/sudo -n /usr/bin/mktemp -d /var/lib/awf-helper-install.XXXXXX`,
 				`/usr/bin/sudo -n /usr/bin/install -o root -g root -m 0500 -- "${RUNNER_TEMP}/gh-aw/actions/install_awf_enclave_helper.py"`,
@@ -188,12 +186,14 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 				"sudo -E", "sudo mount", "sudo chown", "NOPASSWD: ALL",
 				"curl |", "| bash", "--rootless", "install.sh", "AWF_FORCE_BINARY",
 				"<<'PY'",
+				"verify_release_attestation", "verify_release_identity", "release-identity.txt",
+				"gh attestation", "gh api",
 			} {
 				if strings.Contains(text, forbidden) {
 					t.Errorf("helper setup must not grant broad privileges: %s", forbidden)
 				}
 			}
-			manifestCheck := strings.Index(text, `"$install_dir/checksums.txt" "$install_dir/release-identity.txt"`)
+			manifestCheck := strings.Index(text, `verify_release_digest "$install_dir/checksums.txt" "$checksums_sha256"`)
 			privilegedInstall := strings.Index(text, `"$install_dir/checksums.txt" "$install_dir/enclave-storage-helper.py" "$checksums_sha256" "$helper_sha256"`)
 			protectedDigest := strings.Index(text, `[[ "${installer_sha256%% *}" == "`+dockerEnclaveHelperInstallerSHA+`" ]]`)
 			if manifestCheck < 0 || privilegedInstall < 0 || manifestCheck > privilegedInstall {
