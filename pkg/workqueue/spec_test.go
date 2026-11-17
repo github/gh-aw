@@ -52,6 +52,12 @@ func TestSpec_PublicAPI_Canonical(t *testing.T) {
 	}{
 		{name: "integer payload", input: `{"count":42,"ready":true}`},
 		{name: "nested integer payload", input: `{"items":[1,2],"detail":{"count":3}}`},
+		{name: "null value", input: `null`},
+		{name: "boolean value", input: `true`},
+		{name: "string value", input: `"documented JSON"`},
+		{name: "empty array", input: `[]`},
+		{name: "integer array", input: `[1,2,3]`},
+		{name: "negative integer", input: `{"value":-7}`},
 		{name: "fractional number", input: `{"count":1.5}`, wantErr: true},
 		{name: "nested fractional number", input: `{"items":[1,2.5]}`, wantErr: true},
 	}
@@ -228,6 +234,7 @@ func TestSpec_Types_PublicContracts(t *testing.T) {
 		{name: "WorkState", value: workqueue.WorkState{}},
 		{name: "ClaimState", value: workqueue.ClaimState{}},
 		{name: "DispatchState", value: workqueue.DispatchState{}},
+		{name: "Stats", value: workqueue.Stats{}},
 		{name: "Assignment", value: workqueue.Assignment{}},
 		{name: "Evidence", value: workqueue.Evidence{}},
 		{name: "Selection", value: workqueue.Selection{}},
@@ -428,6 +435,30 @@ func TestSpec_PublicAPI_ParseMalformedLedger(t *testing.T) {
 			t.Parallel()
 			_, err := workqueue.Parse([]byte(tt.data))
 			require.Error(t, err, "malformed JSONL must fail ledger parsing: %s", tt.name)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_NodeID checks README / Functions: a graph ID and node key
+// produce a stable node identity, independent of other calls.
+// SPEC_AMBIGUITY: The README does not specify the ID's encoding or format.
+func TestSpec_PublicAPI_NodeID(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name    string
+		graphID string
+		nodeKey string
+	}{
+		{name: "build node", graphID: "spec-graph", nodeKey: "build"},
+		{name: "test node", graphID: "spec-graph", nodeKey: "test"},
+		{name: "another graph", graphID: "another-spec-graph", nodeKey: "build"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			first := workqueue.NodeID(tt.graphID, tt.nodeKey)
+			_ = workqueue.NodeID("unrelated-graph", "unrelated-node")
+			assert.Equal(t, first, workqueue.NodeID(tt.graphID, tt.nodeKey),
+				"the same graph ID and node key should retain a stable identity across calls")
 		})
 	}
 }
