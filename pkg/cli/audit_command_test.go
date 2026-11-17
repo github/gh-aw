@@ -68,9 +68,10 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 			components := tt.components
 			err := applyAuditRepoFlag(tt.repoFlag, &components)
 			if tt.expectError {
-				require.Error(t, err)
 				if tt.expectedError != "" {
-					assert.EqualError(t, err, tt.expectedError)
+					require.EqualError(t, err, tt.expectedError)
+				} else {
+					require.Error(t, err)
 				}
 				return
 			}
