@@ -102,3 +102,13 @@ Run from `docs/` after `npm ci`: `npx playwright test tests/talk.spec.ts`. The c
 ## Pull requests
 
 A PR that adds or changes a slide must show it. Screenshot each changed slide from the preview in a 1920x1080 viewport, at the step that carries its message (often the last), and upload the image into the PR description so it renders inline. Never commit screenshots. If you cannot upload images, say so in the PR description and ask the author to attach one.
+
+Capture with one sandbox-safe Playwright CLI command (no CDP scripts, debug ports or `kill`), with the preview server running:
+
+```bash
+cd docs && npx -y playwright@1.65 screenshot --channel chrome --viewport-size=1920,1080 \
+  --wait-for-selector=".slide.active" --wait-for-timeout=6000 \
+  "http://127.0.0.1:4329/cracktro/index.html#N" "$TMPDIR/slide-N.png"
+```
+
+Without Google Chrome, drop `--channel chrome` after `npx -y playwright@1.65 install chromium`. Raise the timeout for slides with long entry animations; for a later in-slide step, use the browser canvas instead. Never use headless Chrome `--screenshot --virtual-time-budget`: the deck's animation loop never settles and captures mid-transition.
