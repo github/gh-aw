@@ -219,6 +219,29 @@ describe("minimal OTLP metrics protobuf encoder", () => {
   });
 });
 
+describe("OTLP exporter runtime dependencies", () => {
+  // The OTLP exporter ships without node_modules; OpenTelemetry SDK packages are
+  // test-only oracles (see scripts/test_otlp_protobuf.mjs) and must never be required here.
+  it("requires only Node.js built-ins and local modules", () => {
+    const jsDir = new URL(".", import.meta.url).pathname;
+    const builtinModules = new Set(require("node:module").builtinModules);
+    const queue = ["otlp.cjs", "otlp_metrics.cjs", "otlp_protobuf.cjs", "otlp_response.cjs", "send_otlp_span.cjs"];
+    const visited = new Set();
+    const externalRequires = [];
+    while (queue.length > 0) {
+      const file = queue.shift();
+      if (visited.has(file) || !fs.existsSync(`${jsDir}${file}`)) continue;
+      visited.add(file);
+      for (const [, specifier] of fs.readFileSync(`${jsDir}${file}`, "utf8").matchAll(/require\(["']([^"']+)["']\)/g)) {
+        if (specifier.startsWith("./")) queue.push(specifier.slice(2));
+        else if (!specifier.startsWith("node:") && !builtinModules.has(specifier)) externalRequires.push(`${file}: ${specifier}`);
+      }
+    }
+    expect(visited.has("otlp_protobuf.cjs")).toBe(true);
+    expect(externalRequires).toEqual([]);
+  });
+});
+
 describe("protobuf OTLP transport", () => {
   beforeEach(() => {
     for (const key of [
