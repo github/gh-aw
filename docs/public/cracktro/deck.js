@@ -1008,7 +1008,8 @@
   .cvm-bin { opacity: 0; transition: opacity .35s; } .cvm-bin.on { opacity: 1; }
   .cvm-bin rect { fill: #161b22; stroke: #3fb950; stroke-width: 2; }
   .cvm-bin .n { fill: #f0f6fc; font: 600 19px var(--mono); } .cvm-bin .d { fill: #9198a1; font: 500 14px var(--mono); }
-  .cvm-m { transition: width .25s linear; }
+  .cvm-ctx { opacity: 0; transition: opacity .4s; } .cvm-ctx.on { opacity: 1; }
+  .cvm-ctx rect { fill: #ffffff08; stroke-width: 1.5; } .cvm-ctx text { font: 500 16px var(--mono); white-space: pre; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -8072,9 +8073,6 @@
       ["cmd", "$ safeoutputs add_comment '{\"item_number\":42,…}'"],
       ["ok", "✓ queued for the safe-output job"],
     ];
-    const BW = 536,
-      MCP_K = 52,
-      CLI_K = 7;
     let g = `<defs><marker id="cvmG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
       <marker id="cvmC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
@@ -8088,9 +8086,10 @@
     });
     g += `<path class="fm-wire" id="cvmW0" d="M584 450 C 606 450, 594 230, 614 230" stroke="#d29922" marker-end="url(#cvmG)"/>`;
     g += `<path class="fm-wire" id="cvmW1" d="M1004 400 C 1026 400, 1014 180, 1034 180" stroke="#3fb950" marker-end="url(#cvmC)"/>`;
-    const meter = (x, id, lab) =>
-      `<text class="dto-mlab" x="${x + 16}" y="552">${lab}</text><text class="dto-mv" id="${id}V" x="${x + 552}" y="552">0k</text>` +
-      `<rect x="${x + 16}" y="566" width="${BW}" height="26" rx="6" fill="#ffffff0d"/><rect class="cvm-m" id="${id}" x="${x + 16}" y="566" width="0" height="26" rx="6" fill="${id === "cvmMm" ? "#d29922" : "#3fb950"}"/>`;
+    // what rides in the context: qualitative only, no measured token figures exist
+    const ctx = (x, id, col, txt) =>
+      `<g class="cvm-ctx" id="${id}"><text class="cvm-k" x="${x + 16}" y="556">IN CONTEXT</text>` +
+      `<rect x="${x + 16}" y="568" width="536" height="40" rx="8" stroke="${col}"/><text x="${x + 32}" y="594" fill="${col}">${esc(txt)}</text></g>`;
     // MCP: every server's tool schemas ride along in every model request
     g += `<g class="sfl-box" id="cvmMcp"><rect class="sfl-card" x="16" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="32" y="104">agent context · github: local + 2 MCP servers</text>`;
     g += `<text class="cvm-k" x="32" y="136">TOOL SCHEMAS · IN EVERY REQUEST</text>`;
@@ -8101,7 +8100,7 @@
     });
     g += `<text class="cvm-k" x="32" y="414">TOOL CALL</text>`;
     CALL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmC${i}"><text class="${c}" x="32" y="${444 + i * 26}">${esc(t)}</text></g>`));
-    g += meter(16, "cvmMm", "context tokens") + `</g>`;
+    g += ctx(16, "cvmXm", "#d29922", "every schema, every request · whole JSON") + `</g>`;
     // front matter: two lines move GitHub reads to gh and mount every MCP server as a CLI
     g += `<g class="sfl-box" id="cvmFm"><rect class="sfl-card" x="616" y="76" width="388" height="556" rx="12"/><text class="sfl-title" x="632" y="104">.github/workflows/triage.md</text>`;
     g += `<rect class="cvm-hl" id="cvmH0" x="626" y="186" width="368" height="30" rx="6"/><rect class="cvm-hl" id="cvmH1" x="626" y="218" width="368" height="30" rx="6"/>`;
@@ -8113,8 +8112,7 @@
       const y = 306 + i * 64;
       g += `<g class="cvm-bin" id="cvmB${i}"><rect x="632" y="${y}" width="356" height="54" rx="8"/><text class="n" x="648" y="${y + 24}">${n}</text><text class="d" x="648" y="${y + 44}">${esc(d)}</text></g>`;
     });
-    g += `<text class="dto-big" id="cvmBig" x="810" y="560">−87%</text>`;
-    g += `<text class="dto-cap" x="810" y="600">context tokens · same task</text></g>`;
+    g += `<g class="dto-big" id="cvmBig"><text x="810" y="560">0</text><text class="dto-cap" x="810" y="600">MCP tool schemas in context</text></g></g>`;
     // CLI: one prompt line per tool; schemas and data enter context only when asked for, already filtered
     g += `<g class="sfl-box" id="cvmCli"><rect class="sfl-card" x="1036" y="76" width="568" height="556" rx="12"/><text class="sfl-title" x="1052" y="104">agent context · gh-proxy + cli-proxy</text>`;
     g += `<text class="cvm-k" x="1052" y="136">PROMPT · ONE LINE PER CLI</text>`;
@@ -8126,7 +8124,7 @@
       return k < 0 ? esc(t) : `${esc(t.slice(0, k))}<tspan class="jq">${esc(t.slice(k))}</tspan>`;
     };
     SHELL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmS${i}"><text class="${c}" x="1052" y="${236 + i * 26}">${pipe(t)}</text></g>`));
-    g += meter(1036, "cvmMc", "context tokens") + `</g>`;
+    g += ctx(1036, "cvmXc", "#3fb950", "one line per CLI · --help on demand · jq output") + `</g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg ao-svg");
@@ -8148,10 +8146,6 @@
         fn();
       }
     };
-    const setMeter = (id, k) => {
-      $(id).setAttribute("width", Math.round((BW * k) / MCP_K));
-      $(id + "V").textContent = `${Math.round(k)}k`;
-    };
     const reveal = (ids, f, snd) =>
       ids.forEach((id, i) => {
         if (f >= (i + 0.2) / ids.length && !$(id).classList.contains("on")) {
@@ -8163,8 +8157,6 @@
       svg.querySelectorAll(".on, .hot, .gone").forEach(x => x.classList.remove("on", "hot", "gone"));
       $("cvmV0").textContent = "local";
       $("cvmV1").textContent = "false";
-      setMeter("cvmMm", 0);
-      setMeter("cvmMc", 0);
       done = new Set();
       $("cvmLane0").classList.add("on");
       $("cvmMcp").classList.add("on");
@@ -8183,7 +8175,7 @@
     slides.push({
       group: "cost",
       notes:
-        "CLI vs MCP: the workflow, servers, pull requests and token counts on this slide are illustrative and synthetic. An MCP server costs tokens before the agent does anything: every tool it exposes sends its name, description and JSON schema with every model request, and the GitHub MCP server alone exposes dozens of tools. Each call then returns whole JSON objects straight into the context. Two front matter lines change the surface without changing the servers. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a read-only command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. The prompt now carries one line per command; the agent runs --help only for the tool it needs and pipes every result through jq, picking just the fields it wants, then grep or head, so only those lines enter the context. Same task, same servers, far fewer tokens. Both modes need bash; strict workflows with bash disabled stay on MCP.",
+        "CLI vs MCP: the workflow, servers and pull requests on this slide are illustrative and synthetic, and it shows no token figures because none have been measured. An MCP server costs tokens before the agent does anything: every tool it exposes sends its name, description and JSON schema with every model request, and the GitHub MCP server alone exposes dozens of tools. Each call then returns whole JSON objects straight into the context. Two front matter lines change the surface without changing the servers. tools.github.mode: gh-proxy drops the GitHub MCP server and gives the agent a pre-authenticated gh CLI through a proxy sidecar. tools.cli-proxy: true mounts every other MCP server, safe outputs included, as a read-only command on PATH that still calls through the MCP gateway, so policies and guardrails stay the same. The prompt now carries one line per command; the agent runs --help only for the tool it needs and pipes every result through jq, picking just the fields it wants, then grep or head, so only those lines enter the context. Same task, same servers: the schemas and raw JSON no longer ride along, which can reduce token use. Both modes need bash; strict workflows with bash disabled stay on MCP.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -8207,7 +8199,6 @@
             ph("SCH"),
             i => i % 4 === 0 && sfx.pop(i / 4),
           );
-          if (u < P.CALL[0]) setMeter("cvmMm", 34 * ease(ph("SCH")));
         }
         // one call returns whole objects
         if (u >= P.CALL[0]) {
@@ -8216,13 +8207,12 @@
             CALL.map((_, i) => "cvmC" + i),
             ph("CALL"),
           );
-          if (u < P.FLIP[0]) setMeter("cvmMm", 34 + (MCP_K - 34) * ease(ph("CALL")));
+          if (ph("CALL") >= 1) $("cvmXm").classList.add("on");
         }
         if (u >= P.W0[0] && u < P.FLIP[0]) wire("cvmW0", ph("W0"));
         // two front matter lines flip the surface
         if (u >= P.FLIP[0])
           once("flip", () => {
-            setMeter("cvmMm", MCP_K);
             $("cvmLane1").classList.add("on");
             $("cvmFm").classList.add("on");
             $("cvmV0").textContent = "gh-proxy";
@@ -8246,7 +8236,7 @@
           });
           const f = ph("SH");
           reveal(shellIds, f, i => i % 2 === 0 && sfx.pop(i / 2));
-          setMeter("cvmMc", 1 + (CLI_K - 1) * f);
+          if (f >= 1) $("cvmXc").classList.add("on");
         }
         if (u >= P.BIG[0])
           once("big", () => {
