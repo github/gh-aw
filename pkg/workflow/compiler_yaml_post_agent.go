@@ -227,7 +227,7 @@ func (c *Compiler) generateOTLPMetricsConclusionStep(yaml *strings.Builder, data
 	yaml.WriteString("      - name: Emit OTLP job conclusion before artifacts\n")
 	yaml.WriteString("        if: always() && env.GH_AW_OTEL_METRICS == 'true'\n")
 	yaml.WriteString("        continue-on-error: true\n")
-	yaml.WriteString("        run: node \"${{ runner.temp }}/gh-aw/actions/action_conclusion_otlp.cjs\"\n")
+	yaml.WriteString("        run: node \"${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs\"\n")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
 	yaml.WriteString("          GH_AW_JOB_RESULT: ${{ job.status }}\n")

@@ -36,10 +36,13 @@ describe("buildOTLPMetric", () => {
     expect(gauge.gauge.dataPoints[0]).toMatchObject({ asDouble: 0.5, timeUnixNano: "2000000000" });
 
     const histogram = metrics.buildOTLPMetric({ name: "duration", value: 2, type: "histogram", buckets: [5, 1], startMs: 1000, endMs: 2000 });
-    expect(histogram.histogram.dataPoints[0]).toMatchObject({ count: "1", bucketCounts: ["0", "1", "1"], explicitBounds: [1, 5] });
+    expect(histogram.histogram.dataPoints[0]).toMatchObject({ count: "1", bucketCounts: ["0", "1", "0"], explicitBounds: [1, 5] });
 
-    const cumulative = metrics.buildOTLPMetric({ name: "duration", value: 3, type: "histogram", buckets: [1, 5, 15] });
-    expect(cumulative.histogram.dataPoints[0].bucketCounts).toEqual(["0", "1", "1", "1"]);
+    const bucketsFor = value => metrics.buildOTLPMetric({ name: "duration", value, type: "histogram", buckets: [1, 5, 15] }).histogram.dataPoints[0].bucketCounts;
+    expect(bucketsFor(3)).toEqual(["0", "1", "0", "0"]);
+    expect(bucketsFor(5)).toEqual(["0", "1", "0", "0"]);
+    expect(bucketsFor(1)).toEqual(["1", "0", "0", "0"]);
+    expect(bucketsFor(20)).toEqual(["0", "0", "0", "1"]);
   });
 
   it("rejects invalid metric values and buckets", () => {
@@ -163,6 +166,33 @@ describe("buildBuiltinRunMetrics", () => {
     expect(attributes).toContainEqual({ key: "gen_ai.token.type", value: { stringValue: "input_cache_read" } });
     expect(JSON.stringify(sanitized)).not.toContain(configuredValue);
   });
+
+  it("redacts known secret formats from metric identity and non-sensitive attribute keys", () => {
+    const githubToken = `ghp_${"a".repeat(36)}`;
+    const bearer = `Bearer ${"b".repeat(24)}`;
+    const payload = metrics.buildOTLPMetricsPayload({
+      serviceName: "gh-aw",
+      metrics: [
+        metrics.buildOTLPMetric({
+          name: `leak.${githubToken}`,
+          value: 1,
+          unit: githubToken,
+          description: `auth ${bearer}`,
+          attributes: [
+            { key: "status", value: { stringValue: bearer } },
+            { key: "label", value: { stringValue: "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----" } },
+            { key: "conn", value: { stringValue: "postgres://user:pa55word@db.example/app" } },
+          ],
+        }),
+      ],
+    });
+
+    const serialized = JSON.stringify(metrics.sanitizeOTLPMetricsPayload(payload));
+    expect(serialized).not.toContain(githubToken);
+    expect(serialized).not.toContain("b".repeat(24));
+    expect(serialized).not.toContain("PRIVATE KEY");
+    expect(serialized).not.toContain("pa55word");
+  });
 });
 
 describe("OTLP metrics export", () => {
@@ -242,6 +272,30 @@ describe("OTLP metrics export", () => {
     expect(mirror).toHaveLength(0);
   });
 
+  it("drops custom metrics with invalid names or secrets without throwing", async () => {
+    vi.stubEnv("GH_AW_OTEL_METRICS", "true");
+    const mirror = mockOTLPMirror();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const logMetric = require("./otlp.cjs").logMetric;
+    const githubToken = `ghp_${"c".repeat(36)}`;
+
+    await logMetric("1bad name", 1);
+    await logMetric("x".repeat(256), 1);
+    await logMetric("custom.items", 1, { unit: "u".repeat(64) });
+    await logMetric("custom.items", 1, { description: "d".repeat(1024) });
+    await logMetric(`custom.${githubToken}`, 1);
+    await logMetric("custom.items", 1, { description: `token ${githubToken}` });
+    await logMetric("custom.items", 1, { attributes: { status: githubToken } });
+    await metrics.flushCustomMetrics();
+
+    expect(mirror).toHaveLength(0);
+    expect(warn).toHaveBeenCalledTimes(7);
+
+    await logMetric("my-tool.items_processed", 1, { type: "counter", unit: "{item}" });
+    await metrics.flushCustomMetrics();
+    expect(mirror.join("")).toContain('"my-tool.items_processed"');
+  });
+
   it("records metric endpoint failures locally and exports the failure counter to healthy endpoints", async () => {
     vi.stubEnv("GH_AW_OTEL_METRICS", "true");
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://failed.example/v1/traces" }, { url: "https://healthy.example/v1/traces" }]));
@@ -270,6 +324,41 @@ describe("OTLP metrics export", () => {
     expect(fetchMock.mock.calls.map(([url]) => new URL(url).hostname)).toContain("healthy.example");
     expect(fetchMock.mock.calls.some(([, options]) => JSON.parse(options.body).resourceMetrics[0].scopeMetrics[0].metrics[0].name === "gh_aw.otlp.export.failures")).toBe(true);
     expect(persisted.get("/tmp/gh-aw/otlp-metric-failures-reported.txt")).toBe("1");
+    expect(metrics.getUnreportedOTLPMetricFailures()).toBe(0);
+  });
+
+  it("does not re-add failures already carried by the exported payload", async () => {
+    vi.stubEnv("GH_AW_OTEL_METRICS", "true");
+    vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://failed.example/v1/traces" }, { url: "https://healthy.example/v1/traces" }]));
+    const persisted = new Map([["/tmp/gh-aw/otlp-export-errors.count", "2"]]);
+    const readFileSync = fs.readFileSync;
+    vi.spyOn(fs, "readFileSync").mockImplementation((filePath, ...args) => {
+      if (persisted.has(String(filePath))) return persisted.get(String(filePath));
+      if (!String(filePath).startsWith("/tmp/gh-aw/")) return readFileSync(filePath, ...args);
+      throw Object.assign(new Error("missing test file"), { code: "ENOENT" });
+    });
+    vi.spyOn(fs, "writeFileSync").mockImplementation((filePath, value) => persisted.set(String(filePath), String(value)));
+    vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    mockOTLPMirror();
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(callback => {
+      callback();
+      return 0;
+    });
+    const fetchMock = vi.fn(async url =>
+      new URL(url).hostname === "failed.example" ? { ok: false, status: 500, statusText: "error", body: null, headers: new Headers() } : { ok: true, status: 200, statusText: "OK", body: null, headers: new Headers() }
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const payload = metrics.buildOTLPMetricsPayload({ serviceName: "gh-aw", metrics: [metrics.buildOTLPMetric({ name: "gh_aw.otlp.export.failures", type: "counter", value: metrics.getUnreportedOTLPMetricFailures() })] });
+
+    await metrics.sendOTLPMetrics(payload);
+
+    const healthyFailureValues = fetchMock.mock.calls
+      .filter(([url]) => new URL(url).hostname === "healthy.example")
+      .flatMap(([, options]) => JSON.parse(options.body).resourceMetrics[0].scopeMetrics[0].metrics)
+      .filter(metric => metric.name === "gh_aw.otlp.export.failures")
+      .map(metric => Number(metric.sum.dataPoints[0].asInt));
+    expect(healthyFailureValues).toEqual([2, 1]);
+    expect(persisted.get("/tmp/gh-aw/otlp-export-errors.count")).toBe("3");
     expect(metrics.getUnreportedOTLPMetricFailures()).toBe(0);
   });
 

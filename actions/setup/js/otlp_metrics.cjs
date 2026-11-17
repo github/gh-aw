@@ -13,6 +13,12 @@ const MAX_CUSTOM_METRIC_ATTRIBUTES = 8;
 const MAX_CUSTOM_METRIC_SERIES = 100;
 const MAX_CUSTOM_METRIC_ATTRIBUTE_LENGTH = 128;
 const CUSTOM_METRIC_FLUSH_INTERVAL_MS = 1000;
+// OpenTelemetry instrument name syntax, unit, and description limits.
+const CUSTOM_METRIC_NAME_RE = /^[A-Za-z][A-Za-z0-9_.\-/]{0,254}$/;
+const CUSTOM_METRIC_UNIT_RE = /^[\x20-\x7e]{0,63}$/;
+const MAX_CUSTOM_METRIC_DESCRIPTION_LENGTH = 1023;
+const METRIC_REDACTED = "***REDACTED***";
+const GENERIC_SECRET_PATTERNS = [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)/g, /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@/gi];
 const HIGH_CARDINALITY_ATTRIBUTE_KEY_RE = /(?:run[._-]?id|trace[._-]?id|span[._-]?id|commit|sha|actor|user|issue(?:[._-]?number)?|pull[._-]?request(?:[._-]?number)?|conversation|url|job[._-]?id)/i;
 const METRIC_RESOURCE_ATTRIBUTE_KEYS = new Set(["gh-aw.repository", "gh-aw.engine.id", "gh-aw.workflow.name", "github.event_name", "github.job"]);
 const OTLP_METRIC_FAILURES_REPORTED_PATH = "/tmp/gh-aw/otlp-metric-failures-reported.txt";
@@ -93,10 +99,10 @@ function buildOTLPMetric({ name, value, type = "gauge", unit = "", description =
     throw new Error(`metric ${name}: histogram buckets must be strictly increasing`);
   }
   const bucketCounts = new Array(bounds.length + 1).fill("0");
+  // OTLP bucket_counts are per-bucket (not cumulative) and must sum to count;
+  // bucket i covers (bounds[i-1], bounds[i]], with an overflow bucket at the end.
   const index = bounds.findIndex(bound => value <= bound);
-  for (let bucket = index < 0 ? bounds.length : index; bucket < bucketCounts.length; bucket++) {
-    bucketCounts[bucket] = "1";
-  }
+  bucketCounts[index < 0 ? bounds.length : index] = "1";
   return {
     ...base,
     histogram: {
@@ -169,14 +175,30 @@ function buildOTLPMetricsPayload({ serviceName, scopeVersion, resourceAttributes
 }
 
 /**
+ * Redact known credential formats and configured secret values from a metric
+ * string (name, unit, description, or attribute value).
+ * @param {string} value
+ * @param {string[]} secretValues
+ * @returns {string}
+ */
+function redactMetricString(value, secretValues) {
+  const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
+  const { redactBuiltInPatterns, redactSecrets } = require("./redact_secrets.cjs");
+  let redacted = redactBuiltInPatterns(value).content;
+  for (const pattern of GENERIC_SECRET_PATTERNS) {
+    redacted = redacted.replace(pattern, METRIC_REDACTED);
+  }
+  redacted = redactSecrets(redacted, secretValues).content;
+  return redactArtifactMaskedValues(redacted, secretValues);
+}
+
+/**
  * @param {any} payload
  * @returns {any}
  */
 function sanitizeOTLPMetricsPayload(payload) {
   if (!payload || !Array.isArray(payload.resourceMetrics)) return payload;
   const { sanitizeAttrs } = require("./send_otlp_span.cjs");
-  const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
-  const { redactBuiltInPatterns, redactSecrets } = require("./redact_secrets.cjs");
   const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
   const secretValues = getOTLPSecretValues();
   const sanitizeMetricAttrs = attrs => {
@@ -184,12 +206,11 @@ function sanitizeOTLPMetricsPayload(payload) {
     const redacted = attrs.map(attribute => {
       const value = attribute?.value?.stringValue;
       if (typeof value !== "string") return attribute;
-      const patterned = redactBuiltInPatterns(value).content;
-      const configured = redactSecrets(patterned, secretValues).content;
-      return { ...attribute, value: { ...attribute.value, stringValue: redactArtifactMaskedValues(configured, secretValues) } };
+      return { ...attribute, value: { ...attribute.value, stringValue: redactMetricString(value, secretValues) } };
     });
     return sanitizeAttrs(redacted);
   };
+  const sanitizeIdentity = value => (typeof value === "string" ? redactMetricString(value, secretValues) : value);
   const sanitizeDataPoints = section => (section && Array.isArray(section.dataPoints) ? { ...section, dataPoints: section.dataPoints.map(point => ({ ...point, attributes: sanitizeMetricAttrs(point.attributes) })) } : section);
   return {
     ...payload,
@@ -202,6 +223,9 @@ function sanitizeOTLPMetricsPayload(payload) {
             metrics: Array.isArray(scopeMetrics.metrics)
               ? scopeMetrics.metrics.map(metric => ({
                   ...metric,
+                  name: sanitizeIdentity(metric.name),
+                  ...(metric.unit !== undefined ? { unit: sanitizeIdentity(metric.unit) } : {}),
+                  ...(metric.description !== undefined ? { description: sanitizeIdentity(metric.description) } : {}),
                   gauge: sanitizeDataPoints(metric.gauge),
                   sum: sanitizeDataPoints(metric.sum),
                   histogram: sanitizeDataPoints(metric.histogram),
@@ -247,6 +271,26 @@ function getUnreportedOTLPMetricFailures() {
   return Math.max(0, readOTLPExportErrorCount() - readReportedOTLPMetricFailures());
 }
 
+/**
+ * @param {any} payload
+ * @returns {number} Total `gh_aw.otlp.export.failures` value carried by the payload.
+ */
+function countExportFailuresInPayload(payload) {
+  let total = 0;
+  for (const resourceMetrics of payload?.resourceMetrics || []) {
+    for (const scopeMetrics of resourceMetrics?.scopeMetrics || []) {
+      for (const metric of scopeMetrics?.metrics || []) {
+        if (metric?.name !== "gh_aw.otlp.export.failures") continue;
+        for (const point of metric.sum?.dataPoints || []) {
+          const value = Number(point.asInt ?? point.asDouble);
+          if (Number.isFinite(value) && value > 0) total += value;
+        }
+      }
+    }
+  }
+  return total;
+}
+
 function markOTLPMetricFailuresReported(count) {
   if (count <= 0) return;
   try {
@@ -266,20 +310,20 @@ async function sendOTLPMetrics(payload, traceContext) {
   const { parseOTLPEndpoints, sendOTLPToAllEndpoints } = require("./send_otlp_span.cjs");
   const sanitizedPayload = sanitizeOTLPMetricsPayload(payload);
   appendToOTLPMetricsJSONL(sanitizedPayload);
-  /** @type {{skipJSONL: true, signal: "metrics", sanitize: (payload: any) => any, protocolOverride: "http/json", reportResults: true}} */
-  const options = { skipJSONL: true, signal: "metrics", sanitize: sanitizeOTLPMetricsPayload, protocolOverride: "http/json", reportResults: true };
+  /** @type {{skipJSONL: true, signal: "metrics", sanitize: (payload: any) => any, protocolOverride: "http/json"}} */
+  const options = { skipJSONL: true, signal: "metrics", sanitize: sanitizeOTLPMetricsPayload, protocolOverride: "http/json" };
   const endpoints = parseOTLPEndpoints();
-  const endpointResults = (await sendOTLPToAllEndpoints(endpoints, sanitizedPayload, options)) || [];
-  const failedExports = endpointResults.filter(success => !success).length;
-  const unreportedFailures = getUnreportedOTLPMetricFailures();
-  const hasFailureMetric = sanitizedPayload.resourceMetrics.some(resourceMetrics => resourceMetrics.scopeMetrics?.some(scopeMetrics => scopeMetrics.metrics?.some(metric => metric.name === "gh_aw.otlp.export.failures")));
-  if (failedExports === 0) {
-    if (hasFailureMetric && unreportedFailures > 0 && endpointResults.some(Boolean)) markOTLPMetricFailuresReported(unreportedFailures);
-    return;
+  const endpointResults = await sendOTLPToAllEndpoints(endpoints, sanitizedPayload, options);
+  // Failures already carried by this payload reached the healthy collectors, so
+  // the follow-up counter below must only add failures not yet reported.
+  if (endpointResults.some(Boolean)) {
+    markOTLPMetricFailuresReported(Math.min(countExportFailuresInPayload(sanitizedPayload), getUnreportedOTLPMetricFailures()));
   }
+  const failedExports = endpointResults.filter(success => !success).length;
+  if (failedExports === 0) return;
 
   const { buildAttr } = require("./send_otlp_span.cjs");
-  const reportedFailureCount = Math.max(failedExports, unreportedFailures);
+  const reportedFailureCount = Math.max(failedExports, getUnreportedOTLPMetricFailures());
   const workflowName = process.env.GH_AW_INFO_WORKFLOW_NAME || process.env.GITHUB_WORKFLOW || "";
   const failureMetric = buildOTLPMetric({
     name: "gh_aw.otlp.export.failures",
@@ -306,8 +350,8 @@ async function sendOTLPMetrics(payload, traceContext) {
   appendToOTLPMetricsJSONL(failurePayload);
   const successfulEndpoints = endpoints.filter((_, index) => endpointResults[index]);
   if (successfulEndpoints.length > 0) {
-    const reportResults = (await sendOTLPToAllEndpoints(successfulEndpoints, failurePayload, options)) || [];
-    if (reportResults.some(Boolean)) markOTLPMetricFailuresReported(reportedFailureCount);
+    const failureResults = await sendOTLPToAllEndpoints(successfulEndpoints, failurePayload, options);
+    if (failureResults.some(Boolean)) markOTLPMetricFailuresReported(reportedFailureCount);
   }
 }
 
@@ -367,7 +411,7 @@ function buildBuiltinRunMetrics({
   const commonAttributes = [...(jobName ? [buildAttr("gh-aw.job.name", bounded(jobName))] : []), ...(workflow ? [buildAttr("gh-aw.workflow.name", bounded(workflow))] : [])];
   const attributes = (...extra) => [...commonAttributes, ...extra];
   const durationAttributes = result =>
-    attributes(buildAttr("cicd.pipeline.task.run.result", bounded(result)), ...(engine ? [buildAttr("gh-aw.engine.id", bounded(engine))] : []), ...(model ? [buildAttr("gen_ai.request.model", bounded(model))] : []));
+    attributes(...(result ? [buildAttr("cicd.pipeline.task.run.result", bounded(result))] : []), ...(engine ? [buildAttr("gh-aw.engine.id", bounded(engine))] : []), ...(model ? [buildAttr("gen_ai.request.model", bounded(model))] : []));
   const metrics = [];
   for (const [name, result] of [
     ["gh_aw.job.duration", jobConclusion],
@@ -506,6 +550,17 @@ async function logMetric(name, value, options = {}) {
   if (process.env.GH_AW_OTEL_METRICS !== "true") return;
   try {
     const { buildAttr, sanitizeAttrs } = require("./send_otlp_span.cjs");
+    const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
+    if (typeof name !== "string" || !CUSTOM_METRIC_NAME_RE.test(name)) throw new Error("metric name must match the OpenTelemetry instrument name syntax");
+    if (options.unit !== undefined && (typeof options.unit !== "string" || !CUSTOM_METRIC_UNIT_RE.test(options.unit))) throw new Error("metric unit must be printable ASCII of at most 63 characters");
+    if (options.description !== undefined && (typeof options.description !== "string" || options.description.length > MAX_CUSTOM_METRIC_DESCRIPTION_LENGTH)) {
+      throw new Error(`metric description must not exceed ${MAX_CUSTOM_METRIC_DESCRIPTION_LENGTH} characters`);
+    }
+    const secretValues = getOTLPSecretValues();
+    const containsSecret = value => typeof value === "string" && redactMetricString(value, secretValues) !== value;
+    if ([name, options.unit, options.description, ...Object.values(options.attributes || {})].some(containsSecret)) {
+      throw new Error("metric name, unit, description, and attribute values must not contain secrets");
+    }
     const entries = Object.entries(options.attributes || {});
     if (entries.length > MAX_CUSTOM_METRIC_ATTRIBUTES) throw new Error(`metric attributes must not exceed ${MAX_CUSTOM_METRIC_ATTRIBUTES} keys`);
     const attributes = entries.map(([key, attribute]) => {

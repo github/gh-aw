@@ -808,6 +808,14 @@ than 100 unique series per process, and no attribute key or string value longer
 than 128 characters. Attribute keys identifying runs, jobs, traces, spans,
 commits, users, actors, issues, pull requests, conversations, or URLs MUST be
 rejected. Callers MUST NOT encode per-run identifiers in other attribute values.
+Metric names MUST match the OpenTelemetry instrument name syntax
+(`^[A-Za-z][A-Za-z0-9_.\-/]{0,254}$`), units MUST be printable ASCII of at most
+63 characters, and descriptions MUST NOT exceed 1023 characters. Calls whose
+name, unit, description, or string attribute values contain known credential
+formats or configured secret values MUST be dropped with a warning. Before
+mirroring and export, metric names, units, descriptions, and string attribute
+values MUST also be redacted for known credential formats and configured secret
+values.
 
 `logMetric()` MUST use the configured OTLP endpoints and headers, mirror its
 payload before remote export, sanitize attribute values, and remain non-fatal:

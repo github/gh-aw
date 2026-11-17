@@ -2801,6 +2801,24 @@ describe("sendJobConclusionSpan", () => {
     });
   });
 
+  it.each([
+    ["detection", { GH_AW_DETECTION_CONCLUSION: "failure" }, {}, "failure"],
+    ["safe_outputs", {}, { jobResult: "failure" }, "failure"],
+    ["safe_outputs", {}, {}, undefined],
+  ])("labels %s job metrics with the job's own result, not the agent result", async (jobName, env, options, expectedJobResult) => {
+    process.env.GH_AW_OTEL_METRICS = "true";
+    process.env.INPUT_JOB_NAME = jobName;
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    Object.assign(process.env, env);
+    await sendJobConclusionSpan(`gh-aw.${jobName}.conclusion`, { startMs: Date.now() - 5000, ...options });
+    const metrics = mirrorLines.filter(line => line.includes('"resourceMetrics"')).flatMap(line => JSON.parse(line.trim()).resourceMetrics[0].scopeMetrics[0].metrics);
+    const resultOf = name => metrics.find(metric => metric.name === name).histogram.dataPoints[0].attributes.find(attr => attr.key === "cicd.pipeline.task.run.result")?.value.stringValue;
+    expect(resultOf("gh_aw.job.duration")).toBe(expectedJobResult);
+    expect(resultOf("gh_aw.run.duration")).toBe("success");
+    expect(metrics.some(metric => metric.name === "gh_aw.job.errors")).toBe(expectedJobResult === "failure");
+    expect(metrics.some(metric => metric.name === "gh_aw.run.errors")).toBe(false);
+  });
+
   it("sends a span with the given span name", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
     vi.stubGlobal("fetch", mockFetch);
@@ -7623,7 +7641,7 @@ describe("sendOTLPToAllEndpoints", () => {
     const mockFetch = vi.fn().mockImplementation(url => Promise.resolve({ ok: !url.includes("failed"), status: url.includes("failed") ? 500 : 200, statusText: "status" }));
     vi.stubGlobal("fetch", mockFetch);
 
-    await expect(sendOTLPToAllEndpoints([{ url: "https://failed.example" }, { url: "https://healthy.example" }], { resourceSpans: [] }, { skipJSONL: true, maxRetries: 0, reportResults: true })).resolves.toEqual([false, true]);
+    await expect(sendOTLPToAllEndpoints([{ url: "https://failed.example" }, { url: "https://healthy.example" }], { resourceSpans: [] }, { skipJSONL: true, maxRetries: 0 })).resolves.toEqual([false, true]);
   });
 
   it("routes Azure metrics to the metrics stream", async () => {
@@ -7691,7 +7709,7 @@ describe("sendOTLPToAllEndpoints", () => {
     });
 
     // Should not throw even if one endpoint fails.
-    await expect(sendOTLPToAllEndpoints([{ url: "https://primary.example.com:4317" }, { url: "https://secondary.example.com:4317" }], payload, { skipJSONL: true, maxRetries: 0 })).resolves.toBeUndefined();
+    await expect(sendOTLPToAllEndpoints([{ url: "https://primary.example.com:4317" }, { url: "https://secondary.example.com:4317" }], payload, { skipJSONL: true, maxRetries: 0 })).resolves.toEqual([false, true]);
 
     // Both endpoints were attempted.
     expect(mockFetch).toHaveBeenCalledTimes(2);

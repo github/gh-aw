@@ -1269,24 +1269,21 @@ function parseOTLPEndpoints() {
  *
  * @param {OTLPEndpointEntry[]} endpoints  - Resolved endpoint list from {@link parseOTLPEndpoints}
  * @param {any} payload                 - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string, reportResults?: boolean }} [opts]
- * @returns {Promise<boolean[] | void>} True per endpoint when `reportResults` is enabled.
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" | "metrics", sanitize?: (payload: any) => any, protocolOverride?: string }} [opts]
+ * @returns {Promise<boolean[]>} Per-endpoint export success, in `endpoints` order.
  */
 async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
-  const { reportResults = false, ...sendOptions } = opts;
-  if (endpoints.length === 0) return reportResults ? [] : undefined;
   const results = await Promise.allSettled(
-    endpoints.map(async ep => {
-      return sendOTLPSpan(ep.url, payload, {
-        ...sendOptions,
+    endpoints.map(ep =>
+      sendOTLPSpan(ep.url, payload, {
+        ...opts,
         // Pass per-endpoint headers so each collector receives only its own
         // credentials (not the merged set from a different endpoint).
         headersOverride: ep.headers !== undefined ? ep.headers : "",
-      });
-    })
+      })
+    )
   );
-  const endpointResults = results.map(result => result.status === "fulfilled" && result.value === true);
-  return reportResults ? endpointResults : undefined;
+  return results.map(result => result.status === "fulfilled" && result.value === true);
 }
 
 /**
@@ -2407,7 +2404,9 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     statusCode = 2;
     statusMessage = (errorMessages.length > 0 ? `errors detected: ${errorMessages[0]}` : "errors detected").slice(0, 256);
   }
-  const metricJobConclusion = jobResult || (runStatus === "timeout" ? "timed_out" : runStatus);
+  // Only the agent job's own run status reflects its result; other jobs leave the
+  // job result unset rather than inheriting the agent/run outcome.
+  const metricJobConclusion = jobResult || (jobName === "agent" ? (runStatus === "timeout" ? "timed_out" : runStatus) : "");
 
   if (isAgentFailure && errorMessages.length > 0) {
     statusMessage = `agent ${agentConclusion}: ${errorMessages[0]}`.slice(0, 256);

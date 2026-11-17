@@ -3,6 +3,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -105,6 +107,35 @@ func TestOTLPMetricsConclusionRunsBeforeArtifactUploadOnlyWhenEnabled(t *testing
 			}
 		})
 	}
+}
+
+func TestOTLPMetricsEnabledWorkflowCompilesWithConclusionBeforeUpload(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ".github", "workflows")
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	path := filepath.Join(dir, "metrics.md")
+	require.NoError(t, os.WriteFile(path, []byte(`---
+on: workflow_dispatch
+engine: copilot
+env:
+  GH_AW_OTEL_METRICS: "true"
+observability:
+  otlp:
+    endpoint: https://otel.example.com
+---
+Test metrics.
+`), 0600))
+	compiler := NewCompiler()
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(path))
+	content, err := os.ReadFile(filepath.Join(dir, "metrics.lock.yml"))
+	require.NoError(t, err)
+	compiled := string(content)
+
+	emit := strings.Index(compiled, "Emit OTLP job conclusion before artifacts")
+	upload := strings.Index(compiled, "Upload agent artifacts")
+	require.NotEqual(t, -1, emit)
+	require.NotEqual(t, -1, upload)
+	assert.Less(t, emit, upload)
 }
 
 func TestRuntimeModelMetadataConclusionTransport(t *testing.T) {
