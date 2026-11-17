@@ -382,47 +382,7 @@ jobs:
             Tools: create_issue, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
-          GH_AW_PROMPT_CONTENT_0003: |+
-            <github-context>
-            {{#if __GH_AW_GITHUB_ACTOR__ }}
-            - **actor**: __GH_AW_GITHUB_ACTOR__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_REPOSITORY__ }}
-            - **repository**: __GH_AW_GITHUB_REPOSITORY__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_WORKSPACE__ }}
-            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
-            {{/if}}
-            {{#if __GH_AW_EXPR_7C248226__ }}
-            - **issue-number**: #__GH_AW_EXPR_7C248226__
-            {{/if}}
-            {{#if __GH_AW_EXPR_C19C384F__ }}
-            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
-            {{/if}}
-            {{#if __GH_AW_EXPR_76DF9333__ }}
-            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
-            {{/if}}
-            {{#if __GH_AW_EXPR_77C1A4D2__ }}
-            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_RUN_ID__ }}
-            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
-            {{/if}}
-            - **checkouts**: The following repositories have been checked out and are available in the workspace:
-              - repo `__GH_AW_GITHUB_REPOSITORY__` → `__GH_AW_GITHUB_WORKSPACE__` (cwd) [shallow clone, fetch-depth=1 (default)]
-              - **Note**: The workspace path reported above may contain a separate shallow, credential-free checkout of the host repository. Use the exact checkout path shown for the repository you need. Before concluding that a branch is unavailable, confirm your working directory matches that path and inspect refs there. If the branch is not present in that checkout and is not listed as an additional fetched ref, it has NOT been checked out. For private repositories you cannot fetch it. If the branch is required and not available, exit with an error and ask the user to add it to the `fetch:` option of the `checkout:` configuration (e.g., `fetch: ["refs/pulls/open/*"]` for all open PR refs, or `fetch: ["main", "feature/my-branch"]` for specific branches).
-              - **Warning: No git credentials are available to the agent.** Credentials are
-                intentionally removed after the checkout step for security. This means any git
-                operation that needs to authenticate to the remote will fail. In private repositories, that includes:
-                - `git fetch`, `git pull`, `git clone`, and `git push` (direct push, not via safe-output tools)
-                - Checking out or switching to a remote branch that is not already fetched
-                - Deepening a shallow clone (`git fetch --unshallow`)
-                - On-demand blob fetches in partial/blobless clones (operations on files not in the initial checkout)
-                Do NOT attempt to configure credentials, run `git credential fill`, or modify `.gitconfig` —
-                authentication will not succeed. If you encounter credential prompts or authentication errors,
-                stop immediately and report the limitation rather than spending turns trying to work around it.
-            </github-context>
-
+          GH_AW_PROMPT_CONTENT_0003: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n- **checkouts**: The following repositories have been checked out and are available in the workspace:\n  - repo `__GH_AW_GITHUB_REPOSITORY__` → `__GH_AW_GITHUB_WORKSPACE__` (cwd) [shallow clone, fetch-depth=1 (default)]\n  - **Note**: The workspace path reported above may contain a separate shallow, credential-free checkout of the host repository. Use the exact checkout path shown for the repository you need. Before concluding that a branch is unavailable, confirm your working directory matches that path and inspect refs there. If the branch is not present in that checkout and is not listed as an additional fetched ref, it has NOT been checked out. For private repositories you cannot fetch it. If the branch is required and not available, exit with an error and ask the user to add it to the `fetch:` option of the `checkout:` configuration (e.g., `fetch: [\"refs/pulls/open/*\"]` for all open PR refs, or `fetch: [\"main\", \"feature/my-branch\"]` for specific branches).\n  - **Warning: No git credentials are available to the agent.** Credentials are\n    intentionally removed after the checkout step for security. This means any git\n    operation that needs to authenticate to the remote will fail. In private repositories, that includes:\n    - `git fetch`, `git pull`, `git clone`, and `git push` (direct push, not via safe-output tools)\n    - Checking out or switching to a remote branch that is not already fetched\n    - Deepening a shallow clone (`git fetch --unshallow`)\n    - On-demand blob fetches in partial/blobless clones (operations on files not in the initial checkout)\n    Do NOT attempt to configure credentials, run `git credential fill`, or modify `.gitconfig` —\n    authentication will not succeed. If you encounter credential prompts or authentication errors,\n    stop immediately and report the limitation rather than spending turns trying to work around it.\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: |
             </system>
           GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_SERVER_URL\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_SAFE_OUTPUTS\"]"
