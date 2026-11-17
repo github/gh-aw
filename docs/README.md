@@ -188,6 +188,14 @@ Code in the expanded view is editable as plain text for live demonstrations.
 Edits affect only the expanded copy and are discarded when it closes; opening
 the snippet again restores its original contents.
 
+## Structured data
+
+`src/components/CustomHead.astro` emits the homepage graph and a `TechArticle`
+for docs pages. Blog pages get a single `BlogPosting` and breadcrumbs from
+`starlight-blog`; do not add another `BlogPosting`. `CustomHead.astro` enriches
+the plugin entry with the site `publisher` and, when `dateModified` is absent,
+uses `lastUpdated` or falls back to `datePublished`. Breadcrumbs are preserved.
+
 ## ⚠️ Known Dev-Mode Limitations
 
 ### Sitemap behavior in dev and production
