@@ -28,7 +28,7 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 	if !ok {
 		return errors.New("activation job missing: cannot embed Markdown metadata")
 	}
-	encoded, err := json.Marshal(metadata)
+	encoded, err := json.Marshal(nonEmptyMarkdownMetadata(metadata))
 	if err != nil {
 		return fmt.Errorf("cannot embed activation Markdown metadata: %w", err)
 	}
@@ -62,6 +62,22 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 	}
 	activation.Steps = append(steps, activation.Steps...)
 	return nil
+}
+
+// The runtime reads a missing record as empty metadata, matching the lock
+// header's agent_metadata, so empty error-free records are redundant.
+func nonEmptyMarkdownMetadata(metadata *GHAWMarkdownMetadata) *GHAWMarkdownMetadata {
+	result := &GHAWMarkdownMetadata{Version: metadata.Version, Records: make([]GHAWMarkdownMetadataRecord, 0, len(metadata.Records))}
+	for _, record := range metadata.Records {
+		if record.Error == "" && len(record.References) == 0 {
+			switch strings.TrimSpace(string(record.Value)) {
+			case "{}", "null", "":
+				continue
+			}
+		}
+		result.Records = append(result.Records, record)
+	}
+	return result
 }
 
 func activationMetadataPreview(encoded []byte) string {

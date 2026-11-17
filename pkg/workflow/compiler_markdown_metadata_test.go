@@ -20,7 +20,8 @@ import (
 func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "workflow.md")
 	content := "---\non:\n  workflow_call:\nstrict: false\nengine: copilot\n---\n# Work\n\n" +
-		"## agent: reader\n---\nmodel: ${{ inputs.model }}\ntools: [Read]\n---\nRead files.\n"
+		"## agent: reader\n---\nmodel: ${{ inputs.model }}\ntools: [Read]\n---\nRead files.\n## end agent: reader\n\n" +
+		"## agent: writer\n---\ndescription: Writes files\n---\nWrite files.\n"
 	require.NoError(t, os.WriteFile(source, []byte(content), 0o600))
 	compiler := NewCompiler()
 	data, err := compiler.ParseWorkflowFile(source)
@@ -45,10 +46,14 @@ func TestCompilerEmbedsActivationMarkdownMetadata(t *testing.T) {
 	require.NotEmpty(t, catalog.Records)
 	for _, record := range catalog.Records {
 		require.Empty(t, record.References, "embedded records must be self-contained")
+		require.NotContains(t, []string{"{}", "null"}, string(record.Value), "empty records are implied by absence")
 	}
 	require.NotEmpty(t, data.CompiledPromptMarkdown)
 	for _, prompt := range data.CompiledPromptMarkdown {
 		for _, block := range parser.ExtractMarkdownMetadataBlocks(prompt) {
+			if strings.Contains(block.Source, "Writes files") {
+				continue
+			}
 			digest := sha256.Sum256([]byte(block.Source))
 			require.Contains(t, string(decoded), hex.EncodeToString(digest[:]), "include post-substitution prompt metadata")
 		}
