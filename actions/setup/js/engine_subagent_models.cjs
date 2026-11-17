@@ -29,7 +29,7 @@ const os = require("os");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
-const { isModelAvailableInReflectData } = require("./awf_model_routing.cjs");
+const { isModelAvailableInReflectData, routingEndpointPaths } = require("./awf_model_routing.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN } = require("./detect_agent_errors.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 const { getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
@@ -178,7 +178,8 @@ function routingModelsFor(reflectData, providers) {
 
 /**
  * What the `routing_models` entries of one model say about `wireApi`: "supported" when an
- * entry lists it, "unsupported" when every entry has complete metadata
+ * entry lists it, as a path or as the protocol name AWF uses for native providers
+ * (`responses` for `/responses`), "unsupported" when every entry has complete metadata
  * (`candidate_metadata_complete: true`) without it, otherwise "unknown" (no entry, or
  * incomplete metadata, as `copilot_wire_api.cjs` and `awf_model_routing.cjs` treat it).
  * @param {string} model
@@ -189,7 +190,7 @@ function routingModelsFor(reflectData, providers) {
 function endpointSupportIn(model, routingModels, wireApi) {
   const id = String(model || "").toLowerCase();
   const entries = routingModels.filter(candidate => typeof candidate?.model_id === "string" && candidate.model_id.toLowerCase() === id);
-  if (entries.some(entry => Array.isArray(entry.supported_endpoints) && entry.supported_endpoints.includes(wireApi))) return "supported";
+  if (entries.some(entry => Array.isArray(entry.supported_endpoints) && routingEndpointPaths(entry.supported_endpoints).includes(wireApi))) return "supported";
   const complete =
     entries.length > 0 && entries.every(entry => entry.candidate_metadata_complete === true && Array.isArray(entry.supported_endpoints) && entry.supported_endpoints.every(/** @param {unknown} value */ value => typeof value === "string"));
   return complete ? "unsupported" : "unknown";

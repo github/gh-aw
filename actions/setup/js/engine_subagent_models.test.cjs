@@ -869,6 +869,50 @@ describe("Codex sub-agent endpoint compatibility (purelock run 39601756922)", ()
   });
 });
 
+describe("Codex sub-agent endpoint names on native OpenAI (Spec Enforcer run 39771119523)", () => {
+  const specAgent = () => fs.readFileSync(path.join(runs.specEnforcerAgentsDir, "readme-spec-extractor.md"), "utf8");
+  const codexLayout = () => {
+    const run = layout();
+    return { ...run, codexHome: path.join(run.dir, "codex-home") };
+  };
+  const apply = (run, options = {}) => applyCodexSubagentModels({ reflectData: runs.specEnforcerReflect(), provider: "openai", codexHome: run.codexHome, agentsBaseDir: run.agentsBaseDir, env: run.env, logger: run.logger, ...options });
+  const entryOf = (reflect, model) => reflect.endpoints.flatMap(endpoint => (endpoint.configured ? endpoint.routing_models || [] : [])).find(candidate => candidate.model_id === model);
+  const roleFile = run => path.join(run.codexHome, "agents", "readme-spec-extractor.toml");
+
+  it("codex_small_resolves_when_native_openai_lists_responses_by_name", async () => {
+    const run = codexLayout();
+    stageInline(run, "codex", { "readme-spec-extractor": specAgent() });
+
+    const outcome = await apply(run);
+
+    // The run refused startup with catalog_unavailable: the recorded entry lists `responses`, not `/responses`.
+    expect(entryOf(runs.specEnforcerReflect(), "gpt-5-mini-2025-08-07")).toEqual({ model_id: "gpt-5-mini-2025-08-07", supported_endpoints: ["chat_completions", "responses"], candidate_metadata_complete: false });
+    expect(outcome.ok).toBe(true);
+    expect(outcome.resolutions).toEqual([{ name: "readme-spec-extractor", configuredModel: "small", model: "gpt-5-mini-2025-08-07", status: "resolved" }]);
+    expect(parseRoleToml(fs.readFileSync(roleFile(run), "utf8")).model).toBe("gpt-5-mini-2025-08-07");
+    expect(run.records()).toEqual([{ engine: "codex", role: "readme-spec-extractor", configured_model: "small", resolved_model: "gpt-5-mini-2025-08-07", provider: "openai", status: "resolved", cause: null }]);
+  });
+
+  it.each([
+    ["accepts it when they list responses", null, { resolved_model: "gpt-5.4", status: "exact", cause: null }],
+    ["fails it when they list only chat_completions", ["chat_completions"], { resolved_model: null, status: "failed", cause: "unsupported_endpoint" }],
+  ])("checks an exact model with complete endpoint names and %s", async (_label, endpoints, expected) => {
+    const run = codexLayout();
+    // Fixture mutation: the recorded agent pinned to gpt-5.4, the run's only OpenAI model with
+    // complete metadata (`chat_completions`, `responses`); the second case also drops `responses`.
+    const reflect = runs.specEnforcerReflect();
+    expect(entryOf(reflect, "gpt-5.4")).toEqual({ model_id: "gpt-5.4", supported_endpoints: ["chat_completions", "responses"], candidate_metadata_complete: true });
+    if (endpoints) entryOf(reflect, "gpt-5.4").supported_endpoints = endpoints;
+    stageInline(run, "codex", { "readme-spec-extractor": specAgent().replace("model: small", "model: gpt-5.4") });
+
+    const outcome = await apply(run, { reflectData: reflect });
+
+    expect(outcome.ok).toBe(expected.status !== "failed");
+    expect(run.records()).toEqual([{ engine: "codex", role: "readme-spec-extractor", configured_model: "gpt-5.4", provider: "openai", ...expected }]);
+    expect(fs.existsSync(roleFile(run))).toBe(expected.status !== "failed");
+  });
+});
+
 describe("isDetectionPhase", () => {
   it.each([
     ["detection", true],
