@@ -327,7 +327,7 @@ func TestCheckedInAgenticWorkflowsAgentMatchesGeneratedContent(t *testing.T) {
 func TestBuildAgenticWorkflowsSkillContent(t *testing.T) {
 	withMockAWMarkdownFileList(t, []string{"workflow-z.md", "workflow-a.md"}, nil)
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	if err != nil {
 		t.Fatalf("buildAgenticWorkflowsSkillContent() returned error: %v", err)
 	}
@@ -417,7 +417,7 @@ func TestBuildAgenticWorkflowsSkillContentEnsuresOTELParagraph(t *testing.T) {
 	t.Cleanup(func() { agenticWorkflowsSkillTemplate = originalTemplate })
 	agenticWorkflowsSkillTemplate = strings.ReplaceAll(agenticWorkflowsSkillTemplate, "\n"+agenticWorkflowsOTELSkillParagraph, "")
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	require.NoError(t, err)
 	assert.Contains(t, content, agenticWorkflowsOTELSkillParagraph)
 }
@@ -425,7 +425,7 @@ func TestBuildAgenticWorkflowsSkillContentEnsuresOTELParagraph(t *testing.T) {
 func TestBuildAgenticWorkflowsSkillContentWithoutAWDirectory(t *testing.T) {
 	withMockAWMarkdownFileList(t, []string{"workflow-a.md"}, nil)
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	if err != nil {
 		t.Fatalf("buildAgenticWorkflowsSkillContent() returned error: %v", err)
 	}
@@ -445,7 +445,7 @@ func TestBuildAgenticWorkflowsSkillContentWithoutAWDirectory(t *testing.T) {
 func TestBuildAgenticWorkflowsSkillContentFallsBackToEmbeddedFileList(t *testing.T) {
 	withMockAWMarkdownFileList(t, nil, assert.AnError)
 
-	content, err := buildAgenticWorkflowsSkillContent()
+	content, err := buildAgenticWorkflowsSkillContent(t.Context())
 	require.NoError(t, err, "buildAgenticWorkflowsSkillContent() returned error")
 
 	assert.NotContains(t, content, agenticWorkflowsSkillFileListPlaceholder, "expected generated skill content to replace the file-list placeholder")
@@ -477,7 +477,7 @@ func TestCheckedInAgenticWorkflowsSkillMatchesGeneratedContent(t *testing.T) {
 	sort.Strings(awFiles)
 	withMockAWMarkdownFileList(t, awFiles, nil)
 
-	expected, err := buildAgenticWorkflowsSkillContent()
+	expected, err := buildAgenticWorkflowsSkillContent(t.Context())
 	if err != nil {
 		t.Fatalf("buildAgenticWorkflowsSkillContent() returned error: %v", err)
 	}

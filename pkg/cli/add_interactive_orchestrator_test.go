@@ -325,7 +325,7 @@ func TestAddInteractiveConfigForcedPRDeliverySkipsDeliveryPrompt(t *testing.T) {
 		addConfirmChanges = originalConfirmChanges
 		addMissingInitMarkers = originalMissingMarkers
 	})
-	addMissingInitMarkers = func(string, string) ([]string, error) { return nil, nil }
+	addMissingInitMarkers = func(context.Context, string, string) ([]string, error) { return nil, nil }
 	addConfirmChanges = func(*AddInteractiveConfig, []string, []string) (bool, error) {
 		t.Fatal("explicit PR delivery must not prompt for local delivery")
 		return false, nil
@@ -394,7 +394,7 @@ func TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSec
 		return false, nil
 	}
 	addConfirmAuthoringSupport = func(context.Context) (bool, error) { return true, nil }
-	addMissingInitMarkers = func(string, string) ([]string, error) {
+	addMissingInitMarkers = func(context.Context, string, string) ([]string, error) {
 		return []string{bootstrapAgenticSkillPath}, nil
 	}
 	addInitRepository = func(InitOptions) error {
