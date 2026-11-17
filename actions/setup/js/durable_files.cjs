@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
+const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 
 /** Refuse credentials rather than redacting and corrupting restorable session state. */
 function assertNoSecrets(value, env = process.env) {
@@ -93,7 +94,7 @@ function stageFiles({ core, root = "/tmp/gh-aw/agent" }) {
   core.setOutput("present", "true");
 }
 
-function readBundle(root) {
+function readBundle(root, { checkSecrets = true } = {}) {
   const config = configuration(root);
   noSymlinks(config.bundle, root);
   const manifestFile = path.join(config.bundle, "manifest.json");
@@ -116,8 +117,10 @@ function readBundle(root) {
     if (relative === "manifest.json") return;
     const entry = blobs.get(relative);
     const bytes = fs.readFileSync(file);
-    assertNoSecrets(bytes.toString("utf8"));
-    assertNoSecrets(bytes.toString("latin1"));
+    if (checkSecrets) {
+      assertNoSecrets(bytes.toString("utf8"));
+      assertNoSecrets(bytes.toString("latin1"));
+    }
     if (!entry || hash(bytes) !== entry.hash) {
       throw new Error("Durable artifact was damaged or redacted; refusing continuation or publication");
     }
@@ -125,7 +128,7 @@ function readBundle(root) {
     count++;
   });
   if (count !== entries.size) throw new Error("Durable artifact is missing declared session files");
-  return { ...config, entries };
+  return { ...config, entries, manifest };
 }
 
 /** Validate every file before copying any untrusted artifact content. */
@@ -151,4 +154,62 @@ function validateFiles({ core, root = "/tmp/gh-aw/agent" }) {
   core.setOutput("present", "true");
 }
 
-module.exports = { stageFiles, restoreFiles, validateFiles };
+/** Preserve event envelopes and payload structure while allowing credential replacement inside strings. */
+function eventPayloadShape(value) {
+  if (typeof value === "string") return null;
+  if (Array.isArray(value)) return value.map(eventPayloadShape);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, /^(?:id|type|role|toolName)$|Id$/.test(key) ? child : eventPayloadShape(child)]));
+  }
+  // Distinguish a string replaced with a non-string JSON null.
+  return [typeof value, value];
+}
+
+function copilotEventStructure(text) {
+  const structure = [];
+  for (const event of iterateJsonlEvents(text)) {
+    if (event.type !== "json") {
+      if (event.reason === "blank") continue;
+      throw new Error("Cannot safely redact durable Copilot session events");
+    }
+    const { data, ...envelope } = event.value ?? {};
+    if (typeof envelope.type !== "string" || !data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("Cannot safely redact durable Copilot session events");
+    }
+    structure.push({ envelope, data: eventPayloadShape(data) });
+  }
+  return structure;
+}
+
+/** Rehash only the trusted host redactor's own changes to valid Copilot transcripts. */
+function redactCopilotCheckpoint(redact, root = "/tmp/gh-aw/agent") {
+  const { bundle, engine, files } = configuration(root);
+  if (engine !== "copilot") return;
+  noSymlinks(bundle, root);
+  const manifestPath = path.join(bundle, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return;
+  const { entries, manifest } = readBundle(root, { checkSecrets: false });
+  let changed = false;
+  for (const [relative, entry] of entries) {
+    const match = /^(\d+)\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/events\.jsonl$/i.exec(relative);
+    if (!match || path.basename(files[Number(match[1])]) !== "session-state") continue;
+    const text = entry.bytes.toString("utf8");
+    const sanitized = redact(text);
+    if (text === sanitized) continue;
+    if (!entry.bytes.equals(Buffer.from(text)) || !isDeepStrictEqual(copilotEventStructure(text), copilotEventStructure(sanitized))) {
+      throw new Error("Cannot safely redact durable Copilot session events");
+    }
+    assertNoSecrets(sanitized);
+    const file = path.join(bundle, hash(relative) + ".json");
+    const bytes = Buffer.from(sanitized);
+    fs.writeFileSync(file, bytes);
+    entry.hash = hash(bytes);
+    changed = true;
+  }
+  if (changed) {
+    const metadata = [...entries.values()].map(({ path, hash }) => ({ path, hash }));
+    fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, entries: metadata }) + "\n");
+  }
+}
+
+module.exports = { stageFiles, restoreFiles, validateFiles, redactCopilotCheckpoint };

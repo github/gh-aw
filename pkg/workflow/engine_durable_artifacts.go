@@ -10,6 +10,16 @@ import (
 // DurableRestoreStepName identifies durable configuration in compiled jobs and run evidence.
 const DurableRestoreStepName = "Restore durable workflow state"
 
+func generateCopilotCheckpointRedactionEnv(yaml *strings.Builder, data *WorkflowData) {
+	files, err := json.Marshal(data.durableExecutionPlan.Files)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode durable files: %v", err))
+	}
+	yaml.WriteString("          GH_AW_DURABLE_FILES: " + strconv.Quote(string(files)) + "\n")
+	yaml.WriteString("          GH_AW_DURABLE_ENGINE: copilot\n")
+	yaml.WriteString("          GH_AW_DURABLE_STAGED: ${{ steps.stage_durable_files.outputs.present }}\n")
+}
+
 func (c *Compiler) generateDurableArtifactRestore(yaml *strings.Builder, data *WorkflowData) {
 	if data.EngineConfig == nil || data.EngineConfig.Durable == nil {
 		return

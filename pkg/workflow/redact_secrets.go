@@ -162,16 +162,27 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/redact_secrets.cjs');\n")
+	var options []string
 	if data.SecretMasking != nil && len(data.SecretMasking.Steps) > 0 {
-		yaml.WriteString("            await main({ prepareForCustomMasking: true });\n")
+		options = append(options, "prepareForCustomMasking: true")
+	}
+	durableCopilot := data.durableExecutionPlan != nil && data.EngineConfig != nil && data.EngineConfig.ID == "copilot"
+	if durableCopilot {
+		options = append(options, "redactDurableCopilot: process.env.GH_AW_DURABLE_STAGED === 'true'")
+	}
+	if len(options) > 0 {
+		yaml.WriteString("            await main({ " + strings.Join(options, ", ") + " });\n")
 	} else {
 		yaml.WriteString("            await main();\n")
 	}
 
-	// Add environment variables (only when secrets are present, since a step's
-	// `env` must be a mapping and an empty `env:` parses as null)
-	if len(secretReferences) > 0 {
+	if durableCopilot || len(secretReferences) > 0 {
 		yaml.WriteString("        env:\n")
+	}
+	if durableCopilot {
+		generateCopilotCheckpointRedactionEnv(yaml, data)
+	}
+	if len(secretReferences) > 0 {
 
 		// Pass the list of secret names as a comma-separated string
 		// Escape each secret reference to prevent injection when embedding in YAML

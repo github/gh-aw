@@ -687,9 +687,9 @@ function processFile(filePath, secretValues, maskedValues = [], prepareForCustom
 
 /**
  * Main function
- * @param {{prepareForCustomMasking?: boolean, additionalDirectories?: string[], persistDetectionMasks?: (values: string[]) => void}} [options]
+ * @param {{prepareForCustomMasking?: boolean, additionalDirectories?: string[], persistDetectionMasks?: (values: string[]) => void, redactDurableCopilot?: boolean}} [options]
  */
-async function main({ prepareForCustomMasking = false, additionalDirectories = [], persistDetectionMasks } = {}) {
+async function main({ prepareForCustomMasking = false, additionalDirectories = [], persistDetectionMasks, redactDurableCopilot = false } = {}) {
   // Get the list of secret names from environment variable
   const secretNames = process.env.GH_AW_SECRET_NAMES;
 
@@ -763,6 +763,14 @@ async function main({ prepareForCustomMasking = false, additionalDirectories = [
       throw new Error(`${ERR_VALIDATION}: Removed artifact sources after runtime mask collection failed`, { cause: error });
     }
     const maskedValues = [...masks].sort((a, b) => b.length - a.length);
+    if (redactDurableCopilot) {
+      try {
+        const { redactCopilotCheckpoint } = require("./durable_files.cjs");
+        redactCopilotCheckpoint(text => redactArtifactContent(text, secretValues, maskedValues).content);
+      } catch {
+        core.setFailed(`${ERR_VALIDATION}: Could not safely sanitize the durable Copilot checkpoint`);
+      }
+    }
     try {
       stageAWFResolvedConfig(process.env.AWF_RESOLVED_CONFIG, secretValues, maskedValues);
     } catch (error) {

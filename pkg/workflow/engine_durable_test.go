@@ -321,6 +321,25 @@ func durableStepsText(steps []GitHubActionStep) string {
 	return text.String()
 }
 
+func TestCompileCopilotDurableArtifactRedaction(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "continuable.md")
+	markdown := "---\non: workflow_dispatch\nengine:\n  id: copilot\n  durable:\n    retention-days: 7\n---\nContinue the pending task.\n"
+	require.NoError(t, os.WriteFile(source, []byte(markdown), 0o600))
+	require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+	lock, err := os.ReadFile(filepath.Join(dir, "continuable.lock.yml"))
+	require.NoError(t, err)
+	text := string(lock)
+	redaction := extractWorkflowStepByName(t, text, "Redact secrets in logs")
+	require.Contains(t, redaction, "redactDurableCopilot: process.env.GH_AW_DURABLE_STAGED === 'true'")
+	require.Contains(t, redaction, "GH_AW_DURABLE_STAGED: ${{ steps.stage_durable_files.outputs.present }}")
+	require.Contains(t, redaction, "GH_AW_DURABLE_FILES:")
+	validation := extractWorkflowStepByName(t, text, "Validate durable checkpoint artifact")
+	require.Contains(t, validation, "steps.redact_secrets.outcome == 'success'")
+	require.Less(t, strings.Index(text, "Stage durable session files"), strings.Index(text, "Redact secrets in logs"))
+	require.Less(t, strings.Index(text, "Redact secrets in logs"), strings.Index(text, "Validate durable checkpoint artifact"))
+}
+
 func TestCompilePiDurableArtifactLifecycle(t *testing.T) {
 	for _, days := range []int{1, 7, 90} {
 		t.Run(strconv.Itoa(days), func(t *testing.T) {

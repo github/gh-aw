@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
-const { stageFiles, restoreFiles, validateFiles } = require("./durable_files.cjs");
-const { processFile } = require("./redact_secrets.cjs");
+const { stageFiles, restoreFiles, validateFiles, redactCopilotCheckpoint } = require("./durable_files.cjs");
+const { openDurableSession } = require("./durable_native_session.cjs");
+const { processFile, redactArtifactContent } = require("./redact_secrets.cjs");
 const directories = [];
 
 afterEach(() => {
@@ -26,6 +27,69 @@ function fixture() {
   const bundle = path.join(root, "durable/bundle");
   return { root, sessions, bundle, core: { info: vi.fn(), setOutput: vi.fn() } };
 }
+
+describe("Copilot durable checkpoint redaction", () => {
+  const id = "6f9f1648-1234-4000-8000-000000000001";
+  const secret = "fixture-value-only-known-to-host-redaction";
+
+  function checkpoint() {
+    const options = fixture();
+    const selector = path.join(options.sessions, "session.json");
+    const state = path.join(options.sessions, "session-state");
+    const events = path.join(state, id, "events.jsonl");
+    fs.mkdirSync(path.dirname(events), { recursive: true });
+    const header = { type: "session.start", id: "event-1", parentId: null, data: { sessionId: id } };
+    const message = { type: "user.message", id: "event-2", parentId: "event-1", data: { content: `Before ${secret} after` } };
+    fs.writeFileSync(selector, JSON.stringify({ version: 1, engine: "copilot", id }));
+    fs.writeFileSync(events, `${JSON.stringify(header)}\n${JSON.stringify(message)}\n`);
+    vi.stubEnv("GH_AW_DURABLE_FILES", JSON.stringify([selector, state]));
+    vi.stubEnv("GH_AW_DURABLE_ENGINE", "copilot");
+    stageFiles(options);
+    const blob = path.join(options.bundle, createHash("sha256").update(`1/${id}/events.jsonl`).digest("hex") + ".json");
+    return { ...options, header, message, events, blob };
+  }
+
+  it("restores the same native session after masking a credential in an event", () => {
+    const options = checkpoint();
+    vi.stubEnv("SECRET_FIXTURE_TOKEN", secret);
+    redactCopilotCheckpoint(text => redactArtifactContent(text, [secret], []).content, options.root);
+    expect(processFile(options.blob, [secret])).toBe(0);
+    validateFiles(options);
+    fs.rmSync(options.sessions, { recursive: true });
+    restoreFiles(options);
+    const home = path.join(options.root, "copilot-home");
+    const session = openDurableSession("copilot", {
+      GH_AW_DURABLE_ENGINE: "copilot",
+      GH_AW_DURABLE_STORAGE: "artifact",
+      GH_AW_DURABLE_RESUMED: "true",
+      GH_AW_DURABLE_SESSION_DIR: options.sessions,
+      COPILOT_HOME: home,
+    });
+    expect(session.copilotSession()).toBe(id);
+    const restored = fs.readFileSync(path.join(home, "session-state", id, "events.jsonl"), "utf8");
+    expect(restored).not.toContain(secret);
+    expect(
+      restored
+        .trimEnd()
+        .split("\n")
+        .map(line => JSON.parse(line))
+    ).toEqual([options.header, { ...options.message, data: { content: "Before ***REDACTED*** after" } }]);
+  });
+
+  it("refuses to accept changes made before the trusted redaction step", () => {
+    const options = checkpoint();
+    fs.appendFileSync(options.blob, "\n");
+    const redact = vi.fn();
+    expect(() => redactCopilotCheckpoint(redact, options.root)).toThrow("damaged or redacted");
+    expect(redact).not.toHaveBeenCalled();
+  });
+
+  it("refuses redaction that would change the native session identity", () => {
+    const options = checkpoint();
+    expect(() => redactCopilotCheckpoint(text => redactArtifactContent(text, [id], []).content, options.root)).toThrow("Cannot safely redact");
+    expect(fs.readFileSync(options.blob)).toEqual(fs.readFileSync(options.events));
+  });
+});
 
 describe("engine-declared durable files", () => {
   it("round trips only declared session files and tells the harness to continue", () => {
