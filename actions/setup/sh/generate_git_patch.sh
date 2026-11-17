@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set +o histexpand
 
-PATCH_DIR="${GH_AW_TMP_DIR:-/tmp/gh-aw}"
+PATCH_DIR="${GH_AW_TMP_DIR:-${GH_AW_RUNTIME_DIR:?}}"
 path_has_symlink_component() {
   local path="$1"
   case "$path" in

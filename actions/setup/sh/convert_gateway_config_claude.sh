@@ -86,15 +86,15 @@ jq --arg urlPrefix "$URL_PREFIX" '
       .url |= (. | sub("^http://[^/]+/mcp/"; $urlPrefix + "/mcp/"))
     )
   )
-' "$MCP_GATEWAY_OUTPUT" > /tmp/gh-aw/mcp-config/mcp-servers.json
+' "$MCP_GATEWAY_OUTPUT" > "${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"
 
 # Restrict permissions so only the runner process owner can read this file.
 # mcp-servers.json contains the bearer token for the MCP gateway; an attacker
 # who reads it could bypass the --allowed-tools constraint by issuing raw
 # JSON-RPC calls directly to the gateway.
-chmod 600 /tmp/gh-aw/mcp-config/mcp-servers.json
+chmod 600 "${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"
 
-echo "Claude configuration written to /tmp/gh-aw/mcp-config/mcp-servers.json"
+echo "Claude configuration written to ${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"
 echo ""
 echo "Converted configuration:"
-cat /tmp/gh-aw/mcp-config/mcp-servers.json
+cat "${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json"

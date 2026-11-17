@@ -3,7 +3,7 @@ set +o histexpand
 
 set -euo pipefail
 
-CACHE_DIR="${GH_AW_CACHE_DIR:-/tmp/gh-aw/cache-memory}"
+CACHE_DIR="${GH_AW_CACHE_DIR:-${GH_AW_RUNTIME_DIR:?}/cache-memory}"
 
 if [ -d "$CACHE_DIR/.git" ]; then
   if ! git -C "$CACHE_DIR" fsck --no-dangling >/dev/null 2>&1; then

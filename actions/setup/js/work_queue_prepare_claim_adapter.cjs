@@ -33,11 +33,11 @@ async function prepareAdapterContext(options) {
     await assertClaimAuthorized(message, authorization);
     const resource = await resolveRepositoryTarget(options.github || global.github, { repository: adapter["target-repo"] });
     await assertClaimAuthorized(message, { ...authorization, resource });
-    const directory = claimArtifactPath(options.artifactRoot || "/tmp/gh-aw", member.handle);
+    const directory = claimArtifactPath(options.artifactRoot || require("./runtime_paths.cjs").runtimeRoot(), member.handle);
     fs.mkdirSync(path.join(directory, "adapters"), { recursive: true, mode: 0o700 });
     assertClaimArtifactDirectory(directory);
     const inputFile = path.join(directory, "adapter-input.json");
-    const outputFile = preparedAdapterPath(options.artifactRoot || "/tmp/gh-aw", member.handle, options.type);
+    const outputFile = preparedAdapterPath(options.artifactRoot || require("./runtime_paths.cjs").runtimeRoot(), member.handle, options.type);
     const assignmentFile = path.join(directory, "original-assignment.json");
     const writeOptions = { mode: 0o400, flag: "wx" };
     fs.writeFileSync(inputFile, JSON.stringify({ version: 3, claim_handle: member.handle, type: options.type, messages }) + "\n", writeOptions);

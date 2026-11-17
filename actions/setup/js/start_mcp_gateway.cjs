@@ -47,6 +47,38 @@ const { PROXY_ENV_NAMES, STEP_NAME_START_MCP_GATEWAY } = require("./constants.cj
 const { redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
 const { prepareMCPServerCAs } = require("./mcp_server_ca.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
+const { runtimeRoot, runtimePath, runtimeId, runtimeContainerName } = require("./runtime_paths.cjs");
+
+/**
+ * Retry cleanup must never remove a different invocation's gateway.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {typeof execFileSync} [run]
+ * @returns {boolean}
+ */
+function removeRuntimeGatewayContainer(env = process.env, run = execFileSync) {
+  const name = runtimeContainerName("awmg-mcpg", env);
+  const id = runtimeId(env);
+  let metadata;
+  try {
+    metadata = String(run("docker", ["inspect", "--type", "container", "--format", "{{json .}}", name], { encoding: "utf8", timeout: DOCKER_CLEANUP_TIMEOUT_MS }));
+  } catch {
+    return false;
+  }
+  let container;
+  try {
+    container = JSON.parse(metadata);
+  } catch {
+    throw codedError(`Refusing to remove gateway container ${name}: invalid inspection metadata`, ERR_CONFIG);
+  }
+  if (!container || container.Name !== `/${name}` || container.Config?.Labels?.["gh-aw.runtime-id"] !== id) {
+    throw codedError(`Refusing to remove gateway container ${name}: runtime ownership label or container name does not match`, ERR_CONFIG);
+  }
+  if (typeof container.Id !== "string" || !/^[a-f0-9]{64}$/.test(container.Id)) {
+    throw codedError(`Refusing to remove gateway container ${name}: invalid immutable container ID`, ERR_CONFIG);
+  }
+  run("docker", ["rm", "-f", container.Id], { stdio: "ignore", timeout: DOCKER_CLEANUP_TIMEOUT_MS });
+  return true;
+}
 
 function codedError(message, code = ERR_SYSTEM, options) {
   return new Error(`${code}: ${message}`, options);
@@ -373,7 +405,7 @@ function sleep(ms) {
  * @returns {string}
  */
 function getGatewayStartupMarkerPath(env = process.env) {
-  return env.MCP_GATEWAY_STARTUP_MARKER || "/tmp/gh-aw/mcp-gateway-started";
+  return env.MCP_GATEWAY_STARTUP_MARKER || path.join(runtimeRoot(env), "mcp-gateway-started");
 }
 
 /**
@@ -955,16 +987,15 @@ async function main() {
   // -----------------------------------------------------------------------
   // Config and CLI manifest are stored under ${RUNNER_TEMP}/gh-aw/ to prevent
   // tampering.  RUNNER_TEMP is a per-runner directory that is not
-  // world-writable, unlike /tmp.  Logs remain under /tmp/gh-aw/mcp-logs/
-  // because the Docker gateway container mounts -v /tmp:/tmp:rw and writes
-  // there via MCP_GATEWAY_LOG_DIR.
-  const configDir = path.join(runnerTemp || "/tmp", "gh-aw/mcp-config");
-  const cliDir = path.join(runnerTemp || "/tmp", "gh-aw/mcp-cli");
+  // world-writable, unlike /tmp. Logs are written to the invocation's private
+  // runtime directory, mounted at the same absolute path inside the container.
+  const configDir = path.join(require("./runtime_paths.cjs").setupRoot(), "mcp-config");
+  const cliDir = path.join(require("./runtime_paths.cjs").setupRoot(), "mcp-cli");
 
   try {
-    fs.mkdirSync("/tmp/gh-aw/mcp-logs", { recursive: true });
+    fs.mkdirSync(runtimePath("mcp-logs"), { recursive: true });
   } catch (err) {
-    throw codedError(`Failed to create directory /tmp/gh-aw/mcp-logs: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
+    throw codedError(`Failed to create directory ${runtimePath("mcp-logs")}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
   }
 
   // Symlink attack prevention on the config directory
@@ -1086,7 +1117,7 @@ async function main() {
 
   applyOTLPIgnoreIfMissing(configObj);
 
-  const logDir = "/tmp/gh-aw/mcp-logs/";
+  const logDir = runtimePath("mcp-logs") + path.sep;
   writeMcpConfiguration(logDir, configObj);
 
   // Servers declared with `required: false` are best-effort: a failed startup
@@ -1111,19 +1142,8 @@ async function main() {
   const { gatewayPid, stderrPath } = await startGatewayWithRetry(async sharedStartupDeadline => {
     clearGatewayStartupMarker(gatewayStartupMarker);
 
-    // Clean up any stale gateway container from a previous run on this runner.
-    // On persistent self-hosted runners a prior job's gateway container may still
-    // be running and holding the host port, causing "bind: address already in use"
-    // when we try to start the new one.  Force-removing by the well-known container
-    // name is idempotent: docker rm -f exits non-zero when the container doesn't
-    // exist, but the trailing || true (and 2>/dev/null) make the command succeed.
-    core.info("Cleaning up any stale awmg-mcpg container from a previous run...");
-    try {
-      execSync("docker rm -f awmg-mcpg 2>/dev/null && echo 'Removed stale awmg-mcpg container' || true", { stdio: "inherit", timeout: DOCKER_CLEANUP_TIMEOUT_MS });
-    } catch {
-      // Non-fatal: proceed even if the cleanup command itself fails
-      core.info("Could not remove stale awmg-mcpg container (may not exist)");
-    }
+    core.info(`Cleaning up the current invocation's gateway container ${runtimeContainerName("awmg-mcpg")}...`);
+    removeRuntimeGatewayContainer();
     core.info("");
 
     core.info("Starting gateway container...");
@@ -1652,6 +1672,7 @@ function applyBuiltinMCPRunnerIdentity(config, uid = process.geteuid?.(), gid = 
 }
 
 module.exports = {
+  removeRuntimeGatewayContainer,
   resolveMCPConfigExpressions,
   applyBuiltinMCPRunnerIdentity,
   applyOTLPIgnoreIfMissing,

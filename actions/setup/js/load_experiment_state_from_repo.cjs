@@ -136,8 +136,8 @@ async function fetchFileFromBranch(octokit, owner, repo, branch, filePath) {
  * Main entry point called by the actions/github-script step.
  */
 async function main() {
-  const stateFile = process.env.GH_AW_EXPERIMENT_STATE_FILE || "/tmp/gh-aw/experiments/state.jsonl";
-  const stateDir = process.env.GH_AW_EXPERIMENT_STATE_DIR || "/tmp/gh-aw/experiments";
+  const stateFile = process.env.GH_AW_EXPERIMENT_STATE_FILE || require("./runtime_paths.cjs").runtimePath("experiments/state.jsonl");
+  const stateDir = process.env.GH_AW_EXPERIMENT_STATE_DIR || require("./runtime_paths.cjs").runtimePath("experiments");
   const branch = process.env.GH_AW_EXPERIMENT_BRANCH || "";
   const repository = process.env.GITHUB_REPOSITORY || "";
   const [owner, repo] = repository.split("/");

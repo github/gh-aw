@@ -20,7 +20,9 @@ const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
 const { redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
 
 const AWF_RESOLVED_CONFIG_PATH_PATTERN = /^\/run\/awf-config-audit\/run-[a-zA-Z0-9]{6}\/awf-resolved-config\.json$/;
-const AWF_RESOLVED_CONFIG_STAGING_PATH = "/tmp/gh-aw/awf-resolved-config.json";
+function awfResolvedConfigStagingPath() {
+  return require("./runtime_paths.cjs").runtimePath("awf-resolved-config.json");
+}
 const MAX_ADDITIONAL_ARTIFACT_BYTES = 16 * 1024 * 1024;
 const DETECTION_MASKS_ENV = "GH_AW_DETECTION_MASKED_VALUES";
 
@@ -196,24 +198,39 @@ const BUILT_IN_PATTERNS = [
 /**
  * MCP gateway configuration files that may contain bearer tokens.
  * These are the canonical paths produced by the gateway setup scripts.
- * The list is defined as a module-level constant so tests can replace entries.
+ * Paths are resolved only for runtime operations, not pure redaction imports.
+ * Keep the array stable within an invocation so callers can replace entries.
  */
-// Shell setup scripts write under /tmp, while CJS converters use RUNNER_TEMP.
-const MCP_GATEWAY_CONFIG_PATHS = [
-  ...new Set(
-    [
-      path.join("/tmp", "gh-aw/mcp-config/gateway-output.json"),
-      path.join("/tmp", "gh-aw/mcp-config/mcp-servers.json"),
-      path.join("/tmp", "gh-aw/mcp-config/config.toml"),
-      path.join("/tmp", "gh-aw/pi-agent-dir/mcp.json"),
-      path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/gateway-output.json"),
-      path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json"),
-      path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml"),
-      process.env.HOME ? path.join(process.env.HOME, ".copilot/mcp-config.json") : "",
-      process.env.GITHUB_WORKSPACE ? path.join(process.env.GITHUB_WORKSPACE, ".gemini/settings.json") : "",
-    ].filter(Boolean)
-  ),
-];
+/** @type {string[] | undefined} */
+let gatewayConfigPaths;
+/** @type {string | undefined} */
+let gatewayConfigPathsKey;
+
+/** @returns {string[]} */
+function mcpGatewayConfigPaths() {
+  const { runtimeRoot, setupRoot } = require("./runtime_paths.cjs");
+  const runtime = runtimeRoot();
+  const setup = setupRoot();
+  const key = JSON.stringify([runtime, setup, process.env.HOME, process.env.GITHUB_WORKSPACE]);
+  if (gatewayConfigPaths && gatewayConfigPathsKey === key) return gatewayConfigPaths;
+  gatewayConfigPaths = [
+    ...new Set(
+      [
+        path.join(runtime, "mcp-config/gateway-output.json"),
+        path.join(runtime, "mcp-config/mcp-servers.json"),
+        path.join(runtime, "mcp-config/config.toml"),
+        path.join(runtime, "pi-agent-dir/mcp.json"),
+        path.join(setup, "mcp-config/gateway-output.json"),
+        path.join(setup, "mcp-config/mcp-servers.json"),
+        path.join(setup, "mcp-config/config.toml"),
+        process.env.HOME ? path.join(process.env.HOME, ".copilot/mcp-config.json") : "",
+        process.env.GITHUB_WORKSPACE ? path.join(process.env.GITHUB_WORKSPACE, ".gemini/settings.json") : "",
+      ].filter(Boolean)
+    ),
+  ];
+  gatewayConfigPathsKey = key;
+  return gatewayConfigPaths;
+}
 
 /**
  * Minimum credential length required before an Authorization value is treated
@@ -471,10 +488,11 @@ function readAWFResolvedConfig(sourcePath) {
  * @returns {boolean}
  */
 function stageAWFResolvedConfig(sourcePath, secretValues, maskedValues) {
+  const stagingPath = awfResolvedConfigStagingPath();
   try {
     // Remove stale files, directories, or symlinks without following links. This
     // keeps rejected entries out of artifact uploads when older AWF omits this file.
-    fs.rmSync(AWF_RESOLVED_CONFIG_STAGING_PATH, { recursive: true, force: true });
+    fs.rmSync(stagingPath, { recursive: true, force: true });
     if (!sourcePath) return false;
     const raw = readAWFResolvedConfig(sourcePath);
     let parsed;
@@ -487,18 +505,18 @@ function stageAWFResolvedConfig(sourcePath, secretValues, maskedValues) {
     const serialized = JSON.stringify(safeConfig, null, 2);
     const redactionValues = [...new Set([...maskedValues, ...secretValues])];
     const redacted = redactSecrets(redactBuiltInPatterns(redactArtifactMaskedValues(serialized, redactionValues)).content, redactionValues).content;
-    const temporary = fs.mkdtempSync("/tmp/gh-aw/.awf-resolved-config-");
+    const temporary = fs.mkdtempSync(require("./runtime_paths.cjs").runtimePath(".awf-resolved-config-"));
     try {
       const temporaryFile = path.join(temporary, "awf-resolved-config.json");
       fs.writeFileSync(temporaryFile, redacted, { encoding: "utf8", mode: 0o600, flag: "wx" });
-      fs.renameSync(temporaryFile, AWF_RESOLVED_CONFIG_STAGING_PATH);
+      fs.renameSync(temporaryFile, stagingPath);
     } finally {
       fs.rmSync(temporary, { recursive: true, force: true });
     }
     return true;
   } catch (error) {
     // A failed validation or staging attempt must never leave stale output for upload.
-    fs.rmSync(AWF_RESOLVED_CONFIG_STAGING_PATH, { recursive: true, force: true });
+    fs.rmSync(stagingPath, { recursive: true, force: true });
     throw error;
   }
 }
@@ -713,14 +731,14 @@ async function main({ prepareForCustomMasking = false, additionalDirectories = [
     // Extract MCP gateway bearer tokens from known config files and add them to
     // the redaction list.  The gateway token has no fixed prefix so it cannot be
     // matched by the built-in regex patterns; we must read it from the config.
-    const gatewayTokens = extractMCPGatewayTokens(MCP_GATEWAY_CONFIG_PATHS);
+    const gatewayTokens = extractMCPGatewayTokens(mcpGatewayConfigPaths());
     if (gatewayTokens.length > 0) {
       secretValues.push(...gatewayTokens);
     }
 
     // Find all target files in /tmp/gh-aw and ${RUNNER_TEMP}/gh-aw directories
     const targetExtensions = [".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch", ".html"];
-    const tmpFiles = findFiles("/tmp/gh-aw", targetExtensions);
+    const tmpFiles = findFiles(require("./runtime_paths.cjs").runtimeRoot(), targetExtensions);
     const optFiles = findFiles(`${process.env.RUNNER_TEMP}/gh-aw`, targetExtensions);
     const additionalFiles = new Set(additionalDirectories.flatMap(dir => findFiles(dir, null)));
     const files = [...new Set([...tmpFiles, ...optFiles, ...additionalFiles])];
@@ -797,7 +815,7 @@ async function redactFilesInDir(dir) {
         secretValues.push(value.trim());
       }
     }
-    secretValues.push(...extractMCPGatewayTokens(MCP_GATEWAY_CONFIG_PATHS));
+    secretValues.push(...extractMCPGatewayTokens(mcpGatewayConfigPaths()));
 
     const targetExtensions = [".json"];
     const files = findFiles(dir, targetExtensions);
@@ -824,7 +842,11 @@ module.exports = {
   extractMCPGatewayTokens,
   readAWFResolvedConfig,
   stageAWFResolvedConfig,
-  AWF_RESOLVED_CONFIG_STAGING_PATH,
+  get AWF_RESOLVED_CONFIG_STAGING_PATH() {
+    return awfResolvedConfigStagingPath();
+  },
   BUILT_IN_PATTERNS,
-  MCP_GATEWAY_CONFIG_PATHS,
+  get MCP_GATEWAY_CONFIG_PATHS() {
+    return mcpGatewayConfigPaths();
+  },
 };

@@ -192,7 +192,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn, executabl
 /** @param {any} pi */
 function piSubagentExtension(pi) {
   if (process.env.GH_AW_PI_SUBAGENT_CHILD === "1") return;
-  const manifest = path.join(process.env.PI_CODING_AGENT_DIR || "/tmp/gh-aw/pi-agent-dir", "subagents.json");
+  const manifest = path.join(process.env.PI_CODING_AGENT_DIR || require("./runtime_paths.cjs").runtimePath("pi-agent-dir"), "subagents.json");
   if (!fs.existsSync(manifest)) return;
   let agents;
   try {

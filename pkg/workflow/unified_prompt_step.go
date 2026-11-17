@@ -471,7 +471,7 @@ func (c *Compiler) generateUnifiedPromptCreationStepWithContent(yaml *strings.Bu
 	yaml.WriteString("          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions\n")
 	yaml.WriteString("          GH_AW_PROMPT: " + constants.AwPromptsFileExpr + "\n")
 	if data.SafeOutputs != nil {
-		yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl\n")
+		yaml.WriteString("          GH_AW_SAFE_OUTPUTS: /tmp/gh-aw/safeoutputs/outputs.jsonl\n")
 	}
 	writeYAMLEnv(yaml, "          ", "GH_AW_PROMPT_CONFIG", string(configJSON))
 

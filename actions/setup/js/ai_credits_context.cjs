@@ -38,7 +38,7 @@ const API_PROXY_GUARD_COUNTER_FIELDS = ["consecutive_cache_misses", "max_cache_m
 const MAX_AI_CREDITS_EXCEEDED_STDIO_RE =
   /^(?:(?:Execution failed:\s*)?CAPIError:\s*429\s+|Failed to get response from the AI model; retried \d+ times(?: \(total retry wait time:[^)]+\))?(?: \(Request-ID [^)]+\))?\.? Last error: CAPIError:\s*429\s+|Fatal:\s*)Maximum AI credits exceeded(?:\s*\((\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\))?\.?$/i;
 const MAX_AI_CREDITS_EXCEEDED_NATIVE_ERROR_RE = /^(?:(?:API Error:\s*)?403(?::\s*|\s+)(?:Forbidden[.:]?\s*)?)?Maximum AI credits exceeded(?:\s*\((\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\))?\.?$/i;
-const DEFAULT_AGENT_STDIO_LOG = "/tmp/gh-aw/agent-stdio.log";
+const DEFAULT_AGENT_STDIO_LOG = require("./runtime_paths.cjs").runtimePath("agent-stdio.log");
 const AGENT_STDIO_LOG_MAX_TAIL = 64 * 1024; // 64 KB — sufficient for any realistic error block
 
 /**
@@ -158,7 +158,7 @@ function sanitizeModelName(value) {
  */
 function parseMaxAICreditsFromAWFConfig() {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const configPath = process.env.GH_AW_AWF_CONFIG_PATH || path.join(agentOutputFile ? path.dirname(agentOutputFile) : "/tmp/gh-aw", "awf-config.json");
+  const configPath = process.env.GH_AW_AWF_CONFIG_PATH || path.join(agentOutputFile ? path.dirname(agentOutputFile) : require("./runtime_paths.cjs").runtimeRoot(), "awf-config.json");
   if (!fs.existsSync(configPath)) return "";
   try {
     /** @type {unknown} */
@@ -185,8 +185,8 @@ function resolveFirewallAuditLogPath(auditJsonlPathOverride) {
     candidateBases.push(path.join(path.dirname(agentOutputFile), "sandbox", "firewall", "audit"));
     candidateBases.push(path.join(path.dirname(agentOutputFile), "sandbox", "firewall", "logs"));
   }
-  candidateBases.push("/tmp/gh-aw/sandbox/firewall/audit");
-  candidateBases.push("/tmp/gh-aw/sandbox/firewall/logs");
+  candidateBases.push(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/audit"));
+  candidateBases.push(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs"));
 
   for (const base of candidateBases) {
     for (const filename of ["log.jsonl", "audit.jsonl"]) {
@@ -225,12 +225,12 @@ function resolveUnknownModelAICreditsLogPaths(auditJsonlPathOverride) {
     addCandidate(path.join(root, "sandbox", "firewall", "audit", "api-proxy-logs", "events.jsonl"));
   }
 
-  addCandidate("/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl");
-  addCandidate("/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/events.jsonl");
-  addCandidate("/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/event-logs.jsonl");
-  addCandidate("/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/events.jsonl");
-  addCandidate("/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/event-logs.jsonl");
-  addCandidate("/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/events.jsonl");
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl"));
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/events.jsonl"));
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/event-logs.jsonl"));
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/events.jsonl"));
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/audit/api-proxy-logs/event-logs.jsonl"));
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/audit/api-proxy-logs/events.jsonl"));
   addCandidate(resolveFirewallAuditLogPath());
   return candidates;
 }
@@ -262,9 +262,9 @@ function resolveTokenUsageLogPaths(auditJsonlPathOverride) {
     addCandidate(path.join(root, "sandbox", "firewall", "audit", "api-proxy-logs", "token-usage.jsonl"));
   }
 
-  addCandidate("/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
-  addCandidate("/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl");
-  addCandidate("/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl");
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl"));
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"));
+  addCandidate(require("./runtime_paths.cjs").runtimePath("sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl"));
   return candidates;
 }
 
@@ -608,8 +608,8 @@ function resolveAPIProxyGuardLogPaths(eventLogPathOverride) {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
   const roots = [];
   if (agentOutputFile) roots.push(path.dirname(agentOutputFile));
-  roots.push("/tmp/gh-aw");
-  roots.push("/tmp/gh-aw/threat-detection");
+  roots.push(require("./runtime_paths.cjs").runtimeRoot());
+  roots.push(require("./runtime_paths.cjs").runtimePath("threat-detection"));
   for (const root of roots) {
     for (const base of ["logs", "audit"]) {
       addCandidate(path.join(root, "sandbox", "firewall", base, "api-proxy-logs", "token-tracker-audit.jsonl"));

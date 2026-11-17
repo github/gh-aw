@@ -3,7 +3,7 @@ set +o histexpand
 
 set -euo pipefail
 
-SOURCE_DIR="${1:-/tmp/gh-aw}"
+SOURCE_DIR="${1:-${GH_AW_RUNTIME_DIR:?}}"
 DETECTION_DIR="${2:-${SOURCE_DIR}/threat-detection}"
 PROMPT_SOURCE_DIR="${SOURCE_DIR}/aw-prompts"
 PROMPT_DETECTION_DIR="${DETECTION_DIR}/aw-prompts"

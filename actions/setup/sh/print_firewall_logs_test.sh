@@ -11,7 +11,8 @@ SCRIPT="${SCRIPT_DIR}/print_firewall_logs.sh"
 
 TESTS_PASSED=0
 TESTS_FAILED=0
-WORKSPACE="$(mktemp -d)"
+WORKSPACE="$(mktemp -d "${PWD}/.firewall-log-tests.XXXXXX")"
+export GH_AW_RUNTIME_DIR="$WORKSPACE"
 
 cleanup() {
   rm -rf "${WORKSPACE}"

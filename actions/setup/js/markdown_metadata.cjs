@@ -452,7 +452,7 @@ async function ensureRemoteMarkdownMetadata(documents, githubClient, { repositor
 }
 
 function persistMarkdownMetadata() {
-  const infoPath = path.join(process.env.GH_AW_TMP_DIR || require("./constants.cjs").TMP_GH_AW_PATH, "aw_info.json");
+  const infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json");
   if (!fs.existsSync(infoPath)) throw new Error("Compiler Markdown metadata cache is unavailable; activation must generate aw_info.json before installing skills");
   const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
   if (!info || typeof info !== "object" || Array.isArray(info)) throw new Error("Invalid compiler Markdown metadata cache");
@@ -463,7 +463,7 @@ function persistMarkdownMetadata() {
 
 function restoreCachedMetadata() {
   if (initialized) return;
-  const infoPath = path.join(process.env.GH_AW_TMP_DIR || require("./constants.cjs").TMP_GH_AW_PATH, "aw_info.json");
+  const infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json");
   if (fs.existsSync(infoPath)) {
     const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
     const metadata = resolveMarkdownMetadata({ manifest: info });
@@ -514,7 +514,7 @@ function renderMetadata(value) {
   const record = { kind: "artifact", sha256: digest, value: parseMarkdownJSON(source) };
   generatedRecords.set(`artifact:${digest}`, record);
   records.set(`artifact:${digest}`, record);
-  const infoPath = path.join(process.env.GH_AW_TMP_DIR || require("./constants.cjs").TMP_GH_AW_PATH, "aw_info.json");
+  const infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json");
   if (fs.existsSync(infoPath)) persistMarkdownMetadata();
   return source;
 }

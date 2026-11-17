@@ -2050,7 +2050,7 @@ async function main(config = {}) {
                 const runUrl = buildWorkflowRunUrl(context, context.repo);
                 const runId = context.runId;
 
-                const artifactFileName = bundleFilePath ? bundleFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.bundle";
+                const artifactFileName = bundleFilePath ? bundleFilePath.replace(require("./runtime_paths.cjs").runtimeRoot() + "/", "") : "aw-unknown.bundle";
                 const recoveryInstructions = buildManualBranchRecoveryCommands({
                   objectPackRecovery,
                   hasBundleFile: true,
@@ -2427,7 +2427,7 @@ async function main(config = {}) {
                   patchPreview = buildPatchPreviewBlocks(patchContent);
                 }
 
-                const patchFileName = patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
+                const patchFileName = patchFilePath ? patchFilePath.replace(require("./runtime_paths.cjs").runtimeRoot() + "/", "") : "aw-unknown.patch";
                 const recoveryInstructions = buildManualBranchRecoveryCommands({
                   objectPackRecovery,
                   hasBundleFile: false,
@@ -2616,7 +2616,11 @@ async function main(config = {}) {
           // Use the push-failed template with artifact download instructions, matching
           // whichever transport (bundle or format-patch) was actually used to encode the changes.
           const runId = context.runId;
-          const artifactFileName = hasBundleFile ? bundleFilePath.replace("/tmp/gh-aw/", "") : patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
+          const artifactFileName = hasBundleFile
+            ? bundleFilePath.replace(require("./runtime_paths.cjs").runtimeRoot() + "/", "")
+            : patchFilePath
+              ? patchFilePath.replace(require("./runtime_paths.cjs").runtimeRoot() + "/", "")
+              : "aw-unknown.patch";
           const applyInstructions = buildManualBranchRecoveryCommands({
             objectPackRecovery,
             hasBundleFile,

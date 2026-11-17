@@ -55,7 +55,7 @@ function main(options = {}) {
     if (!runnerTemp) throw new Error("work_queue_collection_runner_temp_missing");
     sourceDir = path.join(runnerTemp, "gh-aw", "safeoutputs", "work-queue");
   }
-  const outputDir = options.outputDir || "/tmp/gh-aw";
+  const outputDir = options.outputDir || require("./runtime_paths.cjs").runtimeRoot();
   fs.mkdirSync(outputDir, { recursive: true });
   if (!fs.lstatSync(outputDir).isDirectory()) throw new Error("work_queue_collection_destination_invalid");
   const results = [];

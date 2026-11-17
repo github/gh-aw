@@ -2,13 +2,12 @@
 "use strict";
 
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const { normalizeLedgerAppends } = require("./ledger_transactions.cjs");
 
 function transactionPath() {
   if (process.env.GH_AW_LEDGER_TRANSACTIONS) return path.resolve(process.env.GH_AW_LEDGER_TRANSACTIONS);
-  return path.join(process.env.RUNNER_TEMP || os.tmpdir(), "gh-aw", "ledger-transactions.json");
+  return require("./runtime_paths.cjs").runtimePath("ledger-transactions.json");
 }
 
 async function main(config = {}) {

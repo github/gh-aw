@@ -6,6 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_ROOT="${PWD}/.install-gh-cli-test-$$"
 mkdir "$TEST_ROOT"
+export GH_AW_RUNTIME_DIR="$TEST_ROOT"
 trap 'rm -rf "$TEST_ROOT"' EXIT
 mkdir "${TEST_ROOT}/bin" "${TEST_ROOT}/installer"
 

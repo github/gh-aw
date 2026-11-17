@@ -168,7 +168,7 @@ function parseEngineSession(content, engine) {
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({
-  rootDir = "/tmp/gh-aw",
+  rootDir = require("./runtime_paths.cjs").runtimeRoot(),
   engine,
   protectedSessionCapture = false,
   warn = message => console.warn(message),
@@ -942,7 +942,7 @@ function collectUnifiedSession({
  * @returns {import("./types/unified_session").UnifiedSession}
  */
 function writeUnifiedSession(options = {}) {
-  const outputPath = options.outputPath ?? path.join(options.rootDir ?? "/tmp/gh-aw", "usage/aw_session.jsonl");
+  const outputPath = options.outputPath ?? path.join(options.rootDir ?? require("./runtime_paths.cjs").runtimeRoot(), "usage/aw_session.jsonl");
   try {
     const collected = collectUnifiedSession(options);
     const maskedValues = collected.maskedValues;
@@ -974,7 +974,7 @@ async function main(options = {}) {
   const executionIdentity = options.executionIdentity ?? { runId: process.env.GITHUB_RUN_ID, runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT) };
   const events = writeUnifiedSession({ ...options, executionIdentity, jobDurations, graders: manifest.graders, customGraderIds: options.customGraderIds ?? manifest.customGraders });
   const { publishUnifiedSessionSummary } = require("./unified_session_render.cjs");
-  await publishUnifiedSessionSummary(options.outputPath ?? path.join(options.rootDir ?? "/tmp/gh-aw", "usage/aw_session.jsonl"));
+  await publishUnifiedSessionSummary(options.outputPath ?? path.join(options.rootDir ?? require("./runtime_paths.cjs").runtimeRoot(), "usage/aw_session.jsonl"));
   await publishGraderSummary(events);
 }
 

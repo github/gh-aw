@@ -40,6 +40,17 @@ create_dir() {
   fi
 }
 
+# Concurrent setups may share the immutable asset tree. Publish complete files
+# atomically instead of racing cp's initial destination creation.
+copy_file() {
+  local source="$1" destination="$2" staged
+  staged="$(mktemp "${destination}.copy-XXXXXX")" || return 1
+  if [[ -d "$destination" ]] || ! cp -p "$source" "$staged" || ! mv -f -- "$staged" "$destination"; then
+    rm -f -- "$staged"
+    return 1
+  fi
+}
+
 # Git Bash does not automatically convert Windows environment-variable paths.
 # Preserve RUNNER_TEMP for JavaScript consumers, but use a Bash-compatible path here.
 if [[ "$(uname -o 2>/dev/null)" == "Msys" ]] && command -v cygpath >/dev/null 2>&1; then
@@ -69,22 +80,22 @@ if [ ! -w "${RUNNER_TEMP_BASH}" ]; then
   exit 1
 fi
 
-# Detect tree collision: RUNNER_TEMP must not resolve to /tmp.
-# gh-aw mounts ${RUNNER_TEMP}/gh-aw read-only (setup tree) and /tmp/gh-aw read-write
-# (runtime tree). When RUNNER_TEMP=/tmp both paths collapse into /tmp/gh-aw, giving
-# the agent write access to compiled scripts, prompts, and MCP configs that must stay
-# immutable. Fail fast here rather than silently running with a broken security boundary.
+# The setup tree stays read-only to the agent. Runtime allocation below always
+# uses a distinct private directory, including when RUNNER_TEMP is the OS temp.
 RESOLVED_RUNNER_TEMP="$(cd "${RUNNER_TEMP_BASH}" && pwd -P)"
 if [ -z "${RESOLVED_RUNNER_TEMP}" ]; then
   echo "::error::Failed to resolve canonical path for RUNNER_TEMP: ${RUNNER_TEMP_BASH}"
   exit 1
 fi
-if [ "${RESOLVED_RUNNER_TEMP%/}" = "/tmp" ]; then
-  echo "::error::RUNNER_TEMP resolves to /tmp, which conflicts with gh-aw's runtime tree (/tmp/gh-aw). Please configure your self-hosted runner with a different temp directory to maintain security isolation. See: https://docs.github.com/en/actions/hosting-your-own-runners"
-  exit 1
-fi
-
 debug_log "Using RUNNER_TEMP: ${RUNNER_TEMP_BASH} (resolved: ${RESOLVED_RUNNER_TEMP}, writable: yes)"
+
+# Record cleanup ownership before creating or copying any setup assets.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=sh/runtime_lifecycle.sh
+source "${SCRIPT_DIR}/sh/runtime_lifecycle.sh"
+allocate_gh_aw_runtime
+mkdir -p "${GH_AW_RUNTIME_DIR}/safeoutputs"
+debug_log "Allocated private runtime: ${GH_AW_RUNTIME_DIR}"
 
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-${GH_AW_ROOT}/actions}"
@@ -101,34 +112,10 @@ debug_log "Safe-output custom tokens support: ${SAFE_OUTPUT_CUSTOM_TOKENS_ENABLE
 # Create destination directory if it doesn't exist
 create_dir "${DESTINATION}"
 debug_log "Created directory: ${DESTINATION}"
-
-# Remove and recreate /tmp/gh-aw directory to ensure a clean state.
-# On persistent runners, a previous AWF run may leave this directory (or subdirectories
-# like sandbox/firewall/) owned by root. Plain rm -rf fails with EACCES in that case,
-# so we fall back to sudo rm -rf which is available passwordless on GitHub-hosted runners.
-if [ -d /tmp/gh-aw ] && [ ! -w /tmp/gh-aw ]; then
-  debug_log "/tmp/gh-aw exists but is not writable (likely root-owned from prior run); using sudo to remove"
-  if command -v sudo >/dev/null 2>&1; then
-    sudo -n rm -rf /tmp/gh-aw
-  else
-    echo "::error::/tmp/gh-aw exists but is not writable, and sudo is not available to reclaim it."
-    exit 1
-  fi
-elif [ -d /tmp/gh-aw ]; then
-  # Directory is writable — but subdirectories may not be (e.g., sandbox/firewall/ owned by root).
-  # Attempt plain rm first; if it fails, escalate to sudo.
-  if ! rm -rf /tmp/gh-aw 2>/dev/null; then
-    debug_log "/tmp/gh-aw has non-writable children (likely root-owned from prior AWF run); using sudo to remove"
-    if command -v sudo >/dev/null 2>&1; then
-      sudo -n rm -rf /tmp/gh-aw
-    else
-      echo "::error::/tmp/gh-aw contains non-writable children, and sudo is not available to reclaim it."
-      exit 1
-    fi
-  fi
-fi
-mkdir -p /tmp/gh-aw
-debug_log "Created /tmp/gh-aw directory"
+copy_file "${SCRIPT_DIR}/clean.sh" "${DESTINATION}/clean.sh"
+copy_file "${SCRIPT_DIR}/sh/runtime_lifecycle.sh" "${DESTINATION}/runtime_lifecycle.sh"
+copy_file "${SCRIPT_DIR}/sh/cleanup_runtime_tmp.sh" "${DESTINATION}/cleanup_runtime_tmp.sh"
+copy_file "${SCRIPT_DIR}/sh/release_integrity.sh" "${DESTINATION}/release_integrity.sh"
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -175,7 +162,7 @@ for file in "${JS_SOURCE_DIR}"/*.cjs; do
       debug_log "Skipping test file: ${filename}"
       continue
     fi
-    cp "$file" "${DESTINATION}/${filename}"
+    copy_file "$file" "${DESTINATION}/${filename}"
     debug_log "Copied: ${filename}"
     FILE_COUNT=$((FILE_COUNT + 1))
   fi
@@ -188,7 +175,7 @@ for file in "${JS_SOURCE_DIR}"/*.json; do
     if [[ "${filename}" == "package.json" || "${filename}" == "package-lock.json" ]]; then
       continue
     fi
-    cp "$file" "${DESTINATION}/${filename}"
+    copy_file "$file" "${DESTINATION}/${filename}"
     debug_log "Copied: ${filename}"
     FILE_COUNT=$((FILE_COUNT + 1))
   fi
@@ -201,7 +188,7 @@ if [ -d "${SH_SOURCE_DIR}" ]; then
   for file in "${SH_SOURCE_DIR}"/*.sh; do
     if [ -f "$file" ]; then
       filename=$(basename "$file")
-      cp "$file" "${DESTINATION}/${filename}"
+      copy_file "$file" "${DESTINATION}/${filename}"
       chmod +x "${DESTINATION}/${filename}"
       debug_log "Copied shell script: ${filename}"
       FILE_COUNT=$((FILE_COUNT + 1))
@@ -229,7 +216,7 @@ if [ -d "${MD_SOURCE_DIR}" ]; then
   for file in "${MD_SOURCE_DIR}"/*.md; do
     if [ -f "$file" ]; then
       filename=$(basename "$file")
-      cp "$file" "${PROMPTS_DEST}/${filename}"
+      copy_file "$file" "${PROMPTS_DEST}/${filename}"
       debug_log "Copied prompt: ${filename}"
       PROMPT_COUNT=$((PROMPT_COUNT + 1))
     fi
@@ -245,6 +232,7 @@ debug_log "Copying mcp-scripts files to ${MCP_SCRIPTS_DEST}"
 create_dir "${MCP_SCRIPTS_DEST}"
 
 MCP_SCRIPTS_FILES=(
+  "runtime_paths.cjs"
   "mcp_scripts_bootstrap.cjs"
   "mcp_scripts_config_loader.cjs"
   "mcp_scripts_mcp_server.cjs"
@@ -377,7 +365,7 @@ MCP_SCRIPTS_COUNT=0
 MCP_SCRIPTS_MISSING=()
 for file in "${MCP_SCRIPTS_FILES[@]}"; do
   if [ -f "${JS_SOURCE_DIR}/${file}" ]; then
-    cp "${JS_SOURCE_DIR}/${file}" "${MCP_SCRIPTS_DEST}/${file}"
+    copy_file "${JS_SOURCE_DIR}/${file}" "${MCP_SCRIPTS_DEST}/${file}"
     debug_log "Copied mcp-scripts: ${file}"
     MCP_SCRIPTS_COUNT=$((MCP_SCRIPTS_COUNT + 1))
   else
@@ -405,6 +393,7 @@ create_dir "${SAFE_OUTPUTS_DEST}"
 create_dir "${SAFE_OUTPUTS_DEST}/work-queue"
 
 SAFE_OUTPUTS_FILES=(
+  "runtime_paths.cjs"
   "connector_runtime.cjs"
   "connector_regex.cjs"
   "connector_effect_bindings.cjs"
@@ -602,12 +591,12 @@ SAFE_OUTPUTS_COUNT=0
 SAFE_OUTPUTS_MISSING=()
 for file in "${SAFE_OUTPUTS_FILES[@]}"; do
   if [ -f "${JS_SOURCE_DIR}/${file}" ]; then
-    cp "${JS_SOURCE_DIR}/${file}" "${SAFE_OUTPUTS_DEST}/${file}"
+    copy_file "${JS_SOURCE_DIR}/${file}" "${SAFE_OUTPUTS_DEST}/${file}"
     debug_log "Copied safe-outputs: ${file}"
     SAFE_OUTPUTS_COUNT=$((SAFE_OUTPUTS_COUNT + 1))
   elif [ -f "${DESTINATION}/${file}" ]; then
     # If file was already copied to main destination, copy from there
-    cp "${DESTINATION}/${file}" "${SAFE_OUTPUTS_DEST}/${file}"
+    copy_file "${DESTINATION}/${file}" "${SAFE_OUTPUTS_DEST}/${file}"
     debug_log "Copied safe-outputs (from destination): ${file}"
     SAFE_OUTPUTS_COUNT=$((SAFE_OUTPUTS_COUNT + 1))
   else
@@ -628,7 +617,7 @@ fi
 
 # Copy the MCP server entry point to mcp-server.cjs (the name expected by MCP config)
 if [ -f "${JS_SOURCE_DIR}/safe-outputs-mcp-server.cjs" ]; then
-  cp "${JS_SOURCE_DIR}/safe-outputs-mcp-server.cjs" "${SAFE_OUTPUTS_DEST}/mcp-server.cjs"
+  copy_file "${JS_SOURCE_DIR}/safe-outputs-mcp-server.cjs" "${SAFE_OUTPUTS_DEST}/mcp-server.cjs"
   chmod +x "${SAFE_OUTPUTS_DEST}/mcp-server.cjs"
   debug_log "Copied safe-outputs MCP entry point: mcp-server.cjs"
   SAFE_OUTPUTS_COUNT=$((SAFE_OUTPUTS_COUNT + 1))
@@ -638,11 +627,11 @@ fi
 
 # Copy safe_outputs_tools.json to both canonical and runtime names
 if [ -f "${JS_SOURCE_DIR}/safe_outputs_tools.json" ]; then
-  cp "${JS_SOURCE_DIR}/safe_outputs_tools.json" "${SAFE_OUTPUTS_DEST}/safe_outputs_tools.json"
+  copy_file "${JS_SOURCE_DIR}/safe_outputs_tools.json" "${SAFE_OUTPUTS_DEST}/safe_outputs_tools.json"
   debug_log "Copied safe-outputs tools definition: safe_outputs_tools.json"
   SAFE_OUTPUTS_COUNT=$((SAFE_OUTPUTS_COUNT + 1))
 
-  cp "${JS_SOURCE_DIR}/safe_outputs_tools.json" "${SAFE_OUTPUTS_DEST}/tools.json"
+  copy_file "${JS_SOURCE_DIR}/safe_outputs_tools.json" "${SAFE_OUTPUTS_DEST}/tools.json"
   debug_log "Copied safe-outputs tools definition: tools.json"
   SAFE_OUTPUTS_COUNT=$((SAFE_OUTPUTS_COUNT + 1))
 else
@@ -662,7 +651,7 @@ fi
 # git identity and safe.directory
 GIT_CREDENTIALS_SCRIPT="${SH_SOURCE_DIR}/configure_git_credentials.sh"
 if [ -f "${GIT_CREDENTIALS_SCRIPT}" ]; then
-  cp "${GIT_CREDENTIALS_SCRIPT}" "${SAFE_OUTPUTS_DEST}/configure_git_credentials.sh"
+  copy_file "${GIT_CREDENTIALS_SCRIPT}" "${SAFE_OUTPUTS_DEST}/configure_git_credentials.sh"
   chmod +x "${SAFE_OUTPUTS_DEST}/configure_git_credentials.sh"
   debug_log "Copied git credentials script to safe-outputs: configure_git_credentials.sh"
 else
@@ -674,7 +663,7 @@ fi
 # This script configures git (via configure_git_credentials.sh) and launches the MCP server
 START_SAFE_OUTPUTS_SCRIPT="${SH_SOURCE_DIR}/start_safe_outputs_mcp.sh"
 if [ -f "${START_SAFE_OUTPUTS_SCRIPT}" ]; then
-  cp "${START_SAFE_OUTPUTS_SCRIPT}" "${SAFE_OUTPUTS_DEST}/start_safe_outputs_mcp.sh"
+  copy_file "${START_SAFE_OUTPUTS_SCRIPT}" "${SAFE_OUTPUTS_DEST}/start_safe_outputs_mcp.sh"
   chmod +x "${SAFE_OUTPUTS_DEST}/start_safe_outputs_mcp.sh"
   debug_log "Copied safe-outputs entrypoint script: start_safe_outputs_mcp.sh"
 else

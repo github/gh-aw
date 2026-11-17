@@ -13,9 +13,9 @@ const { normalizeAssignment, normalizeClaimScope } = require("./work_queue_claim
 const { readStagedIntents, stageIntent } = require("./work_queue_intents.cjs");
 const { resolveWorkQueueRuntime } = require("./aw_context.cjs");
 
-const DEFAULT_SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
-const DEFAULT_FINISH_INTENT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "work-queue", "work-queue.finish.jsonl");
-const DEFAULT_INTENT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "work-queue", "work-queue.intents.jsonl");
+const DEFAULT_SNAPSHOT_PATH = require("./runtime_paths.cjs").runtimePath("work-queue.snapshot.json");
+const DEFAULT_FINISH_INTENT_PATH = require("./runtime_paths.cjs").runtimePath("safeoutputs/work-queue/work-queue.finish.jsonl");
+const DEFAULT_INTENT_PATH = require("./runtime_paths.cjs").runtimePath("safeoutputs/work-queue/work-queue.intents.jsonl");
 const MAX_READ = 128;
 function parseSnapshotEnvelope(text) {
   if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_SNAPSHOT_PARSE_BYTES) throw new TypeError("work queue snapshot exceeds its bounded input limit");

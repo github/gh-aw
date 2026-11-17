@@ -176,7 +176,7 @@ function readJSON(file) {
  */
 function persistModelConfigBaseline(env = process.env) {
   if (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent") return undefined;
-  const root = env.GH_AW_TMP_DIR || "/tmp/gh-aw";
+  const root = require("./runtime_paths.cjs").runtimeRoot(env);
   const file = path.join(root, "aw_info.json");
   const info = readJSON(file);
   if (!isObject(info) || !isObject(info.model_config) || info.model_config.baseline_model !== undefined) return undefined;

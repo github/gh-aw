@@ -483,7 +483,7 @@ EOF
   AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall v0.29.5 checksums.txt)" \
     AWF_TEST_DIR="$test_dir" AWF_TEST_SCENARIO="$scenario" AWF_TEST_RESET="$reset" \
     GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS=300 GITHUB_STEP_SUMMARY="${test_dir}/summary" GITHUB_ENV="${test_dir}/github-env" \
-    HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" \
+    HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" RUNNER_TEMP="$test_dir" GH_AW_RUNTIME_DIR="$test_dir" PATH="${test_dir}/bin:${PATH}" \
     bash "${SCRIPT_DIR}/install_awf_binary.sh" v0.29.5 --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
   if [ "$installer_exit" -ne "$expected_exit" ]; then
     TEST_FAILURE_REASON="expected exit ${expected_exit}, got ${installer_exit}: $(tail -n 5 "${test_dir}/output")"

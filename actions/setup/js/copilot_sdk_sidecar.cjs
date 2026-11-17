@@ -173,6 +173,7 @@ async function startCopilotSDKServer(options) {
   });
 
   try {
+    if (child.pid) require("./runtime_paths.cjs").registerRuntimeProcess(child.pid, "copilot-sdk", env);
     await Promise.race([
       waitForReady({
         host: serverURL.hostname || "127.0.0.1",

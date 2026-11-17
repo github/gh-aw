@@ -104,7 +104,7 @@ function canonicalize(filename) {
  * Additional roots select subtrees, never expand the trusted artifact boundary.
  * @param {{ roots?: string[], additionalRoots?: string[], core?: {info?: (message: string) => void} }} [options]
  */
-function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw")], additionalRoots = [], core = globalThis.core } = {}) {
+function main({ roots = [require("./runtime_paths.cjs").runtimeRoot(), require("./runtime_paths.cjs").setupRoot()], additionalRoots = [], core = globalThis.core } = {}) {
   const limits = getObjectPackLimits();
   if (!Array.isArray(additionalRoots) || additionalRoots.some(root => typeof root !== "string")) throw new Error("Invalid additional recovery artifact roots");
   const baseRoots = roots.filter(Boolean).map(root => path.resolve(root));

@@ -44,7 +44,7 @@ async function main(config = {}, suppliedClient) {
   const maximum = Number(config["max-size"] || 10240) * 1024;
   const limit = Number(config.max || 10);
   let count = 0;
-  const root = claimArtifactPath(config["assets-dir"] || "/tmp/gh-aw/safeoutputs/assets", factoryClaim);
+  const root = claimArtifactPath(config["assets-dir"] || require("./runtime_paths.cjs").runtimePath("safeoutputs/assets"), factoryClaim);
   const stagedMode = isStagedMode(config);
   return async message => {
     if (currentClaimHandle() !== factoryClaim) throw new Error("Queue asset state cannot escape its original Claim");

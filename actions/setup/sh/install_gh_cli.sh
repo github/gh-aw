@@ -47,7 +47,7 @@ echo "Adding GitHub CLI apt repository..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=actions/setup/sh/release_integrity.sh
 source "${SCRIPT_DIR}/release_integrity.sh"
-key_file="$(mktemp)"
+key_file="$(mktemp "${GH_AW_RUNTIME_DIR:?}/gh-cli-key.XXXXXX")"
 trap 'rm -f "$key_file"' EXIT
 curl --proto '=https' --proto-redir '=https' -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   -o "$key_file"

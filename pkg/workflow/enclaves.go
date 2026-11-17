@@ -75,7 +75,7 @@ const (
 	enclaveDelegationControlPortOffset = 10
 	// enclaveDelegationStateDir is the protected, persistent mount used for mcpg
 	// delegation controller state so that it survives an in-run restart.
-	enclaveDelegationStateDir = "${RUNNER_TEMP}/gh-aw/mcpg-delegation"
+	enclaveDelegationStateDir = "${GH_AW_RUNTIME_DIR}/mcpg-delegation"
 	// enclaveDelegationRunID is the runtime-resolved identifier for the active
 	// envelope's run_id field: "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}". run_id is
 	// a free-form string in mcpg's wire contract, so the hyphenated run/attempt

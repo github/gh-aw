@@ -9,7 +9,7 @@ set +o histexpand
 
 set -euo pipefail
 
-SRC="/tmp/gh-aw/${GH_AW_SKILL_DIR}"
+SRC="${GH_AW_RUNTIME_DIR:?}/${GH_AW_SKILL_DIR}"
 DST="${GITHUB_WORKSPACE}/${GH_AW_SKILL_DIR}"
 
 echo "[restore-inline-skills] source: $SRC"

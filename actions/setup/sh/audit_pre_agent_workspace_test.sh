@@ -14,7 +14,10 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 
 # Temporary workspace for tests
-TEST_ROOT="$(mktemp -d)"
+TEST_ROOT="$(mktemp -d "${PWD}/.workspace-audit-tests.XXXXXX")"
+export GH_AW_RUNTIME_DIR="${TEST_ROOT}/runtime"
+mkdir "$GH_AW_RUNTIME_DIR"
+AUDIT_FILE="${GH_AW_RUNTIME_DIR}/pre-agent-audit.txt"
 
 cleanup() {
   rm -rf "${TEST_ROOT}"
@@ -57,7 +60,7 @@ else
 fi
 echo ""
 
-# ── Test 2: Writes audit file to /tmp/gh-aw/pre-agent-audit.txt ─────────────
+# ── Test 2: Writes audit file to the invocation-private runtime ──────────────
 echo "Test 2: Audit file is written to the correct path"
 WORKSPACE="${TEST_ROOT}/workspace-2"
 mkdir -p "${WORKSPACE}/.github/agents"
@@ -66,36 +69,36 @@ TMPDIR="${TEST_ROOT}/tmp2"
 mkdir -p "${TMPDIR}/gh-aw"
 GH_OUT="${TEST_ROOT}/github_output2"
 touch "${GH_OUT}"
-rm -f /tmp/gh-aw/pre-agent-audit.txt
+rm -f "$AUDIT_FILE"
 OUTPUT="$(GITHUB_WORKSPACE="${WORKSPACE}" HOME="${TEST_ROOT}/home2" RUNNER_TEMP="${TMPDIR}" GITHUB_OUTPUT="${GH_OUT}" bash "${SCRIPT_PATH}" 2>&1)"
-assert "Audit file created at /tmp/gh-aw/pre-agent-audit.txt" test -f /tmp/gh-aw/pre-agent-audit.txt
-assert "Audit file is non-empty" test -s /tmp/gh-aw/pre-agent-audit.txt
+assert "Audit file created at private runtime path" test -f "$AUDIT_FILE"
+assert "Audit file is non-empty" test -s "$AUDIT_FILE"
 echo ""
 
 # ── Test 3: Audit file contains expected section headers ────────────────────
 echo "Test 3: Section headers are present in audit output"
-assert "Contains workspace agents header" grep -q 'Workspace agents' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace skills header" grep -q 'Workspace skills' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace copilot header" grep -q 'Workspace copilot' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace claude header" grep -q 'Workspace claude' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace codex header" grep -q 'Workspace codex' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace gemini header" grep -q 'Workspace gemini' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace crush header" grep -q 'Workspace crush' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace opencode header" grep -q 'Workspace opencode' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains workspace pi header" grep -q 'Workspace pi' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains agent user home header" grep -q 'Agent user home' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains gh extensions header" grep -q 'gh extensions' /tmp/gh-aw/pre-agent-audit.txt
-assert "Contains gh-aw temp header" grep -q 'gh-aw temp directory' /tmp/gh-aw/pre-agent-audit.txt
+assert "Contains workspace agents header" grep -q 'Workspace agents' "$AUDIT_FILE"
+assert "Contains workspace skills header" grep -q 'Workspace skills' "$AUDIT_FILE"
+assert "Contains workspace copilot header" grep -q 'Workspace copilot' "$AUDIT_FILE"
+assert "Contains workspace claude header" grep -q 'Workspace claude' "$AUDIT_FILE"
+assert "Contains workspace codex header" grep -q 'Workspace codex' "$AUDIT_FILE"
+assert "Contains workspace gemini header" grep -q 'Workspace gemini' "$AUDIT_FILE"
+assert "Contains workspace crush header" grep -q 'Workspace crush' "$AUDIT_FILE"
+assert "Contains workspace opencode header" grep -q 'Workspace opencode' "$AUDIT_FILE"
+assert "Contains workspace pi header" grep -q 'Workspace pi' "$AUDIT_FILE"
+assert "Contains agent user home header" grep -q 'Agent user home' "$AUDIT_FILE"
+assert "Contains gh extensions header" grep -q 'gh extensions' "$AUDIT_FILE"
+assert "Contains gh-aw temp header" grep -q 'gh-aw temp directory' "$AUDIT_FILE"
 echo ""
 
 # ── Test 4: Lists files that exist ──────────────────────────────────────────
 echo "Test 4: Existing agent file appears in audit output"
-assert "Agent file listed in audit" grep -q 'my.md' /tmp/gh-aw/pre-agent-audit.txt
+assert "Agent file listed in audit" grep -q 'my.md' "$AUDIT_FILE"
 echo ""
 
 # ── Test 5: Missing directories are noted as (not found) ────────────────────
 echo "Test 5: Missing directories show (not found)"
-assert "Missing directory noted" grep -q '(not found)' /tmp/gh-aw/pre-agent-audit.txt
+assert "Missing directory noted" grep -q '(not found)' "$AUDIT_FILE"
 echo ""
 
 # ── Test 6: GITHUB_OUTPUT contains pre-agent-audit-file entry ───────────────
@@ -114,10 +117,10 @@ TMPDIR="${TEST_ROOT}/tmp7"
 mkdir -p "${TMPDIR}/gh-aw"
 GH_OUT7="${TEST_ROOT}/github_output7"
 touch "${GH_OUT7}"
-rm -f /tmp/gh-aw/pre-agent-audit.txt
+rm -f "$AUDIT_FILE"
 GITHUB_WORKSPACE="${WORKSPACE}" HOME="${TEST_ROOT}/home7" RUNNER_TEMP="${TMPDIR}" GITHUB_OUTPUT="${GH_OUT7}" bash "${SCRIPT_PATH}" >/dev/null 2>&1
-assert_not "node_modules excluded from listing" grep -q 'node_modules/some-pkg' /tmp/gh-aw/pre-agent-audit.txt
-assert "agent.md still listed despite node_modules sibling" grep -q 'agent.md' /tmp/gh-aw/pre-agent-audit.txt
+assert_not "node_modules excluded from listing" grep -q 'node_modules/some-pkg' "$AUDIT_FILE"
+assert "agent.md still listed despite node_modules sibling" grep -q 'agent.md' "$AUDIT_FILE"
 echo ""
 
 # ── Test 8: Collapsed step summary tree is rendered ─────────────────────────
@@ -167,13 +170,13 @@ GH_OUT10="${TEST_ROOT}/github_output10"
 SUMMARY10="${TEST_ROOT}/step_summary10"
 touch "${GH_OUT10}" "${SUMMARY10}"
 GITHUB_WORKSPACE="${TEST_ROOT}/workspace-8" HOME="${TEST_ROOT}/home10" RUNNER_TEMP="${TMPDIR}" GITHUB_OUTPUT="${GH_OUT10}" GITHUB_STEP_SUMMARY="${SUMMARY10}" bash "${SCRIPT_PATH}" >/dev/null 2>&1
-assert_not "tool-cache excluded from audit listing" grep -q '/tool-cache' /tmp/gh-aw/pre-agent-audit.txt
+assert_not "tool-cache excluded from audit listing" grep -q '/tool-cache' "$AUDIT_FILE"
 assert_not "tool-cache excluded from summary" grep -q '/tool-cache' "${SUMMARY10}"
-assert "Sibling file still listed in audit" grep -Fq "${TMPDIR}/gh-aw/agent-config.json" /tmp/gh-aw/pre-agent-audit.txt
+assert "Sibling file still listed in audit" grep -Fq "${TMPDIR}/gh-aw/agent-config.json" "$AUDIT_FILE"
 assert "Sibling file still listed in summary" grep -Fq "${TMPDIR}/gh-aw/agent-config.json" "${SUMMARY10}"
 SUMMARY_SIZE=$(wc -c < "${SUMMARY10}")
 assert "Summary remains below the 1 MiB limit" test "${SUMMARY_SIZE}" -lt 1048576
-AUDIT_LINE_COUNT=$(wc -l < /tmp/gh-aw/pre-agent-audit.txt | tr -d ' ')
+AUDIT_LINE_COUNT=$(wc -l < "$AUDIT_FILE" | tr -d ' ')
 assert "Reported line count matches audit" grep -Fxq "pre-agent-audit-line-count=${AUDIT_LINE_COUNT}" "${GH_OUT10}"
 echo ""
 

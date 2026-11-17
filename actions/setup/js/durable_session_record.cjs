@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 /** Metadata only: never persist restored transcript content or credentials here. */
-function recordDurableSessionEvent(type, data, { env = process.env, root = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "agent") } = {}) {
+function recordDurableSessionEvent(type, data, { env = process.env, root = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "agent") } = {}) {
   if (!["durable.restore", "durable.session"].includes(type)) throw new Error("Invalid durable session event type");
   const record = {
     type,

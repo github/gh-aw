@@ -80,7 +80,7 @@ fi
 URL_PREFIX="http://${RESOLVED_DOMAIN}:${MCP_GATEWAY_PORT}"
 
 # Create the TOML configuration
-cat > /tmp/gh-aw/mcp-config/config.toml << 'TOML_EOF'
+cat > "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml" << 'TOML_EOF'
 [history]
 persistence = "none"
 
@@ -91,14 +91,14 @@ jq -r --arg urlPrefix "$URL_PREFIX" '
   "[mcp_servers.\(.key)]\n" +
   "url = \"" + ($urlPrefix + "/mcp/" + .key) + "\"\n" +
   "http_headers = { Authorization = \"\(.value.headers.Authorization)\" }\n"
-' "$MCP_GATEWAY_OUTPUT" >> /tmp/gh-aw/mcp-config/config.toml
+' "$MCP_GATEWAY_OUTPUT" >> "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"
 
 # Restrict permissions so only the runner process owner can read this file.
 # config.toml contains the bearer token for the MCP gateway; an attacker
 # who reads it could issue raw JSON-RPC calls directly to the gateway.
-chmod 600 /tmp/gh-aw/mcp-config/config.toml
+chmod 600 "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"
 
-echo "Codex configuration written to /tmp/gh-aw/mcp-config/config.toml"
+echo "Codex configuration written to ${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"
 echo ""
 echo "Converted configuration:"
-cat /tmp/gh-aw/mcp-config/config.toml
+cat "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml"

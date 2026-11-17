@@ -278,7 +278,7 @@ function createMCPServer(options = {}) {
  */
 async function startHttpServer(options = {}) {
   const apiKey = requireHttpApiKey(options.apiKey ?? process.env.GH_AW_SAFE_OUTPUTS_API_KEY, "GH_AW_SAFE_OUTPUTS_API_KEY");
-  const port = options.port ?? 3000;
+  const port = options.port ?? require("./runtime_paths.cjs").runtimePort("GH_AW_SAFE_OUTPUTS_PORT", 3001);
 
   const logger = createMCPLogger("safe-outputs-startup");
 

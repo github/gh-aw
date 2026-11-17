@@ -12,9 +12,9 @@ const { canonicalModelProvider } = require("./resolve_model_alias.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { computeInferenceAIC, computeInferenceCostUSD, findModelPricing } = require("./model_costs.cjs");
 
-const EVALS_DIR = "/tmp/gh-aw/evals";
+const EVALS_DIR = require("./runtime_paths.cjs").runtimePath("evals");
 const DECISIONS_PATH = `${EVALS_DIR}/decisions.json`;
-const USAGE_PATH = "/tmp/gh-aw/evals_token_usage.jsonl";
+const USAGE_PATH = require("./runtime_paths.cjs").runtimePath("evals_token_usage.jsonl");
 
 /** @param {unknown} value @param {string} field @returns {number} */
 function tokenCount(value, field) {

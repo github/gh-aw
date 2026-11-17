@@ -382,7 +382,7 @@ async function checkoutOrCreateBranch(branchName, repoUrl, workspaceDir, options
  * Main entry point called by the actions/github-script step.
  */
 async function main() {
-  const stateDir = process.env.GH_AW_STATE_DIR || process.env.GH_AW_EXPERIMENT_STATE_DIR || "/tmp/gh-aw/experiments";
+  const stateDir = process.env.GH_AW_STATE_DIR || process.env.GH_AW_EXPERIMENT_STATE_DIR || require("./runtime_paths.cjs").runtimePath("experiments");
   const branchName = process.env.GH_AW_STATE_BRANCH || process.env.GH_AW_EXPERIMENT_BRANCH || "";
   const stateLabel = process.env.GH_AW_STATE_LABEL || "experiment state";
   const filesEnv = process.env.GH_AW_STATE_FILES || "state.jsonl,state.json,assignments.json";

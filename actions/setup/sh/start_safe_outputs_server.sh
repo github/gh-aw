@@ -6,6 +6,9 @@ set +o histexpand
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/runtime_processes.sh"
+
 cd ${RUNNER_TEMP}/gh-aw/safeoutputs || exit 1
 
 # Verify required files exist
@@ -79,7 +82,7 @@ echo "  Port: $GH_AW_SAFE_OUTPUTS_PORT"
 echo "  Working directory: $(pwd)"
 
 # Ensure logs directory exists
-mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
+mkdir -p "${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs"
 
 # Create initial server.log file for artifact upload
 {
@@ -87,12 +90,13 @@ mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
   echo "Start time: $(date)"
   echo "==========================================="
   echo ""
-} > /tmp/gh-aw/mcp-logs/safeoutputs/server.log
+} > "${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs/server.log"
 
 # Start the HTTP server in the background
 echo "Starting safe-outputs MCP HTTP server..."
-node mcp-server.cjs >> /tmp/gh-aw/mcp-logs/safeoutputs/server.log 2>&1 &
+node mcp-server.cjs >> "${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs/server.log" 2>&1 &
 SERVER_PID=$!
+register_gh_aw_process "$SERVER_PID" safeoutputs
 echo "Started safe-outputs MCP server with PID $SERVER_PID"
 
 # Wait for server to be ready (max 60 seconds)
@@ -102,7 +106,7 @@ for i in {1..60}; do
   if ! kill -0 $SERVER_PID 2>/dev/null; then
     echo "ERROR: Server process $SERVER_PID has died"
     echo "Server log contents:"
-    cat /tmp/gh-aw/mcp-logs/safeoutputs/server.log
+    cat "${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs/server.log"
     exit 1
   fi
   
@@ -112,7 +116,7 @@ for i in {1..60}; do
     
     # Print the startup log for debugging
     echo "::group::Server Log Contents"
-    cat /tmp/gh-aw/mcp-logs/safeoutputs/server.log
+    cat "${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs/server.log"
     echo "::endgroup::"
     
     break
@@ -122,7 +126,7 @@ for i in {1..60}; do
     echo "ERROR: Safe Outputs MCP server failed to start after 60 seconds"
     echo "Process status: $(pgrep -f 'mcp-server.cjs' || echo 'not running')"
     echo "Server log contents:"
-    cat /tmp/gh-aw/mcp-logs/safeoutputs/server.log
+    cat "${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs/server.log"
     echo "Checking port availability:"
     netstat -tuln | grep "$GH_AW_SAFE_OUTPUTS_PORT" || echo "Port $GH_AW_SAFE_OUTPUTS_PORT not listening"
     exit 1

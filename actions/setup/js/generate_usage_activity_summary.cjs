@@ -39,21 +39,21 @@ const LOCALHOST_CLIENT_PREFIX = "::1:";
 const PLACEHOLDER_DOMAIN_KEY = "-";
 const PLACEHOLDER_DEST_KEY = "-:-";
 const ERROR_DOMAIN_PREFIX = "error:";
-const AGENT_TOKEN_USAGE_PATH = "/tmp/gh-aw/usage/agent/token_usage.jsonl";
-const DETECTION_DIR = "/tmp/gh-aw/threat-detection";
-const DETECTION_USAGE_RESULT_PATH = "/tmp/gh-aw/usage/detection/detection_result.json";
+const AGENT_TOKEN_USAGE_PATH = require("./runtime_paths.cjs").runtimePath("usage/agent/token_usage.jsonl");
+const DETECTION_DIR = require("./runtime_paths.cjs").runtimePath("threat-detection");
+const DETECTION_USAGE_RESULT_PATH = require("./runtime_paths.cjs").runtimePath("usage/detection/detection_result.json");
 const RPC_EVENT_TO_TYPE = { rpc_request: "REQUEST", rpc_response: "RESPONSE", difc_filtered: "DIFC_FILTERED" };
 const API_PROXY_EVENT_LOG_PATHS = [
-  "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl",
-  "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/events.jsonl",
-  "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/event-logs.jsonl",
-  "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/events.jsonl",
-  "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/event-logs.jsonl",
-  "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/events.jsonl",
-  "/tmp/gh-aw/firewall-audit-logs/api-proxy-logs/event-logs.jsonl",
-  "/tmp/gh-aw/firewall-audit-logs/api-proxy-logs/events.jsonl",
-  "/tmp/gh-aw/firewall-logs/api-proxy-logs/event-logs.jsonl",
-  "/tmp/gh-aw/firewall-logs/api-proxy-logs/events.jsonl",
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/events.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall/audit/api-proxy-logs/event-logs.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall/audit/api-proxy-logs/events.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/event-logs.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/events.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("firewall-audit-logs/api-proxy-logs/event-logs.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("firewall-audit-logs/api-proxy-logs/events.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("firewall-logs/api-proxy-logs/event-logs.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("firewall-logs/api-proxy-logs/events.jsonl"),
 ];
 
 function findFiles(rootDir, shouldIncludeFile, maxDepth = Number.POSITIVE_INFINITY, currentDepth = 0) {
@@ -319,10 +319,10 @@ function parseFirewallLogs() {
   };
 
   const firewallLogDirs = [
-    "/tmp/gh-aw/sandbox/firewall/logs",
-    "/tmp/gh-aw/threat-detection/sandbox/firewall/logs",
-    ...findPrefixedDirectories("/tmp/gh-aw", "squid-logs-"),
-    ...findPrefixedDirectories("/tmp/gh-aw/threat-detection", "squid-logs-"),
+    require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs"),
+    require("./runtime_paths.cjs").runtimePath("threat-detection/sandbox/firewall/logs"),
+    ...findPrefixedDirectories(require("./runtime_paths.cjs").runtimeRoot(), "squid-logs-"),
+    ...findPrefixedDirectories(require("./runtime_paths.cjs").runtimePath("threat-detection"), "squid-logs-"),
   ];
 
   for (const logDir of firewallLogDirs) {
@@ -430,7 +430,7 @@ function parseFirewallLogs() {
 /**
  * Parse Copilot session event logs and aggregate counters
  */
-function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copilot-session-state", "/tmp/gh-aw/threat-detection/sandbox/agent/logs/copilot-session-state"]) {
+function parseSessionLogs(sessionLogDirs = [require("./runtime_paths.cjs").runtimePath("sandbox/agent/logs/copilot-session-state"), require("./runtime_paths.cjs").runtimePath("threat-detection/sandbox/agent/logs/copilot-session-state")]) {
   const session = {
     total_events: 0,
     session_starts: 0,
@@ -857,7 +857,14 @@ function parseRPCMessagesJSONL(activity, content) {
 /**
  * Parse MCP gateway/RPC logs and aggregate tool-call and integrity-filter metrics.
  */
-function parseGatewayActivity(logRoots = ["/tmp/gh-aw", "/tmp/gh-aw/threat-detection", "/tmp/gh-aw/sandbox/agent/logs", "/tmp/gh-aw/threat-detection/sandbox/agent/logs"]) {
+function parseGatewayActivity(
+  logRoots = [
+    require("./runtime_paths.cjs").runtimeRoot(),
+    require("./runtime_paths.cjs").runtimePath("threat-detection"),
+    require("./runtime_paths.cjs").runtimePath("sandbox/agent/logs"),
+    require("./runtime_paths.cjs").runtimePath("threat-detection/sandbox/agent/logs"),
+  ]
+) {
   const activity = {
     gateway: {
       total_calls: 0,
@@ -947,7 +954,7 @@ function parseGatewayLogs() {
   return parseGatewayActivity().gateway;
 }
 
-const MANIFEST_FILE_PATH = "/tmp/gh-aw/safe-output-items.jsonl";
+const MANIFEST_FILE_PATH = require("./runtime_paths.cjs").runtimePath("safe-output-items.jsonl");
 
 /**
  * Parse the safe-output-items manifest and aggregate item counts by type.
@@ -1196,7 +1203,7 @@ async function main() {
   }
 
   // Write summary to file
-  const outputPath = "/tmp/gh-aw/usage/activity/summary.json";
+  const outputPath = require("./runtime_paths.cjs").runtimePath("usage/activity/summary.json");
   try {
     fs.writeFileSync(outputPath, JSON.stringify(summary, null, 2), "utf-8");
   } catch (err) {

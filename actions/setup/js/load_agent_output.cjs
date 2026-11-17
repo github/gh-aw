@@ -38,7 +38,7 @@ function isTaskCompleteRegistrationIssue(item) {
  */
 function hasAgentTerminalReasonCompleted() {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log");
   try {
     if (!fs.existsSync(stdioLogPath)) {
       return false;

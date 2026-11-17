@@ -226,6 +226,8 @@ describe("MCP gateway CA launcher arguments", () => {
     const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
     const env = {
       RUNNER_TEMP: directory,
+      GH_AW_RUNTIME_DIR: process.env.GH_AW_RUNTIME_DIR,
+      GH_AW_RUNTIME_ID: process.env.GH_AW_RUNTIME_ID,
       MCP_GATEWAY_DOCKER_COMMAND: "docker run --rm -i --network host __GH_AW_MCP_GATEWAY_CUSTOM_ENV__ gateway:latest --config-stdin",
       ...(inheritedProxy ? { HTTP_PROXY: "http://inherited-proxy.example:8080" } : {}),
       [customGatewayEnvNamesVar]: '["HTTP_PROXY"]',
@@ -249,7 +251,13 @@ describe("MCP gateway CA launcher arguments", () => {
         mkdtempSync: vi.fn(() => directory),
       },
       os: { tmpdir: () => directory },
-      child_process: { spawn, execSync: vi.fn() },
+      child_process: {
+        spawn,
+        execSync: vi.fn(),
+        execFileSync: vi.fn(() => {
+          throw new Error("mock gateway container does not exist");
+        }),
+      },
       "./shim.cjs": {},
       "./symlink_guard.cjs": { lstatGuard: vi.fn(() => ({})) },
       "./mcp_configuration.cjs": { writeMcpConfiguration: vi.fn() },
@@ -270,7 +278,8 @@ describe("MCP gateway CA launcher arguments", () => {
 
       expect(spawn).toHaveBeenCalledTimes(2);
       expect(mocks.fs.closeSync).toHaveBeenCalledTimes(4);
-      expect(mocks.child_process.execSync).toHaveBeenCalledTimes(2);
+      expect(mocks.child_process.execFileSync).toHaveBeenCalledTimes(2);
+      expect(mocks.child_process.execFileSync.mock.calls.every(([, args]) => args[0] === "inspect")).toBe(true);
       const [command, args, options] = spawn.mock.calls[0];
       const launchedConfig = JSON.parse(spawn.mock.results[0].value.stdin.write.mock.calls[0][0]);
       const target = launchedConfig.mcpServers.private.caCertFile;
@@ -595,6 +604,8 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
         env: {
           GH_AW_ENGINE: engine,
           RUNNER_TEMP: "/tmp/test-runner",
+          GH_AW_RUNTIME_DIR: process.env.GH_AW_RUNTIME_DIR,
+          GH_AW_RUNTIME_ID: process.env.GH_AW_RUNTIME_ID,
           GITHUB_WORKSPACE: "/workspace",
           MCP_GATEWAY_AGENT_ID: "test-agent",
           MCP_GATEWAY_PORT: "8080",
@@ -1383,7 +1394,9 @@ describe("start_mcp_gateway startup diagnostics", () => {
 
 describe("start_mcp_gateway startup marker", () => {
   it("defaults to the path read by print_firewall_logs.sh", () => {
-    expect(getGatewayStartupMarkerPath({})).toBe("/tmp/gh-aw/mcp-gateway-started");
+    const root = process.env.GH_AW_RUNTIME_DIR;
+    expect(getGatewayStartupMarkerPath({ GH_AW_RUNTIME_DIR: root })).toBe(path.join(root, "mcp-gateway-started"));
+    expect(() => getGatewayStartupMarkerPath({})).toThrow("GH_AW_RUNTIME_DIR");
   });
 
   it("honors the MCP_GATEWAY_STARTUP_MARKER override", () => {

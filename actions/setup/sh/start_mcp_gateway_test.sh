@@ -6,6 +6,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="$SCRIPT_DIR/start_mcp_gateway.sh"
+TEST_ROOT="$(mktemp -d "${PWD}/.gateway-shell-tests.XXXXXX")"
+export GH_AW_RUNTIME_DIR="${TEST_ROOT}/runtime"
+mkdir "$GH_AW_RUNTIME_DIR"
+trap 'rm -rf "$TEST_ROOT"' EXIT
 
 # Color codes for output
 GREEN='\033[0;32m'
@@ -85,7 +89,7 @@ test_config_not_found() {
   echo "Test 3: Configuration file not found"
   
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_home="$tmpdir/home"
   mkdir -p "$fake_home/.copilot"
   
@@ -109,7 +113,7 @@ test_invalid_json_config() {
   echo "Test 4: Configuration file is invalid JSON"
   
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_home="$tmpdir/home"
   mkdir -p "$fake_home/.copilot"
   
@@ -135,7 +139,7 @@ test_container_missing_docker_run() {
   echo "Test 5: Container missing 'docker run' prefix"
   
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_home="$tmpdir/home"
   mkdir -p "$fake_home/.copilot"
   
@@ -162,7 +166,7 @@ test_container_missing_i_flag() {
   echo "Test 6: Container missing required -i flag"
   
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_home="$tmpdir/home"
   mkdir -p "$fake_home/.copilot"
   
@@ -189,7 +193,7 @@ test_container_missing_rm_flag() {
   echo "Test 7: Container missing required --rm flag"
   
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_home="$tmpdir/home"
   mkdir -p "$fake_home/.copilot"
   
@@ -216,7 +220,7 @@ test_container_missing_network_flag() {
   echo "Test 8: Container missing required --network host flag"
   
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_home="$tmpdir/home"
   mkdir -p "$fake_home/.copilot"
   
@@ -315,7 +319,7 @@ test_validation_functions_exist() {
 
 test_gateway_startup_diagnostics() {
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_bin="$tmpdir/bin"
   mkdir -p "$fake_bin"
   cat > "$fake_bin/docker" << 'EOF'
@@ -325,7 +329,7 @@ exit 42
 EOF
   chmod +x "$fake_bin/docker"
 
-  rm -rf /tmp/gh-aw/mcp-config /tmp/gh-aw/mcp-gateway-started
+  rm -rf "$GH_AW_RUNTIME_DIR/mcp-config" "$GH_AW_RUNTIME_DIR/mcp-gateway-started"
   local output
   set +e
   output=$(printf '%s\n' '{"mcpServers":{},"gateway":{"port":8080,"domain":"localhost","agentId":"redact-me"}}' | \
@@ -346,18 +350,18 @@ EOF
     grep -q "API_TOKEN=\[REDACTED\]" <<< "$output" &&
     grep -q "\"agentId\":\"\[REDACTED\]\"" <<< "$output" &&
     ! grep -q "redact-me" <<< "$output" &&
-    [[ ! -e /tmp/gh-aw/mcp-config/gateway-stderr.log ]] &&
-    ! compgen -G "/tmp/gh-aw-mcp-gateway-stderr.*" > /dev/null; then
+    [[ ! -e "$GH_AW_RUNTIME_DIR/mcp-config/gateway-stderr.log" ]] &&
+    ! compgen -G "$GH_AW_RUNTIME_DIR/.mcp-gateway-stderr.*" > /dev/null; then
     print_result "Gateway startup failure logs redacted stderr without artifacts" "PASS"
   else
     print_result "Gateway startup failure logs redacted stderr without artifacts" "FAIL"
   fi
-  rm -rf "$tmpdir" /tmp/gh-aw/mcp-config /tmp/gh-aw/mcp-gateway-started
+  rm -rf "$tmpdir" "$GH_AW_RUNTIME_DIR/mcp-config" "$GH_AW_RUNTIME_DIR/mcp-gateway-started"
 }
 
 test_gateway_agent_identifier_validation() {
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local fake_bin="$tmpdir/bin"
   mkdir -p "$fake_bin"
   cat > "$fake_bin/docker" << 'EOF'
@@ -400,12 +404,12 @@ EOF
   assert_agent_identifier_config "Rejects an empty singular agent ID" '"agentId":""' "ERROR: Gateway 'agentId' must be a non-empty string"
   assert_agent_identifier_config "Rejects a malformed singular agent ID" '"agentId":["agent-1"]' "ERROR: Gateway 'agentId' must be a non-empty string"
 
-  rm -rf "$tmpdir" /tmp/gh-aw/mcp-config /tmp/gh-aw/mcp-gateway-started
+  rm -rf "$tmpdir" "$GH_AW_RUNTIME_DIR/mcp-config" "$GH_AW_RUNTIME_DIR/mcp-gateway-started"
 }
 
 test_fallback_config_logging() {
   local tmpdir
-  tmpdir=$(mktemp -d)
+  tmpdir=$(mktemp -d "${TEST_ROOT}/case.XXXXXX")
   local config_dir="$tmpdir/mcp-config"
   local fake_home="$tmpdir/home"
   local test_script="$tmpdir/conversion.sh"
@@ -421,7 +425,7 @@ EOF
 
   local cli_servers output
   for cli_servers in '' '["cli"]' 'invalid-json'; do
-    if output=$(HOME="$fake_home" GH_AW_ENGINE="unknown" \
+    if output=$(HOME="$fake_home" GH_AW_RUNTIME_DIR="$tmpdir" GH_AW_ENGINE="unknown" \
       GH_AW_MCP_CLI_SERVERS="$cli_servers" MCP_GATEWAY_AGENT_ID="synthetic-agent-credential" \
       bash -c 'set -e; print_timing() { :; }; source "$1"' _ "$test_script" 2>&1) &&
       grep -Fq "No agent-specific converter found for engine: unknown" <<< "$output" &&

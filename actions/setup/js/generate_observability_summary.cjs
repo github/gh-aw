@@ -4,13 +4,13 @@
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 
-const AW_INFO_PATH = "/tmp/gh-aw/aw_info.json";
-const AGENT_OUTPUT_PATH = "/tmp/gh-aw/agent_output.json";
-const OTLP_EXPORT_ERRORS_PATH = "/tmp/gh-aw/otlp-export-errors.count";
-const OTLP_EXPORT_ERROR_DETAILS_PATH = "/tmp/gh-aw/otlp-export-errors.jsonl";
-const gatewayEventPaths = ["/tmp/gh-aw/mcp-logs/gateway.jsonl", "/tmp/gh-aw/mcp-logs/rpc-messages.jsonl"];
+const AW_INFO_PATH = require("./runtime_paths.cjs").runtimePath("aw_info.json");
+const AGENT_OUTPUT_PATH = require("./runtime_paths.cjs").runtimePath("agent_output.json");
+const OTLP_EXPORT_ERRORS_PATH = require("./runtime_paths.cjs").runtimePath("otlp-export-errors.count");
+const OTLP_EXPORT_ERROR_DETAILS_PATH = require("./runtime_paths.cjs").runtimePath("otlp-export-errors.jsonl");
+const gatewayEventPaths = [require("./runtime_paths.cjs").runtimePath("mcp-logs/gateway.jsonl"), require("./runtime_paths.cjs").runtimePath("mcp-logs/rpc-messages.jsonl")];
 // Squid access log paths: current AWF layout (squid-logs/ subdirectory) and legacy layout (directly under logs/).
-const squidAccessLogPaths = ["/tmp/gh-aw/sandbox/firewall/logs/squid-logs/access.log", "/tmp/gh-aw/sandbox/firewall/logs/access.log"];
+const squidAccessLogPaths = [require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/squid-logs/access.log"), require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/access.log")];
 
 function readJSONIfExists(path) {
   if (!fs.existsSync(path)) {

@@ -3,7 +3,7 @@ set +o histexpand
 
 set -euo pipefail
 
-RESULT_FILE="${1:-/tmp/gh-aw/threat-detection/detection_result.json}"
+RESULT_FILE="${1:-${GH_AW_RUNTIME_DIR:?}/threat-detection/detection_result.json}"
 RESULT_DIR="$(dirname "${RESULT_FILE}")"
 DETECTION_LOG_FILE="${DETECTION_LOG_FILE:-${RESULT_DIR}/detection.log}"
 echo "threat_kinds=" >> "${GITHUB_OUTPUT}"

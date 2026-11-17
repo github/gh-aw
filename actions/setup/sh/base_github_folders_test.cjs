@@ -26,7 +26,7 @@ function fixture(t) {
     return destination;
   };
   const run = (operation, options = {}) => {
-    const env = { ...process.env, COPYFILE_DISABLE: "1", GITHUB_WORKSPACE: workspace, GH_AW_AGENT_FOLDERS: folders, GH_AW_AGENT_FILES: files };
+    const env = { ...process.env, GH_AW_RUNTIME_DIR: root, COPYFILE_DISABLE: "1", GITHUB_WORKSPACE: workspace, GH_AW_AGENT_FOLDERS: folders, GH_AW_AGENT_FILES: files };
     for (const [key, value] of Object.entries(options.env ?? {})) {
       if (value === null) delete env[key];
       else env[key] = value;

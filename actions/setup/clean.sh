@@ -3,7 +3,7 @@ set +o histexpand
 
 # Clean Action Post Script
 # Mirror of actions/setup/post.js for script mode (run: bash steps).
-# Sends an OTLP conclusion span without reclaiming unowned shared runtime paths.
+# Sends an OTLP conclusion span and reclaims only the recorded private runtime.
 #
 # Must be called from an `if: always()` step so it runs even when job steps fail,
 # ensuring both the trace span and the cleanup always complete.
@@ -12,7 +12,7 @@ set +o histexpand
 #   - name: Clean Scripts
 #     if: always()
 #     run: |
-#       bash /tmp/gh-aw/actions-source/actions/setup/clean.sh
+#       bash "$GH_AW_ACTION_SOURCE/actions/setup/clean.sh"
 #     env:
 #       INPUT_DESTINATION: ${{ runner.temp }}/gh-aw/actions
 
@@ -29,12 +29,16 @@ if command -v node &>/dev/null && [ -f "${DESTINATION}/action_conclusion_otlp.cj
   echo "OTLP conclusion span step complete"
 fi
 
-# Shared legacy state has no per-invocation ownership record (mirrors post.js).
-tmpDir="/tmp/gh-aw"
-if [ -e "${tmpDir}" ] || [ -L "${tmpDir}" ]; then
-  echo "Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established." >&2
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Also works from the setup destination after checkout replaces the workspace.
+if [[ -f "${SCRIPT_DIR}/runtime_lifecycle.sh" ]]; then
+  # shellcheck source=actions/setup/sh/runtime_lifecycle.sh
+  source "${SCRIPT_DIR}/runtime_lifecycle.sh"
+else
+  # shellcheck source=actions/setup/sh/runtime_lifecycle.sh
+  source "${SCRIPT_DIR}/sh/runtime_lifecycle.sh"
 fi
+cleanup_status=0
+cleanup_gh_aw_runtime || cleanup_status=$?
 
-if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" && -f "${DESTINATION}/cleanup_runtime_tmp.sh" ]]; then
-  bash "${DESTINATION}/cleanup_runtime_tmp.sh"
-fi
+exit "$cleanup_status"

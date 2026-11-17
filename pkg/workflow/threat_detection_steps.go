@@ -265,7 +265,7 @@ func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []stri
 		fmt.Sprintf("          if [ -d %s ]; then mkdir -p %s/audit && cp -r %s/. %s/audit/; fi\n", auditDir, detectionFirewallLogsDir, auditDir, detectionFirewallLogsDir),
 	}
 	if isArcDindTopology(data) {
-		steps = append(steps, "          if [ -f \"${RUNNER_TEMP}/gh-aw/sandbox/agent/detection_harness_retry.json\" ]; then cp \"${RUNNER_TEMP}/gh-aw/sandbox/agent/detection_harness_retry.json\" /tmp/gh-aw/threat-detection/detection_harness_retry.json; fi\n")
+		steps = append(steps, "          if [ -f \"${GH_AW_RUNTIME_DIR}/sandbox/agent/detection_harness_retry.json\" ]; then cp \"${GH_AW_RUNTIME_DIR}/sandbox/agent/detection_harness_retry.json\" /tmp/gh-aw/threat-detection/detection_harness_retry.json; fi\n")
 	}
 	return steps
 }

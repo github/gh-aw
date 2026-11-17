@@ -197,7 +197,7 @@ function withAgentProvenance(event, sourcePath, index) {
 async function runLogParser(options) {
   const fs = require("fs");
   const path = require("path");
-  const { parseLog, parserName, supportsDirectories = false, rootDir = options.artifactDir ?? "/tmp/gh-aw" } = options;
+  const { parseLog, parserName, supportsDirectories = false, rootDir = options.artifactDir ?? require("./runtime_paths.cjs").runtimeRoot() } = options;
   const stdioLogPath = path.join(rootDir, "agent-stdio.log");
   const protectedCapture = process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1";
 

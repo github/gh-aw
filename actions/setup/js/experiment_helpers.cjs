@@ -9,9 +9,11 @@ const path = require("path");
  * current workflow run.  Example: `{"caveman":"yes","style":"detailed"}`.
  *
  * Used as the default fallback when `GH_AW_EXPERIMENT_STATE_DIR` is not set.
- * @type {string}
+ * @returns {string}
  */
-const EXPERIMENT_ASSIGNMENTS_PATH = "/tmp/gh-aw/experiments/assignments.json";
+function experimentAssignmentsPath() {
+  return require("./runtime_paths.cjs").runtimePath("experiments/assignments.json");
+}
 
 /**
  * Read the experiment assignments written by pick_experiment.cjs.
@@ -21,13 +23,13 @@ const EXPERIMENT_ASSIGNMENTS_PATH = "/tmp/gh-aw/experiments/assignments.json";
  *
  * The path is derived from `GH_AW_EXPERIMENT_STATE_DIR` so it stays in sync
  * with pick_experiment.cjs, which writes to `<GH_AW_EXPERIMENT_STATE_DIR>/assignments.json`.
- * Falls back to {@link EXPERIMENT_ASSIGNMENTS_PATH} when the env var is absent.
+ * Falls back to the current runtime's experiment assignments when the env var is absent.
  *
  * @returns {Record<string, string> | null}
  */
 function readExperimentAssignments() {
   const stateDir = process.env.GH_AW_EXPERIMENT_STATE_DIR || "";
-  const filePath = stateDir ? path.join(stateDir, "assignments.json") : EXPERIMENT_ASSIGNMENTS_PATH;
+  const filePath = stateDir ? path.join(stateDir, "assignments.json") : experimentAssignmentsPath();
   try {
     const raw = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(raw);
@@ -57,4 +59,9 @@ function readExperimentAssignments() {
   return null;
 }
 
-module.exports = { readExperimentAssignments, EXPERIMENT_ASSIGNMENTS_PATH };
+module.exports = {
+  readExperimentAssignments,
+  get EXPERIMENT_ASSIGNMENTS_PATH() {
+    return experimentAssignmentsPath();
+  },
+};

@@ -181,7 +181,7 @@ sha256_hash() {
 }
 
 # Create temp directory
-TEMP_DIR=$(mktemp -d)
+TEMP_DIR=$(mktemp -d "${GH_AW_RUNTIME_DIR:?}/threat-detect-install.XXXXXX")
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 verify_checksum() {

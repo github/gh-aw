@@ -10,31 +10,29 @@ import (
 
 var arcDindLog = logger.New("workflow:arc_dind_artifacts")
 
-// rewriteTmpGhAwPathsForArcDind rewrites artifact paths that use /tmp/gh-aw/ to
-// use ${{ runner.temp }}/gh-aw/ instead, so all paths share a single root for the
-// artifact upload. This prevents upload-artifact from computing "/" as the common
-// ancestor (which happens when paths span both /tmp/gh-aw/ and the runner.temp tree),
-// causing a nested directory layout that breaks downstream artifact downloads.
+// rewriteTmpGhAwPathsForArcDind normalizes legacy ARC artifact paths to the
+// logical runtime root. The final compiler pass resolves that root to the private
+// runtime directory after artifact redaction validation. Keeping one root
+// preserves the relative layout expected by downstream artifact downloads.
 func rewriteTmpGhAwPathsForArcDind(paths []string) []string {
 	arcDindLog.Printf("Rewriting %d artifact paths for ARC/DinD single-root layout", len(paths))
 	result := make([]string, 0, len(paths))
 	rewritten := 0
 	for _, p := range paths {
-		if after, ok := strings.CutPrefix(p, constants.TmpGhAwDirSlash); ok {
-			// /tmp/gh-aw/foo → ${{ runner.temp }}/gh-aw/foo
-			rewrittenPath := path.Join(constants.GhAwRootDir, after)
-			if strings.HasSuffix(after, "/") {
+		rewrittenPath := p
+		if p == constants.GhAwRootDir {
+			rewrittenPath = constants.TmpGhAwDir
+		} else if after, ok := strings.CutPrefix(p, constants.GhAwRootDirSlash); ok {
+			rewrittenPath = path.Join(constants.TmpGhAwDir, after)
+			if strings.HasSuffix(p, "/") && !strings.HasSuffix(rewrittenPath, "/") {
 				rewrittenPath += "/"
 			}
-			result = append(result, rewrittenPath)
-			rewritten++
-		} else if p == constants.TmpGhAwDir {
-			result = append(result, constants.GhAwRootDir)
-			rewritten++
-		} else {
-			result = append(result, p)
 		}
+		if rewrittenPath != p {
+			rewritten++
+		}
+		result = append(result, rewrittenPath)
 	}
-	arcDindLog.Printf("Rewrote %d of %d artifact paths from /tmp/gh-aw to runner.temp", rewritten, len(paths))
+	arcDindLog.Printf("Rewrote %d of %d artifact paths to the logical runtime root", rewritten, len(paths))
 	return result
 }

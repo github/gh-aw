@@ -18,7 +18,7 @@ const { redactMCPScriptLogMessage } = require("./diagnostic_sanitization.cjs");
 async function main() {
   try {
     // Get the mcp-scripts logs directory path
-    const mcpScriptsLogsDir = `/tmp/gh-aw/mcp-scripts/logs/`;
+    const mcpScriptsLogsDir = require("./runtime_paths.cjs").runtimePath("mcp-scripts/logs");
 
     if (!fs.existsSync(mcpScriptsLogsDir)) {
       core.info(`No mcp-scripts logs directory found at: ${mcpScriptsLogsDir}`);

@@ -6,7 +6,7 @@ set +o histexpand
 
 set -e
 
-PROMPT_FILE="${GH_AW_PROMPT:-/tmp/gh-aw/aw-prompts/prompt.txt}"
+PROMPT_FILE="${GH_AW_PROMPT:-${GH_AW_RUNTIME_DIR:?}/aw-prompts/prompt.txt}"
 
 if [ ! -f "$PROMPT_FILE" ]; then
     echo "❌ Error: Prompt file not found at $PROMPT_FILE"

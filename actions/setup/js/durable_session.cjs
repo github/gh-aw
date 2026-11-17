@@ -8,7 +8,7 @@ const { readCopilotCaptureBaseline } = require("./durable_native_session.cjs");
 
 const continuationHeader = "<!-- gh-aw-durable-continuation -->";
 
-function preparePrompt({ env = process.env, promptFile = "/tmp/gh-aw/aw-prompts/prompt.txt" } = {}) {
+function preparePrompt({ env = process.env, promptFile = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "aw-prompts/prompt.txt") } = {}) {
   if (env.GH_AW_DURABLE_RESUMED !== "true") return;
   const files = JSON.parse(env.GH_AW_DURABLE_FILES || "[]");
   if (!Array.isArray(files) || !files.length || files.some(file => typeof file !== "string" || !path.isAbsolute(file))) {
@@ -35,7 +35,7 @@ function preparePrompt({ env = process.env, promptFile = "/tmp/gh-aw/aw-prompts/
 function captureCopilotSessions({ env = process.env, home = os.homedir() } = {}) {
   const destination = env.GH_AW_DURABLE_SESSION_DIR;
   if (!destination || !path.isAbsolute(destination)) throw new Error("Copilot durable capture requires an absolute session directory");
-  const candidates = [path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/session-state"), path.join(home, ".copilot/session-state")];
+  const candidates = [path.join(require("./runtime_paths.cjs").runtimeRoot(env), "sandbox/agent/session-state"), path.join(home, ".copilot/session-state")];
   const source = candidates.find(directory => fs.existsSync(directory) && fs.readdirSync(directory).length);
   if (!source) {
     console.info("Copilot did not produce native durable session files");
@@ -50,7 +50,7 @@ function trimCopilotLogs({ env = process.env } = {}) {
   const baseline = readCopilotCaptureBaseline(directory);
   if (!baseline || baseline.bytes === 0) return;
   // The full transcript stays in the checkpoint; only the unified-session copy is trimmed.
-  const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/logs/copilot-session-state", baseline.id, "events.jsonl");
+  const file = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "sandbox/agent/logs/copilot-session-state", baseline.id, "events.jsonl");
   const content = fs.readFileSync(file);
   if (content.length < baseline.bytes) throw new Error("Restored Copilot transcript was truncated before log capture");
   fs.writeFileSync(file, content.subarray(baseline.bytes));

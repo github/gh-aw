@@ -9,12 +9,12 @@ set +o histexpand
 # the git history accurately reflects which run wrote which data.
 #
 # Required environment variables:
-#   GH_AW_CACHE_DIR:   Path to the cache-memory directory (e.g. /tmp/gh-aw/cache-memory)
+#   GH_AW_CACHE_DIR:   Path to the cache-memory directory within the private runtime
 #   GITHUB_RUN_ID:     GitHub Actions run ID (used as commit message)
 
 set -euo pipefail
 
-CACHE_DIR="${GH_AW_CACHE_DIR:-/tmp/gh-aw/cache-memory}"
+CACHE_DIR="${GH_AW_CACHE_DIR:-${GH_AW_RUNTIME_DIR:?}/cache-memory}"
 RUN_ID="${GITHUB_RUN_ID:-unknown}"
 
 path_has_symlink_component() {
@@ -108,7 +108,7 @@ git add -A
 
 # Commit on the current integrity branch; allow empty commits in case
 # the agent made no changes (idempotent).
-COMMIT_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/gh-aw-commit.XXXXXX")
+COMMIT_TEMP_DIR=$(mktemp -d "${GH_AW_RUNTIME_DIR:?}/commit.XXXXXX")
 COMMIT_ERROR_FILE="$COMMIT_TEMP_DIR/stderr"
 trap 'rm -f -- "$COMMIT_ERROR_FILE"; rmdir -- "$COMMIT_TEMP_DIR"' EXIT
 trap 'exit 130' INT

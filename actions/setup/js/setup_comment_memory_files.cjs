@@ -19,7 +19,7 @@ const {
   resolveCommentMemoryConfig,
 } = require("./comment_memory_helpers.cjs");
 
-const PROMPT_PATH = "/tmp/gh-aw/aw-prompts/prompt.txt";
+const PROMPT_PATH = require("./runtime_paths.cjs").runtimePath("aw-prompts/prompt.txt");
 
 function loadSafeOutputsConfig() {
   const configPath = process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH || `${process.env.RUNNER_TEMP}/gh-aw/safeoutputs/config.json`;

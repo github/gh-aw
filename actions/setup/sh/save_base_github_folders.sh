@@ -5,7 +5,7 @@ set +o histexpand
 # save_base_github_folders.sh - Snapshot agent config folders/files from the workspace
 #
 # Archives agent-specific folders and root instruction files from $GITHUB_WORKSPACE
-# into /tmp/gh-aw/base/ so that they can be included in the activation artifact
+# into $GH_AW_RUNTIME_DIR/base/ so they can be included in the activation artifact
 # and later restored in the agent job after checkout_pr_branch runs.
 #
 # This prevents fork PRs from injecting malicious skill or instruction files
@@ -30,7 +30,7 @@ set +o histexpand
 set -euo pipefail
 
 WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
-DEST="/tmp/gh-aw/base"
+DEST="${GH_AW_RUNTIME_DIR:?}/base"
 rm -f "${DEST}/snapshot.tar"
 
 # Parse the engine-registry-derived lists from environment variables.

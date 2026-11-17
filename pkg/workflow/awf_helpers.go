@@ -25,10 +25,10 @@ const (
 	awfRuntimeAgentTimeoutVarName = "GH_AW_ENGINE_STEP_TIMEOUT_MINUTES"
 	awfConfigRuntimePathExpr      = "${RUNNER_TEMP}/gh-aw/awf-config.json"
 	awfModelsJSONPathExpr         = "/tmp/gh-aw/models.json"
-	awfArcDindRootPathExpr        = "${RUNNER_TEMP}/gh-aw"
-	awfArcDindHomePathExpr        = "${RUNNER_TEMP}/gh-aw/home"
-	awfArcDindProxyLogsDirExpr    = "${RUNNER_TEMP}/gh-aw/sandbox/firewall/logs"
-	awfArcDindAuditDirExpr        = "${RUNNER_TEMP}/gh-aw/sandbox/firewall/audit"
+	awfArcDindRootPathExpr        = "${GH_AW_RUNTIME_DIR}"
+	awfArcDindHomePathExpr        = "${GH_AW_RUNTIME_DIR}/home"
+	awfArcDindProxyLogsDirExpr    = "${GH_AW_RUNTIME_DIR}/sandbox/firewall/logs"
+	awfArcDindAuditDirExpr        = "${GH_AW_RUNTIME_DIR}/sandbox/firewall/audit"
 	// Bash regex used in [[ ... =~ ... ]] to detect TCP Docker hosts (ARC/DinD).
 	// Any tcp:// DOCKER_HOST indicates the Docker daemon runs on a separate filesystem,
 	// requiring --docker-host so AWF connects to the correct daemon.
@@ -39,7 +39,7 @@ const (
 	// awfArcDindChrootBinariesSourcePath is the runner-side directory that AWF overlays
 	// at /usr/local/bin inside chroot mode for ARC/DinD split-filesystem runners.
 	// This is the gh-aw staging directory that holds pre-downloaded binaries (e.g., copilot).
-	awfArcDindChrootBinariesSourcePath = awfArcDindRootPathExpr
+	awfArcDindChrootBinariesSourcePath = "${RUNNER_TEMP}/gh-aw"
 
 	// awfArcDindChrootIdentityHome is the home directory path exported inside chroot mode
 	// for ARC/DinD runners. A dedicated directory under ${RUNNER_TEMP}/gh-aw is used so that the

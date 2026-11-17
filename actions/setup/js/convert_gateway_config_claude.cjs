@@ -25,7 +25,7 @@ require("./shim.cjs");
 const path = require("path");
 const { normalizeGatewayEntry, runGatewayConversion } = require("./convert_gateway_config_shared.cjs");
 
-const OUTPUT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json");
+const OUTPUT_PATH = path.join(require("./runtime_paths.cjs").setupRoot(), "mcp-config/mcp-servers.json");
 
 /**
  * @param {Record<string, unknown>} entry

@@ -9,7 +9,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 const LEDGER_SUBDIR = "daily-aic-ledger";
 const WINDOW_MS = 24 * 60 * 60 * 1000;
-const USAGE_ROOT = "/tmp/gh-aw";
+const USAGE_ROOT = require("./runtime_paths.cjs").runtimeRoot();
 const USAGE_STAGING_ROOT = path.join(USAGE_ROOT, "usage");
 
 function repoMemoryDirOrThrow(repoMemoryDir = process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR) {

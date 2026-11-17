@@ -1102,7 +1102,11 @@ async function main(config = {}) {
       transport.assertUnchanged();
       const runUrl = buildWorkflowRunUrl(context, context.repo);
       const runId = context.runId;
-      const artifactFileName = hasBundleFile ? bundleFilePath.replace("/tmp/gh-aw/", "") : patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
+      const artifactFileName = hasBundleFile
+        ? bundleFilePath.replace(require("./runtime_paths.cjs").runtimeRoot() + "/", "")
+        : patchFilePath
+          ? patchFilePath.replace(require("./runtime_paths.cjs").runtimeRoot() + "/", "")
+          : "aw-unknown.patch";
       const applyInstructions = buildManualBranchApplyCommands({
         objectPackRecovery,
         hasBundleFile,

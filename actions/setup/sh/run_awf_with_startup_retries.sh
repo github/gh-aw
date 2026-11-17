@@ -103,7 +103,7 @@ gh_aw_awf_record_execution_not_started() {
 }
 
 while true; do
-  gh_aw_awf_attempt_log="$(mktemp "${RUNNER_TEMP:-/tmp}/gh-aw-awf-${gh_aw_awf_attempt_log_name}.XXXXXX")"
+  gh_aw_awf_attempt_log="$(mktemp "${GH_AW_RUNTIME_DIR:?}/awf-${gh_aw_awf_attempt_log_name}.XXXXXX")"
   node "$gh_aw_preflight_script" --startup-attempt start "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_backoff_ms" || true
   "$@" 2>&1 | tee -a "$GH_AW_AWF_LOG_FILE" "$gh_aw_awf_attempt_log"
   gh_aw_awf_status=${PIPESTATUS[0]}

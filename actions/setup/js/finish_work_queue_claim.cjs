@@ -20,7 +20,7 @@ const { claimControlReceipts } = require("./work_queue_control_receipts.cjs");
 const { validateDeliveryContract, isTrustedClaimDelivery } = require("./work_queue_delivery.cjs");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
 
-const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
+const SNAPSHOT_PATH = require("./runtime_paths.cjs").runtimePath("work-queue.snapshot.json");
 const FINISH_INTENT_PATH = DEFAULT_FINISH_INTENT_PATH;
 
 /** @typedef {Record<string, unknown> & {verified: true, contractVerified: true, receipt: string, descriptor: object, effects: "none" | "partial"}} VerifiedClaimEffects */

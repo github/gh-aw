@@ -117,7 +117,7 @@ function countInstalledSkillFiles(skillsDst) {
 }
 
 /** Path to the shared skill install failures JSON file within the activation job's runner. */
-const skillStatePath = name => path.join(process.env.GH_AW_TMP_DIR || "/tmp/gh-aw", name);
+const skillStatePath = name => require("./runtime_paths.cjs").runtimePath(name);
 
 /** @param {string} directory */
 function skillDigests(directory) {
@@ -189,7 +189,7 @@ async function main(options = {}) {
   const skillDir = process.env.GH_AW_SKILL_DIR || "";
   const skillInstallAgent = process.env.GH_AW_GH_SKILL_AGENT_NAME || "";
   const skills = parseSkillSpecs(process.env.GH_AW_FRONTMATTER_SKILLS || "");
-  const skillsDst = path.join(process.env.GH_AW_TMP_DIR || "/tmp/gh-aw", skillDir);
+  const skillsDst = require("./runtime_paths.cjs").runtimePath(skillDir);
   const SKILL_INSTALL_HISTORY_FILE = skillStatePath("skill_install_history.json");
 
   try {

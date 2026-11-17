@@ -13,7 +13,7 @@ const { recordModelRouting, resolveEffectiveModel, validateModelIdentifier } = r
 const { persistCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { persistModelConfigBaseline } = require("./routing_analytics.cjs");
 
-const DEFAULT_GH_AW_DIR = "/tmp/gh-aw";
+const DEFAULT_GH_AW_DIR = require("./runtime_paths.cjs").runtimeRoot();
 /**
  * Parses the firewall proxy token-usage.jsonl and appends a collapsible markdown
  * table to $GITHUB_STEP_SUMMARY via core.summary.addDetails.
@@ -33,8 +33,7 @@ const AGENT_USAGE_JSONL_PATH = path.join(DEFAULT_GH_AW_DIR, "agent_usage.jsonl")
 const COPILOT_SESSION_STATE_DIR = path.join(DEFAULT_GH_AW_DIR, "sandbox/agent/logs/copilot-session-state");
 const DEFAULT_SUMMARY_TITLE = "Token Usage";
 function getGhAwPath(relativePath) {
-  const root = process.env.GH_AW_TMP_DIR;
-  return path.join(root && root.trim() ? root.trim() : DEFAULT_GH_AW_DIR, relativePath);
+  return require("./runtime_paths.cjs").runtimePath(relativePath);
 }
 
 function getTokenUsagePaths() {
@@ -115,7 +114,7 @@ function getModelRoutingSelectionFailureCode(error) {
 }
 
 /** @returns {any|null} */
-function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_DIR || DEFAULT_GH_AW_DIR) {
+function resolveModelRoutingOutcome(env = process.env, ghAwDir = require("./runtime_paths.cjs").runtimeRoot(env)) {
   if (env.GH_AW_MODEL_ROUTING_ENABLED !== "true") return null;
   const proxyRecords = readModelRoutingRecord(ghAwDir);
   const record = proxyRecords?.record;
@@ -242,7 +241,7 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
 }
 
 /** @returns {{routing: any, effective: any}|null} */
-function recordModelRoutingFromArtifacts(env = process.env, ghAwDir = env.GH_AW_TMP_DIR || DEFAULT_GH_AW_DIR) {
+function recordModelRoutingFromArtifacts(env = process.env, ghAwDir = require("./runtime_paths.cjs").runtimeRoot(env)) {
   const routing = resolveModelRoutingOutcome(env, ghAwDir);
   if (!routing) return null;
   const infoPath = path.join(ghAwDir, "aw_info.json");
@@ -254,7 +253,7 @@ function recordModelRoutingFromArtifacts(env = process.env, ghAwDir = env.GH_AW_
   return { routing: modelRouting, effective };
 }
 
-function persistAgentAwInfoCopy(ghAwDir = process.env.GH_AW_TMP_DIR || DEFAULT_GH_AW_DIR) {
+function persistAgentAwInfoCopy(ghAwDir = require("./runtime_paths.cjs").runtimeRoot()) {
   const infoPath = path.join(ghAwDir, "aw_info.json");
   const artifactInfoPath = path.join(ghAwDir, "agent", "aw_info.json");
   const runtimeDir = path.join(ghAwDir, "runtime");

@@ -17,7 +17,7 @@ function generateMCPScriptsConfig({ core, crypto }) {
   core.setSecret(apiKey);
 
   // Choose a port for the HTTP server (default 3000)
-  const port = 3000;
+  const port = require("./runtime_paths.cjs").runtimePort("GH_AW_MCP_SCRIPTS_PORT", 3000);
 
   // Set outputs with descriptive names to avoid conflicts
   core.setOutput("mcp_scripts_api_key", apiKey);

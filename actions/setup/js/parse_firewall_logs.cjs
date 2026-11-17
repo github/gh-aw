@@ -33,7 +33,7 @@ function isInternalSidecarHost(domainKey) {
 async function main() {
   try {
     // Get the firewall logs directory path - awf writes logs to /tmp/gh-aw/sandbox/firewall/logs
-    const squidLogsDir = `/tmp/gh-aw/sandbox/firewall/logs/`;
+    const squidLogsDir = require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs");
 
     if (!fs.existsSync(squidLogsDir)) {
       core.info(`No firewall logs directory found at: ${squidLogsDir}`);

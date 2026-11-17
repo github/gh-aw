@@ -6,4 +6,7 @@ set +o histexpand
 
 set -e
 
-docker rm -f awmg-cli-proxy 2>/dev/null || true
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/runtime_docker.sh"
+CONTAINER_NAME="$(gh_aw_container_name awmg-cli-proxy)"
+gh_aw_remove_container "$CONTAINER_NAME" || true

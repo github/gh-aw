@@ -36,49 +36,48 @@ if [ -z "$MCP_GATEWAY_DOCKER_COMMAND" ]; then
 fi
 
 # Create logs directory for gateway
-mkdir -p /tmp/gh-aw/mcp-logs
+mkdir -p "${GH_AW_RUNTIME_DIR:?}/mcp-logs"
 
-# Guard against symlink attacks on the predictable /tmp/gh-aw/mcp-config path.
-# An attacker who can create files in /tmp could pre-create /tmp/gh-aw or
-# /tmp/gh-aw/mcp-config as symlinks and redirect our credential writes to an
-# arbitrary location.  Check both path components before and after creation.
-if [ -L /tmp/gh-aw ]; then
-  echo "ERROR: /tmp/gh-aw is a symlink — possible symlink attack, aborting"
+# Check runtime and config paths before and after creating credential files.
+if [ -L "${GH_AW_RUNTIME_DIR:?}" ]; then
+  echo "ERROR: Private runtime is a symlink, aborting"
   exit 1
 fi
-if [ -L /tmp/gh-aw/mcp-config ]; then
-  echo "ERROR: /tmp/gh-aw/mcp-config is a symlink — possible symlink attack, aborting"
+if [ -L "${GH_AW_RUNTIME_DIR:?}/mcp-config" ]; then
+  echo "ERROR: Private MCP config directory is a symlink, aborting"
   exit 1
 fi
-mkdir -p /tmp/gh-aw/mcp-config
+mkdir -p "${GH_AW_RUNTIME_DIR:?}/mcp-config"
 # Post-creation check: verify neither path was replaced with a symlink after mkdir
 # (mitigates the TOCTOU window between the pre-check and mkdir).
-if [ -L /tmp/gh-aw ] || [ -L /tmp/gh-aw/mcp-config ]; then
-  echo "ERROR: /tmp/gh-aw/mcp-config was replaced with a symlink — possible symlink attack, aborting"
+if [ -L "${GH_AW_RUNTIME_DIR:?}" ] || [ -L "${GH_AW_RUNTIME_DIR:?}/mcp-config" ]; then
+  echo "ERROR: Private MCP config directory was replaced with a symlink, aborting"
   exit 1
 fi
 # Restrict directory permissions so only the runner process owner can read config files
 # (which contain bearer tokens and agent IDs)
-chmod 700 /tmp/gh-aw/mcp-config
+chmod 700 "${GH_AW_RUNTIME_DIR:?}/mcp-config"
 
-GATEWAY_STDOUT=/tmp/gh-aw/mcp-config/gateway-output.json
-# Keep unredacted gateway stderr outside the artifact directory. It is emitted
-# only through print_gateway_startup_diagnostics after redaction.
-GATEWAY_STDERR="$(mktemp /tmp/gh-aw-mcp-gateway-stderr.XXXXXX)"
+GATEWAY_STDOUT="${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json"
+# Transient, owner-only diagnostics are removed before the step completes.
+GATEWAY_STDERR="$(mktemp "${GH_AW_RUNTIME_DIR:?}/.mcp-gateway-stderr.XXXXXX")"
 chmod 600 "$GATEWAY_STDERR"
 trap 'rm -f "$GATEWAY_STDERR"' EXIT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_RENDERER="${SCRIPT_DIR}/render_log_to_stdout.sh"
-GATEWAY_STARTUP_MARKER="${MCP_GATEWAY_STARTUP_MARKER:-/tmp/gh-aw/mcp-gateway-started}"
+GATEWAY_STARTUP_MARKER="${MCP_GATEWAY_STARTUP_MARKER:-${GH_AW_RUNTIME_DIR:?}/mcp-gateway-started}"
 rm -f "$GATEWAY_STARTUP_MARKER"
+
+redact_gateway_stderr() {
+  sed -E \
+    -e 's/(Bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/Ig' \
+    -e 's/((agent[_-]?id|api[_-]?key|token|secret|password|authorization)"?[[:space:]]*[:=][[:space:]]*"?)[^[:space:],}"]+/\1[REDACTED]/Ig'
+}
 
 print_gateway_startup_diagnostics() {
   echo "Gateway startup diagnostics:"
   if [ -s "$GATEWAY_STDERR" ]; then
-    sed -E \
-      -e 's/(Bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/Ig' \
-      -e 's/((agent[_-]?id|api[_-]?key|token|secret|password|authorization)"?[[:space:]]*[:=][[:space:]]*"?)[^[:space:],}"]+/\1[REDACTED]/Ig' \
-      "$GATEWAY_STDERR" | bash "$LOG_RENDERER" "Gateway stderr"
+    bash "$LOG_RENDERER" "Gateway stderr" < "$GATEWAY_STDERR"
   else
     echo "Gateway stderr: (empty)"
   fi
@@ -129,12 +128,12 @@ echo ""
 
 # Validate configuration is valid JSON
 CONFIG_VALIDATION_START=$(date +%s%3N)
-if ! echo "$MCP_CONFIG" | jq empty 2>/tmp/gh-aw/mcp-config/jq-error.log; then
+if ! echo "$MCP_CONFIG" | jq empty 2>"${GH_AW_RUNTIME_DIR:?}/mcp-config/jq-error.log"; then
   echo "ERROR: Configuration is not valid JSON"
   echo ""
   echo "JSON validation error:"
-  if [ -f /tmp/gh-aw/mcp-config/jq-error.log ]; then
-    cat /tmp/gh-aw/mcp-config/jq-error.log
+  if [ -f "${GH_AW_RUNTIME_DIR:?}/mcp-config/jq-error.log" ]; then
+    cat "${GH_AW_RUNTIME_DIR:?}/mcp-config/jq-error.log"
   fi
   echo ""
   echo "Configuration content is withheld because it may contain credentials."
@@ -184,17 +183,7 @@ print_timing $CONFIG_VALIDATION_START "Configuration validation"
 echo ""
 
 # Set MCP_GATEWAY_LOG_DIR environment variable for use by the gateway
-export MCP_GATEWAY_LOG_DIR="/tmp/gh-aw/mcp-logs/"
-
-# Clean up any stale gh-aw gateway container from a previous run on this runner.
-# On persistent self-hosted runners a prior job's gateway container may still be
-# running and holding the host port, causing "bind: address already in use" when
-# we try to start the new one.  Force-removing by the well-known container name
-# is idempotent: docker rm -f exits non-zero when the container doesn't exist,
-# but the trailing || true (and 2>/dev/null) make the overall command succeed.
-echo "Cleaning up any stale awmg-mcpg container from a previous run..."
-docker rm -f awmg-mcpg 2>/dev/null && echo "Removed stale awmg-mcpg container" || true
-echo ""
+export MCP_GATEWAY_LOG_DIR="${GH_AW_RUNTIME_DIR:?}/mcp-logs/"
 
 # Start gateway process with container
 echo "Starting gateway container..."
@@ -203,7 +192,7 @@ GATEWAY_START_TIME=$(date +%s%3N)
 # Note: MCP_GATEWAY_DOCKER_COMMAND is the full docker command with all flags, mounts, and image
 # Pass MCP_GATEWAY_LOG_DIR to the container via -e flag
 echo "$MCP_CONFIG" | MCP_GATEWAY_LOG_DIR="$MCP_GATEWAY_LOG_DIR" $MCP_GATEWAY_DOCKER_COMMAND \
-  > "$GATEWAY_STDOUT" 2> "$GATEWAY_STDERR" &
+  > "$GATEWAY_STDOUT" 2> >(redact_gateway_stderr > "$GATEWAY_STDERR") &
 
 GATEWAY_PID=$!
 echo "Gateway started with PID: $GATEWAY_PID"
@@ -354,7 +343,7 @@ OUTPUT_WAIT_START=$(date +%s%3N)
 WAIT_ATTEMPTS=10
 WAIT_ATTEMPT=0
 while [ $WAIT_ATTEMPT -lt $WAIT_ATTEMPTS ]; do
-  if [ -s /tmp/gh-aw/mcp-config/gateway-output.json ]; then
+  if [ -s "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" ]; then
     echo "Gateway output received!"
     break
   fi
@@ -375,7 +364,7 @@ if [ ! -s "$GATEWAY_STDOUT" ]; then
 fi
 
 # Restrict gateway output file permissions - it contains the bearer token / agent ID
-chmod 600 /tmp/gh-aw/mcp-config/gateway-output.json
+chmod 600 "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json"
 
 # Check if output contains an error payload instead of valid configuration
 # Per MCP Gateway Specification v1.0.0 section 9.1, errors are written to stdout as error payloads
@@ -389,7 +378,7 @@ fi
 # Convert gateway output to agent-specific format
 echo "Converting gateway configuration to agent format..."
 CONFIG_CONVERT_START=$(date +%s%3N)
-export MCP_GATEWAY_OUTPUT=/tmp/gh-aw/mcp-config/gateway-output.json
+export MCP_GATEWAY_OUTPUT="${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json"
 
 # Validate MCP_GATEWAY_AGENT_ID is set (required by converter scripts)
 if [ -z "$MCP_GATEWAY_AGENT_ID" ]; then
@@ -413,9 +402,9 @@ elif [ -n "$GITHUB_COPILOT_CLI_MODE" ]; then
   ENGINE_TYPE="copilot"
 elif [ -n "${HOME:-}" ] && [ -d "$HOME/.copilot" ]; then
   ENGINE_TYPE="copilot"
-elif [ -f "/tmp/gh-aw/mcp-config/config.toml" ]; then
+elif [ -f "${GH_AW_RUNTIME_DIR:?}/mcp-config/config.toml" ]; then
   ENGINE_TYPE="codex"
-elif [ -f "/tmp/gh-aw/mcp-config/mcp-servers.json" ]; then
+elif [ -f "${GH_AW_RUNTIME_DIR:?}/mcp-config/mcp-servers.json" ]; then
   ENGINE_TYPE="claude"
 else
   ENGINE_TYPE="unknown"
@@ -449,13 +438,13 @@ case "$ENGINE_TYPE" in
     if [ -n "$GH_AW_MCP_CLI_SERVERS" ]; then
       if ! jq --argjson cliServers "$GH_AW_MCP_CLI_SERVERS" \
         '.mcpServers |= with_entries(select(.key | IN($cliServers[]) | not))' \
-        /tmp/gh-aw/mcp-config/gateway-output.json > "$HOME/.copilot/mcp-config.json"; then
+        "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" > "$HOME/.copilot/mcp-config.json"; then
         echo "ERROR: Failed to filter CLI-mounted servers from agent MCP config"
         echo "Falling back to unfiltered config"
-        cp /tmp/gh-aw/mcp-config/gateway-output.json "$HOME/.copilot/mcp-config.json"
+        cp "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" "$HOME/.copilot/mcp-config.json"
       fi
     else
-      cp /tmp/gh-aw/mcp-config/gateway-output.json "$HOME/.copilot/mcp-config.json"
+      cp "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" "$HOME/.copilot/mcp-config.json"
     fi
     ;;
 esac
@@ -468,7 +457,7 @@ MCP_CHECK_START=$(date +%s%3N)
 if [ -f ${RUNNER_TEMP}/gh-aw/actions/check_mcp_servers.sh ]; then
   echo "Running MCP server checks..."
   if ! bash ${RUNNER_TEMP}/gh-aw/actions/check_mcp_servers.sh \
-    /tmp/gh-aw/mcp-config/gateway-output.json \
+    "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" \
     "http://localhost:${MCP_GATEWAY_PORT}" \
     "${MCP_GATEWAY_AGENT_ID}"; then
     echo "ERROR: MCP server checks failed - no servers could be connected"
@@ -486,13 +475,13 @@ echo ""
 # Save CLI manifest for mount_mcp_as_cli.cjs before gateway config is deleted
 # The manifest contains server names and their local localhost URLs
 echo "Saving MCP CLI manifest..."
-mkdir -p /tmp/gh-aw/mcp-cli
-if [ -f /tmp/gh-aw/mcp-config/gateway-output.json ] && \
-   jq -e '.mcpServers' /tmp/gh-aw/mcp-config/gateway-output.json >/dev/null 2>&1; then
+mkdir -p "${GH_AW_RUNTIME_DIR:?}/mcp-cli"
+if [ -f "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" ] && \
+   jq -e '.mcpServers' "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" >/dev/null 2>&1; then
   jq '{servers: [.mcpServers | to_entries[] | select(.value.url != null) | {name: .key, url: .value.url}]}' \
-    /tmp/gh-aw/mcp-config/gateway-output.json > /tmp/gh-aw/mcp-cli/manifest.json
-  chmod 600 /tmp/gh-aw/mcp-cli/manifest.json
-  SERVER_COUNT=$(jq '.servers | length' /tmp/gh-aw/mcp-cli/manifest.json)
+    "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" > "${GH_AW_RUNTIME_DIR:?}/mcp-cli/manifest.json"
+  chmod 600 "${GH_AW_RUNTIME_DIR:?}/mcp-cli/manifest.json"
+  SERVER_COUNT=$(jq '.servers | length' "${GH_AW_RUNTIME_DIR:?}/mcp-cli/manifest.json")
   echo "CLI manifest saved with ${SERVER_COUNT} server(s)"
 else
   echo "WARNING: No mcpServers in gateway output, CLI manifest not created"
@@ -501,8 +490,8 @@ echo ""
 
 # Delete gateway configuration file after conversion and checks are complete
 echo "Cleaning up gateway configuration file..."
-if [ -f /tmp/gh-aw/mcp-config/gateway-output.json ]; then
-  rm /tmp/gh-aw/mcp-config/gateway-output.json
+if [ -f "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json" ]; then
+  rm "${GH_AW_RUNTIME_DIR:?}/mcp-config/gateway-output.json"
   echo "Gateway configuration file deleted"
 else
   echo "Gateway configuration file not found (already deleted or never created)"

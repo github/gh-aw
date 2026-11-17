@@ -2,6 +2,28 @@
 
 This action copies workflow script files to the agent environment.
 
+## Runtime ownership
+
+Each setup invocation allocates a private `GH_AW_RUNTIME_DIR` under `RUNNER_TEMP`.
+Retries, matrix jobs, and concurrent runners receive distinct directories.
+Generated paths and runtime helpers use this root; trusted scripts and
+configuration remain in `${RUNNER_TEMP}/gh-aw`.
+The canonical runner-temp path must contain only letters, digits, underscores,
+dots, slashes, and hyphens (plus the drive prefix on Windows); setup rejects
+unsupported paths rather than interpolating them into generated commands.
+
+The post step validates the recorded directory identity and owner marker before
+cleanup. Containers use invocation-specific names and ownership labels. Cleanup
+does not reclaim the legacy `/tmp/gh-aw` tree, replaced allocations, or
+foreign-owned leftovers, and never escalates to sudo. Abrupt termination can
+leave an allocation behind; a later job allocates a fresh root rather than
+trying to reclaim it.
+
+The pinned firewall's fixed Docker resources are guarded by a daemon-keyed
+host lock. Firewall runs sharing `/tmp` and a Docker daemon are serialized;
+occupied resources left by an interrupted firewall are reported, not deleted.
+The inert lock file is retained to avoid lock-inode replacement races.
+
 ## Description
 
 This action runs in all workflow jobs to provide scripts that can be used instead of being inlined in the workflow. This includes scripts for activation jobs, agent jobs, and safe-output jobs.

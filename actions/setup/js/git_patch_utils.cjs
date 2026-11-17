@@ -74,7 +74,7 @@ function sanitizeRepoSlugForPatch(repoSlug) {
  */
 function getPatchPathForBranch(branchName) {
   const sanitized = sanitizeBranchNameForPatch(branchName);
-  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitized}.patch`);
+  return scopedArtifactFilename(require("./runtime_paths.cjs").runtimePath(`aw-${sanitized}.patch`));
 }
 
 /**
@@ -87,7 +87,7 @@ function getPatchPathForBranch(branchName) {
 function getPatchPathForBranchInRepo(branchName, repoSlug) {
   const sanitizedBranch = sanitizeBranchNameForPatch(branchName);
   const sanitizedRepo = sanitizeRepoSlugForPatch(repoSlug);
-  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitizedRepo}-${sanitizedBranch}.patch`);
+  return scopedArtifactFilename(require("./runtime_paths.cjs").runtimePath(`aw-${sanitizedRepo}-${sanitizedBranch}.patch`));
 }
 
 /**

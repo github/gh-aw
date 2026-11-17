@@ -93,11 +93,11 @@ function sanitizeID(value) {
  * @param {string} memoryId
  */
 function getValidationMarkerPath(kind, memoryId) {
-  return path.join(os.tmpdir(), "gh-aw", "memory-validation", `${sanitizeID(kind)}-${sanitizeID(memoryId)}.ok`);
+  return require("./runtime_paths.cjs").runtimePath("memory-validation", `${sanitizeID(kind)}-${sanitizeID(memoryId)}.ok`);
 }
 
 function getRepoMemoryBaselinePath(memoryId) {
-  return path.join(os.tmpdir(), "gh-aw", "memory-validation", `repo-baseline-${sanitizeID(memoryId)}.json`);
+  return require("./runtime_paths.cjs").runtimePath("memory-validation", `repo-baseline-${sanitizeID(memoryId)}.json`);
 }
 
 /**

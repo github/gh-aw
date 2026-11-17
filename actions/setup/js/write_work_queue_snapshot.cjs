@@ -12,7 +12,7 @@ const { bindWorkerAssignment, loadQueue, validateStoredAssignment, expectedWorke
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { WORK_QUEUE_BRANCH } = require("./work_queue_store.cjs");
 
-const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
+const SNAPSHOT_PATH = require("./runtime_paths.cjs").runtimePath("work-queue.snapshot.json");
 
 function activationMessage({ worker, staged, latest, runtime, branch }) {
   if (worker) return `${worker.claims.length} immutable Claims authenticated${staged ? " for staged preview (not bound)" : " and bound"}`;

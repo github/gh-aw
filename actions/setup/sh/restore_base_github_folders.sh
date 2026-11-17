@@ -34,7 +34,7 @@ set +o histexpand
 set -euo pipefail
 
 WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
-SRC="/tmp/gh-aw/base"
+SRC="${GH_AW_RUNTIME_DIR:?}/base"
 
 # Parse the engine-registry-derived lists from environment variables.
 # These must match the values used in save_base_github_folders.sh.

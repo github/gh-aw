@@ -3,6 +3,7 @@
 
 const { spawnSync } = require("child_process");
 const path = require("path");
+const fs = require("fs");
 const { getActionInput } = require("./js/action_input_utils.cjs");
 
 // Record start time for the OTLP span before any setup work begins.
@@ -38,6 +39,18 @@ if (result.error) {
 
 if (result.status !== 0) {
   process.exit(result.status ?? 1);
+}
+
+// setup.sh runs in a child process; import its allocation record for JS work
+// performed by this action before the runner applies GITHUB_ENV to later steps.
+if (process.env.GITHUB_STATE) {
+  for (const line of fs.readFileSync(process.env.GITHUB_STATE, "utf8").split("\n")) {
+    const separator = line.indexOf("=");
+    const key = line.slice(0, separator);
+    if (/^GH_AW_(?:RUNTIME_(?:DIR|ID|DEV|INO|UID|OWNER)|(?:CLI_PROXY|MCP_GATEWAY|MCP_CONTROL|MCP_SCRIPTS|SAFE_OUTPUTS|COPILOT_SDK)_PORT)$/.test(key)) {
+      process.env[key] = line.slice(separator + 1);
+    }
+  }
 }
 
 // Send a gh-aw.<jobName>.setup span to the OTLP endpoint when configured.

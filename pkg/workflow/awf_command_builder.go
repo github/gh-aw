@@ -93,6 +93,7 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 		protectLogCapture:      config.ProtectLogCapture,
 		engineName:             config.EngineName,
 		retryStartupFailures:   config.RetryStartupFailures || usesBuiltInEngineHarness(config.EngineName, config.EngineCommand),
+		serializeDocker:        !isCloudHypervisor && !isNVXRuntime(config.WorkflowData),
 	})
 
 	awfHelpersLog.Print("Successfully built AWF command")
@@ -256,9 +257,6 @@ func appendArcDindMountSettings(expandableArgs, arcDindDockerHostProbe string, i
 	arcDindDockerHostProbe += fmt.Sprintf("\nmkdir -p \"%s\" \"%s\"",
 		awfArcDindHomePathExpr,
 		awfArcDindRootPathExpr+"/sandbox/agent",
-	)
-	arcDindDockerHostProbe += fmt.Sprintf("\nif [ -d /tmp/gh-aw/aw-prompts ]; then cp -a /tmp/gh-aw/aw-prompts \"%s/aw-prompts\"; fi",
-		awfArcDindRootPathExpr,
 	)
 	return expandableArgs, arcDindDockerHostProbe
 }
@@ -433,10 +431,9 @@ func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) s
 	if hasMaxAICreditsExport {
 		preservedVars = append(preservedVars, awfMaxAICreditsVarName)
 	}
-	if strings.Contains(awfConfigJSON, awfArcDindRootPathExpr) {
-		preservedVars = append(preservedVars, "RUNNER_TEMP")
-	}
 	for _, name := range []string{
+		"RUNNER_TEMP",
+		"GH_AW_RUNTIME_DIR",
 		modelRoutingModeEnvVar,
 		"GH_AW_CLOUD_HYPERVISOR_BINARY",
 		"GH_AW_CLOUD_HYPERVISOR_KERNEL",
@@ -489,6 +486,7 @@ type buildAWFCommandScriptInput struct {
 	protectLogCapture      bool
 	engineName             string
 	retryStartupFailures   bool
+	serializeDocker        bool
 }
 
 func buildAWFCommandScript(input buildAWFCommandScriptInput) string {
@@ -536,6 +534,9 @@ func buildAWFInvocationCommand(input buildAWFCommandScriptInput) string {
 		captureArgs,
 		input.shellWrappedCommand,
 	)
+	if input.serializeDocker {
+		command = `node "${RUNNER_TEMP}/gh-aw/actions/run_awf_isolated.cjs" -- ` + command
+	}
 	if input.protectLogCapture {
 		// AWF owns directory isolation, bounded capture and its internal attempts.
 		return command
@@ -727,6 +728,15 @@ func appendLegacyHostPortsArgs(workflowData *WorkflowData, firewallConfig *Firew
 	}
 	if awfSupportsAllowHostPorts(firewallConfig) {
 		hostPortsValue := joinPorts(hostPorts)
+		if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.MCP != nil && workflowData.SandboxConfig.MCP.AutoPort {
+			parts := strings.Split(hostPortsValue, ",")
+			for i, port := range parts {
+				if port == strconv.Itoa(int(DefaultMCPGatewayPort)) {
+					parts[i] = "${{ env.GH_AW_MCP_GATEWAY_PORT }}"
+				}
+			}
+			hostPortsValue = strings.Join(parts, ",")
+		}
 		awfArgs = append(awfArgs, "--allow-host-ports", hostPortsValue)
 		awfHelpersLog.Printf("Added --allow-host-ports %s", hostPortsValue)
 		return awfArgs
@@ -745,9 +755,9 @@ func appendCliProxyArgs(config AWFCommandConfig, firewallConfig *FirewallConfig,
 		awfHelpersLog.Printf("Skipping CLI proxy flags: AWF version %q is older than minimum %s", getAWFImageTag(firewallConfig), constants.AWFCliProxyMinVersion)
 		return awfArgs
 	}
-	difcProxyHost := "host.docker.internal:18443"
+	difcProxyHost := "host.docker.internal:${{ env.GH_AW_CLI_PROXY_PORT }}"
 	if isAWFNetworkIsolationEnabled(config.WorkflowData) {
-		difcProxyHost = "awmg-cli-proxy:18443"
+		difcProxyHost = "awmg-cli-proxy:${{ env.GH_AW_CLI_PROXY_PORT }}"
 	}
 	awfArgs = append(awfArgs, "--difc-proxy-host", difcProxyHost, "--difc-proxy-ca-cert", constants.TmpDIFCProxyTLSCACert)
 	awfHelpersLog.Print("Added --difc-proxy-host and --difc-proxy-ca-cert for CLI proxy sidecar")

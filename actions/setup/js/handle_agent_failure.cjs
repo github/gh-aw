@@ -90,10 +90,10 @@ const HARNESS_UNEXPECTED_ERROR_RE = /^\[(?:copilot|claude|codex)-harness\]\s*une
 const FAILURE_ISSUE_DEDUP_WINDOW_HOURS = 24;
 const FAILURE_ISSUE_CATEGORY_DAILY_CAP = 50;
 const FAILURE_ISSUE_WINDOW_MS = FAILURE_ISSUE_DEDUP_WINDOW_HOURS * 60 * 60 * 1000;
-const DEFAULT_OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
+const DEFAULT_OTEL_JSONL_PATH = require("./runtime_paths.cjs").runtimePath("otel.jsonl");
 /** Path to the failure categories file written by handle_agent_failure and read by the OTLP conclusion span. */
-const FAILURE_CATEGORIES_PATH = "/tmp/gh-aw/failure_categories.json";
-const COPILOT_SESSION_STATE_DIR = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state");
+const FAILURE_CATEGORIES_PATH = require("./runtime_paths.cjs").runtimePath("failure_categories.json");
+const COPILOT_SESSION_STATE_DIR = require("./runtime_paths.cjs").runtimePath("sandbox/agent/logs/copilot-session-state");
 const RECENT_TOOL_CALLS_WITH_COMMAND_PREVIEW = new Set(["bash", "shell"]);
 const ELLIPSIS = "...";
 const ELLIPSIS_LENGTH = ELLIPSIS.length;
@@ -131,7 +131,7 @@ const PLUGIN_DIAGNOSTICS_MAX_LENGTH = 8000;
  * uses this declared path for production runs because GH_AW_AGENT_OUTPUT points to
  * /tmp/gh-aw/agent_output.json in downstream failure jobs, not the Copilot logs directory.
  */
-const PLUGIN_DIAGNOSTICS_LOG_PATH = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
+const PLUGIN_DIAGNOSTICS_LOG_PATH = require("./runtime_paths.cjs").runtimePath("sandbox/agent/logs/plugin-diagnostics.log");
 
 /**
  * Parse action failure issue expiration from environment.
@@ -382,16 +382,16 @@ function hasMCPTransportWedge(sessionContent) {
 }
 
 function getAgentStdioLogPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
-  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log");
 }
 
 function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
-  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-session.jsonl") : "/tmp/gh-aw/agent-session.jsonl";
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-session.jsonl") : require("./runtime_paths.cjs").runtimePath("agent-session.jsonl");
 }
 
 /** Read mismatch evidence only from the collector's unified session, never raw logs. */
 function readModelEndpointMismatch() {
-  const root = process.env.GH_AW_AGENT_OUTPUT ? path.dirname(process.env.GH_AW_AGENT_OUTPUT) : "/tmp/gh-aw";
+  const root = process.env.GH_AW_AGENT_OUTPUT ? path.dirname(process.env.GH_AW_AGENT_OUTPUT) : require("./runtime_paths.cjs").runtimeRoot();
   const file = process.env.GH_AW_UNIFIED_SESSION || path.join(root, "usage/aw_session.jsonl");
   try {
     /** @type {any[]} */
@@ -3307,7 +3307,7 @@ function detectCopilotOrgBillingErrorFromLog(stdioLogPathOverride) {
   }
 
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log");
+  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log"));
   try {
     const logContent = fs.readFileSync(stdioLogPath, "utf8");
     return COPILOT_ORG_BILLING_MODE_RE.test(logContent) && COPILOT_ORG_BILLING_ERROR_RE.test(logContent);
@@ -3335,7 +3335,7 @@ function detectCopilotAgentNotFoundFromLog(stdioLogPathOverride) {
   }
 
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log");
+  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log"));
   try {
     const logContent = fs.readFileSync(stdioLogPath, "utf8");
     const match = logContent.match(COPILOT_AGENT_NOT_FOUND_RE);
@@ -3399,7 +3399,7 @@ function detectAWFStartupSignals(logContent, errorMessages = undefined) {
  */
 function detectAWFFirewallStartupFailureFromLog() {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log");
   try {
     if (!fs.existsSync(stdioLogPath)) return false;
     const logContent = fs.readFileSync(stdioLogPath, "utf8");
@@ -3416,7 +3416,7 @@ function detectAWFFirewallStartupFailureFromLog() {
  */
 function detectEngineRateLimit429Failure() {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log");
   try {
     if (fs.existsSync(stdioLogPath)) {
       const logContent = fs.readFileSync(stdioLogPath, "utf8");
@@ -3451,7 +3451,7 @@ function buildEngineFailureContext(options = {}) {
   const shellExpansionGuardRejectedFromDetection = options.shellExpansionGuardRejected === true;
   // Derive agent-stdio.log path from the agent output file path (same directory)
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log");
   const exitCodePath = path.join(path.dirname(stdioLogPath), "agent_execution_exit_code.txt");
 
   // Include engine ID in failure messages when available (e.g. "copilot", "claude", "codex")
@@ -3839,7 +3839,7 @@ function isDroppedPipeSafeOutputsCommand(line) {
  */
 function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log");
+  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : require("./runtime_paths.cjs").runtimePath("agent-stdio.log"));
 
   let logContent;
   try {

@@ -81,8 +81,7 @@ function loadToolsFromJSONFile(toolsPath, core) {
  * @returns {string}
  */
 function getSafeOutputsGatewayEmptyFlagPath() {
-  const runnerTemp = process.env.RUNNER_TEMP || "/home/runner/work/_temp";
-  return path.join(runnerTemp, "gh-aw", "safeoutputs", "gateway_empty.flag");
+  return require("./runtime_paths.cjs").runtimePath("safeoutputs/gateway_empty.flag");
 }
 
 /**
@@ -91,7 +90,7 @@ function getSafeOutputsGatewayEmptyFlagPath() {
  * @param {string} [runnerTemp]
  */
 function clearStaleSafeOutputsRegistrationEvidence(runnerTemp = RUNNER_TEMP) {
-  const evidencePaths = [path.join(runnerTemp, "gh-aw", "safeoutputs", "gateway_empty.flag"), path.join(runnerTemp, "gh-aw", "mcp-cli", "tools", "safeoutputs.json")];
+  const evidencePaths = [getSafeOutputsGatewayEmptyFlagPath(), path.join(runnerTemp, "gh-aw", "mcp-cli", "tools", "safeoutputs.json")];
   for (const evidencePath of evidencePaths) {
     try {
       fs.unlinkSync(evidencePath);

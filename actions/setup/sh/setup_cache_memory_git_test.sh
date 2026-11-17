@@ -14,7 +14,9 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 
 # Temporary workspace for all tests
-WORKSPACE=$(mktemp -d)
+WORKSPACE=$(mktemp -d "${PWD}/.cache-memory-tests.XXXXXX")
+export GH_AW_RUNTIME_DIR="${WORKSPACE}/runtime"
+mkdir "$GH_AW_RUNTIME_DIR"
 
 cleanup() {
   rm -rf "${WORKSPACE}"
@@ -77,7 +79,7 @@ echo ""
 # ── Test 0: Git diagnostics use private, unpredictable temporary paths ────────
 echo "Test 0: Git diagnostics use private temporary paths"
 assert "diagnostic directory is created with mktemp" \
-  "grep -q 'mktemp -d /tmp/gh-aw-cache-memory.XXXXXX' '${SCRIPT}'"
+  "grep -q 'cache-memory.XXXXXX' '${SCRIPT}'"
 assert "fixed diagnostic paths are not used" \
   "! grep -Eq '/tmp/gh-aw-(git-fsck|checkout|merge)-' '${SCRIPT}'"
 echo ""
@@ -338,12 +340,12 @@ else
 fi
 popd >/dev/null
 
-DIAGNOSTIC_DIRS_BEFORE="$(find /tmp -maxdepth 1 -name 'gh-aw-cache-memory.*' -print | sort)"
+DIAGNOSTIC_DIRS_BEFORE="$(find "$GH_AW_RUNTIME_DIR" -maxdepth 1 -name 'cache-memory.*' -print | sort)"
 set +e
 OUTPUT="$(run_script "${D}" none)"
 EXIT_CODE=$?
 set -e
-DIAGNOSTIC_DIRS_AFTER="$(find /tmp -maxdepth 1 -name 'gh-aw-cache-memory.*' -print | sort)"
+DIAGNOSTIC_DIRS_AFTER="$(find "$GH_AW_RUNTIME_DIR" -maxdepth 1 -name 'cache-memory.*' -print | sort)"
 assert "corrupted repo exits successfully" \
   "[ '${EXIT_CODE}' -eq 0 ]"
 assert "corruption warning logged" \
@@ -355,7 +357,7 @@ assert "restored file preserved after recovery" \
 assert "integrity branch exists after recovery" \
   "git -C '${D}' rev-parse --verify none >/dev/null 2>&1"
 assert "fsck diagnostics do not use predictable paths" \
-  "! compgen -G '/tmp/gh-aw-git-fsck-*' >/dev/null"
+  "! compgen -G '${GH_AW_RUNTIME_DIR}/gh-aw-git-fsck-*' >/dev/null"
 assert "private diagnostic directory is removed after recovery" \
   '[[ "${DIAGNOSTIC_DIRS_AFTER}" == "${DIAGNOSTIC_DIRS_BEFORE}" ]]'
 echo ""

@@ -1,5 +1,5 @@
 name: 'Setup Activation'
-description: 'Copy activation job files to the agent environment'
+description: 'Copy read-only setup files and allocate an invocation-private runtime, reclaimed by the post step'
 author: 'GitHub Next'
 
 inputs:
@@ -28,6 +28,18 @@ inputs:
     default: ''
 
 outputs:
+  GH_AW_RUNTIME_DIR:
+    description: 'Private runtime root allocated by this setup invocation'
+  GH_AW_RUNTIME_ID:
+    description: 'Docker-safe identity of this setup invocation'
+  GH_AW_RUNTIME_DEV:
+    description: 'Recorded runtime filesystem device used for cleanup attribution'
+  GH_AW_RUNTIME_INO:
+    description: 'Recorded runtime inode used for cleanup attribution'
+  GH_AW_RUNTIME_UID:
+    description: 'Recorded runtime owner used for cleanup attribution'
+  GH_AW_RUNTIME_OWNER:
+    description: 'Runtime owner-marker identity used for cleanup attribution'
   files_copied:
     description: 'Number of files copied'
   trace-id:

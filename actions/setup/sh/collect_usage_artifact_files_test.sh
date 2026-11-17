@@ -2,9 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_DIR="$(mktemp -d)"
+TEST_DIR="$(mktemp -d "${PWD}/.usage-collector-tests.XXXXXX")"
 trap 'rm -rf "$TEST_DIR"' EXIT
 ROOT="$TEST_DIR/gh-aw"
+export GH_AW_RUNTIME_DIR="$ROOT"
 SCRIPT="$TEST_DIR/collect_usage_artifact_files.sh"
 sed "s|/tmp/gh-aw|$ROOT|g" "$SCRIPT_DIR/collect_usage_artifact_files.sh" > "$SCRIPT"
 
@@ -50,6 +51,7 @@ PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" >/dev/null
 test ! -f "$ROOT/usage/aw_info.json"
 
 ISOLATED_ROOT="$TEST_DIR/isolated/gh-aw"
+export GH_AW_RUNTIME_DIR="$ISOLATED_ROOT"
 ISOLATED_SCRIPT="$TEST_DIR/collect_usage_artifact_files.sh"
 mkdir -p "$ISOLATED_ROOT/usage" "$ISOLATED_ROOT/agent"
 printf '{"model":"safe"}\n' > "$ISOLATED_ROOT/aw_info.json"

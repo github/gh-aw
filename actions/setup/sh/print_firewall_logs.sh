@@ -29,18 +29,13 @@ done
 # The Go compiler sets AWF_LOGS_DIR="${RUNNER_TEMP}/gh-aw/sandbox/firewall/logs",
 # so FIREWALL_DIR resolves to "${RUNNER_TEMP}/gh-aw/sandbox/firewall".
 FIREWALL_DIR="$(dirname "${AWF_LOGS_DIR}")"
-GATEWAY_STARTUP_MARKER="${MCP_GATEWAY_STARTUP_MARKER:-/tmp/gh-aw/mcp-gateway-started}"
+GATEWAY_STARTUP_MARKER="${MCP_GATEWAY_STARTUP_MARKER:-${GH_AW_RUNTIME_DIR:?}/mcp-gateway-started}"
 
 if [[ "${ROOTLESS}" == "true" ]]; then
-  # Best-effort: reclaim ownership and fix permissions (AWF cleanup may not have run).
-  # Chown transfers ownership back to the runner user so the next run can rm -rf /tmp/gh-aw
-  # without requiring sudo, preventing EACCES failures on reused runners.
-  sudo -n chown -R "$(id -u):$(id -g)" "${FIREWALL_DIR}" 2>/dev/null || true
-  sudo -n chmod -R a+rX "${FIREWALL_DIR}" 2>/dev/null || chmod -R a+rX "${FIREWALL_DIR}" 2>/dev/null || true
+  # A rootless run must never elevate to reclaim foreign-owned state.
+  chmod -R u+rX "${FIREWALL_DIR}" 2>/dev/null || true
 else
-  # Reclaim ownership and fix permissions on firewall dirs for artifact upload and next-run cleanup.
-  # AWF runs with sudo, creating files owned by root; chown transfers ownership back to the runner
-  # user so the next run's setup.sh can rm -rf /tmp/gh-aw without requiring sudo.
+  # Privileged AWF can create root-owned logs; this is not rootless reclamation.
   sudo chown -R "$(id -u):$(id -g)" "${FIREWALL_DIR}" 2>/dev/null || true
   sudo chmod -R a+rX "${FIREWALL_DIR}" 2>/dev/null || true
 fi

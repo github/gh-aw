@@ -422,10 +422,6 @@ func (c *Compiler) generateAgentStepSummaryAppend(yaml *strings.Builder, data *W
 
 	yaml.WriteString("      - name: Append agent step summary\n")
 	yaml.WriteString("        if: always() && " + secretMaskingSuccessCondition(data) + "\n")
-	if isArcDindTopology(data) {
-		yaml.WriteString("        env:\n")
-		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
-	}
 	yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh\"\n")
 }
 
@@ -440,11 +436,8 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 	yaml.WriteString("        if: always()\n")
 	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseTokenUsageStepID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        continue-on-error: true\n")
-	if isArcDindTopology(data) || isModelRoutingEnabled(data) {
+	if isModelRoutingEnabled(data) {
 		yaml.WriteString("        env:\n")
-	}
-	if isArcDindTopology(data) {
-		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
 	}
 	if isModelRoutingEnabled(data) {
 		if isModelRoutingRuntimeGuarded(data) {

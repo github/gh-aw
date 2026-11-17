@@ -32,8 +32,8 @@ const windowsWSLBootstrapStep = `      - name: Initialize WSL runtime
           & $wsl.Source --set-default Ubuntu
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not select the Ubuntu distribution.' }
           $env:WSLENV = 'GITHUB_WORKSPACE/p:RUNNER_TEMP/p:RUNNER_TOOL_CACHE/p'
-          & $wsl.Source --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi; export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git gpgv jq nodejs npm xz-utils; if ! pgrep -x dockerd >/dev/null; then nohup dockerd --host=unix:///var/run/docker.sock >"$RUNNER_TEMP/gh-aw/dockerd.log" 2>&1 </dev/null & fi; for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; echo "WSL Docker daemon did not become ready." >&2; tail -n 50 "$RUNNER_TEMP/gh-aw/dockerd.log"; exit 1'
-          if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to install Linux tools, start Docker, or map required paths.' }
+          & $wsl.Source --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git gpgv jq nodejs npm xz-utils; if ! pgrep -x dockerd >/dev/null; then nohup dockerd --host=unix:///var/run/docker.sock >/dev/null 2>&1 </dev/null & fi; for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; echo "WSL Docker daemon did not become ready." >&2; exit 1'
+          if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to install Linux tools, start Docker, or map the runner directories.' }
 `
 
 // When updating this pin, select an audited nodejs/release-keys commit and use
@@ -104,7 +104,6 @@ func renderWindowsSteps(stepsYAML string, jobEnvironmentVariables []string) (str
 
 	var renderedSteps strings.Builder
 	for _, step := range steps {
-		step = rewriteWindowsSetupActionPath(step)
 		step = rewriteWindowsActionTempPath(step)
 		if isWindowsNodeSetupStep(step) {
 			step, nodeSetupID := addWindowsNodeSetupID(step)
@@ -296,7 +295,7 @@ func rewriteWindowsActionTempPath(step string) string {
 					line = strings.TrimSuffix(line, "\n")
 				}
 				indentation := line[:len(line)-len(strings.TrimLeft(line, " "))]
-				replacement := constants.GhAwRootDir + strings.TrimPrefix(path, constants.TmpGhAwDir)
+				replacement := runtimeDirectoryExpression + strings.TrimPrefix(path, constants.TmpGhAwDir)
 				line = indentation + "path: " + replacement + newline
 			}
 		}
@@ -317,15 +316,10 @@ func rewriteWindowsActionEnvironmentLine(line string, environmentIndent *int) st
 		if trimmed != "" && indent <= *environmentIndent {
 			*environmentIndent = -1
 		} else {
-			line = strings.ReplaceAll(line, constants.TmpGhAwDir, constants.GhAwRootDir)
+			line = resolveRuntimeStepPaths(line)
 		}
 	}
 	return line
-}
-
-func rewriteWindowsSetupActionPath(step string) string {
-	step = strings.ReplaceAll(step, "gh-aw/actions", "gh-aw-setup/actions")
-	return strings.ReplaceAll(step, "'gh-aw', 'actions'", "'gh-aw-setup', 'actions'")
 }
 
 func rewriteWindowsArtifactPathLine(line string) string {
@@ -339,7 +333,7 @@ func rewriteWindowsArtifactPathLine(line string) string {
 	if path != constants.TmpGhAwDir && !strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
 		return line + newline
 	}
-	return indent + constants.GhAwRootDir + strings.TrimPrefix(path, constants.TmpGhAwDir) + newline
+	return indent + runtimeDirectoryExpression + strings.TrimPrefix(path, constants.TmpGhAwDir) + newline
 }
 
 func renderWindowsPOSIXRunStep(step string, jobEnvironmentVariables []string) string {
@@ -363,6 +357,12 @@ func renderWindowsPOSIXRunStep(step string, jobEnvironmentVariables []string) st
 		stepName = ""
 	}
 	script = rewriteWindowsPathOutputs(stepName, script)
+	// Native actions consume the host path; WSL scripts must expand its translated
+	// environment value instead of embedding the Windows representation.
+	script = strings.NewReplacer(
+		runtimeDirectoryExpression, "${GH_AW_RUNTIME_DIR}",
+		"${{ runner.temp }}", "${RUNNER_TEMP}",
+	).Replace(script)
 
 	lines := strings.SplitAfter(step, "\n")
 	runLine, shellLine, runIndent, runEnd, found := windowsRunStepBounds(lines)
@@ -458,6 +458,18 @@ func rewriteWindowsPathOutputs(stepName, script string) string {
 			source := fmt.Sprintf(`echo "%s=%s"`, outputPath.name, artifactPath)
 			target := fmt.Sprintf(`echo "%s=$(wslpath -w "%s")"`, outputPath.name, artifactPath)
 			script = strings.ReplaceAll(script, source, target)
+			for _, root := range []string{"${GH_AW_RUNTIME_DIR:?}", "${GH_AW_RUNTIME_DIR}", runtimeDirectoryExpression} {
+				runtimePath := path.Join(root, "safeoutputs", outputPath.file)
+				source := fmt.Sprintf(`echo "%s=%s"`, outputPath.name, runtimePath)
+				target := fmt.Sprintf(`echo "%s=$(wslpath -w "%s")"`, outputPath.name, runtimePath)
+				script = strings.ReplaceAll(script, source, target)
+			}
+		}
+		for _, root := range []string{"${GH_AW_RUNTIME_DIR:?}", "${GH_AW_RUNTIME_DIR}", runtimeDirectoryExpression} {
+			logPath := path.Join(root, "mcp-logs", "safeoutputs")
+			source := fmt.Sprintf(`echo "GH_AW_MCP_LOG_DIR=%s"`, logPath)
+			target := fmt.Sprintf(`echo "GH_AW_MCP_LOG_DIR=$(wslpath -w "%s")"`, logPath)
+			script = strings.ReplaceAll(script, source, target)
 		}
 		return script
 	case "Setup agent output environment variable":
@@ -468,10 +480,14 @@ func rewriteWindowsPathOutputs(stepName, script string) string {
 			const suffix = `" >> "$GITHUB_OUTPUT"`
 			if strings.HasPrefix(trimmed, prefix) && strings.HasSuffix(trimmed, suffix) {
 				path := strings.TrimSuffix(strings.TrimPrefix(trimmed, prefix), suffix)
-				if path == constants.TmpGhAwDir || strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
-					hostPath := `"` + constants.GhAwRootDirShell + strings.TrimPrefix(path, constants.TmpGhAwDir) + `"`
+				for _, root := range []string{constants.TmpGhAwDir, runtimeDirectoryExpression, "${GH_AW_RUNTIME_DIR}", "${GH_AW_RUNTIME_DIR:?}"} {
+					if path != root && !strings.HasPrefix(path, root+"/") {
+						continue
+					}
+					hostPath := `"${GH_AW_RUNTIME_DIR:?}` + strings.TrimPrefix(path, root) + `"`
 					replacement := `echo "GH_AW_AGENT_OUTPUT=$(wslpath -w ` + hostPath + `)" >> "$GITHUB_OUTPUT"`
 					line = strings.Replace(line, trimmed, replacement, 1)
+					break
 				}
 			}
 			updated.WriteString(line)
@@ -539,11 +555,27 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 		"GITHUB_ENV",
 		"GITHUB_OUTPUT",
 		"GITHUB_PATH",
+		"GITHUB_STATE",
 		"GITHUB_STEP_SUMMARY",
 		"GH_AW_AGENT_OUTPUT",
+		"GH_AW_MCP_LOG_DIR",
 		"GH_AW_SAFE_OUTPUTS",
 		"GH_AW_SAFE_OUTPUTS_CONFIG_PATH",
 		"GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
+		"GH_AW_RUNTIME_DIR",
+		"GH_AW_RUNTIME_ID",
+		"GH_AW_RUNTIME_DEV",
+		"GH_AW_RUNTIME_INO",
+		"GH_AW_RUNTIME_UID",
+		"GH_AW_RUNTIME_OWNER",
+		"GH_AW_RUNTIME_TMP_DIR",
+		"GH_AW_RUNTIME_TMP_ID",
+		"GH_AW_CLI_PROXY_PORT",
+		"GH_AW_MCP_GATEWAY_PORT",
+		"GH_AW_MCP_CONTROL_PORT",
+		"GH_AW_MCP_SCRIPTS_PORT",
+		"GH_AW_SAFE_OUTPUTS_PORT",
+		"GH_AW_COPILOT_SDK_PORT",
 		"GH_AW_WSL_WORKING_DIRECTORY",
 		"HOME",
 		"TEMP",
@@ -558,7 +590,7 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 	}
 	return []string{
 		"$ErrorActionPreference = 'Stop'",
-		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
+		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_MCP_LOG_DIR', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_RUNTIME_DIR', 'GH_AW_RUNTIME_TMP_DIR', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
 		"$pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)",
 		"foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }",
 		"$allowedEnvironmentVariables = @(" + strings.Join(powerShellAllowedVariables, ", ") + ")",
@@ -579,15 +611,23 @@ func windowsWSLScriptSetup(encodedScript string) []string {
 		"$decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)",
 		"$reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)",
 		"try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }",
+		"if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }",
+		"if ($env:GH_AW_RUNTIME_DIR) {",
+		"  $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()",
+		"  if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }",
+		// Lower before Bash parses the script so quoted JSON and heredocs receive
+		// the same Linux path as shell arguments, not a literal variable reference.
+		"  $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)",
+		"}",
 		"$scriptContent = 'unset GH_AW_NODE_BIN; export PATH=\"/usr/local/lib/nodejs/current/bin:$PATH\"; cd \"$GH_AW_WSL_WORKING_DIRECTORY\"' + \"`n\" + $scriptContent",
-		"$scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'",
-		"New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null",
+		"$scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }",
 		"$hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')",
-		"[System.IO.File]::WriteAllText($hostScriptPath, $scriptContent, [System.Text.UTF8Encoding]::new($false))",
-		"$wslScriptPath = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $hostScriptPath).Trim()",
-		"if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the generated script path.' }",
+		"$scriptStream = [System.IO.File]::Open($hostScriptPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)",
 		"$exitCode = 0",
 		"try {",
+		"  try { $scriptBytes = [System.Text.UTF8Encoding]::new($false).GetBytes($scriptContent); $scriptStream.Write($scriptBytes, 0, $scriptBytes.Length) } finally { $scriptStream.Dispose() }",
+		"  $wslScriptPath = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $hostScriptPath).Trim()",
+		"  if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the generated script path.' }",
 		"  & wsl.exe --distribution Ubuntu --user root --exec bash --noprofile --norc -e -o pipefail $wslScriptPath",
 		"  $exitCode = $LASTEXITCODE",
 		"} finally {",

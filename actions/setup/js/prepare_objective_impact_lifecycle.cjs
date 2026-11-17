@@ -141,7 +141,7 @@ function prepareIssueLifecycle(dataDir, repo) {
 }
 
 if (require.main === module) {
-  prepareIssueLifecycle("/tmp/gh-aw/agent/objective-impact-report", process.env.EXPR_GITHUB_REPOSITORY || process.env.GITHUB_REPOSITORY || "");
+  prepareIssueLifecycle(require("./runtime_paths.cjs").runtimePath("agent/objective-impact-report"), process.env.EXPR_GITHUB_REPOSITORY || process.env.GITHUB_REPOSITORY || "");
 }
 
 module.exports = { prepareIssueLifecycle };

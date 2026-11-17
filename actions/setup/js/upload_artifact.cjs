@@ -67,7 +67,7 @@ const privateDeliveryReceipts = new WeakMap();
  * downloading the staging artifact in the safe_outputs job.
  * Queue Claim namespaces are resolved in their immutable execution context.
  */
-const STAGING_BASE = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
+const STAGING_BASE = require("./runtime_paths.cjs").runtimePath("safeoutputs/upload-artifacts");
 function stagingDirectory() {
   const handle = currentClaimHandle();
   const directory = handle ? claimArtifactPath(STAGING_BASE, handle) : STAGING_BASE;
@@ -76,7 +76,7 @@ function stagingDirectory() {
 }
 
 /** Path where the resolver mapping (tmpId → artifact name) is written. */
-const RESOLVER_FILE = process.env.GH_AW_ARTIFACT_RESOLVER_FILE || "/tmp/gh-aw/artifact-resolver.json";
+const RESOLVER_FILE = process.env.GH_AW_ARTIFACT_RESOLVER_FILE || require("./runtime_paths.cjs").runtimePath("artifact-resolver.json");
 
 /**
  * Generate a temporary artifact ID using the same aw_ prefix format as other safe outputs.

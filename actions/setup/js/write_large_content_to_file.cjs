@@ -13,7 +13,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  * @returns {{ filename: string, description: string }} Object with filename and description
  */
 function writeLargeContentToFile(content) {
-  const logsDir = "/tmp/gh-aw/safeoutputs";
+  const logsDir = require("./runtime_paths.cjs").runtimePath("safeoutputs");
 
   try {
     fs.mkdirSync(logsDir, { recursive: true });

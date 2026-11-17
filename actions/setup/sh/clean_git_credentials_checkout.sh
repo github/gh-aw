@@ -18,6 +18,8 @@ fi
 echo "WARNING: Git credential cleanup helper unavailable. Running inline fallback."
 
 cleaned_configs=0
+search_roots=("${GITHUB_WORKSPACE:?}")
+if [[ -n "${GH_AW_RUNTIME_DIR:-}" ]]; then search_roots+=("$GH_AW_RUNTIME_DIR"); fi
 while IFS= read -r git_config; do
   git config --file "${git_config}" --remove-section credential 2>/dev/null || true
   sed -i '/^\[credential /,/^\[/{ /^\[credential /d; /^\[/!d; }' "${git_config}" 2>/dev/null || true
@@ -32,7 +34,7 @@ while IFS= read -r git_config; do
     fi
   done || true
   cleaned_configs=$((cleaned_configs + 1))
-done < <(find "${GITHUB_WORKSPACE}" /tmp -maxdepth 15 -type f -name "config" \( -path "*/.git/config" -o -path "*/.git/modules/*/config" \) 2>/dev/null | sort -u)
+done < <(find "${search_roots[@]}" -maxdepth 15 -type f -name "config" \( -path "*/.git/config" -o -path "*/.git/modules/*/config" \) 2>/dev/null | sort -u)
 
 if [ "${cleaned_configs}" -eq 0 ]; then
   echo "No git config files found for checkout cleanup fallback"

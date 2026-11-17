@@ -593,6 +593,7 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	bash actions/setup/sh/install_gh_cli_test.sh
 	bash actions/setup/sh/install_threat_detect_binary_test.sh
 	bash actions/setup/sh/release_integrity_test.sh
+	node --test actions/setup/runtime_isolation.test.cjs
 	bash .github/scripts/install_tla_runtime_test.sh
 	bash actions/setup/sh/runtime_trust_inventory_test.sh
 	@echo "✓ All script tests passed"

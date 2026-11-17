@@ -29,7 +29,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
 
 /** Default path to the detection engine log file. */
-const DETECTION_LOG_PATH = "/tmp/gh-aw/threat-detection/detection.log";
+const DETECTION_LOG_PATH = require("./runtime_paths.cjs").runtimePath("threat-detection/detection.log");
 
 /** Maximum number of bytes read from the log file before truncation. */
 const MAX_LOG_BYTES = 1024 * 1024; // 1 MiB

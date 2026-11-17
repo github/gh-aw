@@ -20,10 +20,11 @@ func TestArcDindThreatDetectionFileRoundTrip(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			runnerTemp := filepath.Join(root, "shared temp")
+			runtimeDir := filepath.Join(runnerTemp, "gh-aw-job-private")
 			hostDir := filepath.Join(root, "runner private", "threat-detection")
 			hostInputDir := filepath.Join(root, "runner private", "threat-detection-inputs")
 			binDir := filepath.Join(root, "installed bin")
-			stagedDir := filepath.Join(runnerTemp, "gh-aw", "threat-detection")
+			stagedDir := filepath.Join(runtimeDir, "threat-detection")
 			for _, dir := range []string{hostDir, hostInputDir, binDir, stagedDir} {
 				require.NoError(t, os.MkdirAll(dir, 0700))
 			}
@@ -61,11 +62,12 @@ printf 'usage events' > "$output_dir/detection_usage.jsonl"
 			runScript := func(mode string) {
 				t.Helper()
 				cmd := exec.Command("bash", script, mode, hostDir)
-				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+runnerTemp, "PATH="+binDir+":"+os.Getenv("PATH"))
+				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+runnerTemp, "GH_AW_RUNTIME_DIR="+runtimeDir, "PATH="+binDir+":"+os.Getenv("PATH"))
 				cmd.Env = append(cmd.Env, "THREAT_DETECT_BINARY="+filepath.Join(binDir, "threat-detect"))
 				out, err := cmd.CombinedOutput()
 				require.NoError(t, err, "%s", out)
 			}
+			runScript("reset")
 			runScript("stage")
 			require.NoFileExists(t, filepath.Join(hostDir, "detection_result.json"))
 			require.NoFileExists(t, filepath.Join(stagedDir, "detection_result.json"))
@@ -73,7 +75,7 @@ printf 'usage events' > "$output_dir/detection_usage.jsonl"
 			require.NoError(t, os.Remove(filepath.Join(binDir, "threat-detect")))
 			command := `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH"; ` + buildThreatDetectCommand("true", "copilot", &ThreatDetectionConfig{}, true)
 			cmd := exec.Command("bash", "-c", command)
-			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+runnerTemp)
+			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+runnerTemp, "GH_AW_RUNTIME_DIR="+runtimeDir)
 			if fail {
 				cmd.Env = append(cmd.Env, "FAIL_DETECTION=true")
 			}
@@ -111,8 +113,9 @@ printf 'usage events' > "$output_dir/detection_usage.jsonl"
 
 func TestArcDindThreatDetectionResetWithoutExecution(t *testing.T) {
 	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "gh-aw-job-private")
 	hostDir := filepath.Join(root, "host")
-	stagedDir := filepath.Join(root, "gh-aw", "threat-detection")
+	stagedDir := filepath.Join(runtimeDir, "threat-detection")
 	for _, dir := range []string{hostDir, stagedDir} {
 		require.NoError(t, os.MkdirAll(dir, 0700))
 		for _, name := range []string{"detection_result.json", "detection_result_full.json", "detection_usage.json", "detection_usage.jsonl"} {
@@ -122,7 +125,7 @@ func TestArcDindThreatDetectionResetWithoutExecution(t *testing.T) {
 	// No binary is installed and neither stage nor collect runs: this models
 	// failed/cancelled installation and skipped detection execution.
 	cmd := exec.Command("bash", "../../actions/setup/sh/stage_threat_detection_arc_dind.sh", "reset", hostDir)
-	cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "THREAT_DETECT_BINARY=")
+	cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "GH_AW_RUNTIME_DIR="+runtimeDir, "THREAT_DETECT_BINARY=")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", out)
 	for _, dir := range []string{hostDir, stagedDir} {
@@ -134,11 +137,12 @@ func TestArcDindThreatDetectionResetWithoutExecution(t *testing.T) {
 
 func TestArcDindThreatDetectionRejectsUnsafeDirectories(t *testing.T) {
 	for _, mode := range []string{"reset", "stage", "collect"} {
-		for _, target := range []string{"host", "staged", "same directory"} {
+		for _, target := range []string{"host", "staged"} {
 			t.Run(mode+"/"+target, func(t *testing.T) {
 				root := t.TempDir()
+				runtimeDir := filepath.Join(root, "gh-aw-job-private")
 				hostDir := filepath.Join(root, "host")
-				stagedDir := filepath.Join(root, "gh-aw", "threat-detection")
+				stagedDir := filepath.Join(runtimeDir, "threat-detection")
 				outside := filepath.Join(root, "outside")
 				require.NoError(t, os.MkdirAll(outside, 0700))
 				require.NoError(t, os.MkdirAll(filepath.Dir(stagedDir), 0700))
@@ -149,14 +153,12 @@ func TestArcDindThreatDetectionRejectsUnsafeDirectories(t *testing.T) {
 					require.NoError(t, os.Symlink(outside, hostDir))
 				case "staged":
 					require.NoError(t, os.Symlink(outside, stagedDir))
-				default:
-					hostDir = stagedDir
 				}
 				cmd := exec.Command("bash", "../../actions/setup/sh/stage_threat_detection_arc_dind.sh", mode, hostDir)
-				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root)
+				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "GH_AW_RUNTIME_DIR="+runtimeDir)
 				out, err := cmd.CombinedOutput()
 				require.Error(t, err)
-				require.Contains(t, string(out), "separate, non-symlink directories")
+				require.Contains(t, string(out), "non-symlink directories")
 				content, err := os.ReadFile(marker)
 				require.NoError(t, err)
 				require.Equal(t, "untouched", string(content))
@@ -169,12 +171,13 @@ func TestArcDindThreatDetectionUsesVerifiedBinary(t *testing.T) {
 	for _, state := range []string{"verified", "missing", "not executable", "symlink", "unset"} {
 		t.Run(state, func(t *testing.T) {
 			root := t.TempDir()
-			hostDir := filepath.Join(root, "host")
+			runtimeDir := filepath.Join(root, "gh-aw-job-private")
+			hostDir := filepath.Join(runtimeDir, "threat-detection")
 			pathDir := filepath.Join(root, "path")
 			for _, dir := range []string{hostDir, pathDir} {
 				require.NoError(t, os.MkdirAll(dir, 0700))
 			}
-			require.NoError(t, os.MkdirAll(filepath.Join(root, "threat-detection-inputs"), 0700))
+			require.NoError(t, os.MkdirAll(filepath.Join(runtimeDir, "threat-detection-inputs"), 0700))
 			shadow := filepath.Join(pathDir, "threat-detect")
 			require.NoError(t, os.WriteFile(shadow, []byte("#!/bin/bash\nexit 99\n"), 0700))
 			verified := filepath.Join(root, "verified detector")
@@ -190,7 +193,7 @@ func TestArcDindThreatDetectionUsesVerifiedBinary(t *testing.T) {
 				verified = ""
 			}
 			cmd := exec.Command("bash", "../../actions/setup/sh/stage_threat_detection_arc_dind.sh", "stage", hostDir)
-			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "THREAT_DETECT_BINARY="+verified, "PATH="+pathDir+":"+os.Getenv("PATH"))
+			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "GH_AW_RUNTIME_DIR="+runtimeDir, "THREAT_DETECT_BINARY="+verified, "PATH="+pathDir+":"+os.Getenv("PATH"))
 			out, err := cmd.CombinedOutput()
 			stagedBinary := filepath.Join(root, "gh-aw", "bin", "threat-detect")
 			if state != "verified" {
@@ -203,5 +206,54 @@ func TestArcDindThreatDetectionUsesVerifiedBinary(t *testing.T) {
 			require.NoError(t, err, "%s", out)
 			require.Equal(t, "verified", string(out), "PATH shadow must not be staged")
 		})
+	}
+}
+
+func TestArcDindThreatDetectionSharedPrivateRuntime(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "gh-aw-job-private")
+	detectionDir := filepath.Join(runtimeDir, "threat-detection")
+	inputDir := filepath.Join(runtimeDir, "threat-detection-inputs")
+	verified := filepath.Join(root, "verified-detector")
+	require.NoError(t, os.WriteFile(verified, []byte("#!/bin/bash\nexit 0\n"), 0700))
+	script := "../../actions/setup/sh/stage_threat_detection_arc_dind.sh"
+	run := func(mode string) {
+		t.Helper()
+		cmd := exec.Command("bash", script, mode)
+		cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "GH_AW_RUNTIME_DIR="+runtimeDir, "THREAT_DETECT_BINARY="+verified)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", out)
+	}
+	run("reset")
+	for path, content := range map[string]string{
+		filepath.Join(detectionDir, "detection.log"):  "host log",
+		filepath.Join(detectionDir, "execution.json"): "host evidence",
+		filepath.Join(inputDir, "agent_output.json"):  "prepared input",
+		filepath.Join(inputDir, ".optional-input"):    "prepared optional input",
+	} {
+		require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+	}
+	run("stage")
+	require.NoError(t, os.WriteFile(filepath.Join(detectionDir, "detection_result.json"), []byte("detector result"), 0600))
+	run("collect")
+	for path, expected := range map[string]string{
+		filepath.Join(detectionDir, "detection.log"):         "host log",
+		filepath.Join(detectionDir, "execution.json"):        "host evidence",
+		filepath.Join(inputDir, "agent_output.json"):         "prepared input",
+		filepath.Join(inputDir, ".optional-input"):           "prepared optional input",
+		filepath.Join(detectionDir, "detection_result.json"): "detector result",
+	} {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, expected, string(content))
+	}
+	require.FileExists(t, filepath.Join(root, "gh-aw", "bin", "threat-detect"))
+	require.NoDirExists(t, filepath.Join(root, "gh-aw", "threat-detection"))
+	require.NoDirExists(t, filepath.Join(root, "gh-aw", "threat-detection-inputs"))
+	run("reset")
+	for _, directory := range []string{detectionDir, inputDir} {
+		files, err := os.ReadDir(directory)
+		require.NoError(t, err)
+		require.Empty(t, files)
 	}
 }

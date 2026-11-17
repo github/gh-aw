@@ -77,8 +77,7 @@ func (c *Compiler) newWorkQueuePreparedAdapterJob(data *WorkflowData, name strin
 		Permissions:    "permissions:\n      contents: read\n      actions: read",
 		TimeoutMinutes: 10,
 		Env: map[string]string{
-			"GH_AW_WORK_QUEUE_ENABLED":  `"true"`,
-			"GH_AW_WORK_QUEUE_SNAPSHOT": fmt.Sprintf("%q", constants.WorkQueueSnapshotPath),
+			"GH_AW_WORK_QUEUE_ENABLED": `"true"`,
 		},
 	}
 	if threatDetectionEnabled {

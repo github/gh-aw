@@ -37,7 +37,7 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 	// that were added after the latest tag.
 	ref := versionToGitRef(c.version)
 
-	// Script mode: checkout .github folder from github/gh-aw to /tmp/gh-aw/actions-source/
+	// Script mode bootstraps outside the runtime tree, which setup allocates later.
 	if c.actionMode.IsScript() {
 		lines := []string{
 			"      - name: Checkout actions folder\n",
@@ -51,7 +51,7 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 		lines = append(lines,
 			"          sparse-checkout: |\n",
 			"            actions\n",
-			"          path: /tmp/gh-aw/actions-source\n",
+			"          path: .gh-aw-actions-source\n",
 			"          fetch-depth: 1\n",
 			"          clean: false\n",
 			"          persist-credentials: false\n",
@@ -247,7 +247,7 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 			"      - name: Setup Scripts\n",
 			"        id: setup\n",
 			"        run: |\n",
-			"          bash /tmp/gh-aw/actions-source/actions/setup/setup.sh\n",
+			"          bash \"$GITHUB_WORKSPACE/.gh-aw-actions-source/actions/setup/setup.sh\"\n",
 			"        env:\n",
 			fmt.Sprintf("          INPUT_DESTINATION: %s\n", destination),
 			"          INPUT_JOB_NAME: ${{ github.job }}\n",
@@ -359,15 +359,16 @@ func (c *Compiler) generateSetRuntimePathsStep() []string {
 		"            echo \"RUNNER_TOOL_CACHE=${GH_AW_RUNNER_TOOL_CACHE}\" >> \"$GITHUB_ENV\"\n",
 		"          fi\n",
 		"          {\n",
-		"            echo \"GH_AW_SAFE_OUTPUTS=${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl\"\n",
+		"            echo \"GH_AW_SAFE_OUTPUTS=${GH_AW_RUNTIME_DIR:?}/safeoutputs/outputs.jsonl\"\n",
 		"            echo \"GH_AW_SAFE_OUTPUTS_CONFIG_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/config.json\"\n",
 		"            echo \"GH_AW_SAFE_OUTPUTS_TOOLS_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/tools.json\"\n",
 		"          } >> \"$GITHUB_OUTPUT\"\n",
+		"          echo \"GH_AW_MCP_LOG_DIR=${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs\" >> \"$GITHUB_ENV\"\n",
 	}
 }
 
 // generateScriptModeCleanupStep generates a cleanup step for script mode that sends an OTLP
-// conclusion span and removes /tmp/gh-aw/. This mirrors the post.js post step that runs
+// conclusion span and removes the owned runtime tree. This mirrors the post.js step that runs
 // automatically when using a `uses:` action in dev/release/action mode.
 //
 // The step is guarded by `if: always()` so it runs even if prior steps fail, ensuring
@@ -380,9 +381,12 @@ func (c *Compiler) generateScriptModeCleanupStep() string {
 	step.WriteString("      - name: Clean Scripts\n")
 	step.WriteString("        if: always()\n")
 	step.WriteString("        run: |\n")
-	step.WriteString("          bash /tmp/gh-aw/actions-source/actions/setup/clean.sh\n")
+	step.WriteString("          bash \"${RUNNER_TEMP}/gh-aw/actions/clean.sh\"\n")
 	step.WriteString("        env:\n")
 	fmt.Fprintf(&step, "          INPUT_DESTINATION: %s\n", SetupActionDestination)
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
+	for _, suffix := range []string{"DIR", "ID", "DEV", "INO", "UID", "OWNER"} {
+		fmt.Fprintf(&step, "          GH_AW_RUNTIME_%s: ${{ steps.setup.outputs.GH_AW_RUNTIME_%s }}\n", suffix, suffix)
+	}
 	return step.String()
 }

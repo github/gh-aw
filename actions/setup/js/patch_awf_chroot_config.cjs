@@ -2,7 +2,6 @@
 
 const fs = require("fs");
 const os = require("os");
-const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
@@ -20,10 +19,10 @@ function patchAWFChrootConfig(options = {}) {
     throw new Error("RUNNER_TEMP is required");
   }
 
-  const binariesSourcePath = options.binariesSourcePath || process.env.GH_AW_CHROOT_BINARIES_SOURCE_PATH || "/tmp/gh-aw";
-  const identityHome = options.identityHome || process.env.GH_AW_CHROOT_IDENTITY_HOME || "/tmp/gh-aw/home";
-  const configPath = path.join(runnerTemp, "gh-aw", "awf-config.json");
-  const artifactConfigPath = path.join(binariesSourcePath, "awf-config.json");
+  const binariesSourcePath = options.binariesSourcePath || process.env.GH_AW_CHROOT_BINARIES_SOURCE_PATH || require("./runtime_paths.cjs").runtimeRoot();
+  const identityHome = options.identityHome || process.env.GH_AW_CHROOT_IDENTITY_HOME || require("./runtime_paths.cjs").runtimePath("home");
+  const configPath = process.env.GH_AW_AWF_CONFIG_PATH || require("./runtime_paths.cjs").runtimePath("awf-config.json");
+  const artifactConfigPath = require("./runtime_paths.cjs").runtimePath("awf-config.json");
   let config;
   try {
     config = JSON.parse(fs.readFileSync(configPath, "utf8"));

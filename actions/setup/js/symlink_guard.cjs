@@ -58,18 +58,19 @@ function normalizeGuardedPath(filename) {
 }
 
 /**
- * Resolve a safe-output source within the workspace or /tmp without following links.
+ * Resolve a safe-output source within the workspace or this runtime without following links.
  * @param {string} filename
  * @returns {string}
  */
 function resolveWorkspaceOrTmpPath(filename) {
   const absolute = normalizeGuardedPath(filename);
   const workspace = normalizeGuardedPath(process.env.GITHUB_WORKSPACE || process.cwd());
-  for (const root of [workspace, normalizeGuardedPath("/tmp")]) {
+  const runtime = normalizeGuardedPath(require("./runtime_paths.cjs").runtimeRoot());
+  for (const root of [workspace, runtime]) {
     const relative = path.relative(root, absolute);
     if (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)) return absolute;
   }
-  throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspace}) or /tmp directory. Provided path: ${filename} (resolved to: ${absolute})`);
+  throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspace}) or runtime directory (${runtime}). Provided path: ${filename} (resolved to: ${absolute})`);
 }
 
 /**
@@ -110,14 +111,14 @@ function validateUploadSourcePath(canonicalPath) {
 function resolveIssueArtifactPath(filename) {
   const absolute = normalizeGuardedPath(filename);
   const workspace = normalizeGuardedPath(process.env.GITHUB_WORKSPACE || process.cwd());
-  const agentRoot = normalizeGuardedPath("/tmp/gh-aw/agent");
+  const agentRoot = normalizeGuardedPath(require("./runtime_paths.cjs").runtimePath("agent"));
   const denied = validateUploadSourcePath(absolute);
   if (denied) throw assetValidationError(denied);
   for (const root of [workspace, agentRoot]) {
     const relative = path.relative(root, absolute);
     if (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)) return absolute;
   }
-  throw assetValidationError(`File path must be within workspace directory (${workspace}) or /tmp/gh-aw/agent directory. Provided path: ${filename}`);
+  throw assetValidationError(`File path must be within workspace directory (${workspace}) or ${agentRoot} directory. Provided path: ${filename}`);
 }
 
 /**

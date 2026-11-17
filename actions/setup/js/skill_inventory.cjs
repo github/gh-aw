@@ -4,8 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const INVENTORY_PATH = "/tmp/gh-aw/skill_inventory.json";
-const INSTALL_HISTORY_PATH = "/tmp/gh-aw/skill_install_history.json";
+const INVENTORY_PATH = require("./runtime_paths.cjs").runtimePath("skill_inventory.json");
+const INSTALL_HISTORY_PATH = require("./runtime_paths.cjs").runtimePath("skill_install_history.json");
 
 /**
  * Inventory only regular skill files in the staged engine directory and the
@@ -40,7 +40,7 @@ function detectSkillConflicts(skills) {
     }));
 }
 
-function main({ stagedRoot = "/tmp/gh-aw", inventoryPath = INVENTORY_PATH, historyPath = INSTALL_HISTORY_PATH } = {}) {
+function main({ stagedRoot = require("./runtime_paths.cjs").runtimeRoot(), inventoryPath = INVENTORY_PATH, historyPath = INSTALL_HISTORY_PATH } = {}) {
   const skillDir = process.env.GH_AW_SKILL_DIR || "";
   const workspace = process.env.GITHUB_WORKSPACE || "";
   const resolvedStagedRoot = path.resolve(stagedRoot);

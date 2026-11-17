@@ -75,12 +75,12 @@ async function main() {
   // GitHub Actions preserves the directory structure from the uploaded artifact
   // (stripping the common /tmp/gh-aw/ prefix from the uploaded paths)
   // So /tmp/gh-aw/aw-prompts/prompt.txt becomes /tmp/gh-aw/threat-detection/aw-prompts/prompt.txt
-  const threatDetectionDir = "/tmp/gh-aw/threat-detection";
+  const threatDetectionDir = require("./runtime_paths.cjs").runtimePath("threat-detection");
   const promptPath = path.join(threatDetectionDir, "aw-prompts/prompt.txt");
   let promptFileInfo;
   if (!fs.existsSync(promptPath)) {
     promptFileInfo = `${promptPath} (unavailable)`;
-    core.warning(`${ERR_VALIDATION}: Missing workflow prompt context at ${promptPath}. ` + "Ensure the agent artifact includes /tmp/gh-aw/aw-prompts/prompt.txt. " + "Threat detection will continue with fallback workflow context.");
+    core.warning(`${ERR_VALIDATION}: Missing workflow prompt context at ${promptPath}. ` + "Ensure the agent artifact includes aw-prompts/prompt.txt. " + "Threat detection will continue with fallback workflow context.");
   } else {
     let promptStats;
     try {
@@ -216,12 +216,12 @@ async function main() {
 
   // Write prompt file
   try {
-    fs.mkdirSync("/tmp/gh-aw/aw-prompts", { recursive: true });
-    fs.writeFileSync("/tmp/gh-aw/aw-prompts/prompt.txt", promptContent);
+    fs.mkdirSync(require("./runtime_paths.cjs").runtimePath("aw-prompts"), { recursive: true });
+    fs.writeFileSync(require("./runtime_paths.cjs").runtimePath("aw-prompts/prompt.txt"), promptContent);
   } catch (err) {
     throw new Error(`${ERR_SYSTEM}: Failed to prepare threat detection prompt file: ${getErrorMessage(err)}`, { cause: err });
   }
-  core.exportVariable("GH_AW_PROMPT", "/tmp/gh-aw/aw-prompts/prompt.txt");
+  core.exportVariable("GH_AW_PROMPT", require("./runtime_paths.cjs").runtimePath("aw-prompts/prompt.txt"));
 
   // Note: creation of /tmp/gh-aw/threat-detection and detection.log is handled by a separate shell step
 

@@ -14,7 +14,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  */
 async function generateWorkflowOverview(core) {
   const fs = require("fs");
-  const awInfoPath = "/tmp/gh-aw/aw_info.json";
+  const awInfoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json");
 
   // Load aw_info.json
   let awInfo;

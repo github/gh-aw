@@ -200,8 +200,7 @@ async function main() {
     const collectionErrors = [];
     if (!outputFile || !fs.existsSync(outputFile)) {
       core.info(outputFile ? `Output file does not exist: ${outputFile}` : "GH_AW_SAFE_OUTPUTS not set, no output to collect");
-      const runnerTemp = process.env.RUNNER_TEMP || "/home/runner/work/_temp";
-      const gatewayEmptyFlagPath = `${runnerTemp}/gh-aw/safeoutputs/gateway_empty.flag`;
+      const gatewayEmptyFlagPath = require("./runtime_paths.cjs").runtimePath("safeoutputs/gateway_empty.flag");
       if (fs.existsSync(gatewayEmptyFlagPath)) {
         const reason =
           `safeoutputs MCP gateway registered 0 tools during setup; the agent could not emit any safe outputs. ` +
@@ -449,7 +448,7 @@ async function main() {
     // Check if any patch or bundle files exist for detection job conditional
     // Patches are named aw-{branch}.patch (format-patch transport, one per branch)
     // Bundles are named aw-{branch}.bundle (git bundle transport, preserves merge topology)
-    const patchDir = "/tmp/gh-aw";
+    const patchDir = require("./runtime_paths.cjs").runtimeRoot();
     let hasPatch = false;
     const patchFiles = [];
     try {

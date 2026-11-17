@@ -341,8 +341,8 @@ if (require.main === module) {
   }
   collectLifecycle({
     repository: host === "github.com" ? repository : `${host}/${repository}`,
-    memoryDir: "/tmp/gh-aw/repo-memory/lifecycle",
-    metricsDir: "/tmp/gh-aw/repo-memory/default/metrics",
+    memoryDir: require("./runtime_paths.cjs").runtimePath("repo-memory/lifecycle"),
+    metricsDir: require("./runtime_paths.cjs").runtimePath("repo-memory/default/metrics"),
   });
 }
 

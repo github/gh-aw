@@ -244,9 +244,9 @@ function parseJsonOrUndefined(value) {
 // Constants and resolvePostResultWatchdogIdleTimeoutMs are imported from process_runner.cjs.
 const POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS = resolvePostResultWatchdogIdleTimeoutMs();
 
-const TOKEN_USAGE_AUDIT_PATH = "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl";
-const TOKEN_USAGE_AWF_AUDIT_PATH = "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl";
-const TOKEN_USAGE_PATH = "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl";
+const TOKEN_USAGE_AUDIT_PATH = require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl");
+const TOKEN_USAGE_AWF_AUDIT_PATH = require("./runtime_paths.cjs").runtimePath("sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl");
+const TOKEN_USAGE_PATH = require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
 const TOKEN_USAGE_PATHS = [TOKEN_USAGE_AUDIT_PATH, TOKEN_USAGE_AWF_AUDIT_PATH, TOKEN_USAGE_PATH];
 
 const DEFAULT_CONTEXT_REBUILD_FACTOR_LIMIT = 25;

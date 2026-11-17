@@ -2,7 +2,6 @@
 
 const fs = require("fs");
 const path = require("path");
-const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
@@ -24,6 +23,7 @@ function removeFailedSessionArtifacts(files, originalError) {
  * @returns {string}
  */
 function serializeSessionArtifact(events, maskedValues = [], options = {}) {
+  const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
   const secretValues = collectArtifactSecretValues();
   const redacted = redactManifestValue(events, secretValues);
   if (!Array.isArray(redacted)) throw new Error(`${ERR_VALIDATION}: Expected a session event array`);

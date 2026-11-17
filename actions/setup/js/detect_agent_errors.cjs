@@ -82,7 +82,7 @@ const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 
 // File written by the engine execution step with the epoch milliseconds at which the
 // engine CLI was started. Used to measure how long the engine ran before it was killed.
-const AGENT_CLI_START_MS_FILE = "/tmp/gh-aw/agent_cli_start_ms.txt";
+const AGENT_CLI_START_MS_FILE = require("./runtime_paths.cjs").runtimePath("agent_cli_start_ms.txt");
 
 /**
  * Read the engine CLI start timestamp (epoch milliseconds) written by the execution step.
@@ -128,7 +128,7 @@ function writeOutputs(results) {
   }
 }
 
-function hasModelEndpointMismatchRecord(rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw") {
+function hasModelEndpointMismatchRecord(rootDir = require("./runtime_paths.cjs").runtimeRoot()) {
   try {
     const record = JSON.parse(fs.readFileSync(path.join(rootDir, "agent", "model-endpoint-mismatch.json"), "utf8"));
     return (
@@ -227,7 +227,7 @@ async function renderInternalEngineLogOnFailure() {
  * @param {ReturnType<typeof detectErrors>} results
  * @param {string} [rootDir]
  */
-function persistAgentExecution(logContent, results, rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw") {
+function persistAgentExecution(logContent, results, rootDir = require("./runtime_paths.cjs").runtimeRoot()) {
   const exitPath = path.join(rootDir, "agent_execution_exit_code.txt");
   const execution = collectAgentExecution({
     content: logContent,
@@ -240,7 +240,7 @@ function persistAgentExecution(logContent, results, rootDir = process.env.GH_AW_
   writeSessionArtifact(path.join(rootDir, "agent-errors.jsonl"), execution ? [execution] : [], collectAddMaskedValues(logContent));
 }
 
-async function main({ rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw" } = {}) {
+async function main({ rootDir = require("./runtime_paths.cjs").runtimeRoot() } = {}) {
   let logContent = "";
   const logFile = path.join(rootDir, "agent-stdio.log");
 

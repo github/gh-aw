@@ -6,7 +6,7 @@ const { resolveCopilotSDKMCPConfigPath } = require("./copilot_sdk_mcp_config_pat
 
 const GUEST_ROOT = "/workspace/.gh-aw-nvx";
 const STATE_INPUTS = ["aw-prompts", "mcp-config", "agent", "threat-detection", ".pi", "pi-agent-dir", "models.json", "github-event.json", "awf-config.json", "engine-command.sh"];
-const STATE_OUTPUT_DIRECTORIES = ["agent", "threat-detection", "sandbox/agent/logs"];
+const STATE_OUTPUT_DIRECTORIES = ["agent", "threat-detection", "sandbox/agent/logs", "safeoutputs"];
 const STATE_OUTPUT_FILES = ["pi-streaming.jsonl", "claude-debug.log", "agent-step-summary.md", "step-summary.md"];
 const SAFEOUTPUTS_OUTPUT_FILES = ["outputs.jsonl"];
 const SAFEOUTPUTS_OUTPUT_DIRECTORIES = ["upload-artifacts"];
@@ -115,7 +115,7 @@ function stageExecutableLibraries(entry, runtime, guestRuntime) {
 }
 
 /** @param {NodeJS.ProcessEnv} environment @param {string} stateRoot @param {string} guestRoot */
-function stage(environment = process.env, stateRoot = "/tmp/gh-aw", guestRoot = GUEST_ROOT) {
+function stage(environment = process.env, stateRoot = require("./runtime_paths.cjs").runtimeRoot(environment), guestRoot = GUEST_ROOT) {
   try {
     const workspace = environment.GITHUB_WORKSPACE;
     const runnerTemp = environment.RUNNER_TEMP;
@@ -174,6 +174,7 @@ function stage(environment = process.env, stateRoot = "/tmp/gh-aw", guestRoot = 
 function guestEnvironment(environment, guestRoot = GUEST_ROOT) {
   const runtime = `${guestRoot}/gh-aw`;
   const replacements = [
+    [require("./runtime_paths.cjs").runtimeRoot(environment), require("./runtime_paths.cjs").runtimeRoot(environment)],
     [environment.GH_AW_NVX_HOST_ROOT, runtime],
     [environment.GH_AW_NVX_HOST_WORKSPACE, "/workspace"],
     [environment.GH_AW_NVX_HOST_HOME, environment.HOME],
@@ -190,7 +191,7 @@ function guestEnvironment(environment, guestRoot = GUEST_ROOT) {
   }
   result.RUNNER_TEMP = guestRoot;
   result.GH_AW_NODE_BIN = `${runtime}/bin/node`;
-  result.GH_AW_MODELS_JSON_PATH = "/tmp/gh-aw/models.json";
+  result.GH_AW_MODELS_JSON_PATH = path.join(require("./runtime_paths.cjs").runtimeRoot(environment), "models.json");
   result.GH_AW_PI_PACKAGE_ROOT = `${runtime}/engine-cli/node_modules/@earendil-works/pi-coding-agent`;
   result.NODE_PATH = `${runtime}/engine-cli/node_modules${result.NODE_PATH ? `:${result.NODE_PATH}` : ""}`;
   result.PATH = `${runtime}/bin:${runtime}/engine-cli/bin:${runtime}/mcp-cli/bin:${result.PATH || "/usr/local/bin:/usr/bin:/bin"}`;
@@ -199,8 +200,9 @@ function guestEnvironment(environment, guestRoot = GUEST_ROOT) {
 }
 
 /** @param {string} command @param {string} guestRoot @param {string} stateLink */
-function guest(command, guestRoot = GUEST_ROOT, stateLink = "/tmp/gh-aw") {
+function guest(command, guestRoot = GUEST_ROOT, stateLink = require("./runtime_paths.cjs").runtimeRoot()) {
   if (!command) throw new Error("NVX guest command is missing");
+  fs.mkdirSync(path.dirname(stateLink), { recursive: true });
   if (fs.existsSync(stateLink)) fs.rmdirSync(stateLink);
   fs.symlinkSync(`${guestRoot}/state`, stateLink);
   const child = spawn("/bin/bash", ["-c", command], { env: guestEnvironment(process.env, guestRoot), stdio: "inherit" });
@@ -283,7 +285,7 @@ function removeAssets(entry) {
 }
 
 /** @param {NodeJS.ProcessEnv} environment @param {string} stateRoot */
-function collect(environment = process.env, stateRoot = "/tmp/gh-aw") {
+function collect(environment = process.env, stateRoot = require("./runtime_paths.cjs").runtimeRoot(environment)) {
   try {
     if (!environment.RUNNER_TEMP || !environment.GITHUB_WORKSPACE) throw new Error("NVX output collection requires runner paths");
     const marker = path.join(environment.RUNNER_TEMP, "gh-aw", "nvx-assets.json");
@@ -303,7 +305,7 @@ function collect(environment = process.env, stateRoot = "/tmp/gh-aw") {
       }
       for (const name of STATE_OUTPUT_DIRECTORIES) collectAllowedOutput(path.join(root, "state"), stateRoot, name, true);
       for (const name of STATE_OUTPUT_FILES) collectAllowedOutput(path.join(root, "state"), stateRoot, name, false);
-      const hostSafeoutputs = path.join(environment.RUNNER_TEMP, "gh-aw", "safeoutputs");
+      const hostSafeoutputs = path.join(stateRoot, "safeoutputs");
       for (const name of SAFEOUTPUTS_OUTPUT_FILES) collectAllowedOutput(guestSafeoutputs, hostSafeoutputs, name, false);
       for (const name of SAFEOUTPUTS_OUTPUT_DIRECTORIES) collectAllowedOutput(guestSafeoutputs, hostSafeoutputs, name, true);
     } finally {

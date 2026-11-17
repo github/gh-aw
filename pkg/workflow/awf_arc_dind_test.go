@@ -124,12 +124,12 @@ func TestBuildArcDindChrootConfigPatchBodyBashWritesConfigOnce(t *testing.T) {
 
 func TestRewriteArcDindPath(t *testing.T) {
 	t.Run("rewrites tmp gh-aw prefix", func(t *testing.T) {
-		assert.Equal(t, "${RUNNER_TEMP}/gh-aw/aw-prompts/prompt.txt", rewriteArcDindPath("/tmp/gh-aw/aw-prompts/prompt.txt"))
+		assert.Equal(t, "${GH_AW_RUNTIME_DIR}/aw-prompts/prompt.txt", rewriteArcDindPath("/tmp/gh-aw/aw-prompts/prompt.txt"))
 	})
 
 	t.Run("rewrites multiple occurrences", func(t *testing.T) {
 		input := "/tmp/gh-aw/a /tmp/gh-aw/b"
-		expected := "${RUNNER_TEMP}/gh-aw/a ${RUNNER_TEMP}/gh-aw/b"
+		expected := "${GH_AW_RUNTIME_DIR}/a ${GH_AW_RUNTIME_DIR}/b"
 		assert.Equal(t, expected, rewriteArcDindPath(input))
 	})
 
@@ -142,8 +142,8 @@ func TestRewriteArcDindEngineCommand(t *testing.T) {
 	command := "copilot --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt"
 	rewritten := rewriteArcDindEngineCommand(command)
 
-	assert.Contains(t, rewritten, "export HOME=${RUNNER_TEMP}/gh-aw/home")
-	assert.Contains(t, rewritten, "copilot --prompt-file ${RUNNER_TEMP}/gh-aw/aw-prompts/prompt.txt")
+	assert.Contains(t, rewritten, "export HOME=${GH_AW_RUNTIME_DIR}/home")
+	assert.Contains(t, rewritten, "copilot --prompt-file ${GH_AW_RUNTIME_DIR}/aw-prompts/prompt.txt")
 }
 
 func TestBuildAWFImageTagWithDigests(t *testing.T) {
@@ -237,11 +237,13 @@ func TestBuildAWFCommand_ArcDindPreCreatesMountDirs(t *testing.T) {
 	command := BuildAWFCommand(config)
 
 	// Verify mount source directories are pre-created before AWF invocation
-	assert.Contains(t, command, `mkdir -p "${RUNNER_TEMP}/gh-aw/home" "${RUNNER_TEMP}/gh-aw/sandbox/agent"`,
+	assert.Contains(t, command, `mkdir -p "${GH_AW_RUNTIME_DIR}/home" "${GH_AW_RUNTIME_DIR}/sandbox/agent"`,
 		"should pre-create rw mount source directories for arc-dind")
 
 	// Verify the mounts themselves are present
-	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/home:${RUNNER_TEMP}/gh-aw/home:rw"`)
-	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/sandbox/agent:${RUNNER_TEMP}/gh-aw/sandbox/agent:rw"`)
-	assert.Contains(t, command, `export GH_AW_HARNESS_TELEMETRY_DIR="${RUNNER_TEMP}/gh-aw/sandbox/agent"`)
+	assert.Contains(t, command, `--mount "${GH_AW_RUNTIME_DIR}/home:${GH_AW_RUNTIME_DIR}/home:rw"`)
+	assert.Contains(t, command, `--mount "${GH_AW_RUNTIME_DIR}/sandbox/agent:${GH_AW_RUNTIME_DIR}/sandbox/agent:rw"`)
+	assert.Contains(t, command, `export GH_AW_HARNESS_TELEMETRY_DIR="${GH_AW_RUNTIME_DIR}/sandbox/agent"`)
+	assert.NotContains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/home:`)
+	assert.NotContains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/sandbox/agent:`)
 }

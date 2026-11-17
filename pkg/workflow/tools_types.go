@@ -581,6 +581,7 @@ type MCPGatewayRuntimeConfig struct {
 	EntrypointArgs       []string                         `yaml:"entrypointArgs,omitempty"`         // Arguments passed to container entrypoint
 	Env                  map[string]string                `yaml:"env,omitempty"`                    // Environment variables for the gateway
 	Port                 int                              `yaml:"port,omitempty"`                   // Port for the gateway HTTP server (default: 8080)
+	AutoPort             bool                             `yaml:"-"`                                // Setup allocates the default listener per invocation.
 	AgentID              string                           `yaml:"agent-id,omitempty"`               // Agent/session identifier for gateway authentication
 	AgentIDs             []string                         `yaml:"-"`                                // Multiple isolated gateway agent identities
 	AgentPolicies        map[string]MCPGatewayAgentPolicy `yaml:"-"`                                // Per-agent gateway access policies

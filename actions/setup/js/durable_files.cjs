@@ -62,7 +62,7 @@ function hash(bytes) {
 }
 
 /** Snapshot exactly the engine's declared session state before host redaction. */
-function stageFiles({ core, root = "/tmp/gh-aw/agent" }) {
+function stageFiles({ core, root = require("./runtime_paths.cjs").runtimePath("agent") }) {
   const { files, bundle, engine } = configuration(root);
   noSymlinks(bundle, root);
   if (fs.existsSync(bundle)) fs.rmSync(bundle, { recursive: true });
@@ -129,7 +129,7 @@ function readBundle(root) {
 }
 
 /** Validate every file before copying any untrusted artifact content. */
-function restoreFiles({ core, root = "/tmp/gh-aw/agent" }) {
+function restoreFiles({ core, root = require("./runtime_paths.cjs").runtimePath("agent") }) {
   const { files, entries } = readBundle(root);
   const targets = [...entries.entries()].map(([relative, entry]) => {
     const [index, ...suffix] = relative.split("/");
@@ -146,7 +146,7 @@ function restoreFiles({ core, root = "/tmp/gh-aw/agent" }) {
   core.setOutput("restored", "true");
 }
 
-function validateFiles({ core, root = "/tmp/gh-aw/agent" }) {
+function validateFiles({ core, root = require("./runtime_paths.cjs").runtimePath("agent") }) {
   readBundle(root);
   core.setOutput("present", "true");
 }

@@ -513,7 +513,7 @@ async function preStagePatch(entry, index, workspace) {
   }
 
   // Write patch to a temp file and apply it.
-  const tmpPatch = path.join(os.tmpdir(), `gh-aw-sample-${index + 1}.patch`);
+  const tmpPatch = require("./runtime_paths.cjs").runtimePath(`sample-${index + 1}.patch`);
   try {
     fs.writeFileSync(tmpPatch, patch.endsWith("\n") ? patch : patch + "\n");
   } catch (err) {

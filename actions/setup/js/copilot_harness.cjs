@@ -130,7 +130,7 @@ const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 const MODEL_NOT_SUPPORTED_PATTERN = /The requested model is not supported|No model available\b[^\n]*policy enablement/i;
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
 
-const AWF_CONFIG_PATH = process.env.GH_AW_AWF_CONFIG_PATH || "/tmp/gh-aw/awf-config.json";
+const AWF_CONFIG_PATH = process.env.GH_AW_AWF_CONFIG_PATH || require("./runtime_paths.cjs").runtimePath("awf-config.json");
 
 // Additional startup retry budget for scheduled and push-triggered runs when Copilot exits with
 // code 2 before producing any output (typically transient API interruption at startup).
@@ -943,7 +943,7 @@ async function applyCopilotCLISubagentModels(options) {
   const logger = options.logger || log;
   const env = options.env || process.env;
   const workingDirectory = options.workingDirectory || path.resolve(env.GITHUB_WORKSPACE || process.cwd(), env.GH_AW_ENGINE_CWD || ".");
-  const agentsBaseDir = options.agentsBaseDir || path.join(os.tmpdir(), "gh-aw");
+  const agentsBaseDir = options.agentsBaseDir || require("./runtime_paths.cjs").runtimeRoot();
   const personalAgentsDir = options.personalAgentsDir || path.join(env.COPILOT_HOME || path.join(env.HOME || os.homedir(), ".copilot"), "agents");
   const agents = listCopilotSubagents(workingDirectory, agentsBaseDir, logger);
   let resolutions;
@@ -1915,7 +1915,7 @@ async function main() {
 
     // The same custom agents the SDK driver loads: workflow definitions override repository ones.
     const sdkWorkingDirectory = path.resolve(process.env.GITHUB_WORKSPACE || process.cwd(), process.env.GH_AW_ENGINE_CWD || ".");
-    const agents = resolveSubagentModels ? listCopilotSubagents(sdkWorkingDirectory, path.join(os.tmpdir(), "gh-aw"), log) : [];
+    const agents = resolveSubagentModels ? listCopilotSubagents(sdkWorkingDirectory, require("./runtime_paths.cjs").runtimeRoot(), log) : [];
     try {
       const resolutions = await resolveCopilotSubagentModels({
         agents,

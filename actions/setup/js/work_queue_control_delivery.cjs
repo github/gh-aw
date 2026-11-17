@@ -6,7 +6,7 @@ const { closed, identity, canonical, parseStrictJSON } = require("./work_queue_c
 const { normalizeClaimScope } = require("./work_queue_claim_scope.cjs");
 const { MAX_INTENT_BYTES, MAX_INTENTS } = require("./work_queue_intents.cjs");
 
-function readClaimControlMessages(assignment, filename = "/tmp/gh-aw/work-queue.intents.jsonl") {
+function readClaimControlMessages(assignment, filename = require("./runtime_paths.cjs").runtimePath("work-queue.intents.jsonl")) {
   const messages = [];
   const errors = [];
   if (!fs.existsSync(filename)) return { messages, errors };

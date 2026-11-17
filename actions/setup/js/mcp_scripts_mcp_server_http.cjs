@@ -136,7 +136,7 @@ function createMCPServer(configPath, options = {}) {
  */
 async function startHttpServer(configPath, options = {}) {
   const apiKey = requireHttpApiKey(options.apiKey ?? process.env.GH_AW_MCP_SCRIPTS_API_KEY, "GH_AW_MCP_SCRIPTS_API_KEY");
-  const port = options.port ?? 3000;
+  const port = options.port ?? require("./runtime_paths.cjs").runtimePort("GH_AW_MCP_SCRIPTS_PORT", 3000);
   const stateless = options.stateless || false;
 
   const logger = createLogger("mcp-scripts-startup");

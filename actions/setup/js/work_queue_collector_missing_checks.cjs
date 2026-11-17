@@ -39,11 +39,11 @@ function registerTests({ describe, it }) {
           },
         };
         fs.existsSync = filename => {
-          if (filename === "/tmp/gh-aw") return true;
+          if (filename === require("./runtime_paths.cjs").runtimeRoot()) return true;
           return exists(filename);
         };
         fs.readdirSync = new Proxy(readdir, {
-          apply: (target, receiver, args) => (args[0] === "/tmp/gh-aw" ? ["aw-existing.patch"] : Reflect.apply(target, receiver, args)),
+          apply: (target, receiver, args) => (args[0] === require("./runtime_paths.cjs").runtimeRoot() ? ["aw-existing.patch"] : Reflect.apply(target, receiver, args)),
         });
         const { main } = require(collectorPath);
         for (const present of [false, true]) {

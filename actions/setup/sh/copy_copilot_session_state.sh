@@ -14,9 +14,9 @@ set +o histexpand
 
 set -euo pipefail
 
-AWF_SESSION_STATE_DIR="${GH_AW_COPILOT_SESSION_STATE_DIR:-/tmp/gh-aw/sandbox/agent/session-state}"
+AWF_SESSION_STATE_DIR="${GH_AW_COPILOT_SESSION_STATE_DIR:-${GH_AW_RUNTIME_DIR:?}/sandbox/agent/session-state}"
 LEGACY_SESSION_STATE_DIR="${GH_AW_COPILOT_LEGACY_SESSION_STATE_DIR:-$HOME/.copilot/session-state}"
-LOGS_DIR="${GH_AW_COPILOT_SESSION_LOGS_DIR:-/tmp/gh-aw/sandbox/agent/logs/copilot-session-state}"
+LOGS_DIR="${GH_AW_COPILOT_SESSION_LOGS_DIR:-${GH_AW_RUNTIME_DIR:?}/sandbox/agent/logs/copilot-session-state}"
 
 is_redactable_file() {
   case "$1" in

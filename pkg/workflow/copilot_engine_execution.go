@@ -456,7 +456,7 @@ func (e *CopilotEngine) buildCopilotSDKCommand(workflowData *WorkflowData, execP
 	if isCloudHypervisorRuntime(workflowData) {
 		serverArgsPrefix = append(serverArgsPrefix, "--host", "0.0.0.0")
 	}
-	serverArgsPrefix = append(serverArgsPrefix, "--port", strconv.Itoa(constants.DefaultCopilotSDKPort))
+	serverArgsPrefix = append(serverArgsPrefix, "--port", "${{ env.GH_AW_COPILOT_SDK_PORT }}")
 	serverArgs := append(serverArgsPrefix, copilotArgs...)
 	serverArgsJSON, err := json.Marshal(serverArgs)
 	if err != nil {
@@ -722,7 +722,7 @@ func (e *CopilotEngine) addCopilotSDKStepEnv(env map[string]string, workflowData
 	if workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
 		return
 	}
-	env[constants.CopilotSDKURIEnvVar] = fmt.Sprintf("http://127.0.0.1:%d", constants.DefaultCopilotSDKPort)
+	env[constants.CopilotSDKURIEnvVar] = "http://127.0.0.1:${{ env.GH_AW_COPILOT_SDK_PORT }}"
 	copilotExecLog.Printf("copilot-sdk enabled: set %s=%s", constants.CopilotSDKURIEnvVar, env[constants.CopilotSDKURIEnvVar])
 	env[constants.CopilotSDKDriverEnvVar] = "1"
 	env[constants.CopilotSDKServerArgsEnvVar] = copilotSDKServerArgsJSON

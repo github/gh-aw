@@ -10,8 +10,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { INLINE_SKILL_MANIFEST, resolveWorkflowSkillPaths, writeWorkflowSkillArgs } = require("./pi_workflow_skills.cjs");
 const { openPiDurableSession } = require("./durable_native_session.cjs");
 
-const DEFAULT_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
-const DEFAULT_SESSION_DIR = "/tmp/gh-aw/agent/pi-sessions";
+const DEFAULT_AGENT_DIR = require("./runtime_paths.cjs").runtimePath("pi-agent-dir");
+const DEFAULT_SESSION_DIR = require("./runtime_paths.cjs").runtimePath("agent/pi-sessions");
 
 /** @param {string} [command] @param {typeof execFileSync} [execute] @param {string} [minimumVersion] */
 function verifyPiVersion(command = process.env.GH_AW_PI_COMMAND || "pi", execute = execFileSync, minimumVersion = "1.0.0") {
@@ -129,7 +129,7 @@ function applyResolvedPiModel() {
   if (process.env.GH_AW_PI_SUBAGENT_CHILD === "1" || !process.env.GH_AW_PI_MODEL) return;
   let resolved = "";
   try {
-    resolved = fs.readFileSync(process.env.GH_AW_PI_MODEL_FILE || "/tmp/gh-aw/pi-model", "utf8").trim();
+    resolved = fs.readFileSync(process.env.GH_AW_PI_MODEL_FILE || require("./runtime_paths.cjs").runtimePath("pi-model"), "utf8").trim();
   } catch {
     return;
   }
@@ -186,7 +186,7 @@ function preparePiRuntime(config = parsePiConfig()) {
   }
   writeSecureOutput(settingsPath, JSON.stringify(settings, null, 2));
 
-  const gatewayPath = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json");
+  const gatewayPath = path.join(require("./runtime_paths.cjs").setupRoot(), "mcp-config/mcp-servers.json");
   let gateway = { mcpServers: {} };
   try {
     gateway = JSON.parse(fs.readFileSync(gatewayPath, "utf8"));
@@ -209,7 +209,7 @@ function preparePiRuntime(config = parsePiConfig()) {
 /** @param {string} agentDir */
 function stagePiArtifacts(agentDir) {
   for (const kind of ["skills", "agents"]) {
-    const source = path.join(process.env.GH_AW_PI_STAGING_DIR || "/tmp/gh-aw/.pi", kind);
+    const source = path.join(process.env.GH_AW_PI_STAGING_DIR || require("./runtime_paths.cjs").runtimePath(".pi"), kind);
     if (fs.existsSync(source)) fs.cpSync(source, path.join(agentDir, kind), { recursive: true, dereference: false, filter: src => path.basename(src) !== INLINE_SKILL_MANIFEST });
   }
 }

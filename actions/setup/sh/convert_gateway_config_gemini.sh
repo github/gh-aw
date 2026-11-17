@@ -106,7 +106,7 @@ GEMINI_SETTINGS_FILE="${GEMINI_SETTINGS_DIR}/settings.json"
 
 mkdir -p "$GEMINI_SETTINGS_DIR"
 
-jq --arg urlPrefix "$URL_PREFIX" --argjson cliServers "${GH_AW_MCP_CLI_SERVERS:-[]}" '
+jq --arg urlPrefix "$URL_PREFIX" --arg runtimeDir "${GH_AW_RUNTIME_DIR:?}" --argjson cliServers "${GH_AW_MCP_CLI_SERVERS:-[]}" '
   .mcpServers |= with_entries(
     select(.key | IN($cliServers[]) | not) |
     .value |= (
@@ -115,8 +115,7 @@ jq --arg urlPrefix "$URL_PREFIX" --argjson cliServers "${GH_AW_MCP_CLI_SERVERS:-
       .url |= (. | sub("^http://[^/]+/mcp/"; $urlPrefix + "/mcp/"))
     )
   ) |
-  # Allow Gemini CLI to read/write files from /tmp/ (e.g. MCP payload files, cache-memory, agent outputs)
-  .context.includeDirectories = ["/tmp/"]
+  .context.includeDirectories = [$runtimeDir]
 ' "$MCP_GATEWAY_OUTPUT" > "$GEMINI_SETTINGS_FILE"
 
 # Restrict permissions so only the runner process owner can read this file.

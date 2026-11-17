@@ -9,7 +9,7 @@ const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 const { resolveRuntimeImportFilePath, assertRuntimeImportRealPathWithinBase, resolveRuntimeImportKey, removeXMLComments } = require("./runtime_import.cjs");
 const { createLiteralValues, literalFileKey, writeLiteralState } = require("./prompt_literal_values.cjs");
 const { bindAuthorExpressions } = require("./author_prompt.cjs");
-const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
+const LEDGER_REPLAY_PROMPT = require("./runtime_paths.cjs").runtimePath("ledgers/replay-prompt.txt");
 
 /**
  * @typedef {Object} PromptRenderItem
@@ -190,7 +190,7 @@ function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_
     }
     const promptFile = resolvePromptFile(promptsDir, filename);
     try {
-      result += fs.readFileSync(promptFile, "utf8");
+      result += require("./runtime_paths.cjs").resolveRuntimePaths(fs.readFileSync(promptFile, "utf8"), env);
     } catch (error) {
       throw new Error(`${ERR_SYSTEM}: Failed to read prompt file: ${getErrorMessage(error)}`, { cause: error });
     }

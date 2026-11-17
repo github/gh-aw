@@ -52,7 +52,7 @@ const {
   getAWFModelRoutingFailureCode,
 } = require("./awf_model_routing.cjs");
 
-const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
+const DEFAULT_PI_CODING_AGENT_DIR = require("./runtime_paths.cjs").runtimePath("pi-agent-dir");
 const PI_ROUTING_ENDPOINT_APIS = Object.freeze({
   "/v1/messages": "anthropic-messages",
   "/responses": "openai-responses",
@@ -459,7 +459,7 @@ async function main(options = {}) {
     throw error;
   }
   if (!routingRequired) {
-    const modelFile = process.env.GH_AW_PI_MODEL_FILE || "/tmp/gh-aw/pi-model";
+    const modelFile = process.env.GH_AW_PI_MODEL_FILE || require("./runtime_paths.cjs").runtimePath("pi-model");
     fs.mkdirSync(path.dirname(modelFile), { recursive: true, mode: 0o700 });
     fs.writeFileSync(modelFile, modelId, { encoding: "utf8", mode: 0o600 });
   }
@@ -575,7 +575,7 @@ async function main(options = {}) {
   fs.writeFileSync(outputPath, modelsJSON, { encoding: "utf8", mode: 0o600 });
   if (routingSelection) {
     fs.writeFileSync(path.join(agentDir, "model-routing-selection.json"), JSON.stringify(routingSelection), { encoding: "utf8", mode: 0o600 });
-    const routingModelFile = process.env.GH_AW_PI_MODEL_ROUTING_MODEL_FILE || "/tmp/gh-aw/pi-routing-model";
+    const routingModelFile = process.env.GH_AW_PI_MODEL_ROUTING_MODEL_FILE || require("./runtime_paths.cjs").runtimePath("pi-routing-model");
     fs.mkdirSync(path.dirname(routingModelFile), { recursive: true, mode: 0o700 });
     fs.writeFileSync(routingModelFile, modelId, { encoding: "utf8", mode: 0o600 });
   }

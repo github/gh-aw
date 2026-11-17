@@ -651,7 +651,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (stagedFiles) {
       try {
         entry = require("./connector_file.cjs").stageConnectorFiles(entry, stagedFiles, {
-          root: path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts"),
+          root: require("./runtime_paths.cjs").runtimePath("safeoutputs/upload-artifacts"),
           workspace: process.env.GITHUB_WORKSPACE,
           rejectPath: validateUploadSourcePath,
         });
@@ -800,7 +800,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     // Create assets directory
     // Use RUNNER_TEMP so the staged files land on the host filesystem (shared with
     // the artifact-upload step), matching the same pattern used by upload_artifact.
-    const assetsRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "assets");
+    const assetsRoot = require("./runtime_paths.cjs").runtimePath("safeoutputs/assets");
     const assetsDir = currentClaimHandle() ? claimArtifactPath(assetsRoot, currentClaimHandle()) : assetsRoot;
     // Read file and compute hash
     let fileContent;
@@ -2701,7 +2701,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (typeof entry.path === "string") {
       // Enforce allowed canonical source roots: staging dir and GITHUB_WORKSPACE.
       // RUNNER_TEMP is intentionally excluded — only the specific staging subdirectory is allowed.
-      const stagingRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
+      const stagingRoot = require("./runtime_paths.cjs").runtimePath("safeoutputs/upload-artifacts");
       const stagingDir = currentClaimHandle() ? claimArtifactPath(stagingRoot, currentClaimHandle()) : stagingRoot;
 
       let filePath = entry.path;
@@ -2841,7 +2841,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    */
   const uploadCodeCoverageHandler = args => {
     const entry = { ...(args || {}), type: "upload_code_coverage" };
-    const stagingRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-code-coverage");
+    const stagingRoot = require("./runtime_paths.cjs").runtimePath("safeoutputs/upload-code-coverage");
     const stagingDir = currentClaimHandle() ? claimArtifactPath(stagingRoot, currentClaimHandle()) : stagingRoot;
     const coverageRoot = process.env.GITHUB_WORKSPACE ? path.join(process.env.GITHUB_WORKSPACE, "coverage") : "";
 

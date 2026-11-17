@@ -8,7 +8,7 @@ function main() {
   try {
     let content;
     try {
-      content = readGuardedFile(path.join(process.env.GH_AW_TMP_DIR || "/tmp/gh-aw", "agent-step-summary.md"));
+      content = readGuardedFile(require("./runtime_paths.cjs").runtimePath("agent-step-summary.md"));
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
       throw error;

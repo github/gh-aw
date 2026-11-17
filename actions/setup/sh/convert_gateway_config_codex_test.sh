@@ -9,7 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="$SCRIPT_DIR/convert_gateway_config_codex.sh"
 
 # Setup test directory
-TEST_DIR=$(mktemp -d)
+TEST_DIR=$(mktemp -d "${PWD}/.codex-config-tests.XXXXXX")
+export GH_AW_RUNTIME_DIR="$TEST_DIR"
 trap "rm -rf $TEST_DIR" EXIT
 
 echo "=== Testing convert_gateway_config_codex.sh ==="
@@ -20,7 +21,7 @@ export MCP_GATEWAY_DOMAIN="host.docker.internal"
 export MCP_GATEWAY_PORT="80"
 
 # Create the output directory the script writes to
-mkdir -p /tmp/gh-aw/mcp-config
+mkdir -p "${GH_AW_RUNTIME_DIR}/mcp-config"
 
 # Test 1: Basic gateway output conversion
 echo "Test 1: Convert basic gateway output with Authorization headers"
@@ -51,46 +52,46 @@ export MCP_GATEWAY_OUTPUT="$TEST_DIR/gateway-output.json"
 bash "$SCRIPT_PATH" > /dev/null 2>&1
 
 # Check that config.toml was created
-if [ ! -f /tmp/gh-aw/mcp-config/config.toml ]; then
+if [ ! -f "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml" ]; then
   echo "✗ FAIL: config.toml not created"
   exit 1
 fi
 
 # Check for correct TOML format with http_headers inline table
-if ! grep -q 'http_headers = { Authorization = "test-api-key-abc123" }' /tmp/gh-aw/mcp-config/config.toml; then
+if ! grep -q 'http_headers = { Authorization = "test-api-key-abc123" }' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: Missing or incorrect http_headers for github"
-  cat /tmp/gh-aw/mcp-config/config.toml
+  cat "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"
   exit 1
 fi
 
-if ! grep -q 'http_headers = { Authorization = "test-api-key-xyz789" }' /tmp/gh-aw/mcp-config/config.toml; then
+if ! grep -q 'http_headers = { Authorization = "test-api-key-xyz789" }' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: Missing or incorrect http_headers for playwright"
-  cat /tmp/gh-aw/mcp-config/config.toml
+  cat "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"
   exit 1
 fi
 
 # Check that it does NOT use the old [mcp_servers.*.headers] format
-if grep -q '^\[mcp_servers\..*\.headers\]' /tmp/gh-aw/mcp-config/config.toml; then
+if grep -q '^\[mcp_servers\..*\.headers\]' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: Found old-style [mcp_servers.*.headers] section (should use http_headers inline table)"
-  cat /tmp/gh-aw/mcp-config/config.toml
+  cat "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"
   exit 1
 fi
 
 # Check for history section
-if ! grep -q '\[history\]' /tmp/gh-aw/mcp-config/config.toml; then
+if ! grep -q '\[history\]' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: Missing [history] section"
   exit 1
 fi
 
-if ! grep -q 'persistence = "none"' /tmp/gh-aw/mcp-config/config.toml; then
+if ! grep -q 'persistence = "none"' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: Missing persistence = \"none\" in history section"
   exit 1
 fi
 
 # Check that URLs are correctly formatted with domain and port
-if ! grep -q 'url = "http://host.docker.internal:80/mcp/github"' /tmp/gh-aw/mcp-config/config.toml; then
+if ! grep -q 'url = "http://host.docker.internal:80/mcp/github"' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: URL not correctly formatted for github server"
-  cat /tmp/gh-aw/mcp-config/config.toml
+  cat "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"
   exit 1
 fi
 
@@ -102,14 +103,14 @@ echo "Test 2: Validate generated TOML structure"
 # Verify the file contains balanced section headers and required keys.
 # Content-level checks in Test 1 already confirm correctness of specific values;
 # these checks guard against truncated or structurally broken output.
-if ! grep -q '^\[mcp_servers\.' /tmp/gh-aw/mcp-config/config.toml; then
+if ! grep -q '^\[mcp_servers\.' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: config.toml is missing [mcp_servers.*] sections"
-  cat /tmp/gh-aw/mcp-config/config.toml
+  cat "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"
   exit 1
 fi
-if ! grep -qE '^url\s*=' /tmp/gh-aw/mcp-config/config.toml; then
+if ! grep -qE '^url\s*=' "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"; then
   echo "✗ FAIL: config.toml is missing url fields"
-  cat /tmp/gh-aw/mcp-config/config.toml
+  cat "${GH_AW_RUNTIME_DIR}/mcp-config/config.toml"
   exit 1
 fi
 echo "✓ PASS: Generated TOML structure is valid"

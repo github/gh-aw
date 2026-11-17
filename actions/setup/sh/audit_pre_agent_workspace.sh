@@ -7,7 +7,7 @@ set +o histexpand
 #
 # This script runs after all pre-agent preparation (skills, agents, MCP servers) is
 # complete and writes a complete file listing of agent-related directories to
-# /tmp/gh-aw/pre-agent-audit.txt.  The listing is also surfaced via GITHUB_OUTPUT
+# $GH_AW_RUNTIME_DIR/pre-agent-audit.txt, also surfaced via GITHUB_OUTPUT
 # so downstream steps can reference it.
 #
 # Directories scanned (workspace — all agentic engines assumed active):
@@ -48,13 +48,13 @@ set +o histexpand
 
 set -euo pipefail
 
-AUDIT_FILE="/tmp/gh-aw/pre-agent-audit.txt"
-if [ -L /tmp/gh-aw ]; then
+AUDIT_FILE="${GH_AW_RUNTIME_DIR:?}/pre-agent-audit.txt"
+if [ -L "${GH_AW_RUNTIME_DIR:?}" ]; then
   echo "::error::Refusing to use a symlinked gh-aw temporary directory" >&2
   exit 1
 fi
-mkdir -p /tmp/gh-aw
-if [ -L /tmp/gh-aw ] || [ ! -d /tmp/gh-aw ]; then
+mkdir -p "${GH_AW_RUNTIME_DIR:?}"
+if [ -L "${GH_AW_RUNTIME_DIR:?}" ] || [ ! -d "${GH_AW_RUNTIME_DIR:?}" ]; then
   echo "::error::gh-aw temporary path is not a real directory" >&2
   exit 1
 fi
@@ -62,7 +62,7 @@ if [ -L "$AUDIT_FILE" ] || [ -L "${GITHUB_OUTPUT}" ] || { [ -n "${GITHUB_STEP_SU
   echo "::error::Refusing to write through a symlinked audit output path" >&2
   exit 1
 fi
-AUDIT_TMP="$(mktemp /tmp/gh-aw/.pre-agent-audit.XXXXXX)"
+AUDIT_TMP="$(mktemp "${GH_AW_RUNTIME_DIR:?}/.pre-agent-audit.XXXXXX")"
 trap 'rm -f -- "$AUDIT_TMP"' EXIT
 
 # list_dir prints a section header and runs find on the given directory,

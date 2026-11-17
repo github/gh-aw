@@ -15,7 +15,9 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 
 # Temporary workspace for tests
-TEST_WORKSPACE=$(mktemp -d)
+TEST_WORKSPACE=$(mktemp -d "${PWD}/.credential-cleanup-tests.XXXXXX")
+export GH_AW_RUNTIME_DIR="${TEST_WORKSPACE}/runtime"
+mkdir "$GH_AW_RUNTIME_DIR"
 
 cleanup() {
   rm -rf "${TEST_WORKSPACE}"
@@ -48,7 +50,7 @@ echo ""
 
 # ── Test 1: No .git/config anywhere (no-op, exit 0) ─────────────────────────
 echo "Test 1: No .git/config files → exit 0 with informational message"
-EMPTY_WS=$(mktemp -d)
+EMPTY_WS=$(mktemp -d "${TEST_WORKSPACE}/empty.XXXXXX")
 OUTPUT=$(GITHUB_WORKSPACE="${EMPTY_WS}" bash "${CLEAN_SCRIPT}" 2>&1)
 EXIT_CODE=$?
 rmdir "${EMPTY_WS}"
@@ -113,14 +115,14 @@ assert "outer credential section cleaned" "! grep -q '\[credential\]' '${OUTER}/
 assert "inner extraheader cleaned"         "! git config --file '${INNER}/.git/config' http.extraheader 2>/dev/null"
 echo ""
 
-# ── Test 6: Finds git repo in /tmp ──────────────────────────────────────────
-echo "Test 6: Cleans git repo located in /tmp"
-TMP_REPO=$(mktemp -d)
+# ── Test 6: Finds git repo in this invocation's runtime ──────────────────────
+echo "Test 6: Cleans git repo located in the private runtime"
+TMP_REPO=$(mktemp -d "${GH_AW_RUNTIME_DIR}/repo.XXXXXX")
 make_git_config "${TMP_REPO}" "[core]
 	repositoryformatversion = 0
 [credential]
 	helper = store"
-# Use a workspace that does NOT contain the repo so it is found only via /tmp
+# Use a workspace not containing the repo; discovery must use the private runtime.
 GITHUB_WORKSPACE="${TEST_WORKSPACE}/workspace6"
 mkdir -p "${GITHUB_WORKSPACE}"
 GITHUB_WORKSPACE="${GITHUB_WORKSPACE}" bash "${CLEAN_SCRIPT}" >/dev/null 2>&1

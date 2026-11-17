@@ -3,7 +3,7 @@ set +o histexpand
 
 # Start DIFC proxy on the host for AWF CLI proxy sidecar
 # This script starts the awmg proxy container so AWF's cli-proxy container
-# can connect to it via host.docker.internal:18443 for gh CLI access.
+# can connect to its invocation-private host port for gh CLI access.
 #
 # This script exports GH_HOST (and related vars) within the script for use when
 # launching the proxy container, but does NOT write to $GITHUB_ENV and the
@@ -21,31 +21,18 @@ set +o histexpand
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/runtime_docker.sh"
+CONTAINER_NAME="$(gh_aw_container_name awmg-cli-proxy)"
+PROXY_PORT="${GH_AW_CLI_PROXY_PORT:?}"
 
-# Do not inherit TMPDIR: it can point inside an uploaded artifact directory.
-if ! DIAGNOSTIC_DIR="$(mktemp -d /tmp/gh-aw-cli-proxy.XXXXXX 2>/dev/null)"; then
+# Diagnostics remain within this invocation and are deleted before artifact upload.
+if ! DIAGNOSTIC_DIR="$(mktemp -d "${GH_AW_RUNTIME_DIR:?}/.cli-proxy.XXXXXX" 2>/dev/null)"; then
   echo "::error::CLI proxy diagnostics could not be captured safely"
   exit 1
 fi
-artifact_root() {
-  local parent=$1
-  if [ -d "$parent/gh-aw" ]; then
-    (cd "$parent/gh-aw" && pwd -P)
-  elif [ ! -L "$parent/gh-aw" ]; then
-    (cd "$parent" && printf '%s/gh-aw\n' "$(pwd -P)")
-  else
-    return 1
-  fi
-}
 validate_diagnostic_directory() {
-  local parent root
   DIAGNOSTIC_DIR="$(cd "$DIAGNOSTIC_DIR" && pwd -P)" || return 1
-  for parent in /tmp "${RUNNER_TEMP:-/tmp}"; do
-    root="$(artifact_root "$parent")" || return 1
-    case "$DIAGNOSTIC_DIR/" in
-      "$root/"*) return 1 ;;
-    esac
-  done
+  [[ "${DIAGNOSTIC_DIR%/*}" == "${GH_AW_RUNTIME_DIR:?}" && ! -L "$DIAGNOSTIC_DIR" && -O "$DIAGNOSTIC_DIR" ]]
 }
 if ! validate_diagnostic_directory 2>/dev/null; then
   rmdir "$DIAGNOSTIC_DIR" 2>/dev/null || true
@@ -103,15 +90,12 @@ if [ -z "$CONTAINER_IMAGE" ]; then
   exit 0
 fi
 
-TLS_DIR=/tmp/gh-aw/difc-proxy-tls
-MCP_LOG_DIR=/tmp/gh-aw/mcp-logs
+TLS_DIR="${GH_AW_RUNTIME_DIR:?}/difc-proxy-tls"
+MCP_LOG_DIR="${GH_AW_RUNTIME_DIR:?}/mcp-logs"
 
 mkdir -p "$TLS_DIR" "$MCP_LOG_DIR"
 
 derive_proxy_upstream_env
-
-# Remove any leftover container from a prior run (e.g., cancelled job on a self-hosted runner)
-docker rm -f awmg-cli-proxy 2>/dev/null || true
 
 echo "Starting CLI proxy container: $CONTAINER_IMAGE"
 echo "Using CLI proxy upstream host: ${GH_HOST} (API: ${GITHUB_API_URL})"
@@ -124,7 +108,7 @@ fi
 
 DOCKER_NETWORK_ARGS=(--network host)
 if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
-  DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
+  DOCKER_NETWORK_ARGS=(--network bridge -p "127.0.0.1:${PROXY_PORT}:${PROXY_PORT}")
 fi
 
 PROXY_ENV_ARGS=()
@@ -134,7 +118,7 @@ for proxy_var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
   fi
 done
 
-docker run -d --name awmg-cli-proxy "${DOCKER_NETWORK_ARGS[@]}" \
+docker run -d --name "$CONTAINER_NAME" --label "gh-aw.runtime-id=${GH_AW_RUNTIME_ID:?}" "${DOCKER_NETWORK_ARGS[@]}" \
   --user "$(id -u):$(id -g)" \
   -e GH_TOKEN \
   -e GH_HOST \
@@ -150,7 +134,7 @@ docker run -d --name awmg-cli-proxy "${DOCKER_NETWORK_ARGS[@]}" \
   -v "$MCP_LOG_DIR:$MCP_LOG_DIR" \
   "$CONTAINER_IMAGE" proxy \
     "${POLICY_ARGS[@]}" \
-    --listen 0.0.0.0:18443 \
+    --listen "0.0.0.0:${PROXY_PORT}" \
     --log-dir "$MCP_LOG_DIR" \
     --tls --tls-dir "$TLS_DIR" \
     --guards-mode filter \
@@ -160,7 +144,7 @@ docker run -d --name awmg-cli-proxy "${DOCKER_NETWORK_ARGS[@]}" \
 PROXY_READY=false
 for i in $(seq 1 30); do
   if [ -f "$TLS_DIR/ca.crt" ]; then
-    if curl -sf --noproxy '*' --connect-timeout 2 --max-time 2 --cacert "$TLS_DIR/ca.crt" "https://localhost:18443/api/v3/health" -o /dev/null 2>/dev/null; then
+    if curl -sf --noproxy '*' --connect-timeout 2 --max-time 2 --cacert "$TLS_DIR/ca.crt" "https://localhost:${PROXY_PORT}/api/v3/health" -o /dev/null 2>/dev/null; then
       PROXY_READY=true
       break
     fi
@@ -170,8 +154,8 @@ done
 
 if [ "$PROXY_READY" = "false" ]; then
   echo "::error::CLI proxy failed to start within 30s" >&4
-  docker logs awmg-cli-proxy 2>&1 || true
-  docker rm -f awmg-cli-proxy 2>/dev/null || true
+  docker logs "$CONTAINER_NAME" 2>&1 || true
+  gh_aw_remove_container "$CONTAINER_NAME" 2>/dev/null || true
   exit 1
 fi
 
@@ -179,7 +163,7 @@ fi
 UPSTREAM_READY=false
 for attempt in 1 2 3; do
   if curl -sf --noproxy '*' --connect-timeout 5 --max-time 15 \
-    --cacert "$TLS_DIR/ca.crt" "https://localhost:18443/api/v3/rate_limit" -o /dev/null 2>/dev/null; then
+    --cacert "$TLS_DIR/ca.crt" "https://localhost:${PROXY_PORT}/api/v3/rate_limit" -o /dev/null 2>/dev/null; then
     UPSTREAM_READY=true
     break
   fi
@@ -190,9 +174,9 @@ done
 
 if [ "$UPSTREAM_READY" = "false" ]; then
   echo "::error::CLI proxy could not reach the upstream GitHub API. Check runner connectivity and HTTP(S)_PROXY/NO_PROXY settings." >&4
-  docker logs awmg-cli-proxy 2>&1 || true
-  docker rm -f awmg-cli-proxy 2>/dev/null || true
+  docker logs "$CONTAINER_NAME" 2>&1 || true
+  gh_aw_remove_container "$CONTAINER_NAME" 2>/dev/null || true
   exit 1
 fi
 
-echo "CLI proxy ready on port 18443"
+echo "CLI proxy ready on port ${PROXY_PORT}"

@@ -6,7 +6,9 @@ SCRIPT="${SCRIPT_DIR}/commit_cache_memory_git.sh"
 
 TESTS_PASSED=0
 TESTS_FAILED=0
-WORKSPACE="$(mktemp -d)"
+WORKSPACE="$(mktemp -d "${PWD}/.commit-cache-tests.XXXXXX")"
+export GH_AW_RUNTIME_DIR="${WORKSPACE}/runtime"
+mkdir "$GH_AW_RUNTIME_DIR"
 
 cleanup() {
   rm -rf "${WORKSPACE}"
@@ -155,12 +157,12 @@ EOF
     tmp_dir="${case_root}/missing"
   fi
   local result=0
-  GH_AW_CACHE_DIR="$cache_dir" GITHUB_RUN_ID=test-run TMPDIR="$tmp_dir" \
+  GH_AW_RUNTIME_DIR="$tmp_dir" GH_AW_CACHE_DIR="$cache_dir" GITHUB_RUN_ID=test-run TMPDIR="$tmp_dir" \
     PATH="${case_root}/bin:$PATH" FIXTURE_SCENARIO="$scenario" FIXTURE_REAL_GIT="$real_git" \
     bash "${case_root}/commit.sh" > "${case_root}/output" 2>&1 || result=$?
   assert "$scenario preserves sentinel" test "$(cat "${case_root}/sentinel")" = sentinel
   assert "$scenario leaves legacy link untouched" test -L "${case_root}/tmp/gh-aw-commit-err"
-  assert "$scenario removes private diagnostics" test -z "$(find "${case_root}/tmp" -name 'gh-aw-commit.*' -print)"
+  assert "$scenario removes private diagnostics" test -z "$(find "${case_root}/tmp" -name 'commit.*' -print)"
   if [ "$scenario" = allocation-failure ]; then
     assert "allocation failure propagates" test "$result" -ne 0
     assert "allocation failure is diagnosed" grep -q mktemp "${case_root}/output"

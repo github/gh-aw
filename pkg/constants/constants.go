@@ -405,9 +405,9 @@ const DefaultTmpGhAwMount = "/tmp/gh-aw:/tmp/gh-aw:rw"
 // The GITHUB_WORKSPACE environment variable is automatically set by GitHub Actions and passed to the MCP gateway
 const DefaultWorkspaceMount = "\\${GITHUB_WORKSPACE}:\\${GITHUB_WORKSPACE}:rw"
 
-// DefaultSafeOutputsMount is the mount path for safe-outputs runtime files
-// (config.json, tools.json, outputs.jsonl, upload-artifacts/) in the runner temp directory.
-const DefaultSafeOutputsMount = GhAwRootDirShell + "/safeoutputs:" + GhAwRootDirShell + "/safeoutputs:rw"
+// DefaultSafeOutputsMount contains trusted safe-output configuration and scripts.
+// Mutable outputs live in the separately mounted private runtime tree.
+const DefaultSafeOutputsMount = GhAwRootDirShell + "/safeoutputs:" + GhAwRootDirShell + "/safeoutputs:ro"
 
 // Timeout constants using time.Duration for type safety and clear units
 

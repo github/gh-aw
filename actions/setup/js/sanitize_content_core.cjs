@@ -82,7 +82,7 @@ function writeRedactedDomainsLog(filePath) {
 
   const fs = require("fs");
   const path = require("path");
-  const targetPath = filePath || "/tmp/gh-aw/redacted-urls.log";
+  const targetPath = filePath || require("./runtime_paths.cjs").runtimePath("redacted-urls.log");
 
   // Ensure directory exists
   const dir = path.dirname(targetPath);

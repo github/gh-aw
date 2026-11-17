@@ -71,7 +71,7 @@ function recordFallbackModel(model, env, infoPath) {
   }
 }
 
-function getFallbackModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = "agent") {
+function getFallbackModel(infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json"), phase = "agent") {
   const fs = require("fs");
   const resolvedPath = resolveAwInfoPath(infoPath);
   if (!fs.existsSync(resolvedPath)) return "";
@@ -84,7 +84,7 @@ function validateRoutingEffort(value) {
   return typeof value === "string" && ROUTING_EFFORTS.has(value) ? value : "";
 }
 
-function recordModelRouting(routing, env = process.env, infoPath = `${env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`) {
+function recordModelRouting(routing, env = process.env, infoPath = `${require("./runtime_paths.cjs").runtimeRoot(env)}/aw_info.json`) {
   if (!routing || !ROUTING_STATUSES.has(routing.status)) return null;
   const wireModel = validateModelIdentifier(routing.wire_model || routing.model);
   if (routing.status === "selected" && !wireModel) return null;
@@ -129,7 +129,7 @@ function recordModelRouting(routing, env = process.env, infoPath = `${env.GH_AW_
   return modelRouting;
 }
 
-function getModelRouting(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = "agent") {
+function getModelRouting(infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json"), phase = "agent") {
   if (phase !== "agent") return null;
   const fs = require("fs");
   const resolvedPath = resolveAwInfoPath(infoPath);
@@ -245,9 +245,9 @@ function firstAllowed(allowedValues, ...values) {
 }
 
 function resolveModelRoutingSummary({
-  infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`,
-  sessionPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/usage/aw_session.jsonl`,
-  ghAwDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw",
+  infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json"),
+  sessionPath = require("./runtime_paths.cjs").runtimePath("usage/aw_session.jsonl"),
+  ghAwDir = require("./runtime_paths.cjs").runtimeRoot(),
 } = {}) {
   const sessionEvents = readModelRoutingSession(sessionPath);
   const workflowInfo = sessionEvents.find(event => event.type === "workflow.info")?.data;
@@ -300,7 +300,7 @@ function resolveModelRoutingSummary({
   return result;
 }
 
-function resolveEffectiveModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
+function resolveEffectiveModel(infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json"), phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
   let routing = getModelRouting(infoPath, phase);
   if (!routing && typeof env.GH_AW_MODEL_ROUTING_STATUS === "string" && ROUTING_STATUSES.has(env.GH_AW_MODEL_ROUTING_STATUS)) {
     routing = {
@@ -331,7 +331,7 @@ function resolveEffectiveModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/
   };
 }
 
-function getEffectiveModelLabel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
+function getEffectiveModelLabel(infoPath = require("./runtime_paths.cjs").runtimePath("aw_info.json"), phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
   const attribution = resolveEffectiveModel(infoPath, phase, env);
   const { reduceModelNameToIdentifier } = require("./model_aliases.cjs");
   const shortModel = reduceModelNameToIdentifier(attribution.model);
@@ -388,7 +388,7 @@ function formatAttributionModelName(model) {
     .join(" ");
 }
 
-function recordFallbackModelFromUsage(content, env = process.env, infoPath = `${env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, logger = console.warn) {
+function recordFallbackModelFromUsage(content, env = process.env, infoPath = `${require("./runtime_paths.cjs").runtimeRoot(env)}/aw_info.json`, logger = console.warn) {
   let model = "";
   for (const entry of iterateJsonl(content, {
     lineFilter: line => line.includes('"model_fallback"'),

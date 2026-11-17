@@ -5,7 +5,7 @@ const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const COMMENT_MEMORY_TAG = "gh-aw-comment-memory";
-const COMMENT_MEMORY_DIR = "/tmp/gh-aw/comment-memory";
+const COMMENT_MEMORY_DIR = require("./runtime_paths.cjs").runtimePath("comment-memory");
 const COMMENT_MEMORY_EXTENSION = ".md";
 const MAX_MEMORY_ID_LENGTH = 128;
 const COMMENT_MEMORY_MAX_SCAN_PAGES = 50;

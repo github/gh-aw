@@ -511,7 +511,7 @@ function reportAPIProxyGuardRejection(eventLogPathOverride) {
  * @returns {Promise<void>}
  */
 async function main() {
-  const threatDetectionDir = "/tmp/gh-aw/threat-detection";
+  const threatDetectionDir = require("./runtime_paths.cjs").runtimePath("threat-detection");
   const logPath = path.join(threatDetectionDir, DETECTION_LOG_FILENAME);
   const runDetection = process.env.RUN_DETECTION;
   const continueOnError = process.env.GH_AW_DETECTION_CONTINUE_ON_ERROR !== "false";

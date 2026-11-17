@@ -73,7 +73,7 @@ async function main() {
   // directory, and the Go generator passes the same path via GH_AW_ASSETS_DIR, so
   // producer and consumer can never disagree on the location. The literal fallback
   // matches constants.TmpGhAwAssetsDir for robustness if the env var is unset.
-  const assetsDir = process.env.GH_AW_ASSETS_DIR || "/tmp/gh-aw/safeoutputs/assets";
+  const assetsDir = process.env.GH_AW_ASSETS_DIR || require("./runtime_paths.cjs").runtimePath("safeoutputs/assets");
   core.info(`Reading staged assets from: ${assetsDir}`);
   let uploadCount = 0;
   let missingAssetCount = 0;

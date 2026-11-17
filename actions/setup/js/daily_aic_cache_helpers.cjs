@@ -11,11 +11,11 @@ const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  */
 
 /** Path where the per-workflow usage cache lives on the runner. */
-const AIC_USAGE_CACHE_FILE_PATH = "/tmp/gh-aw/agentic-workflow-usage-cache.jsonl";
+const AIC_USAGE_CACHE_FILE_PATH = require("./runtime_paths.cjs").runtimePath("agentic-workflow-usage-cache.jsonl");
 
 /** Cache entries older than this threshold (in ms) are pruned when reading or writing. */
 const CACHE_RETENTION_MS = 48 * 60 * 60 * 1000;
-const AIC_SCAN_CACHE_FILE_PATH = "/tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl";
+const AIC_SCAN_CACHE_FILE_PATH = require("./runtime_paths.cjs").runtimePath("agentic-workflow-usage-scan-v2.jsonl");
 const AIC_SCAN_CACHE_ARTIFACT_NAME = "aic-usage-scan-v2";
 
 /**

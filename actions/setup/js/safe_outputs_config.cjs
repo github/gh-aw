@@ -96,8 +96,7 @@ function loadConfig(server) {
   server.debug(`Final processed config: ${JSON.stringify(redactSensitiveConfig(safeOutputsConfig))}`);
 
   // Handle GH_AW_SAFE_OUTPUTS with default fallback
-  // Default is /opt (read-only mount for agent container)
-  const outputFile = process.env.GH_AW_SAFE_OUTPUTS || `${process.env.RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl`;
+  const outputFile = process.env.GH_AW_SAFE_OUTPUTS || require("./runtime_paths.cjs").runtimePath("safeoutputs/outputs.jsonl");
   if (!process.env.GH_AW_SAFE_OUTPUTS) {
     server.debug(`GH_AW_SAFE_OUTPUTS not set, using default: ${outputFile}`);
   }

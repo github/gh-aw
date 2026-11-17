@@ -314,7 +314,7 @@ function getAWFRoutingModelMatches(reflectData, wireModel) {
   return matches;
 }
 
-function recordAWFModelRoutingOutcome(outcome, env = process.env, filePath = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "agent", "awf-routing-outcome.json")) {
+function recordAWFModelRoutingOutcome(outcome, env = process.env, filePath = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "agent", "awf-routing-outcome.json")) {
   if (env.GH_AW_MODEL_ROUTING !== "1" || !outcome || !["selected", "failed", "rejected"].includes(outcome.status)) return false;
   const wireModel = typeof outcome.wire_model === "string" && outcome.wire_model.length <= 128 && /^[A-Za-z0-9._/:@-]+$/.test(outcome.wire_model) ? outcome.wire_model : "";
   if (outcome.status === "selected" && !wireModel) return false;

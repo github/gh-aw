@@ -5,7 +5,7 @@ const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /** Path written by install_frontmatter_skills.cjs during the activation job. */
-const SKILL_FAILURES_FILE = "/tmp/gh-aw/skill_install_failures.json";
+const SKILL_FAILURES_FILE = require("./runtime_paths.cjs").runtimePath("skill_install_failures.json");
 
 /**
  * Read the shared failures file produced by install_frontmatter_skills.cjs.

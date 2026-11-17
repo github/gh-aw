@@ -2,8 +2,7 @@
 set +o histexpand
 
 # Stop DIFC proxy for pre-agent gh CLI steps
-# This script stops the awmg proxy container and removes the proxy CA certificate
-# from the system trust store (if it was installed).
+# This script stops only the invocation-owned proxy and removes its local git CA setting.
 # The proxy must be stopped before the MCP gateway starts to avoid double-filtering traffic.
 #
 # This script does NOT modify $GITHUB_ENV. The proxy routing env vars (GH_HOST,
@@ -12,17 +11,11 @@ set +o histexpand
 
 set -e
 
-docker rm -f awmg-proxy 2>/dev/null || true
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/runtime_docker.sh"
+CONTAINER_NAME="$(gh_aw_container_name awmg-proxy)"
+gh_aw_remove_container "$CONTAINER_NAME" || true
 git remote remove proxy 2>/dev/null || true
-
-# Remove the DIFC proxy CA certificate from the system trust store if present,
-# to avoid permanently expanding the trusted root set on persistent/self-hosted runners.
-DIFC_PROXY_CA_CERT="/usr/local/share/ca-certificates/awmg-proxy-difc.crt"
-if [ -f "$DIFC_PROXY_CA_CERT" ]; then
-  rm -f "$DIFC_PROXY_CA_CERT" || true
-  if command -v update-ca-certificates >/dev/null 2>&1; then
-    sudo update-ca-certificates || true
-  fi
-fi
+git config --local --unset-all "http.https://localhost:${GH_AW_CLI_PROXY_PORT:?}/.sslCAInfo" 2>/dev/null || true
 
 echo "DIFC proxy stopped"

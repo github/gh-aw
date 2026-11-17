@@ -18,6 +18,7 @@ cleanup() {
 trap cleanup EXIT
 
 export RUNNER_TEMP="$WORKDIR/runner-temp"
+export GH_AW_RUNTIME_DIR="$WORKDIR"
 export GH_AW_HARNESS_TELEMETRY_DIR="$WORKDIR/telemetry"
 mkdir -p "$RUNNER_TEMP"
 

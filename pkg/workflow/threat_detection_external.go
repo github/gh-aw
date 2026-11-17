@@ -421,7 +421,7 @@ func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID s
 		setup.hostSetup = `bash "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh" stage`
 		setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
 		if engineID == "codex" {
-			setup.commandPrefix += `export CODEX_HOME="${RUNNER_TEMP}/gh-aw/threat-detection/codex-home" && `
+			setup.commandPrefix += `export CODEX_HOME="${GH_AW_RUNTIME_DIR}/threat-detection/codex-home" && `
 		}
 	}
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
@@ -718,11 +718,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// threat-detect without interpolating user-controlled prompt text into a command.
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
 	if engineID == "copilot" {
-		inputDir := constants.ThreatDetectionInputDir
-		if isArcDindTopology(threatDetectionData) {
-			inputDir = strings.ReplaceAll(rewriteArcDindPath(inputDir), "${RUNNER_TEMP}", "${{ runner.temp }}")
-		}
-		steps = append(steps, fmt.Sprintf("          GH_AW_DETECTION_INPUT_DIR: %q\n", inputDir))
+		steps = append(steps, fmt.Sprintf("          GH_AW_DETECTION_INPUT_DIR: %q\n", constants.ThreatDetectionInputDir))
 	}
 	if useRootlessCLIInstallation(threatDetectionData) {
 		steps = append(steps, "          THREAT_DETECT_BINARY: ${{ steps.threat_detect_install.outputs.binary-path }}\n")

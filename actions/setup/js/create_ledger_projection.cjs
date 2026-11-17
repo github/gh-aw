@@ -10,7 +10,7 @@ const { validateValueAgainstSchema } = require("./schema-validation.cjs");
 const { materializeReplay } = require("./ledger_replay.cjs");
 const { replayBuiltin } = require("./ledger_builtin.cjs");
 
-const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
+const PROJECTION_ROOT = require("./runtime_paths.cjs").runtimePath("ledgers");
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
 const SHARD_PATH = /^ledger\/shards\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.jsonl$/;
 const COVERAGE_PATH = /^ledger\/coverage\/[0-9a-f]{64}\.jsonl$/;
@@ -132,7 +132,7 @@ async function main(options = {}) {
   const serverHost = options.serverHost || new URL(process.env.GITHUB_SERVER_URL || "https://github.com").host;
   const token = options.token || process.env.GH_TOKEN;
   const workspaceDir = options.workspaceDir || process.env.GITHUB_WORKSPACE || process.cwd();
-  const sourceRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "ledger-source");
+  const sourceRoot = require("./runtime_paths.cjs").runtimePath("ledger-source");
   fs.rmSync(sourceRoot, { recursive: true, force: true });
   fs.mkdirSync(PROJECTION_ROOT, { recursive: true });
   const replayGuidance = [];

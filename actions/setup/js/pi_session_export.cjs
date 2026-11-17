@@ -23,7 +23,7 @@ function main() {
   const sessionId = sessionIDFromStream(fs.readFileSync(streamFile, "utf8"));
   const sessionFile = fs.readdirSync(DEFAULT_SESSION_DIR).find(file => file.endsWith(`_${sessionId}.jsonl`));
   if (!sessionFile) throw new Error(`Persisted Pi session is missing: ${sessionId}`);
-  const output = path.join(process.env.PI_CODING_AGENT_DIR || "/tmp/gh-aw/pi-agent-dir", "session.html");
+  const output = path.join(process.env.PI_CODING_AGENT_DIR || require("./runtime_paths.cjs").runtimePath("pi-agent-dir"), "session.html");
   execFileSync(process.env.GH_AW_PI_COMMAND || "pi", ["--export", path.join(DEFAULT_SESSION_DIR, sessionFile), output], { timeout: 60_000, stdio: ["ignore", "ignore", "inherit"] });
 }
 

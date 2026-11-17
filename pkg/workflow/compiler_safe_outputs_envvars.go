@@ -36,7 +36,6 @@ func addJobLevelWorkQueueEnvVars(envVars map[string]string, data *WorkflowData) 
 		if isWorkQueueParticipant(data) {
 			envVars["GH_AW_WORK_QUEUE_INTENT_ORIGIN"] = `"${{ needs.agent.outputs.work_queue_origin }}"`
 		}
-		envVars["GH_AW_WORK_QUEUE_SNAPSHOT"] = fmt.Sprintf("%q", constants.WorkQueueSnapshotPath)
 	}
 }
 

@@ -193,7 +193,7 @@ startHttpServer(configPath, {
   port: port,
   apiKey: apiKey,
   stateless: true,
-  logDir: "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
+  logDir: path.join(process.env.GH_AW_RUNTIME_DIR, "mcp-scripts/logs")
 }).catch(error => {
   console.error("Failed to start mcp-scripts HTTP server:", error);
   process.exit(1);

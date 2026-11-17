@@ -7,7 +7,7 @@ trap 'if [ -n "$snapshot" ]; then rm -f -- "$snapshot"; fi' EXIT
 
 verify_config() {
   local config="$1" entry key status=0
-  snapshot=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/gh-aw-git-config.XXXXXX")
+  snapshot=$(mktemp "${GH_AW_RUNTIME_DIR:?}/git-config.XXXXXX")
   if ! git --git-dir="${config%/*}" config --file "$config" --includes --null --list >"$snapshot"; then
     echo "ERROR: Cannot verify git credential removal from $config" >&2
     return 1
@@ -39,6 +39,6 @@ if [ "$#" -gt 0 ]; then
 else
   while IFS= read -r -d '' config; do
     verify_config "$config"
-  done < <(find "${GITHUB_WORKSPACE:-.}" /tmp -maxdepth 15 -type f -name config \
+  done < <(find "${GITHUB_WORKSPACE:-.}" "${GH_AW_RUNTIME_DIR:?}" -maxdepth 15 -type f -name config \
     \( -path '*/.git/config' -o -path '*/.git/modules/*/config' \) -print0 2>/dev/null)
 fi

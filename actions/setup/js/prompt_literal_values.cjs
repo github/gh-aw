@@ -124,8 +124,9 @@ function readLiteralState(file) {
 function literalFileKey(prompt, target) {
   // Inline artifacts are staged in the fixed root while activation prompts live
   // under runner.temp. Both are downloaded together under /tmp/gh-aw later.
-  if (path.resolve(target).startsWith("/tmp/gh-aw/") && !path.resolve(prompt).startsWith("/tmp/gh-aw/")) {
-    return path.relative("/tmp/gh-aw/aw-prompts", path.resolve(target));
+  const rootPrefix = require("./runtime_paths.cjs").runtimeRoot() + path.sep;
+  if (path.resolve(target).startsWith(rootPrefix) && !path.resolve(prompt).startsWith(rootPrefix)) {
+    return path.relative(require("./runtime_paths.cjs").runtimePath("aw-prompts"), path.resolve(target));
   }
   return path.relative(path.dirname(path.resolve(prompt)), path.resolve(target));
 }

@@ -70,7 +70,7 @@ function anyValue(value) {
  * @param {{sessionPath?: string}} [options]
  * @returns {Promise<void>}
  */
-async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.jsonl" } = {}) {
+async function sendSessionLogs({ sessionPath = require("./runtime_paths.cjs").runtimePath("usage/aw_session.jsonl") } = {}) {
   const enabled = process.env.GH_AW_OTLP_LOGS_ENABLED;
   if (!enabled || enabled === "false") return;
   if (enabled !== "true") {

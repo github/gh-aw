@@ -228,6 +228,7 @@ async function runHttpServer(options) {
 
   // Start listening
   logger.debug(`Attempting to bind to port ${port}...`);
+  require("./runtime_paths.cjs").registerRuntimeProcess(process.pid, serverLabel);
   httpServer.listen(port, () => {
     logger.debug(`=== ${serverLabel} HTTP Server Started Successfully ===`);
     logger.debug(`HTTP server listening on http://localhost:${port}`);

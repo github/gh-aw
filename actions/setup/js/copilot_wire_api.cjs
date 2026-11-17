@@ -19,7 +19,7 @@ function getSupportedEndpoints(reflectData, model) {
 
 function recordModelEndpointMismatch(record, env = process.env) {
   try {
-    const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "agent", "model-endpoint-mismatch.json");
+    const file = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "agent", "model-endpoint-mismatch.json");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const safeRecord = Object.fromEntries(
       Object.entries(record).map(([key, value]) => [key, typeof value === "string" ? redactDiagnosticText(value).slice(0, 2500) : Array.isArray(value) ? value.map(endpoint => redactDiagnosticText(endpoint).slice(0, 200)) : value])

@@ -133,7 +133,7 @@ const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
-const DEFAULT_ROOT_DIR = "/tmp/gh-aw";
+const DEFAULT_ROOT_DIR = require("./runtime_paths.cjs").runtimeRoot();
 const SESSION_PATH = "usage/aw_session.jsonl";
 const TOKEN_USAGE_PATHS = ["sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"];
 const MODEL_ROUTING_PATHS = TOKEN_USAGE_PATHS.map(file => file.replace(/token-usage\.jsonl$/, "model-routing.jsonl"));
@@ -1265,7 +1265,7 @@ async function sessionContractMain(options) {
   return results;
 }
 
-const DETECTION_ROOT_DIR = "/tmp/gh-aw/threat-detection";
+const DETECTION_ROOT_DIR = require("./runtime_paths.cjs").runtimePath("threat-detection");
 const DETECTION_RESULT_PATH = "detection_result.json";
 const DETECTION_VERDICT_FLAGS = ["prompt_injection", "secret_leak", "malicious_patch"];
 const DETECTION_VERDICT_LISTS = ["reasons", "warnings"];

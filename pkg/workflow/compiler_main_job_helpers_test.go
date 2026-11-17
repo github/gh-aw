@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
@@ -386,7 +387,7 @@ func TestBuildMainJobEnv(t *testing.T) {
 		assert.Nil(t, env)
 	})
 
-	t.Run("safe outputs triggers env initialisation with MCP_LOG_DIR", func(t *testing.T) {
+	t.Run("safe outputs leaves runtime log paths to setup", func(t *testing.T) {
 		c := NewCompiler()
 		c.repoConfigLoaded = true
 		c.repoConfig = &RepoConfig{}
@@ -395,7 +396,8 @@ func TestBuildMainJobEnv(t *testing.T) {
 		}
 		env := c.buildMainJobEnv(data)
 		require.NotNil(t, env)
-		assert.Contains(t, env, "GH_AW_MCP_LOG_DIR")
+		assert.NotContains(t, env, "GH_AW_MCP_LOG_DIR")
+		assert.Contains(t, strings.Join(c.generateSetRuntimePathsStep(), ""), "GH_AW_MCP_LOG_DIR=${GH_AW_RUNTIME_DIR:?}/mcp-logs/safeoutputs")
 		assert.Contains(t, env, "DEFAULT_BRANCH")
 		assert.Equal(t, `""`, env["GH_AW_TARGET_REPO_SLUG"],
 			"the gateway target repository placeholder must resolve outside trial mode")

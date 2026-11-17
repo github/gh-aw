@@ -23,7 +23,7 @@ const { boundSummaryLines } = require("./agent_session_render.cjs");
  *  - /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl (token usage from firewall proxy)
  */
 
-const TOKEN_USAGE_PATH = "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl";
+const TOKEN_USAGE_PATH = require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
 const MAX_RPC_SUMMARY_DETAILS_LENGTH = 120;
 const MAX_RPC_SUMMARY_GENERIC_LENGTH = 160;
 const MAX_RPC_MESSAGE_LABEL_LENGTH = 80;
@@ -527,7 +527,7 @@ function setUnknownModelAICreditsOutput(coreObj, value) {
  * Prints all gateway-related files to core.info for debugging
  */
 function printAllGatewayFiles() {
-  const gatewayDirs = ["/tmp/gh-aw/mcp-logs"];
+  const gatewayDirs = [require("./runtime_paths.cjs").runtimePath("mcp-logs")];
   displayDirectories(gatewayDirs, 64 * 1024);
 }
 
@@ -1093,11 +1093,11 @@ async function main() {
     // First, print all gateway-related files for debugging
     printAllGatewayFiles();
 
-    const gatewayJsonlPath = "/tmp/gh-aw/mcp-logs/gateway.jsonl";
-    const rpcMessagesPath = "/tmp/gh-aw/mcp-logs/rpc-messages.jsonl";
-    const gatewayMdPath = "/tmp/gh-aw/mcp-logs/gateway.md";
-    const gatewayLogPath = "/tmp/gh-aw/mcp-logs/gateway.log";
-    const stderrLogPath = "/tmp/gh-aw/mcp-logs/stderr.log";
+    const gatewayJsonlPath = require("./runtime_paths.cjs").runtimePath("mcp-logs/gateway.jsonl");
+    const rpcMessagesPath = require("./runtime_paths.cjs").runtimePath("mcp-logs/rpc-messages.jsonl");
+    const gatewayMdPath = require("./runtime_paths.cjs").runtimePath("mcp-logs/gateway.md");
+    const gatewayLogPath = require("./runtime_paths.cjs").runtimePath("mcp-logs/gateway.log");
+    const stderrLogPath = require("./runtime_paths.cjs").runtimePath("mcp-logs/stderr.log");
     let aiCreditsRateLimitError = false;
     let unknownModelAICredits = false;
 

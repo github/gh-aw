@@ -15,11 +15,7 @@
  */
 const AGENT_OUTPUT_FILENAME = "agent_output.json";
 
-/**
- * Base path for temporary gh-aw files
- * @type {string}
- */
-const TMP_GH_AW_PATH = "/tmp/gh-aw";
+const { runtimeRoot, runtimePath } = require("./runtime_paths.cjs");
 
 /**
  * Default GitHub REST API version for Actions clients.
@@ -85,72 +81,6 @@ const MAX_CLOSE_COUNT = 10;
  */
 const MAX_CAPTURE_BYTES = 64 * 1024 * 1024;
 
-// ---------------------------------------------------------------------------
-// File paths
-// ---------------------------------------------------------------------------
-
-/**
- * Path to the MCP gateway JSONL log file
- * @type {string}
- */
-const GATEWAY_JSONL_PATH = `${TMP_GH_AW_PATH}/mcp-logs/gateway.jsonl`;
-
-/**
- * Path to the MCP RPC messages JSONL log file
- * @type {string}
- */
-const RPC_MESSAGES_PATH = `${TMP_GH_AW_PATH}/mcp-logs/rpc-messages.jsonl`;
-
-/**
- * Path to the safe-output manifest JSONL file
- * @type {string}
- */
-const MANIFEST_FILE_PATH = `${TMP_GH_AW_PATH}/safe-output-items.jsonl`;
-
-/**
- * Path to the ledger transaction log JSONL file.
- * The ledger MCP server appends redacted `ledger_mutation` audit entries here during the
- * agent run. A trusted step merges validated entries into the safe-output file before
- * ingestion; the file is deliberately separate from the safe-output manifest so agent-run
- * writes can never be mistaken for executed safe outputs.
- * @type {string}
- */
-const LEDGER_TRANSACTION_LOG_PATH = `${TMP_GH_AW_PATH}/ledger-transactions.jsonl`;
-
-/**
- * Path to the temporary ID map JSON file.
- * This file stores the mapping of temporary IDs (e.g., aw_abc123) to their resolved
- * GitHub resource references ({repo, number}) for review and audit purposes.
- * The file is uploaded as part of the safe-outputs-items artifact.
- * @type {string}
- */
-const TEMPORARY_ID_MAP_FILE_PATH = `${TMP_GH_AW_PATH}/temporary-id-map.json`;
-
-/**
- * Path to the safe-output error report JSON file.
- * This file records structured diagnostics (error code, message, failing safe-output
- * types) whenever the safe-output handler manager fails, so that failures of the
- * "Process Safe Outputs" step remain diagnosable after the job logs expire.
- * The file is uploaded as part of the safe-outputs-items artifact.
- * @type {string}
- */
-const SAFE_OUTPUT_ERRORS_FILE_PATH = `${TMP_GH_AW_PATH}/safe-output-errors.json`;
-
-/**
- * Path to the OTLP telemetry mirror file.
- * Every OTLP span payload is appended here as a JSON line for artifact inspection.
- * @type {string}
- */
-const OTEL_JSONL_PATH = `${TMP_GH_AW_PATH}/otel.jsonl`;
-
-/**
- * Path to the GitHub API rate-limit log file.
- * Each entry records the x-ratelimit-* headers (or rate-limit API snapshot)
- * at the time of a GitHub REST API call, enabling post-run rate-limit analysis.
- * @type {string}
- */
-const GITHUB_RATE_LIMITS_JSONL_PATH = `${TMP_GH_AW_PATH}/github_rate_limits.jsonl`;
-
 /**
  * Filename of the threat detection log written by the detection engine via tee.
  * The detection copilot's stdout (containing THREAT_DETECTION_RESULT) is piped
@@ -212,7 +142,12 @@ const STEP_NAME_START_MCP_GATEWAY = "Start MCP Gateway";
 
 module.exports = {
   AGENT_OUTPUT_FILENAME,
-  TMP_GH_AW_PATH,
+  // Pure constants remain importable by offline tools. Runtime paths validate
+  // the invocation environment when accessed, never by falling back globally.
+  /** Base path for this invocation's temporary gh-aw files. */
+  get TMP_GH_AW_PATH() {
+    return runtimeRoot();
+  },
   GITHUB_API_VERSION,
   COPILOT_REVIEWER_BOT,
   COPILOT_REVIEWER_BOT_ID,
@@ -221,14 +156,61 @@ module.exports = {
   MAX_ASSIGNEES,
   MAX_CLOSE_COUNT,
   MAX_CAPTURE_BYTES,
-  GATEWAY_JSONL_PATH,
-  RPC_MESSAGES_PATH,
-  MANIFEST_FILE_PATH,
-  LEDGER_TRANSACTION_LOG_PATH,
-  TEMPORARY_ID_MAP_FILE_PATH,
-  SAFE_OUTPUT_ERRORS_FILE_PATH,
-  OTEL_JSONL_PATH,
-  GITHUB_RATE_LIMITS_JSONL_PATH,
+  /** Path to the MCP gateway JSONL log file. */
+  get GATEWAY_JSONL_PATH() {
+    return runtimePath("mcp-logs/gateway.jsonl");
+  },
+  /** Path to the MCP RPC messages JSONL log file. */
+  get RPC_MESSAGES_PATH() {
+    return runtimePath("mcp-logs/rpc-messages.jsonl");
+  },
+  /** Path to the safe-output manifest JSONL file. */
+  get MANIFEST_FILE_PATH() {
+    return runtimePath("safe-output-items.jsonl");
+  },
+  /**
+   * Path to the ledger transaction log JSONL file.
+   * The ledger MCP server appends redacted `ledger_mutation` audit entries here during
+   * the agent run. A trusted step merges validated entries into the safe-output file
+   * before ingestion; the file is deliberately separate from the safe-output manifest
+   * so agent-run writes can never be mistaken for executed safe outputs.
+   */
+  get LEDGER_TRANSACTION_LOG_PATH() {
+    return runtimePath("ledger-transactions.jsonl");
+  },
+  /**
+   * Path to the temporary ID map JSON file.
+   * Stores temporary IDs (e.g. aw_abc123) and their resolved GitHub resource
+   * references ({repo, number}) for review and audit. The file is uploaded as
+   * part of the safe-outputs-items artifact.
+   */
+  get TEMPORARY_ID_MAP_FILE_PATH() {
+    return runtimePath("temporary-id-map.json");
+  },
+  /**
+   * Path to the safe-output error report JSON file.
+   * Records structured diagnostics (error code, message, failing safe-output
+   * types) whenever the handler manager fails, keeping "Process Safe Outputs"
+   * failures diagnosable after job logs expire. Uploaded with safe-outputs-items.
+   */
+  get SAFE_OUTPUT_ERRORS_FILE_PATH() {
+    return runtimePath("safe-output-errors.json");
+  },
+  /**
+   * Path to the OTLP telemetry mirror file.
+   * Every span payload is appended here as a JSON line for artifact inspection.
+   */
+  get OTEL_JSONL_PATH() {
+    return runtimePath("otel.jsonl");
+  },
+  /**
+   * Path to the GitHub API rate-limit log file.
+   * Each entry records x-ratelimit-* headers or a rate-limit API snapshot at
+   * request time for post-run rate-limit analysis.
+   */
+  get GITHUB_RATE_LIMITS_JSONL_PATH() {
+    return runtimePath("github_rate_limits.jsonl");
+  },
   DETECTION_LOG_FILENAME,
   DETECTION_RESULT_FILENAME,
   DEFAULT_MCP_CALL_WATCHDOG_MS,

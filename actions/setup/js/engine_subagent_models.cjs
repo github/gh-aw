@@ -476,7 +476,7 @@ async function applyClaudeSubagentModels(options) {
   const { normalizeClaudeModel } = require("./model_fallback.cjs");
   const workspaceDir = options.workspaceDir || env.GITHUB_WORKSPACE || process.cwd();
   const workingDirectory = options.workingDirectory || path.resolve(workspaceDir, env.GH_AW_ENGINE_CWD || ".");
-  const agentsBaseDir = options.agentsBaseDir || path.join(os.tmpdir(), "gh-aw");
+  const agentsBaseDir = options.agentsBaseDir || require("./runtime_paths.cjs").runtimeRoot();
   const target = inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("claude"));
   /** @type {string[]} */
   const invalidDeclared = [];
@@ -794,7 +794,7 @@ async function applyCodexSubagentModels(options) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
   const { serializeConfig } = require("./codex_config.cjs");
   const { getAWFModelRoutingPolicy, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
-  const agentsBaseDir = options.agentsBaseDir || path.join(os.tmpdir(), "gh-aw");
+  const agentsBaseDir = options.agentsBaseDir || require("./runtime_paths.cjs").runtimeRoot();
   const directory = path.resolve(agentsBaseDir, inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("codex")).dir);
   /** @type {string[]} */
   const invalid = [];

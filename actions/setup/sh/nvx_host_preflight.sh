@@ -154,7 +154,7 @@ for index in "${!artifact_paths[@]}"; do
   fi
 done
 
-stage_dir="$(tool sudo -n "${trusted_tools[mktemp]}" -d /tmp/gh-aw-nvx.XXXXXXXXXX)"
+stage_dir="$(tool sudo -n "${trusted_tools[mktemp]}" -d "${RUNNER_TEMP:?}/gh-aw/nvx.XXXXXXXXXX")"
 tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0555 -- "$GH_AW_NVX_OPENVMM_SOURCE" "${stage_dir}/openvmm"
 tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_KERNEL_SOURCE" "${stage_dir}/vmlinux"
 tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_INITRAMFS_SOURCE" "${stage_dir}/initramfs.cpio.gz"

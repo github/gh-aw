@@ -108,6 +108,7 @@ func ensureDefaultMCPGatewayConfig(workflowData *WorkflowData) {
 			Container: constants.DefaultMCPGatewayContainer,
 			Version:   defaultMCPGatewayVersionForWorkflow(workflowData),
 			Port:      int(DefaultMCPGatewayPort),
+			AutoPort:  true,
 		}
 	} else {
 		// Fill in defaults for missing fields
@@ -120,6 +121,7 @@ func ensureDefaultMCPGatewayConfig(workflowData *WorkflowData) {
 		}
 		if workflowData.SandboxConfig.MCP.Port == 0 {
 			workflowData.SandboxConfig.MCP.Port = int(DefaultMCPGatewayPort)
+			workflowData.SandboxConfig.MCP.AutoPort = true
 		}
 	}
 

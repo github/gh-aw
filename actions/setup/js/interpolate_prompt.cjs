@@ -208,7 +208,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       const beforeExtraction = content.length;
       // Write agents to /tmp/gh-aw/<engine-dir>/ so the files are included in the
       // activation artifact and available to the downstream agent job.
-      const agentsBaseDir = "/tmp/gh-aw";
+      const agentsBaseDir = require("./runtime_paths.cjs").runtimeRoot();
       const engineId = process.env.GH_AW_ENGINE_ID || "";
       content = writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, restoreArtifact);
       const afterExtraction = content.length;
@@ -227,7 +227,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
     const hasSkillMarkers = /^##[ \t]+skill:[ \t]+`[a-z]/m.test(content);
     if (hasSkillMarkers) {
       const beforeExtraction = content.length;
-      const skillsBaseDir = "/tmp/gh-aw";
+      const skillsBaseDir = require("./runtime_paths.cjs").runtimeRoot();
       const engineId = process.env.GH_AW_ENGINE_ID || "";
       content = writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId, restoreArtifact);
       const afterExtraction = content.length;

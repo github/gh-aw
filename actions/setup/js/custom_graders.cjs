@@ -169,13 +169,13 @@ async function main(options = {}) {
   const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
   const { readGraderManifestEnvironment } = require("./grader_artifacts.cjs");
   const session = [];
-  const content = fs.readFileSync(options.sessionPath ?? "/tmp/gh-aw/usage/aw_session.jsonl", "utf8");
+  const content = fs.readFileSync(options.sessionPath ?? require("./runtime_paths.cjs").runtimePath("usage/aw_session.jsonl"), "utf8");
   for (const entry of iterateJsonlEvents(content)) {
     if (entry.type === "json") session.push(entry.value);
     else if (entry.reason !== "blank") throw new Error("invalid unified session for custom graders");
   }
   const { manifest, output } = runCustomGraders(session, readGraderManifestEnvironment("GH_AW_CUSTOM_GRADER_MANIFEST").graders);
-  const directory = options.outputDirectory ?? "/tmp/gh-aw/custom-graders";
+  const directory = options.outputDirectory ?? require("./runtime_paths.cjs").runtimePath("custom-graders");
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(path.join(directory, "grader_manifest.json"), JSON.stringify(manifest, null, 2), { mode: 0o600 });
   fs.writeFileSync(path.join(directory, "grader_results.json"), JSON.stringify(output, null, 2), { mode: 0o600 });

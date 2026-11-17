@@ -23,7 +23,7 @@ run_installer() {
   shift 4 || true
 
   local sandbox
-  sandbox=$(mktemp -d)
+  sandbox=$(mktemp -d "${PWD}/.threat-detect-tests.XXXXXX")
   mkdir -p "${sandbox}/bin" "${sandbox}/home" "${sandbox}/runner/gh-aw/bin" "${sandbox}/privileged-bin"
   # A native non-Debian runner: no sudo or package manager is available on PATH.
   local tool
@@ -171,7 +171,7 @@ EOF
     sed 's|^"${THREAT_DETECT_INSTALL_DIR}/${THREAT_DETECT_INSTALL_NAME}" --version$|"${SANDBOX_PRIVILEGED_BIN}/threat-detect" --version|' "$INSTALL_SCRIPT" >"$script"
     cp "${SCRIPT_DIR}/install_privileges.sh" "${sandbox}/install_privileges.sh"
   fi
-  RUN_OUTPUT=$(cd "$sandbox" && env PATH="${sandbox}/bin" HOME="${sandbox}/home" \
+  RUN_OUTPUT=$(cd "$sandbox" && env PATH="${sandbox}/bin" HOME="${sandbox}/home" GH_AW_RUNTIME_DIR="$sandbox" \
     RUNNER_TEMP="${sandbox}/runner" SANDBOX_AUTO_PRIVILEGES="${AUTO_PRIVILEGES:-false}" \
     SANDBOX_SUDO_AVAILABLE="$([ "${INSTALL_MODE:-rootless}" = privileged ] && echo true || echo false)" \
     SANDBOX_URL_LOG="$url_log" SANDBOX_EXECUTION_LOG="$execution_log" GITHUB_PATH="$github_path" GITHUB_OUTPUT="$github_output" \

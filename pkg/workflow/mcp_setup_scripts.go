@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
 )
@@ -22,7 +21,7 @@ func generateMCPScriptsSetup(yaml *strings.Builder, workflowData *WorkflowData) 
 	yaml.WriteString("      - name: Write MCP Scripts Config\n")
 	yaml.WriteString("        # runner-guard:ignore RGS-018 -- writes first-party mcp-scripts tools.json manifest and mcp-server.cjs shim generated verbatim from the gh-aw compiler template, not an attacker-controlled dropper.\n")
 	yaml.WriteString("        run: |\n")
-	yaml.WriteString("          mkdir -p \"${RUNNER_TEMP}/gh-aw/mcp-scripts/logs\"\n")
+	yaml.WriteString("          mkdir -p \"${RUNNER_TEMP}/gh-aw/mcp-scripts\" \"${GH_AW_RUNTIME_DIR:?}/mcp-scripts/logs\"\n")
 
 	toolsJSON := GenerateMCPScriptsToolsConfig(workflowData.MCPScripts)
 	toolsDelimiter := GenerateHeredocDelimiterFromContent("MCP_SCRIPTS_TOOLS", toolsJSON)
@@ -68,7 +67,7 @@ func generateMCPScriptsSetup(yaml *strings.Builder, workflowData *WorkflowData) 
 	yaml.WriteString("          API_KEY=$(openssl rand -base64 45 | tr -d '/+=')\n")
 	yaml.WriteString("          echo \"::add-mask::${API_KEY}\"\n")
 	yaml.WriteString("          \n")
-	fmt.Fprintf(yaml, "          PORT=%d\n", constants.DefaultMCPServerPort)
+	yaml.WriteString("          PORT=\"${GH_AW_MCP_SCRIPTS_PORT:?}\"\n")
 	yaml.WriteString("          \n")
 	yaml.WriteString("          # Set outputs for next steps\n")
 	yaml.WriteString("          {\n")

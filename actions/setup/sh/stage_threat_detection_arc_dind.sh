@@ -6,22 +6,22 @@ set -euo pipefail
 # exposing the detector and its working directory to the separate Docker daemon.
 # The optional second argument isolates the host directory in runtime tests.
 MODE="${1:?Expected reset, stage or collect}"
-DETECTION_DIR="${2:-/tmp/gh-aw/threat-detection}"
+DETECTION_DIR="${2:-${GH_AW_RUNTIME_DIR:?}/threat-detection}"
 DETECTION_INPUT_DIR="$(dirname "$DETECTION_DIR")/threat-detection-inputs"
-STAGED_DIR="${RUNNER_TEMP:?RUNNER_TEMP must be set}/gh-aw/threat-detection"
-STAGED_INPUT_DIR="${RUNNER_TEMP}/gh-aw/threat-detection-inputs"
+STAGED_DIR="${GH_AW_RUNTIME_DIR:?}/threat-detection"
+STAGED_INPUT_DIR="${GH_AW_RUNTIME_DIR:?}/threat-detection-inputs"
 BIN_DIR="${RUNNER_TEMP}/gh-aw/bin"
 RESULT_FILES=(detection_result.json detection_result_full.json detection_usage.json detection_usage.jsonl)
 
-if [[ -L "$STAGED_DIR" || -L "$DETECTION_DIR" || -L "$STAGED_INPUT_DIR" || -L "$DETECTION_INPUT_DIR" || "$STAGED_DIR" = "$DETECTION_DIR" ]]; then
-  echo "ERROR: Detection staging requires separate, non-symlink directories" >&2
+if [[ -L "$STAGED_DIR" || -L "$DETECTION_DIR" || -L "$STAGED_INPUT_DIR" || -L "$DETECTION_INPUT_DIR" ]]; then
+  echo "ERROR: Detection staging requires non-symlink directories" >&2
   exit 1
 fi
 
 # Reset is also a separate, unconditional step before preparation/installation:
 # execution may be skipped after a failed install, but stale verdicts must go.
 case "$MODE" in
-  reset|stage)
+  reset)
     for name in "${RESULT_FILES[@]}"; do
       rm -f "${DETECTION_DIR}/${name}" "${STAGED_DIR}/${name}"
     done
@@ -43,8 +43,13 @@ case "$MODE" in
       exit 1
     fi
     mkdir -p "$BIN_DIR"
-    cp -R "${DETECTION_DIR}/." "$STAGED_DIR/"
-    cp -R "${DETECTION_INPUT_DIR}/." "$STAGED_INPUT_DIR/"
+    if [[ "$DETECTION_DIR" != "$STAGED_DIR" ]]; then
+      mkdir -p "$STAGED_DIR" "$STAGED_INPUT_DIR"
+      find "$STAGED_DIR" -mindepth 1 -delete
+      find "$STAGED_INPUT_DIR" -mindepth 1 -delete
+      cp -R "${DETECTION_DIR}/." "$STAGED_DIR/"
+      cp -R "${DETECTION_INPUT_DIR}/." "$STAGED_INPUT_DIR/"
+    fi
     # Remove a stale destination symlink instead of following it during copy.
     rm -f "${BIN_DIR}/threat-detect"
     cp "$detector" "${BIN_DIR}/threat-detect"
@@ -55,7 +60,7 @@ case "$MODE" in
     # Copy only detector outputs. In particular, never replace detection.log
     # (written by the host's tee) or execution.json (host execution evidence).
     for name in "${RESULT_FILES[@]}"; do
-      if [[ -f "${STAGED_DIR}/${name}" && ! -L "${STAGED_DIR}/${name}" ]]; then
+      if [[ "$STAGED_DIR" != "$DETECTION_DIR" && -f "${STAGED_DIR}/${name}" && ! -L "${STAGED_DIR}/${name}" ]]; then
         cp "${STAGED_DIR}/${name}" "${DETECTION_DIR}/${name}"
       fi
     done

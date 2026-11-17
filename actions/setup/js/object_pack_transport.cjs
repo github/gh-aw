@@ -397,7 +397,7 @@ async function recoverObjectPackChecked(transport, paths, options) {
           tip: metadata.tip,
           baseline: base,
           remote,
-          artifactFileName: paths.bundlePath.replace("/tmp/gh-aw/", ""),
+          artifactFileName: paths.bundlePath.replace(require("./runtime_paths.cjs").runtimeRoot() + "/", ""),
           excludedFiles: generationOptions.excludedFiles,
         },
       });

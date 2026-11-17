@@ -41,7 +41,7 @@ const { renderToolRecommendedExample, renderToolSignature, summarizeHelpText } =
 const { isBlankOptionalField, normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 
 /** Directory for JSONL audit logs (writable inside AWF sandbox via /tmp mount) */
-const AUDIT_LOG_DIR = "/tmp/gh-aw/mcp-cli-audit";
+const AUDIT_LOG_DIR = require("./runtime_paths.cjs").runtimePath("mcp-cli-audit");
 const AUDIT_LOG_RETENTION_MS = 24 * 60 * 60 * 1000;
 const SAFE_AUDIT_FIELDS = new Set(["event", "tool", "statusCode", "hasSession", "elapsedMs", "totalElapsedMs", "pingId", "intervalMs", "pid", "toolCount", "argumentBytes", "responseBytes"]);
 

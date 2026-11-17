@@ -2,7 +2,7 @@
 set +o histexpand
 
 # Start DIFC proxy for pre-agent gh CLI steps
-# This script starts the awmg proxy container that routes gh CLI calls
+# This script starts an invocation-namespaced proxy container routing gh CLI calls
 # through DIFC integrity filtering before the agent runs.
 #
 # This script does NOT modify $GITHUB_ENV. The compiler injects step-level
@@ -20,6 +20,9 @@ set +o histexpand
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/runtime_docker.sh"
+CONTAINER_NAME="$(gh_aw_container_name awmg-proxy)"
+PROXY_PORT="${GH_AW_CLI_PROXY_PORT:?}"
 # shellcheck source=proxy_env_lib.sh
 source "${SCRIPT_DIR}/proxy_env_lib.sh"
 
@@ -36,8 +39,8 @@ if [ -z "$CONTAINER_IMAGE" ]; then
   exit 0
 fi
 
-PROXY_LOG_DIR=/tmp/gh-aw/proxy-logs
-MCP_LOG_DIR=/tmp/gh-aw/mcp-logs
+PROXY_LOG_DIR="${GH_AW_RUNTIME_DIR:?}/proxy-logs"
+MCP_LOG_DIR="${GH_AW_RUNTIME_DIR:?}/mcp-logs"
 
 mkdir -p "$PROXY_LOG_DIR" "$MCP_LOG_DIR"
 
@@ -46,15 +49,12 @@ derive_proxy_upstream_env
 echo "Starting DIFC proxy container: $CONTAINER_IMAGE"
 echo "Using DIFC proxy upstream host: ${GH_HOST} (API: ${GITHUB_API_URL})"
 
-# Remove any existing container to avoid name conflicts on cancelled/retried jobs.
-docker rm -f awmg-proxy 2>/dev/null || true
-
 DOCKER_NETWORK_ARGS=(--network host)
 if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
-  DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
+  DOCKER_NETWORK_ARGS=(--network bridge -p "127.0.0.1:${PROXY_PORT}:${PROXY_PORT}")
 fi
 
-docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
+docker run -d --name "$CONTAINER_NAME" --label "gh-aw.runtime-id=${GH_AW_RUNTIME_ID:?}" "${DOCKER_NETWORK_ARGS[@]}" \
   --user "$(id -u):$(id -g)" \
   -e GH_TOKEN \
   -e GH_HOST \
@@ -69,32 +69,20 @@ docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
   -v "$MCP_LOG_DIR:$MCP_LOG_DIR" \
   "$CONTAINER_IMAGE" proxy \
     --policy "$POLICY" \
-    --listen 0.0.0.0:18443 \
+    --listen "0.0.0.0:${PROXY_PORT}" \
     --log-dir "$MCP_LOG_DIR" \
     --tls --tls-dir "$PROXY_LOG_DIR/proxy-tls" \
     --guards-mode filter \
     --trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot,github-agentic-autofix[bot],github-agentic-autofix
 
 # Wait for TLS cert + health check (up to 30s)
-CA_INSTALLED=false
 PROXY_READY=false
 for i in $(seq 1 30); do
   if [ -f "$PROXY_LOG_DIR/proxy-tls/ca.crt" ]; then
-    if [ "$CA_INSTALLED" = "false" ]; then
-      if command -v sudo >/dev/null 2>&1 && command -v update-ca-certificates >/dev/null 2>&1; then
-        if sudo cp "$PROXY_LOG_DIR/proxy-tls/ca.crt" /usr/local/share/ca-certificates/awmg-proxy-difc.crt && \
-           sudo update-ca-certificates; then
-          CA_INSTALLED=true
-        else
-          echo "::warning::Failed to install DIFC proxy CA into system trust store; continuing without system CA update"
-        fi
-      else
-        echo "::warning::Cannot install DIFC proxy CA (missing sudo or update-ca-certificates); continuing without system CA update"
-      fi
-    fi
-    if curl -sf "https://localhost:18443/api/v3/health" -o /dev/null 2>/dev/null; then
-      echo "DIFC proxy ready on port 18443"
-      git remote add proxy "https://localhost:18443/${GITHUB_REPOSITORY}.git" || true
+    if curl -sf --cacert "$PROXY_LOG_DIR/proxy-tls/ca.crt" "https://localhost:${PROXY_PORT}/api/v3/health" -o /dev/null 2>/dev/null; then
+      echo "DIFC proxy ready on port ${PROXY_PORT}"
+      git config --local "http.https://localhost:${PROXY_PORT}/.sslCAInfo" "$PROXY_LOG_DIR/proxy-tls/ca.crt"
+      git remote add proxy "https://localhost:${PROXY_PORT}/${GITHUB_REPOSITORY}.git" || true
       PROXY_READY=true
       break
     fi
@@ -104,6 +92,6 @@ done
 
 if [ "$PROXY_READY" = "false" ]; then
   echo "::warning::DIFC proxy failed to start, falling back to direct API access"
-  docker logs awmg-proxy 2>&1 | tail -20 || true
-  docker rm -f awmg-proxy 2>/dev/null || true
+  docker logs "$CONTAINER_NAME" 2>&1 | tail -20 || true
+  gh_aw_remove_container "$CONTAINER_NAME" 2>/dev/null || true
 fi

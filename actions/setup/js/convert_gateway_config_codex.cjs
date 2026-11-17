@@ -118,7 +118,7 @@ function main() {
     writeCodexHomeFile(home, "models.json", output);
     return output;
   }
-  const outputPath = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml");
+  const outputPath = path.join(require("./runtime_paths.cjs").setupRoot(), "mcp-config/config.toml");
   if (process.argv.includes("--copy-config")) {
     const home = process.env.CODEX_HOME;
     if (!home) throw new Error("CODEX_HOME is required to configure Codex");

@@ -212,7 +212,7 @@ async function createClaimAdapterHandler(options) {
     if (Object.hasOwn(original, "repo") && original.repo !== adapter["target-repo"]) throw new Error("Custom Claim output explicit repository conflicts with its trusted adapter");
     message = await assertClaimAuthorized({ ...original, repo: adapter["target-repo"] }, { requireCompletion: !stagedMode });
     if (stagedMode) return { success: true, staged: true, claim_handle: factoryClaim };
-    const payload = loadPreparedPayload(original, adapter, options.filename || preparedAdapterPath(options.artifactRoot || "/tmp/gh-aw", factoryClaim, message.type));
+    const payload = loadPreparedPayload(original, adapter, options.filename || preparedAdapterPath(options.artifactRoot || require("./runtime_paths.cjs").runtimeRoot(), factoryClaim, message.type));
     const projected = projectAdapterMessage(message, adapter, payload);
     const member = currentClaimAssignment().claims.find(claim => claim.handle === factoryClaim);
     if (!member) throw new Error("Prepared Claim adapter lost its immutable member");

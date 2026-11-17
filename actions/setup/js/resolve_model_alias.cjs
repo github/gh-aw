@@ -644,7 +644,7 @@ function loadModelAliasMap(options = {}) {
   /** @type {Record<string, string[]>|null} */
   let base = null;
   try {
-    const configPath = env.GH_AW_AWF_CONFIG_PATH || path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "awf-config.json");
+    const configPath = env.GH_AW_AWF_CONFIG_PATH || path.join(require("./runtime_paths.cjs").runtimeRoot(env), "awf-config.json");
     const models = JSON.parse(fs.readFileSync(configPath, "utf8"))?.apiProxy?.models;
     if (isMap(models)) base = models;
   } catch {
@@ -666,7 +666,7 @@ function loadModelAliasMap(options = {}) {
 function recordModelResolution(record, env = process.env) {
   if (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent") return false;
   try {
-    const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", MODEL_RESOLUTION_RECORD_PATH);
+    const file = path.join(require("./runtime_paths.cjs").runtimeRoot(env), MODEL_RESOLUTION_RECORD_PATH);
     /** @type {any[]} */
     let records = [];
     try {

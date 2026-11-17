@@ -12,7 +12,7 @@ set +o histexpand
 # GH_AW_ALLOWED_EXTENSIONS is set.
 #
 # Required environment variables:
-#   GH_AW_CACHE_DIR:             Path to the cache-memory directory (e.g. /tmp/gh-aw/cache-memory)
+#   GH_AW_CACHE_DIR:             Cache-memory directory within the private runtime
 #   GH_AW_MIN_INTEGRITY:         Integrity level for this run (merged|approved|unapproved|none)
 #
 # Optional environment variables:
@@ -22,10 +22,10 @@ set +o histexpand
 
 set -euo pipefail
 
-TMP_DIR="$(mktemp -d /tmp/gh-aw-cache-memory.XXXXXX)"
+TMP_DIR="$(mktemp -d "${GH_AW_RUNTIME_DIR:?}/cache-memory.XXXXXX")"
 trap 'rm -rf -- "$TMP_DIR"' EXIT
 
-CACHE_DIR="${GH_AW_CACHE_DIR:-/tmp/gh-aw/cache-memory}"
+CACHE_DIR="${GH_AW_CACHE_DIR:-${GH_AW_RUNTIME_DIR:?}/cache-memory}"
 INTEGRITY="${GH_AW_MIN_INTEGRITY:-none}"
 
 # All integrity levels in descending order (highest first)
@@ -38,9 +38,9 @@ ensure_writable_dir() {
   local mkdir_err
   local chmod_err
   local write_err
-  mkdir_err="$(mktemp /tmp/gh-aw-cache-mkdir-err.XXXXXX)"
-  chmod_err="$(mktemp /tmp/gh-aw-cache-chmod-err.XXXXXX)"
-  write_err="$(mktemp /tmp/gh-aw-cache-write-err.XXXXXX)"
+  mkdir_err="$(mktemp "${TMP_DIR}/mkdir-err.XXXXXX")"
+  chmod_err="$(mktemp "${TMP_DIR}/chmod-err.XXXXXX")"
+  write_err="$(mktemp "${TMP_DIR}/write-err.XXXXXX")"
 
   if ! mkdir -p "$dir" 2>"$mkdir_err"; then
     echo "ERROR: cache-memory setup error: failed to create ${purpose} (${dir})" >&2
@@ -127,7 +127,7 @@ cd "$CACHE_DIR"
 # --- Flatten legacy nested artifact layout before git setup ---
 # Older cache-memory artifact uploads could restore into a nested directory whose
 # name matched the cache directory basename (for example ./cache-memory/* inside
-# /tmp/gh-aw/cache-memory). If that layout is restored, move the nested contents
+# $GH_AW_RUNTIME_DIR/cache-memory). If restored, move the nested contents
 # back to the cache root before cache-hit detection so the agent sees the files
 # at the expected paths again.
 CACHE_BASENAME="$(basename "$CACHE_DIR")"
@@ -202,7 +202,7 @@ else
   # hook-file cleanup step in this script.
   # If git metadata is malformed enough that config cannot be written (for example
   # missing HEAD), recover by reinitializing while preserving working-tree files.
-  _hooks_config_err="$(mktemp)"
+  _hooks_config_err="$(mktemp "${TMP_DIR}/hooks-err.XXXXXX")"
   if ! git config core.hooksPath /dev/null 2>"$_hooks_config_err"; then
     echo "WARNING: Detected corrupted cache-memory git repository (cannot configure hooks); reinitializing git metadata"
     cat "$_hooks_config_err" 2>/dev/null || true

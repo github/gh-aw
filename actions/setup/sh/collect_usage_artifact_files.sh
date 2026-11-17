@@ -2,7 +2,7 @@
 set +o histexpand
 set -euo pipefail
 
-# Collect usage artifact files into /tmp/gh-aw/usage/ for upload.
+# Collect usage artifact files into the private runtime's usage/ for upload.
 # Copies aw_info, agent/detection usage JSONL, evals, A/B experiment state,
 # rate limits, token-usage logs, and model-routing logs from the firewall sandbox directories,
 # so the audit command can mine experiments and evals from the usage artifact alone.
@@ -60,110 +60,111 @@ safe_copy() {
   mv -f -- "$staged_file" "$destination"
 }
 
-ensure_real_directory /tmp/gh-aw
-ensure_real_directory /tmp/gh-aw/usage
-ensure_real_directory /tmp/gh-aw/usage/agent
-ensure_real_directory /tmp/gh-aw/usage/detection
-ensure_real_directory /tmp/gh-aw/usage/evals
-ensure_real_directory /tmp/gh-aw/usage/experiment
-ensure_real_directory /tmp/gh-aw/usage/activity
+RUNTIME="${GH_AW_RUNTIME_DIR:?}"
+ensure_real_directory "$RUNTIME"
+for directory in usage usage/agent usage/detection usage/evals usage/experiment usage/activity; do
+  ensure_real_directory "$RUNTIME/$directory"
+done
 
 echo "Usage artifact source file status:"
 for file in \
-  /tmp/gh-aw/aw_info.json \
-  /tmp/gh-aw/runtime/aw_info.json \
-  /tmp/gh-aw/agent/aw_info.json \
-  /tmp/gh-aw/aw-info.jsonl \
-  /tmp/gh-aw/agent_usage.json \
-  /tmp/gh-aw/agent_usage.jsonl \
-  /tmp/gh-aw/agent/harness_retry.json \
-  /tmp/gh-aw/threat-detection/detection_harness_retry.json \
-  /tmp/gh-aw/detection_usage.jsonl \
-  /tmp/gh-aw/threat-detection/detection_usage.jsonl \
-  /tmp/gh-aw/evals/evals.jsonl \
-  /tmp/gh-aw/evals/evals_status.json \
-  /tmp/gh-aw/evals/evals_token_usage.jsonl \
-  /tmp/gh-aw/evals/execution.json \
-  /tmp/gh-aw/evals/evals/execution.json \
-  /tmp/gh-aw/experiments/state.jsonl \
-  /tmp/gh-aw/experiments/state.json \
-  /tmp/gh-aw/experiments/assignments.json \
-  /tmp/gh-aw/github_rate_limits.jsonl \
-  /tmp/gh-aw/safe-output-items.jsonl \
-  /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl \
-  /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl \
-  /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl \
-  /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl \
-  /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl \
-  /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl \
-  /tmp/gh-aw/threat-detection/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl \
-  /tmp/gh-aw/threat-detection/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl \
-  /tmp/gh-aw/threat-detection/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl; do
+  "$RUNTIME/aw_info.json" \
+  "$RUNTIME/runtime/aw_info.json" \
+  "$RUNTIME/agent/aw_info.json" \
+  "$RUNTIME/aw-info.jsonl" \
+  "$RUNTIME/agent_usage.json" \
+  "$RUNTIME/agent_usage.jsonl" \
+  "$RUNTIME/agent/harness_retry.json" \
+  "$RUNTIME/threat-detection/detection_harness_retry.json" \
+  "$RUNTIME/detection_usage.jsonl" \
+  "$RUNTIME/threat-detection/detection_usage.jsonl" \
+  "$RUNTIME/evals/evals.jsonl" \
+  "$RUNTIME/evals/evals_status.json" \
+  "$RUNTIME/evals/evals_token_usage.jsonl" \
+  "$RUNTIME/evals/execution.json" \
+  "$RUNTIME/evals/evals/execution.json" \
+  "$RUNTIME/experiments/state.jsonl" \
+  "$RUNTIME/experiments/state.json" \
+  "$RUNTIME/experiments/assignments.json" \
+  "$RUNTIME/github_rate_limits.jsonl" \
+  "$RUNTIME/safe-output-items.jsonl" \
+  "$RUNTIME/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl" \
+  "$RUNTIME/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl" \
+  "$RUNTIME/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl" \
+  "$RUNTIME/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl" \
+  "$RUNTIME/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl" \
+  "$RUNTIME/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl" \
+  "$RUNTIME/threat-detection/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl" \
+  "$RUNTIME/threat-detection/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl" \
+  "$RUNTIME/threat-detection/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl"; do
   if [ -f "$file" ] && ! path_has_symlink_component "$file"; then echo "FOUND: $file"; else echo "MISSING: $file"; fi
 done
 
-if [ -f /tmp/gh-aw/aw_info.json ]; then safe_copy /tmp/gh-aw/aw_info.json /tmp/gh-aw/usage/aw_info.json || true; fi
-if [ -f /tmp/gh-aw/runtime/aw_info.json ]; then safe_copy /tmp/gh-aw/runtime/aw_info.json /tmp/gh-aw/usage/aw_info.json || true; fi
+if [ -f "$RUNTIME/aw_info.json" ]; then safe_copy "$RUNTIME/aw_info.json" "$RUNTIME/usage/aw_info.json" || true; fi
+if [ -f "$RUNTIME/runtime/aw_info.json" ]; then safe_copy "$RUNTIME/runtime/aw_info.json" "$RUNTIME/usage/aw_info.json" || true; fi
 # Agent-controlled metadata must not establish or override runtime attribution.
-if [ -f /tmp/gh-aw/aw-info.jsonl ]; then safe_copy /tmp/gh-aw/aw-info.jsonl /tmp/gh-aw/usage/aw-info.jsonl || true; fi
-if [ -f /tmp/gh-aw/agent_usage.json ]; then safe_copy /tmp/gh-aw/agent_usage.json /tmp/gh-aw/usage/agent_usage.json || true; fi
-if [ -f /tmp/gh-aw/agent_usage.jsonl ]; then safe_copy /tmp/gh-aw/agent_usage.jsonl /tmp/gh-aw/usage/agent_usage.jsonl || true; fi
-if [ -f /tmp/gh-aw/threat-detection/detection_usage.jsonl ]; then
-  safe_copy /tmp/gh-aw/threat-detection/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true
-elif [ -f /tmp/gh-aw/detection_usage.jsonl ]; then
-  safe_copy /tmp/gh-aw/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true
+for file in aw-info.jsonl agent_usage.json agent_usage.jsonl github_rate_limits.jsonl; do
+  if [ -f "$RUNTIME/$file" ]; then safe_copy "$RUNTIME/$file" "$RUNTIME/usage/$file" || true; fi
+done
+if [ -f "$RUNTIME/threat-detection/detection_usage.jsonl" ]; then
+  safe_copy "$RUNTIME/threat-detection/detection_usage.jsonl" "$RUNTIME/usage/detection_usage.jsonl" || true
+elif [ -f "$RUNTIME/detection_usage.jsonl" ]; then
+  safe_copy "$RUNTIME/detection_usage.jsonl" "$RUNTIME/usage/detection_usage.jsonl" || true
 fi
-if [ -f /tmp/gh-aw/agent_execution.json ]; then safe_copy /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json || true; fi
-if [ -f /tmp/gh-aw/agent/harness_retry.json ]; then safe_copy /tmp/gh-aw/agent/harness_retry.json /tmp/gh-aw/usage/agent/harness_retry.json || true; fi
-if [ -f /tmp/gh-aw/agent/durable-session.jsonl ]; then
-  if ! safe_copy /tmp/gh-aw/agent/durable-session.jsonl /tmp/gh-aw/usage/agent/durable-session.jsonl 2>/dev/null; then
+if [ -f "$RUNTIME/agent_execution.json" ]; then safe_copy "$RUNTIME/agent_execution.json" "$RUNTIME/usage/agent/execution.json" || true; fi
+if [ -f "$RUNTIME/agent/harness_retry.json" ]; then safe_copy "$RUNTIME/agent/harness_retry.json" "$RUNTIME/usage/agent/harness_retry.json" || true; fi
+if [ -f "$RUNTIME/agent/durable-session.jsonl" ]; then
+  if ! safe_copy "$RUNTIME/agent/durable-session.jsonl" "$RUNTIME/usage/agent/durable-session.jsonl" 2>/dev/null; then
     echo "::warning::Durable session metadata could not be copied; continuing usage evidence collection."
   fi
 fi
-if [ -f /tmp/gh-aw/threat-detection/detection_harness_retry.json ]; then safe_copy /tmp/gh-aw/threat-detection/detection_harness_retry.json /tmp/gh-aw/usage/detection/harness_retry.json || true; fi
-if [ -f /tmp/gh-aw/threat-detection/execution.json ]; then safe_copy /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json || true; fi
-# The evals artifact is rooted at /tmp/gh-aw/ in the evals job, so its execution evidence
-# lands under evals/evals/ when downloaded into /tmp/gh-aw/evals/.
-if [ -f /tmp/gh-aw/evals/evals/execution.json ]; then
-  safe_copy /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json || true
-elif [ -f /tmp/gh-aw/evals/execution.json ]; then
-  safe_copy /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json || true
+if [ -f "$RUNTIME/threat-detection/detection_harness_retry.json" ]; then safe_copy "$RUNTIME/threat-detection/detection_harness_retry.json" "$RUNTIME/usage/detection/harness_retry.json" || true; fi
+if [ -f "$RUNTIME/threat-detection/execution.json" ]; then safe_copy "$RUNTIME/threat-detection/execution.json" "$RUNTIME/usage/detection/execution.json" || true; fi
+# Downloaded evals artifacts can contain a nested evals/ directory.
+if [ -f "$RUNTIME/evals/evals/execution.json" ]; then
+  safe_copy "$RUNTIME/evals/evals/execution.json" "$RUNTIME/usage/evals/execution.json" || true
+elif [ -f "$RUNTIME/evals/execution.json" ]; then
+  safe_copy "$RUNTIME/evals/execution.json" "$RUNTIME/usage/evals/execution.json" || true
 fi
-if [ -f /tmp/gh-aw/evals/evals.jsonl ]; then safe_copy /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl || true; fi
+if [ -f "$RUNTIME/evals/evals.jsonl" ]; then safe_copy "$RUNTIME/evals/evals.jsonl" "$RUNTIME/usage/evals.jsonl" || true; fi
 # The not-evaluated marker is run-level diagnostic evidence, kept beside the evals
 # execution evidence rather than as an answer file.
-if [ -f /tmp/gh-aw/evals/evals_status.json ]; then
-  safe_copy /tmp/gh-aw/evals/evals_status.json /tmp/gh-aw/usage/evals/evals_status.json || true
+if [ -f "$RUNTIME/evals/evals_status.json" ]; then
+  safe_copy "$RUNTIME/evals/evals_status.json" "$RUNTIME/usage/evals/evals_status.json" || true
 fi
-if [ -f /tmp/gh-aw/evals/evals_token_usage.jsonl ]; then
-  safe_copy /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl
+if [ -f "$RUNTIME/evals/evals_token_usage.jsonl" ]; then
+  safe_copy "$RUNTIME/evals/evals_token_usage.jsonl" "$RUNTIME/usage/evals/token_usage.jsonl"
 fi
 for file in state.jsonl state.json assignments.json; do
-  if [ -f "/tmp/gh-aw/experiments/$file" ]; then safe_copy "/tmp/gh-aw/experiments/$file" "/tmp/gh-aw/usage/experiment/$file" || true; fi
+  if [ -f "$RUNTIME/experiments/$file" ]; then safe_copy "$RUNTIME/experiments/$file" "$RUNTIME/usage/experiment/$file" || true; fi
 done
-if [ -f /tmp/gh-aw/github_rate_limits.jsonl ]; then safe_copy /tmp/gh-aw/github_rate_limits.jsonl /tmp/gh-aw/usage/github_rate_limits.jsonl || true; fi
 
 # Agent token usage (ascending priority — authoritative source wins even when empty).
-if [ -s /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl ]; then safe_copy /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/agent/token_usage.jsonl || true; fi
-if [ -s /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl ]; then safe_copy /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/agent/token_usage.jsonl || true; fi
-if [ -f /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]; then safe_copy /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/agent/token_usage.jsonl || true; fi
+for layout in firewall-audit-logs firewall/audit firewall/logs; do
+  source="$RUNTIME/sandbox/$layout/api-proxy-logs/token-usage.jsonl"
+  if [ -s "$source" ] || { [ "$layout" = firewall/logs ] && [ -f "$source" ]; }; then
+    safe_copy "$source" "$RUNTIME/usage/agent/token_usage.jsonl" || true
+  fi
+done
 
 # Agent model routing (ascending priority — authoritative source wins even when empty).
-if [ -f /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl ]; then safe_copy /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl || true; fi
-if [ -f /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl ]; then safe_copy /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl || true; fi
-if [ -f /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl ]; then safe_copy /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl || true; fi
+for layout in firewall-audit-logs firewall/audit firewall/logs; do
+  source="$RUNTIME/sandbox/$layout/api-proxy-logs/model-routing.jsonl"
+  if [ -f "$source" ]; then safe_copy "$source" "$RUNTIME/usage/agent/model-routing.jsonl" || true; fi
+done
 
 # Detection token usage (ascending priority — last non-empty source wins).
-if [ -s /tmp/gh-aw/threat-detection/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl ]; then safe_copy /tmp/gh-aw/threat-detection/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/detection/token_usage.jsonl || true; fi
-if [ -s /tmp/gh-aw/threat-detection/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl ]; then safe_copy /tmp/gh-aw/threat-detection/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/detection/token_usage.jsonl || true; fi
-if [ -s /tmp/gh-aw/threat-detection/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]; then safe_copy /tmp/gh-aw/threat-detection/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/detection/token_usage.jsonl || true; fi
+for layout in firewall-audit-logs firewall/audit firewall/logs; do
+  source="$RUNTIME/threat-detection/sandbox/$layout/api-proxy-logs/token-usage.jsonl"
+  if [ -s "$source" ]; then safe_copy "$source" "$RUNTIME/usage/detection/token_usage.jsonl" || true; fi
+done
 
-if [ ! -e /tmp/gh-aw/usage/detection/token_usage.jsonl ] && [ ! -L /tmp/gh-aw/usage/detection/token_usage.jsonl ]; then
-  : > /tmp/gh-aw/usage/detection/token_usage.jsonl
+if [ ! -e "$RUNTIME/usage/detection/token_usage.jsonl" ] && [ ! -L "$RUNTIME/usage/detection/token_usage.jsonl" ]; then
+  : > "$RUNTIME/usage/detection/token_usage.jsonl"
 fi
 
 if ! command -v node >/dev/null 2>&1; then
   echo "::warning::Node was not found on PATH; usage summaries will run via actions/github-script."
 fi
 
-find /tmp/gh-aw/usage -type f -print | sort
+find "$RUNTIME/usage" -type f -print | sort

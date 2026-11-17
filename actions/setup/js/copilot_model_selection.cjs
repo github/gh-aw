@@ -27,13 +27,13 @@ function verificationFailureDiagnostic(error) {
 }
 
 function copilotSessionStateDirectories(env = process.env) {
-  const root = env.GH_AW_TMP_DIR || "/tmp/gh-aw";
+  const root = require("./runtime_paths.cjs").runtimeRoot(env);
   return [path.join(env.COPILOT_HOME || path.join(env.HOME || os.homedir(), ".copilot"), "session-state"), path.join(root, "sandbox/agent/session-state"), path.join(root, "sandbox/agent/logs/copilot-session-state")];
 }
 
 function recordCopilotModelSelection(selection, env = process.env) {
   if (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent") return;
-  const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/logs/copilot-model-selection.json");
+  const file = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "sandbox/agent/logs/copilot-model-selection.json");
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify(selection));
@@ -49,7 +49,7 @@ function recordCopilotModelSelection(selection, env = process.env) {
  * @returns {string[]}
  */
 function previouslyObservedModels(env) {
-  const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/logs/copilot-model-selection.json");
+  const file = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "sandbox/agent/logs/copilot-model-selection.json");
   try {
     if (!fs.existsSync(file)) return [];
     const record = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -71,9 +71,9 @@ function previouslyObservedModels(env) {
 // Only the runner post-step updates workflow metadata; the harness writes a log.
 function persistCopilotModelSelection(env = process.env) {
   if (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent") return;
-  const log = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/logs/copilot-model-selection.json");
+  const log = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "sandbox/agent/logs/copilot-model-selection.json");
   if (!fs.existsSync(log)) return;
-  const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "aw_info.json");
+  const file = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "aw_info.json");
   try {
     const info = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
     if ((env.GH_AW_ENGINE_ID || info.engine_id) !== "copilot") return;
@@ -344,7 +344,7 @@ function createCopilotSDKModelObserver({ configuredModel, expectedModel, session
  */
 function readCopilotModelSubstitution(env = process.env) {
   if (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent") return "";
-  const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/logs/copilot-model-selection.json");
+  const file = path.join(require("./runtime_paths.cjs").runtimeRoot(env), "sandbox/agent/logs/copilot-model-selection.json");
   try {
     if (!fs.existsSync(file)) return "";
     const record = JSON.parse(fs.readFileSync(file, "utf8"));

@@ -264,7 +264,11 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 	payloadSizeThreshold := opts.payloadSizeThreshold
 	yaml.WriteString("          \n")
 	yaml.WriteString("          # Export gateway environment variables for MCP config and gateway script\n")
-	yaml.WriteString("          export MCP_GATEWAY_PORT=\"" + strconv.Itoa(port) + "\"\n")
+	if gatewayConfig.AutoPort {
+		yaml.WriteString("          export MCP_GATEWAY_PORT=\"${GH_AW_MCP_GATEWAY_PORT:?}\"\n")
+	} else {
+		yaml.WriteString("          export MCP_GATEWAY_PORT=\"" + strconv.Itoa(port) + "\"\n")
+	}
 	yaml.WriteString("          export MCP_GATEWAY_DOMAIN=\"" + domain + "\"\n")
 	// MCP_GATEWAY_HOST_DOMAIN is the domain used by host-side clients (e.g. Gemini CLI).
 	// When MCP_GATEWAY_DOMAIN is host.docker.internal (only reachable from containers),
@@ -342,7 +346,11 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 			if isAWFNetworkIsolationEnabled(workflowData) {
 				controlListenHost = "0.0.0.0"
 			}
-			yaml.WriteString("          export MCP_GATEWAY_DELEGATION_CONTROL_LISTEN=\"" + controlListenHost + ":" + strconv.Itoa(port+enclaveDelegationControlPortOffset) + "\"\n")
+			controlPort := strconv.Itoa(port + enclaveDelegationControlPortOffset)
+			if gatewayConfig.AutoPort {
+				controlPort = "${GH_AW_MCP_CONTROL_PORT:?}"
+			}
+			yaml.WriteString("          export MCP_GATEWAY_DELEGATION_CONTROL_LISTEN=\"" + controlListenHost + ":" + controlPort + "\"\n")
 			if dynamicEnclave := enclaveDynamicRepositoryPolicyConfig(workflowData); dynamicEnclave != nil {
 				expiryScript, err := buildDynamicEnclaveExpiryScript(workflowData, dynamicEnclave)
 				if err != nil {
@@ -360,7 +368,7 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 			// route, and is kept out of the primary agent's environment via --exclude-env.
 			// The pinned mcpg controller serves control operations under the fixed
 			// enclaveDelegationControlAPIBasePath, not a path keyed by controller name.
-			fmt.Fprintf(yaml, "          export AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_ENDPOINT=\"http://127.0.0.1:%d%s/%s\"\n", port+enclaveDelegationControlPortOffset, enclaveDelegationControlAPIBasePath, enclaveDynamicController)
+			fmt.Fprintf(yaml, "          export AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_ENDPOINT=\"http://127.0.0.1:%s%s/%s\"\n", controlPort, enclaveDelegationControlAPIBasePath, enclaveDynamicController)
 		}
 		if enclaveGitHubIssuesEnabled(workflowData) {
 			yaml.WriteString("          AWF_ENCLAVE_GITHUB_MCP_AGENT_ID=$(openssl rand -base64 45 | tr -d '/+=')\n")
@@ -483,7 +491,8 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 	} else {
 		containerCmd.WriteString(" --network host")
 	}
-	containerCmd.WriteString(" --name awmg-mcpg")
+	containerCmd.WriteString(" --name awmg-mcpg-${GH_AW_RUNTIME_ID:?}")
+	containerCmd.WriteString(" --label gh-aw.runtime-id=${GH_AW_RUNTIME_ID:?}")
 	if enclavesEnabled(workflowData) {
 		containerCmd.WriteString(" --label " + enclaveMCPGatewayRunLabel + "=${AWF_ENCLAVE_MCP_GATEWAY_IDENTITY}")
 	}
@@ -529,6 +538,7 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 }
 
 func appendMCPGatewayBaseEnvFlags(containerCmd *strings.Builder, payloadPathPrefix string) {
+	containerCmd.WriteString(" -e GH_AW_RUNTIME_DIR -e GH_AW_RUNTIME_ID")
 	containerCmd.WriteString(" -e MCP_GATEWAY_PORT")
 	containerCmd.WriteString(" -e MCP_GATEWAY_DOMAIN")
 	containerCmd.WriteString(" -e MCP_GATEWAY_AGENT_ID")

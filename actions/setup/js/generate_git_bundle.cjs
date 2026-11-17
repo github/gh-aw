@@ -60,7 +60,7 @@ function sanitizeBranchNameForBundle(branchName) {
  */
 function getBundlePathForBranch(branchName) {
   const sanitized = sanitizeBranchNameForBundle(branchName);
-  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitized}.bundle`);
+  return scopedArtifactFilename(require("./runtime_paths.cjs").runtimePath(`aw-${sanitized}.bundle`));
 }
 
 /**
@@ -82,7 +82,7 @@ function sanitizeRepoSlugForBundle(repoSlug) {
 function getBundlePathForBranchInRepo(branchName, repoSlug) {
   const sanitizedBranch = sanitizeBranchNameForBundle(branchName);
   const sanitizedRepo = sanitizeRepoSlugForBundle(repoSlug);
-  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitizedRepo}-${sanitizedBranch}.bundle`);
+  return scopedArtifactFilename(require("./runtime_paths.cjs").runtimePath(`aw-${sanitizedRepo}-${sanitizedBranch}.bundle`));
 }
 
 /**

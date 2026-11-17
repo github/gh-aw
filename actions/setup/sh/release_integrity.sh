@@ -29,27 +29,14 @@ create_release_staging() {
     echo "ERROR: Invalid release staging prefix" >&2
     return 1
   fi
-  parent="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+  parent="${GH_AW_RUNTIME_DIR:-${RUNNER_TEMP:-${TMPDIR:?A private temp parent is required}}}"
   if command -v cygpath >/dev/null 2>&1; then
     parent="$(cygpath -u "$parent")" || return 1
   fi
-  if ! parent="$(cd "$parent" && pwd -P)"; then
-    if [[ -n "${RUNNER_TEMP:-}" ]]; then
-      return 1
-    fi
-    parent="$(cd /tmp && pwd -P)" || return 1
-  fi
+  parent="$(cd "$parent" && pwd -P)" || return 1
   if ! TEMP_DIR="$(umask 077; mktemp -d "${parent}/${prefix}-install-XXXXXX")"; then
-    if [[ -z "${RUNNER_TEMP:-}" && "$parent" != "$(cd /tmp && pwd -P)" ]]; then
-      parent="$(cd /tmp && pwd -P)" || return 1
-      TEMP_DIR="$(umask 077; mktemp -d "${parent}/${prefix}-install-XXXXXX")" || {
-        echo "ERROR: Could not allocate release staging under $parent" >&2
-        return 1
-      }
-    else
-      echo "ERROR: Could not allocate release staging under $parent" >&2
-      return 1
-    fi
+    echo "ERROR: Could not allocate release staging under $parent" >&2
+    return 1
   fi
   readonly TEMP_DIR
   if ! GH_AW_RELEASE_STAGING_ID="$(release_staging_identity "$TEMP_DIR")"; then
@@ -68,8 +55,14 @@ create_awf_runtime_tmp() {
   if [[ -z "${GITHUB_ENV:-}" ]]; then
     return 0
   fi
+  if [[ -z "${GH_AW_RUNTIME_DIR:-}" || ! -d "$GH_AW_RUNTIME_DIR" || -L "$GH_AW_RUNTIME_DIR" || ! -O "$GH_AW_RUNTIME_DIR" ]]; then
+    echo "ERROR: Setup must allocate an owned private runtime before AWF scratch" >&2
+    return 1
+  fi
+  runtime_parent="$(cd "$GH_AW_RUNTIME_DIR" && pwd -P)" || return 1
   if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" ]]; then
-    if [[ ! -d "$GH_AW_RUNTIME_TMP_DIR" || -L "$GH_AW_RUNTIME_TMP_DIR" || ! -O "$GH_AW_RUNTIME_TMP_DIR" ||
+    if [[ "${GH_AW_RUNTIME_TMP_DIR%/*}" != "$runtime_parent" || "${GH_AW_RUNTIME_TMP_DIR##*/}" != awf-tmp-* ||
+      ! -d "$GH_AW_RUNTIME_TMP_DIR" || -L "$GH_AW_RUNTIME_TMP_DIR" || ! -O "$GH_AW_RUNTIME_TMP_DIR" ||
       "$(release_staging_identity "$GH_AW_RUNTIME_TMP_DIR")" != "${GH_AW_RUNTIME_TMP_ID:-}" ]]; then
       echo "ERROR: Existing AWF runtime temp directory is not owned by this invocation" >&2
       return 1
@@ -77,8 +70,7 @@ create_awf_runtime_tmp() {
     export TMPDIR="$GH_AW_RUNTIME_TMP_DIR"
     return 0
   fi
-  runtime_parent="$(cd /tmp && pwd -P)" || return 1
-  if ! runtime_dir="$(umask 077; mktemp -d "${runtime_parent}/gh-aw-runtime-XXXXXX")"; then
+  if ! runtime_dir="$(umask 077; mktemp -d "${runtime_parent}/awf-tmp-XXXXXX")"; then
     echo "ERROR: Could not allocate private AWF runtime temp directory under $runtime_parent" >&2
     return 1
   fi
@@ -102,8 +94,12 @@ cleanup_awf_runtime_tmp() {
   if [[ -z "$runtime_dir" ]]; then
     return 0
   fi
-  runtime_parent="$(cd /tmp && pwd -P)" || return 0
-  if [[ "${runtime_dir%/*}" != "$runtime_parent" || "${runtime_dir##*/}" != gh-aw-runtime-* ]]; then
+  if [[ -z "${GH_AW_RUNTIME_DIR:-}" || ! -d "$GH_AW_RUNTIME_DIR" || -L "$GH_AW_RUNTIME_DIR" || ! -O "$GH_AW_RUNTIME_DIR" ]]; then
+    echo "Warning: refusing AWF scratch cleanup without the owning private runtime" >&2
+    return 0
+  fi
+  runtime_parent="$(cd "$GH_AW_RUNTIME_DIR" && pwd -P)" || return 0
+  if [[ "${runtime_dir%/*}" != "$runtime_parent" || "${runtime_dir##*/}" != awf-tmp-* ]]; then
     echo "Warning: refusing to clean an AWF runtime temp path outside its private temp root: $runtime_dir" >&2
     return 0
   fi

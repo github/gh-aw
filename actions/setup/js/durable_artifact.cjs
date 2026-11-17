@@ -10,7 +10,15 @@ const { preparePrompt } = require("./durable_session.cjs");
 const { tryRecordDurableSessionEvent } = require("./durable_session_record.cjs");
 
 /** Select and restore a checkpoint before exposing continuation to the engine. */
-async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile = "/tmp/gh-aw/aw-prompts/prompt.txt" }) {
+async function restoreCheckpoint({
+  github,
+  context,
+  core,
+  token,
+  artifactClient = new DefaultArtifactClient(),
+  root = require("./runtime_paths.cjs").runtimePath("agent"),
+  promptFile = require("./runtime_paths.cjs").runtimePath("aw-prompts/prompt.txt"),
+}) {
   const outputs = new Map();
   const record = status =>
     tryRecordDurableSessionEvent(

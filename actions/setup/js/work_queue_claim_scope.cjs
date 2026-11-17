@@ -101,7 +101,7 @@ function normalizeClaimScope(message, assignment) {
 }
 
 function snapshotPath() {
-  return process.env.GH_AW_WORK_QUEUE_SNAPSHOT || "/tmp/gh-aw/work-queue.snapshot.json";
+  return process.env.GH_AW_WORK_QUEUE_SNAPSHOT || require("./runtime_paths.cjs").runtimePath("work-queue.snapshot.json");
 }
 
 function readClaimScopeContext() {

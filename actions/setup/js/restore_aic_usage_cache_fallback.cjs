@@ -45,7 +45,7 @@ async function getTokenFromGithub() {
 }
 
 /** Path where the activation job expects the usage cache to be restored. */
-const CACHE_FILE_PATH = "/tmp/gh-aw/agentic-workflow-usage-cache.jsonl";
+const CACHE_FILE_PATH = require("./runtime_paths.cjs").runtimePath("agentic-workflow-usage-cache.jsonl");
 
 /** Name of the artifact uploaded by the conclusion job that holds the aggregated cache. */
 const AIC_USAGE_CACHE_ARTIFACT_NAME = "aic-usage-cache";

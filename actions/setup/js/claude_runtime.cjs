@@ -86,7 +86,7 @@ function claudePermissionDenials(output) {
 }
 
 /** @param {string[]} args @param {string} [managedDir] @param {string} [tempDir] */
-function claudeBareCapabilities(args, managedDir = "/tmp/gh-aw/.claude", tempDir = "/tmp/gh-aw/agent") {
+function claudeBareCapabilities(args, managedDir = require("./runtime_paths.cjs").runtimePath(".claude"), tempDir = require("./runtime_paths.cjs").runtimePath("agent")) {
   if (!args.includes("--bare")) return { args, pluginDir: undefined };
   const directories = ["skills", "agents"].filter(name => {
     try {

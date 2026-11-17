@@ -323,7 +323,7 @@ func TestRenderStepForRunner(t *testing.T) {
 			t.Errorf("Windows job lacks WSL bootstrap requirement %q:\n%s", expected, got)
 		}
 	}
-	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${RUNNER_TEMP}/gh-aw-setup/actions/setup.sh\" --verbose" {
+	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose" {
 		t.Fatalf("WSL adapter changed the POSIX script: %q", script)
 	}
 
@@ -455,14 +455,14 @@ func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
           mkdir -p /tmp/gh-aw
 `
 	got := renderStepForRunner(job, "runs-on: windows-latest", "agent")
-	if !strings.Contains(got, "path: ${{ runner.temp }}/gh-aw/agent_output.json") {
-		t.Fatalf("Windows artifact path was not mapped to runner temp:\n%s", got)
+	if !strings.Contains(got, "path: ${{ env.GH_AW_RUNTIME_DIR }}/agent_output.json") {
+		t.Fatalf("Windows artifact path was not mapped to the private runtime:\n%s", got)
 	}
-	if !strings.Contains(got, `ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw`) {
-		t.Fatalf("WSL bootstrap did not map /tmp/gh-aw to runner temp:\n%s", got)
+	if strings.Contains(got, `ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw`) {
+		t.Fatalf("WSL bootstrap must not create a global runtime alias:\n%s", got)
 	}
-	if !strings.Contains(got, "destination: ${{ runner.temp }}/gh-aw-setup/actions") {
-		t.Fatalf("Windows setup scripts were not separated from writable runtime artifacts:\n%s", got)
+	if !strings.Contains(got, "destination: ${{ runner.temp }}/gh-aw/actions") {
+		t.Fatalf("Windows setup scripts did not retain the trusted setup directory:\n%s", got)
 	}
 	if !strings.Contains(got, "uses: actions/upload-artifact@v4") {
 		t.Fatalf("Windows artifact action was not preserved:\n%s", got)
@@ -482,8 +482,8 @@ func TestRewriteWindowsActionTempPathMapsNativeEnvironmentPaths(t *testing.T) {
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw-setup/actions
 `
 	got := rewriteWindowsActionTempPath(step)
-	if !strings.Contains(got, `GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/agent-stdio.log`) {
-		t.Fatalf("Native helper output path was not mapped to runner temp:\n%s", got)
+	if !strings.Contains(got, `GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_RUNTIME_DIR }}/agent-stdio.log`) {
+		t.Fatalf("Native helper output path was not mapped to the private runtime:\n%s", got)
 	}
 	if !strings.Contains(got, `GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["${{ runner.temp }}/gh-aw/agent_output.json","${{ runner.temp }}/gh-aw"]'`) {
 		t.Fatalf("Recovery artifact paths were not kept on the Windows host:\n%s", got)
@@ -509,7 +509,7 @@ func TestRewriteWindowsPathOutputs(t *testing.T) {
 		"Setup agent output environment variable",
 		"if [ -f \"/tmp/gh-aw/agent_output.json\" ]; then\n  echo \"GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json\" >> \"$GITHUB_OUTPUT\"\nfi\n",
 	)
-	if !strings.Contains(agentOutput, `GH_AW_AGENT_OUTPUT=$(wslpath -w "${RUNNER_TEMP}/gh-aw/agent_output.json")`) {
+	if !strings.Contains(agentOutput, `GH_AW_AGENT_OUTPUT=$(wslpath -w "${GH_AW_RUNTIME_DIR:?}/agent_output.json")`) {
 		t.Fatalf("Agent output setup did not publish a Windows-native path:\n%s", agentOutput)
 	}
 
@@ -564,7 +564,7 @@ Compile this workflow on a Windows runner.
 	}
 	fallbackStep := extractWorkflowStepByName(t, string(lockBytes), "Upload agent output fallback artifact")
 
-	wantPath := "${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"
+	wantPath := "${{ env.GH_AW_RUNTIME_DIR }}/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"
 	if !strings.Contains(fallbackStep, wantPath) {
 		t.Fatalf("compiled Windows artifact fallback did not map the token usage path %q:\n%s", wantPath, fallbackStep)
 	}

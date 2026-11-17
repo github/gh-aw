@@ -207,7 +207,7 @@ async function runCopilotSDKSession({
   sdkModule,
   sessionStateBaseDir,
   workingDirectory = resolveCopilotSDKWorkingDirectory(),
-  agentsBaseDir = path.join(os.tmpdir(), "gh-aw"),
+  agentsBaseDir = require("./runtime_paths.cjs").runtimeRoot(),
   bare = isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, logger),
   verification,
 }) {
@@ -233,7 +233,7 @@ async function runCopilotSDKSession({
   // Session state directory — mirrors the source path used by unified_session.cjs.
   // /tmp/gh-aw/sandbox/agent/logs/copilot-session-state/{sessionId}/events.jsonl
   // GH_AW_SESSION_STATE_BASE_DIR may be set in tests to redirect writes to an isolated directory.
-  const defaultSessionStateBase = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state");
+  const defaultSessionStateBase = require("./runtime_paths.cjs").runtimePath("sandbox/agent/logs/copilot-session-state");
   const sessionStateBase = sessionStateBaseDir ?? process.env.GH_AW_SESSION_STATE_BASE_DIR ?? defaultSessionStateBase;
 
   /** @type {ReadonlyArray<NonNullable<import("@github/copilot-sdk").CopilotClientOptions["logLevel"]>>} */

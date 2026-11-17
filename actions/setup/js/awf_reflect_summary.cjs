@@ -5,9 +5,9 @@ const fs = require("fs");
 const path = require("path");
 const { AWF_REFLECT_OUTPUT_PATH: AWF_REFLECT_PATH, AWF_REFLECT_LEGACY_PATH } = require("./awf_reflect_paths.cjs");
 
-const AWF_CONFIG_PATH = "/tmp/gh-aw/awf-config.json";
-const AWF_REFLECT_ARTIFACT_PATH = "/tmp/gh-aw/sandbox/firewall/awf-reflect.json";
-const AWF_MODELS_PATH = "/tmp/gh-aw/sandbox/firewall/models.json";
+const AWF_CONFIG_PATH = require("./runtime_paths.cjs").runtimePath("awf-config.json");
+const AWF_REFLECT_ARTIFACT_PATH = require("./runtime_paths.cjs").runtimePath("sandbox/firewall/awf-reflect.json");
+const AWF_MODELS_PATH = require("./runtime_paths.cjs").runtimePath("sandbox/firewall/models.json");
 
 /**
  * Read the AWF reflect payload that was persisted to disk by copilot_harness.cjs.

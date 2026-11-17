@@ -23,7 +23,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  * Contains agent_usage.jsonl and agent/token_usage.jsonl which mirror the contents of
  * the "usage" artifact that getRunAIC() downloads during the daily-AIC guardrail check.
  */
-const USAGE_DIR = "/tmp/gh-aw/usage";
+const USAGE_DIR = require("./runtime_paths.cjs").runtimePath("usage");
 
 /**
  * @param {string} message

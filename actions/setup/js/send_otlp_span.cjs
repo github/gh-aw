@@ -23,7 +23,7 @@ const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavaila
 const { OTEL_ATTR_WORKFLOW_NAME, OTEL_ATTR_REPOSITORY, OTEL_ATTR_RUN_ID, OTEL_ATTR_GITHUB_RUN_ID, OTEL_ATTR_ENGINE_ID, canonicalAttributeName } = require("./otel_attributes_generated.cjs");
 
 function getGhAwPath(relativePath) {
-  const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
+  const root = require("./runtime_paths.cjs").runtimeRoot();
   return path.join(root, relativePath);
 }
 
@@ -669,7 +669,7 @@ function buildOTLPPayload({ traceId, spanId, parentSpanId, spanName, startMs, en
  * be inspected via GitHub Actions artifacts without needing a live collector.
  * @type {string}
  */
-const OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
+const OTEL_JSONL_PATH = require("./runtime_paths.cjs").runtimePath("otel.jsonl");
 
 /**
  * Append an OTLP payload as a single JSON line to the local telemetry mirror
@@ -681,7 +681,7 @@ const OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
  */
 function appendToOTLPJSONL(payload) {
   try {
-    fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+    fs.mkdirSync(require("./runtime_paths.cjs").runtimeRoot(), { recursive: true });
     fs.appendFileSync(OTEL_JSONL_PATH, JSON.stringify(payload) + "\n");
   } catch {
     // Mirror failures are non-fatal; do not propagate.
@@ -780,9 +780,9 @@ function buildGraderTelemetry(graderOutput, eventTimeMs) {
  * @param {(path: string) => any} [readJSON]
  */
 function selectGraderOutputForJob(jobName, readJSON = readJSONIfExists) {
-  if (jobName === "conclusion") return readJSON("/tmp/gh-aw/usage/graders/grader_results.json");
+  if (jobName === "conclusion") return readJSON(require("./runtime_paths.cjs").runtimePath("usage/graders/grader_results.json"));
   if (jobName !== "graders") return undefined;
-  const combinedOutput = readJSON("/tmp/gh-aw/custom-graders/grader_results.json");
+  const combinedOutput = readJSON(require("./runtime_paths.cjs").runtimePath("custom-graders/grader_results.json"));
   if (!combinedOutput || !Array.isArray(combinedOutput.results)) return undefined;
   return { ...combinedOutput, results: combinedOutput.results.filter(result => result?.source === "inline" || result?.source === "operational-value") };
 }
@@ -1742,20 +1742,20 @@ function readDurableParentRunId(runId, runAttempt) {
  * a runtime require() dependency on that module.
  * @type {string}
  */
-const GITHUB_RATE_LIMITS_JSONL_PATH = "/tmp/gh-aw/github_rate_limits.jsonl";
+const GITHUB_RATE_LIMITS_JSONL_PATH = require("./runtime_paths.cjs").runtimePath("github_rate_limits.jsonl");
 
 /**
  * Path to the persisted OTLP export error counter.
  * @type {string}
  */
-const OTLP_EXPORT_ERRORS_PATH = "/tmp/gh-aw/otlp-export-errors.count";
+const OTLP_EXPORT_ERRORS_PATH = require("./runtime_paths.cjs").runtimePath("otlp-export-errors.count");
 
 /**
  * Path to the persisted OTLP export failure detail log.
  * @type {string}
  */
-const OTLP_EXPORT_ERROR_DETAILS_PATH = "/tmp/gh-aw/otlp-export-errors.jsonl";
-const AGENT_EXECUTION_EXIT_CODE_PATH = "/tmp/gh-aw/agent_execution_exit_code.txt";
+const OTLP_EXPORT_ERROR_DETAILS_PATH = require("./runtime_paths.cjs").runtimePath("otlp-export-errors.jsonl");
+const AGENT_EXECUTION_EXIT_CODE_PATH = require("./runtime_paths.cjs").runtimePath("agent_execution_exit_code.txt");
 
 /**
  * Path to the failure categories file written by handle_agent_failure and read
@@ -1764,18 +1764,18 @@ const AGENT_EXECUTION_EXIT_CODE_PATH = "/tmp/gh-aw/agent_execution_exit_code.txt
  * introducing a runtime require() dependency on that module.
  * @type {string}
  */
-const FAILURE_CATEGORIES_PATH = "/tmp/gh-aw/failure_categories.json";
+const FAILURE_CATEGORIES_PATH = require("./runtime_paths.cjs").runtimePath("failure_categories.json");
 
 /**
  * Path to the agent stdio log file.
  * @type {string}
  */
-const AGENT_STDIO_LOG_PATH = "/tmp/gh-aw/agent-stdio.log";
+const AGENT_STDIO_LOG_PATH = require("./runtime_paths.cjs").runtimePath("agent-stdio.log");
 const API_PROXY_EVENT_LOG_PATHS = [
-  "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl",
-  "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/events.jsonl",
-  "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/event-logs.jsonl",
-  "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/events.jsonl",
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs/api-proxy-logs/events.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/event-logs.jsonl"),
+  require("./runtime_paths.cjs").runtimePath("sandbox/firewall-audit-logs/api-proxy-logs/events.jsonl"),
 ];
 const PERMISSION_DENIED_RE = /\b(?:permissions?\s+denied(?!\s+counts?\b)|EACCES|EPERM)\b/i;
 
@@ -1966,7 +1966,7 @@ function formatOTLPExportErrorDetails() {
  */
 function recordOTLPExportError(detail = {}) {
   try {
-    fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+    fs.mkdirSync(require("./runtime_paths.cjs").runtimeRoot(), { recursive: true });
     fs.writeFileSync(OTLP_EXPORT_ERRORS_PATH, String(readOTLPExportErrorCount() + 1));
   } catch {
     // Export-health tracking is best-effort only.
@@ -1975,7 +1975,7 @@ function recordOTLPExportError(detail = {}) {
     return;
   }
   try {
-    fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+    fs.mkdirSync(require("./runtime_paths.cjs").runtimeRoot(), { recursive: true });
     fs.appendFileSync(
       OTLP_EXPORT_ERROR_DETAILS_PATH,
       JSON.stringify(
@@ -2348,7 +2348,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const jobResult = options.jobResult || (jobName === "detection" ? detectionConclusion : "");
   const runtimeMetrics = readAgentRuntimeMetrics(engineId);
   // Read once and reuse for both gh-aw.aic and gen_ai.usage.* attributes.
-  const agentUsageFilePath = jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_usage.json" : "/tmp/gh-aw/agent_usage.json";
+  const agentUsageFilePath = require("./runtime_paths.cjs").runtimePath(jobName === "detection" ? "threat-detection/detection_usage.json" : "agent_usage.json");
   const agentUsageRaw = readJSONIfExists(agentUsageFilePath);
   const agentUsageNormalized = normalizeRuntimeTokenUsage(agentUsageRaw);
   // Detection uses its own counters and must not inherit usage from downloaded agent logs.
@@ -2368,7 +2368,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   }
 
   // Always read agent_output.json so output metrics are available on all outcomes.
-  const rawAgentOutput = readJSONIfExists("/tmp/gh-aw/agent_output.json");
+  const rawAgentOutput = readJSONIfExists(require("./runtime_paths.cjs").runtimePath("agent_output.json"));
   const agentOutput = rawAgentOutput || {};
   // readJSONIfExists returns null when the file is absent OR unreadable (e.g. partial/corrupt write).
   const hasNoReadableAgentOutput = rawAgentOutput === null;
@@ -2437,7 +2437,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // The compact usage summary is assembled by the conclusion job before its
   // setup action post-step emits this run-level span.
   if (jobName === "conclusion") {
-    const usageActivity = readJSONIfExists("/tmp/gh-aw/usage/activity/summary.json");
+    const usageActivity = readJSONIfExists(require("./runtime_paths.cjs").runtimePath("usage/activity/summary.json"));
     for (const [attributeName, sectionName, fieldName] of [
       ["gh-aw.integrity.filtered_events", "integrity", "total_filtered"],
       ["gh-aw.firewall.requests", "firewall", "total_requests"],
@@ -2623,7 +2623,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   attributes.push(...buildCustomOTLPAttributes());
 
   const graderTelemetry = buildGraderTelemetry(selectGraderOutputForJob(jobName), endMs);
-  const evalTelemetry = jobName === "evals" ? buildEvalTelemetry(readJSONLIfExists("/tmp/gh-aw/evals.jsonl"), endMs, readEvalsNotEvaluatedStatus()) : { attributes: [], events: [] };
+  const evalTelemetry = jobName === "evals" ? buildEvalTelemetry(readJSONLIfExists(require("./runtime_paths.cjs").runtimePath("evals.jsonl")), endMs, readEvalsNotEvaluatedStatus()) : { attributes: [], events: [] };
 
   const resourceAttributes = buildGitHubActionsResourceAttributes({
     repository,
@@ -2692,7 +2692,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // absent — e.g. on older compiled workflows or during local development.
   const agentStartMs = (() => {
     try {
-      const raw = fs.readFileSync("/tmp/gh-aw/agent_cli_start_ms.txt", "utf8").trim();
+      const raw = fs.readFileSync(require("./runtime_paths.cjs").runtimePath("agent_cli_start_ms.txt"), "utf8").trim();
       const ms = Number(raw);
       return Number.isFinite(ms) && ms > 0 ? ms : options.startMs;
     } catch {
@@ -2702,7 +2702,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   /** @type {any} */
   let agentEndMs = null;
   try {
-    agentEndMs = fs.statSync("/tmp/gh-aw/agent_output.json").mtimeMs;
+    agentEndMs = fs.statSync(require("./runtime_paths.cjs").runtimePath("agent_output.json")).mtimeMs;
   } catch {
     // agent_output.json may be absent for agent failures and cancellations,
     // including timed-out or manually-cancelled runs where the process was
@@ -2844,7 +2844,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     try {
       const { buildBuiltinRunMetrics, buildOTLPMetricsPayload, sendOTLPMetrics, flushCustomMetrics, getUnreportedOTLPMetricFailures } = require("./otlp_metrics.cjs");
       await flushCustomMetrics();
-      const gatewayMetrics = jobName === "conclusion" ? readJSONIfExists("/tmp/gh-aw/usage/activity/summary.json")?.gateway : undefined;
+      const gatewayMetrics = jobName === "conclusion" ? readJSONIfExists(require("./runtime_paths.cjs").runtimePath("usage/activity/summary.json"))?.gateway : undefined;
       const metricAttributes = [
         ...(eventName ? [buildAttr("github.event_name", eventName)] : []),
         ...(job ? [buildAttr("github.job", job)] : []),

@@ -6,7 +6,7 @@ set +o histexpand
 #
 # This script removes any git credentials that may have been left on disk
 # accidentally by an injected step. It recursively finds all .git/config
-# files in $GITHUB_WORKSPACE and /tmp/ and cleans credentials from each.
+# files in the workspace and private runtime, cleaning credentials from each.
 #
 # This is a security measure to ensure that git credentials configured by
 # custom steps or other workflow steps are removed before the agentic engine
@@ -110,7 +110,7 @@ if [ "$#" -gt 0 ]; then
   exit 0
 fi
 
-# Collect all git config files to clean from workspace and /tmp/.
+# Never scan another invocation's temporary repositories.
 # Includes both repository configs and submodule configs under .git/modules/**/config.
 # Use maxdepth 15 as a conservative cap to cover deeply nested submodules
 # (.git/modules/<a>/modules/<b>/...) without unbounded traversal.
@@ -118,7 +118,7 @@ CLEANED=0
 while IFS= read -r git_config; do
   clean_git_config "${git_config}"
   CLEANED=$((CLEANED + 1))
-done < <(find "${WORKSPACE}" /tmp -maxdepth 15 -type f -name "config" \( -path "*/.git/config" -o -path "*/.git/modules/*/config" \) 2>/dev/null | sort -u)
+done < <(find "${WORKSPACE}" "${GH_AW_RUNTIME_DIR:?}" -maxdepth 15 -type f -name "config" \( -path "*/.git/config" -o -path "*/.git/modules/*/config" \) 2>/dev/null | sort -u)
 
 if [ "${CLEANED}" -eq 0 ]; then
   echo "No .git/config files found, nothing to clean"

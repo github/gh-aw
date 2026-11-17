@@ -20,7 +20,7 @@ function main() {
     format: "Pi",
     engine: "Pi",
     contextOptions: { keepCLIMountedServers: process.env.GH_AW_PI_NATIVE_MCP === "1" },
-    outputPath: path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json"),
+    outputPath: path.join(require("./runtime_paths.cjs").setupRoot(), "mcp-config/mcp-servers.json"),
     transformServer: (_name, entry, urlPrefix) => transformPiEntry(entry, urlPrefix),
     serialize: servers => JSON.stringify({ mcpServers: servers }, null, 2),
   });

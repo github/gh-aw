@@ -6,7 +6,7 @@ const { requestAuthority } = require("./check_admission.cjs");
 const { compactUnifiedSession, readCompactUnifiedSession, MAX_COMPACT_SESSION_BYTES, MAX_COMPACT_SESSION_EVENTS } = require("./compact_unified_session.cjs");
 const { iterateLines, parseJsonlContent } = require("./jsonl_helpers.cjs");
 
-const SESSION_FILE = "/tmp/gh-aw/usage/aw_session.jsonl";
+const SESSION_FILE = require("./runtime_paths.cjs").runtimePath("usage/aw_session.jsonl");
 const MAX_REQUEST_BYTES = 64 * 1024;
 const FAILURE = "ERR_ADMISSION: Unable to deliver the unified session to the conclusion service; completed workflow results are unchanged.";
 

@@ -568,7 +568,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
   const customScriptHandlers = currentClaimHandle() ? new Map() : loadCustomSafeOutputScriptHandlers();
   if (customScriptHandlers.size > 0) {
     core.info(`Loading ${customScriptHandlers.size} custom script handler(s): ${[...customScriptHandlers.keys()].join(", ")}`);
-    const scriptBaseDir = nodePath.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "actions");
+    const scriptBaseDir = nodePath.join(require("./runtime_paths.cjs").setupRoot(), "actions");
     for (const [scriptType, scriptFilename] of customScriptHandlers) {
       // Sanitize scriptFilename to prevent path traversal attacks: only the basename
       // (no directory separators or ".." sequences) is allowed.
@@ -651,7 +651,11 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
         const prepared = await createClaimAdapterHandler({
           adapter,
           github,
-          filename: preparedAdapterPath(nodePath.join("/tmp/gh-aw/claim-adapters", type, String(currentClaimAssignment().claims.findIndex(member => member.handle === currentClaimHandle()))), currentClaimHandle(), type),
+          filename: preparedAdapterPath(
+            nodePath.join(require("./runtime_paths.cjs").runtimePath("claim-adapters"), type, String(currentClaimAssignment().claims.findIndex(member => member.handle === currentClaimHandle()))),
+            currentClaimHandle(),
+            type
+          ),
           loadEffectHandler: async effectType => {
             const handlerModule = require(HANDLER_MAP[effectType]);
             return handlerModule.main({ ...(config[effectType] || {}), "target-repo": adapter["target-repo"] });

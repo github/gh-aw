@@ -47,7 +47,7 @@ const { getActionInput } = require("./action_input_utils.cjs");
 const fs = require("fs");
 const path = require("path");
 
-const PREUPLOAD_CONCLUSION_MARKER = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/actions/otel-conclusion-emitted");
+const PREUPLOAD_CONCLUSION_MARKER = require("./runtime_paths.cjs").runtimePath("otel-conclusion-emitted");
 
 /**
  * Build the OTLP span name from an optional job name.

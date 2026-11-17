@@ -26,7 +26,7 @@ const SAFE_PATH_RE = /^[A-Za-z0-9._/-]+$/;
  * @param {string} [stagingDir] - Activation artifact Pi directory.
  * @returns {string[]}
  */
-function resolveWorkflowSkillPaths(agentDir, stagingDir = process.env.GH_AW_PI_STAGING_DIR || "/tmp/gh-aw/.pi") {
+function resolveWorkflowSkillPaths(agentDir, stagingDir = process.env.GH_AW_PI_STAGING_DIR || require("./runtime_paths.cjs").runtimePath(".pi")) {
   const manifestPath = path.join(stagingDir, "skills", INLINE_SKILL_MANIFEST);
   let names;
   try {
@@ -74,7 +74,7 @@ function writeWorkflowSkillArgs(agentDir, paths) {
  * @param {string} [agentDir]
  * @returns {string[]}
  */
-function readWorkflowSkillArgs(agentDir = process.env.PI_CODING_AGENT_DIR || "/tmp/gh-aw/pi-agent-dir") {
+function readWorkflowSkillArgs(agentDir = process.env.PI_CODING_AGENT_DIR || require("./runtime_paths.cjs").runtimePath("pi-agent-dir")) {
   let raw;
   try {
     raw = fs.readFileSync(path.join(agentDir, WORKFLOW_SKILL_ARGS_FILE), "utf8");

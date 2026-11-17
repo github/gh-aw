@@ -77,10 +77,10 @@ function readCompletionEvidence(rootDir, relativePath) {
  * @param {string} [rootDir]
  * @returns {string[]}
  */
-function buildCompletionEvidence(rootDir = "/tmp/gh-aw") {
+function buildCompletionEvidence(rootDir = require("./runtime_paths.cjs").runtimeRoot()) {
   const runnerTemp = process.env.RUNNER_TEMP || "/home/runner/work/_temp";
   let availability = "unknown (registration evidence not recorded)";
-  const flag = readCompletionEvidence(path.join(runnerTemp, "gh-aw"), "safeoutputs/gateway_empty.flag");
+  const flag = readCompletionEvidence(rootDir, "safeoutputs/gateway_empty.flag");
   const cache = readCompletionEvidence(path.join(runnerTemp, "gh-aw"), "mcp-cli/tools/safeoutputs.json");
   const gateway = readCompletionEvidence(rootDir, "mcp-logs/tools.json");
   const validTools = tools => Array.isArray(tools) && tools.every(tool => typeof tool?.name === "string" && tool.name.length > 0);
@@ -150,7 +150,7 @@ function buildCompletionEvidence(rootDir = "/tmp/gh-aw") {
  * @param {string} [rootDir]
  * @returns {ReturnType<typeof collectUnifiedSession>}
  */
-function collectOutcomeSession(rootDir = "/tmp/gh-aw") {
+function collectOutcomeSession(rootDir = require("./runtime_paths.cjs").runtimeRoot()) {
   return collectUnifiedSession({
     rootDir,
     ...(process.env.GH_AW_ENGINE_ID === "aider" ? { engine: "aider" } : {}),
@@ -195,7 +195,7 @@ function hasFailedFinalResult(events) {
  *   details?: string
  * }}
  */
-function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
+function buildEmptyOutputOutcome(errors, rootDir = require("./runtime_paths.cjs").runtimeRoot(), session) {
   const protectedCapture = process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1";
   const diagnostics = new Set();
   if (errors.length) diagnostics.add("Safe-output validation status: failed");

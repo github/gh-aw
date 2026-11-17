@@ -125,7 +125,7 @@ function extractAndSanitizeDomain(domainWithPort) {
  * @returns {string[]} Array of unique blocked domains (sanitized, sorted)
  */
 function getBlockedDomains(logsDir) {
-  const squidLogsDir = logsDir || "/tmp/gh-aw/sandbox/firewall/logs/";
+  const squidLogsDir = logsDir || require("./runtime_paths.cjs").runtimePath("sandbox/firewall/logs");
 
   // Check if logs directory exists
   if (!fs.existsSync(squidLogsDir)) {

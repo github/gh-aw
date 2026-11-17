@@ -376,7 +376,7 @@ func (c *Compiler) generateSamplesReplayStep(yaml *strings.Builder, data *Workfl
 	writeSampleReplayPayloadEnv(yaml, entries, payload)
 	fmt.Fprintf(yaml, "          GH_AW_AGENT_STDIO_LOG: %s\n", logFile)
 	yaml.WriteString("          GH_AW_SAFE_OUTPUTS_CONFIG_PATH: ${{ runner.temp }}/gh-aw/safeoutputs/config.json\n")
-	yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl\n")
+	yaml.WriteString("          GH_AW_SAFE_OUTPUTS: /tmp/gh-aw/safeoutputs/outputs.jsonl\n")
 	writeSampleReplayInputEnvVars(yaml, data.SafeOutputsInputEnvVars)
 	// GITHUB_TOKEN is the fallback used by apply_samples.cjs when resolving a
 	// pull-request head ref via the REST API for issue_comment / slash_command
