@@ -351,6 +351,11 @@ The Metrics Collector workflow runs daily and stores performance metrics in a st
 - Calculate moving averages and detect anomalies
 - Benchmark individual workflows against ecosystem averages
 
+Read `metrics/lifecycle.json` for the separate retained-delivery population,
+including adoption of older outputs. Honor its coverage, deferred work, and
+discovery checkpoint; do not mix these counts with recent-run metrics or infer
+attributed value from adoption or snapshot survival.
+
 **Use AgentDB to accelerate analysis and recall:**
 - Ingest the latest metrics snapshot and your generated agent profiles into AgentDB.
 - Use a consistent record shape for ingested metrics and profiles:

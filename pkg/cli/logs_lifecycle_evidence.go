@@ -223,11 +223,16 @@ func lifecycleFromItem(run WorkflowRun, item CreatedItemReport, repository, host
 	if source == "" {
 		source = "safe-output-manifest"
 	}
-	return lifecycle.Delivered(lifecycle.Identity{
+	record, err := lifecycle.Delivered(lifecycle.Identity{
 		Host: strings.ToLower(host), Repository: sourceRepository, Workflow: run.WorkflowPath,
 		RunID: run.DatabaseID, RunAttempt: attempt, InvocationID: invocation, EvidenceID: item.EvidenceID,
 		Type: item.Type, TargetURL: targetURL, TargetRepository: targetRepository,
 	}, at, time.Now(), source)
+	if err != nil {
+		return record, err
+	}
+	record.Execution = retainedLifecycleExecution(item)
+	return record, nil
 }
 
 func lifecycleStorePath(runDir string) string {

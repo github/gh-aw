@@ -104,6 +104,64 @@ live snapshot by later collections.
 Episode refresh respects the allowed repositories, wall-clock deadline, and
 remaining API budget, including paginated reads.
 
+### Refresh retained deliveries
+
+```bash
+gh aw logs --adoption --retained --repo owner/repo \
+  --output ./lifecycle-state --count 200 --timeout 2 --json
+```
+
+This mode reads `lifecycle-state/lifecycle.jsonl` directly. It does not discover
+runs, fetch run metadata, or download source artifacts. Restore that file from
+durable storage before invoking it on a new runner. `--repo` scopes the source
+host/repository; recorded cross-repository targets keep their exact identity.
+Workflow arguments and unrelated run-selection/output modes are rejected.
+
+`--count` bounds delivery checks in this mode. Supported records are due after
+24 hours, or immediately if no provider check has been attempted. Oldest checks
+go first; deferred records keep their clocks and remain eligible on the next
+invocation. The ordinary timeout and API-quota protections also apply. JSON
+returns `.retained_adoption` with all scoped retained records, `refreshed`,
+`deferred`, and coverage. A failed provider check preserves the previous decision
+with unavailable coverage; it does not fabricate rejection.
+
+New retained records include execution selectors needed by effect adapters,
+such as review IDs and label deltas. Conflicting replayed selectors fail
+explicitly. Records without required execution selectors can still have
+unsupported effect-survival checks.
+
+### Repository collection
+
+This repository's Metrics Collector runs deterministic collection with its
+source-built CLI before the agent starts. A separate repo-memory branch,
+`memory/output-lifecycle`, retains the per-item ledger and discovery checkpoint.
+The existing shared metrics branch
+receives `metrics/lifecycle.json`, a compact fleet/per-workflow snapshot keyed by
+source workflow path. Performance reports read that snapshot without maintaining
+another adoption classifier.
+
+Initial discovery covers the previous day. Subsequent executions resume saved
+windows and pagination, then catch up from the completed window with a one-hour
+overlap instead of repeatedly selecting only yesterday's runs. Unavailable
+execution evidence stays in a rotating retry backlog. Discovery and new retained
+bytes are bounded per execution: five batches of at most 200 runs and 768 KiB of
+new delivery records. Each discovery batch has a four-minute network budget.
+Incomplete windows remain checkpointed rather than being reported as complete.
+Provider refresh checks at most 1,000 due deliveries per execution, subject to
+its two-minute network and API-quota limits. Due does not guarantee a daily check;
+monitor deferred counts as the retained population grows.
+The first deployment does not automatically backfill deliveries older than the
+initial day; seed the ledger with `logs --delivery` when historical coverage is
+required.
+Discovery follows run creation windows; late reruns outside those windows also
+require a delivery backfill.
+
+Honor the snapshot's coverage, deferred work, unavailable runs, and discovery
+watermark. It describes the retained population, not all decisions occurring
+that day, and must not be added to recent-run cohort counts. Repo-memory's
+persistence job remains separate from the read-only agent job. Cache-memory is
+not the authoritative ledger, and webhooks are not required.
+
 ## Survival, attributed value, and cost
 
 `survival.state: "observed"` means a supported snapshot check succeeded.

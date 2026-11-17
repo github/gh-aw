@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -66,11 +67,22 @@ func (a Survival) Equal(b Survival) bool {
 type Record struct {
 	ID string `json:"id"`
 	Identity
-	Delivery       Delivery  `json:"delivery"`
-	Adoption       Adoption  `json:"adoption"`
-	Survival       Survival  `json:"survival"`
-	ReversalSignal string    `json:"reversal_signal,omitempty"`
-	ReversedAt     time.Time `json:"reversed_at,omitzero"`
+	Delivery       Delivery   `json:"delivery"`
+	Adoption       Adoption   `json:"adoption"`
+	Survival       Survival   `json:"survival"`
+	ReversalSignal string     `json:"reversal_signal,omitempty"`
+	ReversedAt     time.Time  `json:"reversed_at,omitzero"`
+	Execution      *Execution `json:"execution,omitempty"`
+}
+
+// Execution retains the selectors needed to recheck an effect after artifacts expire.
+type Execution struct {
+	Number       int            `json:"number,omitempty"`
+	LabelsBefore []string       `json:"labels_before"`
+	LabelsAdded  []string       `json:"labels_added,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
+	BeforeState  map[string]any `json:"before_state,omitempty"`
+	AfterState   map[string]any `json:"after_state,omitempty"`
 }
 
 // Delivered accepts execution evidence, never a request or a job conclusion.
@@ -209,6 +221,22 @@ func Merge(previous, incoming Record) (Record, error) {
 		!previous.Delivery.At.Equal(incoming.Delivery.At) ||
 		previous.Adoption.RuleVersion != incoming.Adoption.RuleVersion {
 		return Record{}, errors.New("conflicting lifecycle identity or delivery evidence")
+	}
+	if previous.Execution != nil {
+		if incoming.Execution != nil {
+			oldExecution, err := json.Marshal(previous.Execution)
+			if err != nil {
+				return Record{}, err
+			}
+			newExecution, err := json.Marshal(incoming.Execution)
+			if err != nil {
+				return Record{}, err
+			}
+			if !bytes.Equal(oldExecution, newExecution) {
+				return Record{}, errors.New("conflicting retained execution evidence")
+			}
+		}
+		incoming.Execution = previous.Execution
 	}
 	incoming.Delivery.Source = previous.Delivery.Source
 	old, next := previous.Adoption, incoming.Adoption

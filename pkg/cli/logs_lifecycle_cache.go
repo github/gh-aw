@@ -25,7 +25,10 @@ type lifecycleCacheKey struct{}
 var lifecycleCacheGates sync.Map
 
 func lockLifecycleCache(ctx context.Context, runDir string) (func(), error) {
-	dir := filepath.Dir(lifecycleStorePath(runDir))
+	return lockLifecycleStore(ctx, filepath.Dir(lifecycleStorePath(runDir)))
+}
+
+func lockLifecycleStore(ctx context.Context, dir string) (func(), error) {
 	value, _ := lifecycleCacheGates.LoadOrStore(dir, make(chan struct{}, 1))
 	gate, ok := value.(chan struct{})
 	if !ok {
@@ -54,8 +57,11 @@ func lockLifecycleCache(ctx context.Context, runDir string) (func(), error) {
 }
 
 func loadLifecycleCache(runDir string) (map[string]lifecycle.Record, error) {
+	return loadLifecycleRecords(lifecycleStorePath(runDir))
+}
+
+func loadLifecycleRecords(path string) (map[string]lifecycle.Record, error) {
 	records := make(map[string]lifecycle.Record)
-	path := lifecycleStorePath(runDir)
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return records, nil
@@ -99,6 +105,10 @@ func loadLifecycleCache(runDir string) (map[string]lifecycle.Record, error) {
 }
 
 func writeLifecycleCache(runDir string, records map[string]lifecycle.Record) error {
+	return writeLifecycleRecords(lifecycleStorePath(runDir), records)
+}
+
+func writeLifecycleRecords(path string, records map[string]lifecycle.Record) error {
 	keys := make([]string, 0, len(records))
 	for key := range records {
 		keys = append(keys, key)
@@ -126,7 +136,6 @@ func writeLifecycleCache(runDir string, records map[string]lifecycle.Record) err
 			return errors.New("lifecycle cache exceeds the 16 MiB limit; use a separate output directory")
 		}
 	}
-	path := lifecycleStorePath(runDir)
 	if err := os.MkdirAll(filepath.Dir(path), constants.DirPermSensitive); err != nil {
 		return err
 	}

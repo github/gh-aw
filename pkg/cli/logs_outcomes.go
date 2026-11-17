@@ -13,7 +13,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/github"
@@ -56,6 +55,7 @@ func addLogsOutcomeFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("delivery", false, "Report verified safe-output delivery from selected runs' execution evidence")
 	cmd.Flags().Bool("adoption", false, "Refresh safe-output adoption from GitHub (includes delivery; additional API requests)")
 	cmd.Flags().String("adoption-dir", "", "Write adoption JSONL observations to this directory (requires --adoption)")
+	cmd.Flags().Bool("retained", false, "Refresh due retained deliveries without discovering or downloading runs (requires --adoption and --repo; --count limits delivery checks)")
 }
 
 func logsOutcomeArtifactSets(sets []string, outcomes bool) []string {
@@ -140,6 +140,7 @@ func collectRunLifecycle(ctx context.Context, run ProcessedRun, mapping *github.
 			}
 		}
 	}
+	retainedOnly := !found
 	if !found {
 		sourceRepository, _ := repoutil.NormalizeRepoForAPI(logsOutcomeRepository(run.Run))
 		for _, record := range retained {
@@ -148,11 +149,7 @@ func collectRunLifecycle(ctx context.Context, run ProcessedRun, mapping *github.
 				record.Host != outcomeAPIHostForRepo(logsOutcomeRepository(run.Run)) {
 				continue
 			}
-			items = append(items, CreatedItemReport{
-				Type: record.Type, URL: record.TargetURL, Repo: record.TargetRepository,
-				Timestamp:  record.Delivery.At.Format(time.RFC3339Nano),
-				EvidenceID: record.EvidenceID, InvocationID: record.InvocationID, EvidenceSource: record.Delivery.Source, Status: "success",
-			})
+			items = append(items, retainedLifecycleItem(record))
 		}
 		found = len(items) > 0
 	}
@@ -176,6 +173,9 @@ func collectRunLifecycle(ctx context.Context, run ProcessedRun, mapping *github.
 			report.Delivery.Error = err.Error()
 			report.EvalError = err.Error()
 			continue
+		}
+		if retainedOnly {
+			record.Execution = retained[record.ID].Execution
 		}
 		record, err = lifecycle.Merge(retained[record.ID], record)
 		if err != nil {

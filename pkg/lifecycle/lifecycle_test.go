@@ -1,11 +1,32 @@
 package lifecycle
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestLifecycleRetainsExecutionSelectorsAndRejectsConflictingReplay(t *testing.T) {
+	record := testDelivery(t, "add_labels")
+	record.Execution = &Execution{Number: 7, LabelsBefore: []string{}, LabelsAdded: []string{"bug"}}
+	content, err := json.Marshal(record)
+	require.NoError(t, err)
+	var restored Record
+	require.NoError(t, json.Unmarshal(content, &restored))
+	require.NotNil(t, restored.Execution.LabelsBefore)
+	merged, err := Merge(record, restored)
+	require.NoError(t, err)
+	require.Equal(t, record.Execution, merged.Execution)
+	replay := testDelivery(t, "add_labels")
+	merged, err = Merge(record, replay)
+	require.NoError(t, err)
+	require.Equal(t, record.Execution, merged.Execution)
+	replay.Execution = &Execution{Number: 8, LabelsBefore: []string{}, LabelsAdded: []string{"bug"}}
+	_, err = Merge(record, replay)
+	require.ErrorContains(t, err, "conflicting retained execution")
+}
 
 func testDelivery(t *testing.T, outputType string) Record {
 	t.Helper()

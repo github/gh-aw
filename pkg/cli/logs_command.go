@@ -208,6 +208,9 @@ func buildLogsCommandExample() string {
 
 func runLogsCommand(cmd *cobra.Command, args []string) error {
 	logsCommandLog.Printf("Starting logs command: args=%d", len(args))
+	if getBoolFlag(cmd, "retained") {
+		return runRetainedAdoptionCommand(cmd, args)
+	}
 	stdin, _ := cmd.Flags().GetBool("stdin")
 	if stdin {
 		return runLogsCommandFromStdin(cmd, args)

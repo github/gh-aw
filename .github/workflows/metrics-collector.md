@@ -24,6 +24,7 @@ tools:
   github:
     mode: local
   repo-memory:
+  - id: default
     branch-name: memory/meta-orchestrators
     file-glob: "metrics/**"
     allowed-extensions: [".json"]
@@ -133,7 +134,20 @@ tools:
         if (artifactBytes > maxArtifactBytes || artifactFiles > maxArtifactFiles) {
           throw new Error("Metrics upload exceeds the 16MiB or 100-file artifact budget.");
         }
+  - id: lifecycle
+    branch-name: memory/output-lifecycle
+    file-glob: ["lifecycle.jsonl", "collection.json"]
+    allowed-extensions: [".jsonl", ".json"]
+    max-file-size: 16777216
+    max-file-count: 2
+    max-patch-size: 1048576
 pre-agent-steps:
+  - name: Collect and refresh retained delivery lifecycle
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      EXPR_GITHUB_REPOSITORY: ${{ github.repository }}
+    run: node actions/setup/js/collect_lifecycle.cjs
   - name: Record metrics baseline timestamp
     run: |
       set -euo pipefail
@@ -229,6 +243,22 @@ As an infrastructure agent, you collect and persist performance data that enable
 - **Collection Date**: $(date +%Y-%m-%d)
 - **Collection Time**: $(date +%H:%M:%S) UTC
 - **Storage Path**: `/tmp/gh-aw/repo-memory/default/metrics/`
+
+#### Retained lifecycle snapshot
+
+The deterministic pre-agent collector prepares `metrics/lifecycle.json` before
+you start. Preserve it unchanged. It contains per-workflow and fleet delivery,
+human/fallback adoption, and snapshot-survival counts for retained deliveries,
+including outputs from older runs. Workflow keys are source workflow paths.
+Read its `coverage`, discovery checkpoint, deferred count, and errors before
+interpreting it. This retained population is separate from the recent-run cohort
+below; do not add its counts to that cohort or call them attributed value.
+
+The separate `/tmp/gh-aw/repo-memory/lifecycle/` memory holds the authoritative
+per-item ledger and discovery checkpoint. Do not edit that directory. Collection
+resumes saved windows after missed runs and retries unavailable execution evidence;
+bounded or incomplete work stays explicit. No webhooks or agent classification
+are required for this refresh.
 
 #### Pre-flight: Clean Memory Directory
 

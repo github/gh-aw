@@ -24,6 +24,7 @@ func observeLifecycle(ctx context.Context, run WorkflowRun, item CreatedItemRepo
 			return report, err
 		}
 	} else if rule, ok := lifecycle.RuleFor(item.Type); ok && rule.FallbackToDelivery {
+		record.Survival = lifecycle.Survival{State: "unknown", Coverage: "unsupported", ObservedAt: time.Now().UTC()}
 		if evaluator, supported := outcomeEvaluators[item.Type]; supported {
 			evidence := evaluator(ctx, item, resolveItemRepo(item, logsOutcomeRepository(run)))
 			evaluation := normalizeOutcomeEvaluation(evidence)

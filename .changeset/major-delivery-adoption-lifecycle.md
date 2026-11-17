@@ -30,3 +30,9 @@ Delivery requires executed-effect evidence. Adoption distinguishes verified huma
 decisions from explicit delivery-time fallback rules; infrastructure is not value.
 Current survival observations do not establish full-window survival or attributed
 value. Retained lifecycle records are independent of downloaded run folders.
+
+Use `logs --adoption --retained --repo OWNER/REPO --output DIR` for bounded
+refresh after restoring only the retained ledger, even when source artifacts
+have expired. Metrics Collector now persists lifecycle state in separate
+repo-memory, resumes discovery after missed executions, and prepares
+`metrics/lifecycle.json` for existing reports without requiring webhooks.

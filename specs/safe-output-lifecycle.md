@@ -96,6 +96,22 @@ Compact retained observations use the existing logs JSONL schema with
 MUST serialize or fail explicitly rather than lose observations. Snapshot files use sensitive
 permissions and atomic replacement. Invalid retained evidence MUST fail closed.
 
+`logs --adoption --retained --repo OWNER/REPO` refreshes the scoped retained
+population without run discovery, run metadata, or source artifacts. `--count`
+bounds due delivery checks; time and API-quota bounds remain enforced. The
+`retained_adoption` projection distinguishes refreshed and deferred records.
+Oldest provider checks are serviced first, with a 24-hour check interval.
+Execution selectors needed by provider adapters MUST survive cold restoration;
+conflicting replayed selectors MUST fail explicitly.
+
+Scheduled repository collection MUST persist its ledger and discovery cursor
+together through repo-memory, separately from aggregate metric files. A missed
+execution MUST NOT reset discovery to a rolling 24-hour cohort. Bounded or failed
+work MUST remain retryable and visible as partial coverage. Provider failures
+MUST NOT become fabricated adoption decisions. The metrics collector's prepared
+`metrics/lifecycle.json` is a projection, not the authoritative per-item store.
+No webhook delivery or agent classification is required for reconciliation.
+
 ## Verification
 
 Core tests cover registry defaults, distinct actions/attempts, verified decisions,

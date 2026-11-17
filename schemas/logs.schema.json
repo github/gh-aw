@@ -3,6 +3,245 @@
     {
       "type": "object",
       "properties": {
+        "retained_adoption": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "observed_at": {
+              "type": "string"
+            },
+            "delivered": {
+              "type": "integer"
+            },
+            "refreshed": {
+              "type": "integer"
+            },
+            "deferred": {
+              "type": "integer"
+            },
+            "coverage": {
+              "type": "string"
+            },
+            "records": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "host": {
+                    "type": "string"
+                  },
+                  "repository": {
+                    "type": "string"
+                  },
+                  "workflow": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "integer"
+                  },
+                  "run_attempt": {
+                    "type": "integer"
+                  },
+                  "invocation_id": {
+                    "type": "string"
+                  },
+                  "evidence_id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "target_url": {
+                    "type": "string"
+                  },
+                  "target_repository": {
+                    "type": "string"
+                  },
+                  "delivery": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string"
+                      },
+                      "observed_at": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "signal",
+                      "at",
+                      "observed_at",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "adoption": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string"
+                      },
+                      "observed_at": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "rule_version": {
+                        "type": "string"
+                      },
+                      "acceptance_kind": {
+                        "type": "string"
+                      },
+                      "human_verified": {
+                        "type": "boolean"
+                      },
+                      "coverage": {
+                        "type": "string"
+                      },
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "signal",
+                      "observed_at",
+                      "source",
+                      "rule_version",
+                      "human_verified",
+                      "coverage"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "survival": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "observed_at": {
+                        "type": "string"
+                      },
+                      "coverage": {
+                        "type": "string"
+                      },
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "coverage"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "reversal_signal": {
+                    "type": "string"
+                  },
+                  "reversed_at": {
+                    "type": "string"
+                  },
+                  "execution": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "number": {
+                        "type": "integer"
+                      },
+                      "labels_before": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "labels_added": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "before_state": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "after_state": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    },
+                    "required": [
+                      "labels_before"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "id",
+                  "host",
+                  "repository",
+                  "run_id",
+                  "run_attempt",
+                  "invocation_id",
+                  "evidence_id",
+                  "type",
+                  "delivery",
+                  "adoption",
+                  "survival"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "observed_at",
+            "delivered",
+            "refreshed",
+            "deferred",
+            "coverage",
+            "records"
+          ],
+          "additionalProperties": false
+        },
         "delivery": {
           "type": [
             "null",

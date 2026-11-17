@@ -23,6 +23,7 @@ var reportLog = logger.New("cli:logs_report")
 
 // LogsData represents the complete structured data for logs output
 type LogsData struct {
+	RetainedAdoption     *RetainedAdoptionData       `json:"retained_adoption,omitempty" console:"-"`
 	Delivery             []DeliveryData              `json:"delivery,omitempty" console:"-"`
 	FailureInvestigation *FailureInvestigation       `json:"failure_investigation,omitempty" console:"-"`
 	FailureClusters      []FailureCluster            `json:"failure_clusters,omitempty" console:"-"`
