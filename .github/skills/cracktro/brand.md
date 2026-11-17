@@ -65,3 +65,7 @@ When asked to calm or re-brand the deck:
 3. Per slide, count accent hues; remap decorative extra hues to neutrals (`#9198a1`, `#3d444d`) or the slide accent, keeping semantic pairs.
 4. Leave runtime chrome (`runtime.js`: progress bar, dots) neutral or single-hue too.
 5. Preview each changed slide (SKILL.md Preview loop) and check contrast: body ≥ 7:1, muted ≥ 4.5:1 on the slide background.
+
+## Generated brand assets
+
+For social cards, wallpapers, charts or a PowerPoint companion, use the `asset-generator` MCP; see `asset-generator.md`. Never embed its output in slides.
