@@ -144,7 +144,7 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	if workflowData.EngineConfig != nil {
 		checksumsSHA256 = workflowData.EngineConfig.ChecksumsSHA256
 	}
-	npmSteps := generateCopilotInstallerSteps(copilotVersion, "Install GitHub Copilot CLI", rootless, compiledVersion, string(constants.CopilotSessionIDMinVersion), getNVXGuestLibc(workflowData), checksumsSHA256, resolveEngineCooldownDays(workflowData))
+	npmSteps := generateCopilotInstallerSteps(copilotVersion, "Install GitHub Copilot CLI", rootless, compiledVersion, string(constants.CopilotSessionIDMinVersion), getNVXGuestLibc(workflowData), checksumsSHA256)
 	if len(inlineDriverWriteStep) > 0 {
 		npmSteps = append(npmSteps, inlineDriverWriteStep)
 	}

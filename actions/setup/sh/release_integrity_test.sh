@@ -54,7 +54,7 @@ while [ "$#" -gt 0 ]; do
       https_redirects=true
       shift 2 ;;
     -o) out="$2"; shift 2 ;;
-    --write-out) write_out="$2"; shift 2 ;;
+    -w|--write-out) write_out="$2"; shift 2 ;;
     *) url="$1"; shift ;;
   esac
 done
@@ -75,12 +75,16 @@ case "$url" in
     digest=$(shasum -a 256 "$TEST_ROOT/checksums.txt" | awk '{print $1}')
     printf '%s  refs/tags/%s\n' "$digest" "$version" > "$out" ;;
   */SHA256SUMS.txt) cp "$TEST_ROOT/SHA256SUMS.txt" "$out" ;;
+  https://github.com/github/copilot-cli/releases/latest)
+    test "$write_out" = '%{url_effective}'
+    printf '%s' 'https://github.com/github/copilot-cli/releases/tag/v9.9.9'
+    ;;
   */awf-bundle.js|*/awf-linux-*|*/awf-darwin-*) cp "$TEST_ROOT/payload" "$out" ;;
   */copilot-linux-x64.tar.gz) cp "$TEST_ROOT/copilot-linux-x64.tar.gz" "$out" ;;
   */copilot-linuxmusl-x64.tar.gz) cp "$TEST_ROOT/copilot-linuxmusl-x64.tar.gz" "$out" ;;
   *) echo "unexpected download: $url" >&2; exit 97 ;;
 esac
-if [ -n "$write_out" ]; then printf '200'; fi
+if [ -n "$write_out" ] && [[ "$url" != */releases/latest ]]; then printf '200'; fi
 EOF
 cat >"$TEMP_DIR/bin/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -366,8 +370,10 @@ test ! -e "$TEMP_DIR/curl.log"
 if run_copilot latest --rootless; then
   echo "FAIL: Copilot accepted an unreviewed latest download" >&2; exit 1
 fi
-test ! -e "$TEMP_DIR/curl.log"
-echo "PASS: unreviewed/latest release downloads fail before network access"
+test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
+grep -q 'https://github.com/github/copilot-cli/releases/latest' "$TEMP_DIR/curl.log"
+! grep -q '/releases/download/' "$TEMP_DIR/curl.log"
+echo "PASS: unreviewed/latest release downloads fail before artifact download"
 
 for repository in github/copilot-cli github/gh-aw-firewall; do
   manifest=SHA256SUMS.txt

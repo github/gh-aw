@@ -20,8 +20,6 @@ set +o histexpand
 #                       --prefer-toolcache is also supplied.
 #   --prefer-toolcache - Prefer a trusted cached VERSION even with a manifest pin.
 #                        The pin authenticates downloads, not the cached host binary.
-#   --cooldown-days - Accepted as a no-op to keep compiled workflows compatible.
-#                     Release age for the pinned default is checked at build time.
 #
 # Environment overrides (testing):
 #   COPILOT_INSTALL_DIR - Override the install directory (default: /usr/local/bin).
@@ -62,19 +60,10 @@ ROOTLESS=false
 COPILOT_CHECKSUMS_SHA256=""
 SEEN_CHECKSUMS_SHA256=false
 PREFER_TOOLCACHE=false
-SEEN_COOLDOWN_DAYS=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --rootless) ROOTLESS=true; shift ;;
     --prefer-toolcache) PREFER_TOOLCACHE=true; shift ;;
-    --cooldown-days)
-      if [ "$SEEN_COOLDOWN_DAYS" = true ] || [ "$#" -lt 2 ] || [[ ! "$2" =~ ^(0|[1-9][0-9]*)$ ]]; then
-        echo "ERROR: --cooldown-days requires exactly one nonnegative integer number of days" >&2
-        exit 1
-      fi
-      SEEN_COOLDOWN_DAYS=true
-      shift 2
-      ;;
     --checksums-sha256)
       if [ "$SEEN_CHECKSUMS_SHA256" = true ] || [ "$#" -lt 2 ]; then
         echo "ERROR: --checksums-sha256 requires exactly one digest" >&2

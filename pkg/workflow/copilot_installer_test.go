@@ -9,11 +9,14 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-func TestCopilotInstallerPassesGitHubToken(t *testing.T) {
+func TestCopilotInstallerDoesNotPassGitHubTokenOrCooldownFlag(t *testing.T) {
 	for _, version := range []string{"1.0.0", "${{ inputs.engine-version }}"} {
-		step := strings.Join(generateCopilotInstallerSteps(version, "Install Copilot", false, "v1.0.0", "", "", "", 3)[0], "\n")
-		if !strings.Contains(step, "GITHUB_TOKEN: ${{ github.token }}") {
-			t.Errorf("Expected installer step for version %q to authenticate GitHub metadata requests, got:\n%s", version, step)
+		step := strings.Join(generateCopilotInstallerSteps(version, "Install Copilot", false, "v1.0.0", "", "", "")[0], "\n")
+		if strings.Contains(step, "GITHUB_TOKEN:") {
+			t.Errorf("Installer step for version %q must not pass an unused GitHub token, got:\n%s", version, step)
+		}
+		if strings.Contains(step, "--cooldown-days") {
+			t.Errorf("Installer step for version %q must not pass an unsupported cooldown flag, got:\n%s", version, step)
 		}
 	}
 }

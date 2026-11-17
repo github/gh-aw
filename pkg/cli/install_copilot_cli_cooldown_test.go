@@ -34,13 +34,8 @@ func TestInstallCopilotCLIWithoutReleaseMetadata(t *testing.T) {
 		{"download-enterprise-token", false, "", "ghe-test-token", "", false, false},
 		{"cached-no-token", true, "", "", "", false, false},
 		{"download-no-token", false, "", "", "", false, false},
-		{"cached-legacy-cooldown", true, "3", "ghe-test-token", "", false, false},
-		{"download-legacy-cooldown", false, "7", "ghe-test-token", "", false, false},
-		{"cached-legacy-disabled", true, "0", "", "", false, false},
-		{"download-tampered-manifest", false, "3", "ghe-test-token", "SHA256", true, false},
-		{"negative-days", true, "-1", "", "nonnegative integer", false, false},
-		{"boolean-days", true, "false", "", "nonnegative integer", false, false},
-		{"fractional-days", true, "1.5", "", "nonnegative integer", false, false},
+		{"legacy-cooldown-rejected", true, "3", "ghe-test-token", "Unknown Copilot installer flag: --cooldown-days", false, false},
+		{"download-tampered-manifest", false, "", "ghe-test-token", "SHA256", true, false},
 		{"download-latest", false, "", "", "", false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {

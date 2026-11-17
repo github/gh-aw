@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -10,9 +9,7 @@ import (
 
 var copilotInstallerLog = logger.New("workflow:copilot_installer")
 
-// generateCopilotInstallerSteps retains the legacy cooldown flag to keep compiled locks stable.
-// The installer accepts it as a no-op; the pinned CLI default's cooldown is checked at build time.
-func generateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion, copilotMinVersion, guestLibc, checksumsSHA256 string, cooldownDays ...int) []GitHubActionStep {
+func generateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion, copilotMinVersion, guestLibc, checksumsSHA256 string) []GitHubActionStep {
 	preferToolcache := false
 	if checksumsSHA256 == "" && (version == "" || strings.TrimPrefix(version, "v") == string(constants.DefaultCopilotVersion)) {
 		if version == "" {
@@ -33,10 +30,6 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 	if preferToolcache {
 		installerFlags += " --prefer-toolcache"
 	}
-	if len(cooldownDays) > 0 {
-		installerFlags += fmt.Sprintf(" --cooldown-days %d", cooldownDays[0])
-	}
-
 	// Use the install_copilot_cli.sh script from actions/setup/sh
 	// This script includes retry logic for robustness against transient network failures.
 	// The script downloads the Copilot CLI using curl with hardcoded github.com URLs.
@@ -55,7 +48,6 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 			`        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" "${ENGINE_VERSION}"` + installerFlags,
 			"        env:",
 			"          GH_HOST: github.com",
-			"          GITHUB_TOKEN: ${{ github.token }}",
 			"          ENGINE_VERSION: " + version,
 		}
 		stepLines = appendCopilotInstallerVersionEnv(stepLines, compiledVersion, copilotMinVersion, guestLibc)
@@ -67,7 +59,6 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh\" " + version + installerFlags,
 		"        env:",
 		"          GH_HOST: github.com",
-		"          GITHUB_TOKEN: ${{ github.token }}",
 	}
 	stepLines = appendCopilotInstallerVersionEnv(stepLines, "", copilotMinVersion, guestLibc)
 
