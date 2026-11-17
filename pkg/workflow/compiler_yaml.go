@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -16,13 +17,14 @@ var compilerYamlLog = logger.New("workflow:compiler_yaml")
 
 const maxActivationMetadataBytes = 4 * 1024 * 1024
 const activationMetadataChunkSize = 16000
+const activationMetadataFile = "${{ runner.temp }}/gh-aw-markdown-metadata.b64"
 
 // Embed after job construction so rewritten prompt sources are included. Base64
 // keeps authored Actions expressions inert and needs no callee repository token.
 func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadata) error {
 	activation, ok := c.jobManager.GetJob(string(constants.ActivationJobName))
 	if !ok {
-		return fmt.Errorf("activation job missing: cannot embed Markdown metadata")
+		return errors.New("activation job missing: cannot embed Markdown metadata")
 	}
 	encoded, err := json.Marshal(metadata)
 	if err != nil {
@@ -40,7 +42,7 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 		return nil
 	}
 	// Keep both run strings and environment entries below runner limits.
-	activation.Env["GH_AW_INFO_MARKDOWN_METADATA_FILE"] = "${{ runner.temp }}/gh-aw-markdown-metadata.b64"
+	activation.Env["GH_AW_INFO_MARKDOWN_METADATA_FILE"] = activationMetadataFile
 	var steps []string
 	for offset := 0; offset < len(payload); offset += activationMetadataChunkSize {
 		chunk := payload[offset:min(offset+activationMetadataChunkSize, len(payload))]
