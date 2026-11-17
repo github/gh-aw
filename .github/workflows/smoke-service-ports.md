@@ -91,13 +91,15 @@ features:
 
 ## Output Requirements
 
-Add a **concise comment** to the pull request (if triggered by PR) with:
+Report the results through the safe output appropriate for the trigger:
 
-- Each test with a pass/fail status
-- Overall status: PASS or FAIL
-- Note whether `redis-cli` was available or if `nc`/netcat was used as fallback
+- For issue, pull request, issue-comment, or pull-request-comment triggers, use `add_comment` to post a concise comment on the triggering item with:
+  - Each test with a pass/fail status
+  - Overall status: PASS or FAIL
+  - Note whether `redis-cli` was available or if `nc`/netcat was used as fallback
+- For `schedule` or `workflow_dispatch` triggers, use `noop` with the same pass/fail summary in its `message`. Do not call `add_comment` for these events; there is no triggering item to target.
 
-Example:
+Example comment:
 ```
 ## Service Ports Smoke Test (Redis)
 
@@ -110,8 +112,4 @@ Example:
 **Result:** 3/3 tests passed ✅
 ```
 
-**Important**: If no action is needed after completing your analysis, you **MUST** call the `noop` safe-output tool with a brief explanation.
-
-```json
-{"noop": {"message": "No action needed: [brief explanation of what was analyzed and why]"}}
-```
+For a scheduled or manually dispatched run, include the test results and overall PASS/FAIL status in the `noop` message.
