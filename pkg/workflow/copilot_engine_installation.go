@@ -35,7 +35,7 @@ type copilotSDKInstallSpec struct {
 }
 
 const workspaceCommandPrefix = `cd "${GITHUB_WORKSPACE}" && `
-const copilotSDKNodeTargetDir = constants.GhAwRootDirShell + "/copilot-sdk"
+const copilotSDKNodeTargetDir = constants.GhAwRootDirShell + "/engine-cli/copilot-sdk"
 const copilotSDKNodeInstallCommand = `npm install --prefix "` + copilotSDKNodeTargetDir + `" --ignore-scripts --no-save `
 const copilotSDKPythonTargetDir = `${GITHUB_WORKSPACE}/.gh-aw/copilot-sdk/python`
 const copilotSDKWebFetchDependency = "undici@6.28.0"
