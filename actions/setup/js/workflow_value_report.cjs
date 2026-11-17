@@ -381,6 +381,12 @@ function normalizeMetricPeriod(candidate, inventory) {
       metrics_source: candidate.path,
       collection_status: snapshot?.status === "no-data" ? "legacy_unavailable" : "unavailable",
       comparability: "unavailable",
+      session_evidence: {
+        source: null,
+        reported_workflows: 0,
+        delivery_workflows: 0,
+        adoption_workflows: 0,
+      },
       inventory: inventoryMembership([], inventoryIds, []),
       selected_window: {
         delivery: empty,
@@ -395,9 +401,19 @@ function normalizeMetricPeriod(candidate, inventory) {
   const comparable = exactDailyWindow(snapshot);
   const deliveries = new Map();
   const adoptions = new Map();
+  const sessionSources = new Set();
+  let sessionReportedWorkflows = 0;
+  let sessionDeliveryWorkflows = 0;
+  let sessionAdoptionWorkflows = 0;
   for (const id of presentIds) {
     const workflow = snapshot.workflows[id];
     if (!workflow || typeof workflow !== "object" || Array.isArray(workflow)) throw new Error(`${ERR_VALIDATION}: Invalid workflow metrics record: ${id}`);
+    if (typeof workflow.safe_outputs_source === "string" && workflow.safe_outputs_source) {
+      sessionSources.add(workflow.safe_outputs_source);
+      sessionReportedWorkflows++;
+    }
+    if (Object.hasOwn(workflow, "safe_output_delivery")) sessionDeliveryWorkflows++;
+    if (Object.hasOwn(workflow, "safe_output_adoption")) sessionAdoptionWorkflows++;
     deliveries.set(id, comparable ? normalizeDelivery(workflow.safe_output_delivery) : normalizeDelivery(undefined));
     adoptions.set(id, comparable ? normalizeAdoption(workflow.safe_output_adoption) : normalizeAdoption(undefined));
   }
@@ -411,6 +427,12 @@ function normalizeMetricPeriod(candidate, inventory) {
     metrics_source: candidate.path,
     collection_status: ["complete", "partial"].includes(snapshot.collection_status) ? snapshot.collection_status : "unavailable",
     comparability: comparable ? "exact_24h" : "incomparable",
+    session_evidence: {
+      source: sessionSources.size === 1 ? [...sessionSources][0] : sessionSources.size > 1 ? "mixed" : null,
+      reported_workflows: sessionReportedWorkflows,
+      delivery_workflows: sessionDeliveryWorkflows,
+      adoption_workflows: sessionAdoptionWorkflows,
+    },
     inventory: inventoryMembership(presentIds, inventoryIds, unknownIds),
     selected_window: {
       delivery,
@@ -447,7 +469,8 @@ function normalizeLifecyclePeriod(candidate, inventory) {
   const snapshot = candidate.value;
   const inventoryIds = inventory.workflows.map(workflow => workflow.id);
   if (!snapshot || ![1, 2].includes(snapshot.schema_version) || snapshot.scope !== "retained_deliveries" || !["complete", "partial"].includes(snapshot.coverage)) {
-    const empty = encodeObservations([], new Map(), RETAINED_FIELDS, inventory.count);
+    const unavailable = new Map(inventoryIds.map(id => [id, normalizeRetained({}, "unavailable")]));
+    const empty = encodeObservations(inventoryIds, unavailable, [...RETAINED_FIELDS, "accepted"], inventory.count);
     return {
       lifecycle_source: candidate.path,
       retained_population: {
@@ -498,6 +521,64 @@ function normalizeLifecyclePeriod(candidate, inventory) {
 /** @param {Record<string, any>} encoded @param {string} id */
 function observationFor(encoded, id) {
   return encoded.overrides[id] || encoded.default;
+}
+
+/** @param {Record<string, any>} inventory @param {{start: string, end: string, coverage: string} | null} selection */
+function unavailableLifecycleLedger(inventory, selection) {
+  const inventoryIds = inventory.workflows.map(workflow => workflow.id);
+  const deliveries = new Map(
+    inventoryIds.map(id => [
+      id,
+      {
+        coverage: "unavailable",
+        delivered: null,
+        reason_code: "canonical_lifecycle_ledger_missing",
+      },
+    ])
+  );
+  const adoptions = new Map(
+    inventoryIds.map(id => [
+      id,
+      {
+        coverage: "unavailable",
+        ...Object.fromEntries(ADOPTION_FIELDS.map(field => [field, null])),
+        reason_code: "canonical_lifecycle_ledger_missing",
+      },
+    ])
+  );
+  const delivery = encodeObservations(inventoryIds, deliveries, DELIVERY_FIELDS, inventory.count);
+  const adoption = encodeObservations(inventoryIds, adoptions, ADOPTION_FIELDS, inventory.count);
+  return {
+    descriptor: {
+      memory_id: "lifecycle",
+      branch: "memory/output-lifecycle",
+      path: "lifecycle.jsonl",
+      schema_version: 7,
+      availability: "unavailable",
+      reason_code: "canonical_lifecycle_ledger_missing",
+      sha256: null,
+      bytes: null,
+      records: null,
+      identity_fields: ["host", "repository", "workflow", "run_id", "run_attempt", "invocation_id", "evidence_id", "type", "target_url", "target_repository"],
+      clock_fields: ["delivery.at", "delivery.observed_at", "adoption.at", "adoption.observed_at", "survival.observed_at", "reversed_at"],
+    },
+    workflows: {},
+    unmatched_workflow_sources: {},
+    selected_window: {
+      source: "canonical_retained_lifecycle_ledger",
+      window: selection ? { start: selection.start, end: selection.end } : null,
+      semantics: "deliveries_in_window_with_current_adoption_snapshot",
+      delivery,
+      adoption,
+      aggregate: {
+        coverage: "unavailable",
+        delivered: null,
+        ...Object.fromEntries(ADOPTION_FIELDS.map(field => [field, null])),
+        count_semantics: "unavailable",
+        workflow_coverage: { complete: 0, partial: 0, unavailable: inventory.count },
+      },
+    },
+  };
 }
 
 /**
@@ -631,6 +712,8 @@ function inspectLifecycleLedger(ledgerFile, inventory, selection) {
       branch: "memory/output-lifecycle",
       path: "lifecycle.jsonl",
       schema_version: 7,
+      availability: "available",
+      reason_code: null,
       sha256: sha256(content),
       bytes: content.length,
       records: seen.size,
@@ -677,7 +760,9 @@ function inspectLifecycleLedger(ledgerFile, inventory, selection) {
 
 /** @param {Record<string, any>} metricPeriod @param {Record<string, any> | undefined} lifecyclePeriod @param {Record<string, any>} inventory @param {boolean} current */
 function combinePeriod(metricPeriod, lifecyclePeriod, inventory, current) {
-  const unavailableRetained = encodeObservations([], new Map(), [...RETAINED_FIELDS, "accepted"], inventory.count);
+  const inventoryIds = inventory.workflows.map(workflow => workflow.id);
+  const unavailable = new Map(inventoryIds.map(id => [id, normalizeRetained({}, "unavailable")]));
+  const unavailableRetained = encodeObservations(inventoryIds, unavailable, [...RETAINED_FIELDS, "accepted"], inventory.count);
   const retained = lifecyclePeriod?.retained_population || {
     observations: unavailableRetained,
     aggregate: unavailableRetained.aggregate,
@@ -752,9 +837,10 @@ function pruneUploadHistory(metricsDir, currentDate) {
  *   repository: string,
  *   stepSummaryPath?: string,
  *   prune?: boolean,
+ *   allowMissingLifecycle?: boolean,
  * }} options
  */
-function generateWorkflowValueReport({ repoRoot, metricsDir, lifecycleLedgerFile, outputDir, repository, stepSummaryPath, prune = true }) {
+function generateWorkflowValueReport({ repoRoot, metricsDir, lifecycleLedgerFile, outputDir, repository, stepSummaryPath, prune = true, allowMissingLifecycle = false }) {
   if (!repository || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error(`${ERR_CONFIG}: Workflow value reporting requires OWNER/REPO`);
   const inventory = loadWorkflowInventory(repoRoot);
   const currentMetricFile = path.join(metricsDir, "latest.json");
@@ -802,25 +888,34 @@ function generateWorkflowValueReport({ repoRoot, metricsDir, lifecycleLedgerFile
           coverage: currentPeriod.retained_population.source_totals.coverage,
         }
       : null;
-  const ledger = inspectLifecycleLedger(lifecycleLedgerFile, inventory, ledgerSelection);
+  const hasLifecycleLedger = fs.existsSync(lifecycleLedgerFile);
+  const ledger = hasLifecycleLedger ? inspectLifecycleLedger(lifecycleLedgerFile, inventory, ledgerSelection) : unavailableLifecycleLedger(inventory, ledgerSelection);
+  if (!hasLifecycleLedger && !allowMissingLifecycle) {
+    throw new Error(`${ERR_VALIDATION}: Retained lifecycle ledger is unavailable: ${lifecycleLedgerFile}`);
+  }
   const projectedLedger = currentPeriod.retained_population.ledger;
   if (
-    !projectedLedger ||
-    projectedLedger.schema_version !== ledger.descriptor.schema_version ||
-    projectedLedger.sha256 !== ledger.descriptor.sha256 ||
-    projectedLedger.bytes !== ledger.descriptor.bytes ||
-    projectedLedger.records !== ledger.descriptor.records
+    hasLifecycleLedger &&
+    (!projectedLedger ||
+      projectedLedger.schema_version !== ledger.descriptor.schema_version ||
+      projectedLedger.sha256 !== ledger.descriptor.sha256 ||
+      projectedLedger.bytes !== ledger.descriptor.bytes ||
+      projectedLedger.records !== ledger.descriptor.records)
   ) {
     throw new Error(`${ERR_VALIDATION}: Retained lifecycle snapshot does not reference the restored canonical ledger`);
   }
+  if (!hasLifecycleLedger && projectedLedger) throw new Error(`${ERR_VALIDATION}: Retained lifecycle snapshot references a canonical ledger that was not restored`);
   currentPeriod.selected_window = ledger.selected_window;
   currentPeriod.selected_window_source = ledger.selected_window.source;
+  const missingLifecycleEvidence = ledger.descriptor.availability === "unavailable";
   const workflows = inventory.workflows.map(workflow => ({
     ...workflow,
     lifecycle_evidence: ledger.workflows[workflow.id] || {
       ledger_selector: { workflow: workflow.lock_path },
-      delivery_identities: 0,
-      producer_runs: 0,
+      coverage: missingLifecycleEvidence ? "unavailable" : "complete",
+      reason_code: missingLifecycleEvidence ? "canonical_lifecycle_ledger_missing" : null,
+      delivery_identities: missingLifecycleEvidence ? null : 0,
+      producer_runs: missingLifecycleEvidence ? null : 0,
       hosts: [],
       source_repositories: [],
       target_repositories: [],
@@ -916,8 +1011,10 @@ function generateWorkflowValueReport({ repoRoot, metricsDir, lifecycleLedgerFile
   delete currentPortfolio.workflows;
   const emptyLifecycleEvidence = {
     ledger_selector: null,
-    delivery_identities: 0,
-    producer_runs: 0,
+    coverage: missingLifecycleEvidence ? "unavailable" : "complete",
+    reason_code: missingLifecycleEvidence ? "canonical_lifecycle_ledger_missing" : null,
+    delivery_identities: missingLifecycleEvidence ? null : 0,
+    producer_runs: missingLifecycleEvidence ? null : 0,
     hosts: [],
     source_repositories: [],
     target_repositories: [],
@@ -931,7 +1028,9 @@ function generateWorkflowValueReport({ repoRoot, metricsDir, lifecycleLedgerFile
       last_reversal_at: null,
     },
   };
-  const lifecycleEvidenceOverrides = Object.fromEntries(fullWorkflows.filter(workflow => workflow.lifecycle_evidence.delivery_identities > 0).map(workflow => [workflow.id, workflow.lifecycle_evidence]));
+  const lifecycleEvidenceOverrides = Object.fromEntries(
+    fullWorkflows.filter(workflow => Number.isSafeInteger(workflow.lifecycle_evidence.delivery_identities) && workflow.lifecycle_evidence.delivery_identities > 0).map(workflow => [workflow.id, workflow.lifecycle_evidence])
+  );
   currentPortfolio.workflows = fullWorkflows.map(({ current: _current, lifecycle_evidence: _lifecycleEvidence, ...workflow }) => workflow);
   currentPortfolio.lifecycle_evidence = {
     default: emptyLifecycleEvidence,
@@ -984,6 +1083,7 @@ if (require.main === module) {
     repository: process.env.EXPR_GITHUB_REPOSITORY || process.env.GITHUB_REPOSITORY || "",
     stepSummaryPath: process.env.GITHUB_STEP_SUMMARY,
     prune: process.env.GH_AW_WORKFLOW_VALUE_PRUNE !== "false",
+    allowMissingLifecycle: process.env.GH_AW_WORKFLOW_VALUE_ALLOW_MISSING_LIFECYCLE === "true",
   });
   process.stdout.write(
     `Workflow value report generated for ${result.portfolio.inventory.count} workflow(s), ${result.portfolio.periods.length} retained period(s), ${result.output_bytes} byte(s); pruned ${result.retention.removed_files} upload history file(s).\n`

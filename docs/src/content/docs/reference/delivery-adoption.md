@@ -204,9 +204,47 @@ bash scripts/workflow-value-report.sh
 
 The command fetches `memory/meta-orchestrators` and
 `memory/output-lifecycle` read-only from `origin`, writes
-`./workflow-value-report/`, and fails if either evidence branch is unavailable.
+`./workflow-value-report/`, and also writes a normalized CSV dataset under
+`./workflow-value-report/csv/`. It fails when the metrics branch is unavailable.
+When the newer canonical lifecycle branch has not been published yet, retained
+lifecycle and attributed-value evidence remains explicitly null/unavailable.
 Set `WORKFLOW_VALUE_REMOTE`, `WORKFLOW_VALUE_REPOSITORY`, or
 `WORKFLOW_VALUE_OUTPUT_DIR` to override those defaults.
+
+The CSV export contains:
+
+| Path | Contents |
+| --- | --- |
+| `csv/workflows.csv` | Extracted workflow metadata, source/lock digests, and source/lock/pair git introduction and revision provenance. |
+| `csv/contracts.csv` | Deterministic evidence-availability contract derived only from recorded agent-session observations and workflow declarations. |
+| `csv/periods.csv` | Retained period dimension, inventory membership, comparability, and source paths. |
+| `csv/delivery_observations.csv` | One row per workflow, period, and selected-window or retained-population scope. |
+| `csv/adoption_observations.csv` | Human, fallback, rejected, pending, lifecycle, not-applicable, and unknown counts in their native identity unit. |
+| `csv/attributed_value_observations.csv` | Longitudinal value evidence state, native unit, value, and missing-evidence reason without proxy substitution. |
+| `csv/schema.json` | Column types, keys, null encoding, and relationships. |
+| `csv/manifest.json` | Input digests, row counts, coverage/status counts, file hashes and sizes, and export limits. |
+
+The exporter reconstructs every current workflow for every retained period from
+the compact default/override history encoding. Periods before a workflow's
+source/lock pair existed are `not_applicable`. Missing lifecycle and value
+evidence remains null with unavailable coverage. Legacy outcomes, run success,
+labels, output counts, merge rates, grader scores, and agent claims are never
+promoted to adoption or attributed value.
+
+The retained metrics identify their recorded source (for example,
+`agentic_workflows_logs`). The exporter carries that source into the period and
+contract tables. It does not infer a contract from workflow prose or reinterpret
+older session aggregates. If agent sessions did not record the required delivery,
+adoption, attribution, or survival fields, the corresponding contract status is
+`unavailable`.
+
+The local command attempts a temporary full-history clone for git provenance.
+When full history is unavailable, each workflow explicitly reports `shallow` or
+`missing` rather than fabricating introduction dates. Set
+`WORKFLOW_VALUE_FULL_GIT_HISTORY=false` to use the current checkout as-is, or
+`WORKFLOW_VALUE_CSV_OUTPUT_DIR` to select another CSV directory. The export
+fails rather than dropping rows if any file exceeds 16 MiB or the complete
+dataset exceeds 48 MiB.
 
 ## Survival, attributed value, and cost
 

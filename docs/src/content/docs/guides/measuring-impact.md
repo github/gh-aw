@@ -62,8 +62,11 @@ bash scripts/workflow-value-report.sh
 ```
 
 This produces current per-workflow delivery/adoption evidence, retained-history
-coverage, Markdown and SVG plots, and explicit attributed-value availability.
-It does not derive a universal score. See the
+coverage, Markdown and SVG plots, and a normalized CSV dataset with workflow
+metadata/provenance, agent-session-derived evidence contracts, period dimensions,
+and separate delivery, adoption, and attributed-value observations. Missing
+session evidence stays null, pre-introduction periods are not applicable, and
+native units remain separate. It does not derive a universal score. See the
 [workflow value portfolio reference](/gh-aw/reference/delivery-adoption/#workflow-value-portfolio)
 for artifact paths and reconstruction semantics.
 

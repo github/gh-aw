@@ -163,6 +163,7 @@ function run(f, options = {}) {
     repository: "github/gh-aw",
     stepSummaryPath: options.stepSummaryPath,
     prune: options.prune ?? false,
+    allowMissingLifecycle: options.allowMissingLifecycle ?? false,
   });
 }
 
@@ -370,6 +371,29 @@ describe("workflow value portfolio", () => {
     writeCurrent(f);
     fs.writeFileSync(f.ledgerFile, JSON.stringify(ledgerRecord("delivery-sha256-test", ".github/workflows/alpha.lock.yml")) + "\n");
     expect(() => run(f)).toThrow("does not reference the restored canonical ledger");
+  });
+
+  it("keeps lifecycle observations unavailable when an explicitly optional canonical ledger is absent", () => {
+    const f = fixture();
+    const snapshot = metrics(f.ids);
+    writeJSON(path.join(f.metricsDir, "latest.json"), snapshot);
+    writeJSON(path.join(f.metricsDir, "daily", "2026-11-17.json"), snapshot);
+    fs.unlinkSync(f.ledgerFile);
+    const result = run(f, { allowMissingLifecycle: true });
+    expect(result.portfolio.sources.retained_lifecycle.ledger).toMatchObject({
+      availability: "unavailable",
+      reason_code: "canonical_lifecycle_ledger_missing",
+      sha256: null,
+      records: null,
+    });
+    expect(result.portfolio.current.selected_window.aggregate).toMatchObject({ coverage: "unavailable", delivered: null, accepted: null });
+    expect(result.portfolio.current.retained_population.aggregate).toMatchObject({ coverage: "unavailable", delivered: null });
+    expect(result.portfolio.workflows[0].current.retained_population).toMatchObject({
+      coverage: "unavailable",
+      delivered: null,
+      reason_code: "retained_population_unavailable",
+    });
+    expect(result.portfolio.workflows.every(workflow => workflow.lifecycle_evidence.coverage === "unavailable" && workflow.lifecycle_evidence.delivery_identities === null)).toBe(true);
   });
 
   it("keeps run-scoped operational value separate from longitudinal attributed value", () => {
