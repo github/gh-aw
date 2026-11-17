@@ -71,7 +71,7 @@ Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), and Left/Right from an example return to
 the main line. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
 and M to toggle sound. The slide map button (or G) opens a full-screen grid of
-every slide grouped by band, each pattern's examples in a row beside it, with the current slide focused; arrows move between
+every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
 `slides.md` summaries and slide text; arrows pick a result, Enter opens it, and
@@ -79,7 +79,10 @@ Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
 jump directly to a slide (on narrow screens they become previous/next slide arrows
 flanked by track-style previous/next band buttons); `#N` hashes are shareable slide links. Clicking the left third
 goes back; clicking elsewhere advances. On touch screens, swipe left or right
-within a band and up or down between bands. Slides within a band push left, and
+within a band and up or down between bands. On phones the toolbar dims after a
+few idle seconds and brightens on any touch, key or focus. iPhone Safari offers no
+page fullscreen; to present without the browser bars, use
+Share → Add to Home Screen and open the talk from that icon. Slides within a band push left, and
 moving to a later band slides up (reversed when going back). Slides built on a gh-aw
 workflow show its original `/agentic-workflows` prompt along the top; click it to
 open the full prompt in a phone-style dialog (Escape or Done closes it).
@@ -128,6 +131,16 @@ operator-owned infrastructure diagrams come from `public/cracktro/ops-visuals.js
 a dependency-free script that sets `window.AW_OPS_VISUALS` for the deck. The
 homepage imports the same file at build time for its matching sections, so
 edit those diagrams in one place and keep them free of external references.
+The deck engine (stage, navigation dock, band headers, search, slide map, `#N`
+hashes and animated background) lives in `public/cracktro/runtime.js`, a
+talk-agnostic classic script that sets `window.CracktroDeck`. `deck.js` holds the
+talk's slides, styles, prompts, band themes and synth, and ends with
+`CracktroDeck.create({ slides, themes, bands, ... })`; another deck can reuse the
+runtime by loading `runtime.js` and calling `create` with its own slides. The
+API is declared in `public/cracktro/runtime.d.ts`; run `npm run check:cracktro`
+from `docs/` to type-check the runtime and its contract. The docs build runs
+this check too. The page needs no build or module loader and also works when
+opened from disk.
 Mona Sans reuses `public/fonts/`; Monaspace Neon and its SIL Open Font License
 are in `public/cracktro/fonts/`.
 
@@ -177,6 +190,34 @@ close button returns focus to the snippet without changing slides.
 Code in the expanded view is editable as plain text for live demonstrations.
 Edits affect only the expanded copy and are discarded when it closes; opening
 the snippet again restores its original contents.
+
+## Structured data
+
+`src/components/CustomHead.astro` emits the homepage graph and a `TechArticle`
+for docs pages. Blog pages get a single `BlogPosting` and breadcrumbs from
+`starlight-blog`; do not add another `BlogPosting`. `CustomHead.astro` enriches
+the plugin entry with the site `publisher` and, when `dateModified` is absent,
+uses `lastUpdated` or falls back to `datePublished`. Breadcrumbs are preserved.
+
+## Redirect fragments
+
+Moved pages use the `redirects` map in `astro.config.mjs`. After a production
+build, `src/lib/redirect-fragments.js` adds a script before each verified
+meta refresh so `/gh-aw/workshop/#x` redirects to
+`/gh-aw/guides/workshop/#x`. A destination's own fragment takes precedence:
+`/gh-aw/reference/servicenow-connector/#other` redirects to
+`/gh-aw/reference/connectors/#servicenow`.
+
+The integration supports static string redirects to root-relative paths or
+absolute HTTP(S) URLs. Object-form and dynamic redirects, protocol-relative
+destinations, and destinations containing whitespace, control characters or
+backslashes fail the build. Missing or mismatched meta refreshes also fail
+the build rather than patching an unverified page.
+
+This enhancement applies to built static pages, not the dev server. Without
+JavaScript, the original meta refresh still redirects but loses the incoming
+fragment. Run the rewrite unit tests from the repository root with
+`make test-docs-redirect-fragments`.
 
 ## ⚠️ Known Dev-Mode Limitations
 

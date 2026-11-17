@@ -80,20 +80,23 @@ test("inference permissions are isolated from PR code, tests, and cache operatio
 });
 
 test("same-PR selector and shared-client edits cannot become inference-job executable code", () => {
-  assert.equal(decisionSteps.length, 4);
-  const [trusted, evidence, selector] = decisionSteps;
+  assert.equal(decisionSteps.length, 3);
+  const [trusted, selector] = decisionSteps;
   const pinnedCheckout = /uses: actions\/checkout@[a-f0-9]{40}\b/;
   assert.match(trusted, pinnedCheckout);
   assert.match(trusted, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
   assert.match(trusted, /path: trusted\n/);
   assert.match(trusted, /fetch-depth: 1\n/);
-  assert.match(evidence, pinnedCheckout);
-  assert.match(evidence, /ref: \$\{\{ github\.sha \}\}/);
-  assert.match(evidence, /path: evidence\n/);
-  assert.match(evidence, /fetch-depth: 2\n/);
-  for (const checkout of [trusted, evidence]) assert.match(checkout, /persist-credentials: false/);
+  assert.match(trusted, /persist-credentials: false/);
+  assert.match(trusted, /sparse-checkout-cone-mode: false\n/);
+  const sparseFiles = trusted.split("sparse-checkout: |\n")[1].trim().split(/\s+/);
+  assert.deepEqual(sparseFiles, ["/scripts/ci-front-door.cjs", "/scripts/ci-front-door-diff.cjs", "/actions/setup/js/decisions_client.cjs", "/.github/ci/suite-catalog.json", "/.github/ci/decision-prompt.txt"]);
+  assert.equal((decision.match(/uses: actions\/checkout@/g) || []).length, 1);
+  assert.doesNotMatch(decision, /path: evidence|CI_DIFF_WORKSPACE/);
   assert.match(selector, /working-directory: trusted\n/);
-  assert.match(selector, /CI_DIFF_WORKSPACE: \$\{\{ github\.workspace \}\}\/evidence/);
+  assert.match(selector, /CI_DIFF_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(selector, /CI_DIFF_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(selector, /CI_DIFF_HEAD_SHA: \$\{\{ github\.sha \}\}/);
   assert.match(selector, /CI_DECISION_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(selector, /run: node scripts\/ci-front-door\.cjs\n/);
   assert.match(selector, /continue-on-error: true/);
@@ -104,7 +107,7 @@ test("same-PR selector and shared-client edits cannot become inference-job execu
 
 test("initial rollout never bootstraps executable selector code from the PR", () => {
   assert.equal(condition(decision), "github.event_name == 'pull_request'");
-  assert.match(decisionSteps[2], /if: hashFiles\('trusted\/scripts\/ci-front-door\.cjs'\) != ''/);
+  assert.match(decisionSteps[1], /if: hashFiles\('trusted\/scripts\/ci-front-door\.cjs'\) != ''/);
   const suites = validatedSuites("", "skipped");
   assert.equal(suites, "");
   for (const id of optional) assert.equal(evaluate(condition(jobs[id]), { suites }), true, id);

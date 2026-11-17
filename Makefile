@@ -586,6 +586,7 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	bash actions/setup/sh/generate_git_patch_test.sh
 	bash actions/setup/sh/audit_pre_agent_workspace_test.sh
 	bash actions/setup/sh/commit_cache_memory_git_test.sh
+	bash actions/setup/sh/setup_cache_memory_git_test.sh
 	bash actions/setup/sh/create_gh_aw_tmp_dir_test.sh
 	bash actions/setup/sh/download_docker_images_local_test.sh
 	bash actions/setup/sh/install_awf_binary_test.sh
@@ -1309,6 +1310,12 @@ test-docs-remark:
 	@echo "Running docs remark plugin unit tests..."
 	@node docs/src/lib/remark/inlineMarkdownInHtml.test.js
 	@echo "✓ Docs remark plugin unit tests passed"
+
+.PHONY: test-docs-redirect-fragments
+test-docs-redirect-fragments:
+	@echo "Running docs redirect fragment unit tests..."
+	@cd docs && node --test src/lib/redirect-fragments.test.js
+	@echo "✓ Docs redirect fragment unit tests passed"
 
 .PHONY: test-docs-wizard-model
 test-docs-wizard-model:

@@ -95,7 +95,7 @@ function decodePartialSuccess(bytes) {
 }
 
 /**
- * @param {"traces" | "logs"} signal
+ * @param {"traces" | "logs" | "metrics"} signal
  * @returns {{ reason: string, error: boolean }}
  */
 function unavailableOTLPResponse(signal) {
@@ -104,7 +104,7 @@ function unavailableOTLPResponse(signal) {
 
 /**
  * @param {Buffer} bytes
- * @param {"traces" | "logs"} signal
+ * @param {"traces" | "logs" | "metrics"} signal
  * @returns {{ rejected: bigint, warning: boolean }}
  */
 function parseJSONResponse(bytes, signal) {
@@ -114,8 +114,8 @@ function parseJSONResponse(bytes, signal) {
   const partial = "partialSuccess" in response ? response.partialSuccess : response.partial_success;
   if (partial === undefined || partial === null) return { rejected: 0n, warning: false };
   if (typeof partial !== "object" || Array.isArray(partial)) throw new Error("Invalid partial success");
-  const countKey = signal === "logs" ? "rejectedLogRecords" : "rejectedSpans";
-  const snakeKey = signal === "logs" ? "rejected_log_records" : "rejected_spans";
+  const countKey = signal === "logs" ? "rejectedLogRecords" : signal === "metrics" ? "rejectedDataPoints" : "rejectedSpans";
+  const snakeKey = signal === "logs" ? "rejected_log_records" : signal === "metrics" ? "rejected_data_points" : "rejected_spans";
   if ((countKey in partial && snakeKey in partial) || ("errorMessage" in partial && "error_message" in partial)) throw new Error("Duplicate partial success field");
   const count = (countKey in partial ? partial[countKey] : partial[snakeKey]) ?? 0;
   if ((typeof count !== "number" || !Number.isSafeInteger(count)) && (typeof count !== "string" || !/^\d{1,19}$/.test(count))) throw new Error("Invalid rejection count");
@@ -132,7 +132,7 @@ function parseJSONResponse(bytes, signal) {
  * @param {Buffer} bytes
  * @param {string} contentType
  * @param {string} protocol
- * @param {"traces" | "logs"} signal
+ * @param {"traces" | "logs" | "metrics"} signal
  * @returns {{ reason: string, error: boolean }}
  */
 function inspectOTLPResponse(bytes, contentType, protocol, signal) {
@@ -144,7 +144,7 @@ function inspectOTLPResponse(bytes, contentType, protocol, signal) {
     const result = type === "application/json" ? parseJSONResponse(bytes, signal) : type === "application/x-protobuf" ? decodePartialSuccess(bytes) : null;
     if (!result) return unknown;
     if (result.rejected > 0n) {
-      const count = signal === "logs" ? "rejected_log_records" : "rejected_spans";
+      const count = signal === "logs" ? "rejected_log_records" : signal === "metrics" ? "rejected_data_points" : "rejected_spans";
       return { reason: `OTLP ${signal} partial rejection: ${count}=${result.rejected}. Check collector limits and signal schema; request will not be retried.`, error: true };
     }
     return { reason: result.warning ? `OTLP ${signal} collector warning (message withheld). Check collector diagnostics; request will not be retried.` : "", error: false };

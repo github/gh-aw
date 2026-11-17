@@ -58,10 +58,11 @@ describe("custom safe-output issue API", () => {
   });
 
   it("re-exports only the supported public functions without wrapping them", () => {
-    expect(Object.keys(publicApi).sort()).toEqual(["createIssue", "logSpan", "setupGlobals"]);
+    expect(Object.keys(publicApi).sort()).toEqual(["createIssue", "logMetric", "logSpan", "setupGlobals"]);
     expect(createIssue).toBe(require("./create_issue.cjs").createIssue);
     expect(setupGlobals).toBe(require("./setup_globals.cjs").setupGlobals);
     expect(publicApi.logSpan).toBe(require("./otlp.cjs").logSpan);
+    expect(publicApi.logMetric).toBe(require("./otlp.cjs").logMetric);
   });
 
   it("keeps OTEL disabled without a valid trace ID", async () => {

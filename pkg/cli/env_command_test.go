@@ -122,6 +122,37 @@ func TestDefaultsOTLPProtocol(t *testing.T) {
 	assert.True(t, changes[index].delete)
 }
 
+func TestDefaultsOTLPMetrics(t *testing.T) {
+	t.Parallel()
+	for _, enabled := range []string{"true", "false"} {
+		file, err := defaultsParseFile("defaults.yml", []byte("default_otel_metrics: "+enabled+"\n"))
+		require.NoError(t, err)
+		require.NoError(t, defaultsValidateFile(&file))
+		require.NotNil(t, file.DefaultOTLPMetrics)
+		assert.Equal(t, enabled, *file.DefaultOTLPMetrics)
+		changes := defaultsBuildUpdateChanges(&file)
+		index := slices.IndexFunc(changes, func(change defaultsUpdateChange) bool {
+			return change.envName == "GH_AW_OTEL_METRICS"
+		})
+		require.NotEqual(t, -1, index)
+		assert.Equal(t, "default_otel_metrics", changes[index].field)
+		assert.Equal(t, enabled, changes[index].value)
+		assert.False(t, changes[index].delete)
+	}
+	for _, value := range []string{"", "TRUE", "False", "yes", "${{ vars.ENABLED }}"} {
+		require.ErrorContains(t, defaultsValidateFile(&defaultsFile{DefaultOTLPMetrics: &value}), "default_otel_metrics")
+	}
+	file, err := defaultsParseFile("defaults.yml", []byte("default_otel_metrics: null\n"))
+	require.NoError(t, err)
+	require.NoError(t, defaultsValidateFile(&file))
+	changes := defaultsBuildUpdateChanges(&file)
+	index := slices.IndexFunc(changes, func(change defaultsUpdateChange) bool {
+		return change.envName == "GH_AW_OTEL_METRICS"
+	})
+	require.NotEqual(t, -1, index)
+	assert.True(t, changes[index].delete)
+}
+
 func TestDefaultsGetOTLPProtocol(t *testing.T) {
 	stubDefaultsExecGH(t, func(args []string) *exec.Cmd {
 		if slices.Contains(args, "repos/github/gh-aw/actions/variables/OTEL_EXPORTER_OTLP_PROTOCOL") {
@@ -137,6 +168,23 @@ func TestDefaultsGetOTLPProtocol(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, file.DefaultOTLPProtocol)
 	assert.Equal(t, "http/protobuf", *file.DefaultOTLPProtocol)
+}
+
+func TestDefaultsGetOTLPMetrics(t *testing.T) {
+	stubDefaultsExecGH(t, func(args []string) *exec.Cmd {
+		if slices.Contains(args, "repos/github/gh-aw/actions/variables/GH_AW_OTEL_METRICS") {
+			return defaultsGHHelperCommand("false", 0)
+		}
+		return defaultsGHHelperCommand("HTTP 404: Not Found", 1)
+	})
+	output := t.TempDir() + "/defaults.yml"
+	require.NoError(t, defaultsGetToFile(defaultsTarget{scope: defaultsScopeRepo, repoOwner: "github", repoName: "gh-aw"}, output))
+	data, err := os.ReadFile(output)
+	require.NoError(t, err)
+	file, err := defaultsParseFile(output, data)
+	require.NoError(t, err)
+	require.NotNil(t, file.DefaultOTLPMetrics)
+	assert.Equal(t, "false", *file.DefaultOTLPMetrics)
 }
 
 func TestResolveDefaultsTarget(t *testing.T) {

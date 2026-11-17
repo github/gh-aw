@@ -1609,7 +1609,7 @@ additional contribution to session usage.
 The unified projection compacts `session.shutdown` to observed lifecycle and
 request counters; accounting details remain in `session.result`.
 `session.task_complete` retains its supplied success flag without duplicating a
-textual summary already mapped to `assistant.message`. Nontext summaries remain
+textual summary already mapped to `assistant.message`. Nontextual summaries remain
 available as supplied data. Refusals retain the same request and caller identity
 fields as assistant messages.
 

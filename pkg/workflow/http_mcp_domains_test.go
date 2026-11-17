@@ -185,9 +185,9 @@ func TestGetCodexAllowedDomainsWithTools(t *testing.T) {
 
 	result := GetAllowedDomainsForEngine(constants.CodexEngine, network, tools, nil)
 
-	// Should include explicitly requested Codex domain set, GitHub ecosystem, and Tavily domain
+	// Should include explicitly requested Codex transport set, GitHub ecosystem, and Tavily domain
 	require.Contains(t, result, "mcp.tavily.com", "Should include HTTP MCP domain")
-	require.Contains(t, result, "api.openai.com", "Should include Codex domain set")
+	require.NotContains(t, result, "api.openai.com", "Codex transport set must not grant direct model API egress")
 	require.Contains(t, result, "github.githubassets.com", "Should include GitHub ecosystem")
 }
 
@@ -205,9 +205,9 @@ func TestGetCopilotAllowedDomainsWithTools(t *testing.T) {
 
 	result := GetAllowedDomainsForEngine(constants.CopilotEngine, network, tools, nil)
 
-	// Should include explicitly requested Copilot domain set, Python ecosystem, and custom HTTP MCP domain
+	// Should include explicitly requested Copilot transport set, Python ecosystem, and custom HTTP MCP domain
 	require.Contains(t, result, "api.custom.com", "Should include HTTP MCP domain")
-	require.Contains(t, result, "api.githubcopilot.com", "Should include Copilot domain set")
+	require.NotContains(t, result, "api.githubcopilot.com", "Copilot transport set must not grant direct model API egress")
 	require.Contains(t, result, "pypi.org", "Should include Python ecosystem")
 }
 
@@ -309,7 +309,7 @@ func TestGetCopilotAllowedDomainsWithPlaywright(t *testing.T) {
 	// Should include explicitly requested Copilot domain set and Playwright ecosystem domains
 	require.Contains(t, result, "playwright.download.prss.microsoft.com", "Should include Playwright download domain")
 	require.Contains(t, result, "cdn.playwright.dev", "Should include Playwright CDN domain")
-	require.Contains(t, result, "api.githubcopilot.com", "Should include Copilot domain set")
+	require.NotContains(t, result, "api.githubcopilot.com", "Copilot transport set must not grant direct model API egress")
 }
 
 // TestGetCodexAllowedDomainsWithPlaywright tests that Playwright domains are automatically included for Codex engine
@@ -327,5 +327,5 @@ func TestGetCodexAllowedDomainsWithPlaywright(t *testing.T) {
 	// Should include explicitly requested Codex domain set and Playwright ecosystem domains
 	require.Contains(t, result, "playwright.download.prss.microsoft.com", "Should include Playwright download domain")
 	require.Contains(t, result, "cdn.playwright.dev", "Should include Playwright CDN domain")
-	require.Contains(t, result, "api.openai.com", "Should include Codex domain set")
+	require.NotContains(t, result, "api.openai.com", "Codex transport set must not grant direct model API egress")
 }

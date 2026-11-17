@@ -82,6 +82,7 @@ run-name: "Visual Regression Checker"
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+  GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.visual-regression-checker
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Visual%20Regression%20Checker,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -342,6 +343,7 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -420,6 +422,7 @@ jobs:
             - `github` — run `github --help` to see available tools
             - `safeoutputs` — run `safeoutputs --help` to see available tools
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -475,6 +478,7 @@ jobs:
             - `github` — run `github --help` to see available tools
             - `safeoutputs` — run `safeoutputs --help` to see available tools
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -490,6 +494,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -504,6 +509,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -1487,6 +1493,14 @@ jobs:
           if [ ! -f /tmp/gh-aw/agent_output.json ]; then
             echo '{"items":[]}' > /tmp/gh-aw/agent_output.json
           fi
+      - name: Emit OTLP job conclusion before artifacts
+        if: always() && env.GH_AW_OTEL_METRICS == 'true'
+        continue-on-error: true
+        run: node "${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs"
+        env:
+          INPUT_JOB_NAME: ${{ github.job }}
+          GH_AW_JOB_RESULT: ${{ job.status }}
+          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1559,6 +1573,7 @@ jobs:
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
+            ${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json

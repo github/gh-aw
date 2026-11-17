@@ -11,12 +11,12 @@ Plan for recomputing this slide's measured data. Load `.github/skills/cracktro/S
 
 | Workflow file | Repo | Role in the slide's flow | Signal mined |
 |---|---|---|---|
-| `.github/workflows/jsweep.md` | gh-aw | Unslopper | merged `[jsweep]` PRs |
-| `.github/workflows/dead-code-remover.md` | gh-aw | Unslopper | merged `[dead-code]` PRs |
-| `.github/workflows/code-simplifier.md` | gh-aw | Unslopper | merged `[code-simplifier]` PRs |
-| `.github/workflows/tidy.md` | gh-aw | Unslopper | merged `[tidy]` PRs |
-| `.github/workflows/daily-file-diet.md` | gh-aw | Unslopper | merged `[file-diet]` PRs |
-| `.github/workflows/duplicate-code-detector.md` | gh-aw | Unslopper | merged `[duplicate-code]` PRs |
+| `.github/workflows/jsweep.md` | gh-aw | Improver | merged `[jsweep]` PRs |
+| `.github/workflows/dead-code-remover.md` | gh-aw | Improver | merged `[dead-code]` PRs |
+| `.github/workflows/code-simplifier.md` | gh-aw | Improver | merged `[code-simplifier]` PRs |
+| `.github/workflows/tidy.md` | gh-aw | Improver | merged `[tidy]` PRs |
+| `.github/workflows/daily-file-diet.md` | gh-aw | Improver | merged `[file-diet]` PRs |
+| `.github/workflows/duplicate-code-detector.md` | gh-aw | Improver | merged `[duplicate-code]` PRs |
 | Copilot coding agent (not a workflow) | gh-aw | Author of many merged PRs | all merged PRs in the 30-day window (rate, size, time to merge) |
 
 ## 1. Slide
@@ -27,12 +27,12 @@ Plan for recomputing this slide's measured data. Load `.github/skills/cracktro/S
 - Data lives only in these places (grep each):
   - `const UNSLOP = [[name, count], ...]`: all-time merged clean-up PRs per workflow, sorted descending. Display names: `jsweep`, `dead-code-remover`, `code-simplifier`, `tidy`, `daily-file-diet`, `duplicate-code-detector`.
   - `const DAY_ALL = [...]` (30 ints): merged PRs per UTC day, oldest first.
-  - `DAY_UN = [...]` (30 ints): unslopper PRs merged per UTC day; a dot is drawn where the value is non-zero.
+  - `DAY_UN = [...]` (30 ints): improver PRs merged per UTC day; a dot is drawn where the value is non-zero.
   - `mfu-win`: `15 Oct – 13 Nov 2026 · snapshot 14 Nov 2026`.
   - `mfu-big`: `1,263 <small>PRs merged · 42/day</small>`.
   - `mfu-row`: `median <b>166</b> lines · <b>1h54m</b> to merge`.
   - `mfu-leg`: `unslop PRs merged on 25 of 30 days`.
-  - `us-meas` caption: `MEASURED · unslopper PRs, all time · 26 Sep 2025 – 12 Nov 2026 · 427 merged, +34,691 −44,700 · lanes illustrative`.
+  - `us-meas` caption: `MEASURED · improver PRs, all time · 26 Sep 2025 – 12 Nov 2026 · 427 merged, +34,691 −44,700 · lanes illustrative`.
   - `notes:` string: repeats every number above, plus `261 days` and the bar scale.
 - The bar height is `v * 0.6` px in a 64 px SVG. If any day exceeds about 80, lower the 0.6 scale so the bars still fit.
 
@@ -49,7 +49,7 @@ Always show both windows on the slide, as in `mfu-k`/`mfu-win` and the `MEASURED
 ## 3. Sources
 
 - Repo: `github/gh-aw` (public), merged pull requests only.
-- Unslopper workflows (`.github/workflows/`) and their `title-prefix`:
+- Improver workflows (`.github/workflows/`) and their `title-prefix`:
   `jsweep.md` `[jsweep]`, `dead-code-remover.md` `[dead-code]`, `code-simplifier.md` `[code-simplifier]`,
   `tidy.md` `[tidy]`, `daily-file-diet.md` `[file-diet]`, `duplicate-code-detector.md` `[duplicate-code]`.
 - Before each refresh, re-check the prefixes: `grep -n "title-prefix" .github/workflows/{jsweep,dead-code-remover,code-simplifier,tidy,daily-file-diet,duplicate-code-detector}.md`.
@@ -81,7 +81,7 @@ gh pr list -R github/gh-aw --state merged --search "merged:2026-10-15..2026-10-2
   --json number,title,createdAt,mergedAt,additions,deletions,author
 # Cross-check the total (must equal window.merged)
 gh api -X GET search/issues -f q="repo:github/gh-aw is:pr is:merged merged:2026-10-15..2026-11-13" --jq .total_count
-# All-time per unslopper; keep only titles that START with the prefix
+# All-time per improver; keep only titles that START with the prefix
 gh pr list -R github/gh-aw --state merged --search '"[dead-code]" in:title' --limit 1000 \
   --json number,title,createdAt,mergedAt,additions,deletions | jq '[.[]|select(.title|startswith("[dead-code]"))]'
 ```
@@ -118,7 +118,7 @@ For context only (do not put it on the slide unless asked): about 25k PRs have e
 
 - Shared prefixes: `[docs]` (unbloat-docs) is used by several workflows, so it is excluded. Match with `startswith`, because search also returns PRs that only mention the prefix.
 - Pagination: `gh pr list --search` stops at 1000 results. Slice the window, and the helper fails if a slice hits 1000. If an all-time prefix count reaches 1000, split it by `merged:` year.
-- Attribution: unslopper PRs are authored by `app/github-actions` or `app/copilot-swe-agent`. Count them by prefix, not by author. Squash merges keep the PR title, so the prefix survives.
+- Attribution: improver PRs are authored by `app/github-actions` or `app/copilot-swe-agent`. Count them by prefix, not by author. Squash merges keep the PR title, so the prefix survives.
 - duplicate-code-detector mostly files issues (about 218), so its PR count is small. That is expected.
 - Rate limits and TLS timeouts: rerun the helper; it is idempotent. Search API: 30 requests/min.
 - Dates are UTC. Do not include today (partial day).

@@ -4,6 +4,7 @@ import { createRequire } from "module";
 
 // Use CJS require so we share the same module cache as action_conclusion_otlp.cjs
 const req = createRequire(import.meta.url);
+const fs = req("fs");
 
 // Set up global.core mock before loading the module under test so shim.cjs
 // sees it already present and does not overwrite it with its stderr-based shim.
@@ -28,7 +29,7 @@ const { run, buildSpanName, parseJobStartMs } = req("./action_conclusion_otlp.cj
 const mockSendJobConclusionSpan = vi.fn();
 
 /** Env vars read by this module — cleared before each test */
-const MANAGED_ENV_VARS = ["GH_AW_OTLP_ENDPOINTS", "INPUT_JOB_NAME", "INPUT_JOB-NAME", "GITHUB_AW_OTEL_JOB_START_MS"];
+const MANAGED_ENV_VARS = ["GH_AW_OTLP_ENDPOINTS", "GH_AW_JOB_RESULT", "GH_AW_OTEL_CONCLUSION_PREUPLOAD", "INPUT_JOB_NAME", "INPUT_JOB-NAME", "GITHUB_AW_OTEL_JOB_START_MS"];
 
 describe("action_conclusion_otlp.cjs", () => {
   /** @type {Record<string, string | undefined>} */
@@ -83,6 +84,25 @@ describe("action_conclusion_otlp.cjs", () => {
 
       expect(mockSendJobConclusionSpan).toHaveBeenCalledOnce();
       expect(mockSendJobConclusionSpan).toHaveBeenCalledWith("gh-aw.job.conclusion", { startMs: undefined });
+    });
+
+    it("passes the current result during pre-upload conclusion emission", async () => {
+      process.env.GH_AW_OTEL_CONCLUSION_PREUPLOAD = "true";
+      process.env.GH_AW_JOB_RESULT = "failure";
+      vi.spyOn(fs, "existsSync").mockReturnValue(false);
+      vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+
+      await run();
+
+      expect(mockSendJobConclusionSpan).toHaveBeenCalledWith("gh-aw.job.conclusion", { startMs: undefined, jobResult: "failure" });
+    });
+
+    it("does not emit the conclusion a second time after pre-upload emission", async () => {
+      vi.spyOn(fs, "existsSync").mockReturnValue(true);
+
+      await run();
+
+      expect(mockSendJobConclusionSpan).not.toHaveBeenCalled();
     });
   });
 

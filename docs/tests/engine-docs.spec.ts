@@ -35,9 +35,27 @@ test("shared reference links to per-engine contracts and preserves moved-section
     await expect(content.locator(`a[href="/gh-aw/reference/engines/${engine}/"]`).first()).toBeVisible();
   }
   await expect(content.locator("#engine-feature-comparison")).toBeVisible();
-  await expect(content.locator("#copilot-sdk-support")).toBeVisible();
-  await expect(content.locator("#claude-tool-enforcement-security-model")).toBeVisible();
-  await expect(content.locator("#pi-extensions-extensions")).toBeVisible();
+  const anchors = [
+    "engine-environment-variables",
+    "engine-command-line-arguments",
+    "custom-engine-command",
+    "copilot-custom-configuration",
+    "copilot-release-checksum-pins",
+    "copilot-bring-your-own-key-byok-mode",
+    "azure-foundry-openai",
+    "copilot-sdk-support",
+    "sdk-driver-environment-variables",
+    "pi-extensions-extensions",
+    "claude-tool-enforcement-security-model",
+    "gateway-side-enforcement",
+    "shared-imported-engines",
+    "unsupported-engine-samples",
+  ];
+  for (const anchor of anchors) {
+    const target = page.locator(`#${anchor}`);
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeVisible();
+  }
   await expect(content.locator('a[href="/gh-aw/reference/third-party-agent/#unsupported-engine-samples"]')).toBeVisible();
 });
 

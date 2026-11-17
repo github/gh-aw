@@ -301,6 +301,8 @@ these `GH_AW_DEFAULT_*` variables at repo, org, or enterprise scope with
 `default_max_turn_cache_misses`,
 `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, and `default_model_copilot`.
 
+OTLP metrics are enabled by default when configured. Set `default_otel_metrics: false` in the `gh aw env` defaults file to disable them at a scope; delete that variable to restore the default. A workflow-level `GH_AW_OTEL_METRICS` value takes precedence.
+
 ### Agent runs
 
 | Variable | Engine |

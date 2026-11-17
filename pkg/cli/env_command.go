@@ -48,6 +48,7 @@ type defaultsFile struct {
 	DefaultDetectionModel             *string `yaml:"default_detection_model"`
 	DefaultOTLPEndpoint               *string `yaml:"default_otlp_endpoint"`
 	DefaultOTLPProtocol               *string `yaml:"default_otlp_protocol"`
+	DefaultOTLPMetrics                *string `yaml:"default_otel_metrics"`
 	DefaultUTC                        *string `yaml:"default_utc"`
 	DefaultModelCopilot               *string `yaml:"default_model_copilot"`
 	DefaultModelClaude                *string `yaml:"default_model_claude"`
@@ -123,6 +124,7 @@ var defaultsBindings = []defaultsBinding{
 	{envName: compilerenv.DefaultDetectionModel, fieldName: "default_detection_model", get: func(f *defaultsFile) **string { return &f.DefaultDetectionModel }},
 	{envName: compilerenv.DefaultOTLPEndpoint, fieldName: "default_otlp_endpoint", get: func(f *defaultsFile) **string { return &f.DefaultOTLPEndpoint }},
 	{envName: compilerenv.OTLPProtocol, fieldName: "default_otlp_protocol", get: func(f *defaultsFile) **string { return &f.DefaultOTLPProtocol }},
+	{envName: compilerenv.OTLPMetrics, fieldName: "default_otel_metrics", get: func(f *defaultsFile) **string { return &f.DefaultOTLPMetrics }},
 	{envName: compilerenv.DefaultUTC, fieldName: "default_utc", get: func(f *defaultsFile) **string { return &f.DefaultUTC }},
 	{envName: compilerenv.DefaultModelCopilot, fieldName: "default_model_copilot", get: func(f *defaultsFile) **string { return &f.DefaultModelCopilot }},
 	{envName: compilerenv.DefaultModelClaude, fieldName: "default_model_claude", get: func(f *defaultsFile) **string { return &f.DefaultModelClaude }},
@@ -140,6 +142,7 @@ func NewEnvCommand() *cobra.Command {
 
 The YAML file is flat and uses default_-prefixed lowercase keys (e.g., default_max_turns).
 The default_otlp_protocol field manages the standard OTEL_EXPORTER_OTLP_PROTOCOL variable.
+The default_otel_metrics field manages GH_AW_OTEL_METRICS; when unset, workflows enable metrics by default.
 Set a field to null (or omit it) in update mode to delete the variable from the selected scope.
 Any field with a non-null string value will be set or updated.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -359,9 +362,7 @@ func defaultsValidateFile(file *defaultsFile) error {
 	validatePositiveInt("default_agent_job_timeout_minutes", file.DefaultAgentJobTimeoutMinutes)
 	validatePositiveInt("default_detection_job_timeout_minutes", file.DefaultDetectionJobTimeoutMinutes)
 	validateNonEmpty("default_detection_model", file.DefaultDetectionModel)
-	if protocol := file.DefaultOTLPProtocol; protocol != nil && *protocol != "http/json" && *protocol != "http/protobuf" {
-		validationErrors = append(validationErrors, `default_otlp_protocol must be http/json or http/protobuf when set, for example: "http/protobuf"`)
-	}
+	validationErrors = append(validationErrors, validateDefaultOTLP(file)...)
 	if err := validateDefaultUTCOffset(file.DefaultUTC); err != nil {
 		validationErrors = append(validationErrors, err.Error())
 	}
@@ -373,6 +374,17 @@ func defaultsValidateFile(file *defaultsFile) error {
 		return fmt.Errorf("invalid defaults file: %s", strings.Join(validationErrors, "; "))
 	}
 	return nil
+}
+
+func validateDefaultOTLP(file *defaultsFile) []string {
+	var validationErrors []string
+	if protocol := file.DefaultOTLPProtocol; protocol != nil && *protocol != "http/json" && *protocol != "http/protobuf" {
+		validationErrors = append(validationErrors, `default_otlp_protocol must be http/json or http/protobuf when set, for example: "http/protobuf"`)
+	}
+	if metrics := file.DefaultOTLPMetrics; metrics != nil && *metrics != "true" && *metrics != "false" {
+		validationErrors = append(validationErrors, `default_otel_metrics must be "true" or "false" when set`)
+	}
+	return validationErrors
 }
 
 func validateDefaultUTCOffset(value *string) error {

@@ -1,4 +1,4 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"f18b7783eed54f5aea9ff48329ff9813a9ce318eecf8ce974b1c925002801867","body_hash":"2b9fb7f904d21611aec3e1726189185cf2d5f2caa5aa9e4d56979ca935b7ca2d","strict":true,"agent_id":"codex","agent_model":"copilot/gpt-6-luna","engine_versions":{"codex":"0.167.0"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"f18b7783eed54f5aea9ff48329ff9813a9ce318eecf8ce974b1c925002801867","body_hash":"2b9fb7f904d21611aec3e1726189185cf2d5f2caa5aa9e4d56979ca935b7ca2d","strict":true,"agent_id":"codex","agent_model":"copilot/gpt-6-luna","engine_versions":{"codex":"0.169.0"}}
 # gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-go","sha":"b7ad1dad31e06c5925ef5d2fc7ad053ef454303e","version":"v7.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"},{"repo":"astral-sh/setup-uv","sha":"68559e99cc807c1eb7e9238fd43a15bba460eec2","version":"v10.3.3"},{"repo":"docker/build-push-action","sha":"c3c9e263c25d99ce0380d002d59b67737d91b0dc","version":"v7.4.0"},{"repo":"docker/setup-buildx-action","sha":"f87e5991a6d7451dcb8d9637bfbc97413f497069","version":"v4.4.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.14","digest":"sha256:7f649a02f2cc235325ab512f546854e0fad32b7abdc6c24c5475ddc0639e0aaa","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.14@sha256:7f649a02f2cc235325ab512f546854e0fad32b7abdc6c24c5475ddc0639e0aaa"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.14","digest":"sha256:136785634c9207d7328c701d31d53941542ef307840bda6b348274c8842557c0","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.14@sha256:136785634c9207d7328c701d31d53941542ef307840bda6b348274c8842557c0"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.14","digest":"sha256:878b9c1aaeca076004bf2157dd2be28586b68b2b3d69c3ff8fd2b5add2a3126c","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.14@sha256:878b9c1aaeca076004bf2157dd2be28586b68b2b3d69c3ff8fd2b5add2a3126c"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.10","digest":"sha256:629ddcd68a48ab02e7db8af527d2756c6db563b00c1d31d8aa8fcbac96f01c59","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.10@sha256:629ddcd68a48ab02e7db8af527d2756c6db563b00c1d31d8aa8fcbac96f01c59"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"mcp_servers":[{"name":"agenticworkflows","tools":["*"]},{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_discussion","ledger_append","ledger_request_compaction","noop","report_incomplete","report_missing_data","report_missing_tool","upload_asset"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad"},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}},"metadata_refs":{"artifact:4943cffeebb6706aa8bc":{"/tools":"/manifest/mcp_servers/0/tools"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
@@ -96,6 +96,7 @@ run-name: "Agentic Workflow Audit Agent"
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+  GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.audit-workflows
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Agentic%20Workflow%20Audit%20Agent,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=codex'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -164,7 +165,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -215,8 +216,8 @@ jobs:
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_INFO_ENGINE_NAME: "Codex"
           GH_AW_INFO_MODEL: "copilot/gpt-6-luna"
-          GH_AW_INFO_VERSION: "0.167.0"
-          GH_AW_INFO_AGENT_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
+          GH_AW_INFO_AGENT_VERSION: "0.169.0"
           GH_AW_INFO_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GH_AW_INFO_WORKFLOW_SHA: ${{ job.workflow_sha }}
@@ -364,6 +365,7 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -467,6 +469,7 @@ jobs:
           GH_AW_MCP_CLI_SERVERS_LIST: |-
             - `agenticworkflows` — run `agenticworkflows --help` to see available tools
             - `safeoutputs` — run `safeoutputs --help` to see available tools
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -530,6 +533,7 @@ jobs:
           GH_AW_MCP_CLI_SERVERS_LIST: |-
             - `agenticworkflows` — run `agenticworkflows --help` to see available tools
             - `safeoutputs` — run `safeoutputs --help` to see available tools
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -545,6 +549,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -559,6 +564,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -752,7 +758,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -904,14 +910,14 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex CLI
-        run: npm install -g @openai/codex@0.167.0
+        run: npm install -g @openai/codex@0.169.0
         env:
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install Codex CLI in microVM path
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/engine-cli/bin"
-          npm install --ignore-scripts --prefix "${RUNNER_TEMP}/gh-aw/engine-cli" @openai/codex@0.167.0
+          npm install --ignore-scripts --prefix "${RUNNER_TEMP}/gh-aw/engine-cli" @openai/codex@0.169.0
           ln -sf "../node_modules/.bin/codex" "${RUNNER_TEMP}/gh-aw/engine-cli/bin/codex"
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
@@ -1735,6 +1741,14 @@ jobs:
           path: ${{ runner.temp }}/gh-aw/safeoutputs/assets/
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
+      - name: Emit OTLP job conclusion before artifacts
+        if: always() && env.GH_AW_OTEL_METRICS == 'true'
+        continue-on-error: true
+        run: node "${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs"
+        env:
+          INPUT_JOB_NAME: ${{ github.job }}
+          GH_AW_JOB_RESULT: ${{ job.status }}
+          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1802,6 +1816,7 @@ jobs:
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
+            ${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json
@@ -1881,7 +1896,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -2343,7 +2358,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -2719,7 +2734,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -2897,7 +2912,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -2982,7 +2997,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -3067,7 +3082,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -3169,7 +3184,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -3285,7 +3300,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
@@ -3349,7 +3364,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Agentic Workflow Audit Agent"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/audit-workflows.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.167.0"
+          GH_AW_INFO_VERSION: "0.169.0"
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}

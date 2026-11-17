@@ -124,6 +124,7 @@ func TestRecoveryArtifactScanRoots(t *testing.T) {
 		"${{ runner.temp }}/gh-aw/claims/*/aw-*.bundle",
 		"${{ env.ARTIFACT_ROOT }}/**/*.bundle",
 		"relative/custom/*.bundle",
+		conditionalOTLPMetricsArtifactPath,
 		"!/tmp/gh-aw/excluded",
 	}))
 }

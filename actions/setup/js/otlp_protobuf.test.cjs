@@ -4,7 +4,8 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { encodeOTLPTraceRequest, encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
+const { encodeOTLPTraceRequest, encodeOTLPLogsRequest, encodeOTLPMetricsRequest } = require("./otlp_protobuf.cjs");
+const { buildOTLPMetric, buildOTLPMetricsPayload } = require("./otlp_metrics.cjs");
 const { buildAttr, buildOTLPPayload, sanitizeOTLPPayload, sendOTLPSpan, sendOTLPToAllEndpoints, OTEL_JSONL_PATH } = require("./send_otlp_span.cjs");
 
 function payload() {
@@ -176,6 +177,68 @@ describe("minimal OTLP logs protobuf encoder", () => {
   it("rejects requests for the wrong signal instead of silently dropping them", () => {
     expect(() => encodeOTLPLogsRequest(payload())).toThrow(/unknown field: resourceSpans/);
     expect(() => encodeOTLPTraceRequest(logsPayload())).toThrow(/unknown field: resourceLogs/);
+  });
+});
+
+describe("minimal OTLP metrics protobuf encoder", () => {
+  it("encodes signed asInt as sfixed64 and histogram buckets/bounds as packed fields", () => {
+    const request = {
+      resourceMetrics: [
+        {
+          scopeMetrics: [
+            {
+              metrics: [
+                { name: "g", gauge: { dataPoints: [{ asInt: "-1" }] } },
+                { name: "h", histogram: { aggregationTemporality: 1, dataPoints: [{ count: "1", bucketCounts: ["0", "1"], explicitBounds: [1.5] }] } },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(encodeOTLPMetricsRequest(request).toString("hex")).toBe(
+      "0a44124212100a01672a0b0a0931ffffffffffffffff" + "122e0a01684a290a25" + "210100000000000000" + "32100000000000000000" + "0100000000000000" + "3a08000000000000f83f" + "1001"
+    );
+  });
+
+  it("encodes built-in metric payloads, including exemplar trace IDs as bytes", () => {
+    const traceContext = { traceId: "0123456789abcdef0123456789abcdef", spanId: "fedcba9876543210" };
+    const payload = buildOTLPMetricsPayload({
+      serviceName: "gh-aw",
+      metrics: ["gauge", "counter", "histogram"].map(type => buildOTLPMetric({ name: `gh_aw.test.${type}`, type, value: 3, traceContext })),
+    });
+    const encoded = encodeOTLPMetricsRequest(payload);
+    expect(encoded.includes(Buffer.from("gh_aw.test.histogram"))).toBe(true);
+    expect(encoded.includes(Buffer.from(traceContext.traceId, "hex"))).toBe(true);
+    expect(encoded.includes(Buffer.from(traceContext.traceId))).toBe(false);
+  });
+
+  it("rejects requests for the wrong signal", () => {
+    expect(() => encodeOTLPMetricsRequest(payload())).toThrow(/unknown field: resourceSpans/);
+    expect(() => encodeOTLPMetricsRequest({ resourceMetrics: [{ scopeMetrics: [{ metrics: [{ name: "x", summary: {} }] }] }] })).toThrow(/unknown field: summary/);
+  });
+});
+
+describe("OTLP exporter runtime dependencies", () => {
+  // The OTLP exporter ships without node_modules; OpenTelemetry SDK packages are
+  // test-only oracles (see scripts/test_otlp_protobuf.mjs) and must never be required here.
+  it("requires only Node.js built-ins and local modules", () => {
+    const jsDir = new URL(".", import.meta.url).pathname;
+    const builtinModules = new Set(require("node:module").builtinModules);
+    const queue = ["otlp.cjs", "otlp_metrics.cjs", "otlp_protobuf.cjs", "otlp_response.cjs", "send_otlp_span.cjs"];
+    const visited = new Set();
+    const externalRequires = [];
+    while (queue.length > 0) {
+      const file = queue.shift();
+      if (visited.has(file) || !fs.existsSync(`${jsDir}${file}`)) continue;
+      visited.add(file);
+      for (const [, specifier] of fs.readFileSync(`${jsDir}${file}`, "utf8").matchAll(/require\(["']([^"']+)["']\)/g)) {
+        if (specifier.startsWith("./")) queue.push(specifier.slice(2));
+        else if (!specifier.startsWith("node:") && !builtinModules.has(specifier)) externalRequires.push(`${file}: ${specifier}`);
+      }
+    }
+    expect(visited.has("otlp_protobuf.cjs")).toBe(true);
+    expect(externalRequires).toEqual([]);
   });
 });
 
@@ -382,7 +445,7 @@ describe("protobuf OTLP transport", () => {
 
   it.each(["grpc", "invalid"])("reports unsupported protocol %s without sending or losing the mirror", async protocol => {
     vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol);
-    await expect(sendOTLPSpan("https://collector.example.com", payload())).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com", payload())).resolves.toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("Unsupported OTLP traces protocol"));
     expect(fs.appendFileSync).toHaveBeenCalledWith(OTEL_JSONL_PATH, expect.any(String));
@@ -393,7 +456,7 @@ describe("protobuf OTLP transport", () => {
     vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
     const request = payload();
     request.resourceSpans[0].scopeSpans[0].spans[0].startTimeUnixNano = "invalid";
-    await expect(sendOTLPSpan("https://collector.example.com", request)).resolves.toBeUndefined();
+    await expect(sendOTLPSpan("https://collector.example.com", request)).resolves.toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(console.warn).toHaveBeenCalledOnce();
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("OTLP export encoding failed"));

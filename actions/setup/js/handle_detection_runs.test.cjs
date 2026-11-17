@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import path from "path";
 
-const { main, classifyDetectionOutcome } = require("./handle_detection_runs.cjs");
+const { main, classifyDetectionOutcome, ensureDetectionRunsIssue } = require("./handle_detection_runs.cjs");
 
 describe("handle_detection_runs", () => {
   let originalEnv;
@@ -38,6 +38,20 @@ describe("handle_detection_runs", () => {
     }
     Object.assign(process.env, originalEnv);
     vi.unstubAllGlobals();
+  });
+
+  it.each([undefined, "area:agentic-workflows", "area:agentic workflows"])("finds and creates the tracker using label %s", async label => {
+    if (label) process.env.GH_AW_ISSUE_LABEL = label;
+    else delete process.env.GH_AW_ISSUE_LABEL;
+    const expectedLabel = label || "agentic-workflows";
+    await expect(ensureDetectionRunsIssue()).resolves.toEqual({ number: 42, node_id: "ID" });
+    expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith(expect.objectContaining({ q: expect.stringContaining(`label:"${expectedLabel}"`) }));
+    expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+
+    mockGithub.rest.search.issuesAndPullRequests.mockResolvedValueOnce({ data: { total_count: 0, items: [] } });
+    mockGithub.rest.issues.create.mockResolvedValueOnce({ data: { number: 43, node_id: "NEW", html_url: "https://github.com/test-owner/test-repo/issues/43" } });
+    await expect(ensureDetectionRunsIssue()).resolves.toEqual({ number: 43, node_id: "NEW" });
+    expect(mockGithub.rest.issues.create).toHaveBeenCalledWith(expect.objectContaining({ labels: [expectedLabel] }));
   });
 
   it.each([

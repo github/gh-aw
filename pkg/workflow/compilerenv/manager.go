@@ -99,6 +99,9 @@ const (
 	// OTLPProtocol is the standard Actions variable used to select the trusted
 	// JavaScript exporter's wire encoding unless workflow env overrides it.
 	OTLPProtocol = "OTEL_EXPORTER_OTLP_PROTOCOL"
+	// OTLPMetrics controls the JavaScript OTLP metrics exporter. Workflows default
+	// it to true when this Actions variable is unset.
+	OTLPMetrics = "GH_AW_OTEL_METRICS"
 
 	// DefaultModelCopilot is the enterprise override for Copilot fallback model selection.
 	DefaultModelCopilot = "GH_AW_DEFAULT_MODEL_COPILOT"

@@ -83,6 +83,7 @@ run-name: "Smoke Aider"
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+  GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.smoke-aider
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Smoke%20Aider,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=aider'
   OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
@@ -363,6 +364,7 @@ jobs:
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_INCLUDE_PR_CONTEXT: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -442,6 +444,7 @@ jobs:
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -501,6 +504,7 @@ jobs:
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -516,6 +520,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -530,6 +535,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -1927,6 +1933,14 @@ jobs:
         name: Verify Aider smoke test evidence
         run: "node <<'NODE'\nconst fs = require(\"fs\");\nconst path = require(\"path\");\nconst { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\", \"log_parser_shared.cjs\"));\nconst content = fs.readFileSync(process.env.SMOKE_FILE_PATH, \"utf8\");\nif (content.trim() !== \"Smoke test passed for Aider\") {\n  throw new Error(\"Aider did not create the expected smoke-test file content\");\n}\nconst events = (parseLogEntries(fs.readFileSync(process.env.SMOKE_STDIO_PATH, \"utf8\")) || [])\n  .filter(event => event.data?.sourceEngine === \"aider\");\nconst commands = new Map(events.filter(event => event.type === \"tool.execution_start\")\n  .map(event => [event.data.toolCallId, event.data.input?.command]));\nconst verifiedRepository = events.some(event => {\n  if (event.type !== \"tool.execution_complete\" || event.data.success !== true) return false;\n  const command = commands.get(event.data.toolCallId) || \"\";\n  const output = String(event.data.output || \"\").replace(/\\x1b\\[[0-9;]*m/g, \"\");\n  return /\\bgit\\s+(?:--no-pager\\s+)?log\\b/.test(command) && /^[0-9a-f]{7,40} \\S.*$/m.test(output);\n});\nif (!verifiedRepository) {\n  throw new Error(\"Aider did not verify repository access with a successful git log command\");\n}\nconsole.log(\"Verified Aider file writing, shell execution, repository access, and native session evidence\");\nNODE"
 
+      - name: Emit OTLP job conclusion before artifacts
+        if: always() && env.GH_AW_OTEL_METRICS == 'true'
+        continue-on-error: true
+        run: node "${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs"
+        env:
+          INPUT_JOB_NAME: ${{ github.job }}
+          GH_AW_JOB_RESULT: ${{ job.status }}
+          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1991,6 +2005,7 @@ jobs:
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
+            ${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json

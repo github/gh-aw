@@ -7,6 +7,8 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+const conditionalOTLPMetricsArtifactPath = "${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}"
+
 // collectArtifactPaths gathers all paths for the unified artifact upload.
 // It starts from the initial paths already accumulated by generateAgentRunSteps and appends
 // engine-declared output paths, log directories, observability files, safe-outputs files,
@@ -81,11 +83,12 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Written by github_rate_limit_logger.cjs during REST API calls.
 	paths = append(paths, constants.TmpGhAwDirSlash+constants.GithubRateLimitsFilename.String())
 
-	// Collect OTLP span mirror — enables post-hoc trace debugging without a live collector.
-	// Written by send_otlp_span.cjs; each line is a full OTLP/HTTP JSON traces payload.
+	// Collect OTLP mirrors — enables post-hoc telemetry inspection without a live collector.
+	// Each line contains a full OTLP/HTTP JSON payload for its signal.
 	// Only included when OTLP is configured for this workflow.
 	if isOTLPEnabled(data) {
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
+		paths = append(paths, conditionalOTLPMetricsArtifactPath)
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
 	}
 
@@ -217,6 +220,20 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 	c.generateObservabilitySummary(yaml, data)
 }
 
+func (c *Compiler) generateOTLPMetricsConclusionStep(yaml *strings.Builder, data *WorkflowData) {
+	if !isOTLPEnabled(data) {
+		return
+	}
+	yaml.WriteString("      - name: Emit OTLP job conclusion before artifacts\n")
+	yaml.WriteString("        if: always() && env.GH_AW_OTEL_METRICS == 'true'\n")
+	yaml.WriteString("        continue-on-error: true\n")
+	yaml.WriteString("        run: node \"${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs\"\n")
+	yaml.WriteString("        env:\n")
+	yaml.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
+	yaml.WriteString("          GH_AW_JOB_RESULT: ${{ job.status }}\n")
+	yaml.WriteString("          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'\n")
+}
+
 // generatePostAgentCollectionAndUpload orchestrates the post-agent phase:
 // engine output cleanup, access log collection, artifact path accumulation via collectArtifactPaths,
 // step-summary generation via generateSummarySteps, safe-outputs/memory/staging artifact uploads,
@@ -308,6 +325,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 			targetPath: "agent/harness_retry.json",
 		})
 	}
+	c.generateOTLPMetricsConclusionStep(yaml, data)
 	generateRecoveryEnvelopeValidationStep(yaml, "validate_final_recovery_envelopes", data, c.getActionPin, recoveryArtifactScanRoots(artifactPaths)...)
 
 	// Generate single unified artifact upload with all collected paths.

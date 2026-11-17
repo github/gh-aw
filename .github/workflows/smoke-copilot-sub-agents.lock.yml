@@ -75,6 +75,7 @@ run-name: "Smoke Copilot Sub Agents"
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+  GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.smoke-copilot-sub-agents
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Smoke%20Copilot%20Sub%20Agents,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
   OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
@@ -339,6 +340,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -418,6 +420,7 @@ jobs:
           GH_AW_MCP_CLI_SERVERS_LIST: |-
             - `github` — run `github --help` to see available tools
             - `safeoutputs` — run `safeoutputs --help` to see available tools
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -479,6 +482,7 @@ jobs:
           GH_AW_MCP_CLI_SERVERS_LIST: |-
             - `github` — run `github --help` to see available tools
             - `safeoutputs` — run `safeoutputs --help` to see available tools
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -494,6 +498,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -508,6 +513,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -1443,6 +1449,14 @@ jobs:
         with:
           script: "const assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst root = \"/tmp/gh-aw\";\nconst { writeUnifiedSession } = require(path.join(process.env.RUNNER_TEMP, \"gh-aw/actions/unified_session.cjs\"));\nwriteUnifiedSession({ rootDir: root, engine: \"copilot\" });\nconst readJsonl = file => fs.readFileSync(file, \"utf8\")\n  .split(\"\\n\").filter(line => line.trim()).map(line => JSON.parse(line));\nconst events = readJsonl(path.join(root, \"usage/aw_session.jsonl\"));\nconst started = events.filter(event => event.type === \"subagent.started\");\n// [agent, configured model, expected model.resolution status, endpoint]\nconst expected = [\n  [\"haiku-whoami\", \"claude-haiku-4.5\", \"exact\", \"/chat/completions\"],\n  [\"gpt5-whoami\", \"gpt-5\", \"resolved\", \"/responses\"],\n  [\"luna-whoami\", \"gpt-6-luna\", \"exact\", \"/responses\"],\n];\nconst expectedNames = new Set(expected.map(([agentName]) => agentName));\nconst servedModel = model => String(model || \"\")\n  .replace(/^copilot(?:-(?:responses|completions))?(?:-\\d+)?\\//, \"\")\n  .replace(/-[0-9]{4}(?:-[0-9]{2}-[0-9]{2}|[0-9]{4})$/, \"\")\n  .replace(/^(claude-.+)-([0-9]+)-([0-9]+)$/, \"$1-$2.$3\");\nconst resolutionRecords = events.filter(event => event.type === \"model.resolution\" && event.data?.engine === \"copilot\");\nconst executionSucceeded = process.env.SMOKE_EXECUTION === \"success\";\n// Check model resolution for every sub-agent first so a startup failure reports its cause.\nconst servedModels = new Map();\nfor (const [agentName, configuredModel, status] of expected) {\n  const resolutions = resolutionRecords.filter(event => event.data.role === agentName);\n  if (resolutions.length === 0 && !executionSucceeded) {\n    const causes = resolutionRecords.filter(event => event.data.cause).map(event => `${event.data.role}: ${event.data.cause}`);\n    assert.fail(`Copilot SDK execution failed (outcome: ${process.env.SMOKE_EXECUTION || \"unknown\"}) before ${agentName} model.resolution was recorded; recorded resolution causes: ${causes.join(\", \") || \"none\"}`);\n  }\n  assert.equal(resolutions.length, 1, `${agentName} must have exactly one model.resolution record`);\n  const resolution = resolutions[0].data;\n  assert.equal(resolution.status, status, `${agentName} model.resolution status is ${resolution.status}, expected ${status} (cause: ${resolution.cause || \"none\"})`);\n  assert.equal(resolution.configured_model, configuredModel, `${agentName} model.resolution is for ${resolution.configured_model}, expected ${configuredModel}`);\n  const model = servedModel(resolution.resolved_model);\n  assert.ok(model, `${agentName} has no resolved model`);\n  assert.ok(![...servedModels.values()].includes(model), `${agentName} resolved to ${model}, which another sub-agent also uses, so its proxy requests are indistinguishable`);\n  servedModels.set(agentName, model);\n  if (status === \"exact\") assert.equal(model, configuredModel, `${agentName} resolved to ${model}, expected ${configuredModel}`);\n}\nassert.equal(process.env.SMOKE_EXECUTION, \"success\", \"Copilot SDK execution failed\");\nconst unexpected = [...new Set(started.map(event => event.data?.agentName).filter(agentName => !expectedNames.has(agentName)))];\nassert.equal(unexpected.length, 0, `Unexpected sub-agent invocation(s): ${unexpected.join(\", \")}`);\nassert.equal(started.length, expected.length, `Expected exactly ${expected.length} sub-agent invocations, found ${started.length}`);\nassert.equal(started[0]?.data.agentName, expected[0][0], `${expected[0][0]} must be the first sub-agent invoked`);\nconst proxyPaths = [\n  \"sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl\",\n  \"sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl\",\n  \"sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl\",\n];\nconst proxyFile = proxyPaths.map(file => path.join(root, file)).find(file => fs.existsSync(file));\nassert.ok(proxyFile, \"Missing api-proxy token usage evidence\");\nconst requests = readJsonl(proxyFile);\nfor (const [agentName, , , endpoint] of expected) {\n  const model = servedModels.get(agentName);\n  const invocations = started.filter(event => event.data.agentName === agentName);\n  assert.equal(invocations.length, 1, `${agentName} must actually run exactly once`);\n  const invocation = invocations[0];\n  const invocationId = invocation.data.invocationId || invocation.agentId;\n  assert.ok(invocationId, `${agentName} is missing an invocation ID`);\n  const activity = events.filter(event => event.data?.invocationId === invocationId || event.agentId === invocationId);\n  assert.ok(activity.some(event => event.type === \"subagent.completed\"), `${agentName} did not complete`);\n  assert.ok(!activity.some(event => event.type === \"subagent.failed\"), `${agentName} failed`);\n  const models = activity.flatMap(event => [\n    event.data.model, event.data.selectedModel, event.data.resolvedModel, event.data.firstDispatchedModel,\n  ]).filter(Boolean);\n  assert.ok(models.length > 0, `${agentName} has no recorded model`);\n  assert.ok(models.every(value => servedModel(value) === model), `${agentName} changed or fell back from ${model}`);\n  assert.ok(requests.some(request =>\n    servedModel(request.model) === model &&\n    (request.path || request.endpoint) === endpoint &&\n    Number(request.status) === 200 &&\n    request.purpose !== \"routing_classification\"),\n    `${agentName} has no successful ${model} request on ${endpoint}`);\n}"
 
+      - name: Emit OTLP job conclusion before artifacts
+        if: always() && env.GH_AW_OTEL_METRICS == 'true'
+        continue-on-error: true
+        run: node "${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs"
+        env:
+          INPUT_JOB_NAME: ${{ github.job }}
+          GH_AW_JOB_RESULT: ${{ job.status }}
+          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1513,6 +1527,7 @@ jobs:
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
+            ${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json

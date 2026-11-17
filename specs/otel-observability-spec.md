@@ -1,21 +1,21 @@
 ---
 title: gh-aw OpenTelemetry Observability Specification
 description: Formal W3C-style specification for observability contract for GitHub Agentic Workflows using OpenTelemetry traces, metrics, logs, and OTLP export.
-version: 0.6.0
+version: 0.7.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-09
+last_updated: 2026-11-16
 editors:
   - GitHub gh-aw Team
 ---
 
 # gh-aw OpenTelemetry Observability Specification
 
-**Version**: 0.6.0
+**Version**: 0.7.0
 **Status**: Working Draft  
 **Publication Date**: June 18, 2026
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md  
-**Previous Version**: 0.5.0
+**Previous Version**: 0.6.0
 **Editors**: GitHub gh-aw Team
 
 ---
@@ -28,13 +28,13 @@ This specification defines the compatibility-first OpenTelemetry observability c
 
 This document is a **Working Draft** maintained by the GitHub `gh-aw` Team. It may be changed, replaced, or made obsolete by subsequent versions.
 
-Version 0.6.0 clarifies fail-closed safeguards and required export, fan-out, and shutdown ordering without changing the shipped compatibility contract.
+Version 0.7.0 adds OTLP metrics emission (enabled by default when configured) and the `logMetric()` API.
 
 Sections explicitly marked **Informative** are non-normative. All other sections are normative unless stated otherwise.
 
-Implementation mapping, validation requirements, and compatibility test expectations are defined in this specification so version 0.6.0 has one authoritative contract.
+Implementation mapping, validation requirements, and compatibility test expectations are defined in this specification so version 0.7.0 has one authoritative contract.
 
-Implementations claiming conformance MUST identify the version and conformance classes they implement. A conformance claim for version 0.6.0 is a compatibility claim: it MUST preserve externally observable behavior documented by this specification unless a later specification explicitly defines a migration period and compatibility alias.
+Implementations claiming conformance MUST identify the version and conformance classes they implement. A conformance claim for version 0.7.0 is a compatibility claim: it MUST preserve externally observable behavior documented by this specification unless a later specification explicitly defines a migration period and compatibility alias.
 
 ## Table of Contents
 
@@ -437,7 +437,7 @@ Stable resource attributes include:
 | `service.version` | string | REQUIRED when the CLI version or commit is known. |
 | `gh-aw.workflow.name` | string | REQUIRED when the workflow name is known; otherwise SHOULD be `unknown`. |
 | `gh-aw.repository` | string | REQUIRED when repository identity is available. |
-| `gh-aw.run.id` | string | REQUIRED for traces and logs. MUST be opt-in for metrics. |
+| `gh-aw.run.id` | string | REQUIRED for traces and logs. MUST NOT be emitted for metrics. |
 | `github.run_id` | string | REQUIRED when GitHub run ID is available. |
 | `gh-aw.engine.id` | string | RECOMMENDED when an engine ID is known. |
 
@@ -451,9 +451,11 @@ Where a standard OpenTelemetry attribute exists, the standard attribute MAY be e
 
 ### 8.3 Metric Resource Cardinality
 
-A metric provider MUST NOT attach the per-run `cicd.pipeline.run` entity or equivalent unique run attributes by default.
+A metric provider MUST NOT attach the per-run `cicd.pipeline.run` entity or equivalent unique run attributes.
 
-Workflow run IDs, job run IDs, trace IDs, span IDs, commit SHAs, pull-request or issue numbers, actor IDs, item URLs, and conversation IDs MUST NOT be metric resource attributes or metric dimensions by default.
+Workflow run IDs, job run IDs, trace IDs, span IDs, commit SHAs, pull-request or issue numbers, actor IDs, item URLs, and conversation IDs MUST NOT be metric resource attributes or metric dimensions. There is no run-ID opt-in for metrics.
+
+The JavaScript metric resource MAY copy only `gh-aw.repository`, `gh-aw.engine.id`, `gh-aw.workflow.name`, `github.event_name`, and `github.job` from `OTEL_RESOURCE_ATTRIBUTES`. Other resource attributes, including run IDs, MUST be dropped.
 
 ### 8.4 Instrumentation Scope
 
@@ -698,7 +700,33 @@ Custom metric dimensions MAY include workflow name, job category, engine ID, Gen
 
 Values MUST be normalized and bounded.
 
-Metric implementations SHOULD attach exemplars containing trace and span context when supported by the SDK and backend.
+Metric implementations SHOULD attach exemplars containing trace and span context when supported by the SDK and backend. The JavaScript metrics exporter attaches an exemplar when a valid trace and span context is available.
+
+### 11.5 Default-on Job Metrics
+
+Built-in job metrics MUST be enabled by default when OTLP is configured. The effective `GH_AW_OTEL_METRICS` value MUST be the workflow-defined value when present, otherwise the `GH_AW_OTEL_METRICS` Actions variable, otherwise `true`. Only the literal value `true` enables metrics; `false` opts out. `gh aw env` MUST manage this Actions variable through the `default_otel_metrics` key, accepting only `true` or `false`. When enabled and the job conclusion step runs, it MUST emit the applicable metrics below. Collection is best-effort: runner loss or a hard cancellation that prevents the conclusion step can prevent that job's metrics from being emitted.
+
+| Metric | Instrument | Unit | Data-point attributes | Description |
+|---|---|---|---|---|
+| `gh_aw.job.duration` (`gh_aw.run.duration` compatibility alias) | Histogram | `s` | `gh-aw.job.name`, `gh-aw.workflow.name`, `cicd.pipeline.task.run.result`, `gh-aw.engine.id`, `gen_ai.request.model` when available | Wall-clock job duration; the legacy `run` name does not change its job-level scope. |
+| `gh_aw.job.errors` (`gh_aw.run.errors` compatibility alias) | Counter | `{job}` / `{run}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `cicd.pipeline.task.run.result` | One failed, timed-out, or cancelled job. |
+| `gen_ai.client.token.usage` (`gh_aw.tokens.input`, `gh_aw.tokens.output`, `gh_aw.tokens.cache_read`, and `gh_aw.tokens.cache_write` compatibility aliases) | Counter | `{token}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gen_ai.token.type`, `gen_ai.request.model`, `gh-aw.engine.id` when available | Input, output, cache-read, or cache-write tokens for jobs with their own model usage data. |
+| `gh_aw.agent.turns` | Histogram | `{turn}` | `gh-aw.job.name`, `gh-aw.workflow.name` | Turns per agent invocation when reported. |
+| `gh_aw.tool_calls` | Counter | `{call}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gh-aw.tool.status` | Tool executions grouped by status. |
+| `gh_aw.workflow.output.items` (`gh_aw.safe_outputs` compatibility alias) | Counter | `{item}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gh-aw.safe_output.type` | Safe-output items produced. |
+| `gh_aw.ai.credits.limit_exceeded` | Counter | `{event}` | `gh-aw.job.name`, `gh-aw.workflow.name` | AI-credit limit exceeded, when known. |
+| `gh_aw.ai.credits.rate_limit_errors` | Counter | `{event}` | `gh-aw.job.name`, `gh-aw.workflow.name` | AI-credit rate-limit errors, when known. |
+| `gh_aw.otlp.export.failures` | Counter | `{failure}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gh-aw.otlp.endpoint.class`, `gh-aw.otlp.failure.class` | Failed endpoint exports after bounded retry. |
+
+The aliases in parentheses carry the same observations as the canonical metric; dashboards SHOULD use either the canonical name or its alias, not sum both.
+
+`gh_aw.job.duration` and `gh_aw.job.errors` describe individual job measurements. They are job-granularity extensions, not aliases for the workflow-run `cicd.pipeline.run.duration` and `cicd.pipeline.run.errors` metrics in §11.2. The token metric uses the existing `gen_ai.client.token.usage` name, and safe-output items use the existing `gh_aw.workflow.output.items` name.
+
+All built-in counters and histograms MUST use delta temporality. The JavaScript custom metric API uses the same temporality.
+
+The runtime MUST export metrics to `/v1/metrics` using the configured OTLP endpoint list and per-endpoint headers. Metrics MUST honor a non-empty `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` before `OTEL_EXPORTER_OTLP_PROTOCOL`, MUST default to OTLP/HTTP JSON, and with `http/protobuf` MUST encode the sanitized payload as a binary `ExportMetricsServiceRequest` (`Content-Type: application/x-protobuf`) without runtime package dependencies. Unsupported protocols or encoding failures MUST produce an exporter diagnostic and count as export failures without a JSON fallback. Protobuf `partialSuccess.rejected_data_points` MUST be handled like its JSON equivalent. Export failures MUST NOT fail the workflow. Every emitted payload MUST be mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before remote export. The mirror MUST NOT be written when metrics are disabled and MUST be included in the unified agent artifact only when the effective runtime value is `true`.
+
+Metric resource attributes and dimensions MUST be bounded and MUST NOT include run IDs, repository URLs, commit SHAs, actor IDs, or other per-run identity. Token counters MUST be emitted only by jobs with their own model usage data to avoid downstream double counting. Compatibility aliases are additive and retain the original issue-requested names.
 
 ---
 
@@ -766,6 +794,34 @@ MUST issue a GitHub Actions warning explicitly identifying the export as partial
 If no record fits, the exporter MUST warn and skip the
 request. Export failures MUST NOT fail the workflow, and unchanged credentials
 MUST NOT be retried after authorization failures.
+
+### 12.6 Custom Metric API
+
+When `GH_AW_OTEL_METRICS` is exactly `true`, the setup action MUST expose
+`logMetric(name, value, options)` alongside `logSpan`. The API MUST support
+counters, gauges, and histograms; counters MUST use monotonic delta sums, and
+each histogram call MUST record one observation. `options` MAY specify `type`
+(default `gauge`), `unit`, `description`, bounded attributes, and explicit
+histogram buckets.
+
+Custom metric calls MUST allow no more than eight attributes per series, no more
+than 100 unique series per process, and no attribute key or string value longer
+than 128 characters. Attribute keys identifying runs, jobs, traces, spans,
+commits, users, actors, issues, pull requests, conversations, or URLs MUST be
+rejected. Callers MUST NOT encode per-run identifiers in other attribute values.
+Metric names MUST match the OpenTelemetry instrument name syntax
+(`^[A-Za-z][A-Za-z0-9_.\-/]{0,254}$`), units MUST be printable ASCII of at most
+63 characters, and descriptions MUST NOT exceed 1023 characters. Calls whose
+name, unit, description, or string attribute values contain known credential
+formats or configured secret values MUST be dropped with a warning. Before
+mirroring and export, metric names, units, descriptions, and string attribute
+values MUST also be redacted for known credential formats and configured secret
+values.
+
+`logMetric()` MUST use the configured OTLP endpoints and headers, mirror its
+payload before remote export, sanitize attribute values, and remain non-fatal:
+invalid metrics and export failures MUST NOT throw or fail the workflow. Calls
+MUST be no-ops when metrics are disabled.
 
 ---
 
@@ -991,7 +1047,8 @@ current repository.
 | GenAI compatibility | `actions/setup/js/otel_contract.test.cjs`: `it("preserves customer-facing raw OTLP JSONL and GenAI compatibility attributes", ...)` |
 | Privacy defaults | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_SecretRefResourceAttributeRejected`; `actions/setup/js/send_otlp_span.test.cjs`: `it("redacts span attribute values whose keys match sensitive patterns", ...)`, `it("redacts sensitive keys in span event attributes", ...)` |
 | Non-fatal export | `actions/setup/js/send_otlp_span.test.cjs`: `it("warns (does not throw) when server returns non-2xx status on all retries", ...)`, `it("warns (does not throw) when fetch rejects on all retries", ...)`, `it("does not throw when appendFileSync fails", ...)` |
-| Resource and instrumentation invariants | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_CustomAttributesResourceAttributesIndependent`, `TestFormal_MergePrecedenceBaseWinsOverOverride`, `TestFormal_MergeOfEmptyMapsYieldsNil`; cardinality and instrumentation-scope invariants remain pending because no production metric filter or scope resolver exists (`TestFormal_MetricResourceCardinalityBound` and `TestFormal_InstrumentationScopeNaming` are skipped placeholders). |
+| Resource and instrumentation invariants | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_CustomAttributesResourceAttributesIndependent`, `TestFormal_MergePrecedenceBaseWinsOverOverride`, `TestFormal_MergeOfEmptyMapsYieldsNil`; `actions/setup/js/otlp_metrics.test.cjs`: `keeps metric resource attributes to stable low-cardinality identity`, `rejects unbounded custom metric attributes without throwing`, `caps unique custom metric series per process`. |
+| Built-in metrics | `actions/setup/js/otlp_metrics.test.cjs`: `builds the duration, error, token, tool-call, and safe-output metrics`, `counts cancelled conclusions as job errors`, `records metric endpoint failures locally and exports the failure counter to healthy endpoints`; `actions/setup/js/send_otlp_span.test.cjs`: `emits built-in metrics only when GH_AW_OTEL_METRICS is enabled`. |
 
 The repository enforcement entry point for these checks is `make validate-otel-contract`. This target MUST remain focused on the customer-facing compatibility contract rather than all possible OTEL-related tests.
 
@@ -1004,7 +1061,7 @@ The following test IDs are stubs for Level 1 (Stable Configuration and Export) c
 | **T-OT-001** | Compiler config | Compiler accepts `observability.otlp.endpoint` with a valid HTTPS URL and emits `OTEL_EXPORTER_OTLP_ENDPOINT` in the generated workflow environment. |
 | **T-OT-002** | Compiler config | Compiler rejects `observability.otlp.endpoint` set to a non-HTTPS URL when `if-missing: block` is configured, producing a descriptive validation error. |
 | **T-OT-003** | Endpoint normalization | When multiple endpoints are declared, the compiler preserves them in declaration order and retains the first endpoint in the `OTEL_EXPORTER_OTLP_ENDPOINT` variable for backward compatibility. |
-| **T-OT-004** | OTLP export | The runtime JavaScript helper defaults to valid OTLP/HTTP JSON and supports binary OTLP/HTTP protobuf selected through the standard protocol environment variables. Both POST to the configured traces endpoint and recognize a successful 200 response as accepted. Protobuf conformance is compared with the official OpenTelemetry SDK in CI. |
+| **T-OT-004** | OTLP export | The runtime JavaScript helper defaults to valid OTLP/HTTP JSON and supports binary OTLP/HTTP protobuf selected through the standard protocol environment variables. Both POST to the configured traces endpoint and recognize a successful 200 response as accepted. Protobuf conformance for traces and metrics is compared byte-for-byte with the official OpenTelemetry SDK protocol types in CI. |
 | **T-OT-005** | Trace context | The compiler injects `GITHUB_AW_OTEL_TRACE_ID`, `GITHUB_AW_OTEL_PARENT_SPAN_ID`, and `TRACEPARENT` into the generated workflow environment when OTLP observability is enabled. |
 | **T-OT-006** | Local mirrors | The runtime helper writes each exported span as a raw OTLP/HTTP JSON line with a `resourceSpans` key to `/tmp/gh-aw/otel.jsonl`; the file format MUST NOT be an envelope-only summary. |
 | **T-OT-007** | Compiler config | `observability.otlp.headers` entries are emitted as `OTEL_EXPORTER_OTLP_HEADERS` in `key=value,key=value` format and are masked in diagnostics, job summaries, and artifacts. |
@@ -1085,6 +1142,7 @@ context is added to outcome spans or links.
 
 ### Unreleased
 
+- **Added**: Opt-in built-in job metrics and the `logMetric()` API (§11.5, §12.6), including a separate local metrics mirror.
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 - **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
 

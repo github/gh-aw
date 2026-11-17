@@ -236,6 +236,9 @@ const GithubRateLimitsFilename Filename = "github_rate_limits.jsonl"
 // Included in the agent artifact so spans are available without a live collector.
 const OtelJsonlFilename Filename = "otel.jsonl"
 
+// OtelMetricsJsonlFilename is the filename of the OTLP metrics mirror written to /tmp/gh-aw/.
+const OtelMetricsJsonlFilename Filename = "otel-metrics.jsonl"
+
 // OtlpExportErrorsFilename is the filename of the OTLP per-endpoint export failure log
 // written to /tmp/gh-aw/ by send_otlp_span.cjs. Each line is a JSON object containing the
 // collector host, optional status, and sanitized failure reason for one terminal export failure.

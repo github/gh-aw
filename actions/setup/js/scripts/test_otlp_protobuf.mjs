@@ -12,14 +12,17 @@ import { promisify } from "node:util";
 assert.ok(process.env.GH_AW_OTEL_SDK_DIR, "Set GH_AW_OTEL_SDK_DIR to the isolated SDK installation");
 const sdkRequire = createRequire(path.join(process.env.GH_AW_OTEL_SDK_DIR, "package.json"));
 const require = createRequire(import.meta.url);
-const { encodeOTLPTraceRequest } = require("../otlp_protobuf.cjs");
+const { encodeOTLPTraceRequest, encodeOTLPMetricsRequest } = require("../otlp_protobuf.cjs");
 const { buildOTLPPayload } = require("../send_otlp_span.cjs");
+const { buildOTLPMetric, buildOTLPMetricsPayload } = require("../otlp_metrics.cjs");
 const { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } = sdkRequire("@opentelemetry/sdk-trace-base");
 const { resourceFromAttributes } = sdkRequire("@opentelemetry/resources");
 const { ROOT_CONTEXT, SpanKind, SpanStatusCode, TraceFlags, createTraceState, trace } = sdkRequire("@opentelemetry/api");
 const { JsonTraceSerializer, ProtobufTraceSerializer } = sdkRequire("@opentelemetry/otlp-transformer");
 // Generated protocol types from the pinned SDK provide an independent wire oracle.
-const { ExportTraceServiceRequest } = sdkRequire("@opentelemetry/otlp-transformer/build/src/generated/root").opentelemetry.proto.collector.trace.v1;
+const generatedProto = sdkRequire("@opentelemetry/otlp-transformer/build/src/generated/root").opentelemetry.proto;
+const { ExportTraceServiceRequest } = generatedProto.collector.trace.v1;
+const { ExportMetricsServiceRequest } = generatedProto.collector.metrics.v1;
 
 function fromProtoJson(value) {
   if (Array.isArray(value)) return value.map(fromProtoJson);
@@ -191,6 +194,34 @@ test("decodes actual gh-aw payloads with the SDK without losing timestamps or ID
   assert.equal(span.startTimeUnixNano, "1700000000000000000");
   assert.equal(span.endTimeUnixNano, "1700000000123000000");
   assert.equal(span.attributes[0].value.intValue, "128");
+});
+
+test("matches SDK protocol types for gh-aw gauge, sum, and histogram metrics with exemplars", () => {
+  const traceContext = { traceId: "0123456789abcdef0123456789abcdef", spanId: "fedcba9876543210" };
+  const attributes = [{ key: "gh_aw.job.status", value: { stringValue: "success" } }];
+  const timing = { startMs: 1700000000000, endMs: 1700000000123, traceContext, attributes };
+  const payload = buildOTLPMetricsPayload({
+    serviceName: "gh-aw",
+    scopeVersion: "test",
+    metrics: [
+      buildOTLPMetric({ name: "gh_aw.test.gauge", type: "gauge", value: -9007199254740991, unit: "1", description: "gauge", ...timing }),
+      buildOTLPMetric({ name: "gh_aw.test.sum", type: "counter", value: 2.5, unit: "{call}", ...timing }),
+      buildOTLPMetric({ name: "gh_aw.test.histogram", type: "histogram", value: 15, buckets: [1, 5, 15, 60], unit: "s", ...timing }),
+      buildOTLPMetric({ name: "gh_aw.test.overflow", type: "histogram", value: 120.5, buckets: [1, 5, 15, 60], ...timing }),
+    ],
+  });
+  const actual = encodeOTLPMetricsRequest(payload);
+  const reference = ExportMetricsServiceRequest.encode(ExportMetricsServiceRequest.fromObject(toProtoJson(payload))).finish();
+  const decoded = fromProtoJson(ExportMetricsServiceRequest.toObject(ExportMetricsServiceRequest.decode(actual), { longs: String, bytes: String }));
+  assert.deepEqual(actual, Buffer.from(reference), "wire bytes must match the SDK encoder exactly");
+  const [gauge, sum, histogram, overflow] = decoded.resourceMetrics[0].scopeMetrics[0].metrics;
+  assert.equal(gauge.gauge.dataPoints[0].asInt, "-9007199254740991");
+  assert.equal(gauge.gauge.dataPoints[0].exemplars[0].traceId, traceContext.traceId);
+  assert.equal(sum.sum.dataPoints[0].asDouble, 2.5);
+  assert.equal(sum.sum.isMonotonic, true);
+  assert.deepEqual(histogram.histogram.dataPoints[0].bucketCounts, ["0", "0", "1", "0", "0"]);
+  assert.deepEqual(histogram.histogram.dataPoints[0].explicitBounds, [1, 5, 15, 60]);
+  assert.deepEqual(overflow.histogram.dataPoints[0].bucketCounts, ["0", "0", "0", "0", "1"]);
 });
 
 test("sends SDK-decodable binary payloads through real HTTP and curl transports", async () => {

@@ -28,6 +28,17 @@
  *   candidate_metadata_complete (Claude models list only /v1/messages and /chat/completions).
  * - agent-stdio.log line 115 recorded `codex sub-agent 'test-writer': model 'large' ->
  *   'claude-sonnet-5.5'` before endpoint compatibility was checked.
+ *
+ * Package Specification Enforcer, https://github.com/github/gh-aw/actions/runs/39771119523
+ * (Codex 0.163.0, provider openai, github/gh-aw#71157):
+ * - claude-codex-sub-agents/spec-enforcer-39771119523/.codex/agents/readme-spec-extractor.md is
+ *   the `readme-spec-extractor` block of .github/workflows/spec-enforcer.md at the run's revision
+ *   c931ace9725c968f83144b0634822abac2cefd9e, as extractInlineSubAgents stages it
+ *   (`model: small`); the run uploaded no activation artifact.
+ * - awf-reflect-codex-spec-enforcer-39771119523.json is reduced the same way as purelock. AWF's
+ *   native OpenAI endpoint lists protocol names (`chat_completions`, `responses`), not paths.
+ * - agent-stdio.log lines 106-110 recorded each `small` sub-agent resolving to
+ *   'gpt-5-mini-2025-08-07' and then refusing startup because /responses could not be verified.
  */
 
 const path = require("path");
@@ -38,6 +49,8 @@ const typistAgentsDir = path.join(__dirname, "claude-codex-sub-agents", `typist-
 const arxivAgentsDir = path.join(__dirname, "claude-codex-sub-agents", `arxiv-${ARXIV_RUN_ID}`, ".codex", "agents");
 const PURELOCK_RUN_ID = "39601756922";
 const purelockAgentsDir = path.join(__dirname, "claude-codex-sub-agents", `purelock-${PURELOCK_RUN_ID}`, ".codex", "agents");
+const SPEC_ENFORCER_RUN_ID = "39771119523";
+const specEnforcerAgentsDir = path.join(__dirname, "claude-codex-sub-agents", `spec-enforcer-${SPEC_ENFORCER_RUN_ID}`, ".codex", "agents");
 
 /** agent-stdio.log line 123: native initialization, custom agents not registered. */
 const typistInit = {
@@ -99,6 +112,11 @@ function purelockReflect() {
   return structuredClone(require("./awf-reflect-codex-purelock-39601756922.json"));
 }
 
+/** @returns {any} A fresh copy of the reduced Spec Enforcer /reflect (native OpenAI endpoint with routing_models). */
+function specEnforcerReflect() {
+  return structuredClone(require("./awf-reflect-codex-spec-enforcer-39771119523.json"));
+}
+
 module.exports = {
   ARXIV_RUN_ID,
   arxivAgentsDir,
@@ -107,6 +125,9 @@ module.exports = {
   PURELOCK_RUN_ID,
   purelockAgentsDir,
   purelockReflect,
+  SPEC_ENFORCER_RUN_ID,
+  specEnforcerAgentsDir,
+  specEnforcerReflect,
   TYPIST_RUN_ID,
   typistAgentsDir,
   typistAgentToolResult,

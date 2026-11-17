@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const { getIssueLabel } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const { renderSizedReport } = require("./report_size.cjs");
@@ -126,7 +127,7 @@ async function main() {
           owner,
           repo,
           title: issueTitle,
-          labels: ["agentic-workflows", "configuration"],
+          labels: [getIssueLabel(), "configuration"],
         },
         report
       );
