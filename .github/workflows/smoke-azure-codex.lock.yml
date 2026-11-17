@@ -52,7 +52,7 @@
 name: "Smoke Azure Codex"
 on:
   schedule:
-    - cron: "0 0 */2 * *"  # Friendly format: every 2 days
+    - cron: "51 8 */2 * *"  # Friendly format: every 2 days (scattered)
   workflow_dispatch:
     inputs:
       aw_context:
@@ -623,9 +623,6 @@ jobs:
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Restore inline sub-agents from activation artifact
         env:

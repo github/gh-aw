@@ -110,7 +110,7 @@ For context only (do not put it on the slide unless asked): about 25k PRs have e
 ## 6. Validation
 
 - `node --check docs/public/cracktro/deck.js`.
-- Preview: `python3 -m http.server <free port> --bind 127.0.0.1 --directory docs/public`, open `/cracktro/#<slide>` in the browser canvas and screenshot. Check that the panel fits without wrapping, the caption does not reach the sound button, and the bars stay inside the panel.
+- Preview: `python3 -m http.server <free port> --bind 127.0.0.1 --directory docs/public`, open `/cracktro/#merge-fast-unslop-daily` in the browser canvas and screenshot. Check that the panel fits without wrapping, the caption does not reach the sound button, and the bars stay inside the panel.
 - Content rules: no 40-hex SHAs, no URLs, no `github/<repo>` strings in deck.js, no `who:`, no people's names (workflow names only).
 - `cd docs && npx playwright test tests/talk.spec.ts`.
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parsePiLog } from "./parse_pi_log.cjs";
 import { transformPiV3Entries, computePiV3Stats } from "./pi_session.cjs";
-import { atomicWorkflowStream } from "./fixtures/atomic_ci_stream.cjs";
+import { piWorkflowStream } from "./fixtures/pi_workflow_stream.cjs";
 import { success, failure, childObservations } from "./fixtures/pi_ci_stream.cjs";
 import { normalizeAgentSession, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
 import { mergeSessionSources } from "./unified_session.cjs";
@@ -884,7 +884,7 @@ describe("Pi CI stream regressions", () => {
   });
 
   it("keeps multi-turn assistant messages and accounting separate when a proxy reuses responseId across turns", () => {
-    const { logEntries, markdown } = parse(atomicWorkflowStream);
+    const { logEntries, markdown } = parse(piWorkflowStream);
     expect(byType(logEntries, "assistant.message").map(event => event.data.content)).toEqual(["listed"]);
     expect(byType(logEntries, "assistant.message")[0].data).not.toHaveProperty("nativeSnapshots");
     expect(byType(logEntries, "tool.execution_start")[0].data).not.toHaveProperty("nativeSnapshots");

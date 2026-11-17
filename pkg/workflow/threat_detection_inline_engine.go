@@ -11,7 +11,7 @@ import (
 
 // buildDetectionEngineExecutionStep creates the engine execution step for inline threat detection.
 // It uses the same agentic engine already installed in the agent job, but runs it through
-// sandbox.agent (AWF) with no allowed domains (network fully blocked) and no MCP configured.
+// sandbox.agent (AWF) with a detection-specific allowlist and no MCP configured.
 //
 //nolint:largefunc // Existing inline detection step assembly is intentionally kept together.
 func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []string {
@@ -98,8 +98,9 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	// Create minimal WorkflowData for threat detection.
 	// SandboxConfig with AWF enabled ensures the engine runs inside the firewall.
 	// NetworkPermissions.Allowed preserves explicit vendor opt-ins and literal
-	// user-specified domains when Copilot BYOK is enabled, without re-opening other ecosystem
-	// allow-lists.
+	// user-specified domains for custom providers. The npm registry opt-in is
+	// applied below only for inline Copilot detection; external detectors do not
+	// perform this metadata verification.
 	// No MCP servers are configured for detection.
 	// bash: ["*"] allows all shell commands — AWF's network firewall is the primary
 	// constraint, so restricting individual bash commands inside the sandbox adds friction
@@ -117,8 +118,16 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	if threatDetectionData.NetworkPermissions != nil {
 		detectionFirewall = threatDetectionData.NetworkPermissions.Firewall
 	}
+	allowed := getThreatDetectionAdditionalAllowedDomains(data, engineSetting)
+	// Only inline Copilot detection validates npm lockfile metadata. The external
+	// detector path uses a separate prompt and does not inherit the node alias.
+	if engineSetting == string(constants.CopilotEngine) && data.NetworkPermissions != nil &&
+		(slices.Contains(data.NetworkPermissions.Allowed, "node") || slices.Contains(data.NetworkPermissions.Allowed, "registry.npmjs.org")) &&
+		!slices.Contains(allowed, "registry.npmjs.org") {
+		allowed = append(allowed, "registry.npmjs.org")
+	}
 	threatDetectionData.NetworkPermissions = &NetworkPermissions{
-		Allowed:  getThreatDetectionAdditionalAllowedDomains(data, engineSetting),
+		Allowed:  allowed,
 		Firewall: detectionFirewall,
 	}
 	if data.NetworkPermissions != nil {

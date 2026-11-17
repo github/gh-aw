@@ -321,34 +321,7 @@ jobs:
             Tools: create_issue
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
-          GH_AW_PROMPT_CONTENT_0003: |+
-            <github-context>
-            {{#if __GH_AW_GITHUB_ACTOR__ }}
-            - **actor**: __GH_AW_GITHUB_ACTOR__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_REPOSITORY__ }}
-            - **repository**: __GH_AW_GITHUB_REPOSITORY__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_WORKSPACE__ }}
-            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
-            {{/if}}
-            {{#if __GH_AW_EXPR_7C248226__ }}
-            - **issue-number**: #__GH_AW_EXPR_7C248226__
-            {{/if}}
-            {{#if __GH_AW_EXPR_C19C384F__ }}
-            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
-            {{/if}}
-            {{#if __GH_AW_EXPR_76DF9333__ }}
-            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
-            {{/if}}
-            {{#if __GH_AW_EXPR_77C1A4D2__ }}
-            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
-            {{/if}}
-            {{#if __GH_AW_GITHUB_RUN_ID__ }}
-            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
-            {{/if}}
-            </github-context>
-
+          GH_AW_PROMPT_CONTENT_0003: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: |
             </system>
           GH_AW_PROMPT_CONTENT_0005: |
@@ -731,9 +704,6 @@ jobs:
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.14 --rootless
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown

@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/base64"
 	"strings"
 	"testing"
@@ -13,6 +14,13 @@ import (
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestMCPInspectIntervalSchedule(t *testing.T) {
+	workflowID := writeGraderRunWorkflow(t, "---\non:\n  schedule: every 2 days\n---\nTest.\n")
+	if err := InspectWorkflowMCP(context.Background(), workflowID, "", "", false, false); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestMCPInspectSubcommand_NoArgBehaviorDocumented(t *testing.T) {
 	t.Parallel()

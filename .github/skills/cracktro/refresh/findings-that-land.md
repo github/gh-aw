@@ -88,7 +88,7 @@ Multi-device (61/39/35) and doc-healer (13 fixed) must agree with `multi-device-
 
 ```bash
 node --check docs/public/cracktro/deck.js
-python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#N (N = row in slides.md)
+python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#findings-that-land
 git diff -U0 docs/public/cracktro/deck.js | grep '^+' | grep -nE '[0-9a-f]{40}|github/[a-z]|https?://|who:'   # must print nothing
 cd docs && npx playwright test tests/talk.spec.ts
 ```

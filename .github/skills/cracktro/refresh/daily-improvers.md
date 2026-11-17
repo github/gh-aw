@@ -86,7 +86,7 @@ Run it once on an unchanged window first; if it does not reproduce the baseline 
 ## 6. Validation
 
 - `node --check docs/public/cracktro/deck.js`.
-- Preview: `python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public` (async, detached), open `http://127.0.0.1:4329/cracktro/#N` (N = the Daily Improvers row in `slides.md`) in the browser canvas, reload, screenshot. Check the four stats fit their 138 px columns, bars stay inside the card (tallest bar ≤ ~110 px; the current max is 49), and the header fits.
+- Preview: `python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public` (async, detached), open `http://127.0.0.1:4329/cracktro/#daily-improvers` in the browser canvas, reload, screenshot. Check the four stats fit their 138 px columns, bars stay inside the card (tallest bar ≤ ~110 px; the current max is 49), and the header fits.
 - Grep that old values are gone: `grep -n "211\|3.8 h\|26 Oct 2026" docs/public/cracktro/deck.js` should only show intended lines.
 - Content rules: no people, no `github/<repo>` refs, no 40-hex SHAs, no new URLs. Tests (from `docs/`, after `npm ci`): `npx playwright test tests/talk.spec.ts`; say so if not run.
 
@@ -96,6 +96,6 @@ Run it once on an unchanged window first; if it does not reproduce the baseline 
 - Counting Copilot only from timeline events gives 143; include current assignees.
 - Use only merged closers; issues closed by unmerged PRs or manually do not count.
 - Bucket merged bars by `mergedAt`, not issue creation; a refresh can move bars in old months.
-- Slide numbers shift when slides are added; locate by marker, not number.
+- Link the slide by its stable id `#daily-improvers`; locate it in `deck.js` by marker.
 - `HOLD`, `nIssue`, `nDev` repeat across slides; make `edit` `old_str` unique with `du-`/`DU_MONTHS` context.
 - Do not commit the JSON output or touch the illustrative flow (`SEQ`, `EDGES`, files).

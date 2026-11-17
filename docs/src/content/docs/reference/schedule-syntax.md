@@ -38,8 +38,9 @@ Fuzzy schedules distribute workflow execution times deterministically across all
 | | `weekly on friday around 5pm` | Friday 4pm-6pm | Fuzzy |
 | **Bi-weekly** | `bi-weekly` | Scattered across 2 weeks | Fuzzy |
 | **Tri-weekly** | `tri-weekly` | Scattered across 3 weeks | Fuzzy |
-| **Intervals** | `every 10 minutes` | Every 10 minutes | Fixed |
-| | `every 2 days` | Every 2 days | Fixed |
+| **Intervals** | `every 10 minutes` | Every 10 minutes, scattered start minute | Fuzzy |
+| | `every 2 days` | Every 2 days, scattered time | Fuzzy |
+| | `every 2w`, `every 1mo` | Scattered time (and day of month) | Fuzzy |
 | **Cron** | `0 9 * * 1` | Standard cron | Fixed |
 
 ## Fuzzy Schedules
@@ -181,26 +182,32 @@ Use `every N [unit]` syntax for various intervals:
 
 ```yaml
 on:
-  # Minutes (minimum 5 minutes, fixed time)
-  schedule: every 5 minutes    # */5 * * * *
-  schedule: every 10m          # */10 * * * * (short format)
+  # Minutes (minimum 5 minutes, fuzzy - scattered start minute)
+  schedule: every 5 minutes    # 3/5 * * * *
+  schedule: every 10m          # 7/10 * * * * (short format)
 
   # Hours (fuzzy - scattered minute)
   schedule: every 1h           # 58 */1 * * * (minute 58)
   schedule: every 2 hours      # 53 */2 * * * (minute 53)
 
-  # Days (fixed time)
-  schedule: every 1d           # 0 0 * * * (midnight UTC)
-  schedule: every 2 days       # 0 0 */2 * *
+  # Days (fuzzy - scattered time)
+  schedule: every 1d           # 43 5 * * * (same as daily)
+  schedule: every 2 days       # 43 5 */2 * *
 
-  # Weeks (fixed time)
-  schedule: every 1w           # 0 0 * * 0 (Sunday midnight)
-  schedule: every 2w           # 0 0 */14 * *
+  # Weeks (fuzzy - scattered time)
+  schedule: every 1w           # 43 5 * * 1 (same as weekly)
+  schedule: every 2w           # 43 5 */14 * *
 
-  # Months (fixed time)
-  schedule: every 1mo          # 0 0 1 * * (1st of month)
-  schedule: every 2mo          # 0 0 1 */2 *
+  # Months (fuzzy - scattered day 1-28 and time)
+  schedule: every 1mo          # 43 5 17 * *
+  schedule: every 2mo          # 43 5 17 */2 *
 ```
+
+Day, week, and month intervals use the same scattered time slots as `daily`, so many workflows on `every 2 days` no longer all fire at 00:00 UTC. For an exact time, use a cron expression such as `cron: "0 0 */2 * *"`.
+
+The crons above are illustrative: actual times, weekdays, and monthly dates depend on the workflow identifier. Weeks and months require the short forms (`every 2w`, `every 2mo`), not `every 2 weeks` or `every 2 months`.
+
+Recompiling existing workflows changes their schedule once. In particular, `every 1w` moves from Sunday to a hashed weekday, and `every 1mo` moves from the first of the month to a hashed day in 1–28. To preserve those calendar dates, use `weekly on sunday` or an explicit cron such as `cron: "0 0 1 * *"`.
 
 Valid minute intervals: `5m`, `10m`, `15m`, `20m`, `30m`
 Valid hour intervals: `1h`, `2h`, `3h`, `4h`, `6h`, `8h`, `12h`

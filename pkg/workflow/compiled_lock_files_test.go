@@ -275,6 +275,8 @@ func extractWorkflowCallSection(lockContent string) string {
 // Returns nil config when the workflow does not have safe-outputs configured.
 func parseSafeOutputsForLockFileTest(mdPath string) (*SafeOutputsConfig, string, error) {
 	compiler := NewCompiler()
+	// Mirror the CLI, which always sets an identifier so fuzzy schedules can be scattered.
+	compiler.SetWorkflowIdentifier(filepath.Base(mdPath))
 	data, err := compiler.ParseWorkflowFile(mdPath)
 	if err != nil {
 		return nil, "", err
@@ -331,7 +333,9 @@ func TestCompiledLockFiles_SafeOutputsJobOutputs(t *testing.T) {
 }
 
 func TestSmokeClaudeAllowsRequiredChromeServiceDomains(t *testing.T) {
-	data, err := NewCompiler().ParseWorkflowFile(filepath.Join(workflowsDir, "smoke-claude.md"))
+	compiler := NewCompiler()
+	compiler.SetWorkflowIdentifier("smoke-claude.md")
+	data, err := compiler.ParseWorkflowFile(filepath.Join(workflowsDir, "smoke-claude.md"))
 	require.NoError(t, err, "should parse smoke-claude workflow")
 	require.NotNil(t, data.NetworkPermissions, "smoke-claude should configure network permissions")
 
