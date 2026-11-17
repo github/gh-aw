@@ -428,7 +428,8 @@ jobs:
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: |
             </system>
-          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_INPUTS_TOPIC\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_SAFE_OUTPUTS\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_INPUTS_TOPIC\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_RUNTIME_DIR\",\"GH_AW_SAFE_OUTPUTS\"]"
+          GH_AW_RUNTIME_DIR: ${{ env.GH_AW_RUNTIME_DIR }}
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_RUNTIME_DIR }}/safeoutputs/outputs.jsonl
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -466,7 +467,8 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_ENV: "[\"GH_AW_ENGINE_ID\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_INPUTS_TOPIC\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND\",\"GH_AW_PROMPT\",\"GH_AW_SKILL_DIR\",\"GH_AW_SKILL_EXT\",\"GH_AW_SUB_AGENT_DIR\",\"GH_AW_SUB_AGENT_EXT\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ENGINE_ID\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_INPUTS_TOPIC\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND\",\"GH_AW_PROMPT\",\"GH_AW_RUNTIME_DIR\",\"GH_AW_SKILL_DIR\",\"GH_AW_SKILL_EXT\",\"GH_AW_SUB_AGENT_DIR\",\"GH_AW_SUB_AGENT_EXT\"]"
+          GH_AW_RUNTIME_DIR: ${{ env.GH_AW_RUNTIME_DIR }}
           GH_AW_SKILL_DIR: .codex/skills
           GH_AW_SKILL_EXT: /SKILL.md
           GH_AW_SUB_AGENT_DIR: .codex/agents
@@ -526,7 +528,8 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_ENV: "[\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_INPUTS_TOPIC\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND\",\"GH_AW_PROMPT\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_INPUTS_TOPIC\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND\",\"GH_AW_PROMPT\",\"GH_AW_RUNTIME_DIR\"]"
+          GH_AW_RUNTIME_DIR: ${{ env.GH_AW_RUNTIME_DIR }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
           OTEL_EXPORTER_OTLP_PROTOCOL: ""
@@ -790,9 +793,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -831,9 +837,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -872,9 +881,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -917,9 +929,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -958,9 +973,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -999,9 +1017,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1051,9 +1072,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1125,9 +1149,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1169,9 +1196,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1226,9 +1256,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1270,9 +1303,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1313,9 +1349,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1354,9 +1393,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1395,9 +1437,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1439,9 +1484,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1641,16 +1689,19 @@ jobs:
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
-          $compressedScript = [System.Convert]::FromBase64String('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')
+          $compressedScript = [System.Convert]::FromBase64String('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')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1705,9 +1756,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1748,9 +1802,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1803,9 +1860,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1904,9 +1964,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -1951,9 +2014,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -2026,9 +2092,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -2070,9 +2139,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -2158,9 +2230,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -2236,9 +2311,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }
@@ -2279,9 +2357,12 @@ jobs:
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
           if ($scriptContent.Contains('${GH_AW_RUNTIME_DIR}') -and -not $env:GH_AW_RUNTIME_DIR) { throw 'The private runtime directory has not been allocated.' }
           if ($env:GH_AW_RUNTIME_DIR) {
+            if ($env:GH_AW_RUNTIME_ID -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$') { throw 'The private runtime identity is invalid.' }
             $wslRuntimeDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $env:GH_AW_RUNTIME_DIR).Trim()
             if ($LASTEXITCODE -ne 0 -or $wslRuntimeDirectory -cnotmatch '^/[a-zA-Z0-9_./-]+$') { throw 'WSL could not map the private runtime directory to a safe Linux path.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_DIR}', $wslRuntimeDirectory)
+            $runtimeIdentityExpression = '$' + '{{ env.GH_AW_RUNTIME_ID }}'
+            $scriptContent = $scriptContent.Replace($runtimeIdentityExpression, $env:GH_AW_RUNTIME_ID)
           }
           $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = if ($env:GH_AW_RUNTIME_DIR) { $env:GH_AW_RUNTIME_DIR } else { $env:RUNNER_TEMP }

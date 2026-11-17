@@ -78,7 +78,10 @@ function registerTests({ describe, it }) {
         fs.writeFileSync(path.join(sourceDir, "work-queue.intents.jsonl"), "{}\n");
         process.env.GH_AW_RUNTIME_DIR = options.root;
         try {
-          assert.deepEqual(main({ ...options, sourceDir: undefined }).map(value => value.status), ["collected"]);
+          assert.deepEqual(
+            main({ ...options, sourceDir: undefined }).map(value => value.status),
+            ["collected"]
+          );
           assert.equal(fs.readFileSync(path.join(options.outputDir, "work-queue.intents.jsonl"), "utf8"), "{}\n");
         } finally {
           if (previous === undefined) delete process.env.GH_AW_RUNTIME_DIR;
