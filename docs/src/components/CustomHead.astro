@@ -1,6 +1,7 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
 import { getCollection } from 'astro:content';
+import { escapeJsonLd } from '../lib/json-ld.js';
 
 type BlogAuthor = {
   name?: string;
@@ -243,16 +244,21 @@ const filteredHead = head
     const prop = attrs?.property || attrs?.name;
     return !overriddenProps.has(prop);
   })
-  .map((item) => (isHomePage && item.tag === 'title' ? { ...item, content: siteTitle } : item));
+  .map((item) => {
+    if (item.tag === 'script' && item.attrs?.type === 'application/ld+json' && item.content) {
+      return { ...item, content: escapeJsonLd(item.content) };
+    }
+    return isHomePage && item.tag === 'title' ? { ...item, content: siteTitle } : item;
+  });
 ---
 
 <!-- Starlight's head tags (with OG/Twitter duplicates removed) -->
 {filteredHead.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}
 {isDocsHomePage && (
-  <script type="application/ld+json" set:html={JSON.stringify(homeJsonLd)} />
+  <script type="application/ld+json" set:html={escapeJsonLd(JSON.stringify(homeJsonLd))} />
 )}
 {pageJsonLd && (
-  <script type="application/ld+json" set:html={JSON.stringify(pageJsonLd)} />
+  <script type="application/ld+json" set:html={escapeJsonLd(JSON.stringify(pageJsonLd))} />
 )}
 
 <!-- Enhanced OG tags with site name in title and social image -->
