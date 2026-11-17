@@ -1,11 +1,11 @@
 {
-  "kind": "retrospectively-selected-replay-input",
+  "kind": "retrospectively-selected-contract-evidence",
   "main_tip": "0114567b59e2a2333fcc7d6323503520e7e9b8ab",
   "observed_at": "2026-11-17T17:27:00.610367+00:00",
   "start": "2026-03-22T12:00:00+00:00",
   "end": "2026-11-17T12:00:00+00:00",
-  "contract_sha256": "2e7724b8fbe3de1124b8397da95bfd5409ecd8903344fc0e357c3bc959dbc8f8",
-  "evaluator_sha256": "b5edd4360c5363278d1c665c612791caf8bef8fbfd71376b3b73b60b2ae28016",
+  "attributed_value": null,
+  "qualification": "Historical observations supporting contract review, not runtime fixtures or registered CAO assessments. Merge timestamps are adoption proxies; complete-window survival and exclusive attribution remain unknown.",
   "original_evidence_sha256": {
     "manifest.json": "c77d84d2b9432b2ef36f1ebd0e0ebc3cbf6551e9c86fbcc6349ee0494f2ef3dc",
     "observations.json": "005e32a9fa7aa5780018652ba4eca3e9c36dce1dc4767aef70a9ddc6978d2930",
@@ -13,7 +13,8 @@
     "merge-witnesses.json": "fbc5cfe85c75d70fc44f394c6e40cdec9ed7600904483922d8326dd488aca997",
     "may-june-contributions.json": "26279aefd2d187f4e5a06477ce502b6144049457155926ecc6449f3325370340"
   },
-  "weekly_expected": [
+  "weekly_sampling": "Sunday 12:00 UTC from start through end, plus the final cutoff. Each tuple is [covered, eligible].",
+  "weekly_counts": [
     [32, 45],
     [32, 47],
     [32, 49],
@@ -51,7 +52,8 @@
     [75, 75],
     [75, 75]
   ],
-  "daily_expected_sha256": "850ca06ab9d90ea5fd3427ac3508033f5c3f5bb88c5155fc91c2bcbe4bc102f5",
+  "merge_count_columns": ["before_covered", "before_eligible", "after_covered", "after_eligible"],
+  "merge_counts_note": "The expected tuples below are the original audit's observed counts, retained as historical evidence rather than executable test assertions.",
   "cases": [
     { "id": "batch-2026-05-04", "members": [30099, 30098] },
     { "id": "batch-2026-05-18", "members": [32976, 32985, 32984, 32983, 32981, 32980, 32977, 32978] },
