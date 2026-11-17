@@ -20,6 +20,10 @@ func TestGenerateMaintenanceWorkflow_IssueLabel(t *testing.T) {
 			err := GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
 				WorkflowDataList: []*WorkflowData{{
 					Name: "test",
+					CheckoutConfigs: []*CheckoutConfig{{
+						Repository: "org/target",
+						Current:    true,
+					}},
 					SafeOutputs: &SafeOutputsConfig{
 						CreateIssues: &CreateIssuesConfig{Expires: 24},
 					},
@@ -29,14 +33,16 @@ func TestGenerateMaintenanceWorkflow_IssueLabel(t *testing.T) {
 				RepoConfig:  &RepoConfig{IssueLabel: label},
 			})
 			require.NoError(t, err)
-			content, err := os.ReadFile(filepath.Join(dir, "agentics-maintenance.yml"))
-			require.NoError(t, err)
-			var parsed struct {
-				Env map[string]string `yaml:"env"`
+			for _, filename := range []string{"agentics-maintenance.yml", "agentics-maintenance-org-target.yml"} {
+				content, err := os.ReadFile(filepath.Join(dir, filename))
+				require.NoError(t, err)
+				var parsed struct {
+					Env map[string]string `yaml:"env"`
+				}
+				require.NoError(t, yaml.Unmarshal(content, &parsed))
+				require.Equal(t, label, parsed.Env["GH_AW_ISSUE_LABEL"])
+				require.Contains(t, string(content), "labels: [process.env.GH_AW_ISSUE_LABEL || 'agentic-workflows']")
 			}
-			require.NoError(t, yaml.Unmarshal(content, &parsed))
-			require.Equal(t, label, parsed.Env["GH_AW_ISSUE_LABEL"])
-			require.Contains(t, string(content), "labels: [process.env.GH_AW_ISSUE_LABEL || 'agentic-workflows']")
 		})
 	}
 }

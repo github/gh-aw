@@ -159,7 +159,7 @@ func buildMaintenanceWorkflowTriggerYAML(
 	yaml.WriteString(buildMaintenanceDispatchInputsYAML(hasLedgers, opts.hasCacheMemory))
 	yaml.WriteString(buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue, hasLedgers, opts.hasCacheMemory, opts.maintenanceConfig))
 	if opts.issueLabel != "" {
-		fmt.Fprintf(&yaml, "\nenv:\n  GH_AW_ISSUE_LABEL: %q\n", opts.issueLabel)
+		yaml.WriteString("\nenv:\n  GH_AW_ISSUE_LABEL: " + strconv.Quote(opts.issueLabel) + "\n")
 	}
 	yaml.WriteString("\n# Jobs request only the permissions needed for their individual maintenance operations.\npermissions: {}\n\n# Serialize maintenance runs to avoid overlapping writes to repository resources.\nconcurrency:\n  group: ${{ github.workflow }}-${{ github.repository }}\n  cancel-in-progress: false\n\njobs:\n")
 	return yaml.String()
