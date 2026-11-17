@@ -150,9 +150,11 @@ A **Complete Conforming Implementation** MUST satisfy Basic Conformance and:
 - Support all configuration fields in combination
 
 These are normative target requirements, not a claim that the local `gh-aw`
-compiler implements every field. As verified on 2026-11-10, `roles` and
-`private-repos` remain normative but are deferred in the local compiler; the
-local implementation therefore does not claim Complete Conformance for those
+compiler implements every field. As verified on 2026-11-16, `roles` and
+`private-repos` remain deferred in the local compiler; use of either field is
+rejected rather than silently ignored. Track local support in
+[issue #78412](https://github.com/github/gh-aw/issues/78412). The local
+implementation therefore does not claim Complete Conformance for those
 controls. Section 4.8 records each status explicitly.
 
 ### 2.2 Requirements Notation
@@ -595,7 +597,7 @@ This section defines the three new access control fields introduced by this spec
 **Required**: No  
 **Default**: Not specified (all accessible repositories allowed)
 
-The `repos` field is the gateway-internal repository scope field derived from the workflow frontmatter key `allowed-repos` (with `repos` retained as a deprecated frontmatter alias for backward compatibility). When defined, the GitHub MCP server can ONLY access repositories matching at least one pattern in the list.
+The `repos` field is the gateway-internal repository scope field derived from the workflow frontmatter key `allowed-repos` (with `repos` retained as a deprecated frontmatter alias for backward compatibility). **Retention decision (2026-11-16)**: no removal version is scheduled; retain the alias until an explicit versioned migration decision is made. When defined, the GitHub MCP server can ONLY access repositories matching at least one pattern in the list.
 
 **Syntax**:
 - Exact match: `"owner/repo-name"` - matches single repository
@@ -1091,8 +1093,8 @@ The index covers every top-level field named in Sections 4.1–4.4. Go entities 
 | `github-app` | `GitHubToolConfig.GitHubApp` (`GitHubAppConfig`) |
 | `allowed-repos` | `GitHubToolConfig.AllowedRepos` (`GitHubReposScope`) |
 | `repos` (deprecated alias) | `GitHubToolConfig.Repos` (`GitHubReposScope`); `parseGitHubTool()` normalizes it into `AllowedRepos` |
-| `roles` | No `tools.github.roles` field in `GitHubToolConfig`; `WorkflowData.Roles` represents top-level workflow trigger roles and is not equivalent to this field. Normative; deferred in the local compiler. |
-| `private-repos` | No corresponding field in `GitHubToolConfig` or `pkg/workflow/` gateway model. Normative; deferred in the local compiler. |
+| `roles` | No `tools.github.roles` field in `GitHubToolConfig`; `WorkflowData.Roles` represents top-level workflow trigger roles and is not equivalent to this field. Deferred locally; the compiler rejects this field. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
+| `private-repos` | No corresponding field in `GitHubToolConfig` or `pkg/workflow/` gateway model. Deferred locally; the compiler rejects this field. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
 | `min-integrity` | `GitHubToolConfig.MinIntegrity` (`GitHubIntegrityLevel`) |
 | `blocked-users` | `GitHubToolConfig.BlockedUsers` (`[]string`); expression input is tracked separately in `BlockedUsersExpr` |
 | `trusted-users` | `GitHubToolConfig.TrustedUsers` (`[]string`); expression input is tracked separately in `TrustedUsersExpr` |
@@ -2779,7 +2781,7 @@ function queryWithBackoff(request):
 
 This section records the current mapping of Section 4 configuration fields to the compiler model, including fields for which no corresponding local Go entity exists.
 
-**Last verified**: 2026-11-10
+**Last verified**: 2026-11-16
 
 | Field | Current implementation mapping | Status |
 |---|---|---|
@@ -2787,27 +2789,30 @@ This section records the current mapping of Section 4 configuration fields to th
 | `tools` | Compiler field is `GitHubToolConfig.Allowed` (`allowed`), not `tools` | Naming difference; see Section 4.8 |
 | `allowed-repos`, `repos` | `GitHubToolConfig.AllowedRepos` / `Repos`; parsing and validation in `tools_parser.go` and `tools_validation_github.go` | Present; `repos` is deprecated |
 | `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels` | Corresponding `GitHubToolConfig` fields, parsed in `tools_parser.go` and validated in `tools_validation_github.go` | Present |
-| `roles` | No `tools.github.roles` field in the current `pkg/workflow/` model | Normative; deferred locally. `WorkflowData.Roles` is not equivalent to `tools.github.roles`. |
-| `private-repos` | No matching field in the current `pkg/workflow/` model | Normative; deferred locally. |
+| `roles` | No `tools.github.roles` field in the current `pkg/workflow/` model; `WorkflowData.Roles` is unrelated | Deferred and not enforced. Normal main-workflow frontmatter is rejected by the schema; relaxed imported configurations and direct `NewTools` callers are rejected by `validateGitHubGuardPolicy()`. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
+| `private-repos` | No matching field in the current `pkg/workflow/` model | Deferred and not enforced. Normal main-workflow frontmatter is rejected by the schema; relaxed imported configurations and direct `NewTools` callers are rejected by `validateGitHubGuardPolicy()`. Track: [#78412](https://github.com/github/gh-aw/issues/78412). |
 
 Sync procedure:
 1. Update this index and the §4 field definitions when any listed parser, model, or validation path changes.
 2. Resolve the `tools`, `roles`, and `private-repos` mismatches before claiming those keys are supported by the local compiler.
 3. Update the §11 compliance references and run `go test ./pkg/workflow/ -run 'TestValidateGitHub|TestFormal' -count=1`.
 
-### Historical Divergence Audit (2026-06-21; superseded by the 2026-11-10 index)
+### Historical Divergence Audit (2026-06-21; superseded by the 2026-11-16 index)
 
 Cross-reference of `scratchpad/github-mcp-access-control-specification.md` and `scratchpad/guard-policies-specification.md` against `pkg/workflow/tools_validation_github.go` and `pkg/workflow/mcp_github_config.go`:
 
 | Topic | Spec says | Implementation in code | Status |
 |---|---|---|---|
 | Frontmatter field name for repository scope | `allowed-repos` (§4.4.1 of this spec uses `repos` as the access-control field name, but §4.1 configuration structure example and guard-policies-spec use `allowed-repos` as the frontmatter key) | `pkg/workflow/mcp_github_config.go` reads `allowed-repos` (preferred) with `repos` as deprecated alias; compiled gateway config uses `repos` internally (line ~323) | **Resolved; re-confirmed 2026-08-16** — frontmatter uses `allowed-repos`; `repos` is a deprecated alias supported for backwards compatibility. Compliance fixtures under `specs/github-mcp-access-control-compliance/` and preferred-path tests in `pkg/workflow/tools_validation_test.go` use `allowed-repos`; legacy alias coverage remains explicit where needed. |
-| `min-integrity` required when `allowed-repos` present | guard-policies-spec §Conformance GP-02 and GP-11 | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy()`) validates `min-integrity` enum values | **Consistent** |
+| GP-01 `allowed-repos` forms | `allowed-repos` accepts `"all"`, `"public"`, `${{ github.repository }}`, or a non-empty array of supported patterns | `parseGitHubReposScope()` in `pkg/workflow/tools_parser.go` parses forms; `validateReposScope()` and `validateRepoPattern()` in `pkg/workflow/tools_validation_github.go` validate them | **Consistent; rechecked 2026-11-16** |
+| GP-11 `min-integrity` requirement | Explicit `allowed-repos` requires `min-integrity`; `min-integrity` alone defaults scope to `"all"` | `validateGitHubGuardPolicy()` in `pkg/workflow/tools_validation_github.go`; cases in `pkg/workflow/tools_validation_test.go` cover the required field and default | **Consistent; rechecked 2026-11-16** |
 | Empty `allowed-repos` array rejected | guard-policies-spec §Conformance GP-04 | `pkg/workflow/tools_validation_github.go` rejects empty arrays | **Consistent** |
 | Derived safe-outputs `write-sink` policy | guard-policies-spec §5 normative requirements | `pkg/workflow/mcp_github_config.go` `deriveSafeOutputsGuardPolicyFromGitHub()` | **Consistent** |
 | `lockdown: true` takes precedence over guard policies | §9.5.1 (this spec) and guard-policies-spec Resolved Decisions #3 | `pkg/workflow/tools_validation_github.go` now emits a compile-time warning when `lockdown: true` co-exists with guard-policy fields while preserving runtime precedence | **Resolved** |
 
-**Heading alignment note**: §4.4.1 now names `repos` as the gateway-internal field and `allowed-repos` as the frontmatter key. Consumers SHOULD use `allowed-repos` in workflow frontmatter; `repos` remains the internal gateway field name and a deprecated frontmatter alias.
+**Heading alignment note**: §4.4.1 names `repos` as the gateway-internal field and `allowed-repos` as the frontmatter key. Consumers SHOULD use `allowed-repos` in workflow frontmatter. Retain `repos` as a deprecated frontmatter alias; no removal version is scheduled.
+
+**2026-11-16 sync note**: GP-01 parsing and validation agree on the accepted `allowed-repos` forms, and GP-11's cross-field requirement matches `validateGitHubGuardPolicy()` and its tests. The main workflow schema rejects `roles` and `private-repos` before tool validation; explicit guard-policy validation also rejects these fields from relaxed imports and direct `NewTools` callers. The local compiler does not enforce role or private-repository filtering.
 
 ---
 
@@ -2817,12 +2822,12 @@ This section lists the files that **MUST** be reviewed and updated whenever a no
 
 The 2026-11-10 review reconciled local field status and closed stale follow-ups. Changes to §8.5 still require external gateway confirmation because the production evaluator is not in this repository; changes to §4.4 retain the forward-looking update procedure below.
 
-### Follow-up Status (2026-11-10)
+### Follow-up Status (2026-11-16)
 
 | Follow-up | Status |
 |---|---|
 | §8.5 evaluation order | Local model and fixture rechecked; carry forward external production-gateway confirmation for any future order change. |
-| §4.4 field changes | `roles` and `private-repos` remain normative but deferred locally; retain schema, type, parser, validation, and compliance updates for any implementation work. |
+| §4.4 field changes | `roles` and `private-repos` remain deferred locally and are rejected by the compiler; track further support work in [#78412](https://github.com/github/gh-aw/issues/78412). |
 
 ### After Changing §8.5 Combined Evaluation Order
 
