@@ -1,0 +1,890 @@
+{
+  "endpoints": [
+    {
+      "provider": "openai",
+      "port": 10000,
+      "base_url": "http://api-proxy:10000",
+      "configured": true,
+      "models": [
+        "babbage-002",
+        "chat-latest",
+        "chatgpt-image-latest",
+        "davinci-002",
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-0125",
+        "gpt-3.5-turbo-1106",
+        "gpt-3.5-turbo-16k",
+        "gpt-3.5-turbo-instruct",
+        "gpt-3.5-turbo-instruct-0914",
+        "gpt-4.1",
+        "gpt-4.1-2025-04-14",
+        "gpt-4.1-mini",
+        "gpt-4.1-mini-2025-04-14",
+        "gpt-4.1-nano",
+        "gpt-4.1-nano-2025-04-14",
+        "gpt-4o",
+        "gpt-4o-2024-05-13",
+        "gpt-4o-2024-08-06",
+        "gpt-4o-2024-11-20",
+        "gpt-4o-mini",
+        "gpt-4o-mini-2024-07-18",
+        "gpt-4o-mini-search-preview",
+        "gpt-4o-mini-search-preview-2025-03-11",
+        "gpt-4o-mini-transcribe",
+        "gpt-4o-mini-transcribe-2025-03-20",
+        "gpt-4o-mini-transcribe-2025-12-15",
+        "gpt-4o-mini-tts",
+        "gpt-4o-mini-tts-2025-03-20",
+        "gpt-4o-mini-tts-2025-12-15",
+        "gpt-4o-search-preview",
+        "gpt-4o-search-preview-2025-03-11",
+        "gpt-4o-transcribe",
+        "gpt-4o-transcribe-diarize",
+        "gpt-5",
+        "gpt-5-2025-08-07",
+        "gpt-5-chat-latest",
+        "gpt-5-codex",
+        "gpt-5-mini",
+        "gpt-5-mini-2025-08-07",
+        "gpt-5-nano",
+        "gpt-5-nano-2025-08-07",
+        "gpt-5-pro",
+        "gpt-5-pro-2025-10-06",
+        "gpt-5-search-api",
+        "gpt-5-search-api-2025-10-14",
+        "gpt-5.1",
+        "gpt-5.1-2025-11-13",
+        "gpt-5.1-chat-latest",
+        "gpt-5.1-codex",
+        "gpt-5.1-codex-max",
+        "gpt-5.1-codex-mini",
+        "gpt-5.2",
+        "gpt-5.2-2025-12-11",
+        "gpt-5.2-chat-latest",
+        "gpt-5.2-codex",
+        "gpt-5.2-pro",
+        "gpt-5.2-pro-2025-12-11",
+        "gpt-5.3-chat-latest",
+        "gpt-5.3-codex",
+        "gpt-5.4",
+        "gpt-5.4-2026-03-05",
+        "gpt-5.4-mini",
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-nano",
+        "gpt-5.4-nano-2026-03-17",
+        "gpt-5.4-pro",
+        "gpt-5.4-pro-2026-03-05",
+        "gpt-5.5",
+        "gpt-5.5-2026-04-23",
+        "gpt-5.5-pro",
+        "gpt-5.5-pro-2026-04-23",
+        "gpt-5.6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-6-astra",
+        "gpt-6-luna",
+        "gpt-6-sol",
+        "gpt-6.1-sol",
+        "gpt-audio",
+        "gpt-audio-1.5",
+        "gpt-audio-2025-08-28",
+        "gpt-audio-mini",
+        "gpt-audio-mini-2025-10-06",
+        "gpt-audio-mini-2025-12-15",
+        "gpt-image-1",
+        "gpt-image-1-mini",
+        "gpt-image-1.5",
+        "gpt-image-2",
+        "gpt-image-2-2026-04-21",
+        "gpt-image-2.5-flare",
+        "gpt-image-2.5-flare-2026-09-08",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-sunburst-2026-09-08",
+        "gpt-live-1",
+        "gpt-live-transcribe",
+        "gpt-realtime",
+        "gpt-realtime-1.5",
+        "gpt-realtime-2",
+        "gpt-realtime-2.1",
+        "gpt-realtime-2.1-mini",
+        "gpt-realtime-2025-08-28",
+        "gpt-realtime-mini",
+        "gpt-realtime-mini-2025-12-15",
+        "gpt-realtime-translate",
+        "gpt-realtime-whisper",
+        "gpt-transcribe",
+        "o1",
+        "o1-2024-12-17",
+        "o1-pro",
+        "o1-pro-2025-03-19",
+        "o3",
+        "o3-2025-04-16",
+        "o3-deep-research",
+        "o3-deep-research-2025-06-26",
+        "o3-mini",
+        "o3-mini-2025-01-31",
+        "o3-pro",
+        "o3-pro-2025-06-10",
+        "o4-mini",
+        "o4-mini-2025-04-16",
+        "o4-mini-deep-research",
+        "o4-mini-deep-research-2025-06-26",
+        "omni-moderation-2024-09-26",
+        "omni-moderation-latest",
+        "sora-2",
+        "sora-2-pro",
+        "text-embedding-3-large",
+        "text-embedding-3-small",
+        "text-embedding-ada-002",
+        "tts-1",
+        "tts-1-1106",
+        "tts-1-hd",
+        "tts-1-hd-1106",
+        "whisper-1"
+      ],
+      "models_url": "http://api-proxy:10000/v1/models",
+      "routing_models": [
+        {
+          "model_id": "babbage-002",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "chat-latest",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "chatgpt-image-latest",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "davinci-002",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-3.5-turbo",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-3.5-turbo-0125",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-3.5-turbo-1106",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-3.5-turbo-16k",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-3.5-turbo-instruct",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-3.5-turbo-instruct-0914",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4.1",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4.1-2025-04-14",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4.1-mini",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4.1-mini-2025-04-14",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4.1-nano",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4.1-nano-2025-04-14",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-2024-05-13",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-2024-08-06",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-2024-11-20",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-2024-07-18",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-search-preview",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-search-preview-2025-03-11",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-transcribe",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-transcribe-2025-03-20",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-transcribe-2025-12-15",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-tts",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-tts-2025-03-20",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-mini-tts-2025-12-15",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-search-preview",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-search-preview-2025-03-11",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-transcribe",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-4o-transcribe-diarize",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-2025-08-07",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-chat-latest",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-codex",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-mini",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-mini-2025-08-07",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-nano",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-nano-2025-08-07",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-pro",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-pro-2025-10-06",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-search-api",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5-search-api-2025-10-14",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.1",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.1-2025-11-13",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.1-chat-latest",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.1-codex",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.1-codex-max",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.1-codex-mini",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.2",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.2-2025-12-11",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.2-chat-latest",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.2-codex",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.2-pro",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.2-pro-2025-12-11",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.3-chat-latest",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.3-codex",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.4",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.4-2026-03-05",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.4-mini",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.4-mini-2026-03-17",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.4-nano",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.4-nano-2026-03-17",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.4-pro",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.4-pro-2026-03-05",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.5",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.5-2026-04-23",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.5-pro",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.5-pro-2026-04-23",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.6-luna",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.6-sol",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-5.6-terra",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-6-astra",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-6-luna",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-6-sol",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-6.1-sol",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-audio",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-audio-1.5",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-audio-2025-08-28",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-audio-mini",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-audio-mini-2025-10-06",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-audio-mini-2025-12-15",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-1",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-1-mini",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-1.5",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-2",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-2-2026-04-21",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-2.5-flare",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-2.5-flare-2026-09-08",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-2.5-sunburst",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-image-2.5-sunburst-2026-09-08",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-live-1",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-live-transcribe",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-1.5",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-2",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-2.1",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-2.1-mini",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-2025-08-28",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-mini",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-mini-2025-12-15",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-translate",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-realtime-whisper",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "gpt-transcribe",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o1",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o1-2024-12-17",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o1-pro",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o1-pro-2025-03-19",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3-2025-04-16",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3-deep-research",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3-deep-research-2025-06-26",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3-mini",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3-mini-2025-01-31",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3-pro",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o3-pro-2025-06-10",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o4-mini",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o4-mini-2025-04-16",
+          "supported_endpoints": ["chat_completions", "responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o4-mini-deep-research",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "o4-mini-deep-research-2025-06-26",
+          "supported_endpoints": ["responses"],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "omni-moderation-2024-09-26",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "omni-moderation-latest",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "sora-2",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "sora-2-pro",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "text-embedding-3-large",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "text-embedding-3-small",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "text-embedding-ada-002",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "tts-1",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "tts-1-1106",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "tts-1-hd",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "tts-1-hd-1106",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        },
+        {
+          "model_id": "whisper-1",
+          "supported_endpoints": [],
+          "candidate_metadata_complete": false
+        }
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "port": 10001,
+      "base_url": "http://api-proxy:10001",
+      "configured": false,
+      "models": null,
+      "models_url": "http://api-proxy:10001/v1/models"
+    },
+    {
+      "provider": "copilot",
+      "port": 10002,
+      "base_url": "http://api-proxy:10002",
+      "configured": false,
+      "models": null,
+      "models_url": "http://api-proxy:10002/models"
+    },
+    {
+      "provider": "gemini",
+      "port": 10003,
+      "base_url": "http://api-proxy:10003",
+      "configured": false,
+      "models": null,
+      "models_url": "http://api-proxy:10003/v1beta/models"
+    },
+    {
+      "provider": "vertex",
+      "port": 10004,
+      "base_url": "http://api-proxy:10004",
+      "configured": false,
+      "models": null,
+      "models_url": null
+    }
+  ],
+  "models_fetch_complete": true,
+  "model_aliases": {
+    "agent": ["sonnet-6x", "gpt-6", "gpt-5.4", "gpt-5.5", "gpt-5.6", "gpt-5.3", "gemini-pro", "any"],
+    "any": ["copilot/*", "anthropic/*", "openai/*", "google/*", "gemini/*"],
+    "auto": ["copilot/auto", "large"],
+    "claude": ["agent"],
+    "codex": ["agent"],
+    "coding": ["copilot/gpt-5*codex*", "openai/gpt-5*codex*", "gpt-5-codex", "kimi"],
+    "copilot": ["agent"],
+    "deep-research": ["copilot/deep-research*", "copilot/o3-deep-research*", "copilot/o4-mini-deep-research*", "google/deep-research*", "gemini/deep-research*", "openai/o3-deep-research*", "openai/o4-mini-deep-research*"],
+    "detection": ["small"],
+    "evals": ["small"],
+    "gemini": ["agent"],
+    "gpt-5": ["copilot/gpt-5*", "openai/gpt-5*"],
+    "gpt-5-codex": ["copilot/gpt-5*codex*", "openai/gpt-5*codex*"],
+    "gpt-5-mini": ["copilot/gpt-5*mini*", "openai/gpt-5*mini*"],
+    "gpt-5-nano": ["copilot/gpt-5*nano*", "openai/gpt-5*nano*"],
+    "gpt-5-pro": ["copilot/gpt-5*pro*", "openai/gpt-5*pro*"],
+    "gpt-5.1": ["copilot/gpt-5.1*", "openai/gpt-5.1*"],
+    "gpt-5.2": ["copilot/gpt-5.2*", "openai/gpt-5.2*"],
+    "gpt-5.3": ["copilot/gpt-5.3*", "openai/gpt-5.3*"],
+    "gpt-5.4": ["copilot/gpt-5.4*", "openai/gpt-5.4*"],
+    "gpt-5.5": ["copilot/gpt-5.5*", "openai/gpt-5.5*"],
+    "gpt-5.6": ["copilot/gpt-5.6*", "openai/gpt-5.6*"],
+    "gpt-6": ["copilot/gpt-6*", "openai/gpt-6*"],
+    "image-generation": ["copilot/gpt-image*", "openai/gpt-image*", "openai/chatgpt-image*", "copilot/gemini-*image*", "google/gemini-*image*", "gemini/gemini-*image*", "google/imagen*"],
+    "large": ["sonnet", "gpt-6", "gpt-5-pro", "gpt-5", "gemini-pro"],
+    "mini": ["haiku", "gpt-5-mini", "gpt-5-nano", "gemini-flash-lite"],
+    "reasoning": ["copilot/o1*", "copilot/o3*", "copilot/o4*", "openai/o1*", "openai/o3*", "openai/o4*"],
+    "small": ["mini"],
+    "small-agent": ["haiku", "gpt-5-mini", "gemini-flash"],
+    "summarization": ["haiku", "gpt-5-mini", "gemini-flash-lite", "mini"]
+  }
+}
