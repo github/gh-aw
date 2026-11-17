@@ -12,7 +12,7 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 ## Agent navigation and maintenance (mandatory)
 
 - Find slides in `slides.md`: row N is slide N (`#N`); read its Summary before opening `deck.js`.
-- When you add, remove, move, rename a slide or change its message, update its `slides.md` row in the same change. Summaries are public, durable takeaways without aging counts or dates; band headers start `Band header (<band>):`.
+- When you add, remove, move, rename a slide or change its message, update its `slides.md` row (Summary and Keywords) in the same change. Summaries are public, durable takeaways without aging counts or dates; band headers start `Band header (<band>):`. Keywords are required, comma-separated, accurate search terms (synonyms, acronyms, option and pattern names); the build publishes them in JSON-LD and the deck's `/` search matches them.
 - Never copy slide lists, numbers or summaries elsewhere (`index.html` included): the docs build and dev server inject every row into JSON-LD `hasPart`; an invalid row fails the build.
 
 ## Files
@@ -24,7 +24,7 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 - `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg` and `mona-full.png` (full-body Mona): the only assets a test allows. Diagrams are inline SVG in `deck.js` (e.g. the `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
 - `docs/tests/talk.spec.ts`: Playwright tests of the deck, runtime, parser and built JSON-LD against `slides.md`.
-- `.github/skills/cracktro/slides.md`: ordered slides: Heading, Notes (`illustrative` or empty), Summary; band headers included.
+- `.github/skills/cracktro/slides.md`: ordered slides: Heading, Notes (`illustrative` or empty), Summary, Keywords; band headers included.
 - `docs/src/lib/cracktro/`: `slides.js` parses `slides.md` and renders JSON-LD; `integration.js` (Astro) applies it.
 - `docs/README.md` "Interactive talk": user-facing description (keys, public-content rules).
 
@@ -69,6 +69,7 @@ slides.push({
 | `workflow-prompts.md` | Adding or refreshing a slide's `/agentic-workflows` prompt (`PROMPTS`, phone dialog); prompt mining and PR/task/session references. |
 | `data-refresh.md` | Adding, changing or refreshing a data slide; refresh mini-skills and the slide→`refresh/<slug>.md` index. |
 | `brand.md` | Any colour, gradient, glow, title or font change; brand/Primer palette, semantic hues, regularization pass. |
+| `concept-style.md` | Adding or restyling a concept slide in the style of The factory mindset and Trust the process (light header-less row, problem/answer statements, one live metaphor, horizontal split motion). |
 | `asset-generator.md` | Setting up or using the `asset-generator` MCP (og/social cards, wallpapers, charts, `create_slide_deck`); where outputs may live. |
 
 ## People and mascots

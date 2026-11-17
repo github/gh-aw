@@ -206,6 +206,7 @@
   .fz-n { grid-row: span 2; font: 600 18px/1.4 var(--mono); color: #ab7df8; letter-spacing: .06em; }
   .fz-t { font-size: 20px; font-weight: 600; line-height: 1.3; }
   .fz-b { font: 500 13px/1 var(--mono); color: #9198a1; margin-left: 10px; letter-spacing: .04em; }
+  .fz-k { font: 500 13px/1 var(--mono); color: #9198a1; margin-left: 8px; padding: 3px 6px; border: 1px solid #3d444d; border-radius: 6px; letter-spacing: .02em; white-space: nowrap; }
   .fz-s { font-size: 15px; line-height: 1.4; color: #c9d1d9; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .fz mark { background: #ab7df859; color: inherit; border-radius: 3px; }
   body.light .fz { background: #f6f8faf5; color: #1f2328; }
@@ -214,7 +215,8 @@
   body.light .fz-list li[aria-selected="true"] { background: #ffffff; border-color: #8250df; }
   body.light .fz-n { color: #8250df; }
   body.light .fz-s { color: #424a53; }
-  body.light .fz-st, body.light .fz-b { color: #59636e; }
+  body.light .fz-st, body.light .fz-b, body.light .fz-k { color: #59636e; }
+  body.light .fz-k { border-color: #d1d9e0; }
   body.light .fz mark { background: #8250df33; }
 
   /* --- slide map (full-screen overview: a header per band above a grid with one tile per slide) --- */
@@ -381,7 +383,7 @@
                 const n = r.first + r.items.indexOf(s);
                 return h(
                   "li",
-                  { "--i": i, "data-go": n - 1 },
+                  { "--i": i, "data-go": n - 1, title: `${label(s)} (type ${n}, Enter)` },
                   h("span", { class: "bh-n" }, String(n).padStart(2, "0"), s.kids ? h("span", { class: "bh-k", title: `${s.kids.length} examples below` }, `↓ ${s.kids.length}`) : null),
                   h("span", { class: "bh-t" }, label(s))
                 );
@@ -415,6 +417,7 @@
       h("button", {
         class: s.header ? "hd" : s.parent ? "sub" : s.kids ? "col" : "",
         "aria-label": `Slide ${i + 1}`,
+        title: `Slide ${i + 1} (type ${i + 1}, Enter)`,
         onclick: e => {
           e.stopPropagation();
           go(i);
@@ -426,9 +429,10 @@
       { class: "dots" },
       rows.map(r => h("div", { class: "drow", title: rowName(r.group) }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
     );
-    const arrowBtn = (label, key, d, fn) => {
+    const arrowBtn = (label, key, keys, d, fn) => {
       const b = h("button", {
         "aria-label": label,
+        "aria-keyshortcuts": keys,
         title: `${label} (${key})`,
         onclick: e => {
           e.stopPropagation();
@@ -439,10 +443,10 @@
       b._nav = fn;
       return b;
     };
-    const bandPrevBtn = arrowBtn("Previous band", "↑", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-    const prevBtn = arrowBtn("Previous slide", "←", "M15 5l-7 7 7 7", () => prev());
-    const nextBtn = arrowBtn("Next slide", "→", "M9 5l7 7-7 7", () => next());
-    const bandNextBtn = arrowBtn("Next band", "↓", "M18 5v14M6 6l7 6-7 6", () => band(1));
+    const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
+    const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft Backspace", "M15 5l-7 7 7 7", () => prev());
+    const nextBtn = arrowBtn("Next slide", "→", "ArrowRight Space Enter", "M9 5l7 7-7 7", () => next());
+    const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
     const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
     // arrow and the example count, so the audience knows there is a line below; it steps down the column and,
@@ -478,6 +482,7 @@
     const snd = h("button", {
       class: "snd",
       "aria-label": "Toggle sound (M)",
+      "aria-keyshortcuts": "M",
       title: "Sound on/off (M)",
       onclick: e => {
         e.stopPropagation();
@@ -492,6 +497,7 @@
     const fzBtn = h("button", {
       class: "fzb",
       "aria-label": "Search slides (/)",
+      "aria-keyshortcuts": "/ Control+K Meta+K",
       "aria-haspopup": "dialog",
       title: "Search slides (/)",
       onclick: e => {
@@ -504,6 +510,7 @@
     const smBtn = h("button", {
       class: "smb",
       "aria-label": "Slide map (G)",
+      "aria-keyshortcuts": "G",
       "aria-haspopup": "dialog",
       title: "Slide map (G)",
       onclick: e => {
@@ -673,7 +680,8 @@
         label = at ? (back ? "Back to the pattern" : `Next example (${at + 1} of ${N})`) : `${N} example${N > 1 ? "s" : ""} below`;
       vnb.classList.toggle("head", at === 0);
       vnb.setAttribute("aria-label", label);
-      vnb.title = `${label} (${back ? "↑" : "↓"})`;
+      vnb.setAttribute("aria-keyshortcuts", back ? "U" : "ArrowDown");
+      vnb.title = `${label} (${back ? "U" : "↓"})`;
       vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
       vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
     }
@@ -692,6 +700,8 @@
         }
       };
 
+    let jumpBuf = "",
+      jumpT = null;
     addEventListener("keydown", e => {
       /** @type {any} */
       const target = e.target;
@@ -713,6 +723,20 @@
         e.preventDefault();
         return;
       }
+      // typing a slide number then Enter jumps there (the dots' shortcut); the digits expire after 2 s
+      const typed = jumpBuf;
+      jumpBuf = "";
+      clearTimeout(jumpT);
+      if (/^[0-9]$/.test(e.key)) {
+        jumpBuf = (typed + e.key).slice(-4);
+        jumpT = setTimeout(() => (jumpBuf = ""), 2000);
+        return;
+      }
+      if (e.key === "Enter" && +typed) {
+        e.preventDefault();
+        go(+typed - 1);
+        return;
+      }
       if (["ArrowRight", " ", "Enter"].includes(e.key)) {
         e.preventDefault();
         next();
@@ -724,7 +748,10 @@
         band(e.key === "PageDown" ? 1 : -1);
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        vstep(e.key === "ArrowDown" ? 1 : -1);
+        (e.shiftKey ? band : vstep)(e.key === "ArrowDown" ? 1 : -1);
+      } else if (e.key === "u" || e.key === "U") {
+        const col = colOf(slides[cur]);
+        if (col) go(slides.indexOf(col));
       } else if (e.key === "Home") go(0);
       else if (e.key === "End") go(slides.length - 1);
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
@@ -755,8 +782,8 @@
 
     // ---------- search ----------
     // "/" (or Ctrl/Cmd+K, or the dock's search button) opens a full-screen dialog that fuzzy-searches every slide.
-    // The index is precomputed once: each slide's title, its slides.md summary (the JSON-LD hasPart description the
-    // docs build injects; absent on a plain static preview) and its body text plus speaker notes.
+    // The index is precomputed once: each slide's title, its slides.md summary and keywords (the JSON-LD hasPart
+    // description and keywords the docs build injects; absent on a plain static preview) and its body text plus speaker notes.
     // Matching is bounds-based: each query term must occur, letters in order, inside one window of a field, and the
     // window is bounded (at most one and a half times the term), so letters scattered through long notes never match.
     // The tightest window wins: forward from each occurrence of the first letter to the earliest end, then backward to
@@ -764,6 +791,7 @@
     /** @type {[string, number][]} */
     const FZ_FIELDS = [
       ["title", 3],
+      ["keywords", 2.5],
       ["summary", 2],
       ["body", 1],
     ];
@@ -792,8 +820,18 @@
         const part = parts.find(p => p.position === i + 1),
           title = headingText(s) || part?.name || `Slide ${i + 1}`,
           summary = fzNorm(part?.description || ""),
+          keywords = fzNorm(typeof part?.keywords === "string" ? part.keywords : ""),
           body = fzNorm(`${fzText(s.el)} ${s.notes || ""}`);
-        return { n: i, band: BANDS[s.group]?.[0] || "", title, summary, body, notes: fzNorm(s.notes || ""), lc: { title: title.toLowerCase(), summary: summary.toLowerCase(), body: body.toLowerCase() } };
+        return {
+          n: i,
+          band: BANDS[s.group]?.[0] || "",
+          title,
+          summary,
+          keywords,
+          body,
+          notes: fzNorm(s.notes || ""),
+          lc: { title: title.toLowerCase(), keywords: keywords.toLowerCase(), summary: summary.toLowerCase(), body: body.toLowerCase() },
+        };
       });
     };
     // Tightest bounded window [start, end) of `text` holding the characters of `term` in order, or null.
@@ -826,7 +864,7 @@
       const hits = [];
       for (const r of fzIndex) {
         let score = 0;
-        const marks = { title: [], summary: [], body: [] };
+        const marks = { title: [], keywords: [], summary: [], body: [] };
         for (const term of terms) {
           let best = 0;
           for (const [f, w] of FZ_FIELDS) {
@@ -870,6 +908,19 @@
       const inner = marks.body.filter(([b, e]) => b >= from && e <= to).map(([b, e]) => [b - from, e - from]);
       return [from ? "…" : "", ...fzMark(r.body.slice(from, to), inner), to < r.body.length ? "…" : ""];
     };
+    // one tag per keyword that holds a match, with the match marked; keywords are joined by ", " in the index
+    const fzKeys = ({ r, marks }) => {
+      const out = [];
+      if (!marks.keywords?.length) return out;
+      let at = 0;
+      for (const key of r.keywords.split(", ")) {
+        const end = at + key.length,
+          inner = marks.keywords.filter(([b, e]) => b >= at && e <= end).map(([b, e]) => [b - at, e - at]);
+        if (inner.length) out.push(h("span", { class: "fz-k" }, ...fzMark(key, inner)));
+        at = end + 2;
+      }
+      return out;
+    };
     const fzIn = h("input", {
       type: "search",
       class: "fz-in",
@@ -887,7 +938,7 @@
     const fz = h(
       "dialog",
       { class: "fz", "aria-label": "Search slides" },
-      h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
+      h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", "aria-keyshortcuts": "Escape", title: "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
     );
     document.body.append(fz);
     const fzPaint = () => {
@@ -907,7 +958,14 @@
             "li",
             { id: `fz-o-${i}`, role: "option", onclick: () => fzPick(i), onmousemove: () => fzSel !== i && ((fzSel = i), fzPaint()) },
             h("span", { class: "fz-n" }, String(hit.r.n + 1).padStart(2, "0")),
-            h("div", { class: "fz-t" }, ...fzMark(hit.r.title, hit.marks.title || []), hit.r.band && hit.r.band !== hit.r.title ? h("span", { class: "fz-b" }, hit.r.band) : null),
+            h(
+              "div",
+              { class: "fz-t" },
+              ...fzMark(hit.r.title, hit.marks.title || []),
+              hit.r.band && hit.r.band !== hit.r.title ? h("span", { class: "fz-b" }, hit.r.band) : null,
+              // matched keywords explain hits whose title, summary and text do not show the query
+              ...fzKeys(hit)
+            ),
             h("div", { class: "fz-s" }, fzLine(hit))
           )
         )
@@ -916,7 +974,7 @@
         ? fzHits.length
           ? `${fzHits.length} matching slide${fzHits.length === 1 ? "" : "s"} · ↑↓ to choose, Enter to open`
           : "No slides match"
-        : `${fzHits.length} slides · type to search titles, summaries and slide text`;
+        : `${fzHits.length} slides · type to search titles, keywords, summaries and slide text`;
       fzPaint();
     };
     function fzPick(i) {
@@ -965,7 +1023,7 @@
     const smp = h(
       "dialog",
       { class: "smp", "aria-label": "Slide map" },
-      h("div", { class: "smp-bar" }, h("h2", { class: "smp-h" }, "Slide map"), h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", onclick: () => smp.close() }, "Esc")),
+      h("div", { class: "smp-bar" }, h("h2", { class: "smp-h" }, "Slide map"), h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", "aria-keyshortcuts": "Escape G", title: "Close slide map (Esc or G)", onclick: () => smp.close() }, "Esc")),
       smpBody
     );
     document.body.append(smp);
@@ -986,6 +1044,7 @@
                     class: `smp-t${s.header ? " hd" : s.parent ? " sub" : ""}`,
                     type: "button",
                     "aria-label": `Go to slide ${n + 1}: ${label(s) || rowName(r.group)}`,
+                    title: `Go to slide ${n + 1}: ${label(s) || rowName(r.group)} (arrows to move, Enter)`,
                     onclick: () => (smp.close(), go(n)),
                   },
                   h("b", {}, String(n + 1).padStart(2, "0"), s.kids ? h("i", { title: `${s.kids.length} examples below` }, `↓${s.kids.length}`) : null),
