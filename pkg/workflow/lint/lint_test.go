@@ -27,7 +27,6 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"pull-request-target-roles", "untrusted-roles-detection", "safe-output-shell-expansion", "firewall-ssl-bump",
 		"custom-job-detection",
 		"grader-file-io",
-		"grader-shell-file-write",
 		"pull-request-target-checkout", "prompt-expression",
 		"gateway-dispatch-literals",
 		"artipacked", "cache-poisoning", "excessive-permissions", "obfuscation",

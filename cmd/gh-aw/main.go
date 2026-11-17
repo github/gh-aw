@@ -90,15 +90,15 @@ var rootCmd = &cobra.Command{
 	Long: `GitHub Agentic Workflows CLI
 
 Common Tasks:
-  ` + string(constants.CLIExtensionPrefix) + ` init                  		# Set up a new repository
-  ` + string(constants.CLIExtensionPrefix) + ` doctor --repo owner/repo 		# Run diagnostics for authentication and repository setup
-  ` + string(constants.CLIExtensionPrefix) + ` add-wizard            		# Add workflows with interactive guided setup
-  ` + string(constants.CLIExtensionPrefix) + ` new my-workflow       		# Create your first workflow
-  ` + string(constants.CLIExtensionPrefix) + ` compile               		# Compile all workflows
-  ` + string(constants.CLIExtensionPrefix) + ` run my-workflow       		# Execute a workflow
-  ` + string(constants.CLIExtensionPrefix) + ` status                		# Check workflow status
-  ` + string(constants.CLIExtensionPrefix) + ` logs my-workflow      		# Download and analyze execution logs
-  ` + string(constants.CLIExtensionPrefix) + ` audit <run-id-or-url> 		# Audit and compare workflow runs
+  ` + string(constants.CLIExtensionPrefix) + ` init                     # Set up a new repository
+  ` + string(constants.CLIExtensionPrefix) + ` doctor --repo owner/repo # Run diagnostics for authentication and repository setup
+  ` + string(constants.CLIExtensionPrefix) + ` add-wizard               # Add workflows with interactive guided setup
+  ` + string(constants.CLIExtensionPrefix) + ` new my-workflow          # Create your first workflow
+  ` + string(constants.CLIExtensionPrefix) + ` compile                  # Compile all workflows
+  ` + string(constants.CLIExtensionPrefix) + ` run my-workflow          # Execute a workflow
+  ` + string(constants.CLIExtensionPrefix) + ` status                   # Check workflow status
+  ` + string(constants.CLIExtensionPrefix) + ` logs my-workflow         # Download and analyze execution logs
+  ` + string(constants.CLIExtensionPrefix) + ` audit <run-id-or-url>    # Audit and compare workflow runs
 
 For detailed help on any command, use:
   ` + string(constants.CLIExtensionPrefix) + ` [command] --help`,
@@ -642,6 +642,24 @@ func fixPathForCommand(s string) string {
 	return s
 }
 
+func fixCommandPathInError(message string) string {
+	if !strings.HasPrefix(message, "unknown command ") {
+		return message
+	}
+	const marker = ` for "`
+	start := strings.LastIndex(message, marker)
+	if start < 0 {
+		return message
+	}
+	pathStart := start + len(marker)
+	pathEndOffset := strings.Index(message[pathStart:], `"`)
+	if pathEndOffset < 0 {
+		return message
+	}
+	pathEnd := pathStart + pathEndOffset
+	return message[:pathStart] + fixPathForCommand(message[pathStart:pathEnd]) + message[pathEnd:]
+}
+
 func writeUsageCommands(cmd *cobra.Command) {
 	out := cmd.OutOrStderr()
 	cmds := cmd.Commands()
@@ -1032,7 +1050,7 @@ func main() {
 			os.Exit(exitCodeErr.Code)
 		}
 
-		errMsg := err.Error()
+		errMsg := fixCommandPathInError(err.Error())
 		// Check if error is already formatted to avoid double formatting:
 		// - Contains suggestions (FormatErrorWithSuggestions)
 		// - Starts with ✗ (FormatErrorMessage)
@@ -1043,6 +1061,8 @@ func main() {
 
 		if isAlreadyFormatted {
 			fmt.Fprintln(os.Stderr, errMsg)
+		} else if errMsg != err.Error() {
+			fmt.Fprintln(os.Stderr, console.FormatErrorChain(errors.New(errMsg)))
 		} else {
 			fmt.Fprintln(os.Stderr, console.FormatErrorChain(err))
 		}

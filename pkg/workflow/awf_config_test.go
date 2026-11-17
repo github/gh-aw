@@ -1737,6 +1737,57 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 	})
 }
 
+func TestBuildAWFConfigJSON_ProxiedEngineTransportDoesNotGrantDirectModelAPI(t *testing.T) {
+	tests := []struct {
+		engine   constants.EngineName
+		set      string
+		modelAPI string
+	}{
+		{constants.CopilotEngine, "copilot", "api.githubcopilot.com"},
+		{constants.ClaudeEngine, "claude", "api.anthropic.com"},
+		{constants.CodexEngine, "codex", "api.openai.com"},
+		{constants.GeminiEngine, "gemini", "generativelanguage.googleapis.com"},
+		{constants.PiEngine, "pi", "api.githubcopilot.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.engine), func(t *testing.T) {
+			network := &NetworkPermissions{
+				Allowed:  []string{tt.set},
+				Firewall: &FirewallConfig{Enabled: true},
+			}
+			allowedDomains := GetAllowedDomainsForEngine(tt.engine, network, nil, nil)
+			if tt.engine == constants.ClaudeEngine {
+				allowedDomains = NewClaudeEngine().claudeAllowedDomains(&WorkflowData{NetworkPermissions: network})
+			}
+			configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName:     string(tt.engine),
+				AllowedDomains: allowedDomains,
+				WorkflowData: &WorkflowData{
+					EngineConfig:       &EngineConfig{ID: string(tt.engine)},
+					NetworkPermissions: network,
+				},
+			})
+			require.NoError(t, err)
+
+			var parsed struct {
+				Network struct {
+					AllowDomains []string `json:"allowDomains"`
+				} `json:"network"`
+				APIProxy struct {
+					Enabled bool `json:"enabled"`
+				} `json:"apiProxy"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(configJSON), &parsed))
+			assert.True(t, parsed.APIProxy.Enabled, "the inference gateway should remain enabled")
+			assert.Contains(t, parsed.Network.AllowDomains, "host.docker.internal",
+				"the agent must retain transport to the gateway")
+			assert.NotContains(t, parsed.Network.AllowDomains, tt.modelAPI,
+				"the proxied transport baseline must not grant direct model API egress")
+		})
+	}
+}
+
 // TestBuildAWFConfigJSON_APIProxyCACert verifies that sandbox.agent.ca-cert is
 // mapped to apiProxy.caCert and gated to AWF versions that support the field.
 func TestBuildAWFConfigJSON_APIProxyCACert(t *testing.T) {

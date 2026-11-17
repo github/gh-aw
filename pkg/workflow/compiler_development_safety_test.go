@@ -25,7 +25,6 @@ func TestDryRunRejectsUnsupportedEffects(t *testing.T) {
 		{"custom MCP servers", WorkflowData{ParsedTools: &Tools{Custom: map[string]MCPServerConfig{"external": {Command: "unsafe"}}}}},
 		{"mcp-scripts", WorkflowData{MCPScripts: &MCPScriptsConfig{}}},
 		{"safe-outputs.scripts", WorkflowData{SafeOutputs: &SafeOutputsConfig{Scripts: map[string]*SafeScriptConfig{"publish": {}}}}},
-		{"graders.operational-value.run", WorkflowData{Graders: &GradersConfig{Graders: map[string]*GraderDefinition{"operational-value": {Run: "grade.sh"}}}}},
 		{"permissions.id-token", WorkflowData{Permissions: "permissions:\n  id-token: write\n"}},
 		{"on.permissions.id-token", WorkflowData{OnPermissions: NewPermissionsParser("permissions:\n  id-token: write\n").ToPermissions()}},
 		{"jobs.agent.pre-steps", WorkflowData{Jobs: map[string]any{"agent": map[string]any{"pre-steps": []any{map[string]any{"run": "echo unsafe"}}}}}},

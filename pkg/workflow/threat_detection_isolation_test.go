@@ -1125,8 +1125,8 @@ Test workflow`, tt.provider, network, tt.provider)
 			if got := strings.Contains(allowDomainsLine, strconv.Quote("api.openai.com")); got != (tt.provider == "openai") {
 				t.Errorf("OpenAI API transport allowed=%t for provider %q", got, tt.provider)
 			}
-			if tt.provider == "github" && !strings.Contains(allowDomainsLine, strconv.Quote("api.githubcopilot.com")) {
-				t.Error("GitHub-hosted detector must retain Copilot routing transport")
+			if tt.provider == "github" && strings.Contains(allowDomainsLine, strconv.Quote("api.githubcopilot.com")) {
+				t.Error("GitHub-hosted detector must not grant direct Copilot API egress")
 			}
 			for _, domain := range []string{"auth.openai.com", "ab.chatgpt.com"} {
 				if got := strings.Contains(allowDomainsLine, strconv.Quote(domain)); got != tt.vendorOptIn {

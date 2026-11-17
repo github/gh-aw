@@ -130,7 +130,6 @@ type analyzer struct {
 	result          Result
 	promptScope     scope
 	failure         error
-	literalScript   bool
 	safeOutputJob   bool
 	workflowContext bool
 	stepOutput      *stepOutputTransport

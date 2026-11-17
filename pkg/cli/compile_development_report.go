@@ -9,7 +9,7 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
-const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations, authored custom jobs, daily credit accounting, and OTLP telemetry configuration are disabled; OTEL_* and GH_AW_OTLP_* environment variables are removed. Authored steps and post-steps are omitted from emitted locks, including their code and credentials; separate dispatch does not execute them. Pre-steps, pre-agent-steps, on.steps, custom MCP servers, custom safe-output scripts, Bash graders, and authored OIDC permissions are rejected. Per-run credit limits are retained or derived from configured daily limits. Manual dispatch is enabled with maintainer/admin authorization. Agent shell commands and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
+const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations, authored custom jobs, daily credit accounting, and OTLP telemetry configuration are disabled; OTEL_* and GH_AW_OTLP_* environment variables are removed. Authored steps and post-steps are omitted from emitted locks, including their code and credentials; separate dispatch does not execute them. Pre-steps, pre-agent-steps, on.steps, custom MCP servers, custom safe-output scripts, and authored OIDC permissions are rejected. Per-run credit limits are retained or derived from configured daily limits. Manual dispatch is enabled with maintainer/admin authorization. Agent shell commands and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
 
 // DryRunCompileReport describes the compilation gate, not execution authorization.
 type DryRunCompileReport struct {

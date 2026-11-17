@@ -21,5 +21,5 @@ func TestMCPCommandUnknownSubcommandReturnsError(t *testing.T) {
 
 	err := cmd.Execute()
 	require.Error(t, err)
-	assert.Equal(t, `unknown command "remove" for "mcp"`, err.Error())
+	assert.Equal(t, `unknown command "remove" for "gh aw mcp"`, err.Error())
 }

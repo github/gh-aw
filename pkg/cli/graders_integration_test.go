@@ -28,7 +28,7 @@ func TestGradersCommandIntegration(t *testing.T) {
 		{
 			name:       "run grader help",
 			args:       []string{"graders", "run", "--help"},
-			wantOutput: []string{"Run one enabled built-in, JavaScript, or operational-value Bash grader", "<workflow-id> <grader-id> [run-id]", "--repo"},
+			wantOutput: []string{"Run one enabled built-in, JavaScript, or operational-value grader", "<workflow-id> <grader-id> [run-id]", "--repo"},
 		},
 		{
 			name:       "run grader rejects invalid run ID",

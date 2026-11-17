@@ -1619,6 +1619,11 @@ on:
     # to +1 and -1 strings respectively.
     type: 1
 
+    # Remove the trigger reaction in conclusion, including failed or skipped agent
+    # runs. Independent of status-comment.
+    # (optional)
+    remove-on-complete: true
+
     # Whether reactions are allowed for issue triggers (issues, issue_comment).
     # (optional)
     issues: true
@@ -3252,7 +3257,9 @@ engine:
   # can typically be omitted. Supports full model IDs (e.g.,
   # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
   # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-  # main agent engine.
+  # main agent engine. For the main agent engine, router values ('router',
+  # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+  # are rejected for other engines.
   # (optional)
   model: "example-value"
 
@@ -4207,7 +4214,9 @@ engine:
     # can typically be omitted. Supports full model IDs (e.g.,
     # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
     # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-    # main agent engine.
+    # main agent engine. For the main agent engine, router values ('router',
+    # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+    # are rejected for other engines.
     # (optional)
     model: "example-value"
 
@@ -10401,7 +10410,6 @@ safe-outputs:
 
     # Format 1: Array of label names
     labels: []
-      # Array items: string
 
     # Format 2: GitHub Actions expression resolving to a comma-separated list of label
     # names (e.g. '${{ inputs.labels }}')
@@ -10731,8 +10739,8 @@ safe-outputs:
         workflows: "read"
 
     # Time until the pull request expires and should be automatically closed (only for
-    # same-repo PRs without target-repo). Supports integer (days) or relative time
-    # format. Minimum duration: 2 hours.
+    # same-repo PRs without target-repo). Supports integer (days), relative time
+    # format, or false to disable expiration. Minimum duration: 2 hours.
     # (optional)
     # Accepted formats:
 
@@ -10742,6 +10750,9 @@ safe-outputs:
     # Format 2: Relative time (e.g., '2h', '7d', '2w', '1m', '1y'); minimum 2h for
     # hour values
     expires: "example-value"
+
+    # Format 3: Set to false to explicitly disable expiration
+    expires: false
 
     # Enable auto-merge for the pull request. Accepts true/false, an explicit merge
     # method (squash, merge, rebase), or a GitHub Actions expression resolving to any
@@ -16392,6 +16403,13 @@ safe-outputs:
     # (optional)
     body: null
 
+    # Default operation for body updates when the agent omits operation: 'append' (add
+    # to end), 'prepend' (add to start), 'replace' (overwrite completely), or
+    # 'replace-island' (update a workflow-specific section). An explicit agent
+    # operation takes precedence. Defaults to 'append' if not specified.
+    # (optional)
+    operation: "append"
+
     # Controls whether AI-generated footer is added when updating the issue body. When
     # false, the visible footer content is omitted but XML markers are still included.
     # Defaults to true. Only applies when 'body' is enabled.
@@ -19901,6 +19919,17 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     create-issue: "example-value"
 
+    # Whether to surface missing tools as agent failures (default: true). Supports
+    # literal boolean or GitHub Actions expression.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    report-as-failure: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    report-as-failure: "example-value"
+
     # Prefix for issue titles when creating issues for missing tools (default:
     # '[missing tool]')
     # (optional)
@@ -20186,6 +20215,17 @@ safe-outputs:
 
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     create-issue: "example-value"
+
+    # Whether to surface missing data as agent failures (default: true). Supports
+    # literal boolean or GitHub Actions expression.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    report-as-failure: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    report-as-failure: "example-value"
 
     # Prefix for issue titles when creating issues for missing data (default:
     # '[missing data]')
@@ -22123,6 +22163,11 @@ safe-outputs:
   # Format 2: Enable release updates with default configuration
   update-release: null
 
+  # When true, require the agent job to succeed before running detection or
+  # processing safe outputs
+  # (optional)
+  require-agent-success: true
+
   # When true, emit step summary messages instead of making GitHub API calls
   # (preview mode)
   # (optional)
@@ -22441,7 +22486,9 @@ safe-outputs:
       # can typically be omitted. Supports full model IDs (e.g.,
       # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
       # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-      # main agent engine.
+      # main agent engine. For the main agent engine, router values ('router',
+      # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+      # are rejected for other engines.
       # (optional)
       model: "example-value"
 
@@ -23396,7 +23443,9 @@ safe-outputs:
         # can typically be omitted. Supports full model IDs (e.g.,
         # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
         # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-        # main agent engine.
+        # main agent engine. For the main agent engine, router values ('router',
+        # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+        # are rejected for other engines.
         # (optional)
         model: "example-value"
 
@@ -25955,13 +26004,15 @@ import-schema:
 # safe-outputs.threat-detection.engine.model) takes precedence over this field for
 # that engine instance. Supports full model IDs (e.g.
 # 'claude-3-5-sonnet-20241022', 'gpt-5.4') and model aliases (e.g. 'small',
-# 'large').
+# 'large'). Router values ('router', 'router/economy', 'router/balanced',
+# 'router/robust') choose model routing for the main agent instead of a fixed
+# model.
 # (optional)
 model: "example-value"
 
-# Graders over the unified session. Fast built-ins run in conclusion; custom
-# JavaScript and operational-value.run Bash evaluators run only in the separate
-# graders job.
+# Graders over the unified session, including reserved operational-value
+# JavaScript. Fast built-ins run in conclusion; executable custom graders run only
+# in the separate graders job.
 # (optional)
 graders:
   {}

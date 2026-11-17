@@ -81,6 +81,7 @@ run-name: "Smoke Claude Dynamic Workflow"
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+  GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.smoke-claude-dynamic
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Smoke%20Claude%20Dynamic%20Workflow,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=claude'
   OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
@@ -301,6 +302,7 @@ jobs:
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -338,6 +340,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -377,6 +380,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -392,6 +396,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -406,6 +411,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -1249,6 +1255,14 @@ jobs:
         name: Verify packaged Claude dynamic workflow evidence
         run: "node <<'NODE'\nconst assert = require(\"node:assert/strict\");\nconst { execFileSync } = require(\"node:child_process\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\", \"log_parser_shared.cjs\"));\nconst { normalizeClaudeSession } = require(path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\", \"claude_session.cjs\"));\nconst script = \".claude/workflows/smoke-claude-dynamic.js\";\nconst fixture = \".claude/workflows/references/smoke-claude-dynamic/.context\";\nfor (const file of [script, fixture]) {\n  assert.deepEqual(\n    fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE, file)),\n    execFileSync(\"tar\", [\"-xOf\", \"/tmp/gh-aw/base/snapshot.tar\", \"--\", file]),\n    `${file} must match the trusted activation artifact`\n  );\n}\nconst result = JSON.parse(fs.readFileSync(\"/tmp/gh-aw/agent/claude-dynamic-smoke.json\", \"utf8\"));\nassert.deepEqual(result, {\n  status: \"PASS\",\n  workflow: \"smoke-claude-dynamic\",\n  token: \"gh-aw-claude-dynamic-fixture-v1\",\n  runId: process.env.SMOKE_RUN_ID\n}, \"The saved workflow must return the expected fixture and invocation arguments\");\nconst records = parseLogEntries(fs.readFileSync(\"/tmp/gh-aw/agent-stdio.log\", \"utf8\"));\nassert.ok(Array.isArray(records), \"Claude must produce a parseable native session log\");\nconst events = normalizeClaudeSession(records);\nconst launches = events.filter(event =>\n  event.type === \"tool.execution_start\" &&\n  event.data?.toolName === \"Workflow\" &&\n  event.data.input?.name === \"smoke-claude-dynamic\" &&\n  event.data.input.args?.runId === process.env.SMOKE_RUN_ID\n);\nassert.ok(launches.length > 0, \"Claude must invoke the saved script through the native Workflow tool\");\nassert.ok(launches.some(launch => events.some(event =>\n  event.type === \"tool.execution_complete\" &&\n  event.data?.toolCallId === launch.data.toolCallId &&\n  event.data.success === true\n)), \"The native Workflow tool must launch successfully\");\nassert.ok(launches.some(launch => records.some(record =>\n  record.type === \"system\" &&\n  record.subtype === \"task_notification\" &&\n  record.tool_use_id === launch.data.toolCallId &&\n  record.status === \"completed\"\n)), \"The launched dynamic workflow must complete successfully\");\nfs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,\n  \"## Claude dynamic workflow smoke: PASS\\n\\n\" +\n  \"Verified trusted activation packaging, recursive hidden-file restoration, \" +\n  \"native Workflow invocation, fixture contents, and run-ID argument propagation.\\n\");\nNODE"
 
+      - name: Emit OTLP job conclusion before artifacts
+        if: always() && env.GH_AW_OTEL_METRICS == 'true'
+        continue-on-error: true
+        run: node "${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs"
+        env:
+          INPUT_JOB_NAME: ${{ github.job }}
+          GH_AW_JOB_RESULT: ${{ job.status }}
+          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1290,6 +1304,7 @@ jobs:
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
+            ${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json

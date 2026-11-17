@@ -314,14 +314,13 @@ resources:
 			assert.Equal(t, ".github/aw/policy/controls.json", pkg.ResourceFiles[1].DestinationPath)
 		})
 
-		t.Run("installs custom grader evaluator resources", func(t *testing.T) {
+		t.Run("does not infer resources from workflow grader definitions", func(t *testing.T) {
 			downloadPackageFileFromGitHubForHost = func(_ context.Context, owner, repo, path, ref, host string) ([]byte, error) {
 				switch path {
 				case "packages/repo-assist/aw.yml":
 					return []byte(`name: Repo Assist
 files:
   - workflows/review.md
-  - workflows/triage.md
 `), nil
 				case "packages/repo-assist/README.md":
 					return []byte("# Repo Assist\n"), nil
@@ -330,19 +329,10 @@ files:
 on: pull_request
 graders:
   operational-value:
-    run: .github/graders/shared-operational-value.sh
+    script: return [{id: "effect", value: 1}]
 ---
 # Review
 `), nil
-				case "packages/repo-assist/workflows/triage.md":
-					return []byte(`---
-on: issues
-graders:
-  operational-value:
-    run: ./graders/triage-operational-value.sh
----
-# Triage
-`), nil
 				default:
 					return nil, createRepositoryPackageNotFoundError(path)
 				}
@@ -354,63 +344,9 @@ graders:
 
 			pkg, err := resolveRepositoryPackage(t.Context(), &RepoSpec{RepoSlug: "owner/repo", PackagePath: "packages/repo-assist"}, "")
 			require.NoError(t, err)
-			require.Len(t, pkg.ResourceFiles, 2)
-			assert.Equal(t, resolvedPackageResource{SourcePath: ".github/graders/shared-operational-value.sh", DestinationPath: ".github/graders/shared-operational-value.sh"}, pkg.ResourceFiles[0])
-			assert.Equal(t, resolvedPackageResource{SourcePath: "packages/repo-assist/workflows/graders/triage-operational-value.sh", DestinationPath: ".github/workflows/graders/triage-operational-value.sh"}, pkg.ResourceFiles[1])
-		})
-
-		t.Run("deduplicates evaluators from imported manifests", func(t *testing.T) {
-			downloadPackageFileFromGitHubForHost = func(_ context.Context, owner, repo, path, ref, host string) ([]byte, error) {
-				switch path {
-				case "packages/repo-assist/aw.yml":
-					return []byte(`name: Repo Assist
-includes:
-  - modules/a/aw.yml
-  - modules/b/aw.yml
-`), nil
-				case "packages/repo-assist/README.md":
-					return []byte("# Repo Assist\n"), nil
-				case "packages/repo-assist/modules/a/aw.yml":
-					return []byte(`name: Module A
-files:
-  - workflows/a.md
-`), nil
-				case "packages/repo-assist/modules/b/aw.yml":
-					return []byte(`name: Module B
-files:
-  - workflows/b.md
-`), nil
-				case "packages/repo-assist/modules/a/workflows/a.md":
-					return []byte(`---
-on: pull_request
-graders:
-  operational-value:
-    run: .github/graders/shared-operational-value.sh
----
-# A
-`), nil
-				case "packages/repo-assist/modules/b/workflows/b.md":
-					return []byte(`---
-on: issues
-graders:
-  operational-value:
-    run: .github/graders/shared-operational-value.sh
----
-# B
-`), nil
-				default:
-					return nil, createRepositoryPackageNotFoundError(path)
-				}
-			}
-			listPackageWorkflowFilesForHost = func(_ context.Context, owner, repo, ref, workflowPath, host string) ([]string, error) {
-				t.Fatalf("unexpected scan of %s", workflowPath)
-				return nil, nil
-			}
-
-			pkg, err := resolveRepositoryPackage(t.Context(), &RepoSpec{RepoSlug: "owner/repo", PackagePath: "packages/repo-assist"}, "")
-			require.NoError(t, err)
-			require.Len(t, pkg.ResourceFiles, 1)
-			assert.Equal(t, ".github/graders/shared-operational-value.sh", pkg.ResourceFiles[0].DestinationPath)
+			assert.Empty(t, pkg.ResourceFiles)
+			require.Len(t, pkg.InstallationSource, 1)
+			assert.Equal(t, "packages/repo-assist/workflows/review.md", pkg.InstallationSource[0].SourcePath)
 		})
 		getRepositoryPackageLatestRelease = func(_ context.Context, repoSlug, host string) (string, error) {
 			assert.Equal(t, "owner/repo", repoSlug)

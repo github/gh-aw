@@ -32,7 +32,7 @@ Available subcommands:
   gh aw mcp inspect weekly-research --server github --tool create_issue  # Inspect specific tool`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
+				return fmt.Errorf("unknown command %q for %q", args[0], cliCommandPath(cmd))
 			}
 			return nil
 		},

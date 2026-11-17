@@ -40,14 +40,6 @@ func (c *Compiler) validateDryRunEffects(data *WorkflowData) error {
 		unsupported = append(unsupported, "mcp-scripts")
 	}
 	unsupported = append(unsupported, dryRunResolvedOutputEffects(data)...)
-	if data.Graders != nil {
-		for _, name := range slices.Sorted(maps.Keys(data.Graders.Graders)) {
-			grader := data.Graders.Graders[name]
-			if grader != nil && (grader.Enabled == nil || *grader.Enabled) && grader.Run != "" {
-				unsupported = append(unsupported, "graders."+name+".run")
-			}
-		}
-	}
 	permissions := NewPermissionsParser(data.Permissions).ToPermissions()
 	if level, _ := permissions.Get(PermissionIdToken); level == PermissionWrite {
 		unsupported = append(unsupported, "permissions.id-token")
@@ -191,9 +183,14 @@ func makeDryRunJobInert(job *Job, runsOn string) {
 }
 
 func (c *Compiler) dryRunPlaceholderRunsOn(data *WorkflowData, job *Job) string {
-	requireSelfHosted, _ := compilerenv.ResolveRequireSelfHostedRunners()
+	requireSelfHosted, err := compilerenv.ResolveRequireSelfHostedRunners()
+	if err != nil {
+		compilerDevelopmentLog.Printf("Cannot resolve self-hosted runner requirement for dry-run placeholder: %v", err)
+	}
 	requireSelfHosted = requireSelfHosted || c.requireSelfHosted
-	if config, err := c.loadRepoConfig(); err == nil && config != nil {
+	if config, err := c.loadRepoConfig(); err != nil {
+		compilerDevelopmentLog.Printf("Cannot load repository configuration for dry-run placeholder runner selection: %v", err)
+	} else if config != nil {
 		requireSelfHosted = requireSelfHosted || config.RequireSelfHostedRunners
 	}
 	for _, candidate := range []string{job.RunsOn, data.RunsOn, c.formatFrameworkJobRunsOn(data)} {
@@ -253,8 +250,8 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 				}
 			}
 			for _, path := range paths {
-				if len(path) >= 4 && (strings.EqualFold(path[0], "needs") || strings.EqualFold(path[0], "jobs")) && strings.EqualFold(path[2], "outputs") {
-					add(path[1], path[3])
+				if job, output, ok := dryRunOutputReference(path); ok {
+					add(job, output)
 				}
 			}
 		case reflect.Map:
@@ -278,4 +275,13 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 		visit(reflect.ValueOf(value), false)
 	}
 	return outputs
+}
+
+func dryRunOutputReference(path []string) (job, output string, ok bool) {
+	if len(path) < 4 {
+		return "", "", false
+	}
+	root, job, section, output := path[0], path[1], path[2], path[3] //nolint:uncheckedsliceindex // The length guard bounds all four references.
+	ok = (strings.EqualFold(root, "needs") || strings.EqualFold(root, "jobs")) && strings.EqualFold(section, "outputs")
+	return job, output, ok
 }

@@ -32,7 +32,7 @@ constructors:
 | Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule` |
 | Network, tools, images, and sandbox | `NetworkScopeRule`, `PushTargetRule`, `AllowedLabelsRule`, `ToolScopeRule`, `ImageArgumentRule`, `SandboxConfigRule`, `FirewallSSLBumpRule` |
 | Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |
-| Grader I/O | `GraderFileIORule`, `GraderShellFileWriteRule` |
+| Grader I/O | `GraderFileIORule` |
 
 `ASTTargets` selects the authored AW AST (`AWAST`), native Actions AST
 (`ActionsAST`), or both for a rule. `Severity` uses `Error` and `Warning` values

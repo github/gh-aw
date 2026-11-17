@@ -3,9 +3,9 @@
     "bazel": ["releases.bazel.build", "mirror.bazel.build", "bcr.bazel.build", "blog.bazel.build"],
     "chrome": ["*.google.com", "*.googleapis.com", "*.gvt1.com"],
     "clojure": ["repo.clojars.org", "clojars.org"],
-    "codex-vendor": ["ab.chatgpt.com", "auth.openai.com"],
+    "codex-vendor": ["ab.chatgpt.com", "api.openai.com", "auth.openai.com"],
     "containers": ["ghcr.io", "registry.hub.docker.com", "*.docker.io", "*.docker.com", "production.cloudflare.docker.com", "dl.k8s.io", "pkgs.k8s.io", "quay.io", "mcr.microsoft.com", "gcr.io", "auth.docker.io"],
-    "copilot-vendor": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.individual.githubcopilot.com", "telemetry.enterprise.githubcopilot.com"],
+    "copilot-vendor": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.githubcopilot.com", "api.individual.githubcopilot.com", "telemetry.enterprise.githubcopilot.com"],
     "dart": ["pub.dev", "pub.dartlang.org", "storage.googleapis.com"],
     "defaults": [
       "crl3.digicert.com",
@@ -81,6 +81,7 @@
     ],
     "elixir": ["hex.pm", "repo.hex.pm", "builds.hex.pm", "cdn.hex.pm", "fastly.hex.pm"],
     "fonts": ["fonts.googleapis.com", "fonts.gstatic.com"],
+    "gemini-vendor": ["generativelanguage.googleapis.com"],
     "github": [
       "*.githubusercontent.com",
       "codeload.github.com",
@@ -262,11 +263,11 @@
   },
   "engine-defaults": {
     "claude": ["api.github.com", "github.com", "host.docker.internal", "raw.githubusercontent.com"],
-    "codex": ["172.30.0.1", "api.github.com", "api.openai.com", "github.com", "host.docker.internal"],
-    "copilot": ["api.github.com", "api.githubcopilot.com", "github.com", "host.docker.internal", "raw.githubusercontent.com"],
-    "gemini": ["generativelanguage.googleapis.com", "github.com", "host.docker.internal", "raw.githubusercontent.com"],
+    "codex": ["172.30.0.1", "api.github.com", "github.com", "host.docker.internal"],
+    "copilot": ["api.github.com", "github.com", "host.docker.internal", "raw.githubusercontent.com"],
+    "gemini": ["github.com", "host.docker.internal", "raw.githubusercontent.com"],
     "agy": ["host.docker.internal", "github.com", "api.github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"],
-    "pi": ["api.githubcopilot.com", "host.docker.internal", "github.com", "raw.githubusercontent.com"],
+    "pi": ["host.docker.internal", "github.com", "raw.githubusercontent.com"],
     "pi-base": ["host.docker.internal", "github.com", "raw.githubusercontent.com"],
     "threat-detection": ["api.business.githubcopilot.com", "api.enterprise.githubcopilot.com", "api.github.com", "api.githubcopilot.com", "api.individual.githubcopilot.com", "github.com", "host.docker.internal", "registry.npmjs.org"]
   },

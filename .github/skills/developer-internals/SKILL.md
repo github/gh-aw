@@ -196,6 +196,11 @@ func (c *Compiler) validateStrictMode(frontmatter map[string]any, networkPermiss
 }
 ```
 
+For session graders, load
+[operational-value-designer](../operational-value-designer/SKILL.md) before
+editing compiler, runtime, replay, schema, artifact, or consumer contracts.
+
+<!-- instruction-prefix-end -->
 
 
 ## Session Graders
@@ -208,17 +213,16 @@ Keep file I/O at the collection/replay boundary, never inside graders.
 Ten fast built-ins are enabled by default; expensive analyses require opt-in.
 
 Custom syntax is `graders.<distinct-id>.script`, a synchronous JavaScript body
-receiving immutable `session`, `config`, and `helpers` snapshots. Return a
-finite number, `null`, or an object with `value`. The compiler partitions custom
-source into a restricted downstream `graders` job; conclusion receives only
-custom IDs. Never import or execute user code in conclusion, permit its step
-hooks, or allow `jobs.graders` customization. Repository-owned
-`graders.operational-value.run` Bash also runs only in that separate job: freeze
-the confined `.sh` source at compilation, pass session JSONL as `$1` /
-`GH_AW_SESSION_FILE` and config JSON as `GH_AW_GRADER_CONFIG`, and preserve legacy
-metric-array output. Compilation and `grader-shell-file-write` share the Bash AST
-write checker. Shell has bounded execution and a stripped environment but is not
-a filesystem/network sandbox or microVM yet. Built-in overrides remain rejected.
+receiving immutable `session`, `config`, and `helpers` snapshots. Ordinary IDs
+return a finite number, `null`, or an object with `value`. Reserved
+`graders.operational-value.script` uses the same restricted worker but returns a
+nonempty ordered array of unique `{id,value}` metrics; the first value is primary
+and the full array remains in schema-v2 results. The compiler partitions custom
+source into a downstream `graders` job; conclusion receives only custom IDs.
+Never execute user code in conclusion, permit its step hooks, or customize
+`jobs.graders`. Removed `graders.operational-value.run` declarations fail with
+migration guidance to `script`; never ignore or translate them. Built-in
+overrides remain rejected.
 
 The separate job consumes `usage/aw_session.jsonl` and publishes combined results
 in the `graders` artifact without source. Preserve conclusion's published session.

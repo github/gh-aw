@@ -70,7 +70,7 @@ test("runtime extraction keeps the complete remediator contract and bounded prom
   );
   assert.ok(Buffer.byteLength(mainContent) <= 7500, "Orchestrator contract exceeds the instruction-prefix budget");
   const remediator = agents.find(agent => agent.name === "dependabot-remediator");
-  assert.ok(mainContent.includes("Call tools directly, never through Bash"), "Orchestrator is missing GitHub tool guidance");
+  assert.ok(mainContent.includes("Never invoke GitHub tools through Bash"), "Orchestrator is missing GitHub tool guidance");
   assert.ok(remediator.prompt.includes("You have no GitHub MCP tools"), "Remediator must not assume GitHub tools are available");
   for (const section of ["Tool contract", "Deterministic result", "Required approach", "Required validation", "Pull request rule", "Output"]) {
     assert.ok(remediator.prompt.includes(`## ${section}`), `Runtime discarded ${section}`);
@@ -93,9 +93,7 @@ test("safe outputs are executable while GitHub reads stay off the shell", () => 
   const allowed = compiledBashPolicy();
   assert.ok(allowed(`safeoutputs noop '{"message":"No Dependabot updates (0 PRs) #none"}'`));
   assert.ok(!allowed(`github pull_request_read '{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}'`));
-  assert.ok(
-    /GitHub MCP tools only for PR comments, reviews, and maintainer\s+metadata\.[\s\S]*Call tools directly, never through Bash/.test(workflow) || /GitHub tools are not shell commands: never\s+invoke them through Bash/.test(workflow)
-  );
+  assert.match(workflow, /Never invoke GitHub tools through Bash|GitHub tools are not shell commands: never\s+invoke them through Bash/);
 });
 
 test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
@@ -161,9 +159,10 @@ async function select(pulls, trigger = null, fallback = null) {
         writeFileSync(filename, data) {
           if (filename === "/tmp/gh-aw/agent/dependabot-burner/context.json") {
             payload = JSON.parse(data);
-          } else {
-            assert.match(filename, /^\/tmp\/gh-aw\/agent\/dependabot-burner\/diffs\/\d+\.diff$/);
+            return;
           }
+          assert.match(filename, /^\/tmp\/gh-aw\/agent\/dependabot-burner\/diffs\/\d+\.diff$/);
+          assert.equal(typeof data, "string");
         },
       };
     },

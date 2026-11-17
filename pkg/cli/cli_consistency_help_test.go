@@ -23,6 +23,14 @@ func TestAuditCommandDescriptionsAreConsistent(t *testing.T) {
 	assert.Contains(t, cmd.Long, "remaining runs are compared against it", "audit help should document multi-run analysis mode")
 }
 
+func TestCLICommandPathUsesExtensionPrefixWhenAttached(t *testing.T) {
+	root := &cobra.Command{Use: "gh aw"}
+	cmd := &cobra.Command{Use: "work-queue"}
+	root.AddCommand(cmd)
+
+	assert.Equal(t, "gh aw work-queue", cliCommandPath(cmd))
+}
+
 func TestTrialCommandUsesStandardExamplesHeading(t *testing.T) {
 	t.Parallel()
 	cmd := NewTrialCommand(func(string) error { return nil })
@@ -303,7 +311,7 @@ func TestLegacyNestedGHHelpIsRejected(t *testing.T) {
 
 			err := cmd.Execute()
 			require.Error(t, err)
-			assert.Equal(t, `unknown command "gh" for "`+tt.cmdName+`"`, err.Error())
+			assert.Equal(t, `unknown command "gh" for "gh aw `+tt.cmdName+`"`, err.Error())
 		})
 	}
 }

@@ -494,7 +494,7 @@ separate authorization.
 Dry-run rejects other authored host steps (`pre-steps`, `pre-agent-steps`,
 `on.steps`, safe-output and threat-detection steps, secret-masking
 steps, and unsafe built-in job overrides), custom MCP servers, `mcp-scripts`,
-custom safe-output scripts/actions, enabled Bash graders, and authored
+custom safe-output scripts/actions, and authored
 `id-token: write` permissions, including safe-output and imported declarations.
 Compiler-generated pull-request stack gates remain available. Remove unsupported
 declarations in a separate diagnostic workflow; there is no unsafe override.

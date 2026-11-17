@@ -70,7 +70,6 @@ echo "All ${#REQUIRED_DEPS[@]} required dependency files present"
 # Log environment configuration
 echo "Server configuration:"
 echo "  Port: $GH_AW_MCP_SCRIPTS_PORT"
-echo "  API Key: ${GH_AW_MCP_SCRIPTS_API_KEY:0:8}..."
 echo "  Working directory: $(pwd)"
 
 # Ensure logs directory exists

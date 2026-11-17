@@ -100,6 +100,7 @@ env:
   AZURE_CONFIG_DIR: /tmp/gh-aw/agent/.azure
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+  GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.smoke-copilot-aoai-entra
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Smoke%20Copilot%20-%20AOAI%20%28Entra%29,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -448,6 +449,7 @@ jobs:
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_INCLUDE_PR_CONTEXT: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -557,6 +559,7 @@ jobs:
             - `serena` — run `serena --help` to see available tools
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -633,6 +636,7 @@ jobs:
             - `serena` — run `serena --help` to see available tools
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -649,6 +653,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
           AZURE_CONFIG_DIR: ""
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -664,6 +669,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
           AZURE_CONFIG_DIR: ""
+          GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -2947,6 +2953,14 @@ jobs:
         name: Verify agent session artifact
         run: "set -euo pipefail\nroots=(/tmp/gh-aw \"${RUNNER_TEMP:-/tmp}/gh-aw\")\n\nif [ \"$GH_AW_SESSION_ARTIFACT\" = \"copilot-events\" ]; then\n  for root in \"${roots[@]}\"; do\n    session_dir=\"$root/sandbox/agent/logs/copilot-session-state\"\n    if [ -d \"$session_dir\" ]; then\n      session_file=\"$(find \"$session_dir\" -type f -name events.jsonl -size +0c -print -quit)\"\n      if [ -n \"$session_file\" ]; then\n        echo \"Found non-empty Copilot session events: $session_file\"\n        exit 0\n      fi\n    fi\n  done\n  echo \"::error::No non-empty Copilot session events.jsonl found in the agent logs\"\n  exit 1\nfi\n\nfor root in \"${roots[@]}\"; do\n  session_file=\"$root/agent-stdio.log\"\n  if [ -s \"$session_file\" ]; then\n    echo \"Found non-empty agent session transcript: $session_file\"\n    exit 0\n  fi\ndone\n\necho \"::error::No non-empty agent-stdio.log found in the agent logs\"\nexit 1\n"
 
+      - name: Emit OTLP job conclusion before artifacts
+        if: always() && env.GH_AW_OTEL_METRICS == 'true'
+        continue-on-error: true
+        run: node "${RUNNER_TEMP}/gh-aw/actions/action_conclusion_otlp.cjs"
+        env:
+          INPUT_JOB_NAME: ${{ github.job }}
+          GH_AW_JOB_RESULT: ${{ job.status }}
+          GH_AW_OTEL_CONCLUSION_PREUPLOAD: 'true'
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -3020,6 +3034,7 @@ jobs:
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
+            ${{ env.GH_AW_OTEL_METRICS == 'true' && '/tmp/gh-aw/otel-metrics.jsonl' || '' }}
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json

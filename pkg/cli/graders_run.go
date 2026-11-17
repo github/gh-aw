@@ -39,7 +39,6 @@ type graderRunConfig struct {
 	Repo     string
 	Input    io.Reader
 	Output   io.Writer
-	Path     string
 }
 
 type graderRunDefinition struct {
@@ -54,8 +53,6 @@ type graderRunDefinition struct {
 	Threshold   *float64       `json:"threshold"`
 	Config      map[string]any `json:"config,omitempty"`
 	Script      string         `json:"script,omitempty"`
-	Run         string         `json:"run,omitempty"`
-	ShellScript string         `json:"shellScript,omitempty"`
 }
 
 func runGrader(ctx context.Context, config graderRunConfig) error {
@@ -68,7 +65,7 @@ func runGrader(ctx context.Context, config graderRunConfig) error {
 	if err != nil {
 		return err
 	}
-	return runSessionGrader(ctx, grader, payload, config.Output, config.Path)
+	return runSessionGrader(ctx, grader, payload, config.Output)
 }
 
 func loadGraderRunDefinition(workflowArg, graderID string) (graderRunDefinition, error) {
@@ -96,23 +93,16 @@ func loadGraderRunDefinitionMode(workflowArg, graderID string, collection bool) 
 		return graderRunDefinition{}, fmt.Errorf("grader %q is disabled in workflow %s", graderID, workflowPath)
 	}
 	source := "builtin"
-	if definition.Script != "" {
-		source = "inline"
-	} else if definition.Run != "" {
+	if definition.ID == "operational-value" && definition.Script != "" {
 		source = "operational-value"
-		if collection {
-			return graderRunDefinition{}, fmt.Errorf("grader %q uses Bash; collection regrading supports only built-in and isolated JavaScript graders", graderID)
-		}
-		if err := definition.PrepareShellScript(workflowPath); err != nil {
-			return graderRunDefinition{}, err
-		}
+	} else if definition.Script != "" {
+		source = "inline"
 	}
 	gradersRunLog.Printf("Loaded grader %q: source=%s, collection=%t", graderID, source, collection)
 	return graderRunDefinition{
 		Workflow: workflowPath, Selector: workflowPath + ":" + graderID,
 		ID: graderID, Name: definition.Name, Description: definition.Description, Source: source, Unit: definition.Unit,
 		Direction: definition.Direction, Threshold: definition.Threshold, Config: definition.Config, Script: definition.Script,
-		Run: definition.Run, ShellScript: definition.ShellScript,
 	}, nil
 }
 
@@ -208,17 +198,14 @@ func readGraderPayload(reader io.Reader, source string) (json.RawMessage, error)
 	return json.Marshal(events)
 }
 
-func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload json.RawMessage, output io.Writer, searchPath string) error {
+func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload json.RawMessage, output io.Writer) error {
 	nodePath, err := exec.LookPath("node")
 	if err != nil {
 		return errors.New("node is required to run graders")
 	}
-	var permissionFlag string
-	if grader.Source != "operational-value" {
-		permissionFlag, err = graderNodePermissionFlag(ctx, nodePath)
-		if err != nil {
-			return err
-		}
+	permissionFlag, err := graderNodePermissionFlag(ctx, nodePath)
+	if err != nil {
+		return err
 	}
 	directory, err := os.MkdirTemp("", "gh-aw-grader-runtime-*")
 	if err != nil {
@@ -237,27 +224,12 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 		return fmt.Errorf("failed to encode grader input: %w", err)
 	}
 	timeout := graderJSTimeout
-	if grader.Source == "operational-value" {
-		timeout = 125 * time.Second
-	}
 	gradersRunLog.Printf("Executing grader %q via node: source=%s, timeout=%s, payloadBytes=%d", grader.ID, grader.Source, timeout, len(payload))
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	args := []string{permissionFlag, "--allow-fs-read=" + directory}
-	switch grader.Source {
-	case "inline":
-		args = append(args, "--allow-child-process")
-	case "operational-value":
-		// Node's permissions do not sandbox a spawned Bash interpreter. Shell
-		// replay has the same trusted-code boundary as the separate Actions job.
-		args = nil
-	}
-	args = append(args, filepath.Join(directory, "graders_run.cjs"))
+	args := graderRuntimeArgs(directory, permissionFlag, grader)
 	cmd := exec.CommandContext(commandCtx, nodePath, args...)
 	cmd.Env = []string{}
-	if grader.Source == "operational-value" && searchPath != "" {
-		cmd.Env = []string{"PATH=" + searchPath}
-	}
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stdout = output
 	var stderr bytes.Buffer
@@ -271,8 +243,17 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 	return nil
 }
 
+func graderRuntimeArgs(directory, permissionFlag string, grader graderRunDefinition) []string {
+	runner := filepath.Join(directory, "graders_run.cjs")
+	args := []string{permissionFlag, "--allow-fs-read=" + directory}
+	if grader.Source == "inline" || grader.Source == "operational-value" && grader.Script != "" {
+		args = append(args, "--allow-child-process")
+	}
+	return append(args, runner)
+}
+
 func stageGraderRuntime(directory string) (string, error) {
-	for _, name := range []string{"trace_graders.cjs", "grader_session.cjs", "error_codes.cjs", "trajectory_graders.cjs", "builtin_graders.json", "working_set_metrics.cjs", "custom_graders.cjs", "custom_grader_worker.cjs", "operational_value_grader.cjs", "operational_value_worker.cjs"} {
+	for _, name := range []string{"trace_graders.cjs", "grader_session.cjs", "error_codes.cjs", "trajectory_graders.cjs", "builtin_graders.json", "working_set_metrics.cjs", "custom_graders.cjs", "custom_grader_worker.cjs"} {
 		content, err := setup.SessionParserSources.ReadFile("js/" + name)
 		if err != nil {
 			return "", fmt.Errorf("cannot load grader runtime %s: %w", name, err)

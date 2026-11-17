@@ -85,10 +85,12 @@ tools:
     - "cd .github/workflows && npm install --package-lock-only --ignore-scripts"
     - "npm --prefix docs install --package-lock-only --ignore-scripts"
     - "npm --prefix actions/setup/js install --package-lock-only --ignore-scripts"
-    - "npm --prefix docs run build"
+    - "npm --prefix docs ci --ignore-scripts --legacy-peer-deps"
+    - "npm --prefix actions/setup/js ci --ignore-scripts"
     - "npm --prefix actions/setup/js run test:js -- *"
     - "go mod tidy"
     - "go mod verify"
+    - "go build ./..."
     - "go test *"
     - "uv pip compile *"
     - "python -m pip download --require-hashes --only-binary=:all: *"
@@ -391,18 +393,18 @@ contract; do not nest delegations.
   names, versions, and file paths.
 - Inspect local changes with `git status` or `git diff --stat`. Do not add global
   Git flags such as --no-pager or query remotes.
-- Use configured GitHub MCP tools only for PR comments, reviews, and maintainer
-  metadata. Integrity-filtered results mean feedback is unavailable, not absent.
-  Call tools directly, never through Bash; do not probe commands, run gh/auth
-  checks, or set up credentials (workflow-managed).
-- Use only declared validation commands; no shell loops for GitHub reads,
-  undeclared utilities, or pipeline stages.
-- On first tool-permission denial, stop shell calls in that agent and report the
-  blocker; do not probe or relaunch. Continue independent work without changing
-  permissions or the denial budget.
-- The worker cannot delegate and has no GitHub MCP tools; its explicit tool list
-  is narrower than the orchestrator's. Use the read tool for file-only analysis,
-  not Bash.
+- Use configured GitHub MCP tools only for PR comments/reviews and maintainer
+  metadata; provide method, owner, repo, and pullNumber. Integrity-filtered
+  results are unavailable, not absent. Never invoke GitHub tools through Bash or
+  use discovery probes, gh, auth checks, or credential setup; auth is workflow-
+  managed.
+- Run declared validation commands only; do not loop GitHub reads or add
+  utilities/pipeline stages.
+- On the first permission denial, stop shell calls and report the blocker. Do not
+  probe variants or relaunch the agent. Continue independent work without
+  changing permissions or denial budget.
+- The worker cannot delegate, has no GitHub MCP access, and has a narrower tool
+  list; use read for file-only analysis, not Bash.
 
 ## Read first
 
@@ -527,9 +529,17 @@ and the downstream safe-output job determines whether publication succeeds.
 Validate the touched ecosystems, not unrelated manifests:
 
 - Workflow sources: `make dependabot && make build`; refresh generated npm locks if needed.
-- Docs/action npm: `npm --prefix <directory> install --package-lock-only --ignore-scripts`,
-  then the declared docs build or focused action tests.
-- Root Go: `go mod tidy`, `go mod verify`, focused dependency tests.
+- Docs npm: `npm --prefix docs install --package-lock-only --ignore-scripts`, then
+  `npm --prefix docs ci --ignore-scripts --legacy-peer-deps` to prove the manifest
+  and lock install cleanly. Do not run the docs site build here; it needs the WASM
+  bundle and GitHub API access, and repository CI builds docs on the replacement PR.
+- Action npm: `npm --prefix actions/setup/js install --package-lock-only --ignore-scripts`,
+  `npm --prefix actions/setup/js ci --ignore-scripts`, then focused tests with exactly
+  `npm --prefix actions/setup/js run test:js -- <test files>`. Never run `npm test`.
+- Root Go: `go mod tidy`, `go mod verify`, `go build ./...`, then `go test -short`
+  only for packages that import the updated module. Do not run `go test ./...`:
+  wall-clock budget tests such as `TestLintPerformanceBudget` are not dependency
+  validation and are unreliable under sandbox load.
 - Named Python requirements: follow lock-header generator/platform constraints;
   verify hashes with wheel-only `python -m pip download --require-hashes --only-binary=:all:`
   into a disposable directory. Do not install or execute downloaded packages.

@@ -2,7 +2,6 @@ package taint
 
 import (
 	"crypto/sha256"
-	"slices"
 	"testing"
 	"testing/fstest"
 
@@ -284,47 +283,24 @@ func TestJavaScriptAuthoredDriverInterpolation(t *testing.T) {
 	}
 }
 
-func TestAuthoredOperationalGraderEncoding(t *testing.T) {
+func TestAuthoredOperationalGraderUsesRestrictedJavaScriptProfile(t *testing.T) {
+	options := nativeJavaScriptOptions(t)
 	document, err := aw.Parse(`---
 graders:
   operational-value:
     script: |
-      echo '${{ secrets.NOT_INTERPOLATED }}'
-      echo "$GH_TOKEN"
+      return [{id: "restricted", value:
+        typeof process === "undefined" && "${{ secrets.NOT_INTERPOLATED }}".length > 0 ? 1 : 0}];
 ---
 `)
 	require.NoError(t, err)
-	result, err := AnalyzeAuthoredScripts(t.Context(), document, SecretLeakRule())
+	rule := SecretLeakRule()
+	rule.JavaScript = options
+	result, err := AnalyzeAuthoredScripts(t.Context(), document, rule)
 	require.NoError(t, err)
-	require.Len(t, result.Findings, 1)
-	require.Len(t, result.Findings[0].Sources, 1)
-	assert.Equal(t, "github.token", result.Findings[0].Sources[0].Reference)
-}
-
-func TestAuthoredOperationalGraderEnvironment(t *testing.T) {
-	allowed := []string{"PATH", "HOME", "TMPDIR", "TEMP", "TMP", "SystemRoot", "ComSpec", "GH_HOST", "GITHUB_API_URL", "GITHUB_GRAPHQL_URL", "GITHUB_SERVER_URL"}
-	names := append(append([]string{}, allowed...), "GH_TOKEN", "TOKEN", "GITHUB_TOKEN", "GITHUB_WORKSPACE", "RUNNER_TEMP", "CI")
-	for _, name := range names {
-		t.Run(name, func(t *testing.T) {
-			document := &aw.Document{Frontmatter: map[string]any{
-				"env": map[string]any{name: "${{ secrets.BINDING }}"},
-				"graders": map[string]any{"operational-value": map[string]any{
-					"script": `echo "$` + name + `"`,
-				}},
-			}}
-			result, err := AnalyzeAuthoredScripts(t.Context(), document, SecretLeakRule())
-			require.NoError(t, err)
-			if name != "GH_TOKEN" && !slices.Contains(allowed, name) {
-				assert.Empty(t, result.Findings)
-				return
-			}
-			require.Len(t, result.Findings, 1)
-			require.Len(t, result.Findings[0].Sources, 1)
-			expected := "secrets.binding"
-			if name == "GH_TOKEN" {
-				expected = "github.token"
-			}
-			assert.Equal(t, expected, result.Findings[0].Sources[0].Reference)
-		})
-	}
+	assert.Empty(t, result.Findings)
+	assert.Equal(t, []CoverageGap{{
+		Path:   "graders.operational-value.script",
+		Reason: "grader trace, run, workflow and configuration payload data flow is not modeled",
+	}}, result.Gaps)
 }

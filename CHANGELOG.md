@@ -70,7 +70,7 @@ also been removed. Use `gh aw logs --episodes --outcomes` for episode summaries.
 `compile --dry-run` accepts workflow `steps` and `post-steps` but omits their
 code and credentials from emitted locks, so separate dispatch cannot execute
 them. It rejects `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP
-servers/scripts, custom safe-output scripts, enabled Bash graders, and authored
+servers/scripts, custom safe-output scripts, and authored
 OIDC permissions, including imports. Custom jobs and custom safe-output jobs
 become disabled, credential-free placeholders with empty outputs. Existing
 actionable scanner findings fail alongside added findings. Migrate by removing
@@ -111,11 +111,15 @@ unified session. Ten fast built-ins are enabled by default; other built-ins
 require explicit opt-in. Custom JavaScript runs only in a separate restricted
 `graders` job, using immutable `session`, `config`, and `helpers` inputs.
 Conclusion never receives custom executable definitions or user-provided steps.
-Repository-owned `graders.operational-value.run` Bash runs only in that separate
-job: replace legacy stdin requests with the session JSONL file in `$1` /
-`GH_AW_SESSION_FILE` and JSON config in `GH_AW_GRADER_CONFIG`. Existing metric
-arrays remain supported. Compiler validation and `grader-shell-file-write`
-reject detected file writes; trusted shell is not yet microVM-isolated.
+Reserved `graders.operational-value.script` now uses the same restricted
+JavaScript lane and returns a nonempty ordered metric array. The first metric
+remains the primary value; remaining metrics remain diagnostics; schema-v2
+artifacts/events retain the full array and implementation digest. CLI replay,
+offline regrading, experiments, audit/logs, telemetry, and adapters continue to
+consume the same top-level source/value identity.
+`graders.operational-value.run` has been removed; migrate manually to restricted
+`graders.operational-value.script`. Invalid legacy declarations fail explicitly
+and are never ignored or translated.
 Recompile workflows to move grading out of the
 agent job. Read schema-version-2 results from `usage/graders/`; CLI replay now
 accepts unified-session JSONL or a JSON event array instead of legacy trace
