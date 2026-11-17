@@ -109,8 +109,6 @@ jobs:
       contents: read
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"03cbf89...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwM2NiZjg5MzFkZWZmMjFkNTExNjk1ZDk5ZDAyMWZhNzMxOTQ0MzQ5ZWQ2MGMwOGQwMmJmOWM3OGU3MjJlMmNiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IkFnZW50aWMgV29ya2Zsb3dzIn19LHsic2hhMjU2IjoiNDk0M2NmZmVlYmI2NzA2YWE4YmNjMTZmZDU4NzkzMGFiMGQwYzg3MmIxODlhYjE5MTQ4YjkwYTZhNDY0ZjI2YiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJTcXVhZCIsInRvb2xzIjpbIioiXX19LHsic2hhMjU2IjoiNGI5M2ZhZThiNjQ4MmZiNjA5OGMwNDVlYmFkOTc4YmQxZmM4NzZjOGE0OWI5ZGQyZmQxM2FjOGNlMjJmNGI5MSIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoic21hbGwifX0seyJzaGEyNTYiOiI5ZWE2Mzk1NThkZjkxM2U2NTBlNDZhZDI1ZDlkODM1ZjRjYTZmZTgyMTQyMjg3YjlhODg4MGM3MzIyYjFiYTZmIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InRlY2huaWNhbC1kb2Mtd3JpdGVyIn19LHsic2hhMjU2IjoiOWZkNjgyZTg5MjRlZmNiOTM0MjU2YzljMjk0ZmE2YmVhOWQ0MDc1YTMwNjU0NWMzZTkyYWU0OGE1ZWQ1MzJjMCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoic21hbGwifX0seyJzaGEyNTYiOiJhMTdjNmM2MmZmY2Q3NDAxZjQwZjY3MjFmNjQ4NWE0NWNjMmY1N2RiODZiZjRiNTdlMzE2MjAzZTg4MzZlMjY4Iiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6ImFkci13cml0ZXIifX0seyJzaGEyNTYiOiJhZDZmZjBmZTkyMTlmYmZhNWNjYzc3ZDAyNzc2MjNiYmU0ZjQxMDIyMmUzZmQ4Njg0NWFiNzhlY2MxM2JlMWE0Iiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6ImdydW1weS1yZXZpZXdlciIsInRvb2xzIjpbInJlYWQiLCJzZWFyY2giXX19LHsic2hhMjU2IjoiZTBjMzVhOTZkZWRmYjI5Y2I5YjE1NTJmOTlhYTI0YmRhNjdmNGYxYTk2N2Y1MzM2MTQ3ZTg2Mjk1NGViNmI3ZSIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJ3M2Mtc3BlY2lmaWNhdGlvbi13cml0ZXIifX1dfQ==
       GH_AW_MAX_DAILY_AI_CREDITS: "10000"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -165,6 +163,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"4b93fae8b6482fb6098c045ebad978bd1fc876c8a49b9dd2fd13ac8ce22f4b91","kind":"artifact","value":{"model":"small"}},{"sha256":"9fd682e8924efcb934256c9c294fa6bea9d4075a306545c3e92ae48a5ed532c0","kind":"artifact","value":{"model":"small"}}]}'
           GH_AW_INFO_ENGINE_ID: "claude"
           GH_AW_INFO_ENGINE_NAME: "Claude Code"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'agent' }}

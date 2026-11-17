@@ -119,8 +119,6 @@ jobs:
       contents: read
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"03cbf89...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwM2NiZjg5MzFkZWZmMjFkNTExNjk1ZDk5ZDAyMWZhNzMxOTQ0MzQ5ZWQ2MGMwOGQwMmJmOWM3OGU3MjJlMmNiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IkFnZW50aWMgV29ya2Zsb3dzIn19LHsic2hhMjU2IjoiNDk0M2NmZmVlYmI2NzA2YWE4YmNjMTZmZDU4NzkzMGFiMGQwYzg3MmIxODlhYjE5MTQ4YjkwYTZhNDY0ZjI2YiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJTcXVhZCIsInRvb2xzIjpbIioiXX19LHsic2hhMjU2IjoiNzIwNTY0YWI5NGQyN2M3M2UzZjk5NzkyYjBhZTZiY2NmYzBjOTdiMzg2M2VkYTUyMmU5MGM2YzkyZGE2M2E3ZiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoic21hbGwifX0seyJzaGEyNTYiOiI5ZWE2Mzk1NThkZjkxM2U2NTBlNDZhZDI1ZDlkODM1ZjRjYTZmZTgyMTQyMjg3YjlhODg4MGM3MzIyYjFiYTZmIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InRlY2huaWNhbC1kb2Mtd3JpdGVyIn19LHsic2hhMjU2IjoiYTE3YzZjNjJmZmNkNzQwMWY0MGY2NzIxZjY0ODVhNDVjYzJmNTdkYjg2YmY0YjU3ZTMxNjIwM2U4ODM2ZTI2OCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJhZHItd3JpdGVyIn19LHsic2hhMjU2IjoiYWQ2ZmYwZmU5MjE5ZmJmYTVjY2M3N2QwMjc3NjIzYmJlNGY0MTAyMjJlM2ZkODY4NDVhYjc4ZWNjMTNiZTFhNCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJncnVtcHktcmV2aWV3ZXIiLCJ0b29scyI6WyJyZWFkIiwic2VhcmNoIl19fSx7InNoYTI1NiI6ImNkYjM5ZjNhZjYyMDYwNWQwM2I0MDE2MDM1NzJmOTU5ZjhmMWM5MjIyZjU4MjY4MjdhMjA0YzBmNzA4NjUyNTQiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJtb2RlbCI6InNtYWxsIn19LHsic2hhMjU2IjoiZTBjMzVhOTZkZWRmYjI5Y2I5YjE1NTJmOTlhYTI0YmRhNjdmNGYxYTk2N2Y1MzM2MTQ3ZTg2Mjk1NGViNmI3ZSIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJ3M2Mtc3BlY2lmaWNhdGlvbi13cml0ZXIifX0seyJzaGEyNTYiOiJmMjE2YjZmZWJmZmJkN2M3YTM3ZDUxNjNjN2IyNDVmMWMzNzFjNmU5NmNiZTk1NjFkZWRjMzU4ZjU1MTkxZmY3Iiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibW9kZWwiOiJzbWFsbCJ9fV19
       GH_AW_MAX_DAILY_AI_CREDITS: "10000"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -218,6 +216,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"720564ab94d27c73e3f99792b0ae6bccfc0c97b3863eda522e90c6c92da63a7f","kind":"artifact","value":{"model":"small"}},{"sha256":"cdb39f3af620605d03b401603572f959f8f1c9222f5826827a204c0f70865254","kind":"artifact","value":{"model":"small"}},{"sha256":"f216b6febffbd7c7a37d5163c7b245f1c371c6e96cbe9561dedc358f55191ff7","kind":"artifact","value":{"model":"small"}}]}'
           GH_AW_INFO_ENGINE_ID: "claude"
           GH_AW_INFO_ENGINE_NAME: "Claude Code"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'agent' }}

@@ -90,8 +90,6 @@ jobs:
       contents: read
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"03cbf89...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwM2NiZjg5MzFkZWZmMjFkNTExNjk1ZDk5ZDAyMWZhNzMxOTQ0MzQ5ZWQ2MGMwOGQwMmJmOWM3OGU3MjJlMmNiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IkFnZW50aWMgV29ya2Zsb3dzIn19LHsic2hhMjU2IjoiMjBiZDJjMjMzMzcyZjE5ZmJjYWZhMGUxZmMxYTU5MDVkMDkxNWNkOGQ1YjYyNmUwZTkxOTI1MzhlMzBjMzRjZiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoiY29waWxvdC9ncHQtNS42LWx1bmEifX0seyJzaGEyNTYiOiI0OTQzY2ZmZWViYjY3MDZhYThiY2MxNmZkNTg3OTMwYWIwZDBjODcyYjE4OWFiMTkxNDhiOTBhNmE0NjRmMjZiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IlNxdWFkIiwidG9vbHMiOlsiKiJdfX0seyJzaGEyNTYiOiI1NTM3OTE3NDUyYTY4ZThjYjRhMDA2MDhkNzY4Mjk3ZjhhNmEyMTk0ZmE2ODhiNDIxNjYzNWE1NmYxNjZhOGMzIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibW9kZWwiOiJjb3BpbG90L2NsYXVkZS1oYWlrdS00LjUifX0seyJzaGEyNTYiOiI5ZWE2Mzk1NThkZjkxM2U2NTBlNDZhZDI1ZDlkODM1ZjRjYTZmZTgyMTQyMjg3YjlhODg4MGM3MzIyYjFiYTZmIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InRlY2huaWNhbC1kb2Mtd3JpdGVyIn19LHsic2hhMjU2IjoiYTE3YzZjNjJmZmNkNzQwMWY0MGY2NzIxZjY0ODVhNDVjYzJmNTdkYjg2YmY0YjU3ZTMxNjIwM2U4ODM2ZTI2OCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJhZHItd3JpdGVyIn19LHsic2hhMjU2IjoiYWQ2ZmYwZmU5MjE5ZmJmYTVjY2M3N2QwMjc3NjIzYmJlNGY0MTAyMjJlM2ZkODY4NDVhYjc4ZWNjMTNiZTFhNCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJncnVtcHktcmV2aWV3ZXIiLCJ0b29scyI6WyJyZWFkIiwic2VhcmNoIl19fSx7InNoYTI1NiI6ImNmMzFlZTEwOTZmYjAyNmQ4MjA4MmQ1OGY4ZjI0YjllMmRhZjAyN2YwODY0YTlmNTA2MTJlZTdiZDNiYzM3YWIiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJtb2RlbCI6ImNvcGlsb3QvZ3B0LTRvLW1pbmkifX0seyJzaGEyNTYiOiJlMGMzNWE5NmRlZGZiMjljYjliMTU1MmY5OWFhMjRiZGE2N2Y0ZjFhOTY3ZjUzMzYxNDdlODYyOTU0ZWI2YjdlIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InczYy1zcGVjaWZpY2F0aW9uLXdyaXRlciJ9fV19
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -146,6 +144,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"20bd2c233372f19fbcafa0e1fc1a5905d0915cd8d5b626e0e9192538e30c34cf","kind":"artifact","value":{"model":"copilot/gpt-5.6-luna"}},{"sha256":"5537917452a68e8cb4a00608d768297f8a6a2194fa688b4216635a56f166a8c3","kind":"artifact","value":{"model":"copilot/claude-haiku-4.5"}},{"sha256":"cf31ee1096fb026d82082d58f8f24b9e2daf027f0864a9f50612ee7bd3bc37ab","kind":"artifact","value":{"model":"copilot/gpt-4o-mini"}}]}'
           GH_AW_INFO_ENGINE_ID: "pi"
           GH_AW_INFO_ENGINE_NAME: "Pi"
           GH_AW_INFO_MODEL: "copilot/gpt-5.3"

@@ -115,8 +115,6 @@ jobs:
       issues: write # Create or update issues and comments.
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"03cbf89...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwM2NiZjg5MzFkZWZmMjFkNTExNjk1ZDk5ZDAyMWZhNzMxOTQ0MzQ5ZWQ2MGMwOGQwMmJmOWM3OGU3MjJlMmNiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IkFnZW50aWMgV29ya2Zsb3dzIn19LHsic2hhMjU2IjoiNDk0M2NmZmVlYmI2NzA2YWE4YmNjMTZmZDU4NzkzMGFiMGQwYzg3MmIxODlhYjE5MTQ4YjkwYTZhNDY0ZjI2YiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJTcXVhZCIsInRvb2xzIjpbIioiXX19LHsic2hhMjU2IjoiOWVhNjM5NTU4ZGY5MTNlNjUwZTQ2YWQyNWQ5ZDgzNWY0Y2E2ZmU4MjE0MjI4N2I5YTg4ODBjNzMyMmIxYmE2ZiIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJ0ZWNobmljYWwtZG9jLXdyaXRlciJ9fSx7InNoYTI1NiI6ImExN2M2YzYyZmZjZDc0MDFmNDBmNjcyMWY2NDg1YTQ1Y2MyZjU3ZGI4NmJmNGI1N2UzMTYyMDNlODgzNmUyNjgiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJuYW1lIjoiYWRyLXdyaXRlciJ9fSx7InNoYTI1NiI6ImFkNmZmMGZlOTIxOWZiZmE1Y2NjNzdkMDI3NzYyM2JiZTRmNDEwMjIyZTNmZDg2ODQ1YWI3OGVjYzEzYmUxYTQiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJuYW1lIjoiZ3J1bXB5LXJldmlld2VyIiwidG9vbHMiOlsicmVhZCIsInNlYXJjaCJdfX0seyJzaGEyNTYiOiJjZjg2ZTg4ZmE4ZmI1ZDMxMDM2ZmZhNmNhZDgxYTA0ZDI1NGU1ZjdjYmJmMGU4YWNmZTkxNzMwNDg0MjBhMTQwIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibW9kZWwiOiJjbGF1ZGUtaGFpa3UtNC41In19LHsic2hhMjU2IjoiZDc3MmE3ZTdmMWNmM2Y1NjIzZWRlOGZjNzIyNjBjMzFkN2Q1YjEyYzQ2MmZhYjc2ZjA0M2UzMWI4NzUyYjJiMyIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoiY2xhdWRlLWhhaWt1LTQuNSJ9fSx7InNoYTI1NiI6ImUwYzM1YTk2ZGVkZmIyOWNiOWIxNTUyZjk5YWEyNGJkYTY3ZjRmMWE5NjdmNTMzNjE0N2U4NjI5NTRlYjZiN2UiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJuYW1lIjoidzNjLXNwZWNpZmljYXRpb24td3JpdGVyIn19XX0=
       GH_AW_MAX_DAILY_AI_CREDITS: "5000"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -175,6 +173,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"cf86e88fa8fb5d31036ffa6cad81a04d254e5f7cbbf0e8acfe9173048420a140","kind":"artifact","value":{"model":"claude-haiku-4.5"}},{"sha256":"d772a7e7f1cf3f5623ede8fc72260c31d7d5b12c462fab76f043e31b8752b2b3","kind":"artifact","value":{"model":"claude-haiku-4.5"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
           GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}

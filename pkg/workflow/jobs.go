@@ -64,8 +64,7 @@ type Job struct {
 	Container                  string            // Job container configuration
 	Services                   string            // Job services configuration
 	Env                        map[string]string // Job-level environment variables
-	markdownMetadataPreview    string
-	ContinueOnError            *bool // continue-on-error flag for the job (nil means unset)
+	ContinueOnError            *bool             // continue-on-error flag for the job (nil means unset)
 	Steps                      []string
 	Needs                      []string          // Job dependencies (needs clause)
 	Outputs                    map[string]string // YAML-ready scalar snippets, emitted verbatim by WriteJobsYAML
@@ -361,9 +360,6 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 		envKeys := sliceutil.SortedKeys(env)
 
 		for _, key := range envKeys {
-			if key == "GH_AW_INFO_MARKDOWN_METADATA" && job.markdownMetadataPreview != "" {
-				fmt.Fprintf(b, "      # Activation metadata preview: %s\n", job.markdownMetadataPreview) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-			}
 			fmt.Fprintf(b, "      %s: %s\n", key, env[key]) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 	}

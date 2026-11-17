@@ -100,8 +100,6 @@ jobs:
       contents: read
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"03cbf89...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwM2NiZjg5MzFkZWZmMjFkNTExNjk1ZDk5ZDAyMWZhNzMxOTQ0MzQ5ZWQ2MGMwOGQwMmJmOWM3OGU3MjJlMmNiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IkFnZW50aWMgV29ya2Zsb3dzIn19LHsic2hhMjU2IjoiMjg4MmQ3ODJhZjRhMjBjODYxNjY4OWVmNjRiODk3NThkOWFmNDRmYWNhZTI1M2YxZDJlNjllNWYyY2YyZjA3YyIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoiZ3B0LTUifX0seyJzaGEyNTYiOiI0OTQzY2ZmZWViYjY3MDZhYThiY2MxNmZkNTg3OTMwYWIwZDBjODcyYjE4OWFiMTkxNDhiOTBhNmE0NjRmMjZiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IlNxdWFkIiwidG9vbHMiOlsiKiJdfX0seyJzaGEyNTYiOiI5ZWE2Mzk1NThkZjkxM2U2NTBlNDZhZDI1ZDlkODM1ZjRjYTZmZTgyMTQyMjg3YjlhODg4MGM3MzIyYjFiYTZmIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InRlY2huaWNhbC1kb2Mtd3JpdGVyIn19LHsic2hhMjU2IjoiYTE3YzZjNjJmZmNkNzQwMWY0MGY2NzIxZjY0ODVhNDVjYzJmNTdkYjg2YmY0YjU3ZTMxNjIwM2U4ODM2ZTI2OCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJhZHItd3JpdGVyIn19LHsic2hhMjU2IjoiYWQ2ZmYwZmU5MjE5ZmJmYTVjY2M3N2QwMjc3NjIzYmJlNGY0MTAyMjJlM2ZkODY4NDVhYjc4ZWNjMTNiZTFhNCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJncnVtcHktcmV2aWV3ZXIiLCJ0b29scyI6WyJyZWFkIiwic2VhcmNoIl19fSx7InNoYTI1NiI6ImUwYzM1YTk2ZGVkZmIyOWNiOWIxNTUyZjk5YWEyNGJkYTY3ZjRmMWE5NjdmNTMzNjE0N2U4NjI5NTRlYjZiN2UiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJuYW1lIjoidzNjLXNwZWNpZmljYXRpb24td3JpdGVyIn19LHsic2hhMjU2IjoiZmM5M2ExNTA1NGUxMzUwZGYxMzA5OTJlZTg0ZThhZGM4ZGQwYmJiY2I4ZjU4MThiYzczYzc4YjI2NjJhZGYyZCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoiZ3B0LTUifX1dfQ==
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -157,6 +155,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"2882d782af4a20c8616689ef64b89758d9af44facae253f1d2e69e5f2cf2f07c","kind":"artifact","value":{"model":"gpt-5"}},{"sha256":"fc93a15054e1350df130992ee84e8adc8dd0bbbcb8f5818bc73c78b2662adf2d","kind":"artifact","value":{"model":"gpt-5"}}]}'
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_INFO_ENGINE_NAME: "Codex"
           GH_AW_INFO_MODEL: "copilot/gpt-6-sol"

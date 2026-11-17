@@ -116,8 +116,6 @@ jobs:
       contents: read
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
-      # Activation metadata preview: {"version":2,"records":[{"sha256":"02c7144...
-      GH_AW_INFO_MARKDOWN_METADATA: eyJ2ZXJzaW9uIjoyLCJyZWNvcmRzIjpbeyJzaGEyNTYiOiIwMmM3MTQ0MDgwZDQ2YTUzZGRiZjMwYzVlNjQzMWRiNTYyZGI0MTU2OTNkNTE4NjQzYTMyNWUyMTcyNTFjNmE4Iiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibW9kZWwiOiJncHQtNSJ9fSx7InNoYTI1NiI6IjAzY2JmODkzMWRlZmYyMWQ1MTE2OTVkOTlkMDIxZmE3MzE5NDQzNDllZDYwYzA4ZDAyYmY5Yzc4ZTcyMmUyY2IiLCJraW5kIjoiYXJ0aWZhY3QiLCJ2YWx1ZSI6eyJuYW1lIjoiQWdlbnRpYyBXb3JrZmxvd3MifX0seyJzaGEyNTYiOiI0OTQzY2ZmZWViYjY3MDZhYThiY2MxNmZkNTg3OTMwYWIwZDBjODcyYjE4OWFiMTkxNDhiOTBhNmE0NjRmMjZiIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6IlNxdWFkIiwidG9vbHMiOlsiKiJdfX0seyJzaGEyNTYiOiI5ZWE2Mzk1NThkZjkxM2U2NTBlNDZhZDI1ZDlkODM1ZjRjYTZmZTgyMTQyMjg3YjlhODg4MGM3MzIyYjFiYTZmIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6InRlY2huaWNhbC1kb2Mtd3JpdGVyIn19LHsic2hhMjU2IjoiYTE3YzZjNjJmZmNkNzQwMWY0MGY2NzIxZjY0ODVhNDVjYzJmNTdkYjg2YmY0YjU3ZTMxNjIwM2U4ODM2ZTI2OCIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJhZHItd3JpdGVyIn19LHsic2hhMjU2IjoiYTY4OTBlMjA1YWUyN2RhZTgzODM0MDNmNzEyYWQzMmYzZTVkMWNkNTY5ZThkOGE5ZTE4NjExOWZkNWZhMzFlNyIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im1vZGVsIjoiZ3B0LTUifX0seyJzaGEyNTYiOiJhZDZmZjBmZTkyMTlmYmZhNWNjYzc3ZDAyNzc2MjNiYmU0ZjQxMDIyMmUzZmQ4Njg0NWFiNzhlY2MxM2JlMWE0Iiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibmFtZSI6ImdydW1weS1yZXZpZXdlciIsInRvb2xzIjpbInJlYWQiLCJzZWFyY2giXX19LHsic2hhMjU2IjoiZTBjMzVhOTZkZWRmYjI5Y2I5YjE1NTJmOTlhYTI0YmRhNjdmNGYxYTk2N2Y1MzM2MTQ3ZTg2Mjk1NGViNmI3ZSIsImtpbmQiOiJhcnRpZmFjdCIsInZhbHVlIjp7Im5hbWUiOiJ3M2Mtc3BlY2lmaWNhdGlvbi13cml0ZXIifX0seyJzaGEyNTYiOiJlNGVlYWFjYTk5MWI5ZGM0NjEwM2I0ZjhmNzE2MThhMzBmY2Y0OTkwOTMzMzIxZGUzM2JjZGJkYzU4ZjI4OTYxIiwia2luZCI6ImFydGlmYWN0IiwidmFsdWUiOnsibW9kZWwiOiJncHQtNSJ9fV19
       GH_AW_MAX_DAILY_AI_CREDITS: "10000"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -172,6 +170,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"02c7144080d46a53ddbf30c5e6431db562db415693d518643a325e217251c6a8","kind":"artifact","value":{"model":"gpt-5"}},{"sha256":"a6890e205ae27dae8383403f712ad32f3e5d1cd569e8d8a9e186119fd5fa31e7","kind":"artifact","value":{"model":"gpt-5"}},{"sha256":"e4eeaaca991b9dc46103b4f8f71618a30fcf4990933321de33bcdbdc58f28961","kind":"artifact","value":{"model":"gpt-5"}}]}'
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_INFO_ENGINE_NAME: "Codex"
           GH_AW_INFO_MODEL: "copilot/auto"
