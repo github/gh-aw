@@ -1960,6 +1960,97 @@
   .tv-p.done svg .end { opacity: 1; }
   .tv-cap { position: absolute; left: 110px; right: 110px; top: 952px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
 
+  /* --- from delivery to value: the value process on Schema Feature Coverage (column under turn automation into value) --- */
+  .dtv-flow { position: absolute; left: 110px; top: 252px; width: 1700px; display: flex; align-items: stretch; }
+  .active .dtv-flow, .active .dtv-chart { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + .3s); }
+  .dtv-st { --c: #56d4dd; position: relative; flex: 1; min-width: 0; height: 210px; box-sizing: border-box; padding: 12px 14px 10px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid var(--c); display: flex; flex-direction: column; gap: 4px; opacity: .32; transition: opacity .4s, box-shadow .4s; }
+  .dtv-st.ok { --c: #79c0ff; }
+  .dtv-st.part { --c: #d2a8ff; }
+  .dtv-st.unk { --c: #ffa657; }
+  .dtv-st.con { --c: #56d4dd; }
+  .dtv-st.on { opacity: 1; box-shadow: 0 0 34px color-mix(in srgb, var(--c) 28%, transparent); }
+  .dtv-st > i { font: 600 15px/1 var(--mono); font-style: normal; letter-spacing: .12em; color: var(--c); }
+  .dtv-st > b { font-size: 26px; line-height: 1.05; font-variation-settings: "wght" 700, "wdth" 100; color: #f0f6fc; }
+  .dtv-st > strong { font-size: 22px; line-height: 1.15; font-weight: 650; color: #f0f6fc; }
+  .dtv-st.unk > strong { color: #79c0ff; }
+  .dtv-st > span { font-size: 16px; line-height: 1.3; color: #c9d1d9; }
+  .dtv-st.unk > span { color: #ffa657; }
+  .dtv-bot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .dtv-own { font: 600 14px/1 var(--mono); font-style: normal; padding: 5px 9px; border-radius: 6px; color: #c9d1d9; background: #ffffff12; white-space: nowrap; }
+  .dtv-own.dtv-pr { color: #e3b341; background: none; border: 1.5px dashed #e3b341; padding: 3.5px 7.5px; }
+  .dtv-g { flex: none; width: 26px; height: 26px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--c); display: grid; place-items: center; font: 700 15px/1 var(--mono); color: var(--c); }
+  .dtv-st.part .dtv-g, .dtv-st.unk .dtv-g { border-style: dashed; }
+  .dtv-stamp { position: absolute; right: -10px; top: -16px; font: 700 14px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #56d4dd; background: #0d1117; border: 2px solid #56d4dd; border-radius: 6px; padding: 5px 8px; opacity: 0; transform: rotate(8deg) scale(1.6); transition: opacity .25s, transform .35s cubic-bezier(.2,1.6,.4,1); }
+  .dtv-stamp.on { opacity: 1; transform: rotate(8deg) scale(1); }
+  .dtv-ln { width: 34px; flex: none; align-self: center; text-align: center; font: 600 26px/1 var(--mono); color: #3d444d; transition: color .3s; }
+  .dtv-ln.on { color: #c9d1d9; }
+  .dtv-chart { position: absolute; left: 110px; top: 474px; width: 1700px; }
+  .dtv-leg { display: flex; gap: 22px; align-items: center; height: 20px; margin-bottom: 6px; font: 600 15px/1 var(--mono); color: #9198a1; white-space: nowrap; }
+  .dtv-leg > i { font-style: normal; letter-spacing: .12em; color: #56d4dd; margin-right: auto; }
+  .dtv-leg b { margin-right: 6px; }
+  .dtv-svg { display: block; width: 1700px; height: 442px; overflow: visible; }
+  .dtv-svg text { font-family: var(--mono); font-size: 15px; fill: #9198a1; }
+  .dtv-svg .dtv-grid { stroke: #ffffff14; }
+  .dtv-svg .dtv-cov { fill: none; stroke: #f0f6fc; stroke-width: 3; stroke-linejoin: round; }
+  .dtv-svg .dtv-wk { fill: #f0f6fc; }
+  .dtv-svg .dtv-sb { fill: #ffa657; }
+  .dtv-svg .dtv-sa { fill: #79c0ff; }
+  .dtv-svg .dtv-bb { fill: #db6d2840; stroke: #ffa657; stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .dtv-svg .dtv-ab { fill: #4493f84d; stroke: #79c0ff; stroke-width: 1.5; }
+  .dtv-svg .dtv-mi { fill: #d2a8ff; }
+  .dtv-svg .dtv-an { stroke: #d2a8ff; stroke-width: 1.5; stroke-dasharray: 3 4; opacity: .7; }
+  .dtv-svg .dtv-tri { fill: #56d4dd; }
+  .dtv-svg .dtv-dia { fill: #d2a8ff; }
+  .dtv-svg .dtv-hum { fill: none; stroke: #f0f6fc; stroke-width: 2; }
+  .dtv-svg .dtv-cn { stroke: #6e7681; stroke-width: 1; stroke-dasharray: 2 3; }
+  .dtv-svg .dtv-cur { stroke: #f0f6fc; stroke-width: 1.5; opacity: .45; }
+  .dtv-svg .dtv-hi { fill: #f0f6fc; font-weight: 700; }
+  .dtv-svg .dtv-gap { fill: #79c0ff; font-weight: 600; }
+  .dtv-svg .dtv-fx { opacity: 0; transition: opacity .3s; }
+  .dtv-svg .dtv-fx.on { opacity: 1; }
+  .dtv-cap { position: absolute; left: 110px; right: 110px; top: 950px; font: 500 16px/1.35 var(--mono); color: #9198a1; }
+  .dtv-now *, .dtv-now *::after { transition: none !important; }
+
+  /* --- unknown, not zero (measured value pilot, column under turn automation into value) --- */
+  .unz-gates { position: absolute; left: 110px; top: 288px; width: 1010px; display: flex; flex-direction: column; gap: 7px; }
+  .unz-side { position: absolute; left: 1170px; top: 288px; width: 640px; display: flex; flex-direction: column; gap: 12px; }
+  .active .unz-gates, .active .unz-side { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + .3s); }
+  .unz-g { --c: #3d444d; display: grid; grid-template-columns: 40px 190px 1fr auto; align-items: center; column-gap: 16px; height: 60px; padding: 0 18px; box-sizing: border-box; border: 2px solid #30363d; border-radius: 12px; background: #161b22e8; opacity: .3; transition: opacity .35s, border-color .35s; }
+  .unz-g.ok { --c: #4493f8; }
+  .unz-g.part { --c: #d2a8ff; }
+  .unz-g.unk { --c: #ffa657; }
+  .unz-g.on { opacity: 1; border-color: var(--c); }
+  .unz-g.part.on, .unz-g.unk.on { border-style: dashed; }
+  .unz-g > i { width: 40px; height: 40px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--c); display: grid; place-items: center; font: 700 20px/1 var(--mono); font-style: normal; color: var(--c); }
+  .unz-g > b { font-size: 26px; font-variation-settings: "wght" 700, "wdth" 100; color: #f0f6fc; }
+  .unz-g > span { font-size: 18px; line-height: 1.25; color: #c9d1d9; }
+  .unz-g > em { justify-self: end; font: 600 16px/1 var(--mono); font-style: normal; padding: 7px 12px; border-radius: 6px; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); white-space: nowrap; }
+  .unz-res { margin-top: 6px; display: flex; align-items: center; gap: 20px; height: 80px; padding: 0 22px; box-sizing: border-box; border: 2px dashed #3d444d; border-radius: 14px; transition: border-color .4s, background .4s; }
+  .unz-res b { font-size: 28px; color: #f0f6fc; }
+  .unz-res strong { font: 700 28px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #6e7681; transition: color .4s; }
+  .unz-res span { font: 500 18px/1.3 var(--mono); color: #9198a1; }
+  .unz-res.on { border-color: #ffa657; background: #db6d2814; }
+  .unz-res.on strong { color: #ffa657; }
+  .unz-side > i { font: 600 17px/1 var(--mono); letter-spacing: .12em; color: #56d4dd; font-style: normal; }
+  .unz-goal { padding: 18px 22px; border: 2px solid #56d4dd; border-radius: 14px; background: #161b22e8; }
+  .unz-goal b { display: block; font-size: 28px; line-height: 1.15; color: #f0f6fc; }
+  .unz-goal span { display: block; margin-top: 10px; font: 600 16px/1.3 var(--mono); color: #56d4dd; }
+  .unz-rule { display: flex; gap: 12px; font-size: 19px; line-height: 1.3; color: #c9d1d9; opacity: .25; transition: opacity .3s; }
+  .unz-rule.on { opacity: 1; }
+  .unz-rule b { font: 600 18px/1.4 var(--mono); color: #56d4dd; min-width: 20px; }
+  .unz-pos { padding: 14px 18px; border: 2px solid #4493f8; border-radius: 14px; background: #161b22e8; opacity: .25; transition: opacity .35s; }
+  .unz-pos.on { opacity: 1; }
+  .unz-pos > i { display: block; font: 600 15px/1 var(--mono); letter-spacing: .1em; color: #79c0ff; font-style: normal; }
+  .unz-chips { display: flex; gap: 6px; margin: 10px 0 4px; }
+  .unz-chips span { font: 600 14px/1 var(--mono); padding: 6px 8px; border-radius: 6px; color: #79c0ff; background: #4493f81f; white-space: nowrap; }
+  .unz-chips span.unk { color: #ffa657; background: none; border: 1.5px dashed #ffa657; padding: 4.5px 6.5px; }
+  .unz-chips span.part { color: #d2a8ff; background: none; border: 1.5px dashed #d2a8ff; padding: 4.5px 6.5px; }
+  .unz-pos p { margin: 6px 0 0; font-size: 17px; line-height: 1.35; color: #c9d1d9; }
+  .unz-take { margin-top: 12px; padding: 14px 18px; border-left: 4px solid #e3b341; background: #e3b34114; font-size: 22px; line-height: 1.3; color: #f0f6fc; opacity: 0; transition: opacity .4s; }
+  .unz-take.on { opacity: 1; }
+  .unz-cap { position: absolute; left: 110px; right: 110px; top: 950px; font: 500 17px/1.35 var(--mono); color: #9198a1; }
+  .unz-now * { transition: none !important; }
+
   /* --- turn intent to automation --- */
   .slide-head h2.pf-h { font-size: 100px; }
   .pf-card { position: absolute; top: 360px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -25px var(--c); opacity: 0; transform: translateY(30px) scale(.97); transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1); }
@@ -3992,6 +4083,7 @@
       done = false;
     slides.push({
       group: "platform",
+      key: "value",
       notes:
         "Turn Automation into Value: an illustrative dashboard with synthetic data for a sample repository, twelve weeks after switching on agentic workflows. The backlog burns down instead of following its growing trend, test coverage climbs while escaped bugs fall, and PR lead time drops as deploys per week rise. These numbers are not measured on a real repository; they show the kind of outcomes worth tracking. The AW factory band later shows gh-aw's own measured history.",
       enter() {
@@ -4041,6 +4133,579 @@
         h("div", { class: "tv-panels" }, panels),
         h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
       ),
+    });
+  }
+
+  // From Delivery to Value: how value is determined, on a measured example: Schema Feature Coverage's intent, its frozen textual check, 44 delivered and 19 merged pull requests, six inspected before/after windows, and an outcome from 71% to 100% whose attributed value is still null
+  {
+    resetIndex();
+    // [label, title, measured fact, rule, owner, state (con frozen contract, ok established, part proxy only, unk not established), research prototype]
+    const STAGES = [
+      ["01 · INTENT", "Intent", "Every schema field has an example", "", "workflow Markdown", "con"],
+      ["02 · FREEZE", "Value function", "% of fields with a field: line", "all authors, fixed before replay", "reviewed contract", "con"],
+      ["03 · DELIVERY", "Delivery", "44 pull requests", "opened by the workflow's safe output", "gh-aw", "ok"],
+      ["04 · ADOPTION", "Adoption", "19 merged", "merge as proxy; 1 native human decision", "gh-aw", "part"],
+      ["05 · CORRELATE", "Before / after", "6 windows", "7 days each side, 84 daily samples", "gh cao · prototype", "ok", 1],
+      ["06 · VALUE", "Operational value", "71% → 100%", "attributed value: null, survival not shown", "gh cao · prototype", "unk", 1],
+    ];
+    const GLYPH = { con: "✓", ok: "✓", part: "~", unk: "?" };
+    const stamp = h("strong", { class: "dtv-stamp" }, "frozen");
+    const cards = STAGES.map(([n, t, f, r, own, k, proto], i) =>
+      h(
+        "div",
+        { class: "dtv-st " + k },
+        h("i", {}, n),
+        h("b", {}, t),
+        h("strong", {}, f),
+        r ? h("span", {}, r) : null,
+        h("div", { class: "dtv-bot" }, h("em", { class: proto ? "dtv-own dtv-pr" : "dtv-own" }, own), h("span", { class: "dtv-g" }, GLYPH[k])),
+        i === 1 ? stamp : null
+      )
+    );
+    const links = cards.slice(1).map(() => h("div", { class: "dtv-ln" }, "→"));
+    const flow = h(
+      "div",
+      { class: "dtv-flow", "--i": 0 },
+      cards.flatMap((c, i) => (i ? [links[i - 1], c] : [c]))
+    );
+    // Schema Feature Coverage, measured with refresh/from-delivery-to-value.mjs: [covered, total] every Sunday 12:00 UTC from 22 Mar 2026; the last row is LAST
+    const COVER = [
+      [32, 45],
+      [32, 47],
+      [32, 49],
+      [32, 51],
+      [32, 53],
+      [33, 53],
+      [34, 53],
+      [37, 56],
+      [41, 58],
+      [47, 56],
+      [45, 55],
+      [51, 57],
+      [51, 55],
+      [55, 56],
+      [57, 57],
+      [58, 59],
+      [58, 60],
+      [60, 62],
+      [60, 62],
+      [60, 62],
+      [61, 63],
+      [61, 65],
+      [62, 67],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [69, 69],
+      [69, 71],
+      [69, 71],
+      [70, 71],
+      [71, 72],
+      [72, 73],
+      [75, 75],
+      [75, 75],
+    ];
+    const LAST = "2026-11-17",
+      COHORT = [39, 30, 39];
+    // the workflow's marked pull requests: [delivered, merged or null], UTC
+    const OUT = [
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:37", "2026-05-04T13:47"],
+      ["2026-05-04T07:37", "2026-05-04T13:47"],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-18T07:55", "2026-05-18T12:37"],
+      ["2026-05-18T07:55", "2026-05-18T13:14"],
+      ["2026-05-18T07:55", "2026-05-18T13:57"],
+      ["2026-05-18T07:55", null],
+      ["2026-05-18T07:55", "2026-05-18T12:48"],
+      ["2026-05-18T07:55", "2026-05-18T12:47"],
+      ["2026-05-18T07:56", null],
+      ["2026-05-18T07:56", "2026-05-18T12:47"],
+      ["2026-05-18T07:56", "2026-05-18T12:46"],
+      ["2026-05-18T07:56", "2026-05-18T12:45"],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:23", null],
+      ["2026-06-08T08:18", null],
+      ["2026-06-15T08:39", "2026-06-15T13:21"],
+      ["2026-06-15T08:39", "2026-06-15T13:21"],
+      ["2026-06-15T08:40", "2026-06-15T13:22"],
+      ["2026-06-15T08:40", "2026-06-15T13:20"],
+      ["2026-08-17T06:46", "2026-08-17T11:24"],
+      ["2026-09-28T07:08", "2026-09-28T16:37"],
+      ["2026-10-19T07:09", "2026-10-19T14:15"],
+      ["2026-10-26T07:11", "2026-10-26T11:57"],
+      ["2026-11-02T06:47", "2026-11-02T14:24"],
+    ];
+    // inspected windows: [label, merged PRs, first merge, last merge, example gaps closed, schema fields retired, before, after window end, 7 + 7 daily samples]
+    const WIN = [
+      [
+        "May 4",
+        2,
+        "2026-05-04T13:47",
+        "2026-05-04T13:47",
+        2,
+        0,
+        [35, 54],
+        [39, 58],
+        [
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [34, 53],
+          [34, 53],
+          [37, 54],
+          [36, 54],
+          [37, 54],
+          [37, 54],
+          [37, 54],
+          [37, 55],
+          [37, 56],
+        ],
+      ],
+      [
+        "May 18",
+        8,
+        "2026-05-18T12:37",
+        "2026-05-18T13:57",
+        7,
+        1,
+        [41, 58],
+        [47, 56],
+        [
+          [39, 58],
+          [39, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [48, 57],
+          [48, 57],
+          [48, 57],
+          [48, 57],
+          [48, 56],
+          [47, 56],
+          [47, 56],
+        ],
+      ],
+      [
+        "Jun 15",
+        4,
+        "2026-06-15T13:20",
+        "2026-06-15T13:22",
+        4,
+        0,
+        [51, 55],
+        [55, 56],
+        [
+          [50, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [55, 55],
+          [55, 55],
+          [54, 55],
+          [54, 55],
+          [54, 55],
+          [55, 56],
+          [55, 56],
+        ],
+      ],
+      [
+        "Sep 28",
+        1,
+        "2026-09-28T16:37",
+        "2026-09-28T16:37",
+        5,
+        0,
+        [63, 68],
+        [69, 69],
+        [
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [68, 68],
+          [68, 68],
+          [68, 68],
+          [68, 68],
+          [68, 69],
+          [69, 69],
+          [69, 69],
+        ],
+      ],
+      [
+        "Oct 26",
+        1,
+        "2026-10-26T11:57",
+        "2026-10-26T11:57",
+        1,
+        0,
+        [70, 71],
+        [71, 72],
+        [
+          [69, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 72],
+          [71, 72],
+        ],
+      ],
+      [
+        "Nov 2",
+        1,
+        "2026-11-02T14:24",
+        "2026-11-02T14:24",
+        1,
+        0,
+        [71, 72],
+        [73, 74],
+        [
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 72],
+          [71, 72],
+          [72, 72],
+          [72, 72],
+          [72, 72],
+          [72, 73],
+          [72, 73],
+          [72, 73],
+          [72, 73],
+        ],
+      ],
+    ];
+    // the only merge with a native gh-aw explicit-human adoption record
+    const HUMAN = "2026-09-28T16:37";
+    const DAY = 864e5,
+      T0 = Date.parse("2026-03-22T12:00Z"),
+      T1 = Date.parse(LAST + "T12:00Z");
+    const t = s => Date.parse(s + "Z"),
+      X = ms => 160 + (1530 * (ms - T0)) / (T1 - T0),
+      Y = p => 140 - (p - 50) * 2.6,
+      pc = ([c, n]) => (100 * c) / n,
+      f1 = n => n.toFixed(1);
+    // one coverage trace: weekly snapshots plus each window's daily samples and endpoints, in time order
+    const pts = COVER.map((v, i) => [i < COVER.length - 1 ? T0 + i * 7 * DAY : T1, v, "wk"]);
+    for (const [, , f, l, , , b, e, s] of WIN) {
+      const F = t(f),
+        L = t(l);
+      s.forEach((v, d) => v && pts.push([(d < 7 ? F : L) + (d - 7) * DAY, v, d < 7 ? "sb" : "sa"]));
+      pts.push([F - 6e4, b, "wk"]);
+      if (e) pts.push([L + 7 * DAY, e, "wk"]);
+    }
+    pts.sort((a, b) => a[0] - b[0]);
+    let g = `<defs><clipPath id="dtv-clip"><rect x="0" y="0" width="0" height="442"/></clipPath></defs>`;
+    for (const p of [50, 75, 100]) g += `<line class="dtv-grid" x1="160" x2="1690" y1="${f1(Y(p))}" y2="${f1(Y(p))}"/><text x="150" y="${f1(Y(p) + 5)}" text-anchor="end">${p}%</text>`;
+    for (let m = 3; m <= 10; m++) {
+      const M = Date.UTC(2026, m, 1);
+      g += `<line class="dtv-grid" x1="${f1(X(M))}" x2="${f1(X(M))}" y1="0" y2="416"/><text x="${f1(X(M))}" y="436" text-anchor="middle">${new Date(M).toLocaleDateString("en", { month: "short", timeZone: "UTC" })}</text>`;
+    }
+    g += `<text x="170" y="28">same ${COHORT[0]} fields throughout: ${COHORT[1]} → ${COHORT[2]} covered</text>`;
+    // [element markup with its sweep time, sound]: a window shows once its after period is complete
+    const FX = [];
+    WIN.forEach(([lab, n, f, l, gaps, retired, , end], i) => {
+      const y = 160 + i * 19,
+        F = t(f),
+        L = t(l);
+      g += `<text x="150" y="${y + 5}" text-anchor="end">${lab}${n > 1 ? ` · ${n} PRs` : ""}</text>`;
+      FX.push([
+        `<line class="dtv-an" x1="${f1(X(L))}" x2="${f1(X(L))}" y1="10" y2="${y - 6}"/><rect class="dtv-bb" x="${f1(X(F - 7 * DAY))}" y="${y - 6}" width="${f1(X(F) - X(F - 7 * DAY))}" height="12" rx="3"/>` +
+          (L > F ? `<rect class="dtv-mi" x="${f1(X(F))}" y="${y - 6}" width="${f1(Math.max(2, X(L) - X(F)))}" height="12"/>` : "") +
+          `<rect class="dtv-ab" x="${f1(X(L))}" y="${y - 6}" width="${f1(X(L + 7 * DAY) - X(L))}" height="12" rx="3"/><text class="dtv-gap" x="${f1(X(L + 7 * DAY) + 8)}" y="${y + 5}">${end ? `+${gaps}${retired ? ` · ${retired} retired` : ""}` : "pending"}</text>`,
+        Math.min(L + 7 * DAY, T1),
+      ]);
+    });
+    g += `<text x="150" y="338" text-anchor="end">▲ delivered ${OUT.length}</text><text x="150" y="408" text-anchor="end">◆ merged* ${OUT.filter(o => o[1]).length}</text>`;
+    const slots = {},
+      slot = k => (slots[k] = (slots[k] || 0) + 1) - 1;
+    for (const [d, m] of OUT) {
+      const D = t(d),
+        yd = 340 - slot("d" + d.slice(0, 10)) * 7;
+      FX.push([`<path class="dtv-tri" d="M${f1(X(D))} ${yd - 11} l-6 11 h12 Z"/>`, D, "d"]);
+      if (!m) continue;
+      const M = t(m),
+        ym = 410 - slot("m" + m.slice(0, 10)) * 7;
+      FX.push([
+        `<line class="dtv-cn" x1="${f1(X(D))}" y1="${yd}" x2="${f1(X(M))}" y2="${ym - 12}"/><path class="dtv-dia" d="M${f1(X(M))} ${ym - 12} l6 6 -6 6 -6 -6 Z"/>` +
+          (m === HUMAN ? `<circle class="dtv-hum" cx="${f1(X(M))}" cy="${ym - 6}" r="10"/><text class="dtv-hi" x="${f1(X(M))}" y="${ym - 22}" text-anchor="middle">native human</text>` : ""),
+        M,
+        "m",
+      ]);
+    }
+    FX.push([`<text class="dtv-hi" x="1690" y="${f1(Y(pc(COVER.at(-1))) + 24)}" text-anchor="end">${Math.round(pc(COVER.at(-1)))}% · ${COVER.at(-1).join("/")}</text>`, T1]);
+    g += `<text class="dtv-hi" x="168" y="${f1(Y(pc(COVER[0])) - 12)}">${Math.round(pc(COVER[0]))}% · ${COVER[0].join("/")}</text>`;
+    g += FX.map(([s, T], i) => `<g class="dtv-fx" data-fx="${i}">${s}</g>`).join("");
+    g += `<g clip-path="url(#dtv-clip)"><path class="dtv-cov" d="M${pts.map(([T, v]) => `${f1(X(T))} ${f1(Y(pc(v)))}`).join(" L")}"/>${pts.map(([T, v, k]) => `<circle class="dtv-${k}" cx="${f1(X(T))}" cy="${f1(Y(pc(v)))}" r="${k === "wk" ? 3 : 3.5}"/>`).join("")}</g>`;
+    g += `<line class="dtv-cur" x1="160" x2="160" y1="0" y2="416"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "dtv-svg");
+    svg.setAttribute("viewBox", "0 0 1700 442");
+    svg.innerHTML = g;
+    const clip = svg.querySelector("#dtv-clip rect"),
+      cur = svg.querySelector(".dtv-cur"),
+      fx = [...svg.querySelectorAll("[data-fx]")].map(node => [node, FX[+node.dataset.fx][1], FX[+node.dataset.fx][2]]);
+    const leg = h(
+      "div",
+      { class: "dtv-leg" },
+      h("i", {}, "SCHEMA FEATURE COVERAGE · 22 MAR – 17 NOV 2026"),
+      [
+        ["—", "#f0f6fc", "coverage, all authors"],
+        ["●", "#ffa657", "before"],
+        ["●", "#79c0ff", "after"],
+        ["▲", "#56d4dd", "delivered"],
+        ["◆", "#d2a8ff", "merged*"],
+      ].map(([s, c, l]) => h("span", {}, h("b", { style: { color: c } }, s), l))
+    );
+    const chart = h("div", { class: "dtv-chart", "--i": 1 }, leg, svg);
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value · Schema Feature Coverage on gh-aw"), h("h2", { class: "pf-h" }, letters("From Delivery to "), letters("Value", "l-grad"))),
+      flow,
+      chart,
+      h(
+        "div",
+        { class: "dtv-cap" },
+        "MEASURED · gh-aw, replayed 17 Nov 2026 · a field counts when workflow Markdown has a line starting with it: a textual check, not correctness · 36 weekly first-parent main snapshots and 84 daily window samples · ▲ ◆ from the workflow's marked pull requests (search, not native history); *merge = adoption proxy"
+      )
+    );
+    const END = 9400,
+      SW0 = 1500,
+      SW1 = 8500,
+      CARD = [300, 800, 2800, 3100, 3500, 8800],
+      LINK = [600, 2600, 2950, 3300, 8600];
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set();
+    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
+    const past = (cond, id, snd) => {
+      if (cond && !seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return cond;
+    };
+    const paint = e => {
+      cards.forEach((c, i) =>
+        c.classList.toggle(
+          "on",
+          past(e >= CARD[i], "c" + i, () => (i === 5 ? sfx.compile() : sfx.pop(i)))
+        )
+      );
+      links.forEach((l, i) => l.classList.toggle("on", e >= LINK[i]));
+      stamp.classList.toggle(
+        "on",
+        past(e >= 1100, "stamp", () => sfx.review())
+      );
+      const S = T0 + (T1 - T0) * Math.min(1, Math.max(0, (e - SW0) / (SW1 - SW0))),
+        x = f1(X(S));
+      clip.setAttribute("width", f1(X(S) + 4));
+      cur.setAttribute("x1", x);
+      cur.setAttribute("x2", x);
+      cur.style.opacity = e > SW0 && e < SW1 ? "" : "0";
+      fx.forEach(([node, T, k], i) => node.classList.toggle("on", past(e > SW0 && S >= T, "fx" + i, k === "d" ? () => sfx.pop(2) : k === "m" ? () => sfx.key(0.8) : null)));
+    };
+    slides.push({
+      group: "platform",
+      under: "value",
+      notes:
+        "From Delivery to Value, measured on gh-aw's own Schema Feature Coverage workflow: how we determine value, and the boundary of what it proves. Intent comes from the workflow's Markdown: every top-level schema field should have an example. Before any history was replayed, the value function was frozen: the share of schema top-level fields that have a line starting with the field name in workflow or demo Markdown. That is the workflow's own textual check, counted over every author, so people and other agents move it too; it is not compilation or runtime coverage. The coverage line replays 36 weekly first-parent main snapshots from 22 March to 17 November 2026: from 32 of 45 fields, 71 percent, to 75 of 75, with setbacks whenever the schema gained fields; the 39 fields present throughout went from 30 to 39 covered, so the rise is not just schema churn. Delivery: the workflow's safe output opened 44 pull requests, found by searching for its producer footer, which is not complete native history; triangles stacked on one day are separate pull requests from one run, not separate runs or units of value, and repeated proposals can target fields that are still uncovered. Adoption: 19 were merged. A merge is only an adoption proxy here; the native gh-aw adoption record shows an explicit human decision for the 28 September pull request, and the other native queries failed on missing historical identity. Before and after: six inspected windows, seven days on each side, sampled daily with no maturation, 84 samples. For the May and June same-day batches the before window ends at the first merge and the after window starts at the last, and overlapping effects are never summed. Measured on the exact first parent, those batches added 13 examples while one May merge retired the dependencies field, which is not an example fix; the later inspected merges closed 5, 1 and 1 gaps, and two merges in August and October closed one gap each without an inspected window. So the outcome is strong and some contributions are directly witnessed at merge, but qualified attributed value is still null: survival through each full window and exclusive causality are not established. gh cao is a research prototype, and this is a retrospective replay, not a published value result. Delivered pull requests, merges or run success alone are not value.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        el.classList.add("dtv-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("dtv-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
+    });
+  }
+
+  // Unknown, not zero: a read-only value pilot on the Matt Pocock Skills Reviewer: the frozen primary outcome first, then each gate's measured state; delivery and fallback adoption pass and the windows have elapsed, but without lineage, a regression witness, full-window survival or a complete defect population the contribution stays unavailable, not zero; Schema Feature Coverage (From Delivery to Value) is the contrast, observed but also not yet attributed
+  {
+    resetIndex();
+    // [state, glyph, gate, measured detail, chip]: ok established, part fallback only, unk evidence missing
+    const GATES = [
+      ["ok", "✓", "Delivered", "Inline comments and reviews the safe outputs applied in the latest 100 runs", "127 outputs"],
+      ["part", "~", "Adopted", "Accepted by delivery-time fallback, none by a human decision; 12 reviews dismissed", "115 · 0 human"],
+      ["ok", "✓", "Windows", "7 days before and after adoption, both complete for reviews adopted 9 Nov", "7 + 7 days"],
+      ["unk", "?", "Finding → fix", "An explicit defect, a corrective commit and an accepted merge: not shown", "no lineage"],
+      ["unk", "?", "Witness", "No test that fails on the unfixed code and passes on the accepted code", "none"],
+      ["unk", "?", "Survival", "Survival through the whole post-window is unsupported for reviews", "unsupported"],
+      ["unk", "?", "Population", "Every witnessed defect, across all authors, in each window", "incomplete"],
+    ];
+    const gates = GATES.map(([k, g, t, s, v]) => h("div", { class: "unz-g " + k }, h("i", {}, g), h("b", {}, t), h("span", {}, s), h("em", {}, v)));
+    const res = h("div", { class: "unz-res" }, h("b", {}, "Contribution"), h("strong", {}, "unavailable"), h("span", {}, "before ? · after ? · not 0, not positive"));
+    const take = h("div", { class: "unz-take" }, "Lifecycle facts are not value: value needs a witnessed outcome, lineage and survival.");
+    const rules = [
+      "One regression test fails on the unfixed code and passes on the accepted code; one defect per root cause.",
+      "No reproduction: unknown. Open pull request: pending. Empty denominator: unavailable, not zero.",
+      "Feasible: a fix from before the workflow reproduces with two tests, one defect, not credited to the reviewer.",
+    ].map(s => h("div", { class: "unz-rule" }, h("b", {}, "→"), h("span", {}, s)));
+    const pos = h(
+      "div",
+      { class: "unz-pos" },
+      h("i", {}, "CONTRAST · SCHEMA FEATURE COVERAGE"),
+      h(
+        "div",
+        { class: "unz-chips" },
+        [
+          ["", "✓ delivered"],
+          ["part", "~ merged"],
+          ["", "✓ lineage"],
+          ["", "✓ merge witness"],
+          ["unk", "? survival"],
+        ].map(([k, s]) => h("span", { class: k }, s))
+      ),
+      h("p", {}, "Its outcome rose from 71% to 100% across all authors and its merges are witnessed at their exact parent, yet its attributed value is also still null.")
+    );
+    const side = h(
+      "div",
+      { class: "unz-side", "--i": 1 },
+      h("i", {}, "FROZEN PRIMARY OUTCOME"),
+      h("div", { class: "unz-goal" }, h("b", {}, "% of independently witnessed defects corrected before merge"), h("span", {}, "all authors and automation · not only reviewed pull requests")),
+      rules,
+      pos
+    );
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Matt Pocock Skills Reviewer · a read-only value pilot"), h("h2", { class: "pf-h" }, letters("Unknown, "), letters("not zero", "l-grad"))),
+      h("div", { class: "unz-gates", "--i": 0 }, gates, res, take),
+      side,
+      h(
+        "div",
+        { class: "unz-cap" },
+        "MEASURED · gh-aw, snapshot 17 Nov 2026 · latest 100 runs, 15–17 Nov (95 with native reports) · windows of reviews adopted 9 Nov · 7-day windows, daily cadence and no maturation are pilot choices, not defaults · contrast figures as in From Delivery to Value"
+      )
+    );
+    const END = 10000,
+      RULE = [700, 1100, 1500],
+      GATE = GATES.map((_, i) => 2300 + i * 650);
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set();
+    // true once e reaches ms; plays snd the first time, unless the presenter skipped ahead
+    const past = (e, ms, id, snd) => {
+      if (e < ms) return false;
+      if (!seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return true;
+    };
+    const paint = e => {
+      rules.forEach((r, i) =>
+        r.classList.toggle(
+          "on",
+          past(e, RULE[i], "r" + i, () => sfx.key(0.7))
+        )
+      );
+      gates.forEach((g, i) =>
+        g.classList.toggle(
+          "on",
+          past(e, GATE[i], "g" + i, () => (GATES[i][0] === "unk" ? sfx.block(true) : sfx.pop(i)))
+        )
+      );
+      res.classList.toggle(
+        "on",
+        past(e, 7000, "res", () => sfx.omen())
+      );
+      pos.classList.toggle(
+        "on",
+        past(e, 7800, "pos", () => sfx.pop(4))
+      );
+      take.classList.toggle(
+        "on",
+        past(e, 9800, "take", () => sfx.notify(false))
+      );
+    };
+    slides.push({
+      group: "platform",
+      under: "value",
+      notes:
+        "Unknown, not zero, measured: a read-only value pilot on gh-aw's own Matt Pocock Skills Reviewer, the pull request reviewer from the Skills slides. The measurement was frozen first. Its primary outcome is the percentage of independently witnessed defects corrected before merge, across all authors and automation, not only reviewed pull requests. A defect counts only when the same independently accepted regression test fails on the unfixed revision and passes on the accepted revision; several tests for one root cause count once; missing reproduction or coverage is unknown, open pull requests are pending, and an empty denominator is unavailable rather than zero. Seven-day windows before and after each adoption, a daily cadence and no maturation are this pilot's choices, not defaults. Then the gates. The latest 100 runs, 15 to 17 November 2026, returned 95 native reports with 127 delivered outputs: 93 inline comments and 34 reviews. 115 were accepted, every one by delivery-time fallback and none by a recorded human decision, and 12 reviews were dismissed. For reviews adopted on 9 November both windows have fully elapsed, so time is not what is missing; evidence is. No lineage was shown from an explicit defect finding through a corrective commit to an accepted merge, no regression test was found that fails before and passes after, survival through the whole post-window is unsupported for review outputs (a current snapshot is not full-window survival), and there is no complete population of witnessed defects. So before, after and the attributed contribution are unavailable: not zero and not positive. A merge or a documented design decision does not prove a defect was fixed. The witness rule is feasible: one fix merged before the workflow existed reproduces, its two existing regression tests failing on its actual first parent and passing on the accepted code. That is one corrected defect, not credited to the reviewer and not a baseline. No collector, schedule or published value was installed. For contrast, Schema Feature Coverage, measured in From Delivery to Value, has evidence at every gate except survival: delivered pull requests, merges as adoption proxies, lineage from its runs, and coverage measured on each merge's exact first parent, while its outcome rose from 71 to 100 percent across all authors. Its attributed value is still null too, because survival through full windows and exclusive causality are not established; the difference is that its outcome and direct contributions are observed, while the reviewer's are unknown. The pilot shows why the gates matter; it does not show realized value or causation.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        el.classList.add("unz-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("unz-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
     });
   }
 
@@ -10481,7 +11146,14 @@
     g += `<g class="fzs-spike" id="fzsS"><line x1="${cx(0) + 20}" y1="104" x2="104" y2="104"/><text x="112" y="110">${N} runs · 00:00 UTC · the same minute</text><text class="d" x="112" y="136">→ token-API bursts · rate limits · queued runners</text></g>`;
     // minute ruler: avoided zones hatched, measured minutes as bars
     g += `<g class="fzs-min"><text x="${X0 + 24 * CW}" y="520" text-anchor="end">minute · hatched = avoided: hour edges · US :15 :45 · EU :30</text>`;
-    for (const [a, b] of [[0, 4], [12, 18], [27, 33], [42, 48], [55, 59]]) g += `<rect class="no" x="${X0 + a * MW}" y="530" width="${(b - a + 1) * MW}" height="${MB - 530}" rx="3"/>`;
+    for (const [a, b] of [
+      [0, 4],
+      [12, 18],
+      [27, 33],
+      [42, 48],
+      [55, 59],
+    ])
+      g += `<rect class="no" x="${X0 + a * MW}" y="530" width="${(b - a + 1) * MW}" height="${MB - 530}" rx="3"/>`;
     MINS.forEach((n, m) => {
       if (n) g += `<rect class="b" x="${X0 + m * MW + 2}" y="${MB - n * 6}" width="${MW - 4}" height="${n * 6}" rx="2"/>`;
     });
