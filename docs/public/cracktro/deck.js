@@ -1049,16 +1049,16 @@
   .dto-big { fill: #e3b341; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
   .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
   /* --- cli vs mcp --- */
-  .cvm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
+  .cvm .slide-head h2 { --lg: #e3b341; }
   .cvm-k { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
   .cvm-ln { opacity: 0; transition: opacity .3s; } .cvm-ln.on { opacity: 1; } .cvm-ln.gone { opacity: .15; }
   .cvm-ln text { fill: #9198a1; font: 500 15px var(--mono); white-space: pre; }
-  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #3fb950; } .cvm-ln .ed { fill: #d29922; } .cvm-ln .jq { fill: #ffa657; font-weight: 700; } .cvm-ln .fl { fill: #79c0ff; font-weight: 700; } .cvm-js text { font-size: 13px; fill: #d29922; } .cvm-js .ed { fill: #f0f6fc; }
+  .cvm-ln .cmd { fill: #f0f6fc; } .cvm-ln .ok { fill: #79c0ff; } .cvm-ln .ed { fill: #ffa657; } .cvm-ln .jq { fill: #f0f6fc; font-weight: 700; } .cvm-ln .fl { fill: #79c0ff; font-weight: 700; } .cvm-js text { font-size: 13px; fill: #ffa657; } .cvm-js .ed { fill: #f0f6fc; }
   .cvm-yaml text { fill: #e6edf3; font: 500 20px var(--mono); white-space: pre; }
-  .cvm-yaml .k { fill: #79c0ff; } .cvm-yaml .v { fill: #d29922; transition: fill .3s; } .cvm-yaml .v.on { fill: #3fb950; }
-  .cvm-hl { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .3s, stroke .3s; } .cvm-hl.on { fill: #3fb9501a; stroke: #3fb950; }
+  .cvm-yaml .k { fill: #9198a1; } .cvm-yaml .v { fill: #ffa657; transition: fill .3s; } .cvm-yaml .v.on { fill: #79c0ff; }
+  .cvm-hl { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .3s, stroke .3s; } .cvm-hl.on { fill: #4493f81a; stroke: #4493f8; }
   .cvm-bin { opacity: 0; transition: opacity .35s; } .cvm-bin.on { opacity: 1; }
-  .cvm-bin rect { fill: #161b22; stroke: #3fb950; stroke-width: 2; }
+  .cvm-bin rect { fill: #161b22; stroke: #4493f8; stroke-width: 2; }
   .cvm-bin .n { fill: #f0f6fc; font: 600 19px var(--mono); } .cvm-bin .d { fill: #9198a1; font: 500 14px var(--mono); }
   .cvm-ctx { opacity: 0; transition: opacity .4s; } .cvm-ctx.on { opacity: 1; }
   .cvm-ctx rect { fill: #ffffff08; stroke-width: 1.5; } .cvm-ctx text { font: 500 16px var(--mono); white-space: pre; }
@@ -9248,8 +9248,8 @@
       ["", "      9 src/db.js"],
       ["", "      3 src/api/user.js"],
     ];
-    let g = `<defs><marker id="cvmG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
-      <marker id="cvmC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    let g = `<defs><marker id="cvmG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#db6d28"/></marker>
+      <marker id="cvmC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
       [0, 600, "MCP · RESPONSE INTO CONTEXT"],
@@ -9259,8 +9259,8 @@
       g += `<text class="fm-lane-t mra-lane" id="cvmLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
     });
-    g += `<path class="fm-wire" id="cvmW0" d="M584 450 C 606 450, 594 230, 614 230" stroke="#d29922" marker-end="url(#cvmG)"/>`;
-    g += `<path class="fm-wire" id="cvmW1" d="M1004 400 C 1026 400, 1014 180, 1034 180" stroke="#3fb950" marker-end="url(#cvmC)"/>`;
+    g += `<path class="fm-wire" id="cvmW0" d="M584 450 C 606 450, 594 230, 614 230" stroke="#db6d28" marker-end="url(#cvmG)"/>`;
+    g += `<path class="fm-wire" id="cvmW1" d="M1004 400 C 1026 400, 1014 180, 1034 180" stroke="#4493f8" marker-end="url(#cvmC)"/>`;
     // what ends up in the context: qualitative, synthetic
     const ctx = (x, id, col, txt) =>
       `<g class="cvm-ctx" id="${id}"><text class="cvm-k" x="${x + 16}" y="572">IN CONTEXT</text>` +
@@ -9271,7 +9271,7 @@
     g += `<g class="cvm-ln" id="cvmC0"><text class="cmd" x="32" y="162">${esc(CALL)}</text></g>`;
     g += `<text class="cvm-k" x="32" y="196">RESPONSE · STRAIGHT INTO CONTEXT</text>`;
     WALL.forEach((t, i) => (g += `<g class="cvm-ln cvm-js" id="cvmT${i}"><text class="${i === WALL.length - 1 ? "ed" : ""}" x="32" y="${222 + i * 22}">${esc(t)}</text></g>`));
-    g += ctx(16, "cvmXm", "#d29922", "every field of every alert, every page") + `</g>`;
+    g += ctx(16, "cvmXm", "#db6d28", "every field of every alert, every page") + `</g>`;
     // front matter: two lines move GitHub reads to gh and mount every MCP server as a CLI
     g += `<g class="sfl-box" id="cvmFm"><rect class="sfl-card" x="616" y="76" width="388" height="556" rx="12"/><text class="sfl-title" x="632" y="104">.github/workflows/triage.md</text>`;
     g += `<rect class="cvm-hl" id="cvmH0" x="626" y="186" width="368" height="30" rx="6"/><rect class="cvm-hl" id="cvmH1" x="626" y="218" width="368" height="30" rx="6"/>`;
@@ -9296,7 +9296,7 @@
         .replace(/\b(jq|head|sort|uniq|grep)\b/g, m => `<tspan class="jq">${m}</tspan>`)
         .replace(/ \| /g, ` <tspan class="jq">|</tspan> `);
     SHELL.forEach(([c, t], i) => (g += `<g class="cvm-ln" id="cvmS${i}"><text class="${c}" x="1052" y="${222 + i * 24}">${pipe(t)}</text></g>`));
-    g += ctx(1036, "cvmXc", "#3fb950", "two help lines · two counts · two paths") + `</g>`;
+    g += ctx(1036, "cvmXc", "#4493f8", "two help lines · two counts · two paths") + `</g>`;
     g += `<text class="cvm-k cvm-cap" x="${VW / 2}" y="672">MEASURED, schemas only · 1 workflow, MCP → gh-proxy, 15 runs/side, 23 Aug – 3 Sep 2026 · first request 16.7k → 12.8k tokens, whole run ≈ same · snapshot 17 Nov 2026</text>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -9342,7 +9342,7 @@
       dot.style.opacity = 1;
       dot.setAttribute("cx", q.x);
       dot.setAttribute("cy", q.y);
-      dot.setAttribute("fill", id === "cvmW0" ? "#d29922" : "#3fb950");
+      dot.setAttribute("fill", id === "cvmW0" ? "#db6d28" : "#4493f8");
     };
     const shellIds = ["cvmP", ...SHELL.map((_, i) => "cvmS" + i)];
     slides.push({
