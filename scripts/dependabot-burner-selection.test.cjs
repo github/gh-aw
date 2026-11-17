@@ -17,9 +17,10 @@ const prefetch = new AsyncFunction("github", "context", "require", "process", "c
 
 function compiledBashPolicy() {
   const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
-  const toolPolicy = lock.match(/GH_AW_PI_TOOL_POLICY: '([^'\n]+)'/);
+  const toolPolicy = lock.match(/GH_AW_PI_TOOL_POLICY: ('[^'\n]+'|"(?:\\.|[^"\\])*")/);
   assert.ok(toolPolicy, "Missing compiled Pi tool policy");
-  const { bash } = JSON.parse(toolPolicy[1]);
+  const policyJSON = toolPolicy[1].startsWith('"') ? JSON.parse(toolPolicy[1]) : toolPolicy[1].slice(1, -1);
+  const { bash } = JSON.parse(policyJSON);
   assert.ok(Array.isArray(bash) && bash.length > 0 && !bash.includes("*"), "Missing restricted bash allowlist");
   return command => isPiBashAllowed(command, bash);
 }
@@ -94,6 +95,22 @@ test("safe outputs are executable while GitHub reads stay off the shell", () => 
   assert.match(workflow, /Never invoke GitHub tools through Bash|GitHub tools are not shell commands: never\s+invoke them through Bash/);
 });
 
+test("required workflow validation commands pass without enabling unrelated commands", () => {
+  const allowed = compiledBashPolicy();
+  for (const command of ["make dependabot && make build", "npm --prefix .github/workflows install --package-lock-only --ignore-scripts"]) {
+    assert.ok(allowed(command), command);
+  }
+  for (const command of [
+    "make test",
+    "make build && gh auth status",
+    "npm install --package-lock-only --ignore-scripts",
+    "npm --prefix .github/workflows install",
+    "cd .github/workflows && npm install --package-lock-only --ignore-scripts",
+  ]) {
+    assert.ok(!allowed(command), command);
+  }
+});
+
 test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
   const agents = [...workflow.matchAll(/^## agent: `([^`]+)`/gm)].map(match => match[1]);
   assert.deepEqual(agents, ["dependabot-remediator"]);
@@ -103,7 +120,7 @@ test("one remediation worker replaces analysis fan-out and the parent owns publi
   assert.match(workflow, /report incomplete work for a blocked or failed wave/);
   assert.match(workflow, /Leave `replacement_pr_created` false/);
   assert.match(workflow, /Do not submit create-pull-request or noop safe outputs from this worker/);
-  assert.match(workflow, /cd \.github\/workflows && npm install --package-lock-only --ignore-scripts/);
+  assert.match(workflow, /npm --prefix \.github\/workflows install --package-lock-only --ignore-scripts/);
   assert.doesNotMatch(workflow, /npm install --package-lock-only(?:["`]|\n)/);
 });
 

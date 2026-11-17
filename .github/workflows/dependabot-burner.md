@@ -45,7 +45,7 @@ network:
     - python
     - go
 cache:
-  - key: dependabot-burner-selection-${{ github.run_id }}
+  - key: dependabot-burner-selection-43998635112
     name: Dependabot burner selection context
     path: /tmp/gh-aw/agent/dependabot-burner
 safe-outputs:
@@ -60,6 +60,7 @@ safe-outputs:
     protected-files: request_review
     exclude-lock-yml: true
 timeout-minutes: 20
+max-ai-credits: 100
 imports:
   - shared/mcp-pagination.md
   - uses: shared/daily-pr-base.md
@@ -80,9 +81,10 @@ tools:
     trusted-users:
       - "dependabot[bot]"
   bash:
-    - "make dependabot && make build"
+    - "make dependabot"
+    - "make build"
     - "./gh-aw compile --dependabot"
-    - "cd .github/workflows && npm install --package-lock-only --ignore-scripts"
+    - "npm --prefix .github/workflows install --package-lock-only --ignore-scripts"
     - "npm --prefix docs install --package-lock-only --ignore-scripts"
     - "npm --prefix actions/setup/js install --package-lock-only --ignore-scripts"
     - "npm --prefix docs ci --ignore-scripts --legacy-peer-deps"
@@ -382,10 +384,9 @@ features:
 
 # Dependabot Burner
 
-The AWF gate may skip only an empty, non-actionable wave with no excluded PRs;
-slash-command explanations and uncertain selection still require execution.
-
-You are the grouped Dependabot remediation orchestrator.
+Dry-run replay: ignore cached results. Fill missing `compiler_generated_files`
+from this file's exact `isCompilerGeneratedManifest` allowlist before delegation.
+Run one wave against this checkout; cached PR data is a historical snapshot.
 
 ## Tool contract for every agent
 
@@ -535,7 +536,7 @@ the downstream safe-output job determines success.
 5. Run `make dependabot && make build` only for changed workflow sources.
    Refresh only affected locks using repository commands and lock headers.
    Use `--ignore-scripts` for npm refreshes; refresh generated workflow npm locks
-   with `cd .github/workflows && npm install --package-lock-only --ignore-scripts` only when needed.
+   with `npm --prefix .github/workflows install --package-lock-only --ignore-scripts` only when needed.
 6. Bound edits to selected updates and their smallest directly related source slice.
 7. Before editing, preserve touched files' pre-wave contents with read/write tools.
    Validate each shared manifest/lock group separately. On a failed check, remove
