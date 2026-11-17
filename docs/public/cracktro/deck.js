@@ -2603,7 +2603,10 @@
   .active .evo-fact { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 1.4s); }
   .evo-fact b { display: block; font: 700 40px/1 var(--mono); color: var(--c); white-space: nowrap; }
   .evo-fact span { display: block; margin-top: 8px; font-size: 19px; line-height: 1.25; color: #c9d1d9; }
-  .psc-st.k { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95099); }
+  .psc-hd { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .12em; }
+  .psc-c { font: 600 20px var(--mono); opacity: 0; transition: opacity .35s; }
+  .psc-c.on { opacity: 1; } .psc-c.i { fill: #d29922; } .psc-c.a { fill: #79c0ff; } .psc-c.r { fill: #d2a8ff; } .psc-c.f { fill: #ff7b72; } .psc-c.n { fill: #9198a1; }
+  .psc-v { text-anchor: end; font-weight: 700; } .psc-v.k { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95099); }
   .psc-m { width: 1360px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
@@ -18737,7 +18740,7 @@
     });
   }
 
-  // PR Sous Chef: every five minutes a no-AI prefilter picks at most four stuck pull requests; the agent posts Copilot a deduplicated prep list, Copilot cooks, and human review and CI decide
+  // PR Sous Chef: every five minutes it finds pull requests that sit idle with work waiting (review comments, failing CI) and nudges Copilot to pick them back up; humans still review and merge
   {
     resetIndex();
     const VW = 2160,
@@ -18748,74 +18751,74 @@
     const node = (id, cx, y, w, label, fill, icon, cls = "") =>
       `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${cx}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${cx + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${cx}" cy="${y}" r="34" fill="${fill}"/>${ico(icon, cx, y + 1, icon === "copilot" ? 38 : 30)}</g>`;
-    // illustrative queue: [title, reason, kept]
-    const QUEUE = [
-      ["docs: fix typo", "draft", 0],
-      ["feat: retry upload", "conflicts", 1],
-      ["chore: bump deps", "dependency bot", 0],
-      ["fix: flaky test", "agent active", 0],
-      ["feat: new flag", "failing check", 1],
-      ["refactor: parser", "broccoli", 0],
-      ["perf: cache reads", "idle < 10 min", 0],
+    // illustrative open pull requests: [name, idle chip, idle class, work chip, work class, nudged]
+    const PRS = [
+      ["PR A", "idle 3 h", "i", "2 review comments", "r", 1],
+      ["PR B", "active now", "a", "CI failing", "f", 0],
+      ["PR C", "idle 1 d", "i", "nothing to do", "n", 0],
+      ["PR D", "idle 5 h", "i", "CI failing", "f", 1],
+      ["PR E", "idle 2 h", "i", "comments + CI", "f", 1],
     ];
-    // [x, w, file, tag, lines] for the prep list and the Copilot task
+    // [x, w, file, tag, lines] for the rule and the nudge
     const PANELS = [
       [
-        700,
-        700,
-        "comment · @copilot",
-        "PREP",
+        860,
+        540,
+        "the rule",
+        "RULE",
         [
-          ["h", "@copilot  a little prep"],
-          ["", "1. make merge-main"],
-          ["", "2. Review (cli.go:42): address"],
-          ["", "3. Fix failing check  lint"],
-          ["q", "no merging · no CI triggering"],
-          ["fn", "▸ Structured data  {kind, sha256}"],
-          ["add", "+ approve CI run · assign Copilot"],
+          ["h", "1. Is it idle?"],
+          ["q", "   no push, no agent at work"],
+          ["h", "2. Is there work to do?"],
+          ["fn", "   review comments"],
+          ["fn", "   failing CI"],
+          ["", ""],
+          ["pass", "yes + yes → nudge"],
         ],
       ],
       [
-        1460,
-        640,
-        "Copilot task",
-        "COOK",
+        1440,
+        680,
+        "comment on PR E",
+        "NUDGE",
         [
-          ["api", "$ make merge-main"],
-          ["add", "+ answer the review thread"],
-          ["add", "+ fix lint"],
-          ["", "push → CI runs"],
-          ["q", "stop at human review"],
-          ["pass", "✓ ready for review"],
+          ["h", "@copilot  this is idle, please:"],
+          ["add", "+ address 2 review comments"],
+          ["add", "+ fix the failing CI check"],
+          ["q", "Copilot pushes · CI reruns"],
+          ["q", "humans still review and merge"],
+          ["pass", "✓ moving again"],
         ],
       ],
     ];
     // [edge id, path, color, label, lx, ly]
     const EDGES = [
-      ["pscE0", "M374 106 H722", "p", "≤ 4 pull requests", 548, 90],
-      ["pscE1", "M1094 106 H1462", "p", "@copilot prep list", 1278, 90],
-      ["pscE2", "M1780 544 V630 H1028", "g", "human review · CI", 1420, 614],
-      ["pscE3", "M954 630 H458", "g", "merge", 704, 614],
+      ["pscE0", "M470 106 H830", "p", "scan · every 5 min", 650, 90],
+      ["pscE1", "M1234 106 H1470", "p", "nudge", 1352, 90],
+      ["pscE2", "M1780 544 V626 H420 V546", "g", "back in motion · humans review and merge", 1100, 610],
     ];
-    let g = `<defs><clipPath id="pscClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
-      <marker id="pscP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+    let g = `<defs><marker id="pscP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="pscG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
-      [0, 680, "PREFILTER · NO AI"],
-      [680, 1430, "SOUS CHEF"],
-      [1430, VW, "COPILOT"],
+      [0, 830, "OPEN PULL REQUESTS"],
+      [830, 1420, "SOUS CHEF"],
+      [1420, VW, "COPILOT"],
     ].forEach(([x0, x1, t], i) => {
       g += `<text class="fm-lane-t mra-lane" id="pscLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
     });
     const sp = s => s.replace(/ /g, "\u00a0");
-    g += `<g class="sdd-panel" id="pscQ"><rect class="sdd-card" x="40" y="${PY}" width="600" height="${PH}" rx="16"/>
-      <line class="sdd-hd" x1="40" y1="${PY + 50}" x2="640" y2="${PY + 50}"/>
-      <text class="sdd-file" x="62" y="${PY + 33}">open pull requests</text><text class="sdd-tag" x="618" y="${PY + 32}">QUEUE</text>`;
-    QUEUE.forEach(([t, why, k], j) => {
-      const y = PY + 88 + j * 40;
-      g += `<text class="sdd-ln" id="pscQ${j}" x="62" y="${y}">${sp(t)}</text><text class="sdd-stamp psc-st${k ? " k" : ""}" id="pscS${j}" x="618" y="${y}">${k ? "✓ " : ""}${sp(why)}</text>`;
+    g += `<g class="sdd-panel" id="pscQ"><rect class="sdd-card" x="40" y="${PY}" width="760" height="${PH}" rx="16"/>
+      <line class="sdd-hd" x1="40" y1="${PY + 50}" x2="800" y2="${PY + 50}"/>
+      <text class="sdd-file" x="62" y="${PY + 33}">open pull requests</text><text class="sdd-tag" x="778" y="${PY + 32}">SCAN</text>
+      <text class="psc-hd" x="180" y="${PY + 84}">IDLE?</text><text class="psc-hd" x="370" y="${PY + 84}">WORK TO DO?</text>`;
+    PRS.forEach(([n, idle, ic, work, wc, k], j) => {
+      const y = PY + 132 + j * 52;
+      g += `<text class="sdd-ln h" id="pscQ${j}" x="62" y="${y}">${sp(n)}</text>
+        <text class="psc-c ${ic}" id="pscI${j}" x="180" y="${y}">${sp(idle)}</text>
+        <text class="psc-c ${wc}" id="pscW${j}" x="370" y="${y}">${sp(work)}</text>
+        <text class="psc-c psc-v${k ? " k" : " n"}" id="pscV${j}" x="778" y="${y}">${k ? "nudge" : "skip"}</text>`;
     });
     g += `</g>`;
     PANELS.forEach(([x, w, file, tag, lines], i) => {
@@ -18829,11 +18832,9 @@
       g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#psc${c === "g" ? "G" : "P"})"/>`;
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="middle">${lab}</text>`;
     }
-    g += node("pscTick", 88, 106, 250, "Every 5 min", "#1f6feb", "stopwatch", "b");
-    g += node("pscChef", 760, 106, 330, "PR Sous Chef", "#8957e5", "tasklist");
-    g += node("pscBot", 1500, 106, 240, "Copilot", "#8957e5", "copilot");
-    g += `<g class="fm-task" id="pscMaint"><circle cx="990" cy="630" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="959" y="599" width="62" height="62" clip-path="url(#pscClip)"/><text class="ddr-lbl" x="990" y="584">Maintainer</text></g>`;
-    g += node("pscMerged", 120, 630, 300, "Merged", "#8957e5", "merge", "g");
+    g += node("pscOpen", 88, 106, 340, "Open pull requests", "#1f6feb", "pr", "b");
+    g += node("pscChef", 900, 106, 300, "PR Sous Chef", "#8957e5", "tasklist");
+    g += node("pscBot", 1510, 106, 240, "Copilot", "#8957e5", "copilot");
     g += `<circle class="fm-dot sdd-dot" r="9"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg psc-svg");
@@ -18867,24 +18868,24 @@
           $(id).classList.remove("hot");
         });
       };
-      at(200, () => (on("pscLane0"), on("pscTick"), on("pscQ"), sfx.key(0.6)));
-      QUEUE.forEach(([, , k], j) => {
-        at(400 + j * 260, () => (on(`pscQ${j}`), sfx.key(0.5)));
-        at(530 + j * 260, () => (on(`pscS${j}`), k ? sfx.pop(4) : on(`pscQ${j}`, "gone")));
+      at(200, () => (on("pscLane0"), on("pscOpen"), on("pscQ"), sfx.key(0.6)));
+      PRS.forEach((_, j) => at(400 + j * 120, () => (on(`pscQ${j}`), sfx.key(0.4))));
+      flight(1200, "pscE0", 700, "#ab7df8", 3);
+      at(1900, () => (on("pscLane1"), on("pscChef"), on("pscP0"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(2100 + j * 220, () => (on(`pscL0_${j}`), sfx.key(0.5))));
+      PRS.forEach(([, , ic, , wc, k], j) => {
+        const t = 3800 + j * 600;
+        at(t, () => (on(`pscI${j}`), sfx.key(ic === "i" ? 0.6 : 0.3)));
+        at(t + 180, () => (on(`pscW${j}`), sfx.key(wc === "n" ? 0.3 : 0.6)));
+        at(t + 380, () => (on(`pscV${j}`), k ? sfx.pop(4) : on(`pscQ${j}`, "gone")));
       });
-      at(2500, () => (on("pscQ", "ok"), sfx.pop(2)));
-      flight(2700, "pscE0", 600, "#ab7df8", 3);
-      at(3300, () => (on("pscLane1"), on("pscChef"), on("pscP0"), sfx.key(0.8)));
-      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(3500 + j * 230, () => (on(`pscL0_${j}`), sfx.key(0.5))));
-      at(5200, () => (on("pscP0", "ok"), sfx.pop(5)));
-      flight(5400, "pscE1", 600, "#ab7df8", 6);
-      at(6000, () => (on("pscLane2"), on("pscBot"), on("pscP1"), sfx.key(0.8)));
-      [0, 1, 2, 3, 4].forEach(j => at(6200 + j * 300, () => (on(`pscL1_${j}`), sfx.key(0.5))));
-      at(7800, () => (on("pscL1_5"), on("pscP1", "ok"), sfx.pop(8)));
-      flight(8100, "pscE2", 1400, "#3fb950", 7);
-      at(9500, () => (on("pscMaint"), sfx.review()));
-      flight(10100, "pscE3", 1000, "#3fb950", 9);
-      at(11100, () => (on("pscMerged"), sfx.pop(10)));
+      at(7000, () => (on("pscP0", "ok"), sfx.pop(5)));
+      flight(7200, "pscE1", 600, "#ab7df8", 6);
+      at(7800, () => (on("pscLane2"), on("pscBot"), on("pscP1"), sfx.key(0.8)));
+      [0, 1, 2, 3, 4].forEach(j => at(8000 + j * 300, () => (on(`pscL1_${j}`), sfx.key(0.5))));
+      at(9600, () => (on("pscL1_5"), on("pscP1", "ok"), sfx.pop(8)));
+      flight(9900, "pscE2", 1500, "#3fb950", 7);
+      at(11400, () => (on("pscQ", "ok"), sfx.pop(10)));
       len = 14500;
     };
     // measured: Sous Chef nudges to Copilot on gh-aw pull requests by month (snapshot 17 Nov 2026; May starts 13 May, November is partial)
@@ -18922,7 +18923,7 @@
       group: "process",
       under: "prr",
       notes:
-        "PR Sous Chef keeps gh-aw's pull requests moving. It runs every five minutes, on demand and on /souschef or /cook. A deterministic prefilter job with no AI (scripts/pr-sous-chef.mjs) stops when the API rate limit is low, skips draft, stale, opted-out (the broccoli label), dependency-bot and agent-active pull requests, waits until a pull request has been idle for ten minutes and its fingerprint has changed, and hands at most four to the agent, conflicts first, then failing checks, then unresolved review feedback. The agent (the pi engine with economy model routing, read-only permissions) re-runs the script for each pull request and writes only through safe outputs: approving a pending CI run on an allowlist, dismissing a stale review once every thread is resolved, assigning Copilot, and one comment that mentions @copilot with a deduplicated prep list: update the branch with make merge-main, address each review thread, fix each failing check, plus a collapsed structured-data envelope with sha256 hashes so the same work is never requested twice. Copilot does the work and stops at human review and CI; Sous Chef never merges or triggers CI, and after a Copilot task it sends at most one CI follow-up. The bottom strip is measured from gh-aw pull request comments carrying the Sous Chef marker, 13 May to 16 November 2026 (snapshot 17 November 2026): 5,826 Copilot nudges on 2,623 pull requests; Copilot's coding agent replied before the next nudge to 71%; 90% of the nudged pull requests merged, a median 1.8 hours after the first nudge (pull requests that were going to merge anyway are included). The nudges started as free-text requests to refresh the branch and rerun checks, grew noisy in July and August, and since 4 November are the deterministic prep list: 550 lists naming 2,105 review threads and 580 failing checks. The queue, prep list and Copilot task in the flow above are an illustrative, synthetic example.",
+        "PR Sous Chef keeps gh-aw's pull requests from going stale. Every five minutes it asks two questions of each open pull request: is it idle (no recent push, no agent already working on it, idle for at least ten minutes), and is there work to do (unresolved review comments, failing CI, or a branch that needs updating)? When both answers are yes it nudges: one comment that mentions @copilot and lists exactly what is left, so Copilot picks the pull request back up, pushes, and CI runs again. The picking is a deterministic script with no AI, and it hands the agent at most four pull requests per run; drafts, opted-out (the broccoli label) and dependency-bot pull requests are skipped, and a fingerprint of the requested work means the same nudge is never sent twice. Sous Chef has read-only permissions and writes only through safe outputs; it never merges and never triggers CI itself, so humans still review and merge. The bottom strip is measured from gh-aw pull request comments carrying the Sous Chef marker, 13 May to 16 November 2026 (snapshot 17 November 2026): 5,826 Copilot nudges on 2,623 pull requests; Copilot's coding agent replied before the next nudge to 71%; 90% of the nudged pull requests merged, a median 1.8 hours after the first nudge (pull requests that were going to merge anyway are included). Since 4 November the nudges are a deterministic list: 550 of them named 2,105 review threads and 580 failing checks. The pull requests, rule card and nudge comment in the flow above are an illustrative, synthetic example.",
       enter() {
         start = 0;
       },
@@ -18952,7 +18953,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every five minutes a no-AI prefilter picks stuck pull requests; the agent hands Copilot a prep list"), h("h2", {}, letters("PR Sous "), letters("Chef", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finds pull requests that sit idle with work waiting, and nudges Copilot to pick them back up"), h("h2", {}, letters("PR Sous "), letters("Chef", "l-grad"))),
         svg,
         pscm,
         h("div", { class: "dhm-cap" }, "MEASURED · snapshot 17 Nov 2026 · PR comments 13 May–16 Nov 2026 (188 d) · flow illustrative")

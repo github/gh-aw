@@ -18,7 +18,7 @@ Recompute with `pr-sous-chef.mjs`, then patch `deck.js`. Read-only (GitHub Graph
 
 - Heading: **PR Sous Chef** (`group: "process"`, `under: "prr"`): the last kid of the Pull Request Review² column (after Decide · Draft · Record; its code sits just before `// Patch to PR`).
 - Marker: `grep -n "// PR Sous Chef" docs/public/cracktro/deck.js`, then use `view_range`. Never read deck.js whole.
-- CSS prefix: `psc-` (`psc-st` queue stamps, `psc-m` strip width). It reuses `.sdd-*` panels, `.fm-*` flow, `.dhm*` strip and `.ddm-tl` bars.
+- CSS prefix: `psc-` (`psc-hd` column headers, `psc-c` idle/work chips, `psc-v` nudge or skip verdicts, `psc-m` strip width). It reuses `.sdd-*` panels, `.fm-*` flow, `.dhm*` strip and `.ddm-tl` bars.
 - Data lives in the slide block:
   - `const MONTHS = [["May",211], ...]`: nudges per month; the last bar (class `h`) is the partial snapshot month.
   - KPIs: `kpi("5,826","@copilot","nudges")`, `kpi("2,623","pull requests","nudged")`, `kpi("71%","answered","by Copilot","g")`, `kpi("90%","merged, median","1.8 h after a nudge","g")`.
