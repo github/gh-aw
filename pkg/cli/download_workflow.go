@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -49,7 +48,7 @@ func downloadWorkflowContentViaGit(ctx context.Context, repo, path, ref string, 
 	// this layer; '--' is kept as defence-in-depth per the git(1) specification.
 	// #nosec G204 -- repoURL, ref, and path are from workflow import configuration authored by the
 	// developer; exec.CommandContext with separate args (not shell execution) prevents shell injection.
-	cmd := exec.CommandContext(ctx, "git", "archive", "--remote="+repoURL, ref, "--", path)
+	cmd := gitutil.SourceCommandContext(ctx, repoURL, "archive", "--remote="+repoURL, ref, "--", path)
 	archiveOutput, err := cmd.Output()
 	if err != nil {
 		downloadLog.Printf("git archive failed, falling back to git clone: repo=%s, ref=%s, err=%v", repo, ref, err)
@@ -102,19 +101,19 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 	repoURL := fmt.Sprintf("%s/%s.git", githubHost, repo)
 
 	// Initialize git repository
-	initCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "init")
+	initCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "init")
 	if output, err := initCmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("failed to initialize git repository: %w\nOutput: %s", err, string(output))
 	}
 
 	// Add remote
-	remoteCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "remote", "add", "origin", repoURL)
+	remoteCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "remote", "add", "origin", repoURL)
 	if output, err := remoteCmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("failed to add remote: %w\nOutput: %s", err, string(output))
 	}
 
 	// Enable sparse-checkout
-	sparseCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "config", "core.sparseCheckout", "true")
+	sparseCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "config", "core.sparseCheckout", "true")
 	if output, err := sparseCmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("failed to enable sparse checkout: %w\nOutput: %s", err, string(output))
 	}
@@ -140,29 +139,29 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 		// Note: sparse-checkout with SHA refs may not reduce bandwidth as much as with branch refs,
 		// because the server needs to send enough history to reach the specific commit.
 		// However, it still limits the working directory to only the requested file.
-		fetchCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "fetch", "--depth", "1", "origin", ref)
+		fetchCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin", ref)
 		if _, err := fetchCmd.CombinedOutput(); err != nil {
 			// If fetching specific SHA fails, try fetching all branches with depth 1
-			fetchCmd = exec.CommandContext(ctx, "git", "-C", tmpDir, "fetch", "--depth", "1", "origin")
+			fetchCmd = gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin")
 			if output, err := fetchCmd.CombinedOutput(); err != nil {
 				return nil, fmt.Errorf("failed to fetch repository: %w\nOutput: %s", err, string(output))
 			}
 		}
 
 		// Checkout the specific commit
-		checkoutCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "checkout", ref)
+		checkoutCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "checkout", ref)
 		if output, err := checkoutCmd.CombinedOutput(); err != nil {
 			return nil, fmt.Errorf("failed to checkout commit %s: %w\nOutput: %s", ref, err, string(output))
 		}
 	} else {
 		// For branch/tag refs, fetch the specific ref
-		fetchCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "fetch", "--depth", "1", "origin", ref)
+		fetchCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin", ref)
 		if output, err := fetchCmd.CombinedOutput(); err != nil {
 			return nil, fmt.Errorf("failed to fetch ref %s: %w\nOutput: %s", ref, err, string(output))
 		}
 
 		// Checkout FETCH_HEAD
-		checkoutCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "checkout", "FETCH_HEAD")
+		checkoutCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "checkout", "FETCH_HEAD")
 		if output, err := checkoutCmd.CombinedOutput(); err != nil {
 			return nil, fmt.Errorf("failed to checkout FETCH_HEAD: %w\nOutput: %s", err, string(output))
 		}

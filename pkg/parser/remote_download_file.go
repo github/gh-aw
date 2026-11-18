@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	pathpkg "path"
 	"path/filepath"
 	"strings"
@@ -338,7 +337,7 @@ func downloadFileViaGit(ctx context.Context, owner, repo, path, ref, host string
 	// this layer; '--' is kept as defence-in-depth per the git(1) specification.
 	// #nosec G204 -- repoURL, ref, and path are from workflow import configuration authored by the
 	// developer; exec.CommandContext with separate args (not shell execution) prevents shell injection.
-	cmd := exec.CommandContext(ctx, "git", "archive", "--remote="+repoURL, ref, "--", path)
+	cmd := gitutil.SourceCommandContext(ctx, repoURL, "archive", "--remote="+repoURL, ref, "--", path)
 	archiveOutput, err := cmd.Output()
 	if err != nil {
 		// If git archive fails, try with git clone + git show as a fallback
@@ -446,14 +445,14 @@ func getRepoGitURL(owner, repo, host string) string {
 }
 
 func cloneAndCheckoutSHA(ctx context.Context, repoURL, tmpDir, ref string) error {
-	if output, err := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--no-single-branch", repoURL, tmpDir).CombinedOutput(); err != nil {
+	if output, err := gitutil.SourceCommandContext(ctx, repoURL, "clone", "--depth", "1", "--no-single-branch", repoURL, tmpDir).CombinedOutput(); err != nil {
 		remoteLog.Printf("Clone with --no-single-branch failed, trying full clone: %s", string(output))
-		if output, err := exec.CommandContext(ctx, "git", "clone", repoURL, tmpDir).CombinedOutput(); err != nil {
+		if output, err := gitutil.SourceCommandContext(ctx, repoURL, "clone", repoURL, tmpDir).CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to clone repository: %w\nOutput: %s", err, string(output))
 		}
 	}
 	// ValidateGitRef above guarantees ref does not start with '-', so it remains a revision argument.
-	if output, err := exec.CommandContext(ctx, "git", "-C", tmpDir, "checkout", "--detach", ref).CombinedOutput(); err != nil {
+	if output, err := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "checkout", "--detach", ref).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to checkout commit %s: %w\nOutput: %s", ref, err, string(output))
 	}
 	return nil
@@ -462,7 +461,7 @@ func cloneAndCheckoutSHA(ctx context.Context, repoURL, tmpDir, ref string) error
 func cloneBranchOrTag(ctx context.Context, repoURL, tmpDir, ref string) error {
 	// For branch/tag refs, use --branch flag; the value is passed via a separate
 	// argument slot and cannot be confused with a flag because it follows --branch.
-	if output, err := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", ref, repoURL, tmpDir).CombinedOutput(); err != nil {
+	if output, err := gitutil.SourceCommandContext(ctx, repoURL, "clone", "--depth", "1", "--branch", ref, repoURL, tmpDir).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to clone repository: %w\nOutput: %s", err, string(output))
 	}
 	return nil

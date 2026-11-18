@@ -9,6 +9,7 @@ The `gitutil` package contains helpers for:
 - Extracting base repository slugs from action paths.
 - Finding the root directory of the current Git repository using pure Go filesystem traversal.
 - Reading file contents from the `HEAD` commit via a `git` subprocess.
+- Running isolated Git commands for disposable source downloads.
 
 ## Public API
 
@@ -33,6 +34,7 @@ The `gitutil` package contains helpers for:
 | `FindGitRoot` | `func() (string, error)` | Returns the absolute path of the root directory of the current Git repository using pure Go filesystem traversal (no `git` subprocess); starts from the current working directory |
 | `FindGitRootFrom` | `func(startDir string) (string, error)` | Like `FindGitRoot` but starts from `startDir`; traverses upward looking for a `.git` directory or worktree marker file |
 | `ReadFileFromHEAD` | `func(filePath, gitRoot string) (string, error)` | Reads a file's content from the `HEAD` commit without `git show HEAD:path` interpolation by resolving a literal tree entry with `git ls-tree` and then reading the blob with `git cat-file`; rejects paths that escape the repository; requires `git` on `PATH` |
+| `SourceCommandContext` | `func(ctx context.Context, remoteURL string, args ...string) *exec.Cmd` | Constructs an isolated Git command for disposable source downloads and their follow-up operations; allows only HTTPS transport, disables hooks, templates, fsmonitor, credential helpers, interactive prompts and automatic maintenance, and ignores inherited Git configuration and environment overrides |
 
 **Behavioral contracts**:
 
@@ -46,6 +48,7 @@ The `gitutil` package contains helpers for:
 - `Getwd` and `UserHomeDir` MUST wrap the underlying `os` error with actionable recovery guidance rather than returning a bare `fmt.Errorf("...: %w", err)`.
 - `ReadFileFromHEAD` MUST return an error when `gitRoot` is empty.
 - `ReadFileFromHEAD` MUST return an error when `filePath` resolves to a path outside `gitRoot`.
+- Source-download clones and subsequent Git commands MUST use `SourceCommandContext`, not inherit development-checkout settings. Global/system filters and URL rewrites are ignored. Authentication uses host-scoped `gh` tokens passed only through the child environment, never command arguments or repository configuration. SSH, local-file transports, custom remote helpers and interactive credential helpers are intentionally unsupported on these download paths; development checkouts are unchanged.
 
 ## Usage Examples
 
@@ -94,8 +97,11 @@ All exported functions are safe for concurrent use. The SHA-validation functions
 **Internal**:
 - `github.com/github/gh-aw/pkg/logger` — debug logging
 
+**Go packages**:
+- `github.com/cli/go-gh/v2/pkg/auth` — host-scoped credentials for source downloads
+
 **External** (runtime):
-- `git` executable on `PATH` — required only by `ReadFileFromHEAD`
+- `git` executable on `PATH` — required by `ReadFileFromHEAD` and `SourceCommandContext`
 
 ## Design Decisions
 
