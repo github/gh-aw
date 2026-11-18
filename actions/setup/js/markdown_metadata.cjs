@@ -550,6 +550,13 @@ function editMarkdownMetadata(content, transform) {
   return `---\n${renderMetadata(transform(value))}\n---${content.slice(block.end)}`;
 }
 
+/** @param {string} content */
+function removeDocumentFrontmatter(content) {
+  const block = markdownMetadataBlocks(content, true)[0];
+  if (!block) return content;
+  return content.slice(block.end).replace(/^\r?\n/, "");
+}
+
 /**
  * Apply author text operations to decoded JSON scalar values independently of
  * the document structure. Engine frontmatter is JSON (a YAML-compatible subset).
@@ -611,6 +618,7 @@ module.exports = {
   missingMarkdownMetadata,
   persistMarkdownMetadata,
   editMarkdownMetadata,
+  removeDocumentFrontmatter,
   transformMarkdownContent,
   transformValues,
   parseMarkdownJSON,

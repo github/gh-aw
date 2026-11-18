@@ -74,6 +74,8 @@ declare namespace CracktroDeck {
     tours?: Record<string, Tour>;
     last?: string | null;
     sound?: Sound;
+    /** Milliseconds each slide stays up in kiosk mode (K); default 15000, minimum 1000. */
+    kioskInterval?: number;
     css?: string;
     width?: number;
     height?: number;
@@ -98,6 +100,8 @@ declare namespace CracktroDeck {
     /** Start a configured tour at its first slide, or show every slide again with `null`. */
     tour(name: string | null): void;
     tours(): string[];
+    /** Start (`true`), stop (`false`) or toggle kiosk mode; returns whether it is on. Fullscreen needs a user gesture, so a scripted start rotates in the window. */
+    kiosk(on?: boolean): boolean;
   }
 
   interface API {

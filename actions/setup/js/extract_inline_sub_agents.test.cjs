@@ -13,7 +13,7 @@ global.core = {
   setFailed: () => {},
 };
 
-const { extractInlineSubAgents, writeInlineSubAgents, preserveSubAgentFrontmatter, resolveSubAgentExperimentReferences, closeUnterminatedSubAgentMarkers, loadCopilotSDKCustomAgents, ensureClaudeSubAgentName } =
+const { extractInlineSubAgents, writeInlineSubAgents, preserveSubAgentFrontmatter, resolveSubAgentExperimentReferences, closeUnterminatedSubAgentMarkers, loadCopilotSDKCustomAgents, ensureSubAgentIdentity } =
   require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./extract_inline_sub_agents.cjs"));
 const { typistAgentsDir, typistAgentToolUse, typistAgentToolResult, typistInit } = require("./fixtures/claude_codex_subagent_runs.cjs");
 
@@ -479,16 +479,16 @@ describe("Claude staged sub-agent identity", () => {
     expect(fs.readFileSync(fixturePath, "utf8")).toBe(recorded);
   });
 
-  it("keeps an authored name, derives its description and leaves other engines' copies unchanged", () => {
-    expect(ensureClaudeSubAgentName("persona-evaluator", "---\nname: persona-evaluator\nmodel: inherit\n---\nBody\n")).toBe('---\n{"model":"inherit","name":"persona-evaluator","description":"persona-evaluator"}\n---\nBody\n');
-    expect(ensureClaudeSubAgentName("helper", "Body only\n")).toBe('---\n{"name":"helper","description":"helper"}\n---\nBody only\n');
-    expect(ensureClaudeSubAgentName("helper", "---\n---\nBody\n")).toBe('---\n{"name":"helper","description":"helper"}\n---\nBody\n');
+  it("keeps an authored name and derives native agent descriptions without changing Codex copies", () => {
+    expect(ensureSubAgentIdentity("persona-evaluator", "---\nname: persona-evaluator\nmodel: inherit\n---\nBody\n")).toBe('---\n{"model":"inherit","name":"persona-evaluator","description":"persona-evaluator"}\n---\nBody\n');
+    expect(ensureSubAgentIdentity("helper", "Body only\n")).toBe('---\n{"name":"helper","description":"helper"}\n---\nBody only\n');
+    expect(ensureSubAgentIdentity("helper", "---\n---\nBody\n")).toBe('---\n{"name":"helper","description":"helper"}\n---\nBody\n');
 
     const workflow = `Main.\n\n${agentMarker("helper")}\n---\nmodel: small\n---\nHelp.`;
     writeInlineSubAgents(workflow, tmpDir, tmpDir, "codex");
     writeInlineSubAgents(workflow, tmpDir, tmpDir, "copilot");
     expect(fs.readFileSync(path.join(tmpDir, ".codex", "agents", "helper.md"), "utf8")).toBe("---\nmodel: small\n---\nHelp.\n");
-    expect(fs.readFileSync(path.join(tmpDir, ".github", "agents", "helper.agent.md"), "utf8")).toBe("---\nmodel: small\n---\nHelp.\n");
+    expect(parseFrontmatter(fs.readFileSync(path.join(tmpDir, ".github", "agents", "helper.agent.md"), "utf8"))).toEqual({ name: "helper", model: "small", description: "helper" });
   });
 
   it("detects a quoted authored name key and keeps it", () => {

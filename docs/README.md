@@ -83,7 +83,14 @@ Escape hides them, and long notes scroll without advancing the slide.
 The [speaker-notes skill](../.github/skills/cracktro-speaker-notes/SKILL.md)
 sets the research-informed authoring tone. Notes are public and appear on the
 same screen as the slides, not in a private presenter view.
-The slide map button (or G) opens a full-screen grid of
+K (or the kiosk dock button) starts kiosk mode for unattended
+screens: the deck goes fullscreen where the browser allows it (otherwise it stays in
+the window) and advances every 15 seconds through every slide in the current tour or
+view, examples included, wrapping from the last slide to the first. The toolbar, dots
+and notes hide; only a stop button stays, fading after a few idle seconds. K, Escape, that
+button or leaving fullscreen stops it; while kiosk mode runs, Escape stops it before it
+hides notes. A manual move restarts the countdown, and an open
+dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the
