@@ -83,7 +83,8 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		}
 
 		// Check if GitHub App is configured for token minting
-		appConfigured := hasGitHubApp(toolConfig)
+		brokerConfigured, _ := toolConfig["token-broker"].(bool)
+		appConfigured := hasGitHubApp(toolConfig) || brokerConfigured
 
 		// If GitHub App is configured, use the app token minted directly in the agent job.
 		// The token cannot be passed via job outputs from the activation job because

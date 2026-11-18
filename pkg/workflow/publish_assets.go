@@ -234,6 +234,7 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 		PreSteps:      preSteps,
 		PostSteps:     postSteps,
 		Token:         data.SafeOutputs.UploadAssets.GitHubToken,
+		GitHubApp:     data.SafeOutputs.UploadAssets.GitHubApp,
 		Needs:         needs,
 	})
 }

@@ -130,7 +130,7 @@ After artifact upload and any retry, the callback step in `conclusion` uses a fr
 ## OIDC Token Broker
 
 > [!WARNING]
-> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables either capability emits a warning.
+> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables a broker capability emits a warning.
 
 > [!WARNING]
 > Brokered Copilot inference is supported in threat-detection and evals jobs. Main-agent inference remains blocked pending a renewable credential provider in AWF. Enable task and request capabilities independently; task-only adoption does not change the workflow's inference authentication.
@@ -149,6 +149,8 @@ The compiler emits runtime references to the variable and secret, not the endpoi
 The broker contract defines independent authorization for `copilot-request` (Copilot inference) and `copilot-task` (coding-agent task creation and issue assignment). Enable either capability or both. Brokered Copilot inference is supported in threat-detection and evals jobs; each exchange identifies the gh-aw inference provider ID (currently `github`). Main agent inference still requires a renewable AWF credential provider. Do not combine `copilot-request` with `permissions.copilot-requests: write`. The broker validates GitHub's signature, issuer, expiration, audience, repository, workflow identity, and run claims against its enrollment policy; the audience is the configured broker URL. Broker-enabled consumer jobs run an unconditional post-step that requests invalidation scoped to the verified job identity. Restrict runner egress and protect the workflow and configuration that select this destination.
 
 Broker-enabled jobs require `id-token: write`. Reusable workflow callers must grant that permission to the caller job. The runner must reach both the GitHub OIDC endpoint and the broker over HTTPS. Broker failures, including a missing endpoint, must not select a PAT, GitHub App token, or `GITHUB_TOKEN` as a fallback. Unrelated GitHub operations retain their existing authentication.
+
+GitHub API consumers can independently select `tools.github.token-broker: true` or `safe-outputs.token-broker: true` as an alternative to section-level `github-app` or `github-token`. These settings exchange the separate `github-app` capability without distributing App signing credentials to the workflow. The deployment must authorize the installation, repositories, and permissions from verified job identity and enrolled policy. The request supplies no scopes or installation selector. Credentials are acquired separately in each consuming job; static GitHub consumers do not renew them automatically, so credential lifetime must cover the operation.
 
 See the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains independent: the admission outage policy does not apply to credential exchange.
 

@@ -70,6 +70,9 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	}
 
 	// Add GitHub App token minting step if app is configured
+	if usesTokenBrokerSafeOutputs(data) {
+		steps = append(steps, c.buildGitHubBrokerTokenStep(data, "safe-outputs-app-token")...)
+	}
 	if data.SafeOutputs.GitHubApp != nil {
 		// Reaction cleanup uses the activation credential, not the safe-output App.
 		permissions := conclusionSafeOutputAppPermissions(data)

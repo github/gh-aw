@@ -5185,6 +5185,10 @@
                   "$ref": "#/$defs/github_token_same_job",
                   "description": "Optional custom GitHub token (e.g., '${{ secrets.CUSTOM_PAT }}'). For 'remote' type, defaults to GH_AW_GITHUB_TOKEN if not specified."
                 },
+                "token-broker": {
+                  "type": "boolean",
+                  "description": "Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token. Mutually exclusive with github-app and github-token when true."
+                },
                 "toolsets": {
                   "description": "GitHub MCP server toolset name(s) to enable. Accepts a single toolset name (string) or an array of toolset names.",
                   "oneOf": [
@@ -12657,6 +12661,10 @@
           "$ref": "#/$defs/github_token_same_job",
           "description": "GitHub token to use for safe output jobs. Typically a secret reference like ${{ secrets.GITHUB_TOKEN }} or ${{ secrets.CUSTOM_PAT }}",
           "examples": ["${{ secrets.GITHUB_TOKEN }}", "${{ secrets.CUSTOM_PAT }}", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"]
+        },
+        "token-broker": {
+          "type": "boolean",
+          "description": "Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token. Mutually exclusive with github-app and github-token when true."
         },
         "github-app": {
           "$ref": "#/$defs/github_app",

@@ -68,7 +68,7 @@ const globalSafeOutputsAppTokenExpr = "steps.safe-outputs-app-token.outputs.toke
 // prHandlersUseGlobalApp reports whether the PR handlers push to the host repository
 // with the global safe-outputs App token (no per-handler App/token and no other target repo).
 func prHandlersUseGlobalApp(safeOutputs *SafeOutputsConfig) bool {
-	if safeOutputs == nil || safeOutputs.GitHubApp == nil || resolvePRCheckoutTargetRepo(safeOutputs) != "" {
+	if safeOutputs == nil || (safeOutputs.GitHubApp == nil && !safeOutputs.TokenBroker) || resolvePRCheckoutTargetRepo(safeOutputs) != "" {
 		return false
 	}
 	for _, field := range []string{"CreatePullRequests", "PushToPullRequestBranch"} {
@@ -76,7 +76,7 @@ func prHandlersUseGlobalApp(safeOutputs *SafeOutputsConfig) bool {
 			return false
 		}
 	}
-	return safeOutputsGlobalAppTokenMinted(safeOutputs)
+	return safeOutputs.TokenBroker || safeOutputsGlobalAppTokenMinted(safeOutputs)
 }
 
 func prepareSharedPRCheckout(data *WorkflowData) (*CheckoutManager, string) {

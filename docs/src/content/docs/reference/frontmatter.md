@@ -132,7 +132,7 @@ if: github.event_name == 'push'
 ### Token Broker (`token-broker:`)
 
 > [!WARNING]
-> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables either capability emits a warning.
+> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables a broker capability emits a warning.
 
 An optional object that independently enables OIDC-authenticated Copilot credential exchange.
 
@@ -142,6 +142,19 @@ token-broker:
 ```
 
 Select `copilot-request`, `copilot-task`, or both independently. Brokered request authentication is supported in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. Request exchanges include the selected LLM inference provider ID. Jobs using brokered credentials run an unconditional post-step to invalidate credentials for that job. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime, not from workflow source or the compiler environment. Missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
+
+For GitHub API authentication instead of distributing GitHub App credentials, select `tools.github.token-broker: true` and/or `safe-outputs.token-broker: true`:
+
+```aw
+tools:
+  github:
+    token-broker: true
+safe-outputs:
+  token-broker: true
+  add-comment:
+```
+
+These settings independently request the `github-app` broker capability; neither requires a top-level `token-broker` setting. Do not combine a section's enabled `token-broker` with its `github-app` or `github-token`. A top-level `github-app` does not override the section's broker selection. GitHub tool authentication requires an enabled agent sandbox with AWF environment-exclusion support to keep OIDC bootstrap credentials out of the agent. The broker controls installation, repository scope, permissions, and lifetime through deployment policy, not caller-supplied scopes. Each consuming job exchanges its own credential and invalidates it during cleanup. GitHub consumers receive a fixed token for that job; this does not provide automatic renewal for long-running operations.
 
 ### Imports (`imports:`)
 

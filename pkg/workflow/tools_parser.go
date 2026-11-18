@@ -303,6 +303,7 @@ func parseGitHubTool(val any) *GitHubToolConfig { //nolint:largefunc // Existing
 		}
 
 		// Parse app configuration for GitHub App token minting
+		config.TokenBroker, _ = configMap["token-broker"].(bool)
 		if rawApp, exists := configMap["github-app"]; exists {
 			if appMap, ok := rawApp.(map[string]any); ok {
 				config.GitHubApp = parseAppConfig(appMap)

@@ -7,23 +7,23 @@ sidebar:
 
 # Token Broker Specification
 
-**Version**: 1.0.0<br />
+**Version**: 1.1.0<br />
 **Status**: Experimental draft<br />
-**Date**: 2026-10-30<br />
+**Date**: 2026-11-18<br />
 **Editors**: GitHub Agentic Workflows maintainers<br />
 **Latest version**: [Token Broker Specification](/gh-aw/specs/token-broker-specification/)
 
 ## Abstract
 
-This specification defines a deployment-owned HTTPS service that exchanges a verified GitHub Actions OpenID Connect (OIDC) identity token for a short-lived credential. Two independent capabilities authorize GitHub Copilot inference requests and Copilot coding-agent task operations. The specification defines the wire contract, issuer verification, tenant and workflow authorization, credential issuance, renewal, failure handling, and compliance tests. It does not define a public GitHub credential-minting API or supply a server implementation.
+This specification defines a deployment-owned HTTPS service that exchanges a verified GitHub Actions OpenID Connect (OIDC) identity token for a short-lived credential. Independent capabilities authorize GitHub Copilot inference requests, Copilot coding-agent task operations, and GitHub API operations using installation credentials. The specification defines the wire contract, issuer verification, tenant and workflow authorization, credential issuance, renewal, failure handling, and compliance tests. It does not define a public GitHub credential-minting API or supply a server implementation.
 
 ## Status of This Document
 
-Token broker authentication is experimental. The protocol, configuration, and behavior may change without deprecation. Compiling a workflow that enables either broker capability emits an experimental-feature warning.
+Token broker authentication is experimental. The protocol, configuration, and behavior may change without deprecation. Compiling a workflow that enables a broker capability emits an experimental-feature warning.
 
 This is a project specification following W3C-style conventions, not a W3C Recommendation. Repository maintainers govern changes through the normal contribution and review process. Version numbers follow semantic versioning: incompatible contract changes increment the major version, backward-compatible features increment the minor version, and clarifications increment the patch version.
 
-**Implementation status (informative): Partial integration.** The shared client supports both token types. Coding-agent task creation and issue-assignment integrations obtain credentials at request time and renew them as necessary. Brokered Copilot inference is wired for the bounded detection and evals jobs. Main-agent inference remains blocked on a renewable AWF credential provider. The compiler rejects broker-enabled GitHub-backed inference in the main agent job, including applicable fallback models; this is not limited to the engine named `copilot`. A successful standalone `copilot-request` exchange does not establish working cloud inference. Full end-to-end acceptance has not been achieved. Server implementation, deployment, and issuer integrations remain deployment-owned.
+**Implementation status (informative): Partial integration.** The shared client supports all three token types. Coding-agent task creation and issue-assignment integrations obtain credentials at request time and renew them as necessary. GitHub tools and safe outputs can receive a job-local `github-app` credential, without automatic consumer renewal. Brokered Copilot inference is wired for the bounded detection and evals jobs. Main-agent inference remains blocked on a renewable AWF credential provider. The compiler rejects broker-enabled GitHub-backed inference in the main agent job, including applicable fallback models; this is not limited to the engine named `copilot`. A successful standalone `copilot-request` exchange does not establish working cloud inference. Full end-to-end acceptance has not been achieved. Server implementation, deployment, and issuer integrations remain deployment-owned.
 
 ## Table of Contents
 
@@ -46,7 +46,7 @@ The broker removes the need to distribute long-lived capability credentials to p
 
 A **capability** is an operation class identified by `token_type`. A **tenant** is a deployment-enrolled security boundary bound to stable GitHub owner and repository identities. An **execution context** identifies a repository, workflow, run, attempt, and credential-consuming job. An **issuer adapter** is a trusted server component that obtains a credential from an approved backend.
 
-This specification covers broker exchange and its compiler/client integration contract. It does not cover admission decisions, billing, arbitrary GitHub authentication, provider endpoint discovery, deployment provisioning, or a new secret store. The [admission service](/gh-aw/specs/admission-service-specification/) remains independent.
+This specification covers broker exchange and its compiler/client integration contract, including explicitly selected GitHub tools and safe-output authentication. It does not cover admission decisions, billing, provider endpoint discovery, deployment provisioning, or a new secret store. The [admission service](/gh-aw/specs/admission-service-specification/) remains independent.
 
 ### 1.2. Design goals (informative)
 
@@ -66,15 +66,17 @@ Sections 2–7 and Appendix C are normative except where explicitly marked infor
 | --- | --- |
 | Broker server | Satisfies all server requirements, including rejection and isolation requirements, for its declared capability set. |
 | Compiler and runtime client | Satisfies configuration, transport, response-validation, caching, and credential-handling requirements. |
-| Integrated deployment | Combines conforming components and demonstrates actual downstream use and renewal for each claimed capability. |
+| Integrated deployment | Combines conforming components and demonstrates actual downstream use and the capability's lifecycle profile: request-time renewal, or bounded static consumption for `github-app` as defined in Section 6.3. |
 
-A broker MUST declare its supported capability set to operators. The set MAY contain either capability, both, or neither. An empty set can conform to the exchange and rejection protocol but cannot claim usable credential issuance. Omission of an optional capability is not partial conformance. An implementation failing a mandatory requirement MUST NOT claim conformance.
+A broker MUST declare its supported capability set to operators. The set MAY contain any subset of the defined capabilities. An empty set can conform to the exchange and rejection protocol but cannot claim usable credential issuance. Omission of an optional capability is not partial conformance. An implementation failing a mandatory requirement MUST NOT claim conformance.
 
-These are role-based classes, not escalating Basic/Standard/Complete levels. Inference and task support are independent, not tiers. Conformance claims MUST identify the specification version, class, supported capabilities, and test results. Client unit tests alone MUST NOT be presented as server or integrated-deployment certification.
+These are role-based classes, not escalating Basic/Standard/Complete levels. Capability selections are independent, not tiers. Conformance claims MUST identify the specification version, class, supported capabilities, and test results. Client unit tests alone MUST NOT be presented as server or integrated-deployment certification.
 
 ## 3. Runtime Configuration and Trust Boundaries
 
-Workflow source MUST explicitly select one or both capabilities using `token-broker.copilot-request: true` and/or `token-broker.copilot-task: true`. Omission MUST preserve existing authentication. An inherited broker URL alone MUST NOT enable workflow-handler broker authentication. `copilot-request` MUST NOT be combined with `permissions.copilot-requests: write`.
+Workflow source MUST explicitly select Copilot capabilities using `token-broker.copilot-request: true` and/or `token-broker.copilot-task: true`. Omission MUST preserve existing authentication. An inherited broker URL alone MUST NOT enable workflow-handler broker authentication. `copilot-request` MUST NOT be combined with `permissions.copilot-requests: write`.
+
+GitHub API authentication MUST be selected independently using `tools.github.token-broker: true` and/or `safe-outputs.token-broker: true`. Each selects the `github-app` capability for that section; neither requires a top-level Copilot capability. An enabled section-level broker selection MUST NOT be combined with that section's `github-app` or `github-token`, and MUST suppress top-level GitHub App fallback for that section. Omission or `false` MUST preserve existing authentication. Installation selection, repository scope, permissions, and lifetime MUST come from enrolled server policy bound to verified identity, never from caller-selected scope fields.
 
 For opted-in task consumers, the compiler MUST carry the reserved member `_token_broker: {"copilot-task": true}` in the existing `GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG` JSON object. Workflow handlers MUST enable broker authentication only when this member selects `copilot-task` as boolean `true`; missing, false, malformed, or string-valued markers MUST NOT enable it. This marker introduces no new environment variable. A selected capability with a missing or empty `GH_AW_TOKEN_BROKER_URL` MUST fail closed when a credential is requested, rather than disable broker authentication or select a legacy credential.
 
@@ -100,7 +102,7 @@ Admission success, admission absence, and admission's `ignore` outage policy MUS
 
 The configured URL is the complete exchange endpoint; no route suffix or discovery request is appended. The client MUST acquire a GitHub Actions OIDC JWT with that exact audience and send one HTTPS POST with `Content-Type: application/json` and `Accept: application/json`. Redirects MUST NOT be followed during OIDC acquisition or exchange. The broker MUST serve the configured endpoint directly without redirects.
 
-An exchange request MUST be a UTF-8 JSON object containing exactly two unique string members, in either order, for `copilot-task`; a `copilot-request` exchange MUST contain exactly three:
+An exchange request MUST be a UTF-8 JSON object containing exactly two unique string members, in either order, for `copilot-task` or `github-app`; a `copilot-request` exchange MUST contain exactly three:
 
 ```json
 {
@@ -110,7 +112,7 @@ An exchange request MUST be a UTF-8 JSON object containing exactly two unique st
 }
 ```
 
-For `copilot-task`, the `provider` member is omitted:
+For `copilot-task` and `github-app`, the `provider` member is omitted:
 
 ```json
 {
@@ -121,11 +123,11 @@ For `copilot-task`, the `provider` member is omitted:
 
 | Member | Contract |
 | --- | --- |
-| `token_type` | Exactly `copilot-request` or `copilot-task`, case-sensitive. |
+| `token_type` | Exactly `copilot-request`, `copilot-task`, or `github-app`, case-sensitive. |
 | `provider` | Required only for `copilot-request`. A nonempty inference-provider identifier matching gh-aw's provider IDs (for example, `github`). It MUST NOT be a provider endpoint or URL. |
 | `oidc_token` | Nonempty, signed compact JWT issued by the configured trusted GitHub Actions issuer. |
 
-For `copilot-task`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
+For `copilot-task` and `github-app`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
 
 ### 4.2. Independent capabilities
 
@@ -133,8 +135,9 @@ For `copilot-task`, `provider` MUST be absent. The broker MUST reject duplicate 
 | --- | --- |
 | `copilot-request` | Authentication for the deployment's approved GitHub Copilot cloud inference consumer. |
 | `copilot-task` | Authentication for the approved Copilot coding-agent task-creation and issue-assignment operations. |
+| `github-app` | A GitHub App installation access token for the selected GitHub tools or safe-output consumer, scoped by enrolled deployment policy. |
 
-Support for one capability MUST NOT imply support or authorization for the other. The broker MUST NOT return a credential for a different capability as a fallback. The client MUST NOT switch capabilities or fall back to a PAT, bootstrap token, or legacy provider credential after failure.
+Support for one capability MUST NOT imply support or authorization for another. The broker MUST NOT return a credential for a different capability as a fallback. The client MUST NOT switch capabilities or fall back to a PAT, bootstrap token, or legacy provider credential after failure.
 
 ### 4.3. Success response
 
@@ -247,15 +250,17 @@ Adapters MUST enforce a finite maximum credential lifetime and least-privilege s
 
 The broker MUST implement bounded replay/abuse controls and per-tenant/execution/capability rate limits. Policy MUST prevent reuse of an identity from expanding its authorized tenant, repository, workflow, run, attempt, job, capability, or resource scope. Any replay-cache key MUST include the verified identity binding and authorized scope, with retention bounded by identity validity and configured skew.
 
-The same still-valid JWT MAY be used for separately authorized exchanges, including concurrent requests for both capabilities. A global one-use `jti` rule MUST NOT reject these otherwise authorized cross-capability exchanges. Within one authorized capability/context, the server MAY coalesce concurrent issuance, return a still-valid equivalent scoped credential, or apply documented rate limits. It MUST NOT require a request nonce or idempotency field absent from this wire contract.
+The same still-valid JWT MAY be used for separately authorized exchanges, including concurrent requests for multiple capabilities. A global one-use `jti` rule MUST NOT reject these otherwise authorized cross-capability exchanges. Within one authorized capability/context, the server MAY coalesce concurrent issuance, return a still-valid equivalent scoped credential, or apply documented rate limits. It MUST NOT require a request nonce or idempotency field absent from this wire contract.
 
 Replay controls do not make a bearer JWT nontransferable. Theft within its validity window remains a risk; short identity age limits, job isolation, protected transport, and rate limits reduce that exposure.
 
 ### 6.3. Client caching and renewal
 
-Credentials MUST remain in client memory. Cache and in-flight-exchange keys MUST isolate token type, repository, run ID, run attempt, job, and broker endpoint. Concurrent requests within one key MAY share an exchange. A credential MUST NOT be inherited across keys or persisted between processes/jobs.
+Client caches MUST remain in memory. Cache and in-flight-exchange keys MUST isolate token type, repository, run ID, run attempt, job, and broker endpoint. Concurrent requests within one key MAY share an exchange. A credential MUST NOT be inherited across keys or persisted between jobs. The compiler MAY transfer a masked `copilot-request` or `github-app` credential through a step output to the intended consumer in the same job; it MUST NOT publish it as a job output or artifact.
 
-The consumer MUST check expiry at request time and renew when remaining validity is 30 seconds or less. Renewal uses the same exchange with a newly acquired OIDC token; no refresh-token endpoint exists. Renewal failure MUST NOT reuse an expired/near-expiry credential, switch capability, or fall back to legacy authentication.
+Renewable consumers MUST check expiry at request time and renew when remaining validity is 30 seconds or less. Renewal uses the same exchange with a newly acquired OIDC token; no refresh-token endpoint exists. Renewal failure MUST NOT reuse an expired/near-expiry credential, switch capability, or fall back to legacy authentication.
+
+The initial `github-app` integration uses a bounded static-consumer profile: it supplies a fixed credential to existing GitHub consumers rather than a request-time authentication provider. It does not implement automatic renewal and MUST NOT claim request-time renewal conformance. Deployments MUST account for operation duration when setting its bounded lifetime and MUST demonstrate that expired credentials fail without legacy authentication fallback. The unconditional job-scoped invalidation requirement still applies.
 
 Long-running inference requires a renewable provider in the running consumer, not a one-time token passed to a sidecar. A deployment MUST NOT claim integrated inference conformance until that provider and downstream renewal are demonstrated.
 
@@ -266,21 +271,22 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | Test ID | Class | Scenario and expected outcome |
 | --- | --- | --- |
 | T-TBR-001 | Client | Omitted capability selection preserves authentication; inherited URL alone does not enable workflow-handler exchange. Only `_token_broker.copilot-task: true` in existing handler-config JSON enables task integration; a selected capability with missing/empty URL fails closed. Explicit low-level exchanges remain marker-independent. Runtime variable/secret resolution works without a compile-time URL. |
-| T-TBR-002 | Server | Exercise support sets `{}`, request-only, task-only, and both. Authorized supported types succeed; unsupported known types return 501 (or documented 404/422); no alternate capability is minted. |
+| T-TBR-002 | Server | Exercise empty, single-capability, and combined support sets including `github-app`. Authorized supported types succeed; unsupported known types return 501 (or documented 404/422); no alternate capability is minted. |
 | T-TBR-003 | Server | Wrong issuer/audience/signature, multi-audience JWT, unsigned token, disallowed algorithm, and attacker-controlled key URLs return 401 without attacker-directed discovery. |
 | T-TBR-004 | Server | Missing/non-numeric/expired `exp`, future `nbf`/`iat`, invalid ordering, and excessive age/lifetime return 401 under the configured time policy; test exact boundaries. |
 | T-TBR-005 | Server | Wrong tenant/owner/repository IDs, transfer, workflow revision/ref, environment, fork policy, run/attempt, or job evidence returns 403. Missing required evidence also denies. |
 | T-TBR-006 | Server | Valid identity denied a supported capability returns 403, not unsupported. An unsupported known type with invalid identity returns 401. Neither path invokes issuance. |
 | T-TBR-007 | Server | Extra/duplicate/missing fields, malformed UTF-8/JSON, arrays, wrong types, or a missing/extra provider field return 400; unknown string type returns 422; oversize/media-type failures return 413/415. |
 | T-TBR-008 | Both | Success is 200 with exactly two fields, safe nonempty ASCII token, no-store, bounded body, and valid expiration. Client accepts lowercase `t`/`z`, fractional seconds, and numeric offsets through `23:59`; rejects extra/duplicate fields, invalid calendar dates, leap seconds, out-of-range time/offset components, and expiry at/below 30 seconds. |
-| T-TBR-009 | Server | Concurrent use of one valid JWT for both authorized capabilities succeeds. Replay across policy boundaries cannot broaden issuance. Test per-context replay rules, rate limits (429), and bounded cache retention. |
+| T-TBR-009 | Server | Concurrent use of one valid JWT for multiple authorized capabilities succeeds. Replay across policy boundaries cannot broaden issuance. Test per-context replay rules, rate limits (429), and bounded cache retention. |
 | T-TBR-010 | Client | Same-key requests coalesce; changed capability/repository/job/run/attempt/endpoint cannot inherit a token. Refresh occurs at the 30-second boundary; failure never reuses a stale token. |
 | T-TBR-011 | Both | Redirects, stalls, oversized responses, upstream failure, and malformed responses fail safely. Client deadline covers OIDC plus exchange and reads; no automatic retry/fallback occurs. |
 | T-TBR-012 | Both | Inspect errors, logs, traces, metrics, outputs, artifacts, and storage under success and failure. No JWT, bootstrap bearer, minted credential, raw body, or secret configuration leaks. |
 | T-TBR-013 | Server | Backend returns wrong capability/scope, unsafe token, excessive/unknown expiration, or incompatible credential. No successful response is emitted. SSRF and cross-tenant backend selection are rejected. |
-| T-TBR-014 | Deployment | For each claimed capability, use an actual GitHub-issued identity and demonstrate authorized downstream operations and request-time renewal. Broker exchange alone is insufficient. |
+| T-TBR-014 | Deployment | For each claimed capability, use an actual GitHub-issued identity and demonstrate authorized downstream operations and request-time renewal. For the `github-app` static-consumer profile, instead demonstrate bounded lifetime, failure after expiration without fallback, and job-scoped invalidation. Broker exchange alone is insufficient. |
 | T-TBR-015 | Server | Rotate trusted signing keys; cached valid keys remain usable within policy, unknown keys trigger bounded refresh, and untrusted/unavailable keys fail closed. |
 | T-TBR-016 | Both | An unconditional job post-step obtains a fresh OIDC identity and invalidates only credentials for its verified execution context; repeat invalidation succeeds, unauthorized scopes do not revoke credentials, and non-204 responses fail safely. |
+| T-TBR-017 | Client | GitHub tools and safe-output broker selections work independently and together. Conflicting section credentials fail compilation; top-level App fallback does not override broker selection. Only consuming jobs exchange credentials and receive broker-related OIDC permission. Tokens remain masked and job-local, and failures never select legacy credentials. |
 
 Implementers MUST record pass/fail/not-applicable per class and capability, with non-sensitive evidence and policy settings. Tests SHOULD include skew, calendar, concurrency, and revocation boundary conditions. Optional features marked not applicable MUST NOT hide failed mandatory requirements.
 
@@ -334,7 +340,7 @@ These are sanitized local client errors, not server response fields:
 
 ### Appendix C: Security and privacy considerations (normative)
 
-OIDC identities, bootstrap bearers, returned credentials, and server signing material MUST NOT enter logs, traces, metric labels, exception causes, artifacts, safe outputs, step/job outputs, or persisted client configuration. Client secret masking MUST be applied before credential use; masking is defense in depth, not permission to log secrets.
+OIDC identities, bootstrap bearers, returned credentials, and server signing material MUST NOT enter logs, traces, metric labels, exception causes, artifacts, safe outputs, job outputs, or persisted client configuration. Step outputs MUST NOT contain them except for the masked, same-job credential transfers defined in Section 6.3. Client secret masking MUST be applied before credential use; masking is defense in depth, not permission to log secrets.
 
 Server HTTP middleware, reverse proxies, APM agents, and issuer adapters MUST disable or redact credential-bearing request/response capture. Server audit records MAY contain access-controlled non-sensitive metadata such as verified stable repository IDs, run/attempt identifiers, capability, policy decision, timestamp, and a server-generated internal event ID. Raw JWTs, full claim dumps, credentials, and sensitive tenant configuration MUST NOT be included. Audit retention and access MUST be bounded by deployment policy.
 
@@ -357,6 +363,12 @@ Before implementation can claim deployment conformance, operators must resolve:
 These choices do not permit extra wire fields, weakened identity verification, or claims that an unimplemented inference path works.
 
 ## 10. Change Log
+
+### Version 1.1.0 (Draft)
+
+- Added the independent `github-app` capability for explicit GitHub tools and safe-output authentication.
+- Kept installation and scope selection in deployment policy, with no new caller-controlled request members.
+- Documented masked same-job token transfer and the initial static consumers' renewal limitation.
 
 ### Version 1.0.0 (Draft)
 

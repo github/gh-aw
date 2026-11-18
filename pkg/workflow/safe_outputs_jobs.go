@@ -38,6 +38,7 @@ type SafeOutputJobConfig struct {
 	PreSteps                   []string          // Optional steps to run before the GitHub Script step
 	PostSteps                  []string          // Optional steps to run after the GitHub Script step
 	Token                      string            // GitHub token for this output type
+	GitHubApp                  *GitHubAppConfig  // Optional per-handler installation credential
 	UseCopilotRequestsToken    bool              // Whether to use Copilot token preference chain
 	UseCopilotCodingAgentToken bool              // Whether to use agent token preference chain (config token > GH_AW_AGENT_TOKEN)
 	TargetRepoSlug             string            // Target repository for cross-repo operations
@@ -65,7 +66,15 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 
 	// Add GitHub App token minting step if app is configured.
 	// This must run after setup/pre-steps so dynamic credentials can be prepared first.
-	if data.SafeOutputs != nil && data.SafeOutputs.GitHubApp != nil {
+	var app *GitHubAppConfig
+	if data.SafeOutputs != nil {
+		app = data.SafeOutputs.GitHubApp
+	}
+	if usesTokenBrokerSafeOutputs(data) && config.GitHubApp != nil {
+		app = config.GitHubApp
+		config.Token = "${{ steps.safe-outputs-app-token.outputs.token }}"
+	}
+	if app != nil {
 		safeOutputsJobsLog.Print("Adding GitHub App token minting step with auto-computed permissions")
 		// For workflow_call relay workflows, scope the token to the platform repo name only
 		// (not the full slug) because actions/create-github-app-token expects repo names
@@ -76,11 +85,20 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(
 			config.JobName,
-			data.SafeOutputs.GitHubApp,
+			app,
 			config.Permissions,
 			appTokenFallbackRepo,
 			inferSingleCheckoutRepositoryForGitHubAppOwner(data),
 		)...)
+	}
+
+	brokeredGitHub := usesTokenBrokerSafeOutputs(data) && config.Token == "" && !config.UseCopilotCodingAgentToken
+	if brokeredGitHub {
+		config.Permissions.Set(PermissionIdToken, PermissionWrite)
+		if level, _ := config.Permissions.Get(PermissionContents); level == PermissionWrite {
+			config.Permissions.Set(PermissionContents, PermissionRead)
+		}
+		steps = append(steps, c.buildGitHubBrokerTokenStep(data, "safe-outputs-app-token")...)
 	}
 
 	// Build the step based on action mode
@@ -125,6 +143,9 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 	// Add post-steps if provided (e.g., assignees, reviewers)
 	if len(config.PostSteps) > 0 {
 		steps = append(steps, config.PostSteps...)
+	}
+	if brokeredGitHub {
+		steps = append(steps, c.buildBrokerInvalidationStep(data)...)
 	}
 	var jobEnv map[string]string
 	if safeOutputAuthorizationEnabled(data.SafeOutputs) {

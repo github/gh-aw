@@ -336,7 +336,7 @@ func modelRoutingRuntimeIneligibility(data *WorkflowData) string {
 }
 
 func defaultModelRoutingExecutionIneligibility(data *WorkflowData) string {
-	if data.TokenBrokerCopilotRequest || data.TokenBrokerEnabled || enclavesEnabled(data) {
+	if data.TokenBrokerCopilotRequest || data.TokenBrokerCopilotTask || enclavesEnabled(data) {
 		return "custom inference credentials or enclaves"
 	}
 	if conflict := modelRoutingRuntimeCompatibility(data); conflict != nil {

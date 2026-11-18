@@ -2,7 +2,10 @@ package workflow
 
 import (
 	"errors"
+	"fmt"
 	"slices"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 const tokenBrokerURLEnv = "GH_AW_TOKEN_BROKER_URL"
@@ -46,6 +49,46 @@ func usesTokenBrokerTasks(data *WorkflowData) bool {
 	return outputs.AssignToAgent != nil || outputs.CreateAgentSessions != nil ||
 		(outputs.CreateIssues != nil && hasCopilotAssignee(outputs.CreateIssues.Assignees)) ||
 		(outputs.CreatePullRequests != nil && hasCopilotAssignee(outputs.CreatePullRequests.Assignees))
+}
+
+func usesTokenBrokerGitHubTool(data *WorkflowData) bool {
+	return data != nil && data.ParsedTools != nil && data.ParsedTools.GitHub != nil &&
+		data.ParsedTools.GitHub.TokenBroker && data.Tools["github"] != false
+}
+
+func usesTokenBrokerSafeOutputs(data *WorkflowData) bool {
+	return data != nil && data.SafeOutputs != nil && data.SafeOutputs.TokenBroker
+}
+
+func validateTokenBrokerGitHubConfig(data *WorkflowData) error {
+	if usesTokenBrokerGitHubTool(data) {
+		config := data.ParsedTools.GitHub
+		if config.GitHubApp != nil || config.GitHubToken != "" {
+			return fmt.Errorf("tools.github.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
+		}
+		if !isFirewallEnabled(data) || !awfSupportsExcludeEnv(getFirewallConfig(data)) {
+			return fmt.Errorf("tools.github.token-broker: true requires an enabled AWF sandbox at version %s or newer to keep Actions OIDC credentials out of the agent; enable sandbox.agent and update sandbox.agent.version", constants.AWFExcludeEnvMinVersion)
+		}
+	}
+	if usesTokenBrokerSafeOutputs(data) && (data.SafeOutputs.GitHubApp != nil || data.SafeOutputs.GitHubToken != "") {
+		return fmt.Errorf("safe-outputs.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
+	}
+	return nil
+}
+
+// The broker derives installation authority from backend policy, never caller permissions.
+func (c *Compiler) buildGitHubBrokerTokenStep(data *WorkflowData, stepID string) []string {
+	return []string{
+		"      - name: Request brokered GitHub App credential\n",
+		"        id: " + stepID + "\n",
+		"        uses: " + getCachedActionPin("actions/github-script", data) + "\n",
+		"        env:\n",
+		"          " + tokenBrokerURLEnv + ": " + tokenBrokerURLExpression + "\n",
+		"        with:\n",
+		"          script: |\n",
+		"            const { getBrokerToken } = require('" + SetupActionDestination + "/setup/js/token_broker.cjs');\n",
+		"            core.setOutput('token', await getBrokerToken('github-app', { mask: token => core.setSecret(token) }));\n",
+	}
 }
 
 func (c *Compiler) validateTokenBrokerInference(data *WorkflowData) error {
@@ -102,8 +145,14 @@ func (c *Compiler) buildTokenBrokerInvalidationStep(data *WorkflowData) []string
 	if !usesTokenBrokerInference(data) && !usesTokenBrokerTasks(data) {
 		return nil
 	}
+	steps := c.buildBrokerInvalidationStep(data)
+	steps[0] = "      - name: Invalidate brokered Copilot credentials\n"
+	return steps
+}
+
+func (c *Compiler) buildBrokerInvalidationStep(data *WorkflowData) []string {
 	return []string{
-		"      - name: Invalidate brokered Copilot credentials\n",
+		"      - name: Invalidate brokered credentials\n",
 		"        if: always()\n",
 		"        uses: " + getCachedActionPin("actions/github-script", data) + "\n",
 		"        env:\n",

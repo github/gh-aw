@@ -610,6 +610,12 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutput
 	}
 
 	// Merge meta-configuration fields (only set if empty/zero in result)
+	if _, supplied := config["token-broker"]; supplied {
+		if _, defined := explicitSafeOutputs["token-broker"]; !defined &&
+			result.GitHubApp == nil && result.GitHubToken == "" {
+			result.TokenBroker = importedConfig.TokenBroker
+		}
+	}
 	if _, defined := explicitSafeOutputs["require-agent-success"]; !defined {
 		result.RequireAgentSuccess = result.RequireAgentSuccess || importedConfig.RequireAgentSuccess
 	}
@@ -628,10 +634,10 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutput
 	if len(result.Env) == 0 && len(importedConfig.Env) > 0 {
 		result.Env = importedConfig.Env
 	}
-	if result.GitHubToken == "" && importedConfig.GitHubToken != "" {
+	if !result.TokenBroker && result.GitHubToken == "" && importedConfig.GitHubToken != "" {
 		result.GitHubToken = importedConfig.GitHubToken
 	}
-	if result.GitHubApp == nil && importedConfig.GitHubApp != nil {
+	if !result.TokenBroker && result.GitHubApp == nil && importedConfig.GitHubApp != nil {
 		result.GitHubApp = importedConfig.GitHubApp
 	}
 	if result.MaximumPatchSize == 0 && importedConfig.MaximumPatchSize > 0 {
