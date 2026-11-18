@@ -321,3 +321,28 @@ For the compact comparison, call
 `actions/setup/js/compact_unified_session.cjs` on those same immutable bytes.
 Compare individual results inside `grader.result.data.results[]`, not just the
 presence of a `grader.result` event or its aggregate pass count.
+
+## Fixed-cohort robustness check
+
+The final check ran the built `gh-aw value` executable against the [same ten workflow/run IDs](#what-was-tried), their reviewed definitions, their explicit recipes and the original typed bundle. No candidates were redesigned using these results. Each report was run twice with the retained native export, and twice with an empty logs directory: **40 CLI invocations, 10 distinct workflows, no new Actions runs**. Both passes matched the frozen measurement expectations; paired reports were identical apart from their invocation clock.
+
+| What the check distinguished | Result |
+| --- | --- |
+| Executable reports vs. measured outcomes | 10 reports; 1 independently measured change. File Diet still measured **403 → 0** excess lines on the fixed file cohort. The other 9 retained their specific unavailable reasons. |
+| Delivery vs. acceptance | Original archive: 4 effects on 3 workflows. File Diet had 1 human acceptance, Code Metrics 1 pending discussion, and Issue Triage 2 delivery fallbacks. Removing the ledger made counts unavailable, not zero. |
+| Completed-run export vs. goal grade | 9 matching completed-run rows; none recorded an `operational-value` grade. CLI Performance's failed original collection remained absent. Removing the summary did not create a tenth row or a zero grade. |
+| Outcome vs. attributed value | No typed report assigned attribution. Removing native evidence did not change File Diet's observed numbers or turn the issue-to-PR link into direct PR attribution. |
+
+A negative control replaced one raw File Diet sample with JSON `null` in a temporary copy. Previously it was decoded as `0` and the report appeared valid. The command now rejects that input, still accepts a genuinely observed `0`, and preserves explicit unavailability. The typed terminal report also says PRs were **not collected** rather than suggesting a search returned zero. Neither correction changes the original numerical witness.
+
+From this source checkout, use the built CLI and Python 3 to reproduce the check. The first command requires only the checked-in pilot data. The optional second command additionally checks the **original** combined nine-run `summary.json` and four-effect `lifecycle.jsonl`, not a fresh provider snapshot:
+
+```bash wrap
+make build
+python3 scripts/check-operational-value-pilot.py
+python3 scripts/check-operational-value-pilot.py --logs-dir /path/to/retained/pilot/logs
+```
+
+The checker verifies per-workflow identities, definition/recipe/evidence digests, policies, raw observation IDs, nullable results and reasons, paired changes, native coverage, grades and attributed subtotals. A mismatch fails that workflow, continues the remaining cohort, and exits nonzero. It does not update the expected results.
+
+One warm local pass of 20 sequential CLI calls including verification took 0.66 seconds with the archive and 0.60 seconds without it. This small, one-repository typed replay involved no GitHub requests, PR searches, deep Git scans or downloads. It is not a service-level or enterprise throughput benchmark; see the [scaling limits and SWOT analysis](/gh-aw/specs/operational-value-specification/#replay-and-scale).

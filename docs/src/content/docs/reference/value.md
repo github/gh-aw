@@ -12,6 +12,9 @@ value is explicitly unavailable. Workflows do not need to be part of
 `github/gh-aw`: run the installed CLI in the workflow owner's checkout and keep
 the measurement definition and recipe in that repository.
 
+The [Operational Value Report Specification](/gh-aw/specs/operational-value-specification/)
+defines what to freeze before adoption, which evidence the report uses, and its scaling limits.
+
 The shared pipeline handles historical sampling, lifecycle joins, merge-window
 isolation, and full-window file survival. Run success, merge counts, delivery
 fallbacks, and run-scoped grader scores are not longitudinal attributed value.
@@ -112,8 +115,10 @@ to derive, validate, and freeze a measurement and report recipe from workflow in
 /operational-value-designer owner/repo WORKFLOW
 ```
 
-Use the same invocation for every safe-output type. The skill inspects the workflow's
-goal and evidence and authors any needed definition in its owner's repository.
+Use the same invocation for every safe-output type. For a prospective measurement,
+give the designer only the workflow goal, evidence formats and synthetic examples.
+Freeze the definition, cohort and window policy before adoption; keep target runs,
+grades and outcomes out of the design context. Evaluate the unchanged rules afterward.
 Then run `gh aw value WORKFLOW`. The report distinguishes delivery, acceptance,
 recorded grades, and independently measured outcomes; missing evidence stays unavailable.
 The command does not invoke an
@@ -239,7 +244,7 @@ Each observation contains:
 | `sha` | Full commit SHA required for available `git_snapshot` observations. |
 | `population` | Optional unique subject IDs; required when configured. |
 | `context` | Comparable measurement protocol/runner/toolchain/fixture identity; required for benchmarks. |
-| `values` | Finite raw measurements; missing evidence is not an observed zero. |
+| `values` | Finite raw numbers. A `null` array element is an error, not zero; mark an incomplete observation `partial` or `unavailable` with a reason and no values. |
 
 Supported scopes are `git_snapshot`, `run`, `benchmark`, and `object_state`.
 `scalar` requires exactly one independently measured number.

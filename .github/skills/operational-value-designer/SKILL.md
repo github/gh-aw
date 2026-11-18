@@ -3,40 +3,42 @@ name: operational-value-designer
 description: "Set up a workflow's operational value report from its goal and available evidence. Usage: /operational-value-designer OWNER/REPO WORKFLOW."
 argument-hint: "OWNER/REPO WORKFLOW"
 metadata:
-  version: "5.2.0"
+  version: "5.3.0"
 ---
 
 # Operational Value Designer
 
-Start from the workflow's goal and available evidence; do not ask for a mode.
-Reuse recorded grades as run results. Measure the independent outcome when supported;
-otherwise explain what evidence is missing. Return one `gh aw value WORKFLOW` report.
-Only the measurement varies by workflow; never redesign delivery or adoption.
-Work in the workflow owner's repository, not necessarily `github/gh-aw`.
-Definitions, recipes, and fixtures belong there; gh-aw is an installed tool.
+Set up one `gh aw value WORKFLOW` report in the workflow owner's repository.
+Do not ask for a mode or register upstream. Keep native delivery and adoption rules.
+
+**Design blind; evaluate later.** Before the target cohort's adoptions, design from
+workflow intent, evidence schemas and synthetic fixtures in a clean context. Do not
+load that cohort's runs, grades, PRs, adoption decisions, metric history, slide
+results or prior analyses. Freeze definition, recipe and fixtures together. If
+outcomes already informed the design, label that cohort retrospective and apply
+the frozen contract to the next unseen cohort. No timestamp check certifies this.
+Only after freeze, in a separate evaluation context, inspect the target evidence.
+Never tune a rule or exclude a case to improve the result.
 
 ## Route and inspect
 
-- For historical Git/typed-evidence reports or slides, read
+- For prospective design, use the [report specification](https://github.github.com/gh-aw/specs/operational-value-specification/);
+  do not open its pilot results. For historical replay or slides **after freeze**, read
   [longitudinal-report.md](references/longitudinal-report.md).
 - For recorded-grade reporting or session grading, read
   [run-scoped.md](references/run-scoped.md).
   Prefer the target's existing Go graders or supported session queries. The
   separate `graders.operational-value.script` contract runs custom session
   graders in Actions; never add JS execution to a report or Go server.
-- For non-Git evidence or window policies, read
+- For non-Git replay or window verification after freeze, read
   [evidence-and-windows.md](references/evidence-and-windows.md).
 - For the schema-feature slide replay, use the checked-in definition
   `.github/aw/value/schema-feature-coverage.json` and recipe
   `.github/aw/value/schema-feature-coverage.slides.json`. Load their contents and
   the longitudinal reference before changing either.
 
-Inspect the exact workflow, implementation, and representative evidence first.
-Confirm supported evaluator IDs, configuration, query syntax, and evidence
-scopes in the installed runtime, not by assuming the owner has gh-aw's source.
-Never invent a declaration or query the runtime
-cannot execute. Ask only when workflow intent or the measurement boundary is
-unclear, not for approval to execute an agreed plan.
+Confirm supported evaluators, configuration, queries and evidence scopes in
+the installed runtime. Ask only if the workflow intent or boundary is unclear.
 
 `gh aw value` reads primary grades from the existing logs `summary.json` under
 `--logs-dir`. No new evaluator definition is needed for that view. Preserve
@@ -104,25 +106,15 @@ API visibility failures, and unavailable evidence explicitly.
 
 ## Verify and deliver
 
-Test attained, observed zero, unavailable, malformed, inapplicable, and
-changed-population cases through the production evaluator. Repeat identical
-inputs and compare values and identities. Exercise no-adoption, shared-window,
-and touched-file gates. A lifecycle-only report is not a validated value
-function. In multi-workflow pilots, isolate collection failures, distinguish
-complete zero-delivery runs from missing evidence, and report how many
-measurements actually executed. Keep proposed metric contracts separate from
-working definitions; do not call a design-only candidate implemented.
-In the workflow owner's repository, use installed
-`gh aw value` and that repository's fixture checks; do not require gh-aw's Go
-source, tests, or Makefile. Run focused `TestOperationalValue` tests only when
-changing the gh-aw implementation itself, then its final validation gates.
-
-Run the documented command against completed history when available. For the
-slides verify all weekly observations, output cohort, six selected windows,
-84 daily samples, stable cohort, and native five-field witness against the
-recorded baseline in the longitudinal reference. Never hard-code expected
-historical totals into measurement logic or treat synthetic fixtures as a live
-historical replay.
+Test attained, zero, unavailable, malformed, inapplicable and changed-population
+fixtures through the production evaluator. Exercise no-adoption, overlap and
+touched-file gates. After freeze, replay all eligible cases, including no-ops,
+regressions and pending outcomes. Compare identities and values across repeats.
+For pilots, isolate collection failures; count executed measurements, not merely
+configured definitions or successful commands. Missing evidence is not zero.
+Use installed `gh aw value` and the owner's fixture checks. Only gh-aw contributors
+run `TestOperationalValue` and the repository gates. For slides, compare all layers
+to the historical baseline in the replay reference; never hard-code results.
 
 Present the definition, recipe, fixtures, command, and verification limits.
 Freeze semantics and evidence provenance together; corrections are prospective.

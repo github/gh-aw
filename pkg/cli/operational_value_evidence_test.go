@@ -53,6 +53,38 @@ func TestOperationalValueEvidenceCommand(t *testing.T) {
 	output.Reset()
 	require.NoError(t, renderOperationalValueReport(&output, valueEvidenceMeasurement{}, report))
 	assert.Contains(t, output.String(), "Measured improvement: 3.5 ns/op")
+	assert.Contains(t, output.String(), "not collected", "typed evidence does not search for PRs")
+}
+
+func TestOperationalValueEvidenceMissingSample(t *testing.T) {
+	input := valueTestEvidenceObservation(t)
+	definition, err := resolveValueWorkflow(input.Workflow, "acme/repo")
+	require.NoError(t, err)
+	data, err := json.Marshal(input)
+	require.NoError(t, err)
+	var wire map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(data, &wire))
+	path := filepath.Join(t.TempDir(), "evidence.json")
+	load := func(values string) (valueEvidenceBundle, error) {
+		t.Helper()
+		wire["values"] = json.RawMessage(values)
+		valueWriteJSON(t, path, map[string]any{"version": 1, "repository": "github.com/acme/repo", "observations": []any{wire}})
+		bundle, _, err := loadValueEvidenceBundle(path, definition, input.ObservedAt)
+		return bundle, err
+	}
+	for _, invalid := range []string{`[null]`, `[5,null,0]`} {
+		_, err := load(invalid)
+		require.ErrorContains(t, err, "is null")
+		require.ErrorContains(t, err, "mark coverage unavailable")
+	}
+	bundle, err := load(`[0]`)
+	require.NoError(t, err)
+	require.Len(t, bundle.Observations, 1)
+	assert.Equal(t, valueEvidenceSamples{0}, bundle.Observations[0].Values)
+	wire["coverage"], wire["reason"] = json.RawMessage(`"unavailable"`), json.RawMessage(`"sample_missing"`)
+	bundle, err = load(`null`)
+	require.NoError(t, err)
+	assert.Nil(t, bundle.Observations[0].Values)
 }
 
 func valueTestEvidenceObservation(t *testing.T) valueEvidenceObservation {

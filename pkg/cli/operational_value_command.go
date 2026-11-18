@@ -288,8 +288,8 @@ func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, r
 			outcome = fmt.Sprintf("%s evidence (%d selected observations)", report.Evidence.Coverage, len(report.Evidence.Observations))
 		} else {
 			outcome = measurement.format(report.Weekly[0]) + " -> " + measurement.format(report.Weekly[len(report.Weekly)-1]) //nolint:uncheckedsliceindex // Weekly is nonempty above.
+			linked, merged = strconv.Itoa(len(report.Outputs)), strconv.Itoa(len(report.Windows))
 		}
-		linked, merged = strconv.Itoa(len(report.Outputs)), strconv.Itoa(len(report.Windows))
 	}
 	if report.Lifecycle.Delivered != nil {
 		delivered = fmt.Sprintf("%d (retained subset)", *report.Lifecycle.Delivered)

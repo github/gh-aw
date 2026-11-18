@@ -185,7 +185,9 @@ grades from `summary.json` under `--logs-dir`, using the existing logs `RunData`
 and `GraderResult` fields. Reporting MUST NOT require another evaluator
 definition for those recorded results or change the schema-v2 grader artifact.
 The [Value Reference](/gh-aw/reference/value/#recorded-grader-results) documents
-collection and the additive `run_grades` report section.
+collection and the additive `run_grades` report section. The
+[Operational Value Report Specification](/gh-aw/specs/operational-value-specification/)
+defines the outcome-blind measurement contract, follow-up, and attribution boundary.
 
 The report MUST select completed runs by host, repository, exact workflow path,
 and the existing creation-time period. Positive run/attempt identity and the

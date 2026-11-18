@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -34,22 +35,45 @@ type valueEvidenceBundle struct {
 }
 
 type valueEvidenceObservation struct {
-	ID         string    `json:"id"`
-	Workflow   string    `json:"workflow"`
-	Metric     string    `json:"metric"`
-	Scope      string    `json:"scope"`
-	Subject    string    `json:"subject"`
-	RunID      int64     `json:"run_id"`
-	SHA        string    `json:"sha,omitempty"`
-	At         time.Time `json:"at"`
-	ObservedAt time.Time `json:"observed_at"`
-	Phase      string    `json:"phase"`
-	Coverage   string    `json:"coverage"`
-	Reason     string    `json:"reason,omitempty"`
-	Population *[]string `json:"population,omitempty"`
-	Context    string    `json:"context,omitempty"`
-	References []string  `json:"references"`
-	Values     []float64 `json:"values"`
+	ID         string               `json:"id"`
+	Workflow   string               `json:"workflow"`
+	Metric     string               `json:"metric"`
+	Scope      string               `json:"scope"`
+	Subject    string               `json:"subject"`
+	RunID      int64                `json:"run_id"`
+	SHA        string               `json:"sha,omitempty"`
+	At         time.Time            `json:"at"`
+	ObservedAt time.Time            `json:"observed_at"`
+	Phase      string               `json:"phase"`
+	Coverage   string               `json:"coverage"`
+	Reason     string               `json:"reason,omitempty"`
+	Population *[]string            `json:"population,omitempty"`
+	Context    string               `json:"context,omitempty"`
+	References []string             `json:"references"`
+	Values     valueEvidenceSamples `json:"values"`
+}
+
+type valueEvidenceSamples []float64
+
+func (s *valueEvidenceSamples) UnmarshalJSON(data []byte) error {
+	// encoding/json silently turns a null element in []float64 into zero.
+	var samples []*float64
+	if err := json.Unmarshal(data, &samples); err != nil {
+		return fmt.Errorf("decode evidence values: %w", err)
+	}
+	if samples == nil {
+		*s = nil
+		return nil
+	}
+	values := make(valueEvidenceSamples, 0, len(samples))
+	for i, sample := range samples {
+		if sample == nil {
+			return fmt.Errorf("values[%d] is null; supply an observed number (for example 0), or mark coverage unavailable with a reason and no values", i)
+		}
+		values = append(values, *sample)
+	}
+	*s = values
+	return nil
 }
 
 type valueEvidenceResult struct {
