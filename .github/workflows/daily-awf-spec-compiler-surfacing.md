@@ -45,22 +45,25 @@ tools:
             items:
               type: string
           outcome:
-            enum: [pull_request_created, noop]
+            enum: [issue_created, pull_request_created, noop]
         additionalProperties: false
       max-record-kb: 8
       max-patch-kb: 10
   bash: true
+  edit: null
 safe-outputs:
   create-pull-request:
     title-prefix: "[awf-feature-surfacing] "
     labels: [automation, awf, compiler, specifications]
     expires: 7d
     max: 1
+    allowed-files:
+      - ".github/aw/triggers.md"
+      - ".github/aw/syntax*.md"
+      - "pkg/parser/schemas/*.json"
+      - "docs/src/content/docs/**"
     protected-files:
       policy: request-review
-      exclude:
-        - "/.github/aw/triggers.md"
-    expires: 7d
 timeout-minutes: 30
 strict: true
 imports:
@@ -71,7 +74,7 @@ features:
 evals:
   - id: spec_updates_reviewed
     question: Did the agent review AWF specification and compiler updates for features that should be surfaced in gh-aw?
-  - id: finding_reported_or_noop
+  - id: pr_created_or_noop
     question: Did the agent create a pull request for actionable surfacing changes, or report that no change was needed?
 ---
 
@@ -103,7 +106,9 @@ its `open_feature_ids` to identify already-tracked gaps. Check whether each trac
 use the last 7 days as the initial diff window.
 
 Each record contains the run ID, review timestamp, reviewed commit SHA, schema
-SHA-256, stable open feature IDs, and outcome (`pull_request_created` or `noop`). Do
+SHA-256, stable open feature IDs, and outcome. The legacy `issue_created` value
+is retained for existing records; new records use `pull_request_created` or
+`noop`. Do
 not store full diffs, source excerpts, or raw analysis notes in the ledger.
 
 ## Procedure
