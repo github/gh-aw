@@ -208,8 +208,8 @@ func TestTokenBrokerGitHubStandaloneCoverage(t *testing.T) {
 
 func TestTokenBrokerGitHubSchemaAndRoundTrip(t *testing.T) {
 	for _, value := range []any{"true", map[string]any{"provider": "github"}, nil} {
-		assert.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": "workflow_dispatch", "tools": map[string]any{"github": map[string]any{"token-broker": value}}}, "broker.md"))
-		assert.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": "workflow_dispatch", "safe-outputs": map[string]any{"token-broker": value}}, "broker.md"))
+		require.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": "workflow_dispatch", "tools": map[string]any{"github": map[string]any{"token-broker": value}}}, "broker.md"))
+		require.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": "workflow_dispatch", "safe-outputs": map[string]any{"token-broker": value}}, "broker.md"))
 	}
 	var safeOutputs SafeOutputsConfig
 	require.NoError(t, json.Unmarshal([]byte(`{"token-broker":true}`), &safeOutputs))

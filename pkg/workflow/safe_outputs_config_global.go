@@ -13,7 +13,7 @@ import (
 //
 //nolint:largefunc // Legacy global configuration extraction is intentionally centralized.
 func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *SafeOutputsConfig) {
-	config.TokenBroker, _ = outputMap["token-broker"].(bool)
+	config.TokenBroker = outputMap["token-broker"] == true
 	// Handle steering issue mode.
 	if steer, exists := outputMap["steer"]; exists {
 		if steerBool, ok := steer.(bool); ok {

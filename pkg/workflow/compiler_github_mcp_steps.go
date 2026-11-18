@@ -187,7 +187,6 @@ func (c *Compiler) generateGitHubMCPAppTokenMintingSteps(data *WorkflowData) []s
 	if usesTokenBrokerGitHubTool(data) {
 		return c.buildGitHubBrokerTokenStep(data, "github-mcp-app-token")
 	}
-	// Check if GitHub tool has app configuration
 	if data.ParsedTools == nil || data.ParsedTools.GitHub == nil || data.ParsedTools.GitHub.GitHubApp == nil {
 		githubConfigLog.Print("Skipping GitHub MCP app token minting: no github-app configuration on GitHub tool")
 		return nil

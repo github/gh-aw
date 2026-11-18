@@ -55,8 +55,6 @@ func buildDetectionQuotaBlockedSummaryStep() []string {
 // buildConclusionSetupSteps extracts the common setup, token minting, and artifact steps.
 func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	var steps []string
-
-	// Add setup step to copy scripts
 	setupActionRef := c.resolveActionReference("./actions/setup", data)
 	if setupActionRef != "" || c.actionMode.IsScript() {
 		// For dev mode (local action path), checkout the actions folder first
@@ -69,7 +67,6 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 		steps = append(steps, c.generateSetupStepForJob("conclusion", data, setupActionRef, SetupActionDestination, false, notifyTraceID, notifyParentSpanID, "")...)
 	}
 
-	// Add GitHub App token minting step if app is configured
 	if usesTokenBrokerSafeOutputs(data) {
 		steps = append(steps, c.buildGitHubBrokerTokenStep(data, "safe-outputs-app-token")...)
 	}

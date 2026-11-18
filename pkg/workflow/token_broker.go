@@ -64,14 +64,14 @@ func validateTokenBrokerGitHubConfig(data *WorkflowData) error {
 	if usesTokenBrokerGitHubTool(data) {
 		config := data.ParsedTools.GitHub
 		if config.GitHubApp != nil || config.GitHubToken != "" {
-			return fmt.Errorf("tools.github.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
+			return errors.New("tools.github.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
 		}
 		if !isFirewallEnabled(data) || !awfSupportsExcludeEnv(getFirewallConfig(data)) {
 			return fmt.Errorf("tools.github.token-broker: true requires an enabled AWF sandbox at version %s or newer to keep Actions OIDC credentials out of the agent; enable sandbox.agent and update sandbox.agent.version", constants.AWFExcludeEnvMinVersion)
 		}
 	}
 	if usesTokenBrokerSafeOutputs(data) && (data.SafeOutputs.GitHubApp != nil || data.SafeOutputs.GitHubToken != "") {
-		return fmt.Errorf("safe-outputs.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
+		return errors.New("safe-outputs.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
 	}
 	return nil
 }
@@ -145,14 +145,16 @@ func (c *Compiler) buildTokenBrokerInvalidationStep(data *WorkflowData) []string
 	if !usesTokenBrokerInference(data) && !usesTokenBrokerTasks(data) {
 		return nil
 	}
-	steps := c.buildBrokerInvalidationStep(data)
-	steps[0] = "      - name: Invalidate brokered Copilot credentials\n"
-	return steps
+	return c.buildBrokerInvalidationStep(data)
 }
 
 func (c *Compiler) buildBrokerInvalidationStep(data *WorkflowData) []string {
+	name := "Invalidate brokered Copilot credentials"
+	if usesTokenBrokerGitHubTool(data) || usesTokenBrokerSafeOutputs(data) {
+		name = "Invalidate brokered credentials"
+	}
 	return []string{
-		"      - name: Invalidate brokered credentials\n",
+		"      - name: " + name + "\n",
 		"        if: always()\n",
 		"        uses: " + getCachedActionPin("actions/github-script", data) + "\n",
 		"        env:\n",
