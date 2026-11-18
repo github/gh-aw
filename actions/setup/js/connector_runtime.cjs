@@ -238,8 +238,15 @@ function origin(value, full = false) {
   } catch {
     return fail("Connector endpoint must be fixed HTTPS");
   }
+  const queryIndex = value.indexOf("?");
   assert(
-    parsed.protocol === "https:" && parsed.hostname && !parsed.username && !parsed.password && !/[?#]/u.test(value) && (full || (parsed.pathname === "/" && (value === parsed.origin || value === parsed.origin + "/"))),
+    parsed.protocol === "https:" &&
+      parsed.hostname &&
+      !parsed.username &&
+      !parsed.password &&
+      !value.includes("#") &&
+      (queryIndex === -1 || (full && /^api-version=[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u.test(value.slice(queryIndex + 1)))) &&
+      (full || (parsed.pathname === "/" && (value === parsed.origin || value === parsed.origin + "/"))),
     "Connector endpoint must be fixed HTTPS"
   );
   return parsed.origin;
@@ -247,9 +254,14 @@ function origin(value, full = false) {
 function validateInputs(inputs) {
   assert(inputs === undefined || inputs === null || object(inputs));
   for (const [key, input] of entries(inputs)) {
-    fields(input, ["type", "required", "enum", "maxLength", "minLength", "sanitize", "minimum", "maximum", "pattern"], ["type"]);
-    assert(fixedPattern(argumentPattern, key) && ["string", "integer", "number", "boolean"].includes(input.type));
+    fields(input, ["type", "required", "enum", "maxLength", "minLength", "sanitize", "minimum", "maximum", "pattern", "items", "minItems", "maxItems"], ["type"]);
+    assert(fixedPattern(argumentPattern, key) && ["string", "integer", "number", "boolean", "array"].includes(input.type));
     assert(input.required === undefined || typeof input.required === "boolean");
+    if (input.type === "array") {
+      assert(Number.isInteger(input.minItems) && input.minItems >= 1 && Number.isInteger(input.maxItems) && input.maxItems >= input.minItems && input.maxItems <= 100, "Connector string arrays require bounds between 1 and 100");
+      assert(input.items?.type === "string" && !input.items.required && !input.items.sanitize, "Connector arrays require bounded string items");
+      validateInputs({ item: input.items });
+    } else assert(input.items === undefined && !input.minItems && !input.maxItems);
     if (input.type === "string") {
       assert(Number.isInteger(input.maxLength) && input.maxLength >= 1 && input.maxLength <= 65536);
       assert(input.minLength === undefined || (Number.isInteger(input.minLength) && input.minLength >= 0 && input.minLength <= input.maxLength));
@@ -360,6 +372,10 @@ function validateOperation(spec, op, phase, readTool = false) {
   assert(own(spec.endpoints, op.request?.endpoint), "Connector request references an unknown endpoint");
   assert(Number.isInteger(op.maxResponseBytes) && op.maxResponseBytes >= 1 && op.maxResponseBytes <= MAX_RESPONSE);
   validateInputs(op.inputs);
+  assert(
+    Object.values(op.inputs || {}).every(input => input.type !== "array"),
+    "Connector string arrays are supported only by hosted HTTP MCP tools"
+  );
   for (const key of ["resources", "project", "createdResources", "trustedInputs", "responseContains", "responseLimits", "responseAnyInputs"]) assert(op[key] === undefined || object(op[key]));
   validateRequest(op.request, op.inputs, phase);
   if (op.request.binary) assert(!count(op.trustedInputs) && !op.preflight && !op.lookups?.length, "Binary operations require canonical or receipt-bound inputs without secret preflights");
@@ -555,7 +571,7 @@ function validatePlan(plan) {
       assert(fixedPattern(toolPattern, tool));
       fields(constraints, ["inputs", "resources"], ["inputs"]);
       validateInputs(constraints.inputs);
-      for (const [input, resource] of entries(constraints.resources)) assert(constraints.inputs[input]?.required && constraints.inputs[input].type === "string" && fixedPattern(namePattern, resource));
+      for (const [input, resource] of entries(constraints.resources)) assert(constraints.inputs[input]?.required && ["string", "array"].includes(constraints.inputs[input].type) && fixedPattern(namePattern, resource));
     }
   }
   for (const [name, op] of entries(spec.safeOutputs)) {
@@ -655,7 +671,10 @@ function restrictPhase(plan, phase) {
   );
 }
 async function validateArgument(input, value) {
-  if (input.type === "string") {
+  if (input.type === "array") {
+    assert(Array.isArray(value) && value.length >= input.minItems && value.length <= input.maxItems, "Connector argument must be a bounded string array");
+    for (const item of value) await validateArgument(input.items, item);
+  } else if (input.type === "string") {
     const minimum = Math.max(input.minLength || 0, input.sanitize === "title" ? 20 : 0);
     assert(typeof value === "string" && Array.from(value).length <= input.maxLength && Array.from(value).length >= minimum, "Connector argument must be a bounded Unicode string");
     assert(!input.enum?.length || input.enum.includes(value), "Connector argument is outside its declared enum");
@@ -690,7 +709,13 @@ async function validateArguments(inputs, resources, allowed, args) {
       continue;
     }
     await validateArgument(input, args[key]);
-    if (resources?.[key]) assert(typeof args[key] === "string" && allowed[resources[key]]?.includes(args[key]), "Connector argument is outside approved resources");
+    if (resources?.[key]) {
+      const values = Array.isArray(args[key]) ? args[key] : [args[key]];
+      assert(
+        values.every(value => typeof value === "string" && allowed[resources[key]]?.includes(value)),
+        "Connector argument is outside approved resources"
+      );
+    }
   }
 }
 function normalizeArguments(args) {
