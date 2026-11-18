@@ -6,6 +6,8 @@ import { main, parseConfig, renderPrompt, resolvePromptFile } from "./create_pro
 import { main as interpolatePrompt } from "./interpolate_prompt.cjs";
 import substitutePlaceholders from "./substitute_placeholders.cjs";
 
+const { prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
+const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
 const core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
 global.core = core;
 
@@ -21,8 +23,55 @@ describe("create_prompt", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     process.env = originalEnv;
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it.each(["small", "large"])("preserves compiler-owned inline agent metadata through author-file rendering (%s)", async model => {
+    const workflow = "---\non: workflow_dispatch\n---\nSummarize README.md.\n\n## agent: `file-summarizer`\n---\nmodel: ${{ experiments.subagent_model }}\ndescription: Summarizes files\n---\nRead the requested file.\n";
+    const workflows = path.join(tempDir, ".github/workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.writeFileSync(path.join(workflows, "smoke.md"), workflow);
+    prepareMarkdownFixtures(workflow);
+    Object.assign(process.env, {
+      RUNNER_TEMP: tempDir,
+      GITHUB_WORKSPACE: tempDir,
+      GH_AW_PROMPT: path.join(tempDir, "gh-aw/aw-prompts/prompt.txt"),
+      GH_AW_ENGINE_ID: "copilot",
+      GH_AW_EXPERIMENTS_SUBAGENT_MODEL: model,
+      GH_AW_PROMPT_CONFIG: JSON.stringify({
+        items: [{ author_file: ".github/workflows/smoke.md" }],
+        author_expressions: { "experiments.subagent_model": "GH_AW_EXPERIMENTS_SUBAGENT_MODEL" },
+      }),
+    });
+    const write = fs.writeFileSync;
+    const mkdir = fs.mkdirSync;
+    const stage = file => (String(file).startsWith("/tmp/gh-aw/") ? path.join(tempDir, "gh-aw", String(file).slice("/tmp/gh-aw/".length)) : file);
+    vi.spyOn(fs, "writeFileSync").mockImplementation((file, content, ...args) => write(stage(file), content, ...args));
+    vi.spyOn(fs, "mkdirSync").mockImplementation((file, ...args) => mkdir(stage(file), ...args));
+
+    await main(core);
+    await interpolatePrompt({ authorExpressions: JSON.parse(process.env.GH_AW_PROMPT_CONFIG).author_expressions });
+
+    expect(core.setFailed).not.toHaveBeenCalled();
+    const agent = fs.readFileSync(stage("/tmp/gh-aw/.github/agents/file-summarizer.agent.md"), "utf8");
+    expect(readMarkdownMetadata("agent", agent).value).toEqual({ name: "file-summarizer", description: "file-summarizer", model });
+    expect(agent).toContain("Read the requested file.");
+    expect(agent).not.toMatch(/\$\{\{|__GH_AW_|\x00VALUE_/);
+    expect(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8")).not.toContain("Read the requested file.");
+  });
+
+  it.each([
+    ["\uFEFF---\r\non: workflow_dispatch\r\n---\r\nBody\r\n", "Body\r\n"],
+    ["Introduction\n---\nExample prose, not YAML\n---\nConclusion", "Introduction\n---\nExample prose, not YAML\n---\nConclusion\n"],
+  ])("removes only author document frontmatter during rendering", (content, expected) => {
+    const workflows = path.join(tempDir, ".github/workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    const filename = path.join(workflows, "author.md");
+    fs.writeFileSync(filename, content);
+
+    expect(renderPrompt({ items: [{ author_file: ".github/workflows/author.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toBe(expected);
   });
 
   it("renders shell and JavaScript injection payloads byte for byte as data", () => {
