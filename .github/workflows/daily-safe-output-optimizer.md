@@ -17,10 +17,10 @@ permissions:
 sandbox:
   agent:
     id: awf
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model: router/balanced
   mcp:
     tool-timeout: 10m
 safe-outputs:

@@ -14,10 +14,10 @@ permissions:
   copilot-requests: write
 
 
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 strict: true
 
 network:

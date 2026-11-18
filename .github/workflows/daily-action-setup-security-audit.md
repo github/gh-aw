@@ -9,10 +9,10 @@ on:
 permissions:
   contents: read
   issues: read
+model: router/balanced
 engine:
   id: copilot
   copilot-sdk: true
-  model: router/balanced
 max-tool-denials: 3
 strict: true
 tracker-id: daily-action-setup-security-audit

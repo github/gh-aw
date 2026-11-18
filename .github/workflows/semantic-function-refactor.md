@@ -15,10 +15,10 @@ permissions:
   issues: read
   pull-requests: read
 
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 imports:
   - shared/otlp.md
   - shared/reporting.md

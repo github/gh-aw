@@ -15,10 +15,10 @@ permissions:
 concurrency:
   group: windows-grower
   cancel-in-progress: false
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 network: {}
 tools:
   cache-memory:

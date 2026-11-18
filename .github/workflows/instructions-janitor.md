@@ -28,10 +28,10 @@ safe-outputs:
     title-prefix: "[instructions] "
 description: Packs instruction execution contracts into the first 7500 UTF-8 bytes, removes duplication, and keeps topic files focused
 emoji: 🧹
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model: router/balanced
 name: Instructions Janitor
 strict: true
 timeout-minutes: 20

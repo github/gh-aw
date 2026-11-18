@@ -10,10 +10,10 @@ permissions:
   contents: read
   copilot-requests: write
 
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
   durable:
     retention-days: 7
 

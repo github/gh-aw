@@ -8,9 +8,9 @@ permissions:
   copilot-requests: write
   contents: read
   issues: read
+model: router/balanced
 engine:
   id: pi
-  model: router/balanced
 network: defaults
 strict: true
 tracker-id: weekly-network-domains-audit

@@ -146,10 +146,10 @@ steps:
   working-directory: ./actions/setup/js
 description: Analyzes and enhances Go logging practices across the codebase for improved debugging and observability
 emoji: 📝
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model: router/balanced
 name: Go Logger Enhancement
 timeout-minutes: 30
 tools:

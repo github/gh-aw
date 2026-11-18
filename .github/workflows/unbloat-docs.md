@@ -35,10 +35,10 @@ runtimes:
 
 # AI engine configuration
 max-turns: 90  # Reduce from avg 115 turns
+model: router/economy
 engine:
   id: pi
   model-provider: github
-  model: router/economy
 # Shared instructions
 imports:
   - uses: shared/daily-pr-base.md

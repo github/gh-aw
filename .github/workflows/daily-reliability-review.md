@@ -15,9 +15,9 @@ sandbox:
   agent:
     id: awf
 tracker-id: daily-reliability-review
+model: router/economy
 engine:
   id: copilot
-  model: router/economy
   copilot-sdk: true
 strict: true
 network:

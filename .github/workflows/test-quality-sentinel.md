@@ -14,10 +14,10 @@ permissions:
   contents: read
   pull-requests: read
   copilot-requests: write
+model: router/economy
 engine:
   id: copilot
   max-continuations: 15
-  model: router/economy
 skip-if-decision:
   - >-
     Do @/tmp/gh-aw/agent/pr-meta.json, @/tmp/gh-aw/agent/test-diff.txt, and

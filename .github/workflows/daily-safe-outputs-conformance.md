@@ -10,10 +10,10 @@ permissions:
   issues: read
   copilot-requests: write
 tracker-id: safe-outputs-conformance
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model: router/balanced
 strict: true
 tools:
   cli-proxy: true

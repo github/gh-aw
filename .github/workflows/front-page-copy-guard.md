@@ -13,10 +13,10 @@ permissions:
   contents: read
   pull-requests: read
   copilot-requests: write
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 features:
   gh-aw-detection: true
 timeout-minutes: 10

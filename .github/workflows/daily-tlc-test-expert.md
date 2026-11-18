@@ -13,10 +13,10 @@ permissions:
   issues: read
   pull-requests: read
   copilot-requests: write
+model: router/balanced
 engine:
   id: copilot
   copilot-sdk: true
-  model: router/balanced
 strict: true
 timeout-minutes: 45
 network:

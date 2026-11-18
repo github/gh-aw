@@ -15,10 +15,10 @@ permissions:
   copilot-requests: write
 tracker-id: daily-aw-cross-repo-compile-check
 max-turns: 140
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 sandbox:
   agent:
     id: awf

@@ -10,10 +10,10 @@ timeout-minutes: 30
 permissions:
   models: read
 
+model: router/economy
 engine:
   id: copilot
   bare: true
-  model: router/economy
 
 imports:
   - shared/otlp.md

@@ -11,10 +11,10 @@ permissions:
   issues: read
 
 
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 strict: true
 network:
   allowed:

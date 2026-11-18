@@ -1,10 +1,10 @@
 ---
 emoji: "🔧"
 timeout-minutes: 5
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 strict: true
 on:
   schedule: "daily around 14:00 on weekdays"  # ~2 PM UTC, weekdays only

@@ -17,10 +17,10 @@ permissions:
   pull-requests: read
 
 tracker-id: daily-astrostylelite-markdown-spellcheck
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 strict: true
 
 if: needs.spellcheck.outputs.has_findings == 'true'

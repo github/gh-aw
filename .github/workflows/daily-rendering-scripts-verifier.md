@@ -15,10 +15,10 @@ permissions:
   pull-requests: read
 
 tracker-id: daily-rendering-scripts-verifier
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model: router/balanced
 strict: true
 
 graders:

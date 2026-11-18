@@ -18,10 +18,10 @@ imports:
 - shared/otlp.md
 description: Analyzes Go type usage patterns and identifies opportunities for better type safety and code improvements
 emoji: ✍️
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 name: "Typist - Go Type Analysis"
 strict: true
 experiments:

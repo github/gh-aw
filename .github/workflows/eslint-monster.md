@@ -15,10 +15,10 @@ features:
   gh-aw-detection: true
 
 tracker-id: eslint-monster
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 strict: true
 concurrency:
   job-discriminator: ${{ github.run_id }}

@@ -14,10 +14,10 @@ permissions:
   security-events: read
 
 
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 tools:
   cli-proxy: true
   github:

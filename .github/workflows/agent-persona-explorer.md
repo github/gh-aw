@@ -4,10 +4,10 @@ emoji: "🎭"
 description: Explores agentic-workflows custom agent behavior by generating software personas and analyzing responses to common automation tasks
 on: daily
 max-daily-ai-credits: 10000
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 permissions:
   contents: read
   actions: read

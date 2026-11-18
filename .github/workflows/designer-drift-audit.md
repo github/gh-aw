@@ -121,10 +121,10 @@ safe-outputs:
 network:
   allowed:
     - defaults
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 ---
 
 # Designer Drift Audit

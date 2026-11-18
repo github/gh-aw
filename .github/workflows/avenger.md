@@ -18,10 +18,10 @@ env:
   GH_AW_HARNESS_MAX_RETRIES: "4"
 tracker-id: avenger-ci
 max-turns: 50
+model: router/balanced
 engine:
   id: copilot
   model-provider: github
-  model: router/balanced
 network:
   allowed:
     - defaults

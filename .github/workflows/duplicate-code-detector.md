@@ -14,9 +14,9 @@ permissions:
   pull-requests: read
 
 
+model: router
 engine:
   id: pi
-  model: router
 network:
   allowed:
     - defaults

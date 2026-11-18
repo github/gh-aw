@@ -36,10 +36,10 @@ safe-outputs:
   noop: null
 description: Automatically reviews and updates documentation to ensure accuracy and completeness
 emoji: 📝
+model: router/balanced
 engine:
   id: codex
   model-provider: github
-  model: router/balanced
 name: Daily Documentation Updater
 strict: true
 experiments:

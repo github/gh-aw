@@ -56,10 +56,10 @@ experiments:
     weight: [50, 50]
     start_date: "2026-05-24"
 
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 strict: false
 
 imports:

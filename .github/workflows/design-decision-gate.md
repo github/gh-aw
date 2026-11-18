@@ -79,10 +79,10 @@ permissions:
   issues: read
   copilot-requests: write
 max-turns: 30
+model: router/balanced
 engine:
   id: pi
   model-provider: github
-  model: router/balanced
 safe-outputs:
   add-comment:
     max: 2

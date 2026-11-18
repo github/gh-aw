@@ -14,10 +14,10 @@ permissions:
 sandbox:
   agent:
     id: awf
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 strict: true
 runtimes:
   python:

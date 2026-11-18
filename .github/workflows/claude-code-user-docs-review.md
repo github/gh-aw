@@ -18,10 +18,10 @@ permissions:
 
   copilot-requests: write
 tracker-id: claude-code-user-docs-review
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model: router/economy
 strict: true
 
 network:

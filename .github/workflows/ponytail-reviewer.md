@@ -14,10 +14,10 @@ on:
     strategy: centralized
     name: [ponytail, review]
     events: [pull_request_comment, pull_request_review_comment]
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model: router/economy
 permissions:
   contents: read
   pull-requests: read
