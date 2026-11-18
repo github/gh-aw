@@ -783,6 +783,7 @@ async function verifyCompiledDispatchIdentity(input) {
       "GH_AW_WORK_QUEUE_DISPATCH_BUDGET",
       "GITHUB_SHA",
       "RUNNER_TEMP",
+      "GH_AW_SETUP_ROOT",
     ];
     const previous = new Map(keys.map(key => [key, process.env[key]]));
     const fixture = queueFixture({ granted: false, count: 1, workerPrincipal: input.principal, configurePolicy: policy => Object.assign(policy, structuredClone(input.policy)) });
@@ -876,6 +877,7 @@ async function verifyCompiledDispatchIdentity(input) {
     };
     try {
       process.env.RUNNER_TEMP = root;
+      process.env.GH_AW_SETUP_ROOT = path.join(root, "gh-aw-setup");
       process.env.GITHUB_SHA = dispatcherRevision;
       process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
       process.env.GH_AW_WORK_QUEUE_ROLE = "dispatcher";

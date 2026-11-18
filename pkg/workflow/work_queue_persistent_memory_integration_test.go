@@ -69,12 +69,12 @@ func TestWorkQueueESLintRefinerPersistentSnapshotCompilation(t *testing.T) {
 	require.Contains(t, result, "create_issue")
 	require.Contains(t, result, "work_queue_restore_memory.cjs")
 	require.Contains(t, result, "Restore legacy and immutable Claim memory read-only")
-	require.Contains(t, result, `const directory = \"/tmp/gh-aw/agent/eslint-refiner-memory\";`)
-	require.Contains(t, result, "cat /tmp/gh-aw/agent/eslint-refiner-memory/history.json")
+	require.Contains(t, result, `const directory = \"`+runtimeRootExpression+`/agent/eslint-refiner-memory\";`)
+	require.Contains(t, result, "cat "+runtimeRootExpression+"/agent/eslint-refiner-memory/history.json")
 	require.Contains(t, result, "mcp__work-queue")
 	require.Contains(t, result, "mcp__safeoutputs")
 	require.NotContains(t, result, "Bash(work-queue:*)")
-	require.NotContains(t, result, "cat /tmp/gh-aw/eslint-refiner-memory/history.json")
+	require.NotContains(t, result, "cat "+runtimeRootExpression+"/eslint-refiner-memory/history.json")
 	require.NotContains(t, result, "push_repo_memory.cjs")
 }
 

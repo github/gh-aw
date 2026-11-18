@@ -110,7 +110,8 @@ mcp-scripts:
       CAVEMAN_RUN_ID: ${{ github.run_id }}
     script: |
       const { DatabaseSync } = require("node:sqlite");
-      const db = new DatabaseSync("/tmp/gh-aw/ledgers/caveman-run-history/ledger.db", { readOnly: true });
+      const { join } = require("node:path");
+      const db = new DatabaseSync(join(process.env.GH_AW_RUNTIME_ROOT, "ledgers/caveman-run-history/ledger.db"), { readOnly: true });
       try {
         const row = db.prepare("SELECT value FROM state WHERE key = ? LIMIT 1").get(process.env.CAVEMAN_RUN_ID);
         return { current_run: row ? JSON.parse(row.value) : null };

@@ -163,8 +163,8 @@ type RepoConfig struct {
 	// ProtectedFiles configures repository-wide exceptions to safe-output file protection.
 	ProtectedFiles RepoProtectedFilesConfig
 
-	// Admission enables admission and conclusion_admission jobs for all workflows.
-	Admission bool
+	// Admission overrides admission step generation for all workflows when set.
+	Admission *bool
 
 	// GatewayDispatch enables experimental on.gateway-dispatch triggers requiring an approved server.
 	GatewayDispatch bool
@@ -299,7 +299,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	// auto_upgrade parsing.
 	var raw struct {
 		ProtectedFiles           RepoProtectedFilesConfig      `json:"protected_files,omitzero"`
-		Admission                bool                          `json:"admission,omitempty"`
+		Admission                *bool                         `json:"admission,omitempty"`
 		GatewayDispatch          bool                          `json:"gateway-dispatch,omitempty"`
 		Strict                   bool                          `json:"strict,omitempty"`
 		GHES                     bool                          `json:"ghes,omitempty"`

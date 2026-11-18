@@ -19,13 +19,14 @@ steps:
       const crypto = require("node:crypto");
       const fs = require("node:fs");
       const http = require("node:http");
+      const { join } = require("node:path");
 
       const host = "0.0.0.0";
       const port = Number(process.env.PLAYWRIGHT_TITLE_TEST_PORT);
       const title = `playwright-${crypto.randomBytes(24).toString("base64url")}`;
 
       fs.writeFileSync(
-        "/tmp/gh-aw/agent/playwright-title-test-expected.txt",
+        join(process.env.GH_AW_RUNTIME_ROOT, "agent/playwright-title-test-expected.txt"),
         `${title}\n`,
         { mode: 0o600 },
       );

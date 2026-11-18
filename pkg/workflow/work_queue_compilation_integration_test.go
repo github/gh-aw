@@ -518,7 +518,7 @@ Process original immutable Claims.
 		require.Contains(t, job, "contents: read")
 		require.NotContains(t, job, "contents: write")
 		require.NotContains(t, job, "issues: write")
-		require.Contains(t, job, "path: /tmp/gh-aw/claims/")
+		require.Contains(t, job, "path: ${{ env.GH_AW_RUNTIME_ROOT }}/claims/")
 		require.Contains(t, job, "steps.redact_secrets.outcome == 'success'")
 	}
 	require.Contains(t, extractJobSection(compiled, "work_queue_prepare_prepared_0"), "PREPARER_MODE")
@@ -815,7 +815,7 @@ func TestWorkQueueSmokeVerification(t *testing.T) {
 			if tc.intent != "" {
 				require.NoError(t, os.WriteFile(filepath.Join(evidence, "work-queue.finish.jsonl"), []byte(tc.intent), 0o600))
 			}
-			output, err := exec.Command("bash", "-e", "-c", strings.ReplaceAll(script, "/tmp/gh-aw/", evidence+"/")).CombinedOutput()
+			output, err := exec.Command("bash", "-e", "-c", strings.ReplaceAll(script, runtimeRootExpression, evidence)).CombinedOutput()
 			if tc.success {
 				require.NoError(t, err, "%s", output)
 			} else {

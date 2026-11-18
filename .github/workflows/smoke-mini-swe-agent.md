@@ -36,10 +36,12 @@ post-steps:
     run: |
       python3 -I - <<'PY'
       import json
+      import os
       import re
       from pathlib import Path
-      assert Path("/tmp/gh-aw/agent/smoke-mini-swe-agent.txt").read_text().strip() == "Smoke test passed for mini-SWE-agent"
-      trajectory = json.loads(Path("/tmp/gh-aw/agent/mini-swe-agent.traj.json").read_text())
+      agent_dir = Path(os.environ["GH_AW_RUNTIME_ROOT"]) / "agent"
+      assert (agent_dir / "smoke-mini-swe-agent.txt").read_text().strip() == "Smoke test passed for mini-SWE-agent"
+      trajectory = json.loads((agent_dir / "mini-swe-agent.traj.json").read_text())
       assert trajectory["info"]["exit_status"] == "Submitted", "mini-SWE-agent did not submit"
       messages = trajectory["messages"]
       repository_verified = False

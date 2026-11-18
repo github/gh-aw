@@ -45,6 +45,7 @@ post-steps:
       const { execFileSync } = require("node:child_process");
       const fs = require("node:fs");
       const path = require("node:path");
+      const runtimeRoot = process.env.GH_AW_RUNTIME_ROOT;
       const { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "log_parser_shared.cjs"));
       const { normalizeClaudeSession } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "claude_session.cjs"));
       const script = ".claude/workflows/smoke-claude-dynamic.js";
@@ -52,18 +53,18 @@ post-steps:
       for (const file of [script, fixture]) {
         assert.deepEqual(
           fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE, file)),
-          execFileSync("tar", ["-xOf", "/tmp/gh-aw/base/snapshot.tar", "--", file]),
+          execFileSync("tar", ["-xOf", path.join(runtimeRoot, "base/snapshot.tar"), "--", file]),
           `${file} must match the trusted activation artifact`
         );
       }
-      const result = JSON.parse(fs.readFileSync("/tmp/gh-aw/agent/claude-dynamic-smoke.json", "utf8"));
+      const result = JSON.parse(fs.readFileSync(path.join(runtimeRoot, "agent/claude-dynamic-smoke.json"), "utf8"));
       assert.deepEqual(result, {
         status: "PASS",
         workflow: "smoke-claude-dynamic",
         token: "gh-aw-claude-dynamic-fixture-v1",
         runId: process.env.SMOKE_RUN_ID
       }, "The saved workflow must return the expected fixture and invocation arguments");
-      const records = parseLogEntries(fs.readFileSync("/tmp/gh-aw/agent-stdio.log", "utf8"));
+      const records = parseLogEntries(fs.readFileSync(path.join(runtimeRoot, "agent-stdio.log"), "utf8"));
       assert.ok(Array.isArray(records), "Claude must produce a parseable native session log");
       const events = normalizeClaudeSession(records);
       const launches = events.filter(event =>

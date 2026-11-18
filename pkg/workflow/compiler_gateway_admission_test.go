@@ -43,6 +43,11 @@ jobs:
 	require.NoError(t, err)
 	output, err := compiler.CompileToYAML(data, "version-check.md")
 	require.NoError(t, err)
+	type gatewayStep struct {
+		ID   string            `yaml:"id"`
+		Env  map[string]string `yaml:"env"`
+		With map[string]string `yaml:"with"`
+	}
 	var compiled struct {
 		Jobs map[string]struct {
 			Needs       any               `yaml:"needs"`
@@ -52,11 +57,7 @@ jobs:
 			Timeout     int               `yaml:"timeout-minutes"`
 			Outputs     map[string]string `yaml:"outputs"`
 			Env         map[string]string `yaml:"env"`
-			Steps       []struct {
-				ID   string            `yaml:"id"`
-				Env  map[string]string `yaml:"env"`
-				With map[string]string `yaml:"with"`
-			} `yaml:"steps"`
+			Steps       []gatewayStep     `yaml:"steps"`
 		} `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(output), &compiled))
@@ -70,8 +71,14 @@ jobs:
 	assert.Equal(t, map[string]string{"contents": "read", "id-token": "write"}, admission.Permissions)
 	assert.Equal(t, map[string]string{"verified": "${{ steps.verify-gateway-admission.outputs.verified }}"}, admission.Outputs)
 	assert.Equal(t, map[string]string{"GITHUB_API_URL": "${{ github.api_url }}", "GITHUB_SERVER_URL": "${{ github.server_url }}"}, admission.Env)
-	verify := admission.Steps[len(admission.Steps)-1]
-	assert.Equal(t, "verify-gateway-admission", verify.ID)
+	var verify *gatewayStep
+	for i := range admission.Steps {
+		if admission.Steps[i].ID == "verify-gateway-admission" {
+			verify = &admission.Steps[i]
+			break
+		}
+	}
+	require.NotNil(t, verify)
 	assert.Equal(t, "${{ secrets.GH_AW_GATEWAY_GET_TOKEN_URL || vars.GH_AW_GATEWAY_GET_TOKEN_URL }}", verify.Env["GH_AW_GATEWAY_GET_TOKEN_URL"])
 	assert.Equal(t, "${{ secrets.GH_AW_GATEWAY_OIDC_AUDIENCE || vars.GH_AW_GATEWAY_OIDC_AUDIENCE }}", verify.Env["GH_AW_GATEWAY_OIDC_AUDIENCE"])
 	assert.Equal(t, "${{ github.workflow_sha }}", verify.Env["GH_AW_GATEWAY_WORKFLOW_SHA"])

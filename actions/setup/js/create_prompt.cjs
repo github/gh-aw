@@ -10,6 +10,7 @@ const { resolveRuntimeImportFilePath, assertRuntimeImportRealPathWithinBase, res
 const { createLiteralValues, literalFileKey, writeLiteralState } = require("./prompt_literal_values.cjs");
 const { bindAuthorExpressions } = require("./author_prompt.cjs");
 const { relocateRuntimePaths } = require("./runtime_isolation.cjs");
+const { removeDocumentFrontmatter, transformMarkdownContent } = require("./markdown_metadata.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
@@ -122,7 +123,8 @@ function readAuthorPrompt(filename, env, bindings, protectValue, priorContent) {
   const { normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filename, workspaceDir);
   assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFolder, filename);
   let content = fs.readFileSync(normalizedPath, "utf8");
-  content = removeXMLComments(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+  // Keep the body from being rediscovered as document frontmatter in each pass.
+  content = transformMarkdownContent("\n" + removeDocumentFrontmatter(content), removeXMLComments);
   // Body imports promoted into earlier compiler chunks must not run twice.
   const importPattern = /\{\{#(?:runtime-import|import)\??(?:[ \t]+|[ \t]*:[ \t]*)([^{}]+)\}\}/g;
   const importKey = (/** @type {string} */ target) => {
@@ -130,8 +132,9 @@ function readAuthorPrompt(filename, env, bindings, protectValue, priorContent) {
     return range ? resolveRuntimeImportKey(range[1], workspaceDir, Number(range[2]), Number(range[3])) : resolveRuntimeImportKey(target.trim(), workspaceDir);
   };
   const priorImports = new Set([...priorContent.matchAll(importPattern)].map(match => importKey(match[1])));
-  content = content.replace(importPattern, (match, target) => (priorImports.has(importKey(target)) ? "" : match));
-  content = bindAuthorExpressions(content, bindings, env, protectValue);
+  content = transformMarkdownContent(content, text => text.replace(importPattern, (match, target) => (priorImports.has(importKey(target)) ? "" : match)));
+  content = transformMarkdownContent(content, text => bindAuthorExpressions(text, bindings, env, protectValue));
+  content = content.slice(1);
   return content.endsWith("\n") ? content : content + "\n";
 }
 

@@ -134,8 +134,9 @@ engine:
             apiKey: "awf-proxy",
           }],
         };
-        mkdirSync("/tmp/gh-aw/agent", { recursive: true });
-        const settingsDir = mkdtempSync("/tmp/gh-aw/agent/factory-");
+        const agentDir = join(process.env.GH_AW_RUNTIME_ROOT, "agent");
+        mkdirSync(agentDir, { recursive: true });
+        const settingsDir = mkdtempSync(join(agentDir, "factory-"));
         try {
           const settingsPath = join(settingsDir, "settings.json");
           writeFileSync(settingsPath, JSON.stringify(settings), { mode: 0o600 });

@@ -78,7 +78,7 @@ jobs:
           )
 
           root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
-          output = Path("/tmp/gh-aw/pageindex/index")
+          output = Path(os.environ["GH_AW_RUNTIME_ROOT"]) / "pageindex/index"
           output.mkdir(parents=True, exist_ok=True)
           revision = subprocess.check_output(
               ["git", "rev-parse", "HEAD"], cwd=root, text=True

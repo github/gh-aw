@@ -190,7 +190,7 @@ jobs:
             "readme_url": os.environ["REPOSITORY_URL"],
             "repository": os.environ["GITHUB_REPOSITORY"],
           }
-          path = "/tmp/gh-aw/agent/geo-optimizer/metadata.json"
+          path = os.path.join(os.environ["GH_AW_RUNTIME_ROOT"], "agent/geo-optimizer/metadata.json")
           with open(path, "w") as f:
             json.dump(metadata, f, indent=2)
           print(f"Wrote metadata to {path}")

@@ -14,12 +14,10 @@ permissions:
   issues: read
   pull-requests: read
 tracker-id: daily-elixir-credo-snippet-audit
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 timeout-minutes: 45
 strict: true
 runtimes:

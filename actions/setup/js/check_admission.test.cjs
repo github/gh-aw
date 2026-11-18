@@ -26,6 +26,7 @@ async function settle(promise) {
 
 describe("bounded OIDC-only admission client", () => {
   beforeEach(() => {
+    vi.spyOn(require("node:fs"), "appendFileSync").mockImplementation(() => {});
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0);
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", "");
@@ -266,7 +267,7 @@ describe("bounded OIDC-only admission client", () => {
     expect(fetchImpl.mock.calls[1][1].headers.traceparent).toMatch(new RegExp(`^00-${decision.traceId}-[0-9a-f]{16}-01$`));
     expect(decision.endpoints).toEqual([]);
   });
-  it.each(["admitted", "ignored"])("keeps the %s decision in activation step outputs without exporting admission state", async result => {
+  it.each(["admitted", "ignored"])("publishes the %s decision and exports it for activation's daily-validation conditions", async result => {
     for (const [key, value] of Object.entries(base)) vi.stubEnv(key, value);
     const core = { setOutput: vi.fn(), exportVariable: vi.fn(), setSecret: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
     const fetchImpl = vi.fn().mockImplementationOnce(oidcResponse);
@@ -276,7 +277,8 @@ describe("bounded OIDC-only admission client", () => {
     expect(core.setFailed).not.toHaveBeenCalled();
     expect(core.setOutput).toHaveBeenCalledWith("result", result);
     expect(core.setOutput.mock.calls.some(([key]) => key === "correlation-id")).toBe(false);
-    expect(core.exportVariable.mock.calls.map(([key]) => key)).toEqual(["GITHUB_AW_OTEL_TRACE_ID"]);
+    expect(core.exportVariable.mock.calls.map(([key]) => key)).toEqual(["GITHUB_AW_OTEL_TRACE_ID", "GH_AW_ADMISSION_RESULT"]);
+    expect(core.exportVariable).toHaveBeenCalledWith("GH_AW_ADMISSION_RESULT", result);
     expect(fetchImpl).toHaveBeenCalledTimes(result === "admitted" ? 2 : 4);
     if (result === "admitted") expect(core.setOutput).toHaveBeenCalledWith("max-ai-credits", "1000");
     else expect(core.warning).toHaveBeenCalledOnce();
@@ -295,7 +297,7 @@ describe("bounded OIDC-only admission client", () => {
     expect(core.setFailed).not.toHaveBeenCalled();
     expect(core.setOutput).toHaveBeenCalledWith("max-ai-credits-threat-detection", "10");
     expect(core.setOutput).toHaveBeenCalledWith("max-ai-credits-evals", "20");
-    expect(core.exportVariable.mock.calls.map(([key]) => key)).toEqual(["GITHUB_AW_OTEL_TRACE_ID"]);
+    expect(core.exportVariable.mock.calls.map(([key]) => key)).toEqual(["GITHUB_AW_OTEL_TRACE_ID", "GH_AW_ADMISSION_RESULT"]);
   });
   it("exposes only generic diagnostics on a faulty issuer response", async () => {
     for (const [key, value] of Object.entries(base)) vi.stubEnv(key, value);
@@ -304,6 +306,7 @@ describe("bounded OIDC-only admission client", () => {
     await main(core);
     expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(FAILURE);
     expect(core.setOutput).not.toHaveBeenCalled();
+    expect(core.exportVariable).not.toHaveBeenCalled();
     expect(core.warning).not.toHaveBeenCalled();
   });
   it.each(["admitted", "ignored", "blocked"])("writes a collapsed, privacy-preserving %s summary and lifecycle logs", async outcome => {

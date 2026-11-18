@@ -65,7 +65,8 @@ mcp-scripts:
       AUDIT_RUN_ID: ${{ github.run_id }}
     script: |
       const { DatabaseSync } = require("node:sqlite");
-      const db = new DatabaseSync("/tmp/gh-aw/ledgers/concurrency-audits/ledger.db", { readOnly: true });
+      const { join } = require("node:path");
+      const db = new DatabaseSync(join(process.env.GH_AW_RUNTIME_ROOT, "ledgers/concurrency-audits/ledger.db"), { readOnly: true });
       try {
         const current = db.prepare("SELECT payload FROM records WHERE json_extract(payload, '$.record_type') = 'mcp_concurrency_audit' AND json_extract(payload, '$.run_id') = ? LIMIT 1").get(process.env.AUDIT_RUN_ID);
         const latest = db.prepare("SELECT payload FROM records WHERE json_extract(payload, '$.record_type') = 'mcp_concurrency_audit' AND json_extract(payload, '$.analyzed_tool') = ? ORDER BY ordinal DESC LIMIT 1").get(analyzed_tool);

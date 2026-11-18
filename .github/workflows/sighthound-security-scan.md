@@ -11,12 +11,10 @@ permissions:
   issues: read
   actions: read
   copilot-requests: write
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 if: needs.sighthound_scan.outputs.actionable_findings_detected == 'true'
 jobs:
@@ -150,10 +148,10 @@ tools:
 mcp-scripts:
   read-sighthound-findings:
     description: Read the pre-filtered actionable Sighthound findings.
-    run: cat /tmp/gh-aw/agent/sighthound/actionable.json
+    run: cat "$GH_AW_RUNTIME_ROOT/agent/sighthound/actionable.json"
   read-sighthound-summary:
     description: Read the Sighthound scan summary.
-    run: cat /tmp/gh-aw/agent/sighthound/summary.md
+    run: cat "$GH_AW_RUNTIME_ROOT/agent/sighthound/summary.md"
 safe-outputs:
   create-issue:
     max: 1

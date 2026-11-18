@@ -297,6 +297,7 @@ Shared workflow files (without `on:` field) can define the fields below. Other f
 |-------|---------|
 | `import-schema` | Parameter schema for `with` validation and input substitution |
 | `tools` | Tool configurations (`bash`, `web-fetch`, `github`, `mcp-*`, etc.) |
+| `cache` | Dependency cache configurations |
 | `mcp-servers` | Model Context Protocol server configurations |
 | `mcp-scripts` | MCP Scripts configurations |
 | `services` | Docker services for workflow execution |
@@ -321,6 +322,7 @@ Step fields merge in dependency order: a file's steps follow those of everything
 | Field | Merge strategy |
 |-------|---------------|
 | `tools:` | Deep merge; `allowed` arrays concatenate and deduplicate. Other MCP tool conflicts fail. |
+| `cache:` | Imported entries are appended in discovery order, followed by entries from the main workflow. |
 | `mcp-servers:` | Imported servers override same-named main servers; first-wins across imports. |
 | `network:` | `allowed` domains union (deduped, sorted). Main `mode` and `firewall` take precedence. |
 | `permissions:` | Validation only. Main must declare all imported permissions at sufficient levels (`write` ≥ `read` ≥ `none`). |

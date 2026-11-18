@@ -55,6 +55,7 @@ steps:
            "$VENV/bin/uv" pip install --python "$VENV/bin/python3" "open-dataflow==1.0.10" >>"$LOG" 2>&1 &&
          timeout 2m "$VENV/bin/python3" - <<'PY' >>"$LOG" 2>&1
       import json
+      import os
       from pathlib import Path
       from dataflow.utils.storage import FileStorage
       from dataflow.operators.general_text import (
@@ -62,7 +63,7 @@ steps:
           HashDeduplicateFilter,
       )
 
-      fixture_dir = Path("/tmp/gh-aw/agent/dataflow/smoke")
+      fixture_dir = Path(os.environ["GH_AW_RUNTIME_ROOT"]) / "agent/dataflow/smoke"
       fixture_dir.mkdir(parents=True, exist_ok=True)
       fixture = fixture_dir / "fixture.jsonl"
       fixture.write_text(

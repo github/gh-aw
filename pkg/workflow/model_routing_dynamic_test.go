@@ -74,7 +74,7 @@ Report.
 	info := findDynamicRoutingStep(t, lock, "activation", func(s dynamicRoutingLockStep) bool { return s.Env["GH_AW_INFO_MODEL_CONFIG"] != "" })
 	conversation := findDynamicRoutingStep(t, lock, "agent", func(s dynamicRoutingLockStep) bool { return s.Name == "Prepare model-routing conversation" })
 	execution := findDynamicRoutingStep(t, lock, "agent", func(s dynamicRoutingLockStep) bool {
-		return strings.Contains(s.Run, `awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json"`)
+		return strings.Contains(s.Run, `awf --config "${GH_AW_SETUP_ROOT}/awf-config.json"`)
 	})
 	detection := findDynamicRoutingStep(t, lock, "detection", func(s dynamicRoutingLockStep) bool { return s.Env["COPILOT_MODEL"] != "" })
 
@@ -109,7 +109,7 @@ Report.
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "resolve_model_routing.sh"), routingScript, 0o755))
 			cmd := exec.Command("bash", "-e", "-c", decision.Run)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile, "RUNNER_TEMP=" + runnerTemp}
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile, "GH_AW_SETUP_ROOT=" + filepath.Dir(actionsDir)}
 			for key, value := range decision.Env {
 				cmd.Env = append(cmd.Env, key+"="+evaluateTestTemplate(t, value, contexts))
 			}
@@ -172,7 +172,7 @@ Report.
 			}
 
 			cmd = exec.Command("bash", "-e", "-c", configScript)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RUNNER_TEMP=" + runnerTemp, "GH_AW_MODEL_ROUTING=" + routingFlag,
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GH_AW_SETUP_ROOT=" + filepath.Dir(actionsDir), "GH_AW_MODEL_ROUTING=" + routingFlag,
 				modelRoutingModeEnvVar + "=" + routingMode, "GH_AW_MAX_AI_CREDITS=0"}
 			out, err = cmd.CombinedOutput()
 			require.NoError(t, err, string(out))
@@ -203,7 +203,7 @@ func TestDynamicModelRoutingRejectsInvalidRuntimeMode(t *testing.T) {
 	var lock dynamicRoutingLock
 	require.NoError(t, yaml.Unmarshal([]byte(compiled.lock), &lock))
 	execution := findDynamicRoutingStep(t, lock, "agent", func(s dynamicRoutingLockStep) bool {
-		return strings.Contains(s.Run, `awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json"`)
+		return strings.Contains(s.Run, `awf --config "${GH_AW_SETUP_ROOT}/awf-config.json"`)
 	})
 	configStart := strings.Index(execution.Run, `if [ "${GH_AW_MODEL_ROUTING:-}" = "1" ]; then`)
 	require.GreaterOrEqual(t, configStart, 0)
@@ -212,7 +212,7 @@ func TestDynamicModelRoutingRejectsInvalidRuntimeMode(t *testing.T) {
 	runnerTemp := filepath.Join(t.TempDir(), "runner")
 	require.NoError(t, os.MkdirAll(filepath.Join(runnerTemp, "gh-aw"), 0o755))
 	cmd := exec.Command("bash", "-e", "-c", execution.Run[configStart:configStart+configEnd+4])
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RUNNER_TEMP=" + runnerTemp, "GH_AW_MODEL_ROUTING=1", modelRoutingModeEnvVar + "=fast", "GH_AW_MAX_AI_CREDITS=0"}
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GH_AW_SETUP_ROOT=" + filepath.Join(runnerTemp, "gh-aw"), "GH_AW_MODEL_ROUTING=1", modelRoutingModeEnvVar + "=fast", "GH_AW_MAX_AI_CREDITS=0"}
 	out, err := cmd.CombinedOutput()
 	require.Error(t, err)
 	require.Contains(t, string(out), "ERR_CONFIG")

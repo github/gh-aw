@@ -37,6 +37,7 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
+      id-token: write # Request an OIDC token for authenticated services.
     env:
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -1431,6 +1432,7 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       checks: read # Read check runs for workflow context.
+      id-token: write # Request an OIDC token for authenticated services.
       issues: write # Create or update issues and comments.
       pull-requests: read # Read pull requests and review comments for workflow context.
     concurrency:

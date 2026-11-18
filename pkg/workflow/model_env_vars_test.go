@@ -866,7 +866,7 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 		switch {
 		case s.Name == "Prepare model-routing conversation":
 			conversation = &lock.Jobs["agent"].Steps[i]
-		case strings.Contains(s.Run, `awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json"`):
+		case strings.Contains(s.Run, `awf --config "${GH_AW_SETUP_ROOT}/awf-config.json"`):
 			execution = &lock.Jobs["agent"].Steps[i]
 		}
 	}
@@ -906,7 +906,7 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "resolve_model_routing.sh"), routingScript, 0o755))
 			cmd := exec.Command("bash", "-e", "-c", decision.Run)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile, "RUNNER_TEMP=" + runnerTemp}
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile, "GH_AW_SETUP_ROOT=" + filepath.Dir(actionsDir)}
 			for key, value := range decision.Env {
 				cmd.Env = append(cmd.Env, key+"="+evaluateTestTemplate(t, value, vars))
 			}
@@ -937,7 +937,7 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 			require.Equal(t, tc.wantRouting, routingFlag == "1")
 
 			cmd = exec.Command("bash", "-e", "-c", configScript)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RUNNER_TEMP=" + runnerTemp, "GH_AW_MODEL_ROUTING=" + routingFlag, "GH_AW_MAX_AI_CREDITS=0"}
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GH_AW_SETUP_ROOT=" + filepath.Dir(actionsDir), "GH_AW_MODEL_ROUTING=" + routingFlag, "GH_AW_MAX_AI_CREDITS=0"}
 			out, err = cmd.CombinedOutput()
 			require.NoError(t, err, string(out))
 			configJSON, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw", "awf-config.json"))

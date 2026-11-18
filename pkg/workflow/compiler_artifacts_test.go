@@ -540,7 +540,7 @@ imports:
 	for _, want := range []string{
 		"Stage ambient folders for activation artifact",
 		"GH_AW_AMBIENT_FOLDERS: \".squad\"",
-		"/tmp/gh-aw/ambient-folders",
+		runtimeRootExpression + "/ambient-folders",
 		"Restore ambient folders from activation artifact",
 		".squad",
 	} {

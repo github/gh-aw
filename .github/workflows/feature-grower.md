@@ -150,12 +150,10 @@ safe-outputs:
     labels: [cookie]
     max: 1
 timeout-minutes: 20
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 evals:
   - id: eligible-crop-parent
     question: For a requested cookie issue, does its numeric parent identify a crop confirmed immediately beforehand to remain open without an open cookie child? Return UNKNOWN when no issue is requested.

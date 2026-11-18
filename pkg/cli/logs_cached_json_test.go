@@ -83,8 +83,7 @@ func TestCachedLogsPreserveObservedCopilotModel(t *testing.T) {
 
 func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	record := fmt.Sprintf(`{"schema_version":%d,"kind":"run","run":{"run_id":42}}`+"\n", cachedLogsJSONLSchemaVersion)
-	require.NoError(t, os.WriteFile(path, []byte(record), 0o600))
+	require.NoError(t, os.WriteFile(path, fmt.Appendf(nil, "{\"schema_version\":%d,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n", cachedLogsJSONLSchemaVersion), 0o600))
 
 	_, stderr := captureOutput(t, func() error {
 		_, err := loadCachedLogsJSONL(path)
@@ -115,8 +114,7 @@ func TestLoadCachedLogsJSONReportsMissingFile(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	record := fmt.Sprintf(`{"schema_version":%d,"kind":"run","run":{"run_id":42}}`+"\n", cachedLogsJSONLSchemaVersion)
-	require.NoError(t, os.WriteFile(path, []byte("{invalid}\n"+record), 0o600))
+	require.NoError(t, os.WriteFile(path, fmt.Appendf(nil, "{invalid}\n{\"schema_version\":%d,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n", cachedLogsJSONLSchemaVersion), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -125,8 +123,7 @@ func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidRunAttempt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	record := fmt.Sprintf(`{"schema_version":%d,"kind":"run","run":{"run_id":42,"run_attempt":"bogus"}}`+"\n", cachedLogsJSONLSchemaVersion)
-	require.NoError(t, os.WriteFile(path, []byte(record), 0o600))
+	require.NoError(t, os.WriteFile(path, fmt.Appendf(nil, "{\"schema_version\":%d,\"kind\":\"run\",\"run\":{\"run_id\":42,\"run_attempt\":\"bogus\"}}\n", cachedLogsJSONLSchemaVersion), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -399,7 +396,7 @@ func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {
 
 func TestPrepareCachedLogsJSONLLoadsOnceAndOnlyAppends(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	first := []byte(fmt.Sprintf(`{"schema_version":%d,"kind":"run","run":{"run_id":42}}`+"\n", cachedLogsJSONLSchemaVersion))
+	first := fmt.Appendf(nil, "{\"schema_version\":%d,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n", cachedLogsJSONLSchemaVersion)
 	require.NoError(t, os.WriteFile(path, first, 0o600))
 	opts := LogsDownloadOptions{CachedJSONL: path}
 
@@ -422,9 +419,8 @@ func TestPrepareCachedLogsJSONLWildcardLoadsMatchingFilesAndWritesUniqueFile(t *
 	dir := t.TempDir()
 	firstPath := filepath.Join(dir, "logs-1.jsonl")
 	secondPath := filepath.Join(dir, "logs-2.jsonl")
-	const recordFormat = `{"schema_version":%d,"kind":"run","run":{"run_id":%d}}` + "\n"
-	require.NoError(t, os.WriteFile(firstPath, []byte(fmt.Sprintf(recordFormat, cachedLogsJSONLSchemaVersion, 1)), 0o600))
-	require.NoError(t, os.WriteFile(secondPath, []byte(fmt.Sprintf(recordFormat, cachedLogsJSONLSchemaVersion, 2)), 0o600))
+	require.NoError(t, os.WriteFile(firstPath, fmt.Appendf(nil, "{\"schema_version\":%d,\"kind\":\"run\",\"run\":{\"run_id\":1}}\n", cachedLogsJSONLSchemaVersion), 0o600))
+	require.NoError(t, os.WriteFile(secondPath, fmt.Appendf(nil, "{\"schema_version\":%d,\"kind\":\"run\",\"run\":{\"run_id\":2}}\n", cachedLogsJSONLSchemaVersion), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "logs-ignored.json"), []byte("{}\n"), 0o600))
 
 	prepared, err := prepareCachedLogsJSONLPath(filepath.Join(dir, "logs-*"))
@@ -584,22 +580,17 @@ func TestCachedLogsJSONLStoresCompleteWorkflowRunsPayload(t *testing.T) {
 
 func TestLoadCachedLogsJSONLIgnoresIncompatibleSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	data := "{\"schema_version\":0,\"run\":{\"run_id\":41}}\n" +
-		"{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":43}}\n" +
-		"{\"schema_version\":4,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n" +
-		"{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":45}}\n" +
-		"{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":46}}\n" +
-		fmt.Sprintf(`{"schema_version":%d,"kind":"run","run":{"run_id":44}}`+"\n", cachedLogsJSONLSchemaVersion)
-	require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
+	var data []byte
+	for version := range cachedLogsJSONLSchemaVersion + 2 {
+		data = fmt.Appendf(data, "{\"schema_version\":%d,\"kind\":\"run\",\"run\":{\"run_id\":%d}}\n", version, version+1)
+	}
+	require.NoError(t, os.WriteFile(path, data, 0o600))
 
 	runs, err := loadCachedLogsJSONL(path)
 
 	require.NoError(t, err)
 	require.Len(t, runs.runs, 1)
-	assert.Contains(t, runs.runs, int64(44))
-	assert.NotContains(t, runs.runs, int64(42))
-	assert.NotContains(t, runs.runs, int64(43))
-	assert.NotContains(t, runs.runs, int64(41))
+	assert.Contains(t, runs.runs, int64(cachedLogsJSONLSchemaVersion+1))
 }
 
 func TestCachedLogsJSONLStoresRateLimitAsOneLine(t *testing.T) {

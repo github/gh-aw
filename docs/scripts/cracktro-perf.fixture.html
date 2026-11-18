@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Cracktro perf guard fixture</title></head>
+  <body>
+    <!-- Runtime-only deck for cracktro-perf.test.mjs; ?bad=interval,raf,anim,dom,cpu turns on one runaway behaviour per slide. -->
+    <script src="../public/cracktro/runtime.js"></script>
+    <script>
+      const bad = new Set((new URLSearchParams(location.search).get("bad") || "").split(","));
+      window.CracktroDeck.create({
+        slides: ({ h, letters }) => {
+          const slide = (title, extra = {}) => ({ group: "part", notes: "", el: h("section", { class: "slide" }, h("h2", {}, letters(title))), ...extra });
+          return [
+            slide("Calm"),
+            slide("Leaky interval", { enter: () => bad.has("interval") && setInterval(() => {}, 20) }),
+            slide("Endless raf", { enter: () => { if (bad.has("raf")) { const loop = () => requestAnimationFrame(loop); loop(); } } }),
+            slide("Spinner", { enter() { if (bad.has("anim")) this.el.querySelector("h2").animate([{ opacity: 1 }, { opacity: 0.5 }], { duration: 400, iterations: Infinity }); } }),
+            slide("Grower", { tick() { if (bad.has("dom")) this.el.append(h("i"), h("i"), h("i"), h("i")); } }),
+            slide("Burner", { tick() { if (bad.has("cpu")) for (const end = performance.now() + 20; performance.now() < end; ); } }),
+            slide("Rest"),
+          ];
+        },
+        bands: { part: ["Fixture", "Perf guard"] },
+        last: null,
+      });
+    </script>
+  </body>
+</html>

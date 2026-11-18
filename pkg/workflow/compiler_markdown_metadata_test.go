@@ -110,6 +110,9 @@ func TestCompilerEmbedsLargeActivationMarkdownMetadata(t *testing.T) {
 	chunks := 0
 	for _, step := range document.Jobs["activation"].Steps {
 		if !strings.HasPrefix(step.Run, "printf '%s' '") {
+			if chunks == 0 {
+				continue
+			}
 			break
 		}
 		require.Less(t, len(step.Run), 21000)

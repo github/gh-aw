@@ -1623,12 +1623,12 @@
               }
             },
             "schedule": {
-              "description": "Scheduled trigger events using fuzzy schedules or standard cron expressions. Supports shorthand string notation (e.g., 'daily', 'daily around 2pm') or array of schedule objects. Fuzzy schedules automatically distribute execution times to prevent load spikes.",
+              "description": "Scheduled trigger events using fuzzy schedules or standard cron expressions. Supports shorthand string notation (e.g., 'daily', 'daily around 2pm', 'every 2 days', 'every 2w', 'every 2mo') or array of schedule objects. Fuzzy schedules automatically distribute execution times to prevent load spikes; day, week, and month intervals also scatter times, and month intervals scatter the day of month.",
               "oneOf": [
                 {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Shorthand schedule string using fuzzy or cron format. Examples: 'daily', 'daily around 14:00', 'daily between 9:00 and 17:00', 'weekly', 'weekly on monday', 'weekly on friday around 5pm', 'hourly', 'every 2h', 'every 10 minutes', '0 9 * * 1'. Fuzzy schedules distribute execution times to prevent load spikes. For fixed times, use standard cron syntax. Minimum interval is 5 minutes."
+                  "description": "Shorthand schedule string using fuzzy or cron format. Examples: 'daily', 'daily around 14:00', 'daily between 9:00 and 17:00', 'weekly', 'weekly on monday', 'weekly on friday around 5pm', 'hourly', 'every 2h', 'every 10 minutes', 'every 2 days', 'every 2w', 'every 2mo', '0 9 * * 1'. Fuzzy schedules distribute execution times to prevent load spikes; day, week, and month intervals scatter execution times, and month intervals also scatter the day of month. For fixed times, use standard cron syntax. Minimum interval is 5 minutes."
                 },
                 {
                   "type": "array",
@@ -1639,7 +1639,7 @@
                     "properties": {
                       "cron": {
                         "type": "string",
-                        "description": "Cron expression using standard format (e.g., '0 9 * * 1') or fuzzy format (e.g., 'daily', 'daily around 14:00', 'daily between 9:00 and 17:00', 'weekly', 'weekly on monday', 'weekly on friday around 5pm', 'hourly', 'every 2h', 'every 10 minutes'). Fuzzy formats support: daily/weekly schedules with optional time windows, hourly intervals with scattered minutes, interval schedules (minimum 5 minutes), short duration units (m/h/d/w), and UTC timezone offsets (utc+N or utc+HH:MM)."
+                        "description": "Cron expression using standard format (e.g., '0 9 * * 1') or fuzzy format (e.g., 'daily', 'daily around 14:00', 'daily between 9:00 and 17:00', 'weekly', 'weekly on monday', 'weekly on friday around 5pm', 'hourly', 'every 2h', 'every 10 minutes', 'every 2 days', 'every 2w', 'every 2mo'). Fuzzy formats support: daily/weekly schedules with optional time windows, hourly intervals with scattered minutes, day/week/month intervals with scattered execution times (month intervals also scatter the day of month), interval schedules (minimum 5 minutes), short duration units (m/h/d/w/mo), and UTC timezone offsets (utc+N or utc+HH:MM)."
                       },
                       "timezone": {
                         "type": "string",
@@ -2853,7 +2853,7 @@
             "admission": {
               "type": "boolean",
               "default": false,
-              "description": "Enable admission and conclusion_admission jobs for this workflow. Also enabled when aw.json sets admission to true."
+              "description": "Generate admission steps in activation and conclusion. An explicit admission setting in aw.json takes precedence."
             },
             "stale-check": {
               "oneOf": [
