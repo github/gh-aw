@@ -1,4 +1,4 @@
-const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, readLocalMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
+const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, removeDocumentFrontmatter, readLocalMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
 
 it("discards inline skill descriptions without requiring metadata or interpreting YAML", () => {
   installMarkdownMetadata({ version: 2, records: [] });
@@ -139,6 +139,18 @@ describe("compiler-owned Markdown metadata", () => {
   it("does not interpret ordinary Markdown separators as document metadata", () => {
     const content = "Introduction\n---\nExample prose, not YAML\n---\nConclusion";
     expect(transformMarkdownContent(content, text => text.replace("Example", "Rendered"))).toBe("Introduction\n---\nRendered prose, not YAML\n---\nConclusion");
+  });
+
+  it.each([
+    ["---\non: workflow_dispatch\n---\nBody\n", "Body\n"],
+    ["\uFEFF---\r\non: workflow_dispatch\r\n---\r\nBody\r\n", "Body\r\n"],
+    ["Introduction\n---\nExample prose, not YAML\n---\nConclusion", "Introduction\n---\nExample prose, not YAML\n---\nConclusion"],
+  ])("removes only document frontmatter from %j", (content, expected) => {
+    expect(removeDocumentFrontmatter(content)).toBe(expected);
+  });
+
+  it("rejects unterminated document frontmatter when removing it", () => {
+    expect(() => removeDocumentFrontmatter("---\non: workflow_dispatch\nBody")).toThrow("unterminated frontmatter");
   });
 
   it.each(["", "Introduction\n", "Introduction\r\n"])("recognizes an inline artifact at a heading boundary after %j", prefix => {

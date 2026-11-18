@@ -9,7 +9,7 @@ const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 const { resolveRuntimeImportFilePath, assertRuntimeImportRealPathWithinBase, resolveRuntimeImportKey, removeXMLComments } = require("./runtime_import.cjs");
 const { createLiteralValues, literalFileKey, writeLiteralState } = require("./prompt_literal_values.cjs");
 const { bindAuthorExpressions } = require("./author_prompt.cjs");
-const { transformMarkdownContent } = require("./markdown_metadata.cjs");
+const { removeDocumentFrontmatter, transformMarkdownContent } = require("./markdown_metadata.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
@@ -122,7 +122,7 @@ function readAuthorPrompt(filename, env, bindings, protectValue, priorContent) {
   const { normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filename, workspaceDir);
   assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFolder, filename);
   let content = fs.readFileSync(normalizedPath, "utf8");
-  content = transformMarkdownContent(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""), removeXMLComments);
+  content = transformMarkdownContent(removeDocumentFrontmatter(content), removeXMLComments);
   // Body imports promoted into earlier compiler chunks must not run twice.
   const importPattern = /\{\{#(?:runtime-import|import)\??(?:[ \t]+|[ \t]*:[ \t]*)([^{}]+)\}\}/g;
   const importKey = (/** @type {string} */ target) => {

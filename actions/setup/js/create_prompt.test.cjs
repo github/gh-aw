@@ -62,6 +62,18 @@ describe("create_prompt", () => {
     expect(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8")).not.toContain("Read the requested file.");
   });
 
+  it.each([
+    ["\uFEFF---\r\non: workflow_dispatch\r\n---\r\nBody\r\n", "Body\r\n"],
+    ["Introduction\n---\nExample prose, not YAML\n---\nConclusion", "Introduction\n---\nExample prose, not YAML\n---\nConclusion\n"],
+  ])("removes only author document frontmatter during rendering", (content, expected) => {
+    const workflows = path.join(tempDir, ".github/workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    const filename = path.join(workflows, "author.md");
+    fs.writeFileSync(filename, content);
+
+    expect(renderPrompt({ items: [{ author_file: ".github/workflows/author.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toBe(expected);
+  });
+
   it("renders shell and JavaScript injection payloads byte for byte as data", () => {
     const payloads = [
       "$(touch /tmp/gh-aw-command-substitution)",
