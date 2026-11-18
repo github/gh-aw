@@ -56,7 +56,15 @@ func valueGitHubJSON(ctx context.Context, host, endpoint string, target any, fie
 	return nil
 }
 
-func collectValueOutputs(ctx context.Context, definition valueMeasurementDefinition) ([]valueOutput, error) {
+func collectValueOutputs(ctx context.Context, definition valueMeasurementDefinition, recipes ...*valueRecipe) ([]valueOutput, error) {
+	var recipe *valueRecipe
+	if len(recipes) > 0 {
+		recipe = recipes[0]
+	}
+	query := fmt.Sprintf(`q=repo:%s is:pr "workflow_id: %s" in:body`, definition.Repository, definition.Workflow)
+	if recipe != nil && recipe.Author != "" {
+		query += " author:" + recipe.Author
+	}
 	outputs := []valueOutput{}
 	seen := make(map[int]bool)
 	total := -1
@@ -67,7 +75,7 @@ func collectValueOutputs(ctx context.Context, definition valueMeasurementDefinit
 			Items      []valuePullRequest `json:"items"`
 		}
 		err := valueGitHubJSON(ctx, definition.Host, "search/issues", &response,
-			"-f", fmt.Sprintf(`q=repo:%s is:pr "workflow_id: %s" in:body`, definition.Repository, definition.Workflow),
+			"-f", query,
 			"-f", "per_page=100", "-f", fmt.Sprintf("page=%d", page), "-f", "sort=created", "-f", "order=asc")
 		if err != nil {
 			return nil, err
@@ -77,6 +85,9 @@ func collectValueOutputs(ctx context.Context, definition valueMeasurementDefinit
 		}
 		total = response.TotalCount
 		for _, item := range response.Items {
+			if recipe != nil && recipe.AuthorLogin != "" && item.User.Login != recipe.AuthorLogin {
+				return nil, fmt.Errorf("PR %d does not match recipe author_login", item.Number)
+			}
 			if seen[item.Number] {
 				return nil, fmt.Errorf("PR %d has duplicate or invalid producer evidence", item.Number)
 			}

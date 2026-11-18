@@ -1055,14 +1055,16 @@ measurements; missing functions leave value unavailable, not zero.
 gh aw value weekly-research --repo owner/repo --json
 gh aw value docs-updater --value-function value.json --json
 gh aw value schema-feature-coverage --start 2026-03-22 --end 2026-11-17
+gh aw value schema-feature-coverage --recipe .github/aw/value/schema-feature-coverage.slides.json --json
 ```
 
-**Options:** `--start`, `--end`, `--ref`, `--logs-dir`, `--repo/-r`, `--value-function`, `--timeout`, `--json/-j`
+**Options:** `--start`, `--end`, `--ref`, `--logs-dir`, `--repo/-r`, `--value-function`, `--recipe`, `--timeout`, `--json/-j`
 
 Dates select 12:00 UTC snapshots; end defaults to yesterday and start to 30 days
-before end. The operational-value-designer skill authors reviewed functions in
-`.github/aw/value/WORKFLOW.json`; the CLI evaluates them in the
-restricted grader worker over selected repository files. Native delivery and
+before end. The operational-value-designer skill authors versioned definitions in
+`.github/aw/value/WORKFLOW.json`, selecting named Go evaluators over repository
+snapshots; no JavaScript or query runtime is started. `--recipe` fixes dates
+and inspected batch/witness windows for replay. Native delivery and
 adoption do not depend on these functions. PR attribution requires exact native
 human adoption, an isolated merge, and full seven-day file survival. Missing
 proof remains unavailable. The command neither fetches history nor dispatches

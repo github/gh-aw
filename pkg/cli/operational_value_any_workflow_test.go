@@ -52,116 +52,55 @@ func TestOperationalValueAnyWorkflowWithoutMeasurement(t *testing.T) {
 	require.NoError(t, renderOperationalValueReport(&output, nil, report))
 	assert.Contains(t, output.String(), "not configured")
 	assert.Contains(t, output.String(), "1 delivery fallback")
-	assert.Contains(t, output.String(), "measurement_not_configured")
 	foreign, err := resolveValueWorkflow("other-workflow", "acme/repo")
 	require.NoError(t, err)
 	missing := newOperationalValueReport(foreign, report.Start, report.End, report.ObservedAt, map[string]lifecycle.Record{record.ID: record})
-	assert.Nil(t, missing.Lifecycle.Delivered, "another workflow must not establish delivery or zero")
+	assert.Nil(t, missing.Lifecycle.Delivered)
 	assert.Nil(t, missing.Lifecycle.Adoption)
-	assert.Equal(t, "unavailable", missing.Lifecycle.Coverage)
 }
 
-func TestOperationalValueSnapshotFunction(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node unavailable")
-	}
+func TestOperationalValueNativeDefinition(t *testing.T) {
 	git, commit := valueTestGit(t)
 	before := commit("2026-09-20T12:00:00Z", map[string]string{
-		"metrics/value.json": "{\"covered\":1.25}\n",
-		"unselected.txt":     "not available to the value function",
+		"metrics/schema.json": `{"properties":{"a":{},"b":{},"c":{}}}`,
+		"examples[1]/base.md": "a:\n  b:\n", "unselected/demo.md": "c:\n",
 	})
-	after := commit("2026-09-28T16:37:55Z", map[string]string{"metrics/value.json": "{\"covered\":3.75}\n"})
-	definition, err := resolveValueWorkflow("any-workflow", "github/gh-aw")
+	after := commit("2026-09-28T16:37:55Z", map[string]string{"examples[1]/nested/b.md": "```aw\nb:\n```\n"})
+	definition, err := resolveValueWorkflow("any-workflow", "acme/repo")
 	require.NoError(t, err)
 	config := valueFunctionConfig{
-		ID: "test-value-v1", Name: "Measured outcome", Unit: "units", Direction: "higher_is_better",
-		Paths: []string{"metrics"}, Parameters: map[string]any{"offset": 0.5},
-		Script: `if (typeof process !== "undefined" || typeof require !== "undefined" ||
-typeof fetch !== "undefined" || typeof Date !== "undefined" || typeof Math.random !== "undefined")
-  throw new Error("ambient authority exposed");
-if (!Object.isFrozen(snapshot.files) || Object.hasOwn(snapshot.files, "unselected.txt"))
-  throw new Error("snapshot boundary violated");
-const text = snapshot.files["metrics/value.json"];
-if (text === undefined) return null;
-if (!text.endsWith("\n")) throw new Error("file bytes changed");
-return JSON.parse(text).covered + parameters.offset;`,
+		Version: 1, ID: "test-coverage-v1", Name: "Documented fields", Unit: "fields",
+		Direction: "higher_is_better", Evaluator: schemaCoverageEvaluator,
+		Config: json.RawMessage(`{"schema":"metrics/schema.json","examples":["examples[1]"]}`),
 	}
 	path := filepath.Join(t.TempDir(), "value.json")
-	load := func() valueMeasurement {
-		t.Helper()
-		content, err := json.Marshal(config)
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, content, 0o600))
-		measurement, cleanup, err := loadScriptValueMeasurement(t.Context(), definition, path)
-		require.NoError(t, err)
-		t.Cleanup(cleanup)
-		return measurement
-	}
-	measurement := load()
+	content, err := json.Marshal(config)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, content, 0o600))
+	gitPath, err := exec.LookPath("git")
+	require.NoError(t, err)
+	bin := t.TempDir()
+	require.NoError(t, os.Symlink(gitPath, filepath.Join(bin, "git")))
+	t.Setenv("PATH", bin) // Neither Node nor a query runtime is available.
+	measurement, err := loadNativeValueMeasurement(definition, path)
+	require.NoError(t, err)
 	baseline, err := measurement.measure(git, before)
 	require.NoError(t, err)
 	measured, err := measurement.measure(git, after)
 	require.NoError(t, err)
 	repeated, err := measurement.measure(git, after)
 	require.NoError(t, err)
-	assert.Equal(t, measured.Value, repeated.Value)
-	assert.Equal(t, new(1.75), baseline.Value)
-	assert.Equal(t, new(4.25), measured.Value)
-	assert.Equal(t, new(2.5), measurement.change(baseline, measured).Value)
-	assert.Contains(t, measurement.definition().Digest, "sha256:")
-	assert.Nil(t, measurement.cohort(nil), "the shared pipeline must not require schema-coverage evidence")
-	tip := commit("2026-10-10T12:00:00Z", map[string]string{"unrelated.txt": "later history"})
-	merged := valueTestTime(t, "2026-09-28T16:37:55Z")
-	output := valueOutput{
-		PR: 1, RunID: 42, URL: "https://github.com/github/gh-aw/pull/1", SHA: after,
-		Delivered: valueTestTime(t, "2026-09-28T07:00:00Z"), Merged: merged,
-	}
-	record, err := lifecycle.Delivered(lifecycle.Identity{
-		Host: definition.Host, Repository: definition.Repository, Workflow: definition.WorkflowPath,
-		RunID: output.RunID, RunAttempt: 1, InvocationID: "safe-outputs", EvidenceID: "pr-1",
-		Type: "create_pull_request", TargetURL: output.URL,
-	}, output.Delivered, output.Delivered, "safe-output-manifest")
-	require.NoError(t, err)
-	record, err = lifecycle.Observe(record, lifecycle.Observation{
-		State: "accepted", Signal: "merged", At: merged, ObservedAt: merged,
-		AcceptanceKind: "explicit_human", HumanVerified: true,
-	})
-	require.NoError(t, err)
-	window, err := buildValueWindow(git, measurement, tip, output, valueTestTime(t, "2026-10-06T12:00:00Z"),
-		[]valueOutput{output}, map[string]lifecycle.Record{record.ID: record})
-	require.NoError(t, err)
-	assert.Equal(t, "attributed", window.Status)
-	assert.Equal(t, new(2.5), window.Attributed, "custom functions must use the same native adoption and survival gates")
-	require.Len(t, window.Samples, 14)
-	config.Direction = "lower_is_better"
-	lower := load()
-	assert.Equal(t, new(-2.5), lower.change(baseline, measured).Value, "regressions must remain signed, not clamped")
-	assert.NotEqual(t, lower.definition().Digest, measurement.definition().Digest)
-	config.Script = "return null;"
-	missing := load()
-	snapshot, err := missing.measure(git, after)
-	require.NoError(t, err)
-	assert.Nil(t, snapshot.Value)
-	assert.Nil(t, missing.change(baseline, snapshot).Value)
-	config.Script = "return Promise.resolve(1);"
-	invalid := load()
-	_, err = invalid.measure(git, after)
-	require.ErrorContains(t, err, "synchronous")
-	config.Script = "return NaN;"
-	invalid = load()
-	_, err = invalid.measure(git, after)
-	require.ErrorContains(t, err, "finite numeric value")
-	config.Script = "throw new Error('x'.repeat(70000));"
-	invalid = load()
-	_, err = invalid.measure(git, after)
-	require.ErrorContains(t, err, "output exceeds 64 KiB")
+	assert.Equal(t, measured, repeated)
+	assert.Equal(t, new(1.0), baseline.Value)
+	assert.Equal(t, new(2.0), measured.Value)
+	assert.Equal(t, []string{"c"}, measured.Coverage.Missing)
+	assert.Equal(t, []string{"b"}, measurement.change(baseline, measured).Coverage.Closed)
+	assert.Equal(t, valueDeclarationDigest(content), measurement.definition().Digest)
+	assert.Equal(t, definition.WorkflowPath, measurement.definition().WorkflowPath)
+	assert.Equal(t, schemaCoverageEvaluator, measurement.definition().Evaluator)
 }
 
 func TestOperationalValueNumericOverflow(t *testing.T) {
-	measurement := scriptValueMeasurement{info: valueMeasurementDefinition{Direction: "higher_is_better"}}
-	change := measurement.change(valueSnapshot{Value: new(-math.MaxFloat64)}, valueSnapshot{Value: new(math.MaxFloat64)})
-	assert.Nil(t, change.Value)
-	assert.Equal(t, "non_finite_measurement_change", change.Reason)
 	report := operationalValueReport{Windows: []valueWindow{
 		{Attributed: new(math.MaxFloat64)}, {Attributed: new(math.MaxFloat64)},
 	}}
@@ -174,19 +113,27 @@ func TestOperationalValueFunctionDefinitionFailures(t *testing.T) {
 	require.NoError(t, err)
 	path := filepath.Join(t.TempDir(), "value.json")
 	for _, content := range []string{
-		`{"unexpected":"field"}`,
-		`{} {}`,
-		`{"id":"x","name":"x","unit":"items","direction":"wrong","paths":["a"],"script":"return 1;"}`,
-		`{"id":"x","name":"x","unit":"items","direction":"higher_is_better","paths":["../secret"],"script":"return 1;"}`,
+		`{"unexpected":"field"}`, `{} {}`, `null`, `[]`,
+		`{"version":2}`,
+		`{"version":1,"id":"x","name":"x","unit":"fields","direction":"higher_is_better","evaluator":"unsupported"}`,
+		`{"version":1,"id":"x","name":"x","unit":"fields","direction":"higher_is_better","evaluator":"schema-example-coverage-v1","config":{"schema":"../secret","examples":["examples"]}}`,
+		`{"version":1,"id":"x","name":"x","unit":"fields","direction":"lower_is_better","evaluator":"schema-example-coverage-v1"}`,
+		`{"version":1,"id":"x","name":"x","unit":"fields","direction":"higher_is_better","evaluator":"schema-example-coverage-v1","config":{"schema":"schema.json","examples":["examples"],"script":"return 1"}}`,
+		`{"version":1,"id":"x","name":"x","unit":"defects","direction":"sideways","evaluator":"json-number-v1","config":{"path":"value.json"}}`,
+		`{"version":1,"id":"x","name":"x","unit":"defects","direction":"lower_is_better","evaluator":"json-number-v1","config":{"path":"../value.json"}}`,
+		`{"version":1,"id":"x","name":"x","unit":"defects","direction":"lower_is_better","evaluator":"json-number-v1","config":{"path":"value.json","script":"return 1"}}`,
 	} {
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-		_, _, err := loadScriptValueMeasurement(t.Context(), definition, path)
-		require.Error(t, err)
+		_, err := loadNativeValueMeasurement(definition, path)
+		require.Error(t, err, content)
 	}
-	_, _, err = selectValueMeasurement(t.Context(), definition, "", filepath.Join(t.TempDir(), "missing.json"))
+	require.NoError(t, os.WriteFile(path, []byte(`{"script":"return 1;"}`), 0o600))
+	_, err = loadNativeValueMeasurement(definition, path)
+	require.ErrorContains(t, err, "no longer support script")
+	_, err = selectValueMeasurement(definition, "", filepath.Join(t.TempDir(), "missing.json"))
 	require.ErrorContains(t, err, "read value-function")
 	require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte(" "), 512*1024+1), 0o600))
-	_, _, err = loadScriptValueMeasurement(t.Context(), definition, path)
+	_, err = loadNativeValueMeasurement(definition, path)
 	require.ErrorContains(t, err, "512 KiB")
 	for _, repo := range []string{"acme", "../repo", "acme/..", "https://github.com/acme/repo"} {
 		_, err := resolveValueWorkflow("any-workflow", repo)

@@ -1,169 +1,108 @@
 ---
 name: operational-value-designer
-description: "Design longitudinal value functions or run-scoped graders. Usage: /operational-value-designer OWNER/REPO WORKFLOW [longitudinal|run-scoped]."
+description: "Design Go-native value definitions and report recipes from workflow intent; keep run-scoped grading separate. Usage: /operational-value-designer OWNER/REPO WORKFLOW [longitudinal|run-scoped]."
 argument-hint: "OWNER/REPO WORKFLOW [longitudinal|run-scoped]"
 metadata:
-  version: "3.1.0"
+  version: "4.0.0"
 ---
 
 # Operational Value Designer
 
-Design deterministic, evidence-based value functions.
+Turn workflow intent into a deterministic measurement contract, fixtures, and
+an executable `gh aw value` report recipe. Default to longitudinal reporting.
+Only the measurement varies by workflow; never redesign delivery or adoption.
+Work in the workflow owner's repository, not necessarily `github/gh-aw`.
+Definitions, recipes, and fixtures belong there; gh-aw is an installed tool.
 
-## Route first
+## Route and inspect
 
-For slides, longitudinal value, or `gh aw value`, read
-[longitudinal-report.md](references/longitudinal-report.md) and author the
-snapshot function. Keep native delivery/adoption shared. Never substitute a
-run-scoped grader for longitudinal value.
+- For longitudinal reports, slides, or `gh aw value`, read
+  [longitudinal-report.md](references/longitudinal-report.md).
+- For recorded-session grading, read [run-scoped.md](references/run-scoped.md).
+  Prefer the target's existing Go graders or supported session queries. The
+  separate `graders.operational-value.script` contract is retained for existing
+  custom session graders only; do not introduce JS execution into a Go server.
+- For the schema-feature slide replay, use the checked-in definition
+  `.github/aw/value/schema-feature-coverage.json` and recipe
+  `.github/aw/value/schema-feature-coverage.slides.json`. Load their contents and
+  the longitudinal reference before changing either.
 
-For sessions or `graders.operational-value.script`, use the contract below.
-Ask first if the boundary is unclear.
+Inspect the exact workflow, implementation, and representative evidence first.
+Confirm supported evaluator IDs, configuration, query syntax, and evidence
+scopes in the installed runtime, not by assuming the owner has gh-aw's source.
+Never invent a declaration or query the runtime
+cannot execute. Ask only when workflow intent or the measurement boundary is
+unclear, not for approval to execute an agreed plan.
 
-## Ownership and CAO handoff
+## Design contract
 
-gh-aw owns producer facts, run identity, restricted-JS run-scoped grading,
-artifacts/events, experiments, replay, and shared delivery/adoption/reversal/
-survival rules and provider refresh. Inspect these through `gh aw logs --delivery`,
-`gh aw logs --adoption`, or single-run `gh aw audit --adoption`.
-GitHub owns object disposition. githubnext/gh-cao may schedule refresh and consume
-gh-aw lifecycle records for longitudinal Value, storage/querying, and Dashboard
-Language; do not duplicate adoption classification in a consumer.
+Write a compact table: ultimate goal, eligible population, observable outcome,
+native unit, direction, evidence scope/inputs, zero/unavailable/error rules,
+population churn, confounders, and adoption boundary. Choose one primary metric.
 
-Every workflow exposes delivery/adoption without a campaign or CAO.
-Longitudinal attributed value additionally needs a declared measurement,
-attribution evidence, and complete post-adoption-window survival. CAO is an
-optional scheduler/consumer, not a lifecycle prerequisite.
+Prefer the furthest downstream independently verifiable outcome. Activity,
+output counts, agent claims, successful execution, and merges alone are not
+attributed value. Fix the eligible denominator before counting successes.
+Preserve subject identities when churn or set differences affect attribution.
+Missing, conflicting, incomplete, or inapplicable evidence is unavailable, not
+zero. Malformed declarations fail explicitly; do not silently substitute metrics.
 
-`safe_output.result` and `safe_output.execution` record run-time facts, not later
-adoption. `graders.operational-value.script` is optional run-scoped evidence; it
-is neither a prerequisite nor a substitute for longitudinal Value. A current
-survival snapshot does not prove complete-window survival or attributed value.
-Do not add CAO databases, campaign adapters, or dashboard logic to gh-aw.
+Keep three contracts distinct:
 
-## Reserved grader contract
+1. **Measurement:** versioned metadata plus a named Go evaluator and validated
+   parameters, or an already-supported query with an explicit evidence scope.
+2. **Recipe:** dates, sampling policy, producer discovery, cohort, and inspected
+   windows; separate descriptive batches from attributable individual outputs.
+3. **Evidence/result:** pinned input commits, definition/recipe digests,
+   versioned evaluator identity, observations, native adoption records,
+   collection clocks, unavailable reasons, and the attributed subtotal.
 
-Use the reserved `graders.operational-value.script` field:
+The current `gh aw value` supports native `json-number-v1` for independently
+measured, committed numeric evidence and `schema-example-coverage-v1` for
+textual schema examples, not arbitrary queries or JavaScript. An external
+workflow can use either with local paths, without registration in github/gh-aw.
+Unsupported evidence scopes require a reviewed native evaluator or projection;
+leave value unavailable until implemented.
+Do not stretch session semantics or fabricate session events for repository
+snapshots. Do not execute workflow code or introduce a second query language.
 
-```yaml
-graders:
-  operational-value:
-    name: Recorded comment application
-    description: Whether this run recorded a successful comment on the configured issue
-    unit: boolean
-    direction: higher_is_better
-    threshold: 1
-    config:
-      repository: OWNER/REPO
-      issueNumber: 123
-    script: |
-      const unavailable = [
-        {id: "comment-application-recorded", value: null},
-        {id: "recorded-comment-count", value: null},
-      ];
-      if (typeof config.repository !== "string" || !config.repository.trim() ||
-          !Number.isInteger(config.issueNumber) || config.issueNumber < 1) return unavailable;
-      const { eventsOfType } = helpers.createSessionLookups(session);
-      const comments = eventsOfType("safe_output.result")
-        .filter(({ data }) => data?.type === "add_comment");
-      if (!comments.length || comments.some(({ data }) =>
-          data?.status !== "success" ||
-          typeof data.repo !== "string" || !data.repo.trim() ||
-          !Number.isInteger(data.number) || data.number < 1 ||
-          typeof data.url !== "string" || !data.url)) return unavailable;
-      return [
-        {id: "comment-application-recorded", value:
-          comments.every(({ data }) =>
-            data.repo === config.repository && data.number === config.issueNumber) ? 1 : 0},
-        {id: "recorded-comment-count", value: comments.length},
-      ];
-```
+## Shared ownership and safety
 
-The synchronous body receives immutable `session`, `config`, and `helpers`.
-Reuse `helpers.createSessionLookups(session)` for statistics and lookups. The
-script runs in the downstream `graders` job, never conclusion.
+gh-aw owns producer identity, native lifecycle projection, Git sampling, exact
+parent comparison, attribution, reversal, and survival. GitHub owns object
+disposition. `safe_output.result` and `safe_output.execution` record execution,
+not later human acceptance. Inspect native evidence through `logs --delivery`,
+`logs --adoption`, or `audit RUN --adoption`.
 
-Return a nonempty ordered array of unique `{id,value}` objects. IDs must be
-nonempty strings; values must be finite numbers or `null`; extra fields are
-rejected. The first metric supplies top-level `operational-value.value`.
-Remaining metrics become diagnostics. The full ordered `metrics` array remains
-in schema-v2 grader artifacts and events. Keep IDs and order stable.
+Every workflow can report delivery/adoption without a value definition or CAO.
+githubnext/gh-cao may schedule refresh and consume records; do not duplicate
+adoption classification, databases, or Dashboard Language in this skill.
+Run-scoped scores cannot substitute for longitudinal value. A survival snapshot
+cannot prove complete-window survival. Current attribution supports exact
+human-adopted PR merges only; never attribute descriptive batches.
 
-Scripts are limited to 256 KiB. No file, module, process, network, environment,
-credential, clock, random, timer, or input-mutation access exists. Record evidence
-before publication; never return a Promise or the string `"unavailable"`.
+No report may fetch Git history, dispatch workflows, mutate lifecycle records,
+or rewrite past grader results. Surface missing history, unsupported evaluators,
+API visibility failures, and unavailable evidence explicitly.
 
-Other custom grader IDs still use `graders.<distinct-id>.script` and return one
-finite number, `null`, or an object with `value`; they do not use metric arrays.
+## Verify and deliver
 
-## Design procedure
+Test attained, observed zero, unavailable, malformed, inapplicable, and
+changed-population cases through the production evaluator. Repeat identical
+inputs and compare values and identities. Exercise no-adoption, shared-window,
+and touched-file gates. In the workflow owner's repository, use installed
+`gh aw value` and that repository's fixture checks; do not require gh-aw's Go
+source, tests, or Makefile. Run focused `TestOperationalValue` tests only when
+changing the gh-aw implementation itself, then its final validation gates.
 
-Before implementation, write a compact table with:
+Run the documented command against completed history when available. For the
+slides verify all weekly observations, output cohort, six selected windows,
+84 daily samples, stable cohort, and native five-field witness against the
+recorded baseline in the longitudinal reference. Never hard-code expected
+historical totals into measurement logic or treat synthetic fixtures as a live
+historical replay.
 
-- ultimate workflow goal and applicable run subject;
-- outcome ladder from durable effect back to execution activity;
-- strongest observable, attributable, independently verifiable run-time effect;
-- why stronger downstream effects are not knowable at the grading boundary;
-- primary metric, native unit, formula, direction, and threshold;
-- success, zero, `null`, noop, malformed-evidence, and inapplicable rules;
-- exact required unified-session observations;
-- contract adoption commit.
-
-Use the furthest downstream recorded effect that meets all three tests:
-observable now, attributable to this run or exact subject, and independently
-verifiable. Do not reward activity, output existence, token use, or an agent's
-claim of success. A request is not an applied mutation. A handler success is not
-human adoption. Silence does not prove correct restraint.
-
-Return `0` for observed non-attainment. Return `null` when applicability or
-required evidence is absent, malformed, truncated, conflicting, or incomplete.
-Correct restraint may score success only when recorded evidence proves an
-eligible opportunity existed and no action was the right result.
-
-For batches, derive one complete eligible denominator from one recorded snapshot.
-Apply intentional sampling before fixing the denominator. Do not shrink it for
-execution caps or missing work. Bind user-driven runs to the exact repository,
-issue, pull request, ref, URL, mode, or other declared target.
-
-Keep one primary metric. Add diagnostics only when they explain distinct,
-actionable failure modes. Preserve native scale; do not normalize a count,
-duration, amount, or signed quantity merely to fit `[0,1]`.
-
-Freeze intent, script, configuration, and semantic fixtures together. Corrections
-are prospective; never rewrite prior results. The workflow revision and script
-SHA-256 digest identify the adopted implementation.
-
-## Fixtures and verification
-
-Fixtures use `{name,session,config,expected}` and require `attained`, `missed`,
-`unavailable`, and `malformed`; add noop/inapplicable cases when relevant.
-`expected` is the exact ordered array. Test exact inline bytes in a temporary
-`.js` file; never maintain a second production source:
-
-```bash
-bash .github/skills/operational-value-designer/scripts/verify-operational-value-evaluator.sh \
-  /tmp/operational-value.js fixtures.json
-gh aw lint --rules grader-file-io --javascript-module \
-  /path/to/gh-aw/pkg/workflow/taint/javascript .github/workflows/WORKFLOW.md
-gh aw compile .github/workflows/WORKFLOW.md
-cat aw_session.jsonl | gh aw graders run WORKFLOW operational-value
-```
-
-The verifier runs the restricted runtime twice and checks identity, digest, and
-order. A missing native parser warning means unchecked lint coverage.
-
-`graders.operational-value.run` is removed. Invalid declarations must fail with
-migration guidance to `script`; never ignore or translate shell automatically.
-
-<!-- instruction-prefix-end -->
-
-## Generated job check
-
-Inspect the DAG: `graders` depends on successful conclusion, downloads
-`usage/aw_session.jsonl`, has no write/inference/App/OIDC credentials, and uploads
-the separate `graders` artifact.
-
-## Removed Bash migration
-
-Do not wrap shell file/API behavior in JavaScript. Record required evidence in
-the session, then rewrite the predicate as pure JavaScript.
+Present the definition, recipe, fixtures, command, and verification limits.
+Freeze semantics and evidence provenance together; corrections are prospective.
+Label retrospective exploration and partial attribution explicitly. Stop with
+missing evidence rather than relaxing gates or claiming reproduction.

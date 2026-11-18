@@ -93,9 +93,14 @@ Old flags, selectors, field names, and metric references are not aliases.
 `value WORKFLOW` consumes these same retained native records and
 summary projections for any workflow; value functions MUST NOT replace the
 delivery/adoption classifier. Missing measurement definitions leave value
-unavailable without suppressing lifecycle evidence. Workflow-specific snapshot
-functions run in the existing restricted JavaScript worker over explicitly
-selected Git file contents, never in conclusion or with credentials/network.
+unavailable without suppressing lifecycle evidence. Versioned measurement
+definitions select named Go evaluators over immutable Git snapshots; the report
+MUST NOT launch JavaScript, execute workflow code, or silently fall back to
+another evaluator. Unsupported query/evaluator declarations fail explicitly.
+Recipes fix discovery/cohort and inspected-window policies separately from
+measurement semantics. Descriptive batches MUST NOT acquire attributed value.
+Reports retain evaluator identity, declaration digests, resolved Git ref, and
+collected evidence; live API reads are not frozen historical evidence replay.
 The reporting command MUST NOT mutate lifecycle records or historical graders.
 PR attribution additionally requires exact native human adoption, an isolated
 merge, and complete-window Git file survival; other output types retain their

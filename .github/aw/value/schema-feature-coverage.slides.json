@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "schema-coverage-slides-2026-11-17",
+  "repository": "github.com/github/gh-aw",
+  "workflow": "schema-feature-coverage",
+  "start": "2026-03-22",
+  "end": "2026-11-17",
+  "author": "app/github-actions",
+  "author_login": "github-actions[bot]",
+  "early_batches_through": "2026-06-30",
+  "witnesses": [63949, 72028, 74061]
+}

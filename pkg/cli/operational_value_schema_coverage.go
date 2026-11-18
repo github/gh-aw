@@ -7,9 +7,14 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
-type schemaCoverageMeasurement struct{}
+type schemaCoverageMeasurement struct {
+	info   valueMeasurementDefinition
+	config schemaCoverageConfig
+}
 
 const schemaCoverageWorkflowPath = logsWorkflowsPathSegment + "schema-feature-coverage.lock.yml"
 
@@ -31,19 +36,33 @@ type valueCohort struct {
 	After  int      `json:"after"`
 }
 
-func (schemaCoverageMeasurement) definition() valueMeasurementDefinition {
+func (m schemaCoverageMeasurement) definition() valueMeasurementDefinition {
+	if m.info.ID != "" {
+		return m.info
+	}
 	return valueMeasurementDefinition{
 		ID: "schema-textual-coverage-v1", Name: "Schema fields with an example", Unit: "fields",
 		Host: "github.com", Repository: "github/gh-aw", Workflow: "schema-feature-coverage",
 		WorkflowPath: schemaCoverageWorkflowPath,
 		Direction:    "higher_is_better",
+		Evaluator:    schemaCoverageEvaluator,
 	}
 }
 
-func (schemaCoverageMeasurement) measure(git valueGit, sha string) (valueSnapshot, error) {
+func (m schemaCoverageMeasurement) settings() schemaCoverageConfig {
+	if m.config.Schema != "" {
+		return m.config
+	}
+	return schemaCoverageConfig{
+		Schema: "pkg/parser/schemas/main_workflow_schema.json", Examples: []string{constants.WorkflowsDir, "schema-demos"},
+	}
+}
+
+func (m schemaCoverageMeasurement) measure(git valueGit, sha string) (valueSnapshot, error) {
 	coverage := &valueCoverageSnapshot{Fields: []string{}, Missing: []string{}}
 	snapshot := valueSnapshot{SHA: sha, Coverage: coverage}
-	schema, err := git.output("show", sha+":pkg/parser/schemas/main_workflow_schema.json")
+	config := m.settings()
+	schema, err := git.output("show", sha+":"+config.Schema)
 	if err != nil {
 		return snapshot, err
 	}
@@ -60,7 +79,7 @@ func (schemaCoverageMeasurement) measure(git valueGit, sha string) (valueSnapsho
 		coverage.Fields = append(coverage.Fields, field)
 	}
 	slices.Sort(coverage.Fields)
-	lines, err := schemaCoverageLines(git, sha)
+	lines, err := schemaCoverageLines(git, sha, config.Examples)
 	if err != nil {
 		return snapshot, err
 	}
@@ -79,8 +98,12 @@ func (schemaCoverageMeasurement) measure(git valueGit, sha string) (valueSnapsho
 	return snapshot, nil
 }
 
-func schemaCoverageLines(git valueGit, sha string) (string, error) {
-	inventory, err := git.run("ls-tree", "-r", "--name-only", "-z", sha, "--", logsWorkflowsPathSegment, "schema-demos")
+func schemaCoverageLines(git valueGit, sha string, examples []string) (string, error) {
+	args := []string{"ls-tree", "-r", "--name-only", "-z", sha, "--"}
+	for _, path := range examples {
+		args = append(args, ":(literal)"+path)
+	}
+	inventory, err := git.run(args...)
 	if err != nil {
 		return "", err
 	}
@@ -94,8 +117,13 @@ func schemaCoverageLines(git valueGit, sha string) (string, error) {
 	if !found {
 		return "", fmt.Errorf("missing Markdown inventory at %s", sha)
 	}
-	lines, err := git.run("grep", "-h", "-o", "-E", "^[^:[:space:]]+:", sha, "--",
-		":(glob).github/workflows/**/*.md", ":(glob)schema-demos/**/*.md")
+	args = []string{"grep", "-h", "-o", "-E", "^[^:[:space:]]+:", sha, "--"}
+	for file := range strings.SplitSeq(inventory, "\x00") {
+		if strings.HasSuffix(file, ".md") {
+			args = append(args, ":(literal)"+file)
+		}
+	}
+	lines, err := git.run(args...)
 	var exit *exec.ExitError
 	if err != nil && (!errors.As(err, &exit) || exit.ExitCode() != 1) {
 		return "", fmt.Errorf("read Markdown inventory at %s: %w", sha, err)
@@ -147,7 +175,7 @@ func (schemaCoverageMeasurement) cohort(weekly []valueSnapshot) *valueCohort {
 }
 
 func (schemaCoverageMeasurement) format(snapshot valueSnapshot) string {
-	return fmt.Sprintf("%d/%d fields", snapshot.Coverage.Covered, len(snapshot.Coverage.Fields))
+	return formatValueSnapshot(snapshot, "fields")
 }
 
 func valueDifference(a, b []string) []string {

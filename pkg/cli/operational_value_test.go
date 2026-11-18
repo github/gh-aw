@@ -244,6 +244,13 @@ func TestOperationalValueReportAndSearch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, report.AttributedValue)
 	assert.Equal(t, "unavailable", report.AttributionCoverage)
+	recipe := &valueRecipe{Author: "app/github-actions", AuthorLogin: "github-actions[bot]"}
+	user := item["user"]
+	item["user"] = map[string]string{"login": "someone-else"}
+	writeResponse(search)
+	_, err = collectValueOutputs(t.Context(), measurement.definition(), recipe)
+	require.ErrorContains(t, err, "does not match recipe author_login")
+	item["user"] = user
 	for _, mutation := range []func(){
 		func() { item["body"] = "missing footer" },
 		func() { item["body"] = footer; search["incomplete_results"] = true },

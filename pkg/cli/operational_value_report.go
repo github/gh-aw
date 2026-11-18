@@ -30,6 +30,8 @@ type operationalValueReport struct {
 	AttributedValue     *float64                   `json:"attributed_value"`
 	AttributionCoverage string                     `json:"attribution_coverage"`
 	Limitations         []string                   `json:"limitations"`
+	Recipe              *valueRecipeEvidence       `json:"recipe,omitempty"`
+	InspectedWindows    []valueInspectedWindow     `json:"inspected_windows,omitempty"`
 }
 
 type valueWindow struct {

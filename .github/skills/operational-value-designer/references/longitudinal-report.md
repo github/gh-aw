@@ -1,83 +1,138 @@
-# Longitudinal value functions
+# Go-native longitudinal value reports
 
-Author the workflow-specific function consumed by `gh aw value`.
-Do not redesign delivery/adoption, infer human approval, or add a second report
-pipeline. The CLI reports native lifecycle evidence for any workflow even when
-no measurement exists. Missing value is unavailable, not zero.
+Author the measurement definition and report recipe consumed by `gh aw value`.
+The command runs named Go evaluators over Git snapshots, never JavaScript or an
+LLM. It does not currently execute session queries. Reuse a supported query only
+after the target runtime exposes the required evidence scope and contract.
+Do not turn snapshot observations into synthetic session events.
 
-Read the exact workflow intent, eligible subjects, constraints, and output
-semantics before choosing a metric. Inspect representative repository snapshots
-and native lifecycle records. If durable value is not observable in repository
-history, stop with the missing evidence and leave value unavailable; do not
-reward activity, output counts, agent claims, or fabricate an evaluator.
+## Any workflow repository
 
-## Define the contract
+Work in the workflow owner's full checkout with installed `gh aw`. Keep the
+definition, recipe, and semantic fixtures in that repository. No workflow
+registration, copy into github/gh-aw, or local Go development environment is
+required. Resolve all measurement paths relative to that checkout's Git root.
+The schema slides below are an example, not a required workflow or repository.
 
-Write a compact design table in the response: ultimate goal, eligible population,
-observable outcome, native unit, direction, required snapshot paths, zero/null
-rules, confounders, and adoption boundary. Choose one primary metric.
+## Measurement definition
 
-The shared pipeline owns producer linkage, native delivery/adoption, weekly
-snapshots, daily seven-day windows, exact-parent merge comparison, isolation
-from neighboring workflow merges, and full-window file survival. The current
-attribution adapter supports PR merges only. Other output types still expose
-native lifecycle evidence; do not invent a commit or attribute their value.
+Inspect workflow intent, eligible subjects, constraints, and output semantics.
+If durable value is not observable in repository history, report the missing
+evidence and leave value unavailable. Never reward activity or invent a proxy
+merely to produce a number.
 
-Only the value function varies by workflow. Create
-`.github/aw/value/WORKFLOW.json`:
+Save `.github/aw/value/WORKFLOW.json`, auto-detected by the command, or pass
+`--value-function PATH`. Supported native evaluators are `json-number-v1` and
+`schema-example-coverage-v1`. This example is the executable schema-feature
+definition, not a universal metric:
 
 ```json
 {
-  "id": "documented-apis-v1",
-  "name": "Documented public APIs",
-  "unit": "APIs",
+  "version": 1,
+  "id": "schema-textual-coverage-v1",
+  "name": "Schema fields with an example",
+  "unit": "fields",
   "direction": "higher_is_better",
-  "paths": ["metrics/api-coverage.json"],
-  "script": "const text = snapshot.files['metrics/api-coverage.json']; if (text === undefined) return null; const data = JSON.parse(text); return Number.isFinite(data.covered) ? data.covered : null;"
+  "evaluator": "schema-example-coverage-v1",
+  "config": {
+    "schema": "pkg/parser/schemas/main_workflow_schema.json",
+    "examples": [".github/workflows", "schema-demos"]
+  }
 }
 ```
 
-This example applies only when the metric file independently measures the
-workflow's actual goal. Do not copy its metric without inspecting the workflow.
+Paths are literal repository-relative paths, not globs; examples are 1–32
+directories. The evaluator reads top-level schema `.properties` keys and
+recursive Markdown files. A column-zero `<field>:` line counts, including
+fenced code blocks; indentation does not count. This proves textual presence,
+not compilation, correctness, fewer defects, or saved time.
 
-The synchronous script receives immutable `snapshot.sha`, `snapshot.files`
-(repository-relative names to exact UTF-8 contents), and optional `parameters`
-from the definition. Paths select literal tracked files or directories, not
-globs. Return one finite native-scale number or `null`. Use `0` only for observed
-non-attainment; missing, inapplicable, malformed, conflicting, or incomplete
-evidence must not become zero. Do not return an array or a grader result object.
-No file/module/process/network/environment/credential/clock/random/timer access
-or input mutation is available. Do not execute workflow code or shell commands.
+Observations preserve sorted field identities and missing/covered counts.
+An observed Markdown inventory with no matches is zero; an empty schema,
+absent inventory, malformed input, missing Git object, or invalid configuration
+fails explicitly, never as a successful zero. Merge change counts previously
+missing fields covered at merge only when the exact schema population is
+unchanged. Weekly stable-cohort diagnostics separate churn from improvement.
 
-Fix the eligible population in `parameters` when denominator churn could mimic
-improvement. Do not shrink it to observed successes. Bound inputs to 32 paths,
-512 regular files, and 8 MiB per snapshot; script limit is 256 KiB and definition
-limit is 512 KiB. Symlinks/submodules are unsupported. Narrow the measurement or
-report unavailable evidence rather than relaxing these limits.
+Definitions and recipes are strict JSON objects, at most 512 KiB. Unknown
+versions, fields, evaluator IDs, and legacy `script` declarations fail. No
+implicit JavaScript fallback or newly invented query syntax is permitted.
+For another objective with independently measured numeric evidence already
+committed in history, select `json-number-v1` with `config: {"path":
+"metrics/outcome.json"}`, the objective's native unit, and either direction.
+The evidence file is a strict object: `{"value":12}` or `{"value":null}`.
+Optionally include `"population":["subject-a","subject-b"]`; subjects must be
+unique nonempty strings. Population presence or membership changes make merge
+improvement unavailable. Higher-is-better improvement is after minus before;
+lower-is-better reverses the sign. Negative improvement remains negative.
+Missing or malformed files fail; explicit null is unavailable, never zero.
+This evaluator reads evidence, not code. Establish its independent source,
+measurement semantics, and provenance; do not commit an agent's self-score.
+An objective not observable through these inputs still needs a reviewed native
+evaluator/projection. Use lifecycle-only reporting until then.
 
-For higher-is-better metrics, merge improvement is `after - before`; for
-lower-is-better metrics it is `before - after`. Signed regressions remain
-negative; never normalize or clamp. The shared gates must pass before any
-improvement is attributed. This is event-aligned attribution, not proof of
-exclusive causation, correctness, or saved time.
+## Schema slides recipe
 
-## Validate and adopt
+Keep the definition separate from
+`.github/aw/value/schema-feature-coverage.slides.json`. The recipe fixes:
 
-Define attained, missed, unavailable, malformed, changed-population, and
-inapplicable fixtures using representative exact historical inputs. Run each
-twice through the same restricted runtime and check identical native values,
-`null`, or declared errors. Check both improvement directions and
-full-window/no-adoption gates.
-For local runtime work, use the focused `TestOperationalValue` CLI tests.
+- the cohort/snapshot range, 22 March–17 November 2026 at 12:00 UTC;
+- the original `app/github-actions` search author and verified
+  `github-actions[bot]` login;
+- same-day early merge batches through 30 June;
+- individual witnesses 63949, 72028, and 74061.
 
-Run `gh aw value WORKFLOW --value-function PATH --start DATE --end DATE --json`
-against completed history and native records. Verify the pinned commit, exact
-file bytes, function definition digest, units, daily samples, and unavailable
-reasons. Never dispatch a workflow to validate the function.
+Weekly sampling is every seven days plus the final cutoff. All merges remain
+visible in `windows`; `inspected_windows` selects the six slide rows. Batch
+samples use the first merge's seven pre samples and the last merge's seven post
+samples; the before observation is the first parent's, and end is seven days
+after the last merge. Closed/retired field sets are deduplicated across members.
+Batches remain descriptive and have no attributed value. Witnesses use the
+same shared native adoption/isolation/survival gates as every other report.
+Missing witnesses fail rather than silently dropping a row.
 
-Present the definition and fixtures for review before adopting it. Freeze intent,
-inputs, parameters, metric semantics, and fixtures together; the report records
-the exact definition SHA-256. Corrections are prospective. Label historical
-exploration as retrospective and never rewrite old reports, sessions, or grader
-results. Keep `graders.operational-value.script` separate: it measures recorded
-run evidence and cannot substitute for this longitudinal function.
+```bash
+printf '%s\n' 36389625388 | gh aw logs --stdin --repo github/gh-aw --adoption --output .github/aw/logs
+gh aw value schema-feature-coverage \
+  --value-function .github/aw/value/schema-feature-coverage.json \
+  --recipe .github/aw/value/schema-feature-coverage.slides.json --json
+```
+
+Use a full checkout with a local `origin/main` covering the cutoff. The report
+does not fetch or dispatch. `--ref` may select a retained full commit SHA.
+Do not combine a recipe with `--start`/`--end`; edit a separately versioned
+recipe for another period.
+
+The 17 November slide baseline is 36 weekly observations (32/45 → 75/75),
+39 stable fields (30 → 39 covered), 44 producer-linked PRs, 19 merges, and six
+inspected rows with 84 daily samples. Early batches: May 4 (2 PRs, 2 gaps),
+May 18 (8 PRs, 7 gaps, one retired field), June 15 (4 PRs, 4 gaps). Witnesses:
+September 28 (5 gaps), October 26 (1), November 2 (1).
+Only the September witness had complete native human-adoption proof, so five
+fields qualified. PR search totals are not complete native delivery totals.
+Verify evidence; never embed these baseline numbers as computed results.
+
+## Reproducibility and attribution
+
+The report records resolved Git SHA, evaluator ID/version, exact definition and
+recipe digests, PR/merge identities, native records, snapshots, and collection
+time. Built-in defaults identify the versioned evaluator but have no external
+definition digest. Save JSON reports and input lifecycle evidence. Live API
+observations can change; dates alone cannot reproduce a frozen historical
+report. Offline API-evidence replay is not currently implemented.
+
+The shared pipeline owns native delivery/adoption, exact-parent comparison,
+neighbor isolation, and complete seven-day file survival. Require matching
+explicit-human acceptance and untouched changed files through the full window;
+bot resolution, fallback delivery, or a survival snapshot cannot substitute.
+Other output types retain lifecycle evidence without fabricated value.
+
+Test through the same Go evaluator with exact inputs and repeat measurements.
+In an external workflow repository, use its semantic fixtures and the installed
+CLI on full historical inputs. Only contributors changing gh-aw itself run
+`go test ./pkg/cli -run '^TestOperationalValue' -count=1` in the gh-aw source
+checkout with configured caches.
+Compare every baseline layer, not just endpoint counts. A shallow checkout or
+missing native evidence blocks historical verification; state that limitation.
+Freeze definition, recipe, fixtures, and provenance together. Corrections are
+prospective; never rewrite sessions, past reports, or grader artifacts.

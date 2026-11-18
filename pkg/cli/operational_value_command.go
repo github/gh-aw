@@ -28,6 +28,7 @@ type operationalValueConfig struct {
 	LogsDir       string
 	ValueFunction string
 	Repo          string
+	Recipe        string
 }
 
 var valueWorkflowID = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
@@ -39,10 +40,15 @@ logs-dir/lifecycle.jsonl; collect or refresh them with logs --adoption first.
 Value is separate and workflow-specific. Without a value-function definition,
 delivery/adoption remain available and value is explicitly unavailable.
 Definitions are loaded from --value-function or
-.github/aw/value/WORKFLOW.json. A restricted, synchronous JavaScript
-function measures explicitly selected Git snapshot files, without network,
-process, environment, clock, random, or direct filesystem access.
+.github/aw/value/WORKFLOW.json. Versioned declarations select named Go
+evaluators over immutable Git snapshots. No JavaScript or query runtime is
+started. Unsupported evaluators fail explicitly.
+Keep definitions and recipes in the workflow owner's repository; no registration
+in github/gh-aw is required. json-number-v1 reads independently measured numeric
+evidence committed in history. schema-example-coverage-v1 measures textual
+schema-example coverage. Use native units, not normalized success scores.
 The slides' schema-feature-coverage example has a built-in value function.
+Use --recipe to reproduce its author filter and selected batch/witness windows.
 
 One shared pipeline handles weekly/daily sampling, native adoption joins,
 isolated merge windows, and full-window file survival. Attribution currently
@@ -67,37 +73,15 @@ func NewValueCommand() *cobra.Command {
   ` + string(constants.CLIExtensionPrefix) + ` value schema-feature-coverage --start 2026-03-22 --end 2026-11-17`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if timeout <= 0 {
-				return errors.New("--timeout must be greater than zero")
-			}
-			now := time.Now().UTC()
-			start, end, err := operationalValueDates(config, now)
-			if err != nil {
-				return err
-			}
-			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
-			defer cancel()
-			definition, err := resolveValueWorkflow(args[0], config.Repo) //nolint:uncheckedsliceindex // Cobra ExactArgs validates one argument.
-			if err != nil {
-				return err
-			}
-			report, measurement, err := collectOperationalValueReport(ctx, config, definition, start, end, now)
-			if err != nil {
-				return err
-			}
-			if jsonOutput {
-				encoder := json.NewEncoder(cmd.OutOrStdout())
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(report)
-			}
-			return renderOperationalValueReport(cmd.OutOrStdout(), measurement, report)
+			return executeValueReport(cmd, args, config, timeout, jsonOutput)
 		},
 	}
 	cmd.Flags().StringVar(&config.Start, "start", "", "First snapshot date (YYYY-MM-DD, 12:00 UTC; default 30 days before end)")
 	cmd.Flags().StringVar(&config.End, "end", "", "Final snapshot date (YYYY-MM-DD, 12:00 UTC; default yesterday)")
 	cmd.Flags().StringVar(&config.Ref, "ref", "origin/main", "Local main-history ref to replay (no fetch)")
 	cmd.Flags().StringVar(&config.LogsDir, "logs-dir", defaultLogsOutputDir, "Directory containing native lifecycle.jsonl adoption records")
-	cmd.Flags().StringVar(&config.ValueFunction, "value-function", "", "Workflow-specific JSON definition containing selected paths and a restricted JavaScript value function")
+	cmd.Flags().StringVar(&config.ValueFunction, "value-function", "", "Versioned JSON definition selecting a named Go value evaluator")
+	cmd.Flags().StringVar(&config.Recipe, "recipe", "", "Versioned JSON report recipe fixing dates, author filter, and inspected windows")
 	cmd.Flags().StringVarP(&config.Repo, "repo", "r", "", "Repository in [HOST/]OWNER/REPO format (defaults to the current repository)")
 	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output the report as JSON")
@@ -105,7 +89,44 @@ func NewValueCommand() *cobra.Command {
 	return cmd
 }
 
-func collectOperationalValueReport(ctx context.Context, config operationalValueConfig, definition valueMeasurementDefinition, start, end, now time.Time) (operationalValueReport, valueMeasurement, error) {
+func executeValueReport(cmd *cobra.Command, args []string, config operationalValueConfig, timeout time.Duration, jsonOutput bool) error {
+	if timeout <= 0 {
+		return errors.New("--timeout must be greater than zero")
+	}
+	ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
+	defer cancel()
+	definition, err := resolveValueWorkflow(args[0], config.Repo) //nolint:uncheckedsliceindex // Cobra ExactArgs validates one argument.
+	if err != nil {
+		return err
+	}
+	recipe, err := loadValueRecipe(config.Recipe, definition)
+	if err != nil {
+		return err
+	}
+	if recipe != nil {
+		if config.Start != "" || config.End != "" {
+			return errors.New("--recipe supplies start/end; do not combine it with --start or --end")
+		}
+		config.Start, config.End = recipe.Start, recipe.End
+	}
+	now := time.Now().UTC()
+	start, end, err := operationalValueDates(config, now)
+	if err != nil {
+		return err
+	}
+	report, measurement, err := collectOperationalValueReport(ctx, config, definition, start, end, now, recipe)
+	if err != nil {
+		return err
+	}
+	if jsonOutput {
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(report)
+	}
+	return renderOperationalValueReport(cmd.OutOrStdout(), measurement, report)
+}
+
+func collectOperationalValueReport(ctx context.Context, config operationalValueConfig, definition valueMeasurementDefinition, start, end, now time.Time, recipe *valueRecipe) (operationalValueReport, valueMeasurement, error) {
 	report := operationalValueReport{}
 	records, err := loadLifecycleRecords(filepath.Join(config.LogsDir, "lifecycle.jsonl"))
 	if err != nil {
@@ -115,13 +136,15 @@ func collectOperationalValueReport(ctx context.Context, config operationalValueC
 	if rootErr != nil && !errors.Is(rootErr, gitutil.ErrNotGitRepository) {
 		return report, nil, rootErr
 	}
-	measurement, cleanup, err := selectValueMeasurement(ctx, definition, root, config.ValueFunction)
+	measurement, err := selectValueMeasurement(definition, root, config.ValueFunction)
 	if err != nil {
 		return report, nil, err
 	}
-	defer cleanup()
 	report = newOperationalValueReport(definition, start, end, now, records)
 	if measurement == nil {
+		if recipe != nil {
+			return report, nil, errors.New("--recipe requires a configured native value evaluator")
+		}
 		return report, nil, nil
 	}
 	if rootErr != nil {
@@ -132,11 +155,14 @@ func collectOperationalValueReport(ctx context.Context, config operationalValueC
 	if err != nil {
 		return report, nil, err
 	}
-	outputs, err := collectValueOutputs(ctx, definition)
+	outputs, err := collectValueOutputs(ctx, definition, recipe)
 	if err != nil {
 		return report, nil, err
 	}
 	report, err = buildOperationalValueReport(git, measurement, tip, start, end, now, outputs, records)
+	if err == nil {
+		err = inspectValueRecipe(&report, recipe)
+	}
 	return report, measurement, err
 }
 
@@ -169,24 +195,24 @@ func resolveValueWorkflow(arg, repository string) (valueMeasurementDefinition, e
 	}, nil
 }
 
-func selectValueMeasurement(ctx context.Context, definition valueMeasurementDefinition, root, path string) (valueMeasurement, func(), error) {
+func selectValueMeasurement(definition valueMeasurementDefinition, root, path string) (valueMeasurement, error) {
 	explicit := path != ""
 	if path == "" && root != "" {
 		path = filepath.Join(root, ".github", "aw", "value", definition.Workflow+".json")
 	}
 	if path != "" {
 		if _, err := os.Stat(path); err == nil {
-			return loadScriptValueMeasurement(ctx, definition, path)
+			return loadNativeValueMeasurement(definition, path)
 		} else if explicit || !errors.Is(err, os.ErrNotExist) {
-			return nil, func() {}, fmt.Errorf("read value-function definition: %w", err)
+			return nil, fmt.Errorf("read value-function definition: %w", err)
 		}
 	}
 	builtin := schemaCoverageMeasurement{}
 	info := builtin.definition()
 	if definition.Host == info.Host && definition.Repository == info.Repository && definition.Workflow == info.Workflow {
-		return builtin, func() {}, nil
+		return builtin, nil
 	}
-	return nil, func() {}, nil
+	return nil, nil
 }
 
 func operationalValueDates(config operationalValueConfig, now time.Time) (time.Time, time.Time, error) {
@@ -252,6 +278,9 @@ func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, r
 }
 
 func renderOperationalValueWindows(out io.Writer, report operationalValueReport) error {
+	if report.Recipe != nil && len(report.InspectedWindows) != 0 {
+		return renderValueInspectedWindows(out, report)
+	}
 	type windowRow struct {
 		PR     int    `console:"header:Pull request"`
 		Merge  string `console:"header:Merge (UTC)"`
@@ -259,6 +288,7 @@ func renderOperationalValueWindows(out io.Writer, report operationalValueReport)
 		Status string `console:"header:Attribution"`
 		Reason string `console:"header:Evidence"`
 	}
+
 	rows := make([]windowRow, 0, len(report.Windows))
 	for _, window := range report.Windows {
 		change := "unavailable"
@@ -271,5 +301,30 @@ func renderOperationalValueWindows(out io.Writer, report operationalValueReport)
 		return err
 	}
 	_, err := fmt.Fprintln(out, "Retrospective measurement, not proof of saved time or exclusive causality. PR search is not complete native delivery history. Use --json for weekly and daily samples.")
+	return err
+}
+
+func renderValueInspectedWindows(out io.Writer, report operationalValueReport) error {
+	type inspectedRow struct {
+		Window     string `console:"header:Inspected window"`
+		Kind       string `console:"header:Kind"`
+		PRs        int    `console:"header:PRs"`
+		Before     string `console:"header:Before"`
+		After      string `console:"header:After"`
+		Attributed string `console:"header:Attributed value"`
+	}
+	rows := make([]inspectedRow, 0, len(report.InspectedWindows))
+	for _, window := range report.InspectedWindows {
+		attributed := "unavailable: " + window.Reason
+		if window.Attributed != nil {
+			attributed = fmt.Sprintf("%g %s", *window.Attributed, report.Measurement.Unit)
+		}
+		rows = append(rows, inspectedRow{window.Label, window.Kind, len(window.PRs),
+			formatValueSnapshot(window.Before, report.Measurement.Unit), formatValueSnapshot(window.After, report.Measurement.Unit), attributed})
+	}
+	if _, err := fmt.Fprint(out, console.RenderStructStdout(rows)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintln(out, "Inspected windows are a selected subset; batches are descriptive, not attributed. Use --json for all merge windows, provenance, and daily samples.")
 	return err
 }

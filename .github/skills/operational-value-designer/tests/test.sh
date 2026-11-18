@@ -9,15 +9,20 @@ trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 
 for text in \
     'graders.operational-value.script' \
+    'safe_output.result' \
+    'githubnext/gh-cao' \
+    'schema-example-coverage-v1'
+do
+    grep -Fq "$text" "$skill_dir/SKILL.md"
+done
+
+for text in \
     'nonempty ordered array of unique `{id,value}`' \
     'The first metric supplies top-level `operational-value.value`' \
-    'safe_output.outcome' \
-    'githubnext/gh-cao' \
-    'add-operational-value OWNER/REPO WORKFLOW-NAME' \
     'never ignore or translate shell automatically' \
     '256 KiB'
 do
-    grep -Fq "$text" "$skill_dir/SKILL.md"
+    grep -Fq "$text" "$skill_dir/references/run-scoped.md"
 done
 
 for guidance in \
@@ -31,7 +36,7 @@ do
     grep -Fq 'graders.operational-value.script' "$repo_root/$guidance"
 done
 
-node - "$skill_dir/SKILL.md" "$work_dir/evaluator.js" <<'NODE'
+node - "$skill_dir/references/run-scoped.md" "$work_dir/evaluator.js" <<'NODE'
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const [skill, output] = process.argv.slice(2);
