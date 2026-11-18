@@ -39,7 +39,7 @@ Import a declaration, then select read capabilities and safe outputs independent
 This manually triggered consumer reads one approved Linear issue and stages at most
 one comment; it does not post the comment:
 
-```aw wrap title=".github/workflows/linear-review.md"
+```aw wrap
 ---
 on: workflow_dispatch
 engine: copilot

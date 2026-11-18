@@ -77,11 +77,12 @@ digits of SHA-256 over alias, NUL, trigger name, NUL, and the frozen plan digest
 The public selector remains the connector ID and declared trigger name.
 
 The [Connector Specification](/gh-aw/specs/connector-specification/) defines the
-declaration, selected reader, exact resource grant, endpoint, and credential
-authority represented by this metadata. This gateway contract governs source
-authentication, predicate evaluation, projection, and dispatch. A matched
-subscription or canonical URL MUST NOT be treated as a connector reader
-selection or provider-access grant.
+separately selected reader, exact resource grant, request endpoint, network
+approval, and credential authority required for provider access. This subscription
+metadata carries trigger rules and resource constraints, but grants none of those
+reader permissions. This gateway contract governs source authentication, predicate
+evaluation, projection, and dispatch. A matched subscription or canonical URL MUST
+NOT be treated as a connector reader selection or provider-access grant.
 
 Compiler conditions encode every original fixed match predicate and exact
 resource grant as equality checks on decoded JSON Pointer paths. Integer grants

@@ -449,7 +449,7 @@ defines how this declaration is represented and enforced at ingress:
 | --- | --- |
 | `verificationProfile`, `nativeEvents` | Frozen `verification_profile` and `native_events`; the receiver authenticates the enrolled source and original event before projection. Declaration alone is not source authentication. |
 | `match`, `resources` | Encoded equality conditions and projected matched literals; the receiver checks original evidence, while the destination validates the projection. A canonical URL or its origin does not prove resource membership. |
-| `types` | Selected activity values in the compiled subscription; the receiver forwards only activities established by the original delivery and selected by the declaration. Activity selection is not a resource grant. |
+| `types` | Frozen `connector.types` map of JSON Pointers to required primitive types; `ProjectEvent` validates the corresponding native event fields before projection. This is not an activity selection. |
 | `normalize`, URL constraints, `resourceOrigins` | Canonical projected resource URL and approved origins; these constrain normalization and identity, not connector request endpoints, network approval, or provider authorization. |
 | `when`, `filters`, `variants` | Versioned bounded source predicates evaluated by the receiver before projection; missing or ambiguous evidence is a nonmatch. |
 

@@ -101,7 +101,7 @@ Respond ==
   /\ pc = "respond"
   /\ \E status \in {"ok", "unauthorized", "redirect", "uncertain"},
         identity \in IDs, valid \in BOOLEAN :
-       /\ returnedID' = identity /\ evidenceOK' = valid
+       /\ returnedID' = identity /\ evidenceOK' = ((status = "ok") /\ valid)
        /\ authDenied' = (status = "unauthorized")
        /\ requests' = IF status = "unauthorized" /\ Mutation = "auth-retry"
                        THEN requests + 1 ELSE requests
