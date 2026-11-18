@@ -299,7 +299,7 @@ Parent workflow success does not imply successful delegation. `metrics.error_cou
 | `agentic_overkill_for_agentic` | The task may not require an agentic workflow |
 | `agentic_poor_agentic_control` | Agentic control signals were weak |
 | `agentic_partially_reducible` | Part of the task could use deterministic steps |
-| `agentic_model_downgrade_available` | A routine task may not need a high-capability model: use per-task [model routing](/gh-aw/reference/model-routing/) by changing `engine.model` (if set) or the top-level `model` to `router`, or setting `mode: auto` in an existing `engine.model-routing` block; use `router/economy` to cap routing at the lowest level. Also emitted for runs routed at a fixed `balanced` or `robust` mode. Runs routed at economy, or routed by `auto` to a higher level, emit no finding |
+| `agentic_model_downgrade_available` | A routine task may not need a high-capability model. Consider [per-task routing](/gh-aw/reference/model-routing/) with `model: router`, or use `model: router/economy` for a fixed economy level. The finding can also appear on runs using a fixed balanced or robust level. It does not appear for economy runs or when the router chose a higher level for the task. |
 | `agentic_delegated_context_present` | Delegated workflow context was preserved |
 
 The `agentic_poor_agentic_control` assessment uses the larger of reported control signals and counted friction occurrences. This avoids summing potentially overlapping sources, but can undercount distinct signals. Counted friction includes integrity-filtered responses: these indicate friction, not that the gateway control failed. A derived count covers only the available log sources.
