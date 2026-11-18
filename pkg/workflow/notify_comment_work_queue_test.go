@@ -105,6 +105,8 @@ func TestConclusionWorkQueueReferencesOnlyGeneratedSteps(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			data := &WorkflowData{
 				AdmissionEnabled: true,
+				FrontmatterHash:  strings.Repeat("a", 64),
+				BodyHash:         strings.Repeat("b", 64),
 				Tools:            map[string]any{"work-queue": tc.queue},
 				SafeOutputs: &SafeOutputsConfig{
 					NoOp:             &NoOpConfig{},
@@ -127,9 +129,10 @@ func TestConclusionWorkQueueReferencesOnlyGeneratedSteps(t *testing.T) {
 				require.Equal(t, !tc.participant, exists, key)
 			}
 			require.Equal(t, !tc.participant, strings.Contains(steps, "steps.report_failed_jobs.outputs.job_durations"))
-			require.Contains(t, job.Outputs, "admission_compact_session")
-			require.Contains(t, job.Outputs, "usage_artifact_id")
-			require.Contains(t, job.Outputs, "usage_artifact_retry_id")
+			require.NotContains(t, job.Outputs, "admission_compact_session")
+			require.NotContains(t, job.Outputs, "usage_artifact_id")
+			require.NotContains(t, job.Outputs, "usage_artifact_retry_id")
+			require.Contains(t, steps, "conclusion_admission.cjs")
 		})
 	}
 }

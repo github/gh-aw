@@ -81,7 +81,7 @@ func extractCallWorkflowPermissionImport(workflowName, markdownPath string) (*ca
 		if err != nil {
 			return nil, err
 		}
-		// A same-batch Markdown target gains isolated admission OIDC even when its
+		// A same-batch Markdown target gains admission OIDC even when its
 		// existing lock file predates admission support.
 		if fileResult.mdExists {
 			perms.Set(PermissionIdToken, PermissionWrite)

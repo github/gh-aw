@@ -20,14 +20,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAdmissionOptIn(t *testing.T) {
-	for _, repo := range []string{"", "false", "true"} {
+func TestAdmissionCompilationSetting(t *testing.T) {
+	var activationPermissions, conclusionPermissions string
+	for _, repo := range []string{"", "{}", "false", "true"} {
 		for _, workflow := range []string{"", "false", "true"} {
 			t.Run("repo="+repo+"/workflow="+workflow, func(t *testing.T) {
 				root := t.TempDir()
 				require.NoError(t, os.MkdirAll(filepath.Join(root, ".github", "workflows"), 0o755))
 				if repo != "" {
-					require.NoError(t, os.WriteFile(filepath.Join(root, RepoConfigFileName), []byte(`{"admission":`+repo+`}`), 0o600))
+					config := repo
+					if repo != "{}" {
+						config = `{"admission":` + repo + `}`
+					}
+					require.NoError(t, os.WriteFile(filepath.Join(root, RepoConfigFileName), []byte(config), 0o600))
 				}
 				compiler := NewCompiler(WithNoEmit(true))
 				compiler.gitRoot = root
@@ -35,11 +40,12 @@ func TestAdmissionOptIn(t *testing.T) {
 				if workflow != "" {
 					source += "  admission: " + workflow + "\n"
 				}
-				source += "---\nAdmission opt-in\n"
+				source += "---\nAdmission compilation setting\n"
 				data, err := compiler.ParseWorkflowString(source, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
-				enabled := repo == "true" || workflow == "true"
+				enabled := repo == "true" || (repo != "false" && workflow == "true")
 				require.Equal(t, enabled, data.AdmissionEnabled)
+				assert.Zero(t, compiler.GetWarningCount())
 				output, err := compiler.CompileToYAML(data, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
 				var header strings.Builder
@@ -57,29 +63,32 @@ func TestAdmissionOptIn(t *testing.T) {
 				roundtrip, err := ExtractGHAWManifestFromLockFile("# gh-aw-manifest: " + manifestJSON + "\n")
 				require.NoError(t, err)
 				assert.Equal(t, manifest, roundtrip)
-				for _, name := range []string{"admission", "conclusion_admission"} {
-					_, exists := compiler.jobManager.GetJob(name)
-					assert.Equal(t, enabled, exists, name)
-				}
+				_, admissionJob := compiler.jobManager.GetJob("admission")
+				assert.False(t, admissionJob)
+				_, callbackJob := compiler.jobManager.GetJob("conclusion_admission")
+				assert.False(t, callbackJob)
 				activation, exists := compiler.jobManager.GetJob("activation")
 				require.True(t, exists)
 				conclusion, exists := compiler.jobManager.GetJob("conclusion")
 				require.True(t, exists)
+				if activationPermissions == "" {
+					activationPermissions, conclusionPermissions = activation.Permissions, conclusion.Permissions
+				}
+				assert.Equal(t, activationPermissions, activation.Permissions, "admission controls code generation, not job permissions")
+				assert.Equal(t, conclusionPermissions, conclusion.Permissions, "admission controls code generation, not job permissions")
+				agent, exists := compiler.jobManager.GetJob("agent")
+				require.True(t, exists)
+				assert.NotContains(t, agent.Permissions, "id-token: write")
 				_, admissionOutput := activation.Outputs["admission-result"]
 				assert.Equal(t, enabled, admissionOutput)
-				_, compactOutput := conclusion.Outputs["admission_compact_session"]
-				assert.Equal(t, enabled, compactOutput)
-				assert.Equal(t, enabled, strings.Contains(strings.Join(conclusion.Steps, ""), "Prepare admission conclusion metadata"))
-				if enabled {
-					assert.Contains(t, activation.Needs, "admission")
-					assert.Contains(t, activation.If, admissionJobResultCondition)
-				} else {
-					assert.NotContains(t, output, "needs.admission.")
-					assert.NotContains(t, output, "needs.activation.outputs.admission-")
-					assert.NotContains(t, activation.Needs, "admission")
-					assert.NotContains(t, activation.Permissions, "id-token: write")
-					assert.NotContains(t, conclusion.Permissions, "id-token: write")
-				}
+				assert.NotContains(t, conclusion.Outputs, "admission_compact_session")
+				assert.Equal(t, enabled, strings.Contains(strings.Join(conclusion.Steps, ""), "Report admission conclusion"))
+				assert.Contains(t, activation.Permissions, "id-token: write")
+				assert.Contains(t, conclusion.Permissions, "id-token: write")
+				assert.Equal(t, enabled, strings.Contains(strings.Join(activation.Steps, ""), "activation_admission.cjs"))
+				assert.NotContains(t, output, "needs.admission.")
+				assert.Equal(t, enabled, strings.Contains(output, "needs.activation.outputs.admission-"))
+				assert.NotContains(t, activation.Needs, "admission")
 				var rendered map[string]any
 				require.NoError(t, yaml.Unmarshal([]byte(output), &rendered))
 				require.IsType(t, map[string]any{}, rendered["on"])
@@ -89,7 +98,7 @@ func TestAdmissionOptIn(t *testing.T) {
 	}
 }
 
-func TestAdmissionRejectsInvalidOptIn(t *testing.T) {
+func TestAdmissionRejectsInvalidSetting(t *testing.T) {
 	for _, value := range []string{`"true"`, "1", "{}", "[]"} {
 		t.Run(value, func(t *testing.T) {
 			source := "---\non:\n  workflow_dispatch:\n  admission: " + value + "\n---\nTest\n"
@@ -126,10 +135,10 @@ func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, admission, strings.Contains(string(lock), "needs.activation.outputs.admission-"))
 
-					for _, name := range []string{"admission", "conclusion_admission"} {
-						_, exists := compiler.jobManager.GetJob(name)
-						assert.Equal(t, admission, exists, name)
-					}
+					_, admissionJob := compiler.jobManager.GetJob("admission")
+					assert.False(t, admissionJob)
+					_, callbackJob := compiler.jobManager.GetJob("conclusion_admission")
+					assert.False(t, callbackJob)
 					activation, exists := compiler.jobManager.GetJob("activation")
 					require.True(t, exists)
 					conclusion, exists := compiler.jobManager.GetJob("conclusion")
@@ -143,14 +152,14 @@ func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
 						"GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS":            "admission-max-ai-credits-evals",
 					} {
 						if admission {
-							assert.Equal(t, "${{ needs.admission.outputs."+strings.TrimPrefix(output, "admission-")+" }}", activation.Outputs[output])
+							assert.Equal(t, "${{ steps.admission.outputs."+strings.TrimPrefix(output, "admission-")+" }}", activation.Outputs[output])
 						} else {
 							assert.NotContains(t, activation.Outputs, output)
 						}
 						assert.Equal(t, admission, strings.Contains(conclusionSteps, env+": ${{ needs.activation.outputs."+output+" }}"), env)
 					}
-					assert.Equal(t, admission, strings.Contains(conclusionSteps, "Prepare admission conclusion metadata"))
-					assert.Equal(t, admission, conclusion.Outputs["admission_compact_session"] != "")
+					assert.Equal(t, admission, strings.Contains(conclusionSteps, "Report admission conclusion"))
+					assert.NotContains(t, conclusion.Outputs, "admission_compact_session")
 
 					jobs := []string{"agent"}
 					if variant != "admission-only" {
@@ -321,62 +330,50 @@ func TestAdmissionRuntimeWiring(t *testing.T) {
 		"            await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);",
 	}, "\n"))
 	assert.Contains(t, yaml, admissionDailyAICFallbackIfExpr)
-	admission, exists := compiler.jobManager.GetJob("admission")
-	require.True(t, exists)
-	assert.Contains(t, admission.If, "vars.GH_AW_DEFAULT_ADMISSION_URL != ''")
-	assert.Contains(t, admission.Permissions, "id-token: write")
-	assert.NotContains(t, strings.Join(admission.Steps, ""), "create-github-app-token")
-	assert.NotContains(t, strings.Join(admission.Steps, ""), "daily-ai-credits-workflow-guardrail")
-	assert.NotContains(t, admission.If, "MAX_DAILY_AI_CREDITS")
+	_, exists := compiler.jobManager.GetJob("admission")
+	require.False(t, exists)
 	activation, exists := compiler.jobManager.GetJob("activation")
 	require.True(t, exists)
-	assert.Contains(t, activation.Needs, "admission")
-	assert.Contains(t, activation.If, "!cancelled()")
-	assert.Contains(t, activation.If, admissionJobResultCondition)
-	assert.NotContains(t, activation.Permissions, "id-token: write")
-	assert.Equal(t, "${{ needs.admission.outputs.result }}", activation.Env["GH_AW_ADMISSION_RESULT"])
-	assert.NotContains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
-	assert.Contains(t, strings.Join(activation.Steps, ""), "daily-ai-credits-workflow-guardrail")
+	assert.NotContains(t, activation.Needs, "admission")
+	assert.NotContains(t, yaml, "needs.admission.")
+	assert.NotContains(t, activation.If, "GH_AW_DEFAULT_ADMISSION_URL")
+	assert.Contains(t, activation.Permissions, "id-token: write")
+	assert.NotContains(t, activation.Env, "GH_AW_ADMISSION_RESULT")
+	activationSteps := strings.Join(activation.Steps, "")
+	assert.Contains(t, activationSteps, "id: admission\n        if: vars.GH_AW_DEFAULT_ADMISSION_URL != ''")
+	assert.Contains(t, activationSteps, "activation_admission.cjs")
+	assert.Contains(t, activationSteps, "daily-ai-credits-workflow-guardrail")
+	assert.Less(t, strings.Index(activationSteps, "activation_admission.cjs"), strings.Index(activationSteps, "daily-ai-credits-workflow-guardrail"))
 	conclusion, exists := compiler.jobManager.GetJob("conclusion")
 	require.True(t, exists)
-	assert.NotContains(t, conclusion.Permissions, "id-token: write")
+	assert.Contains(t, conclusion.Permissions, "id-token: write")
 	conclusionSteps := strings.Join(conclusion.Steps, "")
-	assert.NotContains(t, conclusionSteps, "conclusion_admission.cjs")
-	assert.Contains(t, conclusionSteps, "Prepare admission conclusion metadata")
-	assert.Contains(t, conclusionSteps, "readCompactUnifiedSession('/tmp/gh-aw/usage/aw_session.jsonl')")
-	assert.NotContains(t, conclusionSteps, "path.join(process.env.RUNNER_TEMP, 'gh-aw', 'usage'")
-	assert.Equal(t, "${{ steps.admission-conclusion-metadata.outputs.compact_session }}", conclusion.Outputs["admission_compact_session"])
-	assert.Equal(t, "${{ steps.upload-usage-artifact.outputs.artifact-id }}", conclusion.Outputs["usage_artifact_id"])
-	assert.Equal(t, "${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}", conclusion.Outputs["usage_artifact_retry_id"])
-	assert.Less(t, strings.Index(conclusionSteps, "Generate usage activity summary and unified session"), strings.Index(conclusionSteps, "Prepare admission conclusion metadata"))
-	assert.Less(t, strings.Index(conclusionSteps, "Prepare admission conclusion metadata"), strings.Index(conclusionSteps, "Upload usage artifact"))
+	assert.Contains(t, conclusionSteps, "conclusion_admission.cjs")
+	assert.NotContains(t, conclusionSteps, "Prepare admission conclusion metadata")
+	assert.NotContains(t, conclusionSteps, "GH_AW_ADMISSION_COMPACT_SESSION")
+	assert.NotContains(t, conclusion.Outputs, "admission_compact_session")
+	assert.NotContains(t, conclusion.Outputs, "usage_artifact_id")
+	assert.NotContains(t, conclusion.Outputs, "usage_artifact_retry_id")
+	assert.Less(t, strings.Index(conclusionSteps, "Generate usage activity summary and unified session"), strings.Index(conclusionSteps, "Upload usage artifact"))
 	assert.Greater(t, strings.Index(conclusionSteps, "Retry upload usage artifact"), strings.Index(conclusionSteps, "Upload usage artifact"))
-	conclusionAdmission, exists := compiler.jobManager.GetJob(string(constants.ConclusionAdmissionJobName))
-	require.True(t, exists)
-	assert.Equal(t, []string{"conclusion"}, conclusionAdmission.Needs)
-	assert.Equal(t, "always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''", conclusionAdmission.If)
-	assert.Contains(t, conclusionAdmission.Permissions, "id-token: write")
-	assert.Contains(t, conclusionAdmission.Permissions, "contents: read")
-	conclusionAdmissionSteps := strings.Join(conclusionAdmission.Steps, "")
-	assert.Contains(t, conclusionAdmissionSteps, "conclusion_admission.cjs")
-	assert.Contains(t, conclusionAdmissionSteps, "GH_AW_ADMISSION_COMPACT_SESSION: ${{ needs.conclusion.outputs.admission_compact_session }}")
-	assert.Contains(t, conclusionAdmissionSteps, "GH_AW_USAGE_ARTIFACT_ID: ${{ needs.conclusion.outputs.usage_artifact_id }}")
-	assert.Contains(t, conclusionAdmissionSteps, "GH_AW_USAGE_ARTIFACT_RETRY_ID: ${{ needs.conclusion.outputs.usage_artifact_retry_id }}")
-	assert.Contains(t, conclusionAdmissionSteps, "GH_AW_ADMISSION_WORKFLOW_HASH: \""+hashes[1]+":"+hashes[2]+"\"")
-	assert.NotContains(t, conclusionAdmissionSteps, "safe_outputs")
+	assert.Less(t, strings.Index(conclusionSteps, "Retry upload usage artifact"), strings.Index(conclusionSteps, "Report admission conclusion"))
+	assert.Contains(t, conclusionSteps, "GH_AW_USAGE_ARTIFACT_ID: ${{ steps.upload-usage-artifact.outputs.artifact-id }}")
+	assert.Contains(t, conclusionSteps, "GH_AW_USAGE_ARTIFACT_RETRY_ID: ${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}")
+	assert.Contains(t, conclusionSteps, "GH_AW_ADMISSION_WORKFLOW_HASH: \""+hashes[1]+":"+hashes[2]+"\"")
+	assert.Contains(t, conclusionSteps, "name: Report admission conclusion\n        if: always() && vars.GH_AW_DEFAULT_ADMISSION_URL != ''\n        continue-on-error: true\n        timeout-minutes: 2\n")
+	_, exists = compiler.jobManager.GetJob(string(constants.ConclusionAdmissionJobName))
+	require.False(t, exists)
 	for name, job := range compiler.jobManager.jobs {
-		if name == "admission" {
-			continue
-		}
 		if name == "activation" {
-			assert.Equal(t, "${{ needs.admission.outputs.max-ai-credits }}", job.Outputs["admission-max-ai-credits"])
+			assert.Equal(t, "${{ steps.admission.outputs.max-ai-credits }}", job.Outputs["admission-max-ai-credits"])
 		}
 		encoded, err := json.Marshal(job)
 		require.NoError(t, err)
-		for _, fragment := range []string{"steps.admission.outputs", "admission-aic", "admission_budget.cjs"} {
+		for _, fragment := range []string{"admission-aic", "admission_budget.cjs"} {
 			assert.NotContains(t, string(encoded), fragment, "job %s", name)
 		}
-		if name != string(constants.ConclusionAdmissionJobName) {
+		if name != "conclusion" && name != "activation" {
+			assert.NotContains(t, string(encoded), "steps.admission.outputs", "job %s", name)
 			assert.NotContains(t, string(encoded), "GH_AW_ADMISSION_WORKFLOW_HASH", "job %s", name)
 		}
 	}
@@ -394,21 +391,23 @@ func TestAdmissionRuntimeWiring(t *testing.T) {
 func TestAdmissionConclusionWorkQueueParticipant(t *testing.T) {
 	data := &WorkflowData{
 		AdmissionEnabled: true,
+		FrontmatterHash:  strings.Repeat("a", 64),
+		BodyHash:         strings.Repeat("b", 64),
 		Tools:            map[string]any{"work-queue": map[string]any{"worker": true}},
 		SafeOutputs:      &SafeOutputsConfig{},
 	}
 	job, err := NewCompiler().buildConclusionJob(data, "agent", []string{"safe_outputs"})
 	require.NoError(t, err)
 	require.NotNil(t, job)
-	assert.NotContains(t, job.Permissions, "id-token: write")
+	assert.Contains(t, job.Permissions, "id-token: write")
 	steps := strings.Join(job.Steps, "")
-	for _, name := range []string{"Generate usage activity summary and unified session", "Prepare admission conclusion metadata", "Upload usage artifact"} {
+	for _, name := range []string{"Generate usage activity summary and unified session", "Report admission conclusion", "Upload usage artifact"} {
 		assert.Equal(t, 1, strings.Count(steps, "name: "+name+"\n"))
 	}
-	assert.NotContains(t, steps, "Report admission conclusion")
 	assert.Less(t, strings.Index(steps, "reconcile_work_queue_run.cjs"), strings.Index(steps, "Generate usage activity summary and unified session"))
-	assert.Less(t, strings.Index(steps, "Generate usage activity summary and unified session"), strings.Index(steps, "Prepare admission conclusion metadata"))
+	assert.Less(t, strings.Index(steps, "Generate usage activity summary and unified session"), strings.Index(steps, "Upload usage artifact"))
 	assert.Greater(t, strings.Index(steps, "Retry upload usage artifact"), strings.Index(steps, "Upload usage artifact"))
+	assert.Less(t, strings.Index(steps, "Retry upload usage artifact"), strings.Index(steps, "Report admission conclusion"))
 }
 
 func TestAdmissionConclusionUploadOrdering(t *testing.T) {
@@ -447,37 +446,14 @@ func TestConclusionAdmissionRequiresValidWorkflowHashes(t *testing.T) {
 		{name: "uppercase hash", frontmatterHash: strings.Repeat("A", 64), bodyHash: strings.Repeat("b", 64)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewCompiler().buildConclusionAdmissionJob(&WorkflowData{
-				Name:            "test",
-				FrontmatterHash: tc.frontmatterHash,
-				BodyHash:        tc.bodyHash,
-			})
+			_, err := NewCompiler().buildConclusionJob(&WorkflowData{
+				Name:             "test",
+				AdmissionEnabled: true,
+				SafeOutputs:      &SafeOutputsConfig{},
+				FrontmatterHash:  tc.frontmatterHash,
+				BodyHash:         tc.bodyHash,
+			}, "agent", nil)
 			require.EqualError(t, err, "admission requires 64-character lowercase SHA-256 workflow hashes")
-		})
-	}
-}
-
-func TestAdmissionActivationDependencyConditions(t *testing.T) {
-	for _, condition := range []string{"", "github.event_name == 'push'", "always()"} {
-		t.Run(condition, func(t *testing.T) {
-			compiler := NewCompiler()
-			activation := &Job{If: condition, Needs: []string{"pre_activation", "select"}}
-			admission, err := compiler.buildAdmissionJob(&WorkflowData{
-				Name:            "test",
-				FrontmatterHash: strings.Repeat("a", 64),
-				BodyHash:        strings.Repeat("b", 64),
-			}, activation)
-			require.NoError(t, err)
-			assert.Equal(t, []string{"pre_activation", "select"}, admission.Needs)
-			assert.Contains(t, admission.If, "vars.GH_AW_DEFAULT_ADMISSION_URL != ''")
-			compiler.connectActivationAdmission(activation)
-			assert.Equal(t, []string{"pre_activation", "select", "admission"}, activation.Needs)
-			assert.Contains(t, activation.If, "!cancelled()")
-			assert.Contains(t, activation.If, admissionJobResultCondition)
-			if condition != "always()" {
-				assert.Contains(t, activation.If, "needs.pre_activation.result == 'success'")
-				assert.Contains(t, activation.If, "needs.select.result == 'success'")
-			}
 		})
 	}
 }
@@ -499,32 +475,56 @@ func TestAdmissionJobCannotBeCustomized(t *testing.T) {
 
 }
 
-func TestAdmissionSkipSafeDownstreamConditions(t *testing.T) {
-	compiler := NewCompiler()
-	compiler.jobManager.jobs = map[string]*Job{
-		"admission":  {Name: "admission", If: "vars.GH_AW_DEFAULT_ADMISSION_URL != ''"},
-		"activation": {Name: "activation", Needs: []string{"admission"}},
-		"agent":      {Name: "agent", Needs: []string{"activation", "custom"}, If: "needs.activation.outputs.daily_ai_credits_exceeded != 'true'"},
-		"custom":     {Name: "custom"},
-		"detection":  {Name: "detection", Needs: []string{"agent"}, If: "needs.agent.outputs.output != ''"},
-		"conclusion": {Name: "conclusion", Needs: []string{"agent"}, If: "always()"},
+func TestAdmissionActivationOrderingAndEligibility(t *testing.T) {
+	for _, admission := range []bool{false, true} {
+		t.Run(strconv.FormatBool(admission), func(t *testing.T) {
+			compiler := NewCompiler(WithNoEmit(true))
+			root := t.TempDir()
+			compiler.gitRoot = root
+			source := `---
+on:
+  admission: ` + strconv.FormatBool(admission) + `
+  pull_request:
+    types: [opened]
+  roles: [triage]
+jobs:
+  activation:
+    pre-steps:
+      - name: Author pre-step
+        run: echo author-pre-step
+    steps:
+      - name: Author step
+        run: echo author-step
+---
+Admission ordering
+`
+			data, err := compiler.ParseWorkflowString(source, filepath.Join(root, "workflow.md"))
+			require.NoError(t, err)
+			_, err = compiler.CompileToYAML(data, filepath.Join(root, "workflow.md"))
+			require.NoError(t, err)
+			activation, exists := compiler.jobManager.GetJob("activation")
+			require.True(t, exists)
+			assert.Equal(t, []string{"pre_activation"}, activation.Needs)
+			assert.Contains(t, activation.If, "needs.pre_activation.outputs.activated == 'true'")
+			assert.NotContains(t, activation.If, "admission")
+			assert.NotContains(t, activation.If, "cancelled()")
+			steps := strings.Join(activation.Steps, "")
+			if admission {
+				check := strings.Index(steps, "name: Check workflow admission")
+				require.NotEqual(t, -1, check)
+				assert.Less(t, strings.Index(steps, "id: setup"), check)
+				for _, later := range []string{"name: Author pre-step", "name: Author step", "id: daily-ai-credits-workflow-guardrail"} {
+					require.Contains(t, steps, later)
+					assert.Less(t, check, strings.Index(steps, later), later)
+				}
+			} else {
+				assert.NotContains(t, steps, "id: admission")
+			}
+			agent, exists := compiler.jobManager.GetJob("agent")
+			require.True(t, exists)
+			assert.NotContains(t, agent.Permissions, "id-token: write")
+		})
 	}
-	compiler.ensureAdmissionSkipSafeConditions()
-	assert.Equal(t, "vars.GH_AW_DEFAULT_ADMISSION_URL != ''", compiler.jobManager.jobs["admission"].If)
-	assert.Contains(t, compiler.jobManager.jobs["activation"].If, admissionJobResultCondition)
-	assert.NotContains(t, compiler.jobManager.jobs["activation"].If, "&& needs.admission.result == 'success'")
-	for _, name := range []string{"activation", "agent", "detection"} {
-		assert.Contains(t, compiler.jobManager.jobs[name].If, "!cancelled()")
-	}
-	agentCondition := compiler.jobManager.jobs["agent"].If
-	assert.Contains(t, agentCondition, "needs.activation.result == 'success'")
-	assert.Contains(t, agentCondition, "needs.custom.result == 'success'")
-	assert.Contains(t, agentCondition, "needs.activation.outputs.daily_ai_credits_exceeded != 'true'")
-	assert.Contains(t, compiler.jobManager.jobs["detection"].If, "needs.agent.result == 'success'")
-	assert.Empty(t, compiler.jobManager.jobs["custom"].If)
-	assert.Equal(t, "always()", compiler.jobManager.jobs["conclusion"].If)
-	compiler.ensureAdmissionSkipSafeConditions()
-	assert.Equal(t, agentCondition, compiler.jobManager.jobs["agent"].If)
 }
 
 func TestAdmissionRejectsFrontmatterHooks(t *testing.T) {
@@ -547,7 +547,7 @@ func TestAdmissionRejectsCodeGenerationSwitch(t *testing.T) {
 			source := "---\non: workflow_dispatch\nadmission-gate: " + value + "\n---\nTest workflow\n"
 			require.NoError(t, os.WriteFile(file, []byte(source), 0o644))
 			err := NewCompiler().CompileWorkflow(file)
-			require.ErrorContains(t, err, "admission-gate", "only on.admission is a supported workflow opt-in")
+			require.ErrorContains(t, err, "admission-gate", "admission-gate is unsupported")
 		})
 	}
 }

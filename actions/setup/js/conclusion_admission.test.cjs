@@ -29,6 +29,7 @@ describe("admission conclusion notification", () => {
   let sessionFile;
   let options;
   beforeEach(() => {
+    vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
     vi.useFakeTimers();
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", "");
     directory = fs.mkdtempSync(path.join(os.tmpdir(), "admission-conclusion-"));

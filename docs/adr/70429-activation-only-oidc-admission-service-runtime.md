@@ -12,19 +12,19 @@ The admission service specification (`docs/src/content/docs/specs/admission-serv
 
 ### Decision
 
-Generate a separate compiler-owned `admission` job (`pkg/workflow/compiler_admission.go`), gated at job level by the managed `GH_AW_DEFAULT_ADMISSION_URL` Actions variable. This job gains `id-token: write` for the start-time admission check; activation retains permissions required by its independent features. The admission job runs trusted setup and the OIDC client, without author hooks or workflow-specific authentication. Activation depends on admission and explicitly accepts success or skip, but not failure or cancellation. Existing prechecks remain prerequisites.
+Run a compiler-owned `admission` step inside activation (`pkg/workflow/compiler_admission.go`), gated by the managed `GH_AW_DEFAULT_ADMISSION_URL` Actions variable. Activation gains `id-token: write` for the start-time admission check. The check follows existing trusted setup and precedes author pre-steps and daily-AIC preparation. Failure fails activation and prevents agent execution; a skipped check leaves fallback behavior intact. Existing prechecks remain prerequisites. This revises the original separate-job design to avoid an extra runner, bootstrap and skipped-ancestor condition handling. The accepted tradeoff is that activation hooks share job-wide OIDC capability even without a configured endpoint.
 
-The completion counterpart uses a separate compiler-owned `conclusion_admission` job, granting it `id-token: write` only for the callback. The ordinary `conclusion` job retains its reporting and artifact-publication work without gaining admission OIDC access; it passes only the bounded compact unified session and usage artifact IDs to the callback job. The callback posts these values to the same authority's `/api/conclusion` route with a fresh token for the same audience and independently reconstructed invocation identity. The shared compact-session helper retains allowlisted metadata, excluding agent messages and unbounded nested payloads: at most 128 records/16 KiB JSONL and 64 KiB for the complete request. The full redacted artifact remains unchanged and can be retrieved through independently verified artifact IDs. No token or request identity crosses jobs through outputs. Artifact upload and any upload retry finish before callback execution, so callback failures cannot delay publication. Failed artifact publication does not suppress compact delivery, but full-session availability remains explicitly unknown. Delivery remains best-effort under either admission outage policy; failures warn without changing completed execution results. Activation and agent do not gain OIDC permission for this callback. The companion `AdmissionConclusion.tla` model checks ordering, bounded metadata, artifact references, full-artifact preservation, fresh credentials, stable retries and durable deduplicated acceptance.
+The completion counterpart runs as a compiler-owned step inside `conclusion`, granting that job `id-token: write` while retaining its reporting and artifact-publication work. After upload and any retry finish, the callback reads the local session through the shared compact projection and takes artifact IDs directly from step outputs. It posts these values to the same authority's `/api/conclusion` route with a fresh token for the same audience and independently reconstructed invocation identity. The projection retains allowlisted metadata, excluding agent messages and unbounded nested payloads: at most 128 records/16 KiB JSONL and 64 KiB for the complete request. The full redacted artifact remains unchanged and can be retrieved through independently verified artifact IDs. No token or request identity crosses jobs through outputs. Failed artifact publication does not suppress compact delivery, but full-session availability remains explicitly unknown. Delivery remains best-effort under either admission outage policy; failures warn without changing completed execution results. The callback has a two-minute step timeout and continues on error. The companion `AdmissionConclusion.tla` model checks ordering, bounded metadata, artifact references, full-artifact preservation, fresh credentials, stable retries and durable deduplicated acceptance.
 
 The client (`actions/setup/js/check_admission.cjs` and `admission_protocol.cjs`) authenticates only with GitHub Actions OIDC, rejects redirects, strictly validates identity and JSON, and makes at most three attempts within one 60-second deadline using shared `withRetry` cancellation and timeout support. It sends caller-owned W3C `traceparent` and compiler-generated `workflow_hash` as an untrusted cache hint. Valid approval replaces daily-AIC validation and its preparatory steps; denial or malformed approval prevents activation. Unconfigured admission and ignored outages retain daily validation. Reusable callers must grant the callee's admission OIDC permission.
 
-Validated admission results and allowances propagate through activation outputs to the existing AWF budget path. A supplied allowance replaces that component's local limit, including an unlimited setting; missing optional detection/evals allowances preserve independent component policy. Skipped or ignored admission retains existing budgets. Missing required or invalid runtime allowances fail closed. Credentials and request identity stay in admission; budget handoff variables are unset before the agent container starts. Lifecycle logs and collapsed step summaries report outcomes, allowance presence and sources, not credentials, identities, amounts or service diagnostics. The structured unified-session artifact records the validated numeric allowances with admission provenance.
+Validated admission step results and allowances propagate through activation outputs to the existing AWF budget path. A supplied allowance replaces that component's local limit, including an unlimited setting; missing optional detection/evals allowances preserve independent component policy. Skipped or ignored admission retains existing budgets. Missing required or invalid runtime allowances fail closed. Acquired credentials and request identity stay client-local; budget handoff variables are unset before the agent container starts. Lifecycle logs and collapsed step summaries report outcomes, allowance presence and sources, not credentials, identities, amounts or service diagnostics. The structured unified-session artifact records the validated numeric allowances with admission provenance.
 
 ### Alternatives Considered
 
 #### Alternative 1: Run admission in the agent job (or in every downstream job)
 
-Admission could be re-checked immediately before each component runs. This was rejected because it would distribute OIDC credentials and change downstream permissions and eligibility. Keeping authentication and the decision in one isolated admission job allows existing runtime budget inputs to consume validated component allowances without further service calls.
+Admission could be re-checked immediately before each component runs. This was rejected because it would distribute OIDC capability and change downstream permissions and eligibility. Keeping authentication and the decision in activation allows existing runtime budget inputs to consume validated component allowances without further service calls.
 
 #### Alternative 2: Authenticate with a GitHub App token or forwarded repository credentials
 
@@ -32,11 +32,11 @@ The client could reuse the existing App-token mint pattern (as the daily-AIC gua
 
 #### Alternative 3: Grant `id-token: write` only when admission is configured
 
-The compiler cannot conditionally generate permissions from runtime Actions variables. Instead, it always generates the isolated jobs and gates them on the endpoint variable. A skipped job starts no runner and gives activation no additional OIDC capability.
+The compiler cannot conditionally generate permissions from runtime Actions variables. Activation and conclusion jobs compiled with admission therefore retain OIDC capability when their endpoint-gated client steps are skipped. Isolating admission in other jobs would avoid this exposure, but adds runners and duplicate bootstrap.
 
-#### Alternative 4: Keep the completion callback in the ordinary conclusion job
+#### Alternative 4: Isolate the completion callback in a separate job
 
-This was rejected because the conclusion job performs safe-output and reporting actions unrelated to admission. Granting that job OIDC would expose token-minting capability to those steps even when admission is disabled. A separate compiler-owned callback job receives only the compact session and artifact locators after publication.
+The original design used a separate callback job to avoid granting OIDC to conclusion's reporting/actions. The revised design accepts job-wide OIDC in conclusion, which already rejects author step hooks, to remove another runner, duplicate bootstrap and compact-session job-output handoff. Callback execution still follows artifact publication attempts and remains best-effort.
 
 #### Alternative 5: Run admission alongside the daily-AIC guardrail instead of replacing it
 
@@ -53,17 +53,17 @@ This was rejected because full sessions contain unbounded agent messages and too
 ### Consequences
 
 #### Positive
-- Organizations can enforce centralized, cross-repository admission policy by setting Actions variables, with no per-workflow source changes and no recompilation to opt in.
+- Organizations can configure centralized, cooperative admission across workflows compiled with admission through Actions variables, without recompilation for subsequent runtime configuration changes.
 - No reusable credential leaves the runner: the authority receives only an audience-scoped OIDC token, and redirects are refused.
 - Admitted runs skip the daily-AIC guardrail and its preparatory steps (App token mint, observation restore and publish, ledger clone), which shortens activation.
 - Existing agent, detection and evals jobs and dependencies are reused; only budget inputs and selection change.
-- Admission OIDC is no longer shared with activation hooks; compiler-owned admission rejects author customization.
-- The completion callback's OIDC permission is confined to a compiler-owned job with only trusted setup and callback steps.
+- Admission reuses activation's runner and setup, with no separate start-time job or skipped-ancestor conditions.
+- The completion callback reuses conclusion's runner and setup and reads the local compact projection without job-output transport.
 - The bounded retry/deadline support added to the shared `withRetry` helper can be reused by other callers.
 
 #### Negative
-- Configured admission adds a runner/job boundary before activation. Its explicit success-or-skip dependency condition must preserve other prerequisite checks.
-- Conclusion delivery adds a small callback job and passes its bounded preview and artifact locators through conclusion outputs. Its static OIDC permission must be included in reusable caller envelopes even when the endpoint-gated job is skipped; ordinary conclusion steps gain no admission OIDC access.
+- Activation hooks and actions compiled with admission share job-wide OIDC capability, even when the endpoint is empty. The admission step cannot provide a per-step credential boundary.
+- Conclusion reporting and actions compiled with admission share job-wide OIDC capability, including when the endpoint is empty.
 - Reusable `workflow_call` callers must grant `id-token: write`. Existing caller envelopes (and the hand-authored Windows probe caller) had to change, and third-party callers that do not grant it will fail.
 - Admission remains cooperative, not an unbypassable organization spending cap. Supplied allowances configure existing runtime proxy limits, but deployments still need a separately deployed authority and protected backend policy/accounting.
 - When the authority is unavailable, activation can wait up to the 60-second deadline before the outage policy applies.
