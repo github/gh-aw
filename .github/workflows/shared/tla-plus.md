@@ -15,7 +15,7 @@ steps:
       cp "$GITHUB_WORKSPACE/actions/setup/sh/release_integrity.sh" "$trusted/actions/setup/sh/"
       printf '%s  %s\n' \
         15317bc27032f3c8160cb47fb77084683e21e3c37680db90b9bb2e57adea16e2 "$trusted/.github/scripts/install_tla_runtime.sh" \
-        0b0acdf23f27360e70c6524b484329e5ba8d61ab1dfb2a5aaa4f9b6118828c72 "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
+        737cc97b413450eed80c0f1f657b9950a126ea0c0f5fd583107ba6816f5ecadf "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
       bash "$trusted/.github/scripts/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools
       # runner-guard:ignore RGS-018 -- Default-branch installer and integrity helper are SHA-256 verified before execution.
 ---
