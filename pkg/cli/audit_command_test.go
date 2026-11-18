@@ -3,6 +3,10 @@
 package cli
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -19,15 +23,7 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 		expectedOwner string
 		expectedRepo  string
 		expectError   bool
-		expectedError string
 	}{
-		{
-			name:          "bare run ID requires repo flag",
-			repoFlag:      "",
-			components:    parser.GitHubURLComponents{},
-			expectError:   true,
-			expectedError: "--repo is required for bare run IDs; use --repo owner/repo",
-		},
 		{
 			name:          "owner already resolved from URL wins",
 			repoFlag:      "flag-owner/flag-repo",
@@ -68,16 +64,65 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 			components := tt.components
 			err := applyAuditRepoFlag(tt.repoFlag, &components)
 			if tt.expectError {
-				if tt.expectedError != "" {
-					require.EqualError(t, err, tt.expectedError)
-				} else {
-					require.Error(t, err)
-				}
+				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedOwner, components.Owner)
 			assert.Equal(t, tt.expectedRepo, components.Repo)
+		})
+	}
+}
+
+func TestApplyAuditRepoFlagDetectsCurrentRepository(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake gh uses a shell script")
+	}
+	for _, tc := range []struct {
+		name, ghResponse, origin, expectedOwner string
+	}{
+		{name: "gh selected repository", ghResponse: "printf 'selected/repo\\n'", expectedOwner: "selected"},
+		{name: "local origin fallback", ghResponse: "exit 1", origin: "https://github.com/local/repo.git", expectedOwner: "local"},
+		{name: "no repository available", ghResponse: "exit 1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			t.Setenv("GH_REPO", "")
+			t.Setenv("GH_HOST", "github.com")
+			t.Setenv("GITHUB_SERVER_URL", "https://github.com")
+			ClearCurrentRepoSlugCache()
+			t.Cleanup(ClearCurrentRepoSlugCache)
+			require.NoError(t, exec.Command("git", "init", "--quiet", "--template=").Run())
+			if tc.origin != "" {
+				require.NoError(t, exec.Command("git", "remote", "add", "origin", tc.origin).Run())
+			}
+			bin := filepath.Join(dir, "bin")
+			require.NoError(t, os.Mkdir(bin, 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\n"+tc.ghResponse+"\n"), 0o700))
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+			components, err := parser.ParseRunURLExtended("12345")
+			require.NoError(t, err)
+			err = applyAuditRepoFlag("", components)
+			if tc.expectedOwner == "" {
+				require.ErrorContains(t, err, "failed to detect current repository")
+				require.ErrorContains(t, err, "--repo owner/repo")
+				require.ErrorContains(t, err, "run URL")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedOwner, components.Owner)
+			assert.Equal(t, "repo", components.Repo)
+			assert.Equal(t, int64(12345), components.Number)
+
+			requests, err := resolveGroupedAuditRunRequests([]string{"12345", "12346"}, "")
+			require.NoError(t, err)
+			require.Len(t, requests, 2)
+			for _, request := range requests {
+				assert.Equal(t, tc.expectedOwner, request.owner)
+				assert.Equal(t, "repo", request.repo)
+			}
 		})
 	}
 }

@@ -969,7 +969,7 @@ gh aw audit 1234567890 --repo owner/repo --runtime cloud-hypervisor # Skip run u
 
 The `--timeout` flag sets a duration such as `50s` or `5m` (default: `0`, no additional deadline). Timed-out single-run JSON audits exit unsuccessfully and return available metadata or collected analysis with `partial: true`, `complete: false`, and the interrupted `stage`. Incomplete reports are not persisted as complete audit caches.
 
-The `--repo` flag accepts `owner/repo` and is required for a bare numeric run ID.
+Bare numeric run IDs use the current repository. The `--repo` flag accepts `owner/repo` to select another repository. Outside a repository, provide `--repo` or a run URL.
 
 The `--artifacts` flag selects which artifact sets to download (default: `all`, unlike `gh aw logs`, which defaults to `usage`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, `delivery`, `usage`, and `work-queue`. The `work-queue` set downloads queue snapshots, worker finish intents, and workflow logs for coordinator operation reporting. The `--experiment` flag filters to runs that include the named experiment; `--variant` restricts to a variant value and requires `--experiment`. The `--output/-o` flag overrides the output directory.
 
