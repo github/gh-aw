@@ -216,36 +216,45 @@ func inputSchema(inputs map[string]Input) map[string]any {
 	properties := map[string]any{}
 	required := []string{}
 	for name, input := range inputs {
-		property := map[string]any{"type": input.Type}
+		properties[name] = inputProperty(input)
 		if input.Required {
 			required = append(required, name)
 		}
-		if input.Type == "string" {
-			property["maxLength"] = input.MaxLength
-			if input.MinLength > 0 || input.Sanitize == "title" {
-				minimum := input.MinLength
-				if input.Sanitize == "title" && minimum < 20 {
-					minimum = 20
-				}
-				property["minLength"] = minimum
-			}
-		}
-		if len(input.Enum) != 0 {
-			property["enum"] = input.Enum
-		}
-		if input.Pattern != "" {
-			property["pattern"] = input.Pattern
-		}
-		if input.Minimum != nil {
-			property["minimum"] = *input.Minimum
-		}
-		if input.Maximum != nil {
-			property["maximum"] = *input.Maximum
-		}
-		properties[name] = property
 	}
 	slices.Sort(required)
 	return map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false}
+}
+
+func inputProperty(input Input) map[string]any {
+	property := map[string]any{"type": input.Type}
+	if input.Type == "array" && input.Items != nil {
+		property["items"] = inputProperty(*input.Items)
+		property["minItems"] = input.MinItems
+		property["maxItems"] = input.MaxItems
+	}
+	if input.Type == "string" {
+		property["maxLength"] = input.MaxLength
+		if input.MinLength > 0 || input.Sanitize == "title" {
+			minimum := input.MinLength
+			if input.Sanitize == "title" && minimum < 20 {
+				minimum = 20
+			}
+			property["minLength"] = minimum
+		}
+	}
+	if len(input.Enum) != 0 {
+		property["enum"] = input.Enum
+	}
+	if input.Pattern != "" {
+		property["pattern"] = input.Pattern
+	}
+	if input.Minimum != nil {
+		property["minimum"] = *input.Minimum
+	}
+	if input.Maximum != nil {
+		property["maximum"] = *input.Maximum
+	}
+	return property
 }
 
 func validateToolNames(spec ConnectorSpec, binding Binding) error {

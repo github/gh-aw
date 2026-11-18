@@ -25,8 +25,8 @@ type Credential struct {
 	Scopes []string `json:"scopes"`
 }
 
-// Input supports bounded primitive values; objects, expressions, and defaults
-// are deliberately excluded from this first contract.
+// Input supports bounded primitives and hosted MCP string arrays.
+// Objects, nested arrays, expressions, and defaults are excluded.
 type Input struct {
 	Type      string   `json:"type"`
 	Required  bool     `json:"required,omitempty"`
@@ -37,6 +37,9 @@ type Input struct {
 	Minimum   *float64 `json:"minimum,omitempty"`
 	Maximum   *float64 `json:"maximum,omitempty"`
 	Pattern   string   `json:"pattern,omitempty"`
+	Items     *Input   `json:"items,omitempty"`
+	MinItems  int      `json:"minItems,omitempty"`
+	MaxItems  int      `json:"maxItems,omitempty"`
 }
 
 // Value is exactly one literal, input reference, structured object or array.
