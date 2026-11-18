@@ -7,9 +7,9 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.0.0<br>
+**Version**: 1.1.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-08<br>
+**Publication Date**: 2026-11-18<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## 1. Scope and conformance
@@ -554,3 +554,10 @@ jointly define accepted values. Selection/lowering is implemented by
 The shared publication runtime is
 [`connector_runtime.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/connector_runtime.cjs).
 Structural internal schemas alone MUST NOT be treated as executable authority.
+
+## 12. Change Log
+
+### Version 1.1.0 (Experimental Working Draft) — 2026-11-18
+
+- Added bounded string-array inputs for hosted HTTP MCP tools, including explicit collection and item constraints.
+- Added support for one bounded literal `api-version` query parameter on hosted HTTP MCP registration URLs; other query parameters and fragments remain prohibited.
