@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "success": {
+    "facts": 168,
+    "sha256": "a0366231fadd39fad3f2fc87b61d6311af8f110846daa1fb5bf03540e7c5ebe6"
+  },
+  "failure": {
+    "facts": 180,
+    "sha256": "19ea586c171bdc4bc4da1538f28a486c5f72611f96b1d6ee9d8c44761fe51cd8"
+  }
+}

@@ -1203,6 +1203,15 @@ validate-otel-contract:
 	@cd actions/setup/js && npm run test:js -- otel_contract.test.cjs send_otlp_span.test.cjs --no-file-parallelism >/dev/null
 	@echo "✓ OpenTelemetry compatibility contract validated"
 
+OTEL_CONFORMANCE_REPORT_DIR ?= $(if $(TMPDIR),$(TMPDIR),/tmp)/gh-aw-otel-conformance-reports
+.PHONY: validate-otel-conformance
+validate-otel-conformance:
+	@command -v otel-conformance >/dev/null || { echo "otel-conformance is required; install the pinned conformance runner packages"; exit 1; }
+	@command -v weaver >/dev/null || { echo "Weaver v0.28.0 is required; install it before running conformance"; exit 1; }
+	@mkdir -p "$(OTEL_CONFORMANCE_REPORT_DIR)"
+	@otel-conformance actions/setup/js/conformance/genai --report-dir "$(OTEL_CONFORMANCE_REPORT_DIR)"
+	@node actions/setup/js/scripts/check_genai_conformance.mjs "$(OTEL_CONFORMANCE_REPORT_DIR)"
+
 .PHONY: check-otel-attributes
 check-otel-attributes:
 	@npm run check --prefix specs/otel
