@@ -252,8 +252,42 @@
       "avg_comments": 0.0,
       "success_rate": 1.0,
       "note": "primary analysis window (2026-11-14T00:00:00Z..2026-11-15T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=1 (#77798 'Redraw centralized campaigns as an enterprise network'), merged same day, 0 open, 0 closed-without-merge; agent_success_rate=100% (1/1) but N=1 so not statistically meaningful vs prior days; avg_duration created->merged for the 1 merged PR=96.93min (14:52:32Z->16:29:28Z), total_duration same since merged_at==closed_at; agent_prs_merged (event-scoped, mergedAt in window)=7, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged:2026-11-14T00:00:00Z..2026-11-14T23:59:59Z, total_count=7), cross-checked against 106 all-author merged PRs in window (7<=106, consistent); avg_comments=0.0 human (non-bot) comments on the 1 cohort PR (its sole comment was from github-actions[bot] Test Quality Sentinel); success_rate up vs 11-13 (73.3%->100%, +36.5% relative, significant) but driven by extremely low volume (N=1); avg_duration down sharply vs 11-13 (400.34->96.93min, -75.8%, significant); volume down sharply vs 11-13 (15->1, -93.3%, significant) \u2014 lowest creation-cohort volume in the retained history window"
+    },
+    {
+      "date": "2026-11-15",
+      "agent_prs_total": 10,
+      "agent_prs_merged": 9,
+      "agent_prs_merged_from_created": 9,
+      "closed_prs": 1,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 231.8,
+      "success_rate": 0.9,
+      "note": "gap-fill (workflow did not run 11-15..11-16, 3-day gap before 2026-11-18 run); true UTC calendar-day window (2026-11-15T00:00:00Z..2026-11-16T00:00:00Z); IMPORTANT bot identity change discovered this run: the copilot-swe-agent author login transitioned from the GitHub App 'app/copilot-swe-agent' (is_bot=true) to a regular user account 'gh-aw-bot' (is_bot=false, display name 'Awi', id U_kgDOD3BQzA), overlapping on 2026-11-14 then fully switched; both use identical 'copilot/*' branch naming and the same gh-aw-agentic-workflow/engine:copilot PR body template, so cohort membership for 11-15 onward uses author.login in {app/copilot-swe-agent, gh-aw-bot} (0 app/copilot-swe-agent activity found after 11-14); creation cohort from 30-day pre-fetched dataset; agent_prs_total=10, all resolved (0 open) at collection time; agent_prs_merged_from_created=9, closed_prs=1 (#77995 'Investigate conclusion failures after successful agent execution', substantive body, not a bare WIP placeholder); agent_success_rate=90.0%; avg_duration created->merged over 9 merged PRs=231.8min; agent_prs_merged (event-scoped, mergedAt in window)=9, independently verified via live paginated GitHub search (is:merged, author:gh-aw-bot, merged range, total_count=9; author:app/copilot-swe-agent same range=0), cross-checked against 54 all-author merged PRs in window (9<=54, consistent); avg_comments not collected for this backfilled day"
+    },
+    {
+      "date": "2026-11-16",
+      "agent_prs_total": 11,
+      "agent_prs_merged": 5,
+      "agent_prs_merged_from_created": 7,
+      "closed_prs": 4,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 284.08,
+      "success_rate": 0.6364,
+      "note": "gap-fill (workflow did not run 11-15..11-16, 3-day gap before 2026-11-18 run); true UTC calendar-day window (2026-11-16T00:00:00Z..2026-11-17T00:00:00Z); cohort author.login in {app/copilot-swe-agent, gh-aw-bot} per the identity transition noted on 11-15 (0 app/copilot-swe-agent activity this day, all 11 are gh-aw-bot); creation cohort from 30-day pre-fetched dataset; agent_prs_total=11, all resolved (0 open) at collection time; agent_prs_merged_from_created=7, closed_prs=4 (#78330 'Investigate unreconciled AI Moderator health metrics', #78287 'Review pip and uv command-injection findings', #78270 'Investigate Auditor collection failures', #78269 'Investigate AI Moderator failures without speculative workflow changes' - all substantive bodies, no bare WIP placeholders); agent_success_rate=63.6%, down sharply vs 11-15 (90.0%->63.6%, -26.4pp, -29.3% relative, significant); avg_duration created->merged over 7 merged PRs=284.08min, up vs 11-15 (231.8->284.08min, +22.6%, significant); volume up slightly vs 11-15 (10->11, +10%, borderline); agent_prs_merged (event-scoped, mergedAt in window)=5, independently verified via live paginated GitHub search (is:merged, author:gh-aw-bot, merged range, total_count=5), cross-checked against 56 all-author merged PRs in window (5<=56, consistent); avg_comments not collected for this backfilled day"
+    },
+    {
+      "date": "2026-11-17",
+      "agent_prs_total": 17,
+      "agent_prs_merged": 15,
+      "agent_prs_merged_from_created": 13,
+      "closed_prs": 4,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 173.78,
+      "avg_comments": 0.18,
+      "success_rate": 0.7647,
+      "note": "primary analysis window (2026-11-17T00:00:00Z..2026-11-18T00:00:00Z); cohort author.login in {app/copilot-swe-agent, gh-aw-bot} (0 app/copilot-swe-agent activity this day, all 17 are gh-aw-bot - see bot identity change note on 11-15); creation cohort from 30-day pre-fetched dataset; agent_prs_total=17, all resolved (0 open) at collection time; agent_prs_merged_from_created=13, closed_prs=4 (#78841 'Split workflow compilation pipeline into focused modules', #78647 'Document Copilot CLI release-age egress requirement', #78645 'Review pip and uv command-injection findings', #78633 'Lock generated workflow dependency installs' - all substantive bodies, no bare WIP placeholders); agent_success_rate=76.5%, up vs 11-16 (63.6%->76.5%, +12.8pp, +20.2% relative, significant) but down vs 11-15 (90.0%->76.5%, -13.5pp, -15.0% relative, significant) - net 3-day trend is a partial recovery after the 11-16 dip; avg_duration created->merged over 13 merged PRs=173.78min, down vs 11-16 (284.08->173.78min, -38.8%, significant); volume up vs 11-16 (11->17, +54.5%, significant); agent_prs_merged (event-scoped, mergedAt in window)=15, independently verified via live paginated GitHub search (is:merged, author:gh-aw-bot, merged:2026-11-17T00:00:00Z..2026-11-17T23:59:59Z, total_count=15; author:app/copilot-swe-agent same range=0), cross-checked against 80 all-author merged PRs in window (15<=80, consistent); avg_comments=0.18 is human (non-bot, non-automation) comments only via get_comments across all 17 cohort PRs - only 2 of 17 PRs had any human comment (#78652 1 comment from @pelikhan, #78647 2 comments from @pelikhan), all other comments were from github-actions[bot] review workflows, the 'gh-aw-bot' PR-Sous-Chef automation account, or the agent's own 'Copilot' reply account (all excluded as non-human)"
     }
   ],
-  "last_updated": "2026-11-14",
-  "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward; gap-filled 11-08..11-10 during the 2026-11-11 run after a 3-day workflow gap (same pattern as the 11-04..11-06 gap resolved on 2026-11-07) Gap-filled 11-11..11-13 during the 2026-11-14 run after a 3-day workflow gap (same recurring pattern as the 11-04..11-06 and 11-08..11-10 gaps)."
+  "last_updated": "2026-11-18",
+  "note": "root-level history.json is the live file (nested copilot-agent-metrics/history.json is not matched by the configured flat *.json file-glob and is no longer updated); gap-filled 11-15..11-16 during the 2026-11-18 run after a 3-day workflow gap (same recurring pattern as prior gaps); this run also discovered and documented a bot identity change (app/copilot-swe-agent -> gh-aw-bot) effective 2026-11-14, see per-day notes"
 }
