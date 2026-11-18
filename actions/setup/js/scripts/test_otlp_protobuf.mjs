@@ -13,11 +13,11 @@ assert.ok(process.env.GH_AW_OTEL_SDK_DIR, "Set GH_AW_OTEL_SDK_DIR to the isolate
 const sdkRequire = createRequire(path.join(process.env.GH_AW_OTEL_SDK_DIR, "package.json"));
 const require = createRequire(import.meta.url);
 const { encodeOTLPTraceRequest, encodeOTLPMetricsRequest } = require("../otlp_protobuf.cjs");
-const { buildOTLPPayload } = require("../send_otlp_span.cjs");
+const { buildOTLPPayload, SPAN_KIND_INTERNAL } = require("../send_otlp_span.cjs");
 const { buildOTLPMetric, buildOTLPMetricsPayload } = require("../otlp_metrics.cjs");
 const { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } = sdkRequire("@opentelemetry/sdk-trace-base");
 const { resourceFromAttributes } = sdkRequire("@opentelemetry/resources");
-const { ROOT_CONTEXT, SpanKind, SpanStatusCode, TraceFlags, createTraceState, trace } = sdkRequire("@opentelemetry/api");
+const { ROOT_CONTEXT, SpanStatusCode, TraceFlags, createTraceState, trace } = sdkRequire("@opentelemetry/api");
 const { JsonTraceSerializer, ProtobufTraceSerializer } = sdkRequire("@opentelemetry/otlp-transformer");
 // Generated protocol types from the pinned SDK provide an independent wire oracle.
 const generatedProto = sdkRequire("@opentelemetry/otlp-transformer/build/src/generated/root").opentelemetry.proto;
@@ -246,8 +246,8 @@ test("matches the SDK for opt-in GenAI spans and metrics with the current schema
     const traceReference = ExportTraceServiceRequest.encode(ExportTraceServiceRequest.fromObject(toProtoJson(span))).finish();
     compare(span, traceReference);
     const decodedSpan = fromProtoJson(decode(encodeOTLPTraceRequest(span))).resourceSpans[0];
-    assert.equal(decodedSpan.scopeSpans[0].scope.schemaUrl, "https://opentelemetry.io/schemas/1.45.0");
-    assert.equal(decodedSpan.scopeSpans[0].spans[0].kind, SpanKind.INTERNAL);
+    assert.equal(decodedSpan.scopeSpans[0].schemaUrl, "https://opentelemetry.io/schemas/1.45.0");
+    assert.equal(decodedSpan.scopeSpans[0].spans[0].kind, SPAN_KIND_INTERNAL);
     assert.equal(decodedSpan.scopeSpans[0].spans[0].status.code, SpanStatusCode.UNSET);
 
     const timing = { startMs: 1700000000000, endMs: 1700000000123, traceContext: { traceId, spanId: "0123456789abcdef" } };
@@ -272,7 +272,7 @@ test("matches the SDK for opt-in GenAI spans and metrics with the current schema
     const referenceMetrics = ExportMetricsServiceRequest.encode(ExportMetricsServiceRequest.fromObject(toProtoJson(metrics))).finish();
     assert.deepEqual(actualMetrics, Buffer.from(referenceMetrics), "metric wire bytes must match the SDK encoder exactly");
     const decodedMetrics = fromProtoJson(ExportMetricsServiceRequest.toObject(ExportMetricsServiceRequest.decode(actualMetrics), { longs: String, bytes: String })).resourceMetrics[0];
-    assert.equal(decodedMetrics.scopeMetrics[0].scope.schemaUrl, "https://opentelemetry.io/schemas/1.45.0");
+    assert.equal(decodedMetrics.scopeMetrics[0].schemaUrl, "https://opentelemetry.io/schemas/1.45.0");
     assert.equal(decodedMetrics.scopeMetrics[0].metrics[0].sum.isMonotonic, true);
     assert.equal(decodedMetrics.scopeMetrics[0].metrics[1].histogram.dataPoints[0].explicitBounds.length, 20);
   } finally {

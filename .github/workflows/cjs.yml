@@ -166,8 +166,10 @@ jobs:
         with:
           repository: open-telemetry/semantic-conventions-conformance
           ref: a4321907b3768c468966538a459130ac6b095bdc
-          path: ${{ runner.temp }}/semantic-conventions-conformance
+          path: semantic-conventions-conformance
           persist-credentials: false
+      - name: Move conformance checkout to runner temp
+        run: mv "$GITHUB_WORKSPACE/semantic-conventions-conformance" "$RUNNER_TEMP/semantic-conventions-conformance"
       - name: Install pinned Weaver
         run: |
           mkdir -p "$RUNNER_TEMP/weaver"
@@ -175,10 +177,7 @@ jobs:
           curl --fail --location --proto '=https' --tlsv1.2 \
             "https://github.com/open-telemetry/weaver/releases/download/v0.28.0/$asset" \
             --output "$RUNNER_TEMP/$asset"
-          curl --fail --location --proto '=https' --tlsv1.2 \
-            "https://github.com/open-telemetry/weaver/releases/download/v0.28.0/$asset.sha256" \
-            --output "$RUNNER_TEMP/$asset.sha256"
-          (cd "$RUNNER_TEMP" && sha256sum --check "$asset.sha256")
+          printf '%s  %s\n' '9878e2d56ad82ae441b0b527377a4f6001ae19f4af362fb0a4d951884f59ab61' "$RUNNER_TEMP/$asset" | sha256sum --check --strict
           tar -xJf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/weaver"
           chmod +x "$RUNNER_TEMP/weaver/weaver"
           echo "$RUNNER_TEMP/weaver" >> "$GITHUB_PATH"

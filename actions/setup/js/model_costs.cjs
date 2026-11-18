@@ -119,7 +119,7 @@ function computeInclusiveInputTokens({ provider, inputTokens, cacheReadTokens, c
   }
   if (inputTokensIncludeCache === true) return inputTokens;
   if (inputTokensIncludeCache === false) return inputTokens + cacheReadTokens + cacheWriteTokens;
-  if (providerIncludesCacheReadsInInput(provider)) return inputTokens + cacheWriteTokens;
+  if (providerIncludesCacheReadsInInput(provider)) return Math.max(inputTokens - cacheReadTokens, 0) + cacheReadTokens + cacheWriteTokens;
   return inputTokens + cacheReadTokens + cacheWriteTokens;
 }
 

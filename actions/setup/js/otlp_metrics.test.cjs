@@ -194,6 +194,21 @@ describe("buildBuiltinRunMetrics", () => {
     expect(result.map(metric => metric.name)).not.toContain("gen_ai.invoke_agent.duration");
   });
 
+  it("omits error.type from agent duration when the agent has no error", () => {
+    const result = buildBuiltinRunMetrics({
+      jobName: "agent",
+      startMs: 1000,
+      endMs: 3000,
+      agentName: "CI",
+      agentDurationSeconds: 2,
+      agentErrorType: "",
+      semconvLatest: true,
+    });
+    const duration = result.find(metric => metric.name === "gen_ai.invoke_agent.duration");
+    expect(duration).toBeDefined();
+    expect(duration.histogram.dataPoints[0].attributes).not.toContainEqual(expect.objectContaining({ key: "error.type" }));
+  });
+
   it("omits the error counter for successful runs and unavailable usage", () => {
     const result = buildBuiltinRunMetrics({ conclusion: "success", startMs: 1000, endMs: 2000 });
     expect(result.map(metric => metric.name)).toEqual(["gh_aw.job.duration", "gh_aw.run.duration"]);

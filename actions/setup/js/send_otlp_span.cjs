@@ -553,8 +553,9 @@ function buildGitHubActionsResourceAttributes({
   }
   const serverUrl = (process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
   const repositoryUrl = repository ? `${serverUrl}/${repository}` : "";
+  const pipelineName = process.env.GITHUB_WORKFLOW || workflowName;
   const standardResourceAttributes = [
-    ...(workflowName ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_NAME, workflowName)] : []),
+    ...(pipelineName ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_NAME, pipelineName)] : []),
     ...(runId ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_RUN_ID, runId)] : []),
     ...(runUrl ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_RUN_URL_FULL, runUrl)] : []),
     ...(job ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_TASK_NAME, job)] : []),
@@ -2194,7 +2195,6 @@ function resolveInclusiveInputTokens(usage) {
     if (typeof cacheRead !== "number" || typeof cacheWrite !== "number") return undefined;
     return input + cacheRead + cacheWrite;
   }
-  if (cacheRead === undefined && cacheWrite === undefined) return input;
   if (cacheRead === 0 && cacheWrite === 0) return input;
   return undefined;
 }
@@ -2672,7 +2672,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     // and length-truncation is always queryable in Sentry/dashboards.
     const effectiveStopReason = runtimeMetrics.stopReason || (isAgentTimedOut ? "timeout" : "unknown");
     agentGenAiAttrs.push(buildArrayAttr("gen_ai.response.finish_reasons", [effectiveStopReason]));
-    agentErrorType = isAgentTimedOut ? "timeout" : isAgentCancelled ? "cancelled" : isAgentFailure || runStatus === "failure" ? "agent_failed" : "";
+    agentErrorType = isAgentTimedOut ? "timeout" : isAgentCancelled ? "cancelled" : isAgentFailure ? "agent_failed" : "";
     if (agentErrorType) agentGenAiAttrs.push(buildAttr(OTEL_ATTR_ERROR_TYPE, agentErrorType));
   }
 

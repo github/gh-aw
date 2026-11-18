@@ -1385,6 +1385,18 @@ describe("buildGitHubActionsResourceAttributes", () => {
     expect(attributes["deployment.environment.name"]).toBe("custom-env");
   });
 
+  it("uses GITHUB_WORKFLOW for the standard pipeline name", () => {
+    const previousWorkflow = process.env.GITHUB_WORKFLOW;
+    process.env.GITHUB_WORKFLOW = "Reusable Caller";
+    try {
+      const attributes = Object.fromEntries(buildGitHubActionsResourceAttributes({ repository: "owner/repo", workflowName: "Logical Workflow", staged: false }).map(attr => [attr.key, attr.value.stringValue]));
+      expect(attributes["cicd.pipeline.name"]).toBe("Reusable Caller");
+    } finally {
+      if (previousWorkflow === undefined) delete process.env.GITHUB_WORKFLOW;
+      else process.env.GITHUB_WORKFLOW = previousWorkflow;
+    }
+  });
+
   it("uses only deployment.environment.name for the opt-in", () => {
     process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "http, gen_ai_latest_experimental";
     const attributes = buildGitHubActionsResourceAttributes({ repository: "owner/repo", runId: "123", staged: false });
@@ -1413,8 +1425,10 @@ describe("GenAI semantic convention helpers", () => {
 
   it.each([
     [{ input_tokens: 10, input_tokens_include_cache: true, cache_read_tokens: 5, cache_write_tokens: 2 }, 10],
+    [{ input_tokens: 10, input_tokens_include_cache: true }, 10],
     [{ input_tokens: 10, input_tokens_include_cache: false, cache_read_tokens: 5, cache_write_tokens: 2 }, 17],
     [{ input_tokens: 10, cache_read_tokens: 0, cache_write_tokens: 0 }, 10],
+    [{ input_tokens: 10 }, undefined],
     [{ input_tokens: 10, cache_read_tokens: 5, cache_write_tokens: 2 }, undefined],
     [{ input_tokens: 10, input_tokens_include_cache: false, cache_read_tokens: 5 }, undefined],
   ])("resolves inclusive input tokens from %j", (usage, expected) => {
@@ -2967,6 +2981,26 @@ describe("sendJobConclusionSpan", () => {
       for (const span of spans) {
         expect(span.attributes).toContainEqual({ key: "error.type", value: { stringValue: expectedErrorType } });
         expect(span.status.code).toBe(2);
+      }
+    });
+
+    it("does not classify a successful agent from the triggering workflow_run conclusion", async () => {
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "");
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/aw_info.json") return JSON.stringify({ workflow_name: "CI", engine_id: "copilot", model: "gpt-4o", workflow_run_conclusion: "failure" });
+        if (filePath === "/tmp/gh-aw/agent_usage.json") return JSON.stringify({ input_tokens: 10, output_tokens: 3, cache_read_tokens: 5, cache_write_tokens: 2, input_tokens_inclusive: 17 });
+        if (filePath === "/tmp/gh-aw/agent_output.json") return JSON.stringify({ items: [], errors: [] });
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
+
+      const payloads = fetchMock.mock.calls.map(([, options]) => JSON.parse(options.body));
+      const spans = payloads.flatMap(payload => (payload.resourceSpans || []).flatMap(resourceSpans => (resourceSpans.scopeSpans || []).flatMap(scopeSpans => scopeSpans.spans || [])));
+      expect(spans).toHaveLength(2);
+      for (const span of spans) {
+        expect(span.attributes).not.toContainEqual(expect.objectContaining({ key: "error.type" }));
+        expect(span.status.code).toBe(0);
       }
     });
 

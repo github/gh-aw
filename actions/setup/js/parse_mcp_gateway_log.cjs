@@ -163,12 +163,15 @@ function parseTokenUsageJsonl(jsonlContent) {
       }
       if (dedupeKey) seenRequestIds.add(dedupeKey);
 
-      const inputTokens = parseNonNegativeFiniteNumber(entry.input_tokens) ?? 0;
+      const parsedInputTokens = parseNonNegativeFiniteNumber(entry.input_tokens);
+      const parsedCacheReadTokens = parseNonNegativeFiniteNumber(entry.cache_read_tokens);
+      const parsedCacheWriteTokens = parseNonNegativeFiniteNumber(entry.cache_write_tokens);
+      const inputTokens = parsedInputTokens ?? 0;
       const outputTokens = parseNonNegativeFiniteNumber(entry.output_tokens) ?? 0;
-      const cacheReadTokens = parseNonNegativeFiniteNumber(entry.cache_read_tokens) ?? 0;
-      const cacheWriteTokens = parseNonNegativeFiniteNumber(entry.cache_write_tokens) ?? 0;
+      const cacheReadTokens = parsedCacheReadTokens ?? 0;
+      const cacheWriteTokens = parsedCacheWriteTokens ?? 0;
       const inclusiveInputTokens =
-        parseNonNegativeFiniteNumber(entry.input_tokens) !== null && parseNonNegativeFiniteNumber(entry.cache_read_tokens) !== null && parseNonNegativeFiniteNumber(entry.cache_write_tokens) !== null
+        parsedInputTokens !== null && (entry.input_tokens_include_cache === true || (parsedCacheReadTokens !== null && parsedCacheWriteTokens !== null))
           ? computeInclusiveInputTokens({
               provider: typeof entry.provider === "string" ? entry.provider : "",
               inputTokens,

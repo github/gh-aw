@@ -9,11 +9,15 @@ const golden = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures/otel_le
 const BASE_MS = 1_700_000_000_000;
 const EXPORT_ERROR_DETAILS_FD = 12346;
 const BASE_ENV = [
+  "ALL_PROXY",
   "GH_AW_AGENT_CONCLUSION",
+  "GH_AW_DETECTION_CONCLUSION",
+  "GH_AW_DETECTION_REASON",
   "GH_AW_AIC",
   "GH_AW_CURRENT_WORKFLOW_REF",
   "GH_AW_GITHUB_EVENT_DEPLOYMENT_STATUS_STATE",
   "GH_AW_INFO_AWF_VERSION",
+  "GH_AW_INFO_ENGINE_ID",
   "GH_AW_INFO_AWMG_VERSION",
   "GH_AW_INFO_BODY_MODIFIED",
   "GH_AW_INFO_CLI_VERSION",
@@ -23,8 +27,13 @@ const BASE_ENV = [
   "GH_AW_INFO_VERSION",
   "GH_AW_INFO_WORKFLOW_NAME",
   "GH_AW_OTEL_METRICS",
+  "GH_AW_OTLP_ATTRIBUTES",
   "GH_AW_OTLP_ENDPOINTS",
+  "GH_AW_OTLP_IF_MISSING",
+  "GH_AW_PHASE",
+  "GH_AW_SETUP_AW_CONTEXT",
   "GH_AW_SETUP_WORKFLOW_NAME",
+  "GH_AW_TMP_DIR",
   "GH_AW_TRACKER_ID",
   "GITHUB_ACTOR",
   "GITHUB_ACTOR_ID",
@@ -43,6 +52,12 @@ const BASE_ENV = [
   "GITHUB_AW_OTEL_TRACE_ID",
   "GITHUB_AW_OTEL_PARENT_SPAN_ID",
   "INPUT_JOB_NAME",
+  "INPUT_PARENT_SPAN_ID",
+  "INPUT_TRACE_ID",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "OTEL_EXPORTER_OTLP_HEADERS",
+  "OTEL_EXPORTER_OTLP_PROTOCOL",
   "OTEL_RESOURCE_ATTRIBUTES",
   "OTEL_SEMCONV_STABILITY_OPT_IN",
   "OTEL_SERVICE_NAME",
@@ -128,6 +143,26 @@ function removeAdditiveFacts(facts) {
     if (["metric", "metric-attribute", "metric-value"].includes(kind) && (owner.startsWith("gen_ai.client.inference.usage.") || owner === "gen_ai.invoke_agent.duration")) return false;
     return true;
   });
+}
+
+function preservedPlatformFacts(facts) {
+  return facts
+    .flatMap(serialized => {
+      const fact = JSON.parse(serialized);
+      const [kind, owner, key] = fact;
+      if (kind === "metric" && owner === "gen_ai.client.token.usage") return [];
+      if (kind === "metric-attribute" && owner === "gen_ai.client.token.usage") return [];
+      if (kind === "metric" && owner.startsWith("gh_aw.")) return [serialized];
+      if (kind === "trace-resource" || kind === "metric-resource") return owner.startsWith("gh-aw.") || owner.startsWith("github.") ? [serialized] : [];
+      if (kind === "span-attribute" || kind === "metric-attribute") {
+        if (key === "gh-aw.action_minutes") return [];
+        if (!key.startsWith("gh-aw.") && !key.startsWith("github.")) return [];
+        const normalizedOwner = kind === "span-attribute" && (owner === "gh-aw.agent.agent" || owner.startsWith("invoke_agent ")) ? "agent-span" : owner;
+        return [JSON.stringify([kind, normalizedOwner, key, fact[3]])];
+      }
+      return [];
+    })
+    .sort();
 }
 
 describe("T-OT-020 default GenAI compatibility golden", () => {
@@ -244,5 +279,23 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
     const digest = crypto.createHash("sha256").update(facts.join("\n")).digest("hex");
     expect(facts).toHaveLength(golden[conclusion].facts);
     expect(digest).toBe(golden[conclusion].sha256);
+  });
+
+  it.each(["success", "failure"])("preserves GitHub and gh-aw facts with the latest opt-in on %s", async conclusion => {
+    process.env.GH_AW_AGENT_CONCLUSION = conclusion;
+    const capture = async () => {
+      const setup = await sendJobSetupSpan({ traceId: "0123456789abcdef0123456789abcdef", startMs: BASE_MS });
+      process.env.GITHUB_AW_OTEL_TRACE_ID = setup.traceId;
+      process.env.GITHUB_AW_OTEL_PARENT_SPAN_ID = setup.spanId;
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: BASE_MS });
+      return preservedPlatformFacts(legacyFacts(tracePayloads, metricPayloads));
+    };
+
+    const compatibleFacts = await capture();
+    tracePayloads = [];
+    metricPayloads = [];
+    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "gen_ai_latest_experimental";
+
+    expect(await capture()).toEqual(compatibleFacts);
   });
 });

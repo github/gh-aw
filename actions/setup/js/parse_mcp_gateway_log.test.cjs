@@ -2216,6 +2216,13 @@ Some content here.`;
       expect(summary.tokenUsage.input_tokens_inclusive).toBe(56);
     });
 
+    test("preserves explicitly inclusive input when cache breakdown is incomplete", () => {
+      const summary = parseTokenUsageJsonl(JSON.stringify({ provider: "unknown-provider", input_tokens: 100, input_tokens_include_cache: true }));
+      expect(summary.tokenUsage.input_tokens_inclusive).toBe(100);
+      expect(summary.tokenUsage).not.toHaveProperty("cache_read_tokens");
+      expect(summary.tokenUsage).not.toHaveProperty("cache_write_tokens");
+    });
+
     test.each([false, true])("preserves malformed evidence through request deduplication (malformed first: %s)", malformedFirst => {
       const { readDedupedTokenUsage } = require("./parse_token_usage.cjs");
       const valid = '{"request_id":"same","input_tokens":100,"output_tokens":5,"cache_read_tokens":0,"cache_write_tokens":0}';

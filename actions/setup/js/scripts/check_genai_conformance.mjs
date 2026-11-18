@@ -47,16 +47,27 @@ function collectMetricNames(value) {
   }
 }
 
+function collectAdvice(value, findings = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) collectAdvice(item, findings);
+    return findings;
+  }
+  if (!value || typeof value !== "object") return findings;
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "all_advice" && Array.isArray(child)) findings.push(...child);
+    collectAdvice(child, findings);
+  }
+  return findings;
+}
+
 for (const scenario of expectedScenarios) {
   const reportPath = path.join(reportDir, `${scenario}.json`);
   assert.ok(fs.existsSync(reportPath), `Missing Weaver report for ${scenario}: ${reportPath}`);
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   const samples = Array.isArray(report.samples) ? report.samples : [];
   assert.ok(samples.length > 0, `Weaver report for ${scenario} contains no samples`);
-
   for (const sample of samples) {
-    const advice = sample.live_check_result?.all_advice;
-    for (const finding of Array.isArray(advice) ? advice : []) {
+    for (const finding of collectAdvice(sample)) {
       const context = finding.context || {};
       const attribute = context.attribute_key || context.missing_attribute || context.attribute;
       const metric = finding.signal_name || context.metric_name || context.metric;
