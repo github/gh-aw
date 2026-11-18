@@ -10,28 +10,51 @@ func bad() {
 	src := map[string]int{"a": 1}
 	dst := make(map[string]int)
 
-	for k, v := range src { // want `range-copy loop can be replaced with maps.Copy\(dst, src\)`
+	// want +1 `range-copy loop can be replaced with maps.Copy\(dst, src\)`
+	for k, v := range src {
 		dst[k] = v
 	}
 
 	var k string
 	var v int
-	for k, v = range src { // want `range-copy loop can be replaced with maps.Copy\(dst, src\)`
+	for k, v = range src {
 		dst[k] = v
 	}
+	_ = k
+	_ = v
 
 	// A shadowed package name prevents an unsafe suggested fix.
 	{
 		maps := struct{}{}
 		_ = maps
-		for k, v := range src { // want `range-copy loop can be replaced with maps.Copy\(dst, src\)`
+		// want +1 `range-copy loop can be replaced with maps.Copy\(dst, src\)`
+		for k, v := range src {
 			dst[k] = v
 		}
 	}
 
 	// Keep comments in the loop rather than dropping them in a suggested fix.
-	for k, v := range src { // want `range-copy loop can be replaced with maps.Copy\(dst, src\)`
+	// want +1 `range-copy loop can be replaced with maps.Copy\(dst, src\)`
+	for k, v := range src {
 		// copied entry
+		dst[k] = v
+	}
+
+	nestedDst := map[string]map[string]int{"a": {}}
+	// want +1 `range-copy loop can be replaced with maps.Copy\(nestedDst\[k\], src\)`
+	for k, v := range src {
+		nestedDst[k][k] = v
+	}
+
+	nextDst := func() map[string]int { return dst }
+	// want +1 `range-copy loop can be replaced with maps.Copy\(nextDst\(\), src\)`
+	for k, v := range src {
+		nextDst()[k] = v
+	}
+
+	nextSrc := func() map[string]int { return src }
+	// want +1 `range-copy loop can be replaced with maps.Copy\(dst, nextSrc\(\)\)`
+	for k, v := range nextSrc() {
 		dst[k] = v
 	}
 }

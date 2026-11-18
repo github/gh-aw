@@ -41,6 +41,9 @@ func analyzeRangeStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 		nolint.HasDirectiveForLinter(pos, noLintIndex, "mapcopyloop") {
 		return
 	}
+	if rangeStmt.Tok != token.DEFINE {
+		return
+	}
 
 	srcType := pass.TypesInfo.TypeOf(rangeStmt.X)
 	if !isMap(srcType) {
@@ -73,7 +76,9 @@ func analyzeRangeStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 		End:     rangeStmt.End(),
 		Message: "range-copy loop can be replaced with maps.Copy(" + dstText + ", " + srcText + ")",
 	}
-	if mapsPackageVisible(pass.Pkg, rangeStmt.Pos()) &&
+	if safeCopyOperand(pass, rangeStmt.X, keyObj, valueObj) &&
+		safeCopyOperand(pass, indexExpr.X, keyObj, valueObj) &&
+		mapsPackageVisible(pass.Pkg, rangeStmt.Pos()) &&
 		!astutil.HasOverlappingComment(pass.Files, rangeStmt.Pos(), rangeStmt.End()) {
 		diag.SuggestedFixes = []analysis.SuggestedFix{{
 			Message: "Replace range-copy loop with maps.Copy",
@@ -114,22 +119,11 @@ func matchCopyBody(pass *analysis.Pass, rangeStmt *ast.RangeStmt, keyObj, valueO
 	if len(rangeStmt.Body.List) != 1 {
 		return nil, false
 	}
-	var bodyStmt ast.Stmt
-	for _, stmt := range rangeStmt.Body.List {
-		bodyStmt = stmt
-	}
-	assignStmt, ok := bodyStmt.(*ast.AssignStmt)
+	assignStmt, ok := rangeStmt.Body.List[0].(*ast.AssignStmt)
 	if !ok || assignStmt.Tok != token.ASSIGN || len(assignStmt.Lhs) != 1 || len(assignStmt.Rhs) != 1 {
 		return nil, false
 	}
-	var lhs, rhs ast.Expr
-	for _, expr := range assignStmt.Lhs {
-		lhs = expr
-	}
-	for _, expr := range assignStmt.Rhs {
-		rhs = expr
-	}
-	indexExpr, ok := lhs.(*ast.IndexExpr)
+	indexExpr, ok := assignStmt.Lhs[0].(*ast.IndexExpr)
 	if !ok {
 		return nil, false
 	}
@@ -137,11 +131,34 @@ func matchCopyBody(pass *analysis.Pass, rangeStmt *ast.RangeStmt, keyObj, valueO
 	if !ok || pass.TypesInfo.ObjectOf(keyIdent) != keyObj {
 		return nil, false
 	}
-	valueIdent, ok := rhs.(*ast.Ident)
+	valueIdent, ok := assignStmt.Rhs[0].(*ast.Ident)
 	if !ok || pass.TypesInfo.ObjectOf(valueIdent) != valueObj {
 		return nil, false
 	}
 	return indexExpr, true
+}
+
+func safeCopyOperand(pass *analysis.Pass, expr ast.Expr, keyObj, valueObj types.Object) bool {
+	switch operand := expr.(type) {
+	case *ast.Ident:
+		obj := pass.TypesInfo.ObjectOf(operand)
+		return obj != keyObj && obj != valueObj
+	case *ast.SelectorExpr:
+		if !safeCopyOperand(pass, operand.X, keyObj, valueObj) {
+			return false
+		}
+		if selection := pass.TypesInfo.Selections[operand]; selection != nil && selection.Indirect() {
+			return false
+		}
+		if receiverType := pass.TypesInfo.TypeOf(operand.X); receiverType != nil {
+			if _, isPointer := types.Unalias(receiverType).Underlying().(*types.Pointer); isPointer {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func mapsPackageVisible(pkg *types.Package, pos token.Pos) bool {
