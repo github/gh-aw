@@ -122,9 +122,12 @@ func TestCLIDocsDocumentTimeoutFlagFormats(t *testing.T) {
 	require.NoError(t, err, "should read CLI setup docs")
 
 	text := string(content)
-	assert.Contains(t, text, "| `audit`, `health` | Go duration | `--timeout 5m` | `audit`: no additional deadline; `health`: disables its collection deadline |")
-	assert.Contains(t, text, "| `logs`, `forecast` | Integer minutes | `--timeout 5` | No timeout |")
-	assert.Contains(t, text, "| `trial` | Integer minutes | `--timeout 10` | No timeout (default: 30 minutes) |")
+	assert.Contains(t, text, "| `audit` | Go duration | `0` | `--timeout 5m` | No additional deadline |")
+	assert.Contains(t, text, "| `health` | Go duration | `2m` | `--timeout 5m` | Disables its collection deadline |")
+	assert.Contains(t, text, "| `connector test` | Go duration greater than zero and at most `20s` | `20s` | `--timeout 10s` | Rejected |")
+	assert.Contains(t, text, "| `logs episode` | Go duration | `5m` | `--timeout 10m` | Rejected |")
+	assert.Contains(t, text, "| `logs`, `forecast` | Integer minutes | `0` | `--timeout 5` | No timeout |")
+	assert.Contains(t, text, "| `trial` | Integer minutes | `30` | `--timeout 10` | No timeout |")
 	assert.Equal(t, 2, strings.Count(text, "`--repos`, `--interactive/-i`, `--dry-run`"))
 }
 

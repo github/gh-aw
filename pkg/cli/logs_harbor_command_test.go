@@ -39,7 +39,7 @@ func TestLogsHarborOptions(t *testing.T) {
 			require.False(t, options.Outcomes)
 		} else {
 			require.Contains(t, options.ArtifactSets, "detection")
-			require.Contains(t, options.ArtifactSets, "adoption")
+			require.Contains(t, options.ArtifactSets, "delivery")
 			require.True(t, options.GradersOnly)
 			require.True(t, options.Outcomes)
 			require.Equal(t, "copilot", options.Engine)
@@ -48,7 +48,7 @@ func TestLogsHarborOptions(t *testing.T) {
 	cmd := NewLogsCommand()
 	require.Contains(t, cmd.Example, "logs --harbor --output ./my-logs")
 	require.Contains(t, cmd.Long, "portable Harbor job to DIR/harbor")
-	require.Contains(t, cmd.Long, "does not run graders or evaluate outcomes")
+	require.Contains(t, cmd.Long, "does not run graders or evaluate adoption unless explicitly requested")
 	opts, err := loadCommonLogsOptions(cmd)
 	require.NoError(t, err)
 	require.False(t, opts.Harbor)
