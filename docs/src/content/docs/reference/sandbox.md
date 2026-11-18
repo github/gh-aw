@@ -461,14 +461,14 @@ Pre-building in a setup job ensures the agent's `timeout-minutes` budget is spen
 
 ### Per-Tool-Call Timeout (`tools.timeout`)
 
-`tools.timeout` controls the maximum time for any single tool invocation (e.g., a `bash` command or MCP server call), in seconds. Increase this when individual commands — such as a full build or a slow test suite — routinely take longer than the engine default:
+`tools.timeout` sets a per-operation timeout in seconds where supported by the engine. For Codex, it controls native MCP tool calls and does not limit shell-command duration. Pi does not apply this setting to shell commands. Use `timeout-minutes` to bound overall execution.
 
 ```yaml wrap
 tools:
-  timeout: 600   # 10 minutes per tool call (seconds)
+  timeout: 600   # 10 minutes per supported tool operation
 ```
 
-Default values vary by engine: Claude uses 60 s, Codex uses 120 s. See [Tool Timeout Configuration](/gh-aw/reference/tools/#tool-timeout-configuration) for details.
+Claude and Codex default to 60 seconds. See [Tool Timeout Configuration](/gh-aw/reference/tools/#tool-timeout-configuration) for details.
 
 ### Self-Hosted Runners for Fast Hardware
 

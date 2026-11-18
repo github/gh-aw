@@ -46,6 +46,7 @@ require(path.join(__dirname, "shim.cjs"));
  * @property {string}  [endpoint]     - Override the OTLP endpoint.  Defaults to `OTEL_EXPORTER_OTLP_ENDPOINT`.
  * @property {boolean} [isError]      - When `true`, the span status is set to ERROR (code 2).
  * @property {string}  [errorMessage] - Human-readable status message included when `isError` is `true`.
+ * @property {() => void} [onError] - Report export failures without exposing exporter diagnostics.
  */
 
 /**
@@ -166,7 +167,8 @@ async function logSpan(toolName, attributes = {}, options = {}) {
     }
   } catch (err) {
     // Export failures must never break the workflow.
-    console.warn(`[otlp] ${toolName}: failed to emit span: ${getErrorMessage(err)}`);
+    if (options.onError) options.onError();
+    else console.warn(`[otlp] ${toolName}: failed to emit span: ${getErrorMessage(err)}`);
   }
 }
 

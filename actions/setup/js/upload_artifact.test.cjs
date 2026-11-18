@@ -3,10 +3,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createRequire } from "node:module";
 import { buildSafeOutputExecutions } from "./safe_output_execution.cjs";
+import { VERSION } from "./safe_output_authorization.cjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const { withSafeOutputInvocation } = createRequire(import.meta.url)("./safe_output_execution.cjs");
 
 const TEST_ROOT = path.join(fs.realpathSync(process.cwd()), `.gh-aw-upload-artifact-${process.pid}`);
 const STAGING_DIR = path.join(TEST_ROOT, "gh-aw", "safeoutputs", "upload-artifacts") + path.sep;
@@ -112,6 +115,56 @@ describe("upload_artifact.cjs", () => {
   });
 
   describe("path-based upload", () => {
+    it.each(["deny", "changed_artifact"])("does not upload after %s at the prepared invocation boundary", async mode => {
+      writeStaging("protected.txt", "original");
+      process.env.ACTIONS_ID_TOKEN_REQUEST_URL = "https://oidc.example.org/token";
+      process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN = "bootstrap";
+      process.env.GITHUB_RUN_ID = "456";
+      mockCore.setSecret = vi.fn();
+      const audience = "https://authority.example.org/gh-aw";
+      vi.spyOn(global, "fetch").mockImplementation(async (_url, options) => {
+        if (options.method === "GET") {
+          const payload = Buffer.from(JSON.stringify({ aud: audience, exp: Math.floor(Date.now() / 1000) + 60 })).toString("base64url");
+          return Response.json({ value: `header.${payload}.signature` });
+        }
+        const request = JSON.parse(options.body);
+        if (mode === "changed_artifact") writeStaging("protected.txt", "changed after preparation");
+        return Response.json({
+          version: VERSION,
+          decision: mode === "deny" ? "deny" : "allow",
+          request_digest: request.request_digest,
+          invocation_id: request.invocation.invocation_id,
+          run_attempt: "1",
+          policy_revision: "policy-v1",
+          decision_id: "decision-v1",
+          issued_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 20000).toISOString(),
+        });
+      });
+      const state = {
+        requirement: { endpoint: "https://authority.example.org/authorize", audience, source: "local" },
+        batchDigest: "b".repeat(64),
+        recordIndex: 0,
+        invocation: {
+          caller: {
+            host: "https://github.com",
+            repository_id: "123",
+            workflow_ref: "owner/repo/.github/workflows/test.lock.yml@refs/heads/main",
+            workflow_sha: "a".repeat(40),
+            workflow_hash: "b".repeat(64),
+            run_id: "456",
+            run_attempt: "1",
+          },
+          output: { type: "upload_artifact", name: "upload_artifact", executor: "manager", implementation_digest: "a".repeat(64) },
+          context: {},
+        },
+      };
+      const results = await withSafeOutputInvocation(state, () => runHandler(buildConfig(), [{ type: "upload_artifact", path: "protected.txt" }]));
+      expect(results[0].success).toBe(false);
+      expect(results[0].error).toContain(mode === "deny" ? "denied" : "changed after approval");
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
+    });
+
     it.each(["7", "400"])("uses expression-resolved retention %s", async retention => {
       writeStaging("report.json");
       await runHandler(buildConfig({ "retention-days": retention }), [{ type: "upload_artifact", path: "report.json" }]);

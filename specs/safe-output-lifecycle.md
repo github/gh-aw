@@ -90,6 +90,38 @@ Public JSON uses `delivery`, `adoption`, `adoption_summary`, and
 `adoption:zero_touch`, with `adoption_window` and explicit `analyze --adoption`.
 Old flags, selectors, field names, and metric references are not aliases.
 
+`value WORKFLOW` consumes these same retained native records and
+summary projections for any workflow; value functions MUST NOT replace the
+delivery/adoption classifier. Missing measurement definitions leave value
+unavailable without suppressing lifecycle evidence. Versioned measurement
+definitions select named Go evaluators over immutable Git snapshots or bounded,
+typed evidence bundles; the report
+MUST NOT launch JavaScript, execute workflow code, or silently fall back to
+another evaluator. Unsupported query/evaluator declarations fail explicitly.
+Recipes fix discovery/cohort and inspected-window policies separately from
+measurement semantics. Descriptive batches MUST NOT acquire attributed value.
+Reports retain evaluator identity, declaration digests, resolved Git ref, and
+collected evidence; live API reads are not frozen historical evidence replay.
+The reporting command MUST NOT mutate lifecycle records or historical graders.
+PR attribution additionally requires exact native human adoption, an isolated
+merge, and complete-window Git file survival; other output types retain their
+lifecycle projections without fabricated longitudinal value.
+
+Window policies MUST record version, baseline strategy, pre/post periods,
+outcome lag, independent durability, cadence, minimum samples, and overlap
+strategy. The seven-day slide policy is a compatibility default, not a universal
+validated horizon. Historical attribution MUST wait for the full outcome,
+durability, and forward-isolation horizons. Delayed aggregate improvements
+MUST remain unattributed without subject linkage.
+
+Imported `evidence-number-v1` observations MUST bind repository, workflow,
+metric, scope, subject, run, source references, and event/collection clocks.
+Unknown declarations, conflicting endpoints, malformed clocks, and nonfinite
+values MUST fail explicitly. Missing independent evidence MUST remain unavailable.
+Caller-supplied values MUST NOT authenticate adoption or survival, or acquire
+attributed value. Elapsed-time maturity MUST NOT imply complete temporal
+sampling; evidence-only replay MUST expose that sampling was not evaluated.
+
 Compact retained observations use the existing logs JSONL schema with
 `kind: output_lifecycle`, independently of run-folder retention. Retention is
 365 days from delivery, at most 20,000 identities and 16 MiB. Concurrent writes

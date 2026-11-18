@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { buildSafeOutputExecutions, canonicalSafeOutputUrl, projectSafeOutputData, finalizeBufferedReviewExecutions } from "./safe_output_execution.cjs";
+import { buildSafeOutputExecutions, canonicalSafeOutputUrl, projectSafeOutputData, finalizeBufferedReviewExecutions, withSafeOutputInvocation, authorizeSafeOutputInvocation } from "./safe_output_execution.cjs";
 import { writeSafeOutputExecutions, extractCreatedItemFromResult } from "./safe_output_manifest.cjs";
 import { main as actionHandlerFactory } from "./safe_output_action_handler.cjs";
 import { computeSafeOutputsStatus } from "./safe_outputs_status.cjs";
@@ -13,6 +13,23 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+
+describe("trusted executor authorization", () => {
+  it("preserves unconfigured execution but rejects policy without a trusted executor", async () => {
+    await expect(authorizeSafeOutputInvocation({ inputs: {} })).resolves.toEqual({ state: "not_configured" });
+    await expect(authorizeSafeOutputInvocation({ inputs: {}, config: { authorization: {} } })).rejects.toThrow("trusted prepared invocation context");
+  });
+
+  it("forwards the prepared effect to the context-bound gate and propagates denials", async () => {
+    const options = { inputs: { message: { type: "custom" } }, scope: { binding: "invocation", refs: [] } };
+    const authorize = vi.fn().mockResolvedValueOnce({ state: "allowed" }).mockRejectedValueOnce(new Error("denied"));
+    await withSafeOutputInvocation({ requirement: {}, invocation: {}, authorize }, async () => {
+      await expect(authorizeSafeOutputInvocation(options)).resolves.toEqual({ state: "allowed" });
+      expect(authorize).toHaveBeenCalledWith(options);
+      await expect(authorizeSafeOutputInvocation(options)).rejects.toThrow("denied");
+    });
+  });
 });
 
 describe("safe-output application outcomes", () => {

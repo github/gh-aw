@@ -13,6 +13,8 @@ const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { currentSafeOutputInvocation } = require("./safe_output_execution.cjs");
+const { handlerAuthorizationRequired, requireAuthorization } = require("./safe_output_authorization_gate.cjs");
 
 /**
  * Main handler factory for call_workflow.
@@ -107,9 +109,20 @@ async function main(config = {}) {
         };
       }
 
+      const invocation = currentSafeOutputInvocation();
+      if (handlerAuthorizationRequired(config)) {
+        const implementation = config["workflow-implementations"]?.[workflowName];
+        if (!implementation || typeof implementation !== "object" || ["path", "revision", "repository_id"].some(key => typeof implementation[key] !== "string" || !implementation[key])) {
+          throw new Error("Safe-output authorization requires a trusted workflow launch implementation");
+        }
+        if (!Number.isSafeInteger(invocation.recordIndex) || invocation.recordIndex < 0) throw new Error("Safe-output authorization requires a trusted workflow launch source ordinal");
+        await requireAuthorization({ inputs: { workflow: workflowName, implementation, inputs } });
+      }
+
       // Set the step outputs that the conditional `uses:` jobs check
       core.setOutput("call_workflow_name", workflowName);
       core.setOutput("call_workflow_payload", payloadJson);
+      if (Number.isSafeInteger(invocation?.recordIndex) && invocation.recordIndex >= 0) core.setOutput("call_workflow_record_index", String(invocation.recordIndex));
 
       core.info(`✓ Selected workflow: ${workflowName}`);
       core.info(`  Payload: ${logPayloadJson}`);

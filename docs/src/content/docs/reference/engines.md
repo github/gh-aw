@@ -129,7 +129,7 @@ Versions may use Actions expressions, passed through environment variables rathe
 
 ### Engine release-age cooldown
 
-Compiler-managed engine installs require releases to be at least **3 days** old by default. Configure a different age with `engine.cooldown`:
+Compiler-managed engine installs use a **3-day** minimum release age by default, except for Copilot's bundled default version described below. Configure a different age with `engine.cooldown`:
 
 ```aw
 engine:
@@ -139,7 +139,9 @@ engine:
 
 The value must be a nonnegative integer number of days; booleans, strings, durations, and expressions are rejected. `cooldown: 0` disables the check only with `strict: false`. Omitting the field keeps the default.
 
-Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass the age to npm via `NPM_CONFIG_MIN_RELEASE_AGE`, including microVM staging. npm enforces it with its built-in `min-release-age` setting, so runtime overrides need npm **11.10.0 or later**. Copilot's installer checks GitHub release publication metadata before activating a cached CLI or downloading an archive; missing or invalid metadata fails the install. The cooldown does not replace checksum verification or pins.
+Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass the age to npm via `NPM_CONFIG_MIN_RELEASE_AGE`, including microVM staging. npm enforces it with its built-in `min-release-age` setting, so runtime overrides need npm **11.10.0 or later**.
+
+Copilot's installer skips the release-age check when the version being installed matches its baked-in `DEFAULT_COPILOT_VERSION`, with or without a leading `v`. This reviewed default is synchronized with the compiler default; the exemption applies to both cached and downloaded installs, even with a longer configured cooldown. With cooldown enabled, other installed versions require GitHub release publication metadata before cache activation or download; missing or invalid metadata fails the install. An uncached `latest` request also remains subject to the cooldown. The exemption does not change checksum verification or pin requirements.
 
 The policy does not cover shell installers, `engine.command` executables, pre-agent steps, or extensions. Runtime dependency cooldowns use `runtimes.<id>.cooldown` (a boolean). Imported definitions that set `behaviors.installation.cooldown` are ignored; set `engine.cooldown` in the workflow instead.
 

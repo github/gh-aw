@@ -27,10 +27,14 @@ func isRolloutPR(pr orgRolloutPR, marker string) bool {
 	if strings.Contains(pr.Body, marker) {
 		return true
 	}
-	if marker == ghawUpgradeMarkerPrefix {
-		return pr.Title == "Upgrade agentic workflows" && strings.HasPrefix(pr.Branch, "upgrade-agentic-workflows-")
+	title := pr.Title
+	if base, version, ok := strings.Cut(title, " (gh aw v"); ok && strings.HasSuffix(version, ")") && version != ")" {
+		title = base
 	}
-	return pr.Title == "Update workflows from source" && strings.HasPrefix(pr.Branch, "update-workflows-")
+	if marker == ghawUpgradeMarkerPrefix {
+		return title == "Upgrade agentic workflows" && strings.HasPrefix(pr.Branch, "upgrade-agentic-workflows-")
+	}
+	return title == "Update workflows from source" && strings.HasPrefix(pr.Branch, "update-workflows-")
 }
 
 func rolloutMarker(command string) string {

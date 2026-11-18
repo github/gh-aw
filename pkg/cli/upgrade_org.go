@@ -332,7 +332,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	if err != nil {
 		return err
 	}
-	prBody = appendPRMessage(prBody, opts.prMessage) + "\n" + xmlMarker
+	prBody = appendUpdatePRReleaseHighlights(ctx, prBody, opts.prMessage, xmlMarker)
 	if err := validatePRBody(prBody); err != nil {
 		return err
 	}
@@ -343,7 +343,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	}
 
 	prURL, err := createPRWithChanges(ctx, "upgrade-agentic-workflows", "chore: upgrade agentic workflows",
-		"Upgrade agentic workflows", prBody, verbose, opts.autoMerge)
+		updatePRTitle("Upgrade agentic workflows"), prBody, verbose, opts.autoMerge)
 	if prURL != "" {
 		addLabelToOrgPR(ctx, prURL, agenticWorkflowsLabel, verbose)
 	}

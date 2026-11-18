@@ -182,7 +182,7 @@ With `cli-proxy: false` and an MCP-backed GitHub mode (`local` or `remote`), ser
 
 ### Tool Operation Timeout (`tools.timeout`)
 
-Sets the per-operation timeout in seconds when supported by the engine. Claude and Codex default to 60 seconds. For Codex, this configures native MCP tool calls, not shell-command duration; use `timeout-minutes` for the overall execution limit.
+Sets the per-operation timeout in seconds when supported by the engine. Claude and Codex default to 60 seconds. For Codex, this configures native MCP tool calls, not shell-command duration. Pi does not apply `tools.timeout` to shell commands. Use `timeout-minutes` for the overall execution limit.
 
 ```yaml wrap
 tools:
