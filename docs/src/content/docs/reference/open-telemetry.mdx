@@ -44,7 +44,7 @@ HTTP 401 and 403 export failures are not retried with unchanged credentials. Che
 
 ### Protobuf encoding and Azure Monitor
 
-The gh-aw JavaScript exporter defaults to OTLP/HTTP JSON (`http/json`) for traces, opt-in [compact session logs](/gh-aw/reference/compiler-enterprise-environment-controls/#unified-session-logs), and opt-in [metrics](#metrics). Set the standard protocol environment variable to use binary OTLP/HTTP protobuf instead:
+The gh-aw JavaScript exporter defaults to OTLP/HTTP JSON (`http/json`) for traces, opt-in [compact session logs](/gh-aw/reference/compiler-enterprise-environment-controls/#unified-session-logs), and [metrics](#metrics), which are enabled by default when OTLP is configured. Set the standard protocol environment variable to use binary OTLP/HTTP protobuf instead:
 
 ```yaml wrap
 env:
@@ -394,9 +394,37 @@ env:
 
 The compiler injects `${{ vars.GH_AW_OTEL_METRICS || 'true' }}` unless the workflow defines `GH_AW_OTEL_METRICS` itself. To manage the Actions variable by repository, organization, or enterprise scope, use `gh aw env get` and `gh aw env update` with `default_otel_metrics: false`; deleting the variable restores the default-on behavior. Only the literal value `true` enables metrics. When enabled, metrics are sent to `/v1/metrics` as OTLP/HTTP JSON by default, or as protobuf when `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` or `OTEL_EXPORTER_OTLP_PROTOCOL` selects `http/protobuf` (see [Protobuf encoding](#protobuf-encoding-and-azure-monitor)), using the configured OTLP endpoints and their per-endpoint headers, and are mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before export. The unified artifact includes the metrics mirror only when the effective runtime value is `true`. It contains metrics recorded in the agent job before artifact upload, including that job's built-in metrics; built-in metrics from other jobs are exported at post-job time and are not included in an artifact.
 
-The built-ins include `gh_aw.job.duration` (histogram, `s`) and `gh_aw.job.errors` (counter, `{job}` for failed, timed-out, and cancelled jobs), `gen_ai.client.token.usage` (counter, `{token}`, by `gen_ai.token.type` for input, output, cache-read, and cache-write tokens), `gh_aw.agent.turns` (histogram, `{turn}`), `gh_aw.tool_calls` (counter, `{call}`, by `gh-aw.tool.status`), and `gh_aw.workflow.output.items` (counter, `{item}`, by `gh-aw.safe_output.type`). AI-credit limit and rate-limit errors and OTLP export failures are also counted when known.
+Built-in metrics are emitted at job completion. Counters and histograms use delta temporality; durations and counts are job-level measurements.
+Unless noted, built-in metrics include `gh-aw.job.name` and `gh-aw.workflow.name` when available. Compatibility metrics use their corresponding metric's type, unit, and attributes, with the run metrics using the run conclusion as noted below.
 
-For compatibility, the exporter also emits `gh_aw.run.duration`, `gh_aw.run.errors`, `gh_aw.tokens.input`, `gh_aw.tokens.output`, `gh_aw.tokens.cache_read`, `gh_aw.tokens.cache_write`, and `gh_aw.safe_outputs` aliases with the same observations. These `run` names still describe job-level measurements; query either a canonical metric or its alias, not both. Counters and histograms use delta temporality. Metric resources may include only the bounded `gh-aw.repository`, `gh-aw.engine.id`, `gh-aw.workflow.name`, `github.event_name`, and `github.job` attributes from `OTEL_RESOURCE_ATTRIBUTES`. Run IDs and other per-run identifiers are never metric dimensions. When trace context is available, data points include trace-linked exemplars.
+| Metric | Type and unit | Attributes and emission condition |
+| --- | --- | --- |
+| `gh_aw.job.duration` | Histogram, `s` | Job result, job and workflow names, and (when known) engine and model; emitted for each completed job. |
+| `gh_aw.job.errors` | Counter, `{job}` | Job result; emitted for `failure`, `timed_out`, or `cancelled` jobs. |
+| `gen_ai.client.token.usage` | Counter, `{token}` | `gen_ai.token.type` is `input`, `output`, `input_cache_read`, or `input_cache_write`; model and engine when known. Emitted for available, non-negative token counts when token usage is enabled. |
+| `gh_aw.agent.turns` | Histogram, `{turn}` | Job and workflow names; emitted when a non-negative agent turn count is available. |
+| `gh_aw.tool_calls` | Counter, `{call}` | `gh-aw.tool.status` is `ok` or `error`; emitted for nonzero tool-call counts. |
+| `gh_aw.ai.credits.limit_exceeded` | Counter, `{event}` | Job and workflow names; emitted when an AI-credit limit is exceeded. |
+| `gh_aw.ai.credits.rate_limit_errors` | Counter, `{event}` | Job and workflow names; emitted when an AI-credit rate-limit error occurs. |
+| `gh_aw.workflow.output.items` | Counter, `{item}` | `gh-aw.safe_output.type`; emitted for each output type recorded by the workflow. |
+
+The exporter also emits these compatibility names:
+
+| Compatibility metric | Corresponding metric |
+| --- | --- |
+| `gh_aw.run.duration` | `gh_aw.job.duration` (uses the run conclusion as its result attribute) |
+| `gh_aw.run.errors` | `gh_aw.job.errors` (emitted according to the run conclusion) |
+| `gh_aw.tokens.input` | `gen_ai.client.token.usage` with `gen_ai.token.type=input` |
+| `gh_aw.tokens.output` | `gen_ai.client.token.usage` with `gen_ai.token.type=output` |
+| `gh_aw.tokens.cache_read` | `gen_ai.client.token.usage` with `gen_ai.token.type=input_cache_read` |
+| `gh_aw.tokens.cache_write` | `gen_ai.client.token.usage` with `gen_ai.token.type=input_cache_write` |
+| `gh_aw.safe_outputs` | `gh_aw.workflow.output.items` |
+
+The `gh_aw.run.*` names remain job-level measurements, not workflow-wide aggregates. Query a canonical metric or its compatibility name, not both, to avoid double counting.
+
+`gh_aw.otlp.export.failures` is a monotonic delta counter with unit `{failure}`. It counts endpoint exports that fail after bounded retries, including failures already observed before the metrics export. Its attributes use fixed classes `gh-aw.otlp.endpoint.class=configured` and `gh-aw.otlp.failure.class=export`; bounded job and workflow names may also be present. The exporter reports unreported failures to endpoints that successfully receive metrics and tracks reported failures to avoid counting them again. If no endpoint succeeds, the failure metric is still mirrored locally, but cannot be delivered to a collector. Export failures do not fail the workflow.
+
+Metric resources include standard service attributes and may include only these additional attributes from `OTEL_RESOURCE_ATTRIBUTES`: `gh-aw.repository`, `gh-aw.engine.id`, `gh-aw.workflow.name`, `github.event_name`, and `github.job`. Additional values must be strings no longer than 128 characters; other resource attributes, including run IDs and other per-run identifiers, are excluded. When trace context is available, data points include trace-linked exemplars.
 
 Custom instrumentation can use `logMetric(name, value, options)` from `otlp.cjs`:
 
@@ -410,7 +438,23 @@ await logMetric("my-tool.items_processed", 42, {
 });
 ```
 
-`type` accepts `counter`, `gauge` (the default), or `histogram`. Counters are delta sums; each histogram call records one observation and accepts optional explicit `buckets`. Calls accept at most eight attributes and 100 unique series per process; keys and string values are limited to 128 characters. Keys identifying runs, jobs, traces, spans, commits, users, actors, issues, pull requests, conversations, or URLs are rejected. Callers must not encode per-run identifiers in other attribute values. Metric names must match the OpenTelemetry instrument name syntax (a letter followed by up to 254 letters, digits, `_`, `.`, `-`, or `/`); units are limited to 63 printable ASCII characters and descriptions to 1023 characters. Calls whose name, unit, description, or attribute values contain known credential formats or configured secret values are dropped with a warning, and these fields are also redacted before mirroring and export. Export and mirror failures are non-fatal.
+`logMetric()` accepts the following parameters:
+
+| Parameter | Description and validation |
+| --- | --- |
+| `name` | Required OpenTelemetry instrument name: a letter followed by up to 254 letters, digits, `_`, `.`, `-`, or `/`. |
+| `value` | Required finite number. Counter values must be non-negative; gauges and histogram observations may be negative. |
+| `options.type` | `gauge` (default), `counter`, or `histogram`. Counters are monotonic delta sums; each histogram call records one observation. |
+| `options.unit` | Optional printable ASCII string of at most 63 characters. |
+| `options.description` | Optional string of at most 1023 characters. |
+| `options.attributes` | Optional map of at most eight string, finite-number, or boolean values. Keys and string values are limited to 128 characters. |
+| `options.buckets` | Optional finite, distinct explicit histogram bounds, sorted before export. Defaults to `[1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600]`; ignored for other types. |
+
+An attribute key matching a high-cardinality pattern (including run, job, trace, span, commit, user, actor, issue, pull-request, conversation, or URL identifiers) is rejected; do not encode per-run identifiers in other attribute values. Calls are limited to 100 unique series per process, where a series is identified by its name, type, unit, description, attributes, and (for histograms) buckets. Invalid calls are dropped with a warning and do not throw to the caller.
+
+Custom metrics are buffered for up to one second before export. Pending calls for the same series are merged: gauges keep the latest value, counters sum their values, and histograms combine their observations and bucket counts. Before a job exports its built-in metrics, it flushes any pending custom metrics.
+
+Metric names, units, descriptions, and attribute values containing known credential formats or configured secret values cause the call to be dropped. Metric fields are also screened and redacted before they are mirrored or exported. Export and mirror failures are non-fatal.
 
 ## Learn More
 
