@@ -32,7 +32,7 @@ require (
 	// available) must never be imported; enforced by the depguard rule in
 	// .golangci.yml.
 	golang.org/x/crypto v0.59.0
-	golang.org/x/mod v0.42.0
+	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.62.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/term v0.48.0
