@@ -1061,6 +1061,13 @@ func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
 		want  bool
 	}{
 		{model: "", want: true},
+		{model: "router", want: true},
+		{model: "router/economy", want: true},
+		{model: "router/balanced", want: true},
+		{model: "router/robust", want: true},
+		{model: "router/fast", want: false},
+		{model: "router/Economy", want: false},
+		{model: "router/economy?effort=high", want: false},
 		{model: "auto", want: true},
 		{model: "copilot/auto", want: true},
 		{model: "copilot/gpt-5.3-codex", want: true},

@@ -110,14 +110,17 @@ describe("resolve_model_alias", () => {
 
   it("resolves Linter Miner sub-agent models against its advertised catalog", () => {
     const workflow = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/linter-miner.md"), "utf8");
-    const agentSections = workflow.split(/^## agent:.*$/gm).slice(1);
+    const [, ...agents] = workflow.split(/^## agent: /m);
+    const models = agents.map(agent => {
+      const model = agent.match(/^model: (.+)$/m)?.[1];
+      if (!model) throw new Error("Missing model in Linter Miner sub-agent");
+      return model;
+    });
     const reflectData = {
       endpoints: [{ configured: true, provider: "copilot", models: ["claude-haiku-4.5", "claude-haiku-5.5", "claude-opus-5.5", "claude-sonnet-5", "claude-sonnet-5.5"] }],
     };
-    expect(agentSections.length).toBeGreaterThan(0);
-    for (const agentSection of agentSections) {
-      const configuredModel = agentSection.match(/^model: (.+)$/m)?.[1];
-      if (!configuredModel) throw new Error("Missing model in Linter Miner sub-agent");
+    expect(models.length).toBeGreaterThan(0);
+    for (const configuredModel of models) {
       const resolved = resolveConfiguredCopilotModel({ configuredModel, aliasMap: ALIAS_MAP, reflectData });
       expect(reflectData.endpoints[0].models).toContain(resolved);
     }
