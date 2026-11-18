@@ -145,6 +145,11 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if op.MaxResponseBytes < 1 || op.MaxResponseBytes > 1024*1024 {
 		return fmt.Errorf("operation %q maxResponseBytes must be between 1 and 1048576", name)
 	}
+	for _, input := range op.Inputs {
+		if input.Type == "array" {
+			return fmt.Errorf("operation %q: string arrays are supported only by hosted HTTP MCP tools", name)
+		}
+	}
 	if err := validateRetryPolicy(op.Retry, op.Request, phase); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
@@ -206,8 +211,21 @@ func validateInputs(inputs map[string]Input) error {
 		if !argumentPattern.MatchString(key) {
 			return fmt.Errorf("invalid input name %q", key)
 		}
-		if input.Type != "string" && input.Type != "integer" && input.Type != "number" && input.Type != "boolean" {
+		if input.Type != "string" && input.Type != "integer" && input.Type != "number" && input.Type != "boolean" && input.Type != "array" {
 			return fmt.Errorf("input %q has unsupported type", key)
+		}
+		if input.Type == "array" {
+			if input.MinItems < 1 || input.MaxItems < input.MinItems || input.MaxItems > 100 {
+				return fmt.Errorf("array input %q requires minItems and maxItems between 1 and 100", key)
+			}
+			if input.Items == nil || input.Items.Type != "string" || input.Items.Required || input.Items.Sanitize != "" {
+				return fmt.Errorf("array input %q requires bounded string items without required or sanitize", key)
+			}
+			if err := validateInputs(map[string]Input{"item": *input.Items}); err != nil {
+				return fmt.Errorf("array input %q: %w", key, err)
+			}
+		} else if input.Items != nil || input.MinItems != 0 || input.MaxItems != 0 {
+			return fmt.Errorf("input %q array constraints require type array", key)
 		}
 		if input.Type == "string" && (input.MaxLength < 1 || input.MaxLength > 65536) {
 			return fmt.Errorf("string input %q requires maxLength between 1 and 65536", key)

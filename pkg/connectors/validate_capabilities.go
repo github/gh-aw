@@ -13,6 +13,7 @@ import (
 var toolPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]{0,127}$`)
 var argumentPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]{0,127}$`)
 var writeGraphQLPattern = regexp.MustCompile(`\b(mutation|subscription)\b`)
+var mcpAPIVersionQueryPattern = regexp.MustCompile(`^api-version=[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
 
 func validatePayload(op Operation, phase string) error {
 	request := op.Request
@@ -103,12 +104,12 @@ func validateValue(value Value, inputs map[string]Input) error {
 func (s *ConnectorSpec) validateHTTPMCP() error {
 	for name, server := range s.HTTPMCP {
 		u, err := url.Parse(server.URL)
-		if !namePattern.MatchString(name) || err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(server.URL, "{}$\\") {
-			return fmt.Errorf("HTTP MCP %q requires a fixed HTTPS URL", name)
+		if !namePattern.MatchString(name) || err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || (u.RawQuery != "" && !mcpAPIVersionQueryPattern.MatchString(u.RawQuery)) || u.ForceQuery || strings.ContainsAny(server.URL, "{}$\\#") {
+			return fmt.Errorf("HTTP MCP %q requires a fixed HTTPS URL with at most one literal api-version query parameter", name)
 		}
 		credential, ok := s.Credentials[server.Credential]
 		if !ok || credential.Phase != "agent" || !server.ReadOnly || len(server.Tools) == 0 {
-			return fmt.Errorf("HTTP MCP %q requires an agent credential, readOnly: true and exact tools", name)
+			return fmt.Errorf("HTTP MCP %q requires an agent-phase credential, readOnly: true and exact tools", name)
 		}
 		if server.MaxResponseBytes < 1 || server.MaxResponseBytes > 1024*1024 {
 			return fmt.Errorf("HTTP MCP %q requires maxResponseBytes between 1 and 1048576", name)
@@ -125,8 +126,8 @@ func (s *ConnectorSpec) validateHTTPMCP() error {
 			}
 			for input, resource := range constraints.Resources {
 				field, ok := constraints.Inputs[input]
-				if !ok || field.Type != "string" || !field.Required || !namePattern.MatchString(resource) {
-					return fmt.Errorf("HTTP MCP %q resource constraints must reference required string inputs", name)
+				if !ok || (field.Type != "string" && field.Type != "array") || !field.Required || !namePattern.MatchString(resource) {
+					return fmt.Errorf("HTTP MCP %q resource constraints must reference required strings or bounded string arrays", name)
 				}
 			}
 		}
