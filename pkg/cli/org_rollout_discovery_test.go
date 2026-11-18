@@ -152,9 +152,30 @@ func TestOrgRolloutReplacementCloseError(t *testing.T) {
 }
 
 func TestOrgRolloutLegacyPRDetection(t *testing.T) {
-	assert.True(t, isRolloutPR(orgRolloutPR{Title: "Upgrade agentic workflows", Branch: "upgrade-agentic-workflows-1234"}, ghawUpgradeMarkerPrefix))
-	assert.True(t, isRolloutPR(orgRolloutPR{Title: "Update workflows from source", Branch: "update-workflows-1234"}, ghawUpdateMarkerPrefix))
-	assert.False(t, isRolloutPR(orgRolloutPR{Title: "Upgrade agentic workflows", Branch: "my-custom-change"}, ghawUpgradeMarkerPrefix))
+	for _, command := range []struct {
+		name   string
+		title  string
+		branch string
+		marker string
+	}{
+		{"update", "Update workflows from source", "update-workflows-1234", ghawUpdateMarkerPrefix},
+		{"upgrade", "Upgrade agentic workflows", "upgrade-agentic-workflows-1234", ghawUpgradeMarkerPrefix},
+	} {
+		t.Run(command.name, func(t *testing.T) {
+			for _, suffix := range []string{"", " (gh aw v1.2.3)", " (gh aw v9.8.7)", " (gh aw v1.2.3-beta.1)", " (gh aw vdev)", " (gh aw v1.2.3-4-gabcd-dirty)"} {
+				t.Run(suffix, func(t *testing.T) {
+					pr := orgRolloutPR{Title: command.title + suffix, Branch: command.branch}
+					assert.True(t, isRolloutPR(pr, command.marker), "unmarked PRs must remain discoverable")
+					pr.Branch = "my-custom-change"
+					assert.False(t, isRolloutPR(pr, command.marker), "a matching title still requires the generated branch prefix")
+				})
+			}
+			for _, suffix := range []string{" with unrelated changes", " (gh aw v)", " (gh aw v1.2.3", " (gh aw v1.2.3) extra"} {
+				assert.False(t, isRolloutPR(orgRolloutPR{Title: command.title + suffix, Branch: command.branch}, command.marker))
+			}
+		})
+	}
+	assert.True(t, isRolloutPR(orgRolloutPR{Body: ghawUpgradeMarkerPrefix, Title: "Custom title", Branch: "custom-branch"}, ghawUpgradeMarkerPrefix))
 	assert.False(t, isRolloutPR(orgRolloutPR{Body: ghawUpgradeMarkerPrefix}, ghawUpdateMarkerPrefix))
 }
 

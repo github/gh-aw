@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "schema-textual-coverage-v1",
+  "name": "Schema fields with an example",
+  "unit": "fields",
+  "direction": "higher_is_better",
+  "evaluator": "schema-example-coverage-v1",
+  "config": {
+    "schema": "pkg/parser/schemas/main_workflow_schema.json",
+    "examples": [".github/workflows", "schema-demos"]
+  }
+}

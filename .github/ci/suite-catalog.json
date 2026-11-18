@@ -1,51 +1,87 @@
 {
   "version": 1,
   "suites": [
+    { "id": "front-door-conformance", "description": "Node tests for scripts/ci-front-door*.cjs and the CGO selection and researcher workflow contracts.", "historical_duration_seconds": null, "mandatory": false },
     {
-      "id": "go-tests",
-      "description": "Existing impacted Go tests, integration compilation, and dependency-change full unit shards.",
+      "id": "verify-integration-build",
+      "description": "Compile every Go package and integration-tagged test binary with go test -run='^$' -exec=true -tags=integration ./...; executes no tests.",
       "historical_duration_seconds": null,
-      "mandatory": true
+      "mandatory": false
     },
     {
-      "id": "security",
-      "description": "Security tests, vulnerability checks, safe-output conformance, and their build prerequisites; never skippable.",
+      "id": "test",
+      "description": "Full Go unit tests with coverage across six test-name shards, including package CLI/workflow tests, fixtures, and their runtime inputs. Requires verify-integration-build.",
       "historical_duration_seconds": null,
-      "mandatory": true
+      "mandatory": false
     },
+    {
+      "id": "canary-go",
+      "description": "Check full Go unit-test coverage using artifacts from test; compare discovered test names with executed tests. Requires test and its integration compilation prerequisite.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    { "id": "impacted-go-tests", "description": "Run make test-impacted-go BASE_REF=HEAD^ to select and execute impacted Go tests from source and test changes.", "historical_duration_seconds": null, "mandatory": false },
     {
       "id": "native-javascript-tests",
-      "description": "Native JavaScript taint analysis security regressions and Actions parser conformance; never skippable.",
+      "description": "Go native JavaScript security/taint-analysis regression tests and equivalence checks against official GitHub Actions expression and workflow parsers.",
       "historical_duration_seconds": null,
-      "mandatory": true
+      "mandatory": false
+    },
+    {
+      "id": "build",
+      "description": "Build the native CLI with make build and regenerate workflow locks using npm dependencies and the Go compiler. Upload the Linux binary for consumers.",
+      "historical_duration_seconds": null,
+      "mandatory": false
     },
     {
       "id": "build-wasm",
-      "description": "WASM build and compiler golden tests for browser-compatible packages.",
+      "description": "Build cmd/gh-aw-wasm and execute Go and Node.js compiler WASM golden tests, including browser-compatible Go packages and compiler fixtures.",
       "historical_duration_seconds": null,
       "mandatory": false
     },
     {
-      "id": "mcp-server-compile-test",
-      "description": "CLI MCP server workflow compilation checks.",
+      "id": "validate-yaml",
+      "description": "Validate workflow YAML escape sequences and release compilation, skill URLs, and .github/aw/releases.json and compat.json against their schemas.",
       "historical_duration_seconds": null,
       "mandatory": false
     },
+    { "id": "bench", "description": "Run Go benchmarks and compare with historical baselines using benchstat for runtime performance regressions.", "historical_duration_seconds": null, "mandatory": false },
+    { "id": "check-validator-sizes", "description": "Run the validator source file-size checker; report oversized validation Go files.", "historical_duration_seconds": null, "mandatory": false },
+    { "id": "lint-go-format", "description": "Check formatting of Go source and test files with repository Go formatting commands.", "historical_duration_seconds": null, "mandatory": false },
+    { "id": "lint-go-golangci", "description": "Run golangci-lint on Go packages in three shards, including compiler, CLI, internal tools, test files, and lint configuration.", "historical_duration_seconds": null, "mandatory": false },
+    { "id": "lint-go-govulncheck", "description": "Run govulncheck for vulnerable Go dependencies and reachable vulnerable functions in the Go application.", "historical_duration_seconds": null, "mandatory": false },
+    {
+      "id": "lint-go-custom",
+      "description": "Run custom Go linters for native and WASM builds, console stderr checks, unchecked printf diagnostics, and action shell script linting.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    { "id": "lint-error-messages", "description": "Lint Go error messages against repository formatting and style requirements.", "historical_duration_seconds": null, "mandatory": false },
+    { "id": "actions-build", "description": "Build and validate the bundled GitHub Actions via internal/tools/actions-build and their JavaScript/shell runtime inputs.", "historical_duration_seconds": null, "mandatory": false },
+    {
+      "id": "fuzz",
+      "description": "Compile integration-tagged Go tests and run grouped parser/workflow fuzz tests covering schedules, triggers, expressions, injection, sanitization, and YAML.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    { "id": "security", "description": "Run Go security regression tests for compiler/runtime security behavior. Requires the native CLI build job.", "historical_duration_seconds": null, "mandatory": false },
+    {
+      "id": "security-scan",
+      "description": "Run zizmor, actionlint, poutine, and runner-guard through the built CLI on the poem workflow. Requires the build job's uploaded Linux binary.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    { "id": "mcp-server-compile-test", "description": "Build the native CLI and test the MCP server compile tool against a deliberately invalid workflow.", "historical_duration_seconds": null, "mandatory": false },
     {
       "id": "cross-platform-build",
-      "description": "Cross-platform CLI builds and generated shell syntax checks.",
+      "description": "Build and test the native CLI on BOTH macOS and Windows, compile sample workflows, check generated shell syntax and scan the Windows binary. Requires build.",
       "historical_duration_seconds": null,
       "mandatory": false
     },
+    { "id": "alpine-container-test", "description": "Build the Linux CLI, construct an Alpine Docker image, and compile a workflow inside it to verify container compatibility.", "historical_duration_seconds": null, "mandatory": false },
     {
-      "id": "alpine-container-test",
-      "description": "Linux CLI compatibility in Alpine containers.",
-      "historical_duration_seconds": null,
-      "mandatory": false
-    },
-    {
-      "id": "actions-build",
-      "description": "Build and validate the bundled GitHub Actions.",
+      "id": "safe-outputs-conformance",
+      "description": "Run scripts/check-safe-outputs-conformance.sh to check safe-output specifications, schemas, Go configuration, and JavaScript handlers for consistency.",
       "historical_duration_seconds": null,
       "mandatory": false
     }
