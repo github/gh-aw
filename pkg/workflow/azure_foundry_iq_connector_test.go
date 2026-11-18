@@ -188,16 +188,25 @@ const assert = require("node:assert/strict");
 const {callMCP, decodePlan, serve} = require(process.argv[1]);
 const {Readable, Writable} = require("node:stream");
 const input = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
-const noSecrets = new Proxy({}, {get() { throw new Error("credential access forbidden"); }});
+let secretReads = 0;
+const noSecrets = new Proxy({}, {get() { secretReads++; throw new Error("credential access forbidden"); }});
 let network = 0;
 const noNetwork = async () => { network++; throw new Error("network access forbidden"); };
 (async () => {
-  for (const args of [
-    {}, {queries:null}, {queries:input.question}, {queries:[]}, {queries:[input.question,input.question]},
-    {queries:[1]}, {queries:[[input.question]]}, {queries:["Unapproved"]}, {queries:["x".repeat(2049)]},
-    {queries:[input.question],knowledgeBase:"other-kb"}
+  for (const [args, message] of [
+    [{}, "Required connector argument is missing"],
+    [{queries:null}, "Connector argument must be a bounded string array"],
+    [{queries:input.question}, "Connector argument must be a bounded string array"],
+    [{queries:[]}, "Connector argument must be a bounded string array"],
+    [{queries:[input.question,input.question]}, "Connector argument must be a bounded string array"],
+    [{queries:[1]}, "Connector argument must be a bounded Unicode string"],
+    [{queries:[[input.question]]}, "Connector argument must be a bounded Unicode string"],
+    [{queries:["Unapproved"]}, "Connector argument is outside approved resources"],
+    [{queries:["x".repeat(2049)]}, "Connector argument must be a bounded Unicode string"],
+    [{queries:[input.question],knowledgeBase:"other-kb"}, "Unknown connector argument"]
   ]) await assert.rejects(callMCP(input.plan, "knowledge-base", "knowledge_base_retrieve", args,
-    {env:noSecrets, fetchImpl:noNetwork}), error => !/access forbidden/.test(error.message));
+    {env:noSecrets, fetchImpl:noNetwork}), {message});
+  assert.equal(secretReads, 0, "invalid arguments must not resolve credentials");
   assert.equal(network, 0);
   const messages = [];
   const wire = JSON.stringify({jsonrpc:"2.0",id:1,method:"tools/list",params:{}}) + "\n";
