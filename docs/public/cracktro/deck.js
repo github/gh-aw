@@ -2159,7 +2159,7 @@
   .vg-now *, .vg-now *::after { transition: none !important; }
 
   /* --- deliver · accept · attribute (column under turn automation into value) --- */
-  .daa-ex { position: absolute; right: 110px; top: 66px; display: flex; align-items: center; gap: 12px; padding: 11px 18px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 17px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #e3b341; }
+  .daa-ex { position: absolute; right: 110px; top: 140px; display: flex; align-items: center; gap: 12px; padding: 11px 18px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 17px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #e3b341; }
   .daa-ex b { color: #f0f6fc; letter-spacing: .04em; text-transform: none; }
   .active .daa-ex { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
   .daa-pr, .daa-tl, .daa-days { position: absolute; }
@@ -4190,264 +4190,6 @@
     return `<g class="${cls}" transform="translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / n).toFixed(4)})">${d.map(p => `<path d="${p}"/>`).join("")}</g>`;
   };
 
-  // Turn Intent into Value: Turn Intent to Automation's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
-  {
-    resetIndex();
-    // the pieces that define value: [chip, colour, how the agent reads it]
-    const PIECE = {
-      g: ["GOAL", "#3fb950", "100% of schema fields covered"],
-      p: ["WHAT COUNTS", "#79c0ff", "every top-level schema field"],
-      c: ["HOW TO CHECK", "#d2a8ff", "a field: line in Markdown"],
-      d: ["WHAT IT SHIPS", "#e3b341", "pull requests, followed to merge"],
-    };
-    const ORDER = ["g", "p", "c", "d"];
-    // condensed from .github/workflows/schema-feature-coverage.md: [text, colour, piece]
-    const MD = [
-      [["---", "#656c76"]],
-      [
-        ["on: ", "#ff7b72"],
-        ["weekly", "#a5d6ff"],
-      ],
-      [["safe-outputs:", "#ff7b72"]],
-      [
-        ["  ", "#7ee787"],
-        ["create-pull-request", "#7ee787", "d"],
-        [":", "#7ee787"],
-      ],
-      [["---", "#656c76"]],
-      [
-        ["Ensure ", "#f0f6fc"],
-        ["100% coverage", "#f0f6fc", "g"],
-        [" of schema features.", "#f0f6fc"],
-      ],
-      [
-        ["Every top-level property", "#f0f6fc", "p"],
-        [" in the main", "#f0f6fc"],
-      ],
-      [["JSON schema should appear in at least", "#f0f6fc"]],
-      [["one workflow file:", "#f0f6fc"]],
-      [
-        ["  grep -rl ", "#d1d7e0"],
-        ['"^${field}:"', "#a5d6ff", "c"],
-        [" …", "#d1d7e0"],
-      ],
-      [["For each uncovered field, add a demo", "#f0f6fc"]],
-      [["and open a pull request.", "#f0f6fc"]],
-    ];
-    const marks = {};
-    const pre = h(
-      "pre",
-      {},
-      MD.flatMap((line, i) => [...line.map(([s, c, k]) => (k ? (marks[k] = h("mark", { class: "tiv-hl", "--c": PIECE[k][1], style: { color: c } }, s)) : h("span", { style: { color: c } }, s))), i < MD.length - 1 ? "\n" : null])
-    );
-    const md = h("div", { class: "pf-card pf-md tiv-md" }, h("div", { class: "cap" }, "01 · Workflow"), h("div", { class: "file" }, "📄 .github/workflows/schema-feature-coverage.md"), pre);
-    const slots = ORDER.map(k => h("div", { class: "tiv-slot", "--c": PIECE[k][1] }, h("em", {}, PIECE[k][0]), h("span", {}, PIECE[k][2])));
-    const ai = h(
-      "div",
-      { class: "pf-card tiv-ai" },
-      h("div", { class: "cap" }, "02 · Design agent"),
-      h("div", { class: "tiv-who" }, h("div", { class: "tiv-orb" }, valueIcon("copilot")), h("div", {}, h("b", {}, "Value design agent"), h("code", {}, "/add-operational-value"))),
-      slots
-    );
-    // the frozen function the measured slides replay: [text, colour, piece it encodes] runs per line
-    const CODE = [
-      [["// Schema Feature Coverage · value v1", "#8b949e"]],
-      [
-        ["export const ", "#ff7b72"],
-        ["follows = ", "#e6edf3"],
-        ['"create-pull-request"', "#a5d6ff", "d"],
-        [";", "#e6edf3"],
-      ],
-      [
-        ["export function ", "#ff7b72"],
-        ["value", "#d2a8ff"],
-        ["(commit) {", "#e6edf3"],
-      ],
-      [
-        ["  const ", "#ff7b72"],
-        ["fields = ", "#e6edf3"],
-        ["schemaFields(commit)", "#e6edf3", "p"],
-        [";", "#e6edf3"],
-      ],
-      [
-        ["  if ", "#ff7b72"],
-        ["(!fields.length) ", "#e6edf3"],
-        ["return null", "#ff7b72"],
-        ["; ", "#e6edf3"],
-        ["// unknown, not 0", "#8b949e"],
-      ],
-      [
-        ["  const ", "#ff7b72"],
-        ["docs = workflowMarkdown(commit);", "#e6edf3"],
-      ],
-      [
-        ["  const ", "#ff7b72"],
-        ["covered = fields.filter(f =>", "#e6edf3"],
-      ],
-      [
-        ["    ", "#e6edf3"],
-        ["docs.hasLine(`${f}:`)", "#e6edf3", "c"],
-        [");", "#e6edf3"],
-      ],
-      [
-        ["  return ", "#ff7b72"],
-        ["covered.length / fields.length", "#e6edf3", "g"],
-        [";", "#e6edf3"],
-      ],
-      [["}", "#e6edf3"]],
-    ];
-    const CHARS = CODE.reduce((n, line) => n + line.reduce((m, [s]) => m + s.length, 0) + 1, 0);
-    const code = h("pre", {});
-    const go = h("div", { class: "tiv-go" }, "🔒 frozen before any results", h("span", {}, "deterministic: same commit, same number"));
-    const fn = h("div", { class: "pf-card tiv-fn" }, h("div", { class: "cap" }, "03 · Value function"), h("div", { class: "file" }, "⚙ value function · v1"), code, go);
-    const links = [h("div", { class: "pf-link", style: { left: "690px", width: "60px" }, "--a": "#4493f8", "--b": "#ab7df8" }), h("div", { class: "pf-link", style: { left: "1130px", width: "60px" }, "--a": "#ab7df8", "--b": "#56d4dd" })];
-    const tags = [
-      h("div", { class: "pf-tag", style: { left: "240px" } }, h("em", {}, "Your words"), "the Markdown you already wrote"),
-      h("div", { class: "pf-tag", style: { left: "740px", width: "400px" } }, h("em", {}, "Extract what defines value"), "the rest stays behind"),
-      h("div", { class: "pf-tag", style: { left: "1280px", width: "440px" } }, h("em", {}, "Frozen first"), "reviewed before any history is replayed"),
-    ];
-    const ghosts = ORDER.map(k => h("div", { class: "tiv-ghost", "--c": PIECE[k][1] }, marks[k].textContent));
-    const el = h(
-      "section",
-      { class: "slide" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value"), h("h2", { class: "pf-h" }, letters("Turn Intent into "), letters("Value", "l-grad"))),
-      links,
-      tags,
-      md,
-      ai,
-      fn,
-      ghosts,
-      h("div", { class: "tiv-cap" }, "ILLUSTRATIVE · Markdown condensed from gh-aw's schema-feature-coverage.md · /add-operational-value is a gh cao skill, a research prototype")
-    );
-    // each piece is highlighted at EXTRACT, leaves 250 ms later and lands in its slot FLY ms after that
-    const EXTRACT = [1900, 2700, 3500, 4300],
-      FLY = 750,
-      TYPE0 = 5700,
-      TYPE1 = 8100,
-      FROZEN = 8500,
-      END = 9100;
-    let t0 = 0,
-      now = 0,
-      quiet = false,
-      seen = new Set(),
-      typed = -1,
-      geo = null;
-    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
-    const past = (cond, id, snd) => {
-      if (cond && !seen.has(id)) {
-        seen.add(id);
-        if (!quiet && snd) snd();
-      }
-      return cond;
-    };
-    const type = k => {
-      if (k === typed) return;
-      typed = k;
-      code.replaceChildren();
-      let left = k;
-      for (const line of CODE) {
-        for (const [s, c, p] of line) {
-          if (left <= 0) break;
-          const part = s.slice(0, left);
-          left -= part.length;
-          code.append(p ? h("span", { class: "tiv-tok", "--c": PIECE[p][1], style: { color: c } }, part) : h("span", { style: { color: c } }, part));
-        }
-        if (left <= 0) break;
-        code.append("\n");
-        left--;
-      }
-      if (k > 0 && k < CHARS) code.append(h("span", { class: "pf-caret" }));
-    };
-    // stage position of a node: offsets ignore the cards' entrance transforms and the stage scale
-    const off = n => {
-      let x = 0,
-        y = 0;
-      for (; n && n !== el; n = n.offsetParent) {
-        x += n.offsetLeft;
-        y += n.offsetTop;
-      }
-      return [x, y];
-    };
-    const locate = () => ORDER.map((k, i) => [off(marks[k]), off(slots[i].lastElementChild)]);
-    const paint = e => {
-      const on = (node, cond) => node.classList.toggle("on", cond);
-      on(
-        md,
-        past(e >= 300, "md", () => sfx.pop(0))
-      );
-      on(tags[0], e >= 700);
-      on(links[0], e >= 1000);
-      on(
-        ai,
-        past(e >= 1200, "ai", () => sfx.pop(2))
-      );
-      md.classList.toggle("dim", e >= EXTRACT[0]);
-      if (e >= EXTRACT[0] + 250 && !geo) geo = locate();
-      ORDER.forEach((k, i) => {
-        on(
-          marks[k],
-          past(e >= EXTRACT[i], "m" + i, () => sfx.key())
-        );
-        const t = (e - EXTRACT[i] - 250) / FLY,
-          g = ghosts[i];
-        if (!geo || t <= 0 || t >= 1) g.style.opacity = "0";
-        else {
-          const [[ax, ay], [zx, zy]] = geo[i],
-            u = t < 0.5 ? 2 * t * t : 1 - (2 - 2 * t) ** 2 / 2,
-            arc = Math.sin(Math.PI * u);
-          g.style.opacity = "1";
-          g.style.transform = `translate(${(ax + (zx - ax) * u).toFixed(1)}px, ${(ay + (zy - ay) * u - 90 * arc).toFixed(1)}px) scale(${(1 + 0.12 * arc).toFixed(3)})`;
-        }
-        on(
-          slots[i],
-          past(e >= EXTRACT[i] + 250 + FLY, "s" + i, () => sfx.pop(3 + i))
-        );
-      });
-      on(tags[1], e >= EXTRACT[0] + 250 + FLY);
-      ai.classList.toggle("busy", e >= EXTRACT[3] + 250 + FLY && e < TYPE1);
-      ai.classList.toggle("done", e >= TYPE1);
-      on(links[1], e >= TYPE0 - 500);
-      on(
-        fn,
-        past(e >= TYPE0 - 300, "fn", () => sfx.pop(6))
-      );
-      type(Math.round(CHARS * Math.min(1, Math.max(0, (e - TYPE0) / (TYPE1 - TYPE0)))));
-      const frozen = past(e >= FROZEN, "frozen", () => sfx.review());
-      fn.classList.toggle("frozen", frozen);
-      on(go, frozen);
-      on(tags[2], frozen);
-    };
-    slides.push({
-      group: "platform",
-      notes:
-        "What: An illustrative, condensed run on gh-aw's real Schema Feature Coverage workflow. The add-operational-value skill from gh cao, a research prototype, keeps only what defines value: the goal (100 percent coverage), the population (top-level schema properties), the check and the output (pull requests, followed to merge).\nWhy: The result is a deterministic value function: same commit, same number. An empty population counts as unknown, not zero, and the function is frozen before any results are seen.\nWhen: Define value this way before you measure outcomes.",
-      enter() {
-        t0 = 0;
-        quiet = false;
-        seen = new Set();
-        geo = null;
-        el.classList.add("tiv-now");
-        paint(0);
-        void el.offsetWidth;
-        el.classList.remove("tiv-now");
-      },
-      onNext() {
-        if (!t0 || now - t0 >= END) return false;
-        t0 = now - END;
-        quiet = true;
-        paint(END);
-        quiet = false;
-        return true;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        now = t;
-        paint(t - t0);
-      },
-      el,
-    });
-  }
-
   // Turn Automation into Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
   {
     resetIndex();
@@ -4559,7 +4301,6 @@
       done = false;
     slides.push({
       group: "platform",
-      key: "value",
       notes:
         "What: An illustrative dashboard with synthetic data for a sample repository twelve weeks after enabling agentic workflows: backlog burndown, rising test coverage, fewer escaped bugs, shorter pull request lead time, more deploys.\nWhy: Outcomes, not run counts, show whether automation helps. These numbers are not measured and imply no savings; they show the kind of signals worth tracking. gh-aw's own measured history comes later, in the AW factory band.\nWhen: Pick a few outcome metrics like these before rollout, so you have a baseline to compare against.",
       enter() {
@@ -4609,574 +4350,6 @@
         h("div", { class: "tv-panels" }, panels),
         h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
       ),
-    });
-  }
-
-  // Deliver · Accept · Attribute: one Schema Feature Coverage pull request on its GitHub timeline, from delivery and a person's merge, through daily windows around the merge and files that stayed, to +5 attributed fields
-  {
-    resetIndex();
-    // measured: refresh/from-delivery-to-value.mjs (window "Sep 28"), the pull request itself and gh aw audit --adoption; times UTC
-    const CASE = {
-      title: "[schema-coverage] feat: add schema coverage demos for uncovered fields",
-      labels: ["automation", "schema-coverage"],
-      diff: [150, 0, 5],
-      delivered: "2026-09-28T07:08",
-      accepted: "2026-09-28T16:37",
-      parent: [63, 68],
-      // daily at the merge time: 7 before, then day 0 (the merge commit) to day 6
-      samples: [
-        [63, 68],
-        [63, 68],
-        [63, 68],
-        [63, 68],
-        [63, 68],
-        [63, 68],
-        [63, 68],
-        [68, 68],
-        [68, 68],
-        [68, 68],
-        [68, 68],
-        [68, 69],
-        [69, 69],
-        [69, 69],
-      ],
-      // first-parent commits on main to the window end, files of the merge, files touched
-      survival: [257, 5, 0],
-      through: "2026-10-05T16:37",
-    };
-    const NS = "http://www.w3.org/2000/svg",
-      day = s => `${new Date(s + "Z").getUTCDate()} ${new Date(s + "Z").toLocaleDateString("en", { month: "short", timeZone: "UTC" })}`,
-      gain = CASE.samples[7][0] - CASE.parent[0],
-      missing = ([c, n]) => n - c;
-    const badge = h("span", { class: "vg-badge" }),
-      sub = h("span", {});
-    const pr = h(
-      "div",
-      { class: "vg-card daa-pr", "--i": 0 },
-      h("h3", {}, CASE.title),
-      h(
-        "p",
-        {},
-        badge,
-        sub,
-        CASE.labels.map(l => h("span", { class: "vg-lbl" }, l)),
-        h("span", { class: "vg-diff" }, h("b", { class: "add" }, `+${CASE.diff[0]}`), " ", h("b", { class: "del" }, `−${CASE.diff[1]}`), ` · ${CASE.diff[2]} files`)
-      )
-    );
-    const mona = document.createElementNS(NS, "svg");
-    mona.setAttribute("viewBox", "0 0 46 46");
-    mona.setAttribute("class", "av");
-    mona.innerHTML = `<image href="assets/avatars/mona.jpg" width="46" height="46"/>`;
-    // [dot class, icon, what happened, step, step colour, detail]
-    const EV = [
-      ["open", valueIcon("pr"), `github-actions[bot] opened it · ${day(CASE.delivered)}, ${CASE.delivered.slice(11)}`, "Delivered", "#3fb950", `${CASE.diff[2]} demo files for uncovered fields`],
-      ["merged", mona, `mona merged it · ${CASE.accepted.slice(11)}`, "Accepted", "#d2a8ff", "a person's decision, in gh-aw's native record"],
-      ["", valueIcon("calendar"), "Two windows open at the merge", "Measured", "#79c0ff", "7 days before and 7 days after, once a day"],
-      ["ok", valueIcon("shield"), `Its ${CASE.survival[1]} files stayed untouched`, "Kept", "#79c0ff", `${CASE.survival[0]} commits to main, through ${day(CASE.through)}`],
-      ["gold", "✦", `+${gain} fields attributed`, "Value", "#e3b341", `${CASE.parent.join("/")} → ${CASE.samples[7].join("/")} covered at the merge`],
-    ];
-    const evs = EV.map(([k, icon, b, step, c, s]) => h("div", { class: "vg-ev", "--c": c }, h("div", { class: "vg-dot " + k }, icon), h("div", {}, h("b", {}, b), h("span", {}, h("strong", {}, step), " · ", s))));
-    const sq = CASE.samples.map(v => h("div", { class: "daa-sq " + (missing(v) ? "miss" : "full") }, String(missing(v))));
-    const mg = h("div", { class: "daa-mg" }),
-      wins = [h("span", {}, "7 days before"), h("span", {}, "7 days after")];
-    const SPARK = [
-      [-260, -70],
-      [-200, -120],
-      [-90, -140],
-      [40, -150],
-      [170, -130],
-      [270, -80],
-      [290, 20],
-      [-280, 30],
-      [-150, 90],
-      [150, 95],
-    ];
-    const tada = h(
-      "div",
-      { class: "daa-tada" },
-      h("i", {}, "ATTRIBUTED VALUE"),
-      h("b", {}, `+${gain} fields`),
-      h("span", {}, "earned by this pull request · event-aligned, not the sole cause"),
-      SPARK.map(([dx, dy], k) => h("span", { class: "daa-sp", "--dx": dx + "px", "--dy": dy + "px", "--k": k }, "✦"))
-    );
-    const days = h(
-      "div",
-      { class: "daa-days", "--i": 2 },
-      h("i", {}, "Schema fields still missing an example · daily"),
-      h("div", { class: "daa-wins" }, wins),
-      h("div", { class: "daa-strip" }, sq.slice(0, 7), mg, sq.slice(7)),
-      h("div", { class: "daa-legend" }, h("span", {}, "sampled at the merge time"), h("span", {}, h("b", {}, "│"), " merge = acceptance")),
-      tada
-    );
-    const el = h(
-      "section",
-      { class: "slide" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value · one pull request, end to end"), h("h2", { class: "pf-h" }, letters("Deliver · Accept · "), letters("Attribute", "l-grad"))),
-      h("div", { class: "daa-ex" }, "excerpt", h("b", {}, `${day(CASE.accepted.slice(0, 10) + "T00:00")} ± 7 days`), "↓ full record"),
-      pr,
-      h("div", { class: "daa-tl", "--i": 1 }, evs),
-      days,
-      h("div", { class: "vg-cap" }, `MEASURED · gh-aw, replayed 17 Nov 2026 · one Schema Feature Coverage pull request, ${day(CASE.delivered)} 2026, UTC · the maintainer is shown as Mona · textual check, not correctness`)
-    );
-    const EV_AT = [700, 1700, 2900, 6900, 7600],
-      MERGE = 2300,
-      B0 = 3200,
-      A0 = 4000,
-      STEP = 380,
-      END = 8200;
-    let t0 = 0,
-      now = 0,
-      quiet = false,
-      seen = new Set(),
-      merged = null;
-    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
-    const past = (cond, id, snd) => {
-      if (cond && !seen.has(id)) {
-        seen.add(id);
-        if (!quiet && snd) snd();
-      }
-      return cond;
-    };
-    const paint = e => {
-      evs.forEach((node, i) =>
-        node.classList.toggle(
-          "on",
-          past(e >= EV_AT[i], "e" + i, () => (i === 4 ? sfx.compile() : sfx.pop(i * 2)))
-        )
-      );
-      const m = past(e >= MERGE, "merge", () => sfx.review());
-      if (m !== merged) {
-        merged = m;
-        badge.classList.toggle("merged", m);
-        badge.replaceChildren(valueIcon(m ? "merge" : "pr"), m ? "Merged" : "Open");
-        sub.replaceChildren(h("b", {}, m ? "mona" : "github-actions[bot]"), m ? " merged 1 commit into " : " wants to merge 1 commit into ", h("b", {}, "main"));
-      }
-      wins.forEach(w => w.classList.toggle("on", e >= EV_AT[2]));
-      mg.classList.toggle("on", e >= EV_AT[2]);
-      sq.forEach((node, j) => {
-        const at = j < 7 ? B0 + (6 - j) * 90 : A0 + (j - 7) * STEP;
-        node.classList.toggle("on", past(e >= at, "q" + j, j < 7 ? (j === 6 ? () => sfx.key() : null) : () => sfx.key(0.6)));
-      });
-      tada.classList.toggle("on", e >= EV_AT[4]);
-    };
-    slides.push({
-      group: "platform",
-      under: "value",
-      notes:
-        "What: One real Schema Feature Coverage pull request on its GitHub timeline, measured by a retrospective replay (snapshot 17 November 2026); the maintainer is shown as Mona, which is illustrative. On 28 September 2026 at 07:08 UTC a safe output opened it with five demo files (delivery); at 16:37 a maintainer merged it, which gh-aw's native adoption record classifies as an explicit human decision (acceptance). Daily samples seven days before and after count schema fields still missing an example: five before; 63 of 68 covered at the exact first parent, 68 of 68 at the merge. A later one-day gap came from a new schema field: everyone's work, not credited here.\nWhy: Credit needs gates: none of 257 commits on main up to 5 October touched its files, and no other merge of the workflow fell within seven days, so it earns five fields.\nWhen: Apply such gates before crediting any workflow. This is event-aligned, not exclusive causation; the check is textual presence, not working examples, fewer defects or saved hours.",
-      enter() {
-        t0 = 0;
-        quiet = false;
-        seen = new Set();
-        merged = null;
-        el.classList.add("vg-now");
-        paint(0);
-        void el.offsetWidth;
-        el.classList.remove("vg-now");
-      },
-      onNext() {
-        if (!t0 || now - t0 >= END) return false;
-        t0 = now - END;
-        quiet = true;
-        paint(END);
-        quiet = false;
-        return true;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        now = t;
-        paint(t - t0);
-      },
-      el,
-    });
-  }
-
-  // From Delivery to Value: the full record of Schema Feature Coverage on gh-aw: pull requests opened and merged, all-author coverage from 71% to 100%, six small seven-day windows, and +5 fields attributed to the one merge that passes every gate
-  {
-    resetIndex();
-    // Schema Feature Coverage, measured with refresh/from-delivery-to-value.mjs: [covered, total] every Sunday 12:00 UTC from 22 Mar 2026; the last row is LAST
-    const COVER = [
-      [32, 45],
-      [32, 47],
-      [32, 49],
-      [32, 51],
-      [32, 53],
-      [33, 53],
-      [34, 53],
-      [37, 56],
-      [41, 58],
-      [47, 56],
-      [45, 55],
-      [51, 57],
-      [51, 55],
-      [55, 56],
-      [57, 57],
-      [58, 59],
-      [58, 60],
-      [60, 62],
-      [60, 62],
-      [60, 62],
-      [61, 63],
-      [61, 65],
-      [62, 67],
-      [63, 68],
-      [63, 68],
-      [63, 68],
-      [63, 68],
-      [63, 68],
-      [69, 69],
-      [69, 71],
-      [69, 71],
-      [70, 71],
-      [71, 72],
-      [72, 73],
-      [75, 75],
-      [75, 75],
-    ];
-    const LAST = "2026-11-17";
-    // the workflow's marked pull requests: [delivered, merged or null], UTC
-    const OUT = [
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:36", null],
-      ["2026-05-04T07:37", "2026-05-04T13:47"],
-      ["2026-05-04T07:37", "2026-05-04T13:47"],
-      ["2026-05-11T07:48", null],
-      ["2026-05-11T07:48", null],
-      ["2026-05-11T07:48", null],
-      ["2026-05-11T07:48", null],
-      ["2026-05-11T07:48", null],
-      ["2026-05-11T07:49", null],
-      ["2026-05-11T07:49", null],
-      ["2026-05-11T07:49", null],
-      ["2026-05-11T07:49", null],
-      ["2026-05-18T07:55", "2026-05-18T12:37"],
-      ["2026-05-18T07:55", "2026-05-18T13:14"],
-      ["2026-05-18T07:55", "2026-05-18T13:57"],
-      ["2026-05-18T07:55", null],
-      ["2026-05-18T07:55", "2026-05-18T12:48"],
-      ["2026-05-18T07:55", "2026-05-18T12:47"],
-      ["2026-05-18T07:56", null],
-      ["2026-05-18T07:56", "2026-05-18T12:47"],
-      ["2026-05-18T07:56", "2026-05-18T12:46"],
-      ["2026-05-18T07:56", "2026-05-18T12:45"],
-      ["2026-06-01T08:22", null],
-      ["2026-06-01T08:22", null],
-      ["2026-06-01T08:22", null],
-      ["2026-06-01T08:22", null],
-      ["2026-06-01T08:23", null],
-      ["2026-06-08T08:18", null],
-      ["2026-06-15T08:39", "2026-06-15T13:21"],
-      ["2026-06-15T08:39", "2026-06-15T13:21"],
-      ["2026-06-15T08:40", "2026-06-15T13:22"],
-      ["2026-06-15T08:40", "2026-06-15T13:20"],
-      ["2026-08-17T06:46", "2026-08-17T11:24"],
-      ["2026-09-28T07:08", "2026-09-28T16:37"],
-      ["2026-10-19T07:09", "2026-10-19T14:15"],
-      ["2026-10-26T07:11", "2026-10-26T11:57"],
-      ["2026-11-02T06:47", "2026-11-02T14:24"],
-    ];
-    // inspected windows: [label, merged PRs, first merge, last merge, example gaps closed, fields retired, before, after-window end, 7 + 7 daily samples]
-    const WIN = [
-      [
-        "May 4",
-        2,
-        "2026-05-04T13:47",
-        "2026-05-04T13:47",
-        2,
-        0,
-        [35, 54],
-        [39, 58],
-        [
-          [33, 53],
-          [33, 53],
-          [33, 53],
-          [33, 53],
-          [33, 53],
-          [34, 53],
-          [34, 53],
-          [37, 54],
-          [36, 54],
-          [37, 54],
-          [37, 54],
-          [37, 54],
-          [37, 55],
-          [37, 56],
-        ],
-      ],
-      [
-        "May 18",
-        8,
-        "2026-05-18T12:37",
-        "2026-05-18T13:57",
-        7,
-        1,
-        [41, 58],
-        [47, 56],
-        [
-          [39, 58],
-          [39, 58],
-          [41, 58],
-          [41, 58],
-          [41, 58],
-          [41, 58],
-          [41, 58],
-          [48, 57],
-          [48, 57],
-          [48, 57],
-          [48, 57],
-          [48, 56],
-          [47, 56],
-          [47, 56],
-        ],
-      ],
-      [
-        "Jun 15",
-        4,
-        "2026-06-15T13:20",
-        "2026-06-15T13:22",
-        4,
-        0,
-        [51, 55],
-        [55, 56],
-        [
-          [50, 55],
-          [51, 55],
-          [51, 55],
-          [51, 55],
-          [51, 55],
-          [51, 55],
-          [51, 55],
-          [55, 55],
-          [55, 55],
-          [54, 55],
-          [54, 55],
-          [54, 55],
-          [55, 56],
-          [55, 56],
-        ],
-      ],
-      [
-        "Sep 28",
-        1,
-        "2026-09-28T16:37",
-        "2026-09-28T16:37",
-        5,
-        0,
-        [63, 68],
-        [69, 69],
-        [
-          [63, 68],
-          [63, 68],
-          [63, 68],
-          [63, 68],
-          [63, 68],
-          [63, 68],
-          [63, 68],
-          [68, 68],
-          [68, 68],
-          [68, 68],
-          [68, 68],
-          [68, 69],
-          [69, 69],
-          [69, 69],
-        ],
-      ],
-      [
-        "Oct 26",
-        1,
-        "2026-10-26T11:57",
-        "2026-10-26T11:57",
-        1,
-        0,
-        [70, 71],
-        [71, 72],
-        [
-          [69, 71],
-          [70, 71],
-          [70, 71],
-          [70, 71],
-          [70, 71],
-          [70, 71],
-          [70, 71],
-          [71, 71],
-          [71, 71],
-          [71, 71],
-          [71, 71],
-          [71, 71],
-          [71, 72],
-          [71, 72],
-        ],
-      ],
-      [
-        "Nov 2",
-        1,
-        "2026-11-02T14:24",
-        "2026-11-02T14:24",
-        1,
-        0,
-        [71, 72],
-        [73, 74],
-        [
-          [71, 71],
-          [71, 71],
-          [71, 71],
-          [71, 71],
-          [71, 71],
-          [71, 72],
-          [71, 72],
-          [72, 72],
-          [72, 72],
-          [72, 72],
-          [72, 73],
-          [72, 73],
-          [72, 73],
-          [72, 73],
-        ],
-      ],
-    ];
-    // the window whose merge passes every gate, zoomed into on Deliver · Accept · Attribute
-    const EXCERPT = "Sep 28";
-    const DAY = 864e5,
-      T0 = Date.parse("2026-03-22T12:00Z"),
-      T1 = Date.parse(LAST + "T12:00Z");
-    const t = s => Date.parse(s + "Z"),
-      X = ms => 160 + (1530 * (ms - T0)) / (T1 - T0),
-      Y = p => 40 + (100 - p) * 5,
-      pc = ([c, n]) => (100 * c) / n,
-      f1 = n => n.toFixed(1),
-      xi = WIN.findIndex(w => w[0] === EXCERPT);
-    const STATS = [
-      [OUT.length, "pull requests opened by the workflow"],
-      [OUT.filter(o => o[1]).length, "of them merged"],
-      [`${Math.round(pc(COVER[0]))}% → ${Math.round(pc(COVER.at(-1)))}%`, "schema fields with an example · all authors"],
-      [`+${WIN[xi][4]} fields`, "attributed · one merge passed every gate", "gold"],
-    ];
-    const stats = h(
-      "div",
-      { class: "dtv-stats", "--i": 0 },
-      STATS.map(([b, s, k]) => h("div", { class: k ? "dtv-n " + k : "dtv-n" }, h("b", {}, String(b)), h("span", {}, s)))
-    );
-    // one coverage trace: weekly snapshots plus each window's daily samples and endpoints, in time order
-    const pts = COVER.map((v, i) => [i < COVER.length - 1 ? T0 + i * 7 * DAY : T1, v]);
-    for (const [, , f, l, , , b, e, s] of WIN) {
-      s.forEach((v, d) => v && pts.push([(d < 7 ? t(f) : t(l)) + (d - 7) * DAY, v]));
-      pts.push([t(f) - 6e4, b]);
-      if (e) pts.push([t(l) + 7 * DAY, e]);
-    }
-    pts.sort((a, b) => a[0] - b[0]);
-    // pull requests per UTC day: [first time, count]
-    const perDay = list => [...list.reduce((m, s) => m.set(s.slice(0, 10), [m.get(s.slice(0, 10))?.[0] ?? s, (m.get(s.slice(0, 10))?.[1] ?? 0) + 1]), new Map()).values()];
-    let g = `<defs><clipPath id="dtv-clip"><rect x="0" y="0" width="0" height="300"/></clipPath></defs>`;
-    for (const p of [50, 75, 100]) g += `<line class="dtv-grid" x1="160" x2="1690" y1="${Y(p)}" y2="${Y(p)}"/><text x="150" y="${Y(p) + 5}" text-anchor="end">${p}%</text>`;
-    for (let m = 3; m <= 10; m++) {
-      const M = Date.UTC(2026, m, 1);
-      g += `<line class="dtv-grid" x1="${f1(X(M))}" x2="${f1(X(M))}" y1="24" y2="508"/><text x="${f1(X(M))}" y="14" text-anchor="middle">${new Date(M).toLocaleDateString("en", { month: "short", timeZone: "UTC" })}</text>`;
-    }
-    g += `<text class="dtv-hd" x="172" y="66">SCHEMA FIELDS WITH AN EXAMPLE · ALL AUTHORS</text>`;
-    g += `<text class="dtv-hd" x="150" y="336" text-anchor="end">WINDOWS</text><text x="150" y="358" text-anchor="end"><tspan fill="#ffa657">before</tspan> · <tspan fill="#79c0ff">after</tspan></text>`;
-    g += `<text class="dtv-hd" x="150" y="457" text-anchor="end">OPENED</text><text class="dtv-hd" x="150" y="501" text-anchor="end">MERGED</text>`;
-    g += `<text class="dtv-hi" x="168" y="${f1(Y(pc(COVER[0])) - 14)}">${Math.round(pc(COVER[0]))}%</text>`;
-    // [markup, the time the sweep reveals it, sound]: a window shows once its after period is complete
-    const FX = [];
-    WIN.forEach(([, , f, l, gaps, , , end], i) => {
-      const y = 318 + i * 16,
-        F = t(f),
-        L = t(l);
-      FX.push([
-        `<rect class="dtv-bb" x="${f1(X(F - 7 * DAY))}" y="${y - 5}" width="${f1(X(F) - X(F - 7 * DAY))}" height="10" rx="3"/><rect class="dtv-ab" x="${f1(X(L))}" y="${y - 5}" width="${f1(X(L + 7 * DAY) - X(L))}" height="10" rx="3"/><text class="dtv-gap" x="${f1(X(L + 7 * DAY) + 6)}" y="${y + 5}">${end ? `+${gaps}` : "pending"}</text>`,
-        Math.min(L + 7 * DAY, T1),
-      ]);
-    });
-    for (const [s, n] of perDay(OUT.map(o => o[0]))) FX.push([valueGlyph("pr", X(t(s)), 452, 18, "dtv-po") + (n > 1 ? `<text class="dtv-pn" x="${f1(X(t(s)))}" y="434" text-anchor="middle">${n}</text>` : ""), t(s), "d"]);
-    for (const [s, n] of perDay(OUT.filter(o => o[1]).map(o => o[1])))
-      FX.push([valueGlyph("merge", X(t(s)), 496, 18, "dtv-pm") + (n > 1 ? `<text class="dtv-pn" x="${f1(X(t(s)))}" y="523" text-anchor="middle">${n}</text>` : ""), t(s), "m"]);
-    FX.push([`<circle class="dtv-end" cx="${f1(X(T1))}" cy="${f1(Y(pc(COVER.at(-1))))}" r="5"/><text class="dtv-hi" x="1690" y="${f1(Y(pc(COVER.at(-1))) - 14)}" text-anchor="end">${Math.round(pc(COVER.at(-1)))}%</text>`, T1]);
-    g += FX.map(([s], i) => `<g class="dtv-fx" data-fx="${i}">${s}</g>`).join("");
-    g += `<g clip-path="url(#dtv-clip)"><path class="dtv-cov" d="M${pts.map(([T, v]) => `${f1(X(T))} ${f1(Y(pc(v)))}`).join(" L")}"/></g>`;
-    // outline the window Deliver · Accept · Attribute zoomed into
-    const ex0 = X(t(WIN[xi][2]) - 7 * DAY) - 10,
-      ex1 = X(t(WIN[xi][3]) + 7 * DAY) + 30;
-    g += `<g class="dtv-fx dtv-ex" data-ex="1"><rect x="${f1(ex0)}" y="24" width="${f1(ex1 - ex0)}" height="488" rx="8"/><text x="${f1((ex0 + ex1) / 2)}" y="534" text-anchor="middle">↑ excerpt · +${WIN[xi][4]} attributed</text></g>`;
-    g += `<line class="dtv-cur" x1="160" x2="160" y1="24" y2="508"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "dtv-svg");
-    svg.setAttribute("viewBox", "0 0 1700 552");
-    svg.innerHTML = g;
-    const clip = svg.querySelector("#dtv-clip rect"),
-      cur = svg.querySelector(".dtv-cur"),
-      fx = [...svg.querySelectorAll("[data-fx]")].map(node => [node, FX[+node.dataset.fx][1], FX[+node.dataset.fx][2]]),
-      exBox = svg.querySelector("[data-ex]");
-    const el = h(
-      "section",
-      { class: "slide" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value · the full record, Mar – Nov 2026"), h("h2", { class: "pf-h" }, letters("From Delivery to "), letters("Value", "l-grad"))),
-      stats,
-      h("div", { class: "dtv-chart", "--i": 1 }, svg),
-      h("div", { class: "dtv-cap" }, "MEASURED · gh-aw, replayed 17 Nov 2026 · weekly main snapshots, daily in windows · textual check, not correctness · pull requests found by search · merge = adoption proxy")
-    );
-    const SW0 = 1200,
-      SW1 = 8000,
-      EX = 8500,
-      END = 9100;
-    let t0 = 0,
-      now = 0,
-      quiet = false,
-      seen = new Set();
-    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
-    const past = (cond, id, snd) => {
-      if (cond && !seen.has(id)) {
-        seen.add(id);
-        if (!quiet && snd) snd();
-      }
-      return cond;
-    };
-    const paint = e => {
-      const S = T0 + (T1 - T0) * Math.min(1, Math.max(0, (e - SW0) / (SW1 - SW0))),
-        x = f1(X(S));
-      clip.setAttribute("width", f1(X(S) + 4));
-      cur.setAttribute("x1", x);
-      cur.setAttribute("x2", x);
-      cur.style.opacity = e > SW0 && e < SW1 ? "" : "0";
-      fx.forEach(([node, T, k], i) => node.classList.toggle("on", past(e > SW0 && S >= T, "fx" + i, k === "d" ? () => sfx.pop(2) : k === "m" ? () => sfx.key(0.8) : null)));
-      exBox.classList.toggle(
-        "on",
-        past(e >= EX, "ex", () => sfx.pop(5))
-      );
-    };
-    slides.push({
-      group: "platform",
-      under: "value",
-      notes:
-        "What: The full record behind the previous slide, measured by a retrospective replay of gh-aw's Schema Feature Coverage workflow. The line applies the frozen value function, a textual check counting every author, to 36 weekly snapshots of main, 22 March to 17 November 2026: from 32 of 45 fields with an example (71 percent) to 75 of 75; the 39 fields present throughout went 30 to 39. Icons show 44 opened pull requests, found by producer footer (not complete history), and 19 merges, only an adoption proxy. Bars are six inspected seven-day windows (84 daily samples); merges on 17 August and 19 October closed one gap each without a window, and one May merge only retired the dependencies field.\nWhy: Outcomes rose, yet only the 28 September merge, outlined in gold, passes every attribution gate; the others are shared, grouped or lack a native adoption record. Exclusive causality is never claimed.\nWhen: Use this to judge a workflow's value. gh cao is a research prototype and this is not a published result; pull requests, merges or run success alone are not value.",
-      enter() {
-        t0 = 0;
-        quiet = false;
-        seen = new Set();
-        el.classList.add("dtv-now");
-        paint(0);
-        void el.offsetWidth;
-        el.classList.remove("dtv-now");
-      },
-      onNext() {
-        if (!t0 || now - t0 >= END) return false;
-        t0 = now - END;
-        quiet = true;
-        paint(END);
-        quiet = false;
-        return true;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        now = t;
-        paint(t - t0);
-      },
-      el,
     });
   }
 
@@ -14250,6 +13423,836 @@
         }
       },
       el: sec,
+    });
+  }
+
+  // Turn Intent into Value: Turn Intent to Automation's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
+  {
+    resetIndex();
+    // the pieces that define value: [chip, colour, how the agent reads it]
+    const PIECE = {
+      g: ["GOAL", "#3fb950", "100% of schema fields covered"],
+      p: ["WHAT COUNTS", "#79c0ff", "every top-level schema field"],
+      c: ["HOW TO CHECK", "#d2a8ff", "a field: line in Markdown"],
+      d: ["WHAT IT SHIPS", "#e3b341", "pull requests, followed to merge"],
+    };
+    const ORDER = ["g", "p", "c", "d"];
+    // condensed from .github/workflows/schema-feature-coverage.md: [text, colour, piece]
+    const MD = [
+      [["---", "#656c76"]],
+      [
+        ["on: ", "#ff7b72"],
+        ["weekly", "#a5d6ff"],
+      ],
+      [["safe-outputs:", "#ff7b72"]],
+      [
+        ["  ", "#7ee787"],
+        ["create-pull-request", "#7ee787", "d"],
+        [":", "#7ee787"],
+      ],
+      [["---", "#656c76"]],
+      [
+        ["Ensure ", "#f0f6fc"],
+        ["100% coverage", "#f0f6fc", "g"],
+        [" of schema features.", "#f0f6fc"],
+      ],
+      [
+        ["Every top-level property", "#f0f6fc", "p"],
+        [" in the main", "#f0f6fc"],
+      ],
+      [["JSON schema should appear in at least", "#f0f6fc"]],
+      [["one workflow file:", "#f0f6fc"]],
+      [
+        ["  grep -rl ", "#d1d7e0"],
+        ['"^${field}:"', "#a5d6ff", "c"],
+        [" …", "#d1d7e0"],
+      ],
+      [["For each uncovered field, add a demo", "#f0f6fc"]],
+      [["and open a pull request.", "#f0f6fc"]],
+    ];
+    const marks = {};
+    const pre = h(
+      "pre",
+      {},
+      MD.flatMap((line, i) => [...line.map(([s, c, k]) => (k ? (marks[k] = h("mark", { class: "tiv-hl", "--c": PIECE[k][1], style: { color: c } }, s)) : h("span", { style: { color: c } }, s))), i < MD.length - 1 ? "\n" : null])
+    );
+    const md = h("div", { class: "pf-card pf-md tiv-md" }, h("div", { class: "cap" }, "01 · Workflow"), h("div", { class: "file" }, "📄 .github/workflows/schema-feature-coverage.md"), pre);
+    const slots = ORDER.map(k => h("div", { class: "tiv-slot", "--c": PIECE[k][1] }, h("em", {}, PIECE[k][0]), h("span", {}, PIECE[k][2])));
+    const ai = h(
+      "div",
+      { class: "pf-card tiv-ai" },
+      h("div", { class: "cap" }, "02 · Design agent"),
+      h("div", { class: "tiv-who" }, h("div", { class: "tiv-orb" }, valueIcon("copilot")), h("div", {}, h("b", {}, "Value design agent"), h("code", {}, "/add-operational-value"))),
+      slots
+    );
+    // the frozen function the measured slides replay: [text, colour, piece it encodes] runs per line
+    const CODE = [
+      [["// Schema Feature Coverage · value v1", "#8b949e"]],
+      [
+        ["export const ", "#ff7b72"],
+        ["follows = ", "#e6edf3"],
+        ['"create-pull-request"', "#a5d6ff", "d"],
+        [";", "#e6edf3"],
+      ],
+      [
+        ["export function ", "#ff7b72"],
+        ["value", "#d2a8ff"],
+        ["(commit) {", "#e6edf3"],
+      ],
+      [
+        ["  const ", "#ff7b72"],
+        ["fields = ", "#e6edf3"],
+        ["schemaFields(commit)", "#e6edf3", "p"],
+        [";", "#e6edf3"],
+      ],
+      [
+        ["  if ", "#ff7b72"],
+        ["(!fields.length) ", "#e6edf3"],
+        ["return null", "#ff7b72"],
+        ["; ", "#e6edf3"],
+        ["// unknown, not 0", "#8b949e"],
+      ],
+      [
+        ["  const ", "#ff7b72"],
+        ["docs = workflowMarkdown(commit);", "#e6edf3"],
+      ],
+      [
+        ["  const ", "#ff7b72"],
+        ["covered = fields.filter(f =>", "#e6edf3"],
+      ],
+      [
+        ["    ", "#e6edf3"],
+        ["docs.hasLine(`${f}:`)", "#e6edf3", "c"],
+        [");", "#e6edf3"],
+      ],
+      [
+        ["  return ", "#ff7b72"],
+        ["covered.length / fields.length", "#e6edf3", "g"],
+        [";", "#e6edf3"],
+      ],
+      [["}", "#e6edf3"]],
+    ];
+    const CHARS = CODE.reduce((n, line) => n + line.reduce((m, [s]) => m + s.length, 0) + 1, 0);
+    const code = h("pre", {});
+    const go = h("div", { class: "tiv-go" }, "🔒 frozen before any results", h("span", {}, "deterministic: same commit, same number"));
+    const fn = h("div", { class: "pf-card tiv-fn" }, h("div", { class: "cap" }, "03 · Value function"), h("div", { class: "file" }, "⚙ value function · v1"), code, go);
+    const links = [h("div", { class: "pf-link", style: { left: "690px", width: "60px" }, "--a": "#4493f8", "--b": "#ab7df8" }), h("div", { class: "pf-link", style: { left: "1130px", width: "60px" }, "--a": "#ab7df8", "--b": "#56d4dd" })];
+    const tags = [
+      h("div", { class: "pf-tag", style: { left: "240px" } }, h("em", {}, "Your words"), "the Markdown you already wrote"),
+      h("div", { class: "pf-tag", style: { left: "740px", width: "400px" } }, h("em", {}, "Extract what defines value"), "the rest stays behind"),
+      h("div", { class: "pf-tag", style: { left: "1280px", width: "440px" } }, h("em", {}, "Frozen first"), "reviewed before any history is replayed"),
+    ];
+    const ghosts = ORDER.map(k => h("div", { class: "tiv-ghost", "--c": PIECE[k][1] }, marks[k].textContent));
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value"), h("h2", { class: "pf-h" }, letters("Turn Intent into "), letters("Value", "l-grad"))),
+      links,
+      tags,
+      md,
+      ai,
+      fn,
+      ghosts,
+      h("div", { class: "tiv-cap" }, "ILLUSTRATIVE · Markdown condensed from gh-aw's schema-feature-coverage.md · /add-operational-value is a gh cao skill, a research prototype")
+    );
+    // each piece is highlighted at EXTRACT, leaves 250 ms later and lands in its slot FLY ms after that
+    const EXTRACT = [1900, 2700, 3500, 4300],
+      FLY = 750,
+      TYPE0 = 5700,
+      TYPE1 = 8100,
+      FROZEN = 8500,
+      END = 9100;
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set(),
+      typed = -1,
+      geo = null;
+    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
+    const past = (cond, id, snd) => {
+      if (cond && !seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return cond;
+    };
+    const type = k => {
+      if (k === typed) return;
+      typed = k;
+      code.replaceChildren();
+      let left = k;
+      for (const line of CODE) {
+        for (const [s, c, p] of line) {
+          if (left <= 0) break;
+          const part = s.slice(0, left);
+          left -= part.length;
+          code.append(p ? h("span", { class: "tiv-tok", "--c": PIECE[p][1], style: { color: c } }, part) : h("span", { style: { color: c } }, part));
+        }
+        if (left <= 0) break;
+        code.append("\n");
+        left--;
+      }
+      if (k > 0 && k < CHARS) code.append(h("span", { class: "pf-caret" }));
+    };
+    // stage position of a node: offsets ignore the cards' entrance transforms and the stage scale
+    const off = n => {
+      let x = 0,
+        y = 0;
+      for (; n && n !== el; n = n.offsetParent) {
+        x += n.offsetLeft;
+        y += n.offsetTop;
+      }
+      return [x, y];
+    };
+    const locate = () => ORDER.map((k, i) => [off(marks[k]), off(slots[i].lastElementChild)]);
+    const paint = e => {
+      const on = (node, cond) => node.classList.toggle("on", cond);
+      on(
+        md,
+        past(e >= 300, "md", () => sfx.pop(0))
+      );
+      on(tags[0], e >= 700);
+      on(links[0], e >= 1000);
+      on(
+        ai,
+        past(e >= 1200, "ai", () => sfx.pop(2))
+      );
+      md.classList.toggle("dim", e >= EXTRACT[0]);
+      if (e >= EXTRACT[0] + 250 && !geo) geo = locate();
+      ORDER.forEach((k, i) => {
+        on(
+          marks[k],
+          past(e >= EXTRACT[i], "m" + i, () => sfx.key())
+        );
+        const t = (e - EXTRACT[i] - 250) / FLY,
+          g = ghosts[i];
+        if (!geo || t <= 0 || t >= 1) g.style.opacity = "0";
+        else {
+          const [[ax, ay], [zx, zy]] = geo[i],
+            u = t < 0.5 ? 2 * t * t : 1 - (2 - 2 * t) ** 2 / 2,
+            arc = Math.sin(Math.PI * u);
+          g.style.opacity = "1";
+          g.style.transform = `translate(${(ax + (zx - ax) * u).toFixed(1)}px, ${(ay + (zy - ay) * u - 90 * arc).toFixed(1)}px) scale(${(1 + 0.12 * arc).toFixed(3)})`;
+        }
+        on(
+          slots[i],
+          past(e >= EXTRACT[i] + 250 + FLY, "s" + i, () => sfx.pop(3 + i))
+        );
+      });
+      on(tags[1], e >= EXTRACT[0] + 250 + FLY);
+      ai.classList.toggle("busy", e >= EXTRACT[3] + 250 + FLY && e < TYPE1);
+      ai.classList.toggle("done", e >= TYPE1);
+      on(links[1], e >= TYPE0 - 500);
+      on(
+        fn,
+        past(e >= TYPE0 - 300, "fn", () => sfx.pop(6))
+      );
+      type(Math.round(CHARS * Math.min(1, Math.max(0, (e - TYPE0) / (TYPE1 - TYPE0)))));
+      const frozen = past(e >= FROZEN, "frozen", () => sfx.review());
+      fn.classList.toggle("frozen", frozen);
+      on(go, frozen);
+      on(tags[2], frozen);
+    };
+    slides.push({
+      group: "engineering",
+      experimental: "operational value",
+      key: "value",
+      notes:
+        "What: An illustrative, condensed run on gh-aw's real Schema Feature Coverage workflow. The add-operational-value skill from gh cao, a research prototype, keeps only what defines value: the goal (100 percent coverage), the population (top-level schema properties), the check and the output (pull requests, followed to merge).\nWhy: The result is a deterministic value function: same commit, same number. An empty population counts as unknown, not zero, and the function is frozen before any results are seen.\nWhen: Define value this way before you measure outcomes.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        geo = null;
+        el.classList.add("tiv-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("tiv-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
+    });
+  }
+
+  // Deliver · Accept · Attribute: one Schema Feature Coverage pull request on its GitHub timeline, from delivery and a person's merge, through daily windows around the merge and files that stayed, to +5 attributed fields
+  {
+    resetIndex();
+    // measured: refresh/from-delivery-to-value.mjs (window "Sep 28"), the pull request itself and gh aw audit --adoption; times UTC
+    const CASE = {
+      title: "[schema-coverage] feat: add schema coverage demos for uncovered fields",
+      labels: ["automation", "schema-coverage"],
+      diff: [150, 0, 5],
+      delivered: "2026-09-28T07:08",
+      accepted: "2026-09-28T16:37",
+      parent: [63, 68],
+      // daily at the merge time: 7 before, then day 0 (the merge commit) to day 6
+      samples: [
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [68, 68],
+        [68, 68],
+        [68, 68],
+        [68, 68],
+        [68, 69],
+        [69, 69],
+        [69, 69],
+      ],
+      // first-parent commits on main to the window end, files of the merge, files touched
+      survival: [257, 5, 0],
+      through: "2026-10-05T16:37",
+    };
+    const NS = "http://www.w3.org/2000/svg",
+      day = s => `${new Date(s + "Z").getUTCDate()} ${new Date(s + "Z").toLocaleDateString("en", { month: "short", timeZone: "UTC" })}`,
+      gain = CASE.samples[7][0] - CASE.parent[0],
+      missing = ([c, n]) => n - c;
+    const badge = h("span", { class: "vg-badge" }),
+      sub = h("span", {});
+    const pr = h(
+      "div",
+      { class: "vg-card daa-pr", "--i": 0 },
+      h("h3", {}, CASE.title),
+      h(
+        "p",
+        {},
+        badge,
+        sub,
+        CASE.labels.map(l => h("span", { class: "vg-lbl" }, l)),
+        h("span", { class: "vg-diff" }, h("b", { class: "add" }, `+${CASE.diff[0]}`), " ", h("b", { class: "del" }, `−${CASE.diff[1]}`), ` · ${CASE.diff[2]} files`)
+      )
+    );
+    const mona = document.createElementNS(NS, "svg");
+    mona.setAttribute("viewBox", "0 0 46 46");
+    mona.setAttribute("class", "av");
+    mona.innerHTML = `<image href="assets/avatars/mona.jpg" width="46" height="46"/>`;
+    // [dot class, icon, what happened, step, step colour, detail]
+    const EV = [
+      ["open", valueIcon("pr"), `github-actions[bot] opened it · ${day(CASE.delivered)}, ${CASE.delivered.slice(11)}`, "Delivered", "#3fb950", `${CASE.diff[2]} demo files for uncovered fields`],
+      ["merged", mona, `mona merged it · ${CASE.accepted.slice(11)}`, "Accepted", "#d2a8ff", "a person's decision, in gh-aw's native record"],
+      ["", valueIcon("calendar"), "Two windows open at the merge", "Measured", "#79c0ff", "7 days before and 7 days after, once a day"],
+      ["ok", valueIcon("shield"), `Its ${CASE.survival[1]} files stayed untouched`, "Kept", "#79c0ff", `${CASE.survival[0]} commits to main, through ${day(CASE.through)}`],
+      ["gold", "✦", `+${gain} fields attributed`, "Value", "#e3b341", `${CASE.parent.join("/")} → ${CASE.samples[7].join("/")} covered at the merge`],
+    ];
+    const evs = EV.map(([k, icon, b, step, c, s]) => h("div", { class: "vg-ev", "--c": c }, h("div", { class: "vg-dot " + k }, icon), h("div", {}, h("b", {}, b), h("span", {}, h("strong", {}, step), " · ", s))));
+    const sq = CASE.samples.map(v => h("div", { class: "daa-sq " + (missing(v) ? "miss" : "full") }, String(missing(v))));
+    const mg = h("div", { class: "daa-mg" }),
+      wins = [h("span", {}, "7 days before"), h("span", {}, "7 days after")];
+    const SPARK = [
+      [-260, -70],
+      [-200, -120],
+      [-90, -140],
+      [40, -150],
+      [170, -130],
+      [270, -80],
+      [290, 20],
+      [-280, 30],
+      [-150, 90],
+      [150, 95],
+    ];
+    const tada = h(
+      "div",
+      { class: "daa-tada" },
+      h("i", {}, "ATTRIBUTED VALUE"),
+      h("b", {}, `+${gain} fields`),
+      h("span", {}, "earned by this pull request · event-aligned, not the sole cause"),
+      SPARK.map(([dx, dy], k) => h("span", { class: "daa-sp", "--dx": dx + "px", "--dy": dy + "px", "--k": k }, "✦"))
+    );
+    const days = h(
+      "div",
+      { class: "daa-days", "--i": 2 },
+      h("i", {}, "Schema fields still missing an example · daily"),
+      h("div", { class: "daa-wins" }, wins),
+      h("div", { class: "daa-strip" }, sq.slice(0, 7), mg, sq.slice(7)),
+      h("div", { class: "daa-legend" }, h("span", {}, "sampled at the merge time"), h("span", {}, h("b", {}, "│"), " merge = acceptance")),
+      tada
+    );
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value · one pull request, end to end"), h("h2", { class: "pf-h" }, letters("Deliver · Accept · "), letters("Attribute", "l-grad"))),
+      h("div", { class: "daa-ex" }, "excerpt", h("b", {}, `${day(CASE.accepted.slice(0, 10) + "T00:00")} ± 7 days`), "↓ full record"),
+      pr,
+      h("div", { class: "daa-tl", "--i": 1 }, evs),
+      days,
+      h("div", { class: "vg-cap" }, `MEASURED · gh-aw, replayed 17 Nov 2026 · one Schema Feature Coverage pull request, ${day(CASE.delivered)} 2026, UTC · the maintainer is shown as Mona · textual check, not correctness`)
+    );
+    const EV_AT = [700, 1700, 2900, 6900, 7600],
+      MERGE = 2300,
+      B0 = 3200,
+      A0 = 4000,
+      STEP = 380,
+      END = 8200;
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set(),
+      merged = null;
+    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
+    const past = (cond, id, snd) => {
+      if (cond && !seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return cond;
+    };
+    const paint = e => {
+      evs.forEach((node, i) =>
+        node.classList.toggle(
+          "on",
+          past(e >= EV_AT[i], "e" + i, () => (i === 4 ? sfx.compile() : sfx.pop(i * 2)))
+        )
+      );
+      const m = past(e >= MERGE, "merge", () => sfx.review());
+      if (m !== merged) {
+        merged = m;
+        badge.classList.toggle("merged", m);
+        badge.replaceChildren(valueIcon(m ? "merge" : "pr"), m ? "Merged" : "Open");
+        sub.replaceChildren(h("b", {}, m ? "mona" : "github-actions[bot]"), m ? " merged 1 commit into " : " wants to merge 1 commit into ", h("b", {}, "main"));
+      }
+      wins.forEach(w => w.classList.toggle("on", e >= EV_AT[2]));
+      mg.classList.toggle("on", e >= EV_AT[2]);
+      sq.forEach((node, j) => {
+        const at = j < 7 ? B0 + (6 - j) * 90 : A0 + (j - 7) * STEP;
+        node.classList.toggle("on", past(e >= at, "q" + j, j < 7 ? (j === 6 ? () => sfx.key() : null) : () => sfx.key(0.6)));
+      });
+      tada.classList.toggle("on", e >= EV_AT[4]);
+    };
+    slides.push({
+      group: "engineering",
+      experimental: "operational value",
+      under: "value",
+      notes:
+        "What: One real Schema Feature Coverage pull request on its GitHub timeline, measured by a retrospective replay (snapshot 17 November 2026); the maintainer is shown as Mona, which is illustrative. On 28 September 2026 at 07:08 UTC a safe output opened it with five demo files (delivery); at 16:37 a maintainer merged it, which gh-aw's native adoption record classifies as an explicit human decision (acceptance). Daily samples seven days before and after count schema fields still missing an example: five before; 63 of 68 covered at the exact first parent, 68 of 68 at the merge. A later one-day gap came from a new schema field: everyone's work, not credited here.\nWhy: Credit needs gates: none of 257 commits on main up to 5 October touched its files, and no other merge of the workflow fell within seven days, so it earns five fields.\nWhen: Apply such gates before crediting any workflow. This is event-aligned, not exclusive causation; the check is textual presence, not working examples, fewer defects or saved hours.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        merged = null;
+        el.classList.add("vg-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("vg-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
+    });
+  }
+
+  // From Delivery to Value: the full record of Schema Feature Coverage on gh-aw: pull requests opened and merged, all-author coverage from 71% to 100%, six small seven-day windows, and +5 fields attributed to the one merge that passes every gate
+  {
+    resetIndex();
+    // Schema Feature Coverage, measured with refresh/from-delivery-to-value.mjs: [covered, total] every Sunday 12:00 UTC from 22 Mar 2026; the last row is LAST
+    const COVER = [
+      [32, 45],
+      [32, 47],
+      [32, 49],
+      [32, 51],
+      [32, 53],
+      [33, 53],
+      [34, 53],
+      [37, 56],
+      [41, 58],
+      [47, 56],
+      [45, 55],
+      [51, 57],
+      [51, 55],
+      [55, 56],
+      [57, 57],
+      [58, 59],
+      [58, 60],
+      [60, 62],
+      [60, 62],
+      [60, 62],
+      [61, 63],
+      [61, 65],
+      [62, 67],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [69, 69],
+      [69, 71],
+      [69, 71],
+      [70, 71],
+      [71, 72],
+      [72, 73],
+      [75, 75],
+      [75, 75],
+    ];
+    const LAST = "2026-11-17";
+    // the workflow's marked pull requests: [delivered, merged or null], UTC
+    const OUT = [
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:37", "2026-05-04T13:47"],
+      ["2026-05-04T07:37", "2026-05-04T13:47"],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-18T07:55", "2026-05-18T12:37"],
+      ["2026-05-18T07:55", "2026-05-18T13:14"],
+      ["2026-05-18T07:55", "2026-05-18T13:57"],
+      ["2026-05-18T07:55", null],
+      ["2026-05-18T07:55", "2026-05-18T12:48"],
+      ["2026-05-18T07:55", "2026-05-18T12:47"],
+      ["2026-05-18T07:56", null],
+      ["2026-05-18T07:56", "2026-05-18T12:47"],
+      ["2026-05-18T07:56", "2026-05-18T12:46"],
+      ["2026-05-18T07:56", "2026-05-18T12:45"],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:23", null],
+      ["2026-06-08T08:18", null],
+      ["2026-06-15T08:39", "2026-06-15T13:21"],
+      ["2026-06-15T08:39", "2026-06-15T13:21"],
+      ["2026-06-15T08:40", "2026-06-15T13:22"],
+      ["2026-06-15T08:40", "2026-06-15T13:20"],
+      ["2026-08-17T06:46", "2026-08-17T11:24"],
+      ["2026-09-28T07:08", "2026-09-28T16:37"],
+      ["2026-10-19T07:09", "2026-10-19T14:15"],
+      ["2026-10-26T07:11", "2026-10-26T11:57"],
+      ["2026-11-02T06:47", "2026-11-02T14:24"],
+    ];
+    // inspected windows: [label, merged PRs, first merge, last merge, example gaps closed, fields retired, before, after-window end, 7 + 7 daily samples]
+    const WIN = [
+      [
+        "May 4",
+        2,
+        "2026-05-04T13:47",
+        "2026-05-04T13:47",
+        2,
+        0,
+        [35, 54],
+        [39, 58],
+        [
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [34, 53],
+          [34, 53],
+          [37, 54],
+          [36, 54],
+          [37, 54],
+          [37, 54],
+          [37, 54],
+          [37, 55],
+          [37, 56],
+        ],
+      ],
+      [
+        "May 18",
+        8,
+        "2026-05-18T12:37",
+        "2026-05-18T13:57",
+        7,
+        1,
+        [41, 58],
+        [47, 56],
+        [
+          [39, 58],
+          [39, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [48, 57],
+          [48, 57],
+          [48, 57],
+          [48, 57],
+          [48, 56],
+          [47, 56],
+          [47, 56],
+        ],
+      ],
+      [
+        "Jun 15",
+        4,
+        "2026-06-15T13:20",
+        "2026-06-15T13:22",
+        4,
+        0,
+        [51, 55],
+        [55, 56],
+        [
+          [50, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [55, 55],
+          [55, 55],
+          [54, 55],
+          [54, 55],
+          [54, 55],
+          [55, 56],
+          [55, 56],
+        ],
+      ],
+      [
+        "Sep 28",
+        1,
+        "2026-09-28T16:37",
+        "2026-09-28T16:37",
+        5,
+        0,
+        [63, 68],
+        [69, 69],
+        [
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [68, 68],
+          [68, 68],
+          [68, 68],
+          [68, 68],
+          [68, 69],
+          [69, 69],
+          [69, 69],
+        ],
+      ],
+      [
+        "Oct 26",
+        1,
+        "2026-10-26T11:57",
+        "2026-10-26T11:57",
+        1,
+        0,
+        [70, 71],
+        [71, 72],
+        [
+          [69, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 72],
+          [71, 72],
+        ],
+      ],
+      [
+        "Nov 2",
+        1,
+        "2026-11-02T14:24",
+        "2026-11-02T14:24",
+        1,
+        0,
+        [71, 72],
+        [73, 74],
+        [
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 72],
+          [71, 72],
+          [72, 72],
+          [72, 72],
+          [72, 72],
+          [72, 73],
+          [72, 73],
+          [72, 73],
+          [72, 73],
+        ],
+      ],
+    ];
+    // the window whose merge passes every gate, zoomed into on Deliver · Accept · Attribute
+    const EXCERPT = "Sep 28";
+    const DAY = 864e5,
+      T0 = Date.parse("2026-03-22T12:00Z"),
+      T1 = Date.parse(LAST + "T12:00Z");
+    const t = s => Date.parse(s + "Z"),
+      X = ms => 160 + (1530 * (ms - T0)) / (T1 - T0),
+      Y = p => 40 + (100 - p) * 5,
+      pc = ([c, n]) => (100 * c) / n,
+      f1 = n => n.toFixed(1),
+      xi = WIN.findIndex(w => w[0] === EXCERPT);
+    const STATS = [
+      [OUT.length, "pull requests opened by the workflow"],
+      [OUT.filter(o => o[1]).length, "of them merged"],
+      [`${Math.round(pc(COVER[0]))}% → ${Math.round(pc(COVER.at(-1)))}%`, "schema fields with an example · all authors"],
+      [`+${WIN[xi][4]} fields`, "attributed · one merge passed every gate", "gold"],
+    ];
+    const stats = h(
+      "div",
+      { class: "dtv-stats", "--i": 0 },
+      STATS.map(([b, s, k]) => h("div", { class: k ? "dtv-n " + k : "dtv-n" }, h("b", {}, String(b)), h("span", {}, s)))
+    );
+    // one coverage trace: weekly snapshots plus each window's daily samples and endpoints, in time order
+    const pts = COVER.map((v, i) => [i < COVER.length - 1 ? T0 + i * 7 * DAY : T1, v]);
+    for (const [, , f, l, , , b, e, s] of WIN) {
+      s.forEach((v, d) => v && pts.push([(d < 7 ? t(f) : t(l)) + (d - 7) * DAY, v]));
+      pts.push([t(f) - 6e4, b]);
+      if (e) pts.push([t(l) + 7 * DAY, e]);
+    }
+    pts.sort((a, b) => a[0] - b[0]);
+    // pull requests per UTC day: [first time, count]
+    const perDay = list => [...list.reduce((m, s) => m.set(s.slice(0, 10), [m.get(s.slice(0, 10))?.[0] ?? s, (m.get(s.slice(0, 10))?.[1] ?? 0) + 1]), new Map()).values()];
+    let g = `<defs><clipPath id="dtv-clip"><rect x="0" y="0" width="0" height="300"/></clipPath></defs>`;
+    for (const p of [50, 75, 100]) g += `<line class="dtv-grid" x1="160" x2="1690" y1="${Y(p)}" y2="${Y(p)}"/><text x="150" y="${Y(p) + 5}" text-anchor="end">${p}%</text>`;
+    for (let m = 3; m <= 10; m++) {
+      const M = Date.UTC(2026, m, 1);
+      g += `<line class="dtv-grid" x1="${f1(X(M))}" x2="${f1(X(M))}" y1="24" y2="508"/><text x="${f1(X(M))}" y="14" text-anchor="middle">${new Date(M).toLocaleDateString("en", { month: "short", timeZone: "UTC" })}</text>`;
+    }
+    g += `<text class="dtv-hd" x="172" y="66">SCHEMA FIELDS WITH AN EXAMPLE · ALL AUTHORS</text>`;
+    g += `<text class="dtv-hd" x="150" y="336" text-anchor="end">WINDOWS</text><text x="150" y="358" text-anchor="end"><tspan fill="#ffa657">before</tspan> · <tspan fill="#79c0ff">after</tspan></text>`;
+    g += `<text class="dtv-hd" x="150" y="457" text-anchor="end">OPENED</text><text class="dtv-hd" x="150" y="501" text-anchor="end">MERGED</text>`;
+    g += `<text class="dtv-hi" x="168" y="${f1(Y(pc(COVER[0])) - 14)}">${Math.round(pc(COVER[0]))}%</text>`;
+    // [markup, the time the sweep reveals it, sound]: a window shows once its after period is complete
+    const FX = [];
+    WIN.forEach(([, , f, l, gaps, , , end], i) => {
+      const y = 318 + i * 16,
+        F = t(f),
+        L = t(l);
+      FX.push([
+        `<rect class="dtv-bb" x="${f1(X(F - 7 * DAY))}" y="${y - 5}" width="${f1(X(F) - X(F - 7 * DAY))}" height="10" rx="3"/><rect class="dtv-ab" x="${f1(X(L))}" y="${y - 5}" width="${f1(X(L + 7 * DAY) - X(L))}" height="10" rx="3"/><text class="dtv-gap" x="${f1(X(L + 7 * DAY) + 6)}" y="${y + 5}">${end ? `+${gaps}` : "pending"}</text>`,
+        Math.min(L + 7 * DAY, T1),
+      ]);
+    });
+    for (const [s, n] of perDay(OUT.map(o => o[0]))) FX.push([valueGlyph("pr", X(t(s)), 452, 18, "dtv-po") + (n > 1 ? `<text class="dtv-pn" x="${f1(X(t(s)))}" y="434" text-anchor="middle">${n}</text>` : ""), t(s), "d"]);
+    for (const [s, n] of perDay(OUT.filter(o => o[1]).map(o => o[1])))
+      FX.push([valueGlyph("merge", X(t(s)), 496, 18, "dtv-pm") + (n > 1 ? `<text class="dtv-pn" x="${f1(X(t(s)))}" y="523" text-anchor="middle">${n}</text>` : ""), t(s), "m"]);
+    FX.push([`<circle class="dtv-end" cx="${f1(X(T1))}" cy="${f1(Y(pc(COVER.at(-1))))}" r="5"/><text class="dtv-hi" x="1690" y="${f1(Y(pc(COVER.at(-1))) - 14)}" text-anchor="end">${Math.round(pc(COVER.at(-1)))}%</text>`, T1]);
+    g += FX.map(([s], i) => `<g class="dtv-fx" data-fx="${i}">${s}</g>`).join("");
+    g += `<g clip-path="url(#dtv-clip)"><path class="dtv-cov" d="M${pts.map(([T, v]) => `${f1(X(T))} ${f1(Y(pc(v)))}`).join(" L")}"/></g>`;
+    // outline the window Deliver · Accept · Attribute zoomed into
+    const ex0 = X(t(WIN[xi][2]) - 7 * DAY) - 10,
+      ex1 = X(t(WIN[xi][3]) + 7 * DAY) + 30;
+    g += `<g class="dtv-fx dtv-ex" data-ex="1"><rect x="${f1(ex0)}" y="24" width="${f1(ex1 - ex0)}" height="488" rx="8"/><text x="${f1((ex0 + ex1) / 2)}" y="534" text-anchor="middle">↑ excerpt · +${WIN[xi][4]} attributed</text></g>`;
+    g += `<line class="dtv-cur" x1="160" x2="160" y1="24" y2="508"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "dtv-svg");
+    svg.setAttribute("viewBox", "0 0 1700 552");
+    svg.innerHTML = g;
+    const clip = svg.querySelector("#dtv-clip rect"),
+      cur = svg.querySelector(".dtv-cur"),
+      fx = [...svg.querySelectorAll("[data-fx]")].map(node => [node, FX[+node.dataset.fx][1], FX[+node.dataset.fx][2]]),
+      exBox = svg.querySelector("[data-ex]");
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value · the full record, Mar – Nov 2026"), h("h2", { class: "pf-h" }, letters("From Delivery to "), letters("Value", "l-grad"))),
+      stats,
+      h("div", { class: "dtv-chart", "--i": 1 }, svg),
+      h("div", { class: "dtv-cap" }, "MEASURED · gh-aw, replayed 17 Nov 2026 · weekly main snapshots, daily in windows · textual check, not correctness · pull requests found by search · merge = adoption proxy")
+    );
+    const SW0 = 1200,
+      SW1 = 8000,
+      EX = 8500,
+      END = 9100;
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set();
+    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
+    const past = (cond, id, snd) => {
+      if (cond && !seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return cond;
+    };
+    const paint = e => {
+      const S = T0 + (T1 - T0) * Math.min(1, Math.max(0, (e - SW0) / (SW1 - SW0))),
+        x = f1(X(S));
+      clip.setAttribute("width", f1(X(S) + 4));
+      cur.setAttribute("x1", x);
+      cur.setAttribute("x2", x);
+      cur.style.opacity = e > SW0 && e < SW1 ? "" : "0";
+      fx.forEach(([node, T, k], i) => node.classList.toggle("on", past(e > SW0 && S >= T, "fx" + i, k === "d" ? () => sfx.pop(2) : k === "m" ? () => sfx.key(0.8) : null)));
+      exBox.classList.toggle(
+        "on",
+        past(e >= EX, "ex", () => sfx.pop(5))
+      );
+    };
+    slides.push({
+      group: "engineering",
+      experimental: "operational value",
+      under: "value",
+      notes:
+        "What: The full record behind the previous slide, measured by a retrospective replay of gh-aw's Schema Feature Coverage workflow. The line applies the frozen value function, a textual check counting every author, to 36 weekly snapshots of main, 22 March to 17 November 2026: from 32 of 45 fields with an example (71 percent) to 75 of 75; the 39 fields present throughout went 30 to 39. Icons show 44 opened pull requests, found by producer footer (not complete history), and 19 merges, only an adoption proxy. Bars are six inspected seven-day windows (84 daily samples); merges on 17 August and 19 October closed one gap each without a window, and one May merge only retired the dependencies field.\nWhy: Outcomes rose, yet only the 28 September merge, outlined in gold, passes every attribution gate; the others are shared, grouped or lack a native adoption record. Exclusive causality is never claimed.\nWhen: Use this to judge a workflow's value. gh cao is a research prototype and this is not a published result; pull requests, merges or run success alone are not value.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        el.classList.add("dtv-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("dtv-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
     });
   }
 
