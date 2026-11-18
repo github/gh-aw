@@ -83,10 +83,10 @@ Test cache-memory import without local definition.
 	// Custom keys now get the integrity/policy prefix to prevent cross-integrity cache sharing
 	expectedStrings := []string{
 		"- name: Create cache-memory directory (session)",
-		"path: .gh-aw-cache-v1-29adc3a27b5dcc3e7281f68af/runtime.tar",
+		"path: .gh-aw-cache-v1-29adc3a27b5dcc3e7281f68a/runtime.tar",
 		"key: memory-none-nopolicy-shared-session-${{ github.run_id }}",
 		"- name: Create cache-memory directory (logs)",
-		"path: .gh-aw-cache-v1-da21cb7d62936d1a863f0f957/runtime.tar",
+		"path: .gh-aw-cache-v1-da21cb7d62936d1a863f0f95/runtime.tar",
 		"key: memory-none-nopolicy-shared-logs-${{ github.run_id }}",
 		"cache_memory_prompt_multi.md", // Template file reference instead of literal content
 		"- **session**: `" + runtimeRootExpression + "/cache-memory-session/`",
