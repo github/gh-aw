@@ -9,14 +9,6 @@ import (
 
 // Model costs and policy overlay helpers for workflow builder.
 
-func rawModelsSection(frontmatter map[string]any) map[string]any {
-	modelsMap, ok := frontmatter["models"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	return modelsMap
-}
-
 func extractMainModelCostsOverlay(toolsResult *toolsProcessingResult, frontmatter map[string]any) map[string]any {
 	if toolsResult.parsedFrontmatter != nil {
 		providersMap := modelOverlayMap(toolsResult.parsedFrontmatter.ModelCosts["providers"])
@@ -25,7 +17,7 @@ func extractMainModelCostsOverlay(toolsResult *toolsProcessingResult, frontmatte
 		}
 	}
 
-	modelsMap := rawModelsSection(frontmatter)
+	modelsMap := modelOverlayMap(frontmatter["models"])
 	if modelsMap == nil {
 		return nil
 	}
@@ -135,7 +127,7 @@ func extractMainModelPolicyOverlay(toolsResult *toolsProcessingResult, frontmatt
 			return mainPolicy
 		}
 	}
-	modelsMap := rawModelsSection(frontmatter)
+	modelsMap := modelOverlayMap(frontmatter["models"])
 	if modelsMap == nil {
 		return nil
 	}
@@ -186,7 +178,7 @@ func resolveDefaultAiCreditsPricing(frontmatter map[string]any, imported map[str
 // extractDefaultAiCreditsPricingFromModels returns the fallback AI credits pricing configured
 // under models.default-ai-credits-pricing in the workflow frontmatter, or nil if absent.
 func extractDefaultAiCreditsPricingFromModels(frontmatter map[string]any) *AiCreditsPricingConfig {
-	modelsMap := rawModelsSection(frontmatter)
+	modelsMap := modelOverlayMap(frontmatter["models"])
 	if modelsMap == nil {
 		return nil
 	}

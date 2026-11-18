@@ -83,9 +83,6 @@ func TestExtractMainModelPolicyOverlay_UsesParsedFrontmatterWhenPresent(t *testi
 }
 
 func TestExtractMainModelPolicyOverlay_FallsBackToRawFrontmatter(t *testing.T) {
-	toolsResult := &toolsProcessingResult{
-		parsedFrontmatter: &FrontmatterConfig{},
-	}
 	frontmatter := map[string]any{
 		"models": map[string]any{
 			"allowed": []any{"gpt-5-mini"},
@@ -93,10 +90,21 @@ func TestExtractMainModelPolicyOverlay_FallsBackToRawFrontmatter(t *testing.T) {
 		},
 	}
 
-	policy := extractMainModelPolicyOverlay(toolsResult, frontmatter)
-	require.NotNil(t, policy)
-	assert.Equal(t, []string{"gpt-5-mini"}, policy["allowed"])
-	assert.Equal(t, []string{"claude-opus"}, policy["blocked"])
+	for _, tt := range []struct {
+		name              string
+		parsedFrontmatter *FrontmatterConfig
+	}{
+		{name: "nil parsed frontmatter"},
+		{name: "empty parsed frontmatter", parsedFrontmatter: &FrontmatterConfig{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			toolsResult := &toolsProcessingResult{parsedFrontmatter: tt.parsedFrontmatter}
+			policy := extractMainModelPolicyOverlay(toolsResult, frontmatter)
+			require.NotNil(t, policy)
+			assert.Equal(t, []string{"gpt-5-mini"}, policy["allowed"])
+			assert.Equal(t, []string{"claude-opus"}, policy["blocked"])
+		})
+	}
 }
 
 func TestExtractMainModelCostsOverlay_FallsBackToRawFrontmatterWhenParsedCostsAreUnavailable(t *testing.T) {
