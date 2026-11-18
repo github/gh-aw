@@ -17,7 +17,7 @@ sidebar:
 
 **Required workflow-version admission:** Compiler-owned workflow-hash-bound OIDC `getToken` call and fail-closed continuation; server verification and on-demand reconciliation remain integration responsibilities.
 
-This specification defines the compiler-to-receiver and receiver-to-runner contract for `on.gateway-dispatch`. It covers GitHub issues, pull requests, discussions, every comment family, reviews/threads, Projects, security alerts, imported connector triggers, and commands. Arbitrary undeclared custom webhook identifiers are unsupported. It does not register webhook sources and is unrelated to the MCP gateway.
+This specification defines the compiler-to-receiver and receiver-to-runner contract for `on.gateway-dispatch`. It covers GitHub issues, pull requests, discussions, every comment family, reviews/threads, Projects, security alerts, imported connector triggers, and commands. The [Connector Specification](../connector-specification/#8-triggers-and-context-boundary) defines the declaration and selection contract for imported providers; this specification defines their receiver metadata and dispatch transport. Arbitrary undeclared custom webhook identifiers are unsupported. It does not register webhook sources and is unrelated to the MCP gateway.
 
 The terms **MUST**, **MUST NOT**, and **MAY** describe requirements for conforming integrations. Receiver requirements are not claims that gh-aw ships a receiver: provider onboarding, signature verification, source authorization, durable admission, and dispatch remain integration responsibilities. This contract does not establish compatibility with the proposed hosted CAO RFC-033 interchange.
 
@@ -61,10 +61,29 @@ The following inventory is exhaustive. Other entries in an internal webhook cata
 | `on.gateway-dispatch.slash-command` | `slash_command` | Selected native GitHub source event and original `action` | Original body and canonical item/comment HTML URL from the source catalog below. The server matches the position-zero slash token before projection. |
 | `on.gateway-dispatch.label-command` | `label_command` | Selected native GitHub source event with `action: labeled` | Original `label.name` and canonical item HTML URL. The server matches the label exactly and separately authorizes any requested label removal. |
 | GitHub notification triggers below | The corresponding GitHub semantic event | `X-GitHub-Event`, corroborated under the enrolled source profile, and native `action` | Original source resource, event-specific identity, declared filter evidence, and canonical item/comment HTML URL; no original body is forwarded. |
+| `on.gateway-dispatch.<connector-id>` | Digest-bound `connector_<24 hex digits>` | Selected declaration's `nativeEvents` under its approved `verificationProfile` | Authenticated original evidence satisfying fixed matches, exact grants, predicates, filters, and one complete variant when declared; approved canonical resource URL. |
 
-Azure DevOps, Jira, and Linear use the [connector contract](/gh-aw/reference/connectors/). Their former native gateway aliases are removed and MUST be rejected. Imported trigger selections use `on.gateway-dispatch.<alias>: [trigger-name]`, not a compiler provider catalog.
+Azure DevOps, Jira, and Linear use the [connector contract](../connector-specification/). Their former native gateway aliases are removed and MUST be rejected. Imported trigger selections use `on.gateway-dispatch.<alias>: [trigger-name]`, not a compiler provider catalog.
 
 ### Imported connector subscriptions
+
+Consumers MUST import the declaration using ordinary `imports` with `uses` and
+typed `with` bindings. Importing alone selects nothing. The gateway key is the
+imported connector ID (the compiler's local alias), not its internal
+`aw.github.com/<id>` spec ID or a provider inferred from a URL.
+Selections are either a nonempty trigger-name list or a trigger mapping whose
+values are null or declared filter mappings. Each configured filter value is a
+nonempty array of typed literals. Unknown names, duplicate selections,
+expressions, reserved gateway aliases, and the removed
+`on.gateway-dispatch.connectors` wrapper MUST fail.
+
+The [complete connector consumer](../connector-specification/#82-selection-and-gateway-binding)
+shows filter-map selection and exact import grants. Consumer filter values
+replace that declared filter's `values` within the same resource grants; they
+do not grant resources. Trigger selection MUST NOT select readers, hosted MCP
+tools, or safe outputs. A trigger-only frozen plan contains no agent/writer
+credential references. Additional content or effects require independent
+capability selection and authorization.
 
 A connector subscription extends the compiler metadata with `connector`, containing
 `id`, `alias`, `trigger`, `digest`, `verification_profile`, `native_events`,
@@ -74,7 +93,17 @@ Rich source rules additionally carry `evaluation_version:
 The receiver MUST reject unknown evaluation versions/operators before enrollment.
 Its internal event name is `connector_` followed by the first 24 lowercase hex
 digits of SHA-256 over alias, NUL, trigger name, NUL, and the frozen plan digest.
-The public selector remains the connector ID and declared trigger name.
+The public selector remains the connector ID and declared trigger name;
+`subscription.types` is the singleton declared trigger name, not the native
+event discriminator or a guessed provider activity.
+
+| Frozen `connector` field | Source and receiver requirement |
+| --- | --- |
+| `id`, `alias`, `trigger`, `digest` | Internal spec ID, local selection key, selected trigger name, and frozen trigger-phase plan digest. Bind all four to the approved subscription; never accept replacements from a delivery. |
+| `verification_profile`, `native_events` | Lowered `verificationProfile` and `nativeEvents`. Authenticate under the separately approved profile and corroborate the declared native discriminator. |
+| `origins`, `normalize`, `types` | Approved `resourceOrigins`, normalization pointers, and optional primitive type checks. Origins are not exact resource grants; normalization fields are not additional payload fields. |
+| `evaluation_version`, `when`, `filters`, `variants` | Versioned bounded source-evidence rules when present. Preserve the full contract and selected filter values during discovery and admission. |
+| `url_identity`, `url_path_prefix` | Optional lowered `urlIdentity`/`urlPathPrefix` constraints. Verify the canonical URL path against the exact authenticated source ID, independently of origin approval. |
 
 Compiler conditions encode every original fixed match predicate and exact
 resource grant as equality checks on decoded JSON Pointer paths. Integer grants
@@ -252,7 +281,7 @@ The reviewed consumption protocol MUST identify the particular label-application
 
 ### Provider normalization policies
 
-No native external-provider normalization policies remain supported. The former Jira, Linear, and Azure DevOps policies MUST NOT activate subscriptions. Future connector ingress requires a separately reviewed event and authentication contract; the removed native routes are not fallbacks.
+No native external-provider normalization policies remain supported. The former Jira, Linear, and Azure DevOps policies MUST NOT activate subscriptions. Imported connector ingress uses the frozen declaration and separately approved receiver profile described above; the removed native routes are not fallbacks.
 
 ## Compiled subscription declaration
 
@@ -268,13 +297,14 @@ sed -n 's/^# gh-aw-manifest: //p' .github/workflows/smoke-security-alerts.lock.y
 | Field | Required interpretation |
 | --- | --- |
 | `schema_version` | Numeric `2`; version 1 singleton declarations/envelopes are unsupported. |
-| `event`, `types` | One supported GitHub family and its selected original activities. |
+| `event`, `types` | One supported GitHub family and its selected original activities, or one digest-bound connector event and its singleton declared trigger name. |
 | `conditions` | Shared typed equality predicates over original payload paths; all MUST match. |
-| `any_of` | Optional alternatives of complete ANDed condition groups, in addition to shared conditions. A Projects Status transition creates one complete pair, never independently combined from/to lists. |
+| `any_of` | Optional alternatives of complete ANDed condition groups, in addition to shared conditions. Projects Status transitions preserve complete pairs; connector variants preserve complete alternative resource constraints. Never flatten either into independent allowlists. |
 | `repos` | Optional approved-source selection copied from shared `on.gateway-dispatch.repos` into GitHub notification, security, and command subscriptions. |
 | `orgs` | Optional case-insensitive organization names/`*` patterns copied into GitHub notification, Projects, security, and command subscriptions. Intersects independently approved source scope and `repos`; never grants access. |
 | `provider` | Legacy external-provider metadata; no native external-provider subscriptions are supported. |
-| `native_events` | GitHub notifications: the singleton native event from the catalog. Commands: sorted, deduplicated required native events. Synthetic command family names are not GitHub webhook registration names. |
+| `connector` | Frozen imported-trigger contract described above. Required for connector events; unsupported profiles, evaluation rules, or canonicalization MUST leave the subscription nonactivating. |
+| `native_events` | GitHub notifications: the singleton native event from the catalog. Commands: sorted, deduplicated required native events. Connectors carry their discriminators in `connector.native_events`. Synthetic command/connector event names are not webhook registration names. |
 | `command_filter` | Commands only: versioned server-side matching/consumption policy, names, source events, strategy, and label removal flag. |
 | `activity_normalization` | Legacy external-provider metadata; all former native policies are unsupported and MUST be rejected. |
 | `dispatch` | Destination, workflow-specific route, required minimal projection, context mapping, homogeneous batching, and byte limits. |
@@ -334,7 +364,7 @@ The logical row key is `(GitHub API origin/base path, destination repository ID,
 | --- | --- |
 | Destination and route | Verified repository ID/current name, installation ID, Actions workflow ID/path, and exact emitted `event_type`. Names are API addressing data, not identity replacements. |
 | Artifact binding | Observed default-branch name/commit, compiled blob identity and `workflow_hash`, and independently approved artifact/subscription identity under the deployment's declared binding policy. |
-| Subscription | Complete normalized declaration, including `native_events`, types, `repos`, `orgs`, conditions, complete `any_of` groups, and applicable normalization/command policies. |
+| Subscription | Complete normalized declaration, including `native_events`, types, `repos`, `orgs`, conditions, complete `any_of` groups, applicable normalization/command policies, and the entire frozen `connector` contract when present. |
 | Authority | Approved source enrollment/scope and destination/artifact approval generation; no credentials or bearer tokens. |
 | Freshness and state | Monotonic table generation, observation/check timestamps, publication time, backend-defined cache/revalidation state, and eligibility or explicit blocked reason. |
 
@@ -793,6 +823,32 @@ Every URL MUST be canonical HTTPS without credentials or query strings, includin
 
 Canonical equality uses the [WHATWG URL parser and serializer](https://url.spec.whatwg.org/), as implemented by the destination's JavaScript `URL`: parsing and serializing the supplied string MUST return that exact string. Another language's URL parser round-trip alone is insufficient. In particular, uppercase scheme/host names, explicit default `:443` ports, and dot-segment paths that this parser would rewrite MUST be rejected rather than silently normalized for dispatch. Family-specific paths, allowed percent-encoded segments, and approved host/base-path bindings remain required.
 
+### Imported connector notification
+
+For the [synthetic connector example](../connector-specification/#9-minimal-declaration-and-consumer),
+the authenticated original evidence must establish `event: record.updated`,
+record ID `RECORD-1`, and selected status `open`. The complete permitted payload is:
+
+```json
+{
+  "url": "https://api.example.com/v1/records/RECORD-1",
+  "type": ["record-updated"],
+  "filters": {
+    "connector_match_0": ["record.updated"],
+    "connector_scope_0": ["RECORD-1"],
+    "connector_filter_status": ["open"]
+  }
+}
+```
+
+The envelope's `aw_context.webhook.event` MUST use the compiler-emitted
+`connector_<24 hex digits>` value, not `record.updated`, `record-updated`, or
+the connector ID. These witness names belong to this compiled example;
+receivers MUST use the actual subscription's condition names and paths.
+No `record-id`, `status`, native record object, signature, or credential may be
+added outside the declared matching filters. The status witnesses the original
+delivery, not current state. This synthetic API/profile is not a live-test target.
+
 ### Slash command notification
 
 ```json title="slash_command.payload.json"
@@ -901,6 +957,7 @@ The runner derives `aw_context.items` rather than trusting a sender-supplied ite
 | Security alerts | Decimal alert number from the validated URL | Family, case-insensitive source `repo`, alert number; canonical `url`. |
 | Commands | Parent issue, PR, or discussion number | Command family, canonical parent URL without anchor in `source`, source `repo`, and number. Distinct comment deliveries remain in the batch; issue/PR/discussion URL paths prevent numerical identity collisions. |
 | GitHub notifications | Parent issue, PR, discussion number, or commit SHA | Semantic event family, canonical parent URL without anchor in `source`, source `repo`, and parent identifier. Distinct comment/review deliveries remain in the batch while their affected parent reference deduplicates. |
+| Imported connectors | `uri:` plus the lowercase SHA-256 hex digest of the canonical URL | Digest-bound connector event in `item_type`, approved URL origin in `source`, canonical `url`, and empty `repo`. This deduplicates references only; it is not a provider ID, grant, or replay key. |
 
 These identities are derived references, not extra sender-supplied resource metadata. IDs not already supplied as declared matching filter literals require provider-authenticated resolution.
 
@@ -932,6 +989,6 @@ The compiler implements hash-bound `getToken` calls and fail-closed client conti
 
 ## References
 
-The [GitHub webhook trigger reference](/gh-aw/reference/webhook-triggers/) defines the detailed GitHub filter catalog and dispatch authorization. The [provider issue reference](/gh-aw/reference/provider-issue-triggers/) explains migration from the removed native integrations to imported connector declarations.
+The [Connector Specification](../connector-specification/) defines imported declarations, capability selection, phase isolation, source-evidence fields, and offline conformance. The [connector reference](/gh-aw/reference/connectors/) describes supplied providers and their setup/evidence limits. The [GitHub webhook trigger reference](/gh-aw/reference/webhook-triggers/) defines the detailed GitHub filter catalog and dispatch authorization. The [provider issue reference](/gh-aw/reference/provider-issue-triggers/) explains migration from the removed native integrations to imported connector declarations.
 
 See the [GitHub repository dispatch API](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event), [App installation-token generation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app), [GitHub actor contexts](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context), [GitHub webhook payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads), [Jira webhooks](https://developer.atlassian.com/cloud/jira/platform/webhooks/), [Linear webhooks](https://linear.app/developers/webhooks).

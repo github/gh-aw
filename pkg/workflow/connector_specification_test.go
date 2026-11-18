@@ -84,6 +84,54 @@ func TestConnectorSpecificationExample(t *testing.T) {
 	}
 }
 
+func TestConnectorSpecificationGatewayExample(t *testing.T) {
+	declaration := connectorSpecificationExample(t, ".github/workflows/connectors/example.md")
+	consumer := connectorSpecificationExample(t, ".github/workflows/example-events.md")
+	for _, selection := range []string{"list", "filter-map"} {
+		t.Run(selection, func(t *testing.T) {
+			root := t.TempDir()
+			sourcePath := filepath.Join(root, ".github/workflows/connectors/example.md")
+			require.NoError(t, os.MkdirAll(filepath.Dir(sourcePath), 0700))
+			require.NoError(t, os.WriteFile(sourcePath, []byte(declaration), 0600))
+			source := consumer
+			if selection == "list" {
+				source = strings.Replace(source, "    example:\n      record-updated:\n        status: [open]\n", "    example: [record-updated]\n", 1)
+			}
+			path := filepath.Join(root, ".github/workflows/example-events.md")
+			require.NoError(t, os.WriteFile(path, []byte(source), 0600))
+			compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
+			compiler.gitRoot = root
+			compiler.repoConfig, compiler.repoConfigLoaded = &RepoConfig{GatewayDispatch: true}, true
+			compiler.SetActionMode(ActionModeDev)
+			data, err := compiler.ParseWorkflowFile(path)
+			require.NoError(t, err)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			config := data.Connectors["example"]
+			require.NotNil(t, config)
+			require.Nil(t, config.Agent)
+			require.Nil(t, config.SafeOutputs)
+			triggerPlan, err := config.Plan.ForPhase("trigger")
+			require.NoError(t, err)
+			require.Empty(t, triggerPlan.Secrets())
+			require.Equal(t, []string{"record-updated"}, triggerPlan.TriggerNames())
+			require.Len(t, data.WebhookSubscriptions, 1)
+			subscription := data.WebhookSubscriptions[0]
+			require.Equal(t, []string{"record-updated"}, subscription.Types)
+			require.Equal(t, "example.com/hmac-sha256", subscription.Connector.VerificationProfile)
+			require.Equal(t, "/record/id", subscription.Connector.URLIdentity)
+			if selection == "filter-map" {
+				require.Equal(t, []any{"open"}, subscription.Connector.Filters["status"].Values)
+			}
+			fixture := []byte(`{"event":"record.updated","record":{"id":"RECORD-1","url":"https://api.example.com/v1/records/RECORD-1","status":"open","body":"not forwarded"}}`)
+			projection, err := triggerPlan.ProjectEvent("record-updated", "record.updated", fixture)
+			require.NoError(t, err)
+			require.False(t, projection.Operational)
+			require.Equal(t, map[string]any{"record-id": "RECORD-1", "url": "https://api.example.com/v1/records/RECORD-1"}, projection.Fields)
+			require.ErrorIs(t, triggerPlan.ActivateTriggers(), connectors.ErrIngressUnavailable)
+		})
+	}
+}
+
 func TestConnectorSpecificationExampleReadBoundaries(t *testing.T) {
 	root := t.TempDir()
 	sourcePath := filepath.Join(root, ".github/workflows/connectors/example.md")
