@@ -3,7 +3,13 @@
 package cli
 
 import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -19,15 +25,7 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 		expectedOwner string
 		expectedRepo  string
 		expectError   bool
-		expectedError string
 	}{
-		{
-			name:          "bare run ID requires repo flag",
-			repoFlag:      "",
-			components:    parser.GitHubURLComponents{},
-			expectError:   true,
-			expectedError: "--repo is required for bare run IDs; use --repo owner/repo",
-		},
 		{
 			name:          "owner already resolved from URL wins",
 			repoFlag:      "flag-owner/flag-repo",
@@ -66,19 +64,120 @@ func TestApplyAuditRepoFlag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			components := tt.components
-			err := applyAuditRepoFlag(tt.repoFlag, &components)
+			err := applyAuditRepoFlag(t.Context(), tt.repoFlag, &components)
 			if tt.expectError {
-				if tt.expectedError != "" {
-					require.EqualError(t, err, tt.expectedError)
-				} else {
-					require.Error(t, err)
-				}
+				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedOwner, components.Owner)
 			assert.Equal(t, tt.expectedRepo, components.Repo)
 		})
+	}
+}
+
+func TestApplyAuditRepoFlagDetectsCurrentRepository(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake gh uses a shell script")
+	}
+	for _, tc := range []struct {
+		name, ghResponse, origin, expectedOwner string
+	}{
+		{name: "gh selected repository", ghResponse: "printf 'selected/repo\\n'", expectedOwner: "selected"},
+		{name: "local origin fallback", ghResponse: "exit 1", origin: "https://github.com/local/repo.git", expectedOwner: "local"},
+		{name: "no repository available", ghResponse: "exit 1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			t.Setenv("GH_REPO", "")
+			t.Setenv("GH_HOST", "github.com")
+			t.Setenv("GITHUB_SERVER_URL", "https://github.com")
+			ClearCurrentRepoSlugCache()
+			t.Cleanup(ClearCurrentRepoSlugCache)
+			require.NoError(t, exec.Command("git", "init", "--quiet", "--template=").Run())
+			if tc.origin != "" {
+				require.NoError(t, exec.Command("git", "remote", "add", "origin", tc.origin).Run())
+			}
+			bin := filepath.Join(dir, "bin")
+			require.NoError(t, os.Mkdir(bin, 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\n"+tc.ghResponse+"\n"), 0o700))
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+			components, err := parser.ParseRunURLExtended("12345")
+			require.NoError(t, err)
+			err = applyAuditRepoFlag(t.Context(), "", components)
+			if tc.expectedOwner == "" {
+				require.ErrorContains(t, err, "failed to detect current repository")
+				require.ErrorContains(t, err, "--repo owner/repo")
+				require.ErrorContains(t, err, "run URL")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedOwner, components.Owner)
+			assert.Equal(t, "repo", components.Repo)
+			assert.Equal(t, int64(12345), components.Number)
+
+			requests, err := resolveGroupedAuditRunRequests(t.Context(), []string{"12345", "12346"}, "")
+			require.NoError(t, err)
+			require.Len(t, requests, 2)
+			for _, request := range requests {
+				assert.Equal(t, tc.expectedOwner, request.owner)
+				assert.Equal(t, "repo", request.repo)
+			}
+		})
+	}
+}
+
+func TestAuditRepositoryDetectionCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake gh and git use shell scripts")
+	}
+	for _, mode := range []string{"single", "diff", "grouped"} {
+		for _, lookup := range []string{"gh", "git", "already canceled"} {
+			t.Run(mode+"/"+lookup, func(t *testing.T) {
+				dir := t.TempDir()
+				marker := filepath.Join(dir, "git-called")
+				t.Setenv("AUDIT_TEST_GIT_MARKER", marker)
+				t.Setenv("GH_REPO", "")
+				ghScript := "#!/bin/sh\nexec sleep 10\n"
+				if lookup == "git" {
+					ghScript = "#!/bin/sh\nexit 1\n"
+				}
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(ghScript), 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\necho called > \"$AUDIT_TEST_GIT_MARKER\"\nexec sleep 10\n"), 0o700))
+				t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+				cmd := NewAuditCommand()
+				ctx := t.Context()
+				expectedErr := context.DeadlineExceeded
+				if lookup == "already canceled" {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithCancel(ctx)
+					cancel()
+					expectedErr = context.Canceled
+				}
+				cmd.SetContext(ctx)
+				require.NoError(t, cmd.Flags().Set("timeout", "100ms"))
+				args := []string{"12345"}
+				if mode != "single" {
+					args = append(args, "12346")
+				}
+				if mode == "grouped" {
+					require.NoError(t, cmd.Flags().Set("group", "true"))
+				}
+
+				start := time.Now()
+				err := runAuditCommand(cmd, args)
+				require.ErrorIs(t, err, expectedErr)
+				assert.Less(t, time.Since(start), 2*time.Second, "repository lookup must honor the audit deadline")
+				if lookup == "git" {
+					assert.FileExists(t, marker)
+				} else {
+					assert.NoFileExists(t, marker, "cancellation must prevent fallback to git")
+				}
+			})
+		}
 	}
 }
 

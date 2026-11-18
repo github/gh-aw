@@ -80,6 +80,8 @@ type ImportsResult struct {
 	MergedEngineMCPToolTimeout    string                // First engine.mcp.tool-timeout found across all imports (Go duration string, e.g. "10m")
 	MergedEngineMCPSessionTimeout string                // First engine.mcp.session-timeout found across all imports (Go duration string, e.g. "4h")
 	MergedEngineModel             string                // First engine.model found in imports that have no engine.id (model preference without engine selection)
+	RouterShortlists              [][]string            // Top-level main-agent shortlists, kept separate to detect conflicting declarations.
+	RouterDisabled                bool                  // An import opts out of default routing without selecting an engine or model.
 	EngineModelChoiceDeclared     bool                  // An import declares a top-level model, or a preference-only engine object declares model, model-routing, or fallback-models (including empty values)
 	MergedMaxTurns                string                // First max-turns value found across all imports (JSON-encoded, first-wins)
 	MergedMaxToolDenials          string                // First max-tool-denials value found across all imports (JSON-encoded, first-wins)

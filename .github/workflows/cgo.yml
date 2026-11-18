@@ -130,14 +130,14 @@ jobs:
       run: |
         node <<'NODE'
         const fs = require('node:fs');
-        const known = ['go-tests', 'security', 'native-javascript-tests', 'build-wasm', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'actions-build'];
-        const mandatory = ['go-tests', 'security', 'native-javascript-tests'];
+        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'canary-go', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'bench', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
+        const dependencies = {test: ['verify-integration-build'], 'canary-go': ['test'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
         let suiteIds = '';
         try {
           const ids = JSON.parse(process.env.RAW_SUITE_IDS);
           if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(ids) &&
               ids.length <= known.length && new Set(ids).size === ids.length &&
-              ids.every(id => known.includes(id)) && mandatory.every(id => ids.includes(id))) {
+              ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
             suiteIds = JSON.stringify(ids);
           }
         } catch (error) {
@@ -148,6 +148,8 @@ jobs:
         NODE
 
   front-door-conformance:
+    needs: [front-door-decision]
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'front-door-conformance'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -165,7 +167,8 @@ jobs:
         node --test scripts/ci-front-door-workflow.test.cjs
 
   verify-integration-build:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'verify-integration-build'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -252,12 +255,13 @@ jobs:
 
   test:
     name: Unit tests (${{ matrix.name }})
-    if: github.event_name != 'pull_request' || needs.checkout-cache.outputs.dependencies-changed == 'true'
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.verify-integration-build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'test'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
     - checkout-cache
     - verify-integration-build
+    - front-door-decision
     permissions:
       contents: read
     strategy:
@@ -279,6 +283,8 @@ jobs:
         - name: N-R
           pattern: ^Test[N-R]
           shard: n-r
+          # Includes a compile sweep of the repository workflows.
+          timeout: 5m
         - name: S-Z and other
           pattern: ^Test([S-Z]|[^A-R])
           shard: s-z
@@ -392,7 +398,7 @@ jobs:
       run: |
         set -o pipefail
         # Run tests with JSON output for artifacts, but also show failures
-        if ! go test -v -parallel=8 -timeout=3m -run='${{ matrix.pattern }}' -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
+        if ! go test -v -parallel=8 -timeout='${{ matrix.timeout || '3m' }}' -run='${{ matrix.pattern }}' -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
           cat test-result-unit-${{ matrix.shard }}.json
           exit 1
         fi
@@ -441,7 +447,8 @@ jobs:
     needs:
     - checkout-cache
     - test
-    if: always() && needs.test.result == 'success'  # Skip coverage check for cancelled/failed test runs
+    - front-door-decision
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'canary-go'))
     permissions:
       contents: read
     steps:
@@ -513,7 +520,8 @@ jobs:
         retention-days: 7
 
   impacted-go-tests:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'impacted-go-tests'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -549,7 +557,8 @@ jobs:
 
   native-javascript-tests:
     name: Native JavaScript and Actions parser tests
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'native-javascript-tests'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -596,7 +605,8 @@ jobs:
       run: make test-actions-parser-conformance
 
   build:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'build'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -805,7 +815,8 @@ jobs:
       run: node scripts/test-wasm-golden.mjs
 
   validate-yaml:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'validate-yaml'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1268,9 +1279,9 @@ jobs:
           core.info(`✅ ${CONFIG_FILE} passes all structural and cross-row invariant checks`);
 
   bench:
-    # Only run benchmarks on main branch for performance tracking
-    if: github.ref == 'refs/heads/main'
-    needs: [checkout-cache]
+    # PR relevance comes from frontdoor; retain main-only performance tracking otherwise.
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'bench'))
+    needs: [checkout-cache, front-door-decision]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -1445,7 +1456,8 @@ jobs:
 
   check-validator-sizes:
     name: Check validator file sizes
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'check-validator-sizes'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Non-blocking: report violations but don't fail the build until existing files are cleaned up
@@ -1489,7 +1501,8 @@ jobs:
         exit "$EXIT_CODE"
 
   lint-go-format:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'lint-go-format'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1546,7 +1559,8 @@ jobs:
         echo "✅ Go formatting check passed" >> $GITHUB_STEP_SUMMARY
 
   lint-go-golangci:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'lint-go-golangci'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -1666,7 +1680,8 @@ jobs:
         fi
 
   lint-go-govulncheck:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'lint-go-govulncheck'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -1720,7 +1735,8 @@ jobs:
       run: make security-govulncheck
 
   lint-go-custom:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'lint-go-custom'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -1772,15 +1788,14 @@ jobs:
         linter_dir=$(mktemp -d)
         trap 'rm -rf "$linter_dir"' EXIT
         env -u GOOS -u GOARCH go build -o "$linter_dir/gh-aw-linters" ./cmd/linters
-        set +e
-        "$linter_dir/gh-aw-linters" -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > "$linter_dir/fprintf-lint.log" 2>&1
-        status=$?
-        set -e
+        log_file="$linter_dir/fprintf-lint.log"
+        status=0
+        "$linter_dir/gh-aw-linters" -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > "$log_file" 2>&1 || status=$?
         if [ "$status" -eq 0 ]; then
           exit 0
         fi
         if [ "$status" -ne 3 ]; then
-          cat "$linter_dir/fprintf-lint.log"
+          cat "$log_file"
           exit "$status"
         fi
         while IFS= read -r diagnostic; do
@@ -1789,7 +1804,7 @@ jobs:
           else
             echo "$diagnostic"
           fi
-        done < "$linter_dir/fprintf-lint.log"
+        done < "$log_file"
 
     - name: Run custom linters (wasm)
       run: GOOS=js GOARCH=wasm make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"
@@ -1802,7 +1817,8 @@ jobs:
       run: make lint-action-sh
 
   lint-error-messages:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'lint-error-messages'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1910,9 +1926,8 @@ jobs:
       run: make actions-validate
 
   fuzz:
-    # Only run fuzz tests on main branch (10s is insufficient for PRs)
-    if: github.ref == 'refs/heads/main'
-    needs: [checkout-cache]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'fuzz'))
+    needs: [checkout-cache, front-door-decision]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -2092,7 +2107,8 @@ jobs:
         retention-days: 7
 
   security:
-    needs: [checkout-cache, build]
+    needs: [checkout-cache, build, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'security'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -2161,9 +2177,8 @@ jobs:
       run: make test-security
 
   security-scan:
-    # Only run security scans on main branch to reduce PR overhead
-    if: github.ref == 'refs/heads/main'
-    needs: [checkout-cache, build]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'security-scan'))
+    needs: [checkout-cache, build, front-door-decision]
     runs-on: ubuntu-latest
     timeout-minutes: 10  # Prevent jobs from hanging indefinitely
     permissions:
@@ -2396,7 +2411,7 @@ jobs:
 
   cross-platform-build:
     needs: [checkout-cache, build, front-door-decision]
-    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.build.result == 'success'
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'cross-platform-build'))
     name: Build & Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -2405,7 +2420,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && needs.front-door-decision.result == 'success' && needs.front-door-decision.outputs.suite_ids && !contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'cross-platform-build') && '["windows-latest"]' || '["macos-latest","windows-latest"]') }}
+        os: [macos-latest, windows-latest]
     concurrency:
       group: ci-${{ github.ref }}-cross-platform-${{ matrix.os }}
       cancel-in-progress: true
@@ -2938,7 +2953,8 @@ jobs:
         rm -rf test-workspace
 
   safe-outputs-conformance:
-    needs: [checkout-cache]
+    needs: [checkout-cache, front-door-decision]
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'safe-outputs-conformance'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

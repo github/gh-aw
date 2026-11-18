@@ -48,6 +48,21 @@
       "default": false,
       "description": "Enable the activation admission check and conclusion callback for all workflows without changing job permissions. An explicit setting overrides workflow frontmatter. If unset, workflows use on.admission, which defaults to false."
     },
+    "safe_output_authorization": {
+      "description": "Require fail-closed authorization for non-diagnostic safe outputs in every workflow. Use true to load GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_URL and GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_AUDIENCE at runtime, or supply a literal authority. Conflicting workflow/import authorities fail compilation. Recompile workflows after changing this setting.",
+      "oneOf": [
+        { "const": true },
+        {
+          "type": "object",
+          "required": ["endpoint", "audience"],
+          "additionalProperties": false,
+          "properties": {
+            "endpoint": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^https://" },
+            "audience": { "type": "string", "minLength": 1, "maxLength": 2048 }
+          }
+        }
+      ]
+    },
     "gateway-dispatch": {
       "type": "boolean",
       "default": false,

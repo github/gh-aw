@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { createRequire } from "node:module";
 
 const mockCore = {
   debug: vi.fn(),
@@ -33,9 +34,11 @@ describe("upload_assets.cjs", () => {
     process.env.GH_AW_AGENT_OUTPUT = tempFilePath;
   };
 
-  const executeScript = async () => {
+  const executeScript = async (guardedFiles = undefined) => {
     global.core = mockCore;
     global.exec = mockExec;
+    const nativeRequire = createRequire(import.meta.url);
+    const require = module => (module === "./symlink_guard.cjs" && guardedFiles ? guardedFiles : nativeRequire(module));
     await eval(`(async () => { ${uploadAssetsScript}; await main(); })()`);
   };
 
@@ -110,6 +113,7 @@ describe("upload_assets.cjs", () => {
     delete process.env.GH_AW_AGENT_OUTPUT;
     delete process.env.GH_AW_ASSETS_DIR;
     delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
+    delete process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE;
     delete process.env.GITHUB_SERVER_URL;
     delete process.env.GITHUB_REPOSITORY;
 
@@ -127,6 +131,8 @@ describe("upload_assets.cjs", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE;
     restoreDescriptorPaths?.();
     if (tempBase && fs.existsSync(tempBase)) {
       fs.rmSync(tempBase, { recursive: true, force: true });
@@ -529,9 +535,14 @@ describe("upload_assets.cjs", () => {
   });
 
   describe("staged mode", () => {
-    it("should not push to origin when GH_AW_SAFE_OUTPUTS_STAGED=true", async () => {
+    it.each(["global", "output"])("should preview without credentials or publication with %s staging", async mode => {
       process.env.GH_AW_ASSETS_BRANCH = "assets/test-workflow";
-      process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
+      process.env.GH_AW_SAFE_OUTPUTS_STAGED = mode === "global" ? "true" : "false";
+      process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE = JSON.stringify({ type: "upload_asset", staged: mode === "output", authorization: { from_environment: true, source: "global" } });
+      const fetch = vi.fn(() => {
+        throw new Error("Staged previews must not acquire credentials");
+      });
+      vi.stubGlobal("fetch", fetch);
       const assetDir = getAssetsDir();
       fs.mkdirSync(assetDir, { recursive: true });
       const { assetPath, sha, size } = makeAsset(assetDir, "test.png", "fake png data");
@@ -545,8 +556,11 @@ describe("upload_assets.cjs", () => {
         if (isGitCommand(command, args, "push")) pushCalled = true;
       });
 
-      await executeScript();
+      // Staging policy is independent of descriptor-based filesystem guards.
+      await executeScript({ readGuardedFile: filename => fs.readFileSync(filename), writeGuardedFile: fs.writeFileSync });
       expect(pushCalled).toBe(false);
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(
         expect.stringContaining("### Assets\n\n🎭 Staged mode: **1** asset ready for publication to branch `assets/test-workflow` (not pushed).\n\n<details>\n<summary>View 1 asset</summary>\n\n")

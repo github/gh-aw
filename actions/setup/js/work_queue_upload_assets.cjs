@@ -24,6 +24,7 @@ const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { readGuardedFile } = require("./symlink_guard.cjs");
+const { authorizeHandlerInvocation } = require("./safe_output_authorization_gate.cjs");
 
 const receipts = new WeakMap();
 
@@ -89,6 +90,11 @@ async function main(config = {}, suppliedClient) {
     }
     const mutateRef = head ? git?.updateRef : git?.createRef;
     if (typeof mutateRef !== "function") throw new Error("Queue asset requires its native branch write endpoint");
+    await authorizeHandlerInvocation({
+      config,
+      inputs: { repository, branch, path: assetPath, sha256, size: content.length, parent: head },
+      scope: { binding: "invocation", refs: [`sha256:${sha256}`] },
+    });
     const { blob, tree, commit } = await withClaimResourceEffects([authorityResource], ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.updateRef", "rest.git.createRef"], async () => {
       const blob = await createBlob({ owner, repo, content: content.toString("base64"), encoding: "base64" });
       const tree = await createTree({ owner, repo, ...(baseTree ? { base_tree: baseTree } : {}), tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });

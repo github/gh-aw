@@ -5,7 +5,7 @@ sidebar:
   order: 1300
 ---
 
-Control which domains and services AI engines can reach during workflow execution with the top-level `network` field. All four engines (Copilot, Claude, Codex, Gemini) support it through the AWF firewall.
+Control which domains and services AI engines can reach during workflow execution with the top-level `network` field. All built-in engines support it through the AWF firewall; see the [AI Engines reference](/gh-aw/reference/engines/) for the complete engine list.
 
 If no `network:` permission is specified, it defaults to `network: defaults`, which allows only certificate validation, JSON schema, and stock Ubuntu archive/keyserver hosts. The [complete baseline](#defaults-baseline) lists every allowed host.
 
@@ -218,7 +218,7 @@ recommend using ecosystem identifiers instead of individual domain names for bet
 
 ## Implementation
 
-All engines (Copilot, Claude, Codex, Gemini) enforce network permissions through AWF (Agent Workflow Firewall), a wrapper from [github.com/github/gh-aw-firewall](https://github.com/github/gh-aw-firewall) that applies domain-based access controls via `--allow-domains`. AWF automatically includes subdomains (for example, `github.com` allows `api.github.com`), supports wildcard patterns, and logs network activity for audit.
+All built-in engines listed in the [AI Engines reference](/gh-aw/reference/engines/) enforce network permissions through AWF (Agent Workflow Firewall), a wrapper from [github.com/github/gh-aw-firewall](https://github.com/github/gh-aw-firewall) that applies domain-based access controls via `--allow-domains`. AWF automatically includes subdomains (for example, `github.com` allows `api.github.com`), supports wildcard patterns, and logs network activity for audit.
 
 Each engine's named domain set covers CLI authentication and model API transport. Sets expand only when listed in `network.allowed`, and none include public npm or PyPI registries (`registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`). Selecting an engine therefore does not grant registry access. GitHub Packages is the deliberate GitHub transport exception described above.
 

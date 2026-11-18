@@ -27,124 +27,18 @@ explicit runtime and TLC version pins, including the work-queue checks using
 TLA+ Tools v1.7.4; importing agent tooling is not a migration of those jobs. Change a
 tool version only with updated checksums and revalidated model results.
 
-### Install the verified TLA+ runtime
-
-Both paths use the repository-owned `.github/scripts/install_tla_runtime.sh`,
-which contains the reviewed TLA+ and JRE SHA-256 pins and reuses
-`actions/setup/sh/release_integrity.sh` for digest verification. The installer
-and its tests are not part of the distributed setup action. The workflow setup
-copies both files into an isolated temporary directory and verifies their bytes
-against SHA-256 pins in the trusted workflow before executing either file. A
-different checkout therefore fails closed, even if it supplies different pins.
-Preserve the repository layout so the installer can resolve the integrity helper.
-
-From an independently trusted, verified checkout on Linux x64, install the complete runtime into a fresh directory:
-
-```bash
-bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools"
-export JAVA_BIN="$RUNNER_TEMP/tla-tools/jre/bin/java"
-export TLA2TOOLS_JAR="$RUNNER_TEMP/tla-tools/tla2tools.jar"
-```
-
-For a custom job with Java 21 already installed, append `--jar-only` to the
-installer command and set `JAVA_BIN` to that Java executable. This mode installs
-the same verified JAR without downloading the Linux x64 JRE. It does not install
-or validate the separately supplied Java runtime. To share paths across Actions
-steps, write them to `$GITHUB_ENV`; `export` applies only to the current shell.
-
-The destination must not exist. Do not reuse a failed or cached installation.
-Downloads are staged, verified before extraction or execution, and published
-only after successful setup; failures remove staging files and fail the step.
-On download, checksum, extraction, or startup failure, stop verification and
-report a tooling/setup failure, not a model verdict. Never bypass verification,
-run a partial runtime, delete an unrelated directory to retry, or substitute an
-unreviewed JAR. A retry must retain the reviewed pins and use a fresh destination.
-
-### Review runtime updates
-
-Do not pin the apparent `v1.8.0` release: it is a rolling build.
-[Upstream publishing code](https://github.com/tlaplus/tlaplus/blob/c058b21a5013c31281312d3f029bcbb5c98e3748/.github/workflows/main.yml)
-deletes/replaces its assets and force-moves its tag. This caused checksum failures
-on November 6, 2026; refreshing its digest would not provide a stable installation.
-The v1.7.4 SHA-256 matches the pre-existing work-queue pin and the publisher's
-[release notes](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4) SHA-1
-`bee4a54f3ee3d4afc347c3240ec2d9e93b075104` for asset `184694200`.
-SHA-1 is historical provenance evidence, not the installation integrity check.
-The JRE SHA-256 matches GitHub's publisher asset digest for asset `521122088`.
-GitHub reports these releases as non-immutable, so replacement must still fail
-closed rather than automatically accepting a new checksum.
-
-For updates, independently verify publisher release/asset identity and digest,
-update the pins and literal URLs in `.github/scripts/install_tla_runtime.sh`
-together, update the installer and helper hashes in both workflow setup steps,
-run `bash .github/scripts/install_tla_runtime_test.sh`, revalidate bounded models,
-and recompile every consumer. Never derive a trusted pin solely from downloaded
-bytes or a checksum fetched beside them; do not change prior verification results.
-
 For Koka, use the repository's existing setup and verification commands when
 available. Otherwise, declare a version-pinned compiler setup in the consuming
 workflow and verify downloaded artifacts against trusted checksums. The
 `shared/tla-plus.md` import does not install Koka.
 
-## Install Koka in GitHub Actions
-
-Use an `ubuntu-24.04` x64 runner for this recipe. Add the following entry to an
-ordinary job's `steps`, or to an agentic workflow's frontmatter `steps`. Install
-before the agent starts, not through the agent's restricted shell. Custom jobs
-need their own installation; they do not inherit agent setup.
-Agentic workflows can instead import `shared/koka.md`, which installs the same
-pinned bundle and sets `KOKA_BIN`; the consuming workflow still declares tools,
-network access, and safe outputs.
-
-```yaml
-- name: Install Koka 3.2.9 (Linux x64)
-  shell: bash
-  run: |
-    set -euo pipefail
-    test "$(uname -s)" = Linux
-    test "$(uname -m)" = x86_64
-    sudo apt-get update -qq
-    sudo apt-get install -y --no-install-recommends \
-      build-essential ca-certificates curl libgmp-dev
-    tools=/tmp/gh-aw/agent/koka
-    mkdir -p "$tools"
-    curl --fail --location --silent --show-error \
-      --retry 2 --connect-timeout 10 --max-time 180 \
-      --output "$tools/koka.tar.gz" \
-      'https://github.com/koka-lang/koka/releases/download/v3.2.9/koka-v3.2.9-linux-x64.tar.gz'
-    printf '%s  %s\n' \
-      310459831a7c6fa6a0cd8e0e02d6b5b3b36441d5e7ce24168bda016cd2e95eee \
-      "$tools/koka.tar.gz" | sha256sum --check --strict
-    tar -xzf "$tools/koka.tar.gz" --no-same-owner -C "$tools"
-    printf '%s\n' "$tools/bin" >> "$GITHUB_PATH"
-    "$tools/bin/koka" --version
-```
-
-The SHA-256 pin is the digest published for the
-[Koka v3.2.9 Linux x64 release asset](https://github.com/koka-lang/koka/releases/tag/v3.2.9).
-Review the asset digest independently when changing versions; do not fetch a
-checksum alongside an untrusted download and treat that as an independent pin.
-This extracts the compiler, bundled standard library, and runtime together:
-keep `bin/`, `lib/koka/v3.2.9/`, and `share/koka/v3.2.9/` under the same prefix.
-Copying only `bin/koka` is insufficient.
-
-Koka generates C by default, so a working C compiler and development headers
-are needed even though the Koka compiler itself is prebuilt. `build-essential`
-provides GCC, Make, and libc headers; `libgmp-dev` supplies GMP headers/libraries.
-Projects using additional native libraries may need further dependencies.
-The example does not run the upstream installer, install VS Code integration,
-or build Koka from source.
-
-`GITHUB_PATH` applies to subsequent Actions steps, not the current step. Use
-`/tmp/gh-aw/agent/koka/bin/koka` explicitly inside the agent sandbox, and confirm
-the sandbox has a C compiler and required headers too: host package installation
-does not install packages in a separate container. The `/tmp/gh-aw/agent` prefix
-keeps Koka's files on the sandbox-visible mount. Downloads occur in setup;
-the agent's network/tool declarations remain separate.
-
-Do not reuse the x64 archive or checksum on ARM64, macOS, or Windows. Select the
-matching asset and verify its own digest; this example does not validate those
-platforms.
+Before installing or updating tooling, read the sections after the prefix marker:
+**Install the verified TLA+ runtime** (`.github/scripts/install_tla_runtime.sh`,
+`--jar-only`), **Review runtime updates** (never pin rolling `v1.8.0`), and
+**Install Koka in GitHub Actions** (or import `shared/koka.md`). On download,
+checksum, extraction, or startup failure, stop and report a tooling/setup
+failure, not a model verdict; never bypass verification, reuse a failed
+destination, or substitute an unreviewed JAR or checksum.
 
 ## Establish the model
 
@@ -205,3 +99,120 @@ during main-module generation.
 - Report assumptions, checked bounds, verdict, and remaining uncertainty. Retain
   sanitized evidence through the workflow's configured artifact/safe-output path.
   Do not publish secrets or dispatch live workflows.
+
+<!-- instruction-prefix-end -->
+
+## Install the verified TLA+ runtime
+
+Both paths use the repository-owned `.github/scripts/install_tla_runtime.sh`,
+which contains the reviewed TLA+ and JRE SHA-256 pins and reuses
+`actions/setup/sh/release_integrity.sh` for digest verification. The installer
+and its tests are not part of the distributed setup action. The workflow setup
+copies both files into an isolated temporary directory and verifies their bytes
+against SHA-256 pins in the trusted workflow before executing either file. A
+different checkout therefore fails closed, even if it supplies different pins.
+Preserve the repository layout so the installer can resolve the integrity helper.
+
+From an independently trusted, verified checkout on Linux x64, install the complete runtime into a fresh directory:
+
+```bash
+bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools"
+export JAVA_BIN="$RUNNER_TEMP/tla-tools/jre/bin/java"
+export TLA2TOOLS_JAR="$RUNNER_TEMP/tla-tools/tla2tools.jar"
+```
+
+For a custom job with Java 21 already installed, append `--jar-only` to the
+installer command and set `JAVA_BIN` to that Java executable. This mode installs
+the same verified JAR without downloading the Linux x64 JRE. It does not install
+or validate the separately supplied Java runtime. To share paths across Actions
+steps, write them to `$GITHUB_ENV`; `export` applies only to the current shell.
+
+The destination must not exist. Do not reuse a failed or cached installation.
+Downloads are staged, verified before extraction or execution, and published
+only after successful setup; failures remove staging files and fail the step.
+On download, checksum, extraction, or startup failure, stop verification and
+report a tooling/setup failure, not a model verdict. Never bypass verification,
+run a partial runtime, delete an unrelated directory to retry, or substitute an
+unreviewed JAR. A retry must retain the reviewed pins and use a fresh destination.
+
+## Review runtime updates
+
+Do not pin the apparent `v1.8.0` release: it is a rolling build.
+[Upstream publishing code](https://github.com/tlaplus/tlaplus/blob/c058b21a5013c31281312d3f029bcbb5c98e3748/.github/workflows/main.yml)
+deletes/replaces its assets and force-moves its tag. This caused checksum failures
+on November 6, 2026; refreshing its digest would not provide a stable installation.
+The v1.7.4 SHA-256 matches the pre-existing work-queue pin and the publisher's
+[release notes](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4) SHA-1
+`bee4a54f3ee3d4afc347c3240ec2d9e93b075104` for asset `184694200`.
+SHA-1 is historical provenance evidence, not the installation integrity check.
+The JRE SHA-256 matches GitHub's publisher asset digest for asset `521122088`.
+GitHub reports these releases as non-immutable, so replacement must still fail
+closed rather than automatically accepting a new checksum.
+
+For updates, independently verify publisher release/asset identity and digest,
+update the pins and literal URLs in `.github/scripts/install_tla_runtime.sh`
+together, update the installer and helper hashes in both workflow setup steps,
+run `bash .github/scripts/install_tla_runtime_test.sh`, revalidate bounded models,
+and recompile every consumer. Never derive a trusted pin solely from downloaded
+bytes or a checksum fetched beside them; do not change prior verification results.
+
+
+## Install Koka in GitHub Actions
+
+Use an `ubuntu-24.04` x64 runner for this recipe. Add the following entry to an
+ordinary job's `steps`, or to an agentic workflow's frontmatter `steps`. Install
+before the agent starts, not through the agent's restricted shell. Custom jobs
+need their own installation; they do not inherit agent setup.
+Agentic workflows can instead import `shared/koka.md`, which installs the same
+pinned bundle and sets `KOKA_BIN`; the consuming workflow still declares tools,
+network access, and safe outputs.
+
+```yaml
+- name: Install Koka 3.2.9 (Linux x64)
+  shell: bash
+  run: |
+    set -euo pipefail
+    test "$(uname -s)" = Linux
+    test "$(uname -m)" = x86_64
+    sudo apt-get update -qq
+    sudo apt-get install -y --no-install-recommends \
+      build-essential ca-certificates curl libgmp-dev
+    tools=/tmp/gh-aw/agent/koka
+    mkdir -p "$tools"
+    curl --fail --location --silent --show-error \
+      --retry 2 --connect-timeout 10 --max-time 180 \
+      --output "$tools/koka.tar.gz" \
+      'https://github.com/koka-lang/koka/releases/download/v3.2.9/koka-v3.2.9-linux-x64.tar.gz'
+    printf '%s  %s\n' \
+      310459831a7c6fa6a0cd8e0e02d6b5b3b36441d5e7ce24168bda016cd2e95eee \
+      "$tools/koka.tar.gz" | sha256sum --check --strict
+    tar -xzf "$tools/koka.tar.gz" --no-same-owner -C "$tools"
+    printf '%s\n' "$tools/bin" >> "$GITHUB_PATH"
+    "$tools/bin/koka" --version
+```
+
+The SHA-256 pin is the digest published for the
+[Koka v3.2.9 Linux x64 release asset](https://github.com/koka-lang/koka/releases/tag/v3.2.9).
+Review the asset digest independently when changing versions; do not fetch a
+checksum alongside an untrusted download and treat that as an independent pin.
+This extracts the compiler, bundled standard library, and runtime together:
+keep `bin/`, `lib/koka/v3.2.9/`, and `share/koka/v3.2.9/` under the same prefix.
+Copying only `bin/koka` is insufficient.
+
+Koka generates C by default, so a working C compiler and development headers
+are needed even though the Koka compiler itself is prebuilt. `build-essential`
+provides GCC, Make, and libc headers; `libgmp-dev` supplies GMP headers/libraries.
+Projects using additional native libraries may need further dependencies.
+The example does not run the upstream installer, install VS Code integration,
+or build Koka from source.
+
+`GITHUB_PATH` applies to subsequent Actions steps, not the current step. Use
+`/tmp/gh-aw/agent/koka/bin/koka` explicitly inside the agent sandbox, and confirm
+the sandbox has a C compiler and required headers too: host package installation
+does not install packages in a separate container. The `/tmp/gh-aw/agent` prefix
+keeps Koka's files on the sandbox-visible mount. Downloads occur in setup;
+the agent's network/tool declarations remain separate.
+
+Do not reuse the x64 archive or checksum on ARM64, macOS, or Windows. Select the
+matching asset and verify its own digest; this example does not validate those
+platforms.

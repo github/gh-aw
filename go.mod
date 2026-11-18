@@ -28,11 +28,11 @@ require (
 	go.uber.org/goleak v1.3.0
 	go.yaml.in/yaml/v3 v3.0.6
 	// Only golang.org/x/crypto/nacl/box is used. The unmaintained
-	// golang.org/x/crypto/openpgp subpackage (advisory GO-2026-5932, no fix
+	// golang.org/x/crypto/openpgp package path (advisory GO-2026-5932, no fix
 	// available) must never be imported; enforced by the depguard rule in
 	// .golangci.yml.
-	golang.org/x/crypto v0.58.0
-	golang.org/x/mod v0.42.0
+	golang.org/x/crypto v0.59.0
+	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.62.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/term v0.48.0
@@ -116,7 +116,7 @@ require (
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/vuln v1.7.0 // indirect
 	google.golang.org/api v0.293.0 // indirect

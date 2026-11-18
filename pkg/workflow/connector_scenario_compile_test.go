@@ -23,7 +23,12 @@ type connectorCompilerScenario struct {
 	output   string
 }
 
+var azureFoundryIQCompilerScenario = connectorCompilerScenario{
+	"azure-foundry-iq", []string{"knowledge-base__knowledge_base_retrieve"}, "FOUNDRY_IQ_SEARCH_ACCESS_TOKEN", "create-issue",
+}
+
 var connectorCompilerScenarios = []connectorCompilerScenario{
+	azureFoundryIQCompilerScenario,
 	{"asana", []string{"get_task"}, "ASANA_READ_ACCESS_TOKEN", "asana-add-comment"},
 	{"linear", []string{"get-issue", "list-comments"}, "LINEAR_READ_API_KEY", "linear-add-comment"},
 	{"jira", []string{"personal__getJiraIssue"}, "JIRA_MCP_PERSONAL_BASIC_AUTH", "jira-add-comment"},
@@ -38,6 +43,7 @@ var connectorCompilerScenarios = []connectorCompilerScenario{
 	{"datadog", []string{"datadog_get_monitor"}, "DATADOG_MONITOR_READ_OAUTH_TOKEN", "create-issue"},
 	{"zendesk", []string{"get_ticket"}, "ZENDESK_READ_OAUTH_TOKEN", "create-issue"},
 	{"notion", []string{"get_page"}, "NOTION_READ_TOKEN", "notion-add-comment"},
+	{"azure-web-iq", []string{"search__news", "search__web"}, "AZURE_WEB_IQ_READ_ACCESS_TOKEN", "create-issue"},
 }
 
 func assertConnectorScenarioAuthority(t *testing.T, data *WorkflowData, scenario connectorCompilerScenario) {
@@ -230,6 +236,9 @@ func TestConnectorScenarioRejectsInvalidConfiguration(t *testing.T) {
 						"unknown-effect":               "missing-operation",
 						"missing-exact-grants":         "resource",
 						"writer-credential-for-reader": "phase",
+					}
+					if scenario.provider == "azure-web-iq" && name == "writer-credential-for-reader" {
+						messages[name] = "requires an agent-phase credential"
 					}
 					require.NotEmpty(t, messages[name], "each mutation must identify its intended rejection")
 					require.ErrorContains(t, err, messages[name])

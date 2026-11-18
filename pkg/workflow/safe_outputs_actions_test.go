@@ -289,7 +289,8 @@ func TestBuildActionSteps(t *testing.T) {
 		},
 	}
 
-	steps := compiler.buildActionSteps(data)
+	steps, err := compiler.buildActionSteps(data)
+	require.NoError(t, err)
 	require.NotEmpty(t, steps, "Should generate steps")
 
 	fullYAML := strings.Join(steps, "")
@@ -318,7 +319,8 @@ func TestBuildActionStepsFallbackPayload(t *testing.T) {
 		},
 	}
 
-	steps := compiler.buildActionSteps(data)
+	steps, err := compiler.buildActionSteps(data)
+	require.NoError(t, err)
 	require.NotEmpty(t, steps, "Should generate steps even without inputs")
 
 	fullYAML := strings.Join(steps, "")
@@ -356,7 +358,9 @@ func TestBuildActionStepsEmpty(t *testing.T) {
 	data := &WorkflowData{
 		SafeOutputs: &SafeOutputsConfig{},
 	}
-	assert.Nil(t, compiler.buildActionSteps(data), "Should return nil for empty actions")
+	steps, err := compiler.buildActionSteps(data)
+	require.NoError(t, err)
+	assert.Nil(t, steps, "Should return nil for empty actions")
 }
 
 // TestExtractSafeOutputsConfigIncludesActions verifies extractSafeOutputsConfig handles actions
@@ -524,7 +528,8 @@ func TestBuildActionStepsWithEnv(t *testing.T) {
 		},
 	}
 
-	steps := compiler.buildActionSteps(data)
+	steps, err := compiler.buildActionSteps(data)
+	require.NoError(t, err)
 	require.NotEmpty(t, steps, "Should generate steps")
 
 	fullYAML := strings.Join(steps, "")
@@ -554,7 +559,8 @@ func TestBuildActionStepsNoEnv(t *testing.T) {
 		},
 	}
 
-	steps := compiler.buildActionSteps(data)
+	steps, err := compiler.buildActionSteps(data)
+	require.NoError(t, err)
 	fullYAML := strings.Join(steps, "")
 	assert.NotContains(t, fullYAML, "env:", "Should not have env block when Env is nil/empty")
 }
@@ -626,7 +632,8 @@ func TestBuildActionStepsSkipsGitHubExpressionDefaultInputs(t *testing.T) {
 		},
 	}
 
-	steps := compiler.buildActionSteps(data)
+	steps, err := compiler.buildActionSteps(data)
+	require.NoError(t, err)
 	fullYAML := strings.Join(steps, "")
 
 	// Only 'labels' should be in with: block

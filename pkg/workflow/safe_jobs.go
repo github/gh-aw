@@ -16,6 +16,8 @@ var safeJobsLog = logger.New("workflow:safe_jobs")
 
 // SafeJobConfig defines a safe job configuration with GitHub Actions job properties
 type SafeJobConfig struct {
+	Authorization *SafeOutputAuthorization `yaml:"authorization,omitempty"`
+	Staged        *TemplatableBool         `yaml:"staged,omitempty"`
 	// Standard GitHub Actions job properties
 	Name           string            `yaml:"name,omitempty"`
 	Description    string            `yaml:"description,omitempty"`
@@ -61,6 +63,8 @@ func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJ
 		}
 
 		safeJob := &SafeJobConfig{}
+		safeJob.Authorization = parseLocalSafeOutputAuthorization(jobConfig["authorization"])
+		safeJob.Staged = parseAuthorizationStaged(jobConfig["staged"])
 
 		// Parse name
 		if name, exists := jobConfig["name"]; exists {
@@ -407,6 +411,11 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 			StepName:         "Download agent output artifact",
 		}, c.getActionPin)
 		steps = append(steps, downloadSteps...)
+		authorizationRequired := data.SafeOutputs.AuthorizationRequirements[normalizedJobName] != nil
+		if authorizationRequired {
+			steps = append(steps, c.buildSafeOutputsSetupSteps(data)...)
+		}
+		authorStepOffset := len(steps)
 
 		// the download artifacts always creates a folder, then unpacks in that folder
 
@@ -443,6 +452,19 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 						}
 					}
 					typedStep.Env["GH_AW_JOB_CHECK_RUN_ID"] = "${{ job.check_run_id }}"
+					if authorizationRequired {
+						gateCondition := fmt.Sprintf("steps.authorize_%s.outputs.authorized == 'true'", normalizedJobName)
+						if typedStep.If != "" {
+							gateCondition += " && (" + stripExpressionWrapper(c.extractExpressionFromIfString(typedStep.If)) + ")"
+						}
+						typedStep.If = gateCondition
+					}
+					if condition := safeJobUnstagedCondition(data.SafeOutputs.Staged, jobConfig.Staged); condition != "" {
+						if typedStep.If != "" {
+							condition += " && (" + stripExpressionWrapper(c.extractExpressionFromIfString(typedStep.If)) + ")"
+						}
+						typedStep.If = condition
+					}
 
 					// Apply action pinning using type-safe version
 					pinnedStep, err := applyActionPinToTypedStep(typedStep, data)
@@ -460,6 +482,16 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 			}
 		}
 
+		if authorizationRequired {
+			implementation := map[string]any{"configuration": jobConfig, "steps": steps[authorStepOffset:]}
+			gate, err := c.buildAuthorizationGateStep(data, normalizedJobName, "job", implementation, jobConfig.Staged,
+				authorizationGateOptions{OutputPath: SafeJobsDownloadDirExpr + constants.AgentOutputFilename.String()})
+			if err != nil {
+				return nil, err
+			}
+			steps = slices.Insert(steps, authorStepOffset, gate...)
+			steps = append(steps, c.buildAuthorizationEvidenceUploadStep(data, normalizedJobName)...)
+		}
 		job.Steps = steps
 
 		// Set permissions if specified
@@ -470,6 +502,17 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 			for perm, level := range jobConfig.Permissions {
 				perms.Set(PermissionScope(perm), PermissionLevel(level))
 			}
+			job.Permissions = perms.RenderToYAML()
+		}
+		if authorizationRequired && !isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), jobConfig.Staged) {
+			perms := NewPermissionsParserFromValue(jobConfig.RawPermissions).ToPermissions()
+			if jobConfig.Permissions["id-token"] == "none" || jobConfig.RawPermissions == "read-all" {
+				return nil, fmt.Errorf("safe-output job %q authorization requires id-token: write; remove the conflicting permission restriction", normalizedJobName)
+			}
+			for permission, level := range jobConfig.Permissions {
+				perms.Set(PermissionScope(permission), PermissionLevel(level))
+			}
+			perms.Set(PermissionScope("id-token"), PermissionWrite)
 			job.Permissions = perms.RenderToYAML()
 		}
 
@@ -484,6 +527,19 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 
 	safeJobsLog.Printf("Successfully built %d safe-jobs", len(safeJobNames))
 	return safeJobNames, nil
+}
+
+func safeJobUnstagedCondition(global, local *TemplatableBool) string {
+	var conditions []string
+	for _, staged := range []*TemplatableBool{global, local} {
+		if templatableBoolIsTrue(staged) {
+			return "false"
+		}
+		if isTemplatableStagedExpression(staged) {
+			conditions = append(conditions, "format('{0}', "+stripExpressionWrapper(string(*staged))+") != 'true'")
+		}
+	}
+	return strings.Join(conditions, " && ")
 }
 
 // extractSafeJobsFromFrontmatter extracts safe-jobs configuration from frontmatter.

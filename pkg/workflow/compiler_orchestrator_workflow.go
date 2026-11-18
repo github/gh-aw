@@ -97,7 +97,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err := c.expandWorkflowConnectors(ctx.frontmatter.Frontmatter, connectorConfigs); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
-	engineSetup, err := c.setupEngineAndImports(ctx.frontmatter, ctx.cleanPath, ctx.content, ctx.markdownDir)
+	engineSetup, err := c.resolveWorkflowEngine(ctx.frontmatter, ctx.cleanPath, ctx.content, ctx.markdownDir)
 	if err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}
@@ -741,6 +741,12 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// Auto-inject create-issues if safe-outputs is configured but has no non-builtin outputs.
 	// This ensures every workflow with safe-outputs has at least one meaningful action handler.
 	applyDefaultCreateIssue(workflowData)
+	if err := c.applyRepoSafeOutputAuthorization(workflowData); err != nil {
+		return err
+	}
+	if err := resolveWorkflowSafeOutputAuthorizations(workflowData); err != nil {
+		return err
+	}
 
 	// Apply the top-level github-app as a fallback for all nested github-app token minting operations.
 	// This runs last so that all section-specific configurations have been resolved first.

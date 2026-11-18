@@ -27,10 +27,14 @@ func isRolloutPR(pr orgRolloutPR, marker string) bool {
 	if strings.Contains(pr.Body, marker) {
 		return true
 	}
-	if marker == ghawUpgradeMarkerPrefix {
-		return pr.Title == "Upgrade agentic workflows" && strings.HasPrefix(pr.Branch, "upgrade-agentic-workflows-")
+	title := pr.Title
+	if base, version, ok := strings.Cut(title, " (gh aw v"); ok && strings.HasSuffix(version, ")") && version != ")" {
+		title = base
 	}
-	return pr.Title == "Update workflows from source" && strings.HasPrefix(pr.Branch, "update-workflows-")
+	if marker == ghawUpgradeMarkerPrefix {
+		return title == "Upgrade agentic workflows" && strings.HasPrefix(pr.Branch, "upgrade-agentic-workflows-")
+	}
+	return title == "Update workflows from source" && strings.HasPrefix(pr.Branch, "update-workflows-")
 }
 
 func rolloutMarker(command string) string {
@@ -233,7 +237,7 @@ func prepareOrgRolloutWorker(ctx context.Context, repo, marker string) ([]orgRol
 	}
 	if len(existing) > 0 && !opts.replace {
 		orgRolloutDiscoveryLog.Printf("Skipping %s: %d existing rollout PR(s) and replace not requested", repo, len(existing))
-		err := emitOrgRolloutResult(orgRolloutResult{Status: "skipped: existing PR", URL: existing[0].URL})
+		err := emitOrgRolloutResult(orgRolloutResult{Status: "skipped: existing PR", URL: existing[0].URL}, ctx)
 		return existing, true, err
 	}
 	return existing, false, nil
@@ -243,7 +247,7 @@ func finishOrgRolloutWorker(ctx context.Context, repo string, existing []orgRoll
 	if opts := orgRolloutFromContext(ctx); opts == nil || !opts.worker {
 		return nil
 	}
-	if err := emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL, Preview: preview}); err != nil {
+	if err := emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL, Preview: preview}, ctx); err != nil {
 		return err
 	}
 	for _, pr := range existing {

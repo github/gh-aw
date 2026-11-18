@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/github/gh-aw/pkg/errorutil"
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"golang.org/x/sync/singleflight"
 )
@@ -110,13 +110,12 @@ func getCachedListRepoClone(cacheKey string) (string, bool) {
 // redundant tmpDir is discarded and the existing entry is returned.
 // Do not call from code that already holds gitListCloneCache.mu.
 func cloneAndCacheListRepoClone(ctx context.Context, cfg listRepoCloneConfig) (string, error) {
-	tmpDir, err := os.MkdirTemp("", "gh-aw-list-*")
+	tmpDir, err := gitutil.CreateSourceTempDir("gh-aw-list-*")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	cloneCmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", cfg.ref, "--single-branch", "--filter=blob:none", "--no-checkout", cfg.repoURL, tmpDir)
-	cloneOutput, err := cloneCmd.CombinedOutput()
+	cloneOutput, err := gitutil.SourceCommandCombinedOutputContext(ctx, cfg.repoURL, "clone", "--depth", "1", "--branch", cfg.ref, "--single-branch", "--filter=blob:none", "--no-checkout", cfg.repoURL, tmpDir)
 	if err != nil {
 		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
 			remoteLog.Printf("Failed to clean up temp directory %q: %v", tmpDir, cleanupErr)
@@ -237,7 +236,7 @@ func listWorkflowFilesViaGitForHost(ctx context.Context, owner, repo, ref, workf
 	}
 
 	// Use git ls-tree to list files in the specified workflows directory
-	lsTreeCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "ls-tree", "-r", "--name-only", "HEAD", workflowPath+"/")
+	lsTreeCmd := gitutil.SourceCommandContext(ctx, "", "-C", tmpDir, "ls-tree", "-r", "--name-only", "HEAD", workflowPath+"/")
 	lsTreeOutput, err := lsTreeCmd.CombinedOutput()
 	if err != nil {
 		remoteLog.Printf("Failed to list files: %s", string(lsTreeOutput))
@@ -355,7 +354,7 @@ func listDirAllFilesViaGitForHost(ctx context.Context, owner, repo, ref, dirPath
 		return nil, err
 	}
 
-	lsTreeCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "ls-tree", "-r", "--name-only", "HEAD", dirPath+"/")
+	lsTreeCmd := gitutil.SourceCommandContext(ctx, "", "-C", tmpDir, "ls-tree", "-r", "--name-only", "HEAD", dirPath+"/")
 	lsTreeOutput, err := lsTreeCmd.CombinedOutput()
 	if err != nil {
 		remoteLog.Printf("Failed to list dir files: %s", string(lsTreeOutput))
@@ -494,7 +493,7 @@ func listDirAllFilesRecursivelyViaGitForHost(ctx context.Context, owner, repo, r
 
 	// Normalise dirPath so it never has a trailing slash before we append one.
 	cleanDirPath := strings.TrimRight(dirPath, "/")
-	lsTreeCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "ls-tree", "-r", "--name-only", "HEAD", cleanDirPath+"/")
+	lsTreeCmd := gitutil.SourceCommandContext(ctx, "", "-C", tmpDir, "ls-tree", "-r", "--name-only", "HEAD", cleanDirPath+"/")
 	lsTreeOutput, err := lsTreeCmd.CombinedOutput()
 	if err != nil {
 		remoteLog.Printf("Failed to list dir files recursively: %s", string(lsTreeOutput))
@@ -576,7 +575,7 @@ func listDirSubdirsViaGitForHost(ctx context.Context, owner, repo, ref, dirPath,
 	}
 
 	// Use ls-tree -d to list only direct subdirectory entries.
-	lsTreeDirsCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "ls-tree", "--name-only", "-d", "HEAD", dirPath+"/")
+	lsTreeDirsCmd := gitutil.SourceCommandContext(ctx, "", "-C", tmpDir, "ls-tree", "--name-only", "-d", "HEAD", dirPath+"/")
 	lsTreeDirsOutput, err := lsTreeDirsCmd.CombinedOutput()
 	if err != nil {
 		remoteLog.Printf("Failed to list tree subdirs: %s", string(lsTreeDirsOutput))

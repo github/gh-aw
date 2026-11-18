@@ -6726,6 +6726,7 @@
         }
       ],
       "properties": {
+        "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
         "steer": {
           "type": "boolean",
           "description": "⚠️ Experimental. Create a run-scoped issue and let the agent read user-authored issue comments containing the keyword 'steer'. The issue is reused for agent failure reporting. Requires top-level issues: read permission.",
@@ -6774,6 +6775,7 @@
               "type": "object",
               "description": "Configuration for automatically creating GitHub issues from AI workflow output. The main job does not need 'issues: write' permission.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "title-prefix": {
                   "type": "string",
                   "description": "Optional prefix to add to the beginning of the issue title (e.g., '[ai] ' or '[analysis] ')"
@@ -7010,6 +7012,7 @@
               "deprecated": true,
               "x-deprecation-message": "'create-agent-task' is deprecated. Use 'create-agent-session' instead.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "base": {
                   "type": "string",
                   "description": "Base branch for the agent session pull request. Defaults to the current branch or repository default branch."
@@ -7089,6 +7092,7 @@
               "type": "object",
               "description": "Configuration for creating GitHub Copilot coding agent sessions from agentic workflow output using gh agent-task CLI. The main job does not need write permissions.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "base": {
                   "type": "string",
                   "description": "Base branch for the agent session pull request. Defaults to the current branch or repository default branch."
@@ -7165,6 +7169,7 @@
               "description": "Configuration for managing GitHub Projects boards. Enable agents to add issues and pull requests to projects, update custom field values (status, priority, effort, dates), create project fields and views. By default it is update-only: if the project does not exist, the job fails with instructions to create it. To allow workflows to create missing projects, explicitly opt in via agent output field create_if_missing=true. Requires a Personal Access Token (PAT) or GitHub App token with Projects permissions (default GITHUB_TOKEN cannot be used). Agent output includes: project (full URL or temporary project ID like aw_XXXXXXXXXXXX or #aw_XXXXXXXXXXXX from create_project), content_type (issue|pull_request|draft_issue), content_number, fields, create_if_missing. For specialized operations, agent can also provide: operation (create_fields|create_view), field_definitions (array of field configs when operation=create_fields), view (view config object when operation=create_view).",
               "required": ["project"],
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of project operations to perform (default: 10). Each operation may add a project item, or update its fields. Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -7334,6 +7339,7 @@
               "type": "object",
               "description": "Configuration for creating new GitHub Projects boards. Enables agents to create new project boards with optional custom fields, views, and an initial item. Requires a Personal Access Token (PAT) or GitHub App token with Projects write permission (default GITHUB_TOKEN cannot be used). Agent output includes: title (project name), owner (org/user login, uses default if omitted), owner_type ('org' or 'user'), optional item_url (issue to add as first item), and optional field_definitions. Returns a temporary project ID for use in subsequent update_project operations.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of create operations to perform (default: 1). Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -7469,6 +7475,7 @@
               "description": "Configuration for posting status updates to GitHub Projects. Status updates provide stakeholder communication about project progress, health, and timeline. Each update appears in the project's Updates tab and creates a historical record. Requires a Personal Access Token (PAT) or GitHub App token with Projects read & write permission (default GITHUB_TOKEN cannot be used). Typically used by scheduled workflows or orchestrators to post regular progress summaries with status indicators (on-track, at-risk, off-track, complete, inactive), dates, and progress details.",
               "required": ["project"],
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of status updates to create (default: 1). Typically 1 per orchestrator run. Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -7544,6 +7551,7 @@
               "type": "object",
               "description": "Configuration for creating GitHub discussions from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "title-prefix": {
                   "type": "string",
                   "description": "Optional prefix for the discussion title"
@@ -7718,6 +7726,7 @@
               "type": "object",
               "description": "Configuration for closing GitHub discussions with comment and resolution from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "required-labels": {
                   "type": "array",
                   "items": {
@@ -7823,6 +7832,7 @@
               "type": "object",
               "description": "Configuration for updating GitHub discussions from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "target": {
                   "type": "string",
                   "description": "Target for updates: 'triggering' (default), '*' (any discussion), or explicit discussion number"
@@ -7922,6 +7932,7 @@
               "type": "object",
               "description": "Configuration for closing GitHub issues with comment from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "required-labels": {
                   "type": "array",
                   "items": {
@@ -8047,6 +8058,7 @@
               "type": "object",
               "description": "Configuration for closing GitHub pull requests without merging, with comment from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "required-labels": {
                   "type": "array",
                   "items": {
@@ -8148,6 +8160,7 @@
               "type": "object",
               "description": "Configuration for marking draft pull requests as ready for review, with comment from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "required-labels": {
                   "type": "array",
                   "items": {
@@ -8249,6 +8262,7 @@
               "type": "object",
               "description": "Configuration for approving workflow runs that are awaiting required approval.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of workflow runs to approve (default: 1). Supports an integer or GitHub Actions expression.",
                   "oneOf": [
@@ -8362,6 +8376,7 @@
               "type": "object",
               "description": "Configuration for automatically creating GitHub issue or pull request comments from AI workflow output. The main job does not need write permissions.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "collapse-data": {
                   "type": "boolean",
                   "description": "Render safe-output data in a collapsed Structured data details block. Default: false (visible fenced JSON). Requires safe-outputs.data to accept structured data."
@@ -8554,6 +8569,7 @@
               "type": "object",
               "description": "Configuration for creating GitHub pull requests from agentic workflow output. Supports creating multiple PRs in a single run when max > 1.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of pull requests to create (default: 1). Each PR requires distinct changes on a separate branch. Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9030,6 +9046,7 @@
               "type": "object",
               "description": "Configuration for creating GitHub pull request review comments from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of review comments to create (default: 10) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9125,6 +9142,7 @@
               "type": "object",
               "description": "Configuration for submitting a consolidated PR review with a status decision (APPROVE, REQUEST_CHANGES, COMMENT). All create-pull-request-review-comment outputs are collected and submitted as part of this review.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of reviews to submit (default: 1) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9242,6 +9260,7 @@
               "type": "object",
               "description": "Configuration for dismissing pull request reviews previously submitted by the current workflow actor.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of review dismissals to perform (default: 10) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9331,6 +9350,7 @@
               "type": "object",
               "description": "Configuration for replying to existing pull request review comments",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of replies to create (default: 10) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9422,6 +9442,7 @@
               "type": "object",
               "description": "Configuration for resolving review threads on pull requests. By default, resolution is scoped to the triggering PR only. When target, target-repo, or allowed-repos are specified, cross-repository thread resolution is supported.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of review threads to resolve (default: 10) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9508,6 +9529,7 @@
               "type": "object",
               "description": "Configuration for creating repository security advisories (SARIF format) from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of security findings to include (default: unlimited) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9587,6 +9609,7 @@
               "type": "object",
               "description": "Configuration for creating autofixes for code scanning alerts",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of autofixes to create (default: 10) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -9646,6 +9669,7 @@
               "type": "object",
               "description": "Configuration for creating GitHub Check Runs to surface agent analysis results on commits and pull requests",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "name": {
                   "type": "string",
                   "description": "Check run name shown in the GitHub Checks UI (e.g., 'Security Analysis'). If omitted, defaults to the workflow name."
@@ -9734,6 +9758,7 @@
               "type": "object",
               "description": "Configuration for adding labels to issues/PRs from agentic workflow output. Labels must already exist in the repository unless 'create-if-missing' is enabled.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed": {
                   "type": "array",
                   "description": "Optional list of allowed labels that can be added. Labels must already exist in the repository unless 'create-if-missing' is enabled. If omitted, any labels are allowed.",
@@ -9874,6 +9899,7 @@
               "type": "object",
               "description": "Configuration for removing labels from issues/PRs from agentic workflow output.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed": {
                   "type": "array",
                   "description": "Optional list of allowed labels that can be removed. If omitted, any labels can be removed.",
@@ -9987,6 +10013,7 @@
               "type": "object",
               "description": "Configuration for adding reviewers to pull requests from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed-reviewers": {
                   "type": "array",
                   "description": "Optional list of allowed reviewer usernames. If omitted, any reviewers are allowed.",
@@ -10126,6 +10153,7 @@
               "type": "object",
               "description": "Configuration for assigning issues to milestones from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed": {
                   "type": "array",
                   "description": "Optional list of allowed milestone titles that can be assigned. If omitted, any milestones are allowed.",
@@ -10224,6 +10252,7 @@
               "type": "object",
               "description": "Configuration for assigning GitHub Copilot coding agent to issues from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "name": {
                   "type": "string",
                   "description": "Default agent name to assign (default: 'copilot')"
@@ -10357,6 +10386,7 @@
               "type": "object",
               "description": "Configuration for assigning users to issues from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed": {
                   "type": "array",
                   "items": {
@@ -10465,6 +10495,7 @@
               "type": "object",
               "description": "Configuration for removing assignees from issues in agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed": {
                   "type": "array",
                   "items": {
@@ -10564,6 +10595,7 @@
               "type": "object",
               "description": "Configuration for linking issues as sub-issues from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of sub-issue links to create (default: 5) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -10671,6 +10703,7 @@
               "type": "object",
               "description": "Configuration for updating GitHub issues from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max-issue-artifacts": {
                   "type": "integer",
                   "default": 10,
@@ -10798,6 +10831,7 @@
               "type": "object",
               "description": "Configuration for updating GitHub pull requests from agentic workflow output. Both title and body updates are enabled by default.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "target": {
                   "type": "string",
                   "description": "Target for updates: 'triggering' (default), '*' (any PR), or explicit PR number"
@@ -10911,6 +10945,7 @@
               "description": "Experimental configuration for controlled pull request merges. The merge is blocked unless all configured gates pass.",
               "required": ["allowed-base-branches"],
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed-base-branches": {
                   "type": "array",
                   "minItems": 1,
@@ -11075,6 +11110,7 @@
               "type": "object",
               "description": "Configuration for pushing changes to a specific branch from agentic workflow output. Supports pushing to multiple PRs in a single run when max > 1.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of push operations to perform (default: 1). Each push targets a different pull request branch. Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -11364,6 +11400,7 @@
               "type": "object",
               "description": "Configuration for hiding comments on GitHub issues, pull requests, or discussions from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of comments to hide (default: 5) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -11443,6 +11480,7 @@
               "type": "object",
               "description": "Configuration for setting the type of GitHub issues from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed": {
                   "type": "array",
                   "description": "Optional list of allowed issue type names (e.g. 'Bug', 'Feature'). If omitted, any type is allowed. Empty string is always allowed to clear the type.",
@@ -11545,6 +11583,7 @@
               "type": "object",
               "description": "Configuration for setting one issue field value by field name and value.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Optional maximum number of set-issue-field operations (default: 5). Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -11637,6 +11676,7 @@
               "type": "object",
               "description": "Configuration for dispatching workflow_dispatch events to other workflows. Orchestrators use this to delegate work to worker workflows.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "workflows": {
                   "type": "array",
                   "description": "List of workflow names (without .md extension) to allow dispatching. Each workflow must exist in .github/workflows/.",
@@ -11751,12 +11791,16 @@
         },
         "dispatch-repository": {
           "type": "object",
+          "properties": {
+            "authorization": { "$ref": "#/$defs/safeOutputAuthorization" }
+          },
           "description": "Dispatch repository_dispatch events to external repositories. Each sub-key defines a named dispatch tool with its own event_type, target repository, input schema, and execution limits. Note: nested keys use snake_case (event_type, allowed_repositories) rather than the kebab-case used by other safe-output fields.",
           "x-example-key": "trigger-ci",
           "additionalProperties": {
             "type": "object",
             "description": "Configuration for a single repository dispatch tool",
             "properties": {
+              "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
               "description": {
                 "type": "string",
                 "description": "Human-readable description of what this dispatch tool does"
@@ -11863,6 +11907,7 @@
               "type": "object",
               "description": "Configuration for calling reusable workflows via workflow_call fan-out. The compiler generates conditional `uses:` jobs at compile time; the agent selects which worker to activate at runtime.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "workflows": {
                   "type": "array",
                   "description": "List of workflow names (without .md extension) to allow calling. Each workflow must exist in .github/workflows/ and declare a workflow_call trigger.",
@@ -11947,6 +11992,7 @@
               "type": "object",
               "description": "Configuration for reporting missing tools from agentic workflow output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of missing tool reports (default: unlimited) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -12040,6 +12086,7 @@
               "type": "object",
               "description": "Configuration for reporting missing data required to achieve workflow goals. Encourages AI agents to be truthful about data gaps instead of hallucinating information.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of missing data reports (default: unlimited) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -12127,6 +12174,7 @@
               "type": "object",
               "description": "Configuration for no-op safe output (logging only, no GitHub API calls). Always available as a fallback to ensure human-visible artifacts.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of noop messages (default: 2) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -12197,6 +12245,7 @@
               "type": "object",
               "description": "Configuration for publishing assets to an orphaned git branch",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "branch": {
                   "type": "string",
                   "description": "Branch name (default: 'assets/${{ github.workflow }}')",
@@ -12277,6 +12326,7 @@
               "type": "object",
               "description": "Configuration for uploading files as run-scoped GitHub Actions artifacts",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max-uploads": {
                   "type": "integer",
                   "description": "Maximum number of upload_artifact tool calls allowed per run (default: 1)",
@@ -12386,6 +12436,7 @@
               "type": "object",
               "description": "Configuration for uploading a code coverage report via actions/upload-code-coverage",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "target-ref": {
                   "type": "string",
                   "pattern": "^refs/(heads|tags)/[A-Za-z0-9._/-]+$",
@@ -12462,6 +12513,7 @@
             {
               "type": "object",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of advisory comments per run (default: 1).",
                   "oneOf": [
@@ -12492,6 +12544,7 @@
             {
               "type": "object",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of draft advisories per run (default: 1).",
                   "oneOf": [
@@ -12521,6 +12574,7 @@
               "type": "object",
               "description": "Configuration for updating GitHub release descriptions",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of releases to update (default: 1) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -12765,6 +12819,8 @@
               "type": "object",
               "description": "Custom safe-output job configuration. The job name will be normalized to use underscores instead of dashes.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
                 "name": {
                   "type": "string",
                   "description": "Display name for the job"
@@ -13099,6 +13155,8 @@
               "type": "object",
               "description": "Inline script handler configuration. The script body has access to 'config' (the handler config object) and should return an async function that processes individual safe-output messages.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
                 "name": {
                   "type": "string",
                   "description": "Display name for the script handler"
@@ -13540,6 +13598,8 @@
               "type": "object",
               "description": "Configuration for a custom safe output action.",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
                 "uses": {
                   "type": "string",
                   "description": "The GitHub Action to use. Supports owner/repo@ref, owner/repo/subdir@ref, or ./local/path.",
@@ -13599,6 +13659,7 @@
               "type": "object",
               "description": "Configuration for report_incomplete safe output",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "max": {
                   "description": "Maximum number of report_incomplete signals (default: 5). Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -13686,6 +13747,7 @@
               "type": "object",
               "description": "Configuration for replacing one label with another on issues/PRs in a single atomic operation. Enables clear state transitions (e.g. 'in-progress' \u2192 'done').",
               "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
                 "allowed-transitions": {
                   "type": "array",
                   "description": "Optional list of allowed label state transitions. Each entry specifies a (from, to) pair that is permitted. When specified, the agent may ONLY perform the listed transitions, regardless of allowed-add/allowed-remove. Useful for enforcing a strict state machine (e.g. only 'in-review' \u2192 'approved' is allowed).",
@@ -14514,6 +14576,27 @@
       "description": "Default LLM model, overridden by nested engine.model. Sets the default model used by the agentic engine for this workflow. Acts as a fallback when an engine instance does not specify its own 'model'; a nested 'engine.model' (e.g. safe-outputs.threat-detection.engine.model) takes precedence over this field for that engine instance. Supports full model IDs (e.g. 'claude-3-5-sonnet-20241022', 'gpt-5.4') and model aliases (e.g. 'small', 'large'). Router values ('router', 'router/economy', 'router/balanced', 'router/robust') choose model routing for the main agent instead of a fixed model.",
       "examples": ["gpt-5.4", "claude-3-5-sonnet-20241022", "gpt-4"]
     },
+    "model-routing": {
+      "description": "Set false to disable implicit main-agent routing without pinning a model, or give a shortlist for an explicit router model value. The shortlist changes no other model requests.",
+      "oneOf": [
+        {
+          "type": "boolean",
+          "const": false,
+          "description": "Keep the normal model overrides and engine default without using the router."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed-models"],
+          "properties": {
+            "allowed-models": {
+              "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing/oneOf/0/properties/allowed-models",
+              "description": "Specify at least one exact model name or gh-aw alias. Declare one list across the workflow and its imports. The engine's capabilities and models.allowed/blocked still apply."
+            }
+          }
+        }
+      ]
+    },
     "graders": {
       "description": "Graders over the unified session, including reserved operational-value JavaScript. Fast built-ins run in conclusion; executable custom graders run only in the separate graders job.",
       "type": "object",
@@ -14732,6 +14815,15 @@
     }
   ],
   "$defs": {
+    "safeOutputAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "audience"],
+      "properties": {
+        "endpoint": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^https://[^/@?#\\s]+(?:/[^?#\\s]*)?$" },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 2048 }
+      }
+    },
     "connectorRegistration": {
       "description": "Compiler-normalized registration; also accepts the earlier external-file prototype.",
       "type": "object",
@@ -15655,7 +15747,7 @@
               "description": "Ordered alternative models after model-specific failures, supported by engines with a built-in retry harness. Each model receives its own harness retry budget. Cannot be combined with model-routing or a custom driver or harness."
             },
             "model-routing": {
-              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. Eligible workflows that choose no model or routing on GitHub Copilot inference default to goal cost and mode auto; set false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "description": "Deprecated. Use a router model value for cost routing, or top-level model-routing: false to opt out. The cost-speed objective still works during migration but has no equivalent cost selector. See https://github.github.com/gh-aw/reference/model-routing/.",
               "oneOf": [
                 {
                   "type": "object",

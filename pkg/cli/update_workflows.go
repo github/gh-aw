@@ -207,6 +207,19 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { /
 		failedUpdates = append(failedUpdates, groupFailures...)
 	}
 
+	for _, failure := range failedUpdates {
+		event := updateJSONLEvent{Event: "warning", Kind: "workflow", Error: failure.Name + ": " + failure.Error}
+		for _, wf := range workflows {
+			if wf.Name == failure.Name {
+				event.Path = filepath.ToSlash(wf.Path)
+				break
+			}
+		}
+		if err := emitUpdateEvent(ctx, event); err != nil {
+			return err
+		}
+	}
+
 	// Show summary
 	showUpdateSummary(successfulUpdates, failedUpdates, opts.NoCompile)
 

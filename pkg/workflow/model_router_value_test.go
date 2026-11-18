@@ -5,6 +5,7 @@ package workflow
 import (
 	"encoding/json"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -143,6 +144,196 @@ func TestCompileRouterModelValue_EquivalentToModelRoutingBlock(t *testing.T) {
 			require.Equal(t, explicitConfig, routedConfig)
 		})
 	}
+}
+
+func TestCompileRouterModelValue_TopLevelShortlist(t *testing.T) {
+	const list = "allowed-models: [gpt-5.6-luna, claude-haiku-4.5]\n"
+	const block = "model-routing:\n  " + list
+	const body = "---\nReport.\n"
+	legacy := compileDefaultRoutingSource(t, routerValueBase+"engine:\n  id: copilot\n  model-routing:\n    goal: cost\n    mode: economy\n    "+list+body)
+	require.NoError(t, legacy.err)
+
+	for _, tc := range []struct {
+		name, main, shared string
+	}{
+		{"main workflow", "model: router/economy\n" + block, ""},
+		{"imported shortlist", "model: router/economy\n", block},
+		{"imported router and shortlist", "", "model: router/economy\n" + block},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string]string{}
+			main := routerValueBase + "engine: copilot\n" + tc.main
+			if tc.shared != "" {
+				files["shared/routing.md"] = "---\n" + tc.shared + body
+				main += "imports: [shared/routing.md]\n"
+			}
+			files["main.md"] = main + body
+			got := compileDefaultRoutingFiles(t, files)
+			_, candidates := routedObjective(t, got)
+			require.Equal(t, []any{"github-copilot/gpt-5.6-luna", "github-copilot/claude-haiku-4.5"}, candidates)
+			// Compare the entire proxy configuration, not just its candidate list:
+			// a shortlist must not become a policy on other model requests.
+			require.Equal(t, legacy.awfConfigs(t), got.awfConfigs(t))
+			config := lockModelConfig(t, got.lock)
+			routing := config["routing"].(map[string]any)
+			require.Equal(t, "router/economy", routing["requested"])
+			delete(routing, "requested")
+			require.Equal(t, lockModelConfig(t, legacy.lock), config)
+		})
+	}
+	for _, tc := range []struct{ name, main, shared, want string }{
+		{"implicit default", block, "", "requires an explicit router model value"},
+		{"pinned model", "model: gpt-5.6-luna\n" + block, "", "requires an explicit router model value"},
+		{"runtime expression", "model: ${{ inputs.level }}\n" + block, "", "requires an explicit router model value"},
+		{"legacy block", "model: router\n" + block + "engine:\n  id: copilot\n  model-routing: {goal: cost, mode: auto}\n", "", "both choose model routing"},
+		{"imported opt-out", "model: router\n" + block, "engine:\n  id: copilot\n  model-routing: false\n", "engine.model-routing: false"},
+		{"two shortlists", "model: router\n" + block, block, "more than one top-level router shortlist"},
+		{"goal in new block", "model: router\n" + block + "  goal: cost\n", "", "goal"},
+		{"empty shortlist", "model: router\nmodel-routing: {allowed-models: []}\n", "", "allowed-models"},
+		{"old firewall", "model: router\n" + block + "sandbox:\n  agent:\n    id: awf\n    version: v0.28.31\n", "", "cannot restrict only the router's candidates"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string]string{}
+			main := routerValueBase + tc.main
+			if tc.shared != "" {
+				files["shared/routing.md"] = "---\n" + tc.shared + body
+				main += "imports: [shared/routing.md]\n"
+			}
+			files["main.md"] = main + body
+			require.ErrorContains(t, compileDefaultRoutingFiles(t, files).err, tc.want)
+		})
+	}
+}
+
+func TestCompileRouterModelValue_ImportedShortlistInputSubstitution(t *testing.T) {
+	const body = "---\nReport.\n"
+	const shared = `---
+import-schema:
+  candidates:
+    type: array
+    items:
+      type: string
+    required: true
+  goal:
+    type: string
+model-routing:
+  allowed-models: ${{ github.aw.import-inputs.candidates }}
+`
+	main := routerValueBase + `model: router/economy
+engine: copilot
+imports:
+  - uses: shared/routing.md
+    with:
+      candidates: [gpt-5.6-luna, claude-haiku-4.5]
+`
+	valid := compileDefaultRoutingFiles(t, map[string]string{
+		"main.md":           main + body,
+		"shared/routing.md": shared + body,
+	})
+	_, candidates := routedObjective(t, valid)
+	require.Equal(t, []any{"github-copilot/gpt-5.6-luna", "github-copilot/claude-haiku-4.5"}, candidates)
+
+	invalidShared := strings.Replace(shared, "  allowed-models:", "  goal: ${{ github.aw.import-inputs.goal }}\n  allowed-models:", 1)
+	invalidMain := strings.Replace(main, "      candidates:", "      goal: cost\n      candidates:", 1)
+	invalid := compileDefaultRoutingFiles(t, map[string]string{
+		"main.md":           invalidMain + body,
+		"shared/routing.md": invalidShared + body,
+	})
+	require.ErrorContains(t, invalid.err, "model-routing")
+	require.ErrorContains(t, invalid.err, "goal")
+}
+
+func TestCompileRouterOptOut(t *testing.T) {
+	const body = "---\nReport.\n"
+	const engine = "engine: copilot\n"
+	const off = "model-routing: false\n"
+	const legacy = "engine:\n  id: copilot\n  model-routing: false\n"
+	for _, scope := range []string{"workflow", "import"} {
+		t.Run(scope, func(t *testing.T) {
+			compile := func(setting string) defaultRoutingCompilation {
+				if scope == "workflow" {
+					return compileDefaultRoutingSource(t, routerValueBase+setting+body)
+				}
+				return compileDefaultRoutingFiles(t, map[string]string{
+					"main.md":          routerValueBase + "imports: [shared/policy.md]\n" + body,
+					"shared/policy.md": "---\n" + setting + body,
+				})
+			}
+			old := compile(legacy)
+			got := compile(engine + off)
+			requireNoDefaultRouting(t, old)
+			requireNoDefaultRouting(t, got)
+			require.Equal(t, old.awfConfigs(t), got.awfConfigs(t))
+			require.True(t, got.data.EngineConfig.ModelRoutingDisabled)
+			require.Empty(t, got.data.Model)
+			// This is the generated runtime choice, both with and without overrides.
+			require.Contains(t, got.lock, "COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}")
+			require.Equal(t, 1, strings.Count(old.stderr, "engine.model-routing is deprecated"))
+			require.NotContains(t, got.stderr, "deprecated")
+			if scope == "import" {
+				require.Contains(t, old.stderr, "shared/policy.md")
+			}
+		})
+	}
+	for _, tc := range []struct{ main, shared, want string }{
+		{"model: router\n" + off, "", "cannot be combined with model-routing: false"},
+		{"model: router/economy\n", off, "cannot be combined with model-routing: false"},
+		{off, "model-routing: {allowed-models: [small]}\n", "a top-level router shortlist requires an explicit router model value"},
+		{"model-routing: true\n", "", "model-routing"},
+		{"", "model-routing: true\n", "model-routing"},
+	} {
+		files := map[string]string{"main.md": routerValueBase + engine + tc.main + body}
+		if tc.shared != "" {
+			files["main.md"] = routerValueBase + engine + tc.main + "imports: [shared/policy.md]\n" + body
+			files["shared/policy.md"] = "---\n" + tc.shared + body
+		}
+		require.ErrorContains(t, compileDefaultRoutingFiles(t, files).err, tc.want)
+	}
+}
+
+func TestCompileLegacyRoutingMigrationWarnings(t *testing.T) {
+	for _, tc := range []struct{ goal, mode, want string }{
+		{"cost", "auto", "Use model: router for cost routing"},
+		{"cost", "robust", "Use model: router/robust for cost routing"},
+		{"cost-speed", "balanced", "no direct replacement"},
+	} {
+		for _, shared := range []bool{false, true} {
+			setting := "engine:\n  id: copilot\n  model-routing:\n    goal: " + tc.goal + "\n    mode: " + tc.mode + "\n    allowed-models: [gpt-5.6-luna]\n"
+			files := map[string]string{"main.md": routerValueBase + setting + "---\nReport.\n"}
+			if shared {
+				files = map[string]string{"main.md": routerValueBase + "imports: [shared/route.md]\n---\nReport.\n", "shared/route.md": "---\n" + setting + "---\n"}
+			}
+			got := compileDefaultRoutingFiles(t, files)
+			objective, candidates := routedObjective(t, got)
+			require.Equal(t, map[string]any{"goal": tc.goal, "mode": tc.mode}, objective)
+			require.Equal(t, []any{"github-copilot/gpt-5.6-luna"}, candidates)
+			require.Equal(t, 1, strings.Count(got.stderr, "engine.model-routing is deprecated"))
+			require.Contains(t, got.stderr, tc.want)
+			require.Contains(t, got.stderr, "top-level model-routing.allowed-models")
+			if shared {
+				require.Contains(t, got.stderr, "shared/route.md")
+			}
+		}
+	}
+}
+
+func TestCompileRouterOptOutImportPrecedence(t *testing.T) {
+	const oldRoute = "engine:\n  id: copilot\n  model-routing: {goal: cost, mode: robust}\n"
+	const off = "model-routing: false\n"
+	const body = "---\nReport.\n"
+	compile := func(main, shared string) defaultRoutingCompilation {
+		return compileDefaultRoutingFiles(t, map[string]string{
+			"main.md":          routerValueBase + main + "imports: [shared/policy.md]\n" + body,
+			"shared/policy.md": "---\n" + shared + body,
+		})
+	}
+	requireNoDefaultRouting(t, compile(off, oldRoute))
+	requireNoDefaultRouting(t, compile("engine: copilot\n", off))
+	got := compile(oldRoute, off)
+	objective, _ := routedObjective(t, got)
+	require.Equal(t, map[string]any{"goal": "cost", "mode": "robust"}, objective)
+	require.ErrorContains(t, compile(oldRoute+off, "").err, "both top-level and nested routing")
+	require.ErrorContains(t, compile("", oldRoute+off).err, "not both")
 }
 
 func lockModelConfig(t *testing.T, lock string) map[string]any {

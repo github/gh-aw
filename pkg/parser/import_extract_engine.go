@@ -12,6 +12,7 @@ import (
 // Side effects: acc.engines, acc.mergedEngineMCPToolTimeout,
 // acc.mergedEngineMCPSessionTimeout, acc.mergedEngineModel.
 func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath string) {
+	acc.extractTopLevelRouting(fm)
 	if _, ok := fm["model"]; ok {
 		acc.engineModelChoiceDeclared = true
 	}
@@ -69,6 +70,18 @@ func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath st
 		if engineJSON, merr := json.Marshal(engineVal); merr == nil {
 			acc.engines = append(acc.engines, string(engineJSON))
 		}
+	}
+}
+
+func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any) {
+	switch routing := fm["model-routing"].(type) {
+	case bool:
+		if !routing {
+			acc.routerDisabled = true
+			acc.engineModelChoiceDeclared = true
+		}
+	case map[string]any:
+		acc.routerShortlists = append(acc.routerShortlists, parseStringSliceField(routing["allowed-models"], true))
 	}
 }
 
