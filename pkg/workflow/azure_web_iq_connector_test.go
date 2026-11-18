@@ -88,7 +88,7 @@ func webIQInvalidArguments() []webIQArgumentCase {
 	return cases
 }
 
-func TestWebIQConnectorArgumentsBeforeCredentials(t *testing.T) {
+func TestAzureWebIQConnectorArgumentsBeforeCredentials(t *testing.T) {
 	plan := webIQPlan(t, "web", "news", "browse")
 	runtime := connectors.Runtime{Phase: "agent", AllowedOrigins: plan.Origins(),
 		ResolveSecret: func(context.Context, string, string) (string, error) {
@@ -112,7 +112,7 @@ func TestWebIQConnectorArgumentsBeforeCredentials(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestWebIQConnectorTargetedSelection(t *testing.T) {
+func TestAzureWebIQConnectorTargetedSelection(t *testing.T) {
 	plan := webIQPlan(t, "web")
 	require.Equal(t, []string{"search__web"}, plan.ToolNames())
 	require.Equal(t, []string{"AZURE_WEB_IQ_READ_ACCESS_TOKEN"}, plan.Secrets())
@@ -174,7 +174,7 @@ func webIQMockRuntime(t *testing.T, result string, status int, calls *int) conne
 	}
 }
 
-func TestWebIQConnectorHostedCalls(t *testing.T) {
+func TestAzureWebIQConnectorHostedCalls(t *testing.T) {
 	plan := webIQPlan(t, "web", "news", "browse")
 	for _, tool := range []string{"web", "news", "browse"} {
 		t.Run(tool, func(t *testing.T) {
@@ -204,7 +204,7 @@ func TestWebIQConnectorHostedCalls(t *testing.T) {
 	}
 }
 
-func TestWebIQConnectorXMLConsumer(t *testing.T) {
+func TestAzureWebIQConnectorXMLConsumer(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/azure-web-iq.md")
 	require.NoError(t, err)
 	document := commentedConnectorDocumentation(t, string(source))
@@ -231,7 +231,7 @@ func TestWebIQConnectorXMLConsumer(t *testing.T) {
 	require.NotContains(t, effects, "${{ secrets.AZURE_WEB_IQ_READ_ACCESS_TOKEN }}")
 }
 
-func TestWebIQConnectorBundledNode(t *testing.T) {
+func TestAzureWebIQConnectorBundledNode(t *testing.T) {
 	plan := webIQPlan(t, "web", "news", "browse")
 	encoded, err := plan.Encode()
 	require.NoError(t, err)

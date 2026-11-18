@@ -219,13 +219,13 @@ stage nothing. Do not claim a staged proposal created an issue.
     </example>
   </examples>
   <sources>
-    https://blogs.bing.com/webiq/2026/11/web-iq-is-now-broadly-available-build-better-agents-that-keep-up-with-the-world/
-    https://learn.microsoft.com/en-us/web-iq/overview
-    https://learn.microsoft.com/en-us/web-iq/get-started/authentication
-    https://learn.microsoft.com/en-us/web-iq/integrations/mcp
-    https://learn.microsoft.com/en-us/web-iq/reference/web-search
-    https://learn.microsoft.com/en-us/web-iq/reference/news-search
-    https://learn.microsoft.com/en-us/web-iq/reference/browse
+    <source href="https://blogs.bing.com/webiq/2026/11/web-iq-is-now-broadly-available-build-better-agents-that-keep-up-with-the-world/"/>
+    <source href="https://learn.microsoft.com/en-us/web-iq/overview"/>
+    <source href="https://learn.microsoft.com/en-us/web-iq/get-started/authentication"/>
+    <source href="https://learn.microsoft.com/en-us/web-iq/integrations/mcp"/>
+    <source href="https://learn.microsoft.com/en-us/web-iq/reference/web-search"/>
+    <source href="https://learn.microsoft.com/en-us/web-iq/reference/news-search"/>
+    <source href="https://learn.microsoft.com/en-us/web-iq/reference/browse"/>
   </sources>
 </connector-documentation>
 -->
