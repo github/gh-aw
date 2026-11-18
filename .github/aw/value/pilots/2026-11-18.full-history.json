@@ -1,0 +1,856 @@
+{
+  "schema_version": 1,
+  "kind": "full_history_schema_slide_replay",
+  "observed_at": "2026-11-18T08:24:01.883725699Z",
+  "repository": "github.com/github/gh-aw",
+  "full_history": true,
+  "main_first_parent_commits": 19128,
+  "ref": "30aaa011200b522ca1ffce0c8aed019048aac096",
+  "measurement": {
+    "id": "schema-textual-coverage-v1",
+    "name": "Schema fields with an example",
+    "unit": "fields",
+    "host": "github.com",
+    "repository": "github/gh-aw",
+    "workflow": "schema-feature-coverage",
+    "workflow_path": ".github/workflows/schema-feature-coverage.lock.yml",
+    "direction": "higher_is_better",
+    "digest": "sha256:3040e579a90115658f7a576a35cf8d81a0ed0ad4174ea529e76c74be9257046a",
+    "evaluator": "schema-example-coverage-v1"
+  },
+  "recipe": {
+    "definition": {
+      "version": 1,
+      "id": "schema-coverage-slides-2026-11-17",
+      "repository": "github.com/github/gh-aw",
+      "workflow": "schema-feature-coverage",
+      "start": "2026-03-22",
+      "end": "2026-11-17",
+      "author": "app/github-actions",
+      "author_login": "github-actions[bot]",
+      "early_batches_through": "2026-06-30",
+      "witnesses": [
+        63949,
+        72028,
+        74061
+      ],
+      "window": {
+        "version": 1,
+        "baseline": "exact_parent",
+        "before_days": 7,
+        "after_days": 7,
+        "outcome_lag_days": 0,
+        "durability_days": 7,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 7,
+        "minimum_after_samples": 7,
+        "isolation_before_days": 7,
+        "isolation_after_days": 7,
+        "overlap": "workflow"
+      }
+    },
+    "digest": "sha256:d15ce604467fe0ce554252336b82708b3a062b01a8bf980ba9eb2b7baea6e7ec"
+  },
+  "window_policy": {
+    "version": 1,
+    "baseline": "exact_parent",
+    "before_days": 7,
+    "after_days": 7,
+    "outcome_lag_days": 0,
+    "durability_days": 7,
+    "sample_every_hours": 24,
+    "trend_every_days": 7,
+    "minimum_before_samples": 7,
+    "minimum_after_samples": 7,
+    "isolation_before_days": 7,
+    "isolation_after_days": 7,
+    "overlap": "workflow"
+  },
+  "start": "2026-03-22T12:00:00Z",
+  "end": "2026-11-17T12:00:00Z",
+  "summary": {
+    "weekly_observations": 36,
+    "producer_linked_prs": 44,
+    "merged_prs": 19,
+    "selected_rows": 6,
+    "selected_samples": 84,
+    "attributed_value": 5,
+    "attribution_coverage": "partial"
+  },
+  "weekly": [
+    {
+      "at": "2026-03-22T12:00:00Z",
+      "sha": "debeacb843da469451f575aa6103d1a4d97d46a4",
+      "covered": 32,
+      "total": 45
+    },
+    {
+      "at": "2026-03-29T12:00:00Z",
+      "sha": "c4dd647a365a4680775ff92820a9bbdca0660f72",
+      "covered": 32,
+      "total": 47
+    },
+    {
+      "at": "2026-04-05T12:00:00Z",
+      "sha": "b513c07a712d5c0a27d6fbe798529054e0f42f62",
+      "covered": 32,
+      "total": 49
+    },
+    {
+      "at": "2026-04-12T12:00:00Z",
+      "sha": "273d8c4206f6256efbd3a2a5a1b240fdf841ee84",
+      "covered": 32,
+      "total": 51
+    },
+    {
+      "at": "2026-04-19T12:00:00Z",
+      "sha": "f7e399203631953ca947cf04842edb738d832fe5",
+      "covered": 32,
+      "total": 53
+    },
+    {
+      "at": "2026-04-26T12:00:00Z",
+      "sha": "0d4ec0e28727edfcd3517b42dbe91f2d6422b529",
+      "covered": 33,
+      "total": 53
+    },
+    {
+      "at": "2026-05-03T12:00:00Z",
+      "sha": "15b7dd5cf3fbd2e58e465c140bf0450a9659e95f",
+      "covered": 34,
+      "total": 53
+    },
+    {
+      "at": "2026-05-10T12:00:00Z",
+      "sha": "dd26abd121515af651cf021e2b2dfb9775d93d4b",
+      "covered": 37,
+      "total": 56
+    },
+    {
+      "at": "2026-05-17T12:00:00Z",
+      "sha": "6de6dc23e98a9540b501d1da9ad31eae95ae03b2",
+      "covered": 41,
+      "total": 58
+    },
+    {
+      "at": "2026-05-24T12:00:00Z",
+      "sha": "b2718c28549b96359c2f32f90333659fb117f879",
+      "covered": 47,
+      "total": 56
+    },
+    {
+      "at": "2026-05-31T12:00:00Z",
+      "sha": "bf5316dbffb62826d6cf00d669cfe6f5561075ec",
+      "covered": 45,
+      "total": 55
+    },
+    {
+      "at": "2026-06-07T12:00:00Z",
+      "sha": "57027f2fa363330eaff210bc9d07e68d77099b0d",
+      "covered": 51,
+      "total": 57
+    },
+    {
+      "at": "2026-06-14T12:00:00Z",
+      "sha": "79d43a9e415e5a1adc7b7a3207ae41e3257ee216",
+      "covered": 51,
+      "total": 55
+    },
+    {
+      "at": "2026-06-21T12:00:00Z",
+      "sha": "11621ebf85863108936f4fd301e576086acf6847",
+      "covered": 55,
+      "total": 56
+    },
+    {
+      "at": "2026-06-28T12:00:00Z",
+      "sha": "fead38af71dd7f269a767299ee92488c0c66ba6f",
+      "covered": 57,
+      "total": 57
+    },
+    {
+      "at": "2026-07-05T12:00:00Z",
+      "sha": "fa90fecb52a09be0603772a510666e579302960b",
+      "covered": 58,
+      "total": 59
+    },
+    {
+      "at": "2026-07-12T12:00:00Z",
+      "sha": "d5ded81997db9154fe302c222042a89e2dd936ff",
+      "covered": 58,
+      "total": 60
+    },
+    {
+      "at": "2026-07-19T12:00:00Z",
+      "sha": "1c3330364b9f35e9c35d0c8fcce65ab583b79f97",
+      "covered": 60,
+      "total": 62
+    },
+    {
+      "at": "2026-07-26T12:00:00Z",
+      "sha": "4c58de394016a4af7792bb65de2cdb3cf49fb461",
+      "covered": 60,
+      "total": 62
+    },
+    {
+      "at": "2026-08-02T12:00:00Z",
+      "sha": "8d0ce55a0109076c5ffeaeb610751fdf1731ebbd",
+      "covered": 60,
+      "total": 62
+    },
+    {
+      "at": "2026-08-09T12:00:00Z",
+      "sha": "69b9b2b0b6f4fa1c2e50b4164ef08f720660ae2f",
+      "covered": 61,
+      "total": 63
+    },
+    {
+      "at": "2026-08-16T12:00:00Z",
+      "sha": "53175a14206f4f2687f60768f6e453cc93774cf7",
+      "covered": 61,
+      "total": 65
+    },
+    {
+      "at": "2026-08-23T12:00:00Z",
+      "sha": "97d39fae57642c74c503ae138f8ab735d36b46ce",
+      "covered": 62,
+      "total": 67
+    },
+    {
+      "at": "2026-08-30T12:00:00Z",
+      "sha": "2c515bf3bee5919feca96efd955370ef1d881f9f",
+      "covered": 63,
+      "total": 68
+    },
+    {
+      "at": "2026-09-06T12:00:00Z",
+      "sha": "16aa6c45979b55cabee7002bba35fbeb6fb361a4",
+      "covered": 63,
+      "total": 68
+    },
+    {
+      "at": "2026-09-13T12:00:00Z",
+      "sha": "b68dba0ae6b4422e4a520ce66e30b88c8313713b",
+      "covered": 63,
+      "total": 68
+    },
+    {
+      "at": "2026-09-20T12:00:00Z",
+      "sha": "ff2eccd10a30d6a7bfaf0da449194e907a206555",
+      "covered": 63,
+      "total": 68
+    },
+    {
+      "at": "2026-09-27T12:00:00Z",
+      "sha": "60ff367876c6c71755b36c5e91e103dcab1fe223",
+      "covered": 63,
+      "total": 68
+    },
+    {
+      "at": "2026-10-04T12:00:00Z",
+      "sha": "cdb9222ea727afcd7f60bc19144ad61c09713198",
+      "covered": 69,
+      "total": 69
+    },
+    {
+      "at": "2026-10-11T12:00:00Z",
+      "sha": "6b97fe9c06c46ffd04a3431ff06346e439f58ad2",
+      "covered": 69,
+      "total": 71
+    },
+    {
+      "at": "2026-10-18T12:00:00Z",
+      "sha": "c86377ec47b38f0b5af463277ee55d1d03d08da8",
+      "covered": 69,
+      "total": 71
+    },
+    {
+      "at": "2026-10-25T12:00:00Z",
+      "sha": "7b2c9cdd154ef588a792b3dd528d73bf4aa15ab5",
+      "covered": 70,
+      "total": 71
+    },
+    {
+      "at": "2026-11-01T12:00:00Z",
+      "sha": "e6398d97e5bceaa0e4ecc4111c7a27949050bdee",
+      "covered": 71,
+      "total": 72
+    },
+    {
+      "at": "2026-11-08T12:00:00Z",
+      "sha": "57111b2d03d5be9a30a998f518c9712700ebfa63",
+      "covered": 72,
+      "total": 73
+    },
+    {
+      "at": "2026-11-15T12:00:00Z",
+      "sha": "618d31bf47887b6b41f522f485857847b856f09a",
+      "covered": 75,
+      "total": 75
+    },
+    {
+      "at": "2026-11-17T12:00:00Z",
+      "sha": "bd0cded89253b8bcf1daf2dbb7a2cc623de26d69",
+      "covered": 75,
+      "total": 75
+    }
+  ],
+  "stable_cohort": {
+    "fields": [
+      "cache",
+      "checkout",
+      "concurrency",
+      "container",
+      "description",
+      "engine",
+      "env",
+      "environment",
+      "features",
+      "github-app",
+      "if",
+      "imports",
+      "inlined-imports",
+      "jobs",
+      "labels",
+      "mcp-scripts",
+      "mcp-servers",
+      "metadata",
+      "name",
+      "network",
+      "on",
+      "permissions",
+      "post-steps",
+      "private",
+      "resources",
+      "run-name",
+      "runs-on",
+      "runtimes",
+      "safe-outputs",
+      "sandbox",
+      "secret-masking",
+      "secrets",
+      "services",
+      "source",
+      "steps",
+      "strict",
+      "timeout-minutes",
+      "tools",
+      "tracker-id"
+    ],
+    "before": 30,
+    "after": 39
+  },
+  "native_lifecycle": {
+    "coverage": "retained_subset",
+    "delivered": 1,
+    "adoption": {
+      "total": 1,
+      "accepted": 1,
+      "accepted_human": 1,
+      "accepted_delivery_fallback": 0,
+      "rejected": 0,
+      "not_applicable": 0,
+      "pending": 0,
+      "unknown": 0,
+      "accepted_strong": 1,
+      "lifecycle": 0,
+      "errors": 0,
+      "zero_touch": 0,
+      "acceptance_rate": 1,
+      "waste_rate": 0,
+      "zero_touch_rate": 0,
+      "median_time_to_adoption_hours": 9.493996944444444
+    },
+    "records": [
+      {
+        "id": "delivery-sha256-9201e2aed3f6fbc5a17db159e06f2cfac8b86e820d42e7e61db042af638e5fc8",
+        "host": "github.com",
+        "repository": "github/gh-aw",
+        "workflow": ".github/workflows/schema-feature-coverage.lock.yml",
+        "run_id": 36389625388,
+        "run_attempt": 1,
+        "invocation_id": "safe-outputs",
+        "evidence_id": "item-sha256-b35a31491c0bbdda75f22e3fc97f550d0689cdfa6358317b085826ca8cccb326-1",
+        "type": "create_pull_request",
+        "target_url": "https://github.com/github/gh-aw/pull/63949",
+        "target_repository": "github/gh-aw",
+        "delivery": {
+          "state": "delivered",
+          "signal": "effect_applied",
+          "at": "2026-09-28T07:08:16.611Z",
+          "observed_at": "2026-11-18T08:23:39.768161798Z",
+          "source": "safe-output-manifest"
+        },
+        "adoption": {
+          "state": "accepted",
+          "signal": "merged",
+          "at": "2026-09-28T16:37:55Z",
+          "observed_at": "2026-11-18T08:23:39.768279913Z",
+          "source": "github-api",
+          "rule_version": "gh-aw-adoption-v1",
+          "acceptance_kind": "explicit_human",
+          "human_verified": true,
+          "coverage": "available"
+        },
+        "survival": {
+          "state": "observed",
+          "signal": "resource_still_accepted",
+          "observed_at": "2026-11-18T08:23:39.768279913Z",
+          "coverage": "snapshot"
+        },
+        "execution": {
+          "number": 63949,
+          "labels_before": null
+        }
+      }
+    ]
+  },
+  "selected_windows": [
+    {
+      "label": "May 4",
+      "kind": "batch",
+      "prs": [
+        30099,
+        30098
+      ],
+      "before_value": 35,
+      "after_value": 37,
+      "closed": [
+        "labels",
+        "metadata"
+      ],
+      "removed": [],
+      "attributed_value": null,
+      "status": "descriptive",
+      "reason": "batch_not_attributed"
+    },
+    {
+      "label": "May 18",
+      "kind": "batch",
+      "prs": [
+        32976,
+        32985,
+        32984,
+        32983,
+        32981,
+        32980,
+        32977,
+        32978
+      ],
+      "before_value": 41,
+      "after_value": 48,
+      "closed": [
+        "check-for-updates",
+        "container",
+        "environment",
+        "github-app",
+        "inline-sub-agents",
+        "models",
+        "pre-steps"
+      ],
+      "removed": [
+        "dependencies"
+      ],
+      "attributed_value": null,
+      "status": "descriptive",
+      "reason": "batch_not_attributed"
+    },
+    {
+      "label": "Jun 15",
+      "kind": "batch",
+      "prs": [
+        39342,
+        39339,
+        39340,
+        39341
+      ],
+      "before_value": 51,
+      "after_value": 55,
+      "closed": [
+        "max-runs",
+        "max-tool-denials",
+        "post-steps",
+        "secrets"
+      ],
+      "removed": [],
+      "attributed_value": null,
+      "status": "descriptive",
+      "reason": "batch_not_attributed"
+    },
+    {
+      "label": "Sep 28",
+      "kind": "single",
+      "prs": [
+        63949
+      ],
+      "before_value": 63,
+      "after_value": 68,
+      "closed": [
+        "excluded-env",
+        "intent",
+        "plugins",
+        "runner",
+        "threat-detection-suppress"
+      ],
+      "removed": [],
+      "attributed_value": 5,
+      "status": "attributed",
+      "reason": "all_gates_passed"
+    },
+    {
+      "label": "Oct 26",
+      "kind": "single",
+      "prs": [
+        72028
+      ],
+      "before_value": 70,
+      "after_value": 71,
+      "closed": [
+        "work-queue-policy"
+      ],
+      "removed": [],
+      "attributed_value": null,
+      "status": "unavailable",
+      "reason": "native_human_adoption_missing"
+    },
+    {
+      "label": "Nov 2",
+      "kind": "single",
+      "prs": [
+        74061
+      ],
+      "before_value": 71,
+      "after_value": 72,
+      "closed": [
+        "token-broker"
+      ],
+      "removed": [],
+      "attributed_value": null,
+      "status": "unavailable",
+      "reason": "native_human_adoption_missing"
+    }
+  ],
+  "attributed_windows": [
+    {
+      "pr": 63949,
+      "run_id": 36389625388,
+      "merged_at": "2026-09-28T16:37:55Z",
+      "before": {
+        "sha": "5fe849d5e82e66889a40c892fc0f1757e0f808c0",
+        "value": 63,
+        "coverage": {
+          "covered": 63,
+          "fields": [
+            "ambient-folders",
+            "cache",
+            "check-for-updates",
+            "checkout",
+            "concurrency",
+            "container",
+            "description",
+            "emoji",
+            "enclaves",
+            "engine",
+            "env",
+            "environment",
+            "evals",
+            "excluded-env",
+            "experiments",
+            "features",
+            "github-app",
+            "graders",
+            "if",
+            "import-schema",
+            "imports",
+            "inlined-imports",
+            "intent",
+            "jobs",
+            "labels",
+            "lsp",
+            "max-ai-credits",
+            "max-daily-ai-credits",
+            "max-runs",
+            "max-tool-denials",
+            "max-turn-cache-misses",
+            "max-turns",
+            "mcp-scripts",
+            "mcp-servers",
+            "metadata",
+            "model",
+            "models",
+            "name",
+            "network",
+            "observability",
+            "on",
+            "permissions",
+            "plugins",
+            "post-steps",
+            "pre-agent-steps",
+            "pre-steps",
+            "private",
+            "redirect",
+            "resources",
+            "run-name",
+            "runner",
+            "runs-on",
+            "runs-on-slim",
+            "runtimes",
+            "safe-outputs",
+            "sandbox",
+            "secret-masking",
+            "secrets",
+            "services",
+            "skills",
+            "source",
+            "steps",
+            "strict",
+            "threat-detection-suppress",
+            "timeout-minutes",
+            "tools",
+            "tracker-id",
+            "user-rate-limit"
+          ],
+          "missing": [
+            "excluded-env",
+            "intent",
+            "plugins",
+            "runner",
+            "threat-detection-suppress"
+          ]
+        }
+      },
+      "after": {
+        "at": "2026-09-28T16:37:55Z",
+        "sha": "62524032a5d44809fd0cf558bb8110fc1c127d70",
+        "value": 68,
+        "coverage": {
+          "covered": 68,
+          "fields": [
+            "ambient-folders",
+            "cache",
+            "check-for-updates",
+            "checkout",
+            "concurrency",
+            "container",
+            "description",
+            "emoji",
+            "enclaves",
+            "engine",
+            "env",
+            "environment",
+            "evals",
+            "excluded-env",
+            "experiments",
+            "features",
+            "github-app",
+            "graders",
+            "if",
+            "import-schema",
+            "imports",
+            "inlined-imports",
+            "intent",
+            "jobs",
+            "labels",
+            "lsp",
+            "max-ai-credits",
+            "max-daily-ai-credits",
+            "max-runs",
+            "max-tool-denials",
+            "max-turn-cache-misses",
+            "max-turns",
+            "mcp-scripts",
+            "mcp-servers",
+            "metadata",
+            "model",
+            "models",
+            "name",
+            "network",
+            "observability",
+            "on",
+            "permissions",
+            "plugins",
+            "post-steps",
+            "pre-agent-steps",
+            "pre-steps",
+            "private",
+            "redirect",
+            "resources",
+            "run-name",
+            "runner",
+            "runs-on",
+            "runs-on-slim",
+            "runtimes",
+            "safe-outputs",
+            "sandbox",
+            "secret-masking",
+            "secrets",
+            "services",
+            "skills",
+            "source",
+            "steps",
+            "strict",
+            "threat-detection-suppress",
+            "timeout-minutes",
+            "tools",
+            "tracker-id",
+            "user-rate-limit"
+          ],
+          "missing": []
+        }
+      },
+      "end": {
+        "at": "2026-10-05T16:37:55Z",
+        "sha": "1eb265346252aaeb8295962ed3bed9a2ae04033e",
+        "value": 69,
+        "coverage": {
+          "covered": 69,
+          "fields": [
+            "ambient-folders",
+            "cache",
+            "check-for-updates",
+            "checkout",
+            "concurrency",
+            "container",
+            "description",
+            "emoji",
+            "enclaves",
+            "engine",
+            "env",
+            "environment",
+            "evals",
+            "excluded-env",
+            "experiments",
+            "features",
+            "github-app",
+            "graders",
+            "if",
+            "import-schema",
+            "imports",
+            "inlined-imports",
+            "intent",
+            "jobs",
+            "labels",
+            "lsp",
+            "max-ai-credits",
+            "max-daily-ai-credits",
+            "max-runs",
+            "max-tool-calls",
+            "max-tool-denials",
+            "max-turn-cache-misses",
+            "max-turns",
+            "mcp-scripts",
+            "mcp-servers",
+            "metadata",
+            "model",
+            "models",
+            "name",
+            "network",
+            "observability",
+            "on",
+            "permissions",
+            "plugins",
+            "post-steps",
+            "pre-agent-steps",
+            "pre-steps",
+            "private",
+            "redirect",
+            "resources",
+            "run-name",
+            "runner",
+            "runs-on",
+            "runs-on-slim",
+            "runtimes",
+            "safe-outputs",
+            "sandbox",
+            "secret-masking",
+            "secrets",
+            "services",
+            "skills",
+            "source",
+            "steps",
+            "strict",
+            "threat-detection-suppress",
+            "timeout-minutes",
+            "tools",
+            "tracker-id",
+            "user-rate-limit"
+          ],
+          "missing": []
+        }
+      },
+      "change": {
+        "value": 5,
+        "coverage": {
+          "closed": [
+            "excluded-env",
+            "intent",
+            "plugins",
+            "runner",
+            "threat-detection-suppress"
+          ],
+          "removed": [],
+          "added": []
+        }
+      },
+      "adoption": {
+        "id": "delivery-sha256-9201e2aed3f6fbc5a17db159e06f2cfac8b86e820d42e7e61db042af638e5fc8",
+        "host": "github.com",
+        "repository": "github/gh-aw",
+        "workflow": ".github/workflows/schema-feature-coverage.lock.yml",
+        "run_id": 36389625388,
+        "run_attempt": 1,
+        "invocation_id": "safe-outputs",
+        "evidence_id": "item-sha256-b35a31491c0bbdda75f22e3fc97f550d0689cdfa6358317b085826ca8cccb326-1",
+        "type": "create_pull_request",
+        "target_url": "https://github.com/github/gh-aw/pull/63949",
+        "target_repository": "github/gh-aw",
+        "delivery": {
+          "state": "delivered",
+          "signal": "effect_applied",
+          "at": "2026-09-28T07:08:16.611Z",
+          "observed_at": "2026-11-18T08:23:39.768161798Z",
+          "source": "safe-output-manifest"
+        },
+        "adoption": {
+          "state": "accepted",
+          "signal": "merged",
+          "at": "2026-09-28T16:37:55Z",
+          "observed_at": "2026-11-18T08:23:39.768279913Z",
+          "source": "github-api",
+          "rule_version": "gh-aw-adoption-v1",
+          "acceptance_kind": "explicit_human",
+          "human_verified": true,
+          "coverage": "available"
+        },
+        "survival": {
+          "state": "observed",
+          "signal": "resource_still_accepted",
+          "observed_at": "2026-11-18T08:23:39.768279913Z",
+          "coverage": "snapshot"
+        },
+        "execution": {
+          "number": 63949,
+          "labels_before": null
+        }
+      },
+      "survival": {
+        "through": "2026-10-05T16:37:55Z",
+        "commits": 257,
+        "files": 5,
+        "touched": 0
+      },
+      "status": "attributed",
+      "reason": "all_gates_passed",
+      "attributed_value": 5
+    }
+  ],
+  "limitations": [
+    "Retrospective replay, not a prospectively adopted measurement contract.",
+    "Repository measurements include all authors and do not prove exclusive causality or saved time.",
+    "PR search is a producer-linked subset, not complete native delivery history.",
+    "Merges are adoption proxies; only matching native explicit-human adoption can establish acceptance.",
+    "Attributed value is a verified subtotal; unavailable windows are not zero.",
+    "Isolation excludes other producer-linked workflow merges, not every possible confounder."
+  ]
+}

@@ -99,8 +99,9 @@ Collecting each fixed run independently exposed that failure without hiding
 the other nine results. A successful lifecycle-only `value` command does not
 repair the missing session identity or make its evidence valid.
 
-The local checkout was shallow. Full historical merge windows and the schema
-slides were not replayed in this trial. No workflow was dispatched.
+The initial trial used a shallow checkout. Full historical merge windows and
+the schema slides were not replayed in that trial. No workflow was dispatched.
+The full-history follow-up below removes that checkout limitation.
 
 ## Reproduce the probe
 
@@ -208,3 +209,27 @@ The original unconfigured first pass used revision `9f70921`; current
 auto-discovery finds the new definitions. Retain the original native ledger to
 reproduce native adoption clocks and maturity anchoring. Without it, numeric
 measurements replay, but native lifecycle coverage is unavailable.
+
+## Full-history follow-up
+
+On 18 November, the checkout was explicitly unshallowed for `main`, retaining
+19,128 first-parent commits. The CLI itself still never fetches history.
+The original schema slides recipe was then replayed against pinned ref
+`30aaa011200b522ca1ffce0c8aed019048aac096`, with freshly collected native
+evidence from completed run `36389625388`.
+
+The [recorded full-history result](https://github.com/github/gh-aw/blob/main/.github/aw/value/pilots/2026-11-18.full-history.json)
+contains 36 observations, coverage 32/45 → 75/75, a 39-field stable cohort
+improving from 30 to 39 covered, 44 producer-linked PRs, 19 merges, and six
+selected rows with 84 samples.
+
+PR #63949 qualifies for **five attributed fields**: exact-parent coverage
+63/68 → 68/68, matching native explicit-human adoption, no neighboring workflow
+merge, and five changed files untouched through seven days and 257 subsequent
+main commits. Attribution coverage remains partial; the other two selected
+witnesses lack collected native adoption proof.
+
+This is a full historical Git replay, not imported-evidence attribution.
+It does not resolve the nine independent goal-evidence gaps in the ten-workflow
+cohort. Original trial observations remain unchanged, and no workflow was
+dispatched.

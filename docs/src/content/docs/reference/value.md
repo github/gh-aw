@@ -365,6 +365,10 @@ samples for the original baseline. The report also inspects every cohort merge
 individually. Additional native records can change which windows have enough
 evidence, so the verified subtotal is not a hard-coded slide number.
 
+The [18 November full-history follow-up](../value-pilot/#full-history-follow-up)
+reproduced these counts and the five-field attribution witness through the CLI,
+using complete `main` history and freshly collected native adoption evidence.
+
 Retain the JSON report and source lifecycle records. The report records the
 resolved Git SHA, evaluator ID, definition and recipe digests, and collected
 observations. `--ref FULL_SHA` pins Git history, but live API evidence can still
