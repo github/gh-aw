@@ -145,19 +145,26 @@ function openDurableSession(engine, env = process.env) {
   function copilotSession(sessionId = id || randomUUID()) {
     if (!SESSION_ID.test(sessionId)) throw new Error("Invalid durable Copilot session UUID");
     const baseline = readCopilotCaptureBaseline(directory);
+    const runId = env.GITHUB_RUN_ID || "local";
+    const runAttempt = env.GITHUB_RUN_ATTEMPT || "1";
+    const baselineIsCurrent = baseline && baseline.runId === runId && baseline.runAttempt === runAttempt;
+    if (baselineIsCurrent && baseline.id !== sessionId) {
+      throw new Error("Durable Copilot continuation cannot select a different session");
+    }
     const target = path.join(env.COPILOT_HOME || path.join(env.HOME || os.homedir(), ".copilot"), "session-state", sessionId);
-    if (!baseline) {
-      if (fs.existsSync(target)) throw new Error("Refusing to overwrite an unrelated native Copilot session");
-      if (id) {
+    if (!baselineIsCurrent) {
+      if (fs.existsSync(target) && !id) throw new Error("Refusing to overwrite an unrelated native Copilot session");
+      if (id && !fs.existsSync(path.join(target, "events.jsonl"))) {
         const source = path.join(directory, "session-state", sessionId);
         if (!fs.existsSync(path.join(source, "events.jsonl"))) throw new Error("Durable Copilot session transcript is missing");
         fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
         fs.cpSync(source, target, { recursive: true, dereference: false });
       }
       const events = path.join(target, "events.jsonl");
-      fs.writeFileSync(path.join(directory, "capture-offset.json"), JSON.stringify({ id: sessionId, bytes: fs.existsSync(events) ? fs.statSync(events).size : 0 }), { mode: 0o600, flag: "wx" });
-    } else if (baseline.id !== sessionId) {
-      throw new Error("Durable Copilot continuation cannot select a different session");
+      const captureBaselineFile = path.join(directory, "capture-offset.json");
+      const temporaryBaselineFile = path.join(directory, `capture-offset-${randomUUID()}.tmp`);
+      fs.writeFileSync(temporaryBaselineFile, JSON.stringify({ id: sessionId, bytes: fs.existsSync(events) ? fs.statSync(events).size : 0, runId, runAttempt }), { mode: 0o600, flag: "wx" });
+      fs.renameSync(temporaryBaselineFile, captureBaselineFile);
     }
     return sessionId;
   }

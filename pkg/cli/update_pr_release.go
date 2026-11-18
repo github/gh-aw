@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -87,7 +88,7 @@ func prepareOrgRolloutReleaseHighlights(ctx context.Context, opts orgRolloutOpti
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(opts.cacheDir, rolloutReleaseHighlightsFile), data, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(opts.cacheDir, rolloutReleaseHighlightsFile), data, constants.FilePermSensitive); err != nil {
 		return fmt.Errorf("sharing rollout release highlights: %w", err)
 	}
 	return nil
