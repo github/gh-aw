@@ -283,6 +283,8 @@ jobs:
         - name: N-R
           pattern: ^Test[N-R]
           shard: n-r
+          # Includes a compile sweep of the repository workflows.
+          timeout: 5m
         - name: S-Z and other
           pattern: ^Test([S-Z]|[^A-R])
           shard: s-z
@@ -396,7 +398,7 @@ jobs:
       run: |
         set -o pipefail
         # Run tests with JSON output for artifacts, but also show failures
-        if ! go test -v -parallel=8 -timeout=3m -run='${{ matrix.pattern }}' -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
+        if ! go test -v -parallel=8 -timeout='${{ matrix.timeout || '3m' }}' -run='${{ matrix.pattern }}' -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
           cat test-result-unit-${{ matrix.shard }}.json
           exit 1
         fi
