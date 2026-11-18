@@ -33,12 +33,10 @@ checkout:
     .github/scripts
 network:
   allowed: ["defaults"]
+model: router/economy
 engine:
   id: pi
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 imports:
   - shared/reporting.md

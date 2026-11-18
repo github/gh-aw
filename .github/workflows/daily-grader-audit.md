@@ -11,12 +11,10 @@ permissions:
   copilot-requests: write
 max-ai-credits: 1500
 max-daily-ai-credits: 5000
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
   mcp:
     tool-timeout: 10m
 tools:

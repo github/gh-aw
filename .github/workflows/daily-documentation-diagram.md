@@ -42,12 +42,10 @@ safe-outputs:
     max-patch-files: 2
     max-patch-size: 512
   noop:
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 timeout-minutes: 20
 evals:

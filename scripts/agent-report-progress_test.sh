@@ -6,6 +6,40 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
+REAL_MAKE=$(command -v make)
+cache_env_target='sandbox-env-test:; @printf "%s\n" "$$GOCACHE" "$$GOMODCACHE" "$$GOLANGCI_LINT_CACHE" "$$npm_config_cache"'
+mkdir -p "$TMP_ROOT/cache root"
+cache_env=$(
+    printf '%s\n' "$cache_env_target" | env -u GOCACHE -u GOMODCACHE -u GOLANGCI_LINT_CACHE -u npm_config_cache \
+        TMPDIR="$TMP_ROOT/cache root" \
+        "$REAL_MAKE" --no-print-directory -f "$SCRIPT_DIR/../Makefile" -f - sandbox-env-test
+)
+printf '%s\n' "$TMP_ROOT/cache root/gh-aw-go-build" "$TMP_ROOT/cache root/gh-aw-go-mod" "$TMP_ROOT/cache root/gh-aw-golangci-lint" \
+    "$TMP_ROOT/cache root/gh-aw-npm-cache" > "$TMP_ROOT/expected-caches.txt"
+printf '%s\n' "$cache_env" > "$TMP_ROOT/actual-caches.txt"
+cmp "$TMP_ROOT/expected-caches.txt" "$TMP_ROOT/actual-caches.txt"
+echo "PASS: make exports sandbox-writable tool caches, including paths with spaces"
+
+cache_env=$(
+    printf '%s\n' "$cache_env_target" | env \
+        GOCACHE="$TMP_ROOT/custom-go-build" GOMODCACHE="$TMP_ROOT/custom-go-mod" \
+        GOLANGCI_LINT_CACHE="$TMP_ROOT/custom-golangci-lint" \
+        npm_config_cache="$TMP_ROOT/custom-npm-cache" \
+        "$REAL_MAKE" --no-print-directory -f "$SCRIPT_DIR/../Makefile" -f - sandbox-env-test
+)
+printf '%s\n' "$TMP_ROOT/custom-go-build" "$TMP_ROOT/custom-go-mod" "$TMP_ROOT/custom-golangci-lint" \
+    "$TMP_ROOT/custom-npm-cache" > "$TMP_ROOT/expected-caches.txt"
+printf '%s\n' "$cache_env" > "$TMP_ROOT/actual-caches.txt"
+cmp "$TMP_ROOT/expected-caches.txt" "$TMP_ROOT/actual-caches.txt"
+echo "PASS: make preserves explicit tool cache overrides"
+
+cache_env=$(
+    printf '%s\n' "$cache_env_target" | env -u GOCACHE -u GOMODCACHE -u GOLANGCI_LINT_CACHE -u npm_config_cache \
+        "$REAL_MAKE" --no-print-directory -f "$SCRIPT_DIR/../Makefile" -f - TMPDIR= sandbox-env-test
+)
+test -z "$cache_env"
+echo "PASS: make leaves default tool caches alone when TMPDIR is empty"
+
 mkdir -p "$TMP_ROOT/scripts" "$TMP_ROOT/bin" "$TMP_ROOT/pkg/space name" "$TMP_ROOT/pkg/another"
 cp "$SCRIPT_DIR/agent-report-progress.sh" "$SCRIPT_DIR/format-changed.sh" "$TMP_ROOT/scripts/"
 printf '%s\n' 'echo fixture-base' > "$TMP_ROOT/scripts/resolve-base-commit.sh"

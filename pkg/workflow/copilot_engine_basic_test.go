@@ -21,7 +21,7 @@ func TestCopilotSDKInstallDependenciesArePinned(t *testing.T) {
 		"inline-typescript": getInlineCopilotSDKInstallSpec("typescript"),
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, dependencies, found := strings.Cut(spec.command, "npm install --ignore-scripts --no-save ")
+			_, dependencies, found := strings.Cut(spec.command, "--ignore-scripts --no-save ")
 			if !found {
 				t.Fatalf("expected SDK npm install command in %q", spec.command)
 			}
@@ -136,7 +136,7 @@ func TestCopilotEngineInstallationSteps(t *testing.T) {
 	if !strings.Contains(sdkInstallStep, "name: Install GitHub Copilot SDK (Node.js)") {
 		t.Fatalf("Expected SDK install step name, got:\n%s", sdkInstallStep)
 	}
-	expectedSDKInstall := "cd \"${GITHUB_WORKSPACE}\" && npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion)
+	expectedSDKInstall := `npm install --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts --no-save @github/copilot-sdk@` + string(constants.DefaultCopilotSDKVersion)
 	if !strings.Contains(sdkInstallStep, expectedSDKInstall) {
 		t.Fatalf("Expected SDK install command %q, got:\n%s", expectedSDKInstall, sdkInstallStep)
 	}
@@ -242,7 +242,7 @@ func TestCopilotEngineInstallationWithCommandAndCopilotSDK(t *testing.T) {
 			name:          "node command uses npm sdk install",
 			command:       "node ./agent.js",
 			expectedName:  "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:   "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
 			expectedSteps: 1,
 		},
 		{
@@ -291,14 +291,14 @@ func TestCopilotEngineInstallationWithCommandAndCopilotSDK(t *testing.T) {
 			name:          "unsupported runtime falls back to node sdk install",
 			command:       "bun run agent.ts",
 			expectedName:  "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:   "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
 			expectedSteps: 1,
 		},
 		{
 			name:          "ts-node command installs ts-node and typescript alongside sdk",
 			command:       "ts-node driver.ts",
 			expectedName:  "name: Install GitHub Copilot SDK (TypeScript)",
-			expectedRun:   "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion) + " " + copilotSDKWebFetchDependency + " ts-node@10.9.2 typescript@5.8.3",
+			expectedRun:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion) + " " + copilotSDKWebFetchDependency + " ts-node@10.9.2 typescript@5.8.3",
 			expectedSteps: 1,
 		},
 		{
@@ -370,7 +370,7 @@ func TestCopilotEngineInstallationWithCopilotSDKDriver(t *testing.T) {
 			name:         "js driver uses npm sdk install",
 			driver:       "my_driver.cjs",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
 		},
 		{
 			name:         "python driver uses pip sdk install",
@@ -382,19 +382,19 @@ func TestCopilotEngineInstallationWithCopilotSDKDriver(t *testing.T) {
 			name:         "typescript driver uses node sdk install (node 24 native ts support)",
 			driver:       "my_driver.ts",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
 		},
 		{
 			name:         "ruby driver uses npm sdk install fallback",
 			driver:       "my_driver.rb",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
 		},
 		{
 			name:         "arbitrary command driver uses npm sdk install fallback",
 			driver:       "my-copilot-driver",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
 		},
 	}
 

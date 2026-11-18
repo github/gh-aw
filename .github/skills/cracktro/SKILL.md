@@ -14,6 +14,8 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 - Find slides in `slides.md` by Id; link them as `#<id>` (stable; never `#N`, the layout is two-dimensional). Read the Summary before opening `deck.js`.
 - When you add, remove, move, rename a slide or change its message, update its `slides.md` row (Summary and Keywords) in the same change. Summaries are public, durable takeaways without aging counts or dates; band headers start `Band header (<band>):`. Keywords are required, comma-separated, accurate search terms (synonyms, acronyms, option and pattern names); the build publishes them in JSON-LD and the deck's `/` search matches them.
 - Never copy slide lists, numbers or summaries elsewhere (`index.html` included): the docs build and dev server inject every row into JSON-LD `hasPart`; an invalid row fails the build.
+- For speaker notes, load `../cracktro-speaker-notes/SKILL.md`: concise What/Why/When cues for technical newcomers, with research-informed tone and preserved evidence caveats.
+- Before adding public content, read `content-rules.md` and the People and mascots section below. Before verification, read Preview loop and Tests below; before publishing, read Pull requests below (screenshots required for slide changes).
 
 ## Files
 
@@ -47,7 +49,7 @@ The stage is a fixed 1920x1080 frame (`W`/`H`) scaled to the window.
 
 ```js
 slides.push({
-  notes: "...",           // speaker notes (N key); public text
+  notes: "...",           // public What/Why/When cues; toolbar button or N
   group: "security",      // band id; picks the THEME; crossing groups slides up
   experimental: "lsp",    // optional .xbadge; label only from the feature's `cracktro` entry in pkg/workflow/data/experimental_features.json (test-enforced)
   key: "improvers",      // optional; pattern slide heading a column of examples
@@ -71,6 +73,8 @@ slides.push({
 | `brand.md` | Any colour, gradient, glow, title or font change; brand/Primer palette, semantic hues, regularization pass. |
 | `concept-style.md` | Adding or restyling a concept slide in the style of The factory mindset and Trust the process (light header-less row, problem/answer statements, one live metaphor, horizontal split motion). |
 | `asset-generator.md` | Setting up or using the `asset-generator` MCP (og/social cards, wallpapers, charts, `create_slide_deck`); where outputs may live. |
+
+<!-- instruction-prefix-end -->
 
 ## People and mascots
 
