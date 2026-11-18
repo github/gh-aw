@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
@@ -46,19 +47,24 @@ func CollectSecretReferences(yamlContent string) []string {
 		rest = rest[idx+len(secretsPrefix):]
 
 		// First character of the name must be an uppercase letter
-		if rest == "" || rest[0] < 'A' || rest[0] > 'Z' {
+		first, _ := utf8.DecodeRuneInString(rest)
+		if first < 'A' || first > 'Z' {
 			continue
 		}
 
 		// Consume [A-Z0-9_]* for the rest of the name
 		end := 1
-		for end < len(rest) {
-			c := rest[end]
-			if (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
-				end++
-			} else {
-				break
+		for i := range rest {
+			if i == 0 {
+				continue
 			}
+			c := rest[i]
+			if (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
+				end = i + 1
+				continue
+			}
+			end = i
+			break
 		}
 		secretsMap[rest[:end]] = struct {
 		}{}
@@ -83,63 +89,54 @@ func CollectActionReferences(yamlContent string) []string {
 	})
 
 	for line := range strings.SplitSeq(yamlContent, "\n") {
-		// Quick check: line must contain "uses:" to avoid scanning every character
-		prefix, afterUses, found := strings.Cut(line, "uses:")
-		if !found {
-			continue
+		if entry, ok := actionReferenceFromLine(line); ok {
+			actionsMap[entry] = struct{}{}
 		}
-
-		// Must start with whitespace — rejects bare top-level keys ("uses: action")
-		// or top-level list items like "- uses: action".
-		if line == "" || (line[0] != ' ' && line[0] != '\t') {
-			continue
-		}
-
-		// The prefix before "uses:" must be either:
-		//   - Only whitespace           (plain key-value: "    uses: action")
-		//   - "-" with leading spaces   (list item:       "    - uses: action")
-		trimmedPrefix := strings.TrimSpace(prefix)
-		if trimmedPrefix != "" && trimmedPrefix != "-" {
-			continue
-		}
-
-		// Extract the action reference: everything after "uses:" trimmed
-		rest := strings.TrimSpace(afterUses)
-		if rest == "" {
-			continue
-		}
-
-		// The action ref is the first whitespace-delimited token; anything after
-		// optional whitespace + "#" is treated as the inline tag comment.
-		spaceIdx := strings.IndexByte(rest, ' ')
-		var ref, comment string
-		if spaceIdx == -1 {
-			ref = rest
-		} else {
-			ref = rest[:spaceIdx]
-			afterRef := strings.TrimSpace(rest[spaceIdx:])
-			if strings.HasPrefix(afterRef, "#") {
-				comment = strings.TrimSpace(afterRef[1:])
-			}
-		}
-
-		// Skip local and self-repository actions and reusable workflows.
-		if strings.HasPrefix(ref, "./") || strings.HasPrefix(ref, "$/") {
-			continue
-		}
-
-		entry := ref
-		if comment != "" {
-			entry = ref + " # " + comment
-		}
-		actionsMap[entry] = struct {
-		}{}
 	}
 
 	actions := sliceutil.SortedKeys(actionsMap)
 
 	secretMaskingLog.Printf("Found %d unique external action reference(s) in workflow", len(actions))
 	return actions
+}
+
+func actionReferenceFromLine(line string) (string, bool) {
+	prefix, afterUses, found := strings.Cut(line, "uses:")
+	if !found {
+		return "", false
+	}
+	for i := range line {
+		if line[i] != ' ' && line[i] != '\t' {
+			return "", false
+		}
+		break
+	}
+
+	trimmedPrefix := strings.TrimSpace(prefix)
+	if trimmedPrefix != "" && trimmedPrefix != "-" {
+		return "", false
+	}
+
+	rest := strings.TrimSpace(afterUses)
+	if rest == "" {
+		return "", false
+	}
+	spaceIdx := strings.IndexByte(rest, ' ')
+	ref, comment := rest, ""
+	if spaceIdx != -1 {
+		ref = rest[:spaceIdx]
+		afterRef := strings.TrimSpace(rest[spaceIdx:])
+		if strings.HasPrefix(afterRef, "#") {
+			comment = strings.TrimSpace(afterRef[1:])
+		}
+	}
+	if strings.HasPrefix(ref, "./") || strings.HasPrefix(ref, "$/") {
+		return "", false
+	}
+	if comment != "" {
+		ref += " # " + comment
+	}
+	return ref, true
 }
 
 func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData) {
@@ -153,28 +150,11 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 	secretMaskingLog.Printf("Generating redaction step for %d secret(s)", len(secretReferences))
 	yaml.WriteString("      - name: Redact secrets in logs\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	yaml.WriteString("        uses: " + getCachedActionPin("actions/github-script", data) + "\n")
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
-
-	// Load redact_secrets script from external file
-	// Use setupGlobals helper to attach GitHub Actions builtin objects to global scope
-	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
-	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
-	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/redact_secrets.cjs');\n")
-	var options []string
-	if data.SecretMasking != nil && len(data.SecretMasking.Steps) > 0 {
-		options = append(options, "prepareForCustomMasking: true")
-	}
 	durableCopilot := data.durableExecutionPlan != nil && data.EngineConfig != nil && data.EngineConfig.ID == "copilot"
-	if durableCopilot {
-		options = append(options, "redactDurableCopilot: process.env.GH_AW_DURABLE_STAGED === 'true'")
-	}
-	if len(options) > 0 {
-		yaml.WriteString("            await main({ " + strings.Join(options, ", ") + " });\n")
-	} else {
-		yaml.WriteString("            await main();\n")
-	}
+	writeSecretRedactionScript(yaml, data, durableCopilot)
 
 	if durableCopilot || len(secretReferences) > 0 {
 		yaml.WriteString("        env:\n")
@@ -183,24 +163,7 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 		generateCopilotCheckpointRedactionEnv(yaml, data)
 	}
 	if len(secretReferences) > 0 {
-
-		// Pass the list of secret names as a comma-separated string
-		// Escape each secret reference to prevent injection when embedding in YAML
-		escapedRefs := make([]string, len(secretReferences))
-		for i, ref := range secretReferences {
-			escapedRefs[i] = escapeSingleQuoteBackslash(ref)
-		}
-		fmt.Fprintf(yaml, "          GH_AW_SECRET_NAMES: '%s'\n", strings.Join(escapedRefs, ","))
-
-		// Pass the actual secret values as environment variables so they can be redacted
-		// Each secret will be available as an environment variable
-		for _, secretName := range secretReferences {
-			// Escape secret name to prevent injection in YAML
-			escapedSecretName := escapeSingleQuoteBackslash(secretName)
-			// Use original secretName in GitHub Actions expression since it's already validated
-			// to only contain safe characters (uppercase letters, numbers, underscores)
-			fmt.Fprintf(yaml, "          SECRET_%s: ${{ secrets.%s }}\n", escapedSecretName, secretName)
-		}
+		writeSecretRedactionEnvironment(yaml, secretReferences)
 	}
 
 	// Inject custom secret masking steps if configured
@@ -213,6 +176,38 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 				c.generateCustomSecretMaskingStep(yaml, trackedStep, data)
 			}
 		}
+	}
+}
+
+func writeSecretRedactionScript(yaml *strings.Builder, data *WorkflowData, durableCopilot bool) {
+	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
+	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
+	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/redact_secrets.cjs');\n")
+
+	var options []string
+	if data.SecretMasking != nil && len(data.SecretMasking.Steps) > 0 {
+		options = append(options, "prepareForCustomMasking: true")
+	}
+	if durableCopilot {
+		options = append(options, "redactDurableCopilot: process.env.GH_AW_DURABLE_STAGED === 'true'")
+	}
+	if len(options) > 0 {
+		yaml.WriteString("            await main({ " + strings.Join(options, ", ") + " });\n")
+		return
+	}
+	yaml.WriteString("            await main();\n")
+}
+
+func writeSecretRedactionEnvironment(yaml *strings.Builder, secretReferences []string) {
+	escapedRefs := make([]string, 0, len(secretReferences))
+	for _, ref := range secretReferences {
+		escapedRefs = append(escapedRefs, escapeSingleQuoteBackslash(ref))
+	}
+	yaml.WriteString("          GH_AW_SECRET_NAMES: '" + strings.Join(escapedRefs, ",") + "'\n")
+
+	for _, secretName := range secretReferences {
+		escapedSecretName := escapeSingleQuoteBackslash(secretName)
+		yaml.WriteString("          SECRET_" + escapedSecretName + ": ${{ secrets." + secretName + " }}\n")
 	}
 }
 
