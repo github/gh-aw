@@ -74,6 +74,27 @@ describe("create_prompt", () => {
     expect(renderPrompt({ items: [{ author_file: ".github/workflows/author.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toBe(expected);
   });
 
+  it.each(["---\nSummarize README.md.\n", "---\nSummarize README.md.\n---\nEnd of guide\n"])("preserves author-body thematic breaks through every transform: %j", body => {
+    const workflows = path.join(tempDir, ".github/workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.writeFileSync(path.join(workflows, "author.md"), "---\non: workflow_dispatch\n---\n" + body);
+
+    expect(renderPrompt({ items: [{ author_file: ".github/workflows/author.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toBe(body);
+  });
+
+  it("discards commented-out agent headers without changing active metadata provenance", () => {
+    const body = "<!--\n## agent: hidden\n---\nmodel: invalid\n-->\n## agent: reader\n---\nmodel: small # <!-- keep compiler digest -->\n---\nRead ${{ env.FILE }}.\n";
+    const source = "model: small # <!-- keep compiler digest -->";
+    const { installMarkdownMetadata } = require("./markdown_metadata.cjs");
+    installMarkdownMetadata({ version: 2, records: [{ sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), kind: "artifact", value: { model: "small" } }] });
+    const workflows = path.join(tempDir, ".github/workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.writeFileSync(path.join(workflows, "author.md"), "---\non: workflow_dispatch\n---\n" + body);
+
+    const rendered = renderPrompt({ items: [{ author_file: ".github/workflows/author.md" }], author_expressions: { "env.FILE": "GH_AW_ENV_FILE" } }, { GITHUB_WORKSPACE: tempDir, GH_AW_ENV_FILE: "README.md" }, tempDir);
+    expect(rendered).toBe('\n## agent: reader\n---\n{"model":"small"}\n---\nRead README.md.\n');
+  });
+
   it("renders shell and JavaScript injection payloads byte for byte as data", () => {
     const payloads = [
       "$(touch /tmp/gh-aw-command-substitution)",

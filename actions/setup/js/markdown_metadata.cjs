@@ -76,7 +76,9 @@ function findMetadataRecord(kind, digest) {
  * @param {boolean} [documentOnly]
  */
 function markdownMetadataBlocks(content, documentOnly = false) {
-  const lines = [...content.matchAll(/[^\n]*(?:\n|$)/g)].filter(line => line[0]);
+  // Mask comments for discovery only; compiler digest lookup needs original bytes.
+  const visible = content.replace(/<!--[\s\S]*?-->/g, comment => comment.replace(/[^\r\n]/g, " "));
+  const lines = [...visible.matchAll(/[^\n]*(?:\n|$)/g)].filter(line => line[0]);
   const blocks = [];
   const lineText = (/** @type {number} */ index) => lines[index][0].replace(/\r?\n$/, "");
   for (let index = 0; index < lines.length; index++) {
