@@ -52,6 +52,10 @@ type SafeOutputJobConfig struct {
 func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobConfig) (*Job, error) {
 	safeOutputsJobsLog.Printf("Building safe output job: %s (actionMode=%s)", config.JobName, c.actionMode)
 	var steps []string
+	if config.JobName == "upload_assets" && data.SafeOutputs.AuthorizationRequirements["upload_asset"] != nil &&
+		isSafeOutputHandlerEnabledAndUnstaged(data.SafeOutputs, "UploadAssets") {
+		config.Permissions.Set(PermissionScope("id-token"), PermissionWrite)
+	}
 
 	// Add pre-steps if provided (e.g., checkout, git config for create-pull-request)
 	if len(config.PreSteps) > 0 {
@@ -122,6 +126,13 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 	if len(config.PostSteps) > 0 {
 		steps = append(steps, config.PostSteps...)
 	}
+	var jobEnv map[string]string
+	if safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		jobEnv = c.buildJobLevelSafeOutputEnvVars(data, GetWorkflowIDFromPath(c.markdownPath))
+		if config.JobName == "upload_assets" && data.SafeOutputs.AuthorizationRequirements["upload_asset"] != nil {
+			steps = append(steps, c.buildAuthorizationEvidenceUploadStep(data, config.JobName)...)
+		}
+	}
 
 	// Determine job condition
 	jobCondition := config.Condition
@@ -149,6 +160,7 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 		Steps:          steps,
 		Outputs:        config.Outputs,
 		Needs:          needs,
+		Env:            jobEnv,
 	}
 
 	return job, nil

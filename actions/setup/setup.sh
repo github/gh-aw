@@ -66,7 +66,7 @@ GH_AW_ROOT="${GH_AW_SETUP_ROOT}"
 cleanup_failed_setup() {
   local status=$?
   if [[ "$status" != 0 ]]; then
-    node "${RUNTIME_HELPER}" cleanup || true
+    GH_AW_RUNTIME_TOKEN="${GH_AW_RUNTIME_TOKEN}" node "${RUNTIME_HELPER}" cleanup || true
   fi
 }
 trap cleanup_failed_setup EXIT
@@ -674,9 +674,9 @@ echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUT
 
 # Relocate every staged dependency and prompt, not just entry points. Never mutate
 # a checkout; script-mode downloads are invocation-owned and can be relocated too.
-node "${RUNTIME_HELPER}" relocate "${DESTINATION}" "${PROMPTS_DEST}" "${MCP_SCRIPTS_DEST}" "${SAFE_OUTPUTS_DEST}"
+GH_AW_RUNTIME_TOKEN="${GH_AW_RUNTIME_TOKEN}" node "${RUNTIME_HELPER}" relocate "${DESTINATION}" "${PROMPTS_DEST}" "${MCP_SCRIPTS_DEST}" "${SAFE_OUTPUTS_DEST}"
 if [[ "${SCRIPT_DIR}" == "${GH_AW_ROOT}/actions-source/actions/setup" ]]; then
-  node "${RUNTIME_HELPER}" relocate "${SCRIPT_DIR}"
+  GH_AW_RUNTIME_TOKEN="${GH_AW_RUNTIME_TOKEN}" node "${RUNTIME_HELPER}" relocate "${SCRIPT_DIR}"
 fi
 
 # Send OTLP job setup span when configured (non-fatal).

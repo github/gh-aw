@@ -53,40 +53,61 @@ func TestCopilotSessionFileCopyStep(t *testing.T) {
 	}
 }
 
-func TestCopilotSessionCopyScriptPrefersAWFManagedDirectory(t *testing.T) {
+func TestCopilotSessionCopyScriptUsesOnlyAWFManagedDirectory(t *testing.T) {
 	awfDir := t.TempDir()
-	legacyDir := t.TempDir()
+	homeDir := t.TempDir()
+	legacyDir := filepath.Join(homeDir, ".copilot", "session-state")
 	logsDir := t.TempDir()
 	writeSessionStateFile(t, awfDir, "session/events.jsonl", "awf events")
 	writeSessionStateFile(t, awfDir, "session/checkpoints/001.md", "awf checkpoint")
 	writeSessionStateFile(t, legacyDir, "session/events.jsonl", "legacy events")
 	writeSessionStateFile(t, legacyDir, "session/legacy-only.txt", "legacy only")
 
-	runCopilotSessionCopyScript(t, awfDir, legacyDir, logsDir)
+	runCopilotSessionCopyScript(t, awfDir, homeDir, logsDir)
 
 	assertSessionStateFile(t, logsDir, "session/events.jsonl", "awf events")
 	assertSessionStateFile(t, logsDir, "session/checkpoints/001.md", "awf checkpoint")
 	assertSessionStateFileMissing(t, logsDir, "session/legacy-only.txt")
 }
 
-func TestCopilotSessionCopyScriptFallsBackToLegacyDirectory(t *testing.T) {
-	awfDir := t.TempDir()
-	legacyDir := t.TempDir()
-	logsDir := t.TempDir()
-	writeSessionStateFile(t, awfDir, "session/session.db", "awf database")
-	writeSessionStateFile(t, legacyDir, "session/events.jsonl", "legacy events")
-	writeSessionStateFile(t, legacyDir, "session/files/nested.txt", "legacy file")
+func TestCopilotSessionCopyScriptDoesNotFallBackToLegacyDirectory(t *testing.T) {
+	for _, name := range []string{"empty", "missing", "non-redactable"} {
+		t.Run(name, func(t *testing.T) {
+			awfDir := filepath.Join(t.TempDir(), "session-state")
+			if name != "missing" {
+				if err := os.MkdirAll(awfDir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if name == "non-redactable" {
+				writeSessionStateFile(t, awfDir, "session/session.db", "awf database")
+			}
+			homeDir := t.TempDir()
+			legacyDir := filepath.Join(homeDir, ".copilot", "session-state")
+			logsDir := filepath.Join(t.TempDir(), "copilot-session-state")
+			writeSessionStateFile(t, legacyDir, "historical-session/events.jsonl", "legacy events")
+			writeSessionStateFile(t, legacyDir, "another-session/files/nested.txt", "legacy file")
 
-	runCopilotSessionCopyScript(t, awfDir, legacyDir, logsDir)
+			output := runCopilotSessionCopyScript(t, awfDir, homeDir, logsDir)
 
-	assertSessionStateFile(t, logsDir, "session/events.jsonl", "legacy events")
-	assertSessionStateFile(t, logsDir, "session/files/nested.txt", "legacy file")
-	assertSessionStateFileMissing(t, logsDir, "session/session.db")
+			if !strings.Contains(output, "::warning::No Copilot session state files found in "+awfDir) {
+				t.Errorf("Expected warning for unusable job session directory, got: %s", output)
+			}
+			if strings.Contains(output, legacyDir) {
+				t.Errorf("Expected no reference to legacy session directory, got: %s", output)
+			}
+			if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
+				t.Errorf("Expected no logs directory for unusable job session directory, stat error = %v", err)
+			}
+			assertSessionStateFile(t, legacyDir, "historical-session/events.jsonl", "legacy events")
+			assertSessionStateFile(t, legacyDir, "another-session/files/nested.txt", "legacy file")
+		})
+	}
 }
 
 func TestCopilotSessionCopyScriptCopiesOnlyRedactableFiles(t *testing.T) {
 	awfDir := t.TempDir()
-	legacyDir := t.TempDir()
+	homeDir := t.TempDir()
 	logsDir := t.TempDir()
 	writeSessionStateFile(t, awfDir, "session/events.jsonl", "awf events")
 	writeSessionStateFile(t, awfDir, "session/checkpoints/001.md", "awf checkpoint")
@@ -94,7 +115,7 @@ func TestCopilotSessionCopyScriptCopiesOnlyRedactableFiles(t *testing.T) {
 	writeSessionStateFile(t, awfDir, "session/extensionless", "sensitive extensionless file")
 	writeSessionStateFile(t, awfDir, "session/settings.yaml", "unsupported extension")
 
-	runCopilotSessionCopyScript(t, awfDir, legacyDir, logsDir)
+	runCopilotSessionCopyScript(t, awfDir, homeDir, logsDir)
 
 	assertSessionStateFile(t, logsDir, "session/events.jsonl", "awf events")
 	assertSessionStateFile(t, logsDir, "session/checkpoints/001.md", "awf checkpoint")
@@ -105,30 +126,78 @@ func TestCopilotSessionCopyScriptCopiesOnlyRedactableFiles(t *testing.T) {
 
 func TestCopilotSessionCopyScriptSkipsEmptyDirectories(t *testing.T) {
 	awfDir := t.TempDir()
-	legacyDir := t.TempDir()
+	homeDir := t.TempDir()
 	logsParent := t.TempDir()
 	logsDir := filepath.Join(logsParent, "copilot-session-state")
 
-	runCopilotSessionCopyScript(t, awfDir, legacyDir, logsDir)
+	runCopilotSessionCopyScript(t, awfDir, homeDir, logsDir)
 
 	if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
 		t.Errorf("Expected no logs directory for empty sources, stat error = %v", err)
 	}
 }
 
-func runCopilotSessionCopyScript(t *testing.T, awfDir, legacyDir, logsDir string) {
+func TestCopilotSessionCopyScriptCopiesOnlyDurableDirectModeSession(t *testing.T) {
+	const sessionID = "00000000-0000-4000-8000-000000000001"
+	awfDir := filepath.Join(t.TempDir(), "session-state")
+	homeDir := t.TempDir()
+	logsDir := filepath.Join(t.TempDir(), "copilot-session-state")
+	writeSessionStateFile(t, homeDir, ".copilot/session-state/"+sessionID+"/events.jsonl", "current events")
+	writeSessionStateFile(t, homeDir, ".copilot/session-state/historical/events.jsonl", "historical events")
+
+	runCopilotSessionCopyScriptWithSessionID(t, awfDir, homeDir, logsDir, sessionID)
+
+	assertSessionStateFile(t, logsDir, sessionID+"/events.jsonl", "current events")
+	assertSessionStateFileMissing(t, logsDir, "historical/events.jsonl")
+}
+
+func TestCopilotSessionCopyScriptIgnoresStaleDirectModeBaseline(t *testing.T) {
+	const sessionID = "00000000-0000-4000-8000-000000000001"
+	awfDir := filepath.Join(t.TempDir(), "session-state")
+	homeDir := t.TempDir()
+	logsDir := filepath.Join(t.TempDir(), "copilot-session-state")
+	writeSessionStateFile(t, homeDir, ".copilot/session-state/"+sessionID+"/events.jsonl", "historical events")
+
+	output := runCopilotSessionCopyScriptWithSessionID(t, awfDir, homeDir, logsDir, sessionID, "older-run")
+
+	if !strings.Contains(output, "::warning::No Copilot session state files found in "+awfDir) {
+		t.Errorf("Expected warning for stale durable session baseline, got: %s", output)
+	}
+	if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
+		t.Errorf("Expected stale session not to be copied, stat error = %v", err)
+	}
+	assertSessionStateFile(t, homeDir, ".copilot/session-state/"+sessionID+"/events.jsonl", "historical events")
+}
+
+func runCopilotSessionCopyScript(t *testing.T, awfDir, homeDir, logsDir string) string {
+	return runCopilotSessionCopyScriptWithSessionID(t, awfDir, homeDir, logsDir, "")
+}
+
+func runCopilotSessionCopyScriptWithSessionID(t *testing.T, awfDir, homeDir, logsDir, sessionID string, baselineRunIDs ...string) string {
 	t.Helper()
 
 	scriptPath, err := filepath.Abs("../../actions/setup/sh/copy_copilot_session_state.sh")
 	if err != nil {
 		t.Fatalf("Failed to resolve Copilot session copy script path: %v", err)
 	}
+	sessionIDFile := filepath.Join(t.TempDir(), "capture-offset.json")
+	if sessionID != "" {
+		baselineRunID := "current-run"
+		if len(baselineRunIDs) > 0 {
+			baselineRunID = baselineRunIDs[0]
+		}
+		if err := os.WriteFile(sessionIDFile, []byte(`{"id":"`+sessionID+`","bytes":0,"runId":"`+baselineRunID+`","runAttempt":"1"}`), 0o600); err != nil {
+			t.Fatalf("Failed to write durable session capture baseline: %v", err)
+		}
+	}
 	cmd := exec.Command("bash", scriptPath)
 	overrides := map[string]string{
-		"GH_AW_COPILOT_SESSION_STATE_DIR":        awfDir,
-		"GH_AW_COPILOT_LEGACY_SESSION_STATE_DIR": legacyDir,
-		"GH_AW_COPILOT_SESSION_LOGS_DIR":         logsDir,
-		"HOME":                                   t.TempDir(),
+		"GH_AW_COPILOT_SESSION_STATE_DIR": awfDir,
+		"GH_AW_COPILOT_SESSION_ID_FILE":   sessionIDFile,
+		"GH_AW_COPILOT_SESSION_LOGS_DIR":  logsDir,
+		"GITHUB_RUN_ID":                   "current-run",
+		"GITHUB_RUN_ATTEMPT":              "1",
+		"HOME":                            homeDir,
 	}
 	for _, variable := range os.Environ() {
 		key, _, _ := strings.Cut(variable, "=")
@@ -139,9 +208,11 @@ func runCopilotSessionCopyScript(t *testing.T, awfDir, legacyDir, logsDir string
 	for key, value := range overrides {
 		cmd.Env = append(cmd.Env, key+"="+value)
 	}
-	if output, err := cmd.CombinedOutput(); err != nil {
+	output, err := cmd.CombinedOutput()
+	if err != nil {
 		t.Fatalf("Copilot session copy script failed: %v\n%s", err, output)
 	}
+	return string(output)
 }
 
 func writeSessionStateFile(t *testing.T, dir, name, content string) {

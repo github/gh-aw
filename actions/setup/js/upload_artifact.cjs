@@ -43,6 +43,8 @@ const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
+const { digestArtifactFiles, handlerAuthorizationRequired, requireAuthorization } = require("./safe_output_authorization_gate.cjs");
+const { canonicalDigest } = require("./safe_output_authorization.cjs");
 const {
   assertClaimAuthorized,
   currentClaimHandle,
@@ -728,6 +730,17 @@ async function main(config = {}) {
           if (nativeRepository.full_name !== repository || !/^[1-9][0-9]*$/.test(String(nativeRepository.id)))
             throw new Error(`${ERR_VALIDATION}: Artifact upload repository identity differs from its native target; scoped effects remain blocked`);
           await assertClaimAuthorized({ ...message, repo: repository }, { effect: true, resource: { repository, host: expectedGitHubHost(), repository_id: String(nativeRepository.id), run_id: process.env.GITHUB_RUN_ID } });
+        }
+        if (handlerAuthorizationRequired(config)) {
+          const artifacts = digestArtifactFiles(stagingDirectory(), absoluteFiles);
+          await requireAuthorization({
+            inputs: { artifactName, artifacts, retentionDays, skipArchive, repository, run_id: process.env.GITHUB_RUN_ID },
+            scope: { binding: "invocation", refs: [`sha256:${canonicalDigest(artifacts)}`] },
+          });
+          if (canonicalDigest(digestArtifactFiles(stagingDirectory(), absoluteFiles)) !== canonicalDigest(artifacts)) {
+            throw new Error("Safe-output authorization artifact changed after approval");
+          }
+          await assertClaimAuthorized({ ...message, repo: repository });
         }
         const effect = recordClaimEffect({ kind: "artifact", repository, outcome: "unknown" });
         const uploadResult = await client.uploadArtifact(artifactName, absoluteFiles, stagingDirectory(), uploadOpts);

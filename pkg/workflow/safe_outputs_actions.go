@@ -25,9 +25,11 @@ var safeOutputActionsLog = logger.New("workflow:safe_outputs_actions")
 // Each configured action is resolved at compile time to get its inputs from action.yml,
 // and is mounted as an MCP tool that the AI agent can call once per workflow run.
 type SafeOutputActionConfig struct {
-	Uses        string            `yaml:"uses"`
-	Description string            `yaml:"description,omitempty"` // optional override of the action's description
-	Env         map[string]string `yaml:"env,omitempty"`         // additional environment variables for the injected step
+	Authorization *SafeOutputAuthorization `yaml:"authorization,omitempty"`
+	Staged        *TemplatableBool         `yaml:"staged,omitempty"`
+	Uses          string                   `yaml:"uses"`
+	Description   string                   `yaml:"description,omitempty"` // optional override of the action's description
+	Env           map[string]string        `yaml:"env,omitempty"`         // additional environment variables for the injected step
 
 	// Computed at compile time (not from frontmatter):
 	ResolvedRef       string                      `yaml:"-"` // Pinned action reference (e.g., "owner/repo@sha # v1")
@@ -74,6 +76,8 @@ func parseActionsConfig(actionsMap map[string]any) map[string]*SafeOutputActionC
 		}
 
 		actionConfig := &SafeOutputActionConfig{}
+		actionConfig.Authorization = parseLocalSafeOutputAuthorization(actionConfigMap["authorization"])
+		actionConfig.Staged = parseAuthorizationStaged(actionConfigMap["staged"])
 
 		if uses, ok := actionConfigMap["uses"].(string); ok {
 			actionConfig.Uses = uses
@@ -536,9 +540,9 @@ func actionOutputKey(normalizedName string) string {
 //   - Is guarded by an `if:` condition checking the payload output from process_safe_outputs
 //   - Uses the resolved action reference
 //   - Has a `with:` block populated from parsed payload output via fromJSON
-func (c *Compiler) buildActionSteps(data *WorkflowData) []string {
+func (c *Compiler) buildActionSteps(data *WorkflowData) ([]string, error) {
 	if data.SafeOutputs == nil || len(data.SafeOutputs.Actions) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Sort action names for deterministic output
@@ -546,10 +550,30 @@ func (c *Compiler) buildActionSteps(data *WorkflowData) []string {
 
 	var steps []string
 	for _, actionName := range actionNames {
-		steps = append(steps, buildActionStep(actionName, data.SafeOutputs.Actions[actionName])...)
+		config := data.SafeOutputs.Actions[actionName]
+		normalized := stringutil.NormalizeSafeOutputIdentifier(actionName)
+		actionSteps := buildActionStep(actionName, config)
+		if data.SafeOutputs.AuthorizationRequirements[normalized] != nil {
+			gate, err := c.buildAuthorizationGateStep(data, actionName, "action", config, config.Staged,
+				authorizationGateOptions{
+					Payload:    fmt.Sprintf("${{ steps.process_safe_outputs.outputs.%s }}", actionOutputKey(normalized)),
+					OutputPath: "${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}",
+					Condition:  fmt.Sprintf("steps.process_safe_outputs.outputs.%s != ''", actionOutputKey(normalized)),
+				})
+			if err != nil {
+				return nil, err
+			}
+			steps = append(steps, gate...)
+			for i, line := range actionSteps {
+				if strings.HasPrefix(line, "        if:") {
+					actionSteps[i] = strings.TrimSuffix(line, "\n") + fmt.Sprintf(" && steps.authorize_%s.outputs.authorized == 'true'\n", normalized)
+				}
+			}
+		}
+		steps = append(steps, actionSteps...)
 	}
 
-	return steps
+	return steps, nil
 }
 
 func buildActionStep(actionName string, config *SafeOutputActionConfig) []string {

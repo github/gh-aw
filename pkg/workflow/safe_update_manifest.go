@@ -98,6 +98,7 @@ type GHAWManifest struct {
 	ThreatDetectionSuppressions []ThreatDetectionSuppression         `json:"threat_detection_suppressions,omitempty"`
 	ThreatDetection             *GHAWManifestDetectionPolicy         `json:"threat_detection,omitempty"`
 	Admission                   bool                                 `json:"admission"`
+	SafeOutputAuthorization     map[string]string                    `json:"safe_output_authorization,omitempty"`
 	WebhookSubscriptions        []WebhookSubscription                `json:"webhook_subscriptions,omitempty"`
 	WorkQueue                   *GHAWManifestWorkQueue               `json:"work_queue,omitempty"`
 	MarkdownMetadata            *GHAWMarkdownMetadata                `json:"-"`

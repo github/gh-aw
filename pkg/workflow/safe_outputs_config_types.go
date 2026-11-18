@@ -20,14 +20,15 @@ var safeOutputsConfigLog = logger.New("workflow:safe_outputs_config")
 
 // BaseSafeOutputConfig holds common configuration fields for all safe output types
 type BaseSafeOutputConfig struct {
-	Max                      *string          `yaml:"max,omitempty"`                        // Maximum number of items to create (supports integer or GitHub Actions expression)
-	GitHubToken              string           `yaml:"github-token,omitempty"`               // GitHub token for this specific output type
-	GitHubApp                *GitHubAppConfig `yaml:"github-app,omitempty"`                 // GitHub App credentials for minting a per-handler installation access token
-	Staged                   *TemplatableBool `yaml:"staged,omitempty"`                     // Templatable preview-only mode for this specific output type
-	Footer                   *string          `yaml:"footer,omitempty"`                     // Controls AI-generated footer behavior. Values vary by handler; false omits the visible footer but keeps XML markers.
-	BodyFooter               string           `yaml:"body-footer,omitempty"`                // Deterministic template appended after agent-generated body content by supported handlers.
-	IssueIntent              *bool            `yaml:"issue-intent,omitempty"`               // When true, enable issue-intent rationale/confidence guidance and schema requirements for this output type.
-	NormalizeClosingKeywords *bool            `yaml:"normalize-closing-keywords,omitempty"` // When true for this output type, strip backticks from recognized issue-closing keywords in body fields.
+	Authorization            *SafeOutputAuthorization `yaml:"authorization,omitempty"`
+	Max                      *string                  `yaml:"max,omitempty"`                        // Maximum number of items to create (supports integer or GitHub Actions expression)
+	GitHubToken              string                   `yaml:"github-token,omitempty"`               // GitHub token for this specific output type
+	GitHubApp                *GitHubAppConfig         `yaml:"github-app,omitempty"`                 // GitHub App credentials for minting a per-handler installation access token
+	Staged                   *TemplatableBool         `yaml:"staged,omitempty"`                     // Templatable preview-only mode for this specific output type
+	Footer                   *string                  `yaml:"footer,omitempty"`                     // Controls AI-generated footer behavior. Values vary by handler; false omits the visible footer but keeps XML markers.
+	BodyFooter               string                   `yaml:"body-footer,omitempty"`                // Deterministic template appended after agent-generated body content by supported handlers.
+	IssueIntent              *bool                    `yaml:"issue-intent,omitempty"`               // When true, enable issue-intent rationale/confidence guidance and schema requirements for this output type.
+	NormalizeClosingKeywords *bool                    `yaml:"normalize-closing-keywords,omitempty"` // When true for this output type, strip backticks from recognized issue-closing keywords in body fields.
 	// Samples carries deterministic replay samples for the hidden
 	// `gh aw compile --use-samples` flag. Each entry is the JSON object
 	// passed to the corresponding MCP tool's `tools/call` arguments.
@@ -39,6 +40,11 @@ type BaseSafeOutputConfig struct {
 
 // SafeOutputsConfig holds configuration for automatic output routes
 type SafeOutputsConfig struct {
+	Authorization                          *SafeOutputAuthorization `yaml:"authorization,omitempty"`
+	authorizationParseError                error
+	importedCustomAuthorizations           map[string]*SafeOutputAuthorization
+	AuthorizationRequirements              map[string]*SafeOutputAuthorization    `yaml:"-"`
+	AuthorizationCoverage                  map[string]string                      `yaml:"-"`
 	Steer                                  bool                                   `yaml:"steer,omitempty"` // Experimental. Create an issue and steer the agent from issue comments.
 	CreateIssues                           *CreateIssuesConfig                    `yaml:"create-issue,omitempty"`
 	CreateSecurityAdvisory                 *CreateSecurityAdvisoryConfig          `yaml:"create-security-advisory,omitempty"`

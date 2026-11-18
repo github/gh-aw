@@ -388,12 +388,19 @@ func regradeReadEvidence(path string, limit int64) ([]byte, error) {
 	if err := regradeCheckSourcePath(path); err != nil {
 		return nil, err
 	}
+	return readRegularGraderEvidence(path, limit)
+}
+
+func readRegularGraderEvidence(path string, limit int64) ([]byte, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("evidence %s must be a regular file", path)
+	}
+	if info.Size() > limit {
+		return nil, fmt.Errorf("evidence %s exceeds the %d-byte limit", path, limit)
 	}
 	file, err := os.Open(path)
 	if err != nil {

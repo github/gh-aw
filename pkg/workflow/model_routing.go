@@ -447,6 +447,10 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 	if err := validateModelRoutingProviderTarget(workflowData, engineName); err != nil {
 		return err
 	}
+	if routing.requested != "" && len(routing.AllowedModels) > 0 && !apiProxySupportsRoutingCandidateModels(workflowData) {
+		return NewValidationError("model-routing.allowed-models", "", "the configured firewall cannot restrict only the router's candidates",
+			fmt.Sprintf("Use AWF and an apiProxy image with routing.candidateModels support (%s or newer).", constants.AWFRoutingCandidateModelsMinVersion))
+	}
 	if routing.Goal != "cost" && routing.Goal != "cost-speed" {
 		return NewValidationError("engine.model-routing.goal", routing.Goal, "unsupported model-routing goal", "Use cost or cost-speed.")
 	}
