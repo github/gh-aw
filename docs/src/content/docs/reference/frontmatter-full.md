@@ -2063,8 +2063,8 @@ on:
     # (optional)
     all: "read"
 
-  # Enable admission and conclusion_admission jobs for this workflow. Also enabled
-  # when aw.json sets admission to true.
+  # Generate admission steps in activation and conclusion (default: false).
+  # An explicit admission setting in aw.json takes precedence.
   # (optional)
   admission: true
 
@@ -26009,6 +26009,16 @@ import-schema:
 # model.
 # (optional)
 model: "example-value"
+
+# Optional shortlist for an explicit router model value. Applies only to the main
+# agent's router choices, not to other model requests. Declare this block once, in
+# the main workflow or a shared import.
+# (optional)
+model-routing:
+  # Specify at least one exact model name or gh-aw alias. The engine's capabilities
+  # and models.allowed/blocked still apply; the shortlist changes no request policy.
+  allowed-models: []
+    # Array of strings
 
 # Graders over the unified session, including reserved operational-value
 # JavaScript. Fast built-ins run in conclusion; executable custom graders run only

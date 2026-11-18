@@ -16,6 +16,8 @@ func Schema(kind string) ([]byte, error) {
 	var err error
 	options := &jsonschema.ForOptions{TypeSchemas: map[reflect.Type]*jsonschema.Schema{
 		reflect.TypeFor[Value]():           {Ref: "#/$defs/value"},
+		reflect.TypeFor[Input]():           {Ref: "#/$defs/input"},
+		reflect.TypeFor[*Input]():          {Ref: "#/$defs/input"},
 		reflect.TypeFor[EventPredicate]():  {Type: "object", Ref: "#/$defs/eventPredicate"},
 		reflect.TypeFor[*EventPredicate](): {Type: "object", Ref: "#/$defs/eventPredicate"},
 	}}
@@ -42,6 +44,12 @@ func Schema(kind string) ([]byte, error) {
 			schema.Defs = map[string]*jsonschema.Schema{}
 		}
 		schema.Defs["value"] = value
+		type inputDefinition Input
+		input, err := jsonschema.For[inputDefinition](options)
+		if err != nil {
+			return nil, fmt.Errorf("generate connector input schema: %w", err)
+		}
+		schema.Defs["input"] = input
 		predicate, err := eventPredicateSchema()
 		if err != nil {
 			return nil, err
@@ -74,7 +82,7 @@ func valueSchema() (*jsonschema.Schema, error) {
 	  "dependentRequired": {"encoding": ["input"], "prefix":["input"]}
 	}`
 	var schema jsonschema.Schema
-	if err := json.Unmarshal([]byte(definition), &schema); err != nil {
+	if err := decodeJSON([]byte(definition), &schema); err != nil {
 		return nil, fmt.Errorf("decode connector value schema: %w", err)
 	}
 	return &schema, nil

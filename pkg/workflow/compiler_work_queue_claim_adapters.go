@@ -63,9 +63,63 @@ func (c *Compiler) buildWorkQueuePreparedAdapterJob(data *WorkflowData, name str
 	if err != nil {
 		return nil, err
 	}
+	implementation := map[string]any{"adapter": string(configuration), "setup": scriptSetup, "steps": rendered}
+	authorizationSteps, err := c.buildWorkQueuePreparedAuthorization(data, name, job, implementation)
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, authorizationSteps...)
 	steps = append(steps, rendered...)
 	job.Steps = c.finishWorkQueuePreparedAdapterSteps(data, name, index, steps)
+	if data.SafeOutputs.AuthorizationRequirements[name] != nil {
+		job.Steps = append(job.Steps, c.buildAuthorizationEvidenceUploadStep(data, job.Name)...)
+	}
 	return job, nil
+}
+
+func workQueuePreparedAuthorizationConfig(data *WorkflowData, name string) (any, *TemplatableBool, error) {
+	for rawName, config := range data.SafeOutputs.Scripts {
+		if stringutil.NormalizeSafeOutputIdentifier(rawName) == name {
+			return config, safeScriptAuthorizationStaged(config), nil
+		}
+	}
+	for rawName, config := range data.SafeOutputs.Actions {
+		if stringutil.NormalizeSafeOutputIdentifier(rawName) == name {
+			return config, config.Staged, nil
+		}
+	}
+	for rawName, config := range data.SafeOutputs.Jobs {
+		if stringutil.NormalizeSafeOutputIdentifier(rawName) == name {
+			if (config.Permissions["id-token"] == "none" || config.RawPermissions == "read-all") && !isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), config.Staged) {
+				return nil, nil, fmt.Errorf("safe-output job %q authorization requires id-token: write", name)
+			}
+			return config, config.Staged, nil
+		}
+	}
+	return nil, nil, fmt.Errorf("safe-output %q has no configured Claim adapter executor", name)
+}
+
+func (c *Compiler) buildWorkQueuePreparedAuthorization(data *WorkflowData, name string, job *Job, implementation map[string]any) ([]string, error) {
+	if data.SafeOutputs.AuthorizationRequirements[name] == nil {
+		return nil, nil
+	}
+	configuration, staged, err := workQueuePreparedAuthorizationConfig(data, name)
+	if err != nil {
+		return nil, err
+	}
+	implementation["configuration"] = configuration
+	if !isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), staged) {
+		job.Permissions += "\n      id-token: write"
+	}
+	if value := resolveSafeOutputsStagedValue(c.trialMode, data.SafeOutputs.Staged); value != nil {
+		job.Env["GH_AW_SAFE_OUTPUTS_STAGED"] = fmt.Sprintf("%q", *value)
+	}
+	job.Env["GH_AW_CLAIM_ADAPTER_STAGED"] = fmt.Sprintf("%q", fmt.Sprint(authorizationStagedValue(staged)))
+	return c.buildAuthorizationGateStep(data, name, "job", implementation, staged, authorizationGateOptions{
+		OutputPath: "${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}",
+		Condition:  "steps.claim_adapter_context.outputs.active == 'true'",
+		Phase:      "prepare_claim_adapter",
+	})
 }
 
 func (c *Compiler) newWorkQueuePreparedAdapterJob(data *WorkflowData, name string, index int, threatDetectionEnabled bool) *Job {
@@ -204,6 +258,9 @@ func (c *Compiler) renderWorkQueuePreparedCustomSteps(data *WorkflowData, name s
 		}
 		step = shallowCopyMap(step)
 		condition := "steps.claim_adapter_context.outputs.active == 'true'"
+		if data.SafeOutputs.AuthorizationRequirements[name] != nil {
+			condition += fmt.Sprintf(" && steps.authorize_%s.outputs.authorized == 'true'", name)
+		}
 		if existing, ok := step["if"].(string); ok && existing != "" {
 			condition = fmt.Sprintf("%s && (%s)", condition, c.extractExpressionFromIfString(existing))
 		}

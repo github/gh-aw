@@ -126,8 +126,8 @@ describe("Copilot native session collection", () => {
     fs.mkdirSync(path.join(state, "session-state", id), { recursive: true });
     fs.writeFileSync(file, old + current);
     fs.writeFileSync(path.join(state, "session-state", id, "events.jsonl"), old + current);
-    fs.writeFileSync(path.join(state, "capture-offset.json"), JSON.stringify({ id, bytes: Buffer.byteLength(old) }));
-    trimCopilotLogs({ env: { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: state } });
+    fs.writeFileSync(path.join(state, "capture-offset.json"), JSON.stringify({ id, bytes: Buffer.byteLength(old), runId: "100", runAttempt: "1" }));
+    trimCopilotLogs({ env: { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: state, GITHUB_RUN_ID: "100", GITHUB_RUN_ATTEMPT: "1" } });
     expect(fs.readFileSync(file, "utf8")).toBe(current);
     expect(fs.readFileSync(path.join(state, "session-state", id, "events.jsonl"), "utf8")).toBe(old + current);
   });
@@ -135,22 +135,44 @@ describe("Copilot native session collection", () => {
   it.each(["firewall", "direct"])("collects %s sessions without exposing old sessions as current unified logs", mode => {
     const state = path.join(directory, "agent/durable-sessions/copilot");
     const home = path.join(directory, "home");
+    const id = "00000000-0000-4000-8000-000000000001";
     const source = mode === "firewall" ? path.join(directory, "sandbox/agent/session-state") : path.join(home, ".copilot/session-state");
-    fs.mkdirSync(path.join(source, "current"), { recursive: true });
-    fs.writeFileSync(path.join(source, "current/events.jsonl"), "current events");
-    fs.writeFileSync(path.join(source, "current/session.db"), Buffer.from([0, 0xff, 1]));
+    fs.mkdirSync(path.join(source, id), { recursive: true });
+    fs.writeFileSync(path.join(source, id, "events.jsonl"), "current events");
+    fs.writeFileSync(path.join(source, id, "session.db"), Buffer.from([0, 0xff, 1]));
+    fs.mkdirSync(path.join(source, "previous"), { recursive: true });
+    fs.writeFileSync(path.join(source, "previous/events.jsonl"), "unrelated historical events");
     fs.mkdirSync(path.join(state, "session-state/previous"), { recursive: true });
-    fs.writeFileSync(path.join(state, "session-state/previous/events.jsonl"), "old events");
-    captureCopilotSessions({ env: { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: state }, home });
-    expect(fs.readFileSync(path.join(state, "session-state/current/events.jsonl"), "utf8")).toBe("current events");
-    expect(fs.readFileSync(path.join(state, "session-state/current/session.db"))).toEqual(Buffer.from([0, 0xff, 1]));
-    expect(fs.readFileSync(path.join(state, "session-state/previous/events.jsonl"), "utf8")).toBe("old events");
-    expect(fs.existsSync(path.join(source, "previous"))).toBe(false);
+    fs.writeFileSync(path.join(state, "session-state/previous/events.jsonl"), "old unrelated events");
+    fs.writeFileSync(path.join(state, "capture-offset.json"), JSON.stringify({ id, bytes: 0, runId: "100", runAttempt: "1" }));
+    captureCopilotSessions({ env: { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: state, GITHUB_RUN_ID: "100", GITHUB_RUN_ATTEMPT: "1" }, home });
+    expect(fs.readFileSync(path.join(state, "session-state", id, "events.jsonl"), "utf8")).toBe("current events");
+    expect(fs.readFileSync(path.join(state, "session-state", id, "session.db"))).toEqual(Buffer.from([0, 0xff, 1]));
+    expect(fs.existsSync(path.join(state, "session-state/previous"))).toBe(false);
+    expect(fs.readFileSync(path.join(source, "previous/events.jsonl"), "utf8")).toBe("unrelated historical events");
+  });
+
+  it("ignores a capture baseline from another workflow run", () => {
+    const state = path.join(directory, "agent/durable-sessions/copilot");
+    const home = path.join(directory, "home");
+    const id = "00000000-0000-4000-8000-000000000001";
+    const source = path.join(home, ".copilot/session-state", id);
+    fs.mkdirSync(source, { recursive: true });
+    fs.writeFileSync(path.join(source, "events.jsonl"), "historical events");
+    fs.mkdirSync(state, { recursive: true });
+    fs.writeFileSync(path.join(state, "capture-offset.json"), JSON.stringify({ id, bytes: 0, runId: "99", runAttempt: "1" }));
+
+    const env = { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: state, GITHUB_RUN_ID: "100", GITHUB_RUN_ATTEMPT: "1" };
+    captureCopilotSessions({ env, home });
+    expect(() => trimCopilotLogs({ env })).not.toThrow();
+
+    expect(fs.existsSync(path.join(state, "session-state", id, "events.jsonl"))).toBe(false);
+    expect(fs.readFileSync(path.join(source, "events.jsonl"), "utf8")).toBe("historical events");
   });
 
   it("reports when no native session was produced", () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     captureCopilotSessions({ env: { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: path.join(directory, "state") }, home: directory });
-    expect(info).toHaveBeenCalledWith("Copilot did not produce native durable session files");
+    expect(write).toHaveBeenCalledWith(expect.stringContaining("Copilot did not produce native durable session files"));
   });
 });

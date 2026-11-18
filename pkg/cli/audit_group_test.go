@@ -59,7 +59,7 @@ func TestSortGroupedAuditEntries(t *testing.T) {
 
 func TestResolveGroupedAuditRunRequests(t *testing.T) {
 	t.Parallel()
-	requests, err := resolveGroupedAuditRunRequests([]string{
+	requests, err := resolveGroupedAuditRunRequests(t.Context(), []string{
 		"https://github.com/owner/repo/actions/runs/100",
 		"101",
 	}, "")
@@ -74,7 +74,7 @@ func TestResolveGroupedAuditRunRequests(t *testing.T) {
 
 func TestResolveGroupedAuditRunRequestsRejectsDuplicateRuns(t *testing.T) {
 	t.Parallel()
-	_, err := resolveGroupedAuditRunRequests([]string{"100", "100"}, "owner/repo")
+	_, err := resolveGroupedAuditRunRequests(t.Context(), []string{"100", "100"}, "owner/repo")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate run ID 100")
 }
@@ -169,6 +169,7 @@ func TestRunAuditGroupedEndToEnd(t *testing.T) {
 		outputDir:     tempDir,
 		jsonOutput:    true,
 		runtimeFilter: "gvisor",
+		repoFlag:      "owner/repo",
 	}
 
 	output := captureAuditGroupStdout(t, func() {
@@ -285,8 +286,12 @@ func captureAuditGroupStdout(t *testing.T, fn func()) string {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stdout = w
+	defer func() {
+		os.Stdout = oldStdout
+		_ = w.Close()
+		_ = r.Close()
+	}()
 	fn()
-	os.Stdout = oldStdout
 	require.NoError(t, w.Close())
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
@@ -299,8 +304,12 @@ func captureAuditGroupStderr(t *testing.T, fn func()) string {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stderr = w
+	defer func() {
+		os.Stderr = oldStderr
+		_ = w.Close()
+		_ = r.Close()
+	}()
 	fn()
-	os.Stderr = oldStderr
 	require.NoError(t, w.Close())
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)

@@ -51,9 +51,17 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 
 	if output, exists := frontmatter["safe-outputs"]; exists {
 		if outputMap, ok := output.(map[string]any); ok {
+			authorizationAliasError := validateSafeOutputAuthorizationAliases(outputMap)
 			outputMap = normalizeMissingReportKeys(outputMap)
 			safeOutputsConfigLog.Printf("Processing safe-outputs configuration with %d top-level keys", len(outputMap))
 			config = &SafeOutputsConfig{}
+			config.Authorization, config.authorizationParseError = parseSafeOutputAuthorization(outputMap["authorization"])
+			if err := validateRawSafeOutputAuthorizations(outputMap); err != nil {
+				config.authorizationParseError = err
+			}
+			if authorizationAliasError != nil {
+				config.authorizationParseError = authorizationAliasError
+			}
 			if adapters, supplied := outputMap["claim-adapters"]; supplied {
 				config.ClaimAdapters, config.claimAdaptersParseError = parseWorkQueueClaimAdapters(adapters)
 			}

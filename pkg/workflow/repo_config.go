@@ -163,8 +163,11 @@ type RepoConfig struct {
 	// ProtectedFiles configures repository-wide exceptions to safe-output file protection.
 	ProtectedFiles RepoProtectedFilesConfig
 
-	// Admission enables admission and conclusion_admission jobs for all workflows.
-	Admission bool
+	// Admission overrides admission step generation for all workflows when set.
+	Admission *bool
+
+	// SafeOutputAuthorization requires authorization for non-diagnostic safe outputs.
+	SafeOutputAuthorization *SafeOutputAuthorization
 
 	// GatewayDispatch enables experimental on.gateway-dispatch triggers requiring an approved server.
 	GatewayDispatch bool
@@ -299,7 +302,8 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	// auto_upgrade parsing.
 	var raw struct {
 		ProtectedFiles           RepoProtectedFilesConfig      `json:"protected_files,omitzero"`
-		Admission                bool                          `json:"admission,omitempty"`
+		Admission                *bool                         `json:"admission,omitempty"`
+		SafeOutputAuthorization  json.RawMessage               `json:"safe_output_authorization,omitempty"`
 		GatewayDispatch          bool                          `json:"gateway-dispatch,omitempty"`
 		Strict                   bool                          `json:"strict,omitempty"`
 		GHES                     bool                          `json:"ghes,omitempty"`
@@ -326,6 +330,11 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	r.GatewayDispatch = raw.GatewayDispatch
 	r.ProtectedFiles = raw.ProtectedFiles
 	r.Admission = raw.Admission
+	authorization, err := parseRepoSafeOutputAuthorization(raw.SafeOutputAuthorization)
+	if err != nil {
+		return err
+	}
+	r.SafeOutputAuthorization = authorization
 	r.Strict = raw.Strict
 	r.GHES = raw.GHES
 	r.RequireSelfHostedRunners = raw.RequireSelfHostedRunners

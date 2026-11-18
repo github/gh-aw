@@ -178,6 +178,9 @@ func safeOutputsJobPermissions(data *WorkflowData) (*Permissions, bool) {
 		permissions.Set(PermissionActions, PermissionWrite)
 	}
 	if isWorkQueueParticipant(data) {
+		if safeOutputsAnyAuthorizationNeedsOIDC(data.SafeOutputs) {
+			permissions.Set(PermissionIdToken, PermissionWrite)
+		}
 		permissions.Set(PermissionActions, PermissionWrite)
 		if data.SafeOutputs != nil && data.SafeOutputs.UploadCodeCoverage != nil && !isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), data.SafeOutputs.UploadCodeCoverage.Staged) {
 			permissions.Set(PermissionCodeQuality, PermissionWrite)
@@ -676,7 +679,10 @@ func (c *Compiler) appendCustomActionSteps(data *WorkflowData, markdownPath stri
 		if err := c.resolveAllActions(data, markdownPath); err != nil {
 			return err
 		}
-		actionStepYAML := c.buildActionSteps(data)
+		actionStepYAML, err := c.buildActionSteps(data)
+		if err != nil {
+			return err
+		}
 		state.steps = append(state.steps, actionStepYAML...)
 		for actionName := range data.SafeOutputs.Actions {
 			normalizedName := stringutil.NormalizeSafeOutputIdentifier(actionName)
@@ -779,6 +785,9 @@ func addNamedSafeOutputHandlerOutputs(data *WorkflowData, outputs map[string]str
 	if data.SafeOutputs.CallWorkflow != nil {
 		outputs["call_workflow_name"] = "${{ steps.process_safe_outputs.outputs.call_workflow_name }}"
 		outputs["call_workflow_payload"] = "${{ steps.process_safe_outputs.outputs.call_workflow_payload }}"
+		if data.SafeOutputs.AuthorizationRequirements["call_workflow"] != nil {
+			outputs["call_workflow_record_index"] = "${{ steps.process_safe_outputs.outputs.call_workflow_record_index }}"
+		}
 	}
 }
 

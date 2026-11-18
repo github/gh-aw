@@ -6,10 +6,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
+
+var compilerYAMLHeaderLog = logger.New("workflow:compiler_yaml_header")
 
 func collectDetectionPolicyForManifest(data *WorkflowData) *GHAWManifestDetectionPolicy {
 	policy := &GHAWManifestDetectionPolicy{Mode: "disabled"}
@@ -30,8 +33,10 @@ func collectDetectionPolicyForManifest(data *WorkflowData) *GHAWManifestDetectio
 func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowData, frontmatterHash string, bodyHash string, secrets []string, actions []string, repoConfig *RepoConfig) error {
 	// Skip the ASCII art banner in wasm/editor mode — it takes up too much space
 	if c.skipHeader {
+		compilerYAMLHeaderLog.Print("Skipping workflow header generation (skipHeader set)")
 		return nil
 	}
+	compilerYAMLHeaderLog.Printf("Generating workflow header: secrets=%d, actions=%d, has_frontmatter_hash=%t", len(secrets), len(actions), frontmatterHash != "")
 	c.generateLockMetadataHeader(yaml, data, frontmatterHash, bodyHash)
 	if err := c.generateManifestHeader(yaml, data, secrets, actions); err != nil {
 		return err
@@ -76,6 +81,7 @@ func (c *Compiler) generateLockMetadataHeader(yaml *strings.Builder, data *Workf
 		}
 		metadataJSON, err := metadata.ToJSON()
 		if err != nil {
+			compilerYAMLHeaderLog.Printf("Lock metadata JSON serialization failed, falling back to legacy frontmatter-hash header: %v", err)
 			// Fallback to legacy format if JSON serialization fails
 			fmt.Fprintf(yaml, "# frontmatter-hash: %s\n", frontmatterHash) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		} else {
@@ -104,6 +110,7 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	if data.ParsedFrontmatter != nil {
 		manifest.ThreatDetectionSuppressions = data.ParsedFrontmatter.ThreatDetectionSuppressions
 	} else {
+		compilerYAMLHeaderLog.Print("Parsed frontmatter unavailable, parsing threat-detection-suppress from raw frontmatter")
 		suppressions, err := parseThreatDetectionSuppressions(data.RawFrontmatter["threat-detection-suppress"])
 		if err != nil {
 			return fmt.Errorf("threat-detection-suppress value is not recognized, expected a list of suppression identifiers: %w", err)
@@ -114,6 +121,9 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	manifest.MCPServers = collectMCPServersForManifest(data)
 	manifest.ThreatDetection = collectDetectionPolicyForManifest(data)
 	manifest.Admission = data.AdmissionEnabled
+	if data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		manifest.SafeOutputAuthorization = data.SafeOutputs.AuthorizationCoverage
+	}
 	manifest.WebhookSubscriptions = data.WebhookSubscriptions
 	if err := deduplicateMarkdownMetadata(yaml.String(), manifest); err != nil {
 		return fmt.Errorf("cannot generate gh-aw-manifest header: cannot deduplicate Markdown metadata: %w", err)

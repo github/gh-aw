@@ -325,14 +325,31 @@ func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) str
 	if claimArtifacts || includeMergeDecisions {
 		condition += " && " + secretRedactionSuccessCondition(data)
 	}
-	steps := []string{
+	var steps []string
+	if data != nil && data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		steps = append(steps,
+			"      - name: Collect safe-output authorization evidence\n",
+			"        if: always()\n",
+			fmt.Sprintf("        uses: %s\n", pinAction("actions/github-script")),
+			"        with:\n",
+			"          script: |\n",
+			"            const fs = require('fs');\n",
+			"            const { authorizationEvidencePath } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/safe_output_authorization.cjs`);\n",
+			"            const source = authorizationEvidencePath();\n",
+			"            if (fs.existsSync(source)) {\n",
+			"              fs.mkdirSync('/tmp/gh-aw', { recursive: true });\n",
+			"              fs.copyFileSync(source, '/tmp/gh-aw/safe-output-authorization.jsonl');\n",
+			"            }\n",
+		)
+	}
+	steps = append(steps,
 		"      - name: Upload Safe Outputs Items\n",
 		fmt.Sprintf("        if: %s\n", condition),
 		fmt.Sprintf("        uses: %s\n", pinAction("actions/upload-artifact")),
 		"        with:\n",
 		fmt.Sprintf("          name: %s%s\n", prefix, constants.SafeOutputItemsArtifactName),
 		"          path: |\n",
-	}
+	)
 	if includeItems {
 		steps = append(steps,
 			"            /tmp/gh-aw/safe-output-items.jsonl\n",
@@ -340,6 +357,12 @@ func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) str
 			fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.TemporaryIdMapFilename),
 			fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.SafeOutputErrorsFilename),
 		)
+	}
+	if data != nil && data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		steps = append(steps, "            /tmp/gh-aw/safe-output-authorization.jsonl\n")
+		if claimArtifacts {
+			steps = append(steps, "            /tmp/gh-aw/claims/*/safe-output-authorization.jsonl\n")
+		}
 	}
 	if includeMergeDecisions {
 		steps = append(steps, "            /tmp/gh-aw/merge-pull-request-decisions.jsonl\n")

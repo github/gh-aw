@@ -11,6 +11,7 @@ import (
 )
 
 var exactSetupStepIDPattern = regexp.MustCompile(`(?m)^\s*id:\s*setup\s*$`)
+var exactAdmissionStepIDPattern = regexp.MustCompile(`(?m)^\s*id:\s*admission\s*$`)
 
 // validateRestrictedBuiltinSetupSteps rejects jobs.<name>.setup-steps for the
 // activation and pre-activation jobs. setup-steps run before any
@@ -78,7 +79,7 @@ func insertSetupStepsAtStart(steps []string, setupSteps []string) []string {
 	return result
 }
 
-func insertPreStepsAtEarliestBoundary(steps []string, preSteps []string) []string {
+func insertPreStepsAtEarliestBoundary(steps []string, preSteps []string, admissionEnabled bool) []string {
 	if len(preSteps) == 0 {
 		return steps
 	}
@@ -88,41 +89,21 @@ func insertPreStepsAtEarliestBoundary(steps []string, preSteps []string) []strin
 	lastSetupIdx := -1
 	for i, step := range steps {
 		if firstCheckoutIdx == -1 && strings.Contains(step, "uses: actions/checkout@") {
-			firstCheckoutIdx = i
-			// Walk backward to the checkout step's list-item boundary ("- ").
-			// If no boundary is found, keep the current index so insertion still
-			// occurs before the checkout uses-line.
-			for j := i; j >= 0; j-- {
-				trimmed := strings.TrimLeft(steps[j], " ")
-				if strings.HasPrefix(trimmed, "- ") {
-					firstCheckoutIdx = j
-					break
-				}
-			}
+			firstCheckoutIdx = jobStepStartIndex(steps, i)
 		}
 		if firstTokenMintIdx == -1 && strings.Contains(step, "uses: actions/create-github-app-token@") {
-			firstTokenMintIdx = i
-			// Walk backward to the token-mint step's list-item boundary ("- ").
-			// If no boundary is found, keep the current index so insertion still
-			// occurs before the token-mint uses-line.
-			for j := i; j >= 0; j-- {
-				trimmed := strings.TrimLeft(steps[j], " ")
-				if strings.HasPrefix(trimmed, "- ") {
-					firstTokenMintIdx = j
-					break
-				}
-			}
+			firstTokenMintIdx = jobStepStartIndex(steps, i)
 		}
-		if exactSetupStepIDPattern.MatchString(step) {
+		// Activation admission must finish before author pre-steps.
+		if exactSetupStepIDPattern.MatchString(step) || (admissionEnabled && exactAdmissionStepIDPattern.MatchString(step)) {
 			lastSetupIdx = i
 		}
 	}
 
 	insertIdx := len(steps)
 	if lastSetupIdx >= 0 {
-		for i := lastSetupIdx + 1; i < len(steps); i++ {
-			trimmed := strings.TrimLeft(steps[i], " ")
-			if strings.HasPrefix(trimmed, "- ") {
+		for i, step := range steps {
+			if i > lastSetupIdx && strings.HasPrefix(strings.TrimLeft(step, " "), "- ") {
 				insertIdx = i
 				break
 			}
@@ -149,6 +130,19 @@ func insertPreStepsAtEarliestBoundary(steps []string, preSteps []string) []strin
 	result = append(result, preSteps...)
 	result = append(result, steps[insertIdx:]...)
 	return result
+}
+
+func jobStepStartIndex(steps []string, index int) int {
+	start := index
+	for i, step := range steps {
+		if i > index {
+			break
+		}
+		if strings.HasPrefix(strings.TrimLeft(step, " "), "- ") {
+			start = i
+		}
+	}
+	return start
 }
 
 func (c *Compiler) extractPinnedJobSteps(fieldName string, jobName string, configMap map[string]any, data *WorkflowData) ([]string, error) {

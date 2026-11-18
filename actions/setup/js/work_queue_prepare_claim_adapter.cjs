@@ -48,6 +48,11 @@ async function prepareAdapterContext(options) {
 
 async function main(options = {}) {
   const coreApi = options.core || global.core;
+  if (require("./safe_output_helpers.cjs").isStagedMode({ staged: process.env.GH_AW_CLAIM_ADAPTER_STAGED })) {
+    coreApi.setOutput("active", "false");
+    coreApi.info("Staged Claim adapter preparation skipped before execution Claims");
+    return { active: false, staged: true };
+  }
   const scope = readClaimScopeContext();
   if (!scope?.assignment) throw new Error("Claim adapter preparation requires the authenticated immutable worker snapshot");
   const { loadAgentOutput } = require("./load_agent_output.cjs");

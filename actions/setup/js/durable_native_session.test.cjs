@@ -77,6 +77,26 @@ function artifactRoundtrip(env, files) {
 }
 
 describe("native CLI artifact continuation", () => {
+  it("replaces a stale Copilot capture baseline with the current run identity", () => {
+    const env = environment("copilot");
+    const session = openDurableSession("copilot", env);
+    session.save(id);
+    const state = env.GH_AW_DURABLE_SESSION_DIR;
+    const nativeSession = path.join(state, "session-state", id);
+    fs.mkdirSync(nativeSession, { recursive: true });
+    fs.writeFileSync(path.join(nativeSession, "events.jsonl"), "restored transcript");
+    fs.writeFileSync(path.join(state, "capture-offset.json"), JSON.stringify({ id: "00000000-0000-4000-8000-000000000002", bytes: 42, runId: "99", runAttempt: "1" }));
+
+    session.copilotSession(id);
+
+    expect(JSON.parse(fs.readFileSync(path.join(state, "capture-offset.json"), "utf8"))).toMatchObject({
+      id,
+      bytes: Buffer.byteLength("restored transcript"),
+      runId: "100",
+      runAttempt: "1",
+    });
+  });
+
   it("reports Pi startup once without weakening exact identity or requiring eager transcript persistence", () => {
     const env = environment("pi");
     const session = openPiDurableSession(env);
@@ -218,6 +238,7 @@ process.stdin.on("end", () => {
     if (engine === "copilot") {
       const baseline = JSON.parse(fs.readFileSync(path.join(state, "capture-offset.json"), "utf8"));
       expect(baseline.bytes).toBeGreaterThan(0);
+      expect(baseline).toMatchObject({ runId: "101", runAttempt: "1" });
       const reopened = openDurableSession(engine, env);
       reopened.copilotSession(selector.id);
       expect(JSON.parse(fs.readFileSync(path.join(state, "capture-offset.json"), "utf8"))).toEqual(baseline);

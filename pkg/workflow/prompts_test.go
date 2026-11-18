@@ -829,7 +829,7 @@ func TestDailyModelResolutionUsesCopilotEngineWithMiniSubAgentModel(t *testing.T
 	}
 }
 
-func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
+func TestDailyGoTestParallelizerUsesCodexWithEconomyRouting(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("Failed to find repo root: %v", err)
@@ -849,8 +849,8 @@ func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse workflow frontmatter: %v", err)
 	}
-	if model, _ := parsed.Frontmatter["model"].(string); !isCodexCompatibleWorkflowModel(model) {
-		t.Fatalf("Expected daily-go-test-parallelizer workflow to use a Codex-compatible model, got %q", model)
+	if model, _ := parsed.Frontmatter["model"].(string); model != "router/economy" {
+		t.Fatalf("Expected daily-go-test-parallelizer workflow to use router/economy, got %q", model)
 	}
 	if !strings.Contains(workflow, "Call exactly one terminal safe-output tool") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to require a terminal safe output")
@@ -1044,7 +1044,12 @@ func TestCodexWorkflowsUseCodexModels(t *testing.T) {
 }
 
 func isCodexCompatibleWorkflowModel(model string) bool {
-	model = strings.ToLower(strings.TrimSpace(model))
+	model = strings.TrimSpace(model)
+	if isReservedRouterModelName(model) {
+		_, err := routerModelMode("model", model)
+		return err == nil
+	}
+	model = strings.ToLower(model)
 	model, _, _ = strings.Cut(model, "?")
 	// Empty selects Codex's native default; both auto spellings are inference pickers.
 	return model == "" || codexModelID(model) == "auto" || isCodexCompatibleModel(model)
@@ -1056,6 +1061,13 @@ func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
 		want  bool
 	}{
 		{model: "", want: true},
+		{model: "router", want: true},
+		{model: "router/economy", want: true},
+		{model: "router/balanced", want: true},
+		{model: "router/robust", want: true},
+		{model: "router/fast", want: false},
+		{model: "router/Economy", want: false},
+		{model: "router/economy?effort=high", want: false},
 		{model: "auto", want: true},
 		{model: "copilot/auto", want: true},
 		{model: "copilot/gpt-5.3-codex", want: true},
@@ -1075,6 +1087,13 @@ func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
 		{model: "copilot/gpt-5.6-terra", want: true},
 		{model: "openai/gpt-5.6-luna", want: true},
 		{model: "copilot/gpt-5.6-luna", want: true},
+		{model: "router", want: true},
+		{model: "router/economy", want: true},
+		{model: "router/balanced", want: true},
+		{model: "router/robust", want: true},
+		{model: "router/unknown", want: false},
+		{model: "Router/Economy", want: false},
+		{model: "router/economy?effort=high", want: false},
 		{model: "openai/gpt-4o", want: false},
 		{model: "copilot/mai-code-1.1-flash", want: false},
 		{model: "copilot/gpt-6-unknown", want: false},

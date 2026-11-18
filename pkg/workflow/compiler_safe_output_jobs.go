@@ -213,15 +213,6 @@ func (c *Compiler) addSafeOutputConclusionJobs(data *WorkflowData, jobName strin
 		if err := c.jobManager.AddJob(conclusionJob); err != nil {
 			return fmt.Errorf("failed to add conclusion job: %w", err)
 		}
-		if data.AdmissionEnabled {
-			conclusionAdmissionJob, err := c.buildConclusionAdmissionJob(data)
-			if err != nil {
-				return fmt.Errorf("failed to build conclusion admission job: %w", err)
-			}
-			if err := c.jobManager.AddJob(conclusionAdmissionJob); err != nil {
-				return fmt.Errorf("failed to add conclusion admission job: %w", err)
-			}
-		}
 		customGradersJob, err := c.buildCustomGradersJob(data)
 		if err != nil {
 			return err
@@ -269,6 +260,16 @@ func (c *Compiler) buildCallWorkflowJobs(data *WorkflowData, markdownPath string
 
 	for _, workflowName := range config.Workflows {
 		callJob := c.buildCallWorkflowJob(data, workflowName, markdownPath)
+		authorizationJob, err := c.buildCallWorkflowLaunchAuthorization(data, workflowName, callJob)
+		if err != nil {
+			return nil, err
+		}
+		if authorizationJob != nil {
+			if err := c.jobManager.AddJob(authorizationJob); err != nil {
+				return nil, err
+			}
+			jobNames = append(jobNames, authorizationJob.Name)
+		}
 		if err := c.jobManager.AddJob(callJob); err != nil {
 			return nil, fmt.Errorf("failed to add call-workflow job '%s': %w", callJob.Name, err)
 		}

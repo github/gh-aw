@@ -63,7 +63,7 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 		}
 
 		job.Steps = insertActivationStepsBeforeArtifactStaging(targetJobName, job.Steps, regularSteps)
-		job.Steps = insertPreStepsAtEarliestBoundary(job.Steps, preSteps)
+		job.Steps = insertPreStepsAtEarliestBoundary(job.Steps, preSteps, targetJobName == string(constants.ActivationJobName) && data.AdmissionEnabled)
 		job.Steps = insertSetupStepsAtStart(job.Steps, setupSteps)
 		compilerJobsLog.Printf("Inserted %d setup-step(s), %d pre-step(s), and %d step(s) into built-in job '%s'", len(setupSteps), len(preSteps), len(regularSteps), targetJobName)
 	}
@@ -320,16 +320,6 @@ func (c *Compiler) applyBuiltinJobNeedsAndIf(jobName, targetJobName string, targ
 	}
 	compilerOwnedNeeds := selectCompilerOwnedNeeds(targetJob.Needs, customJobs)
 	targetJob.Needs = mergeJobNeeds(targetJob.Needs, normalizedNeeds)
-	// Admission's skip-safe status check replaces activation's implicit success gate.
-	if targetJobName == string(constants.ActivationJobName) && !ifExpressionContainsStatusFunc(augmentation.ifCondition) {
-		for _, need := range normalizedNeeds {
-			guard := fmt.Sprintf("needs.%s.result == 'success'", need)
-			if need == string(constants.AdmissionJobName) {
-				guard = admissionJobResultCondition
-			}
-			targetJob.If = c.combineJobIfConditions(targetJob.If, guard)
-		}
-	}
 	if augmentation.ifCondition != "" {
 		targetJob.If = c.combineJobIfConditions(targetJob.If, c.guardIfAgainstStatusFuncBypass(augmentation.ifCondition, compilerOwnedNeeds))
 		compilerJobsLog.Printf("Applied jobs.%s.if augmentation to %q", jobName, targetJobName)
@@ -420,8 +410,7 @@ func selectCompilerOwnedNeeds(needs []string, customJobs map[string]any) []strin
 // GitHub Actions removes the implicit success() check for ALL needs entries the moment any
 // status function appears in a job's if expression. Compiler-owned prerequisites such as
 // activation perform security and permission checks; they must always succeed before the
-// target job runs. An unconfigured admission job may be skipped. This function makes
-// those guards explicit so user-supplied status functions
+// target job runs. This function makes those guards explicit so user-supplied status functions
 // cannot inadvertently (or intentionally) bypass them. User-supplied needs are intentionally
 // excluded: authors choose their own result semantics for setup jobs they own.
 func (c *Compiler) guardIfAgainstStatusFuncBypass(userCondition string, compilerNeeds []string) string {
@@ -443,9 +432,6 @@ func (c *Compiler) guardIfAgainstStatusFuncBypass(userCondition string, compiler
 	combined := ConditionNode(&ExpressionNode{Expression: bare})
 	for _, need := range compilerNeeds {
 		expression := fmt.Sprintf("needs.%s.result == 'success'", need)
-		if need == string(constants.AdmissionJobName) {
-			expression = admissionJobResultCondition
-		}
 		guard := &ExpressionNode{Expression: expression}
 		combined = BuildAnd(combined, guard)
 	}

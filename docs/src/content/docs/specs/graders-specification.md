@@ -7,7 +7,7 @@ sidebar:
 
 # Graders Specification
 
-**Version**: 0.7.0
+**Version**: 0.8.0
 **Status**: Draft Specification
 **Feature Status**: Experimental
 
@@ -15,7 +15,8 @@ sidebar:
 
 Graders compute deterministic execution metrics without additional model calls.
 This specification defines configuration, the in-memory interface, execution
-ordering, artifact output, and grader-backed experiment metrics.
+ordering, artifact output, grader-backed experiment metrics, and read-only
+reporting of recorded operational-value results.
 
 The key words MUST, MUST NOT, SHOULD, and MAY have the meanings defined by
 [RFC 2119](https://www.ietf.org/rfc/rfc2119).
@@ -36,6 +37,10 @@ Legacy preprocessed trace payloads are not accepted by the public interface.
 tool calls, and concrete execution statistics once for all graders. Internal
 trajectory algorithms MAY consume projections derived solely from that session.
 They MUST NOT reconstruct missing evidence by reading external artifacts.
+A Git commit, checkout, or later GitHub state is not an additional grader input.
+External measurement facts MUST already be present in the supplied session.
+Historical Git analysis and later lifecycle collection are separate consumers,
+not mechanisms for adding facts to an immutable session or regrading it.
 
 Main-agent execution statistics MUST exclude detection and eval usage.
 Native tool starts and completions MUST be correlated within their session;
@@ -131,8 +136,11 @@ result object with a finite/null `value`. Reserved `operational-value` MUST use
 the same restricted worker and return a nonempty ordered array of unique
 `{id,value}` objects with nonempty string IDs and finite numeric or null values.
 The first metric MUST supply top-level `operational-value.value`; remaining
-metrics MUST become diagnostics; the complete ordered `metrics` array MUST remain
-in schema-v2 results and unified-session events. File, module, environment,
+metrics MUST become diagnostics. Schema-v2 results and full result-event
+projections MUST preserve the complete ordered `metrics` array. Compact profiles
+MAY omit per-grader results and MUST NOT be treated as a complete result transport.
+Downstream custom results MUST NOT be appended to the already published
+conclusion session. File, module, environment,
 process, network, clock, randomness, and timer capabilities MUST NOT be exposed.
 Separate restricted Node processes MUST bound memory, output, and execution time.
 Existing adapter projections, including gh-cao JSONL mapping, MUST continue to
@@ -146,22 +154,21 @@ or imported declarations. They MUST NOT ignore or translate Bash automatically.
 
 ### Operational-value authority
 
-gh-aw owns execution-time producer facts, episode identity, direct outcome
-snapshots, restricted run-scoped grading, artifacts/events, experiments
-consumption, and replay because these facts are knowable at conclusion. GitHub
-is authoritative for later object disposition. githubnext/gh-cao owns provider
-refresh; adoption, rejection, reversal, and survival lifecycle; longitudinal
-repository/window/campaign Value; canonical storage/querying; and presentation.
-`safe_output.execution` is handler application status, not human adoption.
+gh-aw owns producer identity, run-scoped grading, artifacts/events, experiments
+consumption, and explicit replay. GitHub is authoritative for later object
+disposition; gh-aw projects native delivery, adoption, reversal, and survival
+observations separately from run grades. `safe_output.execution` records
+handler application, not human adoption.
 
-Every standalone Agentic Workflow MUST publish longitudinal Value through
-githubnext/gh-cao `add-operational-value OWNER/REPO WORKFLOW-NAME` without a
-campaign. `--campaign` MUST only scope ownership and roll up directly included
-worker Value; it MUST NOT define separate campaign metric semantics. Delivery,
-adoption, reversal, and survival lifecycle applies independently of campaign
-membership and independently of whether Value is configured. The restricted
-JavaScript operational-value grader is optional run-scoped evidence and MUST NOT
-be treated as a prerequisite or substitute for CAO longitudinal Value.
+Workflows in any repository MAY report recorded grades and native lifecycle
+evidence through `gh aw value` without a campaign or CAO installation.
+githubnext/gh-cao and other consumers MAY schedule collection, retain records,
+and derive repository/campaign views; they MUST NOT replace native lifecycle
+classification or make campaign membership a prerequisite for reporting.
+Workflow-specific measurement contracts remain distinct from collection and
+presentation. A run grade, execution success, or merge alone MUST NOT be treated
+as longitudinal attributed value. Historical Git and typed-evidence reporting
+remain separate report-side analyses, not custom session-grader inputs.
 
 The separate `graders` artifact MUST contain combined built-in and custom
 results and data-only metadata, without overwriting built-in outcomes or
@@ -170,6 +177,40 @@ source digest. Audit MUST conditionally retrieve this artifact when the usage
 manifest registers custom IDs, support workflow-call prefixes, and refresh
 cached reports when results appear. Missing optional results MUST preserve
 built-in results; actual discovery/download errors MUST be surfaced.
+
+### Read-only operational-value reporting
+
+`gh aw value WORKFLOW` MUST read already exported primary operational-value
+grades from `summary.json` under `--logs-dir`, using the existing logs `RunData`
+and `GraderResult` fields. Reporting MUST NOT require another evaluator
+definition for those recorded results or change the schema-v2 grader artifact.
+The [Value Reference](/gh-aw/reference/value/#recorded-grader-results) documents
+collection and the additive `run_grades` report section. The
+[Operational Value Report Specification](/gh-aw/specs/operational-value-specification/)
+defines the outcome-blind measurement contract, follow-up, and attribution boundary.
+
+The report MUST select completed runs by host, repository, exact workflow path,
+and the existing creation-time period. Positive run/attempt identity and the
+canonical run URL MUST agree. Creation-time selection is a run cohort, not a
+reconstruction of grader state at the period cutoff.
+
+Per-run output MUST preserve the primary value, unit, status, and recorded
+message/error. An observed zero MUST remain zero. Missing operational-value
+results MUST be unavailable; other built-in grades MUST NOT be substituted.
+Missing summaries or no matching runs MUST report unavailable coverage.
+Matching rows MUST describe a retained subset, never complete run history.
+Duplicate selected runs/results, inconsistent statuses/values, malformed
+summaries, and conflicting selected-run identities MUST fail explicitly.
+Summary inputs MUST be bounded; the current limit is 50 MiB.
+
+Reporting MUST NOT execute or regrade code, fetch artifacts or Git history,
+aggregate grades, assign longitudinal attribution, or rewrite sessions,
+artifacts, or lifecycle records. Configured Git/typed-evidence measurements
+retain their separate input requirements and behavior. Ingestion or reporting
+in a Go server MUST NOT introduce execution of workflow-provided JavaScript.
+This bridge neither adds a sandbox nor certifies the current restricted
+worker as an OS/container security boundary. External lake ingestion and
+diagnostic/version-aware aggregation are not implemented by this bridge.
 
 ## 6. Local replay
 
@@ -215,8 +256,20 @@ Conforming implementations MUST cover:
 - The same behavior in workflow execution and CLI replay.
 - A measurable large-session performance bound for the default set.
 - Grader-backed experiment reference validation.
+- Read-only primary-grade reporting without Git, GitHub CLI, or Node execution.
+- Retained-run scoping, observed zero, unavailable/error states, and explicit
+  rejection of duplicate or conflicting recorded grade data.
 
 ## 9. Change log
+
+### Version 0.8.0
+
+- Defines read-only primary-grade reporting through the existing logs export.
+- Separates session-only grading, report-side measurements, and later native
+  lifecycle observations; CAO and campaigns are optional consumers.
+- Clarifies that downstream custom results do not rewrite the conclusion session.
+- Leaves grader artifact schema version 2 and session serialization unchanged;
+  adds no execution runtime, sandbox, datastore, or external lake integration.
 
 ### Version 0.7.0
 

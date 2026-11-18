@@ -19,7 +19,7 @@ the relevant provider, not every integration.
 
 Example declarations in this repository include `linear`, `jira`, `azure-devops`, `slack`, `teams`,
 `confluence`, `sentry`, `servicenow`, `gitlab`, `pagerduty`, `datadog`, `zendesk`,
-and `notion`. The [human reference](../../docs/src/content/docs/reference/connectors.md)
+`notion`, and `azure-web-iq`. The [human reference](../../docs/src/content/docs/reference/connectors.md)
 contains credential-route details and migration limits.
 
 The [connector specification](../../docs/src/content/docs/specs/connector-specification.md)
@@ -133,6 +133,7 @@ Adopting one for deployment requires explicitly copying it to `.github/workflows
 | Datadog | Alert/Warn monitor metadata to an investigation handoff | OAuth is currently restricted to approved partner clients with external refresh. Ordinary API/application-key pairs are unsupported; no telemetry or incident correlation is inferred. |
 | Zendesk | Known unresolved-ticket ownership handoff | Only ID/status/subject/update time are exposed. Live note verification has normalization/event-order restrictions; the golden explicitly selects a staged GitHub handoff instead. |
 | Notion | Reference accessibility or timestamp-based maintenance | Only page ID/URL/edit time are exposed, not body or title. Share the page with the internal connection; an old edit time is not proof of incorrect content. |
+| Web IQ | Approved public web/news research or known-URL passages | Exact query and browse-URL grants; externally renewed Entra token bound to one AppID. Hosted results remain unvalidated evidence; no API-key route, live crawl or provider writer. |
 
 These are narrow experimental building blocks, not live-readiness certifications.
 Use a connector-capable compiler and matching bundled runtime; an older installed

@@ -24,10 +24,9 @@ strict: true
 engine:
   id: copilot
   bare: true
-  model-routing:
-    goal: cost
-    mode: economy
-    allowed-models: [gpt-5.6-luna, claude-haiku-4.5]
+model: router/economy
+model-routing:
+  allowed-models: [gpt-5.6-luna, claude-haiku-4.5]
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md

@@ -21,10 +21,9 @@ engine:
   bare: true
   # Remove the built-in task tool so no sub-agent can receive a steering notice.
   args: ["--excluded-tools=task"]
-  model-routing:
-    goal: cost
-    mode: economy
-    allowed-models: [gpt-5.6-luna]
+model: router/economy
+model-routing:
+  allowed-models: [gpt-5.6-luna]
 # Keep in sync with steering.maxAiCredits in the post-step.
 max-ai-credits: 7
 imports:

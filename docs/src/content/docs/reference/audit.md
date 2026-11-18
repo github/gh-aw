@@ -22,7 +22,7 @@ In single-run mode, a job URL without a step anchor extracts the first failing s
 | `-o, --output <dir>` | `./logs` | Directory to write downloaded artifacts and report files |
 | `--json` | off | Output report as JSON to stdout |
 | `--parse` | off | Run JavaScript parsers on agent and firewall logs, writing `log.md` and `firewall.md` (single-run only) |
-| `--repo <owner/repo>` | auto | Specify repository when the run ID is not from a URL |
+| `--repo <owner/repo>` | current repository | Specify repository when the run ID is not from a URL |
 | `--stdin` | off | Read run IDs or URLs from stdin (one per line) instead of positional arguments |
 | `--verbose` | off | Print detailed progress information |
 | `--format <fmt>` | `pretty` | Diff output format: `pretty` or `markdown` (multi-run only) |
@@ -175,13 +175,13 @@ gh aw audit 1234567890 -o ./audit-reports --repo owner/repo
 
 **Stdin mode:**
 
-Use `--stdin` to pass run IDs or URLs from a file or pipeline (mutually exclusive with positional arguments). Blank lines and `#` lines are ignored. Bare numeric IDs require `--repo owner/repo`.
+Use `--stdin` to pass run IDs or URLs from a file or pipeline (mutually exclusive with positional arguments). Blank lines and `#` lines are ignored. Bare numeric IDs use the current repository unless `--repo owner/repo` is provided. If the current repository cannot be detected, provide `--repo` or a run URL.
 
 ```bash
 echo "1234567890" | gh aw audit --stdin
 echo -e "1234567890\n9876543210" | gh aw audit --stdin   # diff mode: first is base
 cat run-ids.txt | gh aw audit --stdin
-cat run-ids.txt | gh aw audit --stdin --repo owner/repo  # required for bare numeric IDs
+cat run-ids.txt | gh aw audit --stdin  # uses the current repository for bare numeric IDs
 ```
 
 **Multi-run diff examples:**

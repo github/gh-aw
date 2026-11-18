@@ -285,6 +285,14 @@ describe("otlp.cjs", () => {
   // ---------------------------------------------------------------------------
 
   describe("logSpan — error resilience", () => {
+    it("reports exporter failure through a redacted callback when supplied", async () => {
+      mockSendOTLPSpan.mockRejectedValue(new Error("private-exporter-url-and-token"));
+      const onError = vi.fn();
+      await expect(otlp.logSpan("safe-output", {}, { onError })).resolves.toBeUndefined();
+      expect(onError).toHaveBeenCalledWith();
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
     it("does not throw when sendOTLPSpan rejects", async () => {
       mockSendOTLPSpan.mockRejectedValue(new Error("network failure"));
 

@@ -8,10 +8,9 @@ Use `evals:` with `safe-outputs` to judge whether an agent achieved its intended
 
 The evals job sends all questions and shared agent output in one OpenAI-compatible
 `POST /decisions` request. Each question uses `choice` with `YES`, `NO`, and
-`UNKNOWN` (insufficient evidence or not applicable). The job does not install or
-run an agentic engine or AWF. A trusted JavaScript step calls the provider directly
-with its credential. Response token usage (including cache and reasoning tokens)
-is saved with catalog-derived AIC and USD costs for summaries and daily accounting.
+`UNKNOWN` (insufficient evidence or not applicable). The job runs no agentic engine
+or AWF; a trusted JavaScript step calls the provider with its credential. Token usage
+(including cache and reasoning tokens) is saved with catalog-derived AIC and USD costs.
 Missing usage or pricing is reported as unavailable, not zero. AWF per-request
 credit limits and sandbox target overrides do not apply to evals.
 Request failures produce a `not_evaluated` marker, not `UNKNOWN` question results.
@@ -164,8 +163,7 @@ Do not combine mutually exclusive scenarios into one question list. If a questio
 ## Anti-Patterns
 
 - ❌ **Compound questions** — "Did the agent update CHANGELOG and bump the version?" splits into two questions. A single NO is ambiguous.
-- ❌ **Unobservable questions** — "Did the agent try its best?" cannot be answered from output text.
+- ❌ **Unobservable questions** — "Did the agent try its best?" cannot be answered from output text; never require external evidence.
 - ❌ **Duplicate IDs** — `id` must be unique within a workflow; the compiler rejects duplicates.
 - ❌ **Empty questions** — both `id` and `question` must be non-empty strings.
 - ❌ **Using a chat-only model** — evals require a model that supports `/decisions`.
-- ❌ **Questions that require external evidence** — questions must be answerable from agent output alone.
