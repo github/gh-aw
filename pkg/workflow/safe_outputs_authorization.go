@@ -12,8 +12,11 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
+
+var safeOutputAuthorizationLog = logger.New("workflow:safe_outputs_authorization")
 
 // SafeOutputAuthorization is a required, fail-closed authority binding.
 // Source is compiler-owned and is never accepted from workflow configuration.
@@ -157,10 +160,13 @@ func setNativeSafeOutputAuthorization(config *SafeOutputsConfig, handler safeOut
 }
 
 func mergeSafeOutputAuthorizations(result, imported *SafeOutputsConfig) error {
+	safeOutputAuthorizationLog.Printf("Merging imported authorization: global=%t scripts=%d actions=%d jobs=%d", imported.Authorization != nil, len(imported.Scripts), len(imported.Actions), len(imported.Jobs))
 	if imported.authorizationParseError != nil {
+		safeOutputAuthorizationLog.Print("Imported authorization rejected: invalid_configuration")
 		return imported.authorizationParseError
 	}
 	if !sameSafeOutputAuthority(result.Authorization, imported.Authorization) {
+		safeOutputAuthorizationLog.Print("Imported authorization rejected: conflicting_authorities")
 		return errors.New("conflicting safe-outputs authorization authorities across imports")
 	}
 	if result.Authorization == nil {
@@ -243,7 +249,11 @@ func resolveSafeOutputAuthorizations(config *SafeOutputsConfig) error {
 	if safeOutputsAnyAuthorizationNeedsOIDC(config) && config.IDToken != nil && *config.IDToken == "none" {
 		return errors.New("safe-output authorization requires id-token: write; remove safe-outputs.id-token: none")
 	}
-	return buildSafeOutputAuthorizationCoverage(config)
+	if err := buildSafeOutputAuthorizationCoverage(config); err != nil {
+		return err
+	}
+	safeOutputAuthorizationLog.Printf("Resolved authorization: global=%t outputs=%d coverage=%d", config.Authorization != nil, len(config.AuthorizationRequirements), len(config.AuthorizationCoverage))
+	return nil
 }
 
 func resolveNativeSafeOutputAuthorizations(config *SafeOutputsConfig) (map[string]string, error) {

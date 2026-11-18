@@ -145,6 +145,12 @@ exempts only the four builtin diagnostics (`noop`, `report-missing-tool`,
 `report-missing-data`, `report-incomplete` and their aliases); an explicit local
 requirement still applies to them.
 
+Authorization can be centralized in a shared agentic workflow imported through
+`imports`. A policy-only shared file can declare `safe-outputs.authorization`;
+the requirement also covers eligible outputs declared by its consumers.
+Direct and nested imports preserve local requirements, and conflicting
+authorities fail compilation. See the [shared import example](../../specs/safe-outputs-specification/#safe-output-invocation-authorization).
+
 Effective staged mode skips authorization and real execution, allowing previews
 without OIDC credentials or a reachable authority. Live authorization fails
 closed: a denied, unavailable, malformed, expired or mismatched decision blocks

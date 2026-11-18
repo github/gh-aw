@@ -301,6 +301,7 @@ async function jsonResponse(response, maxBytes) {
 
 async function acquireToken({ core, env, config, fetchImpl, deadline, now, wallNow }) {
   try {
+    core?.debug?.("Safe-output authorization: requesting OIDC credential");
     const bootstrap = env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
     if (!bootstrap || !env.ACTIONS_ID_TOKEN_REQUEST_URL || typeof core?.setSecret !== "function") fail("missing_credentials");
     core.setSecret(bootstrap);
@@ -382,8 +383,14 @@ function persist(evidencePath, projection) {
  * env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, now?: () => number, wallNow?: () => number}} options
  */
 async function authorizePreparedInvocation({ core, requirement, invocation, staged = false, evidencePath, env = process.env, fetchImpl = fetch, now = () => performance.now(), wallNow = () => Date.now() }) {
-  if (staged === true) return { state: "skipped_staged", reason_code: "skipped_staged" };
-  if (requirement === undefined || requirement === null) return { state: "not_configured", reason_code: "not_configured" };
+  if (staged === true) {
+    core?.debug?.("Safe-output authorization: skipped_staged");
+    return { state: "skipped_staged", reason_code: "skipped_staged" };
+  }
+  if (requirement === undefined || requirement === null) {
+    core?.debug?.("Safe-output authorization: not_configured");
+    return { state: "not_configured", reason_code: "not_configured" };
+  }
   let projection = { state: "error", reason_code: "invalid_preparation" };
   try {
     if (typeof staged !== "boolean" || !prepared.has(invocation)) fail("invalid_preparation");
@@ -398,6 +405,7 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
       requirement_source: config.source,
       run_attempt: invocation.caller.run_attempt,
     };
+    core?.debug?.(`Safe-output authorization: prepared invocation=${projection.invocation_id} executor=${projection.executor} binding=${projection.binding} source=${projection.requirement_source}`);
     if (consumed.has(invocation)) fail("already_requested");
     consumed.add(invocation);
     if (!evidencePath) fail("evidence_failed");
@@ -411,6 +419,7 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
     // Anchor UTC freshness to monotonic elapsed time, resisting wall-clock rollback.
     const currentUTC = () => Math.max(wallNow(), wallStart + Math.max(0, now() - start));
     const token = await acquireToken({ core, env, config, fetchImpl, deadline, now, wallNow: currentUTC });
+    core?.debug?.(`Safe-output authorization: requesting decision invocation=${projection.invocation_id}`);
     const decision = await boundedRequest(
       async signal => {
         const response = await fetchImpl(config.endpoint, {
@@ -431,6 +440,7 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
     projection = { ...projection, state: "allowed", reason_code: "allowed" };
     persist(evidencePath, projection);
     if (now() >= deadline || utc(metadata.expires_at) - currentUTC() < MIN_VALIDITY_MS) fail("invalid_validity");
+    core?.debug?.(`Safe-output authorization: allowed invocation=${projection.invocation_id} evidence=recorded`);
     freeze(projection);
     freshness.set(projection, { now, currentUTC, deadline, evidencePath });
     return projection;
@@ -443,6 +453,7 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
       projection.reason_code = "evidence_failed";
       projection.state = "error";
     }
+    core?.debug?.(`Safe-output authorization: blocked reason=${projection.reason_code}`);
     throw new SafeOutputAuthorizationError(projection.reason_code, freeze(projection));
   }
 }

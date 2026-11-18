@@ -1669,6 +1669,35 @@ requirement. Conflicting authorities MUST fail compilation, including conflicts
 introduced through imports. Agent-provided fields MUST NOT change this trusted
 configuration. `authorization` is reserved metadata, not a tool name.
 
+**Shared workflow imports:** Shared agentic workflows MAY declare global or
+per-output authorization, including a policy-only `safe-outputs` block with no
+output declarations. The compiler MUST preserve these requirements through
+direct and nested `imports`, then resolve inheritance against the merged
+outputs. Imported global authorization therefore applies to eligible outputs
+declared by the importing workflow or another import, not only outputs in the
+policy file.
+
+```aw title=".github/workflows/shared/output-authorization.md"
+safe-outputs:
+  authorization:
+    endpoint: https://authority.example.org/api/safe-output-authorization
+    audience: https://authority.example.org/gh-aw-safe-outputs
+```
+
+```aw title=".github/workflows/triage.md"
+on: workflow_dispatch
+imports:
+  - ./shared/output-authorization.md
+safe-outputs:
+  create-issue:
+    max: 1
+```
+
+The same rules apply to imported native outputs, scripts, actions and jobs.
+Ordinary output configuration overrides MUST NOT discard an imported local
+requirement. Identical authorities MAY be shared across imports; conflicting
+authorities and invalid disabling declarations MUST fail compilation.
+
 Global inheritance excludes only descriptors classified by the compiler as
 builtin diagnostics: `noop`, `report-missing-tool`, `report-missing-data` and
 `report-incomplete`, including aliases. Explicit local authorization on these
@@ -1698,6 +1727,12 @@ Native handlers without a separate effect-preparation adapter also advertise
 `binding: invocation`. Their handler-specific sanitization and dynamic API
 lookups remain inside the reviewed implementation; the approval does not attest
 to an independently resolved final network request.
+
+Compiler diagnostics use `DEBUG=workflow:safe_outputs_authorization`.
+Runtime diagnostics use the GitHub Actions debug log and report preparation,
+OIDC acquisition, decision requests, release and fixed failure reason codes.
+Debug messages MUST NOT contain authority endpoints, audiences, tokens,
+response bodies, or normalized input bodies.
 
 All existing validation, target restrictions, limits, threat detection, protected
 file checks, review requirements and queue Claim checks continue to apply with

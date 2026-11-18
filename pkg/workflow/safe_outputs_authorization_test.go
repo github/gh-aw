@@ -5,6 +5,8 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -165,6 +167,80 @@ func TestSafeOutputAuthorizationImports(t *testing.T) {
 		} else {
 			require.ErrorContains(t, err, "conflicting")
 		}
+	}
+}
+
+func TestSafeOutputAuthorizationSharedWorkflowImports(t *testing.T) {
+	const authority = "    endpoint: https://authority.example/a\n    audience: https://authority.example/gh-aw\n"
+	const global = "safe-outputs:\n  authorization:\n" + authority
+	const local = "safe-outputs:\n  create-issue:\n    authorization:\n      endpoint: https://authority.example/a\n      audience: https://authority.example/gh-aw\n"
+	for _, test := range []struct {
+		name, shared, main, source, errorText, tool, additional string
+		nested                                                  bool
+	}{
+		{name: "policy-only", shared: global, main: "safe-outputs:\n  create-issue:\n    max: 1\n", source: "global"},
+		{name: "nested-policy", shared: global, main: "safe-outputs:\n  create-issue:\n    max: 1\n", source: "global", nested: true},
+		{name: "policy-from-sibling-import", shared: global, additional: "safe-outputs:\n  create-issue:\n    max: 1\n", source: "global"},
+		{name: "outputs-and-policy", shared: global + "  create-issue:\n    max: 1\n", source: "global"},
+		{name: "identical-authorities", shared: global, main: global + "  create-issue:\n    max: 1\n", source: "global"},
+		{name: "local-authority", shared: local, source: "local"},
+		{name: "local-authority-with-override", shared: local, main: "safe-outputs:\n  create-issue:\n    max: 2\n", source: "local"},
+		{name: "global-conflict", shared: global, main: strings.ReplaceAll(global, "authority.example", "different.example") + "  create-issue:\n    max: 1\n", errorText: "conflicting"},
+		{name: "local-conflict", shared: local, main: strings.ReplaceAll(local, "authority.example", "different.example"), errorText: "conflicting"},
+		{name: "disabled-import", shared: "safe-outputs:\n  authorization: false\n", main: "safe-outputs:\n  create-issue:\n    max: 1\n", errorText: "authorization"},
+		{name: "custom-script", tool: "notify", source: "local", shared: "safe-outputs:\n  scripts:\n    notify:\n      script: return async () => ({success:true})\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
+		{name: "custom-action", tool: "notify", source: "local", shared: "safe-outputs:\n  actions:\n    notify:\n      uses: ./reviewed-action\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
+		{name: "custom-job", tool: "notify", source: "local", shared: "safe-outputs:\n  jobs:\n    notify:\n      steps:\n        - run: echo reviewed\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			write := func(name, frontmatter string) {
+				t.Helper()
+				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("---\n"+frontmatter+"---\nShared authorization.\n"), 0o600))
+			}
+			write("policy.md", test.shared)
+			importPath := "./policy.md"
+			if test.nested {
+				write("shared.md", "imports:\n  - ./policy.md\n")
+				importPath = "./shared.md"
+			}
+			imports := "imports:\n  - " + importPath + "\n"
+			if test.additional != "" {
+				write("outputs.md", test.additional)
+				imports += "  - ./outputs.md\n"
+			}
+			write("main.md", "on: workflow_dispatch\n"+imports+test.main)
+			data, err := NewCompiler().ParseWorkflowFile(filepath.Join(dir, "main.md"))
+			if test.errorText != "" {
+				require.ErrorContains(t, err, test.errorText)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, data.SafeOutputs)
+			tool := test.tool
+			if tool == "" {
+				tool = "create_issue"
+			}
+			require.NotNil(t, data.SafeOutputs.AuthorizationRequirements[tool])
+			require.Equal(t, "https://authority.example/a", data.SafeOutputs.AuthorizationRequirements[tool].Endpoint)
+			require.Equal(t, test.source, data.SafeOutputs.AuthorizationRequirements[tool].Source)
+			if test.name == "custom-job" {
+				compiler := NewCompiler()
+				_, err := compiler.buildSafeJobs(data, false)
+				require.NoError(t, err)
+				job, exists := compiler.jobManager.GetJob(tool)
+				require.True(t, exists)
+				require.Contains(t, job.Permissions, "id-token: write")
+				require.Contains(t, strings.Join(job.Steps, ""), "safe_output_authorization_gate.cjs")
+			} else {
+				require.Contains(t, ComputePermissionsForSafeOutputs(data.SafeOutputs).RenderToYAML(), "id-token: write")
+			}
+			generated, err := generateSafeOutputsConfig(data)
+			require.NoError(t, err)
+			var runtimeConfig map[string]any
+			require.NoError(t, json.Unmarshal([]byte(generated), &runtimeConfig))
+			require.NotNil(t, runtimeConfig[tool].(map[string]any)["authorization"])
+		})
 	}
 }
 

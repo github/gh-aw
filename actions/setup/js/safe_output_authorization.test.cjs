@@ -59,7 +59,7 @@ describe("generic fail-closed safe-output authorization", () => {
     directory = path.resolve(`.safe-output-authorization-test-${crypto.randomUUID()}`);
     fs.mkdirSync(directory);
     evidencePath = path.join(directory, "evidence.jsonl");
-    core = { setSecret: vi.fn(), warning: vi.fn() };
+    core = { setSecret: vi.fn(), warning: vi.fn(), debug: vi.fn() };
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -93,6 +93,31 @@ describe("generic fail-closed safe-output authorization", () => {
       throw error;
     }
   }
+
+  it.each(["allow", "deny", "unavailable"])("logs the %s decision lifecycle without authority or input secrets", async decision => {
+    const opts = options({}, { decision });
+    if (decision === "unavailable")
+      opts.fetchImpl
+        .mockReset()
+        .mockImplementationOnce(() => oidc())
+        .mockImplementationOnce(() => {
+          throw new Error("private-response-body");
+        });
+    if (decision === "allow") {
+      await authorizePreparedInvocation(opts);
+      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining("allowed invocation="));
+    } else {
+      await expect(authorizePreparedInvocation(opts)).rejects.toBeInstanceOf(SafeOutputAuthorizationError);
+      expect(core.debug).toHaveBeenCalledWith(`Safe-output authorization: blocked reason=${decision === "deny" ? "denied" : "authority_unavailable"}`);
+    }
+    const messages = core.debug.mock.calls.flat().join("\n");
+    expect(messages).toContain("prepared invocation=");
+    expect(messages).toContain("requesting OIDC credential");
+    expect(messages).toContain("requesting decision invocation=");
+    for (const privateValue of [requirement.endpoint, requirement.audience, env.ACTIONS_ID_TOKEN_REQUEST_TOKEN, env.GITHUB_TOKEN, token(), inputs.body, inputs.secret_ref, "private-response-body"]) {
+      expect(messages).not.toContain(privateValue);
+    }
+  });
 
   it("uses a stable canonical digest test vector and JSON number spelling", () => {
     expect(canonicalDigest({ b: 2, a: 1 })).toBe("43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777");
@@ -156,11 +181,12 @@ describe("generic fail-closed safe-output authorization", () => {
   });
   it("skips staged before configuration, caller, OIDC, authority, claims or author code", async () => {
     const fetchImpl = vi.fn();
-    const { executor, decision } = await execute({ staged: true, requirement: { endpoint: "invalid" }, invocation: undefined, env: {}, fetchImpl });
+    const { executor, decision } = await execute({ core, staged: true, requirement: { endpoint: "invalid" }, invocation: undefined, env: {}, fetchImpl });
     expect(decision).toEqual({ state: "skipped_staged", reason_code: "skipped_staged" });
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(executor).not.toHaveBeenCalled();
     expect(core.setSecret).not.toHaveBeenCalled();
+    expect(core.debug.mock.calls).toEqual([["Safe-output authorization: skipped_staged"]]);
     expect(fs.existsSync(evidencePath)).toBe(false);
   });
   it("does not alter an unconfigured execution path", async () => {

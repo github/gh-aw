@@ -116,6 +116,7 @@ async function main(options = {}) {
   // Author-provided setup, action hooks and script factories never run to preview
   // a protected external executor.
   if (staged) {
+    coreApi.debug?.("Safe-output authorization gate: skipped_staged before loading invocations or Claims");
     coreApi.info(`Staged safe-output executor preview: ${descriptor.type}`);
     coreApi.setOutput("authorized", "false");
     return { state: "skipped_staged", decisions: [] };
@@ -159,10 +160,12 @@ async function main(options = {}) {
     records = [{ index: records[0].index, inputs: typeof payload === "string" ? parseStrictJSON(payload) : payload }];
   }
   if (!records.length) {
+    coreApi.debug?.("Safe-output authorization gate: not_requested");
     coreApi.setOutput("authorized", "false");
     return { state: "not_requested", decisions: [] };
   }
   const batchDigest = canonicalDigest(batch);
+  coreApi.debug?.(`Safe-output authorization gate: preparing records=${records.length} batch_digest=${batchDigest}`);
   const decisions = [];
   const evidencePath = options.evidencePath || path.join(env.RUNNER_TEMP || "", "gh-aw", "safe-output-authorization.jsonl");
   if (!options.authorize) {
@@ -216,6 +219,7 @@ async function main(options = {}) {
     throw error;
   }
   coreApi.setOutput("authorized", "true");
+  coreApi.debug?.(`Safe-output authorization gate: released records=${decisions.length}`);
   return { state: "allowed", decisions, evidencePath };
 }
 
