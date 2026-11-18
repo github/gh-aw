@@ -16,15 +16,13 @@ permissions:
 env:
   TARGET_REPOSITORY: ${{ vars.TARGET_REPOSITORY || github.repository }}
 
+model: router/economy
 engine:
   id: copilot
   # GPT delegates need Responses while the auto-selected Claude main uses Chat Completions.
   copilot-sdk: true
   agent: contribution-checker
   max-continuations: 25
-  model-routing:
-    goal: cost
-    mode: economy
 
 imports:
   - shared/otlp.md

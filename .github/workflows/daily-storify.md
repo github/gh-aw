@@ -14,12 +14,10 @@ permissions:
   discussions: read
   copilot-requests: write
 tracker-id: daily-storify
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 timeout-minutes: 45
 network:

@@ -14,12 +14,10 @@ permissions:
 
 
 tracker-id: linter-miner
+model: router/economy
 engine:
   id: copilot
   copilot-sdk: true
-  model-routing:
-    goal: cost
-    mode: economy
 max-tool-denials: 3
 network:
   allowed:

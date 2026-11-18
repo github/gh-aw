@@ -31,13 +31,11 @@ features:
 network:
   allowed: [defaults, go, node]
 
+model: router/economy
 engine:
   id: copilot
   copilot-sdk: true
   max-continuations: 6
-  model-routing:
-    goal: cost
-    mode: economy
 imports:
   - uses: shared/pr-review-base.md
     with:

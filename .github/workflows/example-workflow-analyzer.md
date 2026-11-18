@@ -12,12 +12,10 @@ permissions:
   actions: read
   copilot-requests: write
 max-ai-credits: 250
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 timeout-minutes: 30
 tools:
   github:

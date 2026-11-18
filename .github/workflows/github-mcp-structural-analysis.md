@@ -15,12 +15,10 @@ permissions:
   discussions: read
   security-events: read
   copilot-requests: write
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 tools:
   cli-proxy: true
