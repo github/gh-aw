@@ -9,6 +9,7 @@ const {
   buildAuthorizationCaller,
   stableInvocationId,
   prepareInvocation,
+  authorizationEvidencePath,
   authorizePreparedInvocation,
   assertAuthorizationFresh,
   assertAuthorizationBatchFresh,
@@ -95,6 +96,28 @@ describe("generic fail-closed safe-output authorization", () => {
       throw error;
     }
   }
+
+  it("uses only the trusted runner directory for authorization evidence", () => {
+    expect(authorizationEvidencePath({ RUNNER_TEMP: directory })).toBe(path.join(directory, "gh-aw", "safe-output-authorization.jsonl"));
+    expect(() => authorizationEvidencePath({})).toThrow("trusted evidence storage");
+    expect(() => authorizationEvidencePath({ RUNNER_TEMP: "" })).toThrow("trusted evidence storage");
+  });
+
+  it("rejects Windows before credentials or request consumption, while retaining staged and opt-out behavior", async () => {
+    const opts = options();
+    const platform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    try {
+      await expect(authorizePreparedInvocation({ ...opts, staged: true })).resolves.toMatchObject({ state: "skipped_staged" });
+      await expect(authorizePreparedInvocation({ ...opts, requirement: undefined })).resolves.toMatchObject({ state: "not_configured" });
+      await expect(execute(opts)).rejects.toThrow("evidence_failed");
+      expect(opts.fetchImpl).not.toHaveBeenCalled();
+      expect(core.setSecret).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+    }
+    await expect(authorizePreparedInvocation(opts)).resolves.toMatchObject({ state: "allowed" });
+  });
 
   describe("OpenTelemetry", () => {
     let sender;

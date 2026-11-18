@@ -66,6 +66,25 @@ function deny() {
 }
 
 describe("manager prepared authorization boundary", () => {
+  it("does not fall back to shared evidence storage when RUNNER_TEMP is missing", async () => {
+    vi.stubEnv("RUNNER_TEMP", "");
+    const factory = vi.spyOn(nativeModule, "main");
+    const authorize = allow();
+    const handlers = await loadHandlers({ create_issue: { authorization: requirement } });
+    const { results } = await processMessages(handlers, [{ type: "create_issue", title: "Protected" }]);
+    expect(results[0]).toMatchObject({ success: false, error: expect.stringContaining("trusted evidence storage") });
+    expect(authorize).not.toHaveBeenCalled();
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it("passes inherited managed authority into executor factories", async () => {
+    const factory = vi.spyOn(nativeModule, "main").mockResolvedValue(async () => ({ success: true }));
+    allow();
+    const handlers = await loadHandlers({ authorization: { from_environment: true, source: "global" }, create_issue: {} });
+    await processMessages(handlers, [{ type: "create_issue", title: "Protected" }]);
+    expect(factory.mock.calls[0][0]).toMatchObject({ authorization: { from_environment: true, source: "global" } });
+  });
+
   it("does not evaluate a custom module or initialize its factory before allow", async () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUT_SCRIPTS", JSON.stringify({ protected: "protected.cjs" }));
     const authorize = allow();

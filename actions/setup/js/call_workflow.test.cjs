@@ -91,9 +91,17 @@ describe("call_workflow handler factory", () => {
 
   it("does not release an authorized launch without a trusted implementation binding", async () => {
     const handler = await main({ workflows: ["worker-a"] });
-    const result = await withSafeOutputInvocation({ requirement: { endpoint: "https://authority.example.org/authorize", audience: "gh-aw" } }, () => handler({ type: "call_workflow", workflow_name: "worker-a", inputs: {} }));
+    const result = await withSafeOutputInvocation({ invocation: {}, requirement: { endpoint: "https://authority.example.org/authorize", audience: "gh-aw" } }, () => handler({ type: "call_workflow", workflow_name: "worker-a", inputs: {} }));
     expect(result.success).toBe(false);
     expect(result.error).toContain("trusted workflow launch implementation");
+    expect(core.setOutput).not.toHaveBeenCalled();
+  });
+
+  it("does not release a directly invoked protected workflow without the manager context", async () => {
+    const handler = await main({ workflows: ["worker-a"], authorization: { from_environment: true, source: "global" } });
+    const result = await handler({ type: "call_workflow", workflow_name: "worker-a", inputs: {} });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("trusted prepared invocation context");
     expect(core.setOutput).not.toHaveBeenCalled();
   });
 

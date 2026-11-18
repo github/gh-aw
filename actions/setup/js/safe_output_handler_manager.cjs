@@ -620,6 +620,8 @@ async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowe
         if (handlerModule && typeof handlerModule.main === "function") {
           // Call the factory function with config to get the message handler
           const handlerConfig = { ...(config[type] || {}) };
+          const requirement = effectiveAuthorization(config, type);
+          if (requirement) handlerConfig.authorization = requirement;
 
           if (PROJECT_HANDLER_TYPES.has(type) && !handlerConfig[GITHUB_TOKEN_CONFIG_KEY] && process.env.GH_AW_PROJECT_GITHUB_TOKEN) {
             handlerConfig[GITHUB_TOKEN_CONFIG_KEY] = process.env.GH_AW_PROJECT_GITHUB_TOKEN;
@@ -800,6 +802,7 @@ async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowe
       try {
         const prepared = await createClaimAdapterHandler({
           adapter,
+          authorization: effectiveAuthorization(config, type),
           github,
           filename: preparedAdapterPath(nodePath.join("/tmp/gh-aw/claim-adapters", type, String(currentClaimAssignment().claims.findIndex(member => member.handle === currentClaimHandle()))), currentClaimHandle(), type),
           loadEffectHandler: async effectType => {
@@ -1284,7 +1287,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     /** @type {any} */
     const invocationState = { invocation, requirement, config: descriptor, batchDigest: invocationBatchDigest, recordIndex: sourceBatch?.indices[index] ?? index, authorization: undefined };
     const deferredGate = phase === "primary" && (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (type === "upload_asset" && !!currentClaimHandle()));
-    const evidencePath = nodePath.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safe-output-authorization.jsonl");
+    const evidencePath = protocol.authorizationEvidencePath();
     let authorization;
     try {
       authorization = deferredGate ? { state: "not_requested", reason_code: "deferred_executor" } : await protocol.authorizePreparedInvocation({ core, requirement, invocation, staged: false, evidencePath });
@@ -2092,7 +2095,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
         if (authorization?.state !== "allowed" || status === "deferred" || auditedBufferedOutputs.has(record.messageIndex)) continue;
         auditedBufferedOutputs.add(record.messageIndex);
         const outcome = protocol.recordAuthorizationOutcome({
-          evidencePath: nodePath.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safe-output-authorization.jsonl"),
+          evidencePath: protocol.authorizationEvidencePath(),
           authorization,
           operationStatus: authorizationOperationStatus(record.result, status === "success" || status === "warning" ? "success" : status === "skipped" ? "skipped" : "failed"),
           core,

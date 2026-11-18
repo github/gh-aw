@@ -1,7 +1,6 @@
 // @ts-check
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
-import os from "os";
 import path from "path";
 import crypto from "crypto";
 import { spawnSync } from "node:child_process";
@@ -9,12 +8,15 @@ import { createRequire } from "node:module";
 import { digestArtifactFiles, executorRecords, main } from "./safe_output_authorization_gate.cjs";
 import { VERSION } from "./safe_output_authorization.cjs";
 import { projectAuthorization } from "./safe_output_execution.cjs";
+const { authorizeHandlerInvocation, handlerAuthorizationRequired, requireAuthorization } = createRequire(import.meta.url)("./safe_output_authorization_gate.cjs");
+const { withSafeOutputInvocation } = createRequire(import.meta.url)("./safe_output_execution.cjs");
 
 describe("prepared authorization artifact bindings", () => {
   let directory;
 
   beforeEach(() => {
-    directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-authorization-gate-"));
+    vi.stubEnv("GITHUB_AW_OTEL_TRACE_ID", "");
+    directory = fs.mkdtempSync(path.resolve(".gh-aw-authorization-gate-"));
   });
 
   describe("external executor batch authorization", () => {
@@ -39,7 +41,7 @@ describe("prepared authorization artifact bindings", () => {
       let core;
 
       beforeEach(() => {
-        directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-authorization-live-gate-"));
+        directory = fs.mkdtempSync(path.resolve(".gh-aw-authorization-live-gate-"));
         env = {
           RUNNER_TEMP: directory,
           GITHUB_REPOSITORY_ID: "123",
@@ -88,6 +90,21 @@ describe("prepared authorization artifact bindings", () => {
         expect(evidence).toContain('"state":"allowed"');
         expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("must-not-transmit");
         expect(evidence).not.toContain("must-not-transmit");
+      });
+
+      it("fails closed without RUNNER_TEMP before contacting OIDC or the authority", async () => {
+        const fetchImpl = authority("allow");
+        delete env.RUNNER_TEMP;
+        await expect(main({ core, env, descriptor, batch: [{ type: "custom_action" }], fetchImpl })).rejects.toThrow("trusted evidence storage");
+        expect(fetchImpl).not.toHaveBeenCalled();
+        expect(core.setOutput).not.toHaveBeenCalledWith("authorized", "true");
+      });
+
+      it("authorizes fractional reusable-workflow payloads without relaxing protocol response parsing", async () => {
+        const fetchImpl = authority("allow");
+        const result = await main({ core, env, descriptor, batch: [{ type: "custom_action" }], payload: '{"threshold":0.5,"nested":[1.25]}', fetchImpl });
+        expect(result.state).toBe("allowed");
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
       });
 
       it("does not enter the external executor after a denied decision", async () => {
@@ -212,10 +229,27 @@ describe("prepared authorization artifact bindings", () => {
       await expect(main({ core, descriptor, batch: [{ type: "custom_action" }, { type: "custom_action" }], payload: "{}", authorize })).rejects.toThrow("exactly one");
       expect(authorize).not.toHaveBeenCalled();
     });
+
+    it.each(['{"threshold":0.5,"threshold":0.25}', '{"threshold":1e999}', '{},"other":true'])("retains strict payload validation before authorization", async payload => {
+      const authorize = vi.fn();
+      await expect(main({ core, descriptor, batch: [{ type: "custom_action" }], payload, authorize })).rejects.toThrow();
+      expect(authorize).not.toHaveBeenCalled();
+    });
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  it("requires prepared context for protected direct executors, including managed authority", async () => {
+    await expect(requireAuthorization({ inputs: {} })).rejects.toThrow("trusted prepared invocation context");
+    expect(() => handlerAuthorizationRequired({ authorization: { from_environment: true, source: "global" } })).toThrow("trusted prepared invocation context");
+    await expect(authorizeHandlerInvocation({ config: { authorization: { from_environment: true, source: "global" } }, inputs: {} })).rejects.toThrow("trusted prepared invocation context");
+    await withSafeOutputInvocation({}, async () => {
+      await expect(requireAuthorization({ inputs: {} })).rejects.toThrow("trusted prepared invocation context");
+    });
+    await expect(authorizeHandlerInvocation({ inputs: {} })).resolves.toEqual({ state: "not_configured" });
   });
 
   it("binds bytes and relative artifact identity instead of only a mutable path", () => {

@@ -173,6 +173,11 @@ func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions 
 	agentArtifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
 
 	var steps []string
+	authorizationRequired := data.SafeOutputs.AuthorizationRequirements["upload_code_coverage"] != nil
+	if authorizationRequired {
+		steps = append(steps, c.buildSafeOutputsSetupSteps(data)...)
+		steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
+	}
 
 	// Download the coverage staging artifact produced by the agent job.
 	const downloadStepID = "download_upload_code_coverage_staging"
@@ -200,7 +205,6 @@ func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions 
 	steps = append(steps, tokenSteps...)
 
 	steps = append(steps, buildVerifyCodeCoverageReportStep(localCoveragePath)...)
-	authorizationRequired := data.SafeOutputs.AuthorizationRequirements["upload_code_coverage"] != nil
 	if authorizationRequired {
 		gate, err := c.buildUploadCodeCoverageAuthorizationSteps(data)
 		if err != nil {
@@ -240,8 +244,6 @@ func buildVerifyCodeCoverageReportStep(path string) []string {
 
 func (c *Compiler) buildUploadCodeCoverageAuthorizationSteps(data *WorkflowData) ([]string, error) {
 	cfg := data.SafeOutputs.UploadCodeCoverage
-	steps := c.buildSafeOutputsSetupSteps(data)
-	steps = append(steps, buildAgentOutputDownloadSteps(artifactPrefixExprForAgentDownstreamJob(data), c.getActionPin)...)
 	payload := "${{ format('{{\"file\":{0},\"language\":{1},\"label\":{2}}}', toJSON(needs.safe_outputs.outputs.upload_code_coverage_file), toJSON(needs.safe_outputs.outputs.upload_code_coverage_language), toJSON(needs.safe_outputs.outputs.upload_code_coverage_label)) }}"
 	gate, err := c.buildAuthorizationGateStep(data, "upload_code_coverage", "standalone",
 		map[string]any{"action": c.getActionPin("actions/upload-code-coverage"), "config": cfg}, cfg.Staged,
@@ -249,7 +251,7 @@ func (c *Compiler) buildUploadCodeCoverageAuthorizationSteps(data *WorkflowData)
 	if err != nil {
 		return nil, err
 	}
-	return append(steps, gate...), nil
+	return gate, nil
 }
 
 func (c *Compiler) buildUploadCodeCoverageToken(data *WorkflowData, permissions *Permissions) ([]string, string) {

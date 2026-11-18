@@ -455,9 +455,15 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 					if authorizationRequired {
 						gateCondition := fmt.Sprintf("steps.authorize_%s.outputs.authorized == 'true'", normalizedJobName)
 						if typedStep.If != "" {
-							gateCondition += " && (" + c.extractExpressionFromIfString(typedStep.If) + ")"
+							gateCondition += " && (" + stripExpressionWrapper(c.extractExpressionFromIfString(typedStep.If)) + ")"
 						}
 						typedStep.If = gateCondition
+					}
+					if condition := safeJobUnstagedCondition(data.SafeOutputs.Staged, jobConfig.Staged); condition != "" {
+						if typedStep.If != "" {
+							condition += " && (" + stripExpressionWrapper(c.extractExpressionFromIfString(typedStep.If)) + ")"
+						}
+						typedStep.If = condition
 					}
 
 					// Apply action pinning using type-safe version
@@ -521,6 +527,19 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 
 	safeJobsLog.Printf("Successfully built %d safe-jobs", len(safeJobNames))
 	return safeJobNames, nil
+}
+
+func safeJobUnstagedCondition(global, local *TemplatableBool) string {
+	var conditions []string
+	for _, staged := range []*TemplatableBool{global, local} {
+		if templatableBoolIsTrue(staged) {
+			return "false"
+		}
+		if isTemplatableStagedExpression(staged) {
+			conditions = append(conditions, "format('{0}', "+stripExpressionWrapper(string(*staged))+") != 'true'")
+		}
+	}
+	return strings.Join(conditions, " && ")
 }
 
 // extractSafeJobsFromFrontmatter extracts safe-jobs configuration from frontmatter.

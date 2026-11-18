@@ -6,7 +6,14 @@ const path = require("path");
 const crypto = require("crypto");
 const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { canonicalDigest, buildAuthorizationCaller, prepareInvocation, authorizePreparedInvocation, assertAuthorizationBatchFresh, recordAuthorizationOutcome } = require("./safe_output_authorization.cjs");
+const { canonicalDigest, buildAuthorizationCaller, prepareInvocation, authorizePreparedInvocation, assertAuthorizationBatchFresh, recordAuthorizationOutcome, authorizationEvidencePath } = require("./safe_output_authorization.cjs");
+
+function handlerAuthorizationRequired(config = {}) {
+  const state = require("./safe_output_execution.cjs").currentSafeOutputInvocation();
+  if (!state?.requirement && !config.authorization) return false;
+  if (!state?.requirement || !state.invocation) throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
+  return true;
+}
 
 function recordExecutorOutcome(result, operationStatus, coreApi = global.core) {
   let evidenceRecorded = true;
@@ -21,11 +28,17 @@ function recordExecutorOutcome(result, operationStatus, coreApi = global.core) {
  * Complete handler-specific preparation at the live effect boundary. The
  * invocation context is compiler/manager-owned, never taken from message fields.
  *
- * @param {{inputs: unknown, scope?: {binding: string, refs: string[]}}} options
+ * @param {{inputs: unknown, scope?: {binding: string, refs: string[]}, config?: any}} options
  */
-async function authorizeHandlerInvocation({ inputs, scope = { binding: "invocation", refs: [] } }) {
+async function authorizeHandlerInvocation({ inputs, scope = { binding: "invocation", refs: [] }, config = {} }) {
+  if (!handlerAuthorizationRequired(config)) return { state: "not_configured" };
+  return requireAuthorization({ inputs, scope });
+}
+
+/** @param {{inputs: unknown, scope?: {binding: string, refs: string[]}}} options */
+async function requireAuthorization({ inputs, scope = { binding: "invocation", refs: [] } }) {
   const state = require("./safe_output_execution.cjs").currentSafeOutputInvocation();
-  if (!state?.requirement) return { state: "not_configured" };
+  if (!state?.requirement || !state.invocation) throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
   const invocation = prepareInvocation({
     caller: state.invocation.caller,
     output: state.invocation.output,
@@ -35,8 +48,7 @@ async function authorizeHandlerInvocation({ inputs, scope = { binding: "invocati
     scope,
     context: state.invocation.context,
   });
-  const evidencePath = path.join(process.env.RUNNER_TEMP || "", "gh-aw", "safe-output-authorization.jsonl");
-  if (!process.env.RUNNER_TEMP) throw new Error("Safe-output authorization requires trusted evidence storage");
+  const evidencePath = authorizationEvidencePath();
   fs.mkdirSync(path.dirname(evidencePath), { recursive: true, mode: 0o700 });
   try {
     state.authorization = await authorizePreparedInvocation({ core: global.core, requirement: state.requirement, invocation, evidencePath });
@@ -157,7 +169,13 @@ async function main(options = {}) {
   const payload = options.payload ?? process.env.GH_AW_AUTHORIZATION_PAYLOAD;
   if (payload !== undefined) {
     if (records.length !== 1) throw new Error("Safe-output authorization action payload must bind exactly one invocation");
-    records = [{ index: records[0].index, inputs: typeof payload === "string" ? parseStrictJSON(payload) : payload }];
+    let inputs = payload;
+    if (typeof payload === "string") {
+      const envelope = parseStrictJSON(`{"payload":${payload}}`, { finiteNumbersIn: "payload" });
+      if (Object.keys(envelope).length !== 1) throw new Error("Safe-output authorization action payload must be one JSON value");
+      inputs = envelope.payload;
+    }
+    records = [{ index: records[0].index, inputs }];
   }
   if (!records.length) {
     coreApi.debug?.("Safe-output authorization gate: not_requested");
@@ -167,7 +185,7 @@ async function main(options = {}) {
   const batchDigest = canonicalDigest(batch);
   coreApi.debug?.(`Safe-output authorization gate: preparing records=${records.length} batch_digest=${batchDigest}`);
   const decisions = [];
-  const evidencePath = options.evidencePath || path.join(env.RUNNER_TEMP || "", "gh-aw", "safe-output-authorization.jsonl");
+  const evidencePath = options.evidencePath || (options.authorize ? undefined : authorizationEvidencePath(env));
   if (!options.authorize) {
     if (!env.RUNNER_TEMP || !descriptor.authorization) throw new Error("Safe-output authorization gate requires trusted configuration and evidence storage");
     fs.mkdirSync(path.dirname(evidencePath), { recursive: true, mode: 0o700 });
@@ -223,4 +241,4 @@ async function main(options = {}) {
   return { state: "allowed", decisions, evidencePath };
 }
 
-module.exports = { digestArtifactFiles, executorRecords, authorizeHandlerInvocation, recordExecutorOutcome, main };
+module.exports = { digestArtifactFiles, executorRecords, handlerAuthorizationRequired, requireAuthorization, authorizeHandlerInvocation, recordExecutorOutcome, main };

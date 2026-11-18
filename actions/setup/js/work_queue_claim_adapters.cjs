@@ -223,6 +223,7 @@ async function createClaimAdapterHandler(options) {
     }
     await assertClaimAuthorized(projected);
     const authorization = await require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation({
+      config: options,
       inputs: { message: projected, adapter },
       scope: { binding: "invocation", refs: [] },
     });

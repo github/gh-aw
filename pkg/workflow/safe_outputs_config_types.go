@@ -42,6 +42,7 @@ type BaseSafeOutputConfig struct {
 type SafeOutputsConfig struct {
 	Authorization                          *SafeOutputAuthorization `yaml:"authorization,omitempty"`
 	authorizationParseError                error
+	importedCustomAuthorizations           map[string]*SafeOutputAuthorization
 	AuthorizationRequirements              map[string]*SafeOutputAuthorization    `yaml:"-"`
 	AuthorizationCoverage                  map[string]string                      `yaml:"-"`
 	Steer                                  bool                                   `yaml:"steer,omitempty"` // Experimental. Create an issue and steer the agent from issue comments.

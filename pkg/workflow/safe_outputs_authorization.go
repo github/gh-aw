@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -183,51 +182,66 @@ func mergeSafeOutputAuthorizations(result, imported *SafeOutputsConfig) error {
 			setNativeSafeOutputAuthorization(result, handler, b)
 		}
 	}
-	if result.DispatchRepository != nil && imported.DispatchRepository != nil {
+	if imported.DispatchRepository != nil {
 		for name, tool := range imported.DispatchRepository.Tools {
-			if existing, exists := result.DispatchRepository.Tools[name]; exists {
-				if !sameSafeOutputAuthority(existing.Authorization, tool.Authorization) {
-					return fmt.Errorf("conflicting authorization authorities for repository dispatch tool %q across imports", name)
-				}
-				if existing.Authorization == nil {
-					existing.Authorization = tool.Authorization
-				}
-			} else {
-				result.DispatchRepository.Tools[name] = tool
+			if err := mergeImportedCustomAuthorization(result, name, tool.Authorization); err != nil {
+				return err
 			}
 		}
 	}
-	var err error
-	if result.Scripts, err = mergeAuthorizedCustomOutputs(result.Scripts, imported.Scripts); err != nil {
-		return err
+	for name, script := range imported.Scripts {
+		if err := mergeImportedCustomAuthorization(result, name, script.Authorization); err != nil {
+			return err
+		}
 	}
-	if result.Actions, err = mergeAuthorizedCustomOutputs(result.Actions, imported.Actions); err != nil {
-		return err
+	for name, action := range imported.Actions {
+		if err := mergeImportedCustomAuthorization(result, name, action.Authorization); err != nil {
+			return err
+		}
+	}
+	for name, job := range imported.Jobs {
+		if err := mergeImportedCustomAuthorization(result, name, job.Authorization); err != nil {
+			return err
+		}
+	}
+	for name, authority := range imported.importedCustomAuthorizations {
+		if err := mergeImportedCustomAuthorization(result, name, authority); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func mergeAuthorizedCustomOutputs[T any](result, imported map[string]*T) (map[string]*T, error) {
-	if result == nil && len(imported) > 0 {
-		result = make(map[string]*T)
+// Imported requirements must survive implementation overrides without enabling
+// author code that the ordinary import merge does not select. The normalized tool
+// identity remains protected even when the selected executor kind changes.
+func mergeImportedCustomAuthorization(result *SafeOutputsConfig, name string, authority *SafeOutputAuthorization) error {
+	if authority == nil {
+		return nil
 	}
-	for name, config := range imported {
-		if previous, exists := result[name]; exists {
-			previousJSON, err := json.Marshal(previous)
-			if err != nil {
-				return nil, fmt.Errorf("cannot serialize existing safe-output %q: %w", name, err)
-			}
-			configJSON, err := json.Marshal(config)
-			if err != nil {
-				return nil, fmt.Errorf("cannot serialize imported safe-output %q: %w", name, err)
-			}
-			if !bytes.Equal(previousJSON, configJSON) {
-				return nil, fmt.Errorf("conflicting custom safe-output %q configuration across imports, including authorization", name)
-			}
-		}
-		result[name] = config
+	if authority.parseError != nil {
+		return authority.parseError
 	}
-	return result, nil
+	if result.importedCustomAuthorizations == nil {
+		result.importedCustomAuthorizations = make(map[string]*SafeOutputAuthorization)
+	}
+	key := stringutil.NormalizeSafeOutputIdentifier(name)
+	if !sameSafeOutputAuthority(result.importedCustomAuthorizations[key], authority) {
+		return fmt.Errorf("conflicting authorization authorities for custom safe-output %q across imports", name)
+	}
+	result.importedCustomAuthorizations[key] = authority
+	return nil
+}
+
+func importedCustomAuthorization(config *SafeOutputsConfig, name string, local *SafeOutputAuthorization) (*SafeOutputAuthorization, error) {
+	imported := config.importedCustomAuthorizations[stringutil.NormalizeSafeOutputIdentifier(name)]
+	if !sameSafeOutputAuthority(imported, local) {
+		return nil, fmt.Errorf("conflicting authorization authorities for custom safe-output %q across imports", name)
+	}
+	if local != nil {
+		return local, nil
+	}
+	return imported, nil
 }
 
 func resolveSafeOutputAuthorizations(config *SafeOutputsConfig) error {
@@ -293,6 +307,10 @@ func resolveCustomSafeOutputAuthorizations(config *SafeOutputsConfig, seen map[s
 			return fmt.Errorf("custom safe-output %q collides with reserved or normalized name %q", name, previous)
 		}
 		seen[normalized] = name
+		local, err := importedCustomAuthorization(config, name, local)
+		if err != nil {
+			return err
+		}
 		requirement, err := effectiveSafeOutputAuthorization(config.Authorization, local, false)
 		if err != nil {
 			return fmt.Errorf("safe-output %q: %w", name, err)
@@ -323,7 +341,11 @@ func resolveCustomSafeOutputAuthorizations(config *SafeOutputsConfig, seen map[s
 				return fmt.Errorf("repository dispatch tool %q collides with reserved or normalized name %q", name, previous)
 			}
 			seen[normalized] = name
-			requirement, err := effectiveSafeOutputAuthorization(parent, tool.Authorization, false)
+			local, err := importedCustomAuthorization(config, name, tool.Authorization)
+			if err != nil {
+				return err
+			}
+			requirement, err := effectiveSafeOutputAuthorization(parent, local, false)
 			if err != nil {
 				return fmt.Errorf("repository dispatch tool %q: %w", name, err)
 			}
@@ -542,14 +564,14 @@ func safeOutputAuthorizationExecutor(name string) string {
 }
 
 func addSafeOutputAuthorizationRuntimeConfig(target map[string]any, config *SafeOutputsConfig) {
-	if config == nil || !safeOutputAuthorizationEnabled(config) {
+	if config == nil {
 		return
 	}
 	if config.Authorization != nil {
 		target["authorization"] = config.Authorization
 	}
 	for _, handler := range safeOutputHandlers {
-		if entry, ok := target[handler.ToolName].(map[string]any); ok {
+		if entry, ok := target[handler.ToolName].(map[string]any); ok && safeOutputAuthorizationEnabled(config) {
 			entry["builtin"] = handler.Builtin
 			entry["authorization_executor"] = safeOutputAuthorizationExecutor(handler.ToolName)
 			if requirement := config.AuthorizationRequirements[handler.ToolName]; requirement != nil {
@@ -566,7 +588,7 @@ func addSafeOutputAuthorizationRuntimeConfig(target map[string]any, config *Safe
 	for name, job := range config.Jobs {
 		addCustomAuthorizationRuntimeConfig(target, config, name, "job", job.Staged)
 	}
-	if dispatch, ok := target["dispatch_repository"].(map[string]any); ok && config.DispatchRepository != nil {
+	if dispatch, ok := target["dispatch_repository"].(map[string]any); ok && config.DispatchRepository != nil && safeOutputAuthorizationEnabled(config) {
 		if tools, ok := dispatch["tools"].(map[string]any); ok {
 			for name := range config.DispatchRepository.Tools {
 				if entry, ok := tools[name].(map[string]any); ok {
@@ -610,15 +632,21 @@ func addWorkflowLaunchAuthorizationConfig(target map[string]any, config *SafeOut
 }
 
 func addCustomAuthorizationRuntimeConfig(target map[string]any, config *SafeOutputsConfig, name, executor string, staged *TemplatableBool) {
-	name = stringutil.NormalizeSafeOutputIdentifier(name)
+	if !safeOutputAuthorizationEnabled(config) && staged == nil {
+		return
+	}
+	normalized := stringutil.NormalizeSafeOutputIdentifier(name)
 	entry, ok := target[name].(map[string]any)
 	if !ok {
-		entry = make(map[string]any)
-		target[name] = entry
+		entry, ok = target[normalized].(map[string]any)
+		if !ok {
+			entry = make(map[string]any)
+			target[normalized] = entry
+		}
 	}
 	entry["builtin"] = false
 	entry["authorization_executor"] = executor
-	if requirement := config.AuthorizationRequirements[name]; requirement != nil {
+	if requirement := config.AuthorizationRequirements[normalized]; requirement != nil {
 		entry["authorization"] = requirement
 	}
 	if staged != nil {
@@ -724,6 +752,8 @@ func (c *Compiler) buildAuthorizationGateStep(data *WorkflowData, name, executor
 	step = append(step,
 		"        with:\n",
 		"          script: |\n",
+		"            const { setupGlobals } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/setup_globals.cjs`);\n",
+		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
 		"            await require(`${process.env.RUNNER_TEMP}/gh-aw/actions/safe_output_authorization_gate.cjs`).main({core, context});\n",
 	)
 	return step, nil

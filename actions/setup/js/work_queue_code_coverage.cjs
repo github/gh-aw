@@ -88,6 +88,7 @@ async function main(config = {}, suppliedClient) {
     const label = `${message.label}/claim/${path.basename(claimArtifactPath("", handle))}`;
     const authorityResource = await resolveRepositoryTarget(github, target);
     const authorization = await authorizeHandlerInvocation({
+      config,
       inputs: { repository, ref, revision, file: message.file, language: message.language, label, sha256 },
       scope: { binding: "invocation", refs: [`sha256:${sha256}`] },
     });

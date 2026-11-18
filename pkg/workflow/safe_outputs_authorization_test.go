@@ -188,8 +188,8 @@ func TestSafeOutputAuthorizationSharedWorkflowImports(t *testing.T) {
 		{name: "global-conflict", shared: global, main: strings.ReplaceAll(global, "authority.example", "different.example") + "  create-issue:\n    max: 1\n", errorText: "conflicting"},
 		{name: "local-conflict", shared: local, main: strings.ReplaceAll(local, "authority.example", "different.example"), errorText: "conflicting"},
 		{name: "disabled-import", shared: "safe-outputs:\n  authorization: false\n", main: "safe-outputs:\n  create-issue:\n    max: 1\n", errorText: "authorization"},
-		{name: "custom-script", tool: "notify", source: "local", shared: "safe-outputs:\n  scripts:\n    notify:\n      script: return async () => ({success:true})\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
-		{name: "custom-action", tool: "notify", source: "local", shared: "safe-outputs:\n  actions:\n    notify:\n      uses: ./reviewed-action\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
+		{name: "custom-script", tool: "notify", source: "local", nested: true, main: "safe-outputs:\n  scripts:\n    notify:\n      script: return async () => ({success:true})\n", shared: "safe-outputs:\n  scripts:\n    notify:\n      script: return async () => ({success:true})\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
+		{name: "custom-action", tool: "notify", source: "local", main: "safe-outputs:\n  actions:\n    notify:\n      uses: ./reviewed-action\n", shared: "safe-outputs:\n  actions:\n    notify:\n      uses: ./reviewed-action\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
 		{name: "custom-job", tool: "notify", source: "local", shared: "safe-outputs:\n  jobs:\n    notify:\n      steps:\n        - run: echo reviewed\n      authorization:\n        endpoint: https://authority.example/a\n        audience: https://authority.example/gh-aw\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {

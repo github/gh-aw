@@ -91,6 +91,7 @@ async function main(config = {}, suppliedClient) {
     const mutateRef = head ? git?.updateRef : git?.createRef;
     if (typeof mutateRef !== "function") throw new Error("Queue asset requires its native branch write endpoint");
     await authorizeHandlerInvocation({
+      config,
       inputs: { repository, branch, path: assetPath, sha256, size: content.length, parent: head },
       scope: { binding: "invocation", refs: [`sha256:${sha256}`] },
     });

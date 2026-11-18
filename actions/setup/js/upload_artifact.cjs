@@ -43,8 +43,7 @@ const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
-const { currentSafeOutputInvocation } = require("./safe_output_execution.cjs");
-const { digestArtifactFiles, authorizeHandlerInvocation } = require("./safe_output_authorization_gate.cjs");
+const { digestArtifactFiles, handlerAuthorizationRequired, requireAuthorization } = require("./safe_output_authorization_gate.cjs");
 const { canonicalDigest } = require("./safe_output_authorization.cjs");
 const {
   assertClaimAuthorized,
@@ -732,9 +731,9 @@ async function main(config = {}) {
             throw new Error(`${ERR_VALIDATION}: Artifact upload repository identity differs from its native target; scoped effects remain blocked`);
           await assertClaimAuthorized({ ...message, repo: repository }, { effect: true, resource: { repository, host: expectedGitHubHost(), repository_id: String(nativeRepository.id), run_id: process.env.GITHUB_RUN_ID } });
         }
-        if (currentSafeOutputInvocation()?.requirement) {
+        if (handlerAuthorizationRequired(config)) {
           const artifacts = digestArtifactFiles(stagingDirectory(), absoluteFiles);
-          await authorizeHandlerInvocation({
+          await requireAuthorization({
             inputs: { artifactName, artifacts, retentionDays, skipArchive, repository, run_id: process.env.GITHUB_RUN_ID },
             scope: { binding: "invocation", refs: [`sha256:${canonicalDigest(artifacts)}`] },
           });

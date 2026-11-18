@@ -3,6 +3,7 @@
 
 const crypto = require("node:crypto");
 const fs = require("node:fs");
+const path = require("node:path");
 const { performance } = require("node:perf_hooks");
 const { parseStrictJSON, utf8Compare, validString } = require("./work_queue_codec.cjs");
 const { readBoundedBody } = require("./admission_protocol.cjs");
@@ -391,6 +392,11 @@ function validateDecision(decision, invocation, requestDigest, now) {
   return { decision_id: decision.decision_id, policy_revision: decision.policy_revision, issued_at: decision.issued_at, expires_at: decision.expires_at };
 }
 
+function authorizationEvidencePath(env = process.env) {
+  if (!env.RUNNER_TEMP) throw new Error("Safe-output authorization requires trusted evidence storage");
+  return path.join(env.RUNNER_TEMP, "gh-aw", "safe-output-authorization.jsonl");
+}
+
 // Append-only records are individually fsynced before returning permission.
 // The compiler/manager owns the path; no authority or agent field selects it.
 function persist(evidencePath, projection) {
@@ -404,7 +410,7 @@ function persist(evidencePath, projection) {
     fs.closeSync(fd);
     fd = undefined;
     // Persist creation of a new directory entry as well as file contents.
-    const directory = fs.openSync(require("node:path").dirname(evidencePath), fs.constants.O_RDONLY);
+    const directory = fs.openSync(path.dirname(evidencePath), fs.constants.O_RDONLY);
     try {
       fs.fsyncSync(directory);
     } finally {
@@ -448,6 +454,9 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
       run_attempt: invocation.caller.run_attempt,
     };
     core?.debug?.(`Safe-output authorization: prepared invocation=${projection.invocation_id} executor=${projection.executor} binding=${projection.binding} source=${projection.requirement_source}`);
+    // Windows cannot fsync the containing directory through Node's file API.
+    // Refuse before consuming a request or acquiring credentials.
+    if (process.platform === "win32") fail("evidence_failed");
     if (consumed.has(invocation)) fail("already_requested");
     consumed.add(invocation);
     if (!evidencePath) fail("evidence_failed");
@@ -560,6 +569,7 @@ module.exports = {
   buildAuthorizationCaller,
   stableInvocationId,
   prepareInvocation,
+  authorizationEvidencePath,
   authorizePreparedInvocation,
   assertAuthorizationFresh,
   assertAuthorizationBatchFresh,

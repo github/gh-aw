@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.26<br>
+**Version**: 1.30.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-13<br>
+**Publication Date**: 2026-11-18<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -8376,6 +8376,13 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.30.0** (2026-11-18):
+
+- **Added**: Opt-in, fail-closed safe-output invocation authorization through an external HTTPS authority authenticated with GitHub OIDC, with global, local, shared-import and repository-default requirements.
+- **Specified**: Executor-bound authorization, staged-mode isolation, bounded consuming requests without automatic retries, durable pre-execution decision evidence and redacted OpenTelemetry spans.
+- **Clarified**: Existing restrictions remain required; authorization covers a prepared invocation or reusable-workflow launch, not verified downstream effects or mandatory organization-wide enforcement.
+- **Updated**: Publication metadata to 1.30.0.
 
 **Version 1.29.26** (2026-11-13):
 

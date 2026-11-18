@@ -31,12 +31,14 @@ func (c *Compiler) buildCallWorkflowLaunchAuthorization(data *WorkflowData, work
 	if err != nil {
 		return nil, err
 	}
+	steps = append(steps, gate...)
+	steps = append(steps, c.buildAuthorizationEvidenceUploadStep(data, "authorize-"+callJob.Name)...)
 	job := &Job{
 		Name: "authorize-" + callJob.Name, RunsOn: c.formatFrameworkJobRunsOn(data),
-		Needs: []string{"safe_outputs", "activation"}, Actions: &actions.Job{If: callJob.Actions.If},
+		Needs: []string{"safe_outputs", "activation", "agent"}, Actions: &actions.Job{If: callJob.Actions.If},
 		Permissions: permissions.RenderToYAML(), TimeoutMinutes: 5,
 		Env:     c.buildJobLevelSafeOutputEnvVars(data, GetWorkflowIDFromPath(c.markdownPath)),
-		Steps:   append(steps, gate...),
+		Steps:   steps,
 		Outputs: map[string]string{"authorized": "${{ steps.authorize_call_workflow.outputs.authorized }}"},
 	}
 	job.Env["GH_AW_AUTHORIZATION_SOURCE_RECORD_INDEX"] = `"${{ needs.safe_outputs.outputs.call_workflow_record_index }}"`

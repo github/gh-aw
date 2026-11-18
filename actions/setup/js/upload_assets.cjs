@@ -10,6 +10,8 @@ const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_cod
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
 const { main: authorizeExecutorBatch, recordExecutorOutcome } = require("./safe_output_authorization_gate.cjs");
+const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
 
 /**
  * @typedef {{ type: string, path?: string, fileName: string, sha: string, size: number, targetFileName: string, url?: string }} UploadAssetItem
@@ -35,8 +37,8 @@ function buildAssetUrl(githubServer, repo, branchName, targetFileName) {
 }
 
 async function main() {
-  // Check if we're in staged mode
-  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+  const descriptor = process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE ? parseStrictJSON(process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE) : undefined;
+  const isStaged = isStagedMode(descriptor);
 
   // Get the branch name from environment variable (required)
   const branchName = process.env.GH_AW_ASSETS_BRANCH;
@@ -211,7 +213,7 @@ async function main() {
     // Commit and push if there are changes (skip if staged)
     if (hasChanges) {
       if (process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE) {
-        authorization = await authorizeExecutorBatch({ core, context, batch: result.items, records: authorizationRecords });
+        authorization = await authorizeExecutorBatch({ core, descriptor: { ...descriptor, staged: isStaged }, batch: result.items, records: authorizationRecords });
         if (!isStaged && authorization.state !== "allowed") throw new Error("Safe-output authorization did not release asset publication");
       }
       const commitMessage = `[skip-ci] Add ${uploadCount} asset(s)`;
