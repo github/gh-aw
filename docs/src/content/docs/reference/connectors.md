@@ -921,7 +921,9 @@ through `with.queries` and operator-approved public HTTPS browse URLs through `w
 Search results never add browse grants. These independent allowlists permit any approved query with
 any approved URL; queries do not restrict search-result domains.
 
-Browse rejects empty hosts, authority userinfo and fragments, including explicitly granted URLs.
+At call time, queries must be nonblank and at most 1000 characters; browse URLs must be HTTPS,
+at most 2048 characters, and have no empty host, authority userinfo or fragment, even if explicitly granted.
+Import validation checks string item types, not these string constraints.
 Paths and queries remain supported and are sent in full; validation does not detect secret-bearing
 names or values. Operators must review every grant for disclosure. URL syntax checks do not classify
 IP addresses or resolve DNS, and this declaration makes no provider-side private-destination

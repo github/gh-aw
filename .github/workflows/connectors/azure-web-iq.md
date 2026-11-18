@@ -97,13 +97,13 @@ import-schema:
     items:
       type: string
     default: []
-    description: Exact approved non-sensitive search and passage queries, at most 1000 characters each; not patterns or website restrictions.
+    description: Exact approved non-sensitive search and passage queries, not patterns or website restrictions; at call time, queries must be nonblank and at most 1000 characters each.
   urls:
     type: array
     items:
       type: string
     default: []
-    description: Exact operator-approved public HTTPS URLs for indexed browse, with a nonempty host and no userinfo or fragment, at most 2048 characters each; no public-address or secret-value detection.
+    description: Exact operator-approved public HTTPS URLs for indexed browse; at call time, URLs must have a nonempty host, no userinfo or fragment and at most 2048 characters each. No public-address or secret-value detection.
   reader-secret:
     type: string
     default: AZURE_WEB_IQ_READ_ACCESS_TOKEN
@@ -141,9 +141,11 @@ import-schema:
     </unsupported>
   </authentication>
   <import-inputs>
-    queries grants exact nonblank query strings for web, news and browse. urls
-    grants exact HTTPS browse URLs. Browse rejects URLs with an empty host,
-    authority userinfo or a fragment locally, even when explicitly granted.
+    queries grants exact query strings for web, news and browse. urls grants
+    exact browse URLs. At call time, queries must be nonblank and at most 1000
+    characters; browse URLs must be HTTPS, at most 2048 characters, and have a
+    nonempty host with no authority userinfo or fragment, even when explicitly
+    granted. These string constraints are not enforced at import time.
     Both inputs default to empty arrays and accept only string items.
     reader-secret changes the stored access-token name only.
     Independent lists permit any approved query with any approved browse URL;

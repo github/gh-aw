@@ -53,8 +53,10 @@ func webIQArguments(tool string) map[string]any {
 }
 
 type webIQArgumentCase struct {
-	Tool string         `json:"tool"`
-	Args map[string]any `json:"args"`
+	Tool          string         `json:"tool"`
+	Args          map[string]any `json:"args"`
+	WantError     string         `json:"wantError,omitempty"`
+	WantNodeError string         `json:"wantNodeError,omitempty"`
 }
 
 func webIQValidBrowseURLs() []string {
@@ -111,48 +113,60 @@ func webIQPrivateBrowseURLs() []string {
 }
 
 func webIQValidArguments() []webIQArgumentCase {
-	cases := []webIQArgumentCase{{"web", webIQArguments("web")}, {"news", webIQArguments("news")}}
+	cases := []webIQArgumentCase{{Tool: "web", Args: webIQArguments("web")}, {Tool: "news", Args: webIQArguments("news")}}
 	for _, url := range webIQValidBrowseURLs() {
 		args := webIQArguments("browse")
 		args["url"] = url
-		cases = append(cases, webIQArgumentCase{"browse", args})
+		cases = append(cases, webIQArgumentCase{Tool: "browse", Args: args})
 	}
 	return cases
 }
 
 func webIQInvalidArguments() []webIQArgumentCase {
+	type change struct {
+		value                    any
+		wantError, wantNodeError string
+	}
 	var cases []webIQArgumentCase
 	for _, tool := range []string{"web", "news", "browse"} {
-		changes := map[string]any{
-			"query": "unapproved query", "contentFormat": "html", "maxLength": 3001,
-			"APPID": "unapproved-app", "scopeName": "unapproved-scope",
+		changes := map[string]change{
+			"query":         {"unapproved query", "outside approved resources", ""},
+			"contentFormat": {"html", "declared enum", ""},
+			"maxLength":     {3001, "declared bounds", ""},
+			"APPID":         {"unapproved-app", "unknown connector argument", ""},
+			"scopeName":     {"unapproved-scope", "unknown connector argument", ""},
 		}
 		if tool == "browse" {
-			changes["url"], changes["liveCrawl"] = "https://example.com/unapproved", "fallback"
+			changes["url"] = change{"https://example.com/unapproved", "outside approved resources", ""}
+			changes["liveCrawl"] = change{"fallback", "bounded UTF-8 string", "bounded Unicode string"}
 		} else {
-			changes["maxResults"] = 11
+			changes["maxResults"] = change{11, "declared bounds", ""}
 		}
 		if tool == "web" {
-			changes["safeSearch"] = "off"
+			changes["safeSearch"] = change{"off", "declared enum", ""}
 		}
 		if tool == "news" {
-			changes["freshness"] = "forever"
+			changes["freshness"] = change{"forever", "bounded UTF-8 string", "bounded Unicode string"}
 		}
-		for key, value := range changes {
+		for key, change := range changes {
 			args := webIQArguments(tool)
-			args[key] = value
-			cases = append(cases, webIQArgumentCase{tool, args})
+			args[key] = change.value
+			cases = append(cases, webIQArgumentCase{Tool: tool, Args: args, WantError: change.wantError, WantNodeError: change.wantNodeError})
 		}
 		for key := range webIQArguments(tool) {
 			args := webIQArguments(tool)
 			delete(args, key)
-			cases = append(cases, webIQArgumentCase{tool, args})
+			cases = append(cases, webIQArgumentCase{Tool: tool, Args: args, WantError: "required connector argument"})
 		}
 	}
 	for _, url := range webIQInvalidBrowseURLs() {
 		args := webIQArguments("browse")
 		args["url"] = url
-		cases = append(cases, webIQArgumentCase{"browse", args})
+		test := webIQArgumentCase{Tool: "browse", Args: args, WantError: "declared pattern"}
+		if url == "https://" {
+			test.WantError, test.WantNodeError = "bounded UTF-8 string", "bounded Unicode string"
+		}
+		cases = append(cases, test)
 	}
 	// These exact grants cannot enable live fetching, regardless of destination.
 	// This is an indexed-only mode check, not public-address validation.
@@ -160,15 +174,17 @@ func webIQInvalidArguments() []webIQArgumentCase {
 		for _, mode := range []string{"fallback", ""} {
 			args := webIQArguments("browse")
 			args["url"] = url
+			test := webIQArgumentCase{Tool: "browse", Args: args, WantError: "bounded UTF-8 string", WantNodeError: "bounded Unicode string"}
 			if mode == "" {
 				delete(args, "liveCrawl")
+				test.WantError, test.WantNodeError = "required connector argument", ""
 			} else {
 				args["liveCrawl"] = mode
 			}
-			cases = append(cases, webIQArgumentCase{"browse", args})
+			cases = append(cases, test)
 		}
 	}
-	cases = append(cases, webIQArgumentCase{"images", map[string]any{}})
+	cases = append(cases, webIQArgumentCase{Tool: "images", Args: map[string]any{}, WantError: "exact allowlist"})
 	return cases
 }
 
@@ -186,25 +202,32 @@ func TestAzureWebIQConnectorArgumentsBeforeCredentials(t *testing.T) {
 	}
 	for _, test := range webIQInvalidArguments() {
 		_, err := plan.CallMCP(t.Context(), runtime, "search", test.Tool, test.Args)
-		require.Error(t, err, "%s: %v", test.Tool, test.Args)
+		require.ErrorContains(t, err, test.WantError, "%s: %v", test.Tool, test.Args)
 	}
 	runtime.Phase = "safe-output"
 	_, err := plan.CallMCP(t.Context(), runtime, "search", "web", webIQArguments("web"))
-	require.Error(t, err)
+	require.ErrorContains(t, err, "runtime phase is not agent")
 	runtime.Phase, runtime.AllowedOrigins = "agent", []string{"https://example.com"}
 	_, err = plan.CallMCP(t.Context(), runtime, "search", "web", webIQArguments("web"))
-	require.Error(t, err)
+	require.ErrorContains(t, err, "connector endpoint origin is not approved by the host")
 }
 
 func TestAzureWebIQConnectorTargetedSelection(t *testing.T) {
 	plan := webIQPlan(t, "web")
 	require.Equal(t, []string{"search__web"}, plan.ToolNames())
 	require.Equal(t, []string{"AZURE_WEB_IQ_READ_ACCESS_TOKEN"}, plan.Secrets())
-	encoded, err := plan.Encode()
+	encoded, err := plan.EncodeJSON()
 	require.NoError(t, err)
+	require.Contains(t, encoded, `"web"`)
 	for _, omitted := range []string{`"news"`, `"browse"`, `"urls"`, webIQURL, `"safeOutputs"`} {
 		require.NotContains(t, encoded, omitted)
 	}
+	newsPlan := webIQPlan(t, "news")
+	require.Equal(t, []string{"search__news"}, newsPlan.ToolNames())
+	newsJSON, err := newsPlan.EncodeJSON()
+	require.NoError(t, err)
+	require.Contains(t, newsJSON, `"news"`)
+	require.NotContains(t, newsJSON, `"web"`)
 	runtime := connectors.Runtime{Phase: "agent", AllowedOrigins: plan.Origins(),
 		ResolveSecret: func(context.Context, string, string) (string, error) {
 			t.Fatal("unselected method resolved credentials")
@@ -341,8 +364,9 @@ const noSecrets = new Proxy({}, {get() {forbiddenSecrets++; throw Error("invalid
 const noHTTP = async () => {forbiddenHTTP++; throw Error("invalid call accessed HTTP");};
 const env = {GH_AW_CONNECTOR_SECRET_AZURE_WEB_IQ_READ_ACCESS_TOKEN:"synthetic-entra-token"};
 (async () => {
-  for (const {tool,args} of fixture.invalid)
-    await assert.rejects(callMCP(fixture.plan,"search",tool,args,{env:noSecrets,fetchImpl:noHTTP}));
+  for (const {tool,args,wantError,wantNodeError} of fixture.invalid)
+    await assert.rejects(callMCP(fixture.plan,"search",tool,args,{env:noSecrets,fetchImpl:noHTTP}),
+      new RegExp(wantNodeError || wantError,"i"),JSON.stringify({tool,args}));
   assert.equal(forbiddenSecrets,0);
   assert.equal(forbiddenHTTP,0);
   for (const {tool,args} of fixture.valid) {
