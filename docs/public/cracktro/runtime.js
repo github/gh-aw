@@ -27,6 +27,7 @@
 
   // Fallbacks for decks that omit a theme, band label or sound service.
   const DEFAULT_THEME = { base: [13, 17, 23], pal: ["#0d419d", "#5a32a3", "#196c2e", "#0a8a2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#79c0ff", "#4493f8", "#cae8ff", "#0d419d"], prog: [0] };
+  /** @type {CracktroDeck.Sound} */
   const SILENT = { cut() {}, techno() {}, slide() {}, touch() {}, step() {}, toggle: () => true, muted: true };
 
   // ---------- runtime styles ----------
