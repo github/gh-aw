@@ -218,7 +218,9 @@ The client exchange deadline MUST be 10 seconds total, including OIDC acquisitio
 
 ### 4.5. Credential invalidation
 
-The client MUST issue an invalidation request to the configured endpoint after each job that can exchange a broker credential. This MUST be a separate POST step with the GitHub Actions `always()` condition, so it runs after success, failure, or cancellation of earlier steps. It MUST request a fresh OIDC identity with the configured audience; it MUST NOT include an exchanged credential in the invalidation request.
+The compiler MUST emit a final credential-invalidation step in every job that can obtain a token from the token broker, regardless of capability, provider, repository scope, or read/write permissions. This includes agent jobs and trusted safe-output jobs. The step MUST run after all credential consumers and before the job exits, using the GitHub Actions `always()` condition so it runs after success, failure, or cancellation of earlier steps. It MUST NOT depend on an exchange step succeeding or returning an output: issuance may have occurred even when the client did not receive a response.
+
+The client MUST issue a separate invalidation POST to the configured endpoint from this step. It MUST request a fresh OIDC identity with the configured audience; it MUST NOT include an exchanged credential in the invalidation request.
 
 The UTF-8 JSON request MUST contain exactly these two unique string members:
 
@@ -229,7 +231,7 @@ The UTF-8 JSON request MUST contain exactly these two unique string members:
 }
 ```
 
-The broker MUST verify the identity and revoke all credentials it issued to that exact authorized execution context, including credentials for any provider or capability issued in that job. The operation MUST be idempotent and MUST NOT revoke credentials belonging to another job, run, attempt, repository, or tenant. A successful invalidation MUST return HTTP 204 with an empty body and `Cache-Control: no-store`. The client MUST fail the invalidation step on any other status, without exposing response bodies or transport diagnostics. The server MUST reject malformed requests and MUST NOT disclose whether credentials exist for an unauthorized context.
+The broker MUST verify the identity and revoke every token it issued to that exact authorized execution context, including all capabilities, providers, repository sets, permission maps, and tokens superseded by renewal. It MUST NOT limit revocation to tokens retained in the client's cache or the latest exchange. Successful invalidation MUST leave no token issued to that job usable. The operation MUST be idempotent and MUST NOT revoke credentials belonging to another job, run, attempt, repository, or tenant. A successful invalidation MUST return HTTP 204 with an empty body and `Cache-Control: no-store` only after revocation is effective. The client MUST fail the invalidation step on any other status, without exposing response bodies or transport diagnostics; the compiler MUST NOT suppress this failure with `continue-on-error`. The server MUST reject malformed requests and MUST NOT disclose whether credentials exist for an unauthorized context.
 
 The invalidation step is cleanup, not a fallback or substitute for short credential lifetimes. If the job is force-terminated before the step can run, short server-enforced lifetimes remain the bound on credential exposure.
 
@@ -340,7 +342,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-013 | Server | Backend returns wrong capability/scope, unsafe token, excessive/unknown expiration, or incompatible credential. No successful response is emitted. SSRF and cross-tenant backend selection are rejected. |
 | T-TBR-014 | Deployment | For each claimed capability, use an actual GitHub-issued identity and demonstrate authorized downstream operations and request-time renewal. Broker exchange alone is insufficient. |
 | T-TBR-015 | Server | Rotate trusted signing keys; cached valid keys remain usable within policy, unknown keys trigger bounded refresh, and untrusted/unavailable keys fail closed. |
-| T-TBR-016 | Both | An unconditional job post-step obtains a fresh OIDC identity and invalidates only credentials for its verified execution context; repeat invalidation succeeds, unauthorized scopes do not revoke credentials, and non-204 responses fail safely. |
+| T-TBR-016 | Both | The compiler emits a final `always()` invalidation step in every broker-consuming job, including agent and safe-output jobs, after all consumers. Exercise success, earlier failure/cancellation, and issuance with a lost exchange response. Fresh OIDC invalidation revokes every token issued to that job across capabilities, providers, scopes, permissions, and renewals before returning 204. Repeat invalidation succeeds; other jobs remain usable; non-204 responses fail the step without `continue-on-error`. |
 | T-TBR-017 | Both | GitHub configuration rejects agent writes and invalid scopes. Wire validation rejects empty/oversized repository lists, case-insensitive duplicates, URLs, wildcards, empty permission maps, duplicate/unknown/administrative permissions, invalid levels, and caller-supplied mode fields with 400. Exercise one, multiple, 500, and 501 repositories. |
 | T-TBR-018 | Server | An authorized multi-repository read request succeeds with exactly the requested repository set and permissions. One unauthorized repository or permission, a transfer/name-reuse mismatch, or an incompatible installation set returns 403 with zero issuance calls and no partial token. |
 | T-TBR-019 | Both | Every agent write request is rejected: compiler rejects configuration; server returns 403 even for direct exchanges using a valid agent identity. Spoofed safe-output labels, missing job evidence, inherited URLs, and task markers cannot authorize GitHub writes. |
@@ -430,6 +432,7 @@ These choices do not permit extra wire fields, weakened identity verification, o
 - Added the proposed `github` capability for one token covering multiple explicitly authorized repositories with a shared repository-permission map.
 - Restricted agent credentials to read access and write credentials to independently authorized trusted safe-output jobs.
 - Defined GitHub App installation scoping, all-or-nothing authorization, scope-isolated caching, renewal, invalidation, and compliance scenarios.
+- Required compiler-generated job-exit cleanup to invalidate every broker-issued token, including renewed tokens and exchanges whose responses were lost.
 - Distinguished the new specification requirements from the existing two-capability compiler/client implementation.
 
 ### Version 1.0.0 (Draft)
