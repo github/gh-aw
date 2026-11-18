@@ -11,6 +11,8 @@ Do not collapse them into a single score.
 Use this page to choose metrics and read them together. For spend
 controls, see [Cost management](/gh-aw/reference/cost-management/).
 For downstream result tracking, see [Delivery and adoption](/gh-aw/reference/delivery-adoption/).
+For the slides' concrete schema-coverage replay, see the
+[Value report](../../reference/value/).
 
 ## Timing of cost, delivery, and adoption
 
