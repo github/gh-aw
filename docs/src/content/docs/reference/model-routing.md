@@ -191,7 +191,7 @@ The default applies only to the main agent, not threat detection, evals, or sub-
 
 ## Advanced: engine model routing
 
-The `model: router` values cover cost-oriented routing. Use `engine.model-routing` when you also need a candidate shortlist or a speed-oriented goal. Both `goal` and `mode` are required: `goal: cost` favors lower cost, while `goal: cost-speed` favors the fastest model and effort meeting the target, even when a slower choice costs less.
+The `model: router` values cover cost-oriented routing and support a [candidate shortlist](#a-shortlist-of-models). Use `engine.model-routing` for a speed-oriented goal. The nested form still accepts both a goal and a mode: `goal: cost` favors lower cost, while `goal: cost-speed` favors the fastest model and effort meeting the target, even when a slower choice costs less.
 
 For example, choose the level per task while favoring speed:
 
@@ -207,16 +207,16 @@ With `goal: cost`, `mode: auto` is equivalent to `model: router`; `mode: economy
 
 ### A shortlist of models
 
-Use `allowed-models` to limit the router's main-agent candidates. Unlike `models.allowed`, it does not restrict other model requests. It accepts exact model names and [model aliases](/gh-aw/reference/model-tables/#model-aliases), such as `sonnet`, but not patterns:
+Use top-level `model-routing.allowed-models` with a literal router model value to limit the router's main-agent candidates. Unlike `models.allowed`, it does not restrict other model requests. It accepts exact model names and [model aliases](/gh-aw/reference/model-tables/#model-aliases), such as `sonnet`, but not patterns:
 
 ```aw wrap
-engine:
-  id: copilot
-  model-routing:
-    goal: cost
-    mode: auto
-    allowed-models: [gpt-5.6-luna, gpt-6-sol]
+engine: copilot
+model: router
+model-routing:
+  allowed-models: [gpt-5.6-luna, gpt-6-sol]
 ```
+
+Declare the top-level shortlist once, either in the workflow or in a shared import. It does not enable routing on its own. A fixed model, a model chosen by an expression, duplicate top-level shortlists, and a mixture of the top-level and nested routing blocks are rejected. The top-level form requires an AWF firewall and API proxy that support separate router candidates (v0.28.33 or later); it never falls back to restricting all model requests. The nested `engine.model-routing.allowed-models` syntax remains supported.
 
 The model policy also narrows a shortlist; a shortlist cannot override it. For example, with `models.allowed: ["gpt-*"]`, a shortlisted Claude model is excluded and the compiler warns. If the policy excludes every entry, compilation fails. Exact names are not checked against current availability, so a shortlist can compile but still [leave no eligible model at run time](#what-happens-if-no-model-is-available).
 

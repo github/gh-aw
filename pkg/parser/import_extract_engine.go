@@ -12,6 +12,9 @@ import (
 // Side effects: acc.engines, acc.mergedEngineMCPToolTimeout,
 // acc.mergedEngineMCPSessionTimeout, acc.mergedEngineModel.
 func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath string) {
+	if routing, ok := fm["model-routing"].(map[string]any); ok {
+		acc.routerShortlists = append(acc.routerShortlists, parseStringSliceField(routing["allowed-models"], true))
+	}
 	if _, ok := fm["model"]; ok {
 		acc.engineModelChoiceDeclared = true
 	}

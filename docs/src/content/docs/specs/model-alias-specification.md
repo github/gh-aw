@@ -615,6 +615,8 @@ A router value is accepted only as the main agent's model (top-level `model`, `e
 - router values for sub-agents, threat detection, evals, or other jobs;
 - a router value combined with `engine.model-routing` or `engine.fallback-models`.
 
+A literal router value MAY be combined with a single top-level `model-routing.allowed-models` shortlist in the workflow or a shared import. It MUST narrow only the main agent's router candidates, exactly as the equivalent nested shortlist does. It MUST NOT enable implicit routing, change a request policy, or be silently ignored when the effective model is fixed or expression-valued. The top-level block does not accept `goal` or `mode`.
+
 A main-agent model that is a single expression, reading only contexts the activation job resolves as later jobs do, on a workflow eligible for routing MAY resolve to a router value at run time. The activation job MUST resolve it once, route the run at that level, and give later jobs the resolved value; any other reserved identifier MUST stop the run before the agent starts. A variable, or an expression on an ineligible workflow, that resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ---

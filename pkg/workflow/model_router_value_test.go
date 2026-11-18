@@ -145,6 +145,65 @@ func TestCompileRouterModelValue_EquivalentToModelRoutingBlock(t *testing.T) {
 	}
 }
 
+func TestCompileRouterModelValue_TopLevelShortlist(t *testing.T) {
+	const list = "allowed-models: [gpt-5.6-luna, claude-haiku-4.5]\n"
+	const block = "model-routing:\n  " + list
+	const body = "---\nReport.\n"
+	legacy := compileDefaultRoutingSource(t, routerValueBase+"engine:\n  id: copilot\n  model-routing:\n    goal: cost\n    mode: economy\n    "+list+body)
+	require.NoError(t, legacy.err)
+
+	for _, tc := range []struct {
+		name, main, shared string
+	}{
+		{"main workflow", "model: router/economy\n" + block, ""},
+		{"imported shortlist", "model: router/economy\n", block},
+		{"imported router and shortlist", "", "model: router/economy\n" + block},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string]string{}
+			main := routerValueBase + "engine: copilot\n" + tc.main
+			if tc.shared != "" {
+				files["shared/routing.md"] = "---\n" + tc.shared + body
+				main += "imports: [shared/routing.md]\n"
+			}
+			files["main.md"] = main + body
+			got := compileDefaultRoutingFiles(t, files)
+			_, candidates := routedObjective(t, got)
+			require.Equal(t, []any{"github-copilot/gpt-5.6-luna", "github-copilot/claude-haiku-4.5"}, candidates)
+			// Compare the entire proxy configuration, not just its candidate list:
+			// a shortlist must not become a policy on other model requests.
+			require.Equal(t, legacy.awfConfigs(t), got.awfConfigs(t))
+			config := lockModelConfig(t, got.lock)
+			routing := config["routing"].(map[string]any)
+			require.Equal(t, "router/economy", routing["requested"])
+			delete(routing, "requested")
+			require.Equal(t, lockModelConfig(t, legacy.lock), config)
+		})
+	}
+	for _, tc := range []struct{ name, main, shared, want string }{
+		{"implicit default", block, "", "requires an explicit router model value"},
+		{"pinned model", "model: gpt-5.6-luna\n" + block, "", "requires an explicit router model value"},
+		{"runtime expression", "model: ${{ inputs.level }}\n" + block, "", "requires an explicit router model value"},
+		{"legacy block", "model: router\n" + block + "engine:\n  id: copilot\n  model-routing: {goal: cost, mode: auto}\n", "", "both choose model routing"},
+		{"imported opt-out", "model: router\n" + block, "engine:\n  id: copilot\n  model-routing: false\n", "engine.model-routing: false"},
+		{"two shortlists", "model: router\n" + block, block, "more than one top-level router shortlist"},
+		{"goal in new block", "model: router\n" + block + "  goal: cost\n", "", "goal"},
+		{"empty shortlist", "model: router\nmodel-routing: {allowed-models: []}\n", "", "allowed-models"},
+		{"old firewall", "model: router\n" + block + "sandbox:\n  agent:\n    id: awf\n    version: v0.28.31\n", "", "cannot restrict only the router's candidates"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string]string{}
+			main := routerValueBase + tc.main
+			if tc.shared != "" {
+				files["shared/routing.md"] = "---\n" + tc.shared + body
+				main += "imports: [shared/routing.md]\n"
+			}
+			files["main.md"] = main + body
+			require.ErrorContains(t, compileDefaultRoutingFiles(t, files).err, tc.want)
+		})
+	}
+}
+
 func lockModelConfig(t *testing.T, lock string) map[string]any {
 	t.Helper()
 	match := awInfoModelConfigPattern.FindStringSubmatch(lock)

@@ -76,7 +76,11 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		preservedMaxRuns:            preservedMaxRuns,
 		preservedMaxTurnCacheMisses: preservedMaxTurnCacheMisses,
 	})
-	model, err = applyRouterModelValue(engineConfig, model)
+	shortlist, err := workflowRouterShortlist(result.Frontmatter, importsResult.RouterShortlists)
+	if err != nil {
+		return nil, err
+	}
+	model, err = applyRouterModelValue(engineConfig, model, shortlist)
 	if err != nil {
 		return nil, err
 	}
