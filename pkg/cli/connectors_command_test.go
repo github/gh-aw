@@ -173,7 +173,7 @@ func TestConnectorsValidatePublicProviderSpecs(t *testing.T) {
 	require.NoError(t, err)
 	declarations, err := filepath.Glob(filepath.Join(repository, ".github", "workflows", "connectors", "*.md"))
 	require.NoError(t, err)
-	require.Len(t, declarations, 14)
+	require.Len(t, declarations, 16)
 	args := []string{"connectors", "validate", "--json"}
 	var expectedIDs []string
 	directory := t.TempDir()
