@@ -5,14 +5,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { test } = require("node:test");
-const { frontDoor } = require("./ci-front-door.cjs");
+const { frontDoor, SUITE_IDS, JOB_DEPENDENCIES } = require("./ci-front-door.cjs");
 const catalog = require("../.github/ci/suite-catalog.json");
 
 const workflow = fs.readFileSync(path.join(__dirname, "../.github/workflows/cgo.yml"), "utf8");
-const jobs = Object.fromEntries([...workflow.matchAll(/^  ([\w-]+):\n([\s\S]*?)(?=^  [\w-]+:\n|$(?![\s\S]))/gm)].map(match => [match[1], match[2]]));
-const optional = ["build-wasm", "actions-build", "mcp-server-compile-test", "alpine-container-test"];
-const mandatory = ["go-tests", "security", "native-javascript-tests"];
-const allSuites = [...mandatory, ...optional, "cross-platform-build"];
+const jobs = Object.fromEntries([...workflow.split("\njobs:\n")[1].matchAll(/^  ([\w-]+):\n([\s\S]*?)(?=^  [\w-]+:\n|$(?![\s\S]))/gm)].map(match => [match[1], match[2]]));
+const infrastructure = ["checkout-cache", "front-door-decision", "summarize-timing"];
 const decision = jobs["front-door-decision"];
 const decisionSteps = decision.split(/^    - name: /m).slice(1);
 const validator = decisionSteps.find(step => step.startsWith("Validate suite outputs\n"));
@@ -28,15 +26,12 @@ function condition(job) {
   return job.match(/^    if: (.+)$/m)?.[1];
 }
 
-// Evaluate the small GitHub expression subset used by this workflow's gates.
-function evaluate(expression, { event = "pull_request", result = "success", suites = "", checkout = "success", build = "success", cancelled = false } = {}) {
+function evaluate(expression, { event = "pull_request", ref = "refs/pull/1/merge", result = "success", suites = "[]", results = {}, cancelled = false } = {}) {
+  const needs = Object.fromEntries(Object.keys(jobs).map(id => [id, { result: results[id] || "success" }]));
+  needs["front-door-decision"] = { result, outputs: { suite_ids: suites } };
   return vm.runInNewContext(expression.replace(/\bneeds\.([\w-]+)/g, 'needs["$1"]'), {
-    github: { event_name: event },
-    needs: {
-      "front-door-decision": { result, outputs: { suite_ids: suites } },
-      "checkout-cache": { result: checkout },
-      build: { result: build },
-    },
+    github: { event_name: event, ref },
+    needs,
     always: () => true,
     cancelled: () => cancelled,
     fromJSON: JSON.parse,
@@ -67,34 +62,47 @@ function validatedSuites(raw, outcome = "success") {
   return output.slice("suite_ids=".length, -1);
 }
 
-test("inference permissions are isolated from PR code, tests, and cache operations", () => {
-  assert.ok(decision);
-  for (const [id, job] of Object.entries(jobs)) {
-    if (id === "front-door-decision") continue;
-    assert.doesNotMatch(job, /copilot-requests: write|CI_DECISION_TOKEN/, id);
+test("every CGO check job is selectable; only checkout, selection and cleanup are infrastructure", () => {
+  assert.deepEqual(
+    Object.keys(jobs)
+      .filter(id => !infrastructure.includes(id))
+      .sort(),
+    [...SUITE_IDS].sort()
+  );
+  assert.deepEqual(catalog.suites.map(suite => suite.id).sort(), [...SUITE_IDS].sort());
+  for (const id of SUITE_IDS) {
+    assert.ok(dependencies(jobs[id]).includes("front-door-decision"), id);
+    assert.match(condition(jobs[id]), /^always\(\) && !cancelled\(\)/, id);
+    assert.equal(evaluate(condition(jobs[id])), false, id);
   }
-  assert.match(decision, /permissions:\n      contents: read\n      copilot-requests: write\n/);
-  assert.equal((workflow.match(/copilot-requests: write/g) || []).length, 1);
-  assert.equal((workflow.match(/CI_DECISION_TOKEN:/g) || []).length, 1);
-  assert.doesNotMatch(decision, /actions\/cache|npm |npx |--test|uses: \.\//);
-  assert.doesNotMatch(workflow, /CI_DECISION_URL|secrets\.COPILOT_GITHUB_TOKEN/);
-  assert.deepEqual(dependencies(decision), []);
+  assert.match(jobs["cross-platform-build"], /os: \[macos-latest, windows-latest\]/);
+  assert.doesNotMatch(jobs["cross-platform-build"], /matrix:[\s\S]*outputs\.suite_ids/);
+  assert.equal(condition(decision), "github.event_name == 'pull_request'");
+  assert.equal(condition(jobs["summarize-timing"]), "always()");
 });
 
-test("same-PR selector and shared-client edits cannot become inference-job executable code", () => {
+test("inference credentials and executable policy stay isolated from PR code", () => {
+  assert.equal((workflow.match(/copilot-requests: write/g) || []).length, 1);
+  assert.equal((workflow.match(/CI_DECISION_TOKEN:/g) || []).length, 1);
+  for (const [id, job] of Object.entries(jobs)) {
+    if (id !== "front-door-decision") assert.doesNotMatch(job, /copilot-requests: write|CI_DECISION_TOKEN/, id);
+  }
   assert.equal(decisionSteps.length, 3);
   const [trusted, selector] = decisionSteps;
-  const pinnedCheckout = /uses: actions\/checkout@[a-f0-9]{40}\b/;
-  assert.match(trusted, pinnedCheckout);
+  assert.match(trusted, /uses: actions\/checkout@[a-f0-9]{40}\b/);
   assert.match(trusted, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
   assert.match(trusted, /path: trusted\n/);
   assert.match(trusted, /fetch-depth: 1\n/);
   assert.match(trusted, /persist-credentials: false/);
   assert.match(trusted, /sparse-checkout-cone-mode: false\n/);
-  const sparseFiles = trusted.split("sparse-checkout: |\n")[1].trim().split(/\s+/);
-  assert.deepEqual(sparseFiles, ["/scripts/ci-front-door.cjs", "/scripts/ci-front-door-diff.cjs", "/actions/setup/js/decisions_client.cjs", "/.github/ci/suite-catalog.json", "/.github/ci/decision-prompt.txt"]);
+  assert.deepEqual(trusted.split("sparse-checkout: |\n")[1].trim().split(/\s+/), [
+    "/scripts/ci-front-door.cjs",
+    "/scripts/ci-front-door-diff.cjs",
+    "/actions/setup/js/decisions_client.cjs",
+    "/.github/ci/suite-catalog.json",
+    "/.github/ci/decision-prompt.txt",
+  ]);
   assert.equal((decision.match(/uses: actions\/checkout@/g) || []).length, 1);
-  assert.doesNotMatch(decision, /path: evidence|CI_DIFF_WORKSPACE/);
   assert.match(selector, /working-directory: trusted\n/);
   assert.match(selector, /CI_DIFF_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(selector, /CI_DIFF_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
@@ -102,111 +110,72 @@ test("same-PR selector and shared-client edits cannot become inference-job execu
   assert.match(selector, /CI_DECISION_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(selector, /run: node scripts\/ci-front-door\.cjs\n/);
   assert.match(selector, /continue-on-error: true/);
-  assert.doesNotMatch(selector, /run:.*evidence|working-directory: evidence/);
+  assert.match(selector, /if: hashFiles\('trusted\/scripts\/ci-front-door\.cjs'\) != ''/);
+  assert.doesNotMatch(decision, /actions\/cache|npm |npx |--test|uses: \.\/|CI_DIFF_WORKSPACE|path: evidence/);
   assert.doesNotMatch(validator, /working-directory:|require\((?!'node:fs')/);
   assert.doesNotMatch(decision, /^    (?:env|defaults):/m);
+  assert.deepEqual(dependencies(decision), []);
 });
 
-test("initial rollout never bootstraps executable selector code from the PR", () => {
-  assert.equal(condition(decision), "github.event_name == 'pull_request'");
-  assert.match(decisionSteps[1], /if: hashFiles\('trusted\/scripts\/ci-front-door\.cjs'\) != ''/);
-  const suites = validatedSuites("", "skipped");
-  assert.equal(suites, "");
-  for (const id of optional) assert.equal(evaluate(condition(jobs[id]), { suites }), true, id);
-});
-
-test("invalid, missing, and unsuccessful selector outputs fail open before job expressions parse JSON", () => {
-  for (const raw of ["", "not-json", "null", "{}", "[]", '["unknown"]', JSON.stringify([...allSuites, "unknown"]), JSON.stringify([...mandatory, "security"]), JSON.stringify(optional)]) {
-    const suites = validatedSuites(raw);
-    assert.equal(suites, "", raw);
-    for (const id of optional) assert.equal(evaluate(condition(jobs[id]), { suites }), true, `${id}: ${raw}`);
+test("PR model decisions control every check job through the actual output validator and job expressions", async () => {
+  for (const wanted of [[], ...SUITE_IDS.map(id => [id]), [...SUITE_IDS]]) {
+    const selection = await frontDoor({
+      catalog,
+      diff: { files: ["pkg/console/style.go"], patch: "+change", truncated: false, unavailable: false },
+      prompt: "",
+      token: "test-token",
+      decide: async () => ({ suite_ids: wanted, confidence: 1 }),
+    });
+    assert.equal(selection.fallback, false);
+    const suites = validatedSuites(JSON.stringify(selection.suite_ids));
+    assert.notEqual(suites, "");
+    for (const id of SUITE_IDS) assert.equal(evaluate(condition(jobs[id]), { suites }), selection.suite_ids.includes(id), `${wanted}: ${id}`);
   }
-  for (const outcome of ["failure", "skipped", "cancelled", ""]) assert.equal(validatedSuites(JSON.stringify(mandatory), outcome), "", outcome);
-  assert.equal(validatedSuites(JSON.stringify(mandatory)), JSON.stringify(mandatory));
+});
+
+test("invalid outputs and missing, failed or skipped decisions run every check job", () => {
+  for (const raw of ["", "not-json", "null", "{}", '["unknown"]', JSON.stringify([...SUITE_IDS, "unknown"]), '["build","build"]', '["go-tests"]', ...Object.keys(JOB_DEPENDENCIES).map(id => JSON.stringify([id]))]) {
+    assert.equal(validatedSuites(raw), "", raw);
+  }
+  assert.equal(validatedSuites("[]"), "[]");
+  assert.equal(validatedSuites(JSON.stringify(SUITE_IDS)), JSON.stringify(SUITE_IDS));
+  for (const id of SUITE_IDS) {
+    for (const result of ["failure", "skipped", "cancelled", ""]) assert.equal(evaluate(condition(jobs[id]), { result }), true, `${id}: ${result}`);
+    assert.equal(evaluate(condition(jobs[id]), { suites: "" }), true, id);
+    assert.equal(evaluate(condition(jobs[id]), { suites: JSON.stringify(SUITE_IDS), cancelled: true }), false, id);
+  }
+  for (const outcome of ["failure", "skipped", "cancelled", ""]) assert.equal(validatedSuites("[]", outcome), "", outcome);
   assert.match(decision, /suite_ids: \$\{\{ steps\.validated\.outputs\.suite_ids \}\}/);
 });
 
-test("optional suite gates survive skipped or failed decision jobs and all non-PR events", () => {
-  for (const id of optional) {
-    assert.deepEqual(dependencies(jobs[id]), ["checkout-cache", "front-door-decision"], id);
-    const expression = condition(jobs[id]);
-    assert.match(expression, /^always\(\) && !cancelled\(\)/, id);
-    assert.equal(evaluate(expression, { suites: JSON.stringify(mandatory) }), false, id);
-    assert.equal(evaluate(expression, { suites: JSON.stringify([...mandatory, id]) }), true, id);
-    for (const result of ["failure", "skipped", "cancelled", ""]) {
-      assert.equal(evaluate(expression, { result, suites: JSON.stringify(mandatory) }), true, `${id}: ${result}`);
+test("selected prerequisite jobs match the CGO graph and dependency failures still block consumers", () => {
+  for (const id of SUITE_IDS) {
+    const checkDependencies = dependencies(jobs[id]).filter(dependency => SUITE_IDS.includes(dependency));
+    assert.deepEqual(checkDependencies, JOB_DEPENDENCIES[id] || [], id);
+    for (const dependency of checkDependencies) {
+      for (const result of ["failure", "skipped", "cancelled"]) {
+        assert.equal(evaluate(condition(jobs[id]), { suites: JSON.stringify(SUITE_IDS), results: { [dependency]: result } }), false, `${id}: ${dependency}:${result}`);
+      }
     }
-    for (const event of ["push", "schedule", "workflow_dispatch"]) {
-      assert.equal(evaluate(expression, { event, result: "skipped" }), true, `${id}: ${event}`);
+    if (dependencies(jobs[id]).includes("checkout-cache")) {
+      assert.equal(evaluate(condition(jobs[id]), { suites: JSON.stringify(SUITE_IDS), results: { "checkout-cache": "failure" } }), false, id);
     }
-    assert.equal(evaluate(expression, { checkout: "failure" }), false, id);
-    assert.equal(evaluate(expression, { cancelled: true }), false, id);
   }
 });
 
-test("PR selector results filter actual optional jobs and macOS after output validation", async () => {
-  const matrix = jobs["cross-platform-build"].match(/^        os: \$\{\{ (.+) \}\}$/m)[1];
-  for (const [file, enabled, inferenceCalls] of [
-    ["scripts/workflow-timing.test.cjs", [], 1],
-    ["cmd/gh-aw-wasm/main.go", ["build-wasm"], 1],
-    ["go.mod", optional, 0],
-  ]) {
-    let calls = 0;
-    const selection = await frontDoor({
-      catalog,
-      diff: { files: [file], patch: "", truncated: false, unavailable: false },
-      prompt: "",
-      token: "test-token",
-      decide: async () => {
-        calls++;
-        return { suite_ids: [], confidence: 1 };
-      },
-    });
-    assert.equal(calls, inferenceCalls, file);
-    const suites = validatedSuites(JSON.stringify(selection.suite_ids));
-    for (const id of optional) {
-      assert.equal(evaluate(condition(jobs[id]), { suites }), enabled.includes(id), `${file}: ${id}`);
-    }
-    assert.equal(JSON.stringify(evaluate(matrix, { suites })), JSON.stringify(inferenceCalls ? ["windows-latest"] : ["macos-latest", "windows-latest"]), file);
-    for (const id of mandatory) assert.ok(JSON.parse(suites).includes(id), `${file}: ${id}`);
-  }
-});
-
-test("non-PR full selection enables every optional gate without inference", async () => {
-  const matrix = jobs["cross-platform-build"].match(/^        os: \$\{\{ (.+) \}\}$/m)[1];
+test("non-PR main controls retain all checks and never require a successful decision job", () => {
   for (const event of ["push", "schedule", "workflow_dispatch"]) {
-    const selection = await frontDoor({
-      catalog,
-      diff: { files: ["scripts/workflow-timing.test.cjs"], patch: "", truncated: false, unavailable: false },
-      fullRun: true,
-      decide: () => assert.fail("non-PR events must not invoke inference"),
-    });
-    const suites = validatedSuites(JSON.stringify(selection.suite_ids));
-    for (const id of optional) assert.equal(evaluate(condition(jobs[id]), { event, suites, result: "skipped" }), true, `${event}: ${id}`);
-    assert.equal(JSON.stringify(evaluate(matrix, { event, suites, result: "skipped" })), '["macos-latest","windows-latest"]');
+    for (const id of SUITE_IDS) {
+      assert.equal(evaluate(condition(jobs[id]), { event, ref: "refs/heads/main", result: "skipped" }), true, `${event}: ${id}`);
+    }
   }
-});
-
-test("mandatory checks are independent of selection and Windows is never omitted", () => {
-  for (const id of ["security", "lint-go-govulncheck", "safe-outputs-conformance", "native-javascript-tests", "impacted-go-tests", "build", "verify-integration-build", "test"]) {
-    assert.ok(jobs[id], id);
-    assert.ok(!dependencies(jobs[id]).includes("front-door-decision"), id);
-    assert.doesNotMatch(jobs[id], /outputs\.suite_ids/, id);
-  }
-  const crossPlatform = jobs["cross-platform-build"];
-  const matrix = crossPlatform.match(/^        os: \$\{\{ (.+) \}\}$/m)[1];
-  assert.equal(evaluate(condition(crossPlatform), { result: "failure" }), true);
-  assert.equal(evaluate(condition(crossPlatform), { result: "skipped", event: "push" }), true);
-  assert.equal(evaluate(condition(crossPlatform), { build: "failure" }), false);
-  const omitted = { suites: JSON.stringify(mandatory) };
-  assert.equal(JSON.stringify(evaluate(matrix, omitted)), '["windows-latest"]');
-  for (const settings of [{}, { ...omitted, result: "failure" }, { ...omitted, result: "skipped" }, { ...omitted, event: "push" }, { suites: JSON.stringify(allSuites) }]) {
-    assert.equal(JSON.stringify(evaluate(matrix, settings)), '["macos-latest","windows-latest"]');
+  for (const id of ["bench", "fuzz", "security-scan"]) {
+    assert.equal(evaluate(condition(jobs[id]), { event: "workflow_dispatch", ref: "refs/heads/feature", result: "skipped" }), false, id);
   }
   assert.match(workflow, /schedule:\n[\s\S]*cron:/);
 });
 
-test("the full workflow needs graph is acyclic and conformance covers the trust boundary", () => {
+test("the entire needs graph is acyclic and timing/cache cleanup waits for all checks", () => {
   const visited = new Set();
   function visit(id, active = new Set()) {
     assert.ok(jobs[id], `unknown dependency: ${id}`);
@@ -217,6 +186,11 @@ test("the full workflow needs graph is acyclic and conformance covers the trust 
   }
   for (const id of Object.keys(jobs)) visit(id);
   assert.deepEqual(dependencies(jobs["checkout-cache"]), []);
-  assert.deepEqual(dependencies(jobs["front-door-conformance"]), []);
+  assert.deepEqual(
+    dependencies(jobs["summarize-timing"]).sort(),
+    Object.keys(jobs)
+      .filter(id => id !== "summarize-timing")
+      .sort()
+  );
   assert.match(jobs["front-door-conformance"], /node --test scripts\/ci-front-door-workflow\.test\.cjs/);
 });

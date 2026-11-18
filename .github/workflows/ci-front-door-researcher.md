@@ -100,24 +100,22 @@ commit and before/after content hashes in the proposal, not invented version
 numbers. Estimate historical duration from matched completed cached jobs, report
 the estimator and sample count per suite, and exclude cancelled/partial jobs.
 
-The complete suite IDs are:
-`go-tests`, `security`, `native-javascript-tests`, `build-wasm`,
-`mcp-server-compile-test`, `cross-platform-build`, `alpine-container-test`,
-`actions-build`. Keep `go-tests` and `security` mandatory; also keep
-`native-javascript-tests` mandatory. All three are hardcoded non-skippable suites.
-Only the other five optional CGO jobs can be selected away. Do not add, remove, or
-rename IDs or change mandatory flags.
+The catalog lists every CGO check job by its actual job ID. All checks are
+eligible for PR filtering, including security, Go tests, linters and Windows.
+Every `mandatory` flag is false. Checkout, selection, and timing/cache cleanup
+are infrastructure outside the catalog. Do not add, remove, or rename IDs,
+change flags, or change the runtime's prerequisite relationships.
 
 The internal selector input is `{diff_summary:{...},suite_catalog:catalog,prompt:string}`;
 the normalized decision output is `{suite_ids:[IDs],confidence:number}` with confidence at
 least **0.9**. Reasoning is ignored. Runtime outputs are `suite_ids` JSON,
-`fallback` boolean and `metrics` JSON. Preserve validation, mandatory-suite
-inclusion, and fail-open **all-suite fallback** for every uncertain, missing,
+`fallback` boolean and `metrics` JSON. Preserve validation, prerequisite
+closure, and fail-open **all-suite fallback** for every uncertain, missing,
 malformed, unsupported, or failed decision. Do not lower confidence thresholds,
 weaken input bounds, change execution/network/authentication code, or edit the
 decision parser, output contract, fallback, tests, or CI wiring.
-Model confidence never overrides the trusted deterministic path policy: only
-policy-eligible suites may be omitted. Never change that policy in a proposal.
+The model decides job relevance; there is no deterministic path allowlist.
+Selected jobs retain their direct and transitive prerequisites.
 
 The selector uses GitHub Decisions at `https://api.githubcopilot.com/v1/decisions`
 with model `gpt-6-luna-decisions`. A dedicated inference job supplies
@@ -126,8 +124,8 @@ with model `gpt-6-luna-decisions`. A dedicated inference job supplies
 from the pinned trusted base; use `CI_DIFF_WORKSPACE` only for local PR diff
 evidence. Never execute PR code in the credential-bearing job. No custom endpoint
 or PAT is needed. Missing credentials fail open with zero requests.
-Make one decision request only if trusted policy permits an omission; otherwise
-make zero. No retries or redirects.
+Make one decision request for complete nonempty PR evidence; invalid evidence
+or selector-policy changes make zero. No retries or redirects.
 The researcher must never provision, probe, or call that service, or request
 credentials. Report authentication failures as prerequisites, not reasons to
 weaken fallback.
@@ -193,7 +191,7 @@ never edit the selector, merge, approve, or push directly.
    full-suite outcome. List suite, PR/SHA, run URL and observed failure, separating
    infrastructure/flaky classifications with evidence. Count raw and confirmed
    misses separately; do not silently discard failures. Block a candidate PR on
-   any new missed regression, incomplete holdout outcomes, or mandatory/fallback
+   any new missed regression, incomplete holdout outcomes, or prerequisite/fallback
    contract regression. Small samples and lack of observed misses do not prove
    safety; state confidence and remaining uncertainty.
 
@@ -207,7 +205,7 @@ For baseline and candidate, report the same deduplicated cohort and denominators
   unknown durations from the sum and report their count. Include selector cost
   when available; otherwise net savings are unavailable.
 - **Suite count:** selected and total suites per PR, average and distribution,
-  mandatory inclusion, fallback count/rate and unknown decisions.
+  prerequisite inclusion, fallback count/rate and unknown decisions.
 - **Missed regressions:** raw and confirmed misses, complete matched full runs,
   unknown outcomes, covered seven-day windows, and holdout sample size.
 - **API counts:** this researcher's new evidence-mining/download API calls are
@@ -228,7 +226,7 @@ Never modify any other part of the diff summarizer module. Do not persist resear
 in the PR, executable cache content, secrets, or raw PR/log bodies.
 
 Before calling `create_pull_request`, inspect `git diff` and run the existing
-selector tests; verify catalog schema, exact IDs, mandatory flags, confidence
+selector tests; verify catalog schema, exact IDs, prerequisite closure, confidence
 threshold and all-suite fallbacks remain unchanged. The draft PR body must include
 the evidence window and hashes, local replay command/inputs, baseline/candidate
 metrics table with denominators, holdout and full-run outcomes, test result,

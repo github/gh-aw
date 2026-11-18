@@ -10,11 +10,12 @@ const source = fs.readFileSync(path.join(root, ".github/workflows/ci-front-door-
 const [, frontmatter, prompt] = source.split(/^---\s*$/m);
 const lock = fs.readFileSync(path.join(root, ".github/workflows/ci-front-door-researcher.lock.yml"), "utf8");
 
-test("CGO runs researcher conformance independently alongside selector conformance", () => {
+test("CGO includes researcher tests in selectable frontdoor conformance", () => {
   const cgo = fs.readFileSync(path.join(root, ".github/workflows/cgo.yml"), "utf8");
   const job = cgo.split("\n  front-door-conformance:\n")[1]?.split(/\n  [a-z][a-z0-9-]*:/)[0];
   assert.ok(job, "missing independent front-door-conformance job");
-  assert.doesNotMatch(job, /^\s+needs:/m);
+  assert.match(job, /needs: \[front-door-decision\]/);
+  assert.match(job, /contains\(fromJSON\(needs.front-door-decision.outputs.suite_ids\), 'front-door-conformance'\)/);
   assert.match(job, /name: Test CI Front Door conformance\s+run: \|\s+node --test scripts\/ci-front-door\.test\.cjs\s+node --test scripts\/ci-front-door-researcher\.test\.cjs/);
 });
 
@@ -74,13 +75,11 @@ test("publication is draft-only and confined to catalog, prompt, and diff summar
 });
 
 test("catalog and runtime safety contracts are explicit", () => {
-  for (const id of ["go-tests", "security", "native-javascript-tests", "build-wasm", "mcp-server-compile-test", "cross-platform-build", "alpine-container-test", "actions-build"]) {
-    assert.ok(prompt.includes(`\`${id}\``), `missing suite ${id}`);
-  }
   assert.match(prompt, /Preserve schema version 1/);
   assert.match(prompt, /finite nonnegative seconds/);
-  assert.match(prompt, /Keep `go-tests` and `security` mandatory/);
-  assert.match(prompt, /`native-javascript-tests` mandatory/);
+  assert.match(prompt, /every CGO check job by its actual job ID/);
+  assert.match(prompt, /All checks are\s+eligible for PR filtering/);
+  assert.match(prompt, /Every `mandatory` flag is false/);
   assert.match(prompt, /at\s+least \*\*0\.9\*\*/);
   assert.match(prompt, /all-suite fallback/);
   assert.match(prompt, /Reasoning is ignored/);
@@ -93,10 +92,11 @@ test("GitHub authentication never authorizes research calls or weaker fallback",
   assert.match(prompt, /pinned trusted base/);
   assert.match(prompt, /`CI_DIFF_WORKSPACE` only for local PR diff/);
   assert.match(prompt, /Never execute PR code in the credential-bearing job/);
-  assert.match(prompt, /Model confidence never overrides the trusted deterministic path policy/);
+  assert.match(prompt, /no deterministic path allowlist/);
+  assert.match(prompt, /direct and transitive prerequisites/);
   assert.match(prompt, /Missing credentials fail open with zero requests/);
-  assert.match(prompt, /one decision request only if trusted policy permits an omission/);
-  assert.match(prompt, /otherwise\s+make zero/);
+  assert.match(prompt, /one decision request for complete nonempty PR evidence/);
+  assert.match(prompt, /selector-policy changes make zero/);
   assert.match(prompt, /No retries or redirects/);
   assert.match(prompt, /never provision, probe, or call that service/);
   assert.match(prompt, /make no changes: report the gap/);

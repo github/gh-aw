@@ -6,8 +6,39 @@ const { invokeDecisions } = require("../actions/setup/js/decisions_client.cjs");
 const { summarizeDiff, summarizeGitHubDiff, LIMITS: DIFF_LIMITS } = require("./ci-front-door-diff.cjs");
 
 // Keep this independent of the catalog: corrupt metadata must never remove jobs.
-const SUITE_IDS = Object.freeze(["go-tests", "security", "native-javascript-tests", "build-wasm", "mcp-server-compile-test", "cross-platform-build", "alpine-container-test", "actions-build"]);
-const MANDATORY = Object.freeze(["go-tests", "security", "native-javascript-tests"]);
+const SUITE_IDS = Object.freeze([
+  "front-door-conformance",
+  "verify-integration-build",
+  "test",
+  "canary-go",
+  "impacted-go-tests",
+  "native-javascript-tests",
+  "build",
+  "build-wasm",
+  "validate-yaml",
+  "bench",
+  "check-validator-sizes",
+  "lint-go-format",
+  "lint-go-golangci",
+  "lint-go-govulncheck",
+  "lint-go-custom",
+  "lint-error-messages",
+  "actions-build",
+  "fuzz",
+  "security",
+  "security-scan",
+  "mcp-server-compile-test",
+  "cross-platform-build",
+  "alpine-container-test",
+  "safe-outputs-conformance",
+]);
+const JOB_DEPENDENCIES = Object.freeze({
+  test: Object.freeze(["verify-integration-build"]),
+  "canary-go": Object.freeze(["test"]),
+  security: Object.freeze(["build"]),
+  "security-scan": Object.freeze(["build"]),
+  "cross-platform-build": Object.freeze(["build"]),
+});
 const LIMITS = Object.freeze({ ...DIFF_LIMITS, response: 16384, request: 262144 });
 const DECISIONS_BASE_URL = "https://api.githubcopilot.com/v1";
 const DECISIONS_MODEL = "gpt-6-luna-decisions";
@@ -47,35 +78,11 @@ function validDiffSummary(diff) {
   }
 }
 
-function eligibleOmissions(diff) {
-  if (!validDiffSummary(diff) || diff.truncated || diff.unavailable || !diff.files.length) return new Set();
-  // The other optional jobs build cmd/gh-aw or internal/tools/actions-build, not
-  // the separate WASM main package. Only build-wasm executes the WASM runner.
-  const wasmOnly = new Set(["cmd/gh-aw-wasm/compile_recovery.go", "cmd/gh-aw-wasm/compile_recovery_test.go", "cmd/gh-aw-wasm/main.go", "cmd/gh-aw-wasm/main_stub.go", "scripts/test-wasm-golden.mjs"]);
-  const files = diff.files.filter(file => !file.endsWith(".lock.yml"));
-  if (!files.length) return new Set();
-  return new Set(
-    SUITE_IDS.filter(
-      id =>
-        !MANDATORY.includes(id) &&
-        files.every(
-          file =>
-            /^(?:README|CONTRIBUTING)\.md$/.test(file) ||
-            /^docs\/src\/content\/docs\/.+\.mdx?$/.test(file) ||
-            // This standalone checkout-cache test is not consumed by optional jobs.
-            file === "scripts/workflow-timing.test.cjs" ||
-            (id !== "build-wasm" && wasmOnly.has(file))
-        )
-    )
-  );
-}
-
 function validateCatalog(catalog) {
   if (catalog?.version !== 1 || !Array.isArray(catalog.suites) || catalog.suites.length !== SUITE_IDS.length) throw new Error("invalid-catalog");
   const seen = new Set();
   for (const suite of catalog.suites) {
-    if (!SUITE_IDS.includes(suite.id) || seen.has(suite.id) || typeof suite.description !== "string" || !suite.description || suite.description.length > 500 || typeof suite.mandatory !== "boolean") throw new Error("invalid-catalog");
-    if (MANDATORY.includes(suite.id) && !suite.mandatory) throw new Error("invalid-catalog");
+    if (!SUITE_IDS.includes(suite.id) || seen.has(suite.id) || typeof suite.description !== "string" || !suite.description || suite.description.length > 500 || suite.mandatory !== false) throw new Error("invalid-catalog");
     if (suite.historical_duration_seconds !== null && (!Number.isFinite(suite.historical_duration_seconds) || suite.historical_duration_seconds < 0)) throw new Error("invalid-catalog");
     seen.add(suite.id);
   }
@@ -96,7 +103,7 @@ function readBounded(file, limit) {
 
 async function postDecision(token, input, { fetchImpl = fetch, onRequest = () => {} } = {}) {
   if (typeof token !== "string" || !token.trim()) throw new Error("missing-decision-token");
-  const suites = input.suite_catalog.suites.filter(suite => !MANDATORY.includes(suite.id));
+  const suites = input.suite_catalog.suites;
   const questions = suites.map(suite => ({
     type: "predicate",
     name: suite.id,
@@ -140,11 +147,19 @@ async function postDecision(token, input, { fetchImpl = fetch, onRequest = () =>
 }
 
 function selectSuites(response, catalog, diff) {
+  validateCatalog(catalog);
+  if (!validDiffSummary(diff) || diff.truncated || diff.unavailable || !diff.files.length) throw new Error("invalid-diff-summary");
   if (!response || !Array.isArray(response.suite_ids) || !Number.isFinite(response.confidence) || response.confidence < 0.9 || response.confidence > 1) throw new Error("invalid-or-low-confidence");
   if (response.suite_ids.length > SUITE_IDS.length || new Set(response.suite_ids).size !== response.suite_ids.length || response.suite_ids.some(id => typeof id !== "string" || !SUITE_IDS.includes(id))) throw new Error("invalid-suite-ids");
-  const selected = new Set([...response.suite_ids, ...catalog.suites.filter(suite => suite.mandatory).map(suite => suite.id), ...MANDATORY]);
-  const eligible = eligibleOmissions(diff);
-  for (const id of SUITE_IDS) if (!eligible.has(id)) selected.add(id);
+  const selected = new Set(response.suite_ids);
+  const include = id => {
+    for (const dependency of JOB_DEPENDENCIES[id] || []) {
+      if (selected.has(dependency)) continue;
+      selected.add(dependency);
+      include(dependency);
+    }
+  };
+  for (const id of response.suite_ids) include(id);
   return SUITE_IDS.filter(id => selected.has(id));
 }
 
@@ -159,10 +174,7 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   let response;
   let reason = fullRun ? "full-run" : !validCatalog ? "invalid-catalog" : !validDiffSummary(diff) ? "invalid-diff-summary" : diff.unavailable ? "diff-unavailable" : diff.truncated ? "diff-truncated" : null;
   if (!reason && diff.files.some(file => file.startsWith(".github/ci/") || file.startsWith("scripts/ci-front-door") || file === ".github/workflows/cgo.yml" || file === "actions/setup/js/decisions_client.cjs")) reason = "policy-changed";
-  if (!reason) {
-    const eligible = eligibleOmissions(diff);
-    if (!validCatalog.suites.some(suite => !suite.mandatory && eligible.has(suite.id))) reason = "no-eligible-omissions";
-  }
+  if (!reason && !diff.files.length) reason = "empty-diff";
   if (!reason) {
     try {
       response = await decide(
@@ -194,7 +206,7 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   const knownDurations = omitted?.every(suite => suite.historical_duration_seconds !== null);
   return {
     suite_ids: suiteIds,
-    fallback: !fullRun && reason !== null && reason !== "no-eligible-omissions",
+    fallback: !fullRun && reason !== null,
     reason: reason || "selected",
     metrics: {
       selected_suite_count: suiteIds.length,
@@ -245,7 +257,7 @@ async function main() {
   process.stdout.write(json + "\n");
 }
 
-module.exports = { SUITE_IDS, MANDATORY, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, summarizeGitHubDiff, postDecision, selectSuites, frontDoor };
+module.exports = { SUITE_IDS, JOB_DEPENDENCIES, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, summarizeGitHubDiff, postDecision, selectSuites, frontDoor };
 if (require.main === module)
   main().catch(() => {
     process.stderr.write("CI Front Door failed; downstream jobs must fail open.\n");
