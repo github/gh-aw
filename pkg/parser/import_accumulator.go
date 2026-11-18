@@ -77,6 +77,7 @@ type importAccumulator struct {
 	// These express a model preference without selecting a specific engine.
 	mergedEngineModel string
 	routerShortlists  [][]string
+	routerDisabled    bool
 	// engineModelChoiceDeclared records that an import declares a top-level model
 	// or a preference-only engine model choice, including empty values.
 	engineModelChoiceDeclared bool
@@ -197,6 +198,7 @@ func (acc *importAccumulator) populateImportsResultScalars(result *ImportsResult
 	result.MergedEngineMCPSessionTimeout = acc.mergedEngineMCPSessionTimeout
 	result.MergedEngineModel = acc.mergedEngineModel
 	result.RouterShortlists = acc.routerShortlists
+	result.RouterDisabled = acc.routerDisabled
 	result.EngineModelChoiceDeclared = acc.engineModelChoiceDeclared
 	result.MergedMaxTurns = acc.mergedMaxTurns
 	result.MergedMaxToolDenials = acc.mergedMaxToolDenials

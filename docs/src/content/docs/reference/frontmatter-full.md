@@ -3270,12 +3270,10 @@ engine:
   fallback-models: []
     # Array of strings
 
-  # Experimental per-run model and reasoning-effort selection from the task text for
-  # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-  # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-  # fixed model and effort settings. Eligible workflows that choose no model or
-  # routing on GitHub Copilot inference default to goal cost and mode auto; set
-  # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+  # Deprecated. Use a router model value for cost routing, or top-level
+  # model-routing: false to opt out. The cost-speed objective still works during
+  # migration but has no equivalent cost selector. See
+  # https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   # Accepted formats:
 
@@ -4328,12 +4326,10 @@ engine:
     # (optional)
     cwd: "example-value"
 
-    # Experimental per-run model and reasoning-effort selection from the task text for
-    # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-    # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-    # fixed model and effort settings. Eligible workflows that choose no model or
-    # routing on GitHub Copilot inference default to goal cost and mode auto; set
-    # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+    # Deprecated. Use a router model value for cost routing, or top-level
+    # model-routing: false to opt out. The cost-speed objective still works during
+    # migration but has no equivalent cost selector. See
+    # https://github.github.com/gh-aw/reference/model-routing/.
     # (optional)
     # Accepted formats:
 
@@ -22499,12 +22495,10 @@ safe-outputs:
       fallback-models: []
         # Array of strings
 
-      # Experimental per-run model and reasoning-effort selection from the task text for
-      # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-      # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-      # fixed model and effort settings. Eligible workflows that choose no model or
-      # routing on GitHub Copilot inference default to goal cost and mode auto; set
-      # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+      # Deprecated. Use a router model value for cost routing, or top-level
+      # model-routing: false to opt out. The cost-speed objective still works during
+      # migration but has no equivalent cost selector. See
+      # https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
       # Accepted formats:
 
@@ -23557,12 +23551,10 @@ safe-outputs:
         # (optional)
         cwd: "example-value"
 
-        # Experimental per-run model and reasoning-effort selection from the task text for
-        # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-        # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-        # fixed model and effort settings. Eligible workflows that choose no model or
-        # routing on GitHub Copilot inference default to goal cost and mode auto; set
-        # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+        # Deprecated. Use a router model value for cost routing, or top-level
+        # model-routing: false to opt out. The cost-speed objective still works during
+        # migration but has no equivalent cost selector. See
+        # https://github.github.com/gh-aw/reference/model-routing/.
         # (optional)
         # Accepted formats:
 
@@ -26010,13 +26002,21 @@ import-schema:
 # (optional)
 model: "example-value"
 
-# Optional shortlist for an explicit router model value. Applies only to the main
-# agent's router choices, not to other model requests. Declare this block once, in
-# the main workflow or a shared import.
+# Set false to disable implicit main-agent routing without pinning a model, or
+# give a shortlist for an explicit router model value. The shortlist changes no
+# other model requests.
 # (optional)
+# Accepted formats:
+
+# Format 1: Keep the normal model overrides and engine default without using the
+# router.
+model-routing: true
+
+# Format 2: object
 model-routing:
-  # Specify at least one exact model name or gh-aw alias. The engine's capabilities
-  # and models.allowed/blocked still apply; the shortlist changes no request policy.
+  # Specify at least one exact model name or gh-aw alias. Declare one list across
+  # the workflow and its imports. The engine's capabilities and
+  # models.allowed/blocked still apply.
   allowed-models: []
     # Array of strings
 
