@@ -14,12 +14,10 @@ permissions:
 
 
 tracker-id: refactoring-cadence
+model: router/economy
 engine:
   id: pi
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 imports:
   - uses: shared/skip-if-issue-open.md
     with:

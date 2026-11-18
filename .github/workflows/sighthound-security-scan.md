@@ -11,12 +11,10 @@ permissions:
   issues: read
   actions: read
   copilot-requests: write
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 if: needs.sighthound_scan.outputs.actionable_findings_detected == 'true'
 jobs:

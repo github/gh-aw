@@ -39,6 +39,7 @@ test("presents the slides listed in slides.md in bands without the removed secti
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
     await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(index + 1));
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(heading);
+    await expect(page.locator(".notes .cue")).toHaveText([/^What: \S/, /^Why: \S/, /^When: \S/]);
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
   expect(errors).toEqual([]);
@@ -72,6 +73,73 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(TOTAL));
+});
+
+test("toggles speaker notes from the toolbar and keyboard without advancing slides", async ({ page }) => {
+  await page.goto(`/gh-aw/cracktro/#${slideId("Safe outputs")}`);
+  const toggle = page.getByRole("button", { name: "Toggle speaker notes (N)", exact: true });
+  const notes = page.getByRole("complementary", { name: "Speaker notes" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toHaveAttribute("aria-keyshortcuts", "N");
+  await expect(toggle).toHaveAttribute("aria-controls", "speaker-notes");
+  await expect(notes).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(notes).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`#${slideId("Safe outputs")}$`));
+  const firstNotes = await notes.textContent();
+  await notes.click();
+  await page.keyboard.press("ArrowDown");
+  await expect(page).toHaveURL(new RegExp(`#${slideId("Safe outputs")}$`));
+  await page.keyboard.press("Escape");
+  await expect(notes).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toBeFocused();
+  await page.keyboard.press("N");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(notes).toBeVisible();
+  await expect(notes).not.toHaveText(firstNotes!);
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(notes).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("Enter");
+  await expect(notes).toBeVisible();
+});
+
+test("keeps speaker notes and compact toolbar controls usable on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto(`/gh-aw/cracktro/#${slideId("Daily Improvers")}`);
+  const toggle = page.getByRole("button", { name: "Toggle speaker notes (N)", exact: true });
+  await toggle.click();
+  const notes = page.getByRole("complementary", { name: "Speaker notes" });
+  await expect(notes).toBeVisible();
+  const boxes = await page.locator(".arrows button, .ntb, .smb, .fzb, .snd, .vnb.on").evaluateAll(els =>
+    els.map(el => {
+      const { x, y, width, height } = el.getBoundingClientRect();
+      return { x, y, width, height };
+    })
+  );
+  for (const [i, a] of boxes.entries()) {
+    expect(a.x).toBeGreaterThanOrEqual(0);
+    expect(a.x + a.width).toBeLessThanOrEqual(320);
+    for (const b of boxes.slice(i + 1)) expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
+  }
+  // Cue labels stack above their text on a phone instead of taking a column.
+  await expect(notes.locator(".cue").first()).toHaveCSS("grid-template-columns", /^\S+$/);
+  const panel = (await notes.boundingBox())!;
+  expect(panel.y).toBeGreaterThanOrEqual(0);
+  expect(panel.x + panel.width).toBeLessThanOrEqual(320);
+  expect(panel.y + panel.height).toBeLessThanOrEqual(Math.min(...boxes.map(b => b.y)));
+  // Long evidence notes remain scrollable without turning a scroll gesture into navigation.
+  await notes.evaluate(el => {
+    el.textContent = "Speaker cue\n".repeat(100);
+  });
+  await notes.focus();
+  await page.keyboard.press("End");
+  await expect.poll(() => notes.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await expect(page).toHaveURL(new RegExp(`#${slideId("Daily Improvers")}$`));
 });
 
 test("fuzzy-searches slide titles, keywords, summaries and text from the dock's search dialog", async ({ page }) => {
@@ -369,22 +437,30 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 
-  // at 320px the four buttons, slide map, search and the sound toggle fit on one row without overlapping
-  const boxes = await page.evaluate(() =>
-    [...document.querySelectorAll(".arrows button"), ...[".smb", ".fzb", ".snd"].map(s => document.querySelector(s)!)].map(e => {
-      const r = e.getBoundingClientRect();
-      return { left: r.left, right: r.right };
-    })
-  );
-  expect(boxes).toHaveLength(7);
-  expect(boxes[0].left).toBeGreaterThanOrEqual(0);
-  for (let i = 1; i < 7; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].right);
-  expect(boxes[6].right).toBeLessThanOrEqual(320);
-  // kiosk and the column button sit on a second row above the dock, inside the screen and clear of it and each other
+  // at 320px the four arrows pack right-aligned beneath the notes, map, search and sound row
+  const rects = (sel: string) =>
+    page.locator(sel).evaluateAll(els =>
+      els.map(e => {
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      })
+    );
+  const arrowBoxes = await rects(".arrows button");
+  const toolBoxes = await rects(".ntb, .smb, .fzb, .snd");
+  expect(arrowBoxes).toHaveLength(4);
+  expect(toolBoxes).toHaveLength(4);
+  for (let i = 1; i < 4; i++) expect(arrowBoxes[i].left).toBeGreaterThan(arrowBoxes[i - 1].right);
+  const toolRight = Math.max(...toolBoxes.map(b => b.right));
+  expect(Math.abs(arrowBoxes[3].right - toolRight)).toBeLessThanOrEqual(1);
+  expect(toolRight).toBeLessThanOrEqual(320);
+  expect(arrowBoxes[0].left).toBeGreaterThanOrEqual(0);
+  expect(Math.abs(arrowBoxes[0].left - Math.min(...toolBoxes.map(b => b.left)))).toBeLessThanOrEqual(1);
+  expect(Math.min(...arrowBoxes.map(b => b.top))).toBeGreaterThanOrEqual(Math.max(...toolBoxes.map(b => b.bottom)));
+  // kiosk and the column button extend that row to the left, inside the screen and clear of every dock control and each other
   await page.goto(`/gh-aw/cracktro/#${slideNo("Daily Improvers")}`);
   await expect(page.locator(".vnb")).toBeVisible();
   const raised = await page.evaluate(() =>
-    [".ksb", ".vnb", ".arrows button", ".smb", ".fzb", ".snd"]
+    [".ksb", ".vnb", ".arrows button", ".ntb", ".smb", ".fzb", ".snd"]
       .flatMap(s => [...document.querySelectorAll(s)])
       .map(e => {
         const r = e.getBoundingClientRect();
@@ -397,6 +473,23 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
     expect(box.right).toBeLessThanOrEqual(320);
     for (const other of raised.slice(i + 1)) expect(overlap(box, other)).toBe(false);
   }
+});
+
+test("animates the compact arrows into the right-aligned dock unless motion is reduced", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.setViewportSize({ width: 600, height: 720 });
+  await page.goto("/gh-aw/cracktro/#1");
+  const arrows = page.locator(".arrows");
+  const transition = () =>
+    arrows.evaluate(el => {
+      const cs = getComputedStyle(el);
+      const props = cs.transitionProperty.split(", ");
+      return props.includes("transform") ? cs.transitionDuration.split(", ")[props.indexOf("transform")] : "none";
+    });
+  await expect.poll(transition).toBe("0.45s");
+  await expect(page.locator(".snd")).toHaveCSS("transition-property", /bottom/);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(transition).toBe("none");
 });
 
 test.describe("compact navigation on touch screens", () => {
@@ -990,7 +1083,7 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
           onKey: e => e.key === "x" && hooks.push("key:" + current().notes) > 0,
         }),
         slide("outro", "Goodbye"),
-        slide("part", "Alpha", examples ? { key: "alpha" } : {}),
+        slide("part", "Alpha", { notes: "What: <b>bold</b> stays text\\nWhy: Labels split cues.", ...(examples ? { key: "alpha" } : {}) }),
         ...(examples ? [slide("part", "Alpha example", { under: "alpha" })] : []),
         slide("part", "Beta"),
       ];
@@ -1053,6 +1146,19 @@ test.describe("reusable runtime", () => {
     await expect(heading(page)).toHaveText("Part one");
     await page.keyboard.press("Home");
     await expect(heading(page)).toHaveText("Hello");
+    expect(errors).toEqual([]);
+  });
+
+  test("renders labelled notes as cue blocks and other notes as plain text", async ({ page }) => {
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html#alpha");
+    const notes = page.getByRole("complementary", { name: "Speaker notes" });
+    await page.keyboard.press("n");
+    await expect(notes.locator(".cue")).toHaveText(["What: <b>bold</b> stays text", "Why: Labels split cues."]);
+    await expect(notes.locator(".cue-k")).toHaveText(["What:", "Why:"]);
+    await expect(notes.locator("b")).toHaveCount(0);
+    await page.keyboard.press("Home");
+    await expect(notes).toHaveText("Hello notes");
+    await expect(notes.locator(".cue")).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
@@ -1236,7 +1342,7 @@ test.describe("reusable runtime", () => {
     await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
     expect(await fsCalls(page)).toEqual(["request"]);
     // the presentation chrome hides; only the stop button stays
-    for (const chrome of [".dots", ".progress", ".fzb", ".smb"]) await expect(page.locator(chrome)).toBeHidden();
+    for (const chrome of [".dots", ".progress", ".fzb", ".smb", ".ntb"]) await expect(page.locator(chrome)).toBeHidden();
     await expect(kiosk).toBeVisible();
 
     await page.clock.runFor(KIOSK_MS - 1000);
@@ -1319,5 +1425,27 @@ test.describe("reusable runtime", () => {
       expect(await fsCalls(page)).toEqual(fs === "deny" ? ["request"] : []);
       expect(errors).toEqual([]);
     }
+  });
+
+  test("hides open speaker notes in kiosk mode and stops kiosk before Escape closes them", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?fs=none#hello");
+    const notes = page.getByRole("complementary", { name: "Speaker notes" });
+    const notesBtn = page.getByRole("button", { name: "Toggle speaker notes (N)", exact: true });
+    await page.keyboard.press("n");
+    await expect(notes).toBeVisible();
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(notes).toBeHidden();
+    await expect(notesBtn).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await expect(notes).toBeVisible();
+    await expect(notesBtn).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+    await expect(notes).toBeHidden();
+    await expect(notesBtn).toHaveAttribute("aria-pressed", "false");
+    expect(errors).toEqual([]);
   });
 });

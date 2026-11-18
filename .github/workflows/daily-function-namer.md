@@ -16,12 +16,10 @@ permissions:
 
 tracker-id: daily-function-namer
 
+model: router/economy
 engine:
   id: pi
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 imports:
   - uses: shared/daily-audit-base.md
     with:

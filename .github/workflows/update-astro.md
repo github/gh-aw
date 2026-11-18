@@ -15,12 +15,10 @@ permissions:
   pull-requests: read
   copilot-requests: write
 tracker-id: update-astro
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 
 timeout-minutes: 45
