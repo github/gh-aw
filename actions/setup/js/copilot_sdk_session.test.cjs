@@ -138,6 +138,36 @@ describe("copilot_sdk_session runtime configuration", () => {
     expect(result.exitCode).not.toBe(COPILOT_MODEL_VERIFICATION_EXIT_CODE);
   });
 
+  it("uses GH_AW_TMP_DIR for session state when TMPDIR is overridden", async () => {
+    delete process.env.GH_AW_SESSION_STATE_BASE_DIR;
+    vi.stubEnv("GH_AW_TMP_DIR", base);
+    vi.stubEnv("TMPDIR", path.join(base, "private-tmp"));
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = async () => ({
+        sessionId: "default-session-state",
+        on: () => {},
+        sendAndWait: async () => ({ type: "assistant.message", data: { content: "Task completed." } }),
+        disconnect: async () => {},
+      });
+    }
+
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger: () => {},
+      workingDirectory: base,
+      agentsBaseDir: base,
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    });
+
+    const eventsPath = path.join(base, "sandbox/agent/logs/copilot-session-state/default-session-state/events.jsonl");
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(eventsPath)).toBe(true);
+    expect(fs.existsSync(path.join(process.env.TMPDIR, "gh-aw/sandbox/agent/logs/copilot-session-state/default-session-state/events.jsonl"))).toBe(false);
+  });
+
   it.each([
     "[sdk-driver] permission denied by workflow tool permissions: shell(ls)",
     '{"source":"sdk-driver","event":"permission-denied-by-workflow-tool-permissions"}',
