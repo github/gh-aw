@@ -205,18 +205,19 @@ func normalizeDisplayVersion(version string) string {
 // runUpgradeForTargetRepo checks out repo to a temporary directory, runs the
 // upgrade command inside it, and opens a pull request with the resulting changes.
 func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptions, createPR bool, verbose bool) error { //nolint:largefunc // Checkout lifetime, upgrade, and PR creation share ordered cleanup.
+	ctx = withUpdateRepository(ctx, repo)
 	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && rollout.dryRun {
 		preview, include, err := scanUpgradeRepoFn(ctx, repo, verbose)
 		if err != nil {
 			return err
 		}
 		if !include {
-			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeNoWorkflowsStatus})
+			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeNoWorkflowsStatus}, ctx)
 		}
 		if upgradeRepoMatchesVersion(preview, GetVersion()) {
-			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeVersionMatchStatus, Preview: &preview})
+			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeVersionMatchStatus, Preview: &preview}, ctx)
 		}
-		return emitOrgRolloutPreview(preview, include)
+		return emitOrgRolloutPreview(preview, include, ctx)
 	}
 	existing, skip, err := prepareOrgRolloutWorker(ctx, repo, ghawUpgradeMarkerPrefix)
 	if err != nil || skip {
@@ -244,11 +245,11 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 			return err
 		}
 		if !include {
-			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeNoWorkflowsStatus})
+			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeNoWorkflowsStatus}, ctx)
 		}
 		preview = &scanned
 		if upgradeRepoMatchesVersion(scanned, GetVersion()) {
-			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeVersionMatchStatus, Preview: preview})
+			return emitOrgRolloutResult(orgRolloutResult{Status: orgUpgradeVersionMatchStatus, Preview: preview}, ctx)
 		}
 	}
 
@@ -317,7 +318,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	}
 	if !changed {
 		if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
-			return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged", Preview: preview})
+			return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged", Preview: preview}, ctx)
 		}
 		upgradeOrgLog.Printf("Skipping PR for %s: no pending changes after upgrade", repo)
 		if verbose {
@@ -349,7 +350,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	}
 	if err != nil {
 		if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && prURL != "" {
-			return errors.Join(err, emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL, Preview: preview}))
+			return errors.Join(err, emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL, Preview: preview}, ctx))
 		}
 		return err
 	}

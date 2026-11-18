@@ -224,18 +224,36 @@ func createOrgIssue(ctx context.Context, repo, title, body, label string) error 
 		"-f", "labels[]="+label,
 	)
 	if err == nil {
-		return nil
+		return reportCreatedOrgIssue(ctx, repo, output)
 	}
 	if !isLabelValidationError(output, err) {
 		return err
 	}
 	// Label may not exist; retry without it so the issue is always created.
 	orgIPLog.Printf("Failed to create issue with label %q, retrying without: %v", label, err)
-	_, err = runOrgAPI(ctx, remoteHost, "Creating issue...",
+	output, err = runOrgAPI(ctx, remoteHost, "Creating issue...",
 		"--method", "POST",
 		endpoint,
 		"-f", "title="+title,
 		"-f", "body="+body,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return reportCreatedOrgIssue(ctx, repo, output)
+}
+
+func reportCreatedOrgIssue(ctx context.Context, repo string, output []byte) error {
+	if updateReporter(ctx) == nil {
+		return nil
+	}
+	var response struct {
+		URL string `json:"html_url"`
+	}
+	parseErr := json.Unmarshal(output, &response)
+	outputErr := emitUpdateEvent(ctx, updateJSONLEvent{Event: "issue", Repository: repo, Status: "created", URL: response.URL})
+	if parseErr != nil {
+		return errors.Join(outputErr, fmt.Errorf("decoding created issue response: %w", parseErr))
+	}
+	return outputErr
 }

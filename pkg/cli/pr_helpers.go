@@ -70,18 +70,19 @@ func createPRWithChanges(ctx context.Context, branchPrefix, commitMessage, prTit
 		_ = switchPRBranch(currentBranch, verbose)
 		return "", fmt.Errorf("failed to create PR: %w", err)
 	}
+	outputErr := emitUpdateEvent(ctx, updateJSONLEvent{Event: "pull_request", Status: "created", URL: prURL})
 
 	var autoMergeErr error
 	if autoMerge {
 		autoMergeErr = enablePRAutoMerge(ctx, prURL)
 	}
 	if err := switchPRBranch(currentBranch, verbose); err != nil {
-		return prURL, errors.Join(autoMergeErr, fmt.Errorf("failed to switch back to branch %s: %w", currentBranch, err))
+		return prURL, errors.Join(outputErr, autoMergeErr, fmt.Errorf("failed to switch back to branch %s: %w", currentBranch, err))
 	}
 	if autoMergeErr != nil {
 		return prURL, autoMergeErr
 	}
 
 	prHelpersLog.Printf("Created PR: %s", prURL)
-	return prURL, nil
+	return prURL, outputErr
 }

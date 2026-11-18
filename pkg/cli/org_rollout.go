@@ -27,12 +27,13 @@ var orgRolloutSensitiveEnv = map[string]struct{}{
 }
 
 type orgRolloutResult struct {
-	Repo    string          `json:"repo,omitempty"`
-	Status  string          `json:"status"`
-	URL     string          `json:"url,omitempty"`
-	Error   string          `json:"error,omitempty"`
-	Preview *orgRepoPreview `json:"preview,omitempty"`
-	Stop    bool            `json:"stop,omitempty"`
+	Repo    string             `json:"repo,omitempty"`
+	Status  string             `json:"status"`
+	URL     string             `json:"url,omitempty"`
+	Error   string             `json:"error,omitempty"`
+	Preview *orgRepoPreview    `json:"preview,omitempty"`
+	Stop    bool               `json:"stop,omitempty"`
+	Events  []updateJSONLEvent `json:"events,omitempty"`
 }
 
 type orgRolloutRow struct {
@@ -47,7 +48,13 @@ type orgRolloutEvent struct {
 	done   bool
 }
 
-func emitOrgRolloutResult(result orgRolloutResult) error {
+func emitOrgRolloutResult(result orgRolloutResult, contexts ...context.Context) error {
+	if len(contexts) > 0 {
+		if reporter := updateReporter(contexts[0]); reporter != nil && reporter.worker {
+			reporter.result = &result
+			return nil
+		}
+	}
 	data, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("encoding rollout result: %w", err)
@@ -58,12 +65,12 @@ func emitOrgRolloutResult(result orgRolloutResult) error {
 	return nil
 }
 
-func emitOrgRolloutPreview(preview orgRepoPreview, include bool) error {
+func emitOrgRolloutPreview(preview orgRepoPreview, include bool, contexts ...context.Context) error {
 	status := "unchanged"
 	if include {
 		status = "planned"
 	}
-	return emitOrgRolloutResult(orgRolloutResult{Status: status, Preview: &preview})
+	return emitOrgRolloutResult(orgRolloutResult{Status: status, Preview: &preview}, contexts...)
 }
 
 func runOrgRollout(ctx context.Context, org string, globs []string, cbs orgRunCallbacks, createPR, createIssue, verbose bool, opts orgRolloutOptions) error {
@@ -189,6 +196,13 @@ func runOrgRolloutPlain(ctx context.Context, rows []orgRolloutRow, opts orgRollo
 		for _, pr := range row.prs {
 			fmt.Fprintf(os.Stderr, "  #%d %s\n", pr.Number, pr.URL)
 		}
+		if !row.selected && updateReporter(ctx) != nil {
+			result := orgRolloutResult{Repo: row.repo, Status: "skipped: existing PR"}
+			if len(row.prs) > 0 {
+				result.URL = row.prs[0].URL
+			}
+			results = append(results, result)
+		}
 		if row.selected && !opts.dryRun && !autoYes {
 			previewOpts := opts
 			previewOpts.dryRun = true
@@ -238,6 +252,9 @@ func reportOrgRolloutResults(ctx context.Context, results []orgRolloutResult, cb
 		failures = append(failures, runErr)
 	}
 	for _, result := range results {
+		if err := reportUpdateRolloutResult(ctx, result); err != nil {
+			failures = append(failures, err)
+		}
 		if result.Preview != nil && (result.Status == "planned" || opts.command == "upgrade") {
 			previews = append(previews, *result.Preview)
 		}

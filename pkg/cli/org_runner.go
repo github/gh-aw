@@ -240,12 +240,21 @@ func runCommandForOrg(ctx context.Context, org string, repoGlobs []string, cbs o
 
 			preview, include, scanErr := cbs.ScanFn(ctx, repo, verbose)
 			if scanErr != nil {
+				if err := emitUpdateEvent(ctx, updateJSONLEvent{Event: "repository_completed", Repository: repo, Status: "failed", Error: scanErr.Error()}); err != nil {
+					return err
+				}
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %v", repo, scanErr)))
 				orgRunnerLog.Printf("Failed to scan %s: %v", repo, scanErr)
 				continue
 			}
 			if !include {
+				if err := emitUpdateEvent(ctx, updateJSONLEvent{Event: "repository_completed", Repository: repo, Status: "unchanged"}); err != nil {
+					return err
+				}
 				continue
+			}
+			if err := reportUpdatePreview(ctx, preview, "planned"); err != nil {
+				return err
 			}
 			results = append(results, preview)
 		}
@@ -329,7 +338,11 @@ func runCommandForOrg(ctx context.Context, org string, repoGlobs []string, cbs o
 				continue
 			}
 			attempted++
-			if err := cbs.IssueFn(ctx, result, verbose); err != nil {
+			issueErr := cbs.IssueFn(withUpdateRepository(ctx, result.Repo), result, verbose)
+			if err := reportUpdateRepositoryCompletion(ctx, result.Repo, issueErr); err != nil {
+				return err
+			}
+			if err := issueErr; err != nil {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %v", result.Repo, err)))
 				orgRunnerLog.Printf("Failed to create issue in %s: %v", result.Repo, err)
 				continue
@@ -383,7 +396,11 @@ func runCommandForOrg(ctx context.Context, org string, repoGlobs []string, cbs o
 			continue
 		}
 		attempted++
-		if err := cbs.ApplyFn(ctx, result, verbose); err != nil {
+		applyErr := cbs.ApplyFn(withUpdateRepository(ctx, result.Repo), result, verbose)
+		if err := reportUpdateRepositoryCompletion(ctx, result.Repo, applyErr); err != nil {
+			return err
+		}
+		if err := applyErr; err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %v", result.Repo, err)))
 			orgRunnerLog.Printf("Failed to apply to %s: %v", result.Repo, err)
 			continue

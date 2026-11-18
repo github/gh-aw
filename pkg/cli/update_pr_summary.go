@@ -25,6 +25,7 @@ import (
 type updatePRFile struct {
 	hash         [32]byte
 	source       string
+	sourceSHA    string
 	compiler     string
 	pins         map[string]updatePRPin
 	metadataOnly bool
@@ -206,6 +207,9 @@ func readUpdatePRFile(full, path, workflowDir string) (updatePRFile, error) {
 				state.pins = summaryYAMLPins([]byte(strings.Join(parsed.FrontmatterLines, "\n")))
 				if source, ok := parsed.Frontmatter["source"].(string); ok {
 					state.source = source
+				}
+				if sourceSHA, ok := parsed.Frontmatter["source-sha"].(string); ok {
+					state.sourceSHA = sourceSHA
 				}
 				state.pins = summaryYAMLPins([]byte(strings.Join(parsed.FrontmatterLines, "\n")))
 			}

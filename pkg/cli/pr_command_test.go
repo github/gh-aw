@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -262,7 +263,18 @@ func TestCreatePRWithChangesAutoMerge(t *testing.T) {
 					return cleanupErr
 				}
 			}
-			url, err := createPRWithChanges(context.Background(), "test", "Update README", "Title", "Body", false, tc.autoMerge)
+			var eventsOutput bytes.Buffer
+			ctx := context.WithValue(context.Background(), updateJSONLKey{}, &updateJSONLReporter{writer: &eventsOutput, command: "upgrade"})
+			url, err := createPRWithChanges(ctx, "test", "Update README", "Title", "Body", false, tc.autoMerge)
+			if tc.createFails {
+				assert.Empty(t, eventsOutput.String())
+			} else {
+				events := decodeUpdateEvents(t, eventsOutput.String())
+				require.Len(t, events, 1)
+				assert.Equal(t, "pull_request", events[0].Event)
+				assert.Equal(t, "created", events[0].Status)
+				assert.Equal(t, prURL, events[0].URL)
+			}
 			if tc.createFails {
 				if err == nil || url != "" || autoCalls != 0 {
 					t.Fatalf("failed creation = (%q, %v), auto calls %d", url, err, autoCalls)
