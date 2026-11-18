@@ -21,9 +21,13 @@ Resolution is performed by a `Resolver`, which holds a label matcher function an
 |------|------|-------------|
 | `AttributionStatus` | string | Classifies the outcome of intent attribution |
 | `AttributionSource` | string | Identifies the data source used for attribution |
+| `Authorizer` | struct | Checks tool calls against a compiled execution policy |
+| `ExecutionPolicy` | struct | Compiled policy containing autonomy, tool restrictions, write scope, checks, approval, auto-merge, attempt, and rule-ID settings |
 | `IntentRecord` | struct | Holds the attribution result for a pull request or issue, including optional `Domains`, `Priority`, and `Risk` classification fields |
+| `PolicyCompiler` | struct | Applies policy rules to mapped intent records |
 | `RootReference` | struct | Represents a referenced issue or artifact root (node ID, type, URL, labels) |
 | `PullRequestData` | struct | Input data for pull request resolution (node ID, URL, labels, explicit intent, closing issues) |
+| `RepositoryContext` | struct | Repository owner, name, visibility, and organization used when matching policy rules |
 | `Resolver` | struct | Stateless resolver that maps labels to intent records |
 | `PolicyRule` | struct | Pairs a match condition with the execution policy fragment to apply |
 | `PolicyCondition` | struct | Describes the intent labels and repository organization context that make a policy rule match |
@@ -84,6 +88,8 @@ Resolution is performed by a `Resolver`, which holds a label matcher function an
 |-------------|-----------|-------------|
 | `Authorizer` | struct | Authorizes individual tool calls against a compiled `ExecutionPolicy` |
 | `AuthorizeTool` | `func (a Authorizer) AuthorizeTool(policy ExecutionPolicy, tool string) error` | Returns `ErrToolDenied` if `tool` is in `DeniedTools` (denial always wins), `ErrToolNotAllowed` if `AllowedTools` is non-nil and does not contain `tool`, or `nil` otherwise. A `nil` `AllowedTools` is unrestricted; a non-nil empty `AllowedTools` denies every tool. |
+
+The package exports `ErrToolDenied` and `ErrToolNotAllowed` as sentinel errors returned by `AuthorizeTool` for those respective denial cases.
 
 ## Usage Examples
 

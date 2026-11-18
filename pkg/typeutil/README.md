@@ -35,7 +35,7 @@ Choose the right category based on the source: use strict conversions for YAML c
 
 #### `ParseIntValue(value any) (int, bool)`
 
-Strictly parses numeric types (`int`, `int64`, `uint64`, `float64`) to `int`. Returns `(value, true)` on success and `(0, false)` for any unrecognized or non-numeric type.
+Strictly parses numeric types (`int`, `int64`, `uint64`, `float64`) to `int`. Returns `(value, true)` on success and `(0, false)` for unrecognized or non-numeric types, `uint64` values greater than the maximum `int`, and `float64` NaN, infinities, or values outside the `int` range. Finite `float64` values within range are truncated toward zero.
 
 Use this when the caller **must distinguish** a missing or invalid value from a legitimate zero (e.g. YAML config field parsing where the YAML library has already produced a typed numeric value).
 
@@ -202,7 +202,7 @@ merged := make([]Item, 0, cap)
 
 - Numeric conversion debug output uses `logger.New("typeutil:convert")` and is only emitted when `DEBUG=typeutil:*`.
 - `float64 → int` truncation is logged at debug level when the fractional part is lost.
-- `uint64 → int` overflow returns `0` rather than panicking, following the defensive convention used elsewhere in the codebase.
+- `ParseIntValue` reports `uint64 → int` overflow as `(0, false)`; `SafeUint64ToInt` returns `0` for overflow, following the defensive convention used elsewhere in the codebase.
 - Map-extraction helpers (`ParseBool`, `LookupMap`, `LookupString`, `LookupStringPath`) are defined in `lookup.go` to keep `convert.go` focused on single-value numeric conversion.
 - `SafeAllocationCapacity` (`allocation.go`) returns `0` on overflow or negative inputs rather than panicking, matching the defensive-zero convention used by the other overflow-safe conversions in this package.
 

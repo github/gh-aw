@@ -13,8 +13,8 @@ import (
 // ParseIntValue as described in the package README.md.
 //
 // Specification: Strictly parses numeric types (int, int64, uint64, float64)
-// to int. Returns (value, true) on success and (0, false) for any unrecognized
-// or non-numeric type.
+// to int. Returns (value, true) on success and (0, false) for unrecognized or
+// non-numeric types, uint64 overflow, and float64 NaN, infinity, or int overflow.
 func TestSpec_PublicAPI_ParseIntValue(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -45,6 +45,48 @@ func TestSpec_PublicAPI_ParseIntValue(t *testing.T) {
 			input:     float64(10),
 			wantValue: 10,
 			wantOK:    true,
+		},
+		{
+			name:      "float64 fractional value truncates toward zero",
+			input:     float64(3.14),
+			wantValue: 3,
+			wantOK:    true,
+		},
+		{
+			name:      "float64 NaN returns (0, false)",
+			input:     math.NaN(),
+			wantValue: 0,
+			wantOK:    false,
+		},
+		{
+			name:      "float64 positive infinity returns (0, false)",
+			input:     math.Inf(1),
+			wantValue: 0,
+			wantOK:    false,
+		},
+		{
+			name:      "float64 negative infinity returns (0, false)",
+			input:     math.Inf(-1),
+			wantValue: 0,
+			wantOK:    false,
+		},
+		{
+			name:      "float64 positive overflow returns (0, false)",
+			input:     math.MaxFloat64,
+			wantValue: 0,
+			wantOK:    false,
+		},
+		{
+			name:      "float64 negative overflow returns (0, false)",
+			input:     -math.MaxFloat64,
+			wantValue: 0,
+			wantOK:    false,
+		},
+		{
+			name:      "uint64 overflow returns (0, false)",
+			input:     ^uint64(0),
+			wantValue: 0,
+			wantOK:    false,
 		},
 		{
 			name:      "string input returns (0, false)",
