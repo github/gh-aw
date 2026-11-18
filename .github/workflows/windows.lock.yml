@@ -176,10 +176,11 @@ jobs:
           GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
           printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
           printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
           printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
           case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
           printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
           trap - EXIT
       - name: Checkout actions folder
@@ -758,7 +759,7 @@ jobs:
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
-          $compressedScript = [System.Convert]::FromBase64String('nJRxS+NMEMb/76cYxtS1hTXqy3tCaxVPo4bTttT0TrASlmR7CTabkN1YQfvdjyTaNCYRsVBadmd+8zw7syu5AsqTECI/4nPmL1pJwOQj7B0eti6v7NM/9mQ6tMwbw56MRtYA8W311rCm4/WailkERCqmEjnQTvrgz+H+HqgA1D7GIzw89EF5XEAcAI3nQGldWB/mfg1oU86nqFJgDuPPvgLUcp1IwLgzrVqX2k7wqHgQAXVBV0Gk//UoW9I4Ebt3608HW5KrJLIjFnOh0izHzRW8TKbDoTGxLeNm3DtZIWxvQ7R0gY47dQfYUC6jlwu+iTVuR9PJmWHfTi8uzLsBai9VF1tb3Q3ZK/xg1Br9MoZp6TDiQsoFxEy4QD3+DP8ddLAVxb5QcyC9HnNdms5Er9eWM0EqB5yRsBUuBY9tj0kvpb6nt2VTAryC9NjB/z9kEsArOIlK7RMgQOf7GwJyQkFHOK7tsb67dqv8gNMs42uYohcNEIdJXjvKvoCuRmaCdF/T35h0O8AdLwQ0xRNb+C5kTYQ4DBXC8fbB2xDuQ78PXDJnra9mDNPjrgxLsfhxCjZ2Sj2u71quH7WdpVxETHlAl3UOO1hkluthU1+Ps4M1ravpT9sY/sYGi+Z5xaB5vha7k15SoA6Qtttr+w36O/hZaNlGRVb2aNH8EXhii4QP3hPNoWmZp9dpmL2H682X7I+uz9I7Ossvl14ja4UtGSaxwwfll2CVp1SBqOXxqFeUFyxSxyLfZW2gvkcq7tXRUdq09y+BPPjmbGxfjy7tc3PSNCioZZW+Pkj/BgA=')
+          $compressedScript = [System.Convert]::FromBase64String('nFR/T6NAEP2fTzG3UrFNVtS701wrGk9RySltkJ4m1iMbWIRYfoRdrEntffYLoKUUMBebNG12Z968N/N2GOWAaRpB7MfUJf5USAPCnmDn4EC4uLRObi1jrJvatWoZw6GpIPR2eqOa49HyjCckBolxwlOmiMcD8F24vwccAhLX4xE8PAyAezSEJACcuIBxU9gAXL8BaJXOh1CVwAKMvvgckFjwRBKod5rZqFLcCp44DWLADsg8iOVHD5MZTtJw+2756SKBUZ7GVkwSGvIsy3YKBnNjrOuqYZnq9ah/vECwuQnxzAE86jY1sKVcjl4t+EZWvRmOjVPVuhmfn2t3ChLndRUbG70V2gu0JtQc/lL1rHQU05CxKSQkdAB79AW+7nWRECd+yF2Q+n3iODjzRL/fYZNQqjU4R0JCNAtpYnmEeRnqe3qHtSXAKzCP7H3fZ2kAr2CnPJMvgQTY3e0ioZj8F0BiiYxA+Qt/7gl2d/CPh/n+t4VYWoDaXgRIC5/J1HcgSUPuBxTyZHD8R8o4gqPNvTcb7GaWEKo0VwsdNRpJ3l62NEPHeQb6L5hy4C0gNmG08b34IfREaRJKvdfsN5F63TWxuVMgiaKqRBgMgDJiL/k1eD2bac2R5eG61VZuKkaqnw9vddVQmi1T6ELi1oxNY8I9wLMm5V1UZlZ5oDZTrXU/b79mXo5/Wqr+G7U0QjurtUE7W1LfyvYFYBukjtPv+C1quuij0KqoGq18f+JiHz2TaUqV90RN10zt5CoLs3bQ8nKe/5HlSbYuJsU7lxtoLZDAojSxqVJdSosipQ6IxCIeyTXmJZbUhCV9FmsF6nNI5es7PMyG9v6VoAi+Ph1ZV8ML60wz2m2TV2q1VW1i/wYA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
@@ -1724,7 +1725,7 @@ jobs:
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
-          $compressedScript = [System.Convert]::FromBase64String('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')
+          $compressedScript = [System.Convert]::FromBase64String('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')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
@@ -2572,10 +2573,11 @@ jobs:
           GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
           printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
           printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
           printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
           case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
           printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
           trap - EXIT
       - name: Checkout actions folder
@@ -3045,10 +3047,11 @@ jobs:
           GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
           printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
           printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
           printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
           case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
           printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
           trap - EXIT
       - name: Checkout actions folder
@@ -3451,10 +3454,11 @@ jobs:
           GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
           printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
           printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
           printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
           case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
           printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
           trap - EXIT
       - name: Checkout actions folder
@@ -3667,10 +3671,11 @@ jobs:
           GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
           printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
           printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
           printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
           case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
           printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
           trap - EXIT
       - name: Checkout actions folder
@@ -3772,10 +3777,11 @@ jobs:
           GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
           printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
           printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
           printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
           case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
           printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
           trap - EXIT
       - name: Checkout actions folder
@@ -3940,10 +3946,11 @@ jobs:
           GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
           printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
           printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
           printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
           case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
           printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
           trap - EXIT
       - name: Checkout actions folder
