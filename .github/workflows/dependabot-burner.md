@@ -61,7 +61,7 @@ safe-outputs:
     reviewers: [copilot]
     protected-files: request_review
     exclude-lock-yml: true
-timeout-minutes: 20
+timeout-minutes: 30
 imports:
   - shared/mcp-pagination.md
   - uses: shared/daily-pr-base.md
@@ -475,6 +475,9 @@ batch JSON, retry history, and maintainer-only feedback. Do not delegate.
   flags, query remotes, commit, push, or mutate PRs directly.
 - Run only declared validation commands. No shell loops, undeclared helpers,
   pipelines, or compound commands except the explicitly allowed validation chains.
+- Set every bash `timeout` to at most 300 seconds. A timed-out validation fails
+  its group: remove that group's edits, record its PRs as unaddressed, and do
+  not rerun or widen the check.
 - After the first permission denial, stop shell calls. Write a blocked result with
   the concrete unverified items; do not probe variants or claim validation passed.
 - Do not submit create-pull-request or noop safe outputs from this worker.
@@ -540,10 +543,14 @@ Validate the touched ecosystems, not unrelated manifests:
 - Action npm: `npm --prefix actions/setup/js install --package-lock-only --ignore-scripts`,
   `npm --prefix actions/setup/js ci --ignore-scripts`, then focused tests with exactly
   `npm --prefix actions/setup/js run test:js -- <test files>`. Never run `npm test`.
-- Root Go: `go mod tidy`, `go mod verify`, `go build ./...`, then `go test -short`
-  only for packages that import the updated module. Do not run `go test ./...`:
-  wall-clock budget tests such as `TestLintPerformanceBudget` are not dependency
-  validation and are unreliable under sandbox load.
+- Root Go: `go mod tidy`, `go mod verify`, `go build ./...`. If every updated
+  module is `// indirect` in `go.mod`, stop there; the build is the validation.
+  For a direct dependency, list importers with exactly
+  `grep -rlF --include=*.go '"<module path>' cmd pkg`, then run `go test -short`
+  naming only those files' package directories (for example
+  `go test -short ./pkg/foo ./pkg/bar`). Never use `./...` or `./pkg/...`
+  patterns: the full suite exceeds the run's time budget, and wall-clock budget
+  tests such as `TestLintPerformanceBudget` are not dependency validation.
 - Named Python requirements: follow lock-header generator/platform constraints;
   verify hashes with wheel-only `python -m pip download --require-hashes --only-binary=:all:`
   into a disposable directory. Do not install or execute downloaded packages.
