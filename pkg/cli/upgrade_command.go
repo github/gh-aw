@@ -357,7 +357,9 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 			if opts.summary != nil {
 				opts.summary.recordFix(file, fixes)
 			}
-			_ = emitUpdateEvent(opts.ctx, updateJSONLEvent{Event: "codemod", Path: filepath.ToSlash(file), Codemods: fixes})
+			if reporter := updateReporter(opts.ctx); reporter != nil {
+				reporter.recordError(emitUpdateEvent(opts.ctx, updateJSONLEvent{Event: "codemod", Path: filepath.ToSlash(file), Codemods: fixes}))
+			}
 		}
 
 		if err := RunFix(fixConfig); err != nil {
@@ -587,22 +589,9 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 		return fmt.Errorf("invalid relaunch flag %q: expected --skip-extension-upgrade", extraFlag)
 	}
 
-	var exe string
-	if exeOverride != "" {
-		exe = exeOverride
-	} else {
-		var err error
-		exe, err = os.Executable()
-		if err != nil {
-			return fmt.Errorf("failed to determine executable path: %w", err)
-		}
-
-		// Resolve symlinks to ensure we exec the real binary, not a wrapper.
-		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = resolved
-		} else {
-			upgradeLog.Printf("Failed to resolve symlink for executable %s (using as-is): %v", exe, err)
-		}
+	exe, err := resolveUpgradeRelaunchExecutable(exeOverride)
+	if err != nil {
+		return err
 	}
 
 	// Explicitly copy os.Args[1:] so appending the extra flag does not modify
@@ -615,15 +604,6 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 		return errors.New("invalid relaunch arguments: argument contains invalid control characters. Example: compile .github/workflows/example.md")
 	}
 	upgradeLog.Printf("Re-launching with new binary: %s (argument count: %d)", exe, len(newArgs))
-
-	// Validate the executable path before re-launching it (defense-in-depth).
-	// exe is always derived from os.Executable() or the pre-rename installPath which is
-	// itself obtained from os.Executable() + filepath.EvalSymlinks (all trusted OS calls).
-	originalExe := exe
-	exe, err := fileutil.ValidateExecutablePath(exe)
-	if err != nil {
-		return fmt.Errorf("invalid executable path %q: %w", originalExe, err)
-	}
 
 	// #nosec G204 -- exe is validated as an absolute path above and originates from
 	// os.Executable() or the known install path. newArgs forwards os.Args[1:] (user-controlled)
@@ -654,6 +634,29 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 		return runErr
 	}
 	return nil
+}
+
+func resolveUpgradeRelaunchExecutable(exeOverride string) (string, error) {
+	exe := exeOverride
+	if exe == "" {
+		var err error
+		exe, err = os.Executable()
+		if err != nil {
+			return "", fmt.Errorf("failed to determine executable path: %w", err)
+		}
+		// Resolve symlinks to ensure we exec the real binary, not a wrapper.
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		} else {
+			upgradeLog.Printf("Failed to resolve symlink for executable %s (using as-is): %v", exe, err)
+		}
+	}
+	// Both sources are trusted OS paths; validate before starting the process.
+	validated, err := fileutil.ValidateExecutablePath(exe)
+	if err != nil {
+		return "", fmt.Errorf("invalid executable path %q: %w", exe, err)
+	}
+	return validated, nil
 }
 
 func validUpgradeRelaunchArgs(args []string) bool {

@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -345,7 +346,7 @@ func TestUpdateJSONLWorkflowFailureWarnings(t *testing.T) {
 	before := resolveLatestRefFn
 	t.Cleanup(func() { resolveLatestRefFn = before })
 	for _, rateLimited := range []bool{false, true} {
-		t.Run(fmt.Sprint(rateLimited), func(t *testing.T) {
+		t.Run(strconv.FormatBool(rateLimited), func(t *testing.T) {
 			reason := "upstream source missing"
 			if rateLimited {
 				reason = "API rate limit exceeded"
