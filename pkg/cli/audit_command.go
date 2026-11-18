@@ -31,7 +31,7 @@ Available unified JSONL sessions are retained and automatically exported to
 sibling .atif trajectories, without changing the report format.
 
 Each argument accepts:
-- A numeric run ID (requires --repo owner/repo, e.g., 1234567890)
+- A numeric run ID (uses the current repository unless --repo owner/repo is provided, e.g., 1234567890)
 - A GitHub Actions run URL (e.g., https://github.com/owner/repo/actions/runs/1234567890)
 - A GitHub Actions job URL (e.g., https://github.com/owner/repo/actions/runs/1234567890/job/9876543210)
 - A GitHub Actions job URL with step (e.g., https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1)
@@ -43,7 +43,7 @@ When a job URL is provided (single-run mode only):
 - If no step number, finds and extracts the first failing step's output
 - Saves job logs to the output directory`
 
-var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo  # Audit with bare run ID (--repo required)
+var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890  # Audit a run in the current repository
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.com/owner/repo/actions/runs/1234567890  # Audit from run URL
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.com/owner/repo/actions/runs/1234567890/job/9876543210  # Audit job and extract first failing step
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1  # Extract step 7 output
@@ -247,7 +247,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 	if err != nil {
 		return err
 	}
-	if err := applyAuditRepoFlag(opts.repoFlag, components); err != nil {
+	if err := applyAuditRepoFlag(ctx, opts.repoFlag, components); err != nil {
 		return err
 	}
 	if opts.search != "" && components.JobID > 0 {
@@ -283,12 +283,16 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 	return err
 }
 
-func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents) error {
+func applyAuditRepoFlag(ctx context.Context, repoFlag string, components *parser.GitHubURLComponents) error {
 	if components.Owner != "" {
 		return nil
 	}
 	if repoFlag == "" {
-		return errors.New("--repo is required for bare run IDs; use --repo owner/repo")
+		var err error
+		repoFlag, err = getCurrentRepoSlugWithContext(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to detect current repository: %w; use --repo owner/repo or provide a run URL", err)
+		}
 	}
 	parts := strings.SplitN(repoFlag, "/", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" { //nolint:uncheckedsliceindex // len(parts) is checked first
@@ -318,7 +322,7 @@ func runAuditMulti(ctx context.Context, args []string, opts auditCommandOptions)
 	}
 
 	// Resolve owner/repo/hostname from --repo flag or base URL
-	if err := applyAuditRepoFlag(opts.repoFlag, baseComponents); err != nil {
+	if err := applyAuditRepoFlag(ctx, opts.repoFlag, baseComponents); err != nil {
 		return err
 	}
 	owner := baseComponents.Owner
