@@ -1,6 +1,6 @@
 ---
 title: Value report pilot
-description: What a ten-workflow field trial established about measurement, evidence scopes, and the limits of value reporting.
+description: What a ten-workflow field trial established about measurement, normalized sessions, and the limits of value reporting.
 sidebar:
   order: 299
 ---
@@ -94,7 +94,7 @@ lifecycle coverage for those workflows because no item records exist.
 An absent item ledger must not be interpreted as zero; preserving verified
 zero requires run-level coverage evidence.
 
-The malformed CLI-performance run aborted the first combined collection.
+The identity-incomplete CLI-performance run aborted the first combined collection.
 Collecting each fixed run independently exposed that failure without hiding
 the other nine results. A successful lifecycle-only `value` command does not
 repair the missing session identity or make its evidence valid.
@@ -129,7 +129,7 @@ credible outcome measurements.
 
 A second pass replayed **the same ten fixed runs**, with ten executable
 `evidence-number-v1` definitions and explicit window recipes. It did not replace
-the first trial, dispatch workflows, repair the malformed session, or fetch
+the first trial, dispatch workflows, repair the incomplete session, or fetch
 missing Git history.
 The [typed input bundle](https://github.com/github/gh-aw/blob/main/.github/aw/value/pilots/2026-11-18.evidence.json)
 and [generated reevaluation results](https://github.com/github/gh-aw/blob/main/.github/aw/value/pilots/2026-11-18.reevaluation.json)
@@ -233,3 +233,86 @@ This is a full historical Git replay, not imported-evidence attribution.
 It does not resolve the nine independent goal-evidence gaps in the ten-workflow
 cohort. Original trial observations remain unchanged, and no workflow was
 dispatched.
+
+## Session-first compatibility probe
+
+A fourth pass inspected the **same ten completed runs**, using the existing
+full-session validator and compact projector, without executing graders.
+The [session transport audit](https://github.com/github/gh-aw/blob/main/.github/aw/value/pilots/2026-11-18.sessions.json)
+pins source hashes, per-run event counts, recorded-grade comparisons, and
+verification limits. It covers four observed engines: Copilot (four runs),
+Claude (two), Codex (two), and Pi (one). CLI Performance has no canonical
+workflow metadata identifying its engine.
+
+| Check | Full `aw_session.jsonl` | Compact profile |
+| --- | --- | --- |
+| Full-session schema validation | 10 passed | Not a full-session contract |
+| Matching repository, workflow, run, and attempt | 9 runs | 9 runs |
+| Events | 8,396 | 354 |
+| Tool-start records | 227 | 0 |
+| Individual built-in grader results | 100: 96 numeric, four unavailable | 0 |
+| Recorded candidate operational-value grades | 0 | 0 |
+
+All 100 recorded grade triples (`id`, `status`, nullable `value`) match their
+original grader artifacts. The nine successful original Go collection reports
+preserve the same 90 triples. This checks existing result projections; it does
+**not** rerun a Go grader or demonstrate target session-query execution.
+Built-in execution and efficiency grades remain distinct from goal outcomes.
+The absence of a recorded candidate grade does not prove that no useful fact
+could be recovered from arbitrary tool output; that would require independently
+validating the candidate's full measurement contract.
+
+### Two boundaries matter
+
+CLI Performance is **schema-valid but identity-incomplete**, not malformed JSON:
+its 53 events include ten grader records, four unavailable, but no
+`workflow.info` or canonical tool-start records. Schema conformance alone does
+not establish usable execution identity or evidence completeness. Its original
+native lifecycle collection failure remains unchanged; no identity was
+inferred from a filename to bypass that guard.
+
+The compact profile deliberately excludes tool evidence and nested grader
+arrays. These sessions store individual grades in
+`grader.result.data.results[]`; compaction preserves a run summary, not those
+results. Nine projections also report size or oversized-line truncation.
+CLI Performance reports `truncated: false` but still loses every individual
+grade through routine projection. **False truncation does not mean complete
+evidence.** See the [compact-session contract](../specs/unified-agent-session-specification/#38-compact-unified-session-normative).
+
+An ingestion path that needs session-based regrading must resolve the full
+artifact with verified repository/run/attempt/invocation binding, rather than
+treat compact notifications as complete sessions. A recorded-result consumer
+can instead use the existing grader artifacts. OTLP export can additionally
+strip identity from event bodies, so its external correlation must also be
+verified. This probe did not access the external data lake or establish which
+ingestion path it uses.
+
+### What this supports
+
+The full unified session is a viable shared **input and result carrier** across
+the four observed engines; the experiment does not justify another session
+format or a JavaScript grading runtime in the Go server. Future workflow-specific
+Go/query graders still need their independently verifiable measurement facts
+recorded before grading. The ten historical runs do not already contain the
+requested goal grades, and this pass did not implement ten new goal evaluators.
+
+Later adoption and durability belong to the existing lifecycle observations,
+joined by a report. File Diet's later 403-line Git outcome is not a historical
+session grade and must not be inserted into that immutable session.
+The current `gh aw value` command still uses Git or supplied typed evidence;
+automatic consumption of session grades is **not implemented** by this probe.
+No workflow was dispatched, no commits were supplied to graders, and no
+published sessions or grader results were changed.
+
+To check a downloaded full session with the existing producer validator:
+
+```bash wrap
+node actions/setup/js/scripts/validate_session.cjs unified \
+  OUTPUT/native/run-RUN_ID/usage/aw_session.jsonl
+```
+
+For the compact comparison, call
+`readCompactUnifiedSession(path)` from
+`actions/setup/js/compact_unified_session.cjs` on those same immutable bytes.
+Compare individual results inside `grader.result.data.results[]`, not just the
+presence of a `grader.result` event or its aggregate pass count.
