@@ -1756,7 +1756,7 @@ async function main() {
   /** @type {Buffer | undefined} */
   let promptStdin;
   if (copilotSDKMode) {
-    resolvedArgs = args;
+    resolvedArgs = /\.(?:cjs|mjs|js|ts|mts)$/i.test(args[0] || "") ? ["--import", path.join(__dirname, "copilot_sdk_module_resolution.cjs"), ...args] : args;
   } else {
     const resolvedPrompt = resolvePromptFileInput(args);
     const fallbackConfigPath = !process.env.GH_AW_AWF_CONFIG_PATH && process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, "gh-aw", "awf-config.json") : undefined;

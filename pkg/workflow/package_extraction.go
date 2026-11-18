@@ -116,6 +116,7 @@ var pkgLog = logger.New("workflow:package_extraction")
 //   - Set CommandNames to all variants of the command (e.g., ["pip", "pip3"])
 //   - Set RequiredSubcommand if the package manager requires a subcommand
 //     (e.g., "install" for pip, "get" for go)
+//   - Set FlagsWithValues for flags whose following argument is not a package
 //   - Set TrimSuffixes to remove shell operators from package names
 //     (typically "&|;")
 //
@@ -172,6 +173,10 @@ type PackageExtractor struct {
 	//   - [] for npx (npx <package>)
 	RequiredSubcommands []string
 
+	// FlagsWithValues lists flags whose following argument should also be skipped
+	// while searching for a package name.
+	FlagsWithValues []string
+
 	// TrimSuffixes is a string of characters to trim from the end of package names.
 	// This is useful for removing shell operators that may appear after package names
 	// in command strings.
@@ -196,7 +201,7 @@ type PackageExtractor struct {
 //  2. Split each line into words
 //  3. Find command name matches (from CommandNames)
 //  4. If RequiredSubcommand is set, look for that subcommand
-//  5. Skip flags (words starting with -)
+//  5. Skip flags (words starting with -) and configured flag values
 //  6. Extract package name and trim configured suffixes
 //  7. Return first package found per command invocation
 //
@@ -297,8 +302,11 @@ func (pe *PackageExtractor) isCommandName(word string) bool {
 // (e.g., "pip install <package>" or "go get <package>")
 func (pe *PackageExtractor) extractWithSubcommands(words []string, commandIndex int, subcommands []string) string {
 	// Look for any of the required subcommands after the command name
-	for j := commandIndex + 1; j < len(words); j++ {
-		if slices.Contains(subcommands, words[j]) {
+	for j, word := range words {
+		if j <= commandIndex {
+			continue
+		}
+		if slices.Contains(subcommands, word) {
 			// Found a matching subcommand - now find the package name
 			return pe.findPackageName(words, j+1)
 		}
@@ -327,10 +335,18 @@ func (pe *PackageExtractor) FindPackageName(words []string, startIndex int) stri
 
 // findPackageName is the internal implementation of FindPackageName
 func (pe *PackageExtractor) findPackageName(words []string, startIndex int) string {
-	for i := startIndex; i < len(words); i++ {
-		pkg := words[i]
+	skipNext := false
+	for i, pkg := range words {
+		if i < startIndex {
+			continue
+		}
+		if skipNext {
+			skipNext = false
+			continue
+		}
 		// Skip flags (start with - or --)
 		if strings.HasPrefix(pkg, "-") {
+			skipNext = slices.Contains(pe.FlagsWithValues, pkg)
 			continue
 		}
 		// Trim configured suffixes (e.g., shell operators)

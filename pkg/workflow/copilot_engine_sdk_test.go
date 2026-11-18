@@ -92,8 +92,8 @@ func TestCopilotEngineExecutionStepsWithCopilotSDK(t *testing.T) {
 	if !strings.Contains(stepContent, `npm root -g`) || !strings.Contains(stepContent, `export NODE_PATH=`) {
 		t.Fatalf("Expected SDK mode command to configure NODE_PATH from npm global root, got:\n%s", stepContent)
 	}
-	if !strings.Contains(stepContent, `${GITHUB_WORKSPACE:-$PWD}/node_modules`) {
-		t.Fatalf("Expected SDK mode command to configure NODE_PATH from workspace node_modules, got:\n%s", stepContent)
+	if !strings.Contains(stepContent, `${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk/node_modules`) {
+		t.Fatalf("Expected SDK mode command to configure NODE_PATH from isolated SDK node_modules, got:\n%s", stepContent)
 	}
 	if !strings.Contains(stepContent, `${NODE_PATH:+:${NODE_PATH}}`) {
 		t.Fatalf("Expected SDK mode command to preserve existing NODE_PATH entries, got:\n%s", stepContent)
