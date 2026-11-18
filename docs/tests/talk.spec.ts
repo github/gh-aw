@@ -380,6 +380,23 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   expect(boxes[0].left).toBeGreaterThanOrEqual(0);
   for (let i = 1; i < 7; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].right);
   expect(boxes[6].right).toBeLessThanOrEqual(320);
+  // kiosk and the column button sit on a second row above the dock, inside the screen and clear of it and each other
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Daily Improvers")}`);
+  await expect(page.locator(".vnb")).toBeVisible();
+  const raised = await page.evaluate(() =>
+    [".ksb", ".vnb", ".arrows button", ".smb", ".fzb", ".snd"]
+      .flatMap(s => [...document.querySelectorAll(s)])
+      .map(e => {
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      })
+  );
+  const overlap = (a: (typeof raised)[0], b: (typeof raised)[0]) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  for (const [i, box] of raised.slice(0, 2).entries()) {
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(320);
+    for (const other of raised.slice(i + 1)) expect(overlap(box, other)).toBe(false);
+  }
 });
 
 test.describe("compact navigation on touch screens", () => {
@@ -960,7 +977,9 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
 <script>
   window.hooks = [];
   let steps = 0;
-  const last = new URLSearchParams(location.search).get("last");
+  const query = new URLSearchParams(location.search);
+  const last = query.get("last");
+  const examples = query.has("examples");
   window.CracktroDeck.create({
     slides: ({ h, letters, current }) => {
       const slide = (group, title, extra = {}) => ({ group, notes: title + " notes", el: h("section", { class: "slide" }, h("h2", {}, letters(title))), ...extra });
@@ -971,13 +990,15 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
           onKey: e => e.key === "x" && hooks.push("key:" + current().notes) > 0,
         }),
         slide("outro", "Goodbye"),
-        slide("part", "Alpha"),
+        slide("part", "Alpha", examples ? { key: "alpha" } : {}),
+        ...(examples ? [slide("part", "Alpha example", { under: "alpha" })] : []),
         slide("part", "Beta"),
       ];
     },
     bands: { part: ["Part one", "The only band"] },
     tours: { ends: { title: "Both ends", summary: "first and last", slides: ["hello", "goodbye"] }, part: { title: "Just the part", bands: ["part"] }, ghost: { slides: ["nope"] } },
     last: last === "none" ? null : last || "outro",
+    kioskInterval: +query.get("kiosk") || undefined,
   });
 </script></body></html>`;
 
@@ -1153,5 +1174,150 @@ test.describe("reusable runtime", () => {
     await page.keyboard.press("ArrowLeft");
     await expect(heading(page)).toHaveText("Hello");
     expect(errors).toEqual([]);
+  });
+
+  // A fake Fullscreen API (real fullscreen is unreliable headless): ?fs=grant enters, ?fs=deny rejects, ?fs=none
+  // has no API (iPhone Safari); window.fsCalls records requests and exits. Run before goto, like page.clock.install.
+  const fakeFullscreen = (page: Page) =>
+    page.addInitScript(() => {
+      const mode = new URLSearchParams(location.search).get("fs");
+      if (!mode) return;
+      const w = window as unknown as { fsCalls: string[] };
+      w.fsCalls = [];
+      let full: Element | null = null;
+      const change = () => document.dispatchEvent(new Event("fullscreenchange"));
+      for (const k of ["fullscreenElement", "webkitFullscreenElement"]) Object.defineProperty(Document.prototype, k, { configurable: true, get: () => full });
+      const request =
+        mode === "none"
+          ? undefined
+          : function (this: Element) {
+              w.fsCalls.push("request");
+              if (mode === "deny") return Promise.reject(new TypeError("Permissions check failed"));
+              full = this;
+              change();
+              return Promise.resolve();
+            };
+      for (const k of ["requestFullscreen", "webkitRequestFullscreen"]) Object.defineProperty(Element.prototype, k, { configurable: true, writable: true, value: request });
+      Document.prototype.exitFullscreen = function () {
+        w.fsCalls.push("exit");
+        full = null;
+        change();
+        return Promise.resolve();
+      };
+    });
+  const fsCalls = (page: Page) => page.evaluate(() => (window as unknown as { fsCalls: string[] }).fsCalls);
+  const KIOSK_MS = 15_000;
+
+  test("leaves the deck on manual navigation unless kiosk mode is started", async ({ page }) => {
+    await page.clock.install();
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html#hello");
+    await expect(heading(page)).toHaveText("Hello");
+    await page.clock.runFor(4 * KIOSK_MS);
+    await expect(heading(page)).toHaveText("Hello");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    const kiosk = page.locator(".ksb");
+    await expect(kiosk).toHaveAttribute("aria-pressed", "false");
+    await expect(kiosk).toHaveAttribute("title", "Start kiosk mode: rotate slides in fullscreen (K)");
+    await expect(kiosk).toHaveAttribute("aria-keyshortcuts", "K");
+    expect(errors).toEqual([]);
+  });
+
+  test("rotates every slide in fullscreen kiosk mode, examples included, wrapping to the first", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?examples&fs=grant#hello");
+    await expect(heading(page)).toHaveText("Hello");
+    // a held K (auto-repeat) starts kiosk mode once instead of toggling it on and off
+    await page.keyboard.down("k");
+    await page.keyboard.down("k");
+    await page.keyboard.up("k");
+    const kiosk = page.getByRole("button", { name: "Stop kiosk mode (K or Esc)" });
+    await expect(kiosk).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    expect(await fsCalls(page)).toEqual(["request"]);
+    // the presentation chrome hides; only the stop button stays
+    for (const chrome of [".dots", ".progress", ".fzb", ".smb"]) await expect(page.locator(chrome)).toBeHidden();
+    await expect(kiosk).toBeVisible();
+
+    await page.clock.runFor(KIOSK_MS - 1000);
+    await expect(heading(page)).toHaveText("Hello");
+    // Hello's onNext step does not hold the rotation; the column's example is shown after its pattern
+    for (const title of ["Part one", "Alpha", "Alpha example", "Beta", "Goodbye", "Hello"]) {
+      await page.clock.runFor(title === "Part one" ? 1000 : KIOSK_MS);
+      await expect(heading(page)).toHaveText(title);
+    }
+
+    // a manual move restarts the countdown
+    await page.keyboard.press("PageDown");
+    await expect(heading(page)).toHaveText("Part one");
+    await page.clock.runFor(KIOSK_MS - 1000);
+    await expect(heading(page)).toHaveText("Part one");
+    await page.clock.runFor(1000);
+    await expect(heading(page)).toHaveText("Alpha");
+
+    // the rotation holds while a dialog is open; Escape closes the dialog without stopping kiosk mode
+    await page.keyboard.press("g");
+    await expect(page.locator(".smp")).toBeVisible();
+    await page.clock.runFor(2 * KIOSK_MS);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".smp")).toBeHidden();
+    await expect(heading(page)).toHaveText("Alpha");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+
+    // the button stops it, leaves the fullscreen it entered, restores the chrome and leaves no timer behind
+    await kiosk.click();
+    await expect(page.getByRole("button", { name: "Start kiosk mode: rotate slides in fullscreen (K)" })).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    expect(await fsCalls(page)).toEqual(["request", "exit"]);
+    await expect(page.locator(".dots")).toBeVisible();
+    await page.clock.runFor(4 * KIOSK_MS);
+    await expect(heading(page)).toHaveText("Alpha");
+    expect(errors).toEqual([]);
+  });
+
+  test("rotates only a tour's slides and stops when fullscreen ends", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?examples&fs=grant#beta&tour=part");
+    await expect(heading(page)).toHaveText("Beta");
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator(".tourp")).toBeHidden();
+    for (const title of ["Part one", "Alpha", "Alpha example", "Beta", "Part one"]) {
+      await page.clock.runFor(KIOSK_MS);
+      await expect(heading(page)).toHaveText(title);
+    }
+    await expect(page).toHaveURL(/#part-one&tour=part$/);
+
+    // Escape in real fullscreen never reaches the page: the browser leaves fullscreen, which ends kiosk mode
+    await page.evaluate(() => document.exitFullscreen());
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await expect(page.locator(".tourp")).toBeVisible();
+    await page.clock.runFor(4 * KIOSK_MS);
+    await expect(heading(page)).toHaveText("Part one");
+    expect(await fsCalls(page)).toEqual(["request", "exit"]);
+    expect(errors).toEqual([]);
+  });
+
+  test("rotates in the window when fullscreen is refused or missing and stops on Escape", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    for (const fs of ["deny", "none"]) {
+      const { errors } = await open(page, `/gh-aw/cracktro/tiny.html?fs=${fs}#hello`);
+      await expect(heading(page)).toHaveText("Hello");
+      await page.getByRole("button", { name: "Start kiosk mode: rotate slides in fullscreen (K)" }).click();
+      await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+      expect(await fsCalls(page)).toEqual(fs === "deny" ? ["request"] : []);
+      await page.clock.runFor(KIOSK_MS);
+      await expect(heading(page)).toHaveText("Part one");
+      await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+      await page.keyboard.press("Escape");
+      await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+      await expect(page.locator(".ksb")).toHaveAttribute("aria-pressed", "false");
+      await page.clock.runFor(4 * KIOSK_MS);
+      await expect(heading(page)).toHaveText("Part one");
+      expect(await fsCalls(page)).toEqual(fs === "deny" ? ["request"] : []);
+      expect(errors).toEqual([]);
+    }
   });
 });

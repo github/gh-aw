@@ -76,7 +76,13 @@ worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to
 the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
-and M to toggle sound. The slide map button (or G) opens a full-screen grid of
+and M to toggle sound. K (or the kiosk dock button) starts kiosk mode for unattended
+screens: the deck goes fullscreen where the browser allows it (otherwise it stays in
+the window) and advances every 15 seconds through every slide in the current tour or
+view, examples included, wrapping from the last slide to the first. The toolbar, dots
+and notes hide; only a stop button stays, fading after a few idle seconds. K, Escape, that
+button or leaving fullscreen stops it. A manual move restarts the countdown, and an open
+dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the

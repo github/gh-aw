@@ -1,5 +1,13 @@
 # Makefile for gh-aw Go project
 
+# Keep tool caches writable inside the sandbox; preserve explicit overrides.
+ifneq ($(strip $(TMPDIR)),)
+export GOCACHE ?= $(TMPDIR)/gh-aw-go-build
+export GOMODCACHE ?= $(TMPDIR)/gh-aw-go-mod
+export GOLANGCI_LINT_CACHE ?= $(TMPDIR)/gh-aw-golangci-lint
+export npm_config_cache ?= $(TMPDIR)/gh-aw-npm-cache
+endif
+
 # Variables
 BINARY_NAME=gh-aw
 # Add .exe extension on Windows
@@ -973,9 +981,11 @@ LINTER_PACKAGES ?= ./cmd/... ./pkg/...
 .PHONY: golint-custom
 golint-custom:
 	@echo "Building custom linters..."
-	@env -u GOOS -u GOARCH go build -o /tmp/gh-aw-linters ./cmd/linters
-	@echo "Running custom linters (largefunc max-lines=$(MAX_LINES))..."
-	@/tmp/gh-aw-linters $(LINTER_FLAGS) -largefunc.max-lines=$(MAX_LINES) $(LINTER_PACKAGES)
+	@set -e; linter_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$linter_dir"' EXIT; \
+	env -u GOOS -u GOARCH go build -o "$$linter_dir/gh-aw-linters" ./cmd/linters; \
+	echo "Running custom linters (largefunc max-lines=$(MAX_LINES))..."; \
+	"$$linter_dir/gh-aw-linters" $(LINTER_FLAGS) -largefunc.max-lines=$(MAX_LINES) $(LINTER_PACKAGES)
 
 # Run incremental linter (only changed files since BASE_REF)
 # This provides 50-75% faster linting on PRs by only checking changed files
