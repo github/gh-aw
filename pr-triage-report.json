@@ -1,42 +1,16 @@
 {
-  "run_id": "43817907030",
+  "run_id": "pr-triage-2026-11-18T00:39:38Z",
   "source": "pr-triage",
-  "generated_at": "2026-11-16T06:39:19Z",
-  "eligible_total": 19,
-  "open_copilot_prs": 22,
-  "cooldown_skipped": 3,
-  "category_counts": {
-    "bug": 2,
-    "chore": 16,
-    "feature": 1
-  },
-  "risk_counts": {
-    "low": 16,
-    "medium": 2,
-    "high": 1
-  },
-  "priority_counts": {
-    "low": 16,
-    "medium": 1,
-    "high": 2
-  },
-  "action_counts": {
-    "auto_merge": 1,
-    "fast_track": 3,
-    "batch_review": 15,
-    "defer": 0,
-    "close": 0
-  },
-  "top_prs": [
-    76957,
-    78246,
-    78256
-  ],
-  "auto_merge_candidates": [
-    78253
-  ],
-  "batch_ids": [
-    "deps-2026-11-16"
-  ],
+  "generated_at": "2026-11-18T00:39:38Z",
+  "eligible_total": 0,
+  "open_copilot_prs": 0,
+  "cooldown_skipped": 0,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
+  "action_counts": {},
+  "top_prs": [],
+  "auto_merge_candidates": [],
+  "batch_ids": [],
   "close_candidates": []
 }
