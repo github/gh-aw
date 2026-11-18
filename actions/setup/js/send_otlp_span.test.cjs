@@ -11,12 +11,14 @@ const originalMkdirSync = nodeFs.mkdirSync.bind(nodeFs);
 const originalOpenSync = nodeFs.openSync.bind(nodeFs);
 const originalReadSync = nodeFs.readSync.bind(nodeFs);
 const originalCloseSync = nodeFs.closeSync.bind(nodeFs);
+const originalExistsSync = nodeFs.existsSync.bind(nodeFs);
 const originalSemconvStabilityOptIn = process.env.OTEL_SEMCONV_STABILITY_OPT_IN;
 
 // Keep the suite's virtual files available through streaming reads as well.
 beforeEach(() => {
   const files = new Map();
   let nextFd = -100;
+  vi.spyOn(fs, "existsSync").mockImplementation(file => (String(file) === "/tmp/gh-aw/aw_info.json" ? false : originalExistsSync(file)));
   vi.spyOn(fs, "openSync").mockImplementation((file, flags, mode) => {
     if (String(file) === "/tmp/gh-aw/otel-metrics.jsonl") return nextFd--;
     if (!vi.isMockFunction(fs.readFileSync)) return originalOpenSync(file, flags, mode);

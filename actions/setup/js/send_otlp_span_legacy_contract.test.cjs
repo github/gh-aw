@@ -170,6 +170,7 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
   let metricPayloads;
   let originalReadFileSync;
   let originalStatSync;
+  let originalExistsSync;
   let originalAppendFileSync;
   let originalOpenSync;
   let originalReadSync;
@@ -213,19 +214,28 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
     originalReadFileSync = fs.readFileSync;
     originalStatSync = fs.statSync;
     originalAppendFileSync = fs.appendFileSync;
+    originalExistsSync = fs.existsSync;
+    const fixtures = {
+      "/tmp/gh-aw/aw_info.json": { workflow_name: "OTel Legacy Golden", engine_id: "claude", model: "claude-3-5-sonnet", cli_version: "test" },
+      "/tmp/gh-aw/agent_usage.json": { input_tokens: 100, output_tokens: 25, cache_read_tokens: 10, cache_write_tokens: 5, ai_credits: 0.125 },
+      "/tmp/gh-aw/agent_output.json": { items: [], errors: [] },
+      "/tmp/gh-aw/agent_cli_start_ms.txt": BASE_MS,
+    };
+    const existingGhAwFiles = new Set([...Object.keys(fixtures), "/tmp/gh-aw/otlp-export-errors.count"]);
+    vi.spyOn(fs, "existsSync").mockImplementation(filePath => {
+      const file = String(filePath);
+      if (file.startsWith("/tmp/gh-aw/")) return existingGhAwFiles.has(file);
+      return originalExistsSync.call(fs, filePath);
+    });
     vi.spyOn(fs, "readFileSync").mockImplementation((filePath, ...args) => {
-      const fixture = {
-        "/tmp/gh-aw/aw_info.json": { workflow_name: "OTel Legacy Golden", engine_id: "claude", model: "claude-3-5-sonnet", cli_version: "test" },
-        "/tmp/gh-aw/agent_usage.json": { input_tokens: 100, output_tokens: 25, cache_read_tokens: 10, cache_write_tokens: 5, ai_credits: 0.125 },
-        "/tmp/gh-aw/agent_output.json": { items: [], errors: [] },
-        "/tmp/gh-aw/agent_cli_start_ms.txt": BASE_MS,
-      };
       if (String(filePath) === "/tmp/gh-aw/otlp-export-errors.count") return "0";
-      if (Object.hasOwn(fixture, String(filePath))) return JSON.stringify(fixture[String(filePath)]);
+      if (Object.hasOwn(fixtures, String(filePath))) return JSON.stringify(fixtures[String(filePath)]);
+      if (String(filePath).startsWith("/tmp/gh-aw/")) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       return originalReadFileSync.call(fs, filePath, ...args);
     });
     vi.spyOn(fs, "statSync").mockImplementation((filePath, ...args) => {
       if (String(filePath) === "/tmp/gh-aw/agent_output.json") return { mtimeMs: BASE_MS + 1000 };
+      if (String(filePath).startsWith("/tmp/gh-aw/")) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       return originalStatSync.call(fs, filePath, ...args);
     });
     vi.spyOn(fs, "appendFileSync").mockImplementation((filePath, content, ...args) => {

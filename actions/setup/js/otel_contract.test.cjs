@@ -18,6 +18,7 @@ const MANAGED_ENV_VARS = [
   "GITHUB_RUN_ATTEMPT",
   "GITHUB_ACTOR",
   "GITHUB_REPOSITORY",
+  "GITHUB_WORKFLOW",
   "GITHUB_EVENT_NAME",
   "GITHUB_JOB",
   "GH_AW_AGENT_CONCLUSION",
@@ -107,6 +108,7 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
     process.env.GITHUB_RUN_ATTEMPT = "2";
     process.env.GITHUB_ACTOR = "octocat";
     process.env.GITHUB_REPOSITORY = "github/gh-aw";
+    process.env.GITHUB_WORKFLOW = "Customer OTEL Contract";
     process.env.GITHUB_EVENT_NAME = "workflow_dispatch";
     process.env.GITHUB_JOB = "agent";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
