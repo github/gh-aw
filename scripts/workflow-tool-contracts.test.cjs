@@ -8,6 +8,8 @@ const { test } = require("node:test");
 const { buildCopilotSDKPermissionHandler } = require("../actions/setup/js/copilot_sdk_permissions.cjs");
 const { queryArguments } = require("../.github/workflows/shared/graft/query.cjs");
 
+const runtimeRoot = "/tmp/gh-aw-run.Test123";
+
 function workflowLock(name) {
   const lockPath = path.join(__dirname, "..", ".github", "workflows", `${name}.lock.yml`);
   return JSON.parse(execFileSync("yq", ["-o=json", lockPath], { encoding: "utf8" }));
@@ -34,7 +36,7 @@ function workflowPermissions(name) {
   const lock = workflowLock(name);
   const config = lock.jobs.agent.steps.find(step => step.name === "Execute GitHub Copilot CLI")?.env?.GH_AW_COPILOT_SDK_TOOL_CONFIG;
   assert.ok(config, `Missing compiler-owned SDK permissions for ${name}`);
-  return JSON.parse(config).permissions;
+  return JSON.parse(config.replaceAll("${{ env.GH_AW_RUNTIME_ROOT }}", runtimeRoot)).permissions;
 }
 
 function permissionHandler(name) {
@@ -103,8 +105,8 @@ test("Daily Graft runs the native CLI against a read-only graph without a Graft 
   assert.match(install.run, /query\.cjs.*\$GRAFT_CLI_DIR\/bin\/graft/);
   assert.match(install.run, /%s\/bin.*GITHUB_PATH/);
   assert.match(build.run, /node_modules\/\.bin\/graft --dir "\$GRAFT_DIR" build "\$GITHUB_WORKSPACE"/);
-  assert.match(execute.run, /--mount.*\/tmp\/gh-aw\/graft:\/tmp\/gh-aw\/graft:ro/);
-  assert.match(execute.run, /--mount.*\/tmp\/gh-aw\/graft-cli:\/tmp\/gh-aw\/graft-cli:ro/);
+  assert.match(execute.run, /\$\{GH_AW_RUNTIME_ROOT\}\/graft:\$\{GH_AW_RUNTIME_ROOT\}\/graft:ro/);
+  assert.match(execute.run, /\$\{GH_AW_RUNTIME_ROOT\}\/graft-cli:\$\{GH_AW_RUNTIME_ROOT\}\/graft-cli:ro/);
 });
 
 test("Daily Graft query wrapper rejects effective graph-directory overrides", () => {
@@ -124,25 +126,26 @@ test("Daily Graft query wrapper rejects effective graph-directory overrides", ()
 
 test("Daily Graft permits native queries but rejects duplicate checks and graph mutations", () => {
   const handler = permissionHandler("daily-graft-intelligence");
+  const graph = `${runtimeRoot}/graft`;
   for (const command of [
     "graft --help",
-    "graft --dir=/tmp/gh-aw/graft map",
-    "graft --dir=/tmp/gh-aw/graft map --max-dirs 5",
-    'graft --dir=/tmp/gh-aw/graft ask "compiler" --source',
-    'graft --dir=/tmp/gh-aw/graft callers "Compile" --depth 2',
-    'graft --dir=/tmp/gh-aw/graft skeleton "pkg/workflow/compiler.go"',
-    'graft --dir=/tmp/gh-aw/graft grep "Compile"',
+    `graft --dir=${graph} map`,
+    `graft --dir=${graph} map --max-dirs 5`,
+    `graft --dir=${graph} ask "compiler" --source`,
+    `graft --dir=${graph} callers "Compile" --depth 2`,
+    `graft --dir=${graph} skeleton "pkg/workflow/compiler.go"`,
+    `graft --dir=${graph} grep "Compile"`,
   ]) {
     checkCommand(handler, command, "approve-once");
   }
   for (const command of [
-    "graft --dir=/tmp/gh-aw/graft check",
-    "graft --dir=/tmp/gh-aw/graft build",
-    "graft --dir=/tmp/gh-aw/graft mcp",
+    `graft --dir=${graph} check`,
+    `graft --dir=${graph} build`,
+    `graft --dir=${graph} mcp`,
     "graft graft_check",
     "graft graft_map",
     "graft map",
-    "graft --dir=/tmp/other-graph map",
+    `graft --dir=${runtimeRoot}/other-graph map`,
     "npx -y @nanonets/graft@0.8.0 check",
   ]) {
     checkCommand(handler, command, "reject");

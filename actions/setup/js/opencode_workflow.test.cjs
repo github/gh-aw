@@ -605,11 +605,15 @@ describe("OpenCode shared workflow harness", () => {
 });
 
 describe("OpenCode MCP adapter", () => {
+  const runtimeRoot = "/tmp/gh-aw-run.Test123";
+
   it("rewrites URLs, preserves headers, excludes CLI servers, and emits only native fields", () => {
     const writeSecureOutput = vi.fn();
     vm.runInNewContext(engineScript("config-adapter"), {
+      process: { env: { GH_AW_RUNTIME_ROOT: runtimeRoot } },
       require: () => ({
         ...gateway,
+        join: (...parts) => require("node:path").join(...parts),
         loadGatewayContext: () => ({
           urlPrefix: "http://host.docker.internal:80",
           cliServers: new Set(["safeoutputs"]),
@@ -621,7 +625,7 @@ describe("OpenCode MCP adapter", () => {
         writeSecureOutput,
       }),
     });
-    expect(writeSecureOutput.mock.calls[0][0]).toBe("/tmp/gh-aw/opencode-mcp.json");
+    expect(writeSecureOutput.mock.calls[0][0]).toBe(`${runtimeRoot}/opencode-mcp.json`);
     expect(JSON.parse(writeSecureOutput.mock.calls[0][1])).toEqual({
       mcp: { servers: { github: { type: "remote", url: "http://host.docker.internal:80/mcp/github", headers: { Authorization: "Bearer fixture" }, disabled: false, codemode: false, oauth: false } } },
     });
@@ -630,8 +634,10 @@ describe("OpenCode MCP adapter", () => {
   it("does not silently accept a malformed gateway server", () => {
     expect(() =>
       vm.runInNewContext(engineScript("config-adapter"), {
+        process: { env: { GH_AW_RUNTIME_ROOT: runtimeRoot } },
         require: () => ({
           ...gateway,
+          join: (...parts) => require("node:path").join(...parts),
           loadGatewayContext: () => ({ urlPrefix: "http://gateway", cliServers: new Set(), servers: { bad: {} } }),
         }),
       })
