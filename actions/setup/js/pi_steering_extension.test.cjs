@@ -8,6 +8,7 @@ beforeEach(() => {
   vi.stubEnv("GH_AW_TIMEOUT_MINUTES", "10");
   vi.stubEnv("GH_AW_STEERING_TIME_WARNING_MINUTES", "5");
   vi.stubEnv("GH_AW_STEERING_TIME_CRITICAL_MINUTES", "2");
+  vi.stubEnv("GH_AW_HARNESS_RECOVERY", "");
   vi.spyOn(process.stderr, "write").mockReturnValue(true);
 });
 afterEach(() => {
@@ -19,11 +20,51 @@ afterEach(() => {
 function harness() {
   const handlers = {};
   const sendUserMessage = vi.fn();
-  extension({ on: (event, handler) => (handlers[event] = handler), sendUserMessage });
+  extension({
+    on: (event, handler) => {
+      const previous = handlers[event];
+      handlers[event] = async (...args) => {
+        if (previous) await previous(...args);
+        await handler(...args);
+      };
+    },
+    sendUserMessage,
+  });
   return { handlers, sendUserMessage };
 }
 
 describe("Pi timeout steering", () => {
+  it("loads opt-in Recovery through the existing extension without resetting its budget on agent_start", async () => {
+    vi.stubEnv("GH_AW_HARNESS_RECOVERY", "1");
+    vi.stubEnv("AWF_REFLECT_ENABLED", "1");
+    const fetchImpl = vi.fn(
+      async (_url, options) =>
+        new Response(
+          options?.method === "POST"
+            ? JSON.stringify({ answers: [{ name: "recovery", type: "choice", choice: "change_strategy" }] })
+            : JSON.stringify({ endpoints: [{ configured: true, provider: "github", models_url: "http://api-proxy:10002/v1/models" }] })
+        )
+    );
+    vi.stubGlobal("fetch", fetchImpl);
+    try {
+      const { handlers, sendUserMessage } = harness();
+      const event = { message: { stopReason: "toolUse" }, toolResults: Array.from({ length: 3 }, () => ({ toolName: "bash", isError: true })) };
+      await handlers.agent_start();
+      for (let index = 0; index < 3; index++) {
+        await handlers.turn_end(event);
+        await handlers.agent_start();
+      }
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
+      expect(sendUserMessage).toHaveBeenCalledTimes(2);
+      vi.advanceTimersByTime(6 * 60000);
+      await handlers.turn_end(event);
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
+      expect(sendUserMessage).toHaveBeenLastCalledWith(expect.stringContaining("wrap up"), { deliverAs: "steer" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("uses defaults when environment values are absent or invalid", () => {
     vi.stubEnv("GH_AW_TIMEOUT_MINUTES", "");
     vi.stubEnv("GH_AW_STEERING_TIME_WARNING_MINUTES", "invalid");

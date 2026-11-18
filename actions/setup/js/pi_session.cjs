@@ -753,4 +753,4 @@ function computePiV3Stats(records, { sourceEngine = "pi" } = {}) {
   };
 }
 
-module.exports = { transformPiV3Entries, computePiV3Stats, normalizePiObservations };
+module.exports = { transformPiV3Entries, computePiV3Stats, normalizePiObservations, isPiResultError };

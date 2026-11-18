@@ -11,6 +11,24 @@ function completedEvent(overrides = {}) {
 }
 
 describe("harness policy dispatcher", () => {
+  it("isolates immutable turn observations without retaining raw tool results", async () => {
+    const tools = [{ toolName: "bash", success: false, output: "PRIVATE" }];
+    const onEvent = vi.fn(event => {
+      expect(event.tools).toEqual([{ toolName: "bash", success: false }]);
+      expect(() => event.tools.push({ toolName: "other", success: true })).toThrow(TypeError);
+      expect(() => (event.tools[0].success = true)).toThrow(TypeError);
+    });
+    await createHarnessPolicyDispatcher({ adapter: { engine: "pi" }, policies: [{ id: "observer", onEvent }] }).dispatch({
+      type: "turn.completed",
+      ongoing: true,
+      remainingMs: 600000,
+      tools,
+    });
+    expect(onEvent).toHaveBeenCalledOnce();
+    expect(tools[0]).toEqual({ toolName: "bash", success: false, output: "PRIVATE" });
+    expect(Object.isFrozen(tools)).toBe(false);
+  });
+
   it("does not enable policies or actions implicitly", async () => {
     const steer = vi.fn();
     const dispatcher = createHarnessPolicyDispatcher({ adapter: { engine: "pi", actions: { steer } } });

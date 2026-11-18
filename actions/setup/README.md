@@ -207,10 +207,43 @@ invocations and thrown execution errors do not manufacture completion events.
 Existing retry counts, backoff, terminal guards, session selection, and
 telemetry remain owned by the retry runner and engine wrappers.
 
+Native adapters can also dispatch `turn.completed` with `ongoing`, `remainingMs`,
+and `tools` entries containing `toolName` and an optional boolean `success`.
+Missing outcomes are unknown, not failures. Tool arrays and entries are immutable
+snapshots; raw arguments and results are excluded.
+
 This is an internal extension point, not workflow configuration. No policies,
 native action handlers, model calls, or optimization features are enabled by
-default. Pi and Copilot native adapters and Recovery remain separate follow-up
-work.
+default.
+
+### Opt-in Pi Recovery
+
+Set the agent environment variable `GH_AW_HARNESS_RECOVERY=1` to enable Recovery
+through Pi's existing steering extension in CLI, SDK, and RPC modes. Other
+values leave it disabled. Detection jobs and Pi child agents do not enable it.
+
+The shared `js/harness_recovery.cjs` policy detects three consecutive failures
+of the same tool across ongoing turns. A successful or unknown outcome breaks
+the streak, as does a different tool. Native nonzero exit codes count as
+failures even when Pi reports `isError: false`. Each evaluation consumes the
+streak and requires three new failures before another evaluation.
+
+At most two decision evaluations run per session, including failures and
+abstentions. Each evaluation has a five-second total network budget, uses the
+existing Decisions client and firewall proxy, and sends only failure counts,
+evaluation number, and remaining milliseconds. There is no direct-provider
+fallback, credential discovery, raw tool content, or free-form generated
+instruction. Errors and refusals abstain with sanitized diagnostics.
+
+The model can choose to continue, abstain, or request a fixed strategy-reassessment
+message through native `sendUserMessage(..., { deliverAs: "steer" })`. Recovery
+does not grant permissions, restart an agent, change models, or infer successful
+completion. It yields to the earlier of Pi's warning and critical timeout
+thresholds, reserving at least ten seconds. A full decision timeout must fit
+before that completion window; late steering and interventions after a terminal
+tool guard are suppressed. Native `agent_start` retries
+do not reset the clock or evaluation cap. This first policy addresses repeated
+tool failures, not arbitrary stalls or wall-clock inactivity.
 
 ### Decisions client
 

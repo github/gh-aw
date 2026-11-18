@@ -13,6 +13,7 @@
  *   GH_AW_TIMEOUT_MINUTES               Total allowed runtime in minutes (default: 30)
  *   GH_AW_STEERING_TIME_WARNING_MINUTES  Minutes-remaining threshold for warning message (default: 5)
  *   GH_AW_STEERING_TIME_CRITICAL_MINUTES Minutes-remaining threshold for critical message (default: 2)
+ *   GH_AW_HARNESS_RECOVERY              Enable bounded tool-failure Recovery when set to 1
  */
 
 "use strict";
@@ -80,6 +81,13 @@ function piSteeringExtension(pi) {
       pi.sendUserMessage(`⚠️ ${remainingMinutes.toFixed(0)} minute(s) remaining. Please wrap up your current task and start writing your final output.`, { deliverAs: "steer" });
     }
   });
+
+  if (process.env.GH_AW_HARNESS_RECOVERY === "1") {
+    require("./pi_recovery_extension.cjs").installPiRecovery(pi, {
+      remainingMs: () => (startTime === undefined ? undefined : config.timeoutMinutes * 60000 - (Date.now() - startTime)),
+      minimumRemainingMs: Math.max(config.timeWarningMinutes, config.timeCriticalMinutes) * 60000,
+    });
+  }
 }
 
 module.exports = piSteeringExtension;

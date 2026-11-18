@@ -3,7 +3,7 @@
 "use strict";
 
 /**
- * Classified, completed invocations only; never includes prompts, output, or credentials.
+ * Classified lifecycle observations; never includes prompts, output, or credentials.
  * @typedef {Readonly<{
  *   type: "attempt.completed",
  *   attempt: number,
@@ -11,7 +11,14 @@
  *   exitCode: number,
  *   outcome: "success" | "failure" | "cancelled",
  *   failureClasses: readonly string[],
- * }>} HarnessPolicyEvent
+ * }>} HarnessAttemptCompletedEvent
+ * @typedef {Readonly<{
+ *   type: "turn.completed",
+ *   ongoing: boolean,
+ *   remainingMs: number,
+ *   tools: readonly Readonly<{ toolName: string, success?: boolean }>[],
+ * }>} HarnessTurnCompletedEvent
+ * @typedef {HarnessAttemptCompletedEvent | HarnessTurnCompletedEvent} HarnessPolicyEvent
  * @typedef {Readonly<{ type: "steer", message: string }>} HarnessPolicyAction
  * @typedef {Readonly<{ engine: string, capabilities: readonly HarnessPolicyAction["type"][] }>} HarnessPolicyContext
  * @typedef {Readonly<{
@@ -56,7 +63,10 @@ function createHarnessPolicyDispatcher({ adapter, policies = [] }) {
 
   return Object.freeze({
     async dispatch(event) {
-      const snapshot = Object.freeze({ ...event, failureClasses: Object.freeze([...event.failureClasses]) });
+      const snapshot =
+        event.type === "attempt.completed"
+          ? Object.freeze({ ...event, failureClasses: Object.freeze([...event.failureClasses]) })
+          : Object.freeze({ ...event, tools: Object.freeze(event.tools.map(tool => Object.freeze({ toolName: tool.toolName, success: tool.success }))) });
       /** @type {HarnessPolicyAction[]} */
       const pendingActions = [];
       for (const policy of registeredPolicies) {
