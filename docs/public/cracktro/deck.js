@@ -2021,6 +2021,55 @@
   .ch-scan { position: absolute; left: 1340px; top: 928px; width: 480px; font: 500 15px/1 var(--mono); letter-spacing: .08em; color: #9198a1; text-align: center; opacity: 0; }
   .active .ch-scan { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.4s; }
 
+  /* --- compiler normalization --- */
+  .nz { --lg: #79c0ff; }
+  .nz-file { position: absolute; top: 296px; border-radius: 16px; background: #0d1117f2; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -28px color-mix(in srgb, var(--c) 33%, transparent); overflow: hidden; opacity: 0; }
+  .nz-file.md { left: 90px; width: 690px; }
+  .nz-file.lock { left: 1010px; width: 820px; }
+  .active .nz-file { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 450ms + 250ms); }
+  .nz-file .cm-tab { height: 44px; font-size: 18px; }
+  .nz-file .cm-tab .sv { margin-left: auto; font-size: 14px; letter-spacing: .08em; color: var(--c); }
+  .nz-code { padding: 12px 0 16px; font: 500 16px/23px var(--mono); color: #d1d7e0; white-space: pre; }
+  .nz-l { position: relative; height: 23px; padding: 0 22px; transition: background .35s, box-shadow .35s, opacity .35s; }
+  .nz-m { position: absolute; right: 12px; top: 0; font: 700 14px/23px var(--mono); font-style: normal; letter-spacing: .04em; }
+  .nz-l.bad { background: #db6d2814; box-shadow: inset 3px 0 #db6d28; }
+  .nz-l.bad .nz-m { color: #ffa657; }
+  .nz-l.bad.on > span { text-decoration: line-through 2px #ffa657b0; opacity: .6; }
+  .nz-l.fix { opacity: .3; }
+  .nz-l.fix .nz-m { color: #79c0ff; opacity: 0; transition: opacity .35s; }
+  .nz-l.fix.on { opacity: 1; background: #4493f814; box-shadow: inset 3px 0 #4493f8; }
+  .nz-l.fix.on .nz-m { opacity: 1; }
+  .nz-l.bad.hot { background: #db6d2838; }
+  .nz-l.fix.hot { background: #4493f838; }
+  .nz-cmd { position: absolute; left: 790px; top: 300px; width: 210px; display: flex; flex-direction: column; align-items: center; gap: 10px; font: 600 17px/1 var(--mono); color: #79c0ff; opacity: 0; }
+  .nz-cmd b { color: #9198a1; font-weight: 500; }
+  .nz-cmd em { font: 700 34px/1 var(--mono); font-style: normal; color: #4493f8; }
+  .active .nz-cmd { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .nz-wire { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; opacity: 0; transition: opacity .3s; }
+  .nz-wire.on { opacity: 1; }
+  .nz-wire path { fill: none; stroke: #79c0ff; stroke-width: 3; stroke-dasharray: 8 8; filter: drop-shadow(0 0 6px #4493f8); }
+  .nz-wire.run path { animation: nz-flow .9s linear infinite; }
+  .nz-wire circle { fill: #79c0ff; }
+  @keyframes nz-flow { to { stroke-dashoffset: -32; } }
+  .nz-chips { position: absolute; left: 90px; top: 846px; width: 1740px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .nz-chip { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #0d1117f8; border: 1px solid #3d444d; opacity: 0; transition: border-color .35s, box-shadow .35s, background .35s; }
+  .active .nz-chip { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 110ms + 900ms); }
+  .nz-chip i { grid-row: span 2; font: 700 20px/1 var(--mono); font-style: normal; color: #9198a1; }
+  .nz-chip b { font-size: 20px; white-space: nowrap; line-height: 1.2; font-variation-settings: "wght" 700, "wdth" 100; color: #9198a1; }
+  .nz-chip span { font: 500 13px/1.35 var(--mono); color: #656c76; white-space: nowrap; }
+  .nz-chip.on i, .nz-chip.on b { color: #f0f6fc; }
+  .nz-chip.on i { color: #79c0ff; }
+  .nz-chip.on span { color: #9198a1; }
+  .nz-chip.hot { border-color: #4493f8; background: #4493f81f; box-shadow: 0 0 34px -8px #4493f866; }
+  .nz-chip.rej { border-style: dashed; }
+  .nz-chip.rej.on i { color: #ffa657; }
+  .nz-chip.rej.hot { border-color: #db6d28; background: #db6d281f; box-shadow: 0 0 34px -8px #db6d2866; }
+  .nz-rej { position: absolute; left: 805px; width: 180px; padding: 8px 0; border: 2px dashed #db6d28; border-radius: 12px; background: #0d1117f2; display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0; transform: scale(.9); transition: opacity .35s, transform .35s, box-shadow .35s, background .35s; }
+  .nz-rej.on { opacity: 1; transform: none; }
+  .nz-rej.hot { background: #db6d2826; box-shadow: 0 0 34px -8px #db6d2899; }
+  .nz-rej b { font: 700 16px/1 var(--mono); letter-spacing: .08em; color: #ffa657; }
+  .nz-rej span { font: 500 13px/1 var(--mono); color: #d1d7e0; }
+
   /* --- turn automation into value --- */
   .tv .slide-head h2 { --lg: #5fed83; }
   .tv-live { position: absolute; right: 110px; top: 120px; display: flex; align-items: center; gap: 14px; padding: 16px 26px; border-radius: 99px; background: #161b22e8; border: 1px solid #3d444d;
@@ -6111,6 +6160,7 @@
     };
     slides.push({
       group: "security",
+      key: "supply-chain",
       notes:
         "What: The compiler's static checks as layers around a workflow: trigger admission for forks and bots, untrusted ${{ }} expressions moved into environment variables, actions pinned to commit SHAs, package hygiene, least privilege, and scans for secrets and hidden instructions. The attacks are simulated and the SHA is shortened for illustration.\nWhy: Problems in the authored file are rejected before anything runs; the runtime sandbox is a separate layer.\nWhen: These always run at compile time; strict mode turns warnings into errors, and actionlint, zizmor or poutine add extra scanning.",
       enter() {
@@ -6198,6 +6248,169 @@
         lock,
         h("div", { class: "ch-legend" }, rows),
         h("div", { class: "ch-scan" }, "+ --validate · actionlint · zizmor · poutine")
+      ),
+    });
+  }
+
+  // Compiler normalization: agent-written workflow markdown with unsafe patterns, rewritten by gh aw compile into a hardened lock file
+  {
+    resetIndex();
+    const TOP = 296,
+      ROW = 23,
+      PAD = 44 + 12;
+    const MD = [
+      "---",
+      "on:",
+      "  issues:",
+      "    types: [opened]",
+      "permissions:",
+      "  contents: write",
+      "steps:",
+      "  - uses: actions/checkout@v4",
+      "    with:",
+      "      persist-credentials: false",
+      '  - run: echo "Title ${{ github.event.issue.title }}"',
+      "jobs:",
+      "  notify:",
+      "    needs: agent",
+      "    if: always()",
+      "    runs-on: ubuntu-latest",
+      "---",
+      "Triage issue #${{ github.event.issue.number }}:",
+      "${{ github.event.issue.title }}",
+    ];
+    const LOCK = [
+      "jobs:",
+      "  activation:",
+      "    steps:",
+      "      - name: Create prompt",
+      "        env:",
+      "          GH_AW_GITHUB_EVENT_ISSUE_TITLE: ${{ github.event.issue.title }}",
+      "  agent:",
+      "    steps:",
+      "      - uses: actions/checkout@11d5960",
+      "        with:",
+      "          persist-credentials: false",
+      "      - env:",
+      "          GH_AW_GITHUB_EVENT_ISSUE_TITLE: ${{ github.event.issue.title }}",
+      '        run: echo "Title $GH_AW_GITHUB_EVENT_ISSUE_TITLE"',
+      "  notify:",
+      "    needs: [agent, detection]",
+      "    if: \"${{ needs.detection.result == 'success'",
+      "      && needs.detection.outputs.detection_success == 'true'",
+      '      && (always()) }}"',
+    ];
+    // each rewrite: unsafe lines in the markdown → normalized lines in the lock file; sub names the gh aw lint rule that flags the draft
+    const FIXES = [
+      { md: [7], lock: [8], title: "Tag → commit SHA", sub: "action-pin · CTR-002" },
+      { md: [10], lock: [12, 13], title: "${{ }} in run → env var", sub: "template-injection · CTR-006" },
+      { md: [17, 18], lock: [5], title: "${{ }} in prompt → data", sub: "compiler binding · no lint rule" },
+      { md: [13, 14], lock: [15, 16, 17, 18], title: "always() → detection gate", sub: "custom-job-detection · CTR-005" },
+      // not rewritten: the compiler rejects write permissions on the agent job
+      { md: [5], lock: [], reject: true, title: "contents: write → rejected", sub: "compile error · use safe-outputs" },
+    ];
+    const tint = (s, prose) => {
+      if (s === "---") return h("span", { class: "ch-c" }, s);
+      if (prose) return h("span", { class: "ch-p" }, s);
+      const m = s.match(/^(\s*(?:- )?)([\w-]+)(:)(.*)$/);
+      return m ? [m[1], h("span", { class: "ch-k" }, m[2]), m[3], h("span", { class: "ch-v" }, m[4])] : h("span", { class: "ch-v" }, s);
+    };
+    const mark = (lines, side) =>
+      FIXES.forEach((f, i) =>
+        f[side].forEach((n, j) => {
+          lines[n].classList.add(side === "md" ? "bad" : "fix");
+          lines[n].dataset.k = i;
+          if (!j) lines[n].append(h("i", { class: "nz-m" }, (side === "md" ? "⚠ " : "✓ ") + String(i + 1).padStart(2, "0")));
+        })
+      );
+    const mdLines = MD.map((s, i) => h("div", { class: "nz-l" }, tint(s, i > 16)));
+    const lockLines = LOCK.map(s => h("div", { class: "nz-l" }, tint(s)));
+    mark(mdLines, "md");
+    mark(lockLines, "lock");
+    const chips = FIXES.map((f, i) => h("div", { class: "nz-chip" + (f.reject ? " rej" : ""), "--i": i }, h("i", {}, (f.reject ? "✗ " : "") + String(i + 1).padStart(2, "0")), h("b", {}, f.title), h("span", {}, f.sub)));
+    const rej = h("div", { class: "nz-rej", style: { top: `${TOP + PAD + 5 * ROW - 20}px` } }, h("b", {}, "✗ REJECTED"), h("span", {}, "use safe-outputs"));
+    const wire = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const dots = [0, 1].map(() => document.createElementNS("http://www.w3.org/2000/svg", "circle"));
+    dots.forEach(d => d.setAttribute("r", "6"));
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "nz-wire");
+    svg.setAttribute("viewBox", "0 0 1920 1080");
+    svg.append(wire, ...dots);
+    const y = n => TOP + PAD + n * ROW + ROW / 2;
+    const X1 = 780,
+      X2 = 1010;
+    const REVEAL = 1.6,
+      GAP = 2.4,
+      HOT = 2.6;
+    let t0 = 0,
+      seen = 0,
+      skip = false,
+      hot = -2;
+    const focus = k => {
+      if (k === hot) return;
+      hot = k;
+      [...mdLines, ...lockLines].forEach(l => l.classList.toggle("hot", l.dataset.k === String(k)));
+      chips.forEach((c, i) => c.classList.toggle("hot", i === k));
+      rej.classList.toggle("hot", !!FIXES[k]?.reject);
+      svg.classList.toggle("on", k >= 0 && !FIXES[k].reject);
+      if (k < 0 || FIXES[k].reject) return;
+      const a = y(FIXES[k].md[0]),
+        b = y(FIXES[k].lock[0]);
+      wire.setAttribute("d", `M${X1},${a} C${X1 + 120},${a} ${X2 - 120},${b} ${X2},${b}`);
+      dots[0].setAttribute("cx", X1);
+      dots[0].setAttribute("cy", a);
+      dots[1].setAttribute("cx", X2);
+      dots[1].setAttribute("cy", b);
+      svg.classList.remove("run");
+      void svg.getBoundingClientRect();
+      svg.classList.add("run");
+    };
+    const fix = (k, on) => {
+      [...mdLines, ...lockLines].forEach(l => l.dataset.k === String(k) && l.classList.toggle("on", on));
+      chips[k].classList.toggle("on", on);
+      if (FIXES[k].reject) rej.classList.toggle("on", on);
+    };
+    slides.push({
+      group: "security",
+      under: "supply-chain",
+      notes:
+        "What: A synthetic workflow as a coding agent might write it, beside an excerpt of what gh aw compile emits. gh aw lint flags three rules in the draft: action-pin, template-injection and custom-job-detection. The compiler pins the action to a commit SHA (shortened here), binds the issue title as environment data in the shell and the prompt, and gates the custom job on threat detection. contents: write is not rewritten: compilation fails and points to safe outputs.\nWhy: Agents copy common but unsafe patterns. Lint names them and the compiler fixes or blocks them, so the lock file passes lint and actionlint.\nWhen: Let agents draft workflows, run gh aw lint, then review the lock file diff.",
+      enter() {
+        t0 = 0;
+        seen = 0;
+        skip = false;
+        hot = -2;
+        FIXES.forEach((_, k) => fix(k, false));
+        focus(-1);
+      },
+      onNext() {
+        if (seen >= FIXES.length) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - (REVEAL + seen * GAP) * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.max(0, Math.min(FIXES.length, Math.floor((e - REVEAL) / GAP) + 1));
+        while (seen < n) {
+          fix(seen, true);
+          sfx.pop(FIXES[seen].reject ? 0 : seen * 2 + 4);
+          seen++;
+        }
+        const done = REVEAL + FIXES.length * GAP;
+        focus(seen < FIXES.length || e < done ? seen - 1 : Math.floor((e - done) / HOT) % FIXES.length);
+      },
+      el: h(
+        "section",
+        { class: "slide nz" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agent-written, compiler-hardened"), h("h2", {}, letters("Compiler "), letters("normalization", "l-grad"))),
+        h("div", { class: "nz-file md", "--c": "#ffa657", "--i": 0 }, h("div", { class: "cm-tab" }, "triage.md", h("span", { class: "sv" }, "AGENT-WRITTEN · LINT ✗ 3")), h("div", { class: "nz-code" }, mdLines)),
+        h("div", { class: "nz-cmd" }, h("span", {}, h("b", {}, "$"), " gh aw compile"), h("em", {}, "→")),
+        h("div", { class: "nz-file lock", "--c": "#79c0ff", "--i": 1 }, h("div", { class: "cm-tab" }, "triage.lock.yml", h("span", { class: "sv" }, "EXCERPT · LINT ✓ CLEAN")), h("div", { class: "nz-code" }, lockLines)),
+        svg,
+        rej,
+        h("div", { class: "nz-chips" }, chips)
       ),
     });
   }
