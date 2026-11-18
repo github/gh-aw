@@ -84,22 +84,20 @@ env:
 jobs:
   activation:
     name: activation
-    needs: admission
-    if: (!cancelled()) && (needs.admission.result == 'success' || needs.admission.result == 'skipped')
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
+      id-token: write # Request an OIDC token for authenticated services.
     env:
-      GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
-      admission-max-ai-credits: ${{ needs.admission.outputs.max-ai-credits }}
-      admission-max-ai-credits-evals: ${{ needs.admission.outputs.max-ai-credits-evals }}
-      admission-max-ai-credits-threat-detection: ${{ needs.admission.outputs.max-ai-credits-threat-detection }}
-      admission-result: ${{ needs.admission.outputs.result }}
+      admission-max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
+      admission-max-ai-credits-evals: ${{ steps.admission.outputs.max-ai-credits-evals }}
+      admission-max-ai-credits-threat-detection: ${{ steps.admission.outputs.max-ai-credits-threat-detection }}
+      admission-result: ${{ steps.admission.outputs.result }}
       aw_context: ${{ steps.generate_aw_info.outputs.aw_context }}
       comment_id: ""
       comment_repo: ""
@@ -133,7 +131,6 @@ jobs:
         with:
           destination: ${{ runner.temp }}/gh-aw/actions
           job-name: ${{ github.job }}
-          trace-id: ${{ needs.admission.outputs.trace-id }}
           safe-output-artifact-client: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Smoke Claude Copilot Auto"
@@ -142,6 +139,21 @@ jobs:
           GH_AW_INFO_AWF_VERSION: "v0.29.14"
           GH_AW_INFO_ENGINE_ID: "claude"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
+      - name: Check workflow admission
+        id: admission
+        if: vars.GH_AW_DEFAULT_ADMISSION_URL != ''
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
+          GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
+          GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
+          GH_AW_ADMISSION_WORKFLOW_HASH: "4ec31db2269627a6405fee7ba5361ffc842d174d11d754611e73d4c7b2bc484b:0892f8d78f24bf370f2f5baf24e5d95508f4e4f1a55992243e99afec8ec11773"
+          GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          script: |
+            await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Generate agentic run info
@@ -442,61 +454,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
-  admission:
-    name: admission
-    if: vars.GH_AW_DEFAULT_ADMISSION_URL != ''
-    runs-on: ubuntu-slim
-    # Permissions for the admission job (workflow permissions default to none).
-    permissions:
-      contents: read
-      id-token: write # Request an OIDC token for authenticated services.
-    timeout-minutes: 5
-    outputs:
-      max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
-      max-ai-credits-evals: ${{ steps.admission.outputs.max-ai-credits-evals }}
-      max-ai-credits-threat-detection: ${{ steps.admission.outputs.max-ai-credits-threat-detection }}
-      result: ${{ steps.admission.outputs.result }}
-      trace-id: ${{ steps.admission.outputs.trace-id }}
-    steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: github/gh-aw
-          sparse-checkout: |
-            actions
-          fetch-depth: 1
-          clean: false
-          persist-credentials: false
-      - name: Setup Scripts
-        id: setup
-        uses: ./actions/setup
-        with:
-          destination: ${{ runner.temp }}/gh-aw/actions
-          job-name: ${{ github.job }}
-        env:
-          GH_AW_SETUP_WORKFLOW_NAME: "Smoke Claude Copilot Auto"
-          GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/unknown.lock.yml@${{ github.ref }}
-      - name: Check workflow admission
-        id: admission
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
-          GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
-          GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "4ec31db2269627a6405fee7ba5361ffc842d174d11d754611e73d4c7b2bc484b:0892f8d78f24bf370f2f5baf24e5d95508f4e4f1a55992243e99afec8ec11773"
-          GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
-        with:
-          script: |
-            await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
-
   agent:
     name: agent
     needs: activation
     if: >
-      ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
-      needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked')
+      needs.activation.outputs.daily_ai_credits_exceeded != 'true' && needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
@@ -1249,7 +1211,6 @@ jobs:
     name: conclusion
     needs:
       - activation
-      - admission
       - agent
       - evals
       - push_evals_state
@@ -1264,6 +1225,7 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       checks: read # Read check runs for workflow context.
+      id-token: write # Request an OIDC token for authenticated services.
       issues: write # Create or update issues and comments.
       pull-requests: read # Read pull requests and review comments for workflow context.
     concurrency:
@@ -1271,19 +1233,16 @@ jobs:
       cancel-in-progress: false
       queue: max
     env:
-      GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"admission\":\"admission\",\"agent\":\"agent\",\"conclusion\":\"conclusion\",\"conclusion_admission\":\"conclusion_admission\",\"evals\":\"evals\",\"push_evals_state\":\"push_evals_state\",\"safe_outputs\":\"safe_outputs\"}"
-      GH_AW_JOB_RESULTS: "{\"activation\":{\"result\":\"${{ needs.activation.result }}\"},\"admission\":{\"result\":\"${{ needs.admission.result }}\"},\"agent\":{\"result\":\"${{ needs.agent.result }}\"},\"evals\":{\"result\":\"${{ needs.evals.result }}\"},\"push_evals_state\":{\"result\":\"${{ needs.push_evals_state.result }}\"},\"safe_outputs\":{\"result\":\"${{ needs.safe_outputs.result }}\"}}"
-      GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"admission\":true,\"agent\":true,\"conclusion\":true,\"conclusion_admission\":true,\"evals\":true,\"push_evals_state\":true,\"safe_outputs\":true}"
+      GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"agent\":\"agent\",\"conclusion\":\"conclusion\",\"evals\":\"evals\",\"push_evals_state\":\"push_evals_state\",\"safe_outputs\":\"safe_outputs\"}"
+      GH_AW_JOB_RESULTS: "{\"activation\":{\"result\":\"${{ needs.activation.result }}\"},\"agent\":{\"result\":\"${{ needs.agent.result }}\"},\"evals\":{\"result\":\"${{ needs.evals.result }}\"},\"push_evals_state\":{\"result\":\"${{ needs.push_evals_state.result }}\"},\"safe_outputs\":{\"result\":\"${{ needs.safe_outputs.result }}\"}}"
+      GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"agent\":true,\"conclusion\":true,\"evals\":true,\"push_evals_state\":true,\"safe_outputs\":true}"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
-      admission_compact_session: ${{ steps.admission-conclusion-metadata.outputs.compact_session }}
       incomplete_count: ${{ steps.report_incomplete.outputs.incomplete_count }}
       noop_comment_body: ${{ steps.noop.outputs.noop_comment_body }}
       noop_message: ${{ steps.noop.outputs.noop_message }}
       tools_reported: ${{ steps.missing_tool.outputs.tools_reported }}
       total_count: ${{ steps.missing_tool.outputs.total_count }}
-      usage_artifact_id: ${{ steps.upload-usage-artifact.outputs.artifact-id }}
-      usage_artifact_retry_id: ${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1518,17 +1477,6 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'generate_usage_artifacts.cjs'));
             await main();
-      - name: Prepare admission conclusion metadata
-        id: admission-conclusion-metadata
-        if: always() && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
-        continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const path = require('node:path');
-            const { readCompactUnifiedSession } = require(path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'compact_unified_session.cjs'));
-            const compact = readCompactUnifiedSession('/tmp/gh-aw/usage/aw_session.jsonl');
-            core.setOutput('compact_session', JSON.stringify({ version: compact.version, session: compact.session, included_events: compact.includedEvents, omitted_events: compact.omittedEvents, oversized_lines: compact.oversizedLines, scan_truncated: compact.scanTruncated, truncated: compact.truncated }));
       - name: Upload usage artifact
         id: upload-usage-artifact
         if: always()
@@ -1605,40 +1553,10 @@ jobs:
           if-no-files-found: ignore
           overwrite: true
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
-
-  conclusion_admission:
-    name: conclusion_admission
-    needs: conclusion
-    if: always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
-    runs-on: ubuntu-slim
-    # Permissions for the conclusion_admission job (workflow permissions default to none).
-    permissions:
-      contents: read
-      id-token: write # Request an OIDC token for authenticated services.
-    timeout-minutes: 5
-    env:
-      GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
-    steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: github/gh-aw
-          sparse-checkout: |
-            actions
-          fetch-depth: 1
-          clean: false
-          persist-credentials: false
-      - name: Setup Scripts
-        id: setup
-        uses: ./actions/setup
-        with:
-          destination: ${{ runner.temp }}/gh-aw/actions
-          job-name: ${{ github.job }}
-        env:
-          GH_AW_SETUP_WORKFLOW_NAME: "Smoke Claude Copilot Auto"
-          GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/unknown.lock.yml@${{ github.ref }}
       - name: Report admission conclusion
         if: always() && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
+        continue-on-error: true
+        timeout-minutes: 2
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
@@ -1648,9 +1566,8 @@ jobs:
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
-          GH_AW_ADMISSION_COMPACT_SESSION: ${{ needs.conclusion.outputs.admission_compact_session }}
-          GH_AW_USAGE_ARTIFACT_ID: ${{ needs.conclusion.outputs.usage_artifact_id }}
-          GH_AW_USAGE_ARTIFACT_RETRY_ID: ${{ needs.conclusion.outputs.usage_artifact_retry_id }}
+          GH_AW_USAGE_ARTIFACT_ID: ${{ steps.upload-usage-artifact.outputs.artifact-id }}
+          GH_AW_USAGE_ARTIFACT_RETRY_ID: ${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}
         with:
           script: |
             const { setupGlobals } = require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'setup_globals.cjs'));

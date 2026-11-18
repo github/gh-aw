@@ -1771,7 +1771,7 @@ jobs:
       run: |
         linter_dir=$(mktemp -d)
         trap 'rm -rf "$linter_dir"' EXIT
-        go build -o "$linter_dir/gh-aw-linters" ./cmd/linters
+        env -u GOOS -u GOARCH go build -o "$linter_dir/gh-aw-linters" ./cmd/linters
         log_file="$linter_dir/fprintf-lint.log"
         status=0
         "$linter_dir/gh-aw-linters" -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > "$log_file" 2>&1 || status=$?

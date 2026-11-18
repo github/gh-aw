@@ -50,6 +50,7 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
+      id-token: write # Request an OIDC token for authenticated services.
       issues: write # Create or update issues and comments.
       pull-requests: write # Create or update pull requests and review comments.
     env:
@@ -2484,6 +2485,7 @@ jobs:
       actions: write # Create or update workflow runs and artifacts.
       checks: read # Read check runs for workflow context.
       discussions: write # Create or update discussions and comments.
+      id-token: write # Request an OIDC token for authenticated services.
       issues: write # Create or update issues and comments.
       pull-requests: write # Create or update pull requests and review comments.
     concurrency:

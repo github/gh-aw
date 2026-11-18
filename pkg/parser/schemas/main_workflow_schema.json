@@ -2853,7 +2853,7 @@
             "admission": {
               "type": "boolean",
               "default": false,
-              "description": "Enable admission and conclusion_admission jobs for this workflow. Also enabled when aw.json sets admission to true."
+              "description": "Generate admission steps in activation and conclusion. An explicit admission setting in aw.json takes precedence."
             },
             "stale-check": {
               "oneOf": [
