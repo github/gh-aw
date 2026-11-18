@@ -76,6 +76,14 @@ Its internal event name is `connector_` followed by the first 24 lowercase hex
 digits of SHA-256 over alias, NUL, trigger name, NUL, and the frozen plan digest.
 The public selector remains the connector ID and declared trigger name.
 
+The [Connector Specification](/gh-aw/specs/connector-specification/) defines the
+separately selected reader, exact resource grant, request endpoint, network
+approval, and credential authority required for provider access. This subscription
+metadata carries trigger rules and resource constraints, but grants none of those
+reader permissions. This gateway contract governs source authentication, predicate
+evaluation, projection, and dispatch. A matched subscription or canonical URL MUST
+NOT be treated as a connector reader selection or provider-access grant.
+
 Compiler conditions encode every original fixed match predicate and exact
 resource grant as equality checks on decoded JSON Pointer paths. Integer grants
 must use canonical safe-integer strings. Expressions in source metadata or
@@ -933,5 +941,9 @@ The compiler implements hash-bound `getToken` calls and fail-closed client conti
 ## References
 
 The [GitHub webhook trigger reference](/gh-aw/reference/webhook-triggers/) defines the detailed GitHub filter catalog and dispatch authorization. The [provider issue reference](/gh-aw/reference/provider-issue-triggers/) explains migration from the removed native integrations to imported connector declarations.
+
+The [Connector Specification](/gh-aw/specs/connector-specification/) defines
+declaration-side connector authority and the nonactivation boundary for imported
+subscriptions.
 
 See the [GitHub repository dispatch API](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event), [App installation-token generation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app), [GitHub actor contexts](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context), [GitHub webhook payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads), [Jira webhooks](https://developer.atlassian.com/cloud/jira/platform/webhooks/), [Linear webhooks](https://linear.app/developers/webhooks).

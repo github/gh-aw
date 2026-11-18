@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
@@ -14,6 +15,34 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestUpdatePRPackageSnapshotTargetsIncludeInstalledDestinations(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	output, err := exec.Command("git", "init", "-q").CombinedOutput()
+	require.NoError(t, err, string(output))
+	record := packageOwnershipRecord{
+		SchemaVersion: packageOwnershipSchemaVersion,
+		Package:       "owner/repo",
+		Source:        "owner/repo@v1",
+		Files: []packageOwnershipFileEntry{
+			{Source: "review.md", Destination: "custom/workflows/review.md"},
+			{Source: "review.lock.yml", Destination: "custom/workflows/review.lock.yml"},
+		},
+	}
+	recordBytes, err := json.Marshal(record)
+	require.NoError(t, err)
+	recordPath := packageOwnershipRecordPath(root, record.Package)
+	require.NoError(t, os.MkdirAll(filepath.Dir(recordPath), 0755))
+	require.NoError(t, os.WriteFile(recordPath, recordBytes, 0600))
+
+	targets, err := updatePRPackageSnapshotTargets(context.Background(), []string{"https://github.com/owner/repo"})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{
+		filepath.Join(root, "custom/workflows/review.md"),
+		filepath.Join(root, "custom/workflows/review.lock.yml"),
+	}, targets)
+}
 
 func TestUpdatePRSummaryPins(t *testing.T) {
 	old := summaryLockPins([]byte(`{"entries":{

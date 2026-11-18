@@ -97,7 +97,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err := c.expandWorkflowConnectors(ctx.frontmatter.Frontmatter, connectorConfigs); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
-	engineSetup, err := c.setupEngineAndImports(ctx.frontmatter, ctx.cleanPath, ctx.content, ctx.markdownDir)
+	engineSetup, err := c.resolveWorkflowEngine(ctx.frontmatter, ctx.cleanPath, ctx.content, ctx.markdownDir)
 	if err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}

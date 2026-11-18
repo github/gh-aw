@@ -19,12 +19,11 @@ strict: true
 engine:
   id: copilot
   bare: true
-  model-routing:
-    goal: cost
-    mode: auto
-    # Claude-only pool: the main model's family, and so its endpoint
-    # (/chat/completions), is fixed; the model's effort is not.
-    allowed-models: [claude-sonnet-5]
+model: router
+model-routing:
+  # Claude-only pool: the main model's family, and so its endpoint
+  # (/chat/completions), is fixed; the model's effort is not.
+  allowed-models: [claude-sonnet-5]
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md

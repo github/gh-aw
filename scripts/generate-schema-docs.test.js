@@ -162,6 +162,7 @@ allPassed &= assertContains(output, "run-install-scripts:", "Runtime example sho
 allPassed &= assertContains(output, "report-failed-jobs:", "Safe outputs example should include report-failed-jobs");
 
 // Test 12: Model routing descriptions explain values and link to the guide
+allPassed &= assertContains(output, "\nmodel-routing: false\n", "The top-level model routing opt-out should use the schema's false constant");
 const unwrappedOutput = output.replace(/\n\s*#\s*/g, " ");
 allPassed &= assertContains(unwrappedOutput, "https://github.github.com/gh-aw/reference/model-routing/", "Model routing should link to its guide");
 allPassed &= assertContains(unwrappedOutput, "cost-speed prefers the fastest model and effort that meet it", "Model routing goal should explain cost-speed");

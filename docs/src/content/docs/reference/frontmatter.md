@@ -290,15 +290,17 @@ engine:
 
 See [Harness Retry and Post-result Watchdog Policy](/gh-aw/reference/engines/#harness-retry-and-post-result-watchdog-policy) for defaults, units, and the equivalent `GH_AW_HARNESS_*` environment variables.
 
-### Model Routing (`model: router`, `engine.model-routing:`)
+<span id="model-routing-model-router-enginemodel-routing"></span>
 
-Set `model` (or `engine.model`) to a router value to route the main agent: `router` (the router judges each task), `router/economy`, `router/balanced`, or `router/robust`. Each is the same as `engine.model-routing` with `goal: cost` and the matching mode (`auto` for `router`). A workflow with no model already behaves like `model: router` when it is eligible.
+### Model Routing
 
-```yaml wrap
+Set the top-level `model` to `router` to let each task determine the routing level, or choose `router/economy`, `router/balanced`, or `router/robust` for a fixed level:
+
+```aw wrap
 model: router/economy
 ```
 
-For shortlists and other settings, see [advanced model routing](/gh-aw/reference/model-routing/#advanced-engine-model-routing).
+To narrow the main agent's choices without restricting sub-agents, add a [shortlist](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. To opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) without pinning a model, omit `model` and set top-level `model-routing: false`.
 
 ### Engine Driver (`engine.driver:`)
 

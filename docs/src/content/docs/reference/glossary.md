@@ -1021,7 +1021,7 @@ A short human-friendly name (such as `sonnet` or `mini`) that gh-aw resolves at 
 
 ### Model Policy (`models.allowed`, `models.blocked`)
 
-An experimental frontmatter feature that restricts which AI models a workflow may use at runtime. Configured under the `models:` top-level key with two fields: `allowed` (a list of model names or glob patterns the workflow is permitted to use) and `blocked` (a list of patterns unconditionally refused). Both lists are enforced by the AWF proxy via `apiProxy.allowedModels` and `disallowedModels`. They are the only request policy, for routed and non-routed workflows alike: with [model routing](/gh-aw/reference/model-routing/), the main agent, built-in agents, and declared sub-agents may use any model the policy allows, and `engine.model-routing.allowed-models` only limits what the router may pick for the main agent. Across imports, policies from multiple files are merged as unions. Environment-variable overrides are supported for runtime flexibility.
+An experimental way to restrict model requests in the main agent's job, including requests from built-in agents and declared sub-agents. Set `models.allowed` and `models.blocked` to model names or glob patterns. Across imports, allowed lists are combined, as are blocked lists. A blocked model cannot be used even if it matches an allowed pattern. A [routing shortlist](/gh-aw/reference/model-routing/#a-shortlist-of-models) only narrows the main agent's choices within the policy.
 
 ```aw wrap
 models:
@@ -1029,9 +1029,11 @@ models:
   blocked: ["*-preview"]
 ```
 
-### Model Routing (`model: router`, `engine.model-routing`)
+<span id="model-routing-model-router-enginemodel-routing"></span>
 
-An experimental feature that chooses the model and reasoning effort for each run from the task the run receives, instead of a single fixed `engine.model`. Chosen with a router value as the model: `model: router`, `router/economy`, `router/balanced`, or `router/robust`, which are not model names and can't be used as aliases or in model lists. Also configurable under `engine.model-routing` with a required `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`), optionally limited to a shortlist of allowed models. Eligible workflows on the `copilot`, `claude`, `codex`, or `pi` engine that set no model run on GitHub Copilot with `goal: cost` and `mode: auto` by default, the same as `model: router`; setting `model-routing: false` opts out. See [Model Routing](/gh-aw/reference/model-routing/).
+### Model Routing
+
+An experimental feature that chooses a model and reasoning effort for the main agent on each run. Set `model: router` to let the task determine the level. Choose `router/economy`, `router/balanced`, or `router/robust` for a fixed level, or use `model-routing: false` to disable implicit routing without pinning a model. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ### Default AI Credits Pricing (`models.default-ai-credits-pricing`)
 

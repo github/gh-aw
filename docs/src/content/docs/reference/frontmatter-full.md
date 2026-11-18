@@ -873,7 +873,7 @@ on:
     # Accepted formats:
 
     # Format 1: Disable stack protection; run on every pull request in the stack.
-    max-stack: 1
+    max-stack: -1
 
     # Format 2: Run only on the top N pull requests in the stack. Default is 1 (only
     # the latest/top pull request).
@@ -1301,7 +1301,7 @@ on:
 
     # Format 1: Disable stack protection; run on every pull request review in the
     # stack.
-    max-stack: 1
+    max-stack: -1
 
     # Format 2: Run only on pull request reviews for the top N pull requests in the
     # stack. Default is 1 (only the latest/top pull request).
@@ -2756,7 +2756,7 @@ sandbox:
   # Format 2: Set to false to disable the agent sandbox (firewall). Warning: This
   # removes firewall protection but keeps the MCP gateway enabled. Not allowed in
   # strict mode.
-  agent: true
+  agent: false
 
   # Format 3: Sandbox type: 'awf' for Agent Workflow Firewall
   agent: "awf"
@@ -3270,12 +3270,10 @@ engine:
   fallback-models: []
     # Array of strings
 
-  # Experimental per-run model and reasoning-effort selection from the task text for
-  # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-  # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-  # fixed model and effort settings. Eligible workflows that choose no model or
-  # routing on GitHub Copilot inference default to goal cost and mode auto; set
-  # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+  # Deprecated. Use a router model value for cost routing, or top-level
+  # model-routing: false to opt out. The cost-speed objective still works during
+  # migration but has no equivalent cost selector. See
+  # https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   # Accepted formats:
 
@@ -3307,7 +3305,7 @@ engine:
 
   # Format 2: Disable the implicit cost/auto model-routing default without pinning a
   # model; the existing model variables and fallback model apply.
-  model-routing: true
+  model-routing: false
 
   # Optional model context window metadata for engines that need to register
   # explicit model catalog entries. Supported by the Pi engine when generating its
@@ -4328,12 +4326,10 @@ engine:
     # (optional)
     cwd: "example-value"
 
-    # Experimental per-run model and reasoning-effort selection from the task text for
-    # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-    # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-    # fixed model and effort settings. Eligible workflows that choose no model or
-    # routing on GitHub Copilot inference default to goal cost and mode auto; set
-    # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+    # Deprecated. Use a router model value for cost routing, or top-level
+    # model-routing: false to opt out. The cost-speed objective still works during
+    # migration but has no equivalent cost selector. See
+    # https://github.github.com/gh-aw/reference/model-routing/.
     # (optional)
     # Accepted formats:
 
@@ -4365,7 +4361,7 @@ engine:
 
     # Format 2: Disable the implicit cost/auto model-routing default without pinning a
     # model; the existing model variables and fallback model apply.
-    model-routing: true
+    model-routing: false
 
     # Optional inference provider override for this engine. Defaults to the engine's
     # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
@@ -4420,7 +4416,7 @@ max-tool-calls: "example-value"
 # Format 1: Configuration object
 
 # Format 2: integer
-max-ai-credits: 1
+max-ai-credits: -1
 
 # Format 3: string
 max-ai-credits: "example-value"
@@ -4440,7 +4436,7 @@ max-turn-cache-misses: 1
 # Format 1: Configuration object
 
 # Format 2: integer
-max-daily-ai-credits: 1
+max-daily-ai-credits: -1
 
 # Format 3: string
 max-daily-ai-credits: "example-value"
@@ -20187,7 +20183,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable missing tool reporting (false). Missing tool
   # reporting is enabled by default when safe-outputs is configured.
-  report-missing-tool: true
+  report-missing-tool: false
 
   # Enable AI agents to report when required data or context is missing. Used for
   # workflow troubleshooting and data validation.
@@ -20484,7 +20480,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable missing data reporting (false). Missing data
   # reporting is enabled by default when safe-outputs is configured.
-  report-missing-data: true
+  report-missing-data: false
 
   # Enable AI agents to explicitly indicate no action is needed. Used for workflow
   # control flow and conditional logic.
@@ -20752,7 +20748,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable noop output (false). Noop is enabled by default
   # when safe-outputs is configured.
-  noop: true
+  noop: false
 
   # Enable AI agents to publish files (images, charts, reports) to an orphaned git
   # branch for persistent storage and web access.
@@ -22453,7 +22449,7 @@ safe-outputs:
     # Accepted formats:
 
     # Format 1: Disable AI engine for threat detection (only run custom steps)
-    engine: true
+    engine: false
 
     # Format 2: Configuration object
 
@@ -22509,12 +22505,10 @@ safe-outputs:
       fallback-models: []
         # Array of strings
 
-      # Experimental per-run model and reasoning-effort selection from the task text for
-      # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-      # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-      # fixed model and effort settings. Eligible workflows that choose no model or
-      # routing on GitHub Copilot inference default to goal cost and mode auto; set
-      # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+      # Deprecated. Use a router model value for cost routing, or top-level
+      # model-routing: false to opt out. The cost-speed objective still works during
+      # migration but has no equivalent cost selector. See
+      # https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
       # Accepted formats:
 
@@ -22546,7 +22540,7 @@ safe-outputs:
 
       # Format 2: Disable the implicit cost/auto model-routing default without pinning a
       # model; the existing model variables and fallback model apply.
-      model-routing: true
+      model-routing: false
 
       # Optional model context window metadata for engines that need to register
       # explicit model catalog entries. Supported by the Pi engine when generating its
@@ -23567,12 +23561,10 @@ safe-outputs:
         # (optional)
         cwd: "example-value"
 
-        # Experimental per-run model and reasoning-effort selection from the task text for
-        # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
-        # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-        # fixed model and effort settings. Eligible workflows that choose no model or
-        # routing on GitHub Copilot inference default to goal cost and mode auto; set
-        # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
+        # Deprecated. Use a router model value for cost routing, or top-level
+        # model-routing: false to opt out. The cost-speed objective still works during
+        # migration but has no equivalent cost selector. See
+        # https://github.github.com/gh-aw/reference/model-routing/.
         # (optional)
         # Accepted formats:
 
@@ -23604,7 +23596,7 @@ safe-outputs:
 
         # Format 2: Disable the implicit cost/auto model-routing default without pinning a
         # model; the existing model variables and fallback model apply.
-        model-routing: true
+        model-routing: false
 
         # Optional inference provider override for this engine. Defaults to the engine's
         # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
@@ -23625,7 +23617,7 @@ safe-outputs:
     engine-timeout: "example-value"
 
     # Format 2: integer
-    engine-timeout: 1
+    engine-timeout: 0
 
     # Detector-only per-attempt max-turns override passed to threat-detect. When
     # omitted, threat-detect falls back to GH_AW_MAX_TURNS (if set) and then to its
@@ -23656,7 +23648,7 @@ safe-outputs:
     # Format 1: Configuration object
 
     # Format 2: integer
-    max-ai-credits: 1
+    max-ai-credits: -1
 
     # Format 3: string
     max-ai-credits: "example-value"
@@ -24617,7 +24609,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable report_incomplete (false). report_incomplete is
   # enabled by default when safe-outputs is configured.
-  report-incomplete: true
+  report-incomplete: false
 
   # Enable AI agents to replace one label with another on GitHub issues or pull
   # requests in a single atomic operation. Ideal for maintaining label-based state
@@ -26019,6 +26011,24 @@ import-schema:
 # model.
 # (optional)
 model: "example-value"
+
+# Set false to disable implicit main-agent routing without pinning a model, or
+# give a shortlist for an explicit router model value. The shortlist changes no
+# other model requests.
+# (optional)
+# Accepted formats:
+
+# Format 1: Keep the normal model overrides and engine default without using the
+# router.
+model-routing: false
+
+# Format 2: object
+model-routing:
+  # Specify at least one exact model name or gh-aw alias. Declare one list across
+  # the workflow and its imports. The engine's capabilities and
+  # models.allowed/blocked still apply.
+  allowed-models: []
+    # Array of strings
 
 # Graders over the unified session, including reserved operational-value
 # JavaScript. Fast built-ins run in conclusion; executable custom graders run only
