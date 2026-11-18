@@ -55,7 +55,11 @@ func TestConnectorOIDCPhasePermissionsAndTokenOrdering(t *testing.T) {
 					}
 				}
 				if len(ids) == 0 {
-					assert.NotEqual(t, "write", job.Permissions["id-token"])
+					if data.AdmissionEnabled && (jobName == "activation" || jobName == "conclusion") {
+						assert.Equal(t, "write", job.Permissions["id-token"], "admission authenticates in %s independently of connector token minting", jobName)
+					} else {
+						assert.NotEqual(t, "write", job.Permissions["id-token"], jobName)
+					}
 				}
 				for i, step := range job.Steps {
 					encoded, err := json.Marshal(step)

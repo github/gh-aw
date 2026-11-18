@@ -119,19 +119,13 @@ For `gh` CLI configuration, host authentication, and `GH_HOST` setup on GHES, se
 
 ## Centralized Activation Admission
 
-Admission jobs are omitted by default. Enable both `admission` and `conclusion_admission` by setting `on.admission: true` in workflow frontmatter, or `"admission": true` in `.github/workflows/aw.json` for all workflows. Either setting enables the jobs; `on.admission: false` does not override a repository opt-in. Recompile after changing either setting.
+The compiler generates the admission check in `activation` and the callback in `conclusion` by default. Set `"admission": false` in `.github/workflows/aw.json` and recompile to omit both steps repository-wide. An explicit repository setting takes precedence over `on.admission` in workflow frontmatter.
 
-```aw
-on:
-  workflow_dispatch:
-  admission: true
-```
-
-Configure an OIDC-authenticated admission authority using organization or repository Actions variables: `GH_AW_DEFAULT_ADMISSION_URL`, `GH_AW_DEFAULT_ADMISSION_AUDIENCE`, and `GH_AW_DEFAULT_ADMISSION_ON_OUTAGE`. For opted-in workflows, the endpoint enables admission at runtime; an empty endpoint skips both jobs. Variables alone do not generate admission jobs. For enterprise-wide rollout, provision organization variables in each enrolled organization. Deployments must explicitly configure their issuer, accepted claims, and trusted workflow identities on the authority.
+Configure an OIDC-authenticated admission authority using organization or repository Actions variables: `GH_AW_DEFAULT_ADMISSION_URL`, `GH_AW_DEFAULT_ADMISSION_AUDIENCE`, and `GH_AW_DEFAULT_ADMISSION_ON_OUTAGE`. An empty endpoint skips both steps at runtime, not their jobs or bootstrap, and does not remove `id-token: write` from either job. Activation author hooks and other conclusion steps share the job-wide permission; the agent does not acquire it through admission. For enterprise-wide rollout, provision organization variables in each enrolled organization. Deployments must explicitly configure their issuer, accepted claims, and trusted workflow identities on the authority.
 
 Approved admission supersedes daily-AIC validation and supplies the primary and optional component allowances used by the existing runtime credit limits. Omitted optional allowances retain their configured component limits. Disabled admission and ignored transient outages retain daily validation and existing limits. The default outage policy is `ignore`; select and protect `block` when availability must not bypass admission. Variables remain cooperative defaults, not mandatory organization policy. Reusable workflow callers must grant `id-token: write` to the caller job; see [enterprise environment controls](/gh-aw/reference/compiler-enterprise-environment-controls/) for the permission envelope and rollout requirements. See also the [admission service specification](/gh-aw/specs/admission-service-specification/).
 
-The same configuration enables an isolated conclusion-admission job to post to `/api/conclusion` on the authority's origin. The ordinary conclusion job first publishes the full unified-session artifact, finishes any upload retry, and passes only bounded compact metadata and artifact IDs to the callback job. The callback obtains its own fresh OIDC token for the same audience; unrelated conclusion and safe-output steps do not receive this permission. The compact profile excludes agent conversation and tool content and is bounded to 128 records/16 KiB JSONL; the whole request is capped at 64 KiB. The authority can resolve the unchanged full session through authenticated, invocation-verified artifact reads. Failed artifact publication does not suppress compact delivery, but the request explicitly carries no IDs if neither upload produced one. Endpoint enrollment covers both compact delivery and protected full-session retrieval. Delivery failures warn without changing completed workflow results, even with outage policy `block`; the authority remains responsible for secure, deduplicated processing and retention.
+After artifact upload and any retry, the callback step in `conclusion` uses a fresh OIDC token to post bounded compact session metadata and artifact IDs to `/api/conclusion` on the authority's origin. The compact profile excludes agent conversation and tool content and is bounded to 128 records/16 KiB JSONL; the whole request is capped at 64 KiB. The authority can resolve the unchanged full session through authenticated, invocation-verified artifact reads. Failed artifact publication does not suppress compact delivery, but the request carries no IDs if neither upload produced one. Delivery failures warn without changing completed workflow results, even with outage policy `block`; the authority remains responsible for secure, deduplicated processing and retention.
 
 ## OIDC Token Broker
 
@@ -156,7 +150,7 @@ The broker contract defines independent authorization for `copilot-request` (Cop
 
 Broker-enabled jobs require `id-token: write`. Reusable workflow callers must grant that permission to the caller job. The runner must reach both the GitHub OIDC endpoint and the broker over HTTPS. Broker failures, including a missing endpoint, must not select a PAT, GitHub App token, or `GITHUB_TOKEN` as a fallback. Unrelated GitHub operations retain their existing authentication.
 
-See the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains a separate opt-in: the admission outage policy does not apply to credential exchange.
+See the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains independent: the admission outage policy does not apply to credential exchange.
 
 ## Copilot Engine on GHES
 

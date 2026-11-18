@@ -144,7 +144,12 @@ func extractCopilotSDKPackages(data *WorkflowData, ecosystem string) []string {
 				installCommands = append(installCommands, line)
 			}
 		}
-		extractor := PackageExtractor{CommandNames: []string{"npm"}, RequiredSubcommands: []string{"install"}, TrimSuffixes: "&|;"}
+		extractor := PackageExtractor{
+			CommandNames:        []string{"npm"},
+			RequiredSubcommands: []string{"install"},
+			FlagsWithValues:     []string{"--prefix"},
+			TrimSuffixes:        "&|;",
+		}
 		return extractor.ExtractPackages(strings.Join(installCommands, "\n"))
 	case "pip":
 		// The SDK command has a --target argument, which the general

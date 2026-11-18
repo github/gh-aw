@@ -194,9 +194,9 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
-  // left from a band header wraps to the last slide of the band above
+  // left from a band header wraps to the last main-line slide of the band above, skipping its column of examples
   await page.keyboard.press("ArrowLeft");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY - 1));
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("ArrowUp");
