@@ -25,6 +25,9 @@ const controller = CracktroDeck.create({
   sound,
 });
 controller.go(0);
+const kioskOn: boolean = controller.kiosk(true);
+controller.kiosk();
+void kioskOn;
 controller.rows[0].items[0].el.focus();
 const currentIndex: number = controller.current();
 void currentIndex;

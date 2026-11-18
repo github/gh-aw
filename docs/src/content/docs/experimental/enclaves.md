@@ -42,7 +42,7 @@ sandbox:
     host-github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}
 ```
 
-The execution step rejects a missing staging credential and binds it as host `GH_TOKEN`, automatically excluded from the primary agent environment. This is separate from the enclave GitHub-tool credential and does not persist secrets through `GITHUB_ENV`. Grant only the repository read access needed for staging. Both agent and detection installers independently authenticate official release attestations and verify the reviewed checksum manifest and its release-tag identity.
+The execution step rejects a missing staging credential and binds it as host `GH_TOKEN`, automatically excluded from the primary agent environment. This is separate from the enclave GitHub-tool credential and does not persist secrets through `GITHUB_ENV`. Grant only the repository read access needed for staging. Both agent and detection installers verify the release-bound checksum manifest against a trusted SHA256 pin and verify payload checksums, without querying release attestations.
 
 ### Public Docker diagnostics
 

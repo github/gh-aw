@@ -323,6 +323,10 @@ network:
     - "api.example.com"    # Custom domain
 ```
 
+### AWF Version (`sandbox.agent.version`)
+
+Selects a pinned AWF release. Installation verifies the release's checksum manifest against a trusted SHA256 pin, then verifies the downloaded bundle or binary. This applies to AWF v0.29.5 and later as well as earlier releases; installation does not query GitHub release attestations. Default AWF installation on GitHub Enterprise Cloud (`*.ghe.com`) requires no additional github.com token or version override. See [AWF checksum pins](/gh-aw/reference/sandbox/#release-integrity-sandboxagentchecksums-sha256) for custom versions.
+
 ### Tools (`tools:`)
 
 Specifies which GitHub API calls, bash commands, browser automation, and MCP servers are available to the AI agent.

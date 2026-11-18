@@ -10,12 +10,10 @@ permissions:
   copilot-requests: write
   issues: read
   pull-requests: read
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 tools:
   cli-proxy: true
   cache-memory: true

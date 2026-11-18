@@ -27,9 +27,19 @@ Use this section for the detailed day-to-day command flow that was intentionally
   docs scripts, not bare `npm run <script>`.
 - Use literal `$TMPDIR` paths for scratch files and writable caches, not
   `/tmp`, resolved macOS temp paths, or system directories. When cache writes
-  need isolation, prefix npm commands with
-  `npm_config_cache="$TMPDIR/gh-aw-npm-cache"` and Go commands with
-  `GOCACHE="$TMPDIR/gh-aw-go-build" GOMODCACHE="$TMPDIR/gh-aw-go-mod"`.
+  need isolation, `make` defaults Go, golangci-lint, and npm caches under `$TMPDIR` when it is set,
+  preserving explicit cache overrides. Before direct tool commands, including
+  `go env` and `go version`, export:
+  ```bash
+  export GOCACHE="$TMPDIR/gh-aw-go-build" GOMODCACHE="$TMPDIR/gh-aw-go-mod"
+  export GOLANGCI_LINT_CACHE="$TMPDIR/gh-aw-golangci-lint"
+  export npm_config_cache="$TMPDIR/gh-aw-npm-cache"
+  ```
+  On macOS, canonicalize the existing temporary directory before path-sensitive
+  tests so the `/var` symlink does not trigger symlink-rejection guards:
+  ```bash
+  export TMPDIR="$(cd "$TMPDIR" && pwd -P)"
+  ```
   Restore local dependencies only after a manifest change or missing-tool
   failure; do not install tools globally.
 - Prefer the smallest focused check. Docs title changes use

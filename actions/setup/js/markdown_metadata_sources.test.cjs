@@ -150,143 +150,74 @@ describe("compiler metadata source acquisition", () => {
     expect(metadata.currentMarkdownMetadata().records).toContainEqual({ ...rejected, sha256: rejected.sha256.slice(0, 20) });
   });
 
-  it("reads the immutable executing revision rather than a replaced checkout lock", async () => {
-    const file = ".github/workflows/main.lock.yml";
-    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
-    const githubClient = { rest: { repos: { getContent: vi.fn(async () => remoteFile(file, [record({ model: "small", tools: ["Read"] })])) } } };
-    await metadata.loadMarkdownMetadata(`owner/repo/${file}@refs/heads/main`, workspace, { repository: "owner/repo", revision, githubClient });
-    expect(githubClient.rest.repos.getContent).toHaveBeenCalledWith({ owner: "owner", repo: "repo", path: file, ref: revision });
-    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small", tools: ["Read"] });
+  it.each([{ records: [] }, { records: [record({ model: "small", tools: ["Read"] })] }])("uses embedded executing metadata, never the checkout's executing lock: %j", ({ records }) => {
+    fs.writeFileSync(path.join(workspace, ".github/workflows/main.lock.yml"), headers([record({ model: "forged" })]));
+    const result = metadata.loadMarkdownMetadata(workspace, { embeddedMetadata: JSON.stringify(catalog(records)) });
+    expect(result).toEqual(catalog(records));
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(records.length ? records[0].value : {});
   });
 
-  it("never falls back to checkout metadata after a source authorization failure", async () => {
-    const file = ".github/workflows/main.lock.yml";
-    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
-    const failure = Object.assign(new Error("Forbidden"), { status: 403, response: { status: 403, headers: {} } });
-    const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(failure) } } };
-    await expect(metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient })).rejects.toBe(failure);
-    expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(1);
+  it("treats an absent embedded catalog as empty", () => {
+    fs.writeFileSync(path.join(workspace, ".github/workflows/main.lock.yml"), headers([record({ model: "forged" })]));
+    expect(metadata.loadMarkdownMetadata(workspace)).toEqual(catalog([]));
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
   });
 
-  const quotaError = (resetSeconds, extra = {}) =>
-    Object.assign(new Error("API rate limit exceeded for installation"), {
-      status: 403,
-      response: {
-        status: 403,
-        headers: { "x-ratelimit-remaining": "0", "x-ratelimit-limit": "15000", "x-ratelimit-used": "15000", "x-ratelimit-resource": "core", ...(resetSeconds ? { "x-ratelimit-reset": String(resetSeconds) } : {}), ...extra },
-      },
-    });
-  const fakeClock = start => {
-    let current = start;
-    vi.spyOn(Date, "now").mockImplementation(() => current);
-    return {
-      now: () => current,
-      sleep: vi.fn(async ms => {
-        current += ms;
-      }),
-    };
-  };
-
-  it("resumes remote metadata reads only after the failed response's quota reset", async () => {
-    const file = ".github/workflows/main.lock.yml";
-    const start = Date.parse("2026-11-09T23:58:53Z");
-    const clock = fakeClock(start);
-    const reset = Date.parse("2026-11-10T00:00:04Z");
-    const requestTimes = [];
-    const githubClient = {
-      rest: {
-        repos: {
-          getContent: vi.fn(async () => {
-            requestTimes.push(clock.now());
-            if (requestTimes.length === 1) throw quotaError(reset / 1000);
-            return remoteFile(file, [record({ model: "small" })]);
-          }),
-        },
-      },
-    };
-    const result = await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient, quotaWait: clock });
-    expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(2);
-    expect(clock.sleep).toHaveBeenCalledExactlyOnceWith(reset + 1000 - start);
-    expect(requestTimes[1]).toBeGreaterThanOrEqual(reset);
-    expect(result.records).toEqual(decodedCatalog([record({ model: "small" })]).records);
-    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
+  it.each(["", "{invalid", '{"version":1,"records":[]}', '{"version":2,"version":2,"records":[]}'])("rejects malformed embedded metadata: %s", embeddedMetadata => {
+    expect(() => metadata.loadMarkdownMetadata(workspace, { embeddedMetadata })).toThrow();
   });
 
-  it.each([
-    ["reset beyond the bounded wait", 3600, "reset_exceeds_budget", 0, 1],
-    ["unknown reset", 0, "unknown_reset", 0, 1],
-    ["renewed exhaustion", 60, "renewed_exhaustion", 1, 2],
-  ])("blocks activation with an explicit quota error on %s without an empty or checkout fallback", async (_case, resetOffset, reason, sleeps, requests) => {
-    const file = ".github/workflows/main.lock.yml";
-    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
-    const start = Date.parse("2026-11-09T23:58:53Z");
-    const clock = fakeClock(start);
-    const githubClient = { rest: { repos: { getContent: vi.fn(async () => Promise.reject(quotaError(resetOffset ? Math.floor(clock.now() / 1000) + resetOffset : 0))) } } };
-    const failure = metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient, quotaWait: { ...clock, maxWaitMs: 10 * 60 * 1000 } });
-    await expect(failure).rejects.toMatchObject({ code: "GH_AW_GITHUB_API_QUOTA_EXHAUSTED", reason, quota: { status: 403, resource: "core", limit: 15000, remaining: 0, used: 15000 } });
-    await expect(failure).rejects.toThrow("GitHub API quota exhausted");
-    expect(clock.sleep).toHaveBeenCalledTimes(sleeps);
-    expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(requests);
-    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
+  it.each(["environment", "file"])("loads a large catalog with per-record rather than catalog-wide structural limits via %s", transport => {
+    const records = Array.from({ length: 300 }, (_, index) => ({
+      sha256: crypto.createHash("sha256").update(`agent-${index}`).digest("hex"),
+      kind: "artifact",
+      value: { model: `model-${index}`, tools: Array.from({ length: 50 }, (_, tool) => `tool-${tool}`) },
+    }));
+    const embeddedMetadata = JSON.stringify(catalog(records));
+    expect(embeddedMetadata.length).toBeGreaterThan(128 * 1024);
+    const embeddedMetadataFile = path.join(workspace, "metadata.json");
+    fs.writeFileSync(embeddedMetadataFile, embeddedMetadata);
+    const result = metadata.loadMarkdownMetadata(workspace, transport === "file" ? { embeddedMetadataFile } : { embeddedMetadata });
+    expect(result).toEqual(catalog(records));
   });
 
-  it("keeps the bounded retry for rate limits without quota exhaustion metadata", async () => {
-    const file = ".github/workflows/main.lock.yml";
-    const secondary = Object.assign(new Error("You have exceeded a secondary rate limit. API rate limit exceeded"), { status: 403, response: { status: 403, headers: {} } });
-    const githubClient = {
-      rest: {
-        repos: {
-          getContent: vi
-            .fn()
-            .mockRejectedValueOnce(secondary)
-            .mockResolvedValue(remoteFile(file, [record({ model: "small" })])),
-        },
-      },
-    };
-    vi.useFakeTimers();
-    try {
-      const request = metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient });
-      await vi.runAllTimersAsync();
-      await request;
-      expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(2);
-    } finally {
-      vi.useRealTimers();
+  it.each(["missing", "malformed", "oversized", "conflicting", "invalid-record", "duplicate-keys"])("rejects %s embedded file metadata", scenario => {
+    const embeddedMetadataFile = path.join(workspace, "metadata.json");
+    const valid = JSON.stringify(catalog([record({ model: "small" })]));
+    if (scenario !== "missing") {
+      let payload = valid;
+      if (scenario === "malformed") payload = "{invalid";
+      if (scenario === "oversized") payload = " ".repeat(4 * 1024 * 1024 + 1);
+      if (scenario === "invalid-record") payload = JSON.stringify(catalog([record({ tools: Array.from({ length: 10001 }, () => "Read") })]));
+      if (scenario === "duplicate-keys") payload = '{"version":2,"version":2,"records":[]}';
+      fs.writeFileSync(embeddedMetadataFile, payload);
     }
+    expect(() => metadata.loadMarkdownMetadata(workspace, { embeddedMetadataFile, ...(scenario === "conflicting" ? { embeddedMetadata: valid } : {}) })).toThrow();
   });
 
-  it("reads the exact executing revision from the local git object store with zero Contents API requests", async () => {
-    const file = ".github/workflows/main.lock.yml";
-    const git = (...args) =>
-      execFileSync("git", ["-C", workspace, ...args], { stdio: ["ignore", "pipe", "ignore"] })
-        .toString()
-        .trim();
-    git("init", "-q");
-    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "small", tools: ["Read"] })]));
-    git("add", file);
-    git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "lock");
-    const executing = git("rev-parse", "HEAD");
-    // A replaced worktree file must never be used as the executing lock.
-    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
-    const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(quotaError(0)) } } };
-    await metadata.loadMarkdownMetadata(`owner/repo/${file}@refs/heads/main`, workspace, { repository: "owner/repo", revision: executing, githubClient });
-    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
-    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small", tools: ["Read"] });
-  });
-
-  it("merges matching caller checkout records for reusable workflows and preserves cache transport", async () => {
+  it("merges matching caller checkout records for reusable workflows and preserves cache transport", () => {
     fs.mkdirSync(path.join(workspace, ".github/agents"), { recursive: true });
     fs.writeFileSync(path.join(workspace, ".github/agents/reader.agent.md"), document);
     const value = { description: "Private reader", model: "small", tools: ["Read"] };
     fs.writeFileSync(path.join(workspace, ".github/workflows/caller.lock.yml"), headers([record(value)]));
-    const file = ".github/workflows/reusable.lock.yml";
-    const githubClient = { rest: { repos: { getContent: vi.fn(async () => remoteFile(file, [])) } } };
-    const result = await metadata.loadMarkdownMetadata(`source/library/${file}@v1`, workspace, { repository: "caller/repo", revision, githubClient });
+    const result = metadata.loadMarkdownMetadata(workspace);
     expect(result.records).toHaveLength(1);
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(value);
     fs.writeFileSync(path.join(workspace, "aw_info.json"), JSON.stringify({ run_id: 123 }));
     metadata.persistMarkdownMetadata();
     expect(JSON.parse(fs.readFileSync(path.join(workspace, "aw_info.json"), "utf8"))).toEqual({ run_id: 123, ...metadata.metadataManifestFields(result) });
+  });
+
+  it("recovers checked-out repository agent records into the run info cache after checkout", () => {
+    fs.writeFileSync(path.join(workspace, "aw_info.json"), JSON.stringify({ run_id: 123, ...fields([]) }));
+    metadata.recoverCheckoutMarkdownMetadata(workspace);
+    expect(JSON.parse(fs.readFileSync(path.join(workspace, "aw_info.json"), "utf8"))).toEqual({ run_id: 123, ...fields([]) });
+    fs.mkdirSync(path.join(workspace, ".github/agents"), { recursive: true });
+    fs.writeFileSync(path.join(workspace, ".github/agents/reader.agent.md"), document);
+    fs.writeFileSync(path.join(workspace, ".github/workflows/other.lock.yml"), headers([record({ model: "small", tools: ["Read"] })]));
+    metadata.recoverCheckoutMarkdownMetadata(workspace);
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small", tools: ["Read"] });
+    expect(JSON.parse(fs.readFileSync(path.join(workspace, "aw_info.json"), "utf8")).agent_metadata).toEqual(fields([record({ model: "small", tools: ["Read"] })]).agent_metadata);
   });
 
   it("merges consistent records but rejects conflicting records atomically", () => {
@@ -302,7 +233,8 @@ describe("compiler metadata source acquisition", () => {
     const compiled = { ...record({ description: "Private reader", rate: 0.25 }), references: { "/model": "/metadata/agent_model", "/tools": "/manifest/declared_tools" } };
     const header = `# gh-aw-metadata: ${JSON.stringify({ agent_model: "small" })}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, declared_tools: ["Read"], ...fields([compiled]) })}\n# generated\n`;
     fs.writeFileSync(path.join(workspace, file), header);
-    const result = await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace);
+    const result = metadata.readLocalMarkdownMetadata(path.join(workspace, file), workspace);
+    metadata.installMarkdownMetadata(result);
     expect(result).toEqual(decodedCatalog([record(value)]));
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(value);
     expect(header.match(/"small"/g)).toHaveLength(1);
@@ -345,7 +277,8 @@ describe("compiler metadata source acquisition", () => {
     const references = Object.fromEntries(Object.keys(value).map(key => [`/${key}`, `/metadata/${key}`]));
     const compiled = { ...record({}), references };
     fs.writeFileSync(path.join(workspace, file), `# gh-aw-metadata: ${JSON.stringify(value)}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...fields([compiled]) })}\n# generated\n`);
-    const result = await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace);
+    const result = metadata.readLocalMarkdownMetadata(path.join(workspace, file), workspace);
+    metadata.installMarkdownMetadata(result);
     expect(result).toEqual(decodedCatalog([record(value)]));
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(value);
     fs.writeFileSync(path.join(workspace, "aw_info.json"), '{"run_id":123}');
@@ -393,9 +326,7 @@ describe("compiler metadata source acquisition", () => {
     fs.writeFileSync(path.join(outside, "agents/reader.md"), document);
     fs.symlinkSync(outside, path.join(workspace, ".claude"));
     const read = vi.spyOn(fs, "readFileSync");
-    const file = ".github/workflows/main.lock.yml";
-    const githubClient = { rest: { repos: { getContent: vi.fn(async () => remoteFile(file, [])) } } };
-    await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient });
+    metadata.loadMarkdownMetadata(workspace);
     expect(read).not.toHaveBeenCalledWith(path.join(workspace, ".claude/agents/reader.md"), "utf8");
     expect(metadata.currentMarkdownMetadata().records).toEqual([]);
   });

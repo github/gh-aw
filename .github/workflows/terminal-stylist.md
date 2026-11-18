@@ -10,11 +10,9 @@ permissions:
   copilot-requests: write
   contents: read
 
+model: router/economy
 engine:
   id: pi
-  model-routing:
-    goal: cost
-    mode: economy
 
 timeout-minutes: 10
 

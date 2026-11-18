@@ -52,7 +52,7 @@ func (d *InlineEngineDriver) wrapperScript() string {
 	sourcePath := d.sourcePath()
 	switch d.Runtime {
 	case "node":
-		return "#!/usr/bin/env bash\nset -euo pipefail\nexec node \"${GITHUB_WORKSPACE}/" + sourcePath + "\" \"$@\"\n"
+		return "#!/usr/bin/env bash\nset -euo pipefail\nexec node --import \"" + SetupActionDestinationShell + "/copilot_sdk_module_resolution.cjs\" \"${GITHUB_WORKSPACE}/" + sourcePath + "\" \"$@\"\n"
 	case "python":
 		return "#!/usr/bin/env bash\nset -euo pipefail\nexec python3 \"${GITHUB_WORKSPACE}/" + sourcePath + "\" \"$@\"\n"
 	case "go":

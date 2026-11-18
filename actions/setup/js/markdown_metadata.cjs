@@ -6,7 +6,7 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
 const { parseLockFileHeaders, parseMarkdownJSON } = require("./lock_file_headers.cjs");
-const { execFileSync } = require("node:child_process");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isRateLimitError } = require("./error_recovery.cjs");
 const { getGitHubAPIQuotaExhaustion, withGitHubAPIQuotaWait } = require("./github_api_quota.cjs");
 // Metadata reads block activation, so cap rate-limit retries at about 90 seconds plus jitter.
@@ -79,16 +79,36 @@ function markdownMetadataBlocks(content, documentOnly = false) {
   const lines = [...content.matchAll(/[^\n]*(?:\n|$)/g)].filter(line => line[0]);
   const blocks = [];
   const lineText = (/** @type {number} */ index) => lines[index][0].replace(/\r?\n$/, "");
+  /** @type {Map<number, string>} */
+  const discoveryLines = new Map();
+  let commentEnd = 0;
+  const discoveryLineText = (/** @type {number} */ index) => {
+    const cached = discoveryLines.get(index);
+    if (cached !== undefined) return cached;
+    const text = lineText(index);
+    const start = /** @type {number} */ lines[index].index;
+    const prefix = Math.min(text.length, Math.max(0, commentEnd - start));
+    const visible = (text.slice(0, prefix).replace(/[^\r\n]/g, " ") + text.slice(prefix)).replace(/<!--[\s\S]*?(?:-->|$)/g, (comment, offset) => {
+      const closing = content.indexOf("-->", start + offset + 4);
+      if (closing < 0) return comment;
+      commentEnd = closing + 3;
+      return comment.replace(/[^\r\n]/g, " ");
+    });
+    discoveryLines.set(index, visible);
+    return visible;
+  };
   for (let index = 0; index < lines.length; index++) {
+    // Discover headers outside comments, but never interpret metadata as HTML.
+    const header = discoveryLineText(index);
     let opening = index;
-    if (index !== 0 || /^##[ \t]+(?:agent|skill):/.test(lineText(index))) {
-      if (documentOnly || !/^##[ \t]+(?:agent|skill):/.test(lineText(index))) continue;
+    if (index !== 0 || /^##[ \t]+(?:agent|skill):/.test(header)) {
+      if (documentOnly || !/^##[ \t]+(?:agent|skill):/.test(header)) continue;
       opening++;
-      while (opening < lines.length && !lineText(opening).trim()) opening++;
+      while (opening < lines.length && !discoveryLineText(opening).trim()) opening++;
     }
     if (
       opening >= lines.length ||
-      lineText(opening)
+      discoveryLineText(opening)
         .replace(/^\uFEFF/, "")
         .trim() !== "---"
     )
@@ -101,7 +121,7 @@ function markdownMetadataBlocks(content, documentOnly = false) {
     const sourceEnd = /** @type {number} */ lines[closing].index;
     const source = content.slice(sourceStart, sourceEnd).replace(/\r?\n$/, "");
     const end = sourceEnd + lineText(closing).length;
-    blocks.push({ start, end, source, skill: /^##[ \t]+skill:/.test(lineText(index)) });
+    blocks.push({ start, end, source, skill: /^##[ \t]+skill:/.test(header) });
     index = closing;
     if (documentOnly) break;
   }
@@ -289,31 +309,6 @@ function readLocalMarkdownMetadata(file, workspace) {
 }
 
 /**
- * Read the executing lock manifest from the local git object store by its
- * immutable commit, never from the worktree. Git objects are content-addressed,
- * so `<commit>:<path>` is exactly the executing revision's file. Returns
- * undefined when the object is not available locally (no lazy fetch).
- * @param {string} workspaceRoot @param {string} revision @param {string} file
- */
-function readGitObjectMarkdownMetadata(workspaceRoot, revision, file) {
-  if (!fs.existsSync(path.join(workspaceRoot, ".git"))) return undefined;
-  let bytes;
-  try {
-    bytes = execFileSync("git", ["-C", workspaceRoot, "--no-replace-objects", "cat-file", "blob", `${revision}:${file}`], {
-      env: { ...process.env, GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0", GIT_CEILING_DIRECTORIES: path.dirname(workspaceRoot) },
-      maxBuffer: MAX_MANIFEST_BYTES,
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 10000,
-    });
-  } catch {
-    return undefined;
-  }
-  const content = new TextDecoder("utf8", { fatal: true }).decode(bytes);
-  if (typeof core !== "undefined") core.info(`Read compiler Markdown metadata from the local git object for executing revision ${revision}; no Contents API request was needed.`);
-  return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
-}
-
-/**
  * @param {any} githubClient
  * @param {{owner: string, repo: string, path: string, ref: string}} identity
  * @param {{now?: () => number, sleep?: (ms: number) => Promise<void>, maxWaitMs?: number}} [quotaWait]
@@ -340,23 +335,55 @@ async function readRemoteMarkdownMetadata(githubClient, identity, quotaWait = {}
   return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
 }
 
-/** @param {string} workflowId @param {string} workspace @param {{repository?: string, githubClient?: any, revision?: string, quotaWait?: {now?: () => number, sleep?: (ms: number) => Promise<void>, maxWaitMs?: number}}} [options] */
-async function loadMarkdownMetadata(workflowId, workspace, { repository, githubClient, revision, quotaWait } = {}) {
-  const match = /^([^/]+)\/([^/]+)\/(.+\.lock\.yml)@(.+)$/.exec(workflowId);
-  if (!match) throw new Error("Compiler Markdown metadata requires the executing workflow identity");
+/**
+ * Install the compiler catalog embedded in the executing job. The compiler omits
+ * the environment when the workflow has no records, so absence means empty and
+ * never triggers a read of the (possibly private) executing workflow.
+ * @param {string} workspace @param {{embeddedMetadata?: string, embeddedMetadataFile?: string}} [options]
+ */
+function loadMarkdownMetadata(workspace, { embeddedMetadata, embeddedMetadataFile } = {}) {
   const workspaceRoot = path.resolve(workspace);
-  const file = path.resolve(workspaceRoot, match[3]);
-  const relative = path.relative(workspaceRoot, file);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Invalid compiler Markdown metadata path");
-  if (revision && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(revision) || /^0+$/.test(revision))) throw new Error("Executing workflow metadata requires an immutable workflow revision");
-  const remote = revision || (repository && repository !== `${match[1]}/${match[2]}`);
-  const local = revision ? readGitObjectMarkdownMetadata(workspaceRoot, revision, match[3]) : undefined;
-  const metadata =
-    local !== undefined ? local : remote ? await readRemoteMarkdownMetadata(githubClient, { owner: match[1], repo: match[2], path: match[3], ref: revision || match[4] }, quotaWait) : readLocalMarkdownMetadata(file, workspaceRoot);
-  if (!metadata) throw new Error("Executing lock manifest lacks compiler Markdown metadata; recompile this workflow");
+  if (embeddedMetadataFile !== undefined) {
+    if (embeddedMetadata !== undefined) throw new Error("Conflicting embedded compiler Markdown metadata sources");
+    const file = fs.openSync(embeddedMetadataFile, "r");
+    try {
+      const stat = fs.fstatSync(file);
+      if (!stat.isFile() || stat.size > MAX_MANIFEST_BYTES) throw new Error("Embedded compiler Markdown metadata exceeds the bounded input limit");
+      const buffer = Buffer.alloc(MAX_MANIFEST_BYTES + 1);
+      let length = 0;
+      while (length < buffer.length) {
+        const read = fs.readSync(file, buffer, length, buffer.length - length, null);
+        if (!read) break;
+        length += read;
+      }
+      if (length > MAX_MANIFEST_BYTES) throw new Error("Embedded compiler Markdown metadata exceeds the bounded input limit");
+      embeddedMetadata = new TextDecoder("utf8", { fatal: true }).decode(buffer.subarray(0, length));
+    } finally {
+      fs.closeSync(file);
+    }
+  }
+  let metadata = { version: 2, records: [] };
+  if (embeddedMetadata !== undefined) {
+    if (Buffer.byteLength(embeddedMetadata) > MAX_MANIFEST_BYTES) throw new Error("Embedded compiler Markdown metadata exceeds the bounded input limit");
+    metadata = parseStrictJSON(embeddedMetadata, { maxBytes: MAX_MANIFEST_BYTES });
+  }
   installMarkdownMetadata(metadata);
   ensureCheckoutMarkdownMetadata(checkoutArtifactDocuments(workspaceRoot), workspaceRoot);
   return currentMarkdownMetadata();
+}
+
+/**
+ * Activation generates run info before checking out repository agents, so
+ * acquire their records from the checkout's compiled lock headers afterwards.
+ * @param {string} workspace
+ */
+function recoverCheckoutMarkdownMetadata(workspace) {
+  const workspaceRoot = path.resolve(workspace);
+  const documents = checkoutArtifactDocuments(workspaceRoot);
+  if (!missingMarkdownMetadata(documents).size) return;
+  const before = records.size;
+  ensureCheckoutMarkdownMetadata(documents, workspaceRoot);
+  if (records.size !== before) persistMarkdownMetadata();
 }
 
 /** @param {string} workspace */
@@ -543,6 +570,13 @@ function editMarkdownMetadata(content, transform) {
   return `---\n${renderMetadata(transform(value))}\n---${content.slice(block.end)}`;
 }
 
+/** @param {string} content */
+function removeDocumentFrontmatter(content) {
+  const block = markdownMetadataBlocks(content, true)[0];
+  if (!block) return content;
+  return content.slice(block.end).replace(/^\r?\n/, "");
+}
+
 /**
  * Apply author text operations to decoded JSON scalar values independently of
  * the document structure. Engine frontmatter is JSON (a YAML-compatible subset).
@@ -599,10 +633,12 @@ module.exports = {
   readLocalMarkdownMetadata,
   currentMarkdownMetadata,
   ensureCheckoutMarkdownMetadata,
+  recoverCheckoutMarkdownMetadata,
   ensureRemoteMarkdownMetadata,
   missingMarkdownMetadata,
   persistMarkdownMetadata,
   editMarkdownMetadata,
+  removeDocumentFrontmatter,
   transformMarkdownContent,
   transformValues,
   parseMarkdownJSON,

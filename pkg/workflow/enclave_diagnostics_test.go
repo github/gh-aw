@@ -86,8 +86,8 @@ func TestEnclaveDiagnosticsWrapperHelperReleaseBoundary(t *testing.T) {
 			step := strings.Join(generateAWFInstallationStepForWorkflow(getAWFVersionForSetup(data), data), "\n")
 			assert.Equal(t, tc.helper, strings.Contains(step, "Install authenticated Docker enclave storage helper"))
 			assert.Contains(t, step, "--rootless")
-			assert.Contains(t, step, "GH_TOKEN: ${{ github.token }}")
-			assert.Contains(t, step, "GH_HOST: github.com")
+			assert.NotContains(t, step, "GH_TOKEN")
+			assert.NotContains(t, step, "GH_HOST")
 		})
 	}
 }
@@ -244,8 +244,8 @@ func TestEnclaveDiagnosticsCompile(t *testing.T) {
 			installer := strings.Index(string(lock), "      - name: Install AWF binary\n")
 			require.GreaterOrEqual(t, installer, 0)
 			installStep := strings.SplitN(string(lock)[installer:], "\n      - ", 2)[0]
-			assert.Contains(t, installStep, "GH_TOKEN: ${{ github.token }}")
-			assert.Contains(t, installStep, "GH_HOST: github.com")
+			assert.NotContains(t, installStep, "GH_TOKEN")
+			assert.NotContains(t, installStep, "GH_HOST")
 			if tc.setting == "true" {
 				assert.Contains(t, string(lock), `\"enclaveDebugPublic\":true`)
 				assert.Contains(t, string(lock), "retention-days: 1\n")

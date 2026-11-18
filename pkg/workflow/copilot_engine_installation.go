@@ -35,6 +35,8 @@ type copilotSDKInstallSpec struct {
 }
 
 const workspaceCommandPrefix = `cd "${GITHUB_WORKSPACE}" && `
+const copilotSDKNodeTargetDir = constants.GhAwRootDirShell + "/engine-cli/copilot-sdk"
+const copilotSDKNodeInstallCommand = `npm install --prefix "` + copilotSDKNodeTargetDir + `" --ignore-scripts --no-save `
 const copilotSDKPythonTargetDir = `${GITHUB_WORKSPACE}/.gh-aw/copilot-sdk/python`
 const copilotSDKWebFetchDependency = "undici@6.28.0"
 
@@ -271,7 +273,7 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
+		command:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {
@@ -284,7 +286,7 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 		)
 	case "typescript":
 		spec.stepName = "Install GitHub Copilot SDK (TypeScript)"
-		spec.command = workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency + " ts-node@10.9.2 typescript@5.8.3"
+		spec.command = copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency + " ts-node@10.9.2 typescript@5.8.3"
 	case "go":
 		spec.stepName = "Install GitHub Copilot SDK (Go)"
 		spec.command = workspaceCommandPrefix + "go get github.com/github/copilot-sdk/go@v" + version
@@ -308,7 +310,7 @@ func getInlineCopilotSDKInstallSpec(runtimeID string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
+		command:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {
@@ -456,9 +458,6 @@ func generateAWFInstallationStep(version string, agentConfig *AgentSandboxConfig
 
 	stepLines := []string{
 		"      - name: Install AWF binary",
-		"        env:",
-		"          GH_TOKEN: ${{ github.token }}",
-		"          GH_HOST: github.com",
 		"        run: " + installCmd,
 	}
 
@@ -484,8 +483,6 @@ func generateDockerEnclaveStorageHelperInstallStep(version string, agentConfig *
 		"      - name: Install authenticated Docker enclave storage helper",
 		"        shell: bash",
 		"        env:",
-		"          GH_TOKEN: ${{ github.token }}",
-		"          GH_HOST: github.com",
 		"          AWF_HELPER_VERSION: " + version,
 	}
 	if agentConfig != nil && agentConfig.ChecksumsSHA256 != "" {
@@ -512,7 +509,7 @@ func dockerEnclaveStorageHelperSetupLines() []string {
 		`          mkdir -m 700 "$install_dir"`,
 		`          installer_dir=""`,
 		`          cleanup() {`,
-		`            rm -f "$install_dir/checksums.txt" "$install_dir/release-identity.txt" "$install_dir/enclave-storage-helper.py"`,
+		`            rm -f "$install_dir/checksums.txt" "$install_dir/enclave-storage-helper.py"`,
 		`            rmdir "$install_dir"`,
 		`            if [[ -n "$installer_dir" ]]; then /usr/bin/sudo -n /usr/bin/rm -rf -- "$installer_dir"; fi`,
 		`          }`,
@@ -522,18 +519,14 @@ func dockerEnclaveStorageHelperSetupLines() []string {
 
 func dockerEnclaveStorageHelperReleaseLines() []string {
 	return []string{
-		`          for asset in checksums.txt release-identity.txt; do`,
-		`            curl --proto '=https' --proto-redir '=https' -fsSL --retry 8 --retry-max-time 180 --connect-timeout 15 --max-time 60 \`,
-		`              "https://github.com/github/gh-aw-firewall/releases/download/$AWF_HELPER_VERSION/$asset" \`,
-		`              -o "$install_dir/$asset"`,
-		`          done`,
-		`          verify_release_identity "$install_dir/checksums.txt" "$install_dir/release-identity.txt" \`,
-		`            github/gh-aw-firewall "$AWF_HELPER_VERSION" "$checksums_sha256"`,
+		`          curl --proto '=https' --proto-redir '=https' -fsSL --retry 8 --retry-max-time 180 --connect-timeout 15 --max-time 60 \`,
+		`            "https://github.com/github/gh-aw-firewall/releases/download/$AWF_HELPER_VERSION/checksums.txt" \`,
+		`            -o "$install_dir/checksums.txt"`,
+		`          verify_release_digest "$install_dir/checksums.txt" "$checksums_sha256"`,
 		`          helper_sha256=$(awk '$2 == "enclave-storage-helper.py" { count++; digest = $1 } END { if (count != 1 || digest !~ /^[0-9a-f]{64}$/) exit 1; print digest }' "$install_dir/checksums.txt")`,
 		`          curl --proto '=https' --proto-redir '=https' -fsSL --retry 8 --retry-max-time 180 --connect-timeout 15 --max-time 60 \`,
 		`            "https://github.com/github/gh-aw-firewall/releases/download/$AWF_HELPER_VERSION/enclave-storage-helper.py" \`,
 		`            -o "$install_dir/enclave-storage-helper.py"`,
-		`          verify_release_attestation "$install_dir/enclave-storage-helper.py" github/gh-aw-firewall`,
 		`          verify_release_digest "$install_dir/enclave-storage-helper.py" "$helper_sha256"`,
 	}
 }

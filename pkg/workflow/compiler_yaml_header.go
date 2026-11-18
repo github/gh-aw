@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -88,7 +89,12 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	// The manifest records safe-update inventory and normalized webhook declarations
 	// for CAO discovery without interpreting generated workflow steps.
 	manifest := NewGHAWManifest(secrets, actions, data.ActionResolutionFailures, data.DockerImagePins, data.Redirect, data.Skills, data.Plugins, data.RawFrontmatter["on"])
-	manifest.MarkdownMetadata = c.collectMarkdownMetadata(data)
+	metadata := data.compiledMarkdownMetadata
+	if metadata == nil {
+		metadata = c.collectMarkdownMetadata(data)
+	}
+	// Manifest deduplication must not mutate the self-contained activation catalog.
+	manifest.MarkdownMetadata = &GHAWMarkdownMetadata{Version: metadata.Version, Records: slices.Clone(metadata.Records)}
 	if isWorkQueueWorker(data) {
 		manifest.WorkQueue = &GHAWManifestWorkQueue{Worker: true}
 		if data.WorkQueuePolicy != nil {

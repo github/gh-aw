@@ -1,4 +1,4 @@
-const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, loadMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
+const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, removeDocumentFrontmatter, readLocalMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
 
 it("discards inline skill descriptions without requiring metadata or interpreting YAML", () => {
   installMarkdownMetadata({ version: 2, records: [] });
@@ -141,6 +141,53 @@ describe("compiler-owned Markdown metadata", () => {
     expect(transformMarkdownContent(content, text => text.replace("Example", "Rendered"))).toBe("Introduction\n---\nRendered prose, not YAML\n---\nConclusion");
   });
 
+  it.each(["agent", "skill"])("ignores commented-out %s fences while preserving active source digests and offsets", kind => {
+    const { removeXMLComments } = require("./runtime_import.cjs");
+    const source = "model: small # <!-- compiler-owned comment -->\ntools: [Read]";
+    installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", tools: ["Read"] })] });
+    const comment = `<!--\r\n## ${kind}: hidden\r\n---\r\nmodel: invalid\r\n-->\r\n`;
+    const active = `## agent: reader\r\n---\r\n${source.replaceAll("\n", "\r\n")}\r\n---\r\nRead files.`;
+    expect(transformMarkdownContent(comment + active, removeXMLComments)).toBe('\r\n## agent: reader\r\n---\n{"model":"small","tools":["Read"]}\n---\r\nRead files.');
+  });
+
+  it.each(["", "\n---\nMore body"])("preserves document frontmatter boundaries around literal comment markers before %j", suffix => {
+    const source = 'description: "Literal <!-- marker"\nmodel: small';
+    const value = { description: "Literal <!-- marker", model: "small" };
+    installMarkdownMetadata({ version: 2, records: [record(source, value)] });
+    const body = "Body --> remains." + suffix;
+    const content = `---\n${source}\n---\n${body}`;
+
+    expect(readMarkdownMetadata("agent", content).value).toEqual(value);
+    expect(removeDocumentFrontmatter(content)).toBe(body);
+    expect(transformMarkdownContent(content, text => text)).toBe(`---\n${JSON.stringify(value)}\n---\n${body}`);
+  });
+
+  it.each(["\n", "\r\n"])("keeps literal comment markers in inline metadata separate from body comments with %j offsets", newline => {
+    const { removeXMLComments } = require("./runtime_import.cjs");
+    const source = 'description: "Literal <!-- marker"\nmodel: small';
+    const value = { description: "Literal <!-- marker", model: "small" };
+    installMarkdownMetadata({ version: 2, records: [record(source, value), record("model: large", { model: "large" })] });
+    const content = ["## agent: first", "---", ...source.split("\n"), "---", "Read files.", "## agent: second", "---", "model: large", "---", "Body --> remains.", "<!--", "## agent: hidden", "---", "model: invalid", "-->", "Done."].join(
+      newline
+    );
+    const expected = ["## agent: first", `---\n${JSON.stringify(value)}\n---`, "Read files.", "## agent: second", '---\n{"model":"large"}\n---', "Body --> remains.", "", "Done."].join(newline);
+
+    expect(require("./markdown_metadata.cjs").missingMarkdownMetadata([content]).size).toBe(0);
+    expect(transformMarkdownContent(content, removeXMLComments)).toBe(expected);
+  });
+
+  it.each([
+    ["---\non: workflow_dispatch\n---\nBody\n", "Body\n"],
+    ["\uFEFF---\r\non: workflow_dispatch\r\n---\r\nBody\r\n", "Body\r\n"],
+    ["Introduction\n---\nExample prose, not YAML\n---\nConclusion", "Introduction\n---\nExample prose, not YAML\n---\nConclusion"],
+  ])("removes only document frontmatter from %j", (content, expected) => {
+    expect(removeDocumentFrontmatter(content)).toBe(expected);
+  });
+
+  it("rejects unterminated document frontmatter when removing it", () => {
+    expect(() => removeDocumentFrontmatter("---\non: workflow_dispatch\nBody")).toThrow("unterminated frontmatter");
+  });
+
   it.each(["", "Introduction\n", "Introduction\r\n"])("recognizes an inline artifact at a heading boundary after %j", prefix => {
     const source = "model: small";
     installMarkdownMetadata({ version: 2, records: [record(source, { model: "small" })] });
@@ -185,11 +232,6 @@ describe("compiler-owned Markdown metadata", () => {
     }
   });
 
-  it("requires an exact executing lock identity when loading records", async () => {
-    await expect(loadMarkdownMetadata("wrong", process.cwd())).rejects.toThrow(/identity/);
-    await expect(loadMarkdownMetadata("owner/repo/../../other.lock.yml@main", process.cwd())).rejects.toThrow(/path/);
-  });
-
   it("materializes metadata solely from JSON headers, ignoring invalid YAML in the body", async () => {
     const fs = require("node:fs");
     const path = require("node:path");
@@ -199,10 +241,12 @@ describe("compiler-owned Markdown metadata", () => {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...require("./markdown_metadata.cjs").metadataManifestFields(metadata) })}\n# compiled fixture\ninvalid: [yaml\n`);
-      expect(await loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).toEqual({ version: 2, records: metadata.records.map(record => ({ ...record, sha256: record.sha256.slice(0, 20) })) });
+      const loaded = readLocalMarkdownMetadata(file, workspace);
+      installMarkdownMetadata(loaded);
+      expect(loaded).toEqual({ version: 2, records: metadata.records.map(record => ({ ...record, sha256: record.sha256.slice(0, 20) })) });
       expect(readDocumentMetadata("rate: 0.25").value).toEqual({ rate: 0.25 });
       fs.writeFileSync(file, "# gh-aw-manifest: {}\n# gh-aw-manifest: {}\n# compiled fixture\n");
-      await expect(loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).rejects.toThrow(/lacks compiler Markdown metadata/);
+      expect(readLocalMarkdownMetadata(file, workspace)).toBeUndefined();
     } finally {
       fs.rmSync(workspace, { recursive: true, force: true });
     }

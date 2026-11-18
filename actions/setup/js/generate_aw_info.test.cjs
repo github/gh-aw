@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
+import os from "node:os";
+import path from "node:path";
 import { createHash } from "node:crypto";
 
 // Mock the global objects that GitHub Actions provides
@@ -192,14 +194,14 @@ describe("generate_aw_info.cjs", () => {
     const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
     const agentDigest = digest(agent);
     const errorDigest = digest("invalid-agent-source");
-    const manifest = {
-      version: 1,
-      agent_metadata: { [agentDigest]: agent, [errorDigest]: null },
-      metadata_errors: { [`artifact:${errorDigest}`]: "confidential-compiler-error" },
-    };
-    mockGithub.rest.repos.getContent.mockImplementationOnce(async ({ path }) => ({
-      data: { type: "file", path, encoding: "base64", content: Buffer.from(`# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# compiled fixture\n`).toString("base64") },
-    }));
+    const manifest = { metadata_errors: { [`artifact:${errorDigest}`]: "confidential-compiler-error" } };
+    process.env.GH_AW_INFO_MARKDOWN_METADATA = JSON.stringify({
+      version: 2,
+      records: [
+        { kind: "artifact", sha256: agentDigest, value: agent },
+        { kind: "artifact", sha256: errorDigest, value: null, error: "confidential-compiler-error" },
+      ],
+    });
 
     await main(mockCore, mockContext);
 
@@ -210,7 +212,7 @@ describe("generate_aw_info.cjs", () => {
       engine_id: "copilot",
       run_id: mockContext.runId,
     });
-    expect(mockGithub.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ ref: process.env.GH_AW_INFO_WORKFLOW_SHA }));
+    expect(mockGithub.rest.repos.getContent).not.toHaveBeenCalled();
     expect(mockCore.setOutput).toHaveBeenCalledWith("model", "gpt-4");
     expect(mockCore.setOutput).toHaveBeenCalledWith("engine_id", "copilot");
     expect(mockCore.info).toHaveBeenCalledWith("Generated aw_info.json at: " + awInfoPath);
@@ -220,65 +222,10 @@ describe("generate_aw_info.cjs", () => {
     }
   });
 
-  describe("GitHub API quota exhaustion while reading the executing lock manifest", () => {
-    const quotaFailure = resetSeconds =>
-      Object.assign(new Error("API rate limit exceeded for installation"), {
-        status: 403,
-        response: { status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-limit": "15000", "x-ratelimit-used": "15000", "x-ratelimit-resource": "core", "x-ratelimit-reset": String(resetSeconds) } },
-      });
-    const clockAt = start => {
-      let current = start;
-      vi.spyOn(Date, "now").mockImplementation(() => current);
-      return {
-        now: () => current,
-        sleep: vi.fn(async ms => {
-          current += ms;
-        }),
-      };
-    };
-
-    it("waits for the failed response's reset and then generates run info", async () => {
-      const start = Date.parse("2026-11-09T23:58:53Z");
-      const reset = Date.parse("2026-11-10T00:00:04Z");
-      const clock = clockAt(start);
-      const requestTimes = [];
-      const fixture = mockGithub.rest.repos.getContent.getMockImplementation();
-      mockGithub.rest.repos.getContent.mockImplementationOnce(async () => {
-        requestTimes.push(clock.now());
-        throw quotaFailure(reset / 1000);
-      });
-      mockGithub.rest.repos.getContent.mockImplementationOnce(async request => {
-        requestTimes.push(clock.now());
-        return fixture(request);
-      });
-      await main(mockCore, mockContext, mockGithub, { quotaWait: clock });
-      expect(clock.sleep).toHaveBeenCalledExactlyOnceWith(reset + 1000 - start);
-      expect(requestTimes).toHaveLength(2);
-      expect(requestTimes[1]).toBeGreaterThanOrEqual(reset);
-      expect(mockCore.setFailed).not.toHaveBeenCalled();
-      expect(fs.writeFileSync).toHaveBeenCalledWith(awInfoPath, expect.any(String));
-    });
-
-    it("blocks activation with an explicit quota summary when the reset is beyond the bounded wait", async () => {
-      const start = Date.parse("2026-11-09T23:00:00Z");
-      const clock = clockAt(start);
-      mockGithub.rest.repos.getContent.mockRejectedValueOnce(quotaFailure(start / 1000 + 3600));
-      await expect(main(mockCore, mockContext, mockGithub, { quotaWait: clock })).rejects.toThrow("GitHub API quota exhausted; activation blocked until at least 2026-11-10T00:00:00.000Z");
-      expect(clock.sleep).not.toHaveBeenCalled();
-      expect(mockGithub.rest.repos.getContent).toHaveBeenCalledTimes(1);
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("resource=core; limit=15000; remaining=0; used=15000; reset=2026-11-10T00:00:00.000Z"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("reason=reset_exceeds_budget"));
-      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("### GitHub API quota exhausted"));
-      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("no unverified fallback was used"));
-      expect(fs.writeFileSync).not.toHaveBeenCalledWith(awInfoPath, expect.any(String));
-    });
-
-    it("does not reclassify an authorization 403 as quota exhaustion", async () => {
-      const denied = Object.assign(new Error("Resource not accessible by integration"), { status: 403, response: { status: 403, headers: {} } });
-      mockGithub.rest.repos.getContent.mockRejectedValueOnce(denied);
-      await expect(main(mockCore, mockContext, mockGithub)).rejects.toBe(denied);
-      expect(mockCore.summary.addRaw).not.toHaveBeenCalledWith(expect.stringContaining("GitHub API quota exhausted"));
-    });
+  it("treats an absent embedded catalog as empty without reading the executing workflow", async () => {
+    await main(mockCore, mockContext, mockGithub);
+    expect(mockGithub.rest.repos.getContent).not.toHaveBeenCalled();
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).agent_metadata).toEqual({});
   });
 
   it("records the executing reusable workflow separately from its caller in the same run", async () => {
@@ -302,6 +249,41 @@ describe("generate_aw_info.cjs", () => {
     expect(String(info.run_id)).toBe(info.context.run_id);
     expect(info.workflow_id).not.toBe(info.context.workflow_id);
     expect(info.workflow_call_id).not.toBe(info.context.workflow_call_id);
+  });
+
+  it.each(["environment", "file"])("generates run info for a private reusable workflow using embedded compiler metadata via %s", async transport => {
+    const source = "model: private-model\ntools: [Read]";
+    const sha256 = createHash("sha256").update(source).digest("hex");
+    const value = { model: "private-model", tools: ["Read"] };
+    process.env.GH_AW_INFO_WORKFLOW_ID = "private/shared/.github/workflows/worker.lock.yml@refs/heads/main";
+    const payload = JSON.stringify({ version: 2, records: [{ kind: "artifact", sha256, value }] });
+    let directory;
+    if (transport === "file") {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-metadata-"));
+      const file = path.join(directory, "metadata.json");
+      const descriptor = fs.openSync(file, "w");
+      try {
+        fs.writeSync(descriptor, payload);
+      } finally {
+        fs.closeSync(descriptor);
+      }
+      vi.stubEnv("GH_AW_INFO_MARKDOWN_METADATA_FILE", file);
+    } else {
+      process.env.GH_AW_INFO_MARKDOWN_METADATA = payload;
+    }
+    const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 })) } } };
+
+    try {
+      await main(mockCore, mockContext, githubClient);
+    } finally {
+      if (directory) fs.rmSync(directory, { recursive: true, force: true });
+    }
+
+    const info = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(info.agent_metadata).toEqual({ [sha256.slice(0, 20)]: value });
+    expect(info.workflow_ref).toBe(process.env.GH_AW_INFO_WORKFLOW_ID);
+    expect(info.repository).toBe("github/my-repo");
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
   });
 
   it("does not misidentify the caller as the executing workflow when its reference is unavailable", async () => {

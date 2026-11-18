@@ -69,11 +69,6 @@ fi
 case "$url" in
   */compat.json) cp "$TEST_ROOT/compat.json" "$out" ;;
   */checksums.txt) cp "$TEST_ROOT/checksums.txt" "$out" ;;
-  */release-identity.txt)
-    version="${url%/*}"
-    version="${version##*/}"
-    digest=$(shasum -a 256 "$TEST_ROOT/checksums.txt" | awk '{print $1}')
-    printf '%s  refs/tags/%s\n' "$digest" "$version" > "$out" ;;
   */SHA256SUMS.txt) cp "$TEST_ROOT/SHA256SUMS.txt" "$out" ;;
   */awf-bundle.js|*/awf-linux-*|*/awf-darwin-*) cp "$TEST_ROOT/payload" "$out" ;;
   */copilot-linux-x64.tar.gz) cp "$TEST_ROOT/copilot-linux-x64.tar.gz" "$out" ;;
@@ -85,17 +80,9 @@ EOF
 cat >"$TEMP_DIR/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-test "$1" = attestation
-test "$2" = verify
-test "$4" = --hostname
-test "$5" = github.com
-test "$6" = --repo
-test "$7" = github/gh-aw-firewall
-test "$8" = --signer-workflow
-test "$9" = github/gh-aw-firewall/.github/workflows/release.yml
-test "${10}" = --cert-oidc-issuer
-test "${11}" = https://token.actions.githubusercontent.com
-test "${12}" = --deny-self-hosted-runners
+printf '%s\n' "$*" >>"$TEST_ROOT/gh.log"
+echo "HTTP 401: Bad credentials (https://api.github.com)" >&2
+exit 1
 EOF
 cat >"$TEMP_DIR/bin/node" <<'EOF'
 #!/usr/bin/env bash
@@ -115,6 +102,7 @@ chmod +x "$TEMP_DIR/bin/"*
 
 run_awf() {
   env TEST_ROOT="$TEMP_DIR" EXECUTION_LOG="$TEMP_DIR/executions" HOME="$TEMP_DIR/home" \
+    GH_HOST=example.ghe.com GH_TOKEN=enterprise-test-token \
     GITHUB_PATH="$TEMP_DIR/github-path" PATH="$TEMP_DIR/bin:$PATH" \
     bash "$TEMP_DIR/scripts/install_awf_binary.sh" "$@" >"$TEMP_DIR/output" 2>&1
 }
@@ -132,6 +120,16 @@ run_awf v0.28.62 --rootless
 test -x "$TEMP_DIR/home/.local/bin/awf"
 grep -q EXECUTED "$TEMP_DIR/executions"
 echo "PASS: authenticated AWF bundle installs and executes"
+
+for node_version in v24.0.0 v18.0.0; do
+  rm -f "$TEMP_DIR/executions" "$TEMP_DIR/curl.log" "$TEMP_DIR/home/.local/bin/awf"
+  AWF_TEST_NODE_VERSION="$node_version" run_awf v0.29.11 --rootless --checksums-sha256 "$manifest_digest"
+  test -x "$TEMP_DIR/home/.local/bin/awf"
+  grep -q EXECUTED "$TEMP_DIR/executions"
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 2
+  test ! -e "$TEMP_DIR/gh.log"
+done
+echo "PASS: modern AWF bundle and binary verify real checksums on ghe.com without calling gh"
 
 for failure in '504 22' '404 22' '000 28' '200 23'; do
   read -r http_status curl_exit <<<"$failure"
@@ -329,23 +327,35 @@ rm -f "$TEMP_DIR/executions" "$TEMP_DIR/curl.log"
 printf 'attacker payload\n' >"$TEMP_DIR/payload"
 attacker_digest="$(shasum -a 256 "$TEMP_DIR/payload" | awk '{print $1}')"
 printf '%s  awf-bundle.js\n' "$attacker_digest" >"$TEMP_DIR/checksums.txt"
-if run_awf v0.28.62 --rootless; then
-  echo "FAIL: AWF accepted artifact-plus-manifest replacement" >&2; exit 1
-fi
-grep -q 'Trusted SHA256 verification failed' "$TEMP_DIR/output"
-test ! -e "$TEMP_DIR/executions"
-test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
+for version in v0.28.62 v0.29.11; do
+  rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/home/.local/bin/awf"
+  if run_awf "$version" --rootless --checksums-sha256 "$manifest_digest"; then
+    echo "FAIL: AWF accepted artifact-plus-manifest replacement" >&2; exit 1
+  fi
+  grep -q 'Trusted SHA256 verification failed' "$TEMP_DIR/output"
+  test ! -e "$TEMP_DIR/executions"
+  test ! -e "$TEMP_DIR/home/.local/bin/awf"
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
+done
 echo "PASS: AWF rejects artifact-plus-manifest replacement before downloading executable"
 
 # An authentic manifest must not allow a tampered bundle to trigger a binary fallback.
 cp "$TEMP_DIR/valid-checksums.txt" "$TEMP_DIR/checksums.txt"
-rm -f "$TEMP_DIR/curl.log"
-if run_awf v0.28.62 --rootless; then
-  echo "FAIL: AWF accepted a tampered bundle" >&2; exit 1
-fi
-grep -q 'refusing fallback' "$TEMP_DIR/output"
-test ! -e "$TEMP_DIR/executions"
-test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 2
+for version in v0.28.62 v0.29.11; do
+  for node_version in v24.0.0 v18.0.0; do
+    rm -f "$TEMP_DIR/curl.log"
+    if AWF_TEST_NODE_VERSION="$node_version" run_awf "$version" --rootless --checksums-sha256 "$manifest_digest"; then
+      echo "FAIL: AWF accepted a tampered payload" >&2; exit 1
+    fi
+    grep -q 'Checksum verification failed' "$TEMP_DIR/output"
+    if [ "$node_version" = v24.0.0 ]; then
+      grep -q 'refusing fallback' "$TEMP_DIR/output"
+    fi
+    test ! -e "$TEMP_DIR/executions"
+    test ! -e "$TEMP_DIR/home/.local/bin/awf"
+    test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 2
+  done
+done
 echo "PASS: AWF bundle integrity failure cannot fall back"
 
 printf '%s  copilot-linux-x64.tar.gz\n' "$attacker_digest" >"$TEMP_DIR/SHA256SUMS.txt"
@@ -424,3 +434,13 @@ if curl --proto '=https' --proto-redir '=https' -fsSL --max-time 2 http://127.0.
 fi
 grep -qi 'protocol.*disabled' "$TEMP_DIR/curl-output"
 echo "PASS: real curl refuses HTTP before connecting"
+
+# Lock files compiled by older gh-aw versions call these from inline helper steps.
+verify_release_identity "$TEMP_DIR/valid-checksums.txt" "$TEMP_DIR/release-identity.txt" \
+  github/gh-aw-firewall v0.29.11 "$manifest_digest"
+if verify_release_identity "$TEMP_DIR/valid-checksums.txt" "$TEMP_DIR/release-identity.txt" \
+  github/gh-aw-firewall v0.29.11 "$payload_digest" 2>/dev/null; then
+  echo "FAIL: legacy identity shim accepted an untrusted manifest" >&2; exit 1
+fi
+verify_release_attestation "$TEMP_DIR/payload" github/gh-aw-firewall 2>/dev/null
+echo "PASS: legacy attestation entry points remain callable and enforce the trusted manifest digest"

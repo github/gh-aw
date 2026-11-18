@@ -1,15 +1,110 @@
 package workflow
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 )
 
 var compilerYamlLog = logger.New("workflow:compiler_yaml")
+
+const maxActivationMetadataBytes = 4 * 1024 * 1024
+const activationMetadataChunkSize = 16000
+const activationMetadataFile = "${{ runner.temp }}/gh-aw-markdown-metadata.json"
+const awInfoStepEnvAnchor = "        id: generate_aw_info\n        env:\n"
+
+// Embed after job construction so rewritten prompt sources are included. Only
+// the step generating run info reads the catalog, and it needs no callee
+// repository token. Repository agent records are omitted: activation recovers
+// them from the checkout's lock headers after checking out .github.
+func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadata) error {
+	metadata = nonEmptyMarkdownMetadata(metadata)
+	if len(metadata.Records) == 0 {
+		return nil
+	}
+	activation, ok := c.jobManager.GetJob(string(constants.ActivationJobName))
+	if !ok {
+		return errors.New("activation job missing: cannot embed Markdown metadata")
+	}
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("cannot embed activation Markdown metadata: %w", err)
+	}
+	// The runtime bounds the escaped payload it reads, not the raw JSON.
+	payload := inertJSON(encoded)
+	if len(payload) > maxActivationMetadataBytes {
+		return fmt.Errorf("activation Markdown metadata exceeds the %d-byte limit; reduce the workflow's agent metadata", maxActivationMetadataBytes)
+	}
+	stepIndex := slices.IndexFunc(activation.Steps, func(step string) bool { return strings.Contains(step, awInfoStepEnvAnchor) })
+	if stepIndex < 0 || stepIndex >= len(activation.Steps) {
+		return errors.New("activation run info step missing: cannot embed Markdown metadata")
+	}
+	step := &activation.Steps[stepIndex]
+	env := "          GH_AW_INFO_MARKDOWN_METADATA: '" + payload + "'\n"
+	if len(payload) > activationMetadataChunkSize {
+		// Keep both run strings and environment entries below runner limits.
+		env = "          GH_AW_INFO_MARKDOWN_METADATA_FILE: " + activationMetadataFile + "\n"
+		var steps []string
+		for offset := 0; offset < len(payload); offset += activationMetadataChunkSize {
+			chunk := payload[offset:min(offset+activationMetadataChunkSize, len(payload))]
+			redirect := ">>"
+			if offset == 0 {
+				redirect = ">"
+			}
+			steps = append(steps, fmt.Sprintf("      - name: Write activation metadata chunk %d\n        shell: bash\n        run: |\n          printf '%%s' '%s' %s \"$RUNNER_TEMP/gh-aw-markdown-metadata.json\"\n", offset/activationMetadataChunkSize+1, chunk, redirect))
+		}
+		*step = strings.Replace(*step, awInfoStepEnvAnchor, awInfoStepEnvAnchor+env, 1)
+		activation.Steps = append(steps, activation.Steps...)
+		return nil
+	}
+	*step = strings.Replace(*step, awInfoStepEnvAnchor, awInfoStepEnvAnchor+env, 1)
+	return nil
+}
+
+// inertJSON escapes characters that Actions, YAML single quotes, or shell
+// single quotes would interpret, and keeps the payload ASCII so chunk
+// boundaries never split a character. These only occur inside JSON strings.
+func inertJSON(encoded []byte) string {
+	var out strings.Builder
+	for _, r := range string(encoded) {
+		switch {
+		case r == '$' || r == '\'':
+			fmt.Fprintf(&out, `\u%04x`, r) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		case r < utf8.RuneSelf:
+			out.WriteRune(r)
+		default:
+			for _, unit := range utf16.Encode([]rune{r}) {
+				fmt.Fprintf(&out, `\u%04x`, unit) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+			}
+		}
+	}
+	return out.String()
+}
+
+// The runtime reads a missing record as empty metadata, matching the lock
+// header's agent_metadata, so empty error-free records are redundant.
+func nonEmptyMarkdownMetadata(metadata *GHAWMarkdownMetadata) *GHAWMarkdownMetadata {
+	result := &GHAWMarkdownMetadata{Version: metadata.Version, Records: make([]GHAWMarkdownMetadataRecord, 0, len(metadata.Records))}
+	for _, record := range metadata.Records {
+		if record.Error == "" && len(record.References) == 0 {
+			switch strings.TrimSpace(string(record.Value)) {
+			case "{}", "null", "":
+				continue
+			}
+		}
+		result.Records = append(result.Records, record)
+	}
+	return result
+}
 
 // buildJobsAndValidate builds all workflow jobs and validates their dependencies.
 // It resets the job manager, builds jobs from the workflow data, and performs
@@ -215,6 +310,11 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// Build all jobs and validate dependencies
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
 		return "", nil, nil, fmt.Errorf("workflow compilation requires valid jobs and dependencies; check job definitions and needs references: %w", err)
+	}
+	fullMetadata, workflowMetadata := c.collectMarkdownMetadataCatalogs(data)
+	data.compiledMarkdownMetadata = fullMetadata
+	if err := c.embedActivationMarkdownMetadata(workflowMetadata); err != nil {
+		return "", nil, nil, err
 	}
 	repoConfig, err = resolvedArtifactRetentionConfig(repoConfig, data)
 	if err != nil {

@@ -13,12 +13,10 @@ permissions:
   actions: read
   pull-requests: read
   copilot-requests: write
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 timeout-minutes: 35
 max-turns: 60

@@ -842,6 +842,22 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			expectedKeys: []string{"report_incomplete"},
 		},
 		{
+			name: "create report incomplete issue config",
+			safeOutputs: &SafeOutputsConfig{
+				ReportIncomplete: &ReportIncompleteConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("5"),
+					},
+					CreateIssue: strPtr("true"),
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"report_incomplete", "create_report_incomplete_issue"},
+		},
+		{
 			name: "merge_pull_request config",
 			safeOutputs: &SafeOutputsConfig{
 				MergePullRequest: &MergePullRequestConfig{
