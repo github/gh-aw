@@ -4340,6 +4340,47 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes (restricted)  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "push_to_pull_request_branch",
+  "description": "Push committed changes to a pull request's branch. Append-only: force-push is not supported.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["message"],
+    "properties": {
+      "message": {"type": "string", "maxLength": 65536},
+      "branch": {"type": "string"},
+      "pull_request_number": {"type": ["number", "string"]},
+      "repo": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Required Message**: `message` is required on every call and is not read from git. Existing local commits keep their own commit messages.
+2. **Branch Selection**: `branch` names the local branch holding the commits. When omitted, the branch is inferred from the current git `HEAD`.
+3. **Target Resolution**: The target pull request is resolved from `target`, with `pull_request_number` and `repo` honored only where the target configuration permits.
+4. **Filter Evaluation**: When `title-prefix` or `required-labels` is configured, the target pull request MUST satisfy them before any push.
+5. **Append-Only Push**: Local commits are applied on top of the existing pull request head. Force-push and history rewriting MUST be rejected.
+6. **Size Limit**: A patch or bundle larger than `max-patch-size` (default 4096 KB) MUST fail the item.
+7. **No Changes**: When there is nothing to push, the outcome follows `if-no-changes` (`warn` by default, `error`, or `ignore`).
+8. **Staged Mode**: In staged mode the handler previews the push and performs no mutation.
+
+**Security Requirements**:
+
+- The privileged handler MUST NOT accept concurrency-control or head-pinning parameters from the agent; the pull request head is pinned by the handler.
+- Patch or bundle size MUST be validated against `max-patch-size` before it is applied.
+- A pull request title that does not start with the configured `title-prefix` MUST be rejected.
+- Cross-repository pushes MUST be restricted to repositories permitted by the configured target-repo settings.
+- Protected-file and signed-commit policies defined elsewhere in this specification apply to pushed changes.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -5171,6 +5212,46 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "assign_to_agent",
+  "description": "Assign the GitHub Copilot coding agent to an issue or pull request.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "issue_number": {"type": ["number", "string"]},
+      "pull_number": {"type": ["number", "string"]},
+      "agent": {"type": "string"},
+      "rationale": {"type": "string", "maxLength": 280},
+      "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+      "suggest": {"type": "boolean"},
+      "pull_request_repo": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` items have been processed, further items MUST be skipped without assigning the agent.
+2. **Target Resolution**: The issue or pull request is resolved per the Target Authorization rules below. `issue_number` and `pull_number` are mutually exclusive when `target` is `"*"`.
+3. **Filter Evaluation**: When `required-labels` is configured, the current labels of the resolved target MUST be checked immediately before assignment (see ATA-006).
+4. **Agent Selection**: `agent` defaults to `copilot`. When `allowed` is configured, an agent outside the allowlist MUST be rejected.
+5. **Pull Request Repository**: `pull_request_repo` selects where the resulting pull request is created. The global `pull-request-repo` is implicitly allowed; any other repository MUST appear in `allowed-pull-request-repos`.
+6. **Staged Mode**: In staged mode the handler previews the assignment and performs no mutation.
+
+**Security Requirements**:
+
+- Target selection MUST follow the Target Authorization rules, enforced at runtime.
+- Agent names and pull request repositories MUST be validated against `allowed` and `allowed-pull-request-repos` before any API call.
+- The `rationale` of an assignment MUST NOT exceed 280 characters.
+- Handler-level token overrides (`github-token`) MUST NOT be exposed to the agent.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
@@ -5579,6 +5660,40 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "hide_comment",
+  "description": "Hide a comment on a GitHub issue, pull request, or discussion.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["comment_id"],
+    "properties": {
+      "comment_id": {"type": "string"},
+      "reason": {"type": "string", "enum": ["SPAM", "ABUSE", "OFF_TOPIC", "OUTDATED", "RESOLVED", "LOW_QUALITY"]}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Comment Resolution**: `comment_id` is a GraphQL node ID, or a positive numeric REST comment ID that the handler resolves to a node ID. A missing or unresolvable ID fails the item.
+2. **Parent Resolution**: The handler MUST resolve the comment's parent issue, pull request, or discussion, and apply the Target Authorization rules below before mutating.
+3. **Reason Normalization**: `reason` is upper-cased and defaults to `SPAM`. When `allowed-reasons` is configured, a reason outside the list MUST cause the comment to be skipped.
+4. **Hiding**: The comment is minimized through the GraphQL `minimizeComment` mutation using the normalized reason as the classifier.
+5. **Staged Mode**: In staged mode the handler previews the action and performs no mutation.
+
+**Security Requirements**:
+
+- The comment's parent item MUST be authorized per HC-001 through HC-005 before the mutation is issued.
+- `reason` MUST be one of the enumerated classifiers and MUST satisfy `allowed-reasons` when configured.
+- Cross-repository targets MUST be validated against `target-repo` and `allowed-repos`.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
@@ -5654,6 +5769,52 @@ safe-outputs:
 **Cross-Repository Support**: Yes (organization or user projects)  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "create_project",
+  "description": "Create a new GitHub Project board.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "title": {"type": "string"},
+      "owner": {"type": "string"},
+      "owner_type": {"type": "string", "enum": ["org", "user"]},
+      "item_url": {"type": "string"},
+      "temporary_id": {"type": "string", "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` projects have been created, further items MUST fail with a `Max count` error.
+2. **Title Resolution**: When `title` is omitted, it is generated from `title-prefix` (default `Project`) and the triggering issue context. When no title can be resolved the item fails.
+3. **Owner Resolution**: `owner` falls back to the configured `target-owner`. When neither is available the item fails. `owner_type` defaults to `org`.
+4. **Initial Item**: When `item_url` is supplied it MUST be a GitHub issue URL or a temporary ID; a temporary ID that has not been resolved fails the item.
+5. **Temporary ID**: The created project is registered under `temporary_id` (generated when omitted) so later `update_project` and `create_project_status_update` items can reference it.
+6. **Configured Views**: Views declared in configuration are created after the project exists.
+7. **Staged Mode**: In staged mode the handler previews the project and performs no mutation.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `target-owner`: Default organization or user that owns created projects
+- `title-prefix`: Prefix for generated project titles (default: `Project`)
+- `views`: Views to create on each new project
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- The owner MUST be resolved from the message or configuration; creation without an owner MUST fail.
+- Temporary IDs MUST match `aw_` followed by 3 to 12 alphanumeric or underscore characters.
+- Project creation requires a GitHub App token; see Required Permissions.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -5682,6 +5843,62 @@ safe-outputs:
 **Default Max**: 10  
 **Cross-Repository Support**: Yes (via `target_repo` field in agent output; requires `allowed-repos` configuration)  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "update_project",
+  "description": "Add or update project items, create fields, or create views on a GitHub Project.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["project"],
+    "properties": {
+      "project": {"type": "string"},
+      "operation": {"type": "string", "enum": ["create_fields", "create_view"]},
+      "content_type": {"type": "string", "enum": ["issue", "pull_request", "draft_issue"]},
+      "content_number": {"type": ["number", "string"]},
+      "target_repo": {"type": "string"},
+      "draft_title": {"type": "string"},
+      "draft_body": {"type": "string", "maxLength": 65536},
+      "draft_issue_id": {"type": "string"},
+      "temporary_id": {"type": "string"},
+      "fields": {"type": "object"},
+      "field_definitions": {"type": "array"},
+      "view": {"type": "object"},
+      "create_if_missing": {"type": "boolean"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Project Resolution**: `project` is a full project URL or a temporary project ID from `create_project`. An unresolved temporary ID or malformed URL fails the item.
+2. **Mode Selection**: With no `operation`, the item adds or updates a project item. `create_fields` creates the custom fields in `field_definitions`; `create_view` creates the view in `view`.
+3. **Item Resolution**: For `issue` and `pull_request`, `content_number` is a positive integer or a resolved temporary ID, looked up in `target_repo` or the current repository. For `draft_issue`, `draft_title` is required unless a known `draft_issue_id` is supplied.
+4. **Field Updates**: `fields` values are applied to the project item after it is added.
+5. **Configured Fields and Views**: `field_definitions` and `views` from configuration are created even when the agent does not request them, and configured field definitions fill in when `create_fields` omits its own.
+6. **View Validation**: A view MUST have a non-empty `name` and a `layout` of `table`, `board`, or `roadmap`.
+7. **Staged Mode**: In staged mode the handler previews the update and performs no mutation.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit
+- `project`: Default project URL
+- `views`: Views to create on the project
+- `field-definitions`: Custom fields to create on the project
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- The project MUST be resolved to a concrete owner and number before any mutation.
+- `target_repo` MUST use `owner/repo` format.
+- Referenced issues and pull requests MUST exist; missing content fails the item.
+- Project permissions are available only to GitHub App tokens; see Required Permissions.
 
 **Required Permissions**:
 
@@ -5712,6 +5929,51 @@ safe-outputs:
 **Cross-Repository Support**: No (same repository only)  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "create_project_status_update",
+  "description": "Post a status update to a GitHub Project.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["project", "body"],
+    "properties": {
+      "project": {"type": "string"},
+      "status": {"type": "string", "enum": ["ON_TRACK", "AT_RISK", "OFF_TRACK", "COMPLETE", "INACTIVE"]},
+      "start_date": {"type": "string"},
+      "target_date": {"type": "string"},
+      "body": {"type": "string", "maxLength": 65536}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` updates have been posted, further items MUST fail with a `Max count` error.
+2. **Project Resolution**: `project` MUST be a full GitHub project URL or a temporary project ID from `create_project`. Invalid or unresolved values fail the item.
+3. **Status Normalization**: `status` is upper-cased and defaults to `ON_TRACK`. An invalid value falls back to `ON_TRACK` with a warning.
+4. **Date Handling**: `start_date` and `target_date` use `YYYY-MM-DD`; an invalid date falls back to the current date with a warning.
+5. **Body Sanitization**: `body` is sanitized, mention-limited per `mentions` configuration, and receives the configured body footer.
+6. **Staged Mode**: In staged mode the handler previews the update and performs no mutation.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 10)
+- `body-footer`: Deterministic footer appended to each update
+- `mentions`: Mention policy applied to the body
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- The project MUST be resolved to an accessible owner and number before posting.
+- Body content MUST be sanitized, with mentions limited by the configured mention policy, before it is sent.
+- Project permissions are available only to GitHub App tokens; see Required Permissions.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -5736,6 +5998,50 @@ safe-outputs:
 **Default Max**: 1  
 **Cross-Repository Support**: No (same repository only)  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "update_release",
+  "description": "Update an existing GitHub Release description.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["tag", "operation", "body"],
+    "properties": {
+      "tag": {"type": "string"},
+      "operation": {"type": "string", "enum": ["replace", "append", "prepend"]},
+      "body": {"type": "string", "minLength": 20, "maxLength": 65536}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Tag Resolution**: The tag is taken from `tag`. When absent, it MAY be inferred from a `release` event payload or `release_url` / `release_id` workflow-dispatch inputs; if no tag can be resolved the item fails.
+2. **Release Lookup**: The release is fetched by tag. When that lookup returns not-found, draft releases are searched before the item fails, because the tag endpoint does not return drafts.
+3. **Missing Release**: A Git tag without a GitHub Release MUST fail with a validation error that explains the release must be created first.
+4. **Body Update**: `replace` overwrites the body; `append` and `prepend` add `body` with a separator. The default operation is `append`.
+5. **Footer**: A generated footer is added unless `footer` is `false`, and `body-footer` is applied when configured.
+6. **Staged Mode**: In staged mode the handler previews the update and performs no mutation.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `footer`: Controls the generated footer (default: `true`)
+- `body-footer`: Deterministic body footer template
+- `github-token`: Handler-level token override
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Release body content MUST be sanitized before it is written.
+- The handler MUST update only the body of an existing release; it MUST NOT create releases or modify release assets.
+- Only the current repository's releases MAY be updated.
 
 **Required Permissions**:
 
@@ -5762,6 +6068,47 @@ safe-outputs:
 **Default Max**: 10  
 **Cross-Repository Support**: No (same repository only)  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "upload_asset",
+  "description": "Upload a file as a URL-addressable asset stored on an orphaned git branch.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["path"],
+    "properties": {
+      "path": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Staging**: The MCP backend stages the file at `path` using guarded reads; the agent job uploads the staged files as an artifact.
+2. **Validation**: `path` MUST be an absolute path under the workspace or `/tmp`. Only image files (`.png`, `.jpg`, `.jpeg`) are accepted unless other extensions are configured, and files over the size limit are rejected.
+3. **Publication**: The privileged `upload_assets` job downloads the artifact, commits the files to the orphaned asset branch, and computes URLs from trusted context.
+4. **Result Reporting**: Tool acceptance alone MUST NOT be reported as successful publication.
+5. **Staged Mode**: In staged mode the publication step previews the upload and performs no mutation.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 10)
+- `max-size`: Maximum file size in KB (default: 10240)
+- `allowed-exts`: Allowed file extensions (default: `.png`, `.jpg`, `.jpeg`)
+- `branch`: Orphaned branch that stores assets
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Source paths MUST be contained within the workspace or `/tmp` and MUST NOT be symbolic links, hard links, or non-regular files.
+- Size, SHA-256 digest, target filename, and URL MUST be derived from staged content, never from agent-supplied metadata.
+- Staged files MUST use mode `0600` and private directories mode `0700`, as detailed in Asset Staging Ownership and Transport below.
 
 **Required Permissions**:
 
@@ -5817,6 +6164,44 @@ Implementation and regression mappings are maintained in the [compiler threat sp
 **Cross-Repository Support**: Yes (via `target-repo`)  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "dispatch_workflow",
+  "description": "Dispatch an allowed workflow via workflow_dispatch.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["workflow_name"],
+    "properties": {
+      "workflow_name": {"type": "string"},
+      "inputs": {"type": "object"},
+      "ref": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` dispatches have been made, further items MUST be rejected.
+2. **Workflow Allowlist**: `workflow_name` MUST appear in `workflows`; otherwise the item fails with an error that lists the allowed workflows.
+3. **Repository and Ref Validation**: Cross-repository targets MUST satisfy `target-repo` and `allowed-repos`. A per-call `ref` MUST match `allowed-refs`, or the default branch when `allowed-refs` is omitted.
+4. **Input Conversion**: `inputs` values are converted to strings as required by `workflow_dispatch`.
+5. **Compiler-Managed Context**: Workflows that accept `aw_context` receive compiler-managed context; agent-supplied work-queue and claim inputs for protected queues MUST be rejected.
+6. **Dispatch**: The workflow is dispatched with the resolved file, ref, and inputs.
+7. **Staged Mode**: In staged mode the handler previews the dispatch and performs no mutation.
+
+**Security Requirements**:
+
+- Only workflows in the configured allowlist MAY be dispatched.
+- Refs MUST be validated against `allowed-refs` patterns before dispatch.
+- Cross-repository dispatch MUST be validated against `allowed-repos` before any API call.
+- Compiler-managed inputs MUST NOT be forgeable by the agent.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -5856,6 +6241,51 @@ Implementation and regression mappings are maintained in the [compiler threat sp
 **Cross-Repository Support**: No (same repository only)  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "create_code_scanning_alert",
+  "description": "Create a code scanning alert for a finding.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["file", "line", "severity", "message"],
+    "properties": {
+      "file": {"type": "string"},
+      "line": {"type": ["number", "string"]},
+      "severity": {"type": "string", "enum": ["error", "warning", "info", "note"]},
+      "message": {"type": "string"},
+      "column": {"type": ["number", "string"]},
+      "ruleIdSuffix": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: When `max` is greater than zero and has been reached, further findings MUST be rejected. A `max` of zero means unlimited.
+2. **Required Fields**: `file`, `line`, `severity`, and `message` MUST be present. `line` MUST parse to a positive integer.
+3. **Column**: `column` defaults to 1 and MUST be a number or numeric string.
+4. **Rule Identifier**: The SARIF rule ID is `<workflow-filename>-<ruleIdSuffix>`, or a numbered `security-finding` ID when no suffix is given. A suffix MUST contain only alphanumeric characters, hyphens, and underscores.
+5. **Severity Mapping**: `severity` is case-insensitive and MUST be `error`, `warning`, `info`, or `note`; it is mapped to a SARIF level.
+6. **SARIF Output**: Accepted findings are written to `code-scanning-alert.sarif` for later upload to code scanning.
+7. **Staged Mode**: In staged mode the handler previews the finding and does not write the SARIF file.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: unlimited)
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Findings MUST be validated before inclusion in the SARIF file; invalid findings MUST be rejected individually.
+- Rule ID suffixes MUST be restricted to a safe character set.
+- SARIF upload requires `security-events: write`; see Required Permissions.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -5882,6 +6312,46 @@ Implementation and regression mappings are maintained in the [compiler threat sp
 **Default Max**: 10  
 **Cross-Repository Support**: No (same repository only)  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "autofix_code_scanning_alert",
+  "description": "Create an autofix for a code scanning alert.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["alert_number", "fix_description", "fix_code"],
+    "properties": {
+      "alert_number": {"type": ["number", "string"]},
+      "fix_description": {"type": "string", "maxLength": 65536},
+      "fix_code": {"type": "string", "maxLength": 65536}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Per-Run Limit**: Once `max` autofixes have been processed (default 10), further items MUST be rejected.
+2. **Required Fields**: `alert_number`, `fix_description`, and `fix_code` MUST be present, and `alert_number` MUST parse to a positive integer.
+3. **Autofix Creation**: The autofix is created with `POST /repos/{owner}/{repo}/code-scanning/alerts/{alert_number}/fixes` in the current repository.
+4. **Failure Diagnostics**: 404, 403, and 422 API responses produce specific diagnostics for a missing alert, missing `security-events: write` permission, and an invalid fix.
+5. **Staged Mode**: In staged mode the handler previews the autofix and performs no mutation.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 10)
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Required fields MUST be validated before any API call.
+- Autofixes MUST target only alerts in the current repository.
+- The agent-supplied fix is a proposal to the code scanning API and MUST NOT be applied to repository files by this handler.
 
 **Required Permissions**:
 
@@ -6034,6 +6504,50 @@ safe-outputs:
 **Default Max**: 1  
 **Cross-Repository Support**: No (same repository only)  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "create_agent_session",
+  "description": "Create a GitHub Copilot coding agent session to delegate coding work.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["body"],
+    "properties": {
+      "body": {"type": "string", "maxLength": 65536}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Empty Task**: An empty or whitespace-only `body` MUST fail the item without calling the API.
+2. **Repository Validation**: The target repository MUST be the configured `target-repo` (or the current repository) or appear in `allowed-repos`; otherwise the item fails.
+3. **Base Branch**: `base` from configuration is used when set; otherwise the repository default branch is resolved.
+4. **Footer**: `body-footer` is appended to the task description when configured.
+5. **Session Creation**: The session is created with `POST /agents/repos/{owner}/{repo}/tasks`, passing the prompt and base ref. The session ID and URL are recorded for outputs and the step summary.
+6. **Staged Mode**: In staged mode the handler previews the session and performs no mutation.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `base`: Base branch for the session
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `body-footer`: Deterministic footer appended to the task description
+- `github-token`: Dedicated token for session creation
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call.
+- Session creation MUST use a token authorized for agent sessions; a dedicated `github-token` or the broker-issued token takes precedence over the default token.
+- Handler token overrides MUST NOT be exposed to the agent.
 
 **Required Permissions**:
 
