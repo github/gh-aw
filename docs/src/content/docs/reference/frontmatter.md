@@ -285,7 +285,7 @@ Set `model` (or `engine.model`) to a router value to route the main agent: `rout
 model: router/economy
 ```
 
-To narrow the main agent's router choices, set top-level [`model-routing.allowed-models`](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. This does not restrict sub-agents. The nested `engine.model-routing` form is still supported.
+To narrow the main agent's router choices, set top-level [`model-routing.allowed-models`](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. This does not restrict sub-agents. To disable implicit routing without pinning a model, set top-level `model-routing: false`. The nested form is [deprecated](/gh-aw/reference/model-routing/#migrate-nested-routing).
 
 ### Engine Driver (`engine.driver:`)
 

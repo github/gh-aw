@@ -53,6 +53,21 @@ func (h *headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 	return h.base.RoundTrip(reqCopy)
 }
 
+func newMCPInspectHTTPClient(headers map[string]string) *http.Client {
+	baseTransport := http.DefaultTransport
+	if baseTransport == nil {
+		baseTransport = &http.Transport{}
+	}
+
+	return &http.Client{
+		Transport: &headerRoundTripper{
+			base:    baseTransport,
+			headers: headers,
+		},
+		Timeout: MCPServerHTTPTimeout,
+	}
+}
+
 // inspectMCPServer connects to an MCP server and queries its capabilities
 func inspectMCPServer(config parser.RegistryMCPServerConfig, toolFilter string, verbose bool, useActionsSecrets bool) error {
 	mcpInspectServerLog.Printf("Inspecting MCP server: name=%s, type=%s", config.Name, config.Type)
@@ -216,18 +231,8 @@ func connectHTTPMCPServer(ctx context.Context, config parser.RegistryMCPServerCo
 
 	// Add custom headers if provided
 	if len(config.Headers) > 0 {
-		// Create a custom HTTP client with header injection
-		baseTransport := http.DefaultTransport
-		if baseTransport == nil {
-			baseTransport = &http.Transport{}
-		}
-
-		transport.HTTPClient = &http.Client{
-			Transport: &headerRoundTripper{
-				base:    baseTransport,
-				headers: config.Headers,
-			},
-		}
+		// Create a custom HTTP client with header injection and a bounded request duration.
+		transport.HTTPClient = newMCPInspectHTTPClient(config.Headers)
 	}
 
 	// Create a timeout context for connection

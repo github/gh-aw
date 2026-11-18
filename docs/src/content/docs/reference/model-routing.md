@@ -38,7 +38,7 @@ Find the likely cause of issue #${{ github.event.issue.number }} and comment wit
 
 Recompile the workflow with `gh aw compile` after changing its configuration. This example uses GitHub Copilot inference and needs [Copilot authentication](/gh-aw/reference/auth/#copilot-requests-write-permission). Routing also needs the AWF firewall, enabled by default; see [runtime requirements](#runtime-requirements) for supported environments.
 
-Eligible workflows on GitHub Copilot inference already use routing when no model is set. To opt out without pinning a model, set `engine.model-routing: false`. See [default routing](#default-routing-for-workflows-without-a-model).
+Eligible workflows on GitHub Copilot inference already use routing when no model is set. To opt out without pinning a model, set top-level `model-routing: false`. See [default routing](#default-routing-for-workflows-without-a-model).
 
 > [!NOTE]
 > `model: auto` uses the engine or provider's own model selection, not gh-aw's per-task router. Use `model: router` for gh-aw routing.
@@ -173,7 +173,7 @@ inference routing: mode=awf-routed model=gpt-5.6-sol effort=high
 
 ## Default routing for workflows without a model
 
-Eligible workflows without a model already behave like `model: router`. For Copilot, Claude, and Codex, a nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` repository or organization variable overrides this default at run time; the agent variable wins. Pi has no such variables. Set `engine.model-routing: false` to opt out without pinning a model, or set a specific model.
+Eligible workflows without a model already behave like `model: router`. For Copilot, Claude, and Codex, a nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` repository or organization variable overrides this default at run time; the agent variable wins. Pi has no such variables. Set top-level `model-routing: false` to opt out without pinning a model, or set a specific model.
 
 Default routing also [fails before the main agent starts](#what-happens-if-no-model-is-available) if no eligible model remains, even if the workflow did not explicitly request routing.
 
@@ -188,6 +188,19 @@ Default routing also [fails before the main agent starts](#what-happens-if-no-mo
 The default applies only to the main agent, not threat detection, evals, or sub-agents. If eligibility isn't met or is uncertain, compilation preserves the previous behavior. When it applies, compilation prints an informational notice. Explicit router values aren't bypassed by model variables.
 
 </details>
+
+## Migrate nested routing
+
+The compiler warns on the nested form in workflows and shared imports. Existing locks and routing objectives keep working; recompilation displays the warning. Migrate the authored declaration, including any shared files that contribute to it:
+
+| Old declaration | Replacement |
+|---|---|
+| `engine.model-routing: false` | Top-level `model-routing: false`. This neither pins a model nor disables model overrides. Omitting the field instead may enable implicit routing. |
+| `goal: cost` with `mode: auto` | `model: router` |
+| `goal: cost` with a fixed mode | `model: router/economy`, `router/balanced`, or `router/robust`, matching the old mode |
+| `goal: cost-speed` | No equivalent. It still selects for speed. Choose a cost-oriented selector deliberately before speed support is removed; the compiler does not substitute one. |
+
+If the legacy settings specify `allowed-models`, preserve their effective list in **one** top-level `model-routing.allowed-models` declaration. Legacy lists can merge across imports; top-level lists do not. If the effective legacy configuration was unrestricted, omit the shortlist. Do not combine a router selector or shortlist with `model-routing: false`.
 
 ## Advanced: engine model routing
 
@@ -289,20 +302,17 @@ Alias patterns wholly excluded by the policy are dropped or narrowed, while part
 
 Router values can also be set in `engine.model` or an imported workflow. `engine.model` takes precedence over the top-level `model`, and a workflow's own model takes precedence over an imported one.
 
-A shared file can set a router value or a routing block. For example, `.github/workflows/shared/routing.md` can contain:
+A shared file can set a router value and its shortlist. For example, `.github/workflows/shared/routing.md` can contain:
 
 ```aw wrap
 ---
-engine:
-  id: copilot
-  model-routing:
-    goal: cost
-    mode: auto
-    allowed-models: [gpt-5.6-luna, gpt-6-sol]
+model: router
+model-routing:
+  allowed-models: [gpt-5.6-luna, gpt-6-sol]
 ---
 ```
 
-An importing workflow uses those settings. It must omit `engine` or use its object form, such as `engine: { id: copilot }`. If it also enables routing for the same engine, its goal and mode apply. If any routing configuration for that engine omits `allowed-models`, there is no shortlist; otherwise the lists are combined. For a shared router value instead, set `model: router/economy` in the shared file; importing workflows can override it with their own model.
+An importing workflow can override the shared model with another router value. A shared file can instead declare `model-routing: false` without selecting an engine.
 
 ### Router value restrictions
 
@@ -331,5 +341,5 @@ Before the main agent starts, a small candidate model classifies the interpolate
 | The agent step fails before the main agent starts, often with exit code `78` | Routing could not select a model. Check the audit's Model Routing details for the reason, such as [no eligible model](#what-happens-if-no-model-is-available), a router error, or an engine compatibility issue. |
 | A sub-agent fails with HTTP 400 in Copilot CLI mode | Its family differs from the selected main model. See [Sub-agents](#sub-agents). |
 | `gh aw audit` reports deviated requests | Sub-agents or built-in agents may use another model; this is expected and isn't a policy violation. |
-| A workflow without a model is routed and you want a fixed model | Set a model, an applicable model variable, or `engine.model-routing: false`; see [default routing](#default-routing-for-workflows-without-a-model). |
+| A workflow without a model is routed and you want a fixed model | Set a model, an applicable model variable, or top-level `model-routing: false`; see [default routing](#default-routing-for-workflows-without-a-model). |
 | `gh aw audit` reports degraded classification | Classification failed; `model: router` uses balanced in this case. |

@@ -237,7 +237,7 @@ func prepareOrgRolloutWorker(ctx context.Context, repo, marker string) ([]orgRol
 	}
 	if len(existing) > 0 && !opts.replace {
 		orgRolloutDiscoveryLog.Printf("Skipping %s: %d existing rollout PR(s) and replace not requested", repo, len(existing))
-		err := emitOrgRolloutResult(orgRolloutResult{Status: "skipped: existing PR", URL: existing[0].URL})
+		err := emitOrgRolloutResult(orgRolloutResult{Status: "skipped: existing PR", URL: existing[0].URL}, ctx)
 		return existing, true, err
 	}
 	return existing, false, nil
@@ -247,7 +247,7 @@ func finishOrgRolloutWorker(ctx context.Context, repo string, existing []orgRoll
 	if opts := orgRolloutFromContext(ctx); opts == nil || !opts.worker {
 		return nil
 	}
-	if err := emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL, Preview: preview}); err != nil {
+	if err := emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL, Preview: preview}, ctx); err != nil {
 		return err
 	}
 	for _, pr := range existing {

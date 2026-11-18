@@ -83,7 +83,6 @@ func TestExtractMainModelPolicyOverlay_UsesParsedFrontmatterWhenPresent(t *testi
 }
 
 func TestExtractMainModelPolicyOverlay_FallsBackToRawFrontmatter(t *testing.T) {
-	toolsResult := &toolsProcessingResult{}
 	frontmatter := map[string]any{
 		"models": map[string]any{
 			"allowed": []any{"gpt-5-mini"},
@@ -91,10 +90,66 @@ func TestExtractMainModelPolicyOverlay_FallsBackToRawFrontmatter(t *testing.T) {
 		},
 	}
 
-	policy := extractMainModelPolicyOverlay(toolsResult, frontmatter)
-	require.NotNil(t, policy)
-	assert.Equal(t, []string{"gpt-5-mini"}, policy["allowed"])
-	assert.Equal(t, []string{"claude-opus"}, policy["blocked"])
+	for _, tt := range []struct {
+		name              string
+		parsedFrontmatter *FrontmatterConfig
+	}{
+		{name: "nil parsed frontmatter"},
+		{name: "empty parsed frontmatter", parsedFrontmatter: &FrontmatterConfig{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			toolsResult := &toolsProcessingResult{parsedFrontmatter: tt.parsedFrontmatter}
+			policy := extractMainModelPolicyOverlay(toolsResult, frontmatter)
+			require.NotNil(t, policy)
+			assert.Equal(t, []string{"gpt-5-mini"}, policy["allowed"])
+			assert.Equal(t, []string{"claude-opus"}, policy["blocked"])
+		})
+	}
+}
+
+func TestExtractMainModelCostsOverlay_FallsBackToRawFrontmatterWhenParsedCostsAreUnavailable(t *testing.T) {
+	rawProviders := map[string]any{
+		"openai": map[string]any{
+			"models": map[string]any{
+				"gpt-5": map[string]any{
+					"cost": map[string]any{"input": "1e-6"},
+				},
+			},
+		},
+	}
+	frontmatter := map[string]any{
+		"models": map[string]any{
+			"providers": rawProviders,
+		},
+	}
+
+	tests := []struct {
+		name              string
+		parsedFrontmatter *FrontmatterConfig
+	}{
+		{
+			name: "parsed costs without providers",
+			parsedFrontmatter: &FrontmatterConfig{
+				ModelCosts: map[string]any{"allowed": []any{"gpt-5"}},
+			},
+		},
+		{
+			name:              "empty parsed costs",
+			parsedFrontmatter: &FrontmatterConfig{},
+		},
+		{
+			name: "nil parsed frontmatter",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			toolsResult := &toolsProcessingResult{parsedFrontmatter: tt.parsedFrontmatter}
+
+			costs := extractMainModelCostsOverlay(toolsResult, frontmatter)
+			require.Equal(t, map[string]any{"providers": rawProviders}, costs)
+		})
+	}
 }
 
 func TestExtractMainModelCostsOverlay_ExtractsNilWhenModelCostsHasOnlyPolicyKeys(t *testing.T) {

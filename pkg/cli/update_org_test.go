@@ -25,6 +25,30 @@ func TestValidateRepoGlobs(t *testing.T) {
 	require.ErrorContains(t, err, "invalid --repos pattern")
 }
 
+func TestPreviewOrgRepoCheckoutUsesCheckoutRelativePaths(t *testing.T) {
+	checkoutDir := t.TempDir()
+	workflowsDir := filepath.Join(checkoutDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "review.md"),
+		[]byte("---\non: push\nengine: claude\nsource: owner/repo/review.md@v1.0.0\n---\n"), 0600))
+	beforeResolve, beforeDownload := resolveLatestRefFn, downloadWorkflowContentFn
+	t.Cleanup(func() {
+		resolveLatestRefFn, downloadWorkflowContentFn = beforeResolve, beforeDownload
+	})
+	resolveLatestRefFn = func(context.Context, string, string, bool, bool, time.Duration) (latestRefResolution, error) {
+		return latestRefResolution{Ref: "v2.0.0"}, nil
+	}
+	downloadWorkflowContentFn = func(context.Context, string, string, string, bool) ([]byte, error) {
+		return []byte("---\non: push\nengine: claude\n---\n"), nil
+	}
+
+	preview, err := previewOrgRepoCheckout(context.Background(), "acme/repo", checkoutDir, UpdateWorkflowsOptions{}, false)
+	require.NoError(t, err)
+	require.Len(t, preview.Workflows, 1)
+	assert.Equal(t, ".github/workflows/review.md", preview.Workflows[0].Path)
+	assert.NotContains(t, preview.Workflows[0].Path, checkoutDir)
+}
+
 func TestFilterOrgRepos(t *testing.T) {
 	repos := []string{"octo/api-service", "octo/web", "octo/worker"}
 
