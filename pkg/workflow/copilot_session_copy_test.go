@@ -151,11 +151,29 @@ func TestCopilotSessionCopyScriptCopiesOnlyDurableDirectModeSession(t *testing.T
 	assertSessionStateFileMissing(t, logsDir, "historical/events.jsonl")
 }
 
+func TestCopilotSessionCopyScriptIgnoresStaleDirectModeBaseline(t *testing.T) {
+	const sessionID = "00000000-0000-4000-8000-000000000001"
+	awfDir := filepath.Join(t.TempDir(), "session-state")
+	homeDir := t.TempDir()
+	logsDir := filepath.Join(t.TempDir(), "copilot-session-state")
+	writeSessionStateFile(t, homeDir, ".copilot/session-state/"+sessionID+"/events.jsonl", "historical events")
+
+	output := runCopilotSessionCopyScriptWithSessionID(t, awfDir, homeDir, logsDir, sessionID, "older-run")
+
+	if !strings.Contains(output, "::warning::No Copilot session state files found in "+awfDir) {
+		t.Errorf("Expected warning for stale durable session baseline, got: %s", output)
+	}
+	if _, err := os.Stat(logsDir); !os.IsNotExist(err) {
+		t.Errorf("Expected stale session not to be copied, stat error = %v", err)
+	}
+	assertSessionStateFile(t, homeDir, ".copilot/session-state/"+sessionID+"/events.jsonl", "historical events")
+}
+
 func runCopilotSessionCopyScript(t *testing.T, awfDir, homeDir, logsDir string) string {
 	return runCopilotSessionCopyScriptWithSessionID(t, awfDir, homeDir, logsDir, "")
 }
 
-func runCopilotSessionCopyScriptWithSessionID(t *testing.T, awfDir, homeDir, logsDir, sessionID string) string {
+func runCopilotSessionCopyScriptWithSessionID(t *testing.T, awfDir, homeDir, logsDir, sessionID string, baselineRunIDs ...string) string {
 	t.Helper()
 
 	scriptPath, err := filepath.Abs("../../actions/setup/sh/copy_copilot_session_state.sh")
@@ -164,7 +182,11 @@ func runCopilotSessionCopyScriptWithSessionID(t *testing.T, awfDir, homeDir, log
 	}
 	sessionIDFile := filepath.Join(t.TempDir(), "capture-offset.json")
 	if sessionID != "" {
-		if err := os.WriteFile(sessionIDFile, []byte(`{"id":"`+sessionID+`","bytes":0}`), 0o600); err != nil {
+		baselineRunID := "current-run"
+		if len(baselineRunIDs) > 0 {
+			baselineRunID = baselineRunIDs[0]
+		}
+		if err := os.WriteFile(sessionIDFile, []byte(`{"id":"`+sessionID+`","bytes":0,"runId":"`+baselineRunID+`","runAttempt":"1"}`), 0o600); err != nil {
 			t.Fatalf("Failed to write durable session capture baseline: %v", err)
 		}
 	}
@@ -173,6 +195,8 @@ func runCopilotSessionCopyScriptWithSessionID(t *testing.T, awfDir, homeDir, log
 		"GH_AW_COPILOT_SESSION_STATE_DIR": awfDir,
 		"GH_AW_COPILOT_SESSION_ID_FILE":   sessionIDFile,
 		"GH_AW_COPILOT_SESSION_LOGS_DIR":  logsDir,
+		"GITHUB_RUN_ID":                   "current-run",
+		"GITHUB_RUN_ATTEMPT":              "1",
 		"HOME":                            homeDir,
 	}
 	for _, variable := range os.Environ() {

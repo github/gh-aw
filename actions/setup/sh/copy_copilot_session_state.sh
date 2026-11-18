@@ -36,8 +36,8 @@ has_redactable_files() {
 }
 
 SESSION_ID=""
-if [ -f "$SESSION_ID_FILE" ]; then
-  SESSION_ID="$(node -e 'const fs = require("node:fs"); const state = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (typeof state.id === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(state.id)) process.stdout.write(state.id);' "$SESSION_ID_FILE" 2>/dev/null || true)"
+if [ -f "$SESSION_ID_FILE" ] && [ -n "${GITHUB_RUN_ID:-}" ]; then
+  SESSION_ID="$(node -e 'const fs = require("node:fs"); const state = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (state.runId === process.env.GITHUB_RUN_ID && state.runAttempt === (process.env.GITHUB_RUN_ATTEMPT || "1") && typeof state.id === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(state.id)) process.stdout.write(state.id);' "$SESSION_ID_FILE" 2>/dev/null || true)"
 fi
 
 SOURCE_DIR=""

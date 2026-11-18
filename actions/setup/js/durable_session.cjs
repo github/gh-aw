@@ -38,7 +38,7 @@ function captureCopilotSessions({ env = process.env, home = os.homedir() } = {})
   const destination = env.GH_AW_DURABLE_SESSION_DIR;
   if (!destination || !path.isAbsolute(destination)) throw new Error("Copilot durable capture requires an absolute session directory");
   const baseline = readCopilotCaptureBaseline(destination);
-  if (!baseline) {
+  if (!isCurrentCopilotCaptureBaseline(baseline, env)) {
     logger.diagnostic("Copilot did not produce native durable session files");
     return;
   }
@@ -69,12 +69,16 @@ function trimCopilotLogs({ env = process.env } = {}) {
   const directory = env.GH_AW_DURABLE_SESSION_DIR;
   if (!directory || !path.isAbsolute(directory)) throw new Error("Copilot durable log capture requires an absolute session directory");
   const baseline = readCopilotCaptureBaseline(directory);
-  if (!baseline || baseline.bytes === 0) return;
+  if (!isCurrentCopilotCaptureBaseline(baseline, env) || baseline.bytes === 0) return;
   // The full transcript stays in the checkpoint; only the unified-session copy is trimmed.
   const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/logs/copilot-session-state", baseline.id, "events.jsonl");
   const content = fs.readFileSync(file);
   if (content.length < baseline.bytes) throw new Error("Restored Copilot transcript was truncated before log capture");
   fs.writeFileSync(file, content.subarray(baseline.bytes));
+}
+
+function isCurrentCopilotCaptureBaseline(baseline, env) {
+  return Boolean(env.GITHUB_RUN_ID && baseline && baseline.runId === env.GITHUB_RUN_ID && baseline.runAttempt === (env.GITHUB_RUN_ATTEMPT || "1"));
 }
 
 if (require.main === module) {
