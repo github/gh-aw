@@ -96,24 +96,31 @@ Admission success, admission absence, and admission's `ignore` outage policy MUS
 
 ### 3.1. Repository-scoped GitHub configuration
 
-`token-broker.github` MUST contain `agent`, `safe-outputs`, or both. Each entry MUST contain exactly `repositories` and `permissions`, with the same scope syntax as Section 4.1. Omitted entries MUST NOT enable GitHub broker authentication for that context. The following proposed configuration is informative, not currently compilable:
+`token-broker.github` MUST contain `agent`, `safe-outputs`, or both. These entries are context opt-ins, not scope objects: an empty YAML value or boolean `true` enables that context; omission or boolean `false` leaves it disabled. Other values and unknown context keys MUST be rejected.
+
+The broker uses the consuming job's resolved repository permissions. Workflow-level `permissions` supplies agent permissions; `safe-outputs.permissions` supplies safe-output permissions. These maps MAY additionally contain `repos`, an explicit repository list with the syntax and limits of `repositories` in Section 4.1, only when brokered GitHub authentication is enabled for the corresponding context. The following proposed configuration is informative, not currently compilable:
 
 ```yaml
 token-broker:
   github:
     agent:
-      repositories: [octo/service, octo/shared]
-      permissions:
-        contents: read
-        issues: read
     safe-outputs:
-      repositories: [octo/service, octo/shared]
-      permissions:
-        contents: write
-        pull-requests: write
+permissions:
+  contents: read
+  issues: read
+  repos: [octo/service, octo/shared]
+safe-outputs:
+  permissions:
+    contents: write
+    pull-requests: write
+    repos: [octo/service, octo/shared]
 ```
 
-The compiler MUST reject `write` permissions in `agent`, empty or malformed scopes, unknown context keys, and ambiguous authentication sources for the same consumer. Safe-output permissions MAY be `read` or `write`; write access MUST be limited to the configured safe-output operations. The compiler MUST NOT copy or merge safe-output authority into the agent configuration.
+`repos` is compiler metadata, not a GitHub Actions permission or a GitHub App permission. The compiler MUST remove it before emitting job `permissions` or constructing the broker request's `permissions` map, and MUST translate it to the request's `repositories` array. It MUST NOT emit `repos` into generated GitHub Actions YAML permission maps. If omitted for an enabled context, the repository scope MUST be only the workflow's repository, never all repositories accessible to the installation. Explicit empty or malformed lists MUST fail compilation. Agent and safe-output repository lists are resolved independently; neither inherits the other's `repos`.
+
+All other permission entries retain their ordinary job-permission meaning and validation. The compiler MUST derive the broker permission map from the resolved repository permissions required by that consumer, including permissions inferred for configured safe-output handlers when not explicitly supplied. It MUST NOT forward job-only permissions such as `id-token` or `copilot-requests` to the GitHub token issuer. `id-token: write` authorizes OIDC acquisition, not repository writes.
+
+The compiler MUST reject `repos` when the corresponding `token-broker.github` context is disabled, any effective repository `write` permission for the agent, empty or malformed broker scopes, and ambiguous authentication sources for the same consumer. Safe-output repository permissions MAY be `read` or `write`; write access MUST be limited to the configured safe-output operations. Supplying only `safe-outputs.permissions.repos` MUST preserve the normal permission inference for those operations, not authorize arbitrary writes. The compiler MUST NOT copy or merge safe-output authority into the agent configuration.
 
 The compiler MUST bind each scope to its consuming job and trusted runtime integration. Agent and write-capable safe-output consumers MUST run in separate jobs with independently authorized OIDC identities. The agent and the safe-outputs MCP server that accepts agent-generated requests MUST NOT receive a write credential, a write-capable OIDC bootstrap environment, or access to a write exchange proxy. Only the trusted safe-output executor, after validating the requested operation and target against the configured safe-output policy, MAY request and use a write credential.
 
@@ -363,7 +370,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-014 | Deployment | For each claimed capability, use an actual GitHub-issued identity and demonstrate authorized downstream operations and request-time renewal. Broker exchange alone is insufficient. |
 | T-TBR-015 | Server | Rotate trusted signing keys; cached valid keys remain usable within policy, unknown keys trigger bounded refresh, and untrusted/unavailable keys fail closed. |
 | T-TBR-016 | Both | The compiler emits a final `always()` invalidation step in every broker-consuming job, including agent and safe-output jobs, after all consumers. Exercise success, earlier failure/cancellation, and issuance with a lost exchange response. Fresh OIDC invalidation revokes every token issued to that job across capabilities, providers, scopes, permissions, and renewals before returning 204. Repeat invalidation succeeds; other jobs remain usable; non-204 responses fail the step without `continue-on-error`. |
-| T-TBR-017 | Both | GitHub configuration rejects agent writes and invalid scopes. Wire validation rejects empty/oversized repository lists, case-insensitive duplicates, URLs, wildcards, empty permission maps, duplicate/unknown/administrative permissions, invalid levels, and caller-supplied mode fields with 400. Exercise one, multiple, 500, and 501 repositories. |
+| T-TBR-017 | Both | GitHub configuration accepts empty/true context opt-ins and disables omitted/false entries; rejects scope objects, unknown contexts, agent repository writes, invalid scopes, and `repos` without the corresponding enabled context. Compiler maps job `permissions.repos` to wire `repositories`, strips `repos` from emitted Actions permissions and wire permission maps, excludes job-only permissions, preserves safe-output permission inference when only `repos` is supplied, and defaults omitted lists independently to the workflow repository. Wire validation rejects empty/oversized repository lists, case-insensitive duplicates, URLs, wildcards, empty permission maps, duplicate/unknown/administrative permissions, invalid levels, and caller-supplied mode fields with 400. Exercise one, multiple, 500, and 501 repositories. |
 | T-TBR-018 | Server | An authorized multi-repository read request succeeds with exactly the requested repository set and permissions. One unauthorized repository or permission, a transfer/name-reuse mismatch, or an incompatible installation set returns 403 with zero issuance calls and no partial token. |
 | T-TBR-019 | Both | Every agent write request is rejected: compiler rejects configuration; server returns 403 even for direct exchanges using a valid agent identity. Spoofed safe-output labels, missing job evidence, inherited URLs, and task markers cannot authorize GitHub writes. |
 | T-TBR-020 | Deployment | Approved agent reads work across selected private repositories; access outside the set and mutations fail. Validated safe-output operations can write only to approved targets. Agent/MCP processes cannot obtain the write token or its OIDC bootstrap authority; unapproved output targets are rejected before issuance. |
@@ -451,6 +458,7 @@ These choices do not permit extra wire fields, weakened identity verification, o
 ### Version 1.1.0 (Draft)
 
 - Added the proposed `github` capability for one token covering multiple explicitly authorized repositories with a shared repository-permission map.
+- Kept broker context opt-ins separate from scope: job permissions supply access levels, with broker-only `permissions.repos` and `safe-outputs.permissions.repos` selecting repositories.
 - Restricted agent credentials to read access and write credentials to independently authorized trusted safe-output jobs.
 - Defined GitHub App installation scoping, all-or-nothing authorization, scope-isolated caching, renewal, invalidation, and compliance scenarios.
 - Required compiler-generated job-exit cleanup to invalidate every broker-issued token, including renewed tokens and exchanges whose responses were lost.
