@@ -554,14 +554,16 @@ Validate the touched ecosystems, not unrelated manifests:
 - Root Go: `go mod tidy`, `go mod verify`, `go build ./...`. If every updated
   module is `// indirect` in `go.mod`, stop there; the build is the validation.
   For a direct dependency, list importers with exactly
-  `grep -rlF --include=*.go '"<module path>' cmd pkg`. This prefix match covers
-  subpackage imports; ignore files whose match continues with anything other than
-  `"` or `/` (a different module). Exit status 1 with no output means no importers:
-  the build is the validation, not a failure. Otherwise run `go test -short`
-  naming only those files' package directories (for example
-  `go test -short ./pkg/foo ./pkg/bar`). Never use `./...` or `./pkg/...`
-  patterns: the full suite exceeds the run's time budget, and wall-clock budget
-  tests such as `TestLintPerformanceBudget` are not dependency validation.
+  `grep -rlF --include=*.go '"<module path>' cmd pkg specs`. This prefix match
+  covers subpackage imports; ignore files whose match continues with anything
+  other than `"` or `/` (a different module), and files under `testdata/`. Exit
+  status 1 with no output means no importers: the build is the validation, not a
+  failure; record `go test: not run (no importers)` in `validation_commands`.
+  Otherwise run `go test -short -skip '^TestLintPerformanceBudget$'` naming only
+  those files' package directories (for example
+  `go test -short -skip '^TestLintPerformanceBudget$' ./pkg/foo ./pkg/bar`).
+  Never use `./...` or `./pkg/...` patterns: the full suite exceeds the run's
+  time budget, and wall-clock budget tests are not dependency validation.
 - Named Python requirements: follow lock-header generator/platform constraints;
   verify hashes with wheel-only `python -m pip download --require-hashes --no-deps --only-binary=:all:`
   plus the header's target flags into a disposable directory. Hashes pin the
