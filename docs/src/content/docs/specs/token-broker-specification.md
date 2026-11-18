@@ -87,10 +87,10 @@ The explicit low-level `getToken(tokenType)` exchange API is marker-independent.
 The compiler MUST emit the single endpoint environment variable `GH_AW_TOKEN_BROKER_URL`, resolved at Actions runtime using:
 
 ```yaml
-GH_AW_TOKEN_BROKER_URL: ${{ vars.GH_AW_TOKEN_BROKER_URL || secrets.GH_AW_TOKEN_BROKER_URL }}
+GH_AW_TOKEN_BROKER_URL: ${{ secrets.GH_AW_TOKEN_BROKER_URL }}
 ```
 
-Organization/repository Actions variables and secrets supply this setting through existing Actions resolution rules. The compiler MUST NOT read a deployment URL from its own environment or embed a resolved deployment URL in generated YAML. There is no separate audience, capability-specific URL, or provider-endpoint setting in this protocol.
+An Actions secret supplies this setting through existing Actions secret resolution rules. Actions variables MUST NOT be used as a fallback. The compiler MUST NOT read a deployment URL from its own environment or embed a resolved deployment URL in generated YAML. There is no separate audience, capability-specific URL, or provider-endpoint setting in this protocol.
 
 The endpoint MUST be an absolute HTTPS URL with a hostname and without user information, fragments, whitespace, or backslashes. An enabled credential request with a missing, empty, or invalid URL MUST fail closed. The configured URL string, including any path or query, is the OIDC audience; client and server MUST NOT normalize it into a different audience. Operators SHOULD avoid query parameters, aliases, and trailing-slash ambiguity.
 

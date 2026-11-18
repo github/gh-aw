@@ -49,7 +49,7 @@ func assertGitHubBrokerConsumer(t *testing.T, job githubBrokerTestJob, stepID st
 	for _, step := range job.Steps {
 		if step.ID == stepID {
 			exchanges++
-			assert.Equal(t, tokenBrokerURLExpression, step.Env[tokenBrokerURLEnv])
+			assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 			assert.Contains(t, step.With["script"], "getBrokerToken('github-app', { mask: token => core.setSecret(token) })")
 			assert.NotContains(t, step.With["script"], "provider")
 			assert.NotContains(t, step.With["script"], "scope")
@@ -58,6 +58,7 @@ func assertGitHubBrokerConsumer(t *testing.T, job githubBrokerTestJob, stepID st
 		if strings.Contains(step.With["script"], "await invalidateBrokerTokens(") {
 			invalidations++
 			assert.Equal(t, "always()", step.If)
+			assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 		}
 	}
 	assert.Equal(t, 1, exchanges)

@@ -9,7 +9,7 @@ import (
 )
 
 const tokenBrokerURLEnv = "GH_AW_TOKEN_BROKER_URL"
-const tokenBrokerURLExpression = "${{ vars.GH_AW_TOKEN_BROKER_URL || secrets.GH_AW_TOKEN_BROKER_URL }}"
+const tokenBrokerURLExpression = "${{ secrets.GH_AW_TOKEN_BROKER_URL }}"
 const tokenBrokerCopilotRequestOutput = "${{ steps.token_broker_copilot_request.outputs.token }}"
 
 var (
