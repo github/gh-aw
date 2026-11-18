@@ -12,6 +12,11 @@ set +o histexpand
 
 set -e
 
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/assert_docker_lease.sh" awmg-proxy
+fi
+
 docker rm -f awmg-proxy 2>/dev/null || true
 git remote remove proxy 2>/dev/null || true
 

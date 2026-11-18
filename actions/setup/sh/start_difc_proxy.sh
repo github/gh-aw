@@ -20,6 +20,10 @@ set +o histexpand
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "${SCRIPT_DIR}/assert_docker_lease.sh" awmg-proxy
+fi
 # shellcheck source=proxy_env_lib.sh
 source "${SCRIPT_DIR}/proxy_env_lib.sh"
 
@@ -55,6 +59,7 @@ if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
 fi
 
 docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
+  --label "io.github.gh-aw.invocation=${GH_AW_DOCKER_OWNER:-}" \
   --user "$(id -u):$(id -g)" \
   -e GH_TOKEN \
   -e GH_HOST \
