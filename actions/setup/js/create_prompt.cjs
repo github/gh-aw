@@ -14,6 +14,19 @@ const { removeDocumentFrontmatter, transformMarkdownContent } = require("./markd
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
+ * Reject prompt text that appears to smuggle control-channel/system-role markers.
+ * This enforces a minimal instruction/data boundary for repo-authored prompt files.
+ * @param {string} section
+ * @param {string} text
+ */
+function assertNoPromptControlMarkers(section, text) {
+  const controlMarkerPattern = /<\|im_start\|>|<\|im_end\|>|<\|system\|>|<\|assistant\|>|<\|user\|>|BEGIN\s+SYSTEM\s+PROMPT|END\s+SYSTEM\s+PROMPT/iu;
+  if (controlMarkerPattern.test(text)) {
+    throw new Error(`Unsafe control marker detected in ${section} prompt content`);
+  }
+}
+
+/**
  * @typedef {Object} PromptRenderItem
  * @property {string} [content_env]
  * @property {string} [file]
@@ -245,11 +258,13 @@ async function main(core) {
     const promptOutputDir = path.join(runnerTemp, "gh-aw", "aw-prompts");
     const systemItemCount = config.system_item_count ?? 0;
     const systemContent = relocateRuntimePaths(renderPrompt({ ...config, items: config.items.slice(0, systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect));
+    assertNoPromptControlMarkers("system", systemContent);
     const workClaimContent = renderWorkClaim(typeof context === "undefined" ? null : context.payload);
     // Keep event data opaque, but retain the newline before author-owned structure.
     const userContent =
       (workClaimContent ? literals.protect(workClaimContent.slice(0, -1)) + "\n" : "") +
       relocateRuntimePaths(renderPrompt({ ...config, items: config.items.slice(systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect, systemContent));
+    assertNoPromptControlMarkers("user", userContent);
     const content = systemContent + userContent;
 
     fs.mkdirSync(promptOutputDir, { recursive: true, mode: 0o700 });

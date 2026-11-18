@@ -484,6 +484,7 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 		containerCmd.WriteString(" --network host")
 	}
 	containerCmd.WriteString(" --name awmg-mcpg")
+	containerCmd.WriteString(` --label "com.gh.aw.owner=$(<"$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner")"`)
 	if enclavesEnabled(workflowData) {
 		containerCmd.WriteString(" --label " + enclaveMCPGatewayRunLabel + "=${AWF_ENCLAVE_MCP_GATEWAY_IDENTITY}")
 	}

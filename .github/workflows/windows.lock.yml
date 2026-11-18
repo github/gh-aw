@@ -650,6 +650,9 @@ jobs:
           set -euo pipefail
           if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
           if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+          setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+          if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
           for kind in runtime setup; do
             if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
@@ -1689,7 +1692,7 @@ jobs:
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
-          $compressedScript = [System.Convert]::FromBase64String('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')
+          $compressedScript = [System.Convert]::FromBase64String('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')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
@@ -2432,7 +2435,7 @@ jobs:
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
-          $compressedScript = [System.Convert]::FromBase64String('jFJfb9M+FH3vpzizsqXTT976QwJEojxMMMEEbGh0QqKUyoqdxlpiR4690hH47CgJSf+kIB6v77n3nnN8SmFBhdMoZCESJrORTDCbgT6CeN9fv1lcfFrc3l1Pr95fLm5vbqYB/UFQVTv9j5fTuw9/7HbT05u3l9cNYD4PYVOhIL5Ji0mIRP6+egTiDW8SRD/x9dzmxfkypWxFjVNfzmYX9DOjjxP6Yv6ft7UzTjVIEKyYUVItg+BKPbBMchinrMwF4kww5QoYrS0JtznolRJmkbIyjYg3LoxUNoF/XPoDVo0Wggplyp48fVa6HBViZ0E5fPigyf+njRHt9lGiDe6l4pCq51EK64oQXI+AVj3xagxBFPWgXlbNNjpoTgjJhbLSrqOB51evasNDiKwUuys2f3ZwQdvuxhPZczwCFSBeYx5OTur6XV/3bGOtrFRO7IxuAauqHuTbNfHGpWUWNIZ/zINj6XfdU4KjCMTrWA7hboAdSw7qTodQtgd9Ppn8JTu3InGlVEs4VYdjECIS7kvNmbkXJmpvnJ/1ea2naBMwsmtIO9BZkuy+EG8c18zp5rlTuAkr+RcB++lfSZtqZ9GsKVN5QIrJQU3SHu+/aXDhpXYZh9IWicuyNYzI9YOALHXGrOBoMg0ujYitNmsy4lqJ0a8BAA==')
+          $compressedScript = [System.Convert]::FromBase64String('jFNhT9swFPzeX3E1KQUm0zJpm9YqH9BWbWijoK5o0hirrNghFqkdOTYd0O63T0ma0JCC+Jj47r179+6lwoIKp5HIRIRMxi0Z4vIS9B7Ee/jydXb8cza5GE9PTkezydnZdEBXBMtl7f3HaHpx/uxryZ6efRuNc8DV1RA2Egrir7ToDxHKddc2iNfsSeD/w5+enSe964iyBTVO/T68PKa/GL3v049Xb7yNmkGkQQaDBTNKquvB4ETdslhyGKesnAsEsWDKJTBaWzJsaii0Ty7G49FkNh2dnj+rORXWJbOEGaGsT7y9gINSEG+DS7C7i2TBQc/3c2cK+rrVFgc7vYMVQdsH8TbL59z2NsLOzkFvVThUmJPTavY8HPVXr3EoZ77gj14oYWYRS6Ns2sRIZUN0O2m3sbV81wRLpBF7++596uZYInAWlKOLLmh4VLMj1AY3UnFIVe0pVzME1y2gtCvDEPh+BaqGytT6W8MzhORCWWnv/EYmTz5nyx1CxKmol3g0eGuB4rmkh7LS2AYVIF5uXrb7Nuj36rtSG2hlpXKiRt0A5sumfPObeHupZRY0QLfDBx3ZLV/313kpVTbhroHdkxzU7Teh7An0Q7//QnImInSpVNdwKgtH48jI8Omoc2ZuhPGLHr3D6p4zFs0DRuqGFITSkrD+Jzs6ZourW/8uJ3wMK3nNAE+EYyFtpJ1FXiaN5JZRzBzUhEXzak2NDp+0izmUtghdHN/BiLm+FZCpjpkVHHmmwaURgdXmjrS4VqL1fwA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
@@ -2936,6 +2939,9 @@ jobs:
           set -euo pipefail
           if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
           if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+          setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+          if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
           for kind in runtime setup; do
             if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
@@ -3344,6 +3350,9 @@ jobs:
           set -euo pipefail
           if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
           if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+          setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+          if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
           for kind in runtime setup; do
             if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
@@ -3558,6 +3567,9 @@ jobs:
           set -euo pipefail
           if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
           if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+          setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+          if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
           for kind in runtime setup; do
             if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
@@ -3663,6 +3675,9 @@ jobs:
           set -euo pipefail
           if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
           if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+          setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+          if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
           for kind in runtime setup; do
             if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
@@ -3788,6 +3803,9 @@ jobs:
           set -euo pipefail
           if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
           if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+          setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+          if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
           for kind in runtime setup; do
             if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
@@ -3965,6 +3983,9 @@ jobs:
           set -euo pipefail
           if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
           if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+          setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+          if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
           owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
           for kind in runtime setup; do
             if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi

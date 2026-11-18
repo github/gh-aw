@@ -134,7 +134,12 @@ for proxy_var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
   fi
 done
 
-docker run -d --name awmg-cli-proxy "${DOCKER_NETWORK_ARGS[@]}" \
+OWNER_ARGS=()
+if [[ -n "${GH_AW_RUNTIME_ROOT:-}" && -f "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner" ]]; then
+  OWNER_ARGS=(--label "com.gh.aw.owner=$(<"$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner")")
+fi
+
+docker run -d --name awmg-cli-proxy "${DOCKER_NETWORK_ARGS[@]}" "${OWNER_ARGS[@]}" \
   --user "$(id -u):$(id -g)" \
   -e GH_TOKEN \
   -e GH_HOST \

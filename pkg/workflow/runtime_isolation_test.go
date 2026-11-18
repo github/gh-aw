@@ -160,9 +160,22 @@ func TestRuntimeIsolationCleanupSkipsMissingMarker(t *testing.T) {
 	}
 	require.Len(t, roots, 2)
 	setupRoot, runtimeRoot := roots[1], roots[0]
+	publishedEnv := append(os.Environ(), strings.Split(strings.TrimSpace(string(env)), "\n")...)
+	publishedEnv = append(publishedEnv, "RUNNER_TEMP="+temp)
+	unrelatedRoot := filepath.Join(temp, "unrelated")
+	require.NoError(t, os.Rename(setupRoot, unrelatedRoot))
+	bash = exec.CommandContext(t.Context(), "bash", "-c", runtimeEarlyCleanupScript)
+	bash.Env = append(publishedEnv, "GH_AW_SETUP_ROOT="+unrelatedRoot)
+	output, err = bash.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	require.Contains(t, string(output), "Invalid setup cleanup root")
+	require.DirExists(t, unrelatedRoot)
+	require.DirExists(t, runtimeRoot)
+	require.NoError(t, os.Rename(unrelatedRoot, setupRoot))
+
 	require.NoError(t, os.Remove(filepath.Join(runtimeRoot, ".gh-aw-runtime-owner")))
 	bash = exec.CommandContext(t.Context(), "bash", "-c", runtimeEarlyCleanupScript)
-	bash.Env = append(os.Environ(), strings.Split(strings.TrimSpace(string(env)), "\n")...)
+	bash.Env = publishedEnv
 	output, err = bash.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 	require.Contains(t, string(output), "Refusing runtime cleanup without ownership")

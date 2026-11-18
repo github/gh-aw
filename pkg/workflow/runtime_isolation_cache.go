@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -189,7 +190,7 @@ func renderStagedRuntimeCache(fields map[string]any, stage *runtimeCacheStage, s
 	}
 	inputs, ok := fields["with"].(map[string]any)
 	if !ok {
-		return "", fmt.Errorf("runtime cache action must have mapping inputs")
+		return "", errors.New("runtime cache action must have mapping inputs")
 	}
 	inputs["path"] = stage.actionPath
 	id := stage.id + "-restore-stage"

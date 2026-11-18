@@ -51,7 +51,12 @@ docker rm -f awmg-proxy 2>/dev/null || true
 
 DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1::18443)
 
-docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
+OWNER_ARGS=()
+if [[ -n "${GH_AW_RUNTIME_ROOT:-}" && -f "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner" ]]; then
+  OWNER_ARGS=(--label "com.gh.aw.owner=$(<"$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner")")
+fi
+
+docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" "${OWNER_ARGS[@]}" \
   --user "$(id -u):$(id -g)" \
   -e GH_TOKEN \
   -e GH_HOST \

@@ -82,6 +82,9 @@ trap - EXIT
 const runtimeEarlyCleanupScript = `set -euo pipefail
 if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
 if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+if [[ -z "${RUNNER_TEMP:-}" ]]; then exit 0; fi
+setup_parent="$(cd -- "$RUNNER_TEMP" && pwd -P)" || exit 0
+if [[ "${GH_AW_SETUP_ROOT%/*}" != "$setup_parent" || ! "${GH_AW_SETUP_ROOT##*/}" =~ ^gh-aw-setup\.[A-Za-z0-9]{10}$ ]]; then echo "::warning::Invalid setup cleanup root"; exit 0; fi
 owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
 for kind in runtime setup; do
   if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi

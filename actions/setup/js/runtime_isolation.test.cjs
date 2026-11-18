@@ -30,6 +30,7 @@ function fixture(realDocker = false, dockerEnvironment) {
     },
   });
   const dockerCalls = [];
+  const dockerOwners = new Map();
   const module = { exports: {} };
   vm.runInNewContext(source, {
     module,
@@ -41,7 +42,8 @@ function fixture(realDocker = false, dockerEnvironment) {
         return {
           spawnSync(command, args, options) {
             dockerCalls.push([command, args]);
-            return realDocker ? childProcess.spawnSync(command, args, { ...options, env: dockerEnvironment }) : { status: 0 };
+            if (realDocker) return childProcess.spawnSync(command, args, { ...options, env: dockerEnvironment });
+            return { status: 0, stdout: args[0] === "container" ? dockerOwners.get(args.at(-1)) : undefined };
           },
         };
       throw new Error(`Unexpected dependency ${name}`);
@@ -55,7 +57,7 @@ function fixture(realDocker = false, dockerEnvironment) {
     const id = crypto.randomBytes(5).toString("hex");
     return { RUNNER_TEMP: runner, GITHUB_ENV: path.join(directory, `env-${id}`), GITHUB_STATE: path.join(directory, `state-${id}`) };
   };
-  return { ...module.exports, directory, temporary, map, mutations, dockerCalls, environment, dispose: () => fs.rmSync(directory, { recursive: true, force: true }) };
+  return { ...module.exports, directory, temporary, map, mutations, dockerCalls, dockerOwners, environment, dispose: () => fs.rmSync(directory, { recursive: true, force: true }) };
 }
 
 describe("private runtime ownership", () => {
@@ -74,9 +76,13 @@ describe("private runtime ownership", () => {
     expect(fs.readFileSync(first.GITHUB_STATE, "utf8")).toContain(`GH_AW_RUNTIME_ID=${first.GH_AW_RUNTIME_ID}`);
     expect(context.allocate(first).GH_AW_RUNTIME_ROOT).toBe(first.GH_AW_RUNTIME_ROOT);
     fs.writeFileSync(path.join(context.map(second.GH_AW_RUNTIME_ROOT), "marker"), "second");
+    const digest = crypto.createHash("sha256").update(first.GH_AW_RUNTIME_TOKEN).digest("hex");
+    const ownedID = "a".repeat(64);
+    context.dockerOwners.set(`awmg-mcpg-${first.GH_AW_RESOURCE_SUFFIX}`, `${ownedID} ${digest}`);
+    context.dockerOwners.set(`awmg-cli-proxy-${first.GH_AW_RESOURCE_SUFFIX}`, `${"b".repeat(64)} wrong-owner`);
     expect(context.cleanup(first)).toBe(true);
     expect(fs.readFileSync(path.join(context.map(second.GH_AW_RUNTIME_ROOT), "marker"), "utf8")).toBe("second");
-    expect(context.dockerCalls[0][1].slice(2)).toEqual(["awmg-mcpg", "awmg-cli-proxy", "awmg-proxy"].map(name => `${name}-${first.GH_AW_RESOURCE_SUFFIX}`));
+    expect(context.dockerCalls.filter(([, args]) => args[0] === "rm")).toEqual([["docker", ["rm", "-f", ownedID]]]);
   });
 
   it("rejects shared paths, unsafe modes, wrong tokens, symlink roots, and unowned roots", () => {
@@ -267,12 +273,14 @@ describe("shared Docker daemon sidecar isolation (not full AWF)", () => {
         for (const env of [first, second]) {
           const name = `awmg-mcpg-${env.GH_AW_RESOURCE_SUFFIX}`;
           names.push(name);
-          run(["run", "-d", "--pull=never", "--network", "none", "--name", name, "--entrypoint", "/bin/sh", image, "-c", "sleep 120"]);
+          const digest = crypto.createHash("sha256").update(env.GH_AW_RUNTIME_TOKEN).digest("hex");
+          run(["run", "-d", "--pull=never", "--network", "none", "--name", name, "--label", `com.gh.aw.owner=${digest}`, "--entrypoint", "/bin/sh", image, "-c", "sleep 120"]);
           expect(run(["inspect", "--format", "{{.State.Running}}", name])).toBe("true");
         }
         run(["run", "--rm", "--pull=never", "--network", "none", "--user", "0:0", "-v", `${context.temporary}:/fixture`, "--entrypoint", "/bin/sh", image, "-c", "mkdir /fixture/gh-aw; echo legacy > /fixture/gh-aw/marker"]);
         expect(fs.statSync(path.join(context.temporary, "gh-aw")).uid).toBe(0);
         context.cleanup(first);
+        expect(() => run(["inspect", names[0]])).toThrow();
         expect(run(["inspect", "--format", "{{.State.Running}}", names[1]])).toBe("true");
         expect(fs.readFileSync(path.join(context.temporary, "gh-aw", "marker"), "utf8")).toBe("legacy\n");
         context.cleanup(second);
