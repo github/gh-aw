@@ -153,8 +153,8 @@ describe("Copilot native session collection", () => {
   });
 
   it("reports when no native session was produced", () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     captureCopilotSessions({ env: { GH_AW_TMP_DIR: directory, GH_AW_DURABLE_SESSION_DIR: path.join(directory, "state") }, home: directory });
-    expect(info).toHaveBeenCalledWith("Copilot did not produce native durable session files");
+    expect(write).toHaveBeenCalledWith(expect.stringContaining("Copilot did not produce native durable session files"));
   });
 });

@@ -5,8 +5,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { readCopilotCaptureBaseline } = require("./durable_native_session.cjs");
+const { createLogger } = require("./mcp_logger.cjs");
 
 const continuationHeader = "<!-- gh-aw-durable-continuation -->";
+const logger = createLogger("durable-session");
 
 function preparePrompt({ env = process.env, promptFile = "/tmp/gh-aw/aw-prompts/prompt.txt" } = {}) {
   if (env.GH_AW_DURABLE_RESUMED !== "true") return;
@@ -37,7 +39,7 @@ function captureCopilotSessions({ env = process.env, home = os.homedir() } = {})
   if (!destination || !path.isAbsolute(destination)) throw new Error("Copilot durable capture requires an absolute session directory");
   const baseline = readCopilotCaptureBaseline(destination);
   if (!baseline) {
-    console.info("Copilot did not produce native durable session files");
+    logger.diagnostic("Copilot did not produce native durable session files");
     return;
   }
   const copilotHome = env.COPILOT_HOME || path.join(home, ".copilot");
@@ -50,7 +52,7 @@ function captureCopilotSessions({ env = process.env, home = os.homedir() } = {})
     }
   });
   if (!source) {
-    console.info("Copilot did not produce native durable session files");
+    logger.diagnostic("Copilot did not produce native durable session files");
     return;
   }
   const target = path.join(destination, "session-state");
