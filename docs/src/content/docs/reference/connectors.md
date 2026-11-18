@@ -76,6 +76,7 @@ credential references are removed from the agent snapshot.
 | Jira | `tools.jira: {personal: [getJiraIssue]}` | `jira-add-comment` | One reader and one effect |
 | Azure DevOps | `tools.azure-devops: [get-work-item-description]` | `azure-devops-comment-on-work-item` | One reader and one effect |
 | Web IQ | `tools.azure-web-iq: {search: [web]}` | `create-issue` (GitHub handoff) | One native reader; no provider writer |
+| Foundry IQ | `tools.azure-foundry-iq: {knowledge-base: [knowledge_base_retrieve]}` | GitHub `create-issue`, staged | One read-only native method; no provider writer |
 
 Place effect selections under `safe-outputs`. Targeted HTTP MCP mappings select only
 exact native tools the declaration already allows; they cannot add tools, arguments, or
@@ -122,6 +123,7 @@ duplicate detection.
 | Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/notion-golden.md) |
 | Asana | Approved task description to a staged next-step comment | [asana-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md) |
 | Web IQ | Approved public web and news query to a cited research handoff | [azure-web-iq-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-web-iq-golden.md) |
+| Foundry IQ | Approved knowledge-base rollback guidance to a cited GitHub handoff | [azure-foundry-iq-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-foundry-iq-golden.md) |
 
 All effects are staged by default; reads still need provider credentials. To adopt a
 fixture, copy its consumer into `.github/workflows/`, keep the declaration at its imported
@@ -717,6 +719,54 @@ perform no space-membership preflight.
 linked pages, or attachments. The writes contain a fixed title and paragraph, not generated runbooks or review
 findings, so the golden proposes a deduplicated GitHub follow-up. Read the `<authentication>` guidance: OAuth
 audience, consent, cloud discovery, ACLs, and renewal are prerequisites.
+
+## Foundry IQ
+
+Import `.github/workflows/connectors/azure-foundry-iq.md` with the existing public-cloud
+Search `service` DNS label, exact `knowledge-base` name and `queries` string
+allowlist. The endpoint is fixed at compilation; approve the resulting
+`<service>.search.windows.net` host in `network.allowed`. Importing selects no tools.
+
+```yaml
+imports:
+  - uses: ".github/workflows/connectors/azure-foundry-iq.md"
+    with:
+      service: example-search
+      knowledge-base: operations-kb
+      queries: ["What deployment rollback checks are documented?"]
+tools:
+  azure-foundry-iq:
+    knowledge-base: [knowledge_base_retrieve]
+```
+
+The native method takes `queries`, an array containing exactly one approved question
+of 1 through 2048 Unicode code points. Unknown arguments, extra questions and
+ungranted text fail before credentials or HTTP. MCP responses are bounded to 256 KiB.
+The literal API version is `2026-11-01-preview`; no custom tools or source overrides
+are exposed. The [Microsoft MCP client source](https://raw.githubusercontent.com/microsoft/azure-ai-search-foundry-iq-live-knowledge-sources/f4c9985e064e185db18a7d5e9445e2b0fe7c310b/src/liveks/mcp_client.py)
+documents the native array argument.
+
+`FOUNDRY_IQ_SEARCH_ACCESS_TOKEN` holds a current Entra bearer access token acquired
+externally for `https://search.azure.com/.default`, without the Bearer prefix.
+Override its **name** with `reader-secret`. Enable Entra data-plane authentication
+and assign **Search Index Data Reader** to that identity on the Search service.
+Acquire and renew tokens through an approved trusted host; this connector neither
+logs in nor refreshes credentials. GitHub OIDC JWTs, API keys, client secrets and
+GitHub installation tokens are not substitutes. Automatic Azure OIDC token exchange
+and delegated source-authorization headers are unsupported.
+
+The selected knowledge base controls source/model access and retrieval behavior.
+Returned grounding text is untrusted and may contain private document content.
+The adapter does not independently verify document identity, completeness, freshness,
+source ACLs or sensitivity-label policy. The MCP content is not the REST
+activity/references envelope, and citation IDs do not authorize URL fetches.
+Approve disclosure to the agent and intended GitHub audience before live use.
+
+The golden stages one GitHub issue and makes no provider mutation. Staging does not
+suppress retrieval or its possible Azure/model charges. No plugin installation,
+resource provisioning, ingestion, graph tools or native triggers are included.
+Offline compilation/mocks are not live compatibility or answer-quality evidence.
+See [MCP retrieval and authentication](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve#call-the-mcp-endpoint).
 
 ## Sentry
 

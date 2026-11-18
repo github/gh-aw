@@ -18,10 +18,10 @@ import (
 func decodeJSON(data []byte, target any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
+	var extra any
 	if err := decoder.Decode(target); err != nil {
 		return err
 	}
-	var extra any
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		return errors.New("expected exactly one JSON document")
 	}
@@ -46,8 +46,13 @@ func validateArguments(inputs map[string]Input, resources map[string]string, all
 			return fmt.Errorf("connector argument %q: %w", key, err)
 		}
 		if resource, ok := resources[key]; ok {
-			text, isString := value.(string)
-			if !isString || !slices.Contains(allowed[resource], text) {
+			values, isArray := stringArrayArgument(value)
+			if text, isString := value.(string); isString {
+				values = []string{text}
+			} else if !isArray {
+				return fmt.Errorf("connector argument %q is outside approved resources", key)
+			}
+			if !allGranted(values, allowed[resource]) {
 				return fmt.Errorf("connector argument %q is outside approved resources", key)
 			}
 		}
@@ -57,6 +62,16 @@ func validateArguments(inputs map[string]Input, resources map[string]string, all
 
 func validateArgument(input Input, value any) error {
 	switch input.Type {
+	case "array":
+		values, ok := stringArrayArgument(value)
+		if !ok || input.Items == nil || len(values) < input.MinItems || len(values) > input.MaxItems {
+			return errors.New("expected a bounded string array")
+		}
+		for _, item := range values {
+			if err := validateArgument(*input.Items, item); err != nil {
+				return fmt.Errorf("array item: %w", err)
+			}
+		}
 	case "string":
 		text, ok := value.(string)
 		minimum := input.MinLength
@@ -92,6 +107,37 @@ func validateArgument(input Input, value any) error {
 		return errors.New("unsupported input type")
 	}
 	return nil
+}
+
+func stringArrayArgument(value any) ([]string, bool) {
+	switch values := value.(type) {
+	case []string:
+		return values, values != nil
+	case []any:
+		if values == nil || len(values) > 100 {
+			return nil, false
+		}
+		result := make([]string, 0, len(values))
+		for _, item := range values {
+			text, ok := item.(string)
+			if !ok {
+				return nil, false
+			}
+			result = append(result, text)
+		}
+		return result, true
+	default:
+		return nil, false
+	}
+}
+
+func allGranted(values, grants []string) bool {
+	for _, value := range values {
+		if !slices.Contains(grants, value) {
+			return false
+		}
+	}
+	return true
 }
 
 func numericValue(value any) (float64, bool) {

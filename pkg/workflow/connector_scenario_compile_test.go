@@ -23,7 +23,12 @@ type connectorCompilerScenario struct {
 	output   string
 }
 
+var azureFoundryIQCompilerScenario = connectorCompilerScenario{
+	"azure-foundry-iq", []string{"knowledge-base__knowledge_base_retrieve"}, "FOUNDRY_IQ_SEARCH_ACCESS_TOKEN", "create-issue",
+}
+
 var connectorCompilerScenarios = []connectorCompilerScenario{
+	azureFoundryIQCompilerScenario,
 	{"asana", []string{"get_task"}, "ASANA_READ_ACCESS_TOKEN", "asana-add-comment"},
 	{"linear", []string{"get-issue", "list-comments"}, "LINEAR_READ_API_KEY", "linear-add-comment"},
 	{"jira", []string{"personal__getJiraIssue"}, "JIRA_MCP_PERSONAL_BASIC_AUTH", "jira-add-comment"},
@@ -233,7 +238,7 @@ func TestConnectorScenarioRejectsInvalidConfiguration(t *testing.T) {
 						"writer-credential-for-reader": "phase",
 					}
 					if scenario.provider == "azure-web-iq" && name == "writer-credential-for-reader" {
-						messages[name] = "requires an agent credential"
+						messages[name] = "requires an agent-phase credential"
 					}
 					require.NotEmpty(t, messages[name], "each mutation must identify its intended rejection")
 					require.ErrorContains(t, err, messages[name])
