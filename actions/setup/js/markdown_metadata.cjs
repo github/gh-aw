@@ -79,16 +79,36 @@ function markdownMetadataBlocks(content, documentOnly = false) {
   const lines = [...content.matchAll(/[^\n]*(?:\n|$)/g)].filter(line => line[0]);
   const blocks = [];
   const lineText = (/** @type {number} */ index) => lines[index][0].replace(/\r?\n$/, "");
+  /** @type {Map<number, string>} */
+  const discoveryLines = new Map();
+  let commentEnd = 0;
+  const discoveryLineText = (/** @type {number} */ index) => {
+    const cached = discoveryLines.get(index);
+    if (cached !== undefined) return cached;
+    const text = lineText(index);
+    const start = /** @type {number} */ lines[index].index;
+    const prefix = Math.min(text.length, Math.max(0, commentEnd - start));
+    const visible = (text.slice(0, prefix).replace(/[^\r\n]/g, " ") + text.slice(prefix)).replace(/<!--[\s\S]*?(?:-->|$)/g, (comment, offset) => {
+      const closing = content.indexOf("-->", start + offset + 4);
+      if (closing < 0) return comment;
+      commentEnd = closing + 3;
+      return comment.replace(/[^\r\n]/g, " ");
+    });
+    discoveryLines.set(index, visible);
+    return visible;
+  };
   for (let index = 0; index < lines.length; index++) {
+    // Discover headers outside comments, but never interpret metadata as HTML.
+    const header = discoveryLineText(index);
     let opening = index;
-    if (index !== 0 || /^##[ \t]+(?:agent|skill):/.test(lineText(index))) {
-      if (documentOnly || !/^##[ \t]+(?:agent|skill):/.test(lineText(index))) continue;
+    if (index !== 0 || /^##[ \t]+(?:agent|skill):/.test(header)) {
+      if (documentOnly || !/^##[ \t]+(?:agent|skill):/.test(header)) continue;
       opening++;
-      while (opening < lines.length && !lineText(opening).trim()) opening++;
+      while (opening < lines.length && !discoveryLineText(opening).trim()) opening++;
     }
     if (
       opening >= lines.length ||
-      lineText(opening)
+      discoveryLineText(opening)
         .replace(/^\uFEFF/, "")
         .trim() !== "---"
     )
@@ -101,7 +121,7 @@ function markdownMetadataBlocks(content, documentOnly = false) {
     const sourceEnd = /** @type {number} */ lines[closing].index;
     const source = content.slice(sourceStart, sourceEnd).replace(/\r?\n$/, "");
     const end = sourceEnd + lineText(closing).length;
-    blocks.push({ start, end, source, skill: /^##[ \t]+skill:/.test(lineText(index)) });
+    blocks.push({ start, end, source, skill: /^##[ \t]+skill:/.test(header) });
     index = closing;
     if (documentOnly) break;
   }
