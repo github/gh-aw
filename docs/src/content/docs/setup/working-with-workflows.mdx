@@ -144,7 +144,9 @@ Commit workflow Markdown and generated lock files together. If the upgrade repor
 
 If `gh aw compile` warns about `engine.model-routing`, update the workflow or shared file that declares it. For cost-based routing, replace automatic mode with `model: router`; for a fixed level, use `model: router/economy`, `model: router/balanced`, or `model: router/robust`. A speed objective has no equivalent: choose a level deliberately rather than assuming it will pick the same model.
 
-If the old setting was `false`, move `model-routing: false` to the top level. Simply deleting it may enable routing. If several imports contributed to a shortlist, preserve their combined list in **one** top-level `model-routing.allowed-models` next to a router value. Recompile and commit the updated lock. See [Model Routing](/gh-aw/reference/model-routing/) for examples.
+If the old setting was `false`, move `model-routing: false` to the top level. Simply deleting it may enable routing.
+
+Preserve the shortlist the workflow used after resolving its imports. Copy a single list as-is into one top-level `model-routing.allowed-models` alongside a router value. If several files contributed to that shortlist, combine their entries in that one list. Omit the list only if the router's choices were previously unrestricted by a shortlist. Recompile and commit the updated lock. See [Model Routing](/gh-aw/reference/model-routing/) for examples.
 
 ## Learn More
 
