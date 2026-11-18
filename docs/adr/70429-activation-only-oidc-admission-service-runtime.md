@@ -32,7 +32,7 @@ The client could reuse the existing App-token mint pattern (as the daily-AIC gua
 
 #### Alternative 3: Grant `id-token: write` only when admission is configured
 
-The compiler cannot conditionally generate permissions from runtime Actions variables. Opted-in activation and conclusion jobs therefore retain OIDC capability when their endpoint-gated client steps are skipped. Isolating admission in other jobs would avoid this exposure, but adds runners and duplicate bootstrap.
+The compiler cannot conditionally generate permissions from runtime Actions variables. Activation and conclusion jobs compiled with admission therefore retain OIDC capability when their endpoint-gated client steps are skipped. Isolating admission in other jobs would avoid this exposure, but adds runners and duplicate bootstrap.
 
 #### Alternative 4: Isolate the completion callback in a separate job
 
@@ -53,7 +53,7 @@ This was rejected because full sessions contain unbounded agent messages and too
 ### Consequences
 
 #### Positive
-- Organizations can enforce centralized, cross-repository admission policy by setting Actions variables, with no per-workflow source changes and no recompilation to opt in.
+- Organizations can configure centralized, cooperative admission across workflows compiled with admission through Actions variables, without recompilation for subsequent runtime configuration changes.
 - No reusable credential leaves the runner: the authority receives only an audience-scoped OIDC token, and redirects are refused.
 - Admitted runs skip the daily-AIC guardrail and its preparatory steps (App token mint, observation restore and publish, ledger clone), which shortens activation.
 - Existing agent, detection and evals jobs and dependencies are reused; only budget inputs and selection change.
@@ -62,8 +62,8 @@ This was rejected because full sessions contain unbounded agent messages and too
 - The bounded retry/deadline support added to the shared `withRetry` helper can be reused by other callers.
 
 #### Negative
-- Opted-in activation hooks and actions share job-wide admission OIDC capability, even when the endpoint is empty. The admission step cannot provide a per-step credential boundary.
-- Opted-in conclusion reporting and actions share job-wide admission OIDC capability, including when the endpoint is empty.
+- Activation hooks and actions compiled with admission share job-wide OIDC capability, even when the endpoint is empty. The admission step cannot provide a per-step credential boundary.
+- Conclusion reporting and actions compiled with admission share job-wide OIDC capability, including when the endpoint is empty.
 - Reusable `workflow_call` callers must grant `id-token: write`. Existing caller envelopes (and the hand-authored Windows probe caller) had to change, and third-party callers that do not grant it will fail.
 - Admission remains cooperative, not an unbypassable organization spending cap. Supplied allowances configure existing runtime proxy limits, but deployments still need a separately deployed authority and protected backend policy/accounting.
 - When the authority is unavailable, activation can wait up to the 60-second deadline before the outage policy applies.

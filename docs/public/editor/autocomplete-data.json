@@ -528,7 +528,7 @@
         },
         "admission": {
           "type": "boolean",
-          "desc": "Enable admission and conclusion_admission jobs for this workflow.",
+          "desc": "Generate admission steps in activation and conclusion (default: true). An explicit admission setting in aw.json takes precedence.",
           "enum": [true, false],
           "leaf": true
         },

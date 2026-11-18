@@ -459,6 +459,9 @@ Marker: ${{ needs.select.outputs.marker }}
 	if !slices.Contains(dependencies, "select") || slices.Contains(dependencies, "admission") {
 		t.Errorf("activation should depend on runtime-import referenced job select without a separate admission job; got needs: %#v", activation["needs"])
 	}
+	if _, exists := jobs["admission"]; exists {
+		t.Error("admission should run inside activation, not as a separate job")
+	}
 	if !strings.Contains(lock, "GH_AW_NEEDS_SELECT_OUTPUTS_ISSUE_NUMBERS: ${{ needs.select.outputs.issue_numbers }}") {
 		t.Errorf("lock file missing issue_numbers env mapping")
 	}

@@ -156,9 +156,14 @@ represented by a skipped state-machine slot, not a real runtime job.
 [admission service contract](../../docs/src/content/docs/specs/admission-service-specification.md),
 including the implemented client's daily-validation precedence, optional
 component allowances, and admission OIDC capability confined to activation and conclusion jobs. It is a bounded reference model, not a proof of the runtime
-or deployment-owned authority. The admission check and completion callback are
-endpoint-gated steps. Skipping them does not remove job-wide OIDC permission
-from activation or conclusion. Activation requires successful or intentionally skipped admission; a successful
+or deployment-owned authority. Admission runs in an endpoint-gated step inside
+activation, after trusted setup and before author pre-steps and daily validation.
+An empty endpoint skips the step, not the runner or job bootstrap. When admission is compiled in,
+activation and conclusion jobs retain job-wide `id-token: write` even when their
+authority-request steps are skipped; activation hooks and conclusion actions
+share that capability. The endpoint gate prevents those steps from acquiring
+admission credentials, not other steps in the same job from minting OIDC tokens.
+Activation requires successful or intentionally skipped admission; a successful
 activation is required before agent execution. Independent OIDC features are
 outside this admission-only permission model.
 
@@ -206,7 +211,7 @@ failing after approval still preventing activation from completing successfully.
 In particular, skipped and fail-open starts deliberately demonstrate
 why this is **cooperative admission, not unbypassable organization policy or a
 hard spending cap**. The model consumes already-resolved runtime settings;
-repository-variable shadowing and an editor removing the job remain outside
+repository-variable shadowing and an editor removing the step remain outside
 the participating-workflow machine.
 
 Use the same checksum-pinned TLA+ Tools v1.7.4 described below:

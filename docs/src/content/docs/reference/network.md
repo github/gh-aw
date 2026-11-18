@@ -5,7 +5,7 @@ sidebar:
   order: 1300
 ---
 
-Control network access for AI engines using the top-level `network` field to specify which domains and services your agentic workflows can access during execution. Supported by all four engines (Copilot, Claude, Codex, Gemini) via the AWF firewall.
+Control which domains and services AI engines can reach during workflow execution with the top-level `network` field. All four engines (Copilot, Claude, Codex, Gemini) support it through the AWF firewall.
 
 If no `network:` permission is specified, it defaults to `network: defaults`, which allows only certificate validation, JSON schema, and stock Ubuntu archive/keyserver hosts. The [complete baseline](#defaults-baseline) lists every allowed host.
 
@@ -50,7 +50,7 @@ network:
 
 ## Hosted web tools
 
-Claude and Codex can invoke provider-hosted web search and fetch tools. Those requests run on provider infrastructure, so `network.allowed` does not constrain their destination domains. Configure a separate `hosted-web` policy when those tools are needed:
+Claude and Codex provider-hosted web search and fetch tools run on provider infrastructure, so `network.allowed` does not constrain their destinations. Configure a separate `hosted-web` policy when they are needed:
 
 ```aw wrap
 engine: claude
@@ -67,7 +67,7 @@ network:
 
 ## Protocol-Specific Domain Filtering
 
-Restrict domains to HTTP-only or HTTPS-only access for legacy systems, strict HTTPS enforcement, or gradual migration. This is currently supported by Copilot and Claude when the AWF firewall is enabled. Domains without a protocol prefix allow both HTTP and HTTPS.
+Restrict a domain to HTTP-only or HTTPS-only access, for legacy systems, strict HTTPS enforcement, or gradual migration. Supported by Copilot and Claude when the AWF firewall is enabled. Domains without a protocol prefix allow both.
 
 ```yaml wrap
 engine: copilot
@@ -81,12 +81,10 @@ network:
 
 ## Content Sanitization
 
-`network:` also controls which domains may appear in sanitized content. URLs from domains outside the allowlist are replaced with `(redacted)` to reduce exfiltration risk through untrusted links.
+`network:` also controls sanitized content: URLs from domains outside the allowlist are replaced with `(redacted)` to reduce exfiltration risk through untrusted links. GitHub domains (`github.com`, `githubusercontent.com`, etc.) are always allowed.
 
 > [!TIP]
-> If you see `(redacted)` in workflow outputs, add the domain to `network.allowed`. The same allowlist applies to both network egress (when the firewall is enabled) and content sanitization.
-
-GitHub domains (`github.com`, `githubusercontent.com`, etc.) are always allowed by default.
+> If you see `(redacted)`, add the domain to `network.allowed`. The same allowlist governs egress and sanitization.
 
 ## Ecosystem Identifiers
 
@@ -107,16 +105,8 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 | `terraform` | HashiCorp registry, apt/yum releases |
 | `bazel` | Bazel build system (`releases.bazel.build`, `bcr.bazel.build`) |
 | `clojure` | Clojure packages (`clojars.org`) |
-| `copilot-vendor` | Direct Copilot API hosts (`api.githubcopilot.com`, plan-specific hosts) and Copilot telemetry — explicit opt-in |
-| `codex-vendor` | Direct OpenAI API and optional authentication/telemetry — explicit opt-in |
-| `gemini-vendor` | Direct Gemini API (`generativelanguage.googleapis.com`) — explicit opt-in |
-| `copilot` | Copilot gateway/GitHub transport (`api.github.com`, GitHub web, `host.docker.internal`, `raw.githubusercontent.com`) |
-| `claude` | Claude gateway/GitHub transport (`api.github.com`, GitHub web, `host.docker.internal`, `raw.githubusercontent.com`); direct Anthropic API requires an explicit domain |
-| `codex` | Codex gateway/GitHub transport (`172.30.0.1`, GitHub API/web, `host.docker.internal`) |
-| `gemini` | Gemini gateway/GitHub transport (GitHub web, `host.docker.internal`, `raw.githubusercontent.com`) |
-| `pi` | Pi gateway/GitHub transport (GitHub web, `host.docker.internal`, `raw.githubusercontent.com`) |
-| `pi-base` | Pi provider-independent gateway baseline (`github.com`, `host.docker.internal`, `raw.githubusercontent.com`) |
-| `threat-detection` | Compatibility alias for Copilot threat-detection network access (`api.githubcopilot.com`, Copilot plan APIs, `api.github.com`, `github.com`, `host.docker.internal`) |
+| `copilot`, `claude`, `codex`, `gemini`, `pi`, `pi-base`, `threat-detection` | Engine gateway/GitHub transport sets, not added automatically ([details](#engine-domain-sets)) |
+| `copilot-vendor`, `codex-vendor`, `gemini-vendor` | Direct provider API sets, explicit opt-in ([details](#engine-domain-sets)) |
 | `dart` | Dart/Flutter packages (`pub.dev`, `storage.googleapis.com`) |
 | `deno` | Deno runtime (`deno.land`, `jsr.io`, `googleapis.deno.dev`) |
 | `dotnet` | NuGet packages and .NET SDK |
@@ -154,20 +144,11 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 | JSON schema | `json-schema.org`, `json.schemastore.org` |
 | Stock Ubuntu archives and keyserver | `archive.ubuntu.com`, `security.ubuntu.com`, `keyserver.ubuntu.com`, `azure.archive.ubuntu.com` |
 
-Third-party package sources (`ppa.launchpad.net`, `packagecloud.io`, `api.snapcraft.io`, `packages.cloud.google.com`, `packages.microsoft.com`) require an explicit `linux-distros` opt-in or individual entries in `network.allowed`. For example:
-
-```yaml
-network:
-  allowed:
-    - defaults
-    - linux-distros
-```
-
-`www.googleapis.com` is not part of `defaults`. Workflows that need it must allow it explicitly or opt into an ecosystem that includes it, such as `chrome`.
+Third-party package sources (`ppa.launchpad.net`, `packagecloud.io`, `api.snapcraft.io`, `packages.cloud.google.com`, `packages.microsoft.com`) require the explicit `linux-distros` opt-in (`allowed: [defaults, linux-distros]`) or individual entries. `www.googleapis.com` is not in `defaults`; allow it explicitly or opt into an ecosystem that includes it, such as `chrome`.
 
 ## Engine Domain Sets
 
-Engine domain sets are named allowlist bundles for gateway/GitHub transport. They are **not** added automatically. Agent inference normally runs through the AWF API proxy, so direct provider API hosts are granted separately. Workflows that previously relied on an engine set for direct API egress must add the corresponding vendor set or literal domain to `network.allowed`.
+Engine domain sets are named bundles for gateway/GitHub transport. They are **not** added automatically. Agent inference normally runs through the AWF API proxy, so direct provider API hosts are granted separately. Workflows that relied on an engine set for direct API egress must add the matching vendor set or literal domain to `network.allowed`.
 
 | Engine set | Included domains |
 |---|---|
@@ -182,13 +163,13 @@ Engine domain sets are named allowlist bundles for gateway/GitHub transport. The
 | `pi-base` | `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; applied before a provider prefix selects a gateway route |
 | `threat-detection` | Applied automatically only to inline Copilot threat-detection runs and available as a compatibility alias: Copilot API hosts, `api.github.com`, `github.com`, and `host.docker.internal`. Telemetry requires an explicit `copilot-vendor` opt-in. |
 
-Inline Copilot detection no longer automatically allows `registry.npmjs.org`, including through the `threat-detection` compatibility alias. To retain its npm lockfile metadata validation, set `features.gh-aw-detection: false`, add `node` or `registry.npmjs.org` to `network.allowed`, and recompile the workflow. Inline detection inherits only the registry host from the `node` set, not its other hosts; runtime configuration alone does not opt it in. This grants the sandbox direct access to the host, not a read-only capability. Explicit `network.blocked` rules still take precedence. Without access, registry verification is unavailable. The default external detector uses its own prompt and does not provide this metadata verification.
+Inline Copilot detection no longer automatically allows `registry.npmjs.org`, including through the `threat-detection` alias. To keep npm lockfile metadata validation, set `features.gh-aw-detection: false`, add `node` or `registry.npmjs.org` to `network.allowed`, and recompile the workflow. Inline detection inherits only the registry host from `node`, and runtime configuration alone does not opt it in. The grant is direct host access, not read-only, and explicit `network.blocked` rules still take precedence. Without it, registry verification is unavailable; the default external detector does not provide this metadata verification.
 
 Gemini's default upstream remains available to the AWF API proxy without granting the agent direct access to `generativelanguage.googleapis.com`. Add `gemini-vendor` or that hostname to `network.allowed` for direct access. An explicitly configured `GEMINI_API_BASE_URL` retains custom-target egress; it does not automatically allow the default hostname.
 
-The `claude` set excludes telemetry, certificate/OCSP hosts, package mirrors, container registries, and Playwright downloads. Those require explicit domains or ecosystem opt-ins such as `defaults`, `containers`, or `playwright`; configuring the Playwright tool also enables its download domains. The default Anthropic target is reached through the AWF API proxy and does not grant agent-side access to `api.anthropic.com`; add that literal domain to `network.allowed` for intentional direct access. `engine.api-target` configures the Copilot target and does not replace Claude's Anthropic endpoint. Use `ANTHROPIC_BASE_URL` to configure a custom Anthropic target; its configured host handling is independent of the direct Anthropic API grant. The broader `anthropic.com` suffix is never included because it would also permit `statsig.anthropic.com`. CLI installation runs outside the agent firewall and does not require adding download hosts to this set.
+The `claude` set excludes telemetry, certificate/OCSP hosts, package mirrors, container registries, and Playwright downloads. Add them via explicit domains or ecosystem opt-ins such as `defaults`, `containers`, or `playwright` (configuring the Playwright tool also enables its download domains). The default Anthropic target goes through the AWF API proxy and does not grant agent-side access to `api.anthropic.com`; add that literal domain for intentional direct access. `engine.api-target` configures only the Copilot target. A custom Anthropic target set with `ANTHROPIC_BASE_URL` is handled independently of the direct API grant. The broad `anthropic.com` suffix is never included because it would also permit `statsig.anthropic.com`. CLI installation runs outside the agent firewall and needs no download hosts in this set.
 
-The `codex` set excludes direct OpenAI API egress and the broad `openai.com` and `chatgpt.com` suffixes. Add `codex-vendor` for direct access to `api.openai.com` or optional agent-side authentication/telemetry. [OpenAI WIF](/gh-aw/reference/auth/#codex-openai-workload-identity-federation) is different: the API proxy exchanges tokens with `auth.openai.com` through its dedicated egress path, so neither that host nor `codex-vendor` is required in the agent or detection allowlist. External Codex detection retains its concrete API transport, uses the API proxy for authentication, and preserves any explicit vendor opt-in; GitHub-hosted detection uses Copilot transport without adding `api.openai.com`.
+The `codex` set excludes direct OpenAI API egress and the broad `openai.com` and `chatgpt.com` suffixes. Add `codex-vendor` for `api.openai.com` or optional agent-side authentication/telemetry. [OpenAI WIF](/gh-aw/reference/auth/#codex-openai-workload-identity-federation) differs: the API proxy exchanges tokens with `auth.openai.com` on its own egress path, so that host and `codex-vendor` are not needed in the agent or detection allowlist. External Codex detection keeps its API transport, authenticates through the API proxy, and keeps any explicit vendor opt-in; GitHub-hosted detection uses Copilot transport without `api.openai.com`.
 
 The `gemini` set excludes `*.googleapis.com`; package downloads such as `storage.googleapis.com` require their own ecosystem opt-in.
 
@@ -199,28 +180,16 @@ The `gemini` set excludes `*.googleapis.com`; package downloads such as `storage
 Single-word entries in `network.allowed` that match the ecosystem identifier pattern (`[a-z][a-z0-9-]*`) are validated against the known ecosystem list at compile time. An unrecognized identifier produces a compilation error with the full list of valid options:
 
 ```yaml wrap
-# ❌ Compilation error: 'rustxxxx' is not a valid ecosystem identifier
 network:
   allowed:
     - defaults
-    - rustxxxx
-
-# ✅ Use the correct identifier
-network:
-  allowed:
-    - defaults
-    - rust
-
-# ✅ Dotted domain names are validated as domains, not ecosystem identifiers
-network:
-  allowed:
-    - defaults
-    - crates.io
+    - rustxxxx    # ❌ Compilation error: use `rust` instead
+    - crates.io   # ✅ Dotted domain names are validated as domains
 ```
 
 ## Strict Mode Validation
 
-When [strict mode](/gh-aw/reference/frontmatter/#strict-mode-strict) is enabled (default), strict mode warns when you list individual ecosystem member domains (e.g., `pypi.org`, `npmjs.org`) and recommends the ecosystem identifier instead (e.g., `python`, `node`). Custom domains outside known ecosystems are allowed without warnings.
+With [strict mode](/gh-aw/reference/frontmatter/#strict-mode-strict) (default), listing individual ecosystem member domains (e.g., `pypi.org`, `npmjs.org`) warns and recommends the ecosystem identifier (e.g., `python`, `node`). Custom domains outside known ecosystems produce no warnings.
 
 ````yaml wrap
 # ⚠ Warns: recommend 'python' instead of 'pypi.org'
@@ -251,26 +220,15 @@ recommend using ecosystem identifiers instead of individual domain names for bet
 
 All engines (Copilot, Claude, Codex, Gemini) enforce network permissions through AWF (Agent Workflow Firewall), a wrapper from [github.com/github/gh-aw-firewall](https://github.com/github/gh-aw-firewall) that applies domain-based access controls via `--allow-domains`. AWF automatically includes subdomains (for example, `github.com` allows `api.github.com`), supports wildcard patterns, and logs network activity for audit.
 
-```yaml wrap
-engine: copilot          # or claude, codex, gemini
-network:
-  allowed:
-    - defaults             # Basic infrastructure
-    - python              # Python ecosystem
-    - "api.example.com"   # Custom domain
-```
+Each engine's named domain set covers CLI authentication and model API transport. Sets expand only when listed in `network.allowed`, and none include public npm or PyPI registries (`registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`). Selecting an engine therefore does not grant registry access. GitHub Packages is the deliberate GitHub transport exception described above.
 
-Each engine has a named domain set for CLI authentication and model API transport. These sets expand only when explicitly listed in `network.allowed` and exclude public npm and PyPI registries. Selecting an engine does not grant access to `registry.npmjs.org`, `pypi.org`, or `files.pythonhosted.org`. GitHub Packages is the deliberate GitHub transport exception described above.
+This is safe because engine CLIs and SDKs are installed on the runner before the sandboxed agent starts, and containerized `npx`/`uvx` MCP servers run in the MCP gateway outside the agent firewall. This guarantee covers only the `node` and `python` ecosystems. Engine sets also exclude container registries and OS/package mirrors such as `ghcr.io`, `packagecloud.io`, and `packages.microsoft.com`; add the ecosystem or explicit domain when the agent needs them.
 
-That is safe because engine CLIs and SDKs are installed by workflow steps on the runner before the sandboxed agent starts, and containerized `npx`/`uvx` MCP servers are launched by the MCP gateway outside the agent firewall. Registry access inside the sandbox is therefore unnecessary for those components.
+To let the agent reach engine domains or `node`/`python` registries, list the matching set or ecosystem identifier (`copilot`, `node`, `python`, …) in `network.allowed`, or declare the entry under `runtimes:` for language ecosystems. With `network: {}` or `network: { allowed: [defaults, github] }`, those domains stay blocked.
 
-This guarantee is scoped to the `node` and `python` ecosystems. Engine domain sets also exclude container registries and OS/package mirror hosts such as `ghcr.io`, `packagecloud.io`, and `packages.microsoft.com`; add the relevant ecosystem or explicit domain to `network.allowed` when the agent needs them.
+Runtime selection also skips unrelated telemetry hosts: `node` excludes `telemetry.vercel.com`, and `dotnet` excludes `dc.services.visualstudio.com`. This applies whether the ecosystem comes from `runtimes:` or `network.allowed`. Recompile existing workflows to apply these updated domain sets to their lock files.
 
-To let the agent reach engine domains or the `node`/`python` registries, opt in explicitly with the matching domain set or ecosystem identifier (`copilot`, `node`, `python`, …) in `network.allowed`, or declare the corresponding entry under `runtimes:` for language ecosystems. With `network: {}` or `network: { allowed: [defaults, github] }`, those domains remain blocked.
-
-Runtime selection does not include unrelated telemetry hosts: the `node` ecosystem excludes `telemetry.vercel.com`, and `dotnet` excludes `dc.services.visualstudio.com`. This applies both to ecosystems selected through `runtimes:` and to those listed in `network.allowed`. Recompile existing workflows to apply these updated domain sets to their lock files.
-
-See [`domains.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains.go) for the full lists. `TestEngineDefaultDomainsDoNotOverlapEcosystems` in [`domains_package_registry_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains_package_registry_test.go) checks suffix and wildcard overlap against package ecosystems, including Node, Python, Go, Dart, Java, .NET, and Ruby, with only the documented GitHub Packages exception.
+See [`domains.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains.go) for the full lists. `TestEngineDefaultDomainsDoNotOverlapEcosystems` in [`domains_package_registry_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains_package_registry_test.go) checks for overlap with package ecosystems (Node, Python, Go, Dart, Java, .NET, Ruby), apart from the documented GitHub Packages exception.
 
 ### Firewall Log Level
 
@@ -281,10 +239,6 @@ strict: false
 sandbox:
   agent:
     args: [--log-level, info]
-network:
-  allowed:
-    - defaults
-    - python
 ```
 
 ### SSL Bump for HTTPS Inspection
@@ -336,7 +290,7 @@ The `network_allowed` input is a string accepting comma-separated ecosystem iden
 
 ## Wildcard Domain Patterns
 
-Wildcard patterns (`*.example.com`) match the base domain and all subdomains at any depth. Only a single leading wildcard is allowed (`*.*.example.com` is invalid), and it must be followed by a dot and domain. Both `example.com` and `*.example.com` match all subdomains.
+Wildcards (`*.example.com`) match the base domain and all subdomains at any depth. Only one leading wildcard is allowed (`*.*.example.com` is invalid), followed by a dot and domain.
 
 ```yaml wrap
 network:
@@ -348,7 +302,7 @@ network:
 
 ## Troubleshooting
 
-If network access is blocked, confirm that the required domains or ecosystems are in `allowed`. Start with `network: defaults`, then add only what the workflow needs. Violations appear in workflow logs.
+If network access is blocked, confirm the required domains or ecosystems are in `allowed`, starting from `network: defaults` and adding only what the workflow needs. Violations appear in workflow logs.
 
 Use `gh aw logs --run-id <run-id>` to identify blocked domains. For deeper analysis, run `gh aw audit <run-id>`; the **Firewall Analysis** section shows each domain request with its allow/deny status, request volume, and policy attribution. Pass two run IDs to compare runs:
 

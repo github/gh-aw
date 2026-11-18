@@ -192,6 +192,16 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     expect(activation.if).toContain("github.run_attempt == 1");
     expect(activation.if).not.toContain("needs.admission");
     expect(activation.needs).toBeUndefined();
+    expect(document.value.jobs).not.toHaveProperty("admission");
+    const admissionIndex = activation.steps.findIndex(step => step.id === "admission");
+    expect(admissionIndex).toBeGreaterThan(-1);
+    expect(activation.steps[admissionIndex]).toMatchObject({
+      name: "Check workflow admission",
+      if: "vars.GH_AW_DEFAULT_ADMISSION_URL != ''",
+    });
+    expect(activation.outputs["admission-result"]).toBe("${{ steps.admission.outputs.result }}");
+    expect(admissionIndex).toBeLessThan(activation.steps.findIndex(step => step.name === "Restore daily AIC scan observations"));
+    expect(admissionIndex).toBeLessThan(activation.steps.findIndex(step => step.name === "Check daily workflow token guardrail"));
     expect(lock).toContain("daily_report_portfolio.cjs");
     expect(lock).toContain("name: Restore daily AIC scan observations");
     expect(lock).toContain("name: Check daily workflow token guardrail");

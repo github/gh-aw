@@ -382,9 +382,9 @@ Use an admission authority when static per-run and daily limits are not enoughâ€
 
 The settings map to Actions variables `GH_AW_DEFAULT_ADMISSION_URL`, `GH_AW_DEFAULT_ADMISSION_AUDIENCE`, and `GH_AW_DEFAULT_ADMISSION_ON_OUTAGE`. Repository variables override organization variables. For enterprise rollout, provision each enrolled organization. The URL must be an absolute HTTPS `/api/admission` URL without credentials, query parameters, or fragments. The audience defaults to that URL when unset.
 
-For opted-in workflows, changes to these runtime variables do not require recompilation. An empty URL skips admission and retains existing local guardrails. `block` stops activation after an exhausted transient outage; the default, `ignore`, continues with existing local controls. Explicit denial and invalid approval block under either policy.
+For workflows compiled with admission, changes to these runtime variables do not require recompilation. An empty URL skips admission and retains existing local guardrails. `block` stops activation after an exhausted transient outage; the default, `ignore`, continues with existing local controls. Explicit denial and invalid approval block under either policy.
 
-The compiler grants `id-token: write` only to the admission-related jobs for this feature. Hand-authored reusable-workflow callers must also allow that permission. Authentication uses GitHub Actions OIDC; do not send PATs, provider tokens, or GitHub App private keys to the authority. The completion callback uses `/api/conclusion` on the same origin.
+The compiler grants job-wide `id-token: write` to activation and conclusion for this feature. Admission runs as a step inside activation, and the completion callback runs inside conclusion; activation hooks and conclusion actions retain token-minting capability even when an empty endpoint skips those steps. The endpoint gate does not skip either job's runner or bootstrap. The agent does not gain this permission merely because admission is enabled. Hand-authored reusable-workflow callers must also allow that permission. Authentication uses GitHub Actions OIDC; do not send PATs, provider tokens, or GitHub App private keys to the authority. The completion callback uses `/api/conclusion` on the same origin.
 
 #### Assign AIC Allowances by Server Size
 
