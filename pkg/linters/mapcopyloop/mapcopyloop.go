@@ -119,11 +119,11 @@ func matchCopyBody(pass *analysis.Pass, rangeStmt *ast.RangeStmt, keyObj, valueO
 	if len(rangeStmt.Body.List) != 1 {
 		return nil, false
 	}
-	assignStmt, ok := rangeStmt.Body.List[0].(*ast.AssignStmt)
+	assignStmt, ok := rangeStmt.Body.List[0].(*ast.AssignStmt) //nolint:uncheckedsliceindex // len is checked above
 	if !ok || assignStmt.Tok != token.ASSIGN || len(assignStmt.Lhs) != 1 || len(assignStmt.Rhs) != 1 {
 		return nil, false
 	}
-	indexExpr, ok := assignStmt.Lhs[0].(*ast.IndexExpr)
+	indexExpr, ok := assignStmt.Lhs[0].(*ast.IndexExpr) //nolint:uncheckedsliceindex // len is checked above
 	if !ok {
 		return nil, false
 	}
@@ -131,7 +131,7 @@ func matchCopyBody(pass *analysis.Pass, rangeStmt *ast.RangeStmt, keyObj, valueO
 	if !ok || pass.TypesInfo.ObjectOf(keyIdent) != keyObj {
 		return nil, false
 	}
-	valueIdent, ok := assignStmt.Rhs[0].(*ast.Ident)
+	valueIdent, ok := assignStmt.Rhs[0].(*ast.Ident) //nolint:uncheckedsliceindex // len is checked above
 	if !ok || pass.TypesInfo.ObjectOf(valueIdent) != valueObj {
 		return nil, false
 	}
