@@ -31,7 +31,7 @@ Available unified JSONL sessions are retained and automatically exported to
 sibling .atif trajectories, without changing the report format.
 
 Each argument accepts:
-- A numeric run ID (e.g., 1234567890)
+- A numeric run ID (requires --repo owner/repo, e.g., 1234567890)
 - A GitHub Actions run URL (e.g., https://github.com/owner/repo/actions/runs/1234567890)
 - A GitHub Actions job URL (e.g., https://github.com/owner/repo/actions/runs/1234567890/job/9876543210)
 - A GitHub Actions job URL with step (e.g., https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1)
@@ -49,16 +49,16 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1  # Extract step 7 output
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.com/owner/repo/runs/1234567890  # Audit from workflow run URL
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.example.com/owner/repo/actions/runs/1234567890  # Audit from GitHub Enterprise
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -o ./audit-reports # Custom output directory
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -v                 # Verbose output
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --parse            # Parse agent logs and firewall logs, generating log.md and firewall.md
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo -o ./audit-reports # Custom output directory
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo -v                 # Verbose output
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo --parse            # Parse agent logs and firewall logs, generating log.md and firewall.md
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo --models  # Report same-run model catalog and routing
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo  # Audit run from a specific repository
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891         # Diff two runs (base vs comparison)
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --format markdown  # Markdown diff output for PR comments
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --group # Group findings by run and audit code
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime cloud-hypervisor   # Skip run unless sandbox agent runtime matches`
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --repo owner/repo # Diff two runs (base vs comparison)
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892 --repo owner/repo # Diff base against multiple runs
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --repo owner/repo --format markdown # Markdown diff output for PR comments
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --repo owner/repo --group # Group findings by run and audit code
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo --runtime cloud-hypervisor # Skip run unless sandbox agent runtime matches`
 
 type auditCommandOptions struct {
 	outputDir        string
@@ -284,8 +284,11 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 }
 
 func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents) error {
-	if repoFlag == "" || components.Owner != "" {
+	if components.Owner != "" {
 		return nil
+	}
+	if repoFlag == "" {
+		return errors.New("--repo is required for bare run IDs; use --repo owner/repo")
 	}
 	parts := strings.SplitN(repoFlag, "/", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" { //nolint:uncheckedsliceindex // len(parts) is checked first
