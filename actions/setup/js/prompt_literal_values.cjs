@@ -16,9 +16,10 @@ const { relocateRuntimePaths } = require("./runtime_isolation.cjs");
 /** @param {LiteralState} [state] */
 function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUUID()}_`, values: [], files: {} }) {
   const pattern = new RegExp(`${state.prefix}(\\d+)\x00`, "g");
+  const controlChannelPattern = /<\|(?:system|assistant|user|tool|function|developer)\|>/i;
   /** @param {string} text */
-  const restore = text =>
-    relocateRuntimePaths(
+  const restore = text => {
+    const restored = relocateRuntimePaths(
       text.replace(pattern, (_, index) => {
         const value = state.values[Number(index)];
         if (value === undefined) {
@@ -28,6 +29,12 @@ function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUU
         return value;
       })
     );
+    if (controlChannelPattern.test(restored)) {
+      core.debug("[promptLiteralValues] Rejected restored text: control_channel_marker");
+      throw new Error(`${ERR_VALIDATION}: Restored literal value contains forbidden control-channel marker`);
+    }
+    return restored;
+  };
   /** @param {string} value */
   const protect = value => {
     // Flatten our own earlier protection, but never interpret a prior run's markers.
