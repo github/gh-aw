@@ -46,8 +46,10 @@ func TestOperationalValueRecordedGradesCommand(t *testing.T) {
 	}
 	runs[0].Graders.Results[0] = GraderResult{ID: "artifact-production", Status: "pass", Value: new(1.0)}
 	runs[1].Graders = nil
-	runs[2].Graders.Results[0] = GraderResult{ID: "operational-value", Status: "error", Error: "verification failed"}
-	runs[3].Graders.Results[0] = GraderResult{ID: "operational-value", Status: "unavailable", Message: "independent evidence missing"}
+	const recordedError = "private verification diagnostic"
+	const recordedMessage = "private evidence diagnostic"
+	runs[2].Graders.Results[0] = GraderResult{ID: "operational-value", Status: "error", Error: recordedError}
+	runs[3].Graders.Results[0] = GraderResult{ID: "operational-value", Status: "unavailable", Message: recordedMessage}
 	runs[4].Graders.Results[0].Status = "fail"
 	runs[4].Graders.Results[0].Value = new(0.00001)
 	path := writeValueGradeSummary(t, dir, runs)
@@ -74,12 +76,11 @@ func TestOperationalValueRecordedGradesCommand(t *testing.T) {
 		assert.Equal(t, "fail", report.RunGrades.Runs[1].Grader.Status)
 		assert.Equal(t, "unavailable", report.RunGrades.Runs[2].Grader.Status)
 		assert.Equal(t, "error", report.RunGrades.Runs[3].Grader.Status)
-		assert.Equal(t, "verification failed", report.RunGrades.Runs[3].Grader.Error)
 		for _, row := range report.RunGrades.Runs[2:] {
 			assert.Nil(t, row.Grader.Value)
 		}
-		assert.Contains(t, report.RunGrades.Runs[4].Grader.Message, "not recorded")
-		assert.Contains(t, report.RunGrades.Runs[5].Grader.Message, "not recorded")
+		assert.Equal(t, "unavailable", report.RunGrades.Runs[4].Grader.Status)
+		assert.Equal(t, "unavailable", report.RunGrades.Runs[5].Grader.Status)
 		assert.Equal(t, "measurement_not_configured", report.Reason)
 		assert.Nil(t, report.AttributedValue)
 
@@ -87,7 +88,10 @@ func TestOperationalValueRecordedGradesCommand(t *testing.T) {
 		require.NoError(t, renderOperationalValueReport(&text, nil, report))
 		assert.Contains(t, text.String(), "Recorded value")
 		assert.Contains(t, text.String(), "1e-05 gaps")
-		assert.Contains(t, text.String(), "verification failed")
+		for _, diagnostic := range []string{recordedError, recordedMessage} {
+			assert.NotContains(t, output.String(), diagnostic)
+			assert.NotContains(t, text.String(), diagnostic)
+		}
 		assert.Contains(t, text.String(), "not longitudinal attributed value")
 		assert.Contains(t, text.String(), "Longitudinal value unavailable")
 		// Collection clocks vary between invocations; the recorded grades do not.
@@ -113,9 +117,19 @@ func TestOperationalValueRecordedGradeScope(t *testing.T) {
 		func(run *RunData) { run.Repository = "other/repo" },
 		func(run *RunData) { run.WorkflowPath = ".github/workflows/other.lock.yml" },
 		func(run *RunData) { run.URL = "https://enterprise.example/acme/repo/actions/runs/2" },
-		func(run *RunData) { run.CreatedAt = start.Add(-time.Second) },
-		func(run *RunData) { run.CreatedAt = end.Add(time.Second) },
-		func(run *RunData) { run.Status = "in_progress" },
+		func(run *RunData) {
+			run.CreatedAt = start.Add(-time.Second)
+			run.URL = "%"
+		},
+		func(run *RunData) {
+			run.CreatedAt = end.Add(time.Second)
+			run.RunAttempt = ""
+		},
+		func(run *RunData) {
+			run.Status = "in_progress"
+			run.CreatedAt = time.Time{}
+			run.URL = ""
+		},
 	} {
 		run := valueGradeTestRun(t, int64(len(runs)+1))
 		change(&run)

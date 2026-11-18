@@ -57,7 +57,11 @@ func buildValueRunGrades(runs []RunData, definition valueMeasurementDefinition, 
 	report := &valueRunGradesReport{Coverage: "unavailable", Reason: "no_matching_completed_runs", Runs: []valueRunGrade{}}
 	seen := make(map[string]struct{})
 	for _, run := range runs {
-		if !strings.EqualFold(run.Repository, definition.Repository) || run.WorkflowPath != definition.WorkflowPath {
+		if !strings.EqualFold(run.Repository, definition.Repository) || run.WorkflowPath != definition.WorkflowPath || run.Status != "completed" {
+			continue
+		}
+		// A missing clock cannot establish that a completed run is outside the window.
+		if !run.CreatedAt.IsZero() && (run.CreatedAt.Before(start) || run.CreatedAt.After(end)) {
 			continue
 		}
 		runURL, err := url.Parse(run.URL)
@@ -77,9 +81,6 @@ func buildValueRunGrades(runs []RunData, definition valueMeasurementDefinition, 
 			runURL.Fragment != "" || !strings.EqualFold(runURL.Path, expectedPath) {
 			return nil, fmt.Errorf("recorded value run %d has incomplete or conflicting run identity", run.RunID)
 		}
-		if run.Status != "completed" || run.CreatedAt.Before(start) || run.CreatedAt.After(end) {
-			continue
-		}
 		key := fmt.Sprintf("%d:%d", run.RunID, attempt)
 		if _, exists := seen[key]; exists {
 			return nil, fmt.Errorf("duplicate recorded value run %s", key)
@@ -89,6 +90,8 @@ func buildValueRunGrades(runs []RunData, definition valueMeasurementDefinition, 
 		if err != nil {
 			return nil, err
 		}
+		// Free-form diagnostics can contain sensitive data. Keep them in the source artifact only.
+		grade.Message, grade.Error = "", ""
 		report.Runs = append(report.Runs, valueRunGrade{
 			RunID: run.RunID, RunAttempt: attempt, CreatedAt: run.CreatedAt, Grader: grade,
 		})
@@ -109,10 +112,7 @@ func buildValueRunGrades(runs []RunData, definition valueMeasurementDefinition, 
 }
 
 func recordedOperationalValueGrade(run RunData) (GraderResult, error) {
-	grade := GraderResult{
-		ID: "operational-value", Status: "unavailable",
-		Message: "operational-value grader result not recorded",
-	}
+	grade := GraderResult{ID: "operational-value", Status: "unavailable"}
 	if run.Graders == nil {
 		return grade, nil
 	}
@@ -139,36 +139,6 @@ func recordedOperationalValueGrade(run RunData) (GraderResult, error) {
 		}
 	}
 	return grade, nil
-}
-
-func sanitizeGraderReasonForDisplay(reason string) string {
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		return ""
-	}
-	reason = strings.Join(strings.Fields(reason), " ")
-
-	replacer := strings.NewReplacer(
-		"token=", "token=[REDACTED]",
-		"access_token=", "access_token=[REDACTED]",
-		"refresh_token=", "refresh_token=[REDACTED]",
-		"apikey=", "apikey=[REDACTED]",
-		"api_key=", "api_key=[REDACTED]",
-		"key=", "key=[REDACTED]",
-		"secret=", "secret=[REDACTED]",
-		"password=", "password=[REDACTED]",
-		"passwd=", "passwd=[REDACTED]",
-		"authorization=", "authorization=[REDACTED]",
-		"sig=", "sig=[REDACTED]",
-		"signature=", "signature=[REDACTED]",
-	)
-	reason = replacer.Replace(reason)
-
-	const maxReasonLen = 256
-	if len(reason) > maxReasonLen {
-		reason = reason[:maxReasonLen] + "... [truncated]"
-	}
-	return reason
 }
 
 func renderValueRunGrades(out io.Writer, report *valueRunGradesReport) error {

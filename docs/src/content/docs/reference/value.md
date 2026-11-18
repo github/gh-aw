@@ -25,7 +25,7 @@ gh aw value WORKFLOW --repo OWNER/REPO --json
 
 ### Recorded grader results
 
-The report reads `summary.json` in `--logs-dir` and matches host, repository, exact workflow path, canonical run URL, run ID and attempt. It preserves primary value (including zero), unit, status, message and error. No definition, Node.js or Git history is needed for this section. Missing grades remain unavailable; unrelated built-in grades are never substituted. Even a successful export represents a retained subset, not complete history.
+The report reads `summary.json` in `--logs-dir` and matches host, repository, exact workflow path, canonical run URL, run ID and attempt. It preserves primary value (including zero), unit and status. Both text and JSON omit free-form grader messages and errors; these remain in the original summary. No definition, Node.js or Git history is needed for this section. Missing grades remain unavailable; unrelated built-in grades are never substituted. Even a successful export represents a retained subset, not complete history.
 
 ### Supply a measurement
 
