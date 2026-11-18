@@ -7,9 +7,9 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.0.0<br>
+**Version**: 1.1.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-08<br>
+**Publication Date**: 2026-11-18<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## 1. Scope and conformance
@@ -144,8 +144,10 @@ tokens are GitHub installation tokens; GitHub OIDC produces an identity JWT.
 Neither route implements a provider-token exchange. Provider consent,
 installation, token renewal, audience acceptance, and ACLs remain external.
 
-Resource-constrained arguments MUST be required strings and match an exact
-authored grant before credential resolution. Numeric response IDs MAY use the
+Resource-constrained arguments MUST be required strings, or nonempty bounded
+string arrays on hosted HTTP MCP tools. Each string MUST match an exact authored
+grant before credential resolution; one granted array item never authorizes
+another item. Numeric response IDs MAY use the
 canonical identity correlation in section 6; argument values MUST NOT be
 silently coerced, trimmed, or granted by that comparison. Independent grant
 lists do not prove tenant, parent, or tuple membership. IDs returned by a read
@@ -166,13 +168,14 @@ require `tool`, an exact name matching `^[A-Za-z][A-Za-z0-9_.-]{0,127}$`.
 
 | Input field | Requirements |
 | --- | --- |
-| `type` | `string`, `integer`, `number`, or `boolean`; no arbitrary object, array, expression, or runtime default. |
+| `type` | `string`, `integer`, `number`, or `boolean`; hosted HTTP MCP tools also accept bounded string `array` inputs. No arbitrary objects, nested arrays, expressions, or runtime defaults. |
 | `required` | Boolean. Unknown arguments and missing required values MUST fail. |
 | `maxLength`, `minLength` | String code-point bounds. `maxLength` is required for strings, from 1 to 65536; `minLength` is between zero and `maxLength`. |
 | `enum` | Exact allowed string values; distinct from resource grants. |
 | `pattern` | A valid bounded string regex, at most 1024 bytes. Authors SHOULD use syntax compatible with both Go and Node. |
 | `minimum`, `maximum` | Numeric bounds for number/integer inputs; minimum MUST NOT exceed maximum. |
 | `sanitize` | `title`, `body` (Markdown), `body-plain` (plain text), or `body-plain-compact` (plain text with single ASCII spaces/newlines), only for human text. Sanitized titles require at least 20 code points; body inputs that must contain actor text SHOULD set `minLength: 1`. |
+| `minItems`, `maxItems`, `items` | Hosted MCP arrays require explicit integer bounds from 1 through 100, with `minItems <= maxItems`, and `items: {type: string, maxLength: ...}`. Item `minLength`, `enum` and `pattern` have the ordinary string semantics. Item `required`, sanitizers and nested arrays are unsupported. Array bounds/items MUST NOT appear on scalar inputs. |
 
 Sanitizers and protected generated attribution run in the trusted publication
 path before staging or delivery. Body limits include generated content.
@@ -216,8 +219,11 @@ patch path. It is not an agent patch escape hatch.
 
 Each `mcp-servers` registration requires a fixed HTTPS `url`, an agent credential,
 `readOnly: true`, a nonempty exact `tools` map, and `maxResponseBytes`.
-Each native tool declares the same primitive `inputs` and exact `resources`
-constraints. Optional fixed registration headers use `X-MCP-*` names.
+Each native tool declares bounded primitive or string-array `inputs` and exact
+`resources` constraints. Optional fixed registration headers use `X-MCP-*` names.
+The fixed URL MAY contain one literal `api-version` query parameter whose value
+matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`. Other query parameters, empty query
+strings and fragments are prohibited; credentials MUST NOT be placed in URLs.
 Endpoint comparison uses the canonical URL representation, including the root
 slash and default HTTPS port; redirects and different endpoint paths remain
 prohibited. An omitted MCP `arguments` object is an empty object, not permission
@@ -548,3 +554,10 @@ jointly define accepted values. Selection/lowering is implemented by
 The shared publication runtime is
 [`connector_runtime.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/connector_runtime.cjs).
 Structural internal schemas alone MUST NOT be treated as executable authority.
+
+## 12. Change Log
+
+### Version 1.1.0 (Experimental Working Draft) — 2026-11-18
+
+- Added bounded string-array inputs for hosted HTTP MCP tools, including explicit collection and item constraints.
+- Added support for one bounded literal `api-version` query parameter on hosted HTTP MCP registration URLs; other query parameters and fragments remain prohibited.

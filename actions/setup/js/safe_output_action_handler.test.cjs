@@ -29,6 +29,15 @@ describe("safe_output_action_handler", () => {
   });
 
   describe("handler — basic payload export", () => {
+    it("does not export an executable action payload in staged mode", async () => {
+      const handler = await main({ action_name: "my_action", staged: true });
+      const result = await handler({ type: "my_action", title: "preview" }, {}, new Map());
+
+      expect(result).toMatchObject({ success: true, staged: true, payload: '{"title":"preview"}' });
+      expect(result.delegated).not.toBe(true);
+      expect(global.core.setOutput).not.toHaveBeenCalled();
+    });
+
     it("should export the payload as a step output and return success", async () => {
       const handler = await main({ action_name: "add_label" });
 

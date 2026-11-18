@@ -1062,6 +1062,70 @@ function remoteFetch(overrides = {}) {
 }
 
 describe("fixed-endpoint HTTP MCP", () => {
+  it("preserves a fixed literal API version on every MCP request", async () => {
+    const doc = remoteDocument();
+    const url = "https://mcp.example.com/v1/mcp?api-version=2026-11-01-preview";
+    doc.spec.httpMcp.registration.url = url;
+    const fetchImpl = remoteFetch({ url });
+    await expect(callMCP(encode(doc), "registration", "getIssue", { record: "approved" }, { env, fetchImpl })).resolves.toHaveProperty("content");
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    for (const suffix of ["?", "?token=secret", "?api-version=", "?api-version=v1&token=secret", "?api-version=v1&api-version=v2", "?api-version=v1%26token", "?api-version=" + "x".repeat(101), "?api-version=v1#"]) {
+      doc.spec.httpMcp.registration.url = "https://mcp.example.com/v1/mcp" + suffix;
+      expect(() => decodePlan(encode(doc))).toThrow();
+    }
+  });
+
+  it("validates bounded string arrays and every item grant before credentials", async () => {
+    const doc = remoteDocument();
+    doc.connection.resources = { queries: ["abc", "😀😀😀😀"] };
+    doc.spec.httpMcp.registration.tools.getIssue = {
+      inputs: { queries: { type: "array", required: true, minItems: 1, maxItems: 2, items: { type: "string", minLength: 1, maxLength: 4, pattern: "^[a-z😀]+$" } } },
+      resources: { queries: "queries" },
+    };
+    const args = { queries: ["abc", "😀😀😀😀"] };
+    await expect(callMCP(encode(doc), "registration", "getIssue", args, { env, fetchImpl: remoteFetch({ arguments: args }) })).resolves.toHaveProperty("content");
+    const noSecrets = new Proxy(
+      {},
+      {
+        get: () => {
+          throw new Error("credential access forbidden");
+        },
+      }
+    );
+    const fetchImpl = vi.fn();
+    for (const value of [null, "abc", [], ["abc", "abc", "abc"], [1], [["abc"]], [""], ["abcde"], ["😀😀😀😀😀"], ["ABC"], ["abc", "nope"]]) {
+      await expect(callMCP(encode(doc), "registration", "getIssue", { queries: value }, { env: noSecrets, fetchImpl })).rejects.toThrow(/Connector argument/);
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects unbounded, nested, non-string and sanitized array item contracts", () => {
+    const valid = { type: "array", required: true, minItems: 1, maxItems: 2, items: { type: "string", maxLength: 4 } };
+    for (const change of [
+      { minItems: 0 },
+      { maxItems: 0 },
+      { maxItems: 101 },
+      { minItems: 3 },
+      { items: undefined },
+      { items: { type: "array", minItems: 1, maxItems: 1, items: valid.items } },
+      { items: { type: "string" } },
+      { items: { type: "integer" } },
+      { items: { ...valid.items, sanitize: "body" } },
+      { items: { ...valid.items, required: true } },
+      { maximum: 1 },
+      { maxLength: 10 },
+      { pattern: "x" },
+      { type: "string", maxLength: 10 },
+    ]) {
+      const doc = remoteDocument();
+      doc.spec.httpMcp.registration.tools.getIssue.inputs.record = { ...valid, ...change };
+      expect(() => decodePlan(encode(doc))).toThrow();
+    }
+    const doc = document("agent");
+    doc.spec.mcp.operation.inputs.queries = valid;
+    expect(() => decodePlan(encode(doc))).toThrow(/only by hosted HTTP MCP/);
+  });
+
   it.each(["https://mcp.example.com", "https://MCP.EXAMPLE.COM:443/v1/mcp"])("uses the canonical fetch URL for the fixed endpoint %s", async endpoint => {
     const doc = remoteDocument();
     doc.spec.httpMcp.registration.url = endpoint;

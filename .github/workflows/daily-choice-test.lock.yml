@@ -2639,6 +2639,7 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/gh-aw/safe-jobs/
       - name: Display Test Config
+        if: "false"
         run: |
           if [ -f "$GH_AW_AGENT_OUTPUT" ]; then
             ENVIRONMENT=$(cat "$GH_AW_AGENT_OUTPUT" | jq -r '.items[] | select(.type == "test_environment") | .environment')

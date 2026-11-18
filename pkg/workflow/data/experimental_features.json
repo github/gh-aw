@@ -70,7 +70,12 @@
       "compiler_warning": "graders",
       "docs": ["/experimental/trace-graders/"],
       "docs_group": true,
-      "cracktro": [{ "slide": "Experiments, graders & evals", "badge": "experiments · graders" }]
+      "cracktro": [
+        { "slide": "Experiments, graders & evals", "badge": "experiments · graders" },
+        { "slide": "Turn Intent into Value", "badge": "operational value" },
+        { "slide": "Deliver · Accept · Attribute", "badge": "operational value" },
+        { "slide": "From Delivery to Value", "badge": "operational value" }
+      ]
     },
     {
       "id": "experiments",

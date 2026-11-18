@@ -198,9 +198,9 @@ This command always upgrades all Markdown files in .github/workflows.`,
 				if err != nil {
 					return err
 				}
-				prBody = appendPRMessage(prBody, opts.prMessage)
+				prBody = appendUpdatePRReleaseHighlights(cmd.Context(), prBody, opts.prMessage, "")
 				_, err = createPRWithChanges(cmd.Context(), "upgrade-agentic-workflows", "chore: upgrade agentic workflows",
-					"Upgrade agentic workflows", prBody, verbose, opts.autoMerge)
+					updatePRTitle("Upgrade agentic workflows"), prBody, verbose, opts.autoMerge)
 				return err
 			}
 			return nil

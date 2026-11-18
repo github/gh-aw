@@ -17,7 +17,9 @@ import { TransportIntegrityError } from "./transport_integrity.cjs";
 describe("error_recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
   });
+  afterEach(() => vi.restoreAllMocks());
 
   describe("isTransientError", () => {
     it.each(["network", "timeout", "rate limit", "secondary rate limit", "econnreset"])("never retries transport-integrity errors whose paths contain %s", text => {
@@ -86,6 +88,39 @@ describe("error_recovery", () => {
   });
 
   describe("withRetry", () => {
+    it("succeeds on the first attempt without an ambient Actions core or injected logger", async () => {
+      const actionsCore = global.core;
+      delete global.core;
+      const operation = vi.fn().mockResolvedValue("success");
+      try {
+        await expect(withRetry(operation)).resolves.toBe("success");
+        expect(operation).toHaveBeenCalledOnce();
+      } finally {
+        global.core = actionsCore;
+      }
+    });
+
+    it("uses an injected logger without an ambient Actions core", async () => {
+      const logger = { info: vi.fn(), warning: vi.fn(), debug: vi.fn() };
+      vi.stubGlobal("core", undefined);
+      try {
+        await expect(withRetry(() => Promise.reject(new Error("Invalid input")), { logger, maxRetries: 0 }, "injected")).rejects.toThrow("Invalid input");
+        expect(logger.debug).toHaveBeenCalledWith("injected failed with non-retryable error: Invalid input");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it("routes retry diagnostics to the injected logger", async () => {
+      const logger = { info: vi.fn(), warning: vi.fn(), debug: vi.fn() };
+      const operation = vi.fn().mockRejectedValueOnce(new Error("Network timeout")).mockResolvedValue("success");
+      await expect(withRetry(operation, { logger, maxRetries: 1, sleep: async () => {} }, "injected")).resolves.toBe("success");
+      expect(logger.warning).toHaveBeenCalledOnce();
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("succeeded on retry attempt 1"));
+      expect(core.info).not.toHaveBeenCalled();
+      expect(core.warning).not.toHaveBeenCalled();
+    });
+
     it("should succeed on first attempt", async () => {
       const operation = vi.fn().mockResolvedValue("success");
       const result = await withRetry(operation, {}, "test-operation");

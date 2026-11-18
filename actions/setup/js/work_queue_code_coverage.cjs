@@ -22,6 +22,7 @@ const {
 const { resolveRepositoryTarget, canonicalResourceTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { authorizeHandlerInvocation } = require("./safe_output_authorization_gate.cjs");
 const privateReceipts = new WeakMap();
 
 /** @param {{ "target-ref"?: string, "coverage-dir"?: string, max?: number, "wait-for-processing-timeout"?: number, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
@@ -86,6 +87,14 @@ async function main(config = {}, suppliedClient) {
     const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
     const label = `${message.label}/claim/${path.basename(claimArtifactPath("", handle))}`;
     const authorityResource = await resolveRepositoryTarget(github, target);
+    const authorization = await authorizeHandlerInvocation({
+      config,
+      inputs: { repository, ref, revision, file: message.file, language: message.language, label, sha256 },
+      scope: { binding: "invocation", refs: [`sha256:${sha256}`] },
+    });
+    if (authorization.state === "allowed" && (await getCommit({ owner, repo, ref })).data.sha !== revision) {
+      throw new Error("Trusted coverage target changed after safe-output authorization");
+    }
     const { data } = await withClaimResourceEffects([authorityResource], ["request:PUT /repos/{owner}/{repo}/code-coverage/report"], () =>
       request("PUT /repos/{owner}/{repo}/code-coverage/report", {
         owner,
