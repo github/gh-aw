@@ -96,6 +96,50 @@ func TestTokenBrokerGitHubCompileConsumers(t *testing.T) {
 	}
 }
 
+func TestTokenBrokerGitHubExperimentalWarning(t *testing.T) {
+	const warning = "Using experimental feature: token-broker"
+	for _, tc := range []struct {
+		name    string
+		fields  string
+		enabled bool
+	}{
+		{
+			name:   "disabled",
+			fields: "safe-outputs:\n  threat-detection: false\n  create-issue:\n",
+		},
+		{
+			name:    "GitHub tool only",
+			fields:  "tools:\n  github:\n    type: local\n    token-broker: true\nsafe-outputs:\n  threat-detection: false\n",
+			enabled: true,
+		},
+		{
+			name:    "safe outputs only",
+			fields:  "safe-outputs:\n  token-broker: true\n  threat-detection: false\n  create-issue:\n",
+			enabled: true,
+		},
+		{
+			name:    "both",
+			fields:  "tools:\n  github:\n    type: local\n    token-broker: true\nsafe-outputs:\n  token-broker: true\n  threat-detection: false\n  create-issue:\n",
+			enabled: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data, _, _ := compileGitHubBrokerTest(t, tc.fields)
+			compiler := NewCompiler()
+			var output strings.Builder
+			compiler.emitExperimentalFeatureWarningsTo(data, &output)
+
+			if tc.enabled {
+				assert.Contains(t, output.String(), warning)
+				assert.Equal(t, 1, compiler.GetExperimentalWarningCount())
+			} else {
+				assert.NotContains(t, output.String(), warning)
+				assert.Zero(t, compiler.GetExperimentalWarningCount())
+			}
+		})
+	}
+}
+
 func TestTokenBrokerGitHubOptInIsolation(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
