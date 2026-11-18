@@ -1073,6 +1073,10 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
   const query = new URLSearchParams(location.search);
   const last = query.get("last");
   const examples = query.has("examples");
+  let muted = query.get("sound") === "off";
+  const sound = query.has("sound")
+    ? { get muted() { return muted; }, toggle: () => (muted = !muted), unlock: () => hooks.push("unlock"), cut() {}, techno() {}, slide() {}, touch() {}, step() {} }
+    : undefined;
   window.CracktroDeck.create({
     slides: ({ h, letters, current }) => {
       const slide = (group, title, extra = {}) => ({ group, notes: title + " notes", el: h("section", { class: "slide" }, h("h2", {}, letters(title))), ...extra });
@@ -1092,6 +1096,7 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
     tours: { ends: { title: "Both ends", summary: "first and last", slides: ["hello", "goodbye"] }, part: { title: "Just the part", bands: ["part"] }, ghost: { slides: ["nope"] } },
     last: last === "none" ? null : last || "outro",
     kioskInterval: +query.get("kiosk") || undefined,
+    sound,
   });
 </script></body></html>`;
 
@@ -1328,7 +1333,7 @@ test.describe("reusable runtime", () => {
     expect(errors).toEqual([]);
   });
 
-  test("rotates every slide in fullscreen kiosk mode, examples included, wrapping to the first", async ({ page }) => {
+  test("rotates the main line in fullscreen kiosk mode, skipping examples, wrapping to the first", async ({ page }) => {
     await page.clock.install();
     await fakeFullscreen(page);
     const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?examples&fs=grant#hello");
@@ -1347,8 +1352,8 @@ test.describe("reusable runtime", () => {
 
     await page.clock.runFor(KIOSK_MS - 1000);
     await expect(heading(page)).toHaveText("Hello");
-    // Hello's onNext step does not hold the rotation; the column's example is shown after its pattern
-    for (const title of ["Part one", "Alpha", "Alpha example", "Beta", "Goodbye", "Hello"]) {
+    // Hello's onNext step does not hold the rotation; the column's example is skipped
+    for (const title of ["Part one", "Alpha", "Beta", "Goodbye", "Hello"]) {
       await page.clock.runFor(title === "Part one" ? 1000 : KIOSK_MS);
       await expect(heading(page)).toHaveText(title);
     }
@@ -1384,12 +1389,13 @@ test.describe("reusable runtime", () => {
   test("rotates only a tour's slides and stops when fullscreen ends", async ({ page }) => {
     await page.clock.install();
     await fakeFullscreen(page);
-    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?examples&fs=grant#beta&tour=part");
-    await expect(heading(page)).toHaveText("Beta");
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?examples&fs=grant#alpha-example&tour=part");
+    await expect(heading(page)).toHaveText("Alpha example");
     await page.keyboard.press("k");
     await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
     await expect(page.locator(".tourp")).toBeHidden();
-    for (const title of ["Part one", "Alpha", "Alpha example", "Beta", "Part one"]) {
+    // starting on an example continues along the main line after it
+    for (const title of ["Beta", "Part one", "Alpha", "Beta", "Part one"]) {
       await page.clock.runFor(KIOSK_MS);
       await expect(heading(page)).toHaveText(title);
     }
@@ -1425,6 +1431,49 @@ test.describe("reusable runtime", () => {
       expect(await fsCalls(page)).toEqual(fs === "deny" ? ["request"] : []);
       expect(errors).toEqual([]);
     }
+  });
+
+  test("keeps a labelled sound toggle beside the kiosk stop button and unlocks audio from the starting gesture", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?sound&fs=none#hello");
+    const sound = page.getByRole("button", { name: "Toggle sound (M)", exact: true });
+    await expect(sound).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Start kiosk mode: rotate slides in fullscreen (K)" }).click();
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toContain("unlock");
+    await expect(sound).toBeVisible();
+    const [stop, toggle] = await Promise.all([page.locator(".ksb").boundingBox(), sound.boundingBox()]);
+    expect(stop && toggle).toBeTruthy();
+    expect(toggle!.left).toBeGreaterThan(stop!.right);
+    expect(toggle!.left - stop!.right).toBeLessThanOrEqual(8);
+    expect(Math.abs(toggle!.top - stop!.top)).toBeLessThanOrEqual(1);
+    // the toggle and M flip the pressed state and the struck-out icon without leaving kiosk mode
+    await sound.click();
+    await expect(sound).toHaveAttribute("aria-pressed", "false");
+    await expect(sound).toHaveClass(/\boff\b/);
+    await page.keyboard.press("m");
+    await expect(sound).toHaveAttribute("aria-pressed", "true");
+    await expect(sound).not.toHaveClass(/\boff\b/);
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await page.clock.runFor(KIOSK_MS);
+    await expect(heading(page)).toHaveText("Part one");
+    expect(errors).toEqual([]);
+  });
+
+  test("starts kiosk mode without unlocking audio while sound is off", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?sound=off&fs=none#hello");
+    const sound = page.getByRole("button", { name: "Toggle sound (M)", exact: true });
+    await expect(sound).toHaveAttribute("aria-pressed", "false");
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(sound).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).not.toContain("unlock");
+    await sound.click();
+    await expect(sound).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
   });
 
   test("hides open speaker notes in kiosk mode and stops kiosk before Escape closes them", async ({ page }) => {

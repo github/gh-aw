@@ -181,12 +181,14 @@
   .ksb { right: calc(184px + var(--sr)); }
   .ntb[aria-pressed="true"] { color: #f0f6fc; border-color: currentColor; box-shadow: inset 0 -3px currentColor; }
   body.light .ntb[aria-pressed="true"] { color: #1f2328; }
-  /* kiosk mode: slides rotate on their own; the chrome hides except the stop button, which fades (with the cursor) when idle */
-  body.kiosk :is(.dots, .arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp, .notes, .progress) { display: none !important; }
-  body.kiosk .ksb { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  /* kiosk mode: slides rotate on their own; the chrome hides except the stop button and the sound toggle beside it,
+     which fade (with the cursor) when idle */
+  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .tourp, .notes, .progress) { display: none !important; }
+  body.kiosk :is(.ksb, .snd) { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  body.kiosk .snd { right: calc(144px + var(--sr)); }
   body.kiosk.nav-idle { cursor: none; }
-  body.kiosk.nav-idle .ksb:not(:focus-visible) { opacity: 0; }
-  body.light.kiosk .ksb { color: #1f2328; border-color: #1f2328; }
+  body.kiosk.nav-idle :is(.ksb, .snd):not(:focus-visible) { opacity: 0; }
+  body.light.kiosk :is(.ksb, .snd) { color: #1f2328; border-color: #1f2328; }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
@@ -585,6 +587,7 @@
       class: "snd",
       "aria-label": "Toggle sound (M)",
       "aria-keyshortcuts": "M",
+      "aria-pressed": "false",
       title: "Sound on/off (M)",
       onclick: e => {
         e.stopPropagation();
@@ -651,7 +654,7 @@
       if (!visible && notes.contains(document.activeElement)) notesBtn.focus();
     }
     for (const t of ["touchstart", "touchend"]) notes.addEventListener(t, e => e.stopPropagation(), { passive: true });
-    // kiosk mode (K): rotates every visible slide in fullscreen; the same dock button stops it
+    // kiosk mode (K): rotates the visible main-line slides in fullscreen; the same dock button stops it
     const ksb = h("button", {
       class: "ksb",
       "aria-pressed": "false",
@@ -703,7 +706,12 @@
     const wash = h("div", { class: "wash" });
     const gridc = h("canvas", { class: "gridc" });
     document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, ksb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
-    snd.classList.toggle("off", sfx.muted);
+    // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
+    const paintSound = () => {
+      snd.classList.toggle("off", !!sfx.muted);
+      snd.setAttribute("aria-pressed", String(!sfx.muted));
+    };
+    paintSound();
 
     // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~230px on the right.
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
@@ -738,16 +746,19 @@
 
     function toggleSound() {
       if (!config.sound) return;
-      snd.classList.toggle("off", sfx.toggle());
+      sfx.toggle();
+      paintSound();
       snd.classList.add("flash");
       setTimeout(() => snd.classList.remove("flash"), 400);
     }
 
     // ---------- kiosk ----------
-    // Kiosk mode walks every visible slide (tour or view, examples included) in deck order, wrapping from the last to
-    // the first, without running slide steps (onNext). It asks for fullscreen from the K key or dock button (a user
-    // gesture); if the browser lacks or refuses it, slides still rotate in the window. Escape, K, the button or leaving
-    // fullscreen stop it; a manual move restarts the countdown. One timer at a time, cleared on every re-arm and stop.
+    // Kiosk mode walks the visible main line (tour or view; column examples are skipped) in deck order, wrapping from
+    // the last slide to the first, without running slide steps (onNext). It asks for fullscreen from the K key or dock
+    // button (a user gesture) and, while sound is on, unlocks audio from that same gesture so band music plays on the
+    // timed moves; the sound toggle stays beside the stop button. If the browser lacks or refuses fullscreen, slides
+    // still rotate in the window. Escape, K, the button or leaving fullscreen stop it; a manual move restarts the
+    // countdown. One timer at a time, cleared on every re-arm and stop.
     const KIOSK_MS = Math.max(1000, Number(config.kioskInterval) || 15000);
     /** @type {{ t: ReturnType<typeof setTimeout> | null, full: boolean, entered: boolean } | null} */
     let kiosk = null;
@@ -762,7 +773,7 @@
     const kioskNext = () => {
       for (let k = 1; k <= slides.length; k++) {
         const i = (cur + k) % slides.length;
-        if (vis(i)) return i;
+        if (vis(i) && !slides[i].parent) return i;
       }
       return cur;
     };
@@ -794,6 +805,7 @@
       if (on) {
         kiosk = { t: null, full: !!fsEl(), entered: false };
         const k = kiosk;
+        if (config.sound && !sfx.muted) sfx.unlock?.();
         const de = doc.documentElement,
           req = de.requestFullscreen || de.webkitRequestFullscreen;
         if (!k.full && req) {
