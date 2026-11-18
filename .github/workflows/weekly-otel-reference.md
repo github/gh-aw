@@ -9,11 +9,9 @@ permissions:
   contents: read
   pull-requests: read
   copilot-requests: write
+model: router/economy
 engine:
   id: copilot
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 timeout-minutes: 30
 network:

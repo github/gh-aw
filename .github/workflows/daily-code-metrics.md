@@ -14,11 +14,9 @@ permissions:
   pull-requests: read
   copilot-requests: write
 tracker-id: daily-code-metrics
+model: router/economy
 engine:
   id: copilot
-  model-routing:
-    goal: cost
-    mode: economy
   copilot-sdk: true
 sandbox:
   agent:

@@ -34,15 +34,13 @@ safe-outputs:
     title-prefix: "[ab-advisor] "
 description: Daily A/B testing advisor that selects a workflow without experiments and implements a validated experiment campaign pull request
 emoji: 🧪
+model: router/balanced
 engine:
   id: codex
   env:
     GOCACHE: /tmp/gh-aw/agent/go-build-cache
     GOMODCACHE: /tmp/gh-aw/agent/go-mod-cache
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
 steps:
   - name: Provision disposable Go validation caches
     run: mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache

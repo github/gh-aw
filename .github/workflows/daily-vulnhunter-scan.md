@@ -11,12 +11,10 @@ permissions:
   contents: read
   copilot-requests: write
   issues: read
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
 jobs:
   vulnhunter_bundle:
     runs-on: ubuntu-latest

@@ -14,11 +14,9 @@ permissions:
   pull-requests: read
 
 
+model: router
 engine:
   id: pi
-  model-routing:
-    goal: cost
-    mode: auto
 network:
   allowed:
     - defaults
