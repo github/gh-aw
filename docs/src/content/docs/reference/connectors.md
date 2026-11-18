@@ -917,16 +917,30 @@ Declaration: `.github/workflows/connectors/azure-web-iq.md`.
 The [Web IQ MCP server](https://learn.microsoft.com/en-us/web-iq/integrations/mcp) exposes native
 `web`, `news` and `browse` methods through the fixed `https://api.microsoft.ai/v3/mcp` endpoint.
 Select exact methods with `tools.azure-web-iq: {search: [web, news, browse]}`. Bind approved query strings
-through `with.queries` and public HTTPS browse URLs through `with.urls`; defaults grant nothing.
+through `with.queries` and operator-approved public HTTPS browse URLs through `with.urls`; defaults grant nothing.
 Search results never add browse grants. These independent allowlists permit any approved query with
 any approved URL; queries do not restrict search-result domains.
+
+Browse rejects empty hosts, authority userinfo and fragments, including explicitly granted URLs.
+Paths and queries remain supported and are sent in full; validation does not detect secret-bearing
+names or values. Operators must review every grant for disclosure. URL syntax checks do not classify
+IP addresses or resolve DNS, and this declaration makes no provider-side private-destination
+filtering guarantee.
 
 Search requires `query`, `maxResults` (1–10), `contentFormat: passage` and `maxLength` (1–3000).
 `web` also requires `safeSearch: strict`; `news` optionally accepts `freshness` as `day`, `week`,
 `month` or `year`. Browse requires `url`, an approved nonblank `query`, `contentFormat: passage`,
-`maxLength` (1–3000) and `liveCrawl: none`. The response byte limit is 131072. The shared hosted
+`maxLength` (1–3000) and `liveCrawl: none`. The [documented `none` mode](https://learn.microsoft.com/en-us/web-iq/reference/browse#parameters)
+returns indexed content without a live crawl, or 404 if the URL is not indexed. The local adapter
+contacts only the fixed MCP endpoint, not the browse URL. The response byte limit is 131072. The shared hosted
 adapter does not independently validate result fields, counts, freshness or returned URL identity.
 Treat passages as untrusted excerpts and check browse identity and usable content before relying on them.
+
+The connector's XML documentation is stripped from prompts, not applied as a runtime policy.
+The example consumer prompts prohibit following result instructions or links and changing policy or privileges,
+but the hosted adapter does not deterministically strip instructions or isolate passages from model
+reasoning. Prompt injection can still influence staged proposals. Independently verify claims before
+publishing or acting on a handoff; staging is neither verification nor content isolation.
 
 [Authentication](https://learn.microsoft.com/en-us/web-iq/get-started/authentication) requires an
 externally acquired and renewed Entra app-only access token for `https://api.microsoft.ai/.default`.

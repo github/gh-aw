@@ -27,7 +27,8 @@ func webIQPlan(t *testing.T, methods ...string) *connectors.Plan {
 		consumer["tools"].(map[string]any)["azure-web-iq"] = map[string]any{"search": methods}
 		entry := consumer["imports"].([]any)[0].(map[string]any)
 		// Invalid URLs are granted too so missing grants cannot mask unsafe patterns.
-		entry["with"].(map[string]any)["urls"] = append(webIQValidBrowseURLs(), webIQInvalidBrowseURLs()...)
+		urls := append(webIQValidBrowseURLs(), webIQInvalidBrowseURLs()...)
+		entry["with"].(map[string]any)["urls"] = append(urls, webIQPrivateBrowseURLs()...)
 	})
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err)
@@ -64,7 +65,8 @@ func webIQValidBrowseURLs() []string {
 		"https://[2001:db8::1]:8443/path",
 		"https://example.com/@public",
 		"https://example.com/?contact=public@example.com",
-		"https://example.com/#@public",
+		"https://example.com/path%23section?query=public%23value",
+		"https://example.com/?query=public&lang=en",
 	}
 }
 
@@ -85,6 +87,26 @@ func webIQInvalidBrowseURLs() []string {
 		"https://example.com\\path",
 		"https://exa\nmple.com/",
 		"https://example.com/\n",
+		"https://example.com/#@public",
+		"https://example.com#fragment",
+		"https://example.com/#",
+		"https://example.com/#access_token=synthetic-secret",
+		"https://example.com/?query=public#token=synthetic-secret",
+	}
+}
+
+func webIQPrivateBrowseURLs() []string {
+	return []string{
+		"https://127.0.0.1/",
+		"https://10.0.0.1/",
+		"https://172.16.0.1/",
+		"https://192.168.0.1/",
+		"https://169.254.169.254/",
+		"https://[::1]/",
+		"https://[fe80::1]/",
+		"https://[fd00::1]/",
+		"https://[::ffff:127.0.0.1]/",
+		"https://localhost/",
 	}
 }
 
@@ -131,6 +153,20 @@ func webIQInvalidArguments() []webIQArgumentCase {
 		args := webIQArguments("browse")
 		args["url"] = url
 		cases = append(cases, webIQArgumentCase{"browse", args})
+	}
+	// These exact grants cannot enable live fetching, regardless of destination.
+	// This is an indexed-only mode check, not public-address validation.
+	for _, url := range webIQPrivateBrowseURLs() {
+		for _, mode := range []string{"fallback", ""} {
+			args := webIQArguments("browse")
+			args["url"] = url
+			if mode == "" {
+				delete(args, "liveCrawl")
+			} else {
+				args["liveCrawl"] = mode
+			}
+			cases = append(cases, webIQArgumentCase{"browse", args})
+		}
 	}
 	cases = append(cases, webIQArgumentCase{"images", map[string]any{}})
 	return cases
