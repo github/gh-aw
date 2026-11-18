@@ -332,8 +332,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	if err != nil {
 		return err
 	}
-	prBody = appendUpdatePRReleaseHighlights(ctx, prBody)
-	prBody = appendPRMessage(prBody, opts.prMessage) + "\n" + xmlMarker
+	prBody = appendUpdatePRReleaseHighlights(ctx, prBody, opts.prMessage, xmlMarker)
 	if err := validatePRBody(prBody); err != nil {
 		return err
 	}
