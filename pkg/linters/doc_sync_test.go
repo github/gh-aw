@@ -46,6 +46,7 @@ var notYetEnforced = map[string]string{
 	"largefunc":                        "existing production violations need remediation before enforcement; nolint suppression already works",
 	"lenstringzero":                    "requires an enforcement audit after the diagnostic-message fix (#54717)",
 	"manualpathconcat":                 "existing production violations need remediation",
+	"mapcopyloop":                      "existing map-copy loops need remediation before CI enforcement",
 	"osisnotexist":                     "existing os error predicates need case-by-case review before CI enforcement",
 	"osopenreadallpreferreadfile":      "os.Open/ReadAll simplifications need an enforcement-readiness audit before CI enables it",
 	"osremoveuncheckedcleanup":         "existing cleanup error findings need remediation before CI enforcement",

@@ -59,6 +59,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/manualmutexunlock"
 	"github.com/github/gh-aw/pkg/linters/manualpathconcat"
 	"github.com/github/gh-aw/pkg/linters/mapclearloop"
+	"github.com/github/gh-aw/pkg/linters/mapcopyloop"
 	"github.com/github/gh-aw/pkg/linters/mapdeletecheck"
 	"github.com/github/gh-aw/pkg/linters/nilctxpassed"
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
@@ -124,7 +125,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 98 analyzer
+// "Public API > Subpackages" table. The README documents 99 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -133,7 +134,7 @@ type docAnalyzer struct {
 //	appendbytestring, appendoneelement, blankassigncomma, blankassignedcleanuperror, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage, errorsnewerrorstring,
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, filepathwalkpreferwalkdir, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
-//	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopenreadallpreferreadfile, osremoveuncheckedcleanup, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
+//	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapcopyloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopenreadallpreferreadfile, osremoveuncheckedcleanup, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortbasicslices, sortslice, splitindexzero, splitlines-on-newline, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, stringssplitfirst,
 //	timeafterleak, timesleepnocontext, timenowsub,
@@ -188,6 +189,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"manualmutexunlock", manualmutexunlock.Analyzer},
 		{"manualpathconcat", manualpathconcat.Analyzer},
 		{"mapclearloop", mapclearloop.Analyzer},
+		{"mapcopyloop", mapcopyloop.Analyzer},
 		{"mapdeletecheck", mapdeletecheck.Analyzer},
 		{"nilctxpassed", nilctxpassed.Analyzer},
 		{"osexitinlibrary", osexitinlibrary.Analyzer},

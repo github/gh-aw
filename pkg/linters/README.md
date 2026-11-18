@@ -54,6 +54,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `lenstringzero` — reports `len(s) == 0` / `len(s) != 0` comparisons on string values that should use `s == ""` / `s != ""`.
 - `logfatallibrary` — reports `log.Fatal`, `log.Fatalf`, and `log.Fatalln` calls in library packages (`pkg/*`) where they implicitly call `os.Exit` and bypass deferred cleanup.
 - `mapclearloop` — reports range-over-map loops that delete every entry and can be replaced with `clear(m)`.
+- `mapcopyloop` — reports range-over-map loops that copy entries into another map and can be replaced with `maps.Copy`.
 - `mapdeletecheck` — reports redundant map membership checks before `delete(m, k)` calls since `delete` is already a no-op for missing keys.
 - `manualmutexunlock` — reports non-deferred mutex `Unlock()` calls that can lead to deadlocks on early returns or panics.
 - `manualpathconcat` — reports manual `"/"` separator string concatenation used to build paths (e.g. `dir + "/" + file`) that should use `filepath.Join` or `path.Join`.
@@ -235,6 +236,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `lenstringzero` | Custom `go/analysis` analyzer that flags `len(s) == 0` / `len(s) != 0` on string values that should use `s == ""` / `s != ""` |
 | `logfatallibrary` | Custom `go/analysis` analyzer that flags `log.Fatal`, `log.Fatalf`, and `log.Fatalln` calls in library packages where they implicitly call `os.Exit` and bypass deferred cleanup |
 | `mapclearloop` | Custom `go/analysis` analyzer that flags range-over-map loops that delete every entry and can be replaced with `clear(m)` |
+| `mapcopyloop` | Custom `go/analysis` analyzer that flags range-over-map loops that copy entries into another map and can be replaced with `maps.Copy` |
 | `mapdeletecheck` | Custom `go/analysis` analyzer that flags redundant map membership checks before `delete(m, k)` calls since `delete` is a no-op for missing keys |
 | `manualmutexunlock` | Custom `go/analysis` analyzer that flags mutex `Unlock()` calls that are not deferred |
 | `manualpathconcat` | Custom `go/analysis` analyzer that flags manual `"/"` separator string concatenation used to build paths that should use `filepath.Join` or `path.Join` |
@@ -407,6 +409,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/lenstringzero` — len-string-zero analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/logfatallibrary` — log-fatal-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/mapclearloop` — map-clear-loop analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/mapcopyloop` — map-copy-loop analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/mapdeletecheck` — map-delete-check analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/manualmutexunlock` — manual-mutex-unlock analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/manualpathconcat` — manual-path-concat analyzer subpackage
