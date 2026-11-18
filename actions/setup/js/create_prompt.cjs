@@ -122,7 +122,8 @@ function readAuthorPrompt(filename, env, bindings, protectValue, priorContent) {
   const { normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filename, workspaceDir);
   assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFolder, filename);
   let content = fs.readFileSync(normalizedPath, "utf8");
-  content = transformMarkdownContent(removeDocumentFrontmatter(content), removeXMLComments);
+  // Keep the body from being rediscovered as document frontmatter in each pass.
+  content = transformMarkdownContent("\n" + removeDocumentFrontmatter(content), removeXMLComments);
   // Body imports promoted into earlier compiler chunks must not run twice.
   const importPattern = /\{\{#(?:runtime-import|import)\??(?:[ \t]+|[ \t]*:[ \t]*)([^{}]+)\}\}/g;
   const importKey = (/** @type {string} */ target) => {
@@ -132,6 +133,7 @@ function readAuthorPrompt(filename, env, bindings, protectValue, priorContent) {
   const priorImports = new Set([...priorContent.matchAll(importPattern)].map(match => importKey(match[1])));
   content = transformMarkdownContent(content, text => text.replace(importPattern, (match, target) => (priorImports.has(importKey(target)) ? "" : match)));
   content = transformMarkdownContent(content, text => bindAuthorExpressions(text, bindings, env, protectValue));
+  content = content.slice(1);
   return content.endsWith("\n") ? content : content + "\n";
 }
 

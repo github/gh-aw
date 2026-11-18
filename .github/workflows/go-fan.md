@@ -28,12 +28,10 @@ imports:
 - shared/otlp.md
 description: "Daily Go module usage reviewer - analyzes direct dependencies prioritizing recently updated ones"
 emoji: 🐹
+model: router/economy
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 name: Go Fan
 strict: true
 timeout-minutes: 30

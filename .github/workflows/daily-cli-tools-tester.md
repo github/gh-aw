@@ -27,12 +27,10 @@ safe-outputs:
     max: 1
   noop:
 timeout-minutes: 60
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 strict: true
 imports:
   - uses: shared/daily-audit-base.md

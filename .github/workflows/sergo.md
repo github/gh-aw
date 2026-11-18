@@ -35,12 +35,10 @@ safe-outputs:
     max: 3
 description: Daily Go code quality analysis using Serena MCP language service protocol expert
 emoji: 🤖
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
 name: "Sergo - Serena Go Expert"
 strict: true
 timeout-minutes: 45

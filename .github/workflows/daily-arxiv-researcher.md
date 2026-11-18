@@ -10,12 +10,10 @@ permissions:
   contents: read
   copilot-requests: write
 
+model: router/economy
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
   durable:
     retention-days: 7
 

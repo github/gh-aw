@@ -141,6 +141,41 @@ describe("compiler-owned Markdown metadata", () => {
     expect(transformMarkdownContent(content, text => text.replace("Example", "Rendered"))).toBe("Introduction\n---\nRendered prose, not YAML\n---\nConclusion");
   });
 
+  it.each(["agent", "skill"])("ignores commented-out %s fences while preserving active source digests and offsets", kind => {
+    const { removeXMLComments } = require("./runtime_import.cjs");
+    const source = "model: small # <!-- compiler-owned comment -->\ntools: [Read]";
+    installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", tools: ["Read"] })] });
+    const comment = `<!--\r\n## ${kind}: hidden\r\n---\r\nmodel: invalid\r\n-->\r\n`;
+    const active = `## agent: reader\r\n---\r\n${source.replaceAll("\n", "\r\n")}\r\n---\r\nRead files.`;
+    expect(transformMarkdownContent(comment + active, removeXMLComments)).toBe('\r\n## agent: reader\r\n---\n{"model":"small","tools":["Read"]}\n---\r\nRead files.');
+  });
+
+  it.each(["", "\n---\nMore body"])("preserves document frontmatter boundaries around literal comment markers before %j", suffix => {
+    const source = 'description: "Literal <!-- marker"\nmodel: small';
+    const value = { description: "Literal <!-- marker", model: "small" };
+    installMarkdownMetadata({ version: 2, records: [record(source, value)] });
+    const body = "Body --> remains." + suffix;
+    const content = `---\n${source}\n---\n${body}`;
+
+    expect(readMarkdownMetadata("agent", content).value).toEqual(value);
+    expect(removeDocumentFrontmatter(content)).toBe(body);
+    expect(transformMarkdownContent(content, text => text)).toBe(`---\n${JSON.stringify(value)}\n---\n${body}`);
+  });
+
+  it.each(["\n", "\r\n"])("keeps literal comment markers in inline metadata separate from body comments with %j offsets", newline => {
+    const { removeXMLComments } = require("./runtime_import.cjs");
+    const source = 'description: "Literal <!-- marker"\nmodel: small';
+    const value = { description: "Literal <!-- marker", model: "small" };
+    installMarkdownMetadata({ version: 2, records: [record(source, value), record("model: large", { model: "large" })] });
+    const content = ["## agent: first", "---", ...source.split("\n"), "---", "Read files.", "## agent: second", "---", "model: large", "---", "Body --> remains.", "<!--", "## agent: hidden", "---", "model: invalid", "-->", "Done."].join(
+      newline
+    );
+    const expected = ["## agent: first", `---\n${JSON.stringify(value)}\n---`, "Read files.", "## agent: second", '---\n{"model":"large"}\n---', "Body --> remains.", "", "Done."].join(newline);
+
+    expect(require("./markdown_metadata.cjs").missingMarkdownMetadata([content]).size).toBe(0);
+    expect(transformMarkdownContent(content, removeXMLComments)).toBe(expected);
+  });
+
   it.each([
     ["---\non: workflow_dispatch\n---\nBody\n", "Body\n"],
     ["\uFEFF---\r\non: workflow_dispatch\r\n---\r\nBody\r\n", "Body\r\n"],

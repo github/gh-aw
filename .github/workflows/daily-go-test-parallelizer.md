@@ -11,15 +11,13 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+model: router/economy
 engine:
   id: codex
   env:
     GOCACHE: /tmp/gh-aw/agent/go-build-cache
     GOMODCACHE: /tmp/gh-aw/agent/go-mod-cache
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
 steps:
   - name: Provision disposable Go validation caches
     run: mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache /tmp/gh-aw/agent/parallelizer-validation

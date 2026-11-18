@@ -31,12 +31,10 @@ safe-outputs:
     title-prefix: "[docs] "
 description: Consolidates and organizes developer documentation from multiple sources into a unified, searchable knowledge base
 emoji: 📝
+model: router/balanced
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
 name: Developer Documentation Consolidator
 strict: true
 timeout-minutes: 30
