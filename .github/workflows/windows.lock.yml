@@ -770,6 +770,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -839,6 +841,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -881,6 +885,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -923,6 +929,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -969,6 +977,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1011,6 +1021,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1053,6 +1065,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1106,6 +1120,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1179,6 +1195,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1224,6 +1242,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1280,6 +1300,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1325,6 +1347,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1369,6 +1393,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1411,6 +1437,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1453,6 +1481,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1498,6 +1528,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1704,6 +1736,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1760,6 +1794,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1804,6 +1840,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1858,6 +1896,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -1956,6 +1996,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -2004,6 +2046,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -2076,6 +2120,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -2121,6 +2167,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -2204,6 +2252,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -2277,6 +2327,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -2321,6 +2373,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
@@ -2447,6 +2501,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }
             if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }
             $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)
+            $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)
           }
           $scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
