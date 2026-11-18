@@ -156,6 +156,8 @@ safe-outputs:
 
 These settings independently request the `github-app` broker capability; neither requires a top-level `token-broker` setting. Do not combine a section's enabled `token-broker` with its `github-app` or `github-token`. A top-level `github-app` does not override the section's broker selection. GitHub tool authentication requires an enabled agent sandbox with AWF environment-exclusion support to keep OIDC bootstrap credentials out of the agent. The broker controls installation, repository scope, permissions, and lifetime through deployment policy, not caller-supplied scopes; GitHub tool credentials must be read-only. Each consuming job exchanges its own credential and invalidates it during cleanup. GitHub consumers receive a fixed token for that job; this does not provide automatic renewal for long-running operations.
 
+Work queue dispatch cannot use a brokered installation token because the broker response does not provide a verified App identity binding. Configure `safe-outputs.dispatch-workflow.github-app` or `safe-outputs.dispatch-workflow.github-token` explicitly. Dispatches without a verifiable binding are blocked before queue publication or launch.
+
 ### Imports (`imports:`)
 
 Share and reuse workflow components across multiple workflows. The `imports:` field in frontmatter (or `{{#import ...}}` in markdown) composes shared tools, steps, MCP servers, and prompts from other workflow files.

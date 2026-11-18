@@ -650,6 +650,12 @@ func (c *Compiler) addSafeOutputTokenEnvVars(steps *[]string, data *WorkflowData
 	// update-project, create-project-status-update, or create-project.
 	// Note: If multiple project configs are present, we prefer update-project > create-project-status-update > create-project.
 	projectURL, projectToken := resolveProjectURLAndToken(data.SafeOutputs)
+	// Handler-specific credentials are already passed in the handler configuration.
+	// Do not broadcast one handler's token (or the legacy default) to other handlers
+	// when the shared client uses the broker.
+	if usesTokenBrokerSafeOutputs(data) {
+		projectToken = ""
+	}
 	if projectURL != "" {
 		*steps = append(*steps, fmt.Sprintf("          GH_AW_PROJECT_URL: %q\n", projectURL))
 	}

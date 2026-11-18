@@ -50,6 +50,7 @@ func assertGitHubBrokerConsumer(t *testing.T, job githubBrokerTestJob, stepID st
 		if step.ID == stepID {
 			exchanges++
 			assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
+			assert.Contains(t, step.With["script"], "require(path.join(actionsDir, 'token_broker.cjs'))")
 			assert.Contains(t, step.With["script"], "getBrokerToken('github-app', { mask: token => core.setSecret(token) })")
 			assert.NotContains(t, step.With["script"], "provider")
 			assert.NotContains(t, step.With["script"], "scope")
@@ -57,6 +58,7 @@ func assertGitHubBrokerConsumer(t *testing.T, job githubBrokerTestJob, stepID st
 		}
 		if strings.Contains(step.With["script"], "await invalidateBrokerTokens(") {
 			invalidations++
+			assert.Contains(t, step.With["script"], "require(path.join(actionsDir, 'token_broker.cjs'))")
 			assert.Equal(t, "always()", step.If)
 			assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 		}
@@ -93,6 +95,47 @@ func TestTokenBrokerGitHubCompileConsumers(t *testing.T) {
 			assert.Contains(t, exclusions, tokenBrokerURLEnv)
 			assert.Contains(t, exclusions, "ACTIONS_ID_TOKEN_REQUEST_URL")
 			assert.Contains(t, exclusions, "ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+		})
+	}
+}
+
+func TestTokenBrokerWorkQueueActivationSnapshot(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		fields string
+		queue  bool
+	}{
+		{"worker", "tools:\n  work-queue:\n    worker: true\n", true},
+		{"observer", "tools:\n  work-queue: true\n", true},
+		{"no queue", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, jobs := compileGitHubBrokerTest(t, tc.fields+"safe-outputs:\n  token-broker: true\n  threat-detection: false\n  noop:\n")
+			job := jobs["activation"]
+			setup, exchange, snapshot, cleanup := -1, -1, -1, -1
+			for i, step := range job.Steps {
+				switch {
+				case step.ID == "setup":
+					setup = i
+				case step.ID == "work-queue-activation-broker-token":
+					exchange = i
+				case step.ID == "work_queue_snapshot":
+					snapshot = i
+				case strings.Contains(step.With["script"], "await invalidateBrokerTokens("):
+					cleanup = i
+				}
+			}
+			if !tc.queue {
+				require.Equal(t, -1, exchange)
+				require.Equal(t, -1, cleanup)
+				return
+			}
+			assertGitHubBrokerConsumer(t, job, "work-queue-activation-broker-token")
+			require.GreaterOrEqual(t, setup, 0)
+			require.Greater(t, exchange, setup)
+			require.Greater(t, snapshot, exchange)
+			require.Greater(t, cleanup, snapshot)
+			require.Equal(t, "${{ steps.work-queue-activation-broker-token.outputs.token }}", job.Steps[snapshot].With["github-token"])
 		})
 	}
 }
@@ -285,6 +328,20 @@ func TestTokenBrokerGitHubImport(t *testing.T) {
 			assert.Equal(t, tc.want, result.TokenBroker)
 			assert.NotNil(t, result.CreateIssues)
 		})
+	}
+}
+
+func TestTokenBrokerGitHubImportConflictingCredentials(t *testing.T) {
+	compiler := NewCompiler()
+	for _, imported := range []string{
+		`{"token-broker":true,"github-token":"${{ secrets.TOKEN }}","create-issue":{}}`,
+		`{"token-broker":true,"github-app":{"app-id":"123","private-key":"${{ secrets.KEY }}"},"create-issue":{}}`,
+	} {
+		for _, explicit := range []map[string]any{nil, {"token-broker": false}, {"github-token": "${{ secrets.OTHER }}"}} {
+			base := compiler.extractSafeOutputsConfig(map[string]any{"safe-outputs": explicit})
+			_, err := compiler.MergeSafeOutputs(base, []string{imported}, explicit)
+			require.ErrorContains(t, err, "safe-outputs.token-broker: true is mutually exclusive")
+		}
 	}
 }
 

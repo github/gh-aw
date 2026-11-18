@@ -22,6 +22,10 @@ func configureWorkQueueDispatchCredential(data *WorkflowData, config map[string]
 		config["github-token"] = "${{ steps." + workQueueDispatchAppTokenStepID + ".outputs.token }}"
 		credential["kind"] = "github_app"
 		credential["app_slug"] = "${{ steps." + workQueueDispatchAppTokenStepID + ".outputs.app-slug }}"
+	} else if token == "" && usesTokenBrokerSafeOutputs(data) {
+		// The broker response does not bind the installation token to an App identity.
+		credential["kind"] = "broker_unverified"
+		config["github-token"] = "${{ steps.safe-outputs-app-token.outputs.token }}"
 	} else {
 		config["github-token"] = resolveSafeOutputGitHubToken(token)
 		if token == "" {

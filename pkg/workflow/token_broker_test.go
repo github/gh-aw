@@ -57,6 +57,20 @@ func TestTokenBrokerExperimentalWarning(t *testing.T) {
 	}
 }
 
+func TestTokenBrokerHelperPaths(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot"}, TokenBrokerEnabled: true, TokenBrokerCopilotRequest: true}
+	for _, steps := range [][]string{
+		compiler.buildTokenBrokerRequestStep(data, ""),
+		compiler.buildTokenBrokerInvalidationStep(data),
+		compiler.buildGitHubBrokerTokenStep(data, "broker-token"),
+	} {
+		script := strings.Join(steps, "")
+		assert.Contains(t, script, "require('"+SetupActionDestination+"/token_broker.cjs')")
+		assert.NotContains(t, script, "/setup/js/token_broker.cjs")
+	}
+}
+
 func TestTokenBrokerCompileOptIn(t *testing.T) {
 	t.Setenv(tokenBrokerURLEnv, "https://compile-time.invalid/never")
 	for _, tc := range []struct {

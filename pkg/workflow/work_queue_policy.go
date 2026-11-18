@@ -56,6 +56,12 @@ func validateWorkQueueConfiguration(data *WorkflowData) error {
 		}
 		return nil
 	}
+	if usesTokenBrokerSafeOutputs(data) && data.SafeOutputs.DispatchWorkflow != nil {
+		dispatch := data.SafeOutputs.DispatchWorkflow
+		if len(dispatch.Workflows) > 0 && dispatch.GitHubApp == nil && dispatch.GitHubToken == "" {
+			return errors.New("work-queue: brokered dispatch cannot verify the installation token's App identity; configure safe-outputs.dispatch-workflow.github-app or github-token explicitly")
+		}
+	}
 	if isWorkQueueWorker(data) {
 		if _, configured := data.RawFrontmatter["run-name"]; configured {
 			return errors.New("work-queue: worker run-name is reserved for immutable dispatch correlation; remove run-name from frontmatter")

@@ -322,7 +322,11 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 		if err := json.Unmarshal(configBytes, &authorizationConfig); err != nil {
 			return nil, fmt.Errorf("cannot preserve imported safe-output authorization: %w", err)
 		}
-		importedAuthorizationConfigs = append(importedAuthorizationConfigs, c.extractSafeOutputsConfig(map[string]any{"safe-outputs": authorizationConfig}))
+		importedConfig := c.extractSafeOutputsConfig(map[string]any{"safe-outputs": authorizationConfig})
+		if err := validateTokenBrokerGitHubConfig(&WorkflowData{SafeOutputs: importedConfig}); err != nil {
+			return nil, err
+		}
+		importedAuthorizationConfigs = append(importedAuthorizationConfigs, importedConfig)
 		config = normalizeMissingReportKeys(config)
 
 		// Check for conflicts and remove types already defined in top-level config

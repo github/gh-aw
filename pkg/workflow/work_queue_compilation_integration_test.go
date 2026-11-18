@@ -30,6 +30,9 @@ func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
 		{"pat", "  github-token: ${{ secrets.PUBLISHER_PAT }}\n", "    github-token: ${{ secrets.WORKER_PAT }}\n", "authenticated", "${{ secrets.WORKER_PAT }}", false},
 		{"app", "", "    github-app:\n      app-id: ${{ vars.WORKER_APP_ID }}\n      private-key: ${{ secrets.WORKER_APP_KEY }}\n", "github_app", "${{ steps.work-queue-dispatch-app-token.outputs.token }}", true},
 		{"global-app", "  github-app:\n    app-id: ${{ vars.WORKER_APP_ID }}\n    private-key: ${{ secrets.WORKER_APP_KEY }}\n", "", "github_app", "${{ steps.work-queue-dispatch-app-token.outputs.token }}", true},
+		{"broker", "  token-broker: true\n", "", "broker_unverified", "${{ steps.safe-outputs-app-token.outputs.token }}", false},
+		{"broker-handler-pat", "  token-broker: true\n", "    github-token: ${{ secrets.WORKER_PAT }}\n", "authenticated", "${{ secrets.WORKER_PAT }}", false},
+		{"broker-handler-app", "  token-broker: true\n", "    github-app:\n      app-id: ${{ vars.WORKER_APP_ID }}\n      private-key: ${{ secrets.WORKER_APP_KEY }}\n", "github_app", "${{ steps.work-queue-dispatch-app-token.outputs.token }}", true},
 	} {
 		t.Run(entry.name, func(t *testing.T) {
 			dir := testutil.TempDir(t, "work-queue-dispatch-credential-")
@@ -42,7 +45,12 @@ func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
 			require.NoError(t, os.WriteFile(filename, []byte(source), 0o600))
 			compiler := NewCompiler(WithVersion("integration"))
 			compiler.SetApprove(true)
-			require.NoError(t, compiler.CompileWorkflow(filename))
+			err := compiler.CompileWorkflow(filename)
+			if entry.name == "broker" {
+				require.ErrorContains(t, err, "brokered dispatch cannot verify the installation token's App identity")
+				return
+			}
+			require.NoError(t, err)
 			content, err := os.ReadFile(filepath.Join(dir, "dispatcher.lock.yml"))
 			require.NoError(t, err)
 			var compiled struct {
