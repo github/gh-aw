@@ -133,7 +133,10 @@ async function summarizeGitHubDiff({ repository, base, head, token, fetchImpl = 
       return [file.filename, ...(file.status === "renamed" ? [file.previous_filename] : [])];
     });
     const retained = new Set(retainLockSample(namesByFile.flat()));
-    for (const [index, file] of changed.entries()) {
+    // Reserve the patch budget for source evidence, including renames across the lock boundary.
+    const lockOnly = namesByFile.map(names => names.every(name => name.endsWith(".lock.yml")));
+    const sourceFirst = [...changed.entries()].sort(([a], [b]) => Number(lockOnly[a]) - Number(lockOnly[b]));
+    for (const [index, file] of sourceFirst) {
       const names = namesByFile[index].filter(name => retained.has(name));
       if (!names.length) continue;
       if (![file.additions, file.deletions, file.changes].every(value => Number.isSafeInteger(value) && value >= 0) || file.changes !== file.additions + file.deletions) throw new Error("invalid-comparison-statistics");

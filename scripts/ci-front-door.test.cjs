@@ -482,6 +482,26 @@ test("complete bounded API patches retain filenames", async () => {
   assert.ok(!bounded.summary.groups.other.patch.includes("\ufffd"));
 });
 
+test("API source evidence precedes an oversized lock sample regardless of response order", async () => {
+  const sample = { filename: ".github/workflows/a.lock.yml", status: "added", additions: 1, deletions: 0, changes: 1, patch: "@@ -0,0 +1 @@\n+" + "a".repeat(LIMITS.groupPatch) };
+  const sources = [...comparison().files, { filename: "z.lock.yml", previous_filename: "docs/guide.md", status: "renamed", additions: 1, deletions: 1, changes: 2, patch: "@@ -1 +1 @@\n-old guide\n+new guide" }];
+  for (const files of [
+    [sample, ...sources],
+    [...sources, sample],
+  ]) {
+    const { summary } = await githubDiff({ value: comparison(files) });
+    assert.equal(summary.unavailable, false);
+    assert.equal(summary.truncated, false);
+    assert.deepEqual(summary.files, [sample.filename, "README.md", "docs/guide.md"]);
+    const group = summary.groups.other;
+    assert.equal(group.patch_truncated, true);
+    assert.equal(Buffer.byteLength(group.patch), LIMITS.groupPatch);
+    assert.match(group.patch, /-before\n\+after/);
+    assert.match(group.patch, /-old guide\n\+new guide/);
+    assert.ok(group.patch.indexOf("new guide") < group.patch.indexOf(sample.filename));
+  }
+});
+
 test("a missing generated sample patch is marked partial without discarding complete source evidence", async () => {
   const sample = { filename: ".github/workflows/a.lock.yml", status: "modified", additions: 20, deletions: 10, changes: 30 };
   const files = [sample, { filename: "z.lock.yml", status: "modified" }, ...comparison().files];
