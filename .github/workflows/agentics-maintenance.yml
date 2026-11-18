@@ -121,6 +121,28 @@ jobs:
     permissions:
       discussions: write # Create or update discussions and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -132,18 +154,34 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Close expired discussions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'close_expired_discussions.cjs'));
             await main();
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   close-expired-issues:
     name: Close expired issues
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
@@ -152,6 +190,28 @@ jobs:
     permissions:
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -163,18 +223,34 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Close expired issues
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'close_expired_issues.cjs'));
             await main();
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   close-expired-pull-requests:
     name: Close expired pull requests
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
@@ -183,6 +259,28 @@ jobs:
     permissions:
       pull-requests: write # Create or update pull requests and review comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -194,19 +292,35 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Close expired pull requests
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'close_expired_pull_requests.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   cleanup-stale-steering-issues:
     name: Cleanup stale steering issues
     if: ${{ (!(github.event.repository.fork)) && github.event_name == 'schedule' }}
@@ -217,6 +331,28 @@ jobs:
       issues: write # Create or update issues and comments.
       contents: read
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -228,19 +364,35 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Close stale steering issues
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'cleanup_stale_steering_issues.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   cleanup-cache-memory:
     name: Cleanup cache memory
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'clean_cache_memories') }}
@@ -249,6 +401,28 @@ jobs:
     permissions:
       actions: write # Create or update workflow runs and artifacts.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -260,19 +434,35 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Cleanup outdated cache-memory entries
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'cleanup_cache_memory.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   run_operation:
     name: Run maintenance operation
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation != '' && inputs.operation != 'none' && inputs.operation != 'safe_outputs' && inputs.operation != 'create_labels' && inputs.operation != 'activity_report' && inputs.operation != 'close_agentic_workflows_issues' && inputs.operation != 'clean_cache_memories' && inputs.operation != 'update_pull_request_branches' && inputs.operation != 'validate' && inputs.operation != 'forecast' && inputs.operation != 'compact_ledger' && (!(github.event.repository.fork)) }}
@@ -285,6 +475,28 @@ jobs:
     outputs:
       operation: ${{ steps.record.outputs.operation }}
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -293,7 +505,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -301,7 +513,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -326,7 +538,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'run_operation_update_upgrade.cjs'));
@@ -338,6 +550,22 @@ jobs:
           GH_AW_OPERATION: ${{ inputs.operation }}
         run: echo "operation=$GH_AW_OPERATION" >> "$GITHUB_OUTPUT"
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   update_pull_request_branches:
     name: Update pull request branches
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'update_pull_request_branches' && (!(github.event.repository.fork)) }}
@@ -347,6 +575,28 @@ jobs:
       contents: write # Create or update repository contents.
       pull-requests: write # Create or update pull requests and review comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -358,7 +608,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -366,7 +616,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -380,12 +630,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'update_pull_request_branches.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   apply_safe_outputs:
     name: Apply safe outputs
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'safe_outputs' && (!(github.event.repository.fork)) }}
@@ -400,6 +666,28 @@ jobs:
     outputs:
       run_url: ${{ steps.record.outputs.run_url }}
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -411,7 +699,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -419,7 +707,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -436,7 +724,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'apply_safe_outputs_replay.cjs'));
@@ -448,6 +736,22 @@ jobs:
           GH_AW_RUN_URL: ${{ inputs.run_url }}
         run: echo "run_url=$GH_AW_RUN_URL" >> "$GITHUB_OUTPUT"
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   create_labels:
     name: Create labels
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'create_labels' && (!(github.event.repository.fork)) }}
@@ -457,6 +761,28 @@ jobs:
       contents: read
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -465,7 +791,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -473,7 +799,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -496,12 +822,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'create_labels.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   activity_report:
     name: activity report
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'activity_report' && (!(github.event.repository.fork)) }}
@@ -513,6 +855,28 @@ jobs:
       contents: read
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -521,7 +885,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -529,7 +893,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -615,6 +979,22 @@ jobs:
             });
             core.info('Created issue #' + createdIssue.data.number + ': ' + createdIssue.data.html_url);
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   forecast_report:
     name: forecast report
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'forecast' && (!(github.event.repository.fork)) }}
@@ -626,6 +1006,28 @@ jobs:
       contents: read
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -634,7 +1036,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -642,7 +1044,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -718,12 +1120,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'create_forecast_issue.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   close_agentic_workflows_issues:
     name: Close agentic workflows issues
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'close_agentic_workflows_issues' && (!(github.event.repository.fork)) }}
@@ -732,6 +1150,28 @@ jobs:
     permissions:
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -743,7 +1183,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -751,7 +1191,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -763,12 +1203,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'close_agentic_workflows_issues.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   validate_workflows:
     name: Validate workflows
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'validate' && (!(github.event.repository.fork)) }}
@@ -778,6 +1234,28 @@ jobs:
       contents: read
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -786,7 +1264,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -794,7 +1272,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -817,12 +1295,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'run_validate_workflows.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   label_disable_agentic_workflow:
     name: Disable agentic workflow by label
     if: ${{ (!(github.event.repository.fork)) && github.event_name == 'issues' && github.event.label.name == 'agentic-workflows:disable' }}
@@ -833,6 +1327,28 @@ jobs:
       contents: read
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -844,7 +1360,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         id: check_permissions
@@ -853,7 +1369,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -866,12 +1382,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'disable_agentic_workflow.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   label_apply_safe_outputs:
     name: Apply safe outputs by label
     if: ${{ (!(github.event.repository.fork)) && github.event_name == 'issues' && github.event.label.name == 'agentic-workflows:apply-safe-outputs' }}
@@ -884,6 +1416,28 @@ jobs:
       issues: write # Create or update issues and comments.
       pull-requests: write # Create or update pull requests and review comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -895,7 +1449,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check admin/maintainer permissions
         id: check_permissions
@@ -904,7 +1458,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_team_member.cjs'));
@@ -921,12 +1475,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'label_apply_safe_outputs.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   compile-workflows:
     name: Compile workflows
     if: ${{ (!(github.event.repository.fork)) && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
@@ -939,6 +1509,28 @@ jobs:
       contents: read
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -966,19 +1558,35 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Check for out-of-sync workflows and create issue or pull request if needed
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_workflow_recompile_needed.cjs'));
             await main();
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   secret-validation:
     name: Validate secrets
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
@@ -987,6 +1595,28 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1003,7 +1633,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Validate Secrets
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1022,7 +1652,7 @@ jobs:
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'validate_secrets.cjs'));
@@ -1037,6 +1667,22 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}
           if-no-files-found: warn
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   ledger_compaction_plan:
     name: Plan ledger compaction
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') }}
@@ -1045,7 +1691,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' || steps.plan_7.outputs.plan_created == 'true' }}
+      plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
       plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}
       plan_0_created: ${{ steps.plan_0.outputs.plan_created }}
       plan_1_created: ${{ steps.plan_1.outputs.plan_created }}
@@ -1053,9 +1699,29 @@ jobs:
       plan_3_created: ${{ steps.plan_3.outputs.plan_created }}
       plan_4_created: ${{ steps.plan_4.outputs.plan_created }}
       plan_5_created: ${{ steps.plan_5.outputs.plan_created }}
-      plan_6_created: ${{ steps.plan_6.outputs.plan_created }}
-      plan_7_created: ${{ steps.plan_7.outputs.plan_created }}
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1067,7 +1733,7 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Plan ledger compaction (arxiv-papers, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'arxiv-papers' }}
@@ -1138,11 +1804,11 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-0.json
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
@@ -1251,11 +1917,11 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-1.json
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
@@ -1283,84 +1949,11 @@ jobs:
               "name": "awf-feature-reviews"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-2.json
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
-            await main();
-
-      - name: Plan ledger compaction (caveman-run-history, untrusted, read-only)
-        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'caveman-run-history' }}
-        continue-on-error: true
-        timeout-minutes: 15
-        id: plan_3
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG: |-
-            {
-              "branch_name": "ledgers/caveman-run-history",
-              "compaction": {
-                "schedule": "daily",
-                "min_segments": 32,
-                "max_segments": 128
-              },
-              "key": "run_id",
-              "max_patch_kb": 10,
-              "max_record_kb": 4,
-              "max_segment_kb": 100,
-              "name": "caveman-run-history",
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "date": {
-                    "type": "string"
-                  },
-                  "files_optimized": {
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "files_processed": {
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "planned_outcome": {
-                    "enum": [
-                      "pull_request_requested",
-                      "noop"
-                    ]
-                  },
-                  "record_type": {
-                    "enum": [
-                      "caveman_run"
-                    ]
-                  },
-                  "run_id": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "record_type",
-                  "run_id",
-                  "date",
-                  "files_processed",
-                  "files_optimized",
-                  "planned_outcome"
-                ],
-                "type": "object"
-              },
-              "type": "table"
-            }
-          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
@@ -1370,7 +1963,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'centralization' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_4
+        id: plan_3
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1504,43 +2097,11 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-3.json
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
-            await main();
-
-      - name: Plan ledger compaction (concurrency-audits, untrusted, read-only)
-        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'concurrency-audits' }}
-        continue-on-error: true
-        timeout-minutes: 15
-        id: plan_5
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG: |-
-            {
-              "branch_name": "ledgers/concurrency-audits",
-              "compaction": {
-                "schedule": "daily",
-                "min_segments": 32,
-                "max_segments": 128
-              },
-              "max_patch_kb": 10,
-              "max_record_kb": 4,
-              "max_segment_kb": 100,
-              "name": "concurrency-audits"
-            }
-          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
@@ -1550,7 +2111,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'git-simulator-lessons' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_6
+        id: plan_4
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1571,11 +2132,11 @@ jobs:
               "type": "notes"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-4.json
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
@@ -1585,7 +2146,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'smoke' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_7
+        id: plan_5
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1629,29 +2190,45 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-7.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-5.json
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
             await main();
 
       - name: Upload ledger compaction plans
-        if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' || steps.plan_7.outputs.plan_created == 'true' }}
+        if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
         id: upload_plans
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ledger-compaction-plans
-          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+          path: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: error
       - name: Report ledger compaction planning failures
-        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' || steps.plan_6.outcome == 'failure' || steps.plan_7.outcome == 'failure' }}
+        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' }}
         run: exit 1
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   ledger_compaction_apply:
     name: Apply ledger compaction
     needs: ledger_compaction_plan
@@ -1661,6 +2238,28 @@ jobs:
     permissions:
       contents: write # Create or update repository contents.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1672,13 +2271,13 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Download ledger compaction plans
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ledger-compaction-plans
-          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+          path: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction
 
       - name: Validate and apply ledger compaction (arxiv-papers, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_0_created == 'true' }}
@@ -1748,12 +2347,12 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-0.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
@@ -1861,12 +2460,12 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-1.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
@@ -1893,93 +2492,20 @@ jobs:
               "name": "awf-feature-reviews"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-2.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
-            await main();
-
-      - name: Validate and apply ledger compaction (caveman-run-history, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_3_created == 'true' }}
-        id: apply_3
-        continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG: |-
-            {
-              "branch_name": "ledgers/caveman-run-history",
-              "compaction": {
-                "schedule": "daily",
-                "min_segments": 32,
-                "max_segments": 128
-              },
-              "key": "run_id",
-              "max_patch_kb": 10,
-              "max_record_kb": 4,
-              "max_segment_kb": 100,
-              "name": "caveman-run-history",
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "date": {
-                    "type": "string"
-                  },
-                  "files_optimized": {
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "files_processed": {
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "planned_outcome": {
-                    "enum": [
-                      "pull_request_requested",
-                      "noop"
-                    ]
-                  },
-                  "record_type": {
-                    "enum": [
-                      "caveman_run"
-                    ]
-                  },
-                  "run_id": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "record_type",
-                  "run_id",
-                  "date",
-                  "files_processed",
-                  "files_optimized",
-                  "planned_outcome"
-                ],
-                "type": "object"
-              },
-              "type": "table"
-            }
-          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
 
       - name: Validate and apply ledger compaction (centralization, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_4_created == 'true' }}
-        id: apply_4
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_3_created == 'true' }}
+        id: apply_3
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -2114,52 +2640,20 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-3.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
-            await main();
-
-      - name: Validate and apply ledger compaction (concurrency-audits, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_5_created == 'true' }}
-        id: apply_5
-        continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG: |-
-            {
-              "branch_name": "ledgers/concurrency-audits",
-              "compaction": {
-                "schedule": "daily",
-                "min_segments": 32,
-                "max_segments": 128
-              },
-              "max_patch_kb": 10,
-              "max_record_kb": 4,
-              "max_segment_kb": 100,
-              "name": "concurrency-audits"
-            }
-          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
 
       - name: Validate and apply ledger compaction (git-simulator-lessons, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_6_created == 'true' }}
-        id: apply_6
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_4_created == 'true' }}
+        id: apply_4
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -2181,20 +2675,20 @@ jobs:
               "type": "notes"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-4.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
 
       - name: Validate and apply ledger compaction (smoke, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_7_created == 'true' }}
-        id: apply_7
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_5_created == 'true' }}
+        id: apply_5
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -2239,20 +2733,36 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-7.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/ledger-compaction/plan-5.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
       - name: Report ledger compaction application failures
-        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' || steps.apply_6.outcome == 'failure' || steps.apply_7.outcome == 'failure' }}
+        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' }}
         run: exit 1
 
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
   work_queue_compaction:
     name: Reconcile and compact work queue
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
@@ -2262,6 +2772,28 @@ jobs:
       contents: write # Create or update repository contents.
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -2273,16 +2805,16 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Reconcile stranded workers and compact work queue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
+          GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ env.GH_AW_SETUP_ROOT }}/work-queue-compaction/plan.json
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { maintenance: reconcile } = require(path.join(actionsDir, 'reconcile_work_queue_run.cjs'));
@@ -2294,3 +2826,19 @@ jobs:
               await apply();
             }
             if (reconciliation.issue_sync_pending?.length) core.warning('Work queue reconciliation and compaction completed; Issue synchronization remains pending. Recover the exact terminal requests with work-queue sync-issues --request-id.');
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done

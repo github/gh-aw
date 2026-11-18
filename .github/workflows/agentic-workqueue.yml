@@ -43,6 +43,28 @@ jobs:
       contents: write # Create or update repository contents.
       issues: write # Create or update issues and comments.
     steps:
+      - name: Allocate isolated runtime directories
+        id: gh-aw-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          GH_AW_RUNTIME_ROOT=""
+          GH_AW_SETUP_ROOT=""
+          trap 'status=$?; if [[ -n "$GH_AW_SETUP_ROOT" ]]; then rm -rf -- "$GH_AW_SETUP_ROOT"; fi; if [[ -n "$GH_AW_RUNTIME_ROOT" ]]; then rm -rf -- "$GH_AW_RUNTIME_ROOT"; fi; exit "$status"' EXIT
+          GH_AW_RUNTIME_ROOT="$(mktemp -d /tmp/gh-aw-run.XXXXXXXXXX)"
+          setup_parent="$(cd -- "${RUNNER_TEMP:?}" && pwd -P)"
+          GH_AW_SETUP_ROOT="$(mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX")"
+          GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
+          GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+          printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
+          printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
+          case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
+          printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+          printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
+          trap - EXIT
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,15 +76,31 @@ jobs:
       - name: Setup Scripts
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ env.GH_AW_SETUP_ROOT }}/actions
 
       - name: Process work queue Issue event
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const actionsDir = path.join(process.env.GH_AW_SETUP_ROOT, 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'cancel_work_queue_closed_issue.cjs'));
             await main();
+      - name: Clean isolated runtime directories
+        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
+          if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+          owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
+          for kind in runtime setup; do
+            if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
+            if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
+            if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
+            marker="$root/.gh-aw-runtime-owner"
+            if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+            rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
+          done
