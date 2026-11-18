@@ -105,11 +105,8 @@ func actionReferenceFromLine(line string) (string, bool) {
 	if !found {
 		return "", false
 	}
-	for i := range line {
-		if line[i] != ' ' && line[i] != '\t' {
-			return "", false
-		}
-		break
+	if len(line) > 0 && line[0] != ' ' && line[0] != '\t' {
+		return "", false
 	}
 
 	trimmedPrefix := strings.TrimSpace(prefix)
@@ -139,7 +136,7 @@ func actionReferenceFromLine(line string) (string, bool) {
 	return ref, true
 }
 
-func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData) {
+func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData, stagedDurableFiles bool) {
 	// Extract secret references from the generated YAML
 	secretReferences := CollectSecretReferences(yamlContent)
 
@@ -153,7 +150,7 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 	yaml.WriteString("        uses: " + getCachedActionPin("actions/github-script", data) + "\n")
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
-	durableCopilot := data.durableExecutionPlan != nil && data.EngineConfig != nil && data.EngineConfig.ID == "copilot"
+	durableCopilot := stagedDurableFiles && data.durableExecutionPlan != nil && data.EngineConfig != nil && data.EngineConfig.ID == "copilot"
 	writeSecretRedactionScript(yaml, data, durableCopilot)
 
 	if durableCopilot || len(secretReferences) > 0 {

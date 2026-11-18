@@ -39,7 +39,7 @@ describe("Copilot durable checkpoint redaction", () => {
     const events = path.join(state, id, "events.jsonl");
     fs.mkdirSync(path.dirname(events), { recursive: true });
     const header = { type: "session.start", id: "event-1", parentId: null, data: { sessionId: id } };
-    const message = { type: "user.message", id: "event-2", parentId: "event-1", data: { content: `Before ${secret} after` } };
+    const message = { type: "user.message", id: "event-2", parentId: "event-1", data: { content: `Before API_KEY=${secret} after` } };
     fs.writeFileSync(selector, JSON.stringify({ version: 1, engine: "copilot", id }));
     fs.writeFileSync(events, `${JSON.stringify(header)}\n${JSON.stringify(message)}\n`);
     vi.stubEnv("GH_AW_DURABLE_FILES", JSON.stringify([selector, state]));
@@ -52,7 +52,8 @@ describe("Copilot durable checkpoint redaction", () => {
   it("restores the same native session after masking a credential in an event", () => {
     const options = checkpoint();
     vi.stubEnv("SECRET_FIXTURE_TOKEN", secret);
-    redactCopilotCheckpoint(text => redactArtifactContent(text, [secret], []).content, options.root);
+    vi.stubEnv("GH_AW_SECRET_NAMES", "API_KEY");
+    redactCopilotCheckpoint(text => redactArtifactContent(text, [secret], []).content, options.root, [secret]);
     expect(processFile(options.blob, [secret])).toBe(0);
     validateFiles(options);
     fs.rmSync(options.sessions, { recursive: true });
@@ -73,20 +74,44 @@ describe("Copilot durable checkpoint redaction", () => {
         .trimEnd()
         .split("\n")
         .map(line => JSON.parse(line))
-    ).toEqual([options.header, { ...options.message, data: { content: "Before ***REDACTED*** after" } }]);
+    ).toEqual([options.header, { ...options.message, data: { content: "Before API_KEY=***REDACTED*** after" } }]);
   });
 
   it("refuses to accept changes made before the trusted redaction step", () => {
     const options = checkpoint();
     fs.appendFileSync(options.blob, "\n");
     const redact = vi.fn();
-    expect(() => redactCopilotCheckpoint(redact, options.root)).toThrow("damaged or redacted");
+    expect(() => redactCopilotCheckpoint(redact, options.root, [secret])).toThrow("damaged or redacted");
     expect(redact).not.toHaveBeenCalled();
   });
 
   it("refuses redaction that would change the native session identity", () => {
     const options = checkpoint();
-    expect(() => redactCopilotCheckpoint(text => redactArtifactContent(text, [id], []).content, options.root)).toThrow("Cannot safely redact");
+    expect(() => redactCopilotCheckpoint(text => redactArtifactContent(text, [id], []).content, options.root, [id])).toThrow("Cannot safely redact");
+    expect(fs.readFileSync(options.blob)).toEqual(fs.readFileSync(options.events));
+  });
+
+  it("allows recognized credentials in nested tool results without freezing arbitrary ID keys", () => {
+    const options = checkpoint();
+    const accessKey = `AKIA${"A".repeat(16)}`;
+    options.message.data = { result: { content: [{ json: { accessKeyId: accessKey, id: "tool-result-id" } }] } };
+    fs.writeFileSync(options.events, `${JSON.stringify(options.header)}\n${JSON.stringify(options.message)}\n`);
+    stageFiles(options);
+
+    redactCopilotCheckpoint(text => redactArtifactContent(text, [], []).content, options.root, [accessKey]);
+
+    validateFiles(options);
+    const records = fs
+      .readFileSync(options.blob, "utf8")
+      .trimEnd()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    expect(records[1].data.result.content[0].json).toEqual({ accessKeyId: "***REDACTED***", id: "tool-result-id" });
+  });
+
+  it("rejects arbitrary transcript rewrites even when event structure is unchanged", () => {
+    const options = checkpoint();
+    expect(() => redactCopilotCheckpoint(text => text.replace("Before", "Persisted prompt injection"), options.root, [secret])).toThrow("Cannot safely redact");
     expect(fs.readFileSync(options.blob)).toEqual(fs.readFileSync(options.events));
   });
 });

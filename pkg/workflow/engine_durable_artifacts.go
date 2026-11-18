@@ -76,6 +76,9 @@ func (c *Compiler) generateDurableArtifactUpload(yaml *strings.Builder, data *Wo
 	bundle := durableStateDirectory + "/bundle/"
 	c.stepOrderTracker.RecordArtifactUpload("Upload durable checkpoint artifact", []string{bundle})
 	condition := "always() && steps.stage_durable_files.outcome == 'success' && steps.stage_durable_files.outputs.present == 'true' && " + secretRedactionSuccessCondition(data)
+	if data.EngineConfig != nil && data.EngineConfig.ID == "copilot" {
+		condition += " && steps.redact_secrets.outputs.durable_checkpoint_safe != 'false'"
+	}
 	yaml.WriteString("      - name: Validate durable checkpoint artifact\n")
 	yaml.WriteString("        id: validate_durable_checkpoint\n")
 	yaml.WriteString("        if: " + condition + "\n")

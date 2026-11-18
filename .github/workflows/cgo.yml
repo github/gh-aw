@@ -1769,8 +1769,9 @@ jobs:
 
     - name: Report unchecked printf errors as warnings
       run: |
+        go build -o "$RUNNER_TEMP/gh-aw-linters" ./cmd/linters
         set +e
-        /tmp/gh-aw-linters -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > /tmp/fprintf-lint.log 2>&1
+        "$RUNNER_TEMP/gh-aw-linters" -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > /tmp/fprintf-lint.log 2>&1
         status=$?
         set -e
         if [ "$status" -eq 0 ]; then

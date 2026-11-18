@@ -75,6 +75,30 @@ describe("redact_secrets.cjs", () => {
     expect(JSON.parse(fs.readFileSync(usageJSONL, "utf8"))).toEqual({ provider: "***REDACTED***", ai_credits: 2 });
     expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
+  it("warns and invalidates only a rejected durable checkpoint", async () => {
+    const { main } = require("./redact_secrets.cjs");
+    const durableRoot = path.join(tempDir, "durable-agent");
+    const bundle = path.join(durableRoot, "durable/bundle");
+    fs.mkdirSync(bundle, { recursive: true });
+    fs.writeFileSync(path.join(bundle, "manifest.json"), "{}");
+    vi.stubEnv("GH_AW_DURABLE_FILES", JSON.stringify([path.join(durableRoot, "session-state")]));
+    vi.stubEnv("GH_AW_DURABLE_ENGINE", "copilot");
+    const durableFiles = require("./durable_files.cjs");
+    const reject = vi.spyOn(durableFiles, "redactCopilotCheckpoint").mockImplementation(() => {
+      throw new Error("unsafe checkpoint details");
+    });
+
+    try {
+      await main({ redactDurableCopilot: true, durableRoot });
+    } finally {
+      reject.mockRestore();
+    }
+
+    expect(fs.existsSync(bundle)).toBe(false);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("durable_checkpoint_safe", "false");
+    expect(mockCore.warning).toHaveBeenCalledWith("ERR_VALIDATION: Rejected the durable Copilot checkpoint during secret redaction");
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
   it("fails closed and removes detection output when file redaction fails", async () => {
     const { main } = require("./redact_secrets.cjs");
     const secret = "synthetic-detection-private-value";

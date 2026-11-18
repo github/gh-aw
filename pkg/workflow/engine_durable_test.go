@@ -14,6 +14,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDurableEngineConfiguration(t *testing.T) {
@@ -324,7 +325,7 @@ func durableStepsText(steps []GitHubActionStep) string {
 func TestCompileCopilotDurableArtifactRedaction(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "continuable.md")
-	markdown := "---\non: workflow_dispatch\nengine:\n  id: copilot\n  durable:\n    retention-days: 7\n---\nContinue the pending task.\n"
+	markdown := "---\non: workflow_dispatch\nengine:\n  id: copilot\n  durable:\n    retention-days: 7\nsafe-outputs:\n  merge-pull-request:\n    allowed-base-branches: [\"agent-work/*\"]\n    max: 1\n---\nContinue the pending task.\n"
 	require.NoError(t, os.WriteFile(source, []byte(markdown), 0o600))
 	require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
 	lock, err := os.ReadFile(filepath.Join(dir, "continuable.lock.yml"))
@@ -336,8 +337,30 @@ func TestCompileCopilotDurableArtifactRedaction(t *testing.T) {
 	require.Contains(t, redaction, "GH_AW_DURABLE_FILES:")
 	validation := extractWorkflowStepByName(t, text, "Validate durable checkpoint artifact")
 	require.Contains(t, validation, "steps.redact_secrets.outcome == 'success'")
+	require.Contains(t, validation, "steps.redact_secrets.outputs.durable_checkpoint_safe != 'false'")
 	require.Less(t, strings.Index(text, "Stage durable session files"), strings.Index(text, "Redact secrets in logs"))
 	require.Less(t, strings.Index(text, "Redact secrets in logs"), strings.Index(text, "Validate durable checkpoint artifact"))
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string         `yaml:"name"`
+				Env  map[string]any `yaml:"env"`
+				With map[string]any `yaml:"with"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal(lock, &workflow))
+	safeOutputs, ok := workflow.Jobs["safe_outputs"]
+	require.True(t, ok)
+	for _, step := range safeOutputs.Steps {
+		if step.Name != "Redact secrets in logs" {
+			continue
+		}
+		require.NotContains(t, step.Env, "GH_AW_DURABLE_STAGED")
+		require.NotContains(t, step.Env, "GH_AW_DURABLE_FILES")
+		require.NotContains(t, step.With["script"], "stage_durable_files")
+	}
 }
 
 func TestCompilePiDurableArtifactLifecycle(t *testing.T) {

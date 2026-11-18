@@ -687,9 +687,9 @@ function processFile(filePath, secretValues, maskedValues = [], prepareForCustom
 
 /**
  * Main function
- * @param {{prepareForCustomMasking?: boolean, additionalDirectories?: string[], persistDetectionMasks?: (values: string[]) => void, redactDurableCopilot?: boolean}} [options]
+ * @param {{prepareForCustomMasking?: boolean, additionalDirectories?: string[], persistDetectionMasks?: (values: string[]) => void, redactDurableCopilot?: boolean, durableRoot?: string}} [options]
  */
-async function main({ prepareForCustomMasking = false, additionalDirectories = [], persistDetectionMasks, redactDurableCopilot = false } = {}) {
+async function main({ prepareForCustomMasking = false, additionalDirectories = [], persistDetectionMasks, redactDurableCopilot = false, durableRoot } = {}) {
   // Get the list of secret names from environment variable
   const secretNames = process.env.GH_AW_SECRET_NAMES;
 
@@ -766,9 +766,32 @@ async function main({ prepareForCustomMasking = false, additionalDirectories = [
     if (redactDurableCopilot) {
       try {
         const { redactCopilotCheckpoint } = require("./durable_files.cjs");
-        redactCopilotCheckpoint(text => redactArtifactContent(text, secretValues, maskedValues).content);
+        const allowedValues = new Set([...secretValues, ...maskedValues]);
+        redactCopilotCheckpoint(
+          text => {
+            const escapes = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+            const decoded = text.replace(/\\(["\\/bfnrt]|u[0-9a-fA-F]{4})/g, (_, escape) => (escape[0] === "u" ? String.fromCharCode(parseInt(escape.slice(1), 16)) : escapes[escape]));
+            for (const source of new Set([text, decoded])) {
+              for (const { pattern } of BUILT_IN_PATTERNS) {
+                pattern.lastIndex = 0;
+                for (const match of source.matchAll(pattern)) allowedValues.add(match[0]);
+              }
+            }
+            return redactArtifactContent(text, secretValues, maskedValues).content;
+          },
+          durableRoot,
+          allowedValues
+        );
+        core.setOutput("durable_checkpoint_safe", "true");
       } catch {
-        core.setFailed(`${ERR_VALIDATION}: Could not safely sanitize the durable Copilot checkpoint`);
+        core.setOutput("durable_checkpoint_safe", "false");
+        try {
+          const { invalidateCopilotCheckpoint } = require("./durable_files.cjs");
+          invalidateCopilotCheckpoint(durableRoot);
+        } catch {
+          core.warning("Could not remove the rejected durable Copilot checkpoint");
+        }
+        core.warning(`${ERR_VALIDATION}: Rejected the durable Copilot checkpoint during secret redaction`);
       }
     }
     try {
