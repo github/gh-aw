@@ -9,6 +9,9 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
+const { main: authorizeExecutorBatch, recordExecutorOutcome } = require("./safe_output_authorization_gate.cjs");
+const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
 
 /**
  * @typedef {{ type: string, path?: string, fileName: string, sha: string, size: number, targetFileName: string, url?: string }} UploadAssetItem
@@ -34,8 +37,8 @@ function buildAssetUrl(githubServer, repo, branchName, targetFileName) {
 }
 
 async function main() {
-  // Check if we're in staged mode
-  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+  const descriptor = process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE ? parseStrictJSON(process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE) : undefined;
+  const isStaged = isStagedMode(descriptor);
 
   // Get the branch name from environment variable (required)
   const branchName = process.env.GH_AW_ASSETS_BRANCH;
@@ -79,6 +82,9 @@ async function main() {
   let missingAssetCount = 0;
   let hasChanges = false;
   const processedAssets = [];
+  const authorizationRecords = [];
+  let authorization;
+  let operationStatus = "failed";
 
   try {
     // Check if orphaned branch already exists, if not create it
@@ -186,6 +192,11 @@ async function main() {
         uploadCount++;
         hasChanges = true;
         processedAssets.push(processedAsset);
+        authorizationRecords.push({
+          index: result.items.indexOf(asset),
+          inputs: { repository: repo, branch: normalizedBranchName, targetFileName, sha256: computedSha, size },
+          artifacts: [{ path: targetFileName, digest: computedSha, size }],
+        });
 
         core.info(`Added asset: ${targetFileName} (${size} bytes)`);
       } catch (error) {
@@ -201,11 +212,16 @@ async function main() {
 
     // Commit and push if there are changes (skip if staged)
     if (hasChanges) {
+      if (process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE) {
+        authorization = await authorizeExecutorBatch({ core, descriptor: { ...descriptor, staged: isStaged }, batch: result.items, records: authorizationRecords });
+        if (!isStaged && authorization.state !== "allowed") throw new Error("Safe-output authorization did not release asset publication");
+      }
       const commitMessage = `[skip-ci] Add ${uploadCount} asset(s)`;
       await exec.exec(`git`, [`commit`, `-m`, commitMessage]);
       if (!isStaged) {
         const maxPushAttempts = 3;
         for (let attempt = 1; attempt <= maxPushAttempts; attempt++) {
+          operationStatus = "indeterminate";
           const pushResult = await exec.getExecOutput("git", ["push", "--porcelain", "origin", normalizedBranchName], { ignoreReturnCode: true });
           if (pushResult.exitCode === 0) {
             break;
@@ -225,6 +241,7 @@ async function main() {
             throw rebaseError;
           }
         }
+        operationStatus = "confirmed";
         core.info(`Successfully uploaded ${uploadCount} assets to branch ${normalizedBranchName}`);
       }
 
@@ -239,6 +256,8 @@ async function main() {
   } catch (error) {
     core.setFailed(`${ERR_API}: Failed to upload assets: ${getErrorMessage(error)}`);
     return;
+  } finally {
+    if (authorization?.state === "allowed") recordExecutorOutcome(authorization, operationStatus, core);
   }
 
   core.setOutput("upload_count", uploadCount.toString());

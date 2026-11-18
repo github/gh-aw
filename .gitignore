@@ -167,6 +167,9 @@ test-runs/
 # Local queue validation tooling and caches
 /.queue-validation-cache/
 
+# Local authorization validation cache
+/.authorization-cache/
+
 # Security scan reports
 # Local tool binaries are installed via `go install` (see Makefile `tools` target)
 # and must never be committed as opaque build artifacts.

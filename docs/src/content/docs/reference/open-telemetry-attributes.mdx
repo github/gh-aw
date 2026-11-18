@@ -319,6 +319,32 @@ These attributes are emitted when experiments are active for a run.
   </tbody>
 </table>
 
+## Safe-output authorization attributes
+
+Protected live invocations emit `safe_output.authorization.oidc.run`, `safe_output.authorization.authority.run`, and `safe_output.authorization.decision.run` spans for the phases reached. These spans require a valid `GITHUB_AW_OTEL_TRACE_ID`; staged invocations and those without an authorization requirement emit none.
+
+<table>
+  <thead>
+    <tr>
+      <th>Attribute</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><code>gh-aw.safe_output.gate.phase</code></td><td>string</td><td>Authorization phase: <code>oidc</code>, <code>authority</code>, or <code>decision</code>.</td></tr>
+    <tr><td><code>gh-aw.safe_output.gate.state</code></td><td>string</td><td>Request-phase state: <code>succeeded</code> or <code>error</code>. Decision state: <code>allowed</code>, <code>denied</code>, or <code>error</code>.</td></tr>
+    <tr><td><code>gh-aw.safe_output.gate.reason_code</code></td><td>string</td><td>Stable outcome or failure code, such as <code>completed</code>, <code>allowed</code>, <code>denied</code>, <code>timeout</code>, <code>credential_error</code>, <code>authority_unavailable</code>, or <code>evidence_failed</code>.</td></tr>
+    <tr><td><code>gh-aw.safe_output.gate.executor</code></td><td>string</td><td>Executor on decision spans when available: <code>manager</code>, <code>native</code>, <code>script</code>, <code>action</code>, <code>job</code>, <code>standalone</code>, <code>workflow</code>, or <code>queue</code>.</td></tr>
+    <tr><td><code>gh-aw.safe_output.gate.binding</code></td><td>string</td><td>Prepared scope binding on decision spans when available: <code>invocation</code> or <code>resolved_effect</code>.</td></tr>
+    <tr><td><code>gh-aw.safe_output.gate.requirement_source</code></td><td>string</td><td>Effective requirement source on decision spans when available: <code>global</code> or <code>local</code>.</td></tr>
+  </tbody>
+</table>
+
+A successful authority request does not imply an allow decision, and an allow decision does not confirm execution or its effects. Network export is not awaited; exporter failures do not change the authorization decision.
+
+Gate attributes exclude endpoints, audiences, tokens, invocation and decision IDs, policy revisions, output names, and request or response bodies. See the [safe-output authorization contract](/gh-aw/specs/safe-outputs-specification/#safe-output-invocation-authorization) for binding, freshness, and evidence requirements.
+
 ## Work queue attributes
 
 Runtime queue spans use `gh-aw.work_queue.*` for verified queue-state snapshots, backlog age, delivery barriers, logical/native capacity, publication retries, and reconciliation outcomes. See the [queue health attribute inventory](/gh-aw/reference/work-queue/#opentelemetry-queue-health) for field meanings and snapshot freshness rules. These measurements are span attributes, not continuously sampled metrics.

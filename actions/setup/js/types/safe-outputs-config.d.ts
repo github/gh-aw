@@ -1,3 +1,5 @@
+import type { SafeOutputAuthorizationRequirement } from "./handler-factory";
+
 // Base interface for all safe output configurations
 interface SafeOutputConfig {
   type: string;
@@ -5,6 +7,7 @@ interface SafeOutputConfig {
   min?: number;
   "github-token"?: string;
   "body-footer"?: string;
+  authorization?: SafeOutputAuthorizationRequirement;
 }
 
 // === Specific Safe Output Configuration Interfaces ===
@@ -378,6 +381,8 @@ interface SafeJobInput {
  * Safe job configuration item
  */
 interface SafeJobConfig {
+  authorization?: SafeOutputAuthorizationRequirement;
+  staged?: boolean | string;
   name?: string;
   "runs-on"?: any;
   if?: string;

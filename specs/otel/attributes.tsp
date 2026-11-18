@@ -19,6 +19,12 @@ model AttributeNames {
   ghAwWorkingSetInvocations: "gh-aw.working_set.invocations";
   ghAwWorkingSetPeakInputTokens: "gh-aw.working_set.peak_input_tokens";
   ghAwWorkingSetRebuildExcessTokens: "gh-aw.working_set.rebuild_excess_tokens";
+  ghAwSafeOutputGatePhase: "gh-aw.safe_output.gate.phase";
+  ghAwSafeOutputGateState: "gh-aw.safe_output.gate.state";
+  ghAwSafeOutputGateReasonCode: "gh-aw.safe_output.gate.reason_code";
+  ghAwSafeOutputGateExecutor: "gh-aw.safe_output.gate.executor";
+  ghAwSafeOutputGateBinding: "gh-aw.safe_output.gate.binding";
+  ghAwSafeOutputGateRequirementSource: "gh-aw.safe_output.gate.requirement_source";
   ghAwWorkQueueOperation: "gh-aw.work_queue.operation";
   ghAwWorkQueuePublicationAttempts: "gh-aw.work_queue.publication.attempts";
   ghAwWorkQueuePublicationConflict: "gh-aw.work_queue.publication.conflict";

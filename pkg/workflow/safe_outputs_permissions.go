@@ -191,7 +191,7 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 	} else if safeOutputs.IDToken != nil && *safeOutputs.IDToken == "write" {
 		safeOutputsPermissionsLog.Print("id-token: write explicitly requested")
 		permissions.Set(PermissionIdToken, PermissionWrite)
-	} else if stepsRequireIDToken(safeOutputs.Steps) {
+	} else if stepsRequireIDToken(safeOutputs.Steps) || safeOutputsAuthorizationNeedsOIDC(safeOutputs) {
 		safeOutputsPermissionsLog.Print("Auto-detected OIDC/vault action in steps; adding id-token: write")
 		permissions.Set(PermissionIdToken, PermissionWrite)
 	}
