@@ -5,7 +5,7 @@ import os from "os";
 import path from "path";
 
 const require = createRequire(import.meta.url);
-const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
+const { resolveHarnessPromptFileArgs, appendHarnessRecoveryGuidance } = require("./harness_prompt_input.cjs");
 const { resolveClaudePromptFileArgs } = require("./claude_harness.cjs");
 const { resolveCodexPromptFileArgs, resolveCodexPromptInput } = require("./codex_harness.cjs");
 
@@ -73,6 +73,13 @@ describe("resolveHarnessPromptFileArgs", () => {
 });
 
 describe("engine prompt delivery contracts", () => {
+  it("appends retry guidance without dropping task or continuation instructions", () => {
+    expect(appendHarnessRecoveryGuidance("Continue unfinished work.", "Reassess.")).toBe("Continue unfinished work.\n\nReassess.");
+    expect(appendHarnessRecoveryGuidance("", "Reassess.")).toBe("\n\nReassess.");
+    expect(appendHarnessRecoveryGuidance(undefined, undefined)).toBeUndefined();
+    expect(() => appendHarnessRecoveryGuidance(undefined, "Reassess.")).toThrow("requires a supported prompt input");
+  });
+
   it.each(["", "instructions 世界\n"])("keeps Claude stdin and Codex positional/stdin delivery distinct", prompt => {
     fs.writeFileSync(promptPath, prompt);
     expect(resolveClaudePromptFileArgs(["--print", "--prompt-file", promptPath])).toEqual({ args: ["--print"], prompt });

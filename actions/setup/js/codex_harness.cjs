@@ -79,7 +79,7 @@ const {
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
-const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
+const { resolveHarnessPromptFileArgs, appendHarnessRecoveryGuidance } = require("./harness_prompt_input.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const { applyCodexSubagentModels, isDetectionPhase } = require("./engine_subagent_models.cjs");
@@ -1108,6 +1108,7 @@ async function main() {
   if (lastThreadId && !resumeArgs) throw new Error("Cannot resume the restored durable Codex session with these arguments");
   const tokenUsagePaths = process.env.GH_AW_CODEX_TOKEN_USAGE_PATH ? [process.env.GH_AW_CODEX_TOKEN_USAGE_PATH] : TOKEN_USAGE_PATHS;
   const resumePrompt = "Continue the interrupted task using the existing session. Preserve previously staged safe outputs; do not emit them again. Complete only unfinished work.";
+  if (process.env.GH_AW_HARNESS_RECOVERY === "1" && promptInput.stdin === undefined) log("recovery: retry guidance unavailable for this prompt transport; use --prompt-file");
   log(
     `context-rebuild circuit breaker: enabled=${contextRebuildCircuitBreaker.enabled}` +
       ` maxRebuildFactor=${contextRebuildCircuitBreaker.maxRebuildFactor}` +
@@ -1124,8 +1125,9 @@ async function main() {
     harnessName: "Codex harness",
     log,
     softTimeoutGuard,
+    recoveryEngine: promptInput.stdin !== undefined ? "codex" : undefined,
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
-    runAttempt: async (attempt, observeStrategy) => {
+    runAttempt: async (attempt, observeStrategy, recoveryGuidance) => {
       if (durableSession?.id && !resumeArgs && attempt > 0) throw new Error("Durable Codex continuation cannot restart a recorded session as a fresh conversation");
       const strategy = selectedHarnessStrategy(resumeArgs || resolvedArgs, "codex");
       observeStrategy(strategy);
@@ -1153,7 +1155,7 @@ async function main() {
         log,
         logArgs: resumeArgs ? [...resumeArgs.slice(0, -1), "<resume prompt via stdin>"] : safeArgs,
         env: codexEnv,
-        stdin: resumeArgs && attempt > 0 ? resumePrompt : promptInput.stdin,
+        stdin: appendHarnessRecoveryGuidance(resumeArgs && attempt > 0 ? resumePrompt : promptInput.stdin, recoveryGuidance),
         maxCollectedOutputBytes: 4 * 1024 * 1024,
         onStdoutLine: line => {
           observeDurableSession(durableSession, "codex", line);

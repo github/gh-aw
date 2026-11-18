@@ -2,7 +2,7 @@
 "use strict";
 
 const { createHarnessPolicyDispatcher } = require("./harness_policy.cjs");
-const { createRecoveryPolicy, evaluateRecoveryDecision, DECISION_TIMEOUT_MS } = require("./harness_recovery.cjs");
+const { createRecoveryPolicy, evaluateRecoveryDecision, isHarnessRecoveryEnabled, DECISION_TIMEOUT_MS } = require("./harness_recovery.cjs");
 const { isPiResultError } = require("./pi_session.cjs");
 
 /**
@@ -18,7 +18,7 @@ const { isPiResultError } = require("./pi_session.cjs");
  * }} options
  */
 function installPiRecovery(pi, { remainingMs, minimumRemainingMs, env = process.env, fetchImpl = fetch, log = message => process.stderr.write(`[gh-aw/recovery] ${message}\n`) }) {
-  if (env.GH_AW_HARNESS_RECOVERY !== "1" || env.GH_AW_PI_SUBAGENT_CHILD === "1" || (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent")) return;
+  if (!isHarnessRecoveryEnabled(env)) return;
   // Keep the entire decision request outside timeout steering's completion window.
   const reserveMs = Math.max(10000, minimumRemainingMs);
   const dispatcher = createHarnessPolicyDispatcher({

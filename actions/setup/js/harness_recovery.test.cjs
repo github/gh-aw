@@ -18,6 +18,41 @@ function answer(choice) {
 }
 
 describe("shared Recovery policy", () => {
+  it("uses classified retry failures without claiming live steering", async () => {
+    const options = policyOptions();
+    const policy = createRecoveryPolicy(options);
+    const retryContext = { engine: "claude", capabilities: ["retry_guidance"] };
+    const event = { type: "retry.ready", failureClasses: ["server_error"], remainingMs: 600000 };
+    await policy.onEvent(event, retryContext);
+    await policy.onEvent({ ...event, failureClasses: ["connection_error"] }, retryContext);
+    await policy.onEvent(event, retryContext);
+    await policy.onEvent(event, retryContext);
+    expect(options.decide).not.toHaveBeenCalled();
+    expect(await policy.onEvent(event, retryContext)).toEqual([{ type: "retry_guidance", message: expect.stringContaining("never bypass a denial") }]);
+    expect(options.decide).toHaveBeenCalledExactlyOnceWith({ consecutiveFailures: 3, decision: 1, remainingMs: 600000 });
+    await policy.onEvent(event, context);
+    expect(options.decide).toHaveBeenCalledOnce();
+  });
+
+  it("suppresses a stale intervention when another tool makes progress during evaluation", async () => {
+    let resolve;
+    const options = policyOptions({
+      decide: vi.fn(
+        () =>
+          new Promise(done => {
+            resolve = done;
+          })
+      ),
+    });
+    const policy = createRecoveryPolicy(options);
+    const pending = policy.onEvent(turn(), context);
+    await policy.onEvent(turn([{ toolName: "bash", success: true }]), context);
+    resolve("change_strategy");
+    expect(await pending).toEqual([]);
+    await policy.onEvent(turn([failed, failed]), context);
+    expect(options.decide).toHaveBeenCalledOnce();
+  });
+
   it("detects repeated tool failures across turns and sends only bounded numeric evidence", async () => {
     const options = policyOptions();
     const policy = createRecoveryPolicy(options);

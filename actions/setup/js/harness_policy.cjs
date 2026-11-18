@@ -18,8 +18,13 @@
  *   remainingMs: number,
  *   tools: readonly Readonly<{ toolName: string, success?: boolean }>[],
  * }>} HarnessTurnCompletedEvent
- * @typedef {HarnessAttemptCompletedEvent | HarnessTurnCompletedEvent} HarnessPolicyEvent
- * @typedef {Readonly<{ type: "steer", message: string }>} HarnessPolicyAction
+ * @typedef {Readonly<{
+ *   type: "retry.ready",
+ *   failureClasses: readonly string[],
+ *   remainingMs: number,
+ * }>} HarnessRetryReadyEvent
+ * @typedef {HarnessAttemptCompletedEvent | HarnessTurnCompletedEvent | HarnessRetryReadyEvent} HarnessPolicyEvent
+ * @typedef {Readonly<{ type: "steer" | "retry_guidance", message: string }>} HarnessPolicyAction
  * @typedef {Readonly<{ engine: string, capabilities: readonly HarnessPolicyAction["type"][] }>} HarnessPolicyContext
  * @typedef {Readonly<{
  *   id: string,
@@ -44,13 +49,14 @@ function createHarnessPolicyDispatcher({ adapter, policies = [] }) {
   }
   const actions = Object.freeze({ ...adapter.actions });
   for (const [type, handler] of Object.entries(actions)) {
-    if (type !== "steer" || typeof handler !== "function") {
+    if (!["steer", "retry_guidance"].includes(type) || typeof handler !== "function") {
       throw new TypeError("Harness policy adapter contains an invalid action handler");
     }
   }
   /** @type {HarnessPolicyAction["type"][]} */
   const capabilities = [];
   if (actions.steer) capabilities.push("steer");
+  if (actions.retry_guidance) capabilities.push("retry_guidance");
   const context = Object.freeze({ engine: adapter.engine, capabilities: Object.freeze(capabilities) });
   const ids = new Set();
   const registeredPolicies = policies.map(({ id, onEvent }) => {
@@ -64,7 +70,7 @@ function createHarnessPolicyDispatcher({ adapter, policies = [] }) {
   return Object.freeze({
     async dispatch(event) {
       const snapshot =
-        event.type === "attempt.completed"
+        event.type !== "turn.completed"
           ? Object.freeze({ ...event, failureClasses: Object.freeze([...event.failureClasses]) })
           : Object.freeze({ ...event, tools: Object.freeze(event.tools.map(tool => Object.freeze({ toolName: tool.toolName, success: tool.success }))) });
       /** @type {HarnessPolicyAction[]} */
@@ -76,19 +82,19 @@ function createHarnessPolicyDispatcher({ adapter, policies = [] }) {
           throw new TypeError(`Harness policy ${policy.id} must return an action array or undefined`);
         }
         for (const action of proposed) {
-          if (action?.type !== "steer" || typeof action.message !== "string" || !action.message.trim()) {
+          if (!["steer", "retry_guidance"].includes(action?.type) || typeof action.message !== "string" || !action.message.trim()) {
             throw new TypeError(`Harness policy ${policy.id} returned an invalid action`);
           }
-          if (!actions.steer) {
-            throw new Error(`Harness policy ${policy.id} requested unsupported capability: steer`);
+          if (!actions[action.type]) {
+            throw new Error(`Harness policy ${policy.id} requested unsupported capability: ${action.type}`);
           }
-          pendingActions.push(Object.freeze({ type: "steer", message: action.message }));
+          pendingActions.push(Object.freeze({ type: action.type, message: action.message }));
         }
       }
 
       // Validate the entire event's proposals before causing native side effects.
       for (const action of pendingActions) {
-        await actions.steer?.(action);
+        await actions[action.type]?.(action);
       }
     },
   });

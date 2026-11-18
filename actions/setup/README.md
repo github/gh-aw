@@ -189,10 +189,11 @@ policies implement `onEvent(event, context)` and return an action array or
 `undefined`, synchronously or asynchronously. Policy IDs must be unique,
 lowercase identifiers of up to 64 characters (`[a-z][a-z0-9_-]*`).
 
-The adapter supplies an engine name and optional `actions.steer(action)`
-handler. The immutable context advertises only registered capabilities;
-policies can abstain when an action is unsupported. The initial action shape
-is `{ type: "steer", message }`, with a nonempty message. All proposals are
+The adapter supplies an engine name and optional `actions.steer(action)` and
+`actions.retry_guidance(action)` handlers. The immutable context advertises only
+registered capabilities; policies can abstain when an action is unsupported.
+Actions use `{ type: "steer" | "retry_guidance", message }`, with a nonempty message.
+Live steering and next-invocation guidance are distinct capabilities. All proposals are
 validated before handlers run in policy and action order. Unsupported actions,
 invalid proposals, and policy or adapter failures reject dispatch explicitly.
 Adapters must use supported native APIs and preserve firewall enforcement;
@@ -212,23 +213,41 @@ and `tools` entries containing `toolName` and an optional boolean `success`.
 Missing outcomes are unknown, not failures. Tool arrays and entries are immutable
 snapshots; raw arguments and results are excluded.
 
+Retry adapters dispatch `retry.ready` with classified `failureClasses` and
+`remainingMs` only after a retry is authorized, backoff finishes, and the invocation
+decision gate allows execution. Recovery cannot create a retry or override a stop.
+
 This is an internal extension point, not workflow configuration. No policies,
 native action handlers, model calls, or optimization features are enabled by
 default.
 
-### Opt-in Pi Recovery
+### Opt-in Recovery
 
 Set the agent environment variable `GH_AW_HARNESS_RECOVERY=1` to enable Recovery
-through Pi's existing steering extension in CLI, SDK, and RPC modes. Other
-values leave it disabled. Detection jobs and Pi child agents do not enable it.
+where the adapter supports an intervention. Other values leave it disabled.
+Detection jobs and child sessions do not enable it.
+
+| Adapter | Observation | Supported intervention |
+| --- | --- | --- |
+| Pi CLI, SDK, RPC | Ongoing native tool turns | Native `sendUserMessage(..., { deliverAs: "steer" })` |
+| Copilot SDK | Main-session post-tool success/failure hooks | Native hook `additionalContext`; tool results and permissions are unchanged |
+| Copilot CLI, Codex CLI, Claude CLI | Repeated classified failures before an already-authorized retry | Fixed guidance appended to the next invocation's prompt |
+| Agy and other single-shot shell engines | No supported steering or retry control | Explicit unsupported diagnostic; no evaluation or new invocation |
+
+CLI retry guidance requires a known `--prompt-file` input and a configured workflow
+timeout. Copilot streams that prompt through stdin when Recovery is enabled.
+Codex and Claude retain their existing stdin delivery, exact-session continuation
+instructions, settings, and permission flags. No CLI adapter claims live steering.
 
 The shared `js/harness_recovery.cjs` policy detects three consecutive failures
-of the same tool across ongoing turns. A successful or unknown outcome breaks
+of the same tool across ongoing native observations, or three consecutive
+authorized retry boundaries with the same failure classes. These observation
+types do not share streaks. A successful or unknown tool outcome breaks
 the streak, as does a different tool. Native nonzero exit codes count as
 failures even when Pi reports `isError: false`. Each evaluation consumes the
 streak and requires three new failures before another evaluation.
 
-At most two decision evaluations run per session, including failures and
+At most two decision evaluations run per native adapter session or CLI retry loop, including failures and
 abstentions. Each evaluation has a five-second total network budget, uses the
 existing Decisions client and firewall proxy, and sends only failure counts,
 evaluation number, and remaining milliseconds. There is no direct-provider
@@ -236,14 +255,20 @@ fallback, credential discovery, raw tool content, or free-form generated
 instruction. Errors and refusals abstain with sanitized diagnostics.
 
 The model can choose to continue, abstain, or request a fixed strategy-reassessment
-message through native `sendUserMessage(..., { deliverAs: "steer" })`. Recovery
+message through the supported adapter capability. Recovery
 does not grant permissions, restart an agent, change models, or infer successful
 completion. It yields to the earlier of Pi's warning and critical timeout
 thresholds, reserving at least ten seconds. A full decision timeout must fit
 before that completion window; late steering and interventions after a terminal
 tool guard are suppressed. Native `agent_start` retries
-do not reset the clock or evaluation cap. This first policy addresses repeated
-tool failures, not arbitrary stalls or wall-clock inactivity.
+do not reset Pi's clock or evaluation cap. Copilot SDK reserves ten seconds before
+the earlier of its send timeout and workflow soft deadline; its tool budget,
+permission, model-verification, and completion guards remain authoritative.
+CLI Recovery reserves ten seconds before the existing soft deadline and rechecks
+that deadline after evaluation. It never runs after success, cancellation, terminal
+failure, retry exhaustion, or an invocation skip. Concurrent tool progress suppresses
+stale interventions. This policy addresses repeated failures, not arbitrary stalls
+or wall-clock inactivity.
 
 ### Decisions client
 

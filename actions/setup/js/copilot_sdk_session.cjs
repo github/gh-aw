@@ -33,6 +33,8 @@ const { isDeepStrictEqual } = require("node:util");
 const { buildCopilotSDKPermissionHandler, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
 const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.cjs");
 const { buildCopilotSDKToolCallBudget } = require("./copilot_sdk_tool_budget.cjs");
+const { buildCopilotSDKRecoveryHooks } = require("./copilot_sdk_recovery.cjs");
+const { buildSoftTimeoutGuard } = require("./harness_retry_guard.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
 const { copilotSessionContext, getCopilotMessageRefusal } = require("./copilot_session.cjs");
@@ -217,6 +219,10 @@ async function runCopilotSDKSession({
   const { CopilotClient, RuntimeConnection, approveAll } = sdk;
 
   const startTime = Date.now();
+  const sendTimeoutMs = getEnvPositiveIntOrDefault("COPILOT_SDK_SEND_TIMEOUT_MS", SDK_SEND_TIMEOUT_MS_DEFAULT);
+  const recoveryDeadline = Math.min(startTime + sendTimeoutMs, buildSoftTimeoutGuard(startTime)?.softDeadlineMs ?? Infinity);
+  let recoveryActive = false;
+  let toolCallBudgetExceeded = false;
   let output = "";
   let hasOutput = false;
 
@@ -392,7 +398,14 @@ async function runCopilotSDKSession({
       workspaceRoot: workingDirectory,
     });
     const toolCallBudget = buildCopilotSDKToolCallBudget(toolConfig?.maxToolCalls, event => {
+      if (event.exhausted) toolCallBudgetExceeded = true;
       writeDriverEvent(event.exhausted ? "guard.tool_call_budget_exceeded" : "guard.tool_call_budget_debit", event);
+    });
+    const recoveryHooks = buildCopilotSDKRecoveryHooks({
+      getSessionId: () => session?.sessionId,
+      remainingMs: () => recoveryDeadline - Date.now(),
+      isActive: () => recoveryActive && !toolCallBudgetExceeded && !workflowToolPermissionDenied && !catastrophicToolDenialsTriggered && !modelSubstitutionError && !contentFiltered && !postCompletionWatchdogTriggered,
+      log,
     });
 
     // Build session config using the multi-provider surface.
@@ -456,7 +469,7 @@ async function runCopilotSDKSession({
       ...(skillDirectories.length ? { enableSkills: true } : {}),
       ...(mcpServers === undefined ? {} : { mcpServers }),
       onPermissionRequest,
-      ...(toolCallBudget ? { hooks: { onPreToolUse: toolCallBudget.onPreToolUse } } : {}),
+      ...(toolCallBudget || recoveryHooks ? { hooks: { ...(toolCallBudget ? { onPreToolUse: toolCallBudget.onPreToolUse } : {}), ...recoveryHooks } } : {}),
       ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
     };
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
@@ -524,6 +537,11 @@ async function runCopilotSDKSession({
       const toolKey = JSON.stringify([scope, data.toolCallId]);
 
       switch (event.type) {
+        case "session.idle":
+        case "session.shutdown":
+          if (context.agentId === undefined && !context.parentToolUseId) recoveryActive = false;
+          break;
+
         case "tool.execution_start": {
           if (data.toolCallId !== undefined) pendingToolCalls.add(toolKey);
           break;
@@ -600,12 +618,13 @@ async function runCopilotSDKSession({
     });
 
     log("sending prompt...");
-    const sendTimeoutMs = getEnvPositiveIntOrDefault("COPILOT_SDK_SEND_TIMEOUT_MS", SDK_SEND_TIMEOUT_MS_DEFAULT);
+    recoveryActive = true;
     // Race against denialGuardPromise so that if the tool-denial guard fires and
     // session.disconnect()/sendAndWait then stall, the driver still settles with a
     // nonzero exit within a bounded interval instead of hanging until the job's own
     // timeout intervenes. denialGuardPromise never settles unless the guard fires.
     const result = await Promise.race([session.sendAndWait({ prompt }, sendTimeoutMs), denialGuardPromise]);
+    recoveryActive = false;
 
     if (catastrophicToolDenialsError) {
       throw catastrophicToolDenialsError;
@@ -673,6 +692,7 @@ async function runCopilotSDKSession({
       durationMs,
     };
   } finally {
+    recoveryActive = false;
     if (denialGuardTimer) {
       clearTimeout(denialGuardTimer);
       denialGuardTimer = null;

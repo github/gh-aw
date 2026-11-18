@@ -37,7 +37,7 @@ describe("Pi Recovery adapter", () => {
   it("delivers a native steering message after repeated failures without forwarding raw evidence", async () => {
     const { handlers, pi, fetchImpl } = harness();
     await handlers.turn_end(turn());
-    expect(pi.sendUserMessage).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("Repeated tool failures"), { deliverAs: "steer" });
+    expect(pi.sendUserMessage).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("Repeated failures"), { deliverAs: "steer" });
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("PRIVATE");
   });
 

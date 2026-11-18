@@ -11,6 +11,25 @@ function completedEvent(overrides = {}) {
 }
 
 describe("harness policy dispatcher", () => {
+  it("negotiates retry guidance independently of live steering and freezes retry observations", async () => {
+    const retryGuidance = vi.fn();
+    const dispatcher = createHarnessPolicyDispatcher({
+      adapter: { engine: "codex", actions: { retry_guidance: retryGuidance } },
+      policies: [
+        {
+          id: "retry-observer",
+          onEvent: (event, context) => {
+            expect(context.capabilities).toEqual(["retry_guidance"]);
+            expect(() => event.failureClasses.push("changed")).toThrow(TypeError);
+            return [{ type: "retry_guidance", message: "Reassess." }];
+          },
+        },
+      ],
+    });
+    await dispatcher.dispatch({ type: "retry.ready", failureClasses: ["server_error"], remainingMs: 600000 });
+    expect(retryGuidance).toHaveBeenCalledExactlyOnceWith({ type: "retry_guidance", message: "Reassess." });
+  });
+
   it("isolates immutable turn observations without retaining raw tool results", async () => {
     const tools = [{ toolName: "bash", success: false, output: "PRIVATE" }];
     const onEvent = vi.fn(event => {

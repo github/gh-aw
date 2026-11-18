@@ -21,6 +21,9 @@ async function main() {
   const durableSession = engineName === "pi" ? openPiDurableSession() : undefined;
   /** @param {string} message */
   const log = message => process.stderr.write(`[${engineName}-harness] ${message}\n`);
+  if (engineName !== "pi" && process.env.GH_AW_HARNESS_RECOVERY === "1") {
+    log("recovery: unsupported by this single-shot shell adapter; no native steering or retry guidance capability");
+  }
   if (process.env.GH_AW_SKIP_IF_DECISION) {
     log("decision gate: harness initialized before decision evaluation");
   }

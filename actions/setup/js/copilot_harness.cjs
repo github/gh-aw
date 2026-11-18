@@ -1663,9 +1663,10 @@ function addCopilotDetectionDirectory(args, env) {
  * Larger files and files containing NUL bytes are returned as stdin data so the full
  * prompt reaches Copilot without being constrained by the operating system's argv limits.
  * @param {string[]} args
+ * @param {{forceStdin?: boolean}} [options]
  * @returns {{args: string[], stdin?: Buffer}}
  */
-function resolvePromptFileInput(args) {
+function resolvePromptFileInput(args, { forceStdin = false } = {}) {
   /** @type {string[]} */
   const resolvedArgs = [];
   /** @type {Buffer | undefined} */
@@ -1689,8 +1690,8 @@ function resolvePromptFileInput(args) {
       const stat = fs.statSync(promptFile);
       log(`resolved --prompt-file: path=${promptFile} size=${stat.size}B`);
 
-      if (stat.size > PROMPT_FILE_INLINE_THRESHOLD_BYTES) {
-        log(`prompt file exceeds ${PROMPT_FILE_INLINE_THRESHOLD_LABEL}; streaming prompt via stdin`);
+      if (forceStdin || stat.size > PROMPT_FILE_INLINE_THRESHOLD_BYTES) {
+        log(forceStdin ? "recovery enabled; streaming prompt via stdin" : `prompt file exceeds ${PROMPT_FILE_INLINE_THRESHOLD_LABEL}; streaming prompt via stdin`);
         promptStdin = fs.readFileSync(promptFile);
       } else {
         const prompt = fs.readFileSync(promptFile);
@@ -1739,6 +1740,7 @@ async function main() {
   // correct SDK endpoint URI.
   const sdkEnv = buildCopilotSDKEnv();
   const copilotSDKMode = isCopilotSDKEnabled();
+  const recoveryEnabled = process.env.GH_AW_HARNESS_RECOVERY === "1" && require("./harness_recovery.cjs").isHarnessRecoveryEnabled();
   let copilotConnectionToken = "";
   if (copilotSDKMode) {
     // The harness always generates the connection token when SDK mode is active.
@@ -1758,11 +1760,12 @@ async function main() {
   if (copilotSDKMode) {
     resolvedArgs = /\.(?:cjs|mjs|js|ts|mts)$/i.test(args[0] || "") ? ["--import", path.join(__dirname, "copilot_sdk_module_resolution.cjs"), ...args] : args;
   } else {
-    const resolvedPrompt = resolvePromptFileInput(args);
+    const resolvedPrompt = resolvePromptFileInput(args, { forceStdin: recoveryEnabled });
     const fallbackConfigPath = !process.env.GH_AW_AWF_CONFIG_PATH && process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, "gh-aw", "awf-config.json") : undefined;
     const configPath = process.env.GH_AW_AWF_CONFIG_PATH || AWF_CONFIG_PATH;
     resolvedArgs = addCopilotURLPermissions(addCopilotDetectionDirectory(resolvedPrompt.args, process.env), { sdkMode: copilotSDKMode, configPath, fallbackConfigPath });
     promptStdin = resolvedPrompt.stdin;
+    if (recoveryEnabled && promptStdin === undefined) log("recovery: retry guidance unavailable for this prompt transport; use --prompt-file");
   }
 
   // Fetch AWF API proxy reflection data before running the agent.
@@ -2084,8 +2087,9 @@ async function main() {
         harnessName: "Copilot harness",
         log,
         softTimeoutGuard,
+        recoveryEngine: !copilotSDKMode && promptStdin !== undefined ? "copilot" : undefined,
         getRetryMode: () => (!copilotSDKMode && useContinueOnRetry ? "--continue" : "fresh run"),
-        runAttempt: async (attempt, observeStrategy) => {
+        runAttempt: async (attempt, observeStrategy, recoveryGuidance) => {
           // Verified native retries resume the exact UUID; other CLI paths retain --continue.
           let currentArgs = !copilotSDKMode && attempt > 0 && useContinueOnRetry ? [...resolvedArgs, "--continue"] : resolvedArgs;
           if (!copilotSDKMode && durableSession?.id && attempt > 0 && !useContinueOnRetry) throw new Error("Durable Copilot continuation cannot restart a recorded session as a fresh conversation");
@@ -2156,7 +2160,7 @@ async function main() {
             log,
             logArgs: safeArgs,
             env: childEnv,
-            stdin: promptStdin,
+            stdin: recoveryGuidance && promptStdin !== undefined ? Buffer.concat([promptStdin, Buffer.from(`\n\n${recoveryGuidance}`)]) : promptStdin,
             onStdoutLine: line => {
               let event;
               try {

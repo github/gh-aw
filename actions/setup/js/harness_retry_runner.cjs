@@ -207,13 +207,14 @@ function shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeO
  *   harnessName: string,
  *   log: (message: string) => void,
  *   softTimeoutGuard: { timeoutMinutes: number, softDeadlineMs: number } | null,
- *   runAttempt: (attempt: number, observeStrategy: (strategy: "restart" | "resume") => void) => Promise<HarnessAttemptResult>,
+ *   runAttempt: (attempt: number, observeStrategy: (strategy: "restart" | "resume") => void, recoveryGuidance?: string) => Promise<HarnessAttemptResult>,
  *   handleFailure: (context: { attempt: number, result: HarnessAttemptResult, maxRetries: number }) => Promise<HarnessFailureDecision> | HarnessFailureDecision,
  *   getRetryMode?: (attempt: number) => string,
  *   sleepFn?: (ms: number) => Promise<void>,
  *   telemetryPath?: string,
  *   evaluateDecision?: () => Promise<import("./skip_if_decision.cjs").SkipDecision | null>,
  *   policyDispatcher?: import("./harness_policy.cjs").HarnessPolicyDispatcher,
+ *   recoveryEngine?: string,
  * }} options
  * @returns {Promise<{ exitCode: number, attempts: number, lastResult: HarnessAttemptResult | null }>}
  */
@@ -224,6 +225,31 @@ async function runHarnessRetryLoop(options) {
   /** @type {HarnessAttemptResult | null} */
   let lastResult = null;
   const sleepFor = options.sleepFn ?? sleep;
+  /** @type {string | undefined} */
+  let recoveryGuidance;
+  /** @type {readonly string[] | undefined} */
+  let retryFailureClasses;
+  /** @type {import("./harness_policy.cjs").HarnessPolicyDispatcher | undefined} */
+  let recovery;
+  if (options.recoveryEngine && process.env.GH_AW_HARNESS_RECOVERY === "1") {
+    const { createRecoveryPolicy, evaluateRecoveryDecision, isHarnessRecoveryEnabled, DECISION_TIMEOUT_MS } = require("./harness_recovery.cjs");
+    if (isHarnessRecoveryEnabled() && options.softTimeoutGuard) {
+      recovery = require("./harness_policy.cjs").createHarnessPolicyDispatcher({
+        adapter: {
+          engine: options.recoveryEngine,
+          actions: {
+            retry_guidance: action => {
+              if (options.softTimeoutGuard && options.softTimeoutGuard.softDeadlineMs - Date.now() > 10000) recoveryGuidance = action.message;
+              else options.log("recovery: retry guidance suppressed; completion window reached");
+            },
+          },
+        },
+        policies: [createRecoveryPolicy({ decide: evidence => evaluateRecoveryDecision(evidence, { log: options.log }), log: options.log, minimumRemainingMs: 10000 + DECISION_TIMEOUT_MS })],
+      });
+    } else if (isHarnessRecoveryEnabled()) {
+      options.log("recovery: retry guidance unavailable; a workflow timeout is required");
+    }
+  }
   let startupAttemptId;
   if (options.telemetryPath) {
     try {
@@ -337,6 +363,15 @@ async function runHarnessRetryLoop(options) {
         }
       }
 
+      if (recovery && retryFailureClasses && options.softTimeoutGuard) {
+        await recovery.dispatch({ type: "retry.ready", failureClasses: retryFailureClasses, remainingMs: options.softTimeoutGuard.softDeadlineMs - Date.now() });
+        if (Date.now() >= options.softTimeoutGuard.softDeadlineMs) {
+          emitSoftTimeoutSignal(options.softTimeoutGuard, "after recovery evaluation", options.harnessName, options.log);
+          lastExitCode = 1;
+          break;
+        }
+      }
+
       attempts = attempt + 1;
       /** @type {(typeof attemptResults)[number]} */
       const attemptResult = {
@@ -356,12 +391,17 @@ async function runHarnessRetryLoop(options) {
       writeAttemptMarker("start", attemptResult);
       let result;
       try {
-        result = await options.runAttempt(attempt, selected => {
-          if (selected === "restart" || selected === "resume") {
-            attemptResult.strategy = selected;
-            writeTelemetry();
-          }
-        });
+        result = await options.runAttempt(
+          attempt,
+          selected => {
+            if (selected === "restart" || selected === "resume") {
+              attemptResult.strategy = selected;
+              writeTelemetry();
+            }
+          },
+          recoveryGuidance
+        );
+        recoveryGuidance = undefined;
       } catch (error) {
         attemptResult.finished_at = Date.now();
         attemptResult.outcome = "interrupted";
@@ -431,6 +471,7 @@ async function runHarnessRetryLoop(options) {
       writeTelemetry();
       if (options.policyDispatcher) await notifyAttemptCompleted();
       if (failureDecision.action === "retry") {
+        retryFailureClasses = attemptResult.failure_classes;
         continue;
       }
       break;

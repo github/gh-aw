@@ -80,6 +80,71 @@ describe("harness_retry_runner.cjs", () => {
     return { outcome, questions: [{ question: 1, outcome }], latencyMs: 1 };
   }
 
+  function recoveryOptions(exitCodes = [1, 1, 1, 0]) {
+    vi.stubEnv("GH_AW_HARNESS_RECOVERY", "1");
+    vi.stubEnv("AWF_REFLECT_ENABLED", "1");
+    vi.stubEnv("GH_AW_PHASE", "agent");
+    const fetchImpl = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async (_url, init) =>
+          new Response(
+            JSON.stringify(init?.method === "POST" ? { answers: [{ name: "recovery", type: "choice", choice: "change_strategy" }] } : { endpoints: [{ configured: true, provider: "github", models_url: "http://api-proxy:10002/v1/models" }] })
+          )
+      );
+    const options = {
+      ...telemetryOptions(exitCodes),
+      recoveryEngine: "codex",
+      maxRetries: exitCodes.length - 1,
+      softTimeoutGuard: { timeoutMinutes: 10, softDeadlineMs: Date.now() + 600000 },
+    };
+    options.runAttempt = vi.fn(options.runAttempt);
+    return { options, fetchImpl };
+  }
+
+  it("adds recovery guidance only to an authorized retry after repeated classified failures", async () => {
+    const { options, fetchImpl } = recoveryOptions();
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 0, attempts: 4 });
+    expect(options.runAttempt.mock.calls.map(call => call[2])).toEqual([undefined, undefined, undefined, expect.stringContaining("never bypass a denial")]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("private output");
+  });
+
+  it.each(["disabled", "detection", "no_capability", "no_timeout", "completion_window", "stop", "final_attempt", "cancelled", "skip"])("does not evaluate Recovery for %s", async mode => {
+    const { options, fetchImpl } = recoveryOptions([1, 1, 1, 1]);
+    if (mode === "disabled") vi.stubEnv("GH_AW_HARNESS_RECOVERY", "0");
+    if (mode === "detection") vi.stubEnv("GH_AW_PHASE", "detection");
+    if (mode === "no_capability") delete options.recoveryEngine;
+    if (mode === "no_timeout") options.softTimeoutGuard = null;
+    if (mode === "completion_window") options.softTimeoutGuard.softDeadlineMs = Date.now() + 15000;
+    if (mode === "stop") options.handleFailure = ({ attempt }) => ({ action: attempt === 2 ? "stop" : "retry" });
+    if (mode === "final_attempt") options.maxRetries = 2;
+    if (mode === "cancelled") options.runAttempt.mockImplementation(async attempt => ({ exitCode: 1, hasOutput: true, output: "", cancelled: attempt === 2 }));
+    if (mode === "skip") options.evaluateDecision = vi.fn().mockResolvedValueOnce(gateResult("allow")).mockResolvedValueOnce(gateResult("allow")).mockResolvedValueOnce(gateResult("allow")).mockResolvedValueOnce(gateResult("deny"));
+    await runHarnessRetryLoop(options);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("caps Recovery across retries without extending the retry budget", async () => {
+    const { options, fetchImpl } = recoveryOptions(Array(12).fill(1));
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 12 });
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(options.runAttempt.mock.calls.filter(call => call[2])).toHaveLength(2);
+  });
+
+  it("suppresses late guidance and honors a deadline consumed by Recovery", async () => {
+    const { options, fetchImpl } = recoveryOptions();
+    const originalFetch = fetchImpl.getMockImplementation();
+    fetchImpl.mockImplementation(async (...args) => {
+      const response = await originalFetch(...args);
+      if (args[1]?.method === "POST") options.softTimeoutGuard.softDeadlineMs = Date.now() - 1;
+      return response;
+    });
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 3 });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(options.runAttempt).toHaveBeenCalledTimes(3);
+  });
+
   it("preserves exact results, backoff, logs and telemetry with an empty dispatcher", async () => {
     const options = telemetryOptions([1, 1, 0]);
     vi.spyOn(Date, "now").mockReturnValue(1234);

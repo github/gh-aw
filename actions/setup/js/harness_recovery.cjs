@@ -8,14 +8,19 @@ const FAILURE_THRESHOLD = 3;
 const MAX_DECISIONS = 2;
 const DECISION_TIMEOUT_MS = 5000;
 const RECOVERY_MESSAGE =
-  "Repeated tool failures indicate the current approach is not progressing. Stop repeating the failing operation and reassess the available evidence. Choose a different approach only within the workflow's existing tool permissions and firewall policy; never bypass a denial or request broader access. If blocked, report the limitation through the configured safe outputs rather than claiming completion.";
+  "Repeated failures indicate the current approach is not progressing. Stop repeating the failing operation and reassess the available evidence. Choose a different approach only within the workflow's existing tool permissions and firewall policy; never bypass a denial or request broader access. If blocked, report the limitation through the configured safe outputs rather than claiming completion.";
+
+/** @param {NodeJS.ProcessEnv} [env] */
+function isHarnessRecoveryEnabled(env = process.env) {
+  return env.GH_AW_HARNESS_RECOVERY === "1" && (!env.GH_AW_PHASE || env.GH_AW_PHASE === "agent") && env.GH_AW_PI_SUBAGENT_CHILD !== "1";
+}
 
 /** @typedef {"continue" | "change_strategy" | "unknown"} RecoveryDecision */
 /** @typedef {Readonly<{ consecutiveFailures: number, decision: number, remainingMs: number }>} RecoveryEvidence */
 
 /**
  * Counts attempts, including failed evaluations, against a fixed per-session cap.
- * Holds only the current tool name and counters, never a transcript or tool output.
+ * Holds only the current failure identity and counters, never a transcript or tool output.
  * @param {{
  *   decide: (evidence: RecoveryEvidence) => Promise<RecoveryDecision>,
  *   log: (message: string) => void,
@@ -24,32 +29,40 @@ const RECOVERY_MESSAGE =
  * @returns {import("./harness_policy.cjs").HarnessPolicy}
  */
 function createRecoveryPolicy({ decide, log, minimumRemainingMs }) {
-  let lastTool = "";
+  let lastFailure = "";
   let consecutiveFailures = 0;
   let decisions = 0;
   let evaluating = false;
+  let observation = 0;
   return {
     id: "recovery",
     async onEvent(event, context) {
-      if (event.type !== "turn.completed" || !event.ongoing || !Number.isFinite(event.remainingMs) || event.remainingMs <= minimumRemainingMs || !context.capabilities.includes("steer") || decisions >= MAX_DECISIONS || evaluating) return;
-      for (const tool of event.tools) {
-        if (tool.success !== false) {
-          lastTool = "";
+      if (event.type === "attempt.completed") return;
+      const capability = event.type === "retry.ready" ? "retry_guidance" : "steer";
+      if ((event.type === "turn.completed" && !event.ongoing) || !Number.isFinite(event.remainingMs) || event.remainingMs <= minimumRemainingMs || !context.capabilities.includes(capability) || decisions >= MAX_DECISIONS) return;
+      const failures =
+        event.type === "retry.ready" ? [{ identity: `attempt:${JSON.stringify([...event.failureClasses].sort())}`, failed: true }] : event.tools.map(tool => ({ identity: `tool:${tool.toolName}`, failed: tool.success === false }));
+      if (!failures.length) return;
+      const currentObservation = ++observation;
+      for (const failure of failures) {
+        if (!failure.failed) {
+          lastFailure = "";
           consecutiveFailures = 0;
         } else {
-          consecutiveFailures = tool.toolName === lastTool ? consecutiveFailures + 1 : 1;
-          lastTool = tool.toolName;
+          consecutiveFailures = failure.identity === lastFailure ? consecutiveFailures + 1 : 1;
+          lastFailure = failure.identity;
         }
       }
-      if (!event.tools.length || consecutiveFailures < FAILURE_THRESHOLD) return;
+      if (consecutiveFailures < FAILURE_THRESHOLD || evaluating) return;
       const evidence = Object.freeze({ consecutiveFailures, decision: ++decisions, remainingMs: event.remainingMs });
       consecutiveFailures = 0;
       evaluating = true;
       try {
         const choice = await decide(evidence);
         log(`recovery: decision=${decisions}/${MAX_DECISIONS}; outcome=${choice}`);
-        return choice === "change_strategy" ? [{ type: "steer", message: RECOVERY_MESSAGE }] : [];
+        return choice === "change_strategy" && observation === currentObservation ? [{ type: capability, message: RECOVERY_MESSAGE }] : [];
       } finally {
+        consecutiveFailures = 0;
         evaluating = false;
       }
     },
@@ -79,7 +92,7 @@ async function evaluateRecoveryDecision(evidence, { env = process.env, fetchImpl
     const result = await invokeDecisions({
       ...endpoint,
       input:
-        "Decide whether repeated tool failures warrant changing strategy. Evidence contains counts only, not task semantics. Do not infer task completion or permission to bypass restrictions. Choose unknown if the evidence is insufficient.",
+        "Decide whether repeated execution failures warrant changing strategy. Evidence contains counts only, not task semantics. Do not infer task completion or permission to bypass restrictions. Choose unknown if the evidence is insufficient.",
       questions: [
         {
           type: "choice",
@@ -105,4 +118,4 @@ async function evaluateRecoveryDecision(evidence, { env = process.env, fetchImpl
   }
 }
 
-module.exports = { createRecoveryPolicy, evaluateRecoveryDecision, DECISION_TIMEOUT_MS };
+module.exports = { createRecoveryPolicy, evaluateRecoveryDecision, isHarnessRecoveryEnabled, DECISION_TIMEOUT_MS };

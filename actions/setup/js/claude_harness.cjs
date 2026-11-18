@@ -64,7 +64,7 @@ const {
 } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
-const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
+const { resolveHarnessPromptFileArgs, appendHarnessRecoveryGuidance } = require("./harness_prompt_input.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_TIMEOUT_MS,
@@ -624,6 +624,7 @@ async function main() {
   const driverStartTime = Date.now();
   // The same deadline guards both the retry loop and each active child process.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
+  if (process.env.GH_AW_HARNESS_RECOVERY === "1" && prompt === null) log("recovery: retry guidance unavailable for this prompt transport; use --prompt-file");
 
   const retryRun = await runHarnessRetryLoop({
     telemetryPath: resolveHarnessRetryTelemetryPath(),
@@ -635,8 +636,9 @@ async function main() {
     harnessName: "Claude harness",
     log,
     softTimeoutGuard,
+    recoveryEngine: prompt !== null ? "claude" : undefined,
     getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
-    runAttempt: async (attempt, observeStrategy) => {
+    runAttempt: async (attempt, observeStrategy, recoveryGuidance) => {
       let nativeTerminalRateLimitError = false;
       /** @type {number | null} */
       let retryAfterMs = null;
@@ -680,7 +682,7 @@ async function main() {
         onStderrLine: line => {
           if (isRateLimitError(line)) nativeTerminalRateLimitError = true;
         },
-        stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
+        stdin: appendHarnessRecoveryGuidance(attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined), recoveryGuidance),
         postResultWatchdog: safeOutputsPath
           ? {
               shouldArm: () => hasTerminalSafeOutput(safeOutputsPath, { byteOffset: safeOutputsByteOffset, logger: log }),

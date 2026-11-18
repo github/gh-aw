@@ -50,6 +50,72 @@ describe("copilot_sdk_session runtime configuration", () => {
     data: { content: "The model returned no content because the response was blocked by content filtering.", rte: true, toolRequests: [] },
   };
 
+  it.each(["budget", "idle"])("composes native Recovery with the pre-tool budget and suppresses guidance after %s", async terminal => {
+    vi.stubEnv("GH_AW_HARNESS_RECOVERY", "1");
+    vi.stubEnv("AWF_REFLECT_ENABLED", "1");
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const fetchImpl = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async (_url, init) =>
+          new Response(
+            JSON.stringify(init?.method === "POST" ? { answers: [{ name: "recovery", type: "choice", choice: "change_strategy" }] } : { endpoints: [{ configured: true, provider: "github", models_url: "http://api-proxy:10002/v1/models" }] })
+          )
+      );
+    let hooks;
+    let handler;
+    const failed = { sessionId: "recovery-main", toolName: "bash", error: "PRIVATE", toolArgs: {} };
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = async config => {
+        hooks = config.hooks;
+        return {
+          sessionId: failed.sessionId,
+          on: callback => {
+            handler = callback;
+          },
+          disconnect: async () => {},
+          sendAndWait: async () => {
+            for (let index = 0; index < 3; index++) {
+              expect(hooks.onPreToolUse(failed, failed)).toBeUndefined();
+              const context = await hooks.onPostToolUseFailure(failed, failed);
+              expect(context).toEqual(index === 2 ? { additionalContext: expect.stringContaining("never bypass a denial") } : undefined);
+            }
+            if (terminal === "budget") expect(hooks.onPreToolUse(failed, failed)).toMatchObject({ permissionDecision: "deny" });
+            else handler({ type: "session.idle", data: {} });
+            for (let index = 0; index < 3; index++) expect(await hooks.onPostToolUseFailure(failed, failed)).toBeUndefined();
+          },
+        };
+      };
+    }
+    class ToolSet {
+      addBuiltIn() {}
+      addMcp() {}
+    }
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger: vi.fn(),
+      workingDirectory: base,
+      agentsBaseDir: base,
+      toolConfig: {
+        version: 1,
+        capabilities: { bash: true, edit: false, webFetch: false, webSearch: false, dynamicWorkflows: false, mcp: false, cliProxy: false },
+        permissions: { allowedTools: [] },
+        explicitlyDisabledTools: [],
+        maxToolCalls: 3,
+      },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow", ToolSet, BuiltInTools: { Isolated: [] } },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("PRIVATE");
+    expect(hooks.onPreToolUse).toBeTypeOf("function");
+    expect(hooks.onPostToolUse).toBeTypeOf("function");
+    expect(hooks.onPostToolUseFailure).toBeTypeOf("function");
+  });
+
   it.each(["event", "result", "idle-timeout", "partial-output"])("fails a content-filtered main response via %s without inventing task output", async mode => {
     let handler;
     const disconnect = vi.fn().mockResolvedValue(undefined);
