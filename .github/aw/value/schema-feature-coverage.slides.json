@@ -8,5 +8,20 @@
   "author": "app/github-actions",
   "author_login": "github-actions[bot]",
   "early_batches_through": "2026-06-30",
-  "witnesses": [63949, 72028, 74061]
+  "witnesses": [63949, 72028, 74061],
+  "window": {
+    "version": 1,
+    "baseline": "exact_parent",
+    "before_days": 7,
+    "after_days": 7,
+    "outcome_lag_days": 0,
+    "durability_days": 7,
+    "sample_every_hours": 24,
+    "trend_every_days": 7,
+    "minimum_before_samples": 7,
+    "minimum_after_samples": 7,
+    "isolation_before_days": 7,
+    "isolation_after_days": 7,
+    "overlap": "workflow"
+  }
 }

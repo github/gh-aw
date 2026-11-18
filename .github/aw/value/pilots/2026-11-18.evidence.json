@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "repository": "github.com/github/gh-aw",
+  "observations": [
+    {
+      "id": "documentation-gap-reference-missing", "workflow": "daily-doc-healer",
+      "metric": "confirmed-documentation-gaps-resolved-v1", "scope": "object_state",
+      "subject": "https://github.com/github/gh-aw/actions/runs/43981238321", "run_id": 43981238321,
+      "at": "2026-11-16T23:47:48Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "independent_gap_population_and_verified_corrections_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/43981238321"], "values": []
+    },
+    {
+      "id": "unreachable-function-analysis-missing", "workflow": "dead-code-remover",
+      "metric": "eligible-unreachable-functions-v1", "scope": "git_snapshot",
+      "subject": "https://github.com/github/gh-aw/actions/runs/43886415206", "run_id": 43886415206,
+      "at": "2026-11-16T14:40:14Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "pinned_complete_independent_analysis_and_safety_evidence_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/43886415206"], "values": []
+    },
+    {
+      "id": "controlled-suite-series-missing", "workflow": "daily-go-test-parallelizer",
+      "metric": "fixed-test-suite-duration-v1", "scope": "benchmark",
+      "subject": "https://github.com/github/gh-aw/actions/runs/44065036647", "run_id": 44065036647,
+      "at": "2026-11-17T10:42:36Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "fixed_population_comparable_repeated_timings_and_race_validation_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/44065036647"], "values": []
+    },
+    {
+      "id": "diagnostic-scenario-reference-missing", "workflow": "go-logger",
+      "metric": "verified-diagnostic-scenarios-v1", "scope": "run",
+      "subject": "https://github.com/github/gh-aw/actions/runs/44009171201", "run_id": 44009171201,
+      "at": "2026-11-17T03:24:53Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "independent_scenario_population_and_behavioral_checks_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/44009171201"], "values": []
+    },
+    {
+      "id": "file-diet-fixed-changed-cohort-parent", "workflow": "daily-file-diet",
+      "metric": "excess-go-source-lines-v1", "scope": "git_snapshot",
+      "subject": "https://github.com/github/gh-aw/issues/78380", "run_id": 43870412927,
+      "sha": "d6f2493fa9d7545895f5ca3ed2fb24ab43a46b28",
+      "at": "2026-11-17T06:08:04Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "baseline", "coverage": "available",
+      "population": [
+        "pkg/cli/logs_orchestrator_download.go", "pkg/cli/logs_download_batch_fetch.go",
+        "pkg/cli/logs_download_rounds.go", "pkg/cli/logs_download_run_processing.go",
+        "pkg/cli/logs_download_setup.go", "pkg/cli/logs_download_stats.go"
+      ],
+      "context": "pr-78635-complete-non-test-source-diff;newline-bytes;budget-799;verified-absence-is-zero;changed-cohort-not-repository-total",
+      "references": [
+        "https://github.com/github/gh-aw/pull/78635/files",
+        "https://api.github.com/repos/github/gh-aw/git/commits/d6f2493fa9d7545895f5ca3ed2fb24ab43a46b28",
+        "https://api.github.com/repos/github/gh-aw/git/blobs/1bc2f817235c7436dcbfb1297ff6dd9489474feb"
+      ],
+      "values": [1202, 0, 0, 0, 0, 0]
+    },
+    {
+      "id": "file-diet-fixed-changed-cohort-merge", "workflow": "daily-file-diet",
+      "metric": "excess-go-source-lines-v1", "scope": "git_snapshot",
+      "subject": "https://github.com/github/gh-aw/issues/78380", "run_id": 43870412927,
+      "sha": "ecf4e21e9438774092bcd313ddbb1c6fc18e8737",
+      "at": "2026-11-17T06:09:01Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "outcome", "coverage": "available",
+      "population": [
+        "pkg/cli/logs_orchestrator_download.go", "pkg/cli/logs_download_batch_fetch.go",
+        "pkg/cli/logs_download_rounds.go", "pkg/cli/logs_download_run_processing.go",
+        "pkg/cli/logs_download_setup.go", "pkg/cli/logs_download_stats.go"
+      ],
+      "context": "pr-78635-complete-non-test-source-diff;newline-bytes;budget-799;verified-absence-is-zero;changed-cohort-not-repository-total",
+      "references": [
+        "https://github.com/github/gh-aw/issues/78380",
+        "https://api.github.com/repos/github/gh-aw/git/commits/ecf4e21e9438774092bcd313ddbb1c6fc18e8737",
+        "https://api.github.com/repos/github/gh-aw/git/blobs/3b1d2af7658c3798efe2f1f5df1f4e854f9e0c0d",
+        "https://api.github.com/repos/github/gh-aw/git/blobs/2a0d7104315e8dd9850469370f7105b175ec08a0",
+        "https://api.github.com/repos/github/gh-aw/git/blobs/9839a4356c76a584fcd1e3ab570a9a3fd350567c",
+        "https://api.github.com/repos/github/gh-aw/git/blobs/5b7689a631a931c7bcd647840ec5f542d8230d81",
+        "https://api.github.com/repos/github/gh-aw/git/blobs/e9b7a1a4924ebaca2f52ef2a967be6ea52bda3b0"
+      ],
+      "values": [0, 93, 417, 381, 199, 151]
+    },
+    {
+      "id": "independent-metric-recomputation-missing", "workflow": "daily-code-metrics",
+      "metric": "independently-verified-metric-observations-v1", "scope": "run",
+      "subject": "https://github.com/github/gh-aw/discussions/78432", "run_id": 43928873951,
+      "at": "2026-11-16T18:38:16Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "fixed_report_population_and_independent_recomputation_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/43928873951"], "values": []
+    },
+    {
+      "id": "triage-reference-classification-missing", "workflow": "issue-triage-agent",
+      "metric": "correctly-triaged-eligible-issues-v1", "scope": "object_state",
+      "subject": "https://github.com/github/gh-aw/issues/77493", "run_id": 43889622699,
+      "at": "2026-11-16T14:56:06Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "complete_eligibility_and_independent_classification_reference_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/43889622699"], "values": []
+    },
+    {
+      "id": "safe-retirement-reference-missing", "workflow": "stale-pr-cleanup",
+      "metric": "safely-retired-stale-prs-v1", "scope": "object_state",
+      "subject": "https://github.com/github/gh-aw/actions/runs/43574891405", "run_id": 43574891405,
+      "at": "2026-11-14T08:21:58Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "complete_pre_action_eligibility_and_independent_justification_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/43574891405"], "values": []
+    },
+    {
+      "id": "compilation-benchmark-series-missing", "workflow": "daily-cli-performance",
+      "metric": "simple-workflow-compilation-time-v1", "scope": "benchmark",
+      "subject": "https://github.com/github/gh-aw/actions/runs/43890801339", "run_id": 43890801339,
+      "at": "2026-11-16T14:56:34Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "canonical_session_identity_and_comparable_repeated_benchmark_series_missing",
+      "references": ["https://api.github.com/repos/github/gh-aw/actions/runs/43890801339"], "values": []
+    },
+    {
+      "id": "accepted-target-version-evidence-missing", "workflow": "dependabot-burner",
+      "metric": "validated-adopted-dependency-upgrades-v1", "scope": "git_snapshot",
+      "subject": "https://github.com/github/gh-aw/actions/runs/44044481567", "run_id": 44044481567,
+      "at": "2026-11-17T08:40:08Z", "observed_at": "2026-11-18T07:46:40Z",
+      "phase": "sample", "coverage": "unavailable", "reason": "complete_update_population_accepted_target_state_and_validation_missing",
+      "references": ["https://github.com/github/gh-aw/actions/runs/44044481567"], "values": []
+    }
+  ]
+}

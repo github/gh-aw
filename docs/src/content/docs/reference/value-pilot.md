@@ -123,3 +123,88 @@ Code Remover's independent analyzer projection, and CLI Performance's typed
 benchmark series. Label correctness, diagnostic usefulness, safe PR retirement,
 and report-driven decisions need independent references before they become
 credible outcome measurements.
+
+## Typed evidence reevaluation
+
+A second pass replayed **the same ten fixed runs**, with ten executable
+`evidence-number-v1` definitions and explicit window recipes. It did not replace
+the first trial, dispatch workflows, repair the malformed session, or fetch
+missing Git history.
+The [typed input bundle](https://github.com/github/gh-aw/blob/main/.github/aw/value/pilots/2026-11-18.evidence.json)
+and [generated reevaluation results](https://github.com/github/gh-aw/blob/main/.github/aw/value/pilots/2026-11-18.reevaluation.json)
+retain original identities, unavailable reasons, exact declaration digests,
+policies, and results.
+
+| Result | First pass | Typed replay |
+| --- | --- | --- |
+| Configured executable definitions | 0 | 10 |
+| Workflows with numeric independent observations evaluated by `value` | 0 | 1 |
+| Workflows without sufficient independent goal evidence | 10 | 9 |
+| Independently observed mechanical witness | File Diet, verified separately | File Diet, computed through the production evaluator |
+| Attributed-value claims | 0 | 0 |
+
+These are ten executable input/aggregation contracts, **not ten independently
+validated goal-measurement implementations**. Nine return explicit unavailable
+observations: the new format cannot create missing eligibility, correctness
+references, analyzer results, accepted target versions, or benchmark samples.
+The native complete-zero coverage gap and malformed CLI-performance collection
+remain visible; no missing outcome was converted into zero.
+
+For File Diet, the bundle fixes the six changed source paths as one cohort,
+including verified absences at each endpoint. Raw newline counts are
+`[1202,0,0,0,0,0]` at exact parent
+`d6f2493fa9d7545895f5ca3ed2fb24ab43a46b28` and
+`[0,93,417,381,199,151]` at merge
+`ecf4e21e9438774092bcd313ddbb1c6fc18e8737`.
+The Go excess-line evaluator computes **403 → 0**, an improvement of 403
+over-budget lines in that cohort, not absolute whole-repository totals.
+The complete source diff establishes the corresponding repository delta;
+neither number measures quality or saved time.
+
+### Why not seven days for everything
+
+Seven days was the slides' reporting convention, not a validated causal or
+statistical threshold. The original slide recipe now pins that policy
+explicitly. The ten new recipes instead record retrospective candidate
+policies:
+
+| Workflow | Before / after days | Outcome lag | Durability | Evidence rationale |
+| --- | --- | --- | --- | --- |
+| Documentation Healer | 14 / 30 | 7 | 30 | Corrections and review can take longer than a weekly cycle. |
+| Dead Code Remover | 1 / 7 | 0 | 14 | Immediate controlled analysis; separate regression/survival horizon. |
+| Go Test Parallelizer | 7 / 14 | 0 | 14 | Five controlled timing replicates minimum; calendar time is not replication. |
+| Go Logger | 7 / 14 | 0 | 30 | Independent scenarios first; longer reversal observation. |
+| File Diet | 1 / 14 | 0 | 14 | Exact source endpoints; longer retention than the original trial. |
+| Code Metrics | 7 / 7 | 0 | 7 | Run-scoped report-quality checks, not longitudinal value. |
+| Issue Triage | 7 / 14 | 1 | 14 | Independent classification and later label retention. |
+| Stale PR Cleanup | 14 / 30 | 1 | 30 | Complete eligibility and delayed reopen/reversal observations. |
+| CLI Performance | 7 / 14 | 0 | 14 | Five comparable benchmark replicates minimum, independently of days. |
+| Dependabot Burner | 1 / 14 | 0 | 30 | Exact target versions and validation, followed by rollback observation. |
+
+These choices were made after the first trial and are **not empirically
+validated or backdated contracts**. Future collection must test their adequacy.
+Changing days did not make any of the nine unavailable goals measurable.
+
+Imported replay records these policies but does not execute historical Git
+sampling, overlap checks, or survival. File Diet's candidate 14-day horizon
+matures on 1 December at 06:09:04 UTC, after the fixed cutoff.
+Even eventual maturity will not establish complete samples or attribution:
+the evidence is caller-supplied, the issue-to-PR link is not a native direct-PR
+attribution path, and complete survival was not evaluated.
+
+### Replay the new inputs
+
+For each workflow in the fixed cohort:
+
+```bash wrap
+gh aw value WORKFLOW --repo github/gh-aw \
+  --value-function .github/aw/value/WORKFLOW.json \
+  --recipe .github/aw/value/WORKFLOW.pilot.json \
+  --evidence .github/aw/value/pilots/2026-11-18.evidence.json \
+  --logs-dir OUTPUT/native --json
+```
+
+The original unconfigured first pass used revision `9f70921`; current
+auto-discovery finds the new definitions. Retain the original native ledger to
+reproduce native adoption clocks and maturity anchoring. Without it, numeric
+measurements replay, but native lifecycle coverage is unavailable.

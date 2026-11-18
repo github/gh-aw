@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "eligible-unreachable-functions-v1",
+  "name": "Independently analyzed eligible unreachable functions",
+  "unit": "functions",
+  "direction": "lower_is_better",
+  "evaluator": "evidence-number-v1",
+  "config": {"scope": "git_snapshot", "aggregation": "scalar", "minimum_samples": 1, "require_population": true}
+}

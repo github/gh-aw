@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "independently-verified-metric-observations-v1",
+  "name": "Independent report-quality checks, not longitudinal value",
+  "unit": "metric_points",
+  "direction": "higher_is_better",
+  "evaluator": "evidence-number-v1",
+  "config": {"scope": "run", "aggregation": "scalar", "minimum_samples": 1, "require_population": true}
+}

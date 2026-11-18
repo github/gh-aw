@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "validated-adopted-dependency-upgrades-v1",
+  "name": "Validated manifest/package/target-version upgrades adopted",
+  "unit": "upgrades",
+  "direction": "higher_is_better",
+  "evaluator": "evidence-number-v1",
+  "config": {"scope": "git_snapshot", "aggregation": "scalar", "minimum_samples": 1, "require_population": true}
+}

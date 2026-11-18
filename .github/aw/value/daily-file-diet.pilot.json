@@ -1,0 +1,5 @@
+{
+  "version": 1, "id": "file-size-budget-policy-v1", "repository": "github.com/github/gh-aw", "workflow": "daily-file-diet",
+  "start": "2026-11-01", "end": "2026-11-17",
+  "window": {"version":1,"baseline":"paired_observation","before_days":1,"after_days":14,"outcome_lag_days":0,"durability_days":14,"sample_every_hours":24,"trend_every_days":7,"minimum_before_samples":1,"minimum_after_samples":14,"isolation_before_days":1,"isolation_after_days":14,"overlap":"changed_files"}
+}

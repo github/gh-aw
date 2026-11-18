@@ -120,7 +120,8 @@ The specialized schema-feature example uses a different evaluator:
 unit `fields`, direction `higher_is_better`, a literal repository-relative
 schema path, and 1–32 literal example directories. It can measure another
 workflow with the same objective and different paths; it is not a universal
-value function. Objectives not observable through either evaluator require a
+value function. Objectives not observable through these evaluators or the typed
+evidence adapter below require a
 reviewed native evaluator or evidence projection before they can be measured.
 
 Definitions and recipes are strict JSON objects, limited to 512 KiB each.
@@ -135,6 +136,76 @@ with no covered fields is zero; empty schemas, absent inventories, malformed
 inputs, and missing history return errors. Definition SHA-256 digests identify
 the exact declaration bytes; the versioned evaluator ID identifies its semantics.
 Review intent, configuration, and fixtures together. Corrections are prospective.
+
+## Typed evidence inputs
+
+`evidence-number-v1` evaluates independently collected observations without
+requiring them to be committed as numeric files. It does not collect or
+authenticate the supplied evidence, execute workflow code, or validate the
+underlying goal's correctness.
+
+```json title=".github/aw/value/performance.json"
+{
+  "version": 1,
+  "id": "compile-time-v1",
+  "name": "Controlled compilation benchmark",
+  "unit": "ns/op",
+  "direction": "lower_is_better",
+  "evaluator": "evidence-number-v1",
+  "config": {
+    "scope": "benchmark",
+    "aggregation": "median",
+    "minimum_samples": 5,
+    "require_population": true
+  }
+}
+```
+
+```bash wrap
+gh aw value performance --repo owner/repo \
+  --value-function .github/aw/value/performance.json \
+  --evidence observations.json --start 2026-09-01 --end 2026-10-31 --json
+```
+
+The bundle is strict JSON with `version: 1`, `repository: "HOST/OWNER/REPO"`,
+and `observations`. It is limited to 512 KiB and 1024 observations.
+Each observation contains:
+
+| Field | Contract |
+| --- | --- |
+| `id`, `workflow`, `metric`, `scope`, `subject`, `run_id` | Unique observation ID, declared workflow/definition/scope, stable subject or experiment identity, positive producer/source run ID. |
+| `at`, `observed_at` | Event and collection timestamps; event ≤ collection ≤ report collection time. |
+| `phase` | `baseline`, `outcome`, or descriptive `sample`. |
+| `coverage`, `reason` | `available`, `partial`, or `unavailable`; the latter two require a reason and no numeric values. |
+| `references` | Nonempty source references. These retain provenance, not authentication. |
+| `sha` | Full commit SHA required for available `git_snapshot` observations. |
+| `population` | Optional unique subject IDs; required when configured. |
+| `context` | Comparable measurement protocol/runner/toolchain/fixture identity; required for benchmarks. |
+| `values` | Finite raw measurements; missing evidence is not an observed zero. |
+
+Supported scopes are `git_snapshot`, `run`, `benchmark`, and `object_state`.
+`scalar` requires exactly one independently measured number.
+`median` aggregates repeated samples without treating them as proof of
+statistical significance. `excess_lines` requires Git scope, population, and
+nonnegative `maximum_lines`; it sums `max(0, count - maximum_lines)` across one
+nonnegative integer newline count per file. A zero for an absent file requires
+independently verified absence. `minimum_samples` is 1–10000; scalar requires 1,
+and benchmark scope requires median aggregation.
+
+Only observations matching the selected workflow, definition ID, scope, and
+event-time report bounds reach the evaluator. There may be at most one baseline
+and outcome per subject; duplicate endpoints fail rather than selecting a
+favorable result. Changed population or context prevents change calculation.
+Raw inputs and their clocks remain in `evidence.observations`.
+
+This mode works without full Git history, but rejects `--ref` and PR
+author/batch/witness recipe selectors. It records
+`trust: "caller_supplied_not_native_adoption"` and **never assigns attributed
+value**. `evidence.coverage: "available"` describes supplied measurements, not
+verified human acceptance or full-window evidence. `window_mature` records only
+elapsed time; temporal `sampling_coverage` remains `not_evaluated`.
+The [reevaluated pilot](../value-pilot/#typed-evidence-reevaluation) includes an
+executable bundle with real observations and explicit missing-evidence cases.
 
 ## Define a report recipe
 
@@ -164,9 +235,49 @@ PR authors. Optional `early_batches_through` groups early merges by UTC date;
 cohort and must not overlap those batches. Without these selections, every
 individual merge remains available in `windows`.
 
+### Window policy
+
+The optional `window` object fixes a versioned metric-specific policy:
+
+| Field | Default / bounds |
+| --- | --- |
+| `version`, `baseline` | `1`; `exact_parent` for Git replay, `paired_observation` for typed evidence. |
+| `before_days`, `after_days` | 7, 7; each 1–365. |
+| `outcome_lag_days`, `durability_days` | 0, 7; lag 0–365, durability 1–365 and at least the lag. |
+| `sample_every_hours`, `trend_every_days` | 24, 7; hours divide 24; trend 1–365 days. |
+| `minimum_before_samples`, `minimum_after_samples` | 7, 7; positive and attainable under the chosen cadence. |
+| `isolation_before_days`, `isolation_after_days` | 7, 7; each 0–365. |
+| `overlap` | `workflow`; alternatively `changed_files`, requiring exact changed-file evidence. |
+
+At most 1024 combined pre/post sample slots are permitted. Partial overrides
+retain other defaults, including sample minima; shorter windows may therefore
+require explicit smaller minima.
+
+**Seven days preserves the slides' original policy; it is not an empirically
+validated universal window.** Choose periods from expected response delay,
+workflow cadence, reversibility, and available independent measurements.
+Benchmark replicates are separate from calendar sampling. Freeze policies
+before future collection; describe policies chosen after observing a cohort as
+retrospective candidates, not preregistered or validated choices.
+
+In Git replay, pre samples cover `[merge - before, merge)`; post samples cover
+`[merge + lag, merge + lag + after)`. Merge `after` remains the exact merge
+snapshot; `outcome` records the lagged snapshot. Survival runs independently
+through `merge + durability`. Attribution waits for the entire outcome,
+durability, and forward-isolation horizons, not merely the minimum sample count.
+Delayed aggregate changes remain descriptive: attribution requires subject
+linkage not currently implemented for that path.
+
+`workflow` overlap excludes neighboring producer-linked merges within the
+declared isolation interval; `changed_files` excludes intersecting changed-file
+sets instead. Missing file evidence stays unavailable. Longer outcome horizons
+do not automatically widen global workflow exclusions. Typed evidence replay
+records these policies but does not execute Git temporal sampling, overlap, or
+survival checks.
+
 ## Shared measurement and attribution
 
-Measurements require a full checkout whose `origin` matches the selected
+Historical Git measurements require a full checkout whose `origin` matches the selected
 repository and whose local main-history ref covers the final snapshot. Git and
 an authenticated `gh` CLI with read access to that repository are required.
 Shallow history, missing objects, stale refs, API failures, malformed producer
@@ -175,9 +286,9 @@ fetch history, dispatch workflows, run workflow code, or mutate lifecycle data.
 
 | Report layer | Evidence and meaning |
 | --- | --- |
-| Outcome | Weekly first-parent main snapshots, plus the final snapshot; includes every author's work. |
+| Outcome | Recipe-cadence first-parent main snapshots, plus the final snapshot; includes every author's work. |
 | Producer-linked outputs | Pull requests with the exact workflow footer and producer run ID, created between the report's start and end instants. Search is not native delivery history. |
-| Merge windows | Every cohort pull request merged by the cutoff, measured against its exact first parent, with seven daily samples before and seven after adoption. |
+| Merge windows | Every cohort pull request merged by the cutoff, with exact-parent comparison and recipe-defined pre/post samples. |
 | Attributed value | Workflow-specific improvement at an isolated merge that passes every shared gate below. |
 
 Attribution requires a native delivered `create_pull_request` record matching the
@@ -185,8 +296,8 @@ host, repository, workflow, producer run, and exact pull request URL. Its availa
 adoption observation must record `explicit_human`, `human_verified: true`, and
 the exact merge timestamp. Bot resolution and delivery fallbacks do not qualify.
 
-No other producer-linked merge of this workflow may occur within seven days on
-either side, including
+Under the default seven-day policy, no other producer-linked merge of this
+workflow may occur within seven days on either side, including
 merges outside the selected delivery cohort. Every file changed by the merge must
 remain untouched by all first-parent main commits through the complete seven-day
 post-adoption window. A native survival **snapshot** cannot replace that history
@@ -195,7 +306,7 @@ measurements must be available. Attribution currently supports human-adopted PR
 merges; other output types retain their native lifecycle evidence without
 invented longitudinal value.
 
-Windows are `[merge - 7 days, merge)` and `[merge, merge + 7 days)`, sampled daily
+Default windows are `[merge - 7 days, merge)` and `[merge, merge + 7 days)`, sampled daily
 at the merge time. Day zero uses the exact merge commit. The end measurement and
 file-survival check include `merge + 7 days`. Evidence after the report cutoff
 is not used to complete a window; future samples and incomplete windows remain
@@ -281,13 +392,14 @@ gh aw value <workflow> [flags]
 | `--repo`, `-r` | Current repository | Source repository in `[HOST/]OWNER/REPO` format. |
 | `--value-function` | Auto-detected | Definition path; otherwise `.github/aw/value/WORKFLOW.json`, then the schema-coverage built-in when applicable. |
 | `--recipe` | None | JSON recipe selecting dates, optional author filter, early batches, and witnesses. Cannot be combined with `--start` or `--end`. |
+| `--evidence` | None | Typed observation bundle for `evidence-number-v1` only; does not replace native lifecycle evidence. |
 | `--timeout` | `5m` | Positive Go duration bounding Git and GitHub collection. |
 | `--json`, `-j` | `false` | Emit the full report on stdout. |
 
 JSON includes `schema_version`, `lifecycle`, `measurement_status`, and the
 `measurement` definition (ID, name, unit, direction, evaluator, digest, host, repository,
 and workflow identity), the pinned `ref`, `start`, `end`,
-`observed_at`, `weekly`, `cohort`, `outputs`, `windows`, `attributed_value`,
+`observed_at`, resolved `window_policy`, `weekly`, `cohort`, `outputs`, `windows`, `attributed_value`,
 `attribution_coverage`, and `limitations`. Snapshots include their commit SHA
 and native-scale `value`; the adapter's `coverage` evidence includes field
 population, missing fields, and covered count. Windows include ordered daily
@@ -300,6 +412,8 @@ defaults have no external definition digest; pass the checked-in definition
 explicitly when retaining replay provenance.
 Git and PR event clocks are distinct from collection time; adoption records are
 observations collected by the separate native lifecycle collector.
+The historical `weekly`/`samples` field names remain stable even when the
+recipe changes cadence. Typed replay adds `evidence` instead of Git snapshots.
 
 See [Delivery and adoption](../delivery-adoption/) for the shared lifecycle
 rules and [Measuring Impact](../../guides/measuring-impact/) for interpreting

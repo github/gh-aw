@@ -3,7 +3,7 @@ name: operational-value-designer
 description: "Design Go-native value definitions and report recipes from workflow intent; keep run-scoped grading separate. Usage: /operational-value-designer OWNER/REPO WORKFLOW [longitudinal|run-scoped]."
 argument-hint: "OWNER/REPO WORKFLOW [longitudinal|run-scoped]"
 metadata:
-  version: "4.0.0"
+  version: "5.0.0"
 ---
 
 # Operational Value Designer
@@ -22,6 +22,8 @@ Definitions, recipes, and fixtures belong there; gh-aw is an installed tool.
   Prefer the target's existing Go graders or supported session queries. The
   separate `graders.operational-value.script` contract is retained for existing
   custom session graders only; do not introduce JS execution into a Go server.
+- For non-Git evidence or window policies, read
+  [evidence-and-windows.md](references/evidence-and-windows.md).
 - For the schema-feature slide replay, use the checked-in definition
   `.github/aw/value/schema-feature-coverage.json` and recipe
   `.github/aw/value/schema-feature-coverage.slides.json`. Load their contents and
@@ -57,14 +59,20 @@ Keep three contracts distinct:
    versioned evaluator identity, observations, native adoption records,
    collection clocks, unavailable reasons, and the attributed subtotal.
 
-The current `gh aw value` supports native `json-number-v1` for independently
-measured, committed numeric evidence and `schema-example-coverage-v1` for
-textual schema examples, not arbitrary queries or JavaScript. An external
-workflow can use either with local paths, without registration in github/gh-aw.
-Unsupported evidence scopes require a reviewed native evaluator or projection;
-leave value unavailable until implemented.
+`gh aw value` supports `json-number-v1` for committed independent numbers,
+`schema-example-coverage-v1` for textual examples, and `evidence-number-v1`
+with `--evidence` for typed Git, run, benchmark, or object-state observations.
+Imported evidence is caller-supplied, never native adoption or survival proof.
+All three work in external repositories without upstream registration.
+Unsupported semantics require a reviewed evaluator/projection; stay unavailable.
 Do not stretch session semantics or fabricate session events for repository
 snapshots. Do not execute workflow code or introduce a second query language.
+
+Declare versioned baseline, before/after periods, lag, durability, cadence,
+minimum samples, and overlap rules before future collection. Seven days is
+the slides' compatibility policy, not an empirically validated universal window.
+Do not tune horizons to favorable outcomes or confuse elapsed time with complete
+evidence. Label policies designed after observing a cohort as retrospective.
 
 ## Shared ownership and safety
 

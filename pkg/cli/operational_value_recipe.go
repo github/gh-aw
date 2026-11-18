@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -11,17 +12,18 @@ import (
 )
 
 type valueRecipe struct {
-	Version             int    `json:"version"`
-	ID                  string `json:"id"`
-	Repository          string `json:"repository"`
-	Workflow            string `json:"workflow"`
-	Start               string `json:"start"`
-	End                 string `json:"end"`
-	Author              string `json:"author,omitempty"`
-	AuthorLogin         string `json:"author_login,omitempty"`
-	EarlyBatchesThrough string `json:"early_batches_through,omitempty"`
-	Witnesses           []int  `json:"witnesses"`
-	Digest              string `json:"-"`
+	Version             int             `json:"version"`
+	ID                  string          `json:"id"`
+	Repository          string          `json:"repository"`
+	Workflow            string          `json:"workflow"`
+	Start               string          `json:"start"`
+	End                 string          `json:"end"`
+	Author              string          `json:"author,omitempty"`
+	AuthorLogin         string          `json:"author_login,omitempty"`
+	EarlyBatchesThrough string          `json:"early_batches_through,omitempty"`
+	Witnesses           []int           `json:"witnesses"`
+	Digest              string          `json:"-"`
+	Window              json.RawMessage `json:"window,omitempty"`
 }
 
 type valueRecipeEvidence struct {
@@ -87,6 +89,9 @@ func loadValueRecipe(filename string, definition valueMeasurementDefinition) (*v
 		seen[pr] = struct{}{}
 	}
 	recipe.Digest = digest
+	if _, err := resolveValueWindowPolicy(&recipe); err != nil {
+		return nil, err
+	}
 	return &recipe, nil
 }
 
@@ -106,8 +111,9 @@ func inspectValueRecipe(report *operationalValueReport, recipe *valueRecipe) err
 	batches := make(map[string][]valueWindow)
 	found := make(map[int]struct{})
 	for _, window := range windows {
-		if len(window.Samples) != 14 {
-			return fmt.Errorf("PR %d has incomplete daily sample slots; expected 14", window.PR)
+		policy := window.Policy.resolved()
+		if len(window.Samples) != (policy.BeforeDays+policy.AfterDays)*24/policy.SampleEveryHours {
+			return fmt.Errorf("PR %d has incomplete sample slots for its window policy", window.PR)
 		}
 		day := window.MergedAt.UTC().Format(time.DateOnly)
 		if recipe.EarlyBatchesThrough != "" && day <= recipe.EarlyBatchesThrough {
@@ -138,10 +144,12 @@ func inspectValueRecipe(report *operationalValueReport, recipe *valueRecipe) err
 
 func inspectValueMembers(members []valueWindow, kind string) valueInspectedWindow {
 	first, last := members[0], members[len(members)-1] //nolint:uncheckedsliceindex // Callers provide nonempty batches or a single witness.
+	firstPolicy, lastPolicy := first.Policy.resolved(), last.Policy.resolved()
+	pre, post := firstPolicy.BeforeDays*24/firstPolicy.SampleEveryHours, lastPolicy.BeforeDays*24/lastPolicy.SampleEveryHours
 	result := valueInspectedWindow{
 		Label: first.MergedAt.UTC().Format("Jan 2"), Kind: kind, PRs: []int{},
 		First: first.MergedAt, Last: last.MergedAt, Before: first.Before, After: last.After,
-		End: last.End, Samples: append(slices.Clone(first.Samples[:7]), last.Samples[7:]...),
+		End: last.End, Samples: append(slices.Clone(first.Samples[:pre]), last.Samples[post:]...),
 		Closed: []string{}, Removed: []string{}, Status: "descriptive", Reason: "batch_not_attributed",
 	}
 	for _, member := range members {

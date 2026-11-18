@@ -228,7 +228,8 @@ func TestOperationalValueReportAndSearch(t *testing.T) {
 	writeResponse(map[string]any{"html_url": outputs[0].URL, "merged_at": outputs[0].Merged, "merge_commit_sha": merge})
 	start, end, err := operationalValueDates(operationalValueConfig{Start: "2026-09-21", End: "2026-10-06"}, valueTestTime(t, "2026-11-17T12:00:00Z"))
 	require.NoError(t, err)
-	report, err := buildOperationalValueReport(git, measurement, tip, start, end, end, outputs, map[string]lifecycle.Record{record.ID: record})
+	options := valueReportOptions{Start: start, End: end, ObservedAt: end}
+	report, err := buildOperationalValueReport(git, measurement, tip, options, outputs, map[string]lifecycle.Record{record.ID: record})
 	require.NoError(t, err)
 	require.Len(t, report.Weekly, 4)
 	assert.Equal(t, start, report.Weekly[0].At)
@@ -240,7 +241,7 @@ func TestOperationalValueReportAndSearch(t *testing.T) {
 	var text bytes.Buffer
 	require.NoError(t, renderOperationalValueReport(&text, measurement, report))
 	assert.Contains(t, text.String(), "verified subtotal")
-	report, err = buildOperationalValueReport(git, measurement, tip, start, end, end, outputs, nil)
+	report, err = buildOperationalValueReport(git, measurement, tip, options, outputs, nil)
 	require.NoError(t, err)
 	assert.Nil(t, report.AttributedValue)
 	assert.Equal(t, "unavailable", report.AttributionCoverage)

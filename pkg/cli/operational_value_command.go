@@ -25,10 +25,12 @@ type operationalValueConfig struct {
 	Start         string
 	End           string
 	Ref           string
+	RefExplicit   bool
 	LogsDir       string
 	ValueFunction string
 	Repo          string
 	Recipe        string
+	Evidence      string
 }
 
 var valueWorkflowID = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
@@ -47,6 +49,10 @@ Keep definitions and recipes in the workflow owner's repository; no registration
 in github/gh-aw is required. json-number-v1 reads independently measured numeric
 evidence committed in history. schema-example-coverage-v1 measures textual
 schema-example coverage. Use native units, not normalized success scores.
+evidence-number-v1 consumes --evidence: a bounded, typed observation bundle
+selected by workflow, metric, scope, subject, and report dates. It evaluates
+declared measurements without fetching history or executing user code.
+Imported evidence never substitutes for native adoption or survival proof.
 The slides' schema-feature-coverage example has a built-in value function.
 Use --recipe to reproduce its author filter and selected batch/witness windows.
 
@@ -73,6 +79,7 @@ func NewValueCommand() *cobra.Command {
   ` + string(constants.CLIExtensionPrefix) + ` value schema-feature-coverage --start 2026-03-22 --end 2026-11-17`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			config.RefExplicit = cmd.Flags().Changed("ref")
 			return executeValueReport(cmd, args, config, timeout, jsonOutput)
 		},
 	}
@@ -82,6 +89,7 @@ func NewValueCommand() *cobra.Command {
 	cmd.Flags().StringVar(&config.LogsDir, "logs-dir", defaultLogsOutputDir, "Directory containing native lifecycle.jsonl adoption records")
 	cmd.Flags().StringVar(&config.ValueFunction, "value-function", "", "Versioned JSON definition selecting a named Go value evaluator")
 	cmd.Flags().StringVar(&config.Recipe, "recipe", "", "Versioned JSON report recipe fixing dates, author filter, and inspected windows")
+	cmd.Flags().StringVar(&config.Evidence, "evidence", "", "Versioned typed observation bundle for evidence-number-v1 (not native adoption proof)")
 	cmd.Flags().StringVarP(&config.Repo, "repo", "r", "", "Repository in [HOST/]OWNER/REPO format (defaults to the current repository)")
 	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output the report as JSON")
@@ -141,6 +149,16 @@ func collectOperationalValueReport(ctx context.Context, config operationalValueC
 		return report, nil, err
 	}
 	report = newOperationalValueReport(definition, start, end, now, records)
+	if evidenceMeasurement, ok := measurement.(valueEvidenceMeasurement); ok {
+		if config.RefExplicit {
+			return report, nil, errors.New("--ref selects historical Git evaluation and cannot be combined with evidence-number-v1")
+		}
+		err := collectValueEvidenceReport(&report, evidenceMeasurement, config.Evidence, recipe)
+		return report, measurement, err
+	}
+	if config.Evidence != "" {
+		return report, nil, errors.New("--evidence requires an evidence-number-v1 measurement definition")
+	}
 	if measurement == nil {
 		if recipe != nil {
 			return report, nil, errors.New("--recipe requires a configured native value evaluator")
@@ -159,7 +177,15 @@ func collectOperationalValueReport(ctx context.Context, config operationalValueC
 	if err != nil {
 		return report, nil, err
 	}
-	report, err = buildOperationalValueReport(git, measurement, tip, start, end, now, outputs, records)
+	policy, err := resolveValueWindowPolicy(recipe)
+	if err != nil {
+		return report, nil, err
+	}
+	if policy.Baseline != "exact_parent" {
+		return report, nil, errors.New("historical Git measurement requires exact_parent baseline")
+	}
+	options := valueReportOptions{Start: start, End: end, ObservedAt: now, Policy: policy}
+	report, err = buildOperationalValueReport(git, measurement, tip, options, outputs, records)
 	if err == nil {
 		err = inspectValueRecipe(&report, recipe)
 	}
@@ -241,11 +267,15 @@ func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, r
 	}
 	outcome, name, delivered, adopted, linked, merged := "unavailable", "not configured", "unavailable", "unavailable", "not collected", "not collected"
 	if measurement != nil {
-		if len(report.Weekly) == 0 {
+		if len(report.Weekly) == 0 && report.Evidence == nil {
 			return errors.New("configured value report has no historical snapshots")
 		}
 		name = report.Measurement.Name
-		outcome = measurement.format(report.Weekly[0]) + " -> " + measurement.format(report.Weekly[len(report.Weekly)-1]) //nolint:uncheckedsliceindex // Weekly is nonempty above.
+		if report.Evidence != nil {
+			outcome = fmt.Sprintf("%s evidence (%d selected observations)", report.Evidence.Coverage, len(report.Evidence.Observations))
+		} else {
+			outcome = measurement.format(report.Weekly[0]) + " -> " + measurement.format(report.Weekly[len(report.Weekly)-1]) //nolint:uncheckedsliceindex // Weekly is nonempty above.
+		}
 		linked, merged = strconv.Itoa(len(report.Outputs)), strconv.Itoa(len(report.Windows))
 	}
 	if report.Lifecycle.Delivered != nil {
@@ -270,14 +300,17 @@ func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, r
 	if _, err := fmt.Fprint(out, console.RenderStructStdout(summary)); err != nil {
 		return err
 	}
-	if report.Reason != "" {
-		_, err := fmt.Fprintf(out, "Value unavailable: %s. Declare a value function to enable historical measurement.\n", report.Reason)
+	if report.Reason != "" && report.Evidence == nil {
+		_, err := fmt.Fprintf(out, "Value unavailable: %s.\n", report.Reason)
 		return err
 	}
 	return renderOperationalValueWindows(out, report)
 }
 
 func renderOperationalValueWindows(out io.Writer, report operationalValueReport) error {
+	if report.Evidence != nil {
+		return renderValueEvidenceReport(out, report)
+	}
 	if report.Recipe != nil && len(report.InspectedWindows) != 0 {
 		return renderValueInspectedWindows(out, report)
 	}

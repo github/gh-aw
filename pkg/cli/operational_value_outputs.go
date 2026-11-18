@@ -23,6 +23,7 @@ type valueOutput struct {
 	Delivered time.Time `json:"delivered"`
 	Merged    time.Time `json:"merged,omitzero"`
 	SHA       string    `json:"merge_sha,omitempty"`
+	Files     []string  `json:"changed_files,omitempty"`
 }
 
 type valuePullRequest struct {

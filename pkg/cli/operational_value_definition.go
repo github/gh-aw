@@ -64,9 +64,18 @@ func loadNativeValueMeasurement(definition valueMeasurementDefinition, path stri
 			return nil, fmt.Errorf("value evaluator path: %w", err)
 		}
 		return jsonNumberMeasurement{info: definition, config: settings}, nil
+	case valueEvidenceEvaluator:
+		settings := valueEvidenceConfig{MinimumSamples: 1, Aggregation: "scalar"}
+		if err := decodeValueDeclaration(config.Config, &settings); err != nil {
+			return nil, err
+		}
+		if err := validateValueEvidenceConfig(settings); err != nil {
+			return nil, err
+		}
+		return valueEvidenceMeasurement{info: definition, config: settings}, nil
 	default:
-		return nil, fmt.Errorf("unsupported value evaluator %q; supported: %s, %s (JavaScript and query execution are not supported by this report)",
-			config.Evaluator, schemaCoverageEvaluator, jsonNumberEvaluator)
+		return nil, fmt.Errorf("unsupported value evaluator %q; supported: %s, %s, %s (JavaScript and query execution are not supported by this report)",
+			config.Evaluator, schemaCoverageEvaluator, jsonNumberEvaluator, valueEvidenceEvaluator)
 	}
 }
 

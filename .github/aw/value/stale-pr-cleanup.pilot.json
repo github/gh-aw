@@ -1,0 +1,5 @@
+{
+  "version": 1, "id": "safe-retirement-policy-v1", "repository": "github.com/github/gh-aw", "workflow": "stale-pr-cleanup",
+  "start": "2026-11-01", "end": "2026-11-17",
+  "window": {"version":1,"baseline":"paired_observation","before_days":14,"after_days":30,"outcome_lag_days":1,"durability_days":30,"sample_every_hours":24,"trend_every_days":7,"minimum_before_samples":14,"minimum_after_samples":30,"isolation_before_days":0,"isolation_after_days":0,"overlap":"workflow"}
+}

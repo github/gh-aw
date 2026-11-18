@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "fixed-test-suite-duration-v1",
+  "name": "Controlled fixed-suite elapsed time",
+  "unit": "ms",
+  "direction": "lower_is_better",
+  "evaluator": "evidence-number-v1",
+  "config": {"scope": "benchmark", "aggregation": "median", "minimum_samples": 5, "require_population": true}
+}

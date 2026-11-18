@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "excess-go-source-lines-v1",
+  "name": "Source lines over the fixed 799-line budget in the declared file cohort",
+  "unit": "lines_over_799",
+  "direction": "lower_is_better",
+  "evaluator": "evidence-number-v1",
+  "config": {"scope": "git_snapshot", "aggregation": "excess_lines", "maximum_lines": 799, "minimum_samples": 1, "require_population": true}
+}

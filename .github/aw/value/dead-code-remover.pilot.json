@@ -1,0 +1,5 @@
+{
+  "version": 1, "id": "unreachable-function-policy-v1", "repository": "github.com/github/gh-aw", "workflow": "dead-code-remover",
+  "start": "2026-11-01", "end": "2026-11-17",
+  "window": {"version":1,"baseline":"paired_observation","before_days":1,"after_days":7,"outcome_lag_days":0,"durability_days":14,"sample_every_hours":24,"trend_every_days":7,"minimum_before_samples":1,"minimum_after_samples":7,"isolation_before_days":1,"isolation_after_days":7,"overlap":"changed_files"}
+}

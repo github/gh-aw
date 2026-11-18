@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "kind": "typed_evidence_window_reevaluation",
+  "source_cohort": ".github/aw/value/pilots/2026-11-18.json",
+  "evidence_bundle": ".github/aw/value/pilots/2026-11-18.evidence.json",
+  "evidence_digest": "sha256:247cf952d292996f8066205229176c6c1d233274bb39958a71a184f2592f0b9a",
+  "observed_from": "2026-11-18T07:49:09.21655934Z",
+  "observed_through": "2026-11-18T07:49:09.474034761Z",
+  "method": "Replay of the original ten fixed runs. No new workflow execution, no repaired session identity, no Git history fetch. Policies are retrospective candidates, not backdated validated contracts.",
+  "summary": {
+    "workflows": 10,
+    "configured_definitions": 10,
+    "numeric_workflows": 1,
+    "unavailable_workflows": 9,
+    "measured_pairs": 1,
+    "attributed_workflows": 0
+  },
+  "workflows": [
+    {
+      "workflow": "daily-cli-performance",
+      "definition_digest": "sha256:5d9bf874c1aab0fd0110ea839aef1468d157377c84325b65679b9ab3210d00d9",
+      "recipe_digest": "sha256:2de106e1d85148d755e229649ec79807310263b33cdd1319d4a8a0173b24fdf1",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 7,
+        "after_days": 14,
+        "outcome_lag_days": 0,
+        "durability_days": 14,
+        "sample_every_hours": 24,
+        "trend_every_days": 1,
+        "minimum_before_samples": 7,
+        "minimum_after_samples": 14,
+        "isolation_before_days": 3,
+        "isolation_after_days": 7,
+        "overlap": "changed_files"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "compilation-benchmark-series-missing",
+          "value": null,
+          "reason": "canonical_session_identity_and_comparable_repeated_benchmark_series_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "daily-code-metrics",
+      "definition_digest": "sha256:2ff7a002f6ff99908f12901aec601bdbe4acbd062f1f793164a455771aad786f",
+      "recipe_digest": "sha256:5fc54939ebf87cdf1113357a2f833a3bd8e0339d77f2aaf57327ab76fe0b2e5a",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 7,
+        "after_days": 7,
+        "outcome_lag_days": 0,
+        "durability_days": 7,
+        "sample_every_hours": 24,
+        "trend_every_days": 1,
+        "minimum_before_samples": 7,
+        "minimum_after_samples": 7,
+        "isolation_before_days": 0,
+        "isolation_after_days": 0,
+        "overlap": "workflow"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "independent-metric-recomputation-missing",
+          "value": null,
+          "reason": "fixed_report_population_and_independent_recomputation_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "daily-doc-healer",
+      "definition_digest": "sha256:87fe34a8a69146979f86e5714bed30a49cbd5f256a88b785224b9138cfce4d8c",
+      "recipe_digest": "sha256:c69d6d419a16fe70ffc6be6ab07fcabc7ad512ade9187c5e8ecd65c80db1f1c9",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 14,
+        "after_days": 30,
+        "outcome_lag_days": 7,
+        "durability_days": 30,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 14,
+        "minimum_after_samples": 30,
+        "isolation_before_days": 0,
+        "isolation_after_days": 0,
+        "overlap": "workflow"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "documentation-gap-reference-missing",
+          "value": null,
+          "reason": "independent_gap_population_and_verified_corrections_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "daily-file-diet",
+      "definition_digest": "sha256:2efffb04a55ff44530776d8aa786cf82aa7f8fd1ad6689ca2c33bc59def788f1",
+      "recipe_digest": "sha256:a60c8aaa15d0438be8d052ce3888270e0422c5a3ff64d2247851acb65f79ab4d",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 1,
+        "after_days": 14,
+        "outcome_lag_days": 0,
+        "durability_days": 14,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 1,
+        "minimum_after_samples": 14,
+        "isolation_before_days": 1,
+        "isolation_after_days": 14,
+        "overlap": "changed_files"
+      },
+      "evidence_coverage": "available",
+      "observations": [
+        {
+          "id": "file-diet-fixed-changed-cohort-parent",
+          "value": 403,
+          "reason": null
+        },
+        {
+          "id": "file-diet-fixed-changed-cohort-merge",
+          "value": 0,
+          "reason": null
+        }
+      ],
+      "changes": [
+        {
+          "subject": "https://github.com/github/gh-aw/issues/78380",
+          "baseline_id": "file-diet-fixed-changed-cohort-parent",
+          "outcome_id": "file-diet-fixed-changed-cohort-merge",
+          "change": {
+            "value": 403
+          },
+          "matures_at": "2026-12-01T06:09:04Z",
+          "window_mature": false,
+          "sampling_coverage": "not_evaluated",
+          "attributed_value": null,
+          "attribution_reason": "evidence_only_native_attribution_not_evaluated"
+        }
+      ],
+      "attributed_value": null
+    },
+    {
+      "workflow": "daily-go-test-parallelizer",
+      "definition_digest": "sha256:aab2f5c6acb68a0550c359bf03bb070930ce133550a75acd8477be11b1c49ae0",
+      "recipe_digest": "sha256:4dffccaccdc194f08fdf8f2f2ac4a2ee4948c1d671b35e515278c3db875cb2a6",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 7,
+        "after_days": 14,
+        "outcome_lag_days": 0,
+        "durability_days": 14,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 7,
+        "minimum_after_samples": 14,
+        "isolation_before_days": 3,
+        "isolation_after_days": 7,
+        "overlap": "changed_files"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "controlled-suite-series-missing",
+          "value": null,
+          "reason": "fixed_population_comparable_repeated_timings_and_race_validation_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "dead-code-remover",
+      "definition_digest": "sha256:ede315b04def850d8c4dd377aaf47db218043b1da931c8244959189dd6541370",
+      "recipe_digest": "sha256:ea532abb1e6df911a407aae426208a978b283d3028e16933c0981c95794a99ad",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 1,
+        "after_days": 7,
+        "outcome_lag_days": 0,
+        "durability_days": 14,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 1,
+        "minimum_after_samples": 7,
+        "isolation_before_days": 1,
+        "isolation_after_days": 7,
+        "overlap": "changed_files"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "unreachable-function-analysis-missing",
+          "value": null,
+          "reason": "pinned_complete_independent_analysis_and_safety_evidence_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "dependabot-burner",
+      "definition_digest": "sha256:912ef36dc6639ec573766f89f48b994fc2d0f6a65d07005730bd63855a61a689",
+      "recipe_digest": "sha256:9cc1e22a8e5857f8b92cf1d43e6f7f8d155892ddf81f37a5768919fa99a90f11",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 1,
+        "after_days": 14,
+        "outcome_lag_days": 0,
+        "durability_days": 30,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 1,
+        "minimum_after_samples": 14,
+        "isolation_before_days": 1,
+        "isolation_after_days": 14,
+        "overlap": "changed_files"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "accepted-target-version-evidence-missing",
+          "value": null,
+          "reason": "complete_update_population_accepted_target_state_and_validation_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "go-logger",
+      "definition_digest": "sha256:8999c21b80e6d5e978d94d727e1bd46cb48c061d00adb8f2786ae73fa09ce30c",
+      "recipe_digest": "sha256:3257bdbcbac6f193b40ad920dcf707f434f45a42f28e520d04dcca5205a6d790",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 7,
+        "after_days": 14,
+        "outcome_lag_days": 0,
+        "durability_days": 30,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 7,
+        "minimum_after_samples": 14,
+        "isolation_before_days": 7,
+        "isolation_after_days": 7,
+        "overlap": "changed_files"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "diagnostic-scenario-reference-missing",
+          "value": null,
+          "reason": "independent_scenario_population_and_behavioral_checks_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "issue-triage-agent",
+      "definition_digest": "sha256:10eca71792db4f6bbbbe45071757864f2f9955e1703a3ed2ac2a80d9d491f201",
+      "recipe_digest": "sha256:97e56e1fa97d1cf23ea91dbd50bba06815699797a44727e003cbcf270d9089a1",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 7,
+        "after_days": 14,
+        "outcome_lag_days": 1,
+        "durability_days": 14,
+        "sample_every_hours": 24,
+        "trend_every_days": 1,
+        "minimum_before_samples": 7,
+        "minimum_after_samples": 14,
+        "isolation_before_days": 0,
+        "isolation_after_days": 0,
+        "overlap": "workflow"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "triage-reference-classification-missing",
+          "value": null,
+          "reason": "complete_eligibility_and_independent_classification_reference_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    },
+    {
+      "workflow": "stale-pr-cleanup",
+      "definition_digest": "sha256:51e4ad8d5bfd9f4d30435d049893f73323babe30d78dd0ecf6daece09393fd3c",
+      "recipe_digest": "sha256:29dec22275186fb829ac22de1cf5f5d0c7bfdc1eee09f73e3437225a6ade1d10",
+      "window_policy": {
+        "version": 1,
+        "baseline": "paired_observation",
+        "before_days": 14,
+        "after_days": 30,
+        "outcome_lag_days": 1,
+        "durability_days": 30,
+        "sample_every_hours": 24,
+        "trend_every_days": 7,
+        "minimum_before_samples": 14,
+        "minimum_after_samples": 30,
+        "isolation_before_days": 0,
+        "isolation_after_days": 0,
+        "overlap": "workflow"
+      },
+      "evidence_coverage": "unavailable",
+      "observations": [
+        {
+          "id": "safe-retirement-reference-missing",
+          "value": null,
+          "reason": "complete_pre_action_eligibility_and_independent_justification_missing"
+        }
+      ],
+      "changes": [],
+      "attributed_value": null
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 # Go-native longitudinal value reports
 
 Author the measurement definition and report recipe consumed by `gh aw value`.
-The command runs named Go evaluators over Git snapshots, never JavaScript or an
-LLM. It does not currently execute session queries. Reuse a supported query only
+The command runs named Go evaluators, never JavaScript or an LLM.
+For typed non-Git inputs or window policies, read
+[evidence-and-windows.md](evidence-and-windows.md). Reuse a supported query only
 after the target runtime exposes the required evidence scope and contract.
 Do not turn snapshot observations into synthetic session events.
 
@@ -17,13 +18,12 @@ The schema slides below are an example, not a required workflow or repository.
 ## Measurement definition
 
 Inspect workflow intent, eligible subjects, constraints, and output semantics.
-If durable value is not observable in repository history, report the missing
-evidence and leave value unavailable. Never reward activity or invent a proxy
-merely to produce a number.
+If independent goal evidence is missing, stay unavailable; never substitute activity.
 
 Save `.github/aw/value/WORKFLOW.json`, auto-detected by the command, or pass
 `--value-function PATH`. Supported native evaluators are `json-number-v1` and
-`schema-example-coverage-v1`. This example is the executable schema-feature
+`schema-example-coverage-v1`; typed bundles use `evidence-number-v1`.
+This example is the executable schema-feature
 definition, not a universal metric:
 
 ```json
@@ -122,7 +122,7 @@ observations can change; dates alone cannot reproduce a frozen historical
 report. Offline API-evidence replay is not currently implemented.
 
 The shared pipeline owns native delivery/adoption, exact-parent comparison,
-neighbor isolation, and complete seven-day file survival. Require matching
+neighbor isolation, and complete recipe-defined file survival. Require matching
 explicit-human acceptance and untouched changed files through the full window;
 bot resolution, fallback delivery, or a survival snapshot cannot substitute.
 Other output types retain lifecycle evidence without fabricated value.

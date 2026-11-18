@@ -1,0 +1,5 @@
+{
+  "version": 1, "id": "diagnostic-scenario-policy-v1", "repository": "github.com/github/gh-aw", "workflow": "go-logger",
+  "start": "2026-11-01", "end": "2026-11-17",
+  "window": {"version":1,"baseline":"paired_observation","before_days":7,"after_days":14,"outcome_lag_days":0,"durability_days":30,"sample_every_hours":24,"trend_every_days":7,"minimum_before_samples":7,"minimum_after_samples":14,"isolation_before_days":7,"isolation_after_days":7,"overlap":"changed_files"}
+}
