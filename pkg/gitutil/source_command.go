@@ -95,7 +95,7 @@ func sourceCommandEnvironment(cmdDir string) []string {
 	for _, value := range os.Environ() {
 		key, _, _ := strings.Cut(value, "=")
 		upperKey := strings.ToUpper(key)
-		if !strings.HasPrefix(upperKey, "GIT_") && upperKey != "SSH_ASKPASS" {
+		if !strings.HasPrefix(upperKey, "GIT_") && !strings.EqualFold(key, "SSH_ASKPASS") {
 			env = append(env, value)
 		}
 	}
@@ -185,7 +185,7 @@ func CreateSourceTempDir(pattern string) (string, error) {
 	if err != nil {
 		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
 			return "", fmt.Errorf(
-				"failed to resolve source temp directory: %w (cleanup failed: %v)",
+				"failed to resolve source temp directory: %w (cleanup failed: %w)",
 				err,
 				cleanupErr,
 			)
