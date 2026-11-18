@@ -395,12 +395,12 @@ env:
 The compiler injects `${{ vars.GH_AW_OTEL_METRICS || 'true' }}` unless the workflow defines `GH_AW_OTEL_METRICS` itself. To manage the Actions variable by repository, organization, or enterprise scope, use `gh aw env get` and `gh aw env update` with `default_otel_metrics: false`; deleting the variable restores the default-on behavior. Only the literal value `true` enables metrics. When enabled, metrics are sent to `/v1/metrics` as OTLP/HTTP JSON by default, or as protobuf when `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` or `OTEL_EXPORTER_OTLP_PROTOCOL` selects `http/protobuf` (see [Protobuf encoding](#protobuf-encoding-and-azure-monitor)), using the configured OTLP endpoints and their per-endpoint headers, and are mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before export. The unified artifact includes the metrics mirror only when the effective runtime value is `true`. It contains metrics recorded in the agent job before artifact upload, including that job's built-in metrics; built-in metrics from other jobs are exported at post-job time and are not included in an artifact.
 
 Built-in metrics are emitted at job completion. Counters and histograms use delta temporality; durations and counts are job-level measurements.
-Unless noted, built-in metrics include `gh-aw.job.name` and `gh-aw.workflow.name` when available. Compatibility metrics use their corresponding metric's type, unit, and attributes, with the run metrics using the run conclusion as noted below.
+Unless noted, built-in metrics include `gh-aw.job.name` and `gh-aw.workflow.name` when available. Run metrics use the run conclusion for `cicd.pipeline.task.run.result`. The `gh_aw.job.errors` unit is `{job}`, while the `gh_aw.run.errors` compatibility metric uses `{run}`.
 
 | Metric | Type and unit | Attributes and emission condition |
 | --- | --- | --- |
-| `gh_aw.job.duration` | Histogram, `s` | Job result, job and workflow names, and (when known) engine and model; emitted for each completed job. |
-| `gh_aw.job.errors` | Counter, `{job}` | Job result; emitted for `failure`, `timed_out`, or `cancelled` jobs. |
+| `gh_aw.job.duration` | Histogram, `s` | `cicd.pipeline.task.run.result` (job result), `gh-aw.job.name`, `gh-aw.workflow.name`, and (when known) `gh-aw.engine.id` and `gen_ai.request.model`; emitted for each completed job. |
+| `gh_aw.job.errors` | Counter, `{job}` | `cicd.pipeline.task.run.result` (job result), `gh-aw.job.name`, and `gh-aw.workflow.name`; emitted for `failure`, `timed_out`, or `cancelled` jobs. |
 | `gen_ai.client.token.usage` | Counter, `{token}` | `gen_ai.token.type` is `input`, `output`, `input_cache_read`, or `input_cache_write`; model and engine when known. Emitted for available, non-negative token counts when token usage is enabled. |
 | `gh_aw.agent.turns` | Histogram, `{turn}` | Job and workflow names; emitted when a non-negative agent turn count is available. |
 | `gh_aw.tool_calls` | Counter, `{call}` | `gh-aw.tool.status` is `ok` or `error`; emitted for nonzero tool-call counts. |
@@ -412,8 +412,8 @@ The exporter also emits these compatibility names:
 
 | Compatibility metric | Corresponding metric |
 | --- | --- |
-| `gh_aw.run.duration` | `gh_aw.job.duration` (uses the run conclusion as its result attribute) |
-| `gh_aw.run.errors` | `gh_aw.job.errors` (emitted according to the run conclusion) |
+| `gh_aw.run.duration` | `gh_aw.job.duration` (uses the run conclusion for `cicd.pipeline.task.run.result`) |
+| `gh_aw.run.errors` | `gh_aw.job.errors` (unit `{run}`; emitted according to the run conclusion for `cicd.pipeline.task.run.result`) |
 | `gh_aw.tokens.input` | `gen_ai.client.token.usage` with `gen_ai.token.type=input` |
 | `gh_aw.tokens.output` | `gen_ai.client.token.usage` with `gen_ai.token.type=output` |
 | `gh_aw.tokens.cache_read` | `gen_ai.client.token.usage` with `gen_ai.token.type=input_cache_read` |
