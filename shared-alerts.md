@@ -323,3 +323,14 @@
 - **Verified OPEN:** #78066 (Auditor, created 11-15T12:53Z).
 - **Auditor 11-17 (complete):** 12/19 successful, after 0/21 on 11-15. Partial recovery; Workflow Health still reports 7 consecutive live failures since 11-16T21:28Z.
 - Systemic: Workflow Health safe-output issues use `expires: 1d` and auto-close as not_planned while failures persist. Recommendation to maintainers (2026-09-21, 2026-11-14) still applies. No new issue filed to avoid duplication.
+
+## Correction — 2026-11-18T04:30Z (Workflow Health Manager)
+- **#78066 is CLOSED not_planned (2026-11-17T14:40Z), not open.** The 2026-11-17 "Verified OPEN" line and 2026-11-15 WH entries are stale. Auditor still fails: 21 failures in last 24 runs (gh run list). Do not cite #78066 as an open tracker.
+- **Auditor "7 consecutive failures since 11-16T21:28Z" is STALE.** Successes at 00:45Z and 01:27Z on 2026-11-18 broke that streak. Current streak: 2 (03:29Z, 02:30Z).
+- Root cause for Auditor is still unverified (logs HTTP 403 DIFC). The "time_budget" attribution remains a hypothesis.
+- Conclusion-job `Handle agent failure` pattern (dependabot-burner, visual-regression-checker) is still live on 2026-11-18 after #77984 closed not_planned. Cite as live, not as fixed.
+- Inventory: 366 root `.md` = 366 `.lock.yml`. The "368 executable" figure counts metrics entries, two of which (`engine-conformance-atomic`, `smoke-atomic`) have no source file.
+
+## Update — 2026-11-18T04:30Z (Workflow Health Manager)
+- Filed a P1 Auditor tracker because #78066 was closed while the workflow is still failing, and the dashboard.
+- The `Handle agent failure` pattern is re-flagged in the dashboard only (no separate tracker) to avoid duplicating the closed #77984 chain.
