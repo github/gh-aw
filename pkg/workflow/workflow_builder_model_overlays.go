@@ -9,24 +9,21 @@ import (
 
 // Model costs and policy overlay helpers for workflow builder.
 
+func rawModelsSection(frontmatter map[string]any) map[string]any {
+	modelsMap, _ := frontmatter["models"].(map[string]any)
+	return modelsMap
+}
+
 func extractMainModelCostsOverlay(toolsResult *toolsProcessingResult, frontmatter map[string]any) map[string]any {
-	// Fall back to raw frontmatter when ParseFrontmatterConfig failed (e.g. due to unrecognized
-	// tool config shapes like bash: ["*"]).
-	if toolsResult.parsedFrontmatter != nil && len(toolsResult.parsedFrontmatter.ModelCosts) > 0 {
-		if providers, hasProviders := toolsResult.parsedFrontmatter.ModelCosts["providers"]; hasProviders {
-			if providersMap, ok := providers.(map[string]any); ok && len(providersMap) > 0 {
-				return map[string]any{"providers": providersMap}
-			}
+	if toolsResult.parsedFrontmatter != nil {
+		providersMap := modelOverlayMap(toolsResult.parsedFrontmatter.ModelCosts["providers"])
+		if len(providersMap) > 0 {
+			return map[string]any{"providers": providersMap}
 		}
-		return nil
 	}
 
-	rawModels, ok := frontmatter["models"]
-	if !ok {
-		return nil
-	}
-	modelsMap, ok := rawModels.(map[string]any)
-	if !ok {
+	modelsMap := rawModelsSection(frontmatter)
+	if modelsMap == nil {
 		return nil
 	}
 	providers, hasProviders := modelsMap["providers"]
@@ -135,8 +132,8 @@ func extractMainModelPolicyOverlay(toolsResult *toolsProcessingResult, frontmatt
 			return mainPolicy
 		}
 	}
-	modelsMap, ok := frontmatter["models"].(map[string]any)
-	if !ok {
+	modelsMap := rawModelsSection(frontmatter)
+	if modelsMap == nil {
 		return nil
 	}
 	mainPolicy := map[string][]string{
@@ -186,8 +183,8 @@ func resolveDefaultAiCreditsPricing(frontmatter map[string]any, imported map[str
 // extractDefaultAiCreditsPricingFromModels returns the fallback AI credits pricing configured
 // under models.default-ai-credits-pricing in the workflow frontmatter, or nil if absent.
 func extractDefaultAiCreditsPricingFromModels(frontmatter map[string]any) *AiCreditsPricingConfig {
-	modelsMap, ok := frontmatter["models"].(map[string]any)
-	if !ok {
+	modelsMap := rawModelsSection(frontmatter)
+	if modelsMap == nil {
 		return nil
 	}
 	return extractDefaultAiCreditsPricingFromModelsMap(modelsMap)
