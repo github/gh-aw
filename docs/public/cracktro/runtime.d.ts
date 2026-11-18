@@ -46,6 +46,8 @@ declare namespace CracktroDeck {
     slide(direction: number, music: string | undefined, shift: number): void;
     touch(): void;
     step(direction: number): void;
+    /** Optional: create or resume the audio context; kiosk mode calls it from the starting gesture while sound is on. */
+    unlock?(): unknown;
   }
 
   interface Services {
