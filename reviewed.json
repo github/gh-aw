@@ -932,5 +932,44 @@
    "tests/test_goal_scheduler.py: scheduler unit tests; archived"
   ],
   "blogged": false
+ },
+ "garnet-labs/ghaw-garnet-reference": {
+  "kind": "tool",
+  "reviewed": "2026-11-18",
+  "score": 6,
+  "summary": "Garnet reference repo for gh-aw runtime review: tokenless OIDC recording and a PR-bound agent comment; vendor-run; workflow sources policy-filtered.",
+  "highlights": [
+   "README 'Use it in your repository': no repository secrets; Garnet authenticates via OIDC (id-token: write), Copilot billed via copilot-requests: write.",
+   "README 'How it is put together': agent counts a record only when bound to the PR head; incomplete capture is 'unknown', labelled runtime-capture-incomplete, never 'clean'.",
+   "README lists gh-aw primitives in use: on.pull_request paths, mcp-servers allowed tools, network.allowed, tools.bash allowlist, safe-outputs add-comment/add-labels, SHA-pinned actions via .github/aw/actions-lock.json.",
+   "Workflow files visible in listing (dependency-runtime-review.md, daily-repo-status.md, agentic-pkg-install.md) but .md contents were secrecy-policy filtered, so not verified beyond the README."
+  ],
+  "blogged": false
+ },
+ "hivecommons/hive": {
+  "kind": "other",
+  "reviewed": "2026-11-18",
+  "score": 5,
+  "summary": "Work-governance plane for AI coding agents that also uses gh-aw (competitor report, compile check, pinned actions lock); gh-aw use is incidental; workflow sources policy-filtered.",
+  "highlights": [
+   "AGENTS.md: explicit agent rules (CI is the sole test verdict, signed commits, changelog fragments per PR); governance rather than gh-aw-specific.",
+   "README 'Trust': 369 of 563 PRs sent back for changes were later approved (65.5%), with an explicit caveat that approval does not prove correctness.",
+   ".github/aw/actions-lock.json pins github/gh-aw-actions/setup@v1.0.1 to a commit SHA; listing shows gh-aw-compile.yml and weekly-competitor-report.md/.lock.yml.",
+   "Workflow file contents were secrecy-policy filtered, so the gh-aw workflow design could not be assessed."
+  ],
+  "blogged": false
+ },
+ "AkashAi7/octoshop-agentic-CI": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-18",
+  "score": 4,
+  "summary": "Getting-started e-commerce demo and lab for gh-aw (daily repo status, starter workflows); README readable, workflow sources policy-filtered.",
+  "highlights": [
+   "README: pairs a daily-repo-status agentic workflow with deterministic 'E-Commerce CI' and an 'npm run verify' step that validates the .md workflows.",
+   "README lab offers starter workflows (ci-failure-explainer.md, checkout-pr-review.md, storefront-issue-triage.md, checkout-auto-handoff.md handing off to @copilot).",
+   "README setup relies on a COPILOT_GITHUB_TOKEN fine-grained PAT or copilot-requests: write for org billing.",
+   "Workflow .md contents were secrecy-policy filtered; the demo is mainly educational with limited original gh-aw patterns visible."
+  ],
+  "blogged": false
  }
 }

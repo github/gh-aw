@@ -1,11 +1,5 @@
 [
  {
-  "id": "hivecommons/hive",
-  "kind": "other",
-  "source": "linked from githubnext/agentics README 2026-11-12",
-  "discovered": "2026-11-12"
- },
- {
   "id": "microsoft/neuro-formal-verification",
   "kind": "other",
   "source": "discovery topic:github-agentic-workflows 2026-11-16",
@@ -24,21 +18,27 @@
   "discovered": "2026-11-17"
  },
  {
-  "id": "garnet-labs/ghaw-garnet-reference",
-  "kind": "tool",
-  "source": "discovery repo search 2026-11-17",
-  "discovered": "2026-11-17"
- },
- {
-  "id": "AkashAi7/octoshop-agentic-CI",
-  "kind": "workflow-collection",
-  "source": "discovery repo search 2026-11-17",
-  "discovered": "2026-11-17"
- },
- {
   "id": "shin-akuma/agentic-workflows-demo",
   "kind": "other",
   "source": "discovery repo search 2026-11-17",
   "discovered": "2026-11-17"
+ },
+ {
+  "id": "PlainConceptsPlatform/agentic-workflows",
+  "kind": "workflow-collection",
+  "source": "discovery repo search 2026-11-18",
+  "discovered": "2026-11-18"
+ },
+ {
+  "id": "Dennis-Otto/issue-assistant",
+  "kind": "tool",
+  "source": "discovery repo search 2026-11-18",
+  "discovered": "2026-11-18"
+ },
+ {
+  "id": "Suv4o/charge-line-data",
+  "kind": "other",
+  "source": "discovery repo search 2026-11-18",
+  "discovered": "2026-11-18"
  }
 ]

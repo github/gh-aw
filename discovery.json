@@ -235,6 +235,22 @@
   {
    "q": "agentic workflows gh-aw in:description fork:false archived:false pushed:>2026-11-01",
    "last_run": "2026-11-17"
+  },
+  {
+   "q": "\"gh aw\" in:readme fork:false archived:false pushed:>2026-11-01",
+   "last_run": "2026-11-18"
+  },
+  {
+   "q": "agentic workflows gh-aw in:description fork:false archived:false pushed:>2026-10-25",
+   "last_run": "2026-11-18"
+  },
+  {
+   "q": "\"safe-outputs\" \"engine: copilot\" fork:false archived:false pushed:>2026-11-01",
+   "last_run": "2026-11-18"
+  },
+  {
+   "q": "\"engine: copilot\" path:.github/workflows extension:md (code search, empty result)",
+   "last_run": "2026-11-18"
   }
  ]
 }
