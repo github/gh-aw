@@ -87,6 +87,7 @@ async function logSpan(toolName, attributes = {}, options = {}) {
       SPAN_KIND_CLIENT,
       buildGitHubActionsResourceAttributes,
       readJSONIfExists,
+      isGenAiLatestExperimental,
     } = require(path.join(__dirname, "send_otlp_span.cjs"));
 
     const now = Date.now();
@@ -132,6 +133,7 @@ async function logSpan(toolName, attributes = {}, options = {}) {
       awfVersion,
       awmgVersion,
       staged,
+      workflowName: process.env.GITHUB_WORKFLOW || "",
     });
 
     const payload = buildOTLPPayload({
@@ -146,7 +148,7 @@ async function logSpan(toolName, attributes = {}, options = {}) {
       kind: SPAN_KIND_CLIENT,
       attributes: spanAttrs,
       resourceAttributes,
-      statusCode: options.isError ? 2 : 1,
+      statusCode: options.isError ? 2 : isGenAiLatestExperimental() ? 0 : 1,
       ...(options.isError && options.errorMessage ? { statusMessage: options.errorMessage } : {}),
     });
 

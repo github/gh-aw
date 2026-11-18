@@ -20,7 +20,29 @@ const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
-const { OTEL_ATTR_WORKFLOW_NAME, OTEL_ATTR_REPOSITORY, OTEL_ATTR_RUN_ID, OTEL_ATTR_GITHUB_RUN_ID, OTEL_ATTR_ENGINE_ID, canonicalAttributeName } = require("./otel_attributes_generated.cjs");
+const {
+  OTEL_ATTR_CICD_PIPELINE_NAME,
+  OTEL_ATTR_CICD_PIPELINE_RUN_ID,
+  OTEL_ATTR_CICD_PIPELINE_RUN_URL_FULL,
+  OTEL_ATTR_CICD_PIPELINE_TASK_NAME,
+  OTEL_ATTR_DEPLOYMENT_ENVIRONMENT,
+  OTEL_ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
+  OTEL_ATTR_ENGINE_ID,
+  OTEL_ATTR_ERROR_TYPE,
+  OTEL_ATTR_GITHUB_RUN_ID,
+  OTEL_ATTR_GEN_AI_AGENT_NAME,
+  OTEL_ATTR_GEN_AI_PROVIDER_NAME,
+  OTEL_ATTR_GEN_AI_TOKEN_MODALITY,
+  OTEL_ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS,
+  OTEL_ATTR_REPOSITORY,
+  OTEL_ATTR_RUN_ID,
+  OTEL_ATTR_VCS_PROVIDER_NAME,
+  OTEL_ATTR_VCS_REF_HEAD_NAME,
+  OTEL_ATTR_VCS_REF_HEAD_REVISION,
+  OTEL_ATTR_VCS_REPOSITORY_URL_FULL,
+  OTEL_ATTR_WORKFLOW_NAME,
+  canonicalAttributeName,
+} = require("./otel_attributes_generated.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -59,6 +81,29 @@ const ENGINE_TO_SYSTEM_MAP = Object.assign(Object.create(null), {
   codex: "openai",
   gemini: "google_vertex_ai",
 });
+
+/** @type {Record<string, string>} gen_ai.provider.name per engine. */
+const ENGINE_TO_PROVIDER_MAP = Object.assign(Object.create(null), {
+  copilot: "github",
+  claude: "anthropic",
+  codex: "openai",
+  gemini: "gcp.gen_ai",
+});
+
+/** @param {string} engineId */
+function resolveGenAiProvider(engineId) {
+  return ENGINE_TO_PROVIDER_MAP[engineId] || engineId;
+}
+
+/** True when OTEL_SEMCONV_STABILITY_OPT_IN contains gen_ai_latest_experimental (spec §6.7). */
+function isGenAiLatestExperimental() {
+  return (process.env.OTEL_SEMCONV_STABILITY_OPT_IN || "")
+    .split(",")
+    .map(s => s.trim())
+    .includes("gen_ai_latest_experimental");
+}
+
+const GEN_AI_SCHEMA_URL = "https://opentelemetry.io/schemas/1.45.0";
 
 // ---------------------------------------------------------------------------
 // Low-level helpers
@@ -321,7 +366,7 @@ const SPAN_KIND_CONSUMER = 5;
  * @property {string} [scopeVersion]    - gh-aw version string (e.g. from GH_AW_INFO_VERSION)
  * @property {Array<{key: string, value: object}>} attributes - Span attributes
  * @property {Array<{key: string, value: object}>} [resourceAttributes] - Extra resource attributes (e.g. github.repository, github.run_id)
- * @property {number} [statusCode]      - OTLP status code: 0=UNSET, 1=OK, 2=ERROR (defaults to 1)
+ * @property {number} [statusCode]      - OTLP status code: 0=UNSET, 1=OK, 2=ERROR
  * @property {string} [statusMessage]   - Human-readable status message (included when statusCode is 2)
  * @property {number} [kind]            - OTLP SpanKind: use SPAN_KIND_* constants. Defaults to SPAN_KIND_INTERNAL (1).
  * @property {Array<{timeUnixNano: string, name: string, attributes: Array<{key: string, value: object}>}>} [events] - Span events following the OTel events spec (e.g. exception events).
@@ -349,7 +394,7 @@ const SPAN_KIND_CONSUMER = 5;
  * @returns {any}
  */
 function buildOTLPSpan({ traceId, spanId, parentSpanId, spanName, startMs, endMs, attributes, statusCode, statusMessage, kind = SPAN_KIND_INTERNAL, events }) {
-  const code = typeof statusCode === "number" ? statusCode : 1; // STATUS_CODE_OK
+  const code = typeof statusCode === "number" ? statusCode : isGenAiLatestExperimental() ? 0 : 1;
   /** @type {{ code: number, message?: string }} */
   const status = { code };
   if (statusMessage) {
@@ -400,6 +445,7 @@ function buildOTLPResourceAttributes(serviceName, scopeVersion, resourceAttribut
  *   sha?: string,
  *   job?: string,
  *   workflowRef?: string,
+ *   workflowName?: string,
  *   actorId?: string,
  *   runnerOs?: string,
  *   runnerArch?: string,
@@ -422,6 +468,7 @@ function buildGitHubActionsResourceAttributes({
   sha = "",
   job = "",
   workflowRef = "",
+  workflowName = "",
   actorId = "",
   runnerOs = "",
   runnerArch = "",
@@ -440,6 +487,9 @@ function buildGitHubActionsResourceAttributes({
     } else {
       resourceAttributes.push(attr);
     }
+  };
+  const addResourceAttrIfAbsent = attr => {
+    if (!resourceAttributes.some(existing => existing.key === attr.key)) resourceAttributes.push(attr);
   };
 
   upsertResourceAttr(buildAttr("github.repository", repository));
@@ -491,7 +541,28 @@ function buildGitHubActionsResourceAttributes({
   if (awmgVersion) {
     upsertResourceAttr(buildAttr("gh-aw.awmg.version", awmgVersion));
   }
-  upsertResourceAttr(buildAttr("deployment.environment", staged ? "staging" : "production"));
+  const deploymentEnvironment = staged ? "staging" : "production";
+  if (!isGenAiLatestExperimental()) {
+    upsertResourceAttr(buildAttr(OTEL_ATTR_DEPLOYMENT_ENVIRONMENT, deploymentEnvironment));
+  } else {
+    for (let index = resourceAttributes.length - 1; index >= 0; index--) {
+      if (resourceAttributes[index].key === OTEL_ATTR_DEPLOYMENT_ENVIRONMENT) resourceAttributes.splice(index, 1);
+    }
+  }
+  const serverUrl = (process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
+  const repositoryUrl = repository ? `${serverUrl}/${repository}` : "";
+  const standardResourceAttributes = [
+    ...(workflowName ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_NAME, workflowName)] : []),
+    ...(runId ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_RUN_ID, runId)] : []),
+    ...(runUrlAttr ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_RUN_URL_FULL, runUrlAttr.value.stringValue)] : []),
+    ...(job ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_TASK_NAME, job)] : []),
+    buildAttr(OTEL_ATTR_VCS_PROVIDER_NAME, "github"),
+    ...(repositoryUrl ? [buildAttr(OTEL_ATTR_VCS_REPOSITORY_URL_FULL, repositoryUrl)] : []),
+    ...(refName ? [buildAttr(OTEL_ATTR_VCS_REF_HEAD_NAME, refName)] : []),
+    ...(sha ? [buildAttr(OTEL_ATTR_VCS_REF_HEAD_REVISION, sha)] : []),
+    buildAttr(OTEL_ATTR_DEPLOYMENT_ENVIRONMENT_NAME, deploymentEnvironment),
+  ];
+  standardResourceAttributes.forEach(addResourceAttrIfAbsent);
   return resourceAttributes;
 }
 
@@ -598,18 +669,18 @@ function buildGitHubActionsRunUrlAttribute(repository, runId) {
  * @returns {any}
  */
 function buildOTLPBatchPayload({ serviceName, scopeVersion, resourceAttributes, spans }) {
+  const scopeSpans = {
+    scope: { name: "gh-aw", version: scopeVersion || "unknown" },
+    ...(isGenAiLatestExperimental() ? { schemaUrl: GEN_AI_SCHEMA_URL } : {}),
+    spans,
+  };
   return {
     resourceSpans: [
       {
         resource: {
           attributes: buildOTLPResourceAttributes(serviceName, scopeVersion, resourceAttributes),
         },
-        scopeSpans: [
-          {
-            scope: { name: "gh-aw", version: scopeVersion || "unknown" },
-            spans,
-          },
-        ],
+        scopeSpans: [scopeSpans],
       },
     ],
   };
@@ -1086,6 +1157,7 @@ function sanitizeAttrs(attrs) {
     const val = attr.value;
     if (typeof val !== "object" || val === null) return attr;
     if (attr.key === "gen_ai.token.type" && "stringValue" in val && typeof val.stringValue === "string" && SAFE_TOKEN_TYPE_VALUES.has(val.stringValue)) return attr;
+    if (attr.key === OTEL_ATTR_GEN_AI_TOKEN_MODALITY && "stringValue" in val && typeof val.stringValue === "string" && ["text", "image", "audio", "video", "unknown"].includes(val.stringValue)) return attr;
     if (isSensitive && "stringValue" in val) {
       return { key: attr.key, value: { stringValue: REDACTED } };
     }
@@ -1600,8 +1672,10 @@ async function sendJobSetupSpan(options = {}) {
   }
 
   if (engineId) {
-    const genAiSystem = ENGINE_TO_SYSTEM_MAP[engineId] || engineId;
-    attributes.push(buildAttr("gen_ai.system", genAiSystem));
+    if (!isGenAiLatestExperimental()) {
+      attributes.push(buildAttr("gen_ai.system", ENGINE_TO_SYSTEM_MAP[engineId] || engineId));
+    }
+    attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, resolveGenAiProvider(engineId)));
     attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (eventName) {
@@ -1655,6 +1729,7 @@ async function sendJobSetupSpan(options = {}) {
     awmgVersion,
     staged,
     runAttempt,
+    workflowName,
   });
 
   const payload = buildOTLPPayload({
@@ -2052,16 +2127,16 @@ function normalizeNonNegativeNumber(rawValue) {
  * Normalize token usage counters from an engine result event usage block.
  *
  * @param {unknown} rawUsage
- * @returns {{input_tokens?: number, output_tokens?: number, cache_read_tokens?: number, cache_write_tokens?: number, ai_credits?: number} | undefined}
+ * @returns {{input_tokens?: number, output_tokens?: number, cache_read_tokens?: number, cache_write_tokens?: number, input_tokens_inclusive?: number, input_tokens_include_cache?: boolean, ai_credits?: number} | undefined}
  */
 function normalizeRuntimeTokenUsage(rawUsage) {
   if (!rawUsage || typeof rawUsage !== "object" || Array.isArray(rawUsage)) {
     return undefined;
   }
 
-  /** @type {{input_tokens?: number, output_tokens?: number, cache_read_tokens?: number, cache_write_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, ai_credits?: number}} */
+  /** @type {{input_tokens?: number, output_tokens?: number, cache_read_tokens?: number, cache_write_tokens?: number, input_tokens_inclusive?: number, input_tokens_include_cache?: boolean, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, ai_credits?: number}} */
   const usage = rawUsage;
-  /** @type {{input_tokens?: number, output_tokens?: number, cache_read_tokens?: number, cache_write_tokens?: number, ai_credits?: number}} */
+  /** @type {{input_tokens?: number, output_tokens?: number, cache_read_tokens?: number, cache_write_tokens?: number, input_tokens_inclusive?: number, input_tokens_include_cache?: boolean, ai_credits?: number}} */
   const normalized = {};
 
   const inputTokens = normalizeNonNegativeNumber(usage.input_tokens);
@@ -2083,12 +2158,43 @@ function normalizeRuntimeTokenUsage(rawUsage) {
     normalized.cache_write_tokens = cacheWriteTokens;
   }
 
+  const inclusiveInputTokens = normalizeNonNegativeNumber(usage.input_tokens_inclusive);
+  if (typeof inclusiveInputTokens === "number") {
+    normalized.input_tokens_inclusive = inclusiveInputTokens;
+  }
+  if (typeof usage.input_tokens_include_cache === "boolean") {
+    normalized.input_tokens_include_cache = usage.input_tokens_include_cache;
+  }
+
   const aiCredits = normalizeNonNegativeNumber(usage.ai_credits);
   if (typeof aiCredits === "number") {
     normalized.ai_credits = aiCredits;
   }
 
   return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+/**
+ * Resolve inclusive input tokens when the usage source provides enough cache semantics.
+ * @param {Record<string, any>} usage
+ * @returns {number | undefined}
+ */
+function resolveInclusiveInputTokens(usage) {
+  const input = normalizeNonNegativeNumber(usage.input_tokens);
+  if (typeof input !== "number") return undefined;
+  const cacheRead = normalizeNonNegativeNumber(usage.cache_read_tokens);
+  const cacheWrite = normalizeNonNegativeNumber(usage.cache_write_tokens);
+  if (typeof usage.input_tokens_inclusive === "number" && Number.isFinite(usage.input_tokens_inclusive) && usage.input_tokens_inclusive >= 0) {
+    return usage.input_tokens_inclusive;
+  }
+  if (usage.input_tokens_include_cache === true) return input;
+  if (usage.input_tokens_include_cache === false) {
+    if (typeof cacheRead !== "number" || typeof cacheWrite !== "number") return undefined;
+    return input + cacheRead + cacheWrite;
+  }
+  if (cacheRead === undefined && cacheWrite === undefined) return input;
+  if (cacheRead === 0 && cacheWrite === 0) return input;
+  return undefined;
 }
 
 /**
@@ -2317,6 +2423,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const bodyModified = typeof awInfo.body_modified === "boolean" ? awInfo.body_modified : parseBooleanEnv(process.env.GH_AW_INFO_BODY_MODIFIED);
   const trackerId = process.env.GH_AW_TRACKER_ID || awInfo.tracker_id || "";
   const jobName = resolveConclusionJobName(spanName);
+  const optIn = isGenAiLatestExperimental();
   const modelRoutingSummary = jobName === "agent" ? resolveModelRoutingSummary({ infoPath: getGhAwPath("aw_info.json"), ghAwDir: getGhAwPath("") }) : null;
   const jobEmitsOwnTokenUsage = jobName === "agent" || jobName === "detection" || (!!engineId && jobName === engineId);
   const runId = process.env.GITHUB_RUN_ID || "";
@@ -2359,7 +2466,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const isAgentCancelled = agentConclusion === "cancelled";
   const isAgentNonOK = isAgentFailure || isAgentCancelled;
   // STATUS_CODE_ERROR = 2, STATUS_CODE_OK = 1
-  let statusCode = isAgentNonOK ? 2 : 1;
+  let statusCode = isAgentNonOK ? 2 : optIn ? 0 : 1;
   let statusMessage;
   if (isAgentFailure) {
     statusMessage = `agent ${agentConclusion}`;
@@ -2485,8 +2592,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
 
   if (jobName) attributes.push(buildAttr("gh-aw.job.name", jobName));
   if (engineId) {
-    const genAiSystem = ENGINE_TO_SYSTEM_MAP[engineId] || engineId;
-    attributes.push(buildAttr("gen_ai.system", genAiSystem));
+    if (!optIn) attributes.push(buildAttr("gen_ai.system", ENGINE_TO_SYSTEM_MAP[engineId] || engineId));
+    attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, resolveGenAiProvider(engineId)));
     attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (model) attributes.push(buildAttr("gen_ai.request.model", model));
@@ -2544,19 +2651,27 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   if (typeof runtimeMetrics.turns === "number") {
     attributes.push(buildAttr("gh-aw.turns", runtimeMetrics.turns));
   }
+  /** GenAI attributes that describe the agent invocation (spec §9.5). */
+  const agentGenAiAttrs = [];
+  let agentErrorType = "";
   if (jobName === "agent") {
     // Emit OTel GenAI semantic attributes on agent conclusion spans even when the
     // dedicated agent sub-span is missing, so LLM activity remains discoverable.
-    attributes.push(buildAttr("gen_ai.operation.name", "chat"));
-    if (workflowName) attributes.push(buildAttr("gen_ai.workflow.name", workflowName));
-    if (runtimeMetrics.resolvedModel) attributes.push(buildAttr("gen_ai.response.model", runtimeMetrics.resolvedModel));
+    agentGenAiAttrs.push(buildAttr("gen_ai.operation.name", optIn ? "invoke_agent" : "chat"));
+    if (workflowName) {
+      agentGenAiAttrs.push(buildAttr(OTEL_ATTR_GEN_AI_AGENT_NAME, workflowName));
+      if (!optIn) agentGenAiAttrs.push(buildAttr("gen_ai.workflow.name", workflowName));
+    }
+    if (runtimeMetrics.resolvedModel) agentGenAiAttrs.push(buildAttr("gen_ai.response.model", runtimeMetrics.resolvedModel));
     // Use the engine-reported stop_reason when available; fall back to "timeout" when
     // the agent was killed before it could write a result entry to agent-stdio.log;
     // use "unknown" as a sentinel for engines (e.g. copilot, codex) that do not emit
     // a result entry at all, so that gen_ai.response.finish_reasons is always present
     // and length-truncation is always queryable in Sentry/dashboards.
     const effectiveStopReason = runtimeMetrics.stopReason || (isAgentTimedOut ? "timeout" : "unknown");
-    attributes.push(buildArrayAttr("gen_ai.response.finish_reasons", [effectiveStopReason]));
+    agentGenAiAttrs.push(buildArrayAttr("gen_ai.response.finish_reasons", [effectiveStopReason]));
+    agentErrorType = isAgentTimedOut ? "timeout" : isAgentCancelled ? "cancelled" : isAgentFailure || runStatus === "failure" ? "agent_failed" : "";
+    if (agentErrorType) agentGenAiAttrs.push(buildAttr(OTEL_ATTR_ERROR_TYPE, agentErrorType));
   }
 
   if (agentConclusion) {
@@ -2644,6 +2759,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     awmgVersion,
     staged,
     runAttempt,
+    workflowName,
   });
   // OpenTelemetry semantic convention for exceptions.  Each event has
   // name="exception" with "exception.type" and "exception.message" attributes,
@@ -2728,7 +2844,10 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   if (typeof aiCredits === "number") {
     usageAttrs.push(buildDoubleAttr("gh-aw.aic", aiCredits));
   }
-  if (typeof agentUsage.input_tokens === "number") {
+  const inclusiveInputTokens = resolveInclusiveInputTokens(agentUsage);
+  if (optIn) {
+    if (typeof inclusiveInputTokens === "number") usageAttrs.push(buildAttr("gen_ai.usage.input_tokens", inclusiveInputTokens));
+  } else if (typeof agentUsage.input_tokens === "number") {
     usageAttrs.push(buildAttr("gen_ai.usage.input_tokens", agentUsage.input_tokens));
   }
   if (typeof agentUsage.output_tokens === "number") {
@@ -2738,14 +2857,12 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     usageAttrs.push(buildAttr("gen_ai.usage.cache_read.input_tokens", agentUsage.cache_read_tokens));
   }
   if (typeof agentUsage.cache_write_tokens === "number") {
-    usageAttrs.push(buildAttr("gen_ai.usage.cache_creation.input_tokens", agentUsage.cache_write_tokens));
+    usageAttrs.push(buildAttr(OTEL_ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS, agentUsage.cache_write_tokens));
+    if (!optIn) usageAttrs.push(buildAttr("gen_ai.usage.cache_creation.input_tokens", agentUsage.cache_write_tokens));
   }
-  // Emit gen_ai.usage.total_tokens as the sum of input and output so OTel GenAI
-  // semantic-convention aggregations (e.g. sum(gen_ai.usage.total_tokens)) work
-  // without per-backend normalization. Cache tokens are excluded from the total
-  // to match the OpenTelemetry GenAI spec definition of "total tokens consumed".
-  // A partial count is not a total; measured zero is distinct from unavailable.
-  if (typeof agentUsage.input_tokens === "number" && typeof agentUsage.output_tokens === "number") {
+  // gen_ai.usage.total_tokens is a gh-aw compatibility attribute that is not part
+  // of the OpenTelemetry GenAI conventions. Cache tokens are excluded.
+  if (!optIn && typeof agentUsage.input_tokens === "number" && typeof agentUsage.output_tokens === "number") {
     const totalTokens = agentUsage.input_tokens + agentUsage.output_tokens;
     if (Number.isFinite(totalTokens)) {
       usageAttrs.push(buildAttr("gen_ai.usage.total_tokens", totalTokens));
@@ -2755,6 +2872,11 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const endpoints = parseOTLPEndpoints();
   const conclusionSpanId = generateSpanId();
   const hasDedicatedAgentSpan = jobName === "agent" && typeof agentStartMs === "number" && agentStartMs > 0 && typeof agentEndMs === "number" && agentEndMs > agentStartMs;
+  if (!optIn || !hasDedicatedAgentSpan) {
+    attributes.push(...agentGenAiAttrs);
+  } else if (agentErrorType) {
+    attributes.push(buildAttr(OTEL_ATTR_ERROR_TYPE, agentErrorType));
+  }
   if (hasDedicatedAgentSpan && typeof agentEndMs === "number") {
     const agentSpanEndMs = agentEndMs;
     const agentSpanEvents = buildSpanEvents(agentSpanEndMs);
@@ -2764,15 +2886,13 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     // LLM dashboards in Grafana, Datadog, and Honeycomb without custom mappings.
     // Token-usage attributes are included here (and only here) to prevent
     // double-counting with the conclusion span.
-    const agentAttributes = [...attributes, ...usageAttrs];
-    // gen_ai.operation.name / gen_ai.workflow.name / gen_ai.response.finish_reasons
-    // are already included via the shared attributes list above.
+    const agentAttributes = [...attributes, ...(optIn ? agentGenAiAttrs.filter(attr => attr.key !== OTEL_ATTR_ERROR_TYPE) : []), ...usageAttrs];
 
     const agentPayload = buildOTLPPayload({
       traceId,
       spanId: generateSpanId(),
-      parentSpanId: conclusionSpanId,
-      spanName: jobName ? `gh-aw.${jobName}.agent` : "gh-aw.job.agent",
+      ...(optIn ? (parentSpanId ? { parentSpanId } : {}) : { parentSpanId: conclusionSpanId }),
+      spanName: optIn ? (workflowName ? `invoke_agent ${workflowName}` : "invoke_agent") : jobName ? `gh-aw.${jobName}.agent` : "gh-aw.job.agent",
       startMs: agentStartMs,
       endMs: agentSpanEndMs,
       serviceName,
@@ -2782,7 +2902,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
       statusCode,
       statusMessage,
       events: agentSpanEvents,
-      kind: SPAN_KIND_CLIENT,
+      kind: optIn ? SPAN_KIND_INTERNAL : SPAN_KIND_CLIENT,
     });
     appendToOTLPJSONL(agentPayload);
     if (endpoints.length > 0) {
@@ -2872,6 +2992,12 @@ async function sendJobConclusionSpan(spanName, options = {}) {
         outputTokens: agentUsage.output_tokens,
         cacheReadTokens: agentUsage.cache_read_tokens,
         cacheWriteTokens: agentUsage.cache_write_tokens,
+        provider: engineId ? resolveGenAiProvider(engineId) : "",
+        inclusiveInputTokens,
+        agentName: jobName === "agent" ? workflowName : "",
+        agentDurationSeconds: hasDedicatedAgentSpan ? (agentEndMs - agentStartMs) / 1000 : undefined,
+        agentErrorType,
+        semconvLatest: optIn,
         emitsTokenUsage: jobEmitsOwnTokenUsage,
         turns: jobName === "agent" ? runtimeMetrics.turns : undefined,
         toolCalls: gatewayMetrics?.total_calls,
@@ -2944,4 +3070,8 @@ module.exports = {
   buildEvalTelemetry,
   parseOTLPCustomAttributes,
   buildCustomOTLPAttributes,
+  resolveGenAiProvider,
+  isGenAiLatestExperimental,
+  GEN_AI_SCHEMA_URL,
+  resolveInclusiveInputTokens,
 };
