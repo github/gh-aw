@@ -189,8 +189,9 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 				if err != nil {
 					return err
 				}
+				prBody = appendUpdatePRReleaseHighlights(cmd.Context(), prBody)
 				_, err = createPRWithChanges(cmd.Context(), "update-workflows", "chore: update workflows",
-					"Update workflows from source", prBody, verbose, opts.AutoMerge)
+					updatePRTitle("Update workflows from source"), prBody, verbose, opts.AutoMerge)
 				return err
 			}
 			return nil
@@ -436,6 +437,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 		if err != nil {
 			return err
 		}
+		prBody = appendUpdatePRReleaseHighlights(ctx, prBody)
 		prBody += "\n" + xmlMarker
 		if err := validatePRBody(prBody); err != nil {
 			return err
@@ -447,7 +449,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 		}
 
 		prURL, err := createPRWithChanges(ctx, "update-workflows", "chore: update workflows",
-			"Update workflows from source", prBody, verbose, opts.AutoMerge)
+			updatePRTitle("Update workflows from source"), prBody, verbose, opts.AutoMerge)
 		if prURL != "" {
 			addLabelToOrgPR(ctx, prURL, agenticWorkflowsLabel, verbose)
 		}
