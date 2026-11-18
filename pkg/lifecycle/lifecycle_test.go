@@ -191,8 +191,10 @@ func TestLifecycleValidatesRetainedDecisionsAndAcceptanceKinds(t *testing.T) {
 	require.ErrorContains(t, err, "equal-clock")
 	conflict = accepted
 	conflict.Adoption.HumanVerified = false
-	_, err = Merge(Record{}, conflict)
-	assert.ErrorContains(t, err, "verified decision")
+	t.Run("rejects unverified retained decision", func(t *testing.T) {
+		_, err := Merge(Record{}, conflict)
+		require.ErrorContains(t, err, "verified decision")
+	})
 
 	fallback := testDelivery(t, "add_comment")
 	_, err = Observe(fallback, Observation{
@@ -200,16 +202,20 @@ func TestLifecycleValidatesRetainedDecisionsAndAcceptanceKinds(t *testing.T) {
 		ObservedAt: at, AcceptanceKind: "fallback_delivery",
 	})
 	require.NoError(t, err)
-	_, err = Observe(fallback, Observation{
-		State: "accepted", Signal: "delivered", At: fallback.Delivery.At,
-		ObservedAt: at, HumanVerified: true, AcceptanceKind: "fallback_delivery",
+	t.Run("rejects human-verified fallback", func(t *testing.T) {
+		_, err := Observe(fallback, Observation{
+			State: "accepted", Signal: "delivered", At: fallback.Delivery.At,
+			ObservedAt: at, HumanVerified: true, AcceptanceKind: "fallback_delivery",
+		})
+		require.ErrorContains(t, err, "fallback is not permitted")
 	})
-	assert.ErrorContains(t, err, "fallback is not permitted")
-	_, err = Observe(fallback, Observation{
-		State: "accepted", Signal: "delivered", At: fallback.Delivery.At.Add(time.Second),
-		ObservedAt: at, AcceptanceKind: "fallback_delivery",
+	t.Run("rejects fallback after delivery time", func(t *testing.T) {
+		_, err := Observe(fallback, Observation{
+			State: "accepted", Signal: "delivered", At: fallback.Delivery.At.Add(time.Second),
+			ObservedAt: at, AcceptanceKind: "fallback_delivery",
+		})
+		require.ErrorContains(t, err, "fallback is not permitted")
 	})
-	assert.ErrorContains(t, err, "fallback is not permitted")
 	for _, outputType := range []string{"connector_custom", "noop"} {
 		t.Run(outputType, func(t *testing.T) {
 			unsupported := testDelivery(t, outputType)
