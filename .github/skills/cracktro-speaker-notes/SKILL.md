@@ -14,7 +14,7 @@ provenance and experimental-feature rules still apply.
 - Address experienced software practitioners who are beginners in GitHub Agentic
   Workflows (AW), not members of its team. Assume no knowledge of internal names.
 - Write calm, conversational speaking cues, not a script, sales pitch or changelog.
-  Prefer concrete verbs, short sentences and “you” to impersonal exposition.
+  Prefer concrete verbs and short sentences; use “you” when it clarifies a choice.
 - Explain an unfamiliar acronym or mechanism locally. Distinguish `gh aw`
   (workflow authoring/compiler) from Copilot (one possible agent runtime).
 - Aim for 55–95 words per slide. This is an editorial target, not a researched
@@ -23,8 +23,9 @@ provenance and experimental-feature rules still apply.
 
 ## Required structure
 
-Keep the slide's existing `notes` string. Use three newline-separated cues with
-these literal labels, in order:
+Keep the slide's existing `notes` property; rewrite its text while preserving
+evidence and caveats. Use three newline-separated cues with these literal labels,
+in order:
 
 1. **What:** Orient the listener to the visible diagram, code or chart. Name the
    important actors and direction of flow, not every label.
@@ -63,11 +64,14 @@ not evidence that this exact notes format improves learning:
    Inspect only that slide's block in `docs/public/cracktro/deck.js`.
 2. Read the current notes and matching content-rule exception before drafting.
    Keep the slide's message and factual provenance; do not invent evidence.
-3. For a requested council, have two models draft and challenge the wording.
-   Honor the requested vendors/models; reconcile disagreements against the
-   slide, implementation and public-content rules, not majority vote.
+3. For a requested council, have two models draft independently before sharing
+   wording, then challenge each other's choices. Honor the requested vendors/models;
+   reconcile disagreements against the slide, implementation and public-content
+   rules, not majority vote.
 4. Read the cues aloud: can a newcomer explain what they see, why it matters
    and when to use it without team context? Check each cue against the visual.
-5. Follow the cracktro skill's syntax, browser and public-content checks.
+5. Check literal cue order, advisory word count, acronym explanations and every
+   required illustrative/provenance caveat. Follow the cracktro skill's syntax,
+   browser and public-content checks.
    Verify toolbar/N-key toggling, current-slide updates and mobile scrolling.
    Keep research URLs in this skill, never in the public notes.
