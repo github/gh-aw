@@ -21,8 +21,10 @@ Resolution is performed by a `Resolver`, which holds a label matcher function an
 |------|------|-------------|
 | `AttributionStatus` | string | Classifies the outcome of intent attribution |
 | `AttributionSource` | string | Identifies the data source used for attribution |
-| `Authorizer` | struct | Checks tool calls against a compiled execution policy |
+| `Authorizer` | struct | Checks tool calls against a compiled execution policy; not yet enforced in the execution path, see `ExecutionPolicy` |
 | `ExecutionPolicy` | struct | Compiled policy containing autonomy, tool restrictions, write scope, checks, approval, auto-merge, attempt, and rule-ID settings |
+| `ErrToolDenied` | error | Returned by `AuthorizeTool` when the tool is in `DeniedTools` |
+| `ErrToolNotAllowed` | error | Returned by `AuthorizeTool` when `AllowedTools` is non-nil and does not contain the tool |
 | `IntentRecord` | struct | Holds the attribution result for a pull request or issue, including optional `Domains`, `Priority`, and `Risk` classification fields |
 | `PolicyCompiler` | struct | Applies policy rules to mapped intent records |
 | `RootReference` | struct | Represents a referenced issue or artifact root (node ID, type, URL, labels) |
@@ -86,10 +88,7 @@ Resolution is performed by a `Resolver`, which holds a label matcher function an
 
 | Type/Method | Signature | Description |
 |-------------|-----------|-------------|
-| `Authorizer` | struct | Authorizes individual tool calls against a compiled `ExecutionPolicy` |
-| `AuthorizeTool` | `func (a Authorizer) AuthorizeTool(policy ExecutionPolicy, tool string) error` | Returns `ErrToolDenied` if `tool` is in `DeniedTools` (denial always wins), `ErrToolNotAllowed` if `AllowedTools` is non-nil and does not contain `tool`, or `nil` otherwise. A `nil` `AllowedTools` is unrestricted; a non-nil empty `AllowedTools` denies every tool. |
-
-The package exports `ErrToolDenied` and `ErrToolNotAllowed` as sentinel errors returned by `AuthorizeTool` for those respective denial cases.
+| `AuthorizeTool` | `func (a Authorizer) AuthorizeTool(policy ExecutionPolicy, tool string) error` | Checks tool calls against a compiled `ExecutionPolicy`; not yet enforced in the execution path, see `ExecutionPolicy`. Returns `ErrToolDenied` if `tool` is in `DeniedTools` (denial always wins), `ErrToolNotAllowed` if `AllowedTools` is non-nil and does not contain `tool`, or `nil` otherwise. A `nil` `AllowedTools` is unrestricted; a non-nil empty `AllowedTools` denies every tool. |
 
 ## Usage Examples
 

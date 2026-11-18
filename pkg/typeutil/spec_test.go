@@ -4,6 +4,7 @@ package typeutil
 
 import (
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,6 +54,12 @@ func TestSpec_PublicAPI_ParseIntValue(t *testing.T) {
 			wantOK:    true,
 		},
 		{
+			name:      "negative float64 fractional value truncates toward zero",
+			input:     float64(-3.7),
+			wantValue: -3,
+			wantOK:    true,
+		},
+		{
 			name:      "float64 NaN returns (0, false)",
 			input:     math.NaN(),
 			wantValue: 0,
@@ -83,7 +90,31 @@ func TestSpec_PublicAPI_ParseIntValue(t *testing.T) {
 			wantOK:    false,
 		},
 		{
-			name:      "uint64 overflow returns (0, false)",
+			name:      "uint64 at max int returns value",
+			input:     uint64(math.MaxInt),
+			wantValue: math.MaxInt,
+			wantOK:    true,
+		},
+		{
+			name:      "uint64 one above max int returns (0, false)",
+			input:     uint64(math.MaxInt) + 1,
+			wantValue: 0,
+			wantOK:    false,
+		},
+		{
+			name:      "float64 at negative int limit returns value",
+			input:     -math.Ldexp(1, strconv.IntSize-1),
+			wantValue: math.MinInt,
+			wantOK:    true,
+		},
+		{
+			name:      "float64 at positive int limit returns (0, false)",
+			input:     math.Ldexp(1, strconv.IntSize-1),
+			wantValue: 0,
+			wantOK:    false,
+		},
+		{
+			name:      "uint64 maximum returns (0, false)",
 			input:     ^uint64(0),
 			wantValue: 0,
 			wantOK:    false,
