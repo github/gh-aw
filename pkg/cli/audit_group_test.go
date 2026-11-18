@@ -169,6 +169,7 @@ func TestRunAuditGroupedEndToEnd(t *testing.T) {
 		outputDir:     tempDir,
 		jsonOutput:    true,
 		runtimeFilter: "gvisor",
+		repoFlag:      "owner/repo",
 	}
 
 	output := captureAuditGroupStdout(t, func() {
@@ -285,8 +286,12 @@ func captureAuditGroupStdout(t *testing.T, fn func()) string {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stdout = w
+	defer func() {
+		os.Stdout = oldStdout
+		_ = w.Close()
+		_ = r.Close()
+	}()
 	fn()
-	os.Stdout = oldStdout
 	require.NoError(t, w.Close())
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
@@ -299,8 +304,12 @@ func captureAuditGroupStderr(t *testing.T, fn func()) string {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stderr = w
+	defer func() {
+		os.Stderr = oldStderr
+		_ = w.Close()
+		_ = r.Close()
+	}()
 	fn()
-	os.Stderr = oldStderr
 	require.NoError(t, w.Close())
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)

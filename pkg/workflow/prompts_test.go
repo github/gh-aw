@@ -1044,7 +1044,12 @@ func TestCodexWorkflowsUseCodexModels(t *testing.T) {
 }
 
 func isCodexCompatibleWorkflowModel(model string) bool {
-	model = strings.ToLower(strings.TrimSpace(model))
+	model = strings.TrimSpace(model)
+	if isReservedRouterModelName(model) {
+		_, err := routerModelMode("model", model)
+		return err == nil
+	}
+	model = strings.ToLower(model)
 	model, _, _ = strings.Cut(model, "?")
 	// Empty selects Codex's native default; both auto spellings are inference pickers.
 	return model == "" || codexModelID(model) == "auto" || isCodexCompatibleModel(model)
@@ -1056,6 +1061,13 @@ func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
 		want  bool
 	}{
 		{model: "", want: true},
+		{model: "router", want: true},
+		{model: "router/economy", want: true},
+		{model: "router/balanced", want: true},
+		{model: "router/robust", want: true},
+		{model: "router/fast", want: false},
+		{model: "router/Economy", want: false},
+		{model: "router/economy?effort=high", want: false},
 		{model: "auto", want: true},
 		{model: "copilot/auto", want: true},
 		{model: "copilot/gpt-5.3-codex", want: true},
