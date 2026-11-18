@@ -1,0 +1,96 @@
+name: Collect operational value evidence
+
+on:
+  schedule:
+    - cron: "31 18 * * *"
+  workflow_dispatch:
+    inputs:
+      cohort_day:
+        description: "Optional enrolled, mature UTC source date (YYYY-MM-DD)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  collect:
+    if: github.repository == 'github/gh-aw' && vars.VALUE_COHORT_START != '' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        workflow: [dead-code-remover, daily-cli-performance]
+    env:
+      TARGET: ${{ matrix.workflow }}
+      BRANCH: ${{ github.event.repository.default_branch }}
+      START: ${{ vars.VALUE_COHORT_START }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select mature cohort
+        id: cohort
+        env:
+          REQUESTED: ${{ inputs.cohort_day }}
+          PYTHONPATH: scripts/value_evidence
+        run: |
+          python3 - <<'PY'
+          import os
+          from datetime import date, datetime, timedelta, timezone
+          from collect import DAYS
+          now = datetime.now(timezone.utc)
+          # A scheduled or retried run before UTC noon cannot yet include today's noon endpoint.
+          last_noon = now.date() - timedelta(days=int(now.hour < 12))
+          latest = last_noon - timedelta(days=1 + DAYS[os.environ["TARGET"]])
+          requested = os.environ.get("REQUESTED")
+          day = date.fromisoformat(requested) if requested else latest
+          start = date.fromisoformat(os.environ["START"])
+          if requested and not start <= day <= latest:
+              raise SystemExit("Requested UTC cohort is not enrolled and mature")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              print(f"day={day}", file=out)
+              print(f"ready={str(start <= day <= latest).lower()}", file=out)
+          PY
+      - name: Read all runs for the UTC source day
+        if: steps.cohort.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAY: ${{ steps.cohort.outputs.day }}
+        run: |
+          set -euo pipefail
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$TARGET.lock.yml/runs" \
+            -f "branch=$BRANCH" -f "created=$DAY" -F per_page=100 > "$RUNNER_TEMP/source-runs.json"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
+        if: steps.cohort.outputs.ready == 'true'
+        with:
+          go-version: "1.27.4"
+          cache: false
+      - name: Measure independent endpoints
+        id: measure
+        if: steps.cohort.outputs.ready == 'true'
+        env:
+          DAY: ${{ steps.cohort.outputs.day }}
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == dead-code-remover ]]; then
+            go build -mod=readonly -o "$RUNNER_TEMP/deadcode" golang.org/x/tools/cmd/deadcode
+          fi
+          status=0
+          python3 scripts/value_evidence/collect.py "$TARGET" "$RUNNER_TEMP/source-runs.json" "$RUNNER_TEMP/value" \
+            --day "$DAY" --start "$START" --branch "$BRANCH" --deadcode "$RUNNER_TEMP/deadcode" \
+            --collector "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" || status=$?
+          if [[ -f "$RUNNER_TEMP/value/provenance.json" ]]; then echo "archive=true" >> "$GITHUB_OUTPUT"; fi
+          exit "$status"
+      - name: Retain complete evidence bundle, including explicit unavailable endpoints
+        if: "!cancelled() && steps.measure.outputs.archive == 'true'"
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: value-${{ matrix.workflow }}-${{ steps.cohort.outputs.day }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/value/
+          retention-days: 30
+          if-no-files-found: error

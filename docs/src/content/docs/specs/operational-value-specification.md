@@ -57,6 +57,9 @@ For `evidence-number-v1`, pass `--evidence observations.json` **instead of** `--
 
 ## When a change counts
 
+The [independent collection example](/gh-aw/reference/value/#collect-independent-observations)
+shows how to supply these inputs for future cohorts without running measurement code in the report.
+
 1. **Identify the effect.** Git PR discovery uses the exact workflow footer, producer run and canonical PR URL. Require one matching native delivered `create_pull_request` record with available, GitHub-verified, explicit-human acceptance at the exact merge time. PR search is not a delivery ledger.
 2. **Measure and follow up.** Compare the exact first parent with the outcome on the selected first-parent history. Apply evaluator-specific population rules and sample minima. Wait for the full lag-plus-after, durability and forward-isolation horizons, not just the first positive sample. Use the declared overlap rule across producer-linked merges (including neighbors outside the delivery period); require every changed file to remain untouched through durability. A later aggregate change without subject linkage is descriptive, not credited.
 3. **Publish the subtotal and its coverage.** `windows[].reason` explains the decision. `pending` means the observation window is still open; `unavailable` means a gate lacks proof. A numeric zero means an eligible, measured zero, not missing evidence. `attributed_value` is the sum of qualifying individual windows in the **one metric's native unit**, or `null` if none qualify. `complete` means all merge windows in this report qualified, not that all historical work was observed. A partial subtotal is not a workflow total or proof of exclusive causality.

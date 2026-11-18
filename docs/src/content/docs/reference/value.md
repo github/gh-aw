@@ -270,6 +270,33 @@ elapsed time; temporal `sampling_coverage` remains `not_evaluated`.
 The [reevaluated pilot](../value-pilot/#typed-evidence-reevaluation) includes an
 executable bundle with real observations and explicit missing-evidence cases.
 
+### Collect independent observations
+
+The [workflow-owner example](https://github.com/github/gh-aw/tree/main/.github/aw/value/prospective)
+includes an opt-in, read-only CI collector for Dead Code Remover and CLI Performance.
+It enrolls scheduled and manual default-branch runs without filtering by conclusion
+or delivery. It checks out the source run's SHA and the fixed follow-up SHA, then
+runs the same independent checks at both. Dead Code Remover uses a seven-day
+follow-up; CLI Performance uses fourteen days and five timing samples per endpoint.
+Both are run-relative measurements, not causal credit.
+
+On the default branch, set repository variable `VALUE_COHORT_START` to the first
+prospective UTC source date. After the cohort matures, download the collector
+artifact and use its declaration and recipe together:
+
+```bash wrap
+gh run download COLLECTOR_RUN_ID --name value-dead-code-remover-YYYY-MM-DD-1 --dir artifact
+gh aw value dead-code-remover --repo github/gh-aw \
+  --value-function artifact/definition.json --recipe artifact/recipe.json \
+  --evidence artifact/observations.json --logs-dir .github/aw/logs --json
+```
+
+The artifact also contains the source run identities, commit SHAs, candidate IDs
+or raw benchmark replicates, and failures. Missing collection is not zero.
+Issue Triage instead needs a sealed pre-action population, a blind human reference,
+and independently observed later labels. The example's local projector joins those
+three inputs; it neither queries withheld issues nor creates human reviews.
+
 ## Define a report recipe
 
 A recipe belongs to the workflow owner's repository and selects its own cohort:
