@@ -218,6 +218,8 @@ The client exchange deadline MUST be 10 seconds total, including OIDC acquisitio
 
 ### 4.5. Credential invalidation
 
+Every broker that issues credentials MUST provide an HTTPS POST endpoint for invalidating them, regardless of its supported capability set. The configured exchange endpoint MUST also serve the invalidation operations defined below; no additional URL, route discovery, or provider-specific revocation endpoint is required from the client. A broker MUST NOT declare a capability supported unless it can effectively revoke the tokens it issues for that capability.
+
 The compiler MUST emit a final credential-invalidation step in every job that can obtain a token from the token broker, regardless of capability, provider, repository scope, or read/write permissions. This includes agent jobs and trusted safe-output jobs. The step MUST run after all credential consumers and before the job exits, using the GitHub Actions `always()` condition so it runs after success, failure, or cancellation of earlier steps. It MUST NOT depend on an exchange step succeeding or returning an output: issuance may have occurred even when the client did not receive a response.
 
 The client MUST issue a separate invalidation POST to the configured endpoint from this step. It MUST request a fresh OIDC identity with the configured audience; it MUST NOT include an exchanged credential in the invalidation request.
@@ -234,6 +236,24 @@ The UTF-8 JSON request MUST contain exactly these two unique string members:
 The broker MUST verify the identity and revoke every token it issued to that exact authorized execution context, including all capabilities, providers, repository sets, permission maps, and tokens superseded by renewal. It MUST NOT limit revocation to tokens retained in the client's cache or the latest exchange. Successful invalidation MUST leave no token issued to that job usable. The operation MUST be idempotent and MUST NOT revoke credentials belonging to another job, run, attempt, repository, or tenant. A successful invalidation MUST return HTTP 204 with an empty body and `Cache-Control: no-store` only after revocation is effective. The client MUST fail the invalidation step on any other status, without exposing response bodies or transport diagnostics; the compiler MUST NOT suppress this failure with `continue-on-error`. The server MUST reject malformed requests and MUST NOT disclose whether credentials exist for an unauthorized context.
 
 The invalidation step is cleanup, not a fallback or substitute for short credential lifetimes. If the job is force-terminated before the step can run, short server-enforced lifetimes remain the bound on credential exposure.
+
+#### 4.5.1. Individual-token invalidation
+
+The endpoint MUST additionally accept a request to invalidate a single broker-issued token. This UTF-8 JSON request MUST contain exactly three unique string members:
+
+```json
+{
+  "operation": "invalidate-token",
+  "token": "<broker-issued-credential>",
+  "oidc_token": "<github-actions-oidc-jwt>"
+}
+```
+
+The `token` member MUST satisfy the token syntax in Section 4.3. The client MUST acquire a fresh OIDC identity with the configured audience. Possession of the token alone MUST NOT authorize revocation: the broker MUST verify the OIDC identity and bind the token to that exact authorized execution context before revoking it. It MUST NOT revoke tokens from another job, run, attempt, repository, or tenant. A valid identity submitting an unknown or foreign token MUST receive the same sanitized HTTP 403 response, without disclosing token ownership or existence.
+
+Successful revocation MUST return HTTP 204 with an empty body and `Cache-Control: no-store` only after the token is unusable. Repeating the operation for an already revoked or expired token belonging to the same authorized context MUST also return 204. The broker MUST retain sufficient bounded, non-secret issuance evidence to support idempotency until the token's original expiration. Revocation of one token MUST NOT revoke unrelated tokens. The transport, request-size, identity-verification, timeout, failure, and credential-redaction requirements apply equally to this operation.
+
+Individual-token invalidation MUST NOT replace compiler-generated job-wide invalidation, which also covers renewed tokens and exchanges whose responses were lost. Unlike job-wide invalidation, this operation necessarily carries the token in its request body; it MUST NOT place the token in a URL, query string, log, or diagnostic.
 
 ## 5. Identity Verification and Authorization
 
@@ -349,6 +369,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-020 | Deployment | Approved agent reads work across selected private repositories; access outside the set and mutations fail. Validated safe-output operations can write only to approved targets. Agent/MCP processes cannot obtain the write token or its OIDC bootstrap authority; unapproved output targets are rejected before issuance. |
 | T-TBR-021 | Both | Changing any target repository, permission level, or execution context prevents cache/in-flight reuse. Equivalent reordered scopes may coalesce. Renewal rechecks policy; invalidation revokes all scopes for only the issuing job. |
 | T-TBR-022 | Server | Instrument the GitHub adapter: explicit repository IDs and permissions reach issuance. Broader, narrower, or installation-wide backend results are rejected and revoked; only implicit metadata read is accepted as additional authority. |
+| T-TBR-023 | Both | The configured endpoint supports `invalidate-token` for every issued capability. A fresh authorized OIDC identity revokes only the specified token; repeat revocation and an owned expired token return 204. Missing/invalid identity returns 401; unknown and foreign tokens return indistinguishable 403 responses without revoking foreign tokens. Malformed requests fail safely, token-bearing bodies remain redacted, and 204 is returned only after revocation is effective. |
 
 Implementers MUST record pass/fail/not-applicable per class and capability, with non-sensitive evidence and policy settings. Tests SHOULD include skew, calendar, concurrency, and revocation boundary conditions. Optional features marked not applicable MUST NOT hide failed mandatory requirements.
 
@@ -433,6 +454,7 @@ These choices do not permit extra wire fields, weakened identity verification, o
 - Restricted agent credentials to read access and write credentials to independently authorized trusted safe-output jobs.
 - Defined GitHub App installation scoping, all-or-nothing authorization, scope-isolated caching, renewal, invalidation, and compliance scenarios.
 - Required compiler-generated job-exit cleanup to invalidate every broker-issued token, including renewed tokens and exchanges whose responses were lost.
+- Required the broker endpoint to support authenticated individual-token invalidation in addition to job-wide cleanup.
 - Distinguished the new specification requirements from the existing two-capability compiler/client implementation.
 
 ### Version 1.0.0 (Draft)
