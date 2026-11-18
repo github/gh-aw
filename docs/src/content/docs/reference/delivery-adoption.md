@@ -177,7 +177,7 @@ CAO can schedule refresh and consume gh-aw records for longitudinal measurement;
 it is not required to inspect delivery or adoption.
 
 For the slides' schema-coverage replay, use
-[`gh aw value`](../value/). It joins native adoption
+[`gh aw value`](/gh-aw/reference/value/). It joins native adoption
 records with Git measurements and a complete-window file-survival check,
 without changing the original records or grader scores.
 
