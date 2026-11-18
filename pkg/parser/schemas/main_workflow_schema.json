@@ -2853,7 +2853,7 @@
             "admission": {
               "type": "boolean",
               "default": true,
-              "description": "Generate admission steps in activation and conclusion. An explicit admission setting in aw.json takes precedence."
+              "description": "Generate admission steps in activation and conclusion for this workflow. Defaults to true."
             },
             "stale-check": {
               "oneOf": [

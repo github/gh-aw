@@ -14,10 +14,9 @@ func admissionBudgetOutputsEnabled(data *WorkflowData) bool {
 }
 
 func (c *Compiler) isAdmissionEnabled(frontmatter map[string]any) bool {
-	repoConfig, err := c.loadRepoConfig()
-	if err == nil && repoConfig != nil && repoConfig.Admission != nil {
-		return *repoConfig.Admission
-	}
+	// Load repository configuration so deprecated settings can be reported, but
+	// only the workflow-local setting controls whether admission is generated.
+	_, _ = c.loadRepoConfig()
 	if on, ok := frontmatter["on"].(map[string]any); ok {
 		if enabled, ok := on["admission"].(bool); ok {
 			return enabled

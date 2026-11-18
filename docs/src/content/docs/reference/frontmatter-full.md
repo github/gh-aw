@@ -2063,8 +2063,7 @@ on:
     # (optional)
     all: "read"
 
-  # Enable admission and conclusion_admission jobs for this workflow. Also enabled
-  # when aw.json sets admission to true.
+  # Enable admission steps for this workflow. Admission is enabled by default.
   # (optional)
   admission: true
 

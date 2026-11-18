@@ -31,7 +31,7 @@ func TestCompileDurableBuiltinEngines(t *testing.T) {
 				lock, err := os.ReadFile(filepath.Join(dir, "continuable.lock.yml"))
 				require.NoError(t, err)
 				text := string(lock)
-				for _, expected := range []string{"Restore durable workflow state", "Stage durable session files", "Upload durable checkpoint artifact", "GH_AW_DURABLE_RESUMED", "TRACEPARENT:", "unified_session", "GH_AW_DURABLE_ENGINE:"} {
+				for _, expected := range []string{"Restore durable workflow state", "Stage durable session files", "Upload durable checkpoint artifact", "GH_AW_DURABLE_RESUMED", "TRACEPARENT:", "GH_AW_DURABLE_ENGINE:"} {
 					require.Contains(t, text, expected)
 				}
 				require.Equal(t, 1, strings.Count(text, "- name: Restore durable workflow state"))

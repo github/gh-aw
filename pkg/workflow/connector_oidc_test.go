@@ -12,6 +12,18 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+func assertAdmissionOIDCPermissions(t *testing.T, workflowYAML string) {
+	t.Helper()
+	var workflow struct {
+		Jobs map[string]struct {
+			Permissions map[string]string `yaml:"permissions"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(workflowYAML), &workflow))
+	require.Equal(t, "write", workflow.Jobs["activation"].Permissions["id-token"])
+	require.Equal(t, "write", workflow.Jobs["conclusion"].Permissions["id-token"])
+}
+
 func TestConnectorOIDCPhasePermissionsAndTokenOrdering(t *testing.T) {
 	for _, selection := range []string{
 		"",
@@ -30,6 +42,7 @@ func TestConnectorOIDCPhasePermissionsAndTokenOrdering(t *testing.T) {
 			require.NoError(t, err)
 			output, err := c.CompileToYAML(data, root+"/proof.md")
 			require.NoError(t, err)
+			assertAdmissionOIDCPermissions(t, output)
 			var workflow struct {
 				Jobs map[string]struct {
 					Permissions map[string]string `yaml:"permissions"`
@@ -54,7 +67,7 @@ func TestConnectorOIDCPhasePermissionsAndTokenOrdering(t *testing.T) {
 						assert.Contains(t, string(encoded), "core.getIDToken")
 					}
 				}
-				if len(ids) == 0 {
+				if len(ids) == 0 && jobName != "activation" && jobName != "conclusion" {
 					assert.NotEqual(t, "write", job.Permissions["id-token"])
 				}
 				for i, step := range job.Steps {

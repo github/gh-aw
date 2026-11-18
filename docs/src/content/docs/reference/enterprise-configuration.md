@@ -119,7 +119,7 @@ For `gh` CLI configuration, host authentication, and `GH_HOST` setup on GHES, se
 
 ## Centralized Activation Admission
 
-The compiler generates the admission check in `activation` and the callback in `conclusion` by default. Set `"admission": false` in `.github/workflows/aw.json` and recompile to omit both steps repository-wide. An explicit repository setting takes precedence over `on.admission` in workflow frontmatter.
+The compiler generates the admission check in `activation` and the callback in `conclusion` by default. Set `on.admission: false` in a workflow to omit both steps for that workflow. The legacy `"admission"` setting in `.github/workflows/aw.json` is deprecated and ignored.
 
 Configure an OIDC-authenticated admission authority using organization or repository Actions variables: `GH_AW_DEFAULT_ADMISSION_URL`, `GH_AW_DEFAULT_ADMISSION_AUDIENCE`, and `GH_AW_DEFAULT_ADMISSION_ON_OUTAGE`. An empty endpoint skips both steps at runtime but does not remove `id-token: write` from either job. Activation author hooks and other conclusion steps share the job-wide permission; the agent does not acquire it through admission. For enterprise-wide rollout, provision organization variables in each enrolled organization. Deployments must explicitly configure their issuer, accepted claims, and trusted workflow identities on the authority.
 

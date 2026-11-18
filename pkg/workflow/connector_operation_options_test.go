@@ -297,7 +297,7 @@ Review.
 			assert.NotContains(t, output, "${{ secrets.WRITE_KEY }}")
 			assert.NotContains(t, output, "${{ secrets.SECOND_WRITE_KEY }}")
 			assert.NotContains(t, output, "Mint connector GitHub")
-			assert.NotContains(t, output, "id-token: write")
+			assertAdmissionOIDCPermissions(t, output)
 		})
 	}
 }

@@ -115,7 +115,7 @@ func TestTeamsConnectorPublicDocumentationSample(t *testing.T) {
 			require.NoError(t, err)
 			require.NotContains(t, string(lock), "TEAMS_GRAPH_CONTEXT_ACCESS_TOKEN")
 			require.NotContains(t, string(lock), `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
-			require.NotContains(t, string(lock), "id-token: write")
+			assertAdmissionOIDCPermissions(t, string(lock))
 			require.NotContains(t, string(lock), "${{ secrets.TEAMS_BOT_ACCESS_TOKEN }}", "staged writes must not resolve the Bot token")
 			require.Contains(t, string(lock), "connector_runtime.cjs")
 			require.Contains(t, string(lock), "teams_reply_to_activity")

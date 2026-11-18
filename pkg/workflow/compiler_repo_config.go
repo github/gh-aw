@@ -39,6 +39,10 @@ func (c *Compiler) loadRepoConfig() (*RepoConfig, error) {
 		c.IncrementWarningCount()
 	} else {
 		repoConfigLog.Print("loadRepoConfig: repo config loaded successfully")
+		if c.repoConfig != nil && c.repoConfig.Admission != nil {
+			fmt.Fprintln(os.Stderr, formatCompilerMessage(RepoConfigFileName, "warning", "the aw.json admission setting is deprecated and ignored; use on.admission per workflow or rely on the default"))
+			c.IncrementWarningCount()
+		}
 	}
 	return c.repoConfig, c.repoConfigErr
 }

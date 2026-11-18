@@ -42,8 +42,11 @@ func TestAdmissionCompilationSetting(t *testing.T) {
 				source += "---\nAdmission compilation setting\n"
 				data, err := compiler.ParseWorkflowString(source, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
-				enabled := repo == "true" || (repo != "false" && workflow != "false")
+				enabled := workflow != "false"
 				require.Equal(t, enabled, data.AdmissionEnabled)
+				if repo == "true" || repo == "false" {
+					assert.Equal(t, 1, compiler.GetWarningCount())
+				}
 				output, err := compiler.CompileToYAML(data, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
 				var header strings.Builder
