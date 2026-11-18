@@ -1,6 +1,18 @@
 {
-  "last_updated": "2026-11-17",
+  "last_updated": "2026-11-18",
   "pending_tasks": [
+    {
+      "file": "docs/src/content/docs/reference/workflow-linters.md",
+      "created": "2026-11-18",
+      "status": "pending",
+      "issue": "Line 170 'finding.Ordinary' is missing a space after the period; split into two sentences"
+    },
+    {
+      "file": ".github/workflows/smoke-agent-public-approved.md",
+      "created": "2026-11-18",
+      "status": "pending",
+      "issue": "run-success (line 61) claims 'Issue assigned' but also fires on the noop no-match path; use neutral wording. Recompile to regenerate the lock file (derived, not hand-edited)"
+    },
     {
       "file": "pkg/workflow/model_costs_pricing_validation.go",
       "created": "2026-11-17",

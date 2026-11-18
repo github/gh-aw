@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-18",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/workflow-linters.md",
+      "docs/src/content/docs/blog/2026-05-20-agent-of-the-day.md"
+    ],
+    "cli": [
+      "gh aw (root help)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/pr-code-quality-reviewer.md",
+      ".github/workflows/smoke-agent-public-approved.md"
+    ],
+    "validation": [
+      "pkg/stringutil/pat_validation_test.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "workflow-linters.md rule table gives rule, threat ID, AST scope, and checks in consistent columns",
+    "pat_validation_test.go error-message assertions match actionable guidance in ValidateCopilotPAT",
+    "gh aw run help gives practical examples covering --ref, --repeat, --dry-run, and --json"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "docs/src/content/docs/reference/workflow-linters.md",
+      "priority": "high",
+      "issue": "Line 170 runs two sentences together: 'finding.Ordinary local bindings' is missing a space after the period"
+    },
+    {
+      "file": ".github/workflows/smoke-agent-public-approved.md",
+      "priority": "high",
+      "issue": "run-success (line 61) says 'Issue assigned to the agentic-workflows agent' but the success branch in notify_comment_error.cjs (line 228) also fires after a noop no-match run"
+    }
+  ],
+  "observations": [
+    "compile help: the 'Unlike gh aw upgrade' sentence sits inside the action-mode section (already pending in improvements.json)",
+    "workflow-linters.md: the Privileged custom code and Historical zizmor sections use very long paragraphs; readability observation only",
+    "blog 2026-05-20: 'Two anomalous event patterns flagged' does not name the patterns; observation only"
+  ]
+}
