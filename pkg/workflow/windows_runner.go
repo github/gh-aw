@@ -498,16 +498,33 @@ func windowsWSLRawRunWrapper(script string, environmentVariables []string) []str
 
 func relocateWindowsWSLScript(script string) string {
 	script = relocateRuntimeText(script)
-	for expression, variable := range map[string]string{
-		runtimeRootExpression:              "${GH_AW_RUNTIME_ROOT}",
-		setupRootExpression:                "${GH_AW_SETUP_ROOT}",
-		"${{ env.GH_AW_RESOURCE_SUFFIX }}": "${GH_AW_RESOURCE_SUFFIX}",
-		"${{ env.GH_AW_DIFC_PROXY_PORT }}": "${GH_AW_DIFC_PROXY_PORT}",
-		"${{ env.GH_AW_CLI_PROXY_PORT }}":  "${GH_AW_CLI_PROXY_PORT}",
-	} {
-		script = strings.ReplaceAll(script, expression, variable)
+	dataBindings := []struct{ expression, marker, variable string }{
+		{runtimeRootExpression, "__GH_AW_DATA_RUNTIME_ROOT__", "${GH_AW_RUNTIME_ROOT}"},
+		{setupRootExpression, "__GH_AW_DATA_SETUP_ROOT__", "${GH_AW_SETUP_ROOT}"},
+		{"${{ env.GH_AW_RESOURCE_SUFFIX }}", "__GH_AW_DATA_RESOURCE_SUFFIX__", "${GH_AW_RESOURCE_SUFFIX}"},
+		{"${{ env.GH_AW_DIFC_PROXY_PORT }}", "__GH_AW_DATA_DIFC_PROXY_PORT__", "${GH_AW_DIFC_PROXY_PORT}"},
+		{"${{ env.GH_AW_CLI_PROXY_PORT }}", "__GH_AW_DATA_CLI_PROXY_PORT__", "${GH_AW_CLI_PROXY_PORT}"},
 	}
-	return logicalSetupShellPathRE.ReplaceAllString(script, `"$1"`)
+	var heredocs shellHeredocTracker
+	var rewritten strings.Builder
+	for _, line := range strings.SplitAfter(script, "\n") {
+		insideHeredoc, quotedHeredoc := heredocs.consume(line)
+		if quotedHeredoc {
+			for _, binding := range dataBindings {
+				line = strings.ReplaceAll(line, binding.expression, binding.marker)
+			}
+		} else {
+			for _, binding := range dataBindings {
+				line = strings.ReplaceAll(line, binding.expression, binding.variable)
+			}
+			line = logicalSetupShellPathRE.ReplaceAllString(line, `"$1"`)
+		}
+		if !insideHeredoc {
+			heredocs.add(line)
+		}
+		rewritten.WriteString(line)
+	}
+	return rewritten.String()
 }
 
 func encodeWindowsWSLRunScript(script string) (string, error) {
@@ -605,6 +622,8 @@ func windowsWSLScriptSetup(encodedScript string) []string {
 		"  if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the isolated setup root.' }",
 		"  if ($env:GH_AW_RESOURCE_SUFFIX -cnotmatch '^[A-Za-z0-9]+$') { throw 'Invalid isolated resource suffix.' }",
 		"  $scriptContent = $scriptContent.Replace('${GH_AW_RUNTIME_ROOT}', $env:GH_AW_RUNTIME_ROOT).Replace('${GH_AW_RESOURCE_SUFFIX}', $env:GH_AW_RESOURCE_SUFFIX)",
+		"  $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT).Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)",
+		"  $scriptContent = $scriptContent.Replace('__GH_AW_DATA_RESOURCE_SUFFIX__', $env:GH_AW_RESOURCE_SUFFIX).Replace('__GH_AW_DATA_DIFC_PROXY_PORT__', $env:GH_AW_DIFC_PROXY_PORT).Replace('__GH_AW_DATA_CLI_PROXY_PORT__', $env:GH_AW_CLI_PROXY_PORT)",
 		"}",
 		"$scriptDirectory = if ($env:GH_AW_SETUP_ROOT -and (Test-Path -LiteralPath $env:GH_AW_SETUP_ROOT)) { $env:GH_AW_SETUP_ROOT } else { $env:RUNNER_TEMP }",
 		"New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null",

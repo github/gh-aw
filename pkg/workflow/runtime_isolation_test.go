@@ -71,7 +71,7 @@ jobs:
 	steps := jobs["agent"].(map[string]any)["steps"].([]any)
 	require.Equal(t, "Allocate isolated runtime directories", steps[0].(map[string]any)["name"])
 	require.Contains(t, actual, `"${{ env.GH_AW_RUNTIME_ROOT }}:${{ env.GH_AW_RUNTIME_ROOT }}:rw"`)
-	require.Contains(t, actual, `"${GH_AW_SETUP_ROOT}:${GH_AW_SETUP_ROOT}:ro"`)
+	require.Contains(t, actual, `"${{ env.GH_AW_SETUP_ROOT }}:${{ env.GH_AW_SETUP_ROOT }}:ro"`)
 	require.Contains(t, actual, `"awmg-mcpg-${{ env.GH_AW_RESOURCE_SUFFIX }}"`)
 	require.Contains(t, actual, `"awmg-cli-proxy-${{ env.GH_AW_RESOURCE_SUFFIX }}"`)
 	require.Contains(t, actual, "docker logs awmg-proxy-${{ env.GH_AW_RESOURCE_SUFFIX }}")
@@ -183,6 +183,40 @@ func TestRuntimeIsolationCleanupSkipsMissingMarker(t *testing.T) {
 	require.NoDirExists(t, setupRoot)
 }
 
+func TestRuntimeIsolationCleanupToleratesUnremovableOwnedRoots(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("runtime allocator requires GNU stat")
+	}
+	temp := t.TempDir()
+	envFile := filepath.Join(temp, "env")
+	bash := exec.CommandContext(t.Context(), "bash", "-c", runtimeAllocationScript)
+	bash.Env = append(os.Environ(), "RUNNER_TEMP="+temp, "GITHUB_ENV="+envFile)
+	output, err := bash.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	env, err := os.ReadFile(envFile)
+	require.NoError(t, err)
+	publishedEnv := append(os.Environ(), strings.Split(strings.TrimSpace(string(env)), "\n")...)
+	publishedEnv = append(publishedEnv, "RUNNER_TEMP="+temp)
+
+	fakeBin := filepath.Join(temp, "bin")
+	require.NoError(t, os.Mkdir(fakeBin, 0700))
+	fakeRM := filepath.Join(fakeBin, "rm")
+	require.NoError(t, os.WriteFile(fakeRM, []byte("#!/bin/sh\nexit 1\n"), 0700))
+	publishedEnv = append(publishedEnv, "PATH="+fakeBin+":"+os.Getenv("PATH"))
+
+	bash = exec.CommandContext(t.Context(), "bash", "-c", runtimeEarlyCleanupScript)
+	bash.Env = publishedEnv
+	output, err = bash.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	require.Contains(t, string(output), "Could not fully remove isolated runtime directory")
+	for _, line := range strings.Split(strings.TrimSpace(string(env)), "\n") {
+		if key, root, ok := strings.Cut(line, "="); ok && (key == "GH_AW_RUNTIME_ROOT" || key == "GH_AW_SETUP_ROOT") {
+			t.Cleanup(func() { _ = os.RemoveAll(root) })
+			require.DirExists(t, root)
+		}
+	}
+}
+
 func TestRuntimeIsolationWindowsBootstrapsWSLBeforeAllocation(t *testing.T) {
 	job := &Job{
 		Name:   "agent",
@@ -292,6 +326,13 @@ func TestRuntimeIsolationRelocatesSpecializedPaths(t *testing.T) {
 	require.Contains(t, actual, "require(`${process.env.GH_AW_SETUP_ROOT}/actions/claim.cjs`)")
 	require.Contains(t, actual, `"${GH_AW_SETUP_ROOT}/protected-capture-${GH_AW_PROTECTED_CAPTURE_ID}"`)
 	require.Contains(t, actual, `'"${GH_AW_SETUP_ROOT}"'/safeoutputs`)
+	quoted := relocateWindowsWSLScript("cat <<'JSON'\n{\"runtime\":\"/tmp/gh-aw\",\"setup\":\"${RUNNER_TEMP}/gh-aw/safeoutputs\"}\nJSON\n")
+	require.Contains(t, quoted, `"__GH_AW_DATA_RUNTIME_ROOT__"`)
+	require.Contains(t, quoted, `"__GH_AW_DATA_SETUP_ROOT__/safeoutputs"`)
+	require.NotContains(t, quoted, "${GH_AW_SETUP_ROOT}")
+	wrapper := strings.Join(windowsWSLScriptSetup("encoded"), "\n")
+	require.Contains(t, wrapper, "Replace('__GH_AW_DATA_SETUP_ROOT__', $setupRoot)")
+	require.Contains(t, wrapper, "Replace('__GH_AW_DATA_RUNTIME_ROOT__', $env:GH_AW_RUNTIME_ROOT)")
 	output := rewriteWindowsPathOutputs("Setup agent output environment variable", `echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/safeoutputs/outputs.jsonl" >> "$GITHUB_OUTPUT"`)
 	require.Contains(t, relocateWindowsWSLScript(output), `wslpath -w "${GH_AW_RUNTIME_ROOT}/safeoutputs/outputs.jsonl"`)
 	require.Contains(t, strings.Join(windowsWSLEnvironmentSetup(nil), "\n"), "'GH_AW_CLI_PROXY_PORT'")

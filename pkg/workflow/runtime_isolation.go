@@ -21,6 +21,7 @@ var logicalRuntimePathRE = regexp.MustCompile(constants.TmpGhAwDir + `($|[^A-Za-
 var logicalSetupPathRE = regexp.MustCompile(`(?:\$\{\{ runner.temp \}\}|\$\{RUNNER_TEMP\}|\$RUNNER_TEMP)/gh-aw($|[^A-Za-z0-9_.-])`)
 var logicalSetupJSPathRE = regexp.MustCompile(`['"]\$\{\{ env\.GH_AW_SETUP_ROOT \}\}(/[A-Za-z0-9_./-]*)?['"]`)
 var logicalSetupShellPathRE = regexp.MustCompile(`'(\$\{GH_AW_SETUP_ROOT\}[/A-Za-z0-9_.:-]*)'`)
+var shellHeredocRE = regexp.MustCompile(`(^|[^<])<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^ \t;&|()<>]+))`)
 var isolatedExecutionBindings = strings.NewReplacer(
 	runtimeRootExpression, "${GH_AW_RUNTIME_ROOT}",
 	"${{ env.GH_AW_RESOURCE_SUFFIX }}", "${GH_AW_RESOURCE_SUFFIX}",
@@ -328,6 +329,7 @@ func runtimeStepRelocationEdits(lines []string, start, end int) []runtimeYAMLEdi
 	javascript := false
 	agentExecution := false
 	executableIndent := -1
+	var heredocs shellHeredocTracker
 	for line := start; line < end; line++ {
 		source := lines[line] //nolint:uncheckedsliceindex // Parsed job positions bound start and end within this source.
 		rewritten := relocateRuntimeText(source)
@@ -339,30 +341,75 @@ func runtimeStepRelocationEdits(lines []string, start, end int) []runtimeYAMLEdi
 		}
 		if inExecutable && strings.TrimSpace(source) != "" && leadingSpaces(source) <= executableIndent {
 			inExecutable = false
+			heredocs = shellHeredocTracker{}
 		}
 		if matches := blockScalarHeaderRE.FindStringSubmatch(strings.TrimSuffix(source, "\n")); matches != nil {
 			inExecutable = true
 			javascript = matches[2] == "script"
 			executableIndent = len(matches[1]) //nolint:uncheckedsliceindex // A successful match includes the declared capture group.
+			heredocs = shellHeredocTracker{}
+		}
+		insideHeredoc, quotedHeredoc := false, false
+		if inExecutable && !javascript {
+			insideHeredoc, quotedHeredoc = heredocs.consume(source)
 		}
 		if (inExecutable && javascript) || (singleLineExecutableRE.MatchString(source) && strings.HasPrefix(strings.TrimSpace(source), "script:")) {
 			rewritten = logicalSetupJSPathRE.ReplaceAllString(rewritten, "`$${process.env.GH_AW_SETUP_ROOT}$1`")
 		} else if inExecutable || singleLineExecutableRE.MatchString(source) {
 			// Setup roots inherit arbitrary RUNNER_TEMP characters: keep them
 			// data-bound, never splice them into executable Actions expressions.
-			rewritten = strings.ReplaceAll(rewritten, setupRootExpression, "${GH_AW_SETUP_ROOT}")
-			rewritten = logicalSetupShellPathRE.ReplaceAllString(rewritten, `"$1"`)
-			if agentExecution {
-				// AWF arguments and JSON expand in Bash. Keeping the generated
-				// execution body expression-free avoids Actions' scalar limit.
-				rewritten = isolatedExecutionBindings.Replace(rewritten)
+			if !quotedHeredoc {
+				rewritten = strings.ReplaceAll(rewritten, setupRootExpression, "${GH_AW_SETUP_ROOT}")
+				rewritten = logicalSetupShellPathRE.ReplaceAllString(rewritten, `"$1"`)
+				if agentExecution {
+					// AWF arguments and JSON expand in Bash. Keeping the generated
+					// execution body expression-free avoids Actions' scalar limit.
+					rewritten = isolatedExecutionBindings.Replace(rewritten)
+				}
 			}
+		}
+		if inExecutable && !javascript && !insideHeredoc {
+			heredocs.add(source)
 		}
 		if rewritten != source {
 			edits = append(edits, runtimeYAMLEdit{start: line, end: line + 1, text: rewritten})
 		}
 	}
 	return edits
+}
+
+type shellHeredocMarker struct {
+	delimiter string
+	quoted    bool
+}
+
+type shellHeredocTracker struct {
+	pending []shellHeredocMarker
+}
+
+func (tracker *shellHeredocTracker) consume(line string) (bool, bool) {
+	if len(tracker.pending) == 0 {
+		return false, false
+	}
+	marker := tracker.pending[0]
+	if strings.TrimSpace(strings.TrimSuffix(line, "\n")) == marker.delimiter {
+		tracker.pending = tracker.pending[1:]
+	}
+	return true, marker.quoted
+}
+
+func (tracker *shellHeredocTracker) add(line string) {
+	for _, match := range shellHeredocRE.FindAllStringSubmatch(line, -1) {
+		delimiter, quoted := match[5], false
+		if match[3] != "" {
+			delimiter, quoted = match[3], true
+		} else if match[4] != "" {
+			delimiter, quoted = match[4], true
+		}
+		if delimiter != "" {
+			tracker.pending = append(tracker.pending, shellHeredocMarker{delimiter: delimiter, quoted: quoted})
+		}
+	}
 }
 
 func applyRuntimeYAMLEdits(lines []string, edits []runtimeYAMLEdit) string {
