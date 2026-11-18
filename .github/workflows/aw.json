@@ -1,4 +1,5 @@
 {
+  "admission": true,
   "gateway-dispatch": true,
   "protected_files": { "exclude": [".changeset/*.md"] },
   "auto_upgrade": { "cron": "0 9 * * 1", "options": ["--pre-releases"] },

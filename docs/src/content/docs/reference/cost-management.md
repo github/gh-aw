@@ -354,7 +354,7 @@ Use an admission authority when static per-run and daily limits are not enoughâ€
 
 #### Enable the Admission Gate
 
-1. Admission steps are always compiled. Legacy `on.admission` frontmatter and `"admission"` in `.github/workflows/aw.json` are deprecated and ignored.
+1. Set `"admission": true` in the existing `.github/workflows/aw.json` object, preserving its other settings. Admission code is omitted by default, and an explicit repository setting overrides `on.admission` in workflow frontmatter without changing job permissions.
 
 2. Recompile affected workflows with `gh aw compile` if their lock files don't already contain the admission steps, and commit the generated `.lock.yml` files.
 
@@ -384,7 +384,7 @@ The settings map to Actions variables `GH_AW_DEFAULT_ADMISSION_URL`, `GH_AW_DEFA
 
 For workflows compiled with admission, changes to these runtime variables do not require recompilation. An empty URL skips admission and retains existing local guardrails. `block` stops activation after an exhausted transient outage; the default, `ignore`, continues with existing local controls. Explicit denial and invalid approval block under either policy.
 
-The compiler grants job-wide `id-token: write` to activation and conclusion for this feature. Admission runs as a step inside activation, and the completion callback runs inside conclusion; activation hooks and conclusion actions retain token-minting capability even when an empty endpoint skips those steps. The endpoint gate does not skip either job's runner or bootstrap. The agent does not gain this permission merely because admission is enabled. Hand-authored reusable-workflow callers must also allow that permission. Authentication uses GitHub Actions OIDC; do not send PATs, provider tokens, or GitHub App private keys to the authority. The completion callback uses `/api/conclusion` on the same origin.
+Activation and conclusion retain job-wide `id-token: write` even when admission code is omitted. Admission runs as a step inside activation, and the completion callback runs inside conclusion; activation hooks and conclusion actions retain token-minting capability even when an empty endpoint skips those steps. The endpoint gate does not skip either job's runner or bootstrap. The agent does not gain this permission merely because admission is enabled. Hand-authored reusable-workflow callers must also allow that permission. Authentication uses GitHub Actions OIDC; do not send PATs, provider tokens, or GitHub App private keys to the authority. The completion callback uses `/api/conclusion` on the same origin.
 
 #### Assign AIC Allowances by Server Size
 

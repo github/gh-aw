@@ -62,7 +62,7 @@ func (c *Compiler) buildInitialWorkflowData(
 
 	workflowData := &WorkflowData{
 		Name:                       toolsResult.workflowName,
-		AdmissionEnabled:           c.isAdmissionEnabled(),
+		AdmissionEnabled:           c.isAdmissionEnabled(result.Frontmatter),
 		FrontmatterName:            toolsResult.frontmatterName,
 		FrontmatterEmoji:           toolsResult.frontmatterEmoji,
 		FrontmatterYAML:            strings.Join(result.FrontmatterLines, "\n"),

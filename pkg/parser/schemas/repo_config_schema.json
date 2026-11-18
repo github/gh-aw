@@ -45,9 +45,8 @@
     },
     "admission": {
       "type": "boolean",
-      "default": true,
-      "deprecated": true,
-      "description": "Deprecated and ignored. Admission steps are always generated."
+      "default": false,
+      "description": "Enable the activation admission check and conclusion callback for all workflows without changing job permissions. An explicit setting overrides workflow frontmatter. If unset, workflows use on.admission, which defaults to false."
     },
     "gateway-dispatch": {
       "type": "boolean",
