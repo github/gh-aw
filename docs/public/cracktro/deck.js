@@ -7423,7 +7423,7 @@
         group: "process",
         under: "commands",
         notes:
-          "What: An illustrative process with synthetic labels; Ducky stands in for a community helper with the triage role and Mona for a maintainer. Each issue carries one state label. The replace-label safe output swaps states, and allowed-transitions restricts agents to declared edges, so new to done is rejected.\nWhy: State stays visible to people, boards and searches. Label commands need only the triage role, so helpers can drive the process without push or merge access.\nWhen: Choose this for multi-stage processes mixing human and agent steps, with one workflow per edge.",
+          "What: An illustrative process with synthetic labels; Ducky stands in for a community helper with the triage role and Mona for a maintainer. Each issue carries one state label. The replace-label safe output swaps states, and allowed-transitions restricts agents to declared edges, so new to done is rejected.\nWhy: State stays visible to people, boards and searches. Roles default to admin, maintainer and write, so this workflow adds triage to on.roles, letting helpers act without push or merge access.\nWhen: Choose this for multi-stage processes mixing human and agent steps, with one workflow per edge.",
         enter() {
           t0 = 0;
           cyc = -1;
@@ -14570,7 +14570,7 @@
     slides.push({
       group: "security",
       notes:
-        "What: The Great Escapi, gh-aw's own red-team workflow: each day an agent inside the agent workflow firewall (AWF) tries a new escape, recorded in repo memory so it never repeats one. The squares are measured from that memory: 426 techniques, 15 February to 22 September 2026. The first 400 were blocked. Attempt 401, on 14 September, escaped by tunnelling to an allowed host on a shared CDN and naming a forbidden site in the TLS SNI field, which the proxy did not check; 13 variants followed. On 22 September the firewall shipped a fix that checks the SNI against the allowlist. The attack diagram is illustrative and simplified.\nWhy: Static rules miss creative attacks; a persistent adversary finds them early.\nWhen: Run a red-team loop against any sandbox or policy you depend on, and route its findings to the owners.",
+        "What: The Great Escapi, gh-aw's own red-team workflow: each day an agent inside the agent workflow firewall (AWF) tries a new escape, recorded in repo memory so it never repeats one. The squares are measured from that memory: 426 techniques, 15 February to 22 September 2026. The first 400 were blocked. Attempt 401, on 14 September, escaped by tunnelling to an allowed host on a shared CDN and naming a forbidden site in the TLS SNI field, which the proxy did not check; 12 variants followed, 13 escapes in all. On 22 September the firewall shipped a fix that checks the SNI against the allowlist. The attack diagram is illustrative and simplified.\nWhy: Static rules miss creative attacks; a persistent adversary finds them early.\nWhen: Run a red-team loop against any sandbox or policy you depend on, and route its findings to the owners.",
       enter() {
         if (!built) {
           built = true;
@@ -18668,7 +18668,7 @@
       group: "process",
       under: "improvers",
       notes:
-        "What: The green panel is measured from gh-aw's daily-cli-performance workflow, 13 March to 25 October 2026. It benchmarks the compiler daily, keeps 101 snapshots in repo memory and files regression issues: 116 filed, 101 assigned to Copilot, 72 picked by Issue Monster, 62 closed by merged fixes, median 6.8 hours. The five rows are real regressions. The production fleet, telemetry and loop above are simulated: a research agent reads OpenTelemetry data, sees a latency objective breached and files issues for Copilot.\nWhy: An agent that observes results after each fix closes the loop instead of only reporting problems.\nWhen: Use it where you have a repeatable measurement, such as benchmarks or service-level objectives, that the next run can recheck.",
+        "What: The green panel is measured from gh-aw's daily-cli-performance workflow, snapshot 14 November 2026. It benchmarks the compiler daily, keeping 101 snapshots in repo memory from 5 April to 13 November, and files regression issues; from 13 March to 25 October: 116 filed, 101 assigned to Copilot, 72 picked by Issue Monster, 62 closed by merged fixes, median 6.8 hours. The five rows are real regressions. The production fleet, telemetry and loop above are simulated: a research agent reads OpenTelemetry data, sees a latency objective breached and files issues for Copilot.\nWhy: An agent that observes results after each fix closes the loop instead of only reporting problems.\nWhen: Use it where you have a repeatable measurement, such as benchmarks or service-level objectives, that the next run can recheck.",
       enter() {
         t0 = prevT = lastSample = lastPkt = 0;
         cyc = -1;
