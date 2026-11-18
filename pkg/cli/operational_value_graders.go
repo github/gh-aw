@@ -185,7 +185,6 @@ func renderValueRunGrades(out io.Writer, report *valueRunGradesReport) error {
 		Created string `console:"header:Created (UTC)"`
 		Status  string `console:"header:Grade status"`
 		Value   string `console:"header:Recorded value"`
-		Reason  string `console:"header:Evidence,omitempty"`
 	}
 	rows := make([]gradeRow, 0, len(report.Runs))
 	for _, run := range report.Runs {
@@ -193,14 +192,9 @@ func renderValueRunGrades(out io.Writer, report *valueRunGradesReport) error {
 		if run.Grader.Value != nil {
 			value = strings.TrimSpace(strconv.FormatFloat(*run.Grader.Value, 'g', -1, 64) + " " + run.Grader.Unit)
 		}
-		reason := run.Grader.Message
-		if run.Grader.Error != "" {
-			reason = run.Grader.Error
-		}
-		reason = sanitizeGraderReasonForDisplay(reason)
 		rows = append(rows, gradeRow{
 			Run: run.RunID, Attempt: run.RunAttempt, Created: run.CreatedAt.UTC().Format(time.RFC3339),
-			Status: run.Grader.Status, Value: value, Reason: reason,
+			Status: run.Grader.Status, Value: value,
 		})
 	}
 	if _, err := fmt.Fprint(out, console.RenderStructStdout(rows)); err != nil {
