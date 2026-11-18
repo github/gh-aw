@@ -1,11 +1,20 @@
 // TypeScript definitions for Safe Output Handler Factory Pattern
 // This file provides type definitions for the handler factory functions
 
-interface SafeOutputAuthorizationRequirement {
-  endpoint: string;
-  audience: string;
+type SafeOutputAuthorizationRequirement = (
+  | {
+      endpoint: string;
+      audience: string;
+      from_environment?: never;
+    }
+  | {
+      from_environment: true;
+      endpoint?: never;
+      audience?: never;
+    }
+) & {
   source?: "global" | "local";
-}
+};
 
 interface SafeOutputAuthorizationEvidence {
   state: "not_configured" | "exempt_builtin" | "skipped_staged" | "allowed" | "denied" | "error" | "not_requested";

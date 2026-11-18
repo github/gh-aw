@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -22,6 +23,7 @@ func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID
 	addJobLevelCommandMetadata(envVars, data)
 	c.addJobLevelSafeOutputConfig(envVars, data)
 	if data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		maps.Copy(envVars, safeOutputAuthorizationDefaultEnv(data.SafeOutputs))
 		envVars["GH_AW_AUTHORIZATION_WORKFLOW_HASH"] = fmt.Sprintf("%q", data.FrontmatterHash+":"+data.BodyHash)
 		config := make(map[string]any)
 		for name, builder := range handlerRegistry {

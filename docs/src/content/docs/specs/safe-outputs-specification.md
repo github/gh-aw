@@ -1669,6 +1669,21 @@ requirement. Conflicting authorities MUST fail compilation, including conflicts
 introduced through imports. Agent-provided fields MUST NOT change this trusted
 configuration. `authorization` is reserved metadata, not a tool name.
 
+**Repository defaults:** `.github/workflows/aw.json` MAY set
+`safe_output_authorization` to the same endpoint/audience object, or to `true`
+to require the runtime Actions variables
+`GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_URL` and
+`GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_AUDIENCE`. The latter are managed with
+`gh aw env` keys `default_safe_output_authorization_url` and
+`default_safe_output_authorization_audience`. Both variables MUST be valid and
+nonempty for live execution; missing values MUST block, not disable the gate.
+The compiler MUST apply the repository requirement after merging imports and
+MUST reject conflicting global or local authorities. An environment-backed
+requirement cannot be proven identical to a literal authority at compile time,
+so combining them MUST fail compilation. Repository policy MUST NOT enable
+otherwise-disabled outputs. Changes to the repository setting require
+recompilation; changes to its runtime variables do not.
+
 **Shared workflow imports:** Shared agentic workflows MAY declare global or
 per-output authorization, including a policy-only `safe-outputs` block with no
 output declarations. The compiler MUST preserve these requirements through
@@ -1733,6 +1748,16 @@ Runtime diagnostics use the GitHub Actions debug log and report preparation,
 OIDC acquisition, decision requests, release and fixed failure reason codes.
 Debug messages MUST NOT contain authority endpoints, audiences, tokens,
 response bodies, or normalized input bodies.
+
+When a workflow trace is configured, authorization emits correlated
+`safe_output.authorization.{oidc,authority,decision}.run` OpenTelemetry spans.
+Attributes under `gh-aw.safe_output.gate.*` include only the phase,
+state, fixed reason code and validated executor, binding and requirement source.
+Spans MUST NOT contain authority URLs, audiences, credentials, invocation IDs,
+policy revisions, decision IDs, request/response bodies or output names.
+Staged and unconfigured paths MUST NOT initialize authorization telemetry.
+Export is best-effort and MUST NOT delay execution of a live grant, bypass
+freshness checks, change a decision or cause authorization replay.
 
 All existing validation, target restrictions, limits, threat detection, protected
 file checks, review requirements and queue Claim checks continue to apply with

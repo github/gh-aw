@@ -14,6 +14,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
 var safeOutputAuthorizationLog = logger.New("workflow:safe_outputs_authorization")
@@ -21,10 +22,11 @@ var safeOutputAuthorizationLog = logger.New("workflow:safe_outputs_authorization
 // SafeOutputAuthorization is a required, fail-closed authority binding.
 // Source is compiler-owned and is never accepted from workflow configuration.
 type SafeOutputAuthorization struct {
-	Endpoint   string `yaml:"endpoint" json:"endpoint"`
-	Audience   string `yaml:"audience" json:"audience"`
-	Source     string `yaml:"-" json:"source,omitempty"`
-	parseError error
+	Endpoint        string `yaml:"endpoint" json:"endpoint,omitempty"`
+	Audience        string `yaml:"audience" json:"audience,omitempty"`
+	Source          string `yaml:"-" json:"source,omitempty"`
+	FromEnvironment bool   `yaml:"-" json:"from_environment,omitempty"`
+	parseError      error
 }
 
 func parseSafeOutputAuthorization(raw any) (*SafeOutputAuthorization, error) {
@@ -129,7 +131,7 @@ func validateSafeOutputAuthorizationAliases(raw map[string]any) error {
 }
 
 func sameSafeOutputAuthority(a, b *SafeOutputAuthorization) bool {
-	return a == nil || b == nil || (a.Endpoint == b.Endpoint && a.Audience == b.Audience)
+	return a == nil || b == nil || (a.Endpoint == b.Endpoint && a.Audience == b.Audience && a.FromEnvironment == b.FromEnvironment)
 }
 
 func nativeSafeOutputAuthorization(config *SafeOutputsConfig, handler safeOutputHandlerDescriptor) *SafeOutputAuthorization {
@@ -688,6 +690,12 @@ func (c *Compiler) buildAuthorizationGateStep(data *WorkflowData, name, executor
 	env := []string{
 		fmt.Sprintf("          GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE: %q\n", configuration),
 		fmt.Sprintf("          GH_AW_AUTHORIZATION_WORKFLOW_HASH: %q\n", data.FrontmatterHash+":"+data.BodyHash),
+	}
+	defaultEnv := safeOutputAuthorizationDefaultEnv(data.SafeOutputs)
+	for _, name := range []string{compilerenv.DefaultSafeOutputAuthorizationURL, compilerenv.DefaultSafeOutputAuthorizationAudience} {
+		if value, ok := defaultEnv[name]; ok {
+			env = append(env, fmt.Sprintf("          %s: %s\n", name, value))
+		}
 	}
 	if options.Payload != "" {
 		env = append(env, "          GH_AW_AUTHORIZATION_PAYLOAD: "+options.Payload+"\n")

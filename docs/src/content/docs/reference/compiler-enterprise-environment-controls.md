@@ -21,6 +21,8 @@ In this enterprise controls reference, OTLP defaults are the scope-sensitive exc
 | `GH_AW_DEFAULT_ADMISSION_URL` | GitHub Actions repository/organization `vars.*` at runtime | HTTPS `/api/admission` endpoint; empty skips both admission steps | Emitted when admission code generation is enabled at compile time |
 | `GH_AW_DEFAULT_ADMISSION_AUDIENCE` | GitHub Actions repository/organization `vars.*` at runtime | Admission OIDC audience | Defaults to the effective admission endpoint |
 | `GH_AW_DEFAULT_ADMISSION_ON_OUTAGE` | GitHub Actions repository/organization `vars.*` at runtime | Admission outage policy, `ignore` or `block` | Defaults to `ignore`; only transient failures can fail open |
+| `GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_URL` | GitHub Actions repository/organization `vars.*` at runtime | HTTPS safe-output authority endpoint | `safe_output_authorization: true` in `aw.json`; empty blocks live outputs |
+| `GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_AUDIENCE` | GitHub Actions repository/organization `vars.*` at runtime | Required safe-output authority OIDC audience | `safe_output_authorization: true` in `aw.json`; empty blocks live outputs |
 | `GH_AW_DEFAULT_MAX_TURNS` | Compiler process environment | Default top-level `max-turns` | `max-turns` is not set in frontmatter and the selected engine supports max-turns |
 | `GH_AW_DEFAULT_TIMEOUT_MINUTES` | GitHub Actions `vars.*` at runtime | Default `agentic_execution` step `timeout-minutes` (20 minutes) | `timeout-minutes` is not set in frontmatter |
 | `GH_AW_DEFAULT_AGENT_JOB_TIMEOUT_MINUTES` | GitHub Actions `vars.*` at runtime | Default generated `agent` job `timeout-minutes` (60 minutes) | `jobs.agent.timeout-minutes` is not set in frontmatter |
@@ -49,6 +51,15 @@ variables in batch. These commands operate on GitHub Actions variables and suppo
 `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` is a compile-time enforcement setting, not a `GH_AW_DEFAULT_*` default, and is not managed by `gh aw env`. The same policy can be enabled persistently with `require_self_hosted_runners: true` in `.github/workflows/aw.json`, or for a single invocation with `gh aw compile --require-self-hosted-runners`.
 
 Admission code is omitted by default. Set `"admission": true` in `.github/workflows/aw.json` and recompile to emit both admission steps repository-wide without changing activation or conclusion job permissions. An explicit repository setting overrides workflow-level `on.admission`. Admission defaults use `default_admission_url`, `default_admission_audience`, and `default_admission_on_outage` in managed YAML. Provision organization variables in each enrolled organization for enterprise-wide rollout; do not assume an enterprise Actions-variable scope for admission. Repository variables override organization values, so admission is cooperative rather than locked policy. Changes to managed variables do not require recompilation.
+
+Safe-output authorization is independent of admission. Set
+`"safe_output_authorization": true` in `aw.json` and recompile to require the
+runtime authority for eligible outputs. Manage its URL and audience through
+`default_safe_output_authorization_url` and
+`default_safe_output_authorization_audience` in `gh aw env` YAML. Unlike an
+empty admission endpoint, missing authorization values block live execution.
+Staged outputs skip the authority. See [safe-output authorization](../governance/#safe-output-authorization)
+for literal repository configuration, merge rules and OIDC requirements.
 
 A valid approval supersedes daily-AIC validation. Its primary and optional detection/evals allowances set the corresponding existing runtime credit limits; omitted optional allowances retain their existing component limits. An empty endpoint skips the admission check and its token acquisition, not activation's runner or bootstrap; an ignored outage retains daily validation and existing limits. Denial and malformed responses block activation. Admission identity and credentials stay within the compiler-owned step; downstream jobs consume only validated outputs. Both `activation` and `conclusion` retain job-wide `id-token: write`, even when admission code is omitted or the endpoint is empty. Activation hooks and other conclusion steps share that permission; the agent does not acquire it through admission. Review existing OIDC relying-party policies accordingly.
 

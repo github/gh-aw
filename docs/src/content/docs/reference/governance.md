@@ -151,6 +151,30 @@ the requirement also covers eligible outputs declared by its consumers.
 Direct and nested imports preserve local requirements, and conflicting
 authorities fail compilation. See the [shared import example](../../specs/safe-outputs-specification/#safe-output-invocation-authorization).
 
+For repository-wide authorization, set this in `.github/workflows/aw.json` and
+recompile:
+
+```json
+{ "safe_output_authorization": true }
+```
+
+Manage its runtime variables with `gh aw env update defaults.yml --scope repo`
+(or `--scope org --org OWNER`):
+
+```yaml title="defaults.yml"
+default_safe_output_authorization_url: https://authority.example.org/api/safe-output-authorization
+default_safe_output_authorization_audience: https://authority.example.org/gh-aw-safe-outputs
+```
+
+`gh aw env update` reconciles all managed fields: include any other defaults to
+retain at that scope. Both authorization values are required for live execution;
+clearing them blocks outputs rather than disabling authorization. Alternatively,
+`safe_output_authorization` accepts the literal endpoint/audience object.
+Conflicting workflow or imported authorities fail compilation, including
+combining an environment-backed repository requirement with a literal authority.
+Repository variables override organization defaults; protect configuration and
+variable administration independently.
+
 Effective staged mode skips authorization and real execution, allowing previews
 without OIDC credentials or a reachable authority. Live authorization fails
 closed: a denied, unavailable, malformed, expired or mismatched decision blocks

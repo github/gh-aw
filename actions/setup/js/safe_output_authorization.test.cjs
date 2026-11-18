@@ -56,6 +56,7 @@ describe("generic fail-closed safe-output authorization", () => {
   let evidencePath;
   let core;
   beforeEach(() => {
+    vi.stubEnv("GITHUB_AW_OTEL_TRACE_ID", "");
     directory = path.resolve(`.safe-output-authorization-test-${crypto.randomUUID()}`);
     fs.mkdirSync(directory);
     evidencePath = path.join(directory, "evidence.jsonl");
@@ -64,6 +65,7 @@ describe("generic fail-closed safe-output authorization", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     fs.rmSync(directory, { recursive: true, force: true });
   });
   function options(changes = {}, decision = {}) {
@@ -93,6 +95,101 @@ describe("generic fail-closed safe-output authorization", () => {
       throw error;
     }
   }
+
+  describe("OpenTelemetry", () => {
+    let sender;
+    let mirrors;
+    beforeEach(() => {
+      mirrors = [];
+      vi.stubEnv("GITHUB_AW_OTEL_TRACE_ID", "a".repeat(32));
+      vi.stubEnv("GITHUB_AW_OTEL_PARENT_SPAN_ID", "b".repeat(16));
+      vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://otel.example.test" }]));
+      sender = require("./send_otlp_span.cjs");
+      vi.spyOn(sender, "readJSONIfExists").mockReturnValue({});
+      vi.spyOn(sender, "appendToOTLPJSONL").mockImplementation(payload => mirrors.push(payload));
+      vi.spyOn(sender, "sendOTLPToAllEndpoints").mockResolvedValue([]);
+    });
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each(["allow", "deny", "unavailable"])("exports correlated %s spans without authorization secrets", async decision => {
+      const opts = options({}, { decision });
+      if (decision === "unavailable")
+        opts.fetchImpl
+          .mockReset()
+          .mockImplementationOnce(() => oidc())
+          .mockRejectedValueOnce(new Error("private-transport-detail"));
+      if (decision === "allow") await authorizePreparedInvocation(opts);
+      else await expect(authorizePreparedInvocation(opts)).rejects.toBeInstanceOf(SafeOutputAuthorizationError);
+      const spans = mirrors.map(payload => payload.resourceSpans[0].scopeSpans[0].spans[0]);
+      expect(spans.map(span => span.name)).toEqual(["safe_output.authorization.oidc.run", "safe_output.authorization.authority.run", "safe_output.authorization.decision.run"]);
+      for (const span of spans) expect(span).toMatchObject({ traceId: "a".repeat(32), parentSpanId: "b".repeat(16) });
+      const final = spans.at(-1);
+      expect(final.status.code).toBe(decision === "allow" ? 1 : 2);
+      const attrs = Object.fromEntries(final.attributes.map(({ key, value }) => [key, Object.values(value)[0]]));
+      expect(attrs).toMatchObject({
+        "gh-aw.safe_output.gate.phase": "decision",
+        "gh-aw.safe_output.gate.state": decision === "allow" ? "allowed" : decision === "deny" ? "denied" : "error",
+        "gh-aw.safe_output.gate.reason_code": decision === "allow" ? "allowed" : decision === "deny" ? "denied" : "authority_unavailable",
+        "gh-aw.safe_output.gate.executor": "manager",
+        "gh-aw.safe_output.gate.binding": "invocation",
+        "gh-aw.safe_output.gate.requirement_source": "global",
+      });
+      const serialized = JSON.stringify(mirrors);
+      for (const privateValue of [
+        requirement.endpoint,
+        requirement.audience,
+        env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
+        env.GITHUB_TOKEN,
+        token(),
+        inputs.body,
+        inputs.secret_ref,
+        "private-transport-detail",
+        "policy-v7",
+        "decision-fixture-1",
+        opts.invocation.invocation_id,
+      ]) {
+        expect(serialized).not.toContain(privateValue);
+      }
+      expect(sender.sendOTLPToAllEndpoints).toHaveBeenCalledTimes(3);
+      expect(opts.fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not await an exporter while authorization is live", async () => {
+      sender.sendOTLPToAllEndpoints.mockImplementation(() => new Promise(() => {}));
+      const authorization = await authorizePreparedInvocation(options());
+      expect(assertAuthorizationFresh({ authorization })).toBe(authorization);
+      expect(mirrors).toHaveLength(3);
+    });
+
+    it("still rejects a grant that expires while mirroring telemetry", async () => {
+      let elapsed = 0;
+      sender.appendToOTLPJSONL.mockImplementation(payload => {
+        const name = payload.resourceSpans[0].scopeSpans[0].spans[0].name;
+        if (name === "safe_output.authorization.decision.run") elapsed = 14000;
+      });
+      const authorization = await authorizePreparedInvocation(options({ now: () => elapsed }));
+      expect(() => assertAuthorizationFresh({ authorization })).toThrow("invalid_validity");
+    });
+
+    it.each(["throw", "reject"])("keeps telemetry %s failures non-fatal and redacted", async failure => {
+      vi.spyOn(require("./otlp.cjs"), "logSpan").mockImplementation(() => {
+        const error = new Error("private-exporter-url-and-token");
+        if (failure === "throw") throw error;
+        return Promise.reject(error);
+      });
+      const authorization = await authorizePreparedInvocation(options());
+      expect(assertAuthorizationFresh({ authorization })).toBe(authorization);
+      expect(core.warning).toHaveBeenCalledWith("ERR_SAFE_OUTPUT_AUTHORIZATION: telemetry_failed");
+      expect(JSON.stringify(core.warning.mock.calls)).not.toContain("private-exporter");
+    });
+
+    it.each(["staged", "unconfigured", "no-trace"])("does not initialize telemetry for %s execution", async mode => {
+      if (mode === "no-trace") vi.stubEnv("GITHUB_AW_OTEL_TRACE_ID", "");
+      await authorizePreparedInvocation(options(mode === "staged" ? { staged: true } : mode === "unconfigured" ? { requirement: undefined } : {}));
+      expect(mirrors).toEqual([]);
+      expect(sender.sendOTLPToAllEndpoints).not.toHaveBeenCalled();
+    });
+  });
 
   it.each(["allow", "deny", "unavailable"])("logs the %s decision lifecycle without authority or input secrets", async decision => {
     const opts = options({}, { decision });
@@ -192,6 +289,35 @@ describe("generic fail-closed safe-output authorization", () => {
   it("does not alter an unconfigured execution path", async () => {
     const opts = options({ requirement: undefined, invocation: undefined });
     expect((await execute(opts)).executor).toHaveBeenCalledOnce();
+    expect(opts.fetchImpl).not.toHaveBeenCalled();
+  });
+  it("resolves compiler-owned repository authorization from managed runtime variables", async () => {
+    const opts = options({
+      requirement: { from_environment: true, source: "global" },
+      env: { ...env, GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_URL: requirement.endpoint, GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_AUDIENCE: requirement.audience },
+    });
+    const authorization = await authorizePreparedInvocation(opts);
+    expect(authorization).toMatchObject({ state: "allowed", requirement_source: "global" });
+    expect(String(opts.fetchImpl.mock.calls[0][0])).toContain(`audience=${encodeURIComponent(requirement.audience)}`);
+    expect(opts.fetchImpl.mock.calls[1][0]).toBe(requirement.endpoint);
+    expect(assertAuthorizationFresh({ authorization })).toBe(authorization);
+  });
+  it.each(["missing", "missing-audience", "insecure", "expression", "mixed-config"])("fails closed for %s managed authority without acquiring credentials", async kind => {
+    const opts = options({
+      requirement: { from_environment: true, source: "global", ...(kind === "mixed-config" ? { endpoint: requirement.endpoint, audience: requirement.audience } : {}) },
+      env: {
+        ...env,
+        GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_URL: kind === "missing" ? "" : kind === "insecure" ? "http://insecure.example" : kind === "expression" ? "${{ vars.ENDPOINT }}" : requirement.endpoint,
+        GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_AUDIENCE: kind === "missing-audience" ? "" : requirement.audience,
+      },
+    });
+    await expect(execute(opts)).rejects.toThrow("invalid_configuration");
+    expect(opts.fetchImpl).not.toHaveBeenCalled();
+    expect(core.setSecret).not.toHaveBeenCalled();
+  });
+  it("skips a staged managed authority before resolving missing variables", async () => {
+    const opts = options({ staged: true, requirement: { from_environment: true, source: "global" } });
+    expect(await authorizePreparedInvocation(opts)).toMatchObject({ state: "skipped_staged" });
     expect(opts.fetchImpl).not.toHaveBeenCalled();
   });
   it("sends a bounded OIDC-only HTTPS POST and durably persists a minimized decision first", async () => {
@@ -342,7 +468,14 @@ describe("generic fail-closed safe-output authorization", () => {
     expect(opts.fetchImpl).toHaveBeenCalledTimes(2);
   });
   it("counts credential time against the monotonic total deadline", async () => {
-    const opts = options({ now: vi.fn().mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValue(20001) });
+    let elapsed = 0;
+    const opts = options({
+      now: () => elapsed,
+      fetchImpl: vi.fn().mockImplementationOnce(() => {
+        elapsed = 20001;
+        return oidc();
+      }),
+    });
     await expect(execute(opts)).rejects.toThrow("timeout");
     expect(opts.fetchImpl).toHaveBeenCalledOnce();
   });

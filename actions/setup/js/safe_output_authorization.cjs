@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const { performance } = require("node:perf_hooks");
 const { parseStrictJSON, utf8Compare, validString } = require("./work_queue_codec.cjs");
 const { readBoundedBody } = require("./admission_protocol.cjs");
+const { withRetry } = require("./error_recovery.cjs");
 
 const VERSION = "gh-aw.safe-output-authorization.v1";
 const MAX_REQUEST_BYTES = 65536;
@@ -248,8 +249,12 @@ function prepareInvocation({ caller, output, normalizedInputs, batchDigest, reco
   }
 }
 
-function configuration(requirement) {
+function configuration(requirement, env) {
   try {
+    if (requirement?.from_environment === true) {
+      closed(requirement, ["from_environment"], ["source"]);
+      requirement = { endpoint: env.GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_URL, audience: env.GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_AUDIENCE, ...(requirement.source === undefined ? {} : { source: requirement.source }) };
+    }
     closed(requirement, ["endpoint", "audience"], ["source"]);
     const endpoint = text(requirement.endpoint, 2048);
     const audience = text(requirement.audience, 2048);
@@ -263,23 +268,57 @@ function configuration(requirement) {
   }
 }
 
-async function boundedRequest(operation, deadline, now) {
-  const remaining = Math.min(HTTP_TIMEOUT_MS, deadline - now());
-  if (remaining <= 0) fail("timeout");
-  const controller = new AbortController();
-  let timer;
+function recordAuthorizationSpan(phase, startMs, projection, coreApi) {
+  const traceId = process.env.GITHUB_AW_OTEL_TRACE_ID || "";
+  if (!/^[a-f0-9]{32}$/.test(traceId) || /^0{32}$/.test(traceId)) return;
+  const warn = () => {
+    try {
+      coreApi?.warning?.("ERR_SAFE_OUTPUT_AUTHORIZATION: telemetry_failed");
+    } catch {
+      // Telemetry must not change authorization or execution outcomes.
+    }
+  };
   try {
-    return await Promise.race([
-      operation(controller.signal),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new SafeOutputAuthorizationError("timeout"));
-        }, remaining);
-      }),
-    ]);
+    const attributes = {
+      "gh-aw.safe_output.gate.phase": phase,
+      "gh-aw.safe_output.gate.state": projection.state,
+      "gh-aw.safe_output.gate.reason_code": projection.reason_code,
+    };
+    for (const key of ["executor", "binding", "requirement_source"]) {
+      if (projection[key] !== undefined) attributes[`gh-aw.safe_output.gate.${key}`] = projection[key];
+    }
+    // Mirror synchronously; never wait for network export inside a live grant.
+    void require("./otlp.cjs")
+      .logSpan(`safe_output.authorization.${phase}`, attributes, { startMs, endMs: Date.now(), isError: ["error", "denied"].includes(projection.state), onError: warn })
+      .catch(warn);
+  } catch {
+    warn();
+  }
+}
+
+async function boundedRequest(operation, deadline, now, coreApi, phase) {
+  const startMs = Date.now();
+  let projection = { state: "succeeded", reason_code: "completed" };
+  try {
+    return await withRetry(
+      async signal => {
+        if (!signal) fail("invalid_preparation");
+        try {
+          return await operation(signal);
+        } catch (error) {
+          throw error instanceof SafeOutputAuthorizationError ? error : new SafeOutputAuthorizationError("authority_unavailable");
+        }
+      },
+      { maxRetries: 0, shouldRetry: () => false, timeoutMs: HTTP_TIMEOUT_MS, deadline, now, timeoutError: () => new SafeOutputAuthorizationError("timeout"), logger: coreApi },
+      "safe-output authorization request"
+    );
+  } catch (error) {
+    const original = error instanceof Error && "originalError" in error ? error.originalError : error;
+    const failure = original instanceof SafeOutputAuthorizationError ? original : new SafeOutputAuthorizationError("authority_unavailable");
+    projection = { state: "error", reason_code: failure.reason_code };
+    throw failure;
   } finally {
-    clearTimeout(timer);
+    recordAuthorizationSpan(phase, startMs, projection, coreApi);
   }
 }
 
@@ -320,7 +359,9 @@ async function acquireToken({ core, env, config, fetchImpl, deadline, now, wallN
         return body.value;
       },
       deadline,
-      now
+      now,
+      core,
+      "oidc"
     );
   } catch (error) {
     if (error instanceof SafeOutputAuthorizationError && ["missing_credentials", "timeout"].includes(error.reason_code)) throw error;
@@ -391,10 +432,11 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
     core?.debug?.("Safe-output authorization: not_configured");
     return { state: "not_configured", reason_code: "not_configured" };
   }
+  const startMs = Date.now();
   let projection = { state: "error", reason_code: "invalid_preparation" };
   try {
     if (typeof staged !== "boolean" || !prepared.has(invocation)) fail("invalid_preparation");
-    const config = configuration(requirement);
+    const config = configuration(requirement, env);
     projection = {
       ...projection,
       invocation_id: invocation.invocation_id,
@@ -432,7 +474,9 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
         return jsonResponse(response, MAX_RESPONSE_BYTES);
       },
       deadline,
-      now
+      now,
+      core,
+      "authority"
     );
     const metadata = validateDecision(decision, invocation, requestDigest, currentUTC());
     projection = { ...projection, ...metadata };
@@ -455,6 +499,8 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
     }
     core?.debug?.(`Safe-output authorization: blocked reason=${projection.reason_code}`);
     throw new SafeOutputAuthorizationError(projection.reason_code, freeze(projection));
+  } finally {
+    recordAuthorizationSpan("decision", startMs, projection, core);
   }
 }
 
