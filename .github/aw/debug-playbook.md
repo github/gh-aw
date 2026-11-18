@@ -162,31 +162,29 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error/budget/evidence. | Resolve cause; unevidenced stays unknown. |
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
-| `E002`, `MAX_COUNT_REACHED`, `connector_budget_exceeded` | Cap vs attempts/records. | Reduce count; no replay. |
-| `E003` | Named count/size limit. | Split/reduce authorized payload. |
 | `ERR_PERMISSION`, `E004`, `APPROVE_WORKFLOW_RUN_PERMISSION_DENIED`, `DISCUSSIONS_TOKEN_SCOPE_MISMATCH` | Target/scope, permissions, token type. | Fix authorized permissions; never expose tokens/evade guards. |
-| `E006` | Body/string length. | Shorten; retain required content. |
-| `E008` | URL count/limit. | Reduce links; no concealment. |
+| `E002`, `E003`, `E006`, `E008`, `MAX_COUNT_REACHED`, `connector_budget_exceeded` | Count/size/string/URL cap vs attempts. | Reduce/split/shorten; keep required content; no replay/concealment. |
 | `ERR_API`, `E007` | GitHub status; operation guard. | Resolve API/target cause; policy skip != failed mutation. |
 | `ERR_CONFIG`, `ERR_ADMISSION`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Schema/OIDC/auth/admission. | Fix config/auth; honor denials/outage policy; recompile; keep credentials/environment private. |
 | `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Version/provenance/minimums/blocklist. | Update gh-aw; recompile/publish source+lock; retain enforcement. |
 | `ERR_GRADER_SESSION_INVALID` | Unified event array: type/data/provenance. | Fix producer/caller; never fabricate sessions. |
-| `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED` | Tool deep-copy failure. | Fix definition/loader; retain copy isolation. |
+| `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED` | Deep-copy failure. | Fix loader; keep isolation. |
 | `ERR_SAFE_OUTPUTS_GATEWAY_CONFIG` | Numeric `MCP_GATEWAY_PORT`; private `MCP_GATEWAY_AGENT_ID` present. | Fix config; retain readiness/auth. |
 | `ERR_NOT_FOUND`, `TARGET_NOT_FOUND` | Target/repository/visibility. | Correct target/access; 404 may hide resources. |
-| `ERR_PARSE` | JSON/NDJSON framing/schema/producer. | Fix producer/format; retain private evidence. |
-| `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout; wrapper is not cause. |
+| `ERR_PARSE` | JSON/NDJSON framing/schema. | Fix producer/format; keep evidence private. |
+| `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout. |
 | `no_new_commits`, `missing_pr_head`, `shallow_history` | Commits/refs/history. | Verify no-op; prepare PR refs/full history before agent. |
 | `E009`, `CONFIG_HASH_MISMATCH` | Source vs lock hash. | Recompile/publish source+lock together; no manual hash edit. |
-| `E010`, `RATE_LIMIT_EXCEEDED` | Retry budget; reset headers. | Stop exhausted retries; respect reset/backoff; reduce API work. |
+| `E010`, `RATE_LIMIT_EXCEEDED` | Retry budget; reset headers. | Stop exhausted retries; respect reset/backoff. |
 | `POLICY_FILE_PROTECTION_DENIED` | Allowed/protected files/patch. | Respect intentional skip; constrain change, retain protection. |
-| `NO_CONTEXT` | Trigger context; explicit target. | Supply authorized target/context-appropriate output. |
-| `NO_LABELS_PROVIDED` | Requested/existing labels. | Supply valid labels; don't claim mutation. |
+| `NO_CONTEXT`, `NO_LABELS_PROVIDED` | Context/target; labels. | Supply target/labels; no claimed mutation. |
 | `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title vs guards. | Respect deliberate skip; fix mistaken target/config only. |
-| `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL` | Lock/approval state. | Respect state; no unrelated unlock/approval. |
+| `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL` | Lock/approval state. | Respect state; no unrelated unlock. |
 | `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Quota/retry-not-before. | Stop/defer within bounds; missing accounting != zero. |
-| `AIC_USAGE_UNKNOWN`, `AIC_USAGE_UNPRICED` | Missing/unpriced usage. | Fix access/pricing; budget unknown. |
+| `AIC_USAGE_UNKNOWN`, `AIC_USAGE_UNPRICED` | Missing/unpriced usage. | Fix access/pricing. |
 | `permission_denied` | Business response; operation authority. | Fix authorized credentials/permissions, not quota. |
+| `allowed`, `completed`, `skipped_staged`, `not_configured`, `deferred_executor` | Authorization state. | Healthy/intentional skip. |
+| `invalid_preparation`, `target_selector_invalid`, `invalid_validity`, `authority_unavailable`, `evidence_failed`, `post_effect_evidence_failed` | Reason; target; expiry; evidence. | Fix cause; fail closed; no replay/bypass. |
 
 ## Merge guard codes
 
@@ -236,8 +234,7 @@ or bypass profiles/effect-scopes.
 | `policy_not_quiescent`, `admission_paused`, `grants_paused` | Claims/dispatches; pause controls. | Respect pause; reconcile before authorized Policy change. |
 | `work_expired` | Deadline/queue time. | Refresh fair prefix; never revive expired Work. |
 | `hard_clear_snapshot_invalid`, `hard_clear_conflict` | Preview revision; current tip/receipt. | Reconcile; preview/authorize afresh; don't reset newer snapshots. |
-| `hard_clear_not_paused` | Admission/grant controls. | Pause both before authorized hard clear. |
-| `hard_clear_unresolved`, `hard_clear_uncertain` | Reservations/Claims/barriers/effects/receipt. | Reconcile trusted evidence before retry; preserve unresolved effects. |
+| `hard_clear_not_paused`, `hard_clear_unresolved`, `hard_clear_uncertain` | Pause controls; reservations/Claims/effects/receipt. | Pause both first; reconcile trusted evidence; preserve unresolved effects. |
 | `graph_invalid`, `graph_pool_conflict`, `node_conflict`, `replacement_invalid`, `work_conflict`, `work_identity_invalid`, `work_invalid`, `identity_invalid` | Graph/node/pool/payload/fingerprint/replacement. | Fix submission; retain accepted identity. |
 | `dependency_cycle`, `dependency_duplicate`, `dependency_invalid`, `dependency_missing`, `dependency_result_unavailable`, `dependency_credentials_missing` | DAG, dependency, receipt, scoped credentials. | Fix graph/result/access; never fabricate completion. |
 | `dependency_verifier_required`, `delivery_verifier_required`, `nonlaunch_verifier_required`, `remediation_verifier_required` | Verifier/evidence type. | Approved verifier required; otherwise block effects. Never disable verification. |
