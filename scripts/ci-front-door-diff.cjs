@@ -102,6 +102,8 @@ async function summarizeGitHubDiff({ repository, base, head, token, fetchImpl = 
       }
       return JSON.parse(Buffer.concat(chunks).toString("utf8"));
     };
+    // Compare paginates commits, not files: page one includes up to 300 files for the entire comparison.
+    // https://docs.github.com/en/rest/commits/commits#compare-two-commits
     const comparison = await request(`compare/${base}...${head}?per_page=1`);
     if (comparison.base_commit?.sha !== base || comparison.merge_base_commit?.sha !== base || comparison.status !== "ahead" || !Array.isArray(comparison.files)) throw new Error("invalid-comparison");
     let changed = comparison.files;
