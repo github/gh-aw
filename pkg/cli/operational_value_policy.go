@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"slices"
-	"strings"
 	"time"
 )
 
@@ -83,22 +82,39 @@ func valueDays(days int) time.Duration {
 	return time.Duration(days) * 24 * time.Hour
 }
 
-func prepareValueOverlap(git valueGit, definition valueMeasurementDefinition, outputs []valueOutput, cutoff time.Time) error {
+func prepareValueOverlap(git valueGit, definition valueMeasurementDefinition, outputs []valueOutput, start, cutoff time.Time, policy valueWindowPolicy) error {
+	var anchors []time.Time
+	for _, out := range outputs {
+		if !out.Delivered.Before(start) && !out.Delivered.After(cutoff) && !out.Merged.IsZero() && !out.Merged.After(cutoff) {
+			anchors = append(anchors, out.Merged)
+		}
+	}
+	slices.SortFunc(anchors, time.Time.Compare)
 	for i := range outputs {
 		output := &outputs[i]
 		if output.Merged.IsZero() || output.Merged.After(cutoff) {
 			continue
 		}
-		sha, err := resolveValueMerge(git.ctx, definition, *output)
+		first := output.Merged.Add(-valueDays(policy.IsolationAfterDays))
+		last := output.Merged.Add(valueDays(policy.IsolationBeforeDays))
+		j, _ := slices.BinarySearchFunc(anchors, first, time.Time.Compare)
+		if j == len(anchors) || anchors[j].After(last) { //nolint:uncheckedsliceindex // The insertion point is nonnegative and at most len(anchors).
+			continue
+		}
+		if err := resolveValueMerge(git, definition, output); err != nil {
+			return err
+		}
+		if output.base == "" {
+			continue // An unverified neighbor cannot establish changed-file isolation.
+		}
+		files, err := git.changedPaths(output.base, output.SHA)
 		if err != nil {
 			return err
 		}
-		files, err := git.run("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", sha+"^1", sha)
-		if err != nil {
+		if err := git.budget.retain(0, files); err != nil {
 			return err
 		}
-		output.SHA = sha
-		output.Files = strings.Split(strings.TrimSuffix(files, "\x00"), "\x00")
+		output.Files = files
 	}
 	return nil
 }

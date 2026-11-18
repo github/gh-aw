@@ -153,7 +153,7 @@ func TestOperationalValueGitReplay(t *testing.T) {
 	resolved, err := git.prepare(measurement.definition(), "main", cutoff)
 	require.NoError(t, err)
 	assert.Equal(t, tip, resolved)
-	output := valueOutput{PR: 1, URL: "https://github.com/github/gh-aw/pull/1", RunID: 42, Delivered: valueTestTime(t, "2026-09-28T07:00:00Z"), Merged: valueTestTime(t, "2026-09-28T16:37:55Z"), SHA: merge}
+	output := valueOutput{PR: 1, URL: "https://github.com/github/gh-aw/pull/1", RunID: 42, Delivered: valueTestTime(t, "2026-09-28T07:00:00Z"), Merged: valueTestTime(t, "2026-09-28T16:37:55Z"), SHA: merge, base: parent}
 	record := valueTestRecord(t, output)
 	window, err := buildValueWindow(git, measurement, tip, output, cutoff, []valueOutput{output}, map[string]lifecycle.Record{record.ID: record})
 	require.NoError(t, err)
@@ -182,11 +182,11 @@ func TestOperationalValueGitReplay(t *testing.T) {
 	assert.Nil(t, pending.Attributed)
 	// A similarly named file must not match the brackets as a glob.
 	tip = commit("2026-10-11T12:00:00Z", map[string]string{"schema-demos/c1.md": "a:\n"})
-	survival, err := git.survival(tip, merge, valueTestTime(t, "2026-10-12T12:00:00Z"))
+	survival, err := git.survival(tip, parent, merge, valueTestTime(t, "2026-10-12T12:00:00Z"))
 	require.NoError(t, err)
 	assert.Zero(t, survival.Touched)
 	tip = commit("2026-10-12T12:00:00Z", map[string]string{"schema-demos/c[1].md": "c:\nchanged\n"})
-	survival, err = git.survival(tip, merge, valueTestTime(t, "2026-10-13T12:00:00Z"))
+	survival, err = git.survival(tip, parent, merge, valueTestTime(t, "2026-10-13T12:00:00Z"))
 	require.NoError(t, err)
 	assert.Equal(t, 1, survival.Touched)
 	_, err = git.prepare(measurement.definition(), "main", valueTestTime(t, "2026-12-01T12:00:00Z"))
@@ -226,7 +226,7 @@ func TestOperationalValueReportAndSearch(t *testing.T) {
 	require.Len(t, outputs, 1)
 	assert.Equal(t, int64(42), outputs[0].RunID)
 	record := valueTestRecord(t, outputs[0])
-	writeResponse(map[string]any{"html_url": outputs[0].URL, "merged_at": outputs[0].Merged, "merge_commit_sha": merge})
+	writeResponse(map[string]any{"html_url": outputs[0].URL, "merged_at": outputs[0].Merged, "merge_commit_sha": merge, "commits": 1})
 	start, end, err := operationalValueDates(operationalValueConfig{Start: "2026-09-21", End: "2026-10-06"}, valueTestTime(t, "2026-11-17T12:00:00Z"))
 	require.NoError(t, err)
 	options := valueReportOptions{Start: start, End: end, ObservedAt: end}
@@ -253,8 +253,12 @@ func TestOperationalValueReportAndSearch(t *testing.T) {
 	_, err = collectValueOutputs(t.Context(), measurement.definition(), recipe)
 	require.ErrorContains(t, err, "does not match recipe author_login")
 	item["user"] = user
+	item["body"] = "unrelated search hit with no producer footer"
+	writeResponse(search)
+	unrelated, err := collectValueOutputs(t.Context(), measurement.definition())
+	require.NoError(t, err)
+	assert.Empty(t, unrelated)
 	for _, mutation := range []func(){
-		func() { item["body"] = "missing footer" },
 		func() { item["body"] = footer; search["incomplete_results"] = true },
 		func() { search["incomplete_results"] = false; search["total_count"] = 1001 },
 		func() { search["total_count"] = 2; search["items"] = []any{item, item} },

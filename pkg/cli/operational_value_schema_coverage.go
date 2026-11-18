@@ -117,7 +117,7 @@ func schemaCoverageLines(git valueGit, sha string, examples []string) (string, e
 	if !found {
 		return "", fmt.Errorf("missing Markdown inventory at %s", sha)
 	}
-	args = []string{"grep", "-h", "-o", "-E", "^[^:[:space:]]+:", sha, "--"}
+	args = []string{"grep", "--no-color", "--no-line-number", "--no-column", "--no-heading", "--no-break", "-h", "-o", "-E", "^[^:[:space:]]+:", sha, "--"}
 	for file := range strings.SplitSeq(inventory, "\x00") {
 		if strings.HasSuffix(file, ".md") {
 			args = append(args, ":(literal)"+file)
@@ -146,7 +146,7 @@ func (schemaCoverageMeasurement) change(before, after valueSnapshot) valueChange
 		return change
 	}
 	coverage.Closed = valueDifference(before.Coverage.Missing, after.Coverage.Missing)
-	value := float64(len(coverage.Closed))
+	value := float64(after.Coverage.Covered - before.Coverage.Covered)
 	change.Value = &value
 	return change
 }

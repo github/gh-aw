@@ -276,14 +276,14 @@ func operationalValueDates(config operationalValueConfig, now time.Time) (time.T
 func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, report operationalValueReport) error {
 	fields := "unavailable"
 	if report.AttributedValue != nil {
-		fields = fmt.Sprintf("%g %s (verified subtotal)", *report.AttributedValue, report.Measurement.Unit)
+		fields = fmt.Sprintf("%g %s (verified subtotal)", *report.AttributedValue, valueDisplayText(report.Measurement.Unit))
 	}
 	outcome, name, delivered, adopted, linked, merged := "unavailable", "not configured", "unavailable", "unavailable", "not collected", "not collected"
 	if measurement != nil {
 		if len(report.Weekly) == 0 && report.Evidence == nil {
 			return errors.New("configured value report has no historical snapshots")
 		}
-		name = report.Measurement.Name
+		name = valueDisplayText(report.Measurement.Name)
 		if report.Evidence != nil {
 			outcome = fmt.Sprintf("%s evidence (%d selected observations)", report.Evidence.Coverage, len(report.Evidence.Observations))
 		} else {
@@ -345,7 +345,7 @@ func renderOperationalValueWindows(out io.Writer, report operationalValueReport)
 	for _, window := range report.Windows {
 		change := "unavailable"
 		if window.Change.Value != nil {
-			change = fmt.Sprintf("%g %s", *window.Change.Value, report.Measurement.Unit)
+			change = fmt.Sprintf("%g %s", *window.Change.Value, valueDisplayText(report.Measurement.Unit))
 		}
 		rows = append(rows, windowRow{window.PR, window.MergedAt.Format(time.RFC3339), change, window.Status, window.Reason})
 	}
@@ -369,7 +369,7 @@ func renderValueInspectedWindows(out io.Writer, report operationalValueReport) e
 	for _, window := range report.InspectedWindows {
 		attributed := "unavailable: " + window.Reason
 		if window.Attributed != nil {
-			attributed = fmt.Sprintf("%g %s", *window.Attributed, report.Measurement.Unit)
+			attributed = fmt.Sprintf("%g %s", *window.Attributed, valueDisplayText(report.Measurement.Unit))
 		}
 		rows = append(rows, inspectedRow{window.Label, window.Kind, len(window.PRs),
 			formatValueSnapshot(window.Before, report.Measurement.Unit), formatValueSnapshot(window.After, report.Measurement.Unit), attributed})

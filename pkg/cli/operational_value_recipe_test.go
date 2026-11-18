@@ -42,7 +42,7 @@ func TestOperationalValueRecipeCommand(t *testing.T) {
 		item.User.Login, item.PullRequest.MergedAt = "github-actions[bot]", at
 		items = append(items, item)
 		valueWriteJSON(t, filepath.Join(fixture, fmt.Sprintf("pr-%d.json", pr)),
-			map[string]any{"html_url": url, "merged_at": at, "merge_commit_sha": sha})
+			map[string]any{"html_url": url, "merged_at": at, "merge_commit_sha": sha, "commits": 1})
 		if i == 2 {
 			witnessOutput = valueOutput{PR: pr, RunID: int64(pr), URL: url, Delivered: item.CreatedAt, Merged: at}
 		}

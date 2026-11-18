@@ -123,7 +123,7 @@ func inspectValueRecipe(report *operationalValueReport, recipe *valueRecipe) err
 			if recipe.EarlyBatchesThrough != "" && day <= recipe.EarlyBatchesThrough {
 				return fmt.Errorf("witness PR %d also belongs to an early batch", window.PR)
 			}
-			if window.Change.Value == nil {
+			if window.Change.Value == nil && window.Reason != valueBoundaryUnavailable {
 				return fmt.Errorf("witness PR %d has unavailable measurement: %s", window.PR, window.Change.Reason)
 			}
 			found[window.PR] = struct{}{}
@@ -149,15 +149,23 @@ func inspectValueMembers(members []valueWindow, kind string) valueInspectedWindo
 	result := valueInspectedWindow{
 		Label: first.MergedAt.UTC().Format("Jan 2"), Kind: kind, PRs: []int{},
 		First: first.MergedAt, Last: last.MergedAt, Before: first.Before, After: last.After,
-		End: last.End, Samples: append(slices.Clone(first.Samples[:pre]), last.Samples[post:]...),
+		End:    last.End,
 		Closed: []string{}, Removed: []string{}, Status: "descriptive", Reason: "batch_not_attributed",
 	}
 	for _, member := range members {
 		result.PRs = append(result.PRs, member.PR)
+		if member.Reason == valueBoundaryUnavailable {
+			result.Status, result.Reason = "unavailable", valueBoundaryUnavailable
+		}
 		if coverage := member.Change.Coverage; coverage != nil {
 			result.Closed = append(result.Closed, coverage.Closed...)
 			result.Removed = append(result.Removed, coverage.Removed...)
 		}
+	}
+	result.Samples = append(slices.Clone(first.Samples[:pre]), last.Samples[post:]...)
+	if result.Reason == valueBoundaryUnavailable {
+		result.Closed, result.Removed = nil, nil
+		return result
 	}
 	slices.Sort(result.Closed)
 	slices.Sort(result.Removed)

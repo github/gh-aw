@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 )
 
 type valueMeasurementDefinition struct {
@@ -47,5 +49,15 @@ func formatValueSnapshot(snapshot valueSnapshot, unit string) string {
 	if snapshot.Coverage != nil {
 		return fmt.Sprintf("%d/%d fields", snapshot.Coverage.Covered, len(snapshot.Coverage.Fields))
 	}
-	return fmt.Sprintf("%g %s", *snapshot.Value, unit)
+	return fmt.Sprintf("%g %s", *snapshot.Value, valueDisplayText(unit))
+}
+
+// Keep structured evidence unchanged; only single-line terminal fields are projected.
+func valueDisplayText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if !unicode.IsPrint(r) {
+			return '\uFFFD'
+		}
+		return r
+	}, s)
 }

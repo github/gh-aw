@@ -28,18 +28,18 @@ func renderValueEvidenceReport(out io.Writer, report operationalValueReport) err
 	}
 	rows := make([]row, 0, len(report.Evidence.Observations))
 	for _, result := range report.Evidence.Observations {
-		value := "unavailable: " + result.Reason
+		value := "unavailable: " + valueDisplayText(result.Reason)
 		if result.Value != nil {
-			value = fmt.Sprintf("%g %s", *result.Value, report.Measurement.Unit)
+			value = fmt.Sprintf("%g %s", *result.Value, valueDisplayText(report.Measurement.Unit))
 		}
-		rows = append(rows, row{result.Input.ID, result.Input.Subject, value})
+		rows = append(rows, row{valueDisplayText(result.Input.ID), valueDisplayText(result.Input.Subject), value})
 	}
 	if _, err := fmt.Fprint(out, console.RenderStructStdout(rows)); err != nil {
 		return err
 	}
 	for _, change := range report.Evidence.Changes {
 		if change.Change.Value != nil {
-			if _, err := fmt.Fprintf(out, "Measured improvement: %g %s; attributed value unavailable (%s).\n", *change.Change.Value, report.Measurement.Unit, change.AttributionReason); err != nil {
+			if _, err := fmt.Fprintf(out, "Measured improvement: %g %s; attributed value unavailable (%s).\n", *change.Change.Value, valueDisplayText(report.Measurement.Unit), change.AttributionReason); err != nil {
 				return err
 			}
 		}

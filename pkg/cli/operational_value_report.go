@@ -12,6 +12,7 @@ import (
 )
 
 const valueWindowDuration = 7 * 24 * time.Hour
+const valueBoundaryUnavailable = "whole_pr_boundary_unverified"
 
 type operationalValueReport struct {
 	SchemaVersion       int                        `json:"schema_version"`
@@ -67,10 +68,13 @@ type valueReportOptions struct {
 
 func buildOperationalValueReport(git valueGit, measurement valueMeasurement, tip string, options valueReportOptions, outputs []valueOutput, records map[string]lifecycle.Record) (operationalValueReport, error) {
 	start, end := options.Start, options.End
+	if git.budget == nil {
+		git.budget = &valueEvidenceBudget{remaining: valueRetainedLimit}
+	}
 	report := newOperationalValueReport(measurement.definition(), start, end, options.ObservedAt, records)
 	report.WindowPolicy = options.Policy.resolved()
 	if report.WindowPolicy.Overlap == "changed_files" {
-		if err := prepareValueOverlap(git, measurement.definition(), outputs, end); err != nil {
+		if err := prepareValueOverlap(git, measurement.definition(), outputs, start, end, report.WindowPolicy); err != nil {
 			return report, err
 		}
 	}
@@ -104,11 +108,9 @@ func buildOperationalValueReport(git valueGit, measurement valueMeasurement, tip
 		}
 		if !output.Merged.IsZero() {
 			if output.SHA == "" {
-				sha, err := resolveValueMerge(git.ctx, measurement.definition(), output)
-				if err != nil {
+				if err := resolveValueMerge(git, measurement.definition(), &output); err != nil {
 					return report, err
 				}
-				output.SHA = sha
 			}
 			window, err := buildValueWindow(git, measurement, tip, output, end, outputs, records, report.WindowPolicy)
 			if err != nil {
@@ -179,15 +181,14 @@ func buildValueWindow(git valueGit, measurement valueMeasurement, tip string, ou
 	if !slices.Contains(strings.Fields(chain), output.SHA) {
 		return window, errors.New("merge is not on the selected first-parent main history")
 	}
-	parent, err := git.run("rev-parse", output.SHA+"^1")
-	if err != nil {
-		return window, err
+	window.Adoption = findValueAdoption(measurement.definition(), output, records)
+	if output.base != "" {
+		window.Before, err = git.measure(measurement, output.base)
+		if err != nil {
+			return window, err
+		}
 	}
-	window.Before, err = measurement.measure(git, parent)
-	if err != nil {
-		return window, err
-	}
-	window.After, err = measurement.measure(git, output.SHA)
+	window.After, err = git.measure(measurement, output.SHA)
 	if err != nil {
 		return window, err
 	}
@@ -195,11 +196,14 @@ func buildValueWindow(git valueGit, measurement valueMeasurement, tip string, ou
 	if err := collectValueWindowEvidence(git, measurement, tip, cutoff, &window); err != nil {
 		return window, err
 	}
+	if output.base == "" {
+		window.Status, window.Reason, window.Change.Reason = "unavailable", valueBoundaryUnavailable, valueBoundaryUnavailable
+		return window, nil
+	}
 	window.Change = valueChange{Reason: "outcome_observation_pending"}
 	if window.Outcome != nil {
 		window.Change = measurement.change(window.Before, *window.Outcome)
 	}
-	window.Adoption = findValueAdoption(measurement.definition(), output, records)
 	assessValueWindow(&window, outputs)
 	return window, nil
 }
@@ -247,7 +251,10 @@ func collectValueWindowEvidence(git valueGit, measurement valueMeasurement, tip 
 			return err
 		}
 		window.End = &snapshot
-		survival, err := git.survival(tip, window.After.SHA, end)
+		if window.Before.SHA == "" {
+			return nil // Repository snapshots remain descriptive without a whole-PR baseline.
+		}
+		survival, err := git.survival(tip, window.Before.SHA, window.After.SHA, end)
 		if err != nil {
 			return err
 		}

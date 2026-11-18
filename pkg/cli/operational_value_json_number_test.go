@@ -40,7 +40,7 @@ func TestOperationalValueExternalRepository(t *testing.T) {
 	item.User.Login, item.PullRequest.MergedAt = "security-bot[bot]", merged
 	valueWriteJSON(t, filepath.Join(fixture, "search.json"), map[string]any{"total_count": 1, "items": []valuePullRequest{item}})
 	valueWriteJSON(t, filepath.Join(fixture, "pr.json"), map[string]any{
-		"html_url": url, "merged_at": merged, "merge_commit_sha": merge,
+		"html_url": url, "merged_at": merged, "merge_commit_sha": merge, "commits": 1,
 	})
 	record, err := lifecycle.Delivered(lifecycle.Identity{
 		Host: "github.com", Repository: "acme/security", Workflow: filepath.Join(constants.WorkflowsDir, "security-sweep.lock.yml"),

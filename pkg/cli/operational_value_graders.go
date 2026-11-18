@@ -30,7 +30,7 @@ type valueRunGrade struct {
 }
 
 func loadValueRunGrades(path string, definition valueMeasurementDefinition, start, end time.Time) (*valueRunGradesReport, error) {
-	data, err := regradeReadEvidence(path, maxGraderPayloadBytes)
+	data, err := readRegularGraderEvidence(path, maxGraderPayloadBytes)
 	if errors.Is(err, os.ErrNotExist) {
 		return &valueRunGradesReport{Coverage: "unavailable", Reason: "logs_summary_not_found", Runs: []valueRunGrade{}}, nil
 	}
@@ -160,7 +160,7 @@ func renderValueRunGrades(out io.Writer, report *valueRunGradesReport) error {
 	for _, run := range report.Runs {
 		value := "unavailable"
 		if run.Grader.Value != nil {
-			value = strings.TrimSpace(strconv.FormatFloat(*run.Grader.Value, 'g', -1, 64) + " " + run.Grader.Unit)
+			value = strings.TrimSpace(strconv.FormatFloat(*run.Grader.Value, 'g', -1, 64) + " " + valueDisplayText(run.Grader.Unit))
 		}
 		rows = append(rows, gradeRow{
 			Run: run.RunID, Attempt: run.RunAttempt, Created: run.CreatedAt.UTC().Format(time.RFC3339),

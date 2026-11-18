@@ -14,8 +14,9 @@ import (
 )
 
 type valueGit struct {
-	ctx context.Context
-	dir string
+	ctx    context.Context
+	dir    string
+	budget *valueEvidenceBudget
 }
 
 func (g valueGit) run(args ...string) (string, error) {
@@ -27,11 +28,11 @@ func (g valueGit) output(args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(g.ctx, "git", append([]string{"--no-pager"}, args...)...)
 	cmd.Dir = g.dir
 	cmd.Env = append(os.Environ(), "GIT_NO_LAZY_FETCH=1", "GIT_NO_REPLACE_OBJECTS=1")
-	output, err := cmd.Output()
+	output, err := valueCommandOutput(cmd, valueCommandLimit)
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(exit.Stderr)))
+			return nil, fmt.Errorf("git: %w: %s", err, valueDisplayText(strings.TrimSpace(string(exit.Stderr))))
 		}
 		return nil, err
 	}
@@ -84,7 +85,7 @@ func (g valueGit) snapshot(measurement valueMeasurement, tip string, at time.Tim
 	if sha == "" {
 		return valueSnapshot{}, fmt.Errorf("no main-history snapshot at %s; full history is required", at.Format(time.RFC3339))
 	}
-	snapshot, err := measurement.measure(g, sha)
+	snapshot, err := g.measure(measurement, sha)
 	snapshot.At = at
 	return snapshot, err
 }
@@ -96,7 +97,15 @@ type valueSurvival struct {
 	Touched int       `json:"touched"`
 }
 
-func (g valueGit) survival(tip, sha string, end time.Time) (valueSurvival, error) {
+func (g valueGit) changedPaths(base, sha string) ([]string, error) {
+	files, err := g.run("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", base, sha)
+	if err != nil || files == "" {
+		return nil, err
+	}
+	return strings.Split(strings.TrimSuffix(files, "\x00"), "\x00"), nil
+}
+
+func (g valueGit) survival(tip, base, sha string, end time.Time) (valueSurvival, error) {
 	result := valueSurvival{Through: end}
 	endSHA, err := g.run("rev-list", "--first-parent", "-1", "--before="+end.Format(time.RFC3339), tip)
 	if err != nil {
@@ -109,12 +118,11 @@ func (g valueGit) survival(tip, sha string, end time.Time) (valueSurvival, error
 	if err != nil {
 		return result, err
 	}
-	files, err := g.run("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", sha+"^1", sha)
+	paths, err := g.changedPaths(base, sha)
 	if err != nil {
 		return result, err
 	}
-	paths := strings.Split(strings.TrimSuffix(files, "\x00"), "\x00")
-	if files == "" {
+	if len(paths) == 0 {
 		return result, errors.New("merge has no changed files; survival evidence is unavailable")
 	}
 	// Literal pathspecs keep filenames containing glob syntax from widening the check.

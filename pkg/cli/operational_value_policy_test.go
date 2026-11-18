@@ -14,7 +14,7 @@ import (
 
 func TestOperationalValuePolicySampling(t *testing.T) {
 	git, commit := valueTestGit(t)
-	commit("2026-09-01T12:00:00Z", map[string]string{
+	parent := commit("2026-09-01T12:00:00Z", map[string]string{
 		"pkg/parser/schemas/main_workflow_schema.json": `{"properties":{"a":{},"b":{},"c":{}}}`,
 		".github/workflows/a.md":                       "a:\n",
 	})
@@ -22,7 +22,7 @@ func TestOperationalValuePolicySampling(t *testing.T) {
 	commit("2026-09-30T16:37:55Z", map[string]string{"schema-demos/c.md": "c:\n"})
 	tip := commit("2026-10-20T12:00:00Z", nil)
 	at := valueTestTime(t, "2026-09-28T16:37:55Z")
-	output := valueOutput{PR: 1, RunID: 1, SHA: sha, URL: "https://github.com/github/gh-aw/pull/1", Delivered: at.Add(-time.Hour), Merged: at}
+	output := valueOutput{PR: 1, RunID: 1, SHA: sha, base: parent, URL: "https://github.com/github/gh-aw/pull/1", Delivered: at.Add(-time.Hour), Merged: at}
 	record := valueTestRecord(t, output)
 	records := map[string]lifecycle.Record{record.ID: record}
 	policy, err := resolveValueWindowPolicy(&valueRecipe{Window: json.RawMessage(`{
