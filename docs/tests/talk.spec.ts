@@ -39,7 +39,7 @@ test("presents the slides listed in slides.md in bands without the removed secti
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
     await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(index + 1));
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(heading);
-    await expect(page.locator(".notes")).toHaveText(/^What: .+\nWhy: .+\nWhen: .+$/);
+    await expect(page.locator(".notes .cue")).toHaveText([/^What: \S/, /^Why: \S/, /^When: \S/]);
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
   expect(errors).toEqual([]);
@@ -126,6 +126,8 @@ test("keeps speaker notes and compact toolbar controls usable on a phone", async
     expect(a.x + a.width).toBeLessThanOrEqual(320);
     for (const b of boxes.slice(i + 1)) expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
   }
+  // Cue labels stack above their text on a phone instead of taking a column.
+  await expect(notes.locator(".cue").first()).toHaveCSS("grid-template-columns", /^\S+$/);
   const panel = (await notes.boundingBox())!;
   expect(panel.y).toBeGreaterThanOrEqual(0);
   expect(panel.x + panel.width).toBeLessThanOrEqual(320);
@@ -435,17 +437,42 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 
-  // at 320px the four buttons, slide map, search and the sound toggle fit on one row without overlapping
-  const boxes = await page.evaluate(() =>
-    [...document.querySelectorAll(".arrows button"), ...[".smb", ".fzb", ".snd"].map(s => document.querySelector(s)!)].map(e => {
-      const r = e.getBoundingClientRect();
-      return { left: r.left, right: r.right };
-    })
-  );
-  expect(boxes).toHaveLength(7);
-  expect(boxes[0].left).toBeGreaterThanOrEqual(0);
-  for (let i = 1; i < 7; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].right);
-  expect(boxes[6].right).toBeLessThanOrEqual(320);
+  // at 320px the four arrows pack right-aligned beneath the notes, map, search and sound row
+  const rects = (sel: string) =>
+    page.locator(sel).evaluateAll(els =>
+      els.map(e => {
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      })
+    );
+  const arrowBoxes = await rects(".arrows button");
+  const toolBoxes = await rects(".ntb, .smb, .fzb, .snd");
+  expect(arrowBoxes).toHaveLength(4);
+  expect(toolBoxes).toHaveLength(4);
+  for (let i = 1; i < 4; i++) expect(arrowBoxes[i].left).toBeGreaterThan(arrowBoxes[i - 1].right);
+  const toolRight = Math.max(...toolBoxes.map(b => b.right));
+  expect(Math.abs(arrowBoxes[3].right - toolRight)).toBeLessThanOrEqual(1);
+  expect(toolRight).toBeLessThanOrEqual(320);
+  expect(arrowBoxes[0].left).toBeGreaterThanOrEqual(0);
+  expect(Math.abs(arrowBoxes[0].left - Math.min(...toolBoxes.map(b => b.left)))).toBeLessThanOrEqual(1);
+  expect(Math.min(...arrowBoxes.map(b => b.top))).toBeGreaterThanOrEqual(Math.max(...toolBoxes.map(b => b.bottom)));
+});
+
+test("animates the compact arrows into the right-aligned dock unless motion is reduced", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.setViewportSize({ width: 600, height: 720 });
+  await page.goto("/gh-aw/cracktro/#1");
+  const arrows = page.locator(".arrows");
+  const transition = () =>
+    arrows.evaluate(el => {
+      const cs = getComputedStyle(el);
+      const props = cs.transitionProperty.split(", ");
+      return props.includes("transform") ? cs.transitionDuration.split(", ")[props.indexOf("transform")] : "none";
+    });
+  await expect.poll(transition).toBe("0.45s");
+  await expect(page.locator(".snd")).toHaveCSS("transition-property", /bottom/);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(transition).toBe("none");
 });
 
 test.describe("compact navigation on touch screens", () => {
@@ -1037,7 +1064,7 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
           onKey: e => e.key === "x" && hooks.push("key:" + current().notes) > 0,
         }),
         slide("outro", "Goodbye"),
-        slide("part", "Alpha"),
+        slide("part", "Alpha", { notes: "What: <b>bold</b> stays text\\nWhy: Labels split cues." }),
         slide("part", "Beta"),
       ];
     },
@@ -1098,6 +1125,19 @@ test.describe("reusable runtime", () => {
     await expect(heading(page)).toHaveText("Part one");
     await page.keyboard.press("Home");
     await expect(heading(page)).toHaveText("Hello");
+    expect(errors).toEqual([]);
+  });
+
+  test("renders labelled notes as cue blocks and other notes as plain text", async ({ page }) => {
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html#alpha");
+    const notes = page.getByRole("complementary", { name: "Speaker notes" });
+    await page.keyboard.press("n");
+    await expect(notes.locator(".cue")).toHaveText(["What: <b>bold</b> stays text", "Why: Labels split cues."]);
+    await expect(notes.locator(".cue-k")).toHaveText(["What:", "Why:"]);
+    await expect(notes.locator("b")).toHaveCount(0);
+    await page.keyboard.press("Home");
+    await expect(notes).toHaveText("Hello notes");
+    await expect(notes.locator(".cue")).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 

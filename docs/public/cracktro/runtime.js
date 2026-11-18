@@ -165,8 +165,9 @@
   body.compact-nav .dots { display: none; }
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
-     Only opacity changes, so the first tap still lands; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
+     Idle fading preserves hit targets; keyboard focus keeps its control fully readable. */
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
+    transform .45s cubic-bezier(.2,.9,.2,1), bottom .45s cubic-bezier(.2,.9,.2,1); }
   body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp) { opacity: .4; }
   body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp) { transition: none; } }
@@ -185,13 +186,21 @@
   .snd.off .x { opacity: 1; }
   .snd.flash { color: #f0f6fc; border-color: #f0f6fc; }
   .notes { position: fixed; left: 24px; right: 24px; bottom: calc(50px + var(--sb)); max-width: 900px; margin: 0 auto; padding: 18px 22px;
-    background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none;
+    background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.55 "Mona Sans", -apple-system, "Segoe UI", sans-serif; z-index: 6; display: none;
     white-space: pre-line; overflow-wrap: anywhere; max-height: calc(100dvh - 140px); overflow-y: auto; overscroll-behavior: contain; }
   .notes.on { display: block; }
   body:not(.compact-nav) .notes { left: 330px; }
+  /* Labelled cues ("What: ...") get a label column and a divider so each reads as its own block. */
+  .notes .cue { display: grid; grid-template-columns: 5.5em 1fr; align-items: baseline; gap: 4px 16px; margin: 0; }
+  .notes .cue + .cue { margin-top: 14px; padding-top: 14px; border-top: 1px solid #3d444d; }
+  .notes .cue-k { font: 600 13px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #79c0ff; white-space: nowrap; }
   @media (max-width: 640px) {
     .snd, .fzb, .smb, .ntb, .vnb { bottom: calc(52px + var(--sb)); }
-    .notes { bottom: calc(94px + var(--sb)); }
+    /* Translate rather than switch anchors so the arrows can slide beneath the toolbar. */
+    .arrows { transform: translateX(calc(100vw - 100% - 36px - var(--sl) - var(--sr))); }
+    .notes { bottom: calc(94px + var(--sb)); padding: 14px 16px; font-size: 16px; line-height: 1.5; }
+    .notes .cue { grid-template-columns: 1fr; }
+    .notes .cue + .cue { margin-top: 12px; padding-top: 12px; }
   }
 
   /* --- slide search (full-screen dialog) --- */
@@ -621,6 +630,14 @@
       },
     });
     notesBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>';
+    // Notes whose every line is "Label: text" (the What/Why/When convention) render as labelled cue blocks;
+    // anything else stays plain text. Built with text nodes only, so notes are never parsed as HTML.
+    function renderNotes(text) {
+      const lines = text.split("\n").filter(l => l.trim());
+      const cues = lines.map(l => /^([A-Z][A-Za-z]{0,15}):\s+(\S.*)$/.exec(l.trim()));
+      if (!cues.length || cues.some(c => !c)) notes.textContent = text;
+      else notes.replaceChildren(...cues.map(([, k, v]) => h("p", { class: "cue" }, h("span", { class: "cue-k" }, `${k}:`), " ", v)));
+    }
     function toggleNotes() {
       const visible = notes.classList.toggle("on");
       notesBtn.setAttribute("aria-pressed", String(visible));
@@ -848,7 +865,7 @@
       bandPrevBtn.disabled = bandTo(slides[n].band, -1) == null;
       bandNextBtn.disabled = bandTo(slides[n].band, 1) == null;
       paintColumn(n);
-      notes.textContent = slides[n].notes || "";
+      renderNotes(slides[n].notes || "");
       notes.scrollTop = 0;
       if (view) tourN.textContent = `${at + 1}/${len}`;
       history.replaceState(null, "", hashFor(n));
