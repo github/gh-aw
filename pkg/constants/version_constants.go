@@ -78,7 +78,7 @@ const DefaultGitHubMCPServerVersion Version = "v2.1.0"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.29.14"
+const DefaultFirewallVersion Version = "v0.29.16"
 
 // AWFOpenAIWIFMinVersion is the first AWF release whose API proxy supports
 // OpenAI Workload Identity Federation.
