@@ -440,6 +440,29 @@ receiver enrollment, replay protection deployment, webhook installation, or live
 operability. Until an approved receiver supports the exact profile and mapping,
 the subscription is nonactivating. Event references are not hydrated bodies.
 
+### Connector-to-gateway contract
+
+The [Webhook Gateway Specification's imported connector contract](/gh-aw/specs/webhook-gateway-specification/#imported-connector-subscriptions)
+defines how this declaration is represented and enforced at ingress:
+
+| Connector declaration | Gateway representation and enforcement |
+| --- | --- |
+| `verificationProfile`, `nativeEvents` | Frozen `verification_profile` and `native_events`; the receiver authenticates the enrolled source and original event before projection. Declaration alone is not source authentication. |
+| `match`, `resources` | Encoded equality conditions and projected matched literals; the receiver checks original evidence, while the destination validates the projection. A canonical URL or its origin does not prove resource membership. |
+| `types` | Selected activity values in the compiled subscription; the receiver forwards only activities established by the original delivery and selected by the declaration. Activity selection is not a resource grant. |
+| `normalize`, URL constraints, `resourceOrigins` | Canonical projected resource URL and approved origins; these constrain normalization and identity, not connector request endpoints, network approval, or provider authorization. |
+| `when`, `filters`, `variants` | Versioned bounded source predicates evaluated by the receiver before projection; missing or ambiguous evidence is a nonmatch. |
+
+Gateway deliveries contain minimal references, not provider bodies, connector
+reader results, or credentials. A trigger MUST NOT select a reader or grant
+resource, credential, endpoint, or network authority. To resolve a delivered
+reference, a workflow MUST separately select an authorized reader, grant the
+exact resource, and satisfy that reader's endpoint/network and credential-phase
+requirements. Gateway source authentication, enrollment, replay handling, and
+dispatch admission remain additional controls; connector reader controls do not
+replace them. See the gateway's [derived-context and responsibility boundary](/gh-aw/specs/webhook-gateway-specification/#derived-context-and-responsibility-boundary)
+for the receiver, runner, and workflow responsibilities.
+
 ## 9. Minimal declaration and consumer
 
 The following is a synthetic contract, not a claim about a real provider API.
