@@ -1786,15 +1786,14 @@ jobs:
         linter_dir=$(mktemp -d)
         trap 'rm -rf "$linter_dir"' EXIT
         env -u GOOS -u GOARCH go build -o "$linter_dir/gh-aw-linters" ./cmd/linters
-        set +e
-        "$linter_dir/gh-aw-linters" -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > "$linter_dir/fprintf-lint.log" 2>&1
-        status=$?
-        set -e
+        log_file="$linter_dir/fprintf-lint.log"
+        status=0
+        "$linter_dir/gh-aw-linters" -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > "$log_file" 2>&1 || status=$?
         if [ "$status" -eq 0 ]; then
           exit 0
         fi
         if [ "$status" -ne 3 ]; then
-          cat "$linter_dir/fprintf-lint.log"
+          cat "$log_file"
           exit "$status"
         fi
         while IFS= read -r diagnostic; do
@@ -1803,7 +1802,7 @@ jobs:
           else
             echo "$diagnostic"
           fi
-        done < "$linter_dir/fprintf-lint.log"
+        done < "$log_file"
 
     - name: Run custom linters (wasm)
       run: GOOS=js GOARCH=wasm make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"

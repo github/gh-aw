@@ -829,7 +829,7 @@ func TestDailyModelResolutionUsesCopilotEngineWithMiniSubAgentModel(t *testing.T
 	}
 }
 
-func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
+func TestDailyGoTestParallelizerUsesCodexWithEconomyRouting(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("Failed to find repo root: %v", err)
@@ -849,8 +849,8 @@ func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse workflow frontmatter: %v", err)
 	}
-	if model, _ := parsed.Frontmatter["model"].(string); !isCodexCompatibleWorkflowModel(model) {
-		t.Fatalf("Expected daily-go-test-parallelizer workflow to use a Codex-compatible model, got %q", model)
+	if model, _ := parsed.Frontmatter["model"].(string); model != "router/economy" {
+		t.Fatalf("Expected daily-go-test-parallelizer workflow to use router/economy, got %q", model)
 	}
 	if !strings.Contains(workflow, "Call exactly one terminal safe-output tool") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to require a terminal safe output")

@@ -15,6 +15,13 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 		return err
 	}
 
+	if routing, hasRouting := fm["model-routing"]; hasRouting {
+		routingFrontmatter := map[string]any{"model-routing": routing}
+		if err := ValidateIncludedFileFrontmatterWithSchemaAndLocation(routingFrontmatter, item.fullPath); err != nil {
+			return fmt.Errorf("import %q: %w", item.importPath, err)
+		}
+	}
+
 	// Phase 2: Validate 'with'/'inputs' values against the imported workflow's 'import-schema'.
 	// Always use the ORIGINAL (unsubstituted) frontmatter for schema lookup so the import-schema
 	// declaration itself is not affected by expression substitution.

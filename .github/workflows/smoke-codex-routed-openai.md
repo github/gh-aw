@@ -20,14 +20,12 @@ concurrency:
   cancel-in-progress: true
   job-discriminator: ${{ github.run_id }}
 strict: true
-engine:
-  id: codex
-  model-routing:
-    goal: cost
-    mode: economy
-    # Native OpenAI routing keeps CODEX_API_KEY / OPENAI_API_KEY inference.
-    # gpt-5.4 has maintained AWF routing metadata (Responses, none..xhigh effort).
-    allowed-models: [gpt-5.4]
+engine: codex
+model: router/economy
+model-routing:
+  # Native OpenAI routing keeps CODEX_API_KEY / OPENAI_API_KEY inference.
+  # gpt-5.4 has maintained AWF routing metadata (Responses, none..xhigh effort).
+  allowed-models: [gpt-5.4]
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md

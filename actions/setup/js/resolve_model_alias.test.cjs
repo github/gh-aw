@@ -108,10 +108,11 @@ describe("resolve_model_alias", () => {
     expect(ALIAS_MAP).not.toHaveProperty("mai-code-1-flash-picker");
   });
 
-  it("resolves Linter Miner sub-agent models against its advertised catalog", () => {
+  it("routes Linter Miner's main model and resolves its sub-agent models against the advertised catalog", () => {
     const workflow = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/linter-miner.md"), "utf8");
+    const mainModel = workflow.match(/^model: (.+)$/m)?.[1];
     const [, ...agents] = workflow.split(/^## agent: /m);
-    const models = agents.map(agent => {
+    const subAgentModels = agents.map(agent => {
       const model = agent.match(/^model: (.+)$/m)?.[1];
       if (!model) throw new Error("Missing model in Linter Miner sub-agent");
       return model;
@@ -119,8 +120,9 @@ describe("resolve_model_alias", () => {
     const reflectData = {
       endpoints: [{ configured: true, provider: "copilot", models: ["claude-haiku-4.5", "claude-haiku-5.5", "claude-opus-5.5", "claude-sonnet-5", "claude-sonnet-5.5"] }],
     };
-    expect(models.length).toBeGreaterThan(0);
-    for (const configuredModel of models) {
+    expect(mainModel).toBe("router/economy");
+    expect(subAgentModels.length).toBeGreaterThan(0);
+    for (const configuredModel of subAgentModels) {
       const resolved = resolveConfiguredCopilotModel({ configuredModel, aliasMap: ALIAS_MAP, reflectData });
       expect(reflectData.endpoints[0].models).toContain(resolved);
     }
