@@ -19,12 +19,11 @@ strict: true
 engine:
   id: pi
   bare: true
-  model-routing:
-    goal: cost
-    mode: robust
-    # Claude-only pool: the main model's family, and so its endpoint
-    # (/v1/messages), is fixed; the model's effort is not.
-    allowed-models: [claude-sonnet-5]
+model: router/robust
+model-routing:
+  # Claude-only pool: the main model's family, and so its endpoint
+  # (/v1/messages), is fixed; the model's effort is not.
+  allowed-models: [claude-sonnet-5]
 imports:
   - shared/reporting.md
 max-tool-calls: 10

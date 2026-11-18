@@ -20,12 +20,11 @@ engine:
   id: copilot
   copilot-sdk: true
   bare: true
-  model-routing:
-    goal: cost
-    mode: economy
-    # claude-haiku-4.5 lists no reasoning efforts, so this also covers a Claude
-    # model selected without an effort. The sub-agent's model stays out of the pool.
-    allowed-models: [claude-haiku-4.5]
+model: router/economy
+model-routing:
+  # claude-haiku-4.5 lists no reasoning efforts, so this also covers a Claude
+  # model selected without an effort. The sub-agent's model stays out of the pool.
+  allowed-models: [claude-haiku-4.5]
 imports:
   - shared/reporting.md
 max-tool-denials: 3

@@ -23,13 +23,12 @@ strict: true
 engine:
   id: claude
   bare: true
-  model-routing:
-    goal: cost
-    mode: economy
-    # Native Anthropic routing keeps ANTHROPIC_API_KEY inference. claude-sonnet-5
-    # has maintained AWF routing metadata (Messages, low..max effort); Haiku has
-    # none on the native path, so it is not a routing candidate here.
-    allowed-models: [claude-sonnet-5]
+model: router/economy
+model-routing:
+  # Native Anthropic routing keeps ANTHROPIC_API_KEY inference. claude-sonnet-5
+  # has maintained AWF routing metadata (Messages, low..max effort); Haiku has
+  # none on the native path, so it is not a routing candidate here.
+  allowed-models: [claude-sonnet-5]
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md
