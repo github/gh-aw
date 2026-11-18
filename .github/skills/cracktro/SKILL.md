@@ -22,43 +22,9 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 - `docs/public/cracktro/runtime.js`: talk-agnostic `window.CracktroDeck` runtime (stage, chrome, band headers, navigation, search, map, background). Keep talk content out.
 - `docs/public/cracktro/deck.js`: about 950 KB: deck CSS, slides, prompts, themes, bands, synth. **Never read it whole.** `grep -n` `// ---------- <section> ----------` and `// <Slide title>` markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg` and `mona-full.png` (full-body Mona): the only assets a test allows. Diagrams are inline SVG in `deck.js` (e.g. the `GA_RUNS` pipeline).
-- `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests of the deck, runtime, parser and built JSON-LD against `slides.md`.
 - `.github/skills/cracktro/slides.md`: ordered slides: Heading, Notes (`illustrative` or empty), Summary, Keywords; band headers included.
-- `docs/src/lib/cracktro/`: `slides.js` parses `slides.md` and renders JSON-LD; `integration.js` (Astro) applies it.
-- `docs/README.md` "Interactive talk": user-facing description (keys, public-content rules).
 
-## Layout (search for these markers)
-
-| Marker | Contents |
-|---|---|
-| `---------- styles ----------` | Deck CSS string. Slide classes use prefixes (`atk-`, `mra-`, `eph-`, `bh-` band headers, ...); check a new prefix is unused. |
-| `---------- helpers ----------` | From the runtime: `h(tag, attrs, ...kids)` DOM; `letters(text, cls)` per-letter headings (`l-grad`, `l-out`); `resetIndex()`. |
-| `---------- slides ----------` | One `{ ... slides.push({...}) }` block per slide after a `// Title: summary` comment. |
-| `const OCTI` | Octicon paths for `ico(name,x,y,size,fill)`. |
-| `---------- sound:` | WebAudio synth `sfx` (methods in `mechanics.md`); `MUSIC` themes; `slide(dir, music, shift)` transposes `shift` semitones. |
-| `---------- band themes ----------` | `THEME` per band (see `mechanics.md`). |
-| `---------- start ----------` | `CracktroDeck.create({ width, height, css, slides, themes, bands, solo, prototypes, last, sound, tours })`; `TOURS` above it holds the hard-coded tours (`mechanics.md`); `slides` may be a factory of `{ h, letters, resetIndex, sound, current }`. |
-| runtime.js `create`, `navigation`, `search`, `slide map`, `animated background` | Rows, headers, chrome; `go()`, keys, dots, notes, hash; `fz-` search; map; `THEME` canvas grid. |
-
-The stage is a fixed 1920x1080 frame (`W`/`H`) scaled to the window.
-
-## Slide object
-
-```js
-slides.push({
-  notes: "...",           // speaker notes (N key); public text
-  group: "security",      // band id; picks the THEME; crossing groups slides up
-  experimental: "lsp",    // optional .xbadge; label only from the feature's `cracktro` entry in pkg/workflow/data/experimental_features.json (test-enforced)
-  key: "improvers",      // optional; pattern slide heading a column of examples
-  under: "improvers",    // optional; hangs below the same-group slide with that key (mechanics.md)
-  techno: 1,              // optional techno layer level
-  el: h("section", { class: "slide" }, ...),
-  enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back
-  tick(t) {},             // called every frame, ONLY for the current slide
-  onNext() {}, onPrev() {}, onKey(e) {}, // return true to consume (in-slide steps)
-});
-```
+Optional detail at the end: `## More files` (fonts, tests, parser, README), `## Layout` (`deck.js` markers, helpers, `create` options), `## Slide object` (fields, hooks; `experimental` labels are test-enforced).
 
 ## Reference files (load only what the task needs)
 
@@ -71,6 +37,7 @@ slides.push({
 | `brand.md` | Any colour, gradient, glow, title or font change; brand/Primer palette, semantic hues, regularization pass. |
 | `concept-style.md` | Adding or restyling a concept slide in the style of The factory mindset and Trust the process (light header-less row, problem/answer statements, one live metaphor, horizontal split motion). |
 | `asset-generator.md` | Setting up or using the `asset-generator` MCP (og/social cards, wallpapers, charts, `create_slide_deck`); where outputs may live. |
+| `perf.md` | Changing `runtime.js` rendering or adding slide animations, timers, `tick` work or runtime DOM; run the slide performance guard before and after. |
 
 ## People and mascots
 
@@ -106,8 +73,49 @@ Screenshots are always 16:9. The canvas panel can be any shape and cannot be res
 
 ## Tests
 
-Run from `docs/` after `npm ci`: `npx playwright test tests/talk.spec.ts`. The config builds and previews (`npm run build && npm run preview`, `localhost:4321`, `/gh-aw/cracktro/`, Chromium `/usr/bin/chromium-browser`), covering built JSON-LD; under `npm run dev`, check `curl -s localhost:4321/gh-aw/cracktro/ | grep hasPart`. If `node_modules` is missing, report the tests as not run.
+Run from `docs/` after `npm ci`: `npx playwright test tests/talk.spec.ts`. The config builds and previews (`npm run build && npm run preview`, `localhost:4321`, `/gh-aw/cracktro/`, Chromium `/usr/bin/chromium-browser`), covering built JSON-LD; under `npm run dev`, check `curl -s localhost:4321/gh-aw/cracktro/ | grep hasPart`. If `node_modules` is missing, report the tests as not run. The slide performance guard (`perf.md`) needs only Node and Chrome.
 
 ## Pull requests
 
 A PR that adds or changes a slide must show it. Screenshot each changed slide from the preview as a 16:9 `.stage` capture (see Preview loop), at the step that carries its message (often the last), and upload the image into the PR description so it renders inline. Never commit screenshots. If you cannot upload images, say so in the PR description and ask the author to attach one.
+
+<!-- instruction-prefix-end -->
+
+## More files
+
+- `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
+- `docs/tests/talk.spec.ts`: Playwright tests of the deck, runtime, parser and built JSON-LD against `slides.md`.
+- `docs/src/lib/cracktro/`: `slides.js` parses `slides.md` and renders JSON-LD; `integration.js` (Astro) applies it.
+- `docs/README.md` "Interactive talk": user-facing description (keys, public-content rules).
+
+## Layout (search for these markers)
+
+| Marker | Contents |
+|---|---|
+| `---------- styles ----------` | Deck CSS string. Slide classes use prefixes (`atk-`, `mra-`, `eph-`, `bh-` band headers, ...); check a new prefix is unused. |
+| `---------- helpers ----------` | From the runtime: `h(tag, attrs, ...kids)` DOM; `letters(text, cls)` per-letter headings (`l-grad`, `l-out`); `resetIndex()`. |
+| `---------- slides ----------` | One `{ ... slides.push({...}) }` block per slide after a `// Title: summary` comment. |
+| `const OCTI` | Octicon paths for `ico(name,x,y,size,fill)`. |
+| `---------- sound:` | WebAudio synth `sfx` (methods in `mechanics.md`); `MUSIC` themes; `slide(dir, music, shift)` transposes `shift` semitones. |
+| `---------- band themes ----------` | `THEME` per band (see `mechanics.md`). |
+| `---------- start ----------` | `CracktroDeck.create({ width, height, css, slides, themes, bands, solo, prototypes, last, sound, tours })`; `TOURS` above it holds the hard-coded tours (`mechanics.md`); `slides` may be a factory of `{ h, letters, resetIndex, sound, current }`. |
+| runtime.js `create`, `navigation`, `search`, `slide map`, `animated background` | Rows, headers, chrome; `go()`, keys, dots, notes, hash; `fz-` search; map; `THEME` canvas grid. |
+
+The stage is a fixed 1920x1080 frame (`W`/`H`) scaled to the window.
+
+## Slide object
+
+```js
+slides.push({
+  notes: "...",           // speaker notes (N key); public text
+  group: "security",      // band id; picks the THEME; crossing groups slides up
+  experimental: "lsp",    // optional .xbadge; label only from the feature's `cracktro` entry in pkg/workflow/data/experimental_features.json (test-enforced)
+  key: "improvers",      // optional; pattern slide heading a column of examples
+  under: "improvers",    // optional; hangs below the same-group slide with that key (mechanics.md)
+  techno: 1,              // optional techno layer level
+  el: h("section", { class: "slide" }, ...),
+  enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back
+  tick(t) {},             // called every frame, ONLY for the current slide
+  onNext() {}, onPrev() {}, onKey(e) {}, // return true to consume (in-slide steps)
+});
+```
