@@ -54,6 +54,7 @@ func TestCommandGroupAssignments(t *testing.T) {
 		// section when explicitly shown (for example in full help/test contexts).
 		{name: "view command in analysis group", commandName: "view", expectedGroup: "analysis", shouldHaveGroup: true},
 		{name: "experiments command in analysis group", commandName: "experiments", expectedGroup: "analysis", shouldHaveGroup: true},
+		{name: "value command in analysis group", commandName: "value", expectedGroup: "analysis", shouldHaveGroup: true},
 
 		// Utilities
 		{name: "mcp-server command in utilities group", commandName: "mcp-server", expectedGroup: "utilities", shouldHaveGroup: true},
