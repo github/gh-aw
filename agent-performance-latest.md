@@ -34,7 +34,9 @@ Small samples (<3 executed): impeccable-skills-reviewer 2/2; visual-regression-c
 - Impeccable Skills Reviewer: KEEP. 2/2 (100%). Insufficient data.
 
 ## Pattern labels (count-only rule; a quiet agent can be correct)
-- under-creation (>= 3 executed, 0 safe outputs in the 11-17 window): auditor (12 successful, 0 outputs), ai-moderator (5 successful, 0 outputs), daily-go-test-parallelizer (0 successful, 0 outputs). Confirm intent before acting.
+- under-creation (>= 3 executed, 0 primary safe outputs in the 11-17 window): auditor (12 successful, 0 outputs), daily-go-test-parallelizer (0 successful, 0 outputs). Confirm intent before acting.
+- under-creation candidates (0 outputs of every type in the 11-17 window; small samples): test-quality-sentinel (38/41; zero in 5 of 6 complete snapshots since 11-03), code-scanning-fixer (4/5), aw-failure-investigator (4/4). A quiet agent can be correct. Confirm intent before acting.
+- ai-moderator removed from under-creation: 11-17 by-type shows 4 add_labels (0 primary outputs; labels are not counted as primary).
 - inconsistency: mattpocock-skills-reviewer (see trend notes).
 - over-creation, repetition, scope-creep: none flagged from profile data.
 
@@ -64,3 +66,4 @@ Weekly report already published 11-15; next weekly due 11-22. No new discussion 
 - 2026-11-15: full ranking, bottom-10 audit, weekly discussion, 2 issues.
 - 2026-11-16: ranking from complete 11-15 snapshot. Verified trackers. Corrected aw_cj01, DDG tokens, and labels. noop.
 - 2026-11-17: ranking from complete 11-17 snapshot. Verified trackers via github issue_read. Corrected DGTP prompt note. Recorded expiry-closure pattern. noop.
+- 2026-11-18: re-verified 11-17 complete snapshot (618 executed, 482 successful, 88.35M tokens, 195 primary outputs; all match). 11-18 snapshot partial (2.25h window), not scored. Corrected ai-moderator under-creation; added zero-output candidates. noop.
