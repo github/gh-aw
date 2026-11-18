@@ -105,7 +105,7 @@ func actionReferenceFromLine(line string) (string, bool) {
 	if !found {
 		return "", false
 	}
-	if len(line) > 0 && line[0] != ' ' && line[0] != '\t' {
+	if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
 		return "", false
 	}
 

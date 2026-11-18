@@ -85,6 +85,13 @@ describe("Copilot durable checkpoint redaction", () => {
     expect(redact).not.toHaveBeenCalled();
   });
 
+  it("rejects non-UTF-8 transcripts even when the redactor makes no changes", () => {
+    const options = checkpoint();
+    fs.writeFileSync(options.events, Buffer.from([0xff, 0xfe]));
+    stageFiles(options);
+    expect(() => redactCopilotCheckpoint(text => text, options.root)).toThrow("Cannot safely redact");
+  });
+
   it("refuses redaction that would change the native session identity", () => {
     const options = checkpoint();
     expect(() => redactCopilotCheckpoint(text => redactArtifactContent(text, [id], []).content, options.root, [id])).toThrow("Cannot safely redact");

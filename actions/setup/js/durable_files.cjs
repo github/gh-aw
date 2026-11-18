@@ -236,27 +236,34 @@ function copilotEventRedactionDeltas(originalText, redactedText, allowedValues) 
   }
 }
 
-/** Rehash only the trusted host redactor's own changes to valid Copilot transcripts. */
+/**
+ * Rehash only the trusted host redactor's own changes to valid Copilot transcripts.
+ * @param {Iterable<string>} allowedValues
+ */
 function redactCopilotCheckpoint(redact, root = "/tmp/gh-aw/agent", allowedValues = []) {
   const { bundle, engine, files } = configuration(root);
-  if (engine !== "copilot") return;
+  if (engine !== "copilot") return [];
   noSymlinks(bundle, root);
   const manifestPath = path.join(bundle, "manifest.json");
-  if (!fs.existsSync(manifestPath)) return;
+  if (!fs.existsSync(manifestPath)) return [];
   const { entries, manifest } = readBundle(root, { checkSecrets: false });
   let changed = false;
   const updates = [];
+  const transcripts = [];
   for (const [relative, entry] of entries) {
     const match = /^(\d+)\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/events\.jsonl$/i.exec(relative);
     if (!match || path.basename(files[Number(match[1])]) !== "session-state") continue;
+    const file = path.join(bundle, hash(relative) + ".json");
+    transcripts.push(file);
     const text = entry.bytes.toString("utf8");
+    if (!entry.bytes.equals(Buffer.from(text))) throw new Error("Cannot safely redact durable Copilot session events");
+    const structure = copilotEventStructure(text);
     const sanitized = redact(text);
+    assertNoSecrets(sanitized);
     if (text === sanitized) continue;
-    if (!entry.bytes.equals(Buffer.from(text)) || !isDeepStrictEqual(copilotEventStructure(text), copilotEventStructure(sanitized)) || !copilotEventRedactionDeltas(text, sanitized, [...allowedValues])) {
+    if (!isDeepStrictEqual(structure, copilotEventStructure(sanitized)) || !copilotEventRedactionDeltas(text, sanitized, [...allowedValues])) {
       throw new Error("Cannot safely redact durable Copilot session events");
     }
-    assertNoSecrets(sanitized);
-    const file = path.join(bundle, hash(relative) + ".json");
     const bytes = Buffer.from(sanitized);
     updates.push({ entry, file, bytes });
   }
@@ -269,6 +276,7 @@ function redactCopilotCheckpoint(redact, root = "/tmp/gh-aw/agent", allowedValue
     const metadata = [...entries.values()].map(({ path, hash }) => ({ path, hash }));
     fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, entries: metadata }) + "\n");
   }
+  return transcripts;
 }
 
 function invalidateCopilotCheckpoint(root = "/tmp/gh-aw/agent") {

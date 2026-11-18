@@ -763,11 +763,13 @@ async function main({ prepareForCustomMasking = false, additionalDirectories = [
       throw new Error(`${ERR_VALIDATION}: Removed artifact sources after runtime mask collection failed`, { cause: error });
     }
     const maskedValues = [...masks].sort((a, b) => b.length - a.length);
+    const processedCheckpointFiles = new Set();
+    let rejectedCheckpointBundle;
     if (redactDurableCopilot) {
       try {
         const { redactCopilotCheckpoint } = require("./durable_files.cjs");
         const allowedValues = new Set([...secretValues, ...maskedValues]);
-        redactCopilotCheckpoint(
+        const transcripts = redactCopilotCheckpoint(
           text => {
             const escapes = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
             const decoded = text.replace(/\\(["\\/bfnrt]|u[0-9a-fA-F]{4})/g, (_, escape) => (escape[0] === "u" ? String.fromCharCode(parseInt(escape.slice(1), 16)) : escapes[escape]));
@@ -782,12 +784,14 @@ async function main({ prepareForCustomMasking = false, additionalDirectories = [
           durableRoot,
           allowedValues
         );
+        for (const file of transcripts) processedCheckpointFiles.add(file);
         core.setOutput("durable_checkpoint_safe", "true");
       } catch {
         core.setOutput("durable_checkpoint_safe", "false");
         try {
           const { invalidateCopilotCheckpoint } = require("./durable_files.cjs");
           invalidateCopilotCheckpoint(durableRoot);
+          rejectedCheckpointBundle = path.join(durableRoot || "/tmp/gh-aw/agent", "durable/bundle");
         } catch {
           core.warning("Could not remove the rejected durable Copilot checkpoint");
         }
@@ -803,6 +807,7 @@ async function main({ prepareForCustomMasking = false, additionalDirectories = [
     }
     // Process each file
     for (const file of files) {
+      if (processedCheckpointFiles.has(file) || (rejectedCheckpointBundle && file.startsWith(rejectedCheckpointBundle + path.sep))) continue;
       processFile(file, secretValues, maskedValues, prepareForCustomMasking, additionalFiles.has(file));
     }
   } catch (error) {
