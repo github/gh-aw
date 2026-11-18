@@ -217,6 +217,10 @@ Retry adapters dispatch `retry.ready` with classified `failureClasses` and
 `remainingMs` only after a retry is authorized, backoff finishes, and the invocation
 decision gate allows execution. Recovery cannot create a retry or override a stop.
 
+Firewall adapters dispatch `firewall.observed` with `severity` (`warning` or
+`denied`), positive `count`, and `remainingMs`. Snapshots exclude raw log records,
+hosts, URLs, and tool content.
+
 This is an internal extension point, not workflow configuration. No policies,
 native action handlers, model calls, or optimization features are enabled by
 default.
@@ -269,6 +273,47 @@ that deadline after evaluation. It never runs after success, cancellation, termi
 failure, retry exhaustion, or an invocation skip. Concurrent tool progress suppresses
 stale interventions. This policy addresses repeated failures, not arbitrary stalls
 or wall-clock inactivity.
+
+### Opt-in Firewall Steering
+
+Set `GH_AW_HARNESS_FIREWALL_STEERING=1` in the agent environment to enable
+deterministic network guidance independently of Recovery. Other values,
+detection jobs, and Pi child sessions leave it disabled. There are no additional
+model requests or polling timers.
+
+The shared `js/harness_firewall_logs.cjs` reader consumes only structured AWF
+audit JSONL: `sandbox/firewall/{audit,logs}/{log,audit}.jsonl` under the runtime
+temporary root. It never opens or parses Squid logs, agent output, or arbitrary
+paths, and has no raw-log fallback. Structured audit fields (`host`, numeric
+`status`, `decision`, and optional audit `_schema`/`http_access` event) distinguish
+explicit denials from origin HTTP errors. `TCP_DENIED`/`DENIED` decisions and
+`NONE_NONE` with status 403/407 count as denials; `NONE_NONE` with status 0 is an
+unconfirmed network warning. Unknown decisions and malformed records are ignored.
+An origin 403 alone does not establish a firewall denial.
+
+Only newly appended records count; startup history is baselined. Each checkpoint
+reads at most 64 KiB per known file, retaining partial records up to 8 KiB and
+handling log creation, truncation, and rotation. Symlinks and non-regular files
+are rejected; read errors disable observation with a sanitized diagnostic.
+The compiler-managed firewall mount must remain read-only to the agent.
+If audit records are unavailable or buffered until teardown, there is no live
+intervention; missing evidence is never inferred to mean a denial or permission.
+
+| Adapter | Delivery checkpoint | Intervention |
+| --- | --- | --- |
+| Pi CLI, SDK, RPC | Ongoing native tool turns | Native steering, before the existing completion window |
+| Copilot SDK | Main-session post-tool hooks | Native `additionalContext`; existing terminal and budget guards apply |
+| Copilot CLI, Codex CLI, Claude CLI | Already-authorized retry with known `--prompt-file` input and workflow timeout | Guidance appended without changing session continuation or permission flags |
+| Agy and other single-shot shell engines | Unsupported | Diagnostic only; no extra invocation |
+
+At most one warning and one denial message are delivered per session or retry
+loop. Denials supersede warnings, including when both occur in one checkpoint.
+Messages contain fixed guidance, never log text, domains, URLs, credentials, or
+free-form model output. Guidance prohibits repeating blocked requests or bypassing
+policy through alternate routes, and directs the agent to permitted local inputs
+or an honest limitation report through safe outputs. It does not change firewall
+rules, grant permissions, add retries, revive completed work, or claim success.
+Recovery and Firewall Steering compose without overwriting each other's guidance.
 
 ### Decisions client
 

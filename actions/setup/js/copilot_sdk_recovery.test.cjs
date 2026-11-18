@@ -1,9 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { buildCopilotSDKRecoveryHooks } from "./copilot_sdk_recovery.cjs";
 
 const main = { sessionId: "main" };
 const failed = { ...main, toolName: "bash", toolArgs: { private: "PRIVATE" }, error: "PRIVATE failure" };
 const success = { ...failed, toolResult: { resultType: "success", textResultForLlm: "PRIVATE result" } };
+let directory;
+afterEach(() => {
+  if (directory) fs.rmSync(directory, { recursive: true, force: true });
+  directory = undefined;
+});
 function harness(overrides = {}) {
   const options = {
     env: { GH_AW_HARNESS_RECOVERY: "1" },
@@ -23,6 +31,25 @@ async function failures(hooks, count = 3) {
 }
 
 describe("Copilot SDK Recovery hooks", () => {
+  it.each([false, true])("composes independent Firewall Steering with Recovery=%s without exposing logs or modifying tool results", async recovery => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), "sdk-firewall-steering-"));
+    const file = path.join(directory, "sandbox/firewall/audit/log.jsonl");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "");
+    const { hooks, options } = harness({ env: { GH_AW_HARNESS_FIREWALL_STEERING: "1", GH_AW_HARNESS_RECOVERY: recovery ? "1" : "", GH_AW_TMP_DIR: directory } });
+    await failures(hooks, 2);
+    fs.appendFileSync(file, '{"_schema":"audit/v0.26.0","ts":1790899201.25,"host":"PRIVATE.example:443","status":403,"decision":"TCP_DENIED","url":"https://PRIVATE.example/?secret=PRIVATE"}\n');
+    expect(await hooks.onPostToolUseFailure({ ...failed, sessionId: "child" }, { sessionId: "child" })).toBeUndefined();
+    const result = await hooks.onPostToolUseFailure(failed, main);
+    expect(Object.keys(result)).toEqual(["additionalContext"]);
+    expect(result.additionalContext).toContain("firewall denied network access");
+    expect(result.additionalContext.includes("Repeated failures")).toBe(recovery);
+    expect(JSON.stringify(result)).not.toContain("PRIVATE");
+    expect(options.decide).toHaveBeenCalledTimes(recovery ? 1 : 0);
+    expect(await hooks.onPostToolUse(success, main)).toBeUndefined();
+    expect(success.toolResult).toEqual({ resultType: "success", textResultForLlm: "PRIVATE result" });
+  });
+
   it.each([{}, { GH_AW_HARNESS_RECOVERY: "true" }, { GH_AW_HARNESS_RECOVERY: "1", GH_AW_PHASE: "detection" }])("does not install without eligible opt-in: %j", env => {
     expect(harness({ env }).hooks).toBeUndefined();
   });

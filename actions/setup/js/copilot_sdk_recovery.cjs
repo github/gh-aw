@@ -3,6 +3,7 @@
 
 const { createHarnessPolicyDispatcher } = require("./harness_policy.cjs");
 const { createRecoveryPolicy, evaluateRecoveryDecision, isHarnessRecoveryEnabled, DECISION_TIMEOUT_MS } = require("./harness_recovery.cjs");
+const { createFirewallSteeringMonitor } = require("./harness_firewall_steering.cjs");
 
 /**
  * Native post-tool hooks return guidance, never modify tool results or permissions.
@@ -18,8 +19,9 @@ const { createRecoveryPolicy, evaluateRecoveryDecision, isHarnessRecoveryEnabled
  * @returns {import("@github/copilot-sdk").SessionHooks | undefined}
  */
 function buildCopilotSDKRecoveryHooks({ getSessionId, remainingMs, isActive, log, env = process.env, decide = evidence => evaluateRecoveryDecision(evidence, { env, log }) }) {
-  if (!isHarnessRecoveryEnabled(env)) return;
-  const policy = createRecoveryPolicy({ decide, log, minimumRemainingMs: 10000 + DECISION_TIMEOUT_MS });
+  const firewall = createFirewallSteeringMonitor({ env, minimumRemainingMs: 10000, log });
+  const policy = isHarnessRecoveryEnabled(env) ? createRecoveryPolicy({ decide, log, minimumRemainingMs: 10000 + DECISION_TIMEOUT_MS }) : undefined;
+  if (!policy && !firewall) return;
 
   /**
    * @param {{sessionId: string, toolName: string}} input
@@ -30,22 +32,24 @@ function buildCopilotSDKRecoveryHooks({ getSessionId, remainingMs, isActive, log
     const sessionId = getSessionId();
     if (!sessionId || input.sessionId !== sessionId || invocation.sessionId !== sessionId || !isActive()) return;
     if (typeof input.toolName !== "string" || !input.toolName || input.toolName.length > 256) return;
-    /** @type {string | undefined} */
-    let additionalContext;
-    const dispatcher = createHarnessPolicyDispatcher({
-      adapter: {
-        engine: "copilot",
-        actions: {
-          steer(action) {
-            if (isActive() && remainingMs() > 10000) additionalContext = action.message;
-            else log("recovery: steering suppressed; terminal guard or completion window reached");
-          },
+    /** @type {string[]} */
+    const messages = [];
+    /** @type {import("./harness_policy.cjs").HarnessPolicyAdapter} */
+    const adapter = {
+      engine: "copilot",
+      actions: {
+        steer(action) {
+          if (isActive() && remainingMs() > 10000) messages.push(action.message);
+          else log("harness-policy: steering suppressed; terminal guard or completion window reached");
         },
       },
-      policies: [policy],
-    });
-    await dispatcher.dispatch({ type: "turn.completed", ongoing: true, remainingMs: remainingMs(), tools: [{ toolName: input.toolName, success }] });
-    return additionalContext ? { additionalContext } : undefined;
+    };
+    if (firewall) await firewall.observe(adapter, remainingMs());
+    if (policy) {
+      const dispatcher = createHarnessPolicyDispatcher({ adapter, policies: [policy] });
+      await dispatcher.dispatch({ type: "turn.completed", ongoing: true, remainingMs: remainingMs(), tools: [{ toolName: input.toolName, success }] });
+    }
+    return messages.length && isActive() && remainingMs() > 10000 ? { additionalContext: messages.join("\n\n") } : undefined;
   }
 
   return {

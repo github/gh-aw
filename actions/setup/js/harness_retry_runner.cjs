@@ -207,14 +207,14 @@ function shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeO
  *   harnessName: string,
  *   log: (message: string) => void,
  *   softTimeoutGuard: { timeoutMinutes: number, softDeadlineMs: number } | null,
- *   runAttempt: (attempt: number, observeStrategy: (strategy: "restart" | "resume") => void, recoveryGuidance?: string) => Promise<HarnessAttemptResult>,
+ *   runAttempt: (attempt: number, observeStrategy: (strategy: "restart" | "resume") => void, retryGuidance?: string) => Promise<HarnessAttemptResult>,
  *   handleFailure: (context: { attempt: number, result: HarnessAttemptResult, maxRetries: number }) => Promise<HarnessFailureDecision> | HarnessFailureDecision,
  *   getRetryMode?: (attempt: number) => string,
  *   sleepFn?: (ms: number) => Promise<void>,
  *   telemetryPath?: string,
  *   evaluateDecision?: () => Promise<import("./skip_if_decision.cjs").SkipDecision | null>,
  *   policyDispatcher?: import("./harness_policy.cjs").HarnessPolicyDispatcher,
- *   recoveryEngine?: string,
+ *   retryGuidanceEngine?: string,
  * }} options
  * @returns {Promise<{ exitCode: number, attempts: number, lastResult: HarnessAttemptResult | null }>}
  */
@@ -225,25 +225,32 @@ async function runHarnessRetryLoop(options) {
   /** @type {HarnessAttemptResult | null} */
   let lastResult = null;
   const sleepFor = options.sleepFn ?? sleep;
-  /** @type {string | undefined} */
-  let recoveryGuidance;
+  /** @type {string[]} */
+  let retryGuidance = [];
   /** @type {readonly string[] | undefined} */
   let retryFailureClasses;
   /** @type {import("./harness_policy.cjs").HarnessPolicyDispatcher | undefined} */
   let recovery;
-  if (options.recoveryEngine && process.env.GH_AW_HARNESS_RECOVERY === "1") {
+  /** @type {import("./harness_policy.cjs").HarnessPolicyAdapter} */
+  const guidanceAdapter = {
+    engine: options.retryGuidanceEngine || options.harnessName,
+    actions: {
+      retry_guidance: action => {
+        if (options.softTimeoutGuard && options.softTimeoutGuard.softDeadlineMs - Date.now() > 10000) retryGuidance.push(action.message);
+        else options.log("harness-policy: retry guidance suppressed; completion window reached");
+      },
+    },
+  };
+  const firewall =
+    options.retryGuidanceEngine && options.softTimeoutGuard && process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1"
+      ? require("./harness_firewall_steering.cjs").createFirewallSteeringMonitor({ minimumRemainingMs: 10000, log: options.log })
+      : undefined;
+  if (options.retryGuidanceEngine && !options.softTimeoutGuard && process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1") options.log("firewall-steering: retry guidance unavailable; a workflow timeout is required");
+  if (options.retryGuidanceEngine && process.env.GH_AW_HARNESS_RECOVERY === "1") {
     const { createRecoveryPolicy, evaluateRecoveryDecision, isHarnessRecoveryEnabled, DECISION_TIMEOUT_MS } = require("./harness_recovery.cjs");
     if (isHarnessRecoveryEnabled() && options.softTimeoutGuard) {
       recovery = require("./harness_policy.cjs").createHarnessPolicyDispatcher({
-        adapter: {
-          engine: options.recoveryEngine,
-          actions: {
-            retry_guidance: action => {
-              if (options.softTimeoutGuard && options.softTimeoutGuard.softDeadlineMs - Date.now() > 10000) recoveryGuidance = action.message;
-              else options.log("recovery: retry guidance suppressed; completion window reached");
-            },
-          },
-        },
+        adapter: guidanceAdapter,
         policies: [createRecoveryPolicy({ decide: evidence => evaluateRecoveryDecision(evidence, { log: options.log }), log: options.log, minimumRemainingMs: 10000 + DECISION_TIMEOUT_MS })],
       });
     } else if (isHarnessRecoveryEnabled()) {
@@ -363,10 +370,11 @@ async function runHarnessRetryLoop(options) {
         }
       }
 
-      if (recovery && retryFailureClasses && options.softTimeoutGuard) {
-        await recovery.dispatch({ type: "retry.ready", failureClasses: retryFailureClasses, remainingMs: options.softTimeoutGuard.softDeadlineMs - Date.now() });
+      if ((recovery || firewall) && retryFailureClasses && options.softTimeoutGuard) {
+        if (firewall) await firewall.observe(guidanceAdapter, options.softTimeoutGuard.softDeadlineMs - Date.now());
+        if (recovery) await recovery.dispatch({ type: "retry.ready", failureClasses: retryFailureClasses, remainingMs: options.softTimeoutGuard.softDeadlineMs - Date.now() });
         if (Date.now() >= options.softTimeoutGuard.softDeadlineMs) {
-          emitSoftTimeoutSignal(options.softTimeoutGuard, "after recovery evaluation", options.harnessName, options.log);
+          emitSoftTimeoutSignal(options.softTimeoutGuard, "after harness policy evaluation", options.harnessName, options.log);
           lastExitCode = 1;
           break;
         }
@@ -399,9 +407,9 @@ async function runHarnessRetryLoop(options) {
               writeTelemetry();
             }
           },
-          recoveryGuidance
+          retryGuidance.length ? retryGuidance.join("\n\n") : undefined
         );
-        recoveryGuidance = undefined;
+        retryGuidance = [];
       } catch (error) {
         attemptResult.finished_at = Date.now();
         attemptResult.outcome = "interrupted";

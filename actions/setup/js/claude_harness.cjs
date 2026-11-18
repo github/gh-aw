@@ -625,6 +625,7 @@ async function main() {
   // The same deadline guards both the retry loop and each active child process.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
   if (process.env.GH_AW_HARNESS_RECOVERY === "1" && prompt === null) log("recovery: retry guidance unavailable for this prompt transport; use --prompt-file");
+  if (process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1" && prompt === null) log("firewall-steering: retry guidance unavailable for this prompt transport; use --prompt-file");
 
   const retryRun = await runHarnessRetryLoop({
     telemetryPath: resolveHarnessRetryTelemetryPath(),
@@ -636,7 +637,7 @@ async function main() {
     harnessName: "Claude harness",
     log,
     softTimeoutGuard,
-    recoveryEngine: prompt !== null ? "claude" : undefined,
+    retryGuidanceEngine: prompt !== null ? "claude" : undefined,
     getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
     runAttempt: async (attempt, observeStrategy, recoveryGuidance) => {
       let nativeTerminalRateLimitError = false;

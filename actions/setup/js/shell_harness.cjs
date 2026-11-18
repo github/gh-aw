@@ -24,6 +24,9 @@ async function main() {
   if (engineName !== "pi" && process.env.GH_AW_HARNESS_RECOVERY === "1") {
     log("recovery: unsupported by this single-shot shell adapter; no native steering or retry guidance capability");
   }
+  if (engineName !== "pi" && process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1") {
+    log("firewall-steering: unsupported by this single-shot shell adapter; no native steering or retry guidance capability");
+  }
   if (process.env.GH_AW_SKIP_IF_DECISION) {
     log("decision gate: harness initialized before decision evaluation");
   }

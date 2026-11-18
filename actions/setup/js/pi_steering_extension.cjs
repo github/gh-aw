@@ -14,6 +14,7 @@
  *   GH_AW_STEERING_TIME_WARNING_MINUTES  Minutes-remaining threshold for warning message (default: 5)
  *   GH_AW_STEERING_TIME_CRITICAL_MINUTES Minutes-remaining threshold for critical message (default: 2)
  *   GH_AW_HARNESS_RECOVERY              Enable bounded tool-failure Recovery when set to 1
+ *   GH_AW_HARNESS_FIREWALL_STEERING     Enable bounded firewall guidance when set to 1
  */
 
 "use strict";
@@ -82,6 +83,12 @@ function piSteeringExtension(pi) {
     }
   });
 
+  if (process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1") {
+    require("./pi_firewall_steering_extension.cjs").installPiFirewallSteering(pi, {
+      remainingMs: () => (startTime === undefined ? undefined : config.timeoutMinutes * 60000 - (Date.now() - startTime)),
+      minimumRemainingMs: Math.max(config.timeWarningMinutes, config.timeCriticalMinutes) * 60000,
+    });
+  }
   if (process.env.GH_AW_HARNESS_RECOVERY === "1") {
     require("./pi_recovery_extension.cjs").installPiRecovery(pi, {
       remainingMs: () => (startTime === undefined ? undefined : config.timeoutMinutes * 60000 - (Date.now() - startTime)),

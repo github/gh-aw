@@ -11,6 +11,24 @@ function completedEvent(overrides = {}) {
 }
 
 describe("harness policy dispatcher", () => {
+  it("projects immutable firewall observations without forwarding raw evidence", async () => {
+    const onEvent = vi.fn(event => {
+      expect(event).toEqual({ type: "firewall.observed", severity: "denied", count: 1, remainingMs: 600000 });
+      expect(() => {
+        event.count = 2;
+      }).toThrow(TypeError);
+    });
+    await createHarnessPolicyDispatcher({ adapter: { engine: "pi" }, policies: [{ id: "observer", onEvent }] }).dispatch({
+      type: "firewall.observed",
+      severity: "denied",
+      count: 1,
+      remainingMs: 600000,
+      url: "PRIVATE",
+      raw: "PRIVATE",
+    });
+    expect(onEvent).toHaveBeenCalledOnce();
+  });
+
   it("negotiates retry guidance independently of live steering and freezes retry observations", async () => {
     const retryGuidance = vi.fn();
     const dispatcher = createHarnessPolicyDispatcher({

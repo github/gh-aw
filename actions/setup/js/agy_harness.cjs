@@ -54,6 +54,7 @@ const resolveAgyModel = async options => {
 
 const main = async () => {
   if (process.env.GH_AW_HARNESS_RECOVERY === "1") log("recovery: unsupported by the single-shot Agy adapter; no native steering or retry guidance capability");
+  if (process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1") log("firewall-steering: unsupported by the single-shot Agy adapter; no native steering or retry guidance capability");
   const version = process.env.GH_AW_ENGINE_VERSION;
   if (!version || !Object.hasOwn(checksums, version)) throw new Error("Agy requires a verified 1.3.1, 1.3.3 or 1.3.6 release");
   if (!command) throw new Error("Agy command is required");

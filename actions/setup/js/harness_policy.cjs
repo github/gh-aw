@@ -23,7 +23,13 @@
  *   failureClasses: readonly string[],
  *   remainingMs: number,
  * }>} HarnessRetryReadyEvent
- * @typedef {HarnessAttemptCompletedEvent | HarnessTurnCompletedEvent | HarnessRetryReadyEvent} HarnessPolicyEvent
+ * @typedef {Readonly<{
+ *   type: "firewall.observed",
+ *   severity: "warning" | "denied",
+ *   count: number,
+ *   remainingMs: number,
+ * }>} HarnessFirewallObservedEvent
+ * @typedef {HarnessAttemptCompletedEvent | HarnessTurnCompletedEvent | HarnessRetryReadyEvent | HarnessFirewallObservedEvent} HarnessPolicyEvent
  * @typedef {Readonly<{ type: "steer" | "retry_guidance", message: string }>} HarnessPolicyAction
  * @typedef {Readonly<{ engine: string, capabilities: readonly HarnessPolicyAction["type"][] }>} HarnessPolicyContext
  * @typedef {Readonly<{
@@ -70,9 +76,11 @@ function createHarnessPolicyDispatcher({ adapter, policies = [] }) {
   return Object.freeze({
     async dispatch(event) {
       const snapshot =
-        event.type !== "turn.completed"
-          ? Object.freeze({ ...event, failureClasses: Object.freeze([...event.failureClasses]) })
-          : Object.freeze({ ...event, tools: Object.freeze(event.tools.map(tool => Object.freeze({ toolName: tool.toolName, success: tool.success }))) });
+        event.type === "firewall.observed"
+          ? Object.freeze({ type: event.type, severity: event.severity, count: event.count, remainingMs: event.remainingMs })
+          : event.type !== "turn.completed"
+            ? Object.freeze({ ...event, failureClasses: Object.freeze([...event.failureClasses]) })
+            : Object.freeze({ ...event, tools: Object.freeze(event.tools.map(tool => Object.freeze({ toolName: tool.toolName, success: tool.success }))) });
       /** @type {HarnessPolicyAction[]} */
       const pendingActions = [];
       for (const policy of registeredPolicies) {

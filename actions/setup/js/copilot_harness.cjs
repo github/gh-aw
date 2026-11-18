@@ -1691,7 +1691,7 @@ function resolvePromptFileInput(args, { forceStdin = false } = {}) {
       log(`resolved --prompt-file: path=${promptFile} size=${stat.size}B`);
 
       if (forceStdin || stat.size > PROMPT_FILE_INLINE_THRESHOLD_BYTES) {
-        log(forceStdin ? "recovery enabled; streaming prompt via stdin" : `prompt file exceeds ${PROMPT_FILE_INLINE_THRESHOLD_LABEL}; streaming prompt via stdin`);
+        log(forceStdin ? "harness guidance enabled; streaming prompt via stdin" : `prompt file exceeds ${PROMPT_FILE_INLINE_THRESHOLD_LABEL}; streaming prompt via stdin`);
         promptStdin = fs.readFileSync(promptFile);
       } else {
         const prompt = fs.readFileSync(promptFile);
@@ -1741,6 +1741,7 @@ async function main() {
   const sdkEnv = buildCopilotSDKEnv();
   const copilotSDKMode = isCopilotSDKEnabled();
   const recoveryEnabled = process.env.GH_AW_HARNESS_RECOVERY === "1" && require("./harness_recovery.cjs").isHarnessRecoveryEnabled();
+  const firewallSteeringEnabled = process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1" && require("./harness_firewall_steering.cjs").isFirewallSteeringEnabled();
   let copilotConnectionToken = "";
   if (copilotSDKMode) {
     // The harness always generates the connection token when SDK mode is active.
@@ -1760,12 +1761,13 @@ async function main() {
   if (copilotSDKMode) {
     resolvedArgs = /\.(?:cjs|mjs|js|ts|mts)$/i.test(args[0] || "") ? ["--import", path.join(__dirname, "copilot_sdk_module_resolution.cjs"), ...args] : args;
   } else {
-    const resolvedPrompt = resolvePromptFileInput(args, { forceStdin: recoveryEnabled });
+    const resolvedPrompt = resolvePromptFileInput(args, { forceStdin: recoveryEnabled || firewallSteeringEnabled });
     const fallbackConfigPath = !process.env.GH_AW_AWF_CONFIG_PATH && process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, "gh-aw", "awf-config.json") : undefined;
     const configPath = process.env.GH_AW_AWF_CONFIG_PATH || AWF_CONFIG_PATH;
     resolvedArgs = addCopilotURLPermissions(addCopilotDetectionDirectory(resolvedPrompt.args, process.env), { sdkMode: copilotSDKMode, configPath, fallbackConfigPath });
     promptStdin = resolvedPrompt.stdin;
     if (recoveryEnabled && promptStdin === undefined) log("recovery: retry guidance unavailable for this prompt transport; use --prompt-file");
+    if (firewallSteeringEnabled && promptStdin === undefined) log("firewall-steering: retry guidance unavailable for this prompt transport; use --prompt-file");
   }
 
   // Fetch AWF API proxy reflection data before running the agent.
@@ -2087,7 +2089,7 @@ async function main() {
         harnessName: "Copilot harness",
         log,
         softTimeoutGuard,
-        recoveryEngine: !copilotSDKMode && promptStdin !== undefined ? "copilot" : undefined,
+        retryGuidanceEngine: !copilotSDKMode && promptStdin !== undefined ? "copilot" : undefined,
         getRetryMode: () => (!copilotSDKMode && useContinueOnRetry ? "--continue" : "fresh run"),
         runAttempt: async (attempt, observeStrategy, recoveryGuidance) => {
           // Verified native retries resume the exact UUID; other CLI paths retain --continue.

@@ -94,7 +94,7 @@ describe("harness_retry_runner.cjs", () => {
       );
     const options = {
       ...telemetryOptions(exitCodes),
-      recoveryEngine: "codex",
+      retryGuidanceEngine: "codex",
       maxRetries: exitCodes.length - 1,
       softTimeoutGuard: { timeoutMinutes: 10, softDeadlineMs: Date.now() + 600000 },
     };
@@ -114,7 +114,7 @@ describe("harness_retry_runner.cjs", () => {
     const { options, fetchImpl } = recoveryOptions([1, 1, 1, 1]);
     if (mode === "disabled") vi.stubEnv("GH_AW_HARNESS_RECOVERY", "0");
     if (mode === "detection") vi.stubEnv("GH_AW_PHASE", "detection");
-    if (mode === "no_capability") delete options.recoveryEngine;
+    if (mode === "no_capability") delete options.retryGuidanceEngine;
     if (mode === "no_timeout") options.softTimeoutGuard = null;
     if (mode === "completion_window") options.softTimeoutGuard.softDeadlineMs = Date.now() + 15000;
     if (mode === "stop") options.handleFailure = ({ attempt }) => ({ action: attempt === 2 ? "stop" : "retry" });
@@ -144,6 +144,45 @@ describe("harness_retry_runner.cjs", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(options.runAttempt).toHaveBeenCalledTimes(3);
   });
+
+  it.each(["allowed", "disabled", "detection", "no_capability", "no_timeout", "completion_window", "stop", "final_attempt", "cancelled", "skip", "deadline", "success"])(
+    "preserves retry authority with independent Firewall Steering: %s",
+    async mode => {
+      const options = {
+        ...telemetryOptions([1, 0]),
+        retryGuidanceEngine: "codex",
+        softTimeoutGuard: { timeoutMinutes: 10, softDeadlineMs: Date.now() + 600000 },
+        log: vi.fn(),
+      };
+      vi.stubEnv("GH_AW_TMP_DIR", directory);
+      vi.stubEnv("GH_AW_HARNESS_RECOVERY", "");
+      vi.stubEnv("GH_AW_HARNESS_FIREWALL_STEERING", mode === "disabled" ? "" : "1");
+      vi.stubEnv("GH_AW_PHASE", mode === "detection" ? "detection" : "agent");
+      const fetchImpl = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected model request"));
+      const file = path.join(directory, "sandbox/firewall/audit/log.jsonl");
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, "");
+      options.runAttempt = vi.fn(async attempt => {
+        fs.appendFileSync(file, '{"_schema":"audit/v0.26.0","host":"PRIVATE.example:443","status":403,"decision":"TCP_DENIED","url":"https://PRIVATE.example/?secret=PRIVATE"}\n');
+        return { exitCode: mode === "success" ? 0 : attempt === 0 ? 1 : 0, output: "private output", hasOutput: true, cancelled: mode === "cancelled" };
+      });
+      if (mode === "no_capability") delete options.retryGuidanceEngine;
+      if (mode === "no_timeout") options.softTimeoutGuard = null;
+      if (mode === "completion_window") options.softTimeoutGuard.softDeadlineMs = Date.now() + 10000;
+      if (mode === "stop") options.handleFailure = () => ({ action: "stop" });
+      if (mode === "final_attempt") options.maxRetries = 0;
+      if (mode === "skip") options.evaluateDecision = vi.fn().mockResolvedValueOnce(gateResult("allow")).mockResolvedValueOnce(gateResult("deny"));
+      if (mode === "deadline")
+        options.sleepFn = async () => {
+          options.softTimeoutGuard.softDeadlineMs = Date.now() - 1;
+        };
+      const result = await runHarnessRetryLoop(options);
+      expect(result.attempts).toBe(["stop", "final_attempt", "cancelled", "skip", "deadline", "success"].includes(mode) ? 1 : 2);
+      expect(options.runAttempt.mock.calls.flatMap(call => (call[2] ? [call[2]] : []))).toEqual(mode === "allowed" ? [expect.stringContaining("firewall denied network access")] : []);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(JSON.stringify(options.log.mock.calls)).not.toContain("PRIVATE");
+    }
+  );
 
   it("preserves exact results, backoff, logs and telemetry with an empty dispatcher", async () => {
     const options = telemetryOptions([1, 1, 0]);

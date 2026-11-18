@@ -33,6 +33,7 @@ describe("copilot_sdk_session runtime configuration", () => {
     vi.stubEnv("GH_AW_MODEL_FALLBACK", "");
     vi.stubEnv("GH_AW_MODEL_ROUTING", "");
     vi.stubEnv("GH_AW_COPILOT_SDK_SERVER_ARGS", "[]");
+    vi.stubEnv("GH_AW_HARNESS_FIREWALL_STEERING", "");
     vi.stubEnv("GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON", JSON.stringify({ model: "claude-sonnet-4.6", models, providers }));
   });
   afterEach(() => {
@@ -50,8 +51,18 @@ describe("copilot_sdk_session runtime configuration", () => {
     data: { content: "The model returned no content because the response was blocked by content filtering.", rte: true, toolRequests: [] },
   };
 
-  it.each(["budget", "idle"])("composes native Recovery with the pre-tool budget and suppresses guidance after %s", async terminal => {
-    vi.stubEnv("GH_AW_HARNESS_RECOVERY", "1");
+  it.each([
+    ["budget", "recovery"],
+    ["idle", "recovery"],
+    ["budget", "firewall"],
+    ["idle", "firewall"],
+  ])("respects %s guards with native %s guidance and the pre-tool budget", async (terminal, policy) => {
+    vi.stubEnv("GH_AW_HARNESS_RECOVERY", policy === "recovery" ? "1" : "");
+    vi.stubEnv("GH_AW_HARNESS_FIREWALL_STEERING", policy === "firewall" ? "1" : "");
+    vi.stubEnv("GH_AW_TMP_DIR", base);
+    const auditFile = path.join(base, "sandbox/firewall/audit/log.jsonl");
+    fs.mkdirSync(path.dirname(auditFile), { recursive: true });
+    fs.writeFileSync(auditFile, "");
     vi.stubEnv("AWF_REFLECT_ENABLED", "1");
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const fetchImpl = vi
@@ -78,9 +89,11 @@ describe("copilot_sdk_session runtime configuration", () => {
           disconnect: async () => {},
           sendAndWait: async () => {
             for (let index = 0; index < 3; index++) {
+              if (policy === "firewall" && index === 0) fs.appendFileSync(auditFile, '{"_schema":"audit/v0.26.0","host":"PRIVATE.example:443","status":403,"decision":"TCP_DENIED"}\n');
               expect(hooks.onPreToolUse(failed, failed)).toBeUndefined();
               const context = await hooks.onPostToolUseFailure(failed, failed);
-              expect(context).toEqual(index === 2 ? { additionalContext: expect.stringContaining("never bypass a denial") } : undefined);
+              const guidanceIndex = policy === "recovery" ? 2 : 0;
+              expect(context).toEqual(index === guidanceIndex ? { additionalContext: expect.stringContaining(policy === "recovery" ? "never bypass a denial" : "firewall denied network access") } : undefined);
             }
             if (terminal === "budget") expect(hooks.onPreToolUse(failed, failed)).toMatchObject({ permissionDecision: "deny" });
             else handler({ type: "session.idle", data: {} });
@@ -109,7 +122,7 @@ describe("copilot_sdk_session runtime configuration", () => {
       sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow", ToolSet, BuiltInTools: { Isolated: [] } },
     });
     expect(result.exitCode).toBe(0);
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(policy === "recovery" ? 2 : 0);
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("PRIVATE");
     expect(hooks.onPreToolUse).toBeTypeOf("function");
     expect(hooks.onPostToolUse).toBeTypeOf("function");

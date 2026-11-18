@@ -37,7 +37,7 @@ function createRecoveryPolicy({ decide, log, minimumRemainingMs }) {
   return {
     id: "recovery",
     async onEvent(event, context) {
-      if (event.type === "attempt.completed") return;
+      if (event.type !== "turn.completed" && event.type !== "retry.ready") return;
       const capability = event.type === "retry.ready" ? "retry_guidance" : "steer";
       if ((event.type === "turn.completed" && !event.ongoing) || !Number.isFinite(event.remainingMs) || event.remainingMs <= minimumRemainingMs || !context.capabilities.includes(capability) || decisions >= MAX_DECISIONS) return;
       const failures =

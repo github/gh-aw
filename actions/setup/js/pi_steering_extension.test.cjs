@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const { default: extension, loadSteeringConfig } = await import("./pi_steering_extension.cjs");
 
@@ -9,6 +12,7 @@ beforeEach(() => {
   vi.stubEnv("GH_AW_STEERING_TIME_WARNING_MINUTES", "5");
   vi.stubEnv("GH_AW_STEERING_TIME_CRITICAL_MINUTES", "2");
   vi.stubEnv("GH_AW_HARNESS_RECOVERY", "");
+  vi.stubEnv("GH_AW_HARNESS_FIREWALL_STEERING", "");
   vi.spyOn(process.stderr, "write").mockReturnValue(true);
 });
 afterEach(() => {
@@ -34,6 +38,36 @@ function harness() {
 }
 
 describe("Pi timeout steering", () => {
+  it("loads independent Firewall Steering once per session without resetting its clock or evidence cap on agent_start", async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pi-steering-firewall-"));
+    vi.stubEnv("GH_AW_TMP_DIR", directory);
+    vi.stubEnv("GH_AW_HARNESS_FIREWALL_STEERING", "1");
+    const file = path.join(directory, "sandbox/firewall/audit/log.jsonl");
+    const denied = '{"_schema":"audit/v0.26.0","host":"PRIVATE.example:443","status":403,"decision":"TCP_DENIED"}\n';
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, denied);
+    try {
+      const { handlers, sendUserMessage } = harness();
+      const event = { message: { stopReason: "toolUse" } };
+      await handlers.agent_start();
+      await handlers.turn_end(event);
+      expect(sendUserMessage).not.toHaveBeenCalled();
+      fs.appendFileSync(file, denied);
+      await handlers.turn_end(event);
+      expect(sendUserMessage).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("firewall denied network access"), { deliverAs: "steer" });
+      await handlers.agent_start();
+      fs.appendFileSync(file, denied);
+      await handlers.turn_end(event);
+      expect(sendUserMessage).toHaveBeenCalledOnce();
+      vi.advanceTimersByTime(6 * 60000);
+      await handlers.agent_start();
+      await handlers.turn_end(event);
+      expect(sendUserMessage).toHaveBeenLastCalledWith(expect.stringContaining("wrap up"), { deliverAs: "steer" });
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("loads opt-in Recovery through the existing extension without resetting its budget on agent_start", async () => {
     vi.stubEnv("GH_AW_HARNESS_RECOVERY", "1");
     vi.stubEnv("AWF_REFLECT_ENABLED", "1");

@@ -46,7 +46,7 @@ function resolveHarnessPromptFileArgs(args, { logger, allowMissingPath = false }
 /** @param {string | undefined} prompt @param {string | undefined} guidance */
 function appendHarnessRecoveryGuidance(prompt, guidance) {
   if (!guidance) return prompt;
-  if (prompt === undefined) throw new Error("Recovery retry guidance requires a supported prompt input, for example --prompt-file prompt.md");
+  if (prompt === undefined) throw new Error("Harness retry guidance requires a supported prompt input, for example --prompt-file prompt.md");
   return `${prompt}\n\n${guidance}`;
 }
 

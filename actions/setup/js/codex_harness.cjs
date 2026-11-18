@@ -1109,6 +1109,7 @@ async function main() {
   const tokenUsagePaths = process.env.GH_AW_CODEX_TOKEN_USAGE_PATH ? [process.env.GH_AW_CODEX_TOKEN_USAGE_PATH] : TOKEN_USAGE_PATHS;
   const resumePrompt = "Continue the interrupted task using the existing session. Preserve previously staged safe outputs; do not emit them again. Complete only unfinished work.";
   if (process.env.GH_AW_HARNESS_RECOVERY === "1" && promptInput.stdin === undefined) log("recovery: retry guidance unavailable for this prompt transport; use --prompt-file");
+  if (process.env.GH_AW_HARNESS_FIREWALL_STEERING === "1" && promptInput.stdin === undefined) log("firewall-steering: retry guidance unavailable for this prompt transport; use --prompt-file");
   log(
     `context-rebuild circuit breaker: enabled=${contextRebuildCircuitBreaker.enabled}` +
       ` maxRebuildFactor=${contextRebuildCircuitBreaker.maxRebuildFactor}` +
@@ -1125,7 +1126,7 @@ async function main() {
     harnessName: "Codex harness",
     log,
     softTimeoutGuard,
-    recoveryEngine: promptInput.stdin !== undefined ? "codex" : undefined,
+    retryGuidanceEngine: promptInput.stdin !== undefined ? "codex" : undefined,
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
     runAttempt: async (attempt, observeStrategy, recoveryGuidance) => {
       if (durableSession?.id && !resumeArgs && attempt > 0) throw new Error("Durable Codex continuation cannot restart a recorded session as a fresh conversation");
