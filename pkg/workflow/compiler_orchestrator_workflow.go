@@ -350,6 +350,9 @@ func hasExplicitConcurrencyGroup(frontmatter map[string]any) bool {
 }
 
 func (c *Compiler) mergeImportedWorkflowConfiguration(ctx *workflowBuildContext) error {
+	if err := c.mergeImportedCaches(ctx.frontmatter.Frontmatter, ctx.workflowData, ctx.engineSetup.importsResult.MergedCaches); err != nil {
+		return fmt.Errorf("failed to merge cache from imports: %w", err)
+	}
 	if ctx.engineSetup.importsResult.MergedConcurrency != "" && !hasExplicitConcurrencyGroup(ctx.frontmatter.Frontmatter) {
 		var importedConcurrency any
 		if err := jsonutil.UnmarshalString(ctx.engineSetup.importsResult.MergedConcurrency, &importedConcurrency); err == nil {
