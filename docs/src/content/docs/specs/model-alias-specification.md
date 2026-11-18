@@ -7,9 +7,9 @@ sidebar:
 
 # Model Alias Format Specification
 
-**Version**: 1.4.0\
+**Version**: 1.5.0\
 **Status**: Draft  
-**Publication Date**: 2026-11-14\
+**Publication Date**: 2026-11-18\
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [model-alias-specification](/gh-aw/specs/model-alias-specification/)  
 **Latest Published Version**: This document
@@ -1038,6 +1038,10 @@ Model parameters are compile-time configuration values and are not derived from 
 ---
 
 ## Change Log
+
+### Version 1.5.0 (Draft)
+
+- **Added**: §9.4 allows one top-level `model-routing.allowed-models` shortlist with a literal router value. The shortlist narrows only the main agent's router candidates and does not change policy for other model requests.
 
 ### Version 1.4.0 (Draft)
 

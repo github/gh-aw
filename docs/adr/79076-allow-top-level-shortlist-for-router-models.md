@@ -1,14 +1,14 @@
 # ADR-79076: Allow a Top-Level Shortlist for Router Models
 
 **Date**: 2026-11-18
-**Status**: Draft
-**Deciders**: rabeckett (PR author and author of issue #78928); [TODO: verify other deciders and the parent issue #78927 owners]
+**Status**: Accepted
+**Deciders**: rabeckett (PR author and author of [#78928](https://github.com/github/gh-aw/issues/78928))
 
 ---
 
 ### Context
 
-A workflow selects a cost-oriented router level with `model: router`, `router/economy`, `router/balanced` or `router/robust`. The only way to limit which models the router may choose for the main agent is the nested `engine.model-routing.allowed-models` block. That block requires `goal` and `mode`, so an author who wants a shortlist must configure the engine twice, once for the model and once for routing (issue #78928). `models.allowed` and `models.blocked` cannot do this job because they are request policies that apply to every model request, not only the main agent's. The shortlist must therefore be scoped to the main agent, and an older AWF firewall that cannot separate router candidates from other requests must not silently restrict all requests.
+A workflow selects a cost-oriented router level with `model: router`, `router/economy`, `router/balanced` or `router/robust`. The nested `engine.model-routing.allowed-models` form requires authors to express that choice as `goal` and `mode` instead. `models.allowed` and `models.blocked` cannot substitute for a shortlist because they constrain other model requests too. The new form needs to preserve the same distinction between main-agent candidates and global request policy.
 
 ### Decision
 
@@ -18,7 +18,7 @@ We will accept a top-level `model-routing.allowed-models` list, valid only with 
 
 #### Alternative 1: Keep the nested `engine.model-routing` block
 
-This is the status quo and remains supported. It already produces the same selection when combined with `goal: cost` and `mode: economy`. It was not chosen as the only path because it forces an engine block and a second routing configuration beside a `model: router/*` value that already selects the mode. This was a close call, since the nested form needs no new syntax. The new form is still limited to cost-oriented routing, so the nested form remains the only way to express `goal: cost-speed`.
+This remains supported and produces the same selection for an equivalent cost-oriented goal, mode and shortlist. Keeping it as the only option would require authors to replace their `model: router/*` selector with an engine block just to add a shortlist. The nested form remains the only way to express `goal: cost-speed`.
 
 #### Alternative 2: Narrow the router with `models.allowed` or `models.blocked`
 
@@ -33,8 +33,7 @@ The nested form combines `allowed-models` lists across imported workflows that r
 #### Positive
 
 - An author can write `model: router/economy` and a shortlist once, without an engine block, `goal` or `mode`.
-- The top-level form compiles to the same AWF proxy configuration and lock model configuration as the nested equivalent. Tests compare both for the local, imported and mixed cases.
-- Other model requests (sub-agents and similar) keep their current policy. Tests assert that the full proxy configuration is identical to the nested form.
+- The top-level form compiles to the same AWF proxy configuration as the nested equivalent. Compiler tests compare local and imported shortlists, including the policy for other model requests. Lock audit metadata also records the explicit router selector.
 - Ambiguous inputs fail at compile time, including a fixed model, an implicit default, an expression-valued model, duplicate declarations, an empty list, and firewalls older than v0.28.33. None of these silently discards or widens the list.
 
 #### Negative
@@ -52,7 +51,3 @@ The nested form combines `allowed-models` lists across imported workflows that r
 - Documentation changes span the frontmatter reference, the full frontmatter reference, the model-routing reference, the model alias specification and the engine syntax guide. The top-level key is labelled experimental.
 - Workflow migrations and any deprecation of the nested form are separate follow-up steps, as the issue states.
 - The smoke workflow was compiled locally with both forms and the firewall output compared. It was not dispatched.
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
