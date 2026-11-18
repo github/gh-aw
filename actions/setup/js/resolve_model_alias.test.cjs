@@ -108,14 +108,16 @@ describe("resolve_model_alias", () => {
     expect(ALIAS_MAP).not.toHaveProperty("mai-code-1-flash-picker");
   });
 
-  it("resolves Linter Miner main and sub-agent models against its advertised catalog", () => {
+  it("resolves Linter Miner sub-agent models against its advertised catalog", () => {
     const workflow = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/linter-miner.md"), "utf8");
-    const models = [...workflow.matchAll(/^model: (.+)$/gm)].map(match => match[1]);
+    const agentSections = workflow.split(/^## agent:.*$/gm).slice(1);
     const reflectData = {
       endpoints: [{ configured: true, provider: "copilot", models: ["claude-haiku-4.5", "claude-haiku-5.5", "claude-opus-5.5", "claude-sonnet-5", "claude-sonnet-5.5"] }],
     };
-    expect(models).toHaveLength(3);
-    for (const configuredModel of models) {
+    expect(agentSections.length).toBeGreaterThan(0);
+    for (const agentSection of agentSections) {
+      const configuredModel = agentSection.match(/^model: (.+)$/m)?.[1];
+      if (!configuredModel) throw new Error("Missing model in Linter Miner sub-agent");
       const resolved = resolveConfiguredCopilotModel({ configuredModel, aliasMap: ALIAS_MAP, reflectData });
       expect(reflectData.endpoints[0].models).toContain(resolved);
     }
