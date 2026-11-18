@@ -81,7 +81,7 @@ func TestGenerateMCPScriptsMCPServerScript(t *testing.T) {
 		t.Error("Script should reference tools.json configuration file")
 	}
 
-	if !strings.Contains(script, "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs") {
+	if !strings.Contains(script, `path.join(process.env.RUNNER_TEMP, "gh-aw", "mcp-scripts", "logs")`) {
 		t.Error("Script should specify log directory")
 	}
 
@@ -98,6 +98,9 @@ func TestGenerateMCPScriptsMCPServerScript(t *testing.T) {
 
 	// Test the tools configuration JSON
 	toolsJSON := GenerateMCPScriptsToolsConfig(config)
+	if !strings.Contains(toolsJSON, `"logDir": "${GH_AW_SETUP_ROOT}/mcp-scripts/logs"`) {
+		t.Error("Tools config should defer the private log directory to the runtime environment")
+	}
 
 	if !strings.Contains(toolsJSON, `"serverName": "mcpscripts"`) {
 		t.Error("Tools config should contain server name 'safeinputs'")

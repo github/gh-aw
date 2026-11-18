@@ -899,11 +899,7 @@ jobs:
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
-<<<<<<< HEAD
-        run: bash "${GH_AW_SETUP_ROOT}/actions/install_awf_binary.sh" v0.29.14 --rootless
-=======
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.16 --rootless
->>>>>>> origin/main
+        run: bash "${GH_AW_SETUP_ROOT}/actions/install_awf_binary.sh" v0.29.16 --rootless
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -932,11 +928,7 @@ jobs:
           GH_AW_SKILL_DIR: ".codex/skills"
         run: bash "${GH_AW_SETUP_ROOT}/actions/restore_inline_skills.sh"
       - name: Download container images
-<<<<<<< HEAD
-        run: bash "${GH_AW_SETUP_ROOT}/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.29.14@sha256:7f649a02f2cc235325ab512f546854e0fad32b7abdc6c24c5475ddc0639e0aaa ghcr.io/github/gh-aw-firewall/api-proxy:0.29.14@sha256:136785634c9207d7328c701d31d53941542ef307840bda6b348274c8842557c0 ghcr.io/github/gh-aw-firewall/squid:0.29.14@sha256:878b9c1aaeca076004bf2157dd2be28586b68b2b3d69c3ff8fd2b5add2a3126c ghcr.io/github/gh-aw-mcpg:v0.5.10@sha256:629ddcd68a48ab02e7db8af527d2756c6db563b00c1d31d8aa8fcbac96f01c59 ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a
-=======
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.29.16@sha256:6c623033b0537a92474b94fb49d1960d6bf8f41ae27e1a33b63d56f779855964 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.16@sha256:88a95a3cab5f4b44cf01b2dd4539dbd6a9ccb907519250ccdabe598101e5a1d8 ghcr.io/github/gh-aw-firewall/squid:0.29.16@sha256:fcac76862a1d901f8adb0eb491b99d8d1f6d08f08e8c17d77b883ec671e918c1 ghcr.io/github/gh-aw-mcpg:v0.5.10@sha256:629ddcd68a48ab02e7db8af527d2756c6db563b00c1d31d8aa8fcbac96f01c59 ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a
->>>>>>> origin/main
+        run: bash "${GH_AW_SETUP_ROOT}/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.29.16@sha256:6c623033b0537a92474b94fb49d1960d6bf8f41ae27e1a33b63d56f779855964 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.16@sha256:88a95a3cab5f4b44cf01b2dd4539dbd6a9ccb907519250ccdabe598101e5a1d8 ghcr.io/github/gh-aw-firewall/squid:0.29.16@sha256:fcac76862a1d901f8adb0eb491b99d8d1f6d08f08e8c17d77b883ec671e918c1 ghcr.io/github/gh-aw-mcpg:v0.5.10@sha256:629ddcd68a48ab02e7db8af527d2756c6db563b00c1d31d8aa8fcbac96f01c59 ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a
       - name: Configure Codex
         run: |
           set -o pipefail

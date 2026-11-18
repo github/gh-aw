@@ -40,7 +40,7 @@ func GenerateMCPScriptsToolsConfig(mcpScripts *MCPScriptsConfig) string {
 	config := MCPScriptsConfigJSON{
 		ServerName: "mcpscripts",
 		Version:    constants.MCPScriptsMCPVersion,
-		LogDir:     MCPScriptsDirectory + "/logs",
+		LogDir:     "${GH_AW_SETUP_ROOT}/mcp-scripts/logs",
 		Tools:      []MCPScriptsToolJSON{},
 	}
 
@@ -193,7 +193,7 @@ startHttpServer(configPath, {
   port: port,
   apiKey: apiKey,
   stateless: true,
-  logDir: "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
+  logDir: path.join(process.env.RUNNER_TEMP, "gh-aw", "mcp-scripts", "logs")
 }).catch(error => {
   console.error("Failed to start mcp-scripts HTTP server:", error);
   process.exit(1);

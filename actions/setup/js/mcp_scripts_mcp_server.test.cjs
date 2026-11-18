@@ -83,6 +83,15 @@ describe("mcp_scripts_mcp_server.cjs", () => {
     });
   });
 
+  describe("resolveConfigLogDir", () => {
+    it("resolves the private setup root placeholder at runtime", async () => {
+      const { resolveConfigLogDir } = await import("./mcp_scripts_mcp_server.cjs");
+
+      expect(resolveConfigLogDir("${GH_AW_SETUP_ROOT}/mcp-scripts/logs", "/tmp/gh-aw-setup.test")).toBe(path.join("/tmp/gh-aw-setup.test", "mcp-scripts", "logs"));
+      expect(resolveConfigLogDir("/tmp/legacy-logs", "/tmp/gh-aw-setup.test")).toBe("/tmp/legacy-logs");
+    });
+  });
+
   describe("createToolConfig", () => {
     it("should create a valid tool configuration", async () => {
       const { createToolConfig } = await import("./mcp_scripts_mcp_server.cjs");

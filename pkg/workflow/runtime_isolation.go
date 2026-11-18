@@ -72,10 +72,11 @@ GH_AW_RESOURCE_SUFFIX="${GH_AW_RUNTIME_ROOT##*/gh-aw-run.}"
 GH_AW_RUNTIME_TOKEN="$(openssl rand -hex 32)"
 printf '::add-mask::%s\n' "$GH_AW_RUNTIME_TOKEN"
 owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+if [[ ! "$owner_hash" =~ ^[a-f0-9]{64}$ ]]; then echo "Invalid runtime owner digest" >&2; exit 1; fi
 printf '%s' "$owner_hash" > "$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"
 printf '%s' "$owner_hash" > "$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"
 case "$GH_AW_SETUP_ROOT" in *$'\n'*|*$'\r'*) echo "Invalid setup root" >&2; exit 1 ;; esac
-printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" >> "$GITHUB_ENV"
+printf 'GH_AW_RUNTIME_ROOT=%s\nGH_AW_SETUP_ROOT=%s\nGH_AW_RESOURCE_SUFFIX=%s\nGH_AW_RUNTIME_TOKEN=%s\nGH_AW_RUNTIME_OWNER=%s\n' "$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX" "$GH_AW_RUNTIME_TOKEN" "$owner_hash" >> "$GITHUB_ENV"
 printf 'GH_AW_RUNTIME_ID=%s\nGH_AW_SETUP_ID=%s\n' "$(stat -c '%d:%i' "$GH_AW_RUNTIME_ROOT")" "$(stat -c '%d:%i' "$GH_AW_SETUP_ROOT")" >> "$GITHUB_ENV"
 trap - EXIT
 `
@@ -352,6 +353,9 @@ func runtimeStepRelocationEdits(lines []string, start, end int) []runtimeYAMLEdi
 		insideHeredoc, quotedHeredoc := false, false
 		if inExecutable && !javascript {
 			insideHeredoc, quotedHeredoc = heredocs.consume(source)
+		}
+		if insideHeredoc && strings.HasPrefix(strings.TrimSpace(source), "//") {
+			rewritten = source
 		}
 		if (inExecutable && javascript) || (singleLineExecutableRE.MatchString(source) && strings.HasPrefix(strings.TrimSpace(source), "script:")) {
 			rewritten = logicalSetupJSPathRE.ReplaceAllString(rewritten, "`$${process.env.GH_AW_SETUP_ROOT}$1`")

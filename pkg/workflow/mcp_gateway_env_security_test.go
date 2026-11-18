@@ -160,6 +160,8 @@ func TestMCPGatewayCustomEnvCommandContract(t *testing.T) {
 	imageIndex := strings.Index(command, "ghcr.io/github/gh-aw-mcpg:")
 	require.GreaterOrEqual(t, markerIndex, 0, "Docker command should contain the custom environment marker")
 	require.Greater(t, imageIndex, markerIndex, "Custom environment marker should appear before the container image")
+	assert.Contains(t, command, `--label "com.gh.aw.owner=${GH_AW_RUNTIME_OWNER}"`)
+	assert.NotContains(t, command, `.gh-aw-runtime-owner`)
 	assert.NotContains(t, command, "GH_AW_MCP_GATEWAY_ENV_0")
 	assert.NotContains(t, command, "API_TOKEN=value")
 

@@ -132,7 +132,7 @@ func TestRuntimeIsolationAllocatorEstablishesOwnershipBeforePublication(t *testi
 		`openssl rand -hex 32`,
 		`"$GH_AW_RUNTIME_ROOT/.gh-aw-runtime-owner"`,
 		`"$GH_AW_SETUP_ROOT/.gh-aw-runtime-owner"`,
-		"GH_AW_RESOURCE_SUFFIX", "GH_AW_RUNTIME_TOKEN",
+		"GH_AW_RESOURCE_SUFFIX", "GH_AW_RUNTIME_TOKEN", "GH_AW_RUNTIME_OWNER",
 	} {
 		require.Contains(t, step, expected)
 	}
@@ -209,7 +209,7 @@ func TestRuntimeIsolationCleanupToleratesUnremovableOwnedRoots(t *testing.T) {
 	output, err = bash.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 	require.Contains(t, string(output), "Could not fully remove isolated runtime directory")
-	for _, line := range strings.Split(strings.TrimSpace(string(env)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(env)), "\n") {
 		if key, root, ok := strings.Cut(line, "="); ok && (key == "GH_AW_RUNTIME_ROOT" || key == "GH_AW_SETUP_ROOT") {
 			t.Cleanup(func() { _ = os.RemoveAll(root) })
 			require.DirExists(t, root)
@@ -292,6 +292,20 @@ func TestRuntimeIsolationSetupRootsAreNeverExecutableExpressions(t *testing.T) {
 	require.Contains(t, actual, "destination: "+setupRootExpression+"/actions")
 	require.NotContains(t, actual, `run: node "${{ env.GH_AW_SETUP_ROOT }}`)
 	require.NotContains(t, actual, "require('${{ env.GH_AW_SETUP_ROOT }}")
+}
+
+func TestRuntimeIsolationLeavesQuotedHeredocCommentsAsData(t *testing.T) {
+	actual, err := finalizeRunnerTempSafety(`jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat <<'SCRIPT'
+          // Adapter writes under /tmp/gh-aw, which is not an executable path.
+          SCRIPT
+`)
+	require.NoError(t, err)
+	require.Contains(t, actual, "// Adapter writes under /tmp/gh-aw, which is not an executable path.")
 }
 
 func TestRuntimeIsolationWindowsEncodedScriptsUsePrivateRoots(t *testing.T) {

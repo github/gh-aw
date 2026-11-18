@@ -24,6 +24,15 @@ const { createToolConfig } = require("./mcp_scripts_tool_factory.cjs");
 const { bootstrapMCPScriptsServer, cleanupConfigFile } = require("./mcp_scripts_bootstrap.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { redactMCPScriptLogMessage } = require("./diagnostic_sanitization.cjs");
+const path = require("path");
+
+function resolveConfigLogDir(logDir, setupRoot = process.env.GH_AW_SETUP_ROOT || "/tmp/gh-aw") {
+  const setupRootPrefix = "${GH_AW_SETUP_ROOT}/";
+  if (typeof logDir === "string" && logDir.startsWith(setupRootPrefix)) {
+    return path.join(setupRoot, logDir.slice(setupRootPrefix.length));
+  }
+  return logDir;
+}
 
 /**
  * @typedef {Object} MCPScriptsToolConfig
@@ -62,8 +71,9 @@ function startMCPScriptsServer(configPath, options = {}) {
   server.serverInfo.version = config.version || "1.0.0";
 
   // Use logDir from config if not overridden by options
-  if (!options.logDir && config.logDir) {
-    server.logDir = config.logDir;
+  const configLogDir = resolveConfigLogDir(config.logDir);
+  if (!options.logDir && configLogDir) {
+    server.logDir = configLogDir;
   }
 
   // Register all tools with the server
@@ -110,6 +120,7 @@ if (require.main === module) {
 
 module.exports = {
   startMCPScriptsServer,
+  resolveConfigLogDir,
   // Re-export helpers for convenience
   loadConfig,
   createToolConfig,
