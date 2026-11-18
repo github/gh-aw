@@ -82,8 +82,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .ksb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ksb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -109,7 +109,7 @@
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
   /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: calc(184px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+  .vnb { position: fixed; right: calc(224px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
   .vnb.on { display: flex; }
   .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -165,37 +165,52 @@
   body.compact-nav .dots { display: none; }
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
-     Only opacity changes, so the first tap still lands; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ksb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
-  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ksb, .tourp) { opacity: .4; }
-  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ksb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ksb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb, .ksb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+     Idle fading preserves hit targets; keyboard focus keeps its control fully readable. */
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
+    transform .45s cubic-bezier(.2,.9,.2,1), bottom .45s cubic-bezier(.2,.9,.2,1); }
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: none; } }
+  .snd, .fzb, .smb, .ntb, .ksb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover, .ksb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg, .ksb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
-  .ksb { right: calc(144px + var(--sr)); }
-  /* compact dock: the row holds the arrows, map, search and sound, so kiosk and the column button sit on a second row above it */
-  body.compact-nav .ksb { bottom: calc(52px + var(--sb)); right: calc(24px + var(--sr)); }
-  body.compact-nav .vnb { bottom: calc(52px + var(--sb)); right: calc(64px + var(--sr)); }
-  body.compact-nav .notes { bottom: calc(92px + var(--sb)); }
-  /* kiosk mode: slides rotate on their own; the chrome hides except the stop button, which fades (with the cursor) when idle */
-  body.kiosk :is(.dots, .arrows, .vnb, .snd, .fzb, .smb, .tourp, .notes, .progress) { display: none !important; }
-  body.kiosk .ksb { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  .ntb { right: calc(144px + var(--sr)); }
+  .ksb { right: calc(184px + var(--sr)); }
+  .ntb[aria-pressed="true"] { color: #f0f6fc; border-color: currentColor; box-shadow: inset 0 -3px currentColor; }
+  body.light .ntb[aria-pressed="true"] { color: #1f2328; }
+  /* kiosk mode: slides rotate on their own; the chrome hides except the stop button and the sound toggle beside it,
+     which fade (with the cursor) when idle */
+  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .tourp, .notes, .progress) { display: none !important; }
+  body.kiosk :is(.ksb, .snd) { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  body.kiosk .snd { right: calc(144px + var(--sr)); }
   body.kiosk.nav-idle { cursor: none; }
-  body.kiosk.nav-idle .ksb:not(:focus-visible) { opacity: 0; }
-  body.light.kiosk .ksb { color: #1f2328; border-color: #1f2328; }
+  body.kiosk.nav-idle :is(.ksb, .snd):not(:focus-visible) { opacity: 0; }
+  body.light.kiosk :is(.ksb, .snd) { color: #1f2328; border-color: #1f2328; }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
   .snd.off .x { opacity: 1; }
   .snd.flash { color: #f0f6fc; border-color: #f0f6fc; }
   .notes { position: fixed; left: 24px; right: 24px; bottom: calc(50px + var(--sb)); max-width: 900px; margin: 0 auto; padding: 18px 22px;
-    background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
+    background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.55 "Mona Sans", -apple-system, "Segoe UI", sans-serif; z-index: 6; display: none;
+    white-space: pre-line; overflow-wrap: anywhere; max-height: calc(100dvh - 140px); overflow-y: auto; overscroll-behavior: contain; }
   .notes.on { display: block; }
   body:not(.compact-nav) .notes { left: 330px; }
+  /* Labelled cues ("What: ...") get a label column and a divider so each reads as its own block. */
+  .notes .cue { display: grid; grid-template-columns: 5.5em 1fr; align-items: baseline; gap: 4px 16px; margin: 0; }
+  .notes .cue + .cue { margin-top: 14px; padding-top: 14px; border-top: 1px solid #3d444d; }
+  .notes .cue-k { font: 600 13px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #79c0ff; white-space: nowrap; }
+  @media (max-width: 640px) {
+    .snd, .fzb, .smb, .ntb, .ksb, .vnb { bottom: calc(52px + var(--sb)); }
+    /* Translate rather than switch anchors so the arrows can slide beneath the toolbar. */
+    .arrows { transform: translateX(calc(100vw - 100% - 36px - var(--sl) - var(--sr))); }
+    .notes { bottom: calc(94px + var(--sb)); padding: 14px 16px; font-size: 16px; line-height: 1.5; }
+    .notes .cue { grid-template-columns: 1fr; }
+    .notes .cue + .cue { margin-top: 12px; padding-top: 12px; }
+  }
 
   /* --- slide search (full-screen dialog) --- */
   .fz { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
@@ -427,7 +442,7 @@
         r.header = {
           group: r.group,
           header: true,
-          notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${tops.map(s => label(s) + (s.kids ? ` (with ${s.kids.length} example${s.kids.length > 1 ? "s" : ""} below)` : "")).join(", ")}.`,
+          notes: `What: ${PROTO[r.group] ? `Research prototype: ${PROTO[r.group]}. ` : ""}The ${title} section map shows topic tiles; a down-arrow badge marks worked examples.\nWhy: ${sub}.\nWhen: Use this map to choose a topic, then open a tile or follow its examples.`,
           el: h(
             "section",
             { class: "slide bh", "--bh": c[0], "--bh2": c[2] },
@@ -572,6 +587,7 @@
       class: "snd",
       "aria-label": "Toggle sound (M)",
       "aria-keyshortcuts": "M",
+      "aria-pressed": "false",
       title: "Sound on/off (M)",
       onclick: e => {
         e.stopPropagation();
@@ -609,8 +625,36 @@
     });
     smBtn.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="5" height="4" rx="1"/><rect x="10" y="4" width="5" height="4" rx="1"/><rect x="16.5" y="4" width="4" height="4" rx="1"/><rect x="3.5" y="10" width="5" height="4" rx="1"/><rect x="10" y="10" width="5" height="4" rx="1"/><rect x="3.5" y="16" width="5" height="4" rx="1"/><rect x="10" y="16" width="5" height="4" rx="1"/><rect x="16.5" y="16" width="4" height="4" rx="1"/></svg>';
-    const notes = h("div", { class: "notes" });
-    // kiosk mode (K): rotates every visible slide in fullscreen; the same dock button stops it
+    const notes = h("aside", { class: "notes", id: "speaker-notes", "aria-label": "Speaker notes", "aria-live": "polite", tabindex: "0" });
+    const notesBtn = h("button", {
+      class: "ntb",
+      type: "button",
+      "aria-label": "Toggle speaker notes (N)",
+      "aria-keyshortcuts": "N",
+      "aria-controls": "speaker-notes",
+      "aria-pressed": "false",
+      title: "Speaker notes on/off (N)",
+      onclick: e => {
+        e.stopPropagation();
+        toggleNotes();
+      },
+    });
+    notesBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>';
+    // Notes whose every line is "Label: text" (the What/Why/When convention) render as labelled cue blocks;
+    // anything else stays plain text. Built with text nodes only, so notes are never parsed as HTML.
+    function renderNotes(text) {
+      const lines = text.split("\n").filter(l => l.trim());
+      const cues = lines.map(l => /^([A-Z][A-Za-z]{0,15}):\s+(\S.*)$/.exec(l.trim()));
+      if (!cues.length || cues.some(c => !c)) notes.textContent = text;
+      else notes.replaceChildren(...cues.map(([, k, v]) => h("p", { class: "cue" }, h("span", { class: "cue-k" }, `${k}:`), " ", v)));
+    }
+    function toggleNotes() {
+      const visible = notes.classList.toggle("on");
+      notesBtn.setAttribute("aria-pressed", String(visible));
+      if (!visible && notes.contains(document.activeElement)) notesBtn.focus();
+    }
+    for (const t of ["touchstart", "touchend"]) notes.addEventListener(t, e => e.stopPropagation(), { passive: true });
+    // kiosk mode (K): rotates the visible main-line slides in fullscreen; the same dock button stops it
     const ksb = h("button", {
       class: "ksb",
       "aria-pressed": "false",
@@ -661,15 +705,20 @@
     for (const t of ["touchstart", "touchend"]) tourP.addEventListener(t, e => e.stopPropagation(), { passive: true });
     const wash = h("div", { class: "wash" });
     const gridc = h("canvas", { class: "gridc" });
-    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, ksb, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
-    snd.classList.toggle("off", sfx.muted);
+    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, ksb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
+    const paintSound = () => {
+      snd.classList.toggle("off", !!sfx.muted);
+      snd.setAttribute("aria-pressed", String(!sfx.muted));
+    };
+    paintSound();
 
-    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; map/search/sound need ~150px on the right.
+    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~230px on the right.
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
       stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 150);
+      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 230);
     };
     addEventListener("resize", fit);
     fit();
@@ -697,16 +746,19 @@
 
     function toggleSound() {
       if (!config.sound) return;
-      snd.classList.toggle("off", sfx.toggle());
+      sfx.toggle();
+      paintSound();
       snd.classList.add("flash");
       setTimeout(() => snd.classList.remove("flash"), 400);
     }
 
     // ---------- kiosk ----------
-    // Kiosk mode walks every visible slide (tour or view, examples included) in deck order, wrapping from the last to
-    // the first, without running slide steps (onNext). It asks for fullscreen from the K key or dock button (a user
-    // gesture); if the browser lacks or refuses it, slides still rotate in the window. Escape, K, the button or leaving
-    // fullscreen stop it; a manual move restarts the countdown. One timer at a time, cleared on every re-arm and stop.
+    // Kiosk mode walks the visible main line (tour or view; column examples are skipped) in deck order, wrapping from
+    // the last slide to the first, without running slide steps (onNext). It asks for fullscreen from the K key or dock
+    // button (a user gesture) and, while sound is on, unlocks audio from that same gesture so band music plays on the
+    // timed moves; the sound toggle stays beside the stop button. If the browser lacks or refuses fullscreen, slides
+    // still rotate in the window. Escape, K, the button or leaving fullscreen stop it; a manual move restarts the
+    // countdown. One timer at a time, cleared on every re-arm and stop.
     const KIOSK_MS = Math.max(1000, Number(config.kioskInterval) || 15000);
     /** @type {{ t: ReturnType<typeof setTimeout> | null, full: boolean, entered: boolean } | null} */
     let kiosk = null;
@@ -721,7 +773,7 @@
     const kioskNext = () => {
       for (let k = 1; k <= slides.length; k++) {
         const i = (cur + k) % slides.length;
-        if (vis(i)) return i;
+        if (vis(i) && !slides[i].parent) return i;
       }
       return cur;
     };
@@ -753,6 +805,7 @@
       if (on) {
         kiosk = { t: null, full: !!fsEl(), entered: false };
         const k = kiosk;
+        if (config.sound && !sfx.muted) sfx.unlock?.();
         const de = doc.documentElement,
           req = de.requestFullscreen || de.webkitRequestFullscreen;
         if (!k.full && req) {
@@ -925,7 +978,8 @@
       bandPrevBtn.disabled = bandTo(slides[n].band, -1) == null;
       bandNextBtn.disabled = bandTo(slides[n].band, 1) == null;
       paintColumn(n);
-      notes.textContent = slides[n].notes || "";
+      renderNotes(slides[n].notes || "");
+      notes.scrollTop = 0;
       if (view) tourN.textContent = `${at + 1}/${len}`;
       history.replaceState(null, "", hashFor(n));
     }
@@ -1006,6 +1060,7 @@
       /** @type {any} */
       const target = e.target;
       if (fz.open || smp.open) return; // the search and map dialogs handle their own keys
+      if (target.closest?.(".notes") && !["n", "N", "Escape"].includes(e.key)) return;
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         openSearch();
@@ -1059,7 +1114,8 @@
       else if (e.key === "Escape" && kiosk && !e.defaultPrevented) {
         e.preventDefault();
         setKiosk(false);
-      } else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
+      } else if (e.key === "n" || e.key === "N") toggleNotes();
+      else if (e.key === "Escape" && notes.classList.contains("on")) toggleNotes();
       else if (e.key === "m" || e.key === "M") toggleSound();
       else if (e.key === "g" || e.key === "G") openMap();
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
@@ -1067,7 +1123,7 @@
     addEventListener("click", e => {
       /** @type {any} */
       const target = e.target;
-      if (fz.open || smp.open || target.closest(".fz, .smp, a, button")) return;
+      if (fz.open || smp.open || target.closest(".fz, .smp, .notes, a, button")) return;
       const tile = target.closest("[data-go]");
       if (tile) return go(+tile.dataset.go);
       e.clientX < innerWidth / 3 ? prev() : next();
