@@ -141,6 +141,36 @@ func recordedOperationalValueGrade(run RunData) (GraderResult, error) {
 	return grade, nil
 }
 
+func sanitizeGraderReasonForDisplay(reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return ""
+	}
+	reason = strings.Join(strings.Fields(reason), " ")
+
+	replacer := strings.NewReplacer(
+		"token=", "token=[REDACTED]",
+		"access_token=", "access_token=[REDACTED]",
+		"refresh_token=", "refresh_token=[REDACTED]",
+		"apikey=", "apikey=[REDACTED]",
+		"api_key=", "api_key=[REDACTED]",
+		"key=", "key=[REDACTED]",
+		"secret=", "secret=[REDACTED]",
+		"password=", "password=[REDACTED]",
+		"passwd=", "passwd=[REDACTED]",
+		"authorization=", "authorization=[REDACTED]",
+		"sig=", "sig=[REDACTED]",
+		"signature=", "signature=[REDACTED]",
+	)
+	reason = replacer.Replace(reason)
+
+	const maxReasonLen = 256
+	if len(reason) > maxReasonLen {
+		reason = reason[:maxReasonLen] + "... [truncated]"
+	}
+	return reason
+}
+
 func renderValueRunGrades(out io.Writer, report *valueRunGradesReport) error {
 	if report == nil {
 		return nil
@@ -167,6 +197,7 @@ func renderValueRunGrades(out io.Writer, report *valueRunGradesReport) error {
 		if run.Grader.Error != "" {
 			reason = run.Grader.Error
 		}
+		reason = sanitizeGraderReasonForDisplay(reason)
 		rows = append(rows, gradeRow{
 			Run: run.RunID, Attempt: run.RunAttempt, Created: run.CreatedAt.UTC().Format(time.RFC3339),
 			Status: run.Grader.Status, Value: value, Reason: reason,
