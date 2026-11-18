@@ -16,7 +16,7 @@ const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
-const { projectSafeOutputData, finalizeBufferedReviewExecutions } = require("./safe_output_execution.cjs");
+const { projectSafeOutputData, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, projectAuthorization } = require("./safe_output_execution.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
@@ -31,7 +31,7 @@ const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
-const { getDefaultTargetRepo, parseRepoSlug } = require("./repo_helpers.cjs");
+const { getDefaultTargetRepo, parseRepoSlug, isExactRepoSlug, resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const {
   createManifestLogger,
   ensureManifestExists,
@@ -43,7 +43,7 @@ const {
   SAFE_OUTPUT_ERRORS_FILE_PATH,
   CLAIM_DELIVERY_ERRORS_FILE_NAME,
 } = require("./safe_output_manifest.cjs");
-const { loadCustomSafeOutputJobTypes, loadCustomSafeOutputScriptHandlers, loadCustomSafeOutputActionHandlers, isStagedMode } = require("./safe_output_helpers.cjs");
+const { loadCustomSafeOutputJobTypes, loadCustomSafeOutputScriptHandlers, loadCustomSafeOutputActionHandlers, isStagedMode, resolveTarget } = require("./safe_output_helpers.cjs");
 const { emitSafeOutputActionOutputs } = require("./safe_outputs_action_outputs.cjs");
 const { listCommentMemoryFiles, COMMENT_MEMORY_DIR } = require("./comment_memory_helpers.cjs");
 const { checkRateLimitHeadroom } = require("./rate_limit_helpers.cjs");
@@ -154,6 +154,37 @@ const CODE_PUSH_TYPES = new Set(["push_to_pull_request_branch", "create_pull_req
 /** @type {Set<string>} Project-safe-output handlers that should default to GH_AW_PROJECT_GITHUB_TOKEN when no per-handler github-token is configured. */
 const PROJECT_HANDLER_TYPES = new Set(["create_project", "create_project_status_update", "update_project"]);
 const MENTION_HANDLER_TYPES = new Set(["add_comment", "close_discussion", "create_discussion", "create_issue", "create_pull_request", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"]);
+/** @type {Record<string, string>} */
+const TARGET_SELECTOR_KINDS = {
+  add_comment: "issue_or_pull_request",
+  update_issue: "issue",
+  close_issue: "issue",
+  update_pull_request: "pull_request",
+  merge_pull_request: "pull_request",
+  close_pull_request: "pull_request",
+  submit_pull_request_review: "pull_request",
+};
+const REPOSITORY_SELECTOR_TYPES = new Set([
+  ...Object.keys(TARGET_SELECTOR_KINDS),
+  "add_labels",
+  "remove_labels",
+  "replace_label",
+  "create_issue",
+  "create_pull_request",
+  "create_discussion",
+  "update_discussion",
+  "close_discussion",
+  "comment_memory",
+  "create_security_advisory",
+  "add_security_advisory_comment",
+  "update_release",
+  "create_check_run",
+  "create_code_scanning_alert",
+  "autofix_code_scanning_alert",
+  "create_missing_tool_issue",
+  "create_missing_data_issue",
+  "create_report_incomplete_issue",
+]);
 
 // Threat-detection warn-mode requirement IDs from safe-outputs specification:
 // - WTD2: Convertible outputs must be mapped to a reviewable type.
@@ -363,6 +394,120 @@ const connectorBudgetsByHandlerMap = new WeakMap();
 
 /** @type {WeakSet<Function>} Only built-in local diagnostics may bypass publication checks. */
 const localDiagnosticHandlers = new WeakSet();
+const handlerConfigurations = new WeakMap();
+const authorizationBatchContexts = new WeakMap();
+
+function trustedDescriptor(config, type, /** @type {any} */ message = null) {
+  const descriptor = config[type] || {};
+  const tool = type === "dispatch_repository" && message && descriptor.tools && Object.hasOwn(descriptor.tools, message.tool_name) ? descriptor.tools[message.tool_name] : null;
+  return tool ? { ...descriptor, ...tool, tools: descriptor.tools, _authorizationName: message.tool_name } : descriptor;
+}
+
+function effectiveAuthorization(config, type, /** @type {any} */ message = null) {
+  const descriptor = trustedDescriptor(config, type, message);
+  if (descriptor.authorization) return descriptor.authorization;
+  return descriptor.builtin === true ? undefined : config.authorization;
+}
+
+function hasAuthorization(config) {
+  return !!config.authorization || Object.values(config).some(value => value && typeof value === "object" && (value.authorization || (value.tools && Object.values(value.tools).some(tool => tool?.authorization))));
+}
+
+function authorizationOperationStatus(result, fallback) {
+  return ["partial", "indeterminate"].includes(result?.operation_outcome) ? result.operation_outcome : fallback;
+}
+
+function freezeInvocationValue(value) {
+  if (!value || typeof value !== "object") return value;
+  for (const nested of Object.values(value)) freezeInvocationValue(nested);
+  return Object.freeze(value);
+}
+
+function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "") {
+  if (typeof value === "string") {
+    if (/(?:number|_id)$/.test(key) && !["temporary_id", "output_id", "claim_id", "work_id"].includes(key) && /^#?aw_[A-Za-z0-9_]+$/.test(value)) {
+      const target = temporaryIdMap.get(normalizeTemporaryId(value));
+      if (target?.number != null) return target.number;
+    }
+    return replaceTemporaryIdReferences(value, temporaryIdMap, repository);
+  }
+  if (!value || typeof value !== "object") return value;
+  const result = Array.isArray(value)
+    ? value.map(item => normalizeInvocationInputs(item, temporaryIdMap, repository))
+    : Object.fromEntries(Reflect.ownKeys(value).map(name => [name, normalizeInvocationInputs(value[name], temporaryIdMap, repository, String(name))]));
+  return Object.freeze(result);
+}
+
+/**
+ * Register only trusted loaders here. Author modules and factories are evaluated
+ * by the invocation boundary, never while discovering protected output types.
+ */
+async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks = []) {
+  config = normalizeSafeOutputConfig(config);
+  if (hasAuthorization(config)) {
+    config = JSON.parse(JSON.stringify(config));
+    for (const type of REPOSITORY_SELECTOR_TYPES) {
+      if (!config[type] || typeof config[type] !== "object") continue;
+      const defaultRepository = getDefaultTargetRepo(config[type]);
+      if (isExactRepoSlug(parseRepoSlug(defaultRepository))) config[type]["target-repo"] = defaultRepository;
+    }
+    freezeInvocationValue(config);
+  }
+  const scripts = loadCustomSafeOutputScriptHandlers();
+  const actions = loadCustomSafeOutputActionHandlers();
+  const lazy = hasAuthorization(config) || isStagedMode() || [...scripts.keys()].some(type => isStagedMode(config[type]));
+  if (!lazy) {
+    const handlers = await initializeHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks);
+    handlerConfigurations.set(handlers, config);
+    return handlers;
+  }
+  const handlers = new Map();
+  const errors = new Map();
+  handlerConfigurations.set(handlers, config);
+  handlerLoadErrorsByHandlerMap.set(handlers, errors);
+  handlerThreatWarningAbortTypes.set(handlers, new Set(Object.keys(config).filter(type => config[type]?.threat_warning_policy === "abort")));
+  const budgets = new Map();
+  for (const [type, options] of Object.entries(config)) {
+    if (options?.connector_operation !== true) continue;
+    if (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100) throw new Error(`Invalid trusted connector budget for "${type}": max must be an integer from 1 to 100`);
+    budgets.set(type, { max: options.max, attempted: 0 });
+  }
+  connectorBudgetsByHandlerMap.set(handlers, budgets);
+  for (const type of new Set([...Object.keys(HANDLER_MAP).filter(type => config[type]), ...scripts.keys(), ...actions.keys(), ...Object.keys(config.claim_adapters || {})])) {
+    if (type === "upload_asset" && !currentClaimHandle()) continue;
+    let executable;
+    /** @type {((...args: any[]) => Promise<any>) & {getReviewTarget?: (message: any) => any}} */
+    const handler = async (...args) => {
+      const requirement = effectiveAuthorization(config, type, args[0]);
+      if (requirement) {
+        const state = currentSafeOutputInvocation();
+        const deferred =
+          actions.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)));
+        if (!state || state.requirement !== requirement || state.invocation?.output.type !== type || (state.authorization?.state !== "allowed" && !(deferred && state.authorization?.state === "not_requested"))) {
+          throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
+        }
+      }
+      if (!executable) {
+        const initialized = await initializeHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks, type);
+        executable = initialized.get(type);
+        if (!executable) throw new Error(`Handler initialization failed for "${type}"`);
+        Object.assign(handler, executable);
+      }
+      return executable(...args);
+    };
+    if (type === "submit_pull_request_review") {
+      handler.getReviewTarget = message => {
+        const target = resolveTarget({ targetConfig: config[type].target || "triggering", item: message, context, itemType: "PR review", supportsPR: false, supportsIssue: false });
+        const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config[type]);
+        const repository = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "PR review");
+        return target.success && target.number && repository.success ? { repo: repository.repo, pull_request_number: target.number } : null;
+      };
+    }
+    if (config[type]?.builtin === true) localDiagnosticHandlers.add(handler);
+    handlers.set(type, handler);
+  }
+  return handlers;
+}
 
 /**
  * Wrap a handler so project-safe-output execution can temporarily bind global.github
@@ -398,6 +543,7 @@ function wrapWithClientRebinding(type, messageHandler, handlerGithubClient) {
 async function finalizeLedgerAppend(config, messageHandlers) {
   let ledgerAppendHandler = messageHandlers.get("ledger_append");
   if (!ledgerAppendHandler && config.ledger_append) {
+    if (effectiveAuthorization(config, "ledger_append") || isStagedMode(config.ledger_append) || isStagedMode(config)) return;
     const ledgerAppendModule = require(HANDLER_MAP.ledger_append);
     ledgerAppendHandler = await ledgerAppendModule.main(config.ledger_append);
   }
@@ -441,7 +587,7 @@ function bindHandlerToFactoryScope(handler) {
  * @param {string[]} [activationCommentLinks] - Link accumulator shared across this invocation's handlers
  * @returns {Promise<Map<string, Function>>} Map of type to message handler function
  */
-async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks = []) {
+async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks = [], /** @type {string|null} */ onlyType = null) {
   config = normalizeSafeOutputConfig(config);
   const messageHandlers = new Map();
   handlerThreatWarningAbortTypes.set(messageHandlers, new Set(Object.keys(config).filter(type => config[type]?.threat_warning_policy === "abort")));
@@ -462,6 +608,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
   core.info("Loading and initializing safe output handlers based on configuration...");
 
   for (const [type, handlerPath] of Object.entries(HANDLER_MAP)) {
+    if (onlyType && type !== onlyType) continue;
     // Check if this safe output type is enabled in the config
     // The presence of the config key indicates the handler should be loaded
     if (config[type]) {
@@ -473,6 +620,8 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
         if (handlerModule && typeof handlerModule.main === "function") {
           // Call the factory function with config to get the message handler
           const handlerConfig = { ...(config[type] || {}) };
+          const requirement = effectiveAuthorization(config, type);
+          if (requirement) handlerConfig.authorization = requirement;
 
           if (PROJECT_HANDLER_TYPES.has(type) && !handlerConfig[GITHUB_TOKEN_CONFIG_KEY] && process.env.GH_AW_PROJECT_GITHUB_TOKEN) {
             handlerConfig[GITHUB_TOKEN_CONFIG_KEY] = process.env.GH_AW_PROJECT_GITHUB_TOKEN;
@@ -570,6 +719,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
     core.info(`Loading ${customScriptHandlers.size} custom script handler(s): ${[...customScriptHandlers.keys()].join(", ")}`);
     const scriptBaseDir = nodePath.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "actions");
     for (const [scriptType, scriptFilename] of customScriptHandlers) {
+      if (onlyType && scriptType !== onlyType) continue;
       // Sanitize scriptFilename to prevent path traversal attacks: only the basename
       // (no directory separators or ".." sequences) is allowed.
       const safeFilename = nodePath.basename(scriptFilename);
@@ -621,6 +771,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
     core.info(`Loading ${customActionHandlers.size} custom action handler(s): ${[...customActionHandlers.keys()].join(", ")}`);
     const actionHandlerPath = require("path").join(__dirname, "safe_output_action_handler.cjs");
     for (const [actionType, actionName] of customActionHandlers) {
+      if (onlyType && actionType !== onlyType) continue;
       try {
         const actionModule = require(actionHandlerPath);
         if (actionModule && typeof actionModule.main === "function") {
@@ -645,11 +796,13 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
 
   if (currentClaimHandle()) {
     for (const [type, adapter] of Object.entries(config.claim_adapters || {})) {
+      if (onlyType && type !== onlyType) continue;
       if (!["prepared", "script"].includes(adapter.mode)) continue;
       messageHandlers.delete(type);
       try {
         const prepared = await createClaimAdapterHandler({
           adapter,
+          authorization: effectiveAuthorization(config, type),
           github,
           filename: preparedAdapterPath(nodePath.join("/tmp/gh-aw/claim-adapters", type, String(currentClaimAssignment().claims.findIndex(member => member.handle === currentClaimHandle()))), currentClaimHandle(), type),
           loadEffectHandler: async effectType => {
@@ -733,15 +886,19 @@ function rejectCrossClaimTemporaryReferences(partitions, rejected) {
     }
   }
   for (const [handle, members] of partitions) {
-    partitions.set(
-      handle,
-      members.filter(member => {
-        const foreign = [...extractTemporaryIdReferences(member)].find(id => temporaryOwners.has(id) && !temporaryOwners.get(id).has(handle));
-        if (!foreign) return true;
-        rejected.push({ type: member.type, claim_handle: handle, success: false, errorCode: "claim_scope_invalid", error: "Cross-Claim temporary-ID references are forbidden; exchange data through verified DAG Results" });
-        return false;
-      })
-    );
+    const retainedIndices = [];
+    const sourceBatch = authorizationBatchContexts.get(members);
+    const retained = members.filter((member, index) => {
+      const foreign = [...extractTemporaryIdReferences(member)].find(id => temporaryOwners.has(id) && !temporaryOwners.get(id).has(handle));
+      if (!foreign) {
+        if (sourceBatch) retainedIndices.push(sourceBatch.indices[index]);
+        return true;
+      }
+      rejected.push({ type: member.type, claim_handle: handle, success: false, errorCode: "claim_scope_invalid", error: "Cross-Claim temporary-ID references are forbidden; exchange data through verified DAG Results" });
+      return false;
+    });
+    if (sourceBatch) authorizationBatchContexts.set(retained, { digest: sourceBatch.digest, indices: retainedIndices });
+    partitions.set(handle, retained);
   }
 }
 
@@ -1022,13 +1179,160 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  * @param {Array<Object>} messages - Array of safe output messages
  * @param {((item: {type: string, url?: string, number?: number, repo?: string, temporaryId?: string}) => void)|null} [onItemCreated] - Optional callback invoked after each successful create operation (for manifest logging)
  * @param {((results: Array<any>, protectedTargets: Set<string>, requiredComments: Map<string, any[]>) => Promise<void>)|null} [finalizeBufferedOutputs] - Finalize buffered effects before resolving waiting dependencies
- * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
+ * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>, authorizeSyntheticUpdate: Function}>}
  */
 async function processMessages(messageHandlers, messages, onItemCreated = null, finalizeBufferedOutputs = null) {
-  if (readClaimScopeContext() && !currentClaimHandle()) {
+  const trustedConfig = handlerConfigurations.get(messageHandlers) || {};
+  const originalMessages = JSON.parse(JSON.stringify(messages));
+  const authorizations = new Map();
+  const permissions = new Map();
+  const actionTypes = loadCustomSafeOutputActionHandlers();
+  const scriptTypes = loadCustomSafeOutputScriptHandlers();
+  const authorizationConfigured = hasAuthorization(trustedConfig);
+  const protocol = require("./safe_output_authorization.cjs");
+  const sourceBatch = authorizationBatchContexts.get(messages);
+  const batchDigest = authorizationConfigured ? sourceBatch?.digest || protocol.canonicalDigest(originalMessages) : null;
+  const stagedFor = (type, message = null) => isStagedMode(trustedConfig) || isStagedMode(trustedDescriptor(trustedConfig, type, message));
+  const previewOnly = (type, message) => !!effectiveAuthorization(trustedConfig, type, message) || scriptTypes.has(type) || actionTypes.has(type);
+
+  async function executeInvocation(type, index, message, resolvedTemporaryIds, temporaryIdMap, handler, phase = "primary") {
+    if (type === "dispatch_repository" && trustedConfig[type]?.tools && !Object.hasOwn(trustedConfig[type].tools, message.tool_name)) {
+      return { success: false, error: "Repository dispatch tool is not configured" };
+    }
+    const descriptor = trustedDescriptor(trustedConfig, type, message);
+    const requirement = effectiveAuthorization(trustedConfig, type, message);
+    if (stagedFor(type, message)) {
+      if (authorizationConfigured || previewOnly(type, message)) authorizations.set(index, { state: "skipped_staged", reason_code: "skipped_staged" });
+      return previewOnly(type, message) ? { success: true, staged: true, preview: true } : handler(message, resolvedTemporaryIds, temporaryIdMap);
+    }
+    if (!requirement) {
+      if (authorizationConfigured) authorizations.set(index, { state: descriptor.builtin === true && trustedConfig.authorization ? "exempt_builtin" : "not_configured" });
+      return handler(message, resolvedTemporaryIds, temporaryIdMap);
+    }
+    // Targets that are still temporary cannot consume an authority decision.
+    for (const [key, value] of Object.entries(message)) {
+      if (typeof value !== "string" || !/(?:number|_id)$/.test(key) || key === "temporary_id" || key === "output_id") continue;
+      if (/^#?aw_[A-Za-z0-9_]+$/.test(value) && !temporaryIdMap.has(normalizeTemporaryId(value))) {
+        return { deferred: true, reason: "Waiting for temporary target resolution" };
+      }
+    }
+    const preparedAdapter = !!currentClaimHandle() && ["prepared", "script"].includes(trustedConfig.claim_adapters?.[type]?.mode);
+    const preparedMessage = normalizeInvocationInputs(message, preparedAdapter ? new Map() : temporaryIdMap, getDefaultTargetRepo(descriptor));
+    authorizations.set(index, { state: "error", reason_code: "invalid_preparation" });
+    const invocationBatchDigest = sourceBatch?.digests?.[index] || batchDigest || protocol.canonicalDigest(originalMessages);
+    const implementationPath = preparedAdapter
+      ? nodePath.join(__dirname, "work_queue_claim_adapters.cjs")
+      : phase !== "primary"
+        ? __filename
+        : scriptTypes.has(type)
+          ? nodePath.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "actions", nodePath.basename(scriptTypes.get(type) || ""))
+          : nodePath.join(
+              __dirname,
+              currentClaimHandle() && type === "create_code_scanning_alert"
+                ? "work_queue_code_scanning.cjs"
+                : currentClaimHandle() && type === "upload_code_coverage"
+                  ? "work_queue_code_coverage.cjs"
+                  : HANDLER_MAP[type] || "safe_output_action_handler.cjs"
+            );
+    const caller = protocol.buildAuthorizationCaller();
+    const targetKind = TARGET_SELECTOR_KINDS[type];
+    const defaults = freezeInvocationValue({
+      repository: getDefaultTargetRepo(descriptor),
+      ...(targetKind ? { target_selector: descriptor.target || "triggering" } : {}),
+      ...(MENTION_HANDLER_TYPES.has(type) ? { mentions: descriptor.mentions ?? trustedConfig.mentions ?? {} } : {}),
+    });
+    const refs = [`source-repository-id:${caller.repository_id}`];
+    if (isExactRepoSlug(parseRepoSlug(defaults.repository))) refs.push(`${descriptor["target-repo"] ? "configured" : "default"}-repository:${defaults.repository}`);
+    const nativeSelector = REPOSITORY_SELECTOR_TYPES.has(type) && !scriptTypes.has(type) && !actionTypes.has(type) && !preparedAdapter;
+    if (nativeSelector) {
+      const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(descriptor);
+      const repository = resolveAndValidateRepo(preparedMessage, defaultTargetRepo, allowedRepos, type);
+      if (!repository.success) {
+        authorizations.set(index, { state: "not_requested", reason_code: "target_selector_invalid" });
+        return { success: false, error: repository.error };
+      }
+      if (repository.success && isExactRepoSlug(repository.repoParts)) {
+        refs.push(`validated-repository-selector:${repository.repo}`);
+        if (targetKind && preparedMessage.comment_id == null) {
+          const target = resolveTarget({
+            targetConfig: String(defaults.target_selector),
+            item: preparedMessage,
+            context,
+            itemType: type,
+            supportsPR: targetKind === "issue_or_pull_request",
+            supportsIssue: targetKind === "issue",
+          });
+          if (target.success && Number.isSafeInteger(target.number) && target.number > 0) refs.push(`validated-${targetKind}-selector:${repository.repo}#${target.number}`);
+        }
+      }
+    }
+    const policy = { configuration: redactSensitiveConfig(descriptor), defaults: redactSensitiveConfig(defaults), requirement };
+    const invocation = protocol.prepareInvocation({
+      caller,
+      output: {
+        type,
+        name: phase === "primary" ? descriptor._authorizationName || type : `${descriptor._authorizationName || type}:${phase}`,
+        executor: descriptor.authorization_executor || (scriptTypes.has(type) ? "script" : "manager"),
+        implementation_digest: require("node:crypto").createHash("sha256").update(fs.readFileSync(implementationPath)).digest("hex"),
+      },
+      normalizedInputs: JSON.parse(JSON.stringify({ message: preparedMessage, resolvedTemporaryIds, defaults })),
+      batchDigest: invocationBatchDigest,
+      recordIndex: sourceBatch?.indices[index] ?? index,
+      scope: { binding: "invocation", refs },
+      context: {
+        policy_digest: protocol.canonicalDigest(JSON.parse(JSON.stringify(policy))),
+        ...(currentClaimHandle() ? { claim_id: claimIdentity(currentClaimHandle()).claim_id, delivery_id: claimIdentity(currentClaimHandle()).dispatch_id } : {}),
+      },
+    });
+    /** @type {any} */
+    const invocationState = { invocation, requirement, config: descriptor, batchDigest: invocationBatchDigest, recordIndex: sourceBatch?.indices[index] ?? index, authorization: undefined };
+    invocationState.authorize = options => require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation(options);
+    const deferredGate = phase === "primary" && (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (type === "upload_asset" && !!currentClaimHandle()));
+    const evidencePath = protocol.authorizationEvidencePath();
+    let authorization;
+    try {
+      authorization = deferredGate ? { state: "not_requested", reason_code: "deferred_executor" } : await protocol.authorizePreparedInvocation({ core, requirement, invocation, staged: false, evidencePath });
+      if (authorization.state === "allowed") permissions.set(index, authorization);
+      invocationState.authorization = authorization;
+      authorizations.set(index, authorization);
+      // Recheck the live Claim after the remote authority wait. Both gates apply.
+      await assertClaimAuthorized(preparedMessage);
+      if (!deferredGate) protocol.assertAuthorizationFresh({ authorization });
+      if (require("node:crypto").createHash("sha256").update(fs.readFileSync(implementationPath)).digest("hex") !== invocation.output.implementation_digest) {
+        throw new Error("Safe-output implementation changed after preparation");
+      }
+      const result = await withSafeOutputInvocation(invocationState, () => handler(preparedMessage, Object.freeze({ ...resolvedTemporaryIds }), temporaryIdMap));
+      const actualAuthorization = invocationState.authorization;
+      authorizations.set(index, actualAuthorization);
+      if (actualAuthorization?.state === "allowed" && result?.deferred) {
+        throw new Error("Authorized safe-output invocation deferred after executor entry; reconcile before retrying");
+      }
+      if (actualAuthorization?.state === "allowed" && !result?.deferred_manifest) {
+        const outcome = protocol.recordAuthorizationOutcome({
+          evidencePath,
+          authorization: actualAuthorization,
+          operationStatus: authorizationOperationStatus(result, result?.success === false ? "failed" : result?.skipped ? "skipped" : "success"),
+          core,
+        });
+        if (outcome.evidenceRecorded === false) authorizations.set(index, { ...actualAuthorization, evidenceRecorded: false, reason_code: outcome.reason_code });
+      }
+      return result;
+    } catch (error) {
+      const actualAuthorization = error.authorization || invocationState.authorization || authorization;
+      if (actualAuthorization) authorizations.set(index, actualAuthorization);
+      if (actualAuthorization?.state === "allowed") {
+        const outcome = protocol.recordAuthorizationOutcome({ evidencePath, authorization: actualAuthorization, operationStatus: authorizationOperationStatus(error, "failed"), core });
+        if (outcome.evidenceRecorded === false) authorizations.set(index, { ...actualAuthorization, evidenceRecorded: false, reason_code: outcome.reason_code });
+      }
+      throw error;
+    }
+  }
+
+  if (!messages.every(message => stagedFor(message.type, message)) && readClaimScopeContext() && !currentClaimHandle()) {
     throw new Error("Queue safe outputs must execute in a trusted per-Claim handler context; use the scoped manager");
   }
   messages = messages.map(message => {
+    if (stagedFor(message.type, message)) return { ...message, type: normalizeSafeOutputName(message.type) };
     try {
       return normalizeRuntimeMessage(message);
     } catch (error) {
@@ -1150,20 +1454,22 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       results.push({ type: messageType, messageIndex: i, success: false, errorCode: dependency.errorCode, error: dependency.error });
       return;
     }
-    try {
-      if (currentClaimHandle() && message._claimScopeError) throw new Error(message._claimScopeError);
-      message = await assertClaimAuthorized(message);
-    } catch (error) {
-      results.push({
-        type: messageType,
-        messageIndex: i,
-        claim_handle: message.claim_handle,
-        success: false,
-        ...(error.suppressed
-          ? { cancelled: error.state === "cancelled", skipped: true, reason: error.state === "result" ? "Durable Result settled; effects not replayed" : "Claim cancelled; outputs suppressed", errorCode: error.code }
-          : { errorCode: message._claimScopeErrorCode || error.code || "claim_scope_invalid", error: getErrorMessage(error) }),
-      });
-      return;
+    if (!stagedFor(messageType, message)) {
+      try {
+        if (currentClaimHandle() && message._claimScopeError) throw new Error(message._claimScopeError);
+        message = await assertClaimAuthorized(message);
+      } catch (error) {
+        results.push({
+          type: messageType,
+          messageIndex: i,
+          claim_handle: message.claim_handle,
+          success: false,
+          ...(error.suppressed
+            ? { cancelled: error.state === "cancelled", skipped: true, reason: error.state === "result" ? "Durable Result settled; effects not replayed" : "Claim cancelled; outputs suppressed", errorCode: error.code }
+            : { errorCode: message._claimScopeErrorCode || error.code || "claim_scope_invalid", error: getErrorMessage(error) }),
+        });
+        return;
+      }
     }
 
     if (!messageType) {
@@ -1219,6 +1525,13 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       } else if (threatPolicy.policy === "none") {
         core.warning(`Threat-detection warn policy has no explicit classification for "${messageType}"; allowing handler execution by default`);
       }
+    }
+
+    if (stagedFor(messageType, message) && previewOnly(messageType, message)) {
+      authorizations.set(i, { state: "skipped_staged", reason_code: "skipped_staged" });
+      core.info(`Staged safe-output invocation preview: ${messageType}`);
+      results.push({ type: messageType, messageIndex: i, success: true, staged: true, result: { staged: true, preview: true } });
+      return;
     }
 
     const messageHandler = messageHandlers.get(messageType);
@@ -1404,7 +1717,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
         return;
       }
-      const result = recordMergeDecision(messageType, await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
+      const result = recordMergeDecision(messageType, await executeInvocation(messageType, i, effectiveMessage, resolvedTemporaryIds, temporaryIdMap, messageHandler), i);
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
       // no-op warnings, or if_no_changes: warn/ignore). Subsequent messages are still
@@ -1629,7 +1942,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
           // Call the handler again with updated temp ID map
           await assertClaimAuthorized(deferred.message);
           const stalePRReason = localDiagnosticHandlers.has(deferred.handler) ? null : await getStalePullRequestReason(global.github, global.context);
-          const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
+          const result = stalePRReason
+            ? { skipped: true, reason: stalePRReason }
+            : recordMergeDecision(deferred.type, await executeInvocation(deferred.type, deferred.messageIndex, deferred.message, resolvedTemporaryIds, temporaryIdMap, deferred.handler), deferred.messageIndex);
 
           if (result && result.skipped === true && !result.deferred) {
             const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
@@ -1753,13 +2068,41 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   }
 
   await retryDeferredMessages();
+  const expiredReviewTargets = new Set();
+  const auditedBufferedOutputs = new Set();
   if (finalizeBufferedOutputs) {
     for (let pass = 0; pass <= messages.length; pass++) {
       const pendingPublications = results.filter(record => record.success && !record.skipped && record.result?.deferred_manifest);
+      for (const record of pendingPublications) {
+        const permission = permissions.get(record.messageIndex);
+        if (!permission) continue;
+        try {
+          require("./safe_output_authorization.cjs").assertAuthorizationFresh({ authorization: permission });
+        } catch (error) {
+          record.success = false;
+          record.error = "Safe-output authorization expired before buffered publication";
+          authorizations.set(record.messageIndex, error.authorization || { state: "error", reason_code: "invalid_validity" });
+          const target = reviewKey(record.result);
+          if (target) expiredReviewTargets.add(target);
+        }
+      }
       const pendingResults = new Set(pendingPublications.map(record => record.result));
       const temporaryIdCount = temporaryIdMap.size;
       const deferredCount = deferredMessages.length;
-      await finalizeBufferedOutputs(results, protectedReviews(), requiredReviewComments());
+      await finalizeBufferedOutputs(results, new Set([...protectedReviews(), ...expiredReviewTargets]), requiredReviewComments());
+      for (const record of pendingPublications) {
+        const authorization = authorizations.get(record.messageIndex);
+        const status = classifySafeOutputResult(record);
+        if (authorization?.state !== "allowed" || status === "deferred" || auditedBufferedOutputs.has(record.messageIndex)) continue;
+        auditedBufferedOutputs.add(record.messageIndex);
+        const outcome = protocol.recordAuthorizationOutcome({
+          evidencePath: protocol.authorizationEvidencePath(),
+          authorization,
+          operationStatus: authorizationOperationStatus(record.result, status === "success" || status === "warning" ? "success" : status === "skipped" ? "skipped" : "failed"),
+          core,
+        });
+        if (outcome.evidenceRecorded === false) authorizations.set(record.messageIndex, { ...authorization, evidenceRecorded: false, reason_code: outcome.reason_code });
+      }
       const publicationProgress = pendingPublications.some(record => classifySafeOutputResult(record) !== "deferred");
       await drainWaitingMessages();
       if (publicationProgress || temporaryIdMap.size !== temporaryIdCount || deferredMessages.length !== deferredCount) {
@@ -1784,11 +2127,28 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   for (const result of results) {
     const outputId = messages[result.messageIndex]?.output_id;
     if (outputId !== undefined) result.output_id = outputId;
+    const authorization = projectAuthorization(authorizations.get(result.messageIndex) || (authorizationConfigured ? { state: "not_requested", reason_code: result.delegated ? "deferred_executor" : "execution_prevented" } : null));
+    if (authorization) result.authorization = authorization;
   }
 
   // Return outputs with unresolved IDs for synthetic update processing
   // Convert temporaryIdMap to plain object for serialization
   const temporaryIdMapObj = Object.fromEntries(temporaryIdMap);
+  const authorizeSyntheticUpdate = async (tracked, update, performUpdate) => {
+    const index = messages.indexOf(tracked.message);
+    if (index < 0 && effectiveAuthorization(trustedConfig, tracked.type)) throw new Error("Missing trusted synthetic-update invocation identity");
+    try {
+      await executeInvocation(tracked.type, index, { ...tracked.message, ...update }, temporaryIdMapObj, temporaryIdMap, performUpdate, "temporary_id_update");
+    } catch (error) {
+      const record = results.find(item => item.messageIndex === index);
+      if (record) {
+        record.success = false;
+        record.error = "Synthetic safe-output update failed";
+        record.authorization = projectAuthorization(authorizations.get(index));
+      }
+      throw error;
+    }
+  };
 
   return {
     success: true,
@@ -1798,6 +2158,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     outputsWithUnresolvedIds,
     missings,
     codePushFailures,
+    authorizeSyntheticUpdate,
   };
 }
 
@@ -2012,8 +2373,12 @@ function sanitizeSyntheticUpdateBody(body, allowedAliases, maxMentions, ctx) {
  * @param {number} [maxMentions] - Maximum allowed mentions
  * @returns {Promise<number>} Number of successful updates
  */
-async function processSyntheticUpdates(github, context, trackedOutputs, temporaryIdMap, artifactUrlMap, mentionsConfig = {}, maxMentions = 50) {
+async function processSyntheticUpdates(github, context, trackedOutputs, temporaryIdMap, artifactUrlMap, mentionsConfig = {}, maxMentions = 50, /** @type {Function|null} */ authorizeUpdate = null) {
   if (readClaimScopeContext() && !currentClaimHandle()) throw new Error("Synthetic queue writes require a trusted per-Claim execution context");
+  if (!authorizeUpdate && process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG) {
+    const config = loadConfig();
+    if (trackedOutputs.some(tracked => effectiveAuthorization(config, tracked.type, tracked.message))) throw new Error("Synthetic safe-output updates require their trusted authorization context");
+  }
   let updateCount = 0;
 
   core.info(`\n=== Processing Synthetic Updates ===`);
@@ -2051,38 +2416,45 @@ async function processSyntheticUpdates(github, context, trackedOutputs, temporar
             let updatedContent = replaceArtifactUrlReferences(contentToCheck, artifactUrlMap);
             updatedContent = replaceTemporaryIdReferences(updatedContent, temporaryIdMap, tracked.result.repo);
             // Update based on the original type
-            switch (tracked.type) {
-              case "create_issue":
-                await updateIssueBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedAliases, maxMentions);
-                updateCount++;
-                break;
-              case "create_discussion":
-                await updateDiscussionBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedAliases, maxMentions);
-                updateCount++;
-                break;
-              case "add_comment":
-                // Update comment using the tracked comment ID
-                if (tracked.result.commentId) {
-                  await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, tracked.result.isDiscussion, allowedAliases, maxMentions);
+            const performUpdate = async () => {
+              switch (tracked.type) {
+                case "create_issue":
+                  await updateIssueBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedAliases, maxMentions);
                   updateCount++;
-                } else {
-                  core.debug(`Skipping synthetic update for comment - comment ID not tracked`);
-                }
-                break;
-              case "comment_memory":
-                if (tracked.result.commentId) {
-                  await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, false, allowedAliases, maxMentions);
+                  break;
+                case "create_discussion":
+                  await updateDiscussionBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedAliases, maxMentions);
                   updateCount++;
-                } else {
-                  core.debug(`Skipping synthetic update for comment_memory - comment ID not tracked`);
-                }
-                break;
-              case "create_pull_request":
-                await updatePullRequestBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedAliases, maxMentions);
-                updateCount++;
-                break;
-              default:
-                core.debug(`Unknown output type: ${tracked.type}`);
+                  break;
+                case "add_comment":
+                  // Update comment using the tracked comment ID
+                  if (tracked.result.commentId) {
+                    await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, tracked.result.isDiscussion, allowedAliases, maxMentions);
+                    updateCount++;
+                  } else {
+                    core.debug(`Skipping synthetic update for comment - comment ID not tracked`);
+                  }
+                  break;
+                case "comment_memory":
+                  if (tracked.result.commentId) {
+                    await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, false, allowedAliases, maxMentions);
+                    updateCount++;
+                  } else {
+                    core.debug(`Skipping synthetic update for comment_memory - comment ID not tracked`);
+                  }
+                  break;
+                case "create_pull_request":
+                  await updatePullRequestBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedAliases, maxMentions);
+                  updateCount++;
+                  break;
+                default:
+                  core.debug(`Unknown output type: ${tracked.type}`);
+              }
+            };
+            if (authorizeUpdate) {
+              await authorizeUpdate(tracked, { body: updatedContent, repo: tracked.result.repo, item_number: tracked.result.number ?? tracked.result.itemNumber, comment_id: tracked.result.commentId ?? null }, performUpdate);
+            } else {
+              await performUpdate();
             }
           } catch (error) {
             core.warning(`✗ Failed to update ${tracked.type} ${tracked.result.repo}#${tracked.result.number}: ${getErrorMessage(error)}`);
@@ -2207,14 +2579,18 @@ async function main(options = {}) {
     const output = loadAgentOutput({ partitioning: true });
     const messages = output.success ? output.items : [];
     const partitions = new Map(scope.assignment.claims.map(claim => [claim.handle, []]));
+    const sourceDigest = require("./safe_output_authorization.cjs").canonicalDigest(JSON.parse(JSON.stringify(messages)));
+    for (const partition of partitions.values()) authorizationBatchContexts.set(partition, { digest: sourceDigest, indices: [] });
     const rejected = [];
     const controls = readClaimControlMessages(scope.assignment, options.controlIntentPath);
     rejected.push(...controls.errors.map(error => ({ ...error, success: false, errorCode: "claim_control_delivery_invalid" })));
-    for (const message of messages) {
+    for (const [sourceIndex, message] of messages.entries()) {
       try {
         if (message._claimScopeError) throw new Error(message._claimScopeError);
         const normalized = normalizeClaimScope(message, scope.assignment);
-        partitions.get(normalized.claim_handle).push(normalized);
+        const partition = partitions.get(normalized.claim_handle);
+        partition.push(normalized);
+        authorizationBatchContexts.get(partition).indices.push(sourceIndex);
       } catch (error) {
         rejected.push({ success: false, type: message.type, claim_handle: message.claim_handle, error: getErrorMessage(error), errorCode: message._claimScopeErrorCode || error.code || "claim_scope_invalid" });
       }
@@ -2382,6 +2758,15 @@ async function main(options = {}) {
 
     const fileBackedCommentMemoryMessages = currentClaimHandle() ? [] : buildCommentMemoryMessagesFromFiles(agentOutputItems, config);
     const allMessages = [...agentOutputItems, ...fileBackedCommentMemoryMessages];
+    const sourceBatch = options.messages && authorizationBatchContexts.get(options.messages);
+    if (sourceBatch) {
+      authorizationBatchContexts.set(allMessages, sourceBatch);
+    } else if (hasAuthorization(config)) {
+      const { canonicalDigest } = require("./safe_output_authorization.cjs");
+      const digest = canonicalDigest(JSON.parse(JSON.stringify(agentOutputItems)));
+      const derivedDigest = fileBackedCommentMemoryMessages.length ? canonicalDigest(JSON.parse(JSON.stringify(allMessages))) : digest;
+      authorizationBatchContexts.set(allMessages, { digest, indices: allMessages.map((_, index) => index), digests: allMessages.map((_, index) => (index < agentOutputItems.length ? digest : derivedDigest)) });
+    }
     if (currentClaimHandle()) setCollectedMissings({ missingTools: [], missingData: [], noopMessages: [], reportIncomplete: [] });
     if (allMessages.length === 0) {
       core.info("No safe-output messages available - nothing to process");
@@ -2521,7 +2906,16 @@ async function main(options = {}) {
       // Convert temp ID map back to Map
       const temporaryIdMap = new Map(Object.entries(processingResult.temporaryIdMap));
 
-      syntheticUpdateCount = await processSyntheticUpdates(github, context, processingResult.outputsWithUnresolvedIds, temporaryIdMap, processingResult.artifactUrlMap, config.mentions ?? {}, maxMentions);
+      syntheticUpdateCount = await processSyntheticUpdates(
+        github,
+        context,
+        processingResult.outputsWithUnresolvedIds,
+        temporaryIdMap,
+        processingResult.artifactUrlMap,
+        config.mentions ?? {},
+        maxMentions,
+        processingResult.authorizeSyntheticUpdate
+      );
     }
 
     // Write step summaries for all processed safe-outputs

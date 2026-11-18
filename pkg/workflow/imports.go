@@ -296,6 +296,7 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 	// staged, env, github-token, max-patch-size, runs-on) as well as those defining safe output types.
 	// Meta fields can be imported even when no safe output types are defined.
 	var importedConfigs []map[string]any
+	var importedAuthorizationConfigs []*SafeOutputsConfig
 	// Collect protected-files exclude lists from type-conflicting imports so they can be
 	// merged as a set even when the importing config already defines the same handler type.
 	// These are keyed by handler type name (e.g. "create-pull-request").
@@ -307,10 +308,21 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 		}
 
 		var config map[string]any
-		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		configBytes := []byte(configJSON)
+		if err := json.Unmarshal(configBytes, &config); err != nil {
 			importsLog.Printf("Skipping malformed safe-outputs config: %v", err)
 			continue
 		}
+		if err := validateSafeOutputAuthorizationAliases(config); err != nil {
+			return nil, err
+		}
+		// Native extraction preprocesses templatable fields in place. Keep its
+		// authority snapshot separate from the map parsed for the ordinary merge.
+		var authorizationConfig map[string]any
+		if err := json.Unmarshal(configBytes, &authorizationConfig); err != nil {
+			return nil, fmt.Errorf("cannot preserve imported safe-output authorization: %w", err)
+		}
+		importedAuthorizationConfigs = append(importedAuthorizationConfigs, c.extractSafeOutputsConfig(map[string]any{"safe-outputs": authorizationConfig}))
 		config = normalizeMissingReportKeys(config)
 
 		// Check for conflicts and remove types already defined in top-level config
@@ -379,6 +391,15 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 	result := topSafeOutputs
 	if result == nil {
 		result = &SafeOutputsConfig{}
+	}
+	// Preserve required authorities before ordinary import override semantics
+	// remove handler configurations shadowed by the main workflow.
+	for _, imported := range importedAuthorizationConfigs {
+		if imported != nil {
+			if err := mergeSafeOutputAuthorizations(result, imported); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// Track explicit settings so later imports cannot replace disables with defaults.
@@ -524,6 +545,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutput
 	if importedConfig == nil {
 		importsLog.Print("Imported safe-output config extracted no fields, skipping merge")
 		return result, nil
+	}
+	if err := mergeSafeOutputAuthorizations(result, importedConfig); err != nil {
+		return nil, err
 	}
 	if importedConfig.CreateIssuesDisabled {
 		result.CreateIssuesDisabled = true

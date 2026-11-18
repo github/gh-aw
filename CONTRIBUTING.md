@@ -556,9 +556,10 @@ Quick reference:
 
 ### CI Front Door
 
-CGO selects optional PR suites through `scripts/ci-front-door.cjs`. All other
-checks retain their existing conditions, including mandatory security,
-vulnerability, taint-analysis, and safe-output tests. Main-branch pushes,
+CGO filters every check job on PRs through `scripts/ci-front-door.cjs`, including
+Go tests, security checks, linters, conformance, builds, benchmarks, fuzzing, and
+both macOS and Windows. Only checkout, selection, and timing/cache cleanup are
+unconditional infrastructure. Main-branch pushes,
 manual runs, and the weekly scheduled control run all applicable suites without
 calling the Decision API. CJS and Windows CI are unchanged.
 
@@ -568,58 +569,70 @@ Only the dedicated `front-door-decision` job has `copilot-requests: write`;
 `checkout-cache`, tests, cache restores, and conformance checks do not receive
 this permission. The selection step passes the built-in workflow token through
 `CI_DECISION_TOKEN`. It runs the selector, shared client, catalog, prompt, and
-deterministic policy from a separate checkout pinned to the PR's trusted base
-SHA. A second checkout of the PR merge commit supplies only local git diff
-evidence through `CI_DIFF_WORKSPACE`; no PR-controlled code runs in this job.
-Both checkouts disable credential persistence. During initial rollout, a missing
+selection logic from a separate checkout pinned to the PR's trusted base
+SHA. SHA-pinned GitHub API evidence supplies the PR merge commit's first-parent
+diff without a second checkout; no PR-controlled code runs in this job.
+The checkout disables credential persistence. During initial rollout, a missing
 trusted selector is skipped and older trusted versions fall back to all suites;
 the PR implementation is never used to bootstrap credential-bearing execution.
 No endpoint variable or PAT is needed, and credentials are never sent to another
 host. Missing tokens or denied inference permissions, including restricted fork
 PRs, run all suites.
-A configured token makes exactly one POST containing the diff summary and five
-named predicates, including on invalid local input; there are no retries,
-redirects, or other selector API requests. Checkout, existing CI cache/artifact
+A configured token makes one POST containing the diff summary and a named
+safe-to-omit predicate for every catalog job. The model decides relevance;
+there is no path allowlist or mandatory check-job list. Invalid inputs,
+empty/unavailable/incomplete evidence, and selector-policy changes bypass
+inference and retain all jobs.
+There are no retries or redirects. Diff-evidence API requests are counted
+separately. Checkout, existing CI cache/artifact
 actions, and timing collection are outside this selector boundary.
 
 The request includes `diff_summary`, `suite_catalog`, and the versioned prompt.
-The summary uses only the local merge commit's first-parent diff and excludes
-`.lock.yml` files before reading patches. It separates `.js`/`.cjs`, `.go`, and
+The summary uses only the merge commit's first-parent diff, retaining the first
+`.lock.yml` in sorted path order as a representative generated sample and
+excluding all other generated locks before inventory and patch budgets apply.
+The sample is representative generated evidence, not an eligibility rule.
+It separates `.js`/`.cjs`, `.go`, and
 other files into `javascript`, `go`, and `other` groups. Each group retains its
 filenames and up to 8,000 UTF-8 patch bytes; `patch_truncated` explicitly marks
 partial snippets. Large patches do not discard the file inventory or consume
 another group's patch budget. Decisions must treat missing hunks conservatively.
-Incomplete inventories (more than 2,000 files or a 128 KiB summary), unavailable
-history, and selector-policy changes still force all suites. No fetch or API
-mining repairs a missing diff.
+Incomplete inventories (more than 2,000 retained paths or a 128 KiB summary),
+unavailable history, and selector-policy changes still force all suites.
+The API path uses one immutable-SHA comparison. At its 300-file cap, the selector
+instead paginates the immutable merge commit's files, verifying its SHA and
+first parent against the event on every page before filtering locks. A raw
+3,000-file ceiling, 2 MiB per-response bound, or shared 10-second evidence
+deadline still fails open. Local `CI_DIFF_WORKSPACE` evidence never fetches.
 
-GitHub returns a named safe-to-omit predicate for each optional suite.
+GitHub returns a named safe-to-omit predicate for each check job.
 Probabilities at least 0.9 permit omission; probabilities at most 0.1 retain the
 suite. Any intermediate probability, refusal, missing/duplicate/unknown answer,
 malformed JSON, non-200 status, 10-second deadline, or more than 16 KiB of response
 data forces all suites. The adapter preserves normalized replay responses such
-as `{"suite_ids":["build-wasm"],"confidence":0.95}`. Mandatory IDs are always
-added locally. Invalid outputs are rejected before reaching downstream job
+as `{"suite_ids":["build-wasm"],"confidence":0.95}`. Selected jobs retain
+their direct and transitive prerequisites: `test` requires
+`verify-integration-build`, `canary-go` requires `test`, and `security`,
+`security-scan`, and `cross-platform-build` require `build`.
+Invalid IDs or missing prerequisites are rejected before reaching downstream job
 conditions. A skipped or failed decision job, step failure, or missing outputs
-also runs all optional suites. Selection runs independently of the checkout
-cache; only optional suites depend on it. Mandatory checks never wait for the
-decision, and Windows remains in the cross-platform matrix even when macOS is
-omitted. Pushes and other non-PR events skip the decision job without suppressing
+also runs all check jobs. Selection runs independently of the checkout
+cache; all check jobs wait for its validated output on PRs. Cross-platform
+selection enables or omits both macOS and Windows together.
+Pushes and other non-PR events skip the decision job without suppressing
 any suite.
 
-Model-proposed omissions are intersected with a trusted deterministic path
-allowlist, including during recorded-response replay. Root `README.md` and
-`CONTRIBUTING.md`, documentation content, and the standalone workflow timing
-test can permit optional-suite omissions. Explicitly enumerated WASM entrypoint
-files and the WASM golden runner permit omissions only for other optional
-suites; `build-wasm` remains enabled. All other paths, including generic Go test
-files, dependency/build configuration, security files, unknown paths, and
-malformed or incomplete inventories, cannot authorize omissions. Model
-confidence and injected diff instructions cannot expand this allowlist.
+The same model-driven selection and prerequisite closure apply during
+recorded-response replay. Source, test-only, dependency, configuration, and
+unknown paths all reach the model; no path category automatically forces all
+jobs to run or skip. This is a relevance decision, not a guarantee of safety:
+uncertain answers still run every job, and independent full runs remain the
+control for missed regressions.
 
 `.github/ci/suite-catalog.json` has schema version 1 and entries with a stable
 `id`, short `description`, `mandatory` flag, and
 `historical_duration_seconds` (nonnegative seconds, or `null` for unknown).
+All `mandatory` flags are false. IDs match the 24 selectable CGO check jobs.
 Adding a suite requires updating both the catalog and the runtime's fixed ID
 list, plus job wiring and tests. Never invent historical durations.
 

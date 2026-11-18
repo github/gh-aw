@@ -260,6 +260,16 @@ func (c *Compiler) buildCallWorkflowJobs(data *WorkflowData, markdownPath string
 
 	for _, workflowName := range config.Workflows {
 		callJob := c.buildCallWorkflowJob(data, workflowName, markdownPath)
+		authorizationJob, err := c.buildCallWorkflowLaunchAuthorization(data, workflowName, callJob)
+		if err != nil {
+			return nil, err
+		}
+		if authorizationJob != nil {
+			if err := c.jobManager.AddJob(authorizationJob); err != nil {
+				return nil, err
+			}
+			jobNames = append(jobNames, authorizationJob.Name)
+		}
 		if err := c.jobManager.AddJob(callJob); err != nil {
 			return nil, fmt.Errorf("failed to add call-workflow job '%s': %w", callJob.Name, err)
 		}

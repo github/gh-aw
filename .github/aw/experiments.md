@@ -144,6 +144,23 @@ Prefer high-frequency workflows for faster significance.
 
 ---
 
+## Anti-Patterns
+
+- ❌ **Multiple dimensions in one experiment** — can't attribute the improvement.
+- ❌ **Removing `experiments:` before sample size reached** — resets state, invalidates counts.
+- ❌ **Interpreting early results** (<~20 runs/variant) — chance variation dominates.
+- ❌ **Experiments as feature flags** — use `features:` for deterministic switches.
+- ❌ **Engine experiments in one file** — `engine:` cannot switch mid-run; use two parallel files.
+- ❌ **Conditional frontmatter imports** — keep imports security-stable and use `{{#if experiments.<name> }}` with `{{#runtime-import? path}}` (optional form, not promoted to unconditional lock-file macros) for prompt experiments instead.
+- ❌ **Nesting `{{#if experiments.<name> }}` inside `{{#runtime-import? }}`** — evaluation order is brittle across import boundaries. Prefer explicit branching in the main workflow prompt or separate workflow files per variant.
+- ❌ **Writing the internal env-var form** `__GH_AW_EXPERIMENTS__*` — implementation detail, may change.
+
+Later sections: dimension catalog, minimal working example, multiple experiments, lifecycle, and `continual:` ramps (experimental). Read **Lifecycle** before concluding an experiment and **Continual Experiment Ramps** before adding `continual:`.
+
+<!-- instruction-prefix-end -->
+
+---
+
 ## Dimensions Worth Experimenting On
 
 ### Prompt Design
@@ -157,8 +174,6 @@ experiments:
 ```
 
 Use `{{#if experiments.prompt_style == "concise" }}` blocks to swap prompt instructions. Always compare against a specific variant value.
-
-> ⚠️ **Never write** the internal env-var form `__GH_AW_EXPERIMENTS__PROMPT_STYLE___detailed`. The compiler expands `experiments.<name>` references automatically.
 
 **Typical metrics**: output quality, AI credits, success rate, output length.
 
@@ -316,16 +331,3 @@ the stage, assignment counts, active weights, and selected variant.
 The ramp only changes candidate traffic; it does not evaluate outcomes or promote a
 winner. Use the existing experiment analysis commands and metrics to decide whether
 to stop the experiment or make a variant permanent.
-
----
-
-## Anti-Patterns
-
-- ❌ **Multiple dimensions in one experiment** — can't attribute the improvement.
-- ❌ **Removing `experiments:` before sample size reached** — resets state, invalidates counts.
-- ❌ **Interpreting early results** (<~20 runs/variant) — chance variation dominates.
-- ❌ **Experiments as feature flags** — use `features:` for deterministic switches.
-- ❌ **Engine experiments in one file** — `engine:` cannot switch mid-run; use two parallel files.
-- ❌ **Conditional frontmatter imports** — keep imports security-stable and use `{{#if experiments.<name> }}` with `{{#runtime-import? path}}` (optional form, not promoted to unconditional lock-file macros) for prompt experiments instead.
-- ❌ **Nesting `{{#if experiments.<name> }}` inside `{{#runtime-import? }}`** — evaluation order is brittle across import boundaries. Prefer explicit branching in the main workflow prompt or separate workflow files per variant.
-- ❌ **Writing the internal env-var form** `__GH_AW_EXPERIMENTS__*` — implementation detail, may change.

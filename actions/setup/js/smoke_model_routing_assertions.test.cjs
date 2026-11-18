@@ -789,15 +789,10 @@ describe("smoke_model_routing_assertions", () => {
 
     it("routed_codex_smoke_checks_proxy-selected effort: the workflow configures routed Codex on GitHub with gpt-5.6 candidates", () => {
       const workflow = fs.readFileSync(new URL("../../../.github/workflows/smoke-codex-routed.md", import.meta.url), "utf8");
-      const engine = workflow
-        .split("\nengine:\n")[1]
-        .split("\n")
-        .filter(line => line.startsWith("  "))
-        .join("\n");
-      expect(engine).toContain("  id: codex");
-      expect(engine).toContain("  model-provider: github");
-      expect(engine).toContain("    mode: robust");
-      expect(engine).toMatch(/\n {2}model-routing:\n(?: {4}.*\n)* {4}allowed-models: \[gpt-5\.6-luna, gpt-5\.6-terra, gpt-5\.6-sol\]/);
+      const frontmatter = workflow.split(/^---\r?$/m)[1];
+      expect(frontmatter).toMatch(/^engine:\r?\n  id: codex\r?\n  model-provider: github$/m);
+      expect(frontmatter).toMatch(/^model: router\/robust$/m);
+      expect(frontmatter).toMatch(/^model-routing:\r?\n  allowed-models: \[gpt-5\.6-luna, gpt-5\.6-terra, gpt-5\.6-sol\]$/m);
       expect(workflow).toContain('engine: "codex"');
       expect(workflow).toContain('allowedModels: ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]');
       expect(workflow).toContain('mainEndpoint: "/responses"');

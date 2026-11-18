@@ -60,6 +60,18 @@ describe("visual regression workflow contract", () => {
     expect(workflow).not.toMatch(/playwright-cli browser_/);
   });
 
+  it("inspects a large accessibility tree with a saved snapshot and ranged reads, not a shell pipeline", () => {
+    const capture = workflow.match(/`(playwright-cli snapshot --filename=(\/tmp\/gh-aw\/agent\/[\w.-]+))`/);
+    expect(capture).not.toBeNull();
+    const [, command, snapshotPath] = capture;
+    const config = JSON.parse(compiledWorkflow.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/)[1]);
+    const handler = buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));
+    expect(handler({ kind: "shell", fullCommandText: command }).kind).toBe("approve-once");
+    expect(handler({ kind: "read", path: snapshotPath }).kind).toBe("approve-once");
+    expect(workflow).toMatch(/native `view` tool.*`view_range: \[1, 60\]`.*to EOF/);
+    expect(handler({ kind: "shell", fullCommandText: `cd /tmp/gh-aw/agent && grep -n heading ${snapshotPath} | head -80` }).kind).toBe("reject");
+  });
+
   it("permits standalone readiness and browser calls while rejecting observed helper chains", () => {
     const config = JSON.parse(compiledWorkflow.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/)[1]);
     const handler = buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));

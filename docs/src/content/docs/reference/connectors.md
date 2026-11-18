@@ -75,6 +75,7 @@ credential references are removed from the agent snapshot.
 | Linear | `tools.linear: [get-issue]` | `linear-add-comment` | One reader and one effect |
 | Jira | `tools.jira: {personal: [getJiraIssue]}` | `jira-add-comment` | One reader and one effect |
 | Azure DevOps | `tools.azure-devops: [get-work-item-description]` | `azure-devops-comment-on-work-item` | One reader and one effect |
+| Web IQ | `tools.azure-web-iq: {search: [web]}` | `create-issue` (GitHub handoff) | One native reader; no provider writer |
 | Foundry IQ | `tools.azure-foundry-iq: {knowledge-base: [knowledge_base_retrieve]}` | GitHub `create-issue`, staged | One read-only native method; no provider writer |
 
 Place effect selections under `safe-outputs`. Targeted HTTP MCP mappings select only
@@ -121,6 +122,7 @@ duplicate detection.
 | Zendesk | Unresolved-ticket metadata to a private engineering-ownership handoff | [zendesk-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/zendesk-golden.md) |
 | Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/notion-golden.md) |
 | Asana | Approved task description to a staged next-step comment | [asana-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md) |
+| Web IQ | Approved public web and news query to a cited research handoff | [azure-web-iq-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-web-iq-golden.md) |
 | Foundry IQ | Approved knowledge-base rollback guidance to a cited GitHub handoff | [azure-foundry-iq-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-foundry-iq-golden.md) |
 
 All effects are staged by default; reads still need provider credentials. To adopt a
@@ -957,6 +959,55 @@ scope labels. `gh aw connector asana setup` prints the renewal steps. The connec
 task updates, attachments, search, threaded replies, or webhook receiver. The
 [golden consumer](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md) stages one next-step
 suggestion. Offline compilation and mocks do not establish live authorization or delivery.
+
+## Microsoft Web IQ
+
+Declaration: `.github/workflows/connectors/azure-web-iq.md`.
+
+The [Web IQ MCP server](https://learn.microsoft.com/en-us/web-iq/integrations/mcp) exposes native
+`web`, `news` and `browse` methods through the fixed `https://api.microsoft.ai/v3/mcp` endpoint.
+Select exact methods with `tools.azure-web-iq: {search: [web, news, browse]}`. Bind approved query strings
+through `with.queries` and operator-approved public HTTPS browse URLs through `with.urls`; defaults grant nothing.
+Search results never add browse grants. These independent allowlists permit any approved query with
+any approved URL; queries do not restrict search-result domains.
+
+At call time, queries must be nonblank and at most 1000 characters; browse URLs must be HTTPS,
+at most 2048 characters, and have no empty host, authority userinfo or fragment, even if explicitly granted.
+Import validation checks string item types, not these string constraints.
+Paths and queries remain supported and are sent in full; validation does not detect secret-bearing
+names or values. Operators must review every grant for disclosure. URL syntax checks do not classify
+IP addresses or resolve DNS, and this declaration makes no provider-side private-destination
+filtering guarantee.
+
+Search requires `query`, `maxResults` (1–10), `contentFormat: passage` and `maxLength` (1–3000).
+`web` also requires `safeSearch: strict`; `news` optionally accepts `freshness` as `day`, `week`,
+`month` or `year`. Browse requires `url`, an approved nonblank `query`, `contentFormat: passage`,
+`maxLength` (1–3000) and `liveCrawl: none`. The [documented `none` mode](https://learn.microsoft.com/en-us/web-iq/reference/browse#parameters)
+returns indexed content without a live crawl, or 404 if the URL is not indexed. The local adapter
+contacts only the fixed MCP endpoint, not the browse URL. The response byte limit is 131072. The shared hosted
+adapter does not independently validate result fields, counts, freshness or returned URL identity.
+Treat passages as untrusted excerpts and check browse identity and usable content before relying on them.
+
+The connector's XML documentation is stripped from prompts, not applied as a runtime policy.
+The example consumer prompts prohibit following result instructions or links and changing policy or privileges,
+but the hosted adapter does not deterministically strip instructions or isolate passages from model
+reasoning. Prompt injection can still influence staged proposals. Independently verify claims before
+publishing or acting on a handoff; staging is neither verification nor content isolation.
+
+[Authentication](https://learn.microsoft.com/en-us/web-iq/get-started/authentication) requires an
+externally acquired and renewed Entra app-only access token for `https://api.microsoft.ai/.default`.
+Provision a paid Azure Web IQ resource, connect it in the Web IQ portal, bind an Entra client ID to
+exactly one Web IQ AppID, and enable the selected services. Store the unprefixed token as
+`AZURE_WEB_IQ_READ_ACCESS_TOKEN`; `reader-secret` overrides only its name. Multi-AppID selection and API
+keys are unsupported: the documented `x-apikey` header differs from the contract's `X-API-Key`.
+There is no token exchange, renewal or credential fallback.
+
+The [golden consumer](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-web-iq-golden.md)
+stages one cited GitHub research issue from web and news passages. Staging suppresses publication,
+not billable reads or inference. Approve disclosure of queries, URLs and returned passages; Zero
+Query Logging is not enabled by this connector. No Auto/Auto Advanced, full-page formats, live
+crawling, named-scope management, China endpoint, provider mutation or trigger is declared.
+Compilation and mocks establish neither live access, completeness, freshness nor research quality.
 
 ## Validation and runtime boundaries
 
