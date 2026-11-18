@@ -17545,7 +17545,7 @@
       g += `<g data-s="0"><rect x="0" y="${y}" width="280" height="56" rx="28" fill="#161b22" stroke="${c}" stroke-width="2"${kind === 2 ? ` stroke-dasharray="8 6"` : ""}/><text class="m" x="24" y="${y + 34}" style="fill:${c}">${t}</text></g>`;
       g += `<path class="ln" data-s="1" data-p="1" data-c="${c}" d="M280 ${y + 28} C330 ${y + 28} 330 230 380 230" style="stroke:${c}66;stroke-width:2"/>`;
     });
-    g += `<g data-s="0" style="--hc:#4493f8"><rect class="card" x="380" y="40" width="440" height="380" rx="16" style="stroke:#4493f8;stroke-width:2.5"/><text class="k" x="404" y="78" style="fill:#4493f8">hosted CAO receiver</text><text x="404" y="106">deployment-owned, not in gh-aw</text></g>`;
+    g += `<g data-s="0" style="--hc:#4493f8"><rect class="card" x="380" y="40" width="440" height="380" rx="16" style="stroke:#4493f8;stroke-width:2.5"/><text class="k" x="404" y="78" style="fill:#4493f8">hosted CAO receiver</text><text x="404" y="106">research prototype · not in gh-aw</text></g>`;
     [
       ["authenticate each delivery", 2],
       ["match compiled subscriptions", 3],
@@ -17590,7 +17590,7 @@
       group: "enterprise",
       experimental: "hosted receiver required",
       notes:
-        "What: Experimental, with synthetic events and an illustrative flow; this is not the MCP gateway. A workflow subscribes to GitHub, Jira or Linear events. A hosted receiver, which gh-aw doesn't ship, batches matching deliveries into a restricted repository dispatch; a compiled provenance job verifies the sending App and an OpenID Connect (OIDC) admission check before the agent reads the batch as untrusted input.\nWhy: Some events have no Actions trigger. Your deployment owns receiver, App and dispatch authority; the docs advise keeping it non-activating until that contract is enforced.\nWhen: Only if you can operate the receiver.",
+        "What: Experimental, with synthetic events and an illustrative flow; this is not the MCP gateway. A workflow subscribes to GitHub, Jira or Linear events. A hosted receiver, a gh cao research prototype that gh-aw doesn't ship, batches matching deliveries into a restricted repository dispatch; a compiled provenance job verifies the sending App and an OpenID Connect (OIDC) admission check before the agent reads the batch as untrusted input.\nWhy: Some events have no Actions trigger. Your deployment owns receiver, App and dispatch authority; the docs advise keeping it non-activating until that contract is enforced.\nWhen: Only if you can operate the receiver.",
       enter: () => stage.enter(),
       tick: t => stage.tick(t),
       el,
