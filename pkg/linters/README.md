@@ -90,6 +90,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `stringsindexcontains` — reports `strings.Index(s, substr)` comparisons with `-1` or `0` (e.g. `!= -1`, `>= 0`, `> -1`, `== -1`, `< 0`, `<= -1`) and their yoda-order variants that should use `strings.Contains(s, substr)` or `!strings.Contains(s, substr)` instead.
 - `stringsindexhasprefix` — reports `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) and their yoda-order variants that should use `strings.HasPrefix(s, sub)` or `!strings.HasPrefix(s, sub)` instead.
 - `stringsjoinone` — reports `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is never used and the call is equivalent to just `s`.
+- `strings-compare-in-sortfunc` — reports `strings.Compare(a, b)` used as the sole result of a `slices.SortFunc`/`SortStableFunc`/`MinFunc`/`MaxFunc`/`BinarySearchFunc` comparator; use `cmp.Compare(a, b)`.
 - `stringssplitfirst` — reports `strings.Split(s, sep)[0]` with a constant non-empty separator; use `strings.Cut` to read the first segment without allocating a slice.
 - `timeafterleak` — reports `time.After` calls used as the channel-receive expression in a `select` case inside a `for` or `range` loop that leak a timer channel on each iteration when another case fires first.
 - `timesleepnocontext` — reports `time.Sleep` calls inside functions that already receive a `context.Context`, where a context-aware `select` should be used instead.
@@ -271,6 +272,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `stringsindexcontains` | Custom `go/analysis` analyzer that flags `strings.Index(s, substr)` comparisons with `-1` or `0` that should use `strings.Contains` or `!strings.Contains` |
 | `stringsindexhasprefix` | Custom `go/analysis` analyzer that flags `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) that should use `strings.HasPrefix` or `!strings.HasPrefix` |
 | `stringsjoinone` | Custom `go/analysis` analyzer that flags `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is unused and the call is equivalent to just `s` |
+| `strings-compare-in-sortfunc` | Custom `go/analysis` analyzer that flags `strings.Compare` as the sole result of a slices comparator function literal |
 | `stringssplitfirst` | Custom `go/analysis` analyzer that flags `strings.Split(s, sep)[0]` with a constant non-empty separator |
 | `timeafterleak` | Custom `go/analysis` analyzer that flags `time.After` in `select` cases inside loops that leak a timer channel on each iteration when another case fires first |
 | `timesleepnocontext` | Custom `go/analysis` analyzer that flags `time.Sleep` calls in context-aware functions |
@@ -329,6 +331,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/sprintfint"
 	"github.com/github/gh-aw/pkg/linters/splitlines-on-newline"
 	"github.com/github/gh-aw/pkg/linters/ssljson"
+	"github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc"
 	"github.com/github/gh-aw/pkg/linters/stringssplitfirst"
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
@@ -365,6 +368,7 @@ _ = sprintfbool.Analyzer
 _ = sprintfint.Analyzer
 _ = splitlinesonnewline.Analyzer
 _ = ssljson.Analyzer
+_ = stringscompareinsortfunc.Analyzer
 _ = stringssplitfirst.Analyzer
 _ = timesleepnocontext.Analyzer
 _ = trimleftright.Analyzer
@@ -437,6 +441,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/stringsindexcontains` — strings-index-contains analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsindexhasprefix` — strings-index-has-prefix analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsjoinone` — strings-join-one analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc` — strings-compare-in-sortfunc analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringssplitfirst` — strings-split-first analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timeafterleak` — time-after-leak analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage

@@ -55,6 +55,7 @@ var notYetEnforced = map[string]string{
 	"seenmapbool":                      "existing production violations need remediation",
 	"sortbasicslices":                  "existing production violations need remediation before CI enforcement",
 	"splitindexzero":                   "existing production violations need remediation before CI enforcement",
+	"stringscompareinsortfunc":         "existing production violations need remediation before CI enforcement",
 	"splitlinesonnewline":              "existing production violations need remediation before CI enforcement",
 	"stringssplitfirst":                "existing production violations need remediation before CI enforcement",
 	"sprintferrdot":                    "has not yet completed an enforcement-readiness audit",
@@ -301,6 +302,8 @@ func docSlugToAnalyzerName(slug string) string {
 	switch slug {
 	case "panic-in-library-code":
 		return "panicinlibrarycode"
+	case "strings-compare-in-sortfunc":
+		return "stringscompareinsortfunc"
 	case "splitlines-on-newline":
 		return "splitlinesonnewline"
 	default:

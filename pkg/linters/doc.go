@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 98 active analyzers:
+// All 99 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -84,6 +84,7 @@
 //   - stringsindexcontains — flags strings.Index(s, substr) comparisons that should use strings.Contains
 //   - stringsindexhasprefix — reports strings.Index(s, sub) comparisons with 0 (== 0 and != 0) and their yoda-order variants that should use strings.HasPrefix(s, sub) or !strings.HasPrefix(s, sub)
 //   - stringsjoinone — flags strings.Join([]string{s}, sep) calls with a single-element slice literal where the separator is unused and the call is equivalent to just s
+//   - strings-compare-in-sortfunc — reports strings.Compare(a, b) used as the sole result of a slices.SortFunc/SortStableFunc/MinFunc/MaxFunc/BinarySearchFunc comparator; use cmp.Compare
 //   - stringssplitfirst — flags strings.Split(s, sep)[0] with a constant non-empty separator; use strings.Cut to read the first segment without allocating a slice
 //   - timeafterleak — flags time.After in select cases inside loops that leak timer channels
 //   - timesleepnocontext — flags time.Sleep calls in context-aware functions that should propagate cancellation

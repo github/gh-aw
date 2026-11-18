@@ -80,6 +80,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/strconvparseignorederror"
 	"github.com/github/gh-aw/pkg/linters/stringbytesroundtrip"
 	"github.com/github/gh-aw/pkg/linters/stringreplaceminusone"
+	stringscompareinsortfunc "github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc"
 	"github.com/github/gh-aw/pkg/linters/stringsconcatloop"
 	"github.com/github/gh-aw/pkg/linters/stringscountcontains"
 	"github.com/github/gh-aw/pkg/linters/stringsindexcontains"
@@ -190,6 +191,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringsindexhasprefix.Analyzer,
 	stringsjoinone.Analyzer,
 	stringssplitfirst.Analyzer,
+	stringscompareinsortfunc.Analyzer,
 	stringscountcontains.Analyzer,
 	jsondecodertrailingdataunchecked.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
