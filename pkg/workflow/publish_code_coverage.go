@@ -138,7 +138,18 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 		return nil, errors.New("safe-outputs.upload-code-coverage configuration is required")
 	}
 	permissions := NewPermissionsContentsReadCodeQualityWritePRRead()
-	steps := c.buildUploadCodeCoverageSteps(data, permissions)
+	if data.SafeOutputs.AuthorizationRequirements["upload_code_coverage"] != nil &&
+		isSafeOutputHandlerEnabledAndUnstaged(data.SafeOutputs, "UploadCodeCoverage") {
+		permissions.Set(PermissionScope("id-token"), PermissionWrite)
+	}
+	steps, err := c.buildUploadCodeCoverageSteps(data, permissions)
+	if err != nil {
+		return nil, err
+	}
+	var jobEnv map[string]string
+	if safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		jobEnv = c.buildJobLevelSafeOutputEnvVars(data, GetWorkflowIDFromPath(c.markdownPath))
+	}
 	jobCondition := fmt.Sprintf("needs.%s.outputs.upload_code_coverage_file != ''", constants.SafeOutputsJobName)
 	job := &Job{
 		Name:           string(constants.UploadCodeCoverageJobName),
@@ -149,18 +160,24 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 		TimeoutMinutes: 10,
 		Steps:          steps,
 		Needs:          []string{mainJobName, string(constants.SafeOutputsJobName)},
+		Env:            jobEnv,
 	}
 	publishCodeCoverageLog.Print("Built upload_code_coverage job")
 	return job, nil
 }
 
-func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions *Permissions) []string {
+func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions *Permissions) ([]string, error) {
 	cfg := data.SafeOutputs.UploadCodeCoverage
 	// Artifact prefix for workflow_call context: this job depends directly on the agent job,
 	// so it must use the agent-job-relative prefix expression (mirrors upload_assets).
 	agentArtifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
 
 	var steps []string
+	authorizationRequired := data.SafeOutputs.AuthorizationRequirements["upload_code_coverage"] != nil
+	if authorizationRequired {
+		steps = append(steps, c.buildSafeOutputsSetupSteps(data)...)
+		steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
+	}
 
 	// Download the coverage staging artifact produced by the agent job.
 	const downloadStepID = "download_upload_code_coverage_staging"
@@ -187,13 +204,19 @@ func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions 
 	tokenSteps, coverageToken := c.buildUploadCodeCoverageToken(data, permissions)
 	steps = append(steps, tokenSteps...)
 
-	steps = append(steps, "      - name: Verify code coverage report\n")
-	steps = append(steps, "        env:\n")
-	steps = append(steps, fmt.Sprintf("          COVERAGE_FILE: %s\n", localCoveragePath))
-	steps = append(steps, "        run: |\n")
-	steps = append(steps, "          test -s \"$COVERAGE_FILE\"\n")
+	steps = append(steps, buildVerifyCodeCoverageReportStep(localCoveragePath)...)
+	if authorizationRequired {
+		gate, err := c.buildUploadCodeCoverageAuthorizationSteps(data)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, gate...)
+	}
 	steps = append(steps, "      - name: Upload code coverage report\n")
 	steps = append(steps, fmt.Sprintf("        id: %s\n", constants.UploadCodeCoverageJobName))
+	if authorizationRequired {
+		steps = append(steps, "        if: steps.authorize_upload_code_coverage.outputs.authorized == 'true'\n")
+	}
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-code-coverage")))
 	steps = append(steps, "        with:\n")
 	steps = append(steps, fmt.Sprintf("          file: %s\n", localCoveragePath))
@@ -203,7 +226,32 @@ func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions 
 	steps = append(steps, "          # Timeout is in seconds; 160 matches actions/upload-code-coverage's documented default.\n")
 	steps = append(steps, fmt.Sprintf("          wait-for-processing-timeout: %d\n", waitForProcessingTimeout))
 	steps = append(steps, fmt.Sprintf("          token: %s\n", coverageToken))
-	return steps
+	if authorizationRequired {
+		steps = append(steps, c.buildAuthorizationEvidenceUploadStep(data, "upload_code_coverage")...)
+	}
+	return steps, nil
+}
+
+func buildVerifyCodeCoverageReportStep(path string) []string {
+	return []string{
+		"      - name: Verify code coverage report\n",
+		"        env:\n",
+		fmt.Sprintf("          COVERAGE_FILE: %s\n", path),
+		"        run: |\n",
+		"          test -s \"$COVERAGE_FILE\"\n",
+	}
+}
+
+func (c *Compiler) buildUploadCodeCoverageAuthorizationSteps(data *WorkflowData) ([]string, error) {
+	cfg := data.SafeOutputs.UploadCodeCoverage
+	payload := "${{ format('{{\"file\":{0},\"language\":{1},\"label\":{2}}}', toJSON(needs.safe_outputs.outputs.upload_code_coverage_file), toJSON(needs.safe_outputs.outputs.upload_code_coverage_language), toJSON(needs.safe_outputs.outputs.upload_code_coverage_label)) }}"
+	gate, err := c.buildAuthorizationGateStep(data, "upload_code_coverage", "standalone",
+		map[string]any{"action": c.getActionPin("actions/upload-code-coverage"), "config": cfg}, cfg.Staged,
+		authorizationGateOptions{Payload: payload, OutputPath: "${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}", ArtifactRoot: codeCoverageDownloadPath})
+	if err != nil {
+		return nil, err
+	}
+	return gate, nil
 }
 
 func (c *Compiler) buildUploadCodeCoverageToken(data *WorkflowData, permissions *Permissions) ([]string, string) {

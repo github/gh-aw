@@ -113,6 +113,9 @@ func runOrgRollout(ctx context.Context, org string, globs []string, cbs orgRunCa
 			fmt.Fprintln(os.Stderr, "Could not remove rollout API cache: "+err.Error())
 		}
 	}()
+	if err := prepareOrgRolloutReleaseHighlights(ctx, opts); err != nil {
+		return err
+	}
 	var results []orgRolloutResult
 	if opts.interactive {
 		results, err = runOrgRolloutTUI(ctx, rows, opts)

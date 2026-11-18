@@ -16,6 +16,12 @@ const (
 	OTelAttrGhAwWorkingSetInvocations                  = "gh-aw.working_set.invocations"
 	OTelAttrGhAwWorkingSetPeakInputTokens              = "gh-aw.working_set.peak_input_tokens"
 	OTelAttrGhAwWorkingSetRebuildExcessTokens          = "gh-aw.working_set.rebuild_excess_tokens"
+	OTelAttrGhAwSafeOutputGatePhase                    = "gh-aw.safe_output.gate.phase"
+	OTelAttrGhAwSafeOutputGateState                    = "gh-aw.safe_output.gate.state"
+	OTelAttrGhAwSafeOutputGateReasonCode               = "gh-aw.safe_output.gate.reason_code"
+	OTelAttrGhAwSafeOutputGateExecutor                 = "gh-aw.safe_output.gate.executor"
+	OTelAttrGhAwSafeOutputGateBinding                  = "gh-aw.safe_output.gate.binding"
+	OTelAttrGhAwSafeOutputGateRequirementSource        = "gh-aw.safe_output.gate.requirement_source"
 	OTelAttrGhAwWorkQueueOperation                     = "gh-aw.work_queue.operation"
 	OTelAttrGhAwWorkQueuePublicationAttempts           = "gh-aw.work_queue.publication.attempts"
 	OTelAttrGhAwWorkQueuePublicationConflict           = "gh-aw.work_queue.publication.conflict"
@@ -219,6 +225,12 @@ var otelAttributeNamesByValue = map[string]string{
 	"gh-aw.working_set.invocations":                     "gh-aw.working_set.invocations",
 	"gh-aw.working_set.peak_input_tokens":               "gh-aw.working_set.peak_input_tokens",
 	"gh-aw.working_set.rebuild_excess_tokens":           "gh-aw.working_set.rebuild_excess_tokens",
+	"gh-aw.safe_output.gate.phase":                      "gh-aw.safe_output.gate.phase",
+	"gh-aw.safe_output.gate.state":                      "gh-aw.safe_output.gate.state",
+	"gh-aw.safe_output.gate.reason_code":                "gh-aw.safe_output.gate.reason_code",
+	"gh-aw.safe_output.gate.executor":                   "gh-aw.safe_output.gate.executor",
+	"gh-aw.safe_output.gate.binding":                    "gh-aw.safe_output.gate.binding",
+	"gh-aw.safe_output.gate.requirement_source":         "gh-aw.safe_output.gate.requirement_source",
 	"gh-aw.work_queue.operation":                        "gh-aw.work_queue.operation",
 	"gh-aw.work_queue.publication.attempts":             "gh-aw.work_queue.publication.attempts",
 	"gh-aw.work_queue.publication.conflict":             "gh-aw.work_queue.publication.conflict",
