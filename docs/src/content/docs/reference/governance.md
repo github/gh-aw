@@ -149,7 +149,7 @@ Authorization can be centralized in a shared agentic workflow imported through
 `imports`. A policy-only shared file can declare `safe-outputs.authorization`;
 the requirement also covers eligible outputs declared by its consumers.
 Direct and nested imports preserve local requirements, and conflicting
-authorities fail compilation. See the [shared import example](../../specs/safe-outputs-specification/#safe-output-invocation-authorization).
+authorities fail compilation. See the [shared import example](../specs/safe-outputs-specification/#safe-output-invocation-authorization).
 
 For repository-wide authorization, set this in `.github/workflows/aw.json` and
 recompile:
@@ -189,7 +189,7 @@ included. Protect workflow configuration and credentials independently. This
 opt-in client gate is not an organization-wide enforcement or credential-custody
 boundary, and target-side controls remain necessary for atomicity and revocation.
 
-See the [authorization contract](../../specs/safe-outputs-specification/#safe-output-invocation-authorization)
+See the [authorization contract](../specs/safe-outputs-specification/#safe-output-invocation-authorization)
 for protocol limits, execution coverage and evidence states.
 
 ## Runtime Policy Variables

@@ -417,11 +417,10 @@ Greet the user warmly.
 	)
 	compiler.gitRoot = gitRoot
 	workflowData, err := compiler.ParseWorkflowString(markdown, "workflow.md")
-	require.NoError(t, err)
-
-	_, err = compiler.CompileToYAML(workflowData, "workflow.md")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to load aw.json")
+	if err == nil {
+		_, err = compiler.CompileToYAML(workflowData, "workflow.md")
+	}
+	require.ErrorContains(t, err, "cannot resolve repository safe-output authorization")
 }
 
 func TestCompileToYAML_GHESCompatPinsStringAPI(t *testing.T) {

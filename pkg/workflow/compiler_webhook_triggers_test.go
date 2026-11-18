@@ -287,7 +287,7 @@ func TestWebhookRepoConfigValidation(t *testing.T) {
 			compiler := NewCompiler()
 			compiler.gitRoot = root
 			_, err = compiler.ParseWorkflowString(webhookWorkflow("on:\n  gateway-dispatch:\n    dependabot-alerts: {}\n"), "invalid-cao.md")
-			require.ErrorContains(t, err, "cannot enable hosted CAO triggers")
+			require.ErrorContains(t, err, "cannot resolve repository safe-output authorization")
 		})
 	}
 }

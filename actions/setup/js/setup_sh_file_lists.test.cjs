@@ -258,8 +258,8 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
     expect(missing).toEqual([]);
   });
 
-  it("does not deploy files that call core.setSecret", () => {
-    expect(filesCallingCoreSetSecret(mcpScriptsFiles)).toEqual([]);
+  it("limits core.setSecret use to the trusted authorization client", () => {
+    expect(filesCallingCoreSetSecret(mcpScriptsFiles)).toEqual(["safe_output_authorization.cjs"]);
   });
 });
 
@@ -376,8 +376,8 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
     expect(missing).toEqual([]);
   });
 
-  it("does not deploy files that call core.setSecret", () => {
-    expect(filesCallingCoreSetSecret(safeOutputsRoots)).toEqual([]);
+  it("limits core.setSecret use to the trusted authorization client", () => {
+    expect(filesCallingCoreSetSecret(safeOutputsRoots)).toEqual(["safe_output_authorization.cjs"]);
   });
 
   it("copies safe_outputs_tools.json to both safe_outputs_tools.json and tools.json", () => {
