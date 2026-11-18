@@ -48,6 +48,7 @@ describe("CLI proxy diagnostic redaction", () => {
       "docker",
       `printf '%s\\n' "$*" >> "$TEST_CALLS"
 case "$1" in
+  port) printf '0.0.0.0:23456\\n' ;;
   run)
     if [ "$TEST_OVERSIZED_RUN" = true ]; then
       "$TEST_NODE" -e 'process.stdout.write("x".repeat(2 * 1024 * 1024) + process.env.GH_TOKEN + "\\n")'
@@ -114,6 +115,8 @@ exec /bin/rm "$@"`
         PATH: `${root}:${path.dirname(process.execPath)}:${process.env.PATH}`,
         TMPDIR: artifactRoot,
         RUNNER_TEMP: runnerTemp,
+        GITHUB_ENV: path.join(root, "github-env"),
+        GH_AW_NETWORK_ISOLATION: options.networkIsolation === false ? "false" : "true",
         GH_TOKEN: custom,
         CLI_PROXY_IMAGE: options.noImage ? "" : "synthetic-proxy:latest",
         GITHUB_SERVER_URL: "https://github.com",
@@ -176,9 +179,21 @@ exec /bin/rm "$@"`
   it("preserves successful startup and only publishes sanitized output", () => {
     const result = runProxy({ ready: true });
     expect(result.status).toBe(0);
-    expect(result.output).toContain("CLI proxy ready on port 18443");
+    expect(result.output).toContain("CLI proxy ready on port 23456");
     expect(result.output).toContain("connection refused: ***");
     expect(result.calls).not.toContain("logs awmg-cli-proxy");
+    expect(result.calls).toContain("--network bridge -p 127.0.0.1::18443");
+    expect(result.calls).toContain("port awmg-cli-proxy 18443/tcp");
+  });
+
+  it("preserves legacy host networking and its fixed port without publishing a new host interface", () => {
+    const result = runProxy({ ready: true, networkIsolation: false });
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("CLI proxy ready on port 18443");
+    expect(result.calls).toContain("--network host");
+    expect(result.calls).not.toContain("port awmg-cli-proxy");
+    expect(result.calls).not.toContain(" -p ");
+    expect(fs.readFileSync(path.join(root, "github-env"), "utf8")).toContain("GH_AW_CLI_PROXY_PORT=18443");
   });
 
   it("trusts Copilot reviews and agentic autofix PRs without disabling integrity filtering", () => {
@@ -224,7 +239,7 @@ exec /bin/rm "$@"`
       expect(probe).toContain("--max-time");
       expect(probe).toContain("--cacert");
     }
-    expect(probes[1]).toContain("https://localhost:18443/api/v3/rate_limit");
+    expect(probes[1]).toContain("https://localhost:23456/api/v3/rate_limit");
   });
 
   it("fails startup and removes the container when local health succeeds but upstream access fails", () => {
@@ -240,7 +255,7 @@ exec /bin/rm "$@"`
   it("retries a transient upstream failure and succeeds on the next probe", () => {
     const result = runProxy({ ready: true, upstreamFailCount: 1 });
     expect(result.status).toBe(0);
-    expect(result.output).toContain("CLI proxy ready on port 18443");
+    expect(result.output).toContain("CLI proxy ready on port 23456");
     expect(result.calls.split("\n").filter(line => line.includes("/rate_limit"))).toHaveLength(2);
     expect(result.calls.split("\n").filter(line => line === "rm -f awmg-cli-proxy")).toHaveLength(1);
   });

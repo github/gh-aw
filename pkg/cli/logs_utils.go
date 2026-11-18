@@ -160,9 +160,8 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 		// The engine's log path is absolute (e.g., /tmp/gh-aw/sandbox/agent/logs/ for a
 		// directory, or /tmp/gh-aw/pi-streaming.jsonl for a direct file).
 		// After flattening, it's at logDir/<relative-path>.
-		// Strip /tmp/gh-aw/ prefix to get the relative path
-		const tmpGhAwPrefix = "/tmp/gh-aw/"
-		if after, ok := strings.CutPrefix(logFileForParsing, tmpGhAwPrefix); ok {
+		// Both canonical engine paths and emitted private roots flatten identically.
+		if after, ok := flattenedAgentLogPath(logFileForParsing); ok {
 			relPath := after
 			flattenedPath := filepath.Join(logDir, relPath)
 			logsUtilsLog.Printf("Checking flattened location for logs: %s", flattenedPath)

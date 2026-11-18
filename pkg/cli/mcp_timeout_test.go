@@ -447,8 +447,12 @@ func TestMCPAuditPipeDrainTimeoutSummarizesReport(t *testing.T) {
 }
 
 func TestMCPAuditSkipsBaselineDiscovery(t *testing.T) {
-	assert.Contains(t, buildAuditCommandArgs(auditArgs{}, []string{"123"}), "--no-baseline")
-	assert.NotContains(t, buildAuditCommandArgs(auditArgs{}, []string{"123", "456"}), "--no-baseline")
+	single, err := buildAuditCommandArgs(auditArgs{}, []string{"123"})
+	require.NoError(t, err)
+	assert.Contains(t, single, "--no-baseline")
+	multiple, err := buildAuditCommandArgs(auditArgs{}, []string{"123", "456"})
+	require.NoError(t, err)
+	assert.NotContains(t, multiple, "--no-baseline")
 }
 
 func TestMCPAuditHandlerPassesNoBaselineBeforePositionals(t *testing.T) {

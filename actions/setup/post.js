@@ -1,6 +1,5 @@
 // Setup Activation Action - Post Step
-// Sends an OTLP conclusion span for the job. Shared legacy runtime paths have
-// no per-invocation ownership record and must not be reclaimed by this step.
+// Sends a conclusion span and reclaims only captured invocation-owned state.
 
 const path = require("path");
 const fs = require("fs");
@@ -84,28 +83,39 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
 
 // Wait for the OTLP span before completing the post step.
 (async () => {
+  if (process.platform === "win32") {
+    const result = require("./wsl.js").runInWSL("node", __filename);
+    if (result.error || result.status !== 0) console.warn(`Warning: private WSL runtime cleanup failed: ${result.error?.message || result.status}`);
+    return;
+  }
   // Send a gh-aw.<jobName>.conclusion span to the configured OTLP endpoint, if any.
   // Delegates to action_conclusion_otlp.cjs so that script mode (clean.sh) and
   // dev/release mode share the same implementation.  Non-fatal: errors are
   // handled inside sendJobConclusionSpan via console.warn.
   try {
-    const { run } = require(path.join(__dirname, "js", "action_conclusion_otlp.cjs"));
+    const setupRoot = process.env.STATE_GH_AW_SETUP_ROOT;
+    if (!setupRoot) throw new Error("No invocation-owned setup state");
+    require("./js/runtime_isolation.cjs").validateSetup(setupRoot, process.env.STATE_GH_AW_RUNTIME_TOKEN, process.env.STATE_GH_AW_SETUP_ID);
+    const conclusionScript = path.join(setupRoot, "actions", "action_conclusion_otlp.cjs");
+    const { run } = require(conclusionScript);
     await run();
   } catch {
     // Non-fatal: silently ignore any OTLP export errors in the post step.
   }
 
-  const tmpDir = "/tmp/gh-aw";
+  const tmpDir = process.env.STATE_GH_AW_RUNTIME_ROOT;
   const maxDebugDepth = 4;
   const maxDebugFiles = 200;
 
-  if (isDebugModeEnabled()) {
-    listTmpGhAwFiles(tmpDir, maxDebugDepth, maxDebugFiles);
-  }
-
-  if (fs.existsSync(tmpDir)) {
-    console.warn(`Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established.`);
+  if (tmpDir && isDebugModeEnabled()) {
+    try {
+      require("./js/runtime_isolation.cjs").validate(tmpDir, process.env.STATE_GH_AW_RUNTIME_TOKEN, process.env.STATE_GH_AW_RUNTIME_ID);
+      listTmpGhAwFiles(tmpDir, maxDebugDepth, maxDebugFiles);
+    } catch {
+      // Never inspect paths whose invocation ownership cannot be established.
+    }
   }
 
   cleanupRuntimeTmp();
+  require("./js/runtime_isolation.cjs").cleanup();
 })();

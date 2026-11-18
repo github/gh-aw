@@ -4,7 +4,7 @@ author: 'GitHub Next'
 
 inputs:
   destination:
-    description: 'Destination directory for activation files (default: ${RUNNER_TEMP}/gh-aw/actions)'
+    description: 'Destination inside the invocation-private GH_AW_SETUP_ROOT (default: ${GH_AW_SETUP_ROOT}/actions)'
     required: false
   safe-output-artifact-client:
     description: 'Deprecated no-op (artifact support is now built into setup action scripts)'

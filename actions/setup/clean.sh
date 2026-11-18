@@ -18,23 +18,26 @@ set +o histexpand
 
 set -e
 
-DESTINATION="${INPUT_DESTINATION:-${RUNNER_TEMP}/gh-aw/actions}"
+DESTINATION="${INPUT_DESTINATION:-${GH_AW_SETUP_ROOT:-${RUNNER_TEMP}/gh-aw}/actions}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNTIME_HELPER="${SCRIPT_DIR}/js/runtime_isolation.cjs"
 
 # Send OTLP job conclusion span (non-fatal).
 # Delegates to action_conclusion_otlp.cjs (same file used by actions/setup/post.js)
 # to keep dev/release and script mode behavior in sync.
-if command -v node &>/dev/null && [ -f "${DESTINATION}/action_conclusion_otlp.cjs" ]; then
+if [[ -n "${GH_AW_SETUP_ROOT:-}" ]] && node "${RUNTIME_HELPER}" validate-setup && [ -f "${DESTINATION}/action_conclusion_otlp.cjs" ]; then
   echo "Sending OTLP conclusion span..."
   node "${DESTINATION}/action_conclusion_otlp.cjs" || true
   echo "OTLP conclusion span step complete"
 fi
 
-# Shared legacy state has no per-invocation ownership record (mirrors post.js).
-tmpDir="/tmp/gh-aw"
-if [ -e "${tmpDir}" ] || [ -L "${tmpDir}" ]; then
-  echo "Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established." >&2
+if [[ "${GH_AW_SETUP_ACTION_COMPLETE:-}" == "true" ]]; then
+  echo "Deferring private runtime cleanup until action post steps have completed"
+  exit 0
 fi
 
 if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" && -f "${DESTINATION}/cleanup_runtime_tmp.sh" ]]; then
   bash "${DESTINATION}/cleanup_runtime_tmp.sh"
 fi
+
+node "${RUNTIME_HELPER}" cleanup

@@ -247,7 +247,7 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 			"      - name: Setup Scripts\n",
 			"        id: setup\n",
 			"        run: |\n",
-			"          bash /tmp/gh-aw/actions-source/actions/setup/setup.sh\n",
+			"          bash \"/tmp/gh-aw/actions-source/actions/setup/setup.sh\"\n",
 			"        env:\n",
 			fmt.Sprintf("          INPUT_DESTINATION: %s\n", destination),
 			"          INPUT_JOB_NAME: ${{ github.job }}\n",
@@ -380,7 +380,7 @@ func (c *Compiler) generateScriptModeCleanupStep() string {
 	step.WriteString("      - name: Clean Scripts\n")
 	step.WriteString("        if: always()\n")
 	step.WriteString("        run: |\n")
-	step.WriteString("          bash /tmp/gh-aw/actions-source/actions/setup/clean.sh\n")
+	step.WriteString("          bash \"/tmp/gh-aw/actions-source/actions/setup/clean.sh\"\n")
 	step.WriteString("        env:\n")
 	fmt.Fprintf(&step, "          INPUT_DESTINATION: %s\n", SetupActionDestination)
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")

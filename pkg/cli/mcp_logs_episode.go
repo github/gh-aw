@@ -33,7 +33,11 @@ func validateMCPEpisodeLogsArgs(args logsArgs) error {
 	return nil
 }
 
-func buildEpisodeLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, int, int) {
+func buildEpisodeLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, int, int, error) {
+	outputDir, err := cliRuntimePath(constants.TmpAwMcpLogsDir)
+	if err != nil {
+		return nil, 0, 0, err
+	}
 	count := effectiveMCPLogsToolCount(args.Count)
 	timeout := effectiveMCPLogsToolTimeoutMinutes(args.Timeout, count, "", "")
 	apiRequests := args.MaxAPIRequests
@@ -41,7 +45,7 @@ func buildEpisodeLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, 
 		apiRequests = 500
 	}
 	cmdArgs := []string{
-		"logs", "episode", "--json", "--output", constants.TmpAwMcpLogsDir,
+		"logs", "episode", "--json", "--output", outputDir,
 		"--max-runs", strconv.Itoa(count), "--max-api-requests", strconv.Itoa(apiRequests),
 		"--timeout", strconv.Itoa(timeout) + "m",
 	}
@@ -74,5 +78,5 @@ func buildEpisodeLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, 
 		cmdArgs = append(cmdArgs, "--end-date", args.EndDate)
 	}
 	cmdArgs = append(cmdArgs, "--", args.EpisodeRun)
-	return cmdArgs, count, timeout
+	return cmdArgs, count, timeout, nil
 }

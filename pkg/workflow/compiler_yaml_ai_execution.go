@@ -83,6 +83,7 @@ func componentExecutionEvidenceShellLines(component, state, filePath string) []s
 
 func injectComponentExecutionStartedInShellScript(command, component, filePath string) string {
 	var started strings.Builder
+	started.WriteString("unset GH_AW_RUNTIME_TOKEN GH_AW_RUNTIME_ID GH_AW_SETUP_ID\n")
 	for _, line := range componentExecutionEvidenceShellLines(component, "started", filePath) {
 		started.WriteString(line)
 		started.WriteByte('\n')
@@ -125,7 +126,7 @@ func injectComponentExecutionStarted(step GitHubActionStep, component, filePath 
 		}
 	}
 
-	startedLines := componentExecutionEvidenceShellLines(component, "started", filePath)
+	startedLines := append([]string{"unset GH_AW_RUNTIME_TOKEN GH_AW_RUNTIME_ID GH_AW_SETUP_ID"}, componentExecutionEvidenceShellLines(component, "started", filePath)...)
 	injected := make(GitHubActionStep, 0, typeutil.SafeAllocationCapacity(len(step), len(startedLines)))
 	injected = append(injected, step[:insertIndex]...)
 	for _, line := range startedLines {

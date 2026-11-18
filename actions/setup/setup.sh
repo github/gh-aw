@@ -30,14 +30,9 @@ debug_log() {
   fi
 }
 
-# Helper: create directories, using sudo on macOS where system directories are root-owned
+# Runtime directories are always owned by this invocation; never escalate cleanup.
 create_dir() {
-  if [[ "$(uname -s)" == "Darwin" ]] && [[ "$1" == /opt/* ]]; then
-    sudo mkdir -p "$1"
-    sudo chown -R "$(whoami)" "$1"
-  else
-    mkdir -p "$1"
-  fi
+  mkdir -p "$1"
 }
 
 # Git Bash does not automatically convert Windows environment-variable paths.
@@ -50,7 +45,31 @@ fi
 
 # GH_AW_ROOT uses RUNNER_TEMP for write access on both GitHub-hosted and self-hosted runners.
 # RUNNER_TEMP is guaranteed to be set by GitHub Actions and is always writable.
-GH_AW_ROOT="${RUNNER_TEMP_BASH}/gh-aw"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNTIME_HELPER="${SCRIPT_DIR}/js/runtime_isolation.cjs"
+RUNTIME_SETTINGS="$(node "${RUNTIME_HELPER}" allocate)"
+# Paths come from a validated, private allocation. Preserve spaces in RUNNER_TEMP.
+RUNTIME_VALUES=()
+while IFS= read -r value; do
+  RUNTIME_VALUES+=("${value}")
+done <<< "${RUNTIME_SETTINGS}"
+GH_AW_RUNTIME_ROOT="${RUNTIME_VALUES[0]}"
+GH_AW_RUNTIME_TOKEN="${RUNTIME_VALUES[1]}"
+GH_AW_RESOURCE_SUFFIX="${RUNTIME_VALUES[2]}"
+GH_AW_RUNTIME_ID="${RUNTIME_VALUES[3]}"
+GH_AW_SETUP_ROOT="${RUNTIME_VALUES[4]}"
+GH_AW_SETUP_ID="${RUNTIME_VALUES[5]}"
+export GH_AW_RUNTIME_ROOT GH_AW_RUNTIME_TOKEN GH_AW_RESOURCE_SUFFIX GH_AW_RUNTIME_ID GH_AW_SETUP_ROOT GH_AW_SETUP_ID
+GH_AW_ROOT="${GH_AW_SETUP_ROOT}"
+
+# A failed setup cannot rely on its post action having been registered.
+cleanup_failed_setup() {
+  local status=$?
+  if [[ "$status" != 0 ]]; then
+    node "${RUNTIME_HELPER}" cleanup || true
+  fi
+}
+trap cleanup_failed_setup EXIT
 
 # Verify RUNNER_TEMP is set and the directory has write access
 if [ -z "${RUNNER_TEMP_BASH}" ]; then
@@ -69,18 +88,9 @@ if [ ! -w "${RUNNER_TEMP_BASH}" ]; then
   exit 1
 fi
 
-# Detect tree collision: RUNNER_TEMP must not resolve to /tmp.
-# gh-aw mounts ${RUNNER_TEMP}/gh-aw read-only (setup tree) and /tmp/gh-aw read-write
-# (runtime tree). When RUNNER_TEMP=/tmp both paths collapse into /tmp/gh-aw, giving
-# the agent write access to compiled scripts, prompts, and MCP configs that must stay
-# immutable. Fail fast here rather than silently running with a broken security boundary.
 RESOLVED_RUNNER_TEMP="$(cd "${RUNNER_TEMP_BASH}" && pwd -P)"
 if [ -z "${RESOLVED_RUNNER_TEMP}" ]; then
   echo "::error::Failed to resolve canonical path for RUNNER_TEMP: ${RUNNER_TEMP_BASH}"
-  exit 1
-fi
-if [ "${RESOLVED_RUNNER_TEMP%/}" = "/tmp" ]; then
-  echo "::error::RUNNER_TEMP resolves to /tmp, which conflicts with gh-aw's runtime tree (/tmp/gh-aw). Please configure your self-hosted runner with a different temp directory to maintain security isolation. See: https://docs.github.com/en/actions/hosting-your-own-runners"
   exit 1
 fi
 
@@ -91,6 +101,11 @@ DESTINATION="${INPUT_DESTINATION:-${GH_AW_ROOT}/actions}"
 if [[ "$(uname -o 2>/dev/null)" == "Msys" ]] && command -v cygpath >/dev/null 2>&1; then
   DESTINATION="$(cygpath -u "${DESTINATION}")"
 fi
+case "${DESTINATION}" in
+  "${GH_AW_ROOT}/"*) ;;
+  *) echo "::error::Setup destination must be inside GH_AW_SETUP_ROOT"; exit 1 ;;
+esac
+node "${RUNTIME_HELPER}" destination "${DESTINATION}"
 
 # Get safe-output-custom-tokens flag from input (default: false)
 SAFE_OUTPUT_CUSTOM_TOKENS_ENABLED="${INPUT_SAFE_OUTPUT_CUSTOM_TOKENS:-false}"
@@ -101,34 +116,6 @@ debug_log "Safe-output custom tokens support: ${SAFE_OUTPUT_CUSTOM_TOKENS_ENABLE
 # Create destination directory if it doesn't exist
 create_dir "${DESTINATION}"
 debug_log "Created directory: ${DESTINATION}"
-
-# Remove and recreate /tmp/gh-aw directory to ensure a clean state.
-# On persistent runners, a previous AWF run may leave this directory (or subdirectories
-# like sandbox/firewall/) owned by root. Plain rm -rf fails with EACCES in that case,
-# so we fall back to sudo rm -rf which is available passwordless on GitHub-hosted runners.
-if [ -d /tmp/gh-aw ] && [ ! -w /tmp/gh-aw ]; then
-  debug_log "/tmp/gh-aw exists but is not writable (likely root-owned from prior run); using sudo to remove"
-  if command -v sudo >/dev/null 2>&1; then
-    sudo -n rm -rf /tmp/gh-aw
-  else
-    echo "::error::/tmp/gh-aw exists but is not writable, and sudo is not available to reclaim it."
-    exit 1
-  fi
-elif [ -d /tmp/gh-aw ]; then
-  # Directory is writable — but subdirectories may not be (e.g., sandbox/firewall/ owned by root).
-  # Attempt plain rm first; if it fails, escalate to sudo.
-  if ! rm -rf /tmp/gh-aw 2>/dev/null; then
-    debug_log "/tmp/gh-aw has non-writable children (likely root-owned from prior AWF run); using sudo to remove"
-    if command -v sudo >/dev/null 2>&1; then
-      sudo -n rm -rf /tmp/gh-aw
-    else
-      echo "::error::/tmp/gh-aw contains non-writable children, and sudo is not available to reclaim it."
-      exit 1
-    fi
-  fi
-fi
-mkdir -p /tmp/gh-aw
-debug_log "Created /tmp/gh-aw directory"
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -446,6 +433,7 @@ SAFE_OUTPUTS_FILES=(
   "mcp_handler_process.cjs"
   "read_buffer.cjs"
   "memory_custom_validation.cjs"
+  "runtime_isolation.cjs"
   "memory_schema_contract.cjs"
   "memory_file_eligibility.cjs"
   "messages.cjs"
@@ -683,6 +671,13 @@ else
 fi
 
 echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUTPUTS_DEST}"
+
+# Relocate every staged dependency and prompt, not just entry points. Never mutate
+# a checkout; script-mode downloads are invocation-owned and can be relocated too.
+node "${RUNTIME_HELPER}" relocate "${DESTINATION}" "${PROMPTS_DEST}" "${MCP_SCRIPTS_DEST}" "${SAFE_OUTPUTS_DEST}"
+if [[ "${SCRIPT_DIR}" == "${GH_AW_ROOT}/actions-source/actions/setup" ]]; then
+  node "${RUNTIME_HELPER}" relocate "${SCRIPT_DIR}"
+fi
 
 # Send OTLP job setup span when configured (non-fatal).
 # Delegates to action_setup_otlp.cjs (same file used by actions/setup/index.js)

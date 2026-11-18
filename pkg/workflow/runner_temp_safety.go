@@ -168,7 +168,7 @@ func finalizeRunnerTempSafety(yamlContent string) (string, error) {
 	if err := validateNoRunnerTempInExecutableBodies(yamlContent); err != nil {
 		return "", err
 	}
-	return yamlContent, nil
+	return finalizeRuntimeIsolation(yamlContent)
 }
 
 func validateNoRunnerTempInExecutableBodies(yamlContent string) error {

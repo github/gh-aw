@@ -124,7 +124,7 @@ fi
 
 DOCKER_NETWORK_ARGS=(--network host)
 if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
-  DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
+  DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1::18443)
 fi
 
 PROXY_ENV_ARGS=()
@@ -156,11 +156,22 @@ docker run -d --name awmg-cli-proxy "${DOCKER_NETWORK_ARGS[@]}" \
     --guards-mode filter \
     --trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot,copilot-pull-request-reviewer,github-agentic-autofix[bot],github-agentic-autofix
 
+PROXY_PORT=18443
+if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
+  PROXY_PORT="$(docker port awmg-cli-proxy 18443/tcp | head -1)"
+  PROXY_PORT="${PROXY_PORT##*:}"
+fi
+if [[ ! "${PROXY_PORT}" =~ ^[0-9]+$ ]]; then
+  echo "::error::Unable to determine invocation-private CLI proxy port"
+  exit 1
+fi
+printf 'GH_AW_CLI_PROXY_PORT=%s\n' "${PROXY_PORT}" >> "${GITHUB_ENV}"
+
 # Wait for TLS cert + health check (up to 30s)
 PROXY_READY=false
 for i in $(seq 1 30); do
   if [ -f "$TLS_DIR/ca.crt" ]; then
-    if curl -sf --noproxy '*' --connect-timeout 2 --max-time 2 --cacert "$TLS_DIR/ca.crt" "https://localhost:18443/api/v3/health" -o /dev/null 2>/dev/null; then
+    if curl -sf --noproxy '*' --connect-timeout 2 --max-time 2 --cacert "$TLS_DIR/ca.crt" "https://localhost:${PROXY_PORT}/api/v3/health" -o /dev/null 2>/dev/null; then
       PROXY_READY=true
       break
     fi
@@ -179,7 +190,7 @@ fi
 UPSTREAM_READY=false
 for attempt in 1 2 3; do
   if curl -sf --noproxy '*' --connect-timeout 5 --max-time 15 \
-    --cacert "$TLS_DIR/ca.crt" "https://localhost:18443/api/v3/rate_limit" -o /dev/null 2>/dev/null; then
+    --cacert "$TLS_DIR/ca.crt" "https://localhost:${PROXY_PORT}/api/v3/rate_limit" -o /dev/null 2>/dev/null; then
     UPSTREAM_READY=true
     break
   fi
@@ -195,4 +206,4 @@ if [ "$UPSTREAM_READY" = "false" ]; then
   exit 1
 fi
 
-echo "CLI proxy ready on port 18443"
+echo "CLI proxy ready on port ${PROXY_PORT}"

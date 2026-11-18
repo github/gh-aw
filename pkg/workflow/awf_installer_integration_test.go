@@ -126,14 +126,14 @@ Inspect the repository.
 					!strings.Contains(installStep, "wsl.exe --distribution Ubuntu --user root --exec bash --noprofile --norc -e -o pipefail") {
 					t.Errorf("generated Windows install step does not launch Bash in WSL:\n%s", installStep)
 				}
-				windowsCommand := strings.ReplaceAll(expectedCommand, "/gh-aw/actions/", "/gh-aw-setup/actions/")
+				windowsCommand := strings.ReplaceAll(expectedCommand, "${RUNNER_TEMP}/gh-aw/actions/", "${GH_AW_SETUP_ROOT}/actions/")
 				if script := decodeWindowsWSLRunScript(t, installStep); !strings.Contains(script, strings.TrimPrefix(windowsCommand, "        run: ")) {
 					t.Errorf("generated Windows WSL payload lacks the pinned installer command:\n%s", script)
 				}
 			} else {
 				commandFound := false
 				for line := range strings.SplitSeq(installStep, "\n") {
-					if strings.HasPrefix(line, "        run:") && line == expectedCommand {
+					if strings.HasPrefix(line, "        run:") && line == strings.ReplaceAll(expectedCommand, "${RUNNER_TEMP}/gh-aw/actions/", "${GH_AW_SETUP_ROOT}/actions/") {
 						commandFound = true
 						break
 					}

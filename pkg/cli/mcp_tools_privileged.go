@@ -296,7 +296,10 @@ func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool) f
 			return buildLogsEmptyResult(err)
 		}
 
-		cmdArgs, effectiveCount, timeoutValue := buildLogsCommandArgs(ctx, args)
+		cmdArgs, effectiveCount, timeoutValue, pathErr := buildLogsCommandArgs(ctx, args)
+		if pathErr != nil {
+			return nil, nil, newMCPError(jsonrpc.CodeInternalError, pathErr.Error(), nil)
+		}
 
 		// Log the command being executed for debugging
 		mcpLog.Printf("Executing logs tool: workflow=%s, requested_count=%d, effective_count=%d, firewall=%v, no_firewall=%v, filtered_integrity=%v, graders=%v, timeout=%d, command_args=%v",
@@ -358,12 +361,15 @@ func buildLogsEmptyResult(cause error) (*mcp.CallToolResult, any, error) {
 // buildLogsCommandArgs builds the `gh aw logs` command arguments for the logs
 // tool, returning the arguments along with the effective run count and the
 // effective timeout (in minutes) applied to the subprocess.
-func buildLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, int, int) {
+func buildLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, int, int, error) {
 	if args.EpisodeRun != "" {
 		return buildEpisodeLogsCommandArgs(ctx, args)
 	}
-	// Force output directory to /tmp/gh-aw/aw-mcp/logs for MCP server
-	cmdArgs := []string{"logs", "-o", constants.TmpAwMcpLogsDir}
+	outputDir, err := cliRuntimePath(constants.TmpAwMcpLogsDir)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	cmdArgs := []string{"logs", "-o", outputDir}
 	effectiveCount := effectiveMCPLogsToolCount(args.Count)
 	cmdArgs = append(cmdArgs, "-c", strconv.Itoa(effectiveCount))
 	if args.Delivery {
@@ -390,7 +396,7 @@ func buildLogsCommandArgs(ctx context.Context, args logsArgs) ([]string, int, in
 		cmdArgs = append(cmdArgs, "--", args.WorkflowName)
 	}
 
-	return cmdArgs, effectiveCount, timeoutValue
+	return cmdArgs, effectiveCount, timeoutValue, nil
 }
 
 // appendLogsFilterArgs appends the optional filter/pagination flags of the logs
@@ -678,7 +684,10 @@ func runMCPAuditSubprocess(ctx context.Context, responseDeadline time.Time, exec
 	if timeout <= mcpAuditResponseMargin {
 		return nil, &mcpStageError{stage: "subprocess_slot", err: context.DeadlineExceeded}
 	}
-	cmdArgs := buildAuditCommandArgs(args, runItems)
+	cmdArgs, pathErr := buildAuditCommandArgs(args, runItems)
+	if pathErr != nil {
+		return nil, pathErr
+	}
 	timeoutArgs := []string{"--timeout", (timeout - mcpAuditResponseMargin).String()}
 	if boundary := slices.Index(cmdArgs, "--"); boundary >= 0 {
 		cmdArgs = slices.Insert(cmdArgs, boundary, timeoutArgs...)
@@ -737,12 +746,16 @@ func resolveAuditRunItems(args auditArgs) ([]string, error) {
 }
 
 // buildAuditCommandArgs builds the `gh aw audit` command arguments.
-// Output is forced to /tmp/gh-aw/aw-mcp/logs for the MCP server (same as logs)
+// Output uses the runtime MCP logs directory (same as logs)
 // and --json is used for structured MCP consumption. All run IDs/URLs are passed
 // directly - the audit command handles single vs. diff mode.
-func buildAuditCommandArgs(args auditArgs, runItems []string) []string {
+func buildAuditCommandArgs(args auditArgs, runItems []string) ([]string, error) {
+	outputDir, err := cliRuntimePath(constants.TmpAwMcpLogsDir)
+	if err != nil {
+		return nil, err
+	}
 	cmdArgs := []string{"audit"}
-	cmdArgs = append(cmdArgs, "-o", constants.TmpAwMcpLogsDir, "--json")
+	cmdArgs = append(cmdArgs, "-o", outputDir, "--json")
 	if len(runItems) == 1 {
 		cmdArgs = append(cmdArgs, "--no-baseline")
 	}
@@ -768,7 +781,7 @@ func buildAuditCommandArgs(args auditArgs, runItems []string) []string {
 	if len(runItems) > 0 {
 		cmdArgs = appendMCPPositionals(cmdArgs, runItems...)
 	}
-	return cmdArgs
+	return cmdArgs, nil
 }
 
 // buildAuditErrorResult converts a failed audit subprocess execution into a JSON
@@ -958,8 +971,12 @@ func newAuditDiffToolHandler(execCmd execCmdFunc, actor string, validateActor bo
 		}
 
 		// Build: gh aw audit diff <base> <compare...> -o ... --json [--artifacts ...]
+		outputDir, pathErr := cliRuntimePath(constants.TmpAwMcpLogsDir)
+		if pathErr != nil {
+			return nil, nil, newMCPError(jsonrpc.CodeInternalError, pathErr.Error(), nil)
+		}
 		cmdArgs := []string{"audit", "diff"}
-		cmdArgs = append(cmdArgs, "-o", constants.TmpAwMcpLogsDir, "--json")
+		cmdArgs = append(cmdArgs, "-o", outputDir, "--json")
 		if len(args.Artifacts) > 0 {
 			cmdArgs = append(cmdArgs, "--artifacts", strings.Join(args.Artifacts, ","))
 		}

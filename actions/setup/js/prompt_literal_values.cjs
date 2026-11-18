@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { relocateRuntimePaths } = require("./runtime_isolation.cjs");
 
 /**
  * @typedef {{opaque: string, rendered: string, metadata: boolean}} LiteralFile
@@ -17,14 +18,16 @@ function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUU
   const pattern = new RegExp(`${state.prefix}(\\d+)\x00`, "g");
   /** @param {string} text */
   const restore = text =>
-    text.replace(pattern, (_, index) => {
-      const value = state.values[Number(index)];
-      if (value === undefined) {
-        core.debug("[promptLiteralValues] Rejected state: unknown_value");
-        throw new Error(`${ERR_VALIDATION}: Unknown literal prompt value`);
-      }
-      return value;
-    });
+    relocateRuntimePaths(
+      text.replace(pattern, (_, index) => {
+        const value = state.values[Number(index)];
+        if (value === undefined) {
+          core.debug("[promptLiteralValues] Rejected state: unknown_value");
+          throw new Error(`${ERR_VALIDATION}: Unknown literal prompt value`);
+        }
+        return value;
+      })
+    );
   /** @param {string} value */
   const protect = value => {
     // Flatten our own earlier protection, but never interpret a prior run's markers.

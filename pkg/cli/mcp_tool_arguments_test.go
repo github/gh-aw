@@ -132,7 +132,8 @@ func TestMCPToolsSeparatePositionalsAndPreserveOptions(t *testing.T) {
 			}
 		})
 	}
-	args, _, _ := buildLogsCommandArgs(context.Background(), logsArgs{WorkflowName: "one", Count: 3, Branch: "main"})
+	args, _, _, pathErr := buildLogsCommandArgs(context.Background(), logsArgs{WorkflowName: "one", Count: 3, Branch: "main"})
+	require.NoError(t, pathErr)
 	boundary := slices.Index(args, "--")
 	require.NotEqual(t, -1, boundary)
 	assert.Equal(t, []string{"one"}, args[boundary+1:])

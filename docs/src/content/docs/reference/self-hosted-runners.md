@@ -68,6 +68,14 @@ When `runner.installation` is omitted, native installers automatically choose ro
 
 Rootless installation cannot repair root-owned state from previous privileged AWF runs. If preparing `~/.copilot` fails, installation stops with an ownership-repair diagnostic. Before retrying, a runner administrator must restore ownership of that directory and its contents to the runner's UID and GID and make it writable. Installers clean only their own staging directories, not shared `/tmp/awf-*-chroot-home` or `/tmp/awf-chroot-*` directories that may belong to active jobs. A runner administrator must remove confirmed stale directories before the runner is reused.
 
+### Runtime directory ownership
+
+Generated jobs allocate a private runtime directory before downloading workflow assets. Runtime files, sandbox mounts, logs, and artifacts use that allocation rather than a shared `/tmp/gh-aw` tree. Setup never deletes legacy `/tmp/gh-aw` state.
+
+Teardown checks the current invocation's ownership record before removing its runtime directory and does not use `sudo` to reclaim it. A forcibly terminated runner can leave files behind; later jobs allocate new directories instead of deleting those remnants. Runner administrators must remove confirmed stale or root-owned files separately, after verifying that no active invocation owns them.
+
+Private directories do not make a shared Docker daemon safe for concurrent AWF execution. The pinned AWF release still uses [fixed container names](https://github.com/github/gh-aw-firewall/blob/v0.29.14/src/container-lifecycle.ts) and a [fixed network name](https://github.com/github/gh-aw-firewall/blob/v0.29.14/src/topology.ts). Gateway listeners and legacy host-network proxies also retain fixed ports. Give concurrent runners separate Docker daemons and network namespaces until these resources support per-invocation isolation; namespacing gh-aw's gateway and proxy containers alone does not remove those limitations.
+
 ## Runner HTTP proxy settings
 
 On runners that require an HTTP proxy for outbound access, configure `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` in the runner environment before the CLI proxy and MCP gateway start. Both containers inherit defined values, including the lowercase forms `http_proxy`, `https_proxy`, and `no_proxy`. Explicit MCP gateway environment settings take precedence over inherited values.

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
-import os from "os";
 import vm from "vm";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
@@ -29,6 +28,7 @@ describe("shared-runner cleanup boundary", () => {
                 conclusions += 1;
               },
             };
+          if (name === "./js/runtime_isolation.cjs") return { cleanup: () => false };
           throw new Error(`Unexpected import: ${name}`);
         },
       });
@@ -36,9 +36,9 @@ describe("shared-runner cleanup boundary", () => {
     await execute(false);
     expect(warnings).toEqual([]);
     await execute(true);
-    expect(conclusions).toBe(2);
+    expect(conclusions).toBe(0);
     expect(mutations).toEqual([]);
-    expect(warnings).toEqual(["Warning: leaving shared /tmp/gh-aw untouched; per-invocation ownership cannot be established."]);
+    expect(warnings).toEqual([]);
   });
 
   it("post.js invokes only the scoped AWF runtime cleanup recorded by setup", async () => {
@@ -60,6 +60,7 @@ describe("shared-runner cleanup boundary", () => {
           };
         }
         if (name.endsWith("action_conclusion_otlp.cjs")) return { run: async () => {} };
+        if (name === "./js/runtime_isolation.cjs") return { cleanup: () => false };
         throw new Error(`Unexpected import: ${name}`);
       },
     });
@@ -68,7 +69,7 @@ describe("shared-runner cleanup boundary", () => {
   });
 
   it("clean.sh never invokes removal or privileged cleanup", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-clean-test-"));
+    const root = fs.mkdtempSync(path.join(__dirname, ".gh-aw-clean-test-"));
     try {
       const bin = path.join(root, "bin");
       const log = path.join(root, "mutations");

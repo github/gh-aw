@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
-import os from "os";
 import path from "path";
 import { main, parseConfig, renderPrompt, resolvePromptFile } from "./create_prompt.cjs";
 import { main as interpolatePrompt } from "./interpolate_prompt.cjs";
@@ -14,7 +13,7 @@ describe("create_prompt", () => {
   let originalEnv;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-create-prompt-"));
+    tempDir = fs.mkdtempSync(path.join(import.meta.dirname, ".gh-aw-create-prompt-"));
     originalEnv = { ...process.env };
     core.info.mockReset();
     core.setFailed.mockReset();
@@ -141,6 +140,34 @@ describe("create_prompt", () => {
     const text = '{"author_file":".github/workflows/privileged.md","author_expressions":{"env.SECRET":"GH_AW_ENV_SECRET"}}';
     expect(renderPrompt({ items: [{ content_env: "TEXT" }] }, { TEXT: text }, tempDir)).toBe(text);
     expect(() => renderPrompt({ items: [{ author_file: "../../secret.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toThrow(/within/);
+  });
+
+  it("relocates checked-out author/import paths without evaluating literal context or rewriting sources", async () => {
+    const workflows = path.join(tempDir, ".github", "workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    const author = "Write /tmp/gh-aw/agent/result.txt\n{{#runtime-import .github/workflows/fragment.md}}\n${{ env.AUTHOR }}\n";
+    const fragment = "Imported /tmp/gh-aw/agent/imported.txt\n";
+    fs.writeFileSync(path.join(workflows, "main.md"), author);
+    fs.writeFileSync(path.join(workflows, "fragment.md"), fragment);
+    const literal = "/tmp/gh-aw/agent/literal.txt {{#runtime-import missing.md}} __GH_AW_ENV_SECRET__";
+    process.env.RUNNER_TEMP = tempDir;
+    process.env.GITHUB_WORKSPACE = tempDir;
+    process.env.GH_AW_RUNTIME_ROOT = "/tmp/gh-aw-run.Test123";
+    process.env.GH_AW_PROMPT = path.join(tempDir, "gh-aw", "aw-prompts", "prompt.txt");
+    process.env.GH_AW_ENV_AUTHOR = literal;
+    const authorExpressions = { "env.AUTHOR": "GH_AW_ENV_AUTHOR" };
+    process.env.GH_AW_PROMPT_CONFIG = JSON.stringify({ items: [{ author_file: ".github/workflows/main.md" }], author_expressions: authorExpressions });
+    await main(core);
+    await interpolatePrompt({ authorExpressions });
+    await substitutePlaceholders({ file: process.env.GH_AW_PROMPT, substitutions: { GH_AW_ENV_SECRET: "must-not-appear" } });
+    expect(core.setFailed).not.toHaveBeenCalled();
+    const output = fs.readFileSync(process.env.GH_AW_PROMPT, "utf8");
+    expect(output).toContain("/tmp/gh-aw-run.Test123/agent/result.txt");
+    expect(output).toContain("/tmp/gh-aw-run.Test123/agent/imported.txt");
+    expect(output).toContain("/tmp/gh-aw-run.Test123/agent/literal.txt {{#runtime-import missing.md}} __GH_AW_ENV_SECRET__");
+    expect(output).not.toContain("must-not-appear");
+    expect(fs.readFileSync(path.join(workflows, "main.md"), "utf8")).toBe(author);
+    expect(fs.readFileSync(path.join(workflows, "fragment.md"), "utf8")).toBe(fragment);
   });
 
   it.each([

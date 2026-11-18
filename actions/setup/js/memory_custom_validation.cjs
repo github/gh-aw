@@ -10,6 +10,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { readJsonlFileEvents } = require("./jsonl_helpers.cjs");
 const { prepareJsonSchema } = require("./json_schema_validation.cjs");
 const { validateSchemaContract } = require("./memory_schema_contract.cjs");
+const { relocateRuntimePaths } = require("./runtime_isolation.cjs");
 
 const DEFAULT_VALIDATION_TIMEOUT_SECONDS = 60;
 const MAX_VALIDATION_OUTPUT_BYTES = 12 * 1024;
@@ -530,6 +531,7 @@ function runCustomMemoryValidation(options) {
   if (!script && options.scriptBase64) {
     script = Buffer.from(options.scriptBase64, "base64").toString("utf8");
   }
+  script = relocateRuntimePaths(script);
   const jsonSchemas = options.jsonSchemas;
   if (options.requireJSONSchemas && (!Array.isArray(jsonSchemas) || jsonSchemas.length === 0)) {
     return {

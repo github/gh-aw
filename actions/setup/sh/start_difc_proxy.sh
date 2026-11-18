@@ -49,10 +49,7 @@ echo "Using DIFC proxy upstream host: ${GH_HOST} (API: ${GITHUB_API_URL})"
 # Remove any existing container to avoid name conflicts on cancelled/retried jobs.
 docker rm -f awmg-proxy 2>/dev/null || true
 
-DOCKER_NETWORK_ARGS=(--network host)
-if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
-  DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
-fi
+DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1::18443)
 
 docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
   --user "$(id -u):$(id -g)" \
@@ -75,26 +72,22 @@ docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
     --guards-mode filter \
     --trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot,github-agentic-autofix[bot],github-agentic-autofix
 
-# Wait for TLS cert + health check (up to 30s)
-CA_INSTALLED=false
+PROXY_PORT="$(docker port awmg-proxy 18443/tcp | head -1)"
+PROXY_PORT="${PROXY_PORT##*:}"
+if [[ ! "${PROXY_PORT}" =~ ^[0-9]+$ ]]; then
+  echo "::error::Unable to determine invocation-private DIFC proxy port"
+  exit 1
+fi
+printf 'GH_AW_DIFC_PROXY_PORT=%s\n' "${PROXY_PORT}" >> "${GITHUB_ENV}"
+
+# Wait for TLS cert + health check (up to 30s). Trust the CA only for this
+# invocation; never install it into the shared host trust store.
 PROXY_READY=false
 for i in $(seq 1 30); do
   if [ -f "$PROXY_LOG_DIR/proxy-tls/ca.crt" ]; then
-    if [ "$CA_INSTALLED" = "false" ]; then
-      if command -v sudo >/dev/null 2>&1 && command -v update-ca-certificates >/dev/null 2>&1; then
-        if sudo cp "$PROXY_LOG_DIR/proxy-tls/ca.crt" /usr/local/share/ca-certificates/awmg-proxy-difc.crt && \
-           sudo update-ca-certificates; then
-          CA_INSTALLED=true
-        else
-          echo "::warning::Failed to install DIFC proxy CA into system trust store; continuing without system CA update"
-        fi
-      else
-        echo "::warning::Cannot install DIFC proxy CA (missing sudo or update-ca-certificates); continuing without system CA update"
-      fi
-    fi
-    if curl -sf "https://localhost:18443/api/v3/health" -o /dev/null 2>/dev/null; then
-      echo "DIFC proxy ready on port 18443"
-      git remote add proxy "https://localhost:18443/${GITHUB_REPOSITORY}.git" || true
+    if curl -sf --cacert "$PROXY_LOG_DIR/proxy-tls/ca.crt" "https://localhost:${PROXY_PORT}/api/v3/health" -o /dev/null 2>/dev/null; then
+      echo "DIFC proxy ready on port ${PROXY_PORT}"
+      git remote add proxy "https://localhost:${PROXY_PORT}/${GITHUB_REPOSITORY}.git" || true
       PROXY_READY=true
       break
     fi

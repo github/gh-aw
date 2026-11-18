@@ -11,7 +11,7 @@ import (
 
 func TestBuildLogsCommandArgsIncludesResourceBudgets(t *testing.T) {
 	maxStorageMB := 10240
-	cmdArgs, _, _ := buildLogsCommandArgs(context.Background(), logsArgs{
+	cmdArgs, _, _, pathErr := buildLogsCommandArgs(context.Background(), logsArgs{
 		Count:                 1,
 		Timeout:               1,
 		MaxGitHubAPIRateLimit: -2000,
@@ -19,6 +19,9 @@ func TestBuildLogsCommandArgsIncludesResourceBudgets(t *testing.T) {
 		PruneOlderRuns:        true,
 		IgnoreWorkflowRuns:    []int64{123, 456},
 	})
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
 	command := strings.Join(cmdArgs, " ")
 
 	if !strings.Contains(command, "--max-github-api-rate-limit -2000") {

@@ -45,7 +45,8 @@ func TestBuildLogsCommandArgsPreservesWorkflowPositionals(t *testing.T) {
 				PruneOlderRuns:        true,
 				Artifacts:             []string{"agent", "firewall"},
 			}
-			cmdArgs, count, timeout := buildLogsCommandArgs(ctx, args)
+			cmdArgs, count, timeout, pathErr := buildLogsCommandArgs(ctx, args)
+			require.NoError(t, pathErr)
 			require.Equal(t, "logs", cmdArgs[0])
 			assert.Equal(t, args.Count, count)
 			assert.Equal(t, args.Timeout, timeout)

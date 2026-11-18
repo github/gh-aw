@@ -482,8 +482,8 @@ func TestRewriteWindowsActionTempPathMapsNativeEnvironmentPaths(t *testing.T) {
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw-setup/actions
 `
 	got := rewriteWindowsActionTempPath(step)
-	if !strings.Contains(got, `GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/agent-stdio.log`) {
-		t.Fatalf("Native helper output path was not mapped to runner temp:\n%s", got)
+	if !strings.Contains(got, "GH_AW_AGENT_OUTPUT: "+windowsRuntimeRootExpression+"/agent-stdio.log") {
+		t.Fatalf("Native helper output path was not mapped to the private WSL root:\n%s", got)
 	}
 	if !strings.Contains(got, `GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["${{ runner.temp }}/gh-aw/agent_output.json","${{ runner.temp }}/gh-aw"]'`) {
 		t.Fatalf("Recovery artifact paths were not kept on the Windows host:\n%s", got)
@@ -564,7 +564,7 @@ Compile this workflow on a Windows runner.
 	}
 	fallbackStep := extractWorkflowStepByName(t, string(lockBytes), "Upload agent output fallback artifact")
 
-	wantPath := "${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"
+	wantPath := windowsRuntimeRootExpression + "/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"
 	if !strings.Contains(fallbackStep, wantPath) {
 		t.Fatalf("compiled Windows artifact fallback did not map the token usage path %q:\n%s", wantPath, fallbackStep)
 	}

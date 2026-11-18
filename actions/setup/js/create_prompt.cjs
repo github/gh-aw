@@ -9,6 +9,7 @@ const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 const { resolveRuntimeImportFilePath, assertRuntimeImportRealPathWithinBase, resolveRuntimeImportKey, removeXMLComments } = require("./runtime_import.cjs");
 const { createLiteralValues, literalFileKey, writeLiteralState } = require("./prompt_literal_values.cjs");
 const { bindAuthorExpressions } = require("./author_prompt.cjs");
+const { relocateRuntimePaths } = require("./runtime_isolation.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
@@ -240,12 +241,12 @@ async function main(core) {
     const promptsDir = path.join(runnerTemp, "gh-aw", "prompts");
     const promptOutputDir = path.join(runnerTemp, "gh-aw", "aw-prompts");
     const systemItemCount = config.system_item_count ?? 0;
-    const systemContent = renderPrompt({ ...config, items: config.items.slice(0, systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect);
+    const systemContent = relocateRuntimePaths(renderPrompt({ ...config, items: config.items.slice(0, systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect));
     const workClaimContent = renderWorkClaim(typeof context === "undefined" ? null : context.payload);
     // Keep event data opaque, but retain the newline before author-owned structure.
     const userContent =
       (workClaimContent ? literals.protect(workClaimContent.slice(0, -1)) + "\n" : "") +
-      renderPrompt({ ...config, items: config.items.slice(systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect, systemContent);
+      relocateRuntimePaths(renderPrompt({ ...config, items: config.items.slice(systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect, systemContent));
     const content = systemContent + userContent;
 
     fs.mkdirSync(promptOutputDir, { recursive: true, mode: 0o700 });

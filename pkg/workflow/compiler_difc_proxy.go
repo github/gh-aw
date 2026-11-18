@@ -334,6 +334,7 @@ func proxyEnvVars() map[string]string {
 		"GITHUB_API_URL":      "https://localhost:18443/api/v3",
 		"GITHUB_GRAPHQL_URL":  "https://localhost:18443/api/graphql",
 		"NODE_EXTRA_CA_CERTS": constants.TmpProxyTLSCACert,
+		"SSL_CERT_FILE":       constants.TmpProxyTLSCACert,
 	}
 }
 

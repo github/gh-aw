@@ -15,14 +15,4 @@ set -e
 docker rm -f awmg-proxy 2>/dev/null || true
 git remote remove proxy 2>/dev/null || true
 
-# Remove the DIFC proxy CA certificate from the system trust store if present,
-# to avoid permanently expanding the trusted root set on persistent/self-hosted runners.
-DIFC_PROXY_CA_CERT="/usr/local/share/ca-certificates/awmg-proxy-difc.crt"
-if [ -f "$DIFC_PROXY_CA_CERT" ]; then
-  rm -f "$DIFC_PROXY_CA_CERT" || true
-  if command -v update-ca-certificates >/dev/null 2>&1; then
-    sudo update-ca-certificates || true
-  fi
-fi
-
 echo "DIFC proxy stopped"

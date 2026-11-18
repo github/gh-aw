@@ -42,6 +42,13 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION, ERR_PARSE, ERR_SYSTEM, ERR_API, ERR_CONFIG } = require("./error_codes.cjs");
 const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
+const { relocateRuntimePaths } = require("./runtime_isolation.cjs");
+
+function resolveSamplePatchPath(index, env = process.env) {
+  const filename = `gh-aw-sample-${index + 1}.patch`;
+  const root = env.GH_AW_RUNTIME_ROOT ? relocateRuntimePaths("/tmp/gh-aw", env) : os.tmpdir();
+  return path.join(root, filename);
+}
 
 const DEFAULT_BASE_BRANCH = process.env.GH_AW_CUSTOM_BASE_BRANCH || process.env.GITHUB_BASE_REF || process.env.GITHUB_REF_NAME || "main";
 const PATCH_SIDECAR_TOOLS = new Set(["create_pull_request", "push_to_pull_request_branch"]);
@@ -513,7 +520,7 @@ async function preStagePatch(entry, index, workspace) {
   }
 
   // Write patch to a temp file and apply it.
-  const tmpPatch = path.join(os.tmpdir(), `gh-aw-sample-${index + 1}.patch`);
+  const tmpPatch = resolveSamplePatchPath(index);
   try {
     fs.writeFileSync(tmpPatch, patch.endsWith("\n") ? patch : patch + "\n");
   } catch (err) {
@@ -767,4 +774,5 @@ module.exports = {
   fetchPullRequestHeadRef,
   // Exported for unit testing of the defense-in-depth error detection.
   sampleResultIsError,
+  resolveSamplePatchPath,
 };

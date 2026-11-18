@@ -29,7 +29,7 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 		yaml.WriteString("          [mcp_servers." + serverName + "]\n")
 		yaml.WriteString("          container = \"" + image + "\"\n")
 		yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
-		yaml.WriteString("          env_vars = [\"GITHUB_SERVER_URL\", \"RUNNER_TEMP\"]\n")
+		yaml.WriteString("          env_vars = [\"GITHUB_SERVER_URL\", \"RUNNER_TEMP\", \"GH_AW_RUNTIME_ROOT\", \"GH_AW_SETUP_ROOT\", \"GH_AW_RESOURCE_SUFFIX\"]\n")
 		fmt.Fprintf(yaml, "          env = { GH_AW_WORK_QUEUE_ROLE = %q }\n", role) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		yaml.WriteString("          entrypoint = \"node\"\n")
 		yaml.WriteString("          entrypointArgs = [\"" + workQueueMCPServerEntrypoint + "\"]\n")
@@ -45,6 +45,7 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
 	yaml.WriteString("                \"env\": {\n")
 	yaml.WriteString("                  \"RUNNER_TEMP\": \"\\${RUNNER_TEMP}\",\n")
+	writeRuntimeRootMCPEnvironment(yaml)
 	yaml.WriteString("                  \"GITHUB_SERVER_URL\": \"\\${GITHUB_SERVER_URL}\",\n")
 	fmt.Fprintf(yaml, "                  \"GH_AW_WORK_QUEUE_ROLE\": %q\n", role) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("                },\n")
@@ -80,7 +81,7 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 		yaml.WriteString("          mounts = [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
 		yaml.WriteString("          entrypoint = \"node\"\n")
 		yaml.WriteString("          entrypointArgs = [\"${RUNNER_TEMP}/gh-aw/actions/ledger_mcp_server.cjs\"]\n")
-		names := []string{"GH_AW_MEMORY_DIR", "GITHUB_RUN_ID", "GITHUB_WORKSPACE", "RUNNER_TEMP"}
+		names := []string{"GH_AW_MEMORY_DIR", "GITHUB_RUN_ID", "GITHUB_WORKSPACE", "RUNNER_TEMP", "GH_AW_RUNTIME_ROOT", "GH_AW_SETUP_ROOT", "GH_AW_RESOURCE_SUFFIX"}
 		names = append(names, ledgerMCPConfiguredEnvNames(workflowData)...)
 		yaml.WriteString("          env_vars = [\"" + strings.Join(names, "\", \"") + "\"]\n")
 		return
@@ -96,6 +97,7 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 	yaml.WriteString("                \"env\": {\n")
 	yaml.WriteString("                  \"GH_AW_MEMORY_DIR\": \"\\${GH_AW_MEMORY_DIR}\",\n")
 	yaml.WriteString("                  \"GITHUB_WORKSPACE\": \"\\${GITHUB_WORKSPACE}\",\n")
+	writeRuntimeRootMCPEnvironment(yaml)
 	for _, name := range ledgerMCPConfiguredEnvNames(workflowData) {
 		yaml.WriteString("                  \"" + name + "\": \"\\${" + name + "}\",\n")
 	}
@@ -162,6 +164,7 @@ func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, 
 		"GH_AW_PR_HEAD_BASE_PR_NUMBER", "GH_AW_PR_HEAD_BASE_REF", "GH_AW_PR_HEAD_REPO",
 		"GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REPOSITORY", "GITHUB_SHA",
 		"GITHUB_TOKEN", "GITHUB_WORKSPACE", "RUNNER_TEMP",
+		"GH_AW_RUNTIME_ROOT", "GH_AW_SETUP_ROOT", "GH_AW_RESOURCE_SUFFIX",
 	}
 	safeOutputsEnvVars = append(safeOutputsEnvVars, objectPackLimitEnvNames...)
 	if workflowData != nil {
@@ -308,7 +311,7 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 	}
 	yaml.WriteString("]\n")
 
-	yaml.WriteString("          env_vars = [\"DEBUG\", \"GH_TOKEN\", \"GITHUB_TOKEN\", \"GITHUB_ACTOR\", \"GITHUB_REPOSITORY\"]\n")
+	yaml.WriteString("          env_vars = [\"DEBUG\", \"GH_TOKEN\", \"GITHUB_TOKEN\", \"GITHUB_ACTOR\", \"GITHUB_REPOSITORY\", \"GH_AW_RUNTIME_ROOT\", \"GH_AW_SETUP_ROOT\", \"GH_AW_RESOURCE_SUFFIX\"]\n")
 }
 
 // renderSafeOutputsMCPConfigWithOptions generates the Safe Outputs MCP server configuration with engine-specific options.
@@ -361,6 +364,9 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 		{"GITHUB_TOKEN", "GITHUB_TOKEN", false},
 		{"GITHUB_WORKSPACE", "GITHUB_WORKSPACE", false},
 		{"RUNNER_TEMP", "RUNNER_TEMP", false},
+		{"GH_AW_RUNTIME_ROOT", "GH_AW_RUNTIME_ROOT", false},
+		{"GH_AW_SETUP_ROOT", "GH_AW_SETUP_ROOT", false},
+		{"GH_AW_RESOURCE_SUFFIX", "GH_AW_RESOURCE_SUFFIX", false},
 	}
 	for _, name := range objectPackLimitEnvNames {
 		envVars = append(envVars, struct {
@@ -433,6 +439,12 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 	}
 }
 
+func writeRuntimeRootMCPEnvironment(yaml *strings.Builder) {
+	for _, name := range []string{"GH_AW_RUNTIME_ROOT", "GH_AW_SETUP_ROOT", "GH_AW_RESOURCE_SUFFIX"} {
+		fmt.Fprintf(yaml, "                  %q: \"\\${%s}\",\n", name, name) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	}
+}
+
 // renderAgenticWorkflowsMCPConfigWithOptions generates the Agentic Workflows MCP server configuration with engine-specific options
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
@@ -449,6 +461,9 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 		{"GITHUB_TOKEN", "GITHUB_TOKEN", false},           // Variable reference (gh CLI auto-sets GH_TOKEN from GITHUB_TOKEN if needed)
 		{"GITHUB_ACTOR", "GITHUB_ACTOR", false},           // Variable reference for actor-based access control
 		{"GITHUB_REPOSITORY", "GITHUB_REPOSITORY", false}, // Variable reference for repository context
+		{"GH_AW_RUNTIME_ROOT", "GH_AW_RUNTIME_ROOT", false},
+		{"GH_AW_SETUP_ROOT", "GH_AW_SETUP_ROOT", false},
+		{"GH_AW_RESOURCE_SUFFIX", "GH_AW_RESOURCE_SUFFIX", false},
 	}
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts

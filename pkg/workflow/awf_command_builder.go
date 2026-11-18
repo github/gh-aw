@@ -438,6 +438,9 @@ func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) s
 	}
 	for _, name := range []string{
 		modelRoutingModeEnvVar,
+		"GH_AW_RUNTIME_ROOT",
+		"GH_AW_SETUP_ROOT",
+		"GH_AW_RESOURCE_SUFFIX",
 		"GH_AW_CLOUD_HYPERVISOR_BINARY",
 		"GH_AW_CLOUD_HYPERVISOR_KERNEL",
 		"GH_AW_CLOUD_HYPERVISOR_ROOTFS",
@@ -509,6 +512,7 @@ func buildAWFCommandScript(input buildAWFCommandScriptInput) string {
 		input.arcDindDockerHostProbe,
 		input.arcDindPrefixProbe,
 		input.toolCacheMountProbe,
+		"unset GH_AW_RUNTIME_TOKEN GH_AW_RUNTIME_ID GH_AW_SETUP_ID",
 		awfShellcheckDirective,
 		buildAWFInvocationCommand(input),
 	)

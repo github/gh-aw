@@ -49,7 +49,8 @@ func TestEpisodeRetrievalCommandAndMCPArguments(t *testing.T) {
 		Count: 25, MaxAPIRequests: 70, StartDate: "2026-10-18", EndDate: "2026-10-20", Timeout: 2,
 	}
 	require.NoError(t, validateMCPEpisodeLogsArgs(args))
-	cmdArgs, count, timeout := buildLogsCommandArgs(context.Background(), args)
+	cmdArgs, count, timeout, pathErr := buildLogsCommandArgs(context.Background(), args)
+	require.NoError(t, pathErr)
 	require.Equal(t, 25, count)
 	require.Equal(t, 2, timeout)
 	require.Equal(t, []string{
@@ -68,7 +69,8 @@ func TestEpisodeRetrievalCommandAndMCPArguments(t *testing.T) {
 	args.Refresh = true
 	args.Delivery, args.Adoption = true, true
 	require.NoError(t, validateMCPEpisodeLogsArgs(args))
-	cmdArgs, _, _ = buildLogsCommandArgs(context.Background(), args)
+	cmdArgs, _, _, pathErr = buildLogsCommandArgs(context.Background(), args)
+	require.NoError(t, pathErr)
 	require.Contains(t, cmdArgs, "--refresh")
 	require.Contains(t, cmdArgs, "--delivery")
 	require.Contains(t, cmdArgs, "--adoption")
@@ -91,7 +93,8 @@ func TestEpisodeRetrievalMCPRejectsUnsupportedOptions(t *testing.T) {
 		require.Error(t, validateMCPEpisodeLogsArgs(args), "%+v", args)
 	}
 	args := logsArgs{EpisodeRun: "https://github.com/other/repo/actions/runs/123"}
-	cmdArgs, _, _ := buildLogsCommandArgs(context.Background(), args)
+	cmdArgs, _, _, pathErr := buildLogsCommandArgs(context.Background(), args)
+	require.NoError(t, pathErr)
 	require.NotContains(t, cmdArgs, "--repo")
 }
 

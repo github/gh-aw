@@ -586,6 +586,7 @@ func appendMCPGatewayBaseEnvFlags(containerCmd *strings.Builder, payloadPathPref
 	containerCmd.WriteString(" -e GITHUB_HEAD_REF")
 	containerCmd.WriteString(" -e GITHUB_BASE_REF")
 	containerCmd.WriteString(" -e RUNNER_TEMP")
+	containerCmd.WriteString(" -e GH_AW_RUNTIME_ROOT -e GH_AW_SETUP_ROOT -e GH_AW_RESOURCE_SUFFIX")
 	containerCmd.WriteString(" -e RUNNER_TOOL_CACHE")
 	containerCmd.WriteString(" -e MCP_GATEWAY_ALLOWED_MOUNT_ROOTS")
 }
@@ -854,6 +855,7 @@ func buildAddedGatewayEnvVarSet(workflowData *WorkflowData, customGatewayEnvName
 		sinkVisibilityEnvVar,
 		"GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "GITHUB_SHA", "GITHUB_WORKSPACE",
 		"RUNNER_TEMP", "RUNNER_TOOL_CACHE", "MCP_GATEWAY_ALLOWED_MOUNT_ROOTS",
+		"GH_AW_RUNTIME_ROOT", "GH_AW_SETUP_ROOT", "GH_AW_RESOURCE_SUFFIX",
 		"GITHUB_TOKEN", "GITHUB_RUN_ID", "GITHUB_RUN_NUMBER", "GITHUB_RUN_ATTEMPT",
 		"GITHUB_JOB", "GITHUB_ACTION", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH",
 		"GITHUB_ACTOR", "GITHUB_ACTOR_ID", "GITHUB_TRIGGERING_ACTOR",
