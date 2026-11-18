@@ -44,7 +44,41 @@ of adoption at the report cutoff.
 Without a value function, the command needs no Git history or measurement
 runtime. It returns `measurement_status: "unavailable"`,
 `reason: "measurement_not_configured"`, and `attributed_value: null`.
+Recorded run grades, when collected, remain available separately in `run_grades`.
 Only collect completed runs; no new execution or workflow dispatch is needed.
+
+## Recorded grader results
+
+The command also reads primary `operational-value` grades already exported by
+`gh aw logs` into `summary.json` under `--logs-dir`. To collect those artifacts:
+
+```bash wrap
+gh aw logs weekly-research --repo owner/repo --artifacts graders \
+  --output .github/aw/logs
+gh aw value weekly-research --repo owner/repo --json
+```
+
+`run_grades.runs` contains the run ID, attempt, creation time, and the existing
+grader result, including its primary value, unit, status, and message/error.
+Only completed runs matching the selected host, repository, workflow path, and
+creation-time period are included. Run URLs must agree with the recorded
+identity. Grades are collected observations, not reconstructed historical
+grades as of the period cutoff.
+
+Observed zero remains zero. A missing `operational-value` result is reported as
+`unavailable`; execution errors remain `error`. Other built-in grades are not
+substituted for operational value. Missing summaries or no matching completed
+runs produce unavailable coverage. Matching rows have `retained_subset`
+coverage, not a claim of complete run history. Malformed summaries, conflicting
+identities, duplicate results, and inconsistent statuses/values fail explicitly.
+The summary input is limited to 50 MiB.
+
+This is a read-only view of the existing logs export: no code execution,
+regrading, artifact fetching, aggregation, or automatic attribution. The
+recorded grades themselves need no measurement definition, Git history, or
+Node.js. If a Git/typed-evidence measurement is configured, its existing input
+requirements still apply. Recollect logs to refresh the exported grades.
+Custom `--summary-file` locations are not discovered automatically.
 
 ## Define the workflow-specific measurement
 

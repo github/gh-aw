@@ -34,6 +34,7 @@ type operationalValueReport struct {
 	InspectedWindows    []valueInspectedWindow     `json:"inspected_windows,omitempty"`
 	WindowPolicy        valueWindowPolicy          `json:"window_policy"`
 	Evidence            *valueEvidenceReport       `json:"evidence,omitempty"`
+	RunGrades           *valueRunGradesReport      `json:"run_grades,omitempty"`
 }
 
 type valueWindow struct {

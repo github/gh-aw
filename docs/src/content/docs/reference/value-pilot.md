@@ -299,10 +299,15 @@ requested goal grades, and this pass did not implement ten new goal evaluators.
 Later adoption and durability belong to the existing lifecycle observations,
 joined by a report. File Diet's later 403-line Git outcome is not a historical
 session grade and must not be inserted into that immutable session.
-The current `gh aw value` command still uses Git or supplied typed evidence;
-automatic consumption of session grades is **not implemented** by this probe.
+At the time of this probe, `gh aw value` used Git or supplied typed evidence;
+automatic consumption of session grades was not implemented by the probe.
 No workflow was dispatched, no commits were supplied to graders, and no
 published sessions or grader results were changed.
+
+A subsequent [read-only reporting bridge](../value/#recorded-grader-results)
+exposes primary operational-value grades already present in the existing logs
+summary. It does not execute graders or invent the missing goal grades in this
+historical cohort.
 
 To check a downloaded full session with the existing producer validator:
 

@@ -38,8 +38,12 @@ var valueWorkflowID = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
 const operationalValueHelp = `Report delivery and adoption for any workflow using the same native lifecycle
 records and rules as logs --adoption. Existing records are read from
 logs-dir/lifecycle.jsonl; collect or refresh them with logs --adoption first.
+Recorded operational-value primary grades are read from logs-dir/summary.json,
+the existing logs export. Completed runs are selected by repository, workflow,
+host, and creation time. Values, units, and statuses are reported per run without
+aggregation, attribution, or regrading. Missing grades remain unavailable.
 
-Value is separate and workflow-specific. Without a value-function definition,
+Longitudinal value is separate and workflow-specific. Without a value-function definition,
 delivery/adoption remain available and value is explicitly unavailable.
 Definitions are loaded from --value-function or
 .github/aw/value/WORKFLOW.json. Versioned declarations select named Go
@@ -123,6 +127,10 @@ func executeValueReport(cmd *cobra.Command, args []string, config operationalVal
 		return err
 	}
 	report, measurement, err := collectOperationalValueReport(ctx, config, definition, start, end, now, recipe)
+	if err != nil {
+		return err
+	}
+	report.RunGrades, err = loadValueRunGrades(filepath.Join(config.LogsDir, "summary.json"), definition, start, end)
 	if err != nil {
 		return err
 	}
@@ -300,8 +308,11 @@ func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, r
 	if _, err := fmt.Fprint(out, console.RenderStructStdout(summary)); err != nil {
 		return err
 	}
+	if err := renderValueRunGrades(out, report.RunGrades); err != nil {
+		return err
+	}
 	if report.Reason != "" && report.Evidence == nil {
-		_, err := fmt.Fprintf(out, "Value unavailable: %s.\n", report.Reason)
+		_, err := fmt.Fprintf(out, "Longitudinal value unavailable: %s.\n", report.Reason)
 		return err
 	}
 	return renderOperationalValueWindows(out, report)

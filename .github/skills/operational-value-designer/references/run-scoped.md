@@ -1,8 +1,9 @@
 # Run-scoped operational-value graders
 
-This reference preserves the existing `graders.operational-value.script`
-contract for checkouts supporting custom JavaScript session graders. It is not
-the default for `gh aw value`, a Go server evaluator, or longitudinal replay.
+Reuse recorded grades before authoring a new evaluator. This reference covers
+the read-only `gh aw value` view and the existing
+`graders.operational-value.script` contract for custom session graders in Actions.
+The report never executes that code or replays longitudinal history.
 Prefer existing native graders or supported queries when available; inspect
 the target implementation before authoring a declaration.
 
@@ -51,12 +52,17 @@ script runs in the downstream `graders` job, never conclusion.
 Return a nonempty ordered array of unique `{id,value}` objects. IDs must be
 nonempty strings; values must be finite numbers or `null`; extra fields are
 rejected. The first metric supplies top-level `operational-value.value`.
-Remaining metrics become diagnostics. The full ordered `metrics` array remains
-in schema-v2 grader artifacts and events. Keep IDs and order stable.
+Remaining metrics become diagnostics. The schema-v2 grader artifact preserves
+the full ordered `metrics` array; the logs summary exposes only the primary.
+Custom results do not rewrite the conclusion session; compact notifications
+are not a complete grader-result transport.
+Keep IDs and order stable.
 
-Scripts are limited to 256 KiB. No file, module, process, network, environment,
-credential, clock, random, timer, or input-mutation access exists. Record evidence
-before publication; never return a Promise or the string `"unavailable"`.
+Scripts are limited to 256 KiB. The restricted API must not expose file, module,
+process, network, environment, credential, clock, random, timer, or input-mutation
+capabilities. Treat code as untrusted; API restrictions do not certify an
+OS/container sandbox. Record evidence before publication; never return a Promise
+or the string `"unavailable"`.
 
 Other custom grader IDs still use `graders.<distinct-id>.script` and return one
 finite number, `null`, or an object with `value`; they do not use metric arrays.
@@ -97,6 +103,24 @@ duration, amount, or signed quantity merely to fit `[0,1]`.
 Freeze intent, script, configuration, and semantic fixtures together. Corrections
 are prospective; never rewrite prior results. The workflow revision and script
 SHA-256 digest identify the adopted implementation.
+
+## Read recorded primary grades
+
+Use the existing collection/report commands:
+
+```bash
+gh aw logs WORKFLOW --repo OWNER/REPO --artifacts graders --output LOGS
+gh aw value WORKFLOW --repo OWNER/REPO --logs-dir LOGS --json
+```
+
+`run_grades` reads `LOGS/summary.json` (50 MiB limit): primary value, unit, status,
+and message/error for completed runs in the selected host/repository/workflow
+and creation-time period (`--start`/`--end`). Coverage is a retained subset.
+Keep missing grades unavailable, distinct from zero or errors; never substitute
+other built-ins. Reporting never fetches artifacts, executes, regrades, aggregates,
+or attributes grades. No new definition/runtime is needed; configured Git/typed
+measurements keep their requirements. External lake ingestion and version-aware
+aggregation are not implemented.
 
 ## Fixtures and verification
 

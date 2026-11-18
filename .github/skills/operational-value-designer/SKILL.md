@@ -1,27 +1,29 @@
 ---
 name: operational-value-designer
-description: "Design Go-native value definitions and report recipes from workflow intent; keep run-scoped grading separate. Usage: /operational-value-designer OWNER/REPO WORKFLOW [longitudinal|run-scoped]."
+description: "Reuse recorded value grades or design workflow-specific measurements; keep session grading separate from longitudinal attribution. Usage: /operational-value-designer OWNER/REPO WORKFLOW [longitudinal|run-scoped]."
 argument-hint: "OWNER/REPO WORKFLOW [longitudinal|run-scoped]"
 metadata:
-  version: "5.0.0"
+  version: "5.1.0"
 ---
 
 # Operational Value Designer
 
-Turn workflow intent into a deterministic measurement contract, fixtures, and
-an executable `gh aw value` report recipe. Default to longitudinal reporting.
+Reuse existing operational-value grades for per-run reporting before designing
+another measurement. Author a deterministic contract, fixtures, and report
+recipe only when the requested measurement needs them.
 Only the measurement varies by workflow; never redesign delivery or adoption.
 Work in the workflow owner's repository, not necessarily `github/gh-aw`.
 Definitions, recipes, and fixtures belong there; gh-aw is an installed tool.
 
 ## Route and inspect
 
-- For longitudinal reports, slides, or `gh aw value`, read
+- For historical Git/typed-evidence reports or slides, read
   [longitudinal-report.md](references/longitudinal-report.md).
-- For recorded-session grading, read [run-scoped.md](references/run-scoped.md).
+- For recorded-grade reporting or session grading, read
+  [run-scoped.md](references/run-scoped.md).
   Prefer the target's existing Go graders or supported session queries. The
-  separate `graders.operational-value.script` contract is retained for existing
-  custom session graders only; do not introduce JS execution into a Go server.
+  separate `graders.operational-value.script` contract runs custom session
+  graders in Actions; never add JS execution to a report or Go server.
 - For non-Git evidence or window policies, read
   [evidence-and-windows.md](references/evidence-and-windows.md).
 - For the schema-feature slide replay, use the checked-in definition
@@ -35,6 +37,12 @@ scopes in the installed runtime, not by assuming the owner has gh-aw's source.
 Never invent a declaration or query the runtime
 cannot execute. Ask only when workflow intent or the measurement boundary is
 unclear, not for approval to execute an agreed plan.
+
+`gh aw value` reads primary grades from the existing logs `summary.json` under
+`--logs-dir`. No new evaluator definition is needed for that view. Preserve
+zero, unavailable, and error states; never substitute an efficiency grade.
+This read-only bridge does not regrade, aggregate, change execution isolation,
+or prove external lake ingestion.
 
 ## Design contract
 
@@ -51,8 +59,9 @@ zero. Malformed declarations fail explicitly; do not silently substitute metrics
 
 Keep three contracts distinct:
 
-1. **Measurement:** versioned metadata plus a named Go evaluator and validated
-   parameters, or an already-supported query with an explicit evidence scope.
+1. **Measurement:** an existing session-grader contract, or versioned metadata
+   with a named Go report evaluator/validated parameters or supported query.
+   Keep session and historical evidence scopes distinct.
 2. **Recipe:** dates, sampling policy, producer discovery, cohort, and inspected
    windows; separate descriptive batches from attributable individual outputs.
 3. **Evidence/result:** pinned input commits, definition/recipe digests,
@@ -66,7 +75,7 @@ Imported evidence is caller-supplied, never native adoption or survival proof.
 All three work in external repositories without upstream registration.
 Unsupported semantics require a reviewed evaluator/projection; stay unavailable.
 Do not stretch session semantics or fabricate session events for repository
-snapshots. Do not execute workflow code or introduce a second query language.
+snapshots. Reports must not execute workflow code or add a query language.
 
 Declare versioned baseline, before/after periods, lag, durability, cadence,
 minimum samples, and overlap rules before future collection. Seven days is
