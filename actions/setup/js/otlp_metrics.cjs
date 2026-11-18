@@ -475,12 +475,14 @@ function buildBuiltinRunMetrics({
         buildAttr("gen_ai.token.modality", "unknown"),
         ...(model ? [buildAttr("gen_ai.request.model", bounded(model))] : [])
       );
-      for (const [name, value] of [
+      /** @type {Array<[string, number | undefined]>} */
+      const inferenceMetrics = [
         ["gen_ai.client.inference.usage.input_tokens", inclusiveInput],
         ["gen_ai.client.inference.usage.output_tokens", num(outputTokens)],
         ["gen_ai.client.inference.usage.cache_read.input_tokens", num(cacheReadTokens)],
         ["gen_ai.client.inference.usage.cache_write.input_tokens", num(cacheWriteTokens)],
-      ]) {
+      ];
+      for (const [name, value] of inferenceMetrics) {
         if (typeof value === "number" && value > 0) {
           metrics.push(buildOTLPMetric({ name, type: "counter", unit: "{token}", value, attributes: usageAttributes, startMs, endMs, traceContext }));
         }

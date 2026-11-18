@@ -495,7 +495,9 @@ function buildGitHubActionsResourceAttributes({
   upsertResourceAttr(buildAttr("github.repository", repository));
   upsertResourceAttr(buildAttr(OTEL_ATTR_GITHUB_RUN_ID, runId));
   upsertResourceAttr(buildAttr("github.run_attempt", runAttempt));
-  const runUrlAttr = buildGitHubActionsRunUrlAttribute(repository, runId);
+  const [repositoryOwner = "", repositoryName = ""] = repository.split("/");
+  const runUrl = repositoryOwner && repositoryName && runId ? buildWorkflowRunUrl({ runId }, { owner: repositoryOwner, repo: repositoryName }) : "";
+  const runUrlAttr = runUrl ? buildAttr("github.actions.run_url", runUrl) : null;
   if (runUrlAttr) {
     upsertResourceAttr(runUrlAttr);
   }
@@ -554,7 +556,7 @@ function buildGitHubActionsResourceAttributes({
   const standardResourceAttributes = [
     ...(workflowName ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_NAME, workflowName)] : []),
     ...(runId ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_RUN_ID, runId)] : []),
-    ...(runUrlAttr ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_RUN_URL_FULL, runUrlAttr.value.stringValue)] : []),
+    ...(runUrl ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_RUN_URL_FULL, runUrl)] : []),
     ...(job ? [buildAttr(OTEL_ATTR_CICD_PIPELINE_TASK_NAME, job)] : []),
     buildAttr(OTEL_ATTR_VCS_PROVIDER_NAME, "github"),
     ...(repositoryUrl ? [buildAttr(OTEL_ATTR_VCS_REPOSITORY_URL_FULL, repositoryUrl)] : []),

@@ -374,10 +374,12 @@ metric.
 
 Other values in the list MUST be ignored by gh-aw.
 
-Compatibility-only names remain supported and are not deprecated by this version. They MUST stay emitted by default
-for at least three minor releases and six months after the release that adds this section. Only after that may a
-later spec version deprecate them; making the opt-in behaviour the default, which stops them, is a breaking change
-in a release after the deprecation and after semantic-conventions-genai publishes a release.
+Compatibility-only names remain supported and are not deprecated by gh-aw in this version, even where they are
+deprecated or removed by OpenTelemetry; each name's upstream status and replacement are identified in its section.
+They MUST stay emitted by default for at least three minor releases and six months after the release that adds this
+section. Only after that may a later spec version deprecate them; making the opt-in behaviour the default, which
+stops them, is a breaking change in a release after the deprecation and after semantic-conventions-genai publishes a
+release.
 
 Without `gen_ai_latest_experimental`, the default export MUST be a superset of the export before this section was
 added: every span (name, kind, parent, status), attribute, resource attribute, metric and data point keeps its value;
@@ -649,7 +651,7 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 |---|---|---|
 | `gen_ai.operation.name` | string | REQUIRED on GenAI operation spans, except where §9.5 prohibits it on the agent conclusion span. |
 | `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. |
-| `gen_ai.system` | string | Compatibility only (§6.7). Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Deprecated by OpenTelemetry. |
+| `gen_ai.system` | string | Deprecated by OpenTelemetry and superseded by `gen_ai.provider.name`; compatibility only (§6.7). Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Not deprecated by gh-aw in this version. |
 | `gen_ai.agent.name` | string | REQUIRED on the built-in agent span (§9.5), including an agent conclusion span acting as the agent span; the workflow name. |
 | `gen_ai.request.model` | string | CONDITIONALLY REQUIRED when available. |
 | `gen_ai.response.model` | string | RECOMMENDED when returned. |
@@ -658,10 +660,10 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 | `gen_ai.usage.output_tokens` | int | RECOMMENDED when returned. |
 | `gen_ai.usage.cache_read.input_tokens` | int | RECOMMENDED when applicable. |
 | `gen_ai.usage.cache_write.input_tokens` | int | RECOMMENDED when applicable. Additive. |
-| `gen_ai.usage.cache_creation.input_tokens` | int | Compatibility only (§6.7); same value as `gen_ai.usage.cache_write.input_tokens`. |
-| `gen_ai.usage.total_tokens` | int | Compatibility only (§6.7); input plus output, excluding cache. |
+| `gen_ai.usage.cache_creation.input_tokens` | int | No longer defined by the current GenAI conventions; superseded by `gen_ai.usage.cache_write.input_tokens`. Compatibility only (§6.7); same value as the replacement. |
+| `gen_ai.usage.total_tokens` | int | Removed from the current GenAI conventions; compatibility only (§6.7); input plus output, excluding cache, with no standard replacement. |
 | `gen_ai.usage.reasoning.output_tokens` | int | RECOMMENDED when applicable. |
-| `gen_ai.workflow.name` | string | Compatibility only (§6.7); replaced by `gen_ai.agent.name`. |
+| `gen_ai.workflow.name` | string | Removed from the current GenAI conventions and superseded by `gen_ai.agent.name`; compatibility only (§6.7). |
 | `error.type` | string | CONDITIONALLY REQUIRED on the agent span and agent conclusion span when the agent did not succeed: `timeout`, `cancelled` or `agent_failed`. |
 
 For built-in agent telemetry, `gen_ai.response.finish_reasons` and token usage attributes SHOULD be on the built-in agent span or, when no dedicated agent span is emitted, the agent conclusion span. With the §6.7 opt-in and a dedicated agent span, they MUST NOT be present on the conclusion span (§9.5).
@@ -755,7 +757,8 @@ and SHOULD carry `gen_ai.agent.name`, `gen_ai.request.model` when known, and `er
 succeed.
 
 `gen_ai.client.token.usage` with `gen_ai.token.type` is compatibility only (§6.7). It has been removed from the
-OpenTelemetry GenAI conventions.
+OpenTelemetry GenAI conventions and is superseded by the four `gen_ai.client.inference.usage.*` counters above.
+This version does not deprecate the compatibility metric in gh-aw.
 
 If an engine exports its own `gen_ai.client.inference.usage.*` for the agent job, the runtime MUST NOT also emit
 them for that run (D11).

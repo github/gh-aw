@@ -5,7 +5,13 @@ import path from "node:path";
 const reportDir = process.argv[2];
 if (!reportDir) throw new Error("Usage: node check_genai_conformance.mjs <weaver-report-directory>");
 
-const expectedMetricNames = new Set(["gen_ai.client.inference.usage.input_tokens", "gen_ai.invoke_agent.duration"]);
+const expectedMetricNames = new Set([
+  "gen_ai.client.inference.usage.input_tokens",
+  "gen_ai.client.inference.usage.output_tokens",
+  "gen_ai.client.inference.usage.cache_read.input_tokens",
+  "gen_ai.client.inference.usage.cache_write.input_tokens",
+  "gen_ai.invoke_agent.duration",
+]);
 const observedMetrics = new Set();
 const expectedScenarios = ["agent_success_latest", "agent_failure_latest"];
 
