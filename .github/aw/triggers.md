@@ -144,6 +144,8 @@ on:
   schedule: every 6 hours                # Every 6 hours, all days
 ```
 
+Day, week, and month intervals are also supported: `every 2 days`, `every 2w`, and `every 2mo`. Recompiling workflows that use these intervals changes their scattered cron once, including the weekday for `every 1w` and day of month for `every 1mo`; see the [schedule syntax reference](https://github.github.com/gh-aw/reference/schedule-syntax/) for migration details.
+
 The compiler converts fuzzy schedules to deterministic cron (e.g., `daily on weekdays` → `43 5 * * 1-5`), scatters execution to avoid load spikes, and adds `workflow_dispatch:` for manual runs.
 
 **Recommended Pattern:**
