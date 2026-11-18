@@ -4,11 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
-
-var compilerAdmissionLog = logger.New("workflow:compiler_admission")
 
 // Dry-run execution keeps its own credit limits, but conclusion still records
 // metadata from the admission step, which remains in the dry-run graph.
@@ -17,15 +14,16 @@ func admissionBudgetOutputsEnabled(data *WorkflowData) bool {
 }
 
 func (c *Compiler) isAdmissionEnabled(frontmatter map[string]any) bool {
+	repoConfig, err := c.loadRepoConfig()
+	if err == nil && repoConfig != nil && repoConfig.Admission != nil {
+		return *repoConfig.Admission
+	}
 	if on, ok := frontmatter["on"].(map[string]any); ok {
-		if enabled, ok := on["admission"].(bool); ok && enabled {
-			return true
+		if enabled, ok := on["admission"].(bool); ok {
+			return enabled
 		}
 	}
-	repoConfig, err := c.loadRepoConfig()
-	enabled := err == nil && repoConfig != nil && repoConfig.Admission
-	compilerAdmissionLog.Printf("Admission from repo config: enabled=%t, configLoaded=%t", enabled, err == nil)
-	return enabled
+	return true
 }
 
 func (c *Compiler) buildConclusionAdmissionStep(data *WorkflowData) []string {

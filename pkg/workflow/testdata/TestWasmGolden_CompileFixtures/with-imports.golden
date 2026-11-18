@@ -37,10 +37,15 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
+      id-token: write # Request an OIDC token for authenticated services.
     env:
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
+      admission-max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
+      admission-max-ai-credits-evals: ${{ steps.admission.outputs.max-ai-credits-evals }}
+      admission-max-ai-credits-threat-detection: ${{ steps.admission.outputs.max-ai-credits-threat-detection }}
+      admission-result: ${{ steps.admission.outputs.result }}
       aw_context: ${{ steps.generate_aw_info.outputs.aw_context }}
       comment_id: ""
       comment_repo: ""
@@ -84,6 +89,21 @@ jobs:
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
+      - name: Check workflow admission
+        id: admission
+        if: vars.GH_AW_DEFAULT_ADMISSION_URL != ''
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
+          GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
+          GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
+          GH_AW_ADMISSION_WORKFLOW_HASH: "6cf9e9f04dfa8ac4d498b0ee1bcbf86bfc958022095d4cd82dca49ecb91ca6a8:869a6fd8e781b5debe970575ba6f9eb4cf640d5e9353de455680f9926b65208e"
+          GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          script: |
+            await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Resolve model routing
@@ -970,6 +990,8 @@ jobs:
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ needs.activation.outputs.model-routing != 'true' && (vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'default') || '' }}
+          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
+          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
@@ -1263,6 +1285,7 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       checks: read # Read check runs for workflow context.
+      id-token: write # Request an OIDC token for authenticated services.
       issues: write # Create or update issues and comments.
       pull-requests: read # Read pull requests and review comments for workflow context.
     concurrency:
@@ -1423,6 +1446,10 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
+          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
+          GH_AW_ADMISSION_MAX_AI_CREDITS_THREAT_DETECTION: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}
+          GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}
           GH_AW_GRADER_MANIFEST_0: '{"version":2,"graders":[]}'
           GH_AW_GRADER_MANIFEST_CHUNKS: '1'
           GH_AW_JOB_DURATIONS: ${{ steps.report_failed_jobs.outputs.job_durations }}
@@ -1515,6 +1542,26 @@ jobs:
           if-no-files-found: ignore
           overwrite: true
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
+      - name: Report admission conclusion
+        if: always() && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
+          GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
+          GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
+          GH_AW_ADMISSION_WORKFLOW_HASH: "6cf9e9f04dfa8ac4d498b0ee1bcbf86bfc958022095d4cd82dca49ecb91ca6a8:869a6fd8e781b5debe970575ba6f9eb4cf640d5e9353de455680f9926b65208e"
+          GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          GH_AW_USAGE_ARTIFACT_ID: ${{ steps.upload-usage-artifact.outputs.artifact-id }}
+          GH_AW_USAGE_ARTIFACT_RETRY_ID: ${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}
+        with:
+          script: |
+            const { setupGlobals } = require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   safe_outputs:
     name: safe_outputs

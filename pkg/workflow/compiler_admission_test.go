@@ -20,14 +20,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAdmissionOptIn(t *testing.T) {
-	for _, repo := range []string{"", "false", "true"} {
+func TestAdmissionCompilationSetting(t *testing.T) {
+	for _, repo := range []string{"", "{}", "false", "true"} {
 		for _, workflow := range []string{"", "false", "true"} {
 			t.Run("repo="+repo+"/workflow="+workflow, func(t *testing.T) {
 				root := t.TempDir()
 				require.NoError(t, os.MkdirAll(filepath.Join(root, ".github", "workflows"), 0o755))
 				if repo != "" {
-					require.NoError(t, os.WriteFile(filepath.Join(root, RepoConfigFileName), []byte(`{"admission":`+repo+`}`), 0o600))
+					config := repo
+					if repo != "{}" {
+						config = `{"admission":` + repo + `}`
+					}
+					require.NoError(t, os.WriteFile(filepath.Join(root, RepoConfigFileName), []byte(config), 0o600))
 				}
 				compiler := NewCompiler(WithNoEmit(true))
 				compiler.gitRoot = root
@@ -35,10 +39,10 @@ func TestAdmissionOptIn(t *testing.T) {
 				if workflow != "" {
 					source += "  admission: " + workflow + "\n"
 				}
-				source += "---\nAdmission opt-in\n"
+				source += "---\nAdmission compilation setting\n"
 				data, err := compiler.ParseWorkflowString(source, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
-				enabled := repo == "true" || workflow == "true"
+				enabled := repo == "true" || (repo != "false" && workflow != "false")
 				require.Equal(t, enabled, data.AdmissionEnabled)
 				output, err := compiler.CompileToYAML(data, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
@@ -74,6 +78,7 @@ func TestAdmissionOptIn(t *testing.T) {
 					assert.Contains(t, conclusion.Permissions, "id-token: write")
 					assert.Contains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
 				} else {
+					assert.NotContains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
 					assert.NotContains(t, output, "needs.admission.")
 					assert.NotContains(t, output, "needs.activation.outputs.admission-")
 					assert.NotContains(t, activation.Needs, "admission")
@@ -89,7 +94,7 @@ func TestAdmissionOptIn(t *testing.T) {
 	}
 }
 
-func TestAdmissionRejectsInvalidOptIn(t *testing.T) {
+func TestAdmissionRejectsInvalidSetting(t *testing.T) {
 	for _, value := range []string{`"true"`, "1", "{}", "[]"} {
 		t.Run(value, func(t *testing.T) {
 			source := "---\non:\n  workflow_dispatch:\n  admission: " + value + "\n---\nTest\n"

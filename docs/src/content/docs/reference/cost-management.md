@@ -354,20 +354,9 @@ Use an admission authority when static per-run and daily limits are not enoughâ€
 
 #### Enable the Admission Gate
 
-1. Opt in for an individual workflow by adding `admission: true` alongside its existing triggers:
+1. Check that `.github/workflows/aw.json` doesn't set `"admission": false`. Admission steps are compiled by default, and an explicit repository setting overrides `on.admission` in workflow frontmatter.
 
-   ```aw wrap
-   on:
-     workflow_dispatch:
-     admission: true
-   ```
-
-   Alternatively, set `"admission": true` in the existing `.github/workflows/aw.json` object to opt in repository-wide. Preserve other settings.
-
-   > [!IMPORTANT]
-   > A workflow-level `false` cannot override repository-level `true`.
-
-2. Recompile affected workflows with `gh aw compile` and commit the updated Markdown or repository configuration and generated `.lock.yml` files. Admission jobs are omitted by default; setting an endpoint alone does not add them.
+2. Recompile affected workflows with `gh aw compile` if their lock files don't already contain the admission steps, and commit the generated `.lock.yml` files.
 
 3. Export existing managed defaults before editing them:
 

@@ -156,8 +156,9 @@ represented by a skipped state-machine slot, not a real runtime job.
 [admission service contract](../../docs/src/content/docs/specs/admission-service-specification.md),
 including the implemented client's daily-validation precedence, optional
 component allowances, and admission OIDC capability confined to activation and conclusion jobs. It is a bounded reference model, not a proof of the runtime
-or deployment-owned authority. Admission runs in an endpoint-gated job.
-Activation requires successful or intentionally skipped admission; a successful
+or deployment-owned authority. The admission check and completion callback are
+endpoint-gated steps. Skipping them does not remove job-wide OIDC permission
+from activation or conclusion. Activation requires successful or intentionally skipped admission; a successful
 activation is required before agent execution. Independent OIDC features are
 outside this admission-only permission model.
 

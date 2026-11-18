@@ -45,8 +45,8 @@
     },
     "admission": {
       "type": "boolean",
-      "default": false,
-      "description": "Enable admission and conclusion_admission jobs for all workflows. Admission is also enabled by on.admission: true in an individual workflow."
+      "default": true,
+      "description": "Override admission step generation for all workflows. Set false to omit the activation check and conclusion callback, regardless of workflow frontmatter. If unset, workflows use on.admission, which defaults to true."
     },
     "gateway-dispatch": {
       "type": "boolean",
