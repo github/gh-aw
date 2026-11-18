@@ -152,6 +152,7 @@ func TestConnectorSetupCanonicalGoldens(t *testing.T) {
 	for _, provider := range []string{
 		"linear", "jira", "azure-devops", "slack", "teams", "confluence", "sentry",
 		"servicenow", "gitlab", "pagerduty", "datadog", "zendesk", "notion", "asana",
+		"azure-web-iq",
 	} {
 		t.Run(provider, func(t *testing.T) {
 			path := repositoryConnectorFixtureDirectory + "/" + provider + "-golden.md"
@@ -188,6 +189,14 @@ func TestConnectorSetupCanonicalGoldens(t *testing.T) {
 			require.Contains(t, output, "Importing selects nothing")
 			require.Contains(t, output, "No secrets were read, written, minted, or refreshed")
 			require.Contains(t, output, "No capabilities, native methods, write credentials or webhook ingress were enabled")
+			if provider == "azure-web-iq" {
+				for _, expected := range []string{
+					"queries: array", "AZURE_WEB_IQ_READ_ACCESS_TOKEN",
+					"bind an Entra application's client ID to exactly one Web IQ AppID",
+				} {
+					require.Contains(t, connectorConsoleText(output), expected)
+				}
+			}
 		})
 	}
 }
