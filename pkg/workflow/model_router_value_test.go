@@ -5,6 +5,7 @@ package workflow
 import (
 	"encoding/json"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -202,6 +203,44 @@ func TestCompileRouterModelValue_TopLevelShortlist(t *testing.T) {
 			require.ErrorContains(t, compileDefaultRoutingFiles(t, files).err, tc.want)
 		})
 	}
+}
+
+func TestCompileRouterModelValue_ImportedShortlistInputSubstitution(t *testing.T) {
+	const body = "---\nReport.\n"
+	const shared = `---
+import-schema:
+  candidates:
+    type: array
+    items:
+      type: string
+    required: true
+  goal:
+    type: string
+model-routing:
+  allowed-models: ${{ github.aw.import-inputs.candidates }}
+`
+	main := routerValueBase + `model: router/economy
+engine: copilot
+imports:
+  - uses: shared/routing.md
+    with:
+      candidates: [gpt-5.6-luna, claude-haiku-4.5]
+`
+	valid := compileDefaultRoutingFiles(t, map[string]string{
+		"main.md":           main + body,
+		"shared/routing.md": shared + body,
+	})
+	_, candidates := routedObjective(t, valid)
+	require.Equal(t, []any{"github-copilot/gpt-5.6-luna", "github-copilot/claude-haiku-4.5"}, candidates)
+
+	invalidShared := strings.Replace(shared, "  allowed-models:", "  goal: ${{ github.aw.import-inputs.goal }}\n  allowed-models:", 1)
+	invalidMain := strings.Replace(main, "      candidates:", "      goal: cost\n      candidates:", 1)
+	invalid := compileDefaultRoutingFiles(t, map[string]string{
+		"main.md":           invalidMain + body,
+		"shared/routing.md": invalidShared + body,
+	})
+	require.ErrorContains(t, invalid.err, "model-routing")
+	require.ErrorContains(t, invalid.err, "goal")
 }
 
 func lockModelConfig(t *testing.T, lock string) map[string]any {
