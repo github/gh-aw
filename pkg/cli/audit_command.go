@@ -247,7 +247,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 	if err != nil {
 		return err
 	}
-	if err := applyAuditRepoFlag(opts.repoFlag, components); err != nil {
+	if err := applyAuditRepoFlag(ctx, opts.repoFlag, components); err != nil {
 		return err
 	}
 	if opts.search != "" && components.JobID > 0 {
@@ -283,13 +283,13 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 	return err
 }
 
-func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents) error {
+func applyAuditRepoFlag(ctx context.Context, repoFlag string, components *parser.GitHubURLComponents) error {
 	if components.Owner != "" {
 		return nil
 	}
 	if repoFlag == "" {
 		var err error
-		repoFlag, err = GetCurrentRepoSlug()
+		repoFlag, err = getCurrentRepoSlugWithContext(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to detect current repository: %w; use --repo owner/repo or provide a run URL", err)
 		}
@@ -322,7 +322,7 @@ func runAuditMulti(ctx context.Context, args []string, opts auditCommandOptions)
 	}
 
 	// Resolve owner/repo/hostname from --repo flag or base URL
-	if err := applyAuditRepoFlag(opts.repoFlag, baseComponents); err != nil {
+	if err := applyAuditRepoFlag(ctx, opts.repoFlag, baseComponents); err != nil {
 		return err
 	}
 	owner := baseComponents.Owner

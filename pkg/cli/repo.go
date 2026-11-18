@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -23,10 +24,20 @@ var currentRepoSlugCache syncutil.OnceLoader[string]
 // getCurrentRepoSlugUncached preserves gh's canonical, selected repository.
 // Local origin parsing is a fallback when gh cannot resolve a repository.
 func getCurrentRepoSlugUncached() (string, error) {
+	return getCurrentRepoSlugWithContext(context.Background())
+}
+
+func getCurrentRepoSlugWithContext(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	repoLog.Print("Fetching current repository slug")
 
 	repoLog.Print("Attempting to get repository slug via gh CLI")
-	output, err := workflow.RunGH("Fetching repository info...", "repo", "view", "--json", "owner,name", "--jq", ".owner.login + \"/\" + .name")
+	output, err := workflow.RunGHContext(ctx, "Fetching repository info...", "repo", "view", "--json", "owner,name", "--jq", ".owner.login + \"/\" + .name")
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if err == nil {
 		repoSlug := strings.TrimSpace(string(output))
 		if repoSlug != "" {
@@ -48,7 +59,7 @@ func getCurrentRepoSlugUncached() (string, error) {
 		}
 		return "", errors.New("failed to get current repository: gh CLI returned an invalid repository slug")
 	}
-	return getCurrentRepoSlugFromGit()
+	return getCurrentRepoSlugFromGitContext(ctx)
 }
 
 // getWorkQueueRepoSlug discovers only the queue target locally. Other commands
@@ -63,8 +74,15 @@ func getWorkQueueRepoSlug() (string, error) {
 }
 
 func getCurrentRepoSlugFromGit() (string, error) {
-	gitCmd := exec.Command("git", "remote", "get-url", "origin")
+	return getCurrentRepoSlugFromGitContext(context.Background())
+}
+
+func getCurrentRepoSlugFromGitContext(ctx context.Context) (string, error) {
+	gitCmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
 	gitOutput, err := gitCmd.Output()
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if err != nil {
 		repoLog.Printf("Failed to get git remote URL: %v", err)
 		return "", fmt.Errorf("failed to get local Git origin: %w", err)
