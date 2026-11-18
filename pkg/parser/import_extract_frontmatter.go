@@ -38,6 +38,12 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 	}
 
 	// Phase 3: Extract engine configuration (id, runtime, mcp timeouts, model preference).
+	if warning := LegacyModelRoutingWarning(fm); warning != "" {
+		if disabled, ok := fm["model-routing"].(bool); ok && !disabled {
+			return fmt.Errorf("import %q: use top-level model-routing: false or nested engine.model-routing, not both", item.importPath)
+		}
+		acc.warnings = append(acc.warnings, fmt.Sprintf("import %q: %s", item.importPath, warning))
+	}
 	acc.extractEngineConfig(fm, item.fullPath)
 
 	// Phase 4: Extract scalar and builder-based configuration fields.

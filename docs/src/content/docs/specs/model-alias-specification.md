@@ -7,7 +7,7 @@ sidebar:
 
 # Model Alias Format Specification
 
-**Version**: 1.5.0\
+**Version**: 1.6.0\
 **Status**: Draft  
 **Publication Date**: 2026-11-18\
 **Editor**: GitHub Agentic Workflows Team  
@@ -617,6 +617,8 @@ A router value is accepted only as the main agent's model (top-level `model`, `e
 
 A literal router value MAY be combined with a single top-level `model-routing.allowed-models` shortlist in the workflow or a shared import. It MUST narrow only the main agent's router candidates, exactly as the equivalent nested shortlist does. It MUST NOT enable implicit routing, change a request policy, or be silently ignored when the effective model is fixed or expression-valued. The top-level block does not accept `goal` or `mode`.
 
+Top-level `model-routing: false` in a workflow or shared import MUST disable implicit routing without selecting a model or changing model override precedence. It MUST NOT be combined with a literal router selector or a shortlist. `true` is not a selector. Compilers SHOULD warn on authored `engine.model-routing` declarations, including imports. For `goal: cost-speed` they MUST NOT substitute a cost objective or advertise an equivalent router selector.
+
 A main-agent model that is a single expression, reading only contexts the activation job resolves as later jobs do, on a workflow eligible for routing MAY resolve to a router value at run time. The activation job MUST resolve it once, route the run at that level, and give later jobs the resolved value; any other reserved identifier MUST stop the run before the agent starts. A variable, or an expression on an ineligible workflow, that resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ---
@@ -1038,6 +1040,10 @@ Model parameters are compile-time configuration values and are not derived from 
 ---
 
 ## Change Log
+
+### Version 1.6.0 (Draft)
+
+- **Added**: §9.4 supports a top-level routing opt-out. The nested syntax and `cost-speed` are deprecated but remain supported during migration.
 
 ### Version 1.5.0 (Draft)
 

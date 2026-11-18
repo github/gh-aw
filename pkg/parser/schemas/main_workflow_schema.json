@@ -14577,16 +14577,25 @@
       "examples": ["gpt-5.4", "claude-3-5-sonnet-20241022", "gpt-4"]
     },
     "model-routing": {
-      "description": "Optional shortlist for an explicit router model value. Applies only to the main agent's router choices, not to other model requests. Declare this block once, in the main workflow or a shared import.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["allowed-models"],
-      "properties": {
-        "allowed-models": {
-          "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing/oneOf/0/properties/allowed-models",
-          "description": "Specify at least one exact model name or gh-aw alias. The engine's capabilities and models.allowed/blocked still apply; the shortlist changes no request policy."
+      "description": "Set false to disable implicit main-agent routing without pinning a model, or give a shortlist for an explicit router model value. The shortlist changes no other model requests.",
+      "oneOf": [
+        {
+          "type": "boolean",
+          "const": false,
+          "description": "Keep the normal model overrides and engine default without using the router."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed-models"],
+          "properties": {
+            "allowed-models": {
+              "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing/oneOf/0/properties/allowed-models",
+              "description": "Specify at least one exact model name or gh-aw alias. Declare one list across the workflow and its imports. The engine's capabilities and models.allowed/blocked still apply."
+            }
+          }
         }
-      }
+      ]
     },
     "graders": {
       "description": "Graders over the unified session, including reserved operational-value JavaScript. Fast built-ins run in conclusion; executable custom graders run only in the separate graders job.",
@@ -15738,7 +15747,7 @@
               "description": "Ordered alternative models after model-specific failures, supported by engines with a built-in retry harness. Each model receives its own harness retry budget. Cannot be combined with model-routing or a custom driver or harness."
             },
             "model-routing": {
-              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. Eligible workflows that choose no model or routing on GitHub Copilot inference default to goal cost and mode auto; set false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "description": "Deprecated. Use a router model value for cost routing, or top-level model-routing: false to opt out. The cost-speed objective still works during migration but has no equivalent cost selector. See https://github.github.com/gh-aw/reference/model-routing/.",
               "oneOf": [
                 {
                   "type": "object",

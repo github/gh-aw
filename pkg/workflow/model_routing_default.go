@@ -180,6 +180,9 @@ func declaresModelOrRoutingChoice(frontmatter map[string]any, model string, engi
 	if _, ok := frontmatter["model"]; ok {
 		return true
 	}
+	if _, ok := frontmatter["model-routing"]; ok {
+		return true
+	}
 	if engineObj, ok := frontmatter["engine"].(map[string]any); ok && engineObjectDeclaresModelChoice(engineObj) {
 		return true
 	}
@@ -262,13 +265,13 @@ func (c *Compiler) reportDefaultModelRouting(data *WorkflowData, markdownPath st
 // DefaultModelRoutingBatchNotice is the aggregated informational notice for
 // workflows that received the implicit model-routing default in batch mode.
 func DefaultModelRoutingBatchNotice(count int) string {
-	return fmt.Sprintf("%d workflow(s) set no model or engine.model-routing, so they use model routing with goal %s and mode %s on GitHub Copilot inference. "+
-		"Set engine.model-routing: false to opt out, or choose a model. A nonempty vars.GH_AW_MODEL_AGENT_<ENGINE> or vars.GH_AW_DEFAULT_MODEL_<ENGINE> bypasses routing at run time. "+
+	return fmt.Sprintf("%d workflow(s) set no model or routing configuration, so they use model routing with goal %s and mode %s on GitHub Copilot inference. "+
+		"Set model-routing: false to opt out, or choose a model. A nonempty vars.GH_AW_MODEL_AGENT_<ENGINE> or vars.GH_AW_DEFAULT_MODEL_<ENGINE> bypasses routing at run time. "+
 		"See https://github.github.com/gh-aw/reference/model-routing/", count, defaultModelRoutingGoal, defaultModelRoutingMode)
 }
 
 func defaultModelRoutingNotice(workflowFile, engineID string) string {
-	message := fmt.Sprintf("%s: no model or engine.model-routing is set, so the %s engine uses model routing with goal %s and mode %s on GitHub Copilot inference. Set engine.model-routing: false to opt out, or choose a model.",
+	message := fmt.Sprintf("%s: no model or routing configuration is set, so the %s engine uses model routing with goal %s and mode %s on GitHub Copilot inference. Set model-routing: false to opt out, or choose a model.",
 		workflowFile, engineID, defaultModelRoutingGoal, defaultModelRoutingMode)
 	if agentVar, defaultVar, ok := modelRoutingRuntimeVariables(engineID); ok {
 		message += fmt.Sprintf(" A nonempty vars.%s or vars.%s bypasses routing at run time.", agentVar, defaultVar)

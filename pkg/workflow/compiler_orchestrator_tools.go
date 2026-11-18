@@ -657,6 +657,10 @@ func (c *Compiler) hasContentContext(frontmatter map[string]any) bool {
 // The schema's x-deprecation-message (falling back to description) is used as
 // the warning text so deprecations self-document without per-field plumbing.
 func (c *Compiler) warnDeprecatedFrontmatterFields(frontmatter map[string]any) {
+	if warning := parser.LegacyModelRoutingWarning(frontmatter); warning != "" {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
+		c.IncrementWarningCount()
+	}
 	deprecatedFields, err := parser.GetMainWorkflowDeprecatedFieldsDeep()
 	if err != nil {
 		orchestratorToolsLog.Printf("Failed to load deprecated fields from schema: %v", err)
