@@ -31,6 +31,7 @@ type operationalValueConfig struct {
 	Repo          string
 	Recipe        string
 	Evidence      string
+	Daily         bool
 }
 
 var valueWorkflowID = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
@@ -94,6 +95,7 @@ func NewValueCommand() *cobra.Command {
 	cmd.Flags().StringVar(&config.ValueFunction, "value-function", "", "Versioned JSON definition selecting a named Go value evaluator")
 	cmd.Flags().StringVar(&config.Recipe, "recipe", "", "Versioned JSON report recipe fixing dates, author filter, and inspected windows")
 	cmd.Flags().StringVar(&config.Evidence, "evidence", "", "Versioned typed observation bundle for evidence-number-v1 (not native adoption proof)")
+	cmd.Flags().BoolVar(&config.Daily, "daily", false, "Show daily Git measurements and retained human acceptance evidence at noon UTC")
 	cmd.Flags().StringVarP(&config.Repo, "repo", "r", "", "Repository in [HOST/]OWNER/REPO format (defaults to the current repository)")
 	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output the report as JSON")
@@ -157,6 +159,9 @@ func collectOperationalValueReport(ctx context.Context, config operationalValueC
 		return report, nil, err
 	}
 	report = newOperationalValueReport(definition, start, end, now, records)
+	if _, typed := measurement.(valueEvidenceMeasurement); config.Daily && (measurement == nil || typed) {
+		return report, nil, errors.New("--daily requires a historical Git measurement, such as schema-example-coverage-v1; omit --daily for other reports")
+	}
 	if evidenceMeasurement, ok := measurement.(valueEvidenceMeasurement); ok {
 		if config.RefExplicit {
 			return report, nil, errors.New("--ref selects historical Git evaluation and cannot be combined with evidence-number-v1")
@@ -192,7 +197,7 @@ func collectOperationalValueReport(ctx context.Context, config operationalValueC
 	if policy.Baseline != "exact_parent" {
 		return report, nil, errors.New("historical Git measurement requires exact_parent baseline")
 	}
-	options := valueReportOptions{Start: start, End: end, ObservedAt: now, Policy: policy}
+	options := valueReportOptions{Start: start, End: end, ObservedAt: now, Policy: policy, Daily: config.Daily}
 	report, err = buildOperationalValueReport(git, measurement, tip, options, outputs, records)
 	if err == nil {
 		err = inspectValueRecipe(&report, recipe)
@@ -309,6 +314,9 @@ func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, r
 		return err
 	}
 	if err := renderValueRunGrades(out, report.RunGrades); err != nil {
+		return err
+	}
+	if err := renderValueDaily(out, measurement, report.Daily); err != nil {
 		return err
 	}
 	if report.Reason != "" && report.Evidence == nil {

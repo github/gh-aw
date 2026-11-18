@@ -47,6 +47,28 @@ runtime. It returns `measurement_status: "unavailable"`,
 Recorded run grades, when collected, remain available separately in `run_grades`.
 Only collect completed runs; no new execution or workflow dispatch is needed.
 
+## Daily evidence
+
+Add `--daily` to a historical Git report to see one measurement per day, independently of PR windows:
+
+```bash wrap
+gh aw value schema-feature-coverage --daily \
+  --recipe .github/aw/value/schema-feature-coverage.slides.json \
+  --logs-dir .github/aw/logs --json
+```
+
+Each `daily[]` row contains the noon UTC `snapshot` (commit, value, and population when available).
+`retained_human_acceptances` counts distinct retained delivery records for this workflow with
+a verified human acceptance, by **decision time**, even if delivery happened before the report.
+Each interval ends at the row's noon, inclusive, and excludes the preceding noon.
+The first row is the baseline and includes only decisions exactly at the start instant.
+
+The lifecycle ledger retains the latest observation per effect, not a complete decision history.
+Positive counts have `acceptance_coverage: "retained_subset"`; without a matching decision,
+the count is `null` and coverage is `unknown`, **not** a verified zero. Delivery fallbacks are
+not counted. `--daily` neither estimates a temporal association nor changes attributed value.
+Sparse typed evidence and session grades are not interpolated into daily measurements.
+
 ## Recorded grader results
 
 The command also reads primary `operational-value` grades already exported by

@@ -24,6 +24,7 @@ type operationalValueReport struct {
 	End                 time.Time                  `json:"end"`
 	ObservedAt          time.Time                  `json:"observed_at"`
 	Weekly              []valueSnapshot            `json:"weekly"`
+	Daily               []valueDailyObservation    `json:"daily,omitempty"`
 	Cohort              *valueCohort               `json:"cohort,omitempty"`
 	Outputs             []valueOutput              `json:"outputs"`
 	Windows             []valueWindow              `json:"windows"`
@@ -61,6 +62,7 @@ type valueWindow struct {
 type valueReportOptions struct {
 	Start, End, ObservedAt time.Time
 	Policy                 valueWindowPolicy
+	Daily                  bool
 }
 
 func buildOperationalValueReport(git valueGit, measurement valueMeasurement, tip string, options valueReportOptions, outputs []valueOutput, records map[string]lifecycle.Record) (operationalValueReport, error) {
@@ -86,6 +88,13 @@ func buildOperationalValueReport(git valueGit, measurement valueMeasurement, tip
 		}
 	}
 	report.Cohort = measurement.cohort(report.Weekly)
+	if options.Daily {
+		rows, err := collectValueDaily(git, measurement, tip, report, records)
+		if err != nil {
+			return report, err
+		}
+		report.Daily = rows
+	}
 	for _, output := range outputs {
 		if output.Delivered.Before(start) || output.Delivered.After(end) {
 			continue

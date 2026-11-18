@@ -168,6 +168,7 @@ func TestOperationalValueGitReplay(t *testing.T) {
 		if i >= 7 {
 			expected = 3
 		}
+
 		assert.Equal(t, expected, sample.Coverage.Covered)
 	}
 	require.NotNil(t, window.Survival)
@@ -308,4 +309,41 @@ func TestOperationalValueInputFailures(t *testing.T) {
 	_, err = git.prepare(measurement.definition(), "main", now)
 	require.ErrorContains(t, err, "requires full Git history")
 	assert.NotContains(t, err.Error(), "fetch --unshallow", "the command must not fetch implicitly")
+}
+func TestOperationalValueDailyEvidence(t *testing.T) {
+	git, commit := valueTestGit(t)
+	m := schemaCoverageMeasurement{}
+	commit("2026-09-20T07:00:00Z", map[string]string{
+		"pkg/parser/schemas/main_workflow_schema.json": `{"properties":{"a":{}}}`,
+		"schema-demos/example.md":                      "no example yet",
+	})
+	tip := commit("2026-09-22T07:00:00Z", map[string]string{"schema-demos/example.md": "a:\n"})
+	start := valueTestTime(t, "2026-09-21T12:00:00Z")
+	end := start.Add(48 * time.Hour)
+	record := valueTestRecord(t, valueOutput{RunID: 1, URL: "https://github.com/github/gh-aw/pull/1",
+		Delivered: start.Add(-time.Hour), Merged: start.Add(time.Minute)})
+	atNoon := valueTestRecord(t, valueOutput{RunID: 2, URL: "https://github.com/github/gh-aw/pull/2",
+		Delivered: start, Merged: start.Add(24 * time.Hour)})
+	foreign, fallback := record, record
+	foreign.Workflow = "other"
+	fallback.Adoption.AcceptanceKind = "fallback_delivery"
+	records := map[string]lifecycle.Record{"1": record, "2": atNoon, "3": foreign, "4": fallback}
+	opts := valueReportOptions{Start: start, End: end, ObservedAt: end, Daily: true}
+	report, err := buildOperationalValueReport(git, m, tip, opts, nil, records)
+	require.NoError(t, err)
+	require.Len(t, report.Daily, 3)
+	assert.Equal(t, new(0.0), report.Daily[0].Snapshot.Value)
+	assert.Nil(t, report.Daily[0].RetainedAcceptances)
+	assert.Equal(t, new(1.0), report.Daily[1].Snapshot.Value)
+	assert.Equal(t, new(2), report.Daily[1].RetainedAcceptances)
+	assert.Equal(t, "retained_subset", report.Daily[1].AcceptanceCoverage)
+	assert.Equal(t, "unknown", report.Daily[2].AcceptanceCoverage)
+	var text bytes.Buffer
+	require.NoError(t, renderOperationalValueReport(&text, m, report))
+	assert.Contains(t, text.String(), "Retained human acceptances")
+	opts.Daily = false
+	original, err := buildOperationalValueReport(git, m, tip, opts, nil, records)
+	require.NoError(t, err)
+	report.Daily = nil
+	assert.Equal(t, original, report)
 }
