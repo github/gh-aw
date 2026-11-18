@@ -23,7 +23,7 @@ func (c *Compiler) isAdmissionEnabled(frontmatter map[string]any) bool {
 			return enabled
 		}
 	}
-	return true
+	return false
 }
 
 func (c *Compiler) buildConclusionAdmissionStep(data *WorkflowData) []string {

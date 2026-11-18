@@ -21,6 +21,7 @@ import (
 )
 
 func TestAdmissionCompilationSetting(t *testing.T) {
+	var activationPermissions, conclusionPermissions string
 	for _, repo := range []string{"", "{}", "false", "true"} {
 		for _, workflow := range []string{"", "false", "true"} {
 			t.Run("repo="+repo+"/workflow="+workflow, func(t *testing.T) {
@@ -42,7 +43,7 @@ func TestAdmissionCompilationSetting(t *testing.T) {
 				source += "---\nAdmission compilation setting\n"
 				data, err := compiler.ParseWorkflowString(source, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
-				enabled := repo == "true" || (repo != "false" && workflow != "false")
+				enabled := repo == "true" || (repo != "false" && workflow == "true")
 				require.Equal(t, enabled, data.AdmissionEnabled)
 				output, err := compiler.CompileToYAML(data, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
@@ -69,21 +70,24 @@ func TestAdmissionCompilationSetting(t *testing.T) {
 				require.True(t, exists)
 				conclusion, exists := compiler.jobManager.GetJob("conclusion")
 				require.True(t, exists)
+				if activationPermissions == "" {
+					activationPermissions, conclusionPermissions = activation.Permissions, conclusion.Permissions
+				}
+				assert.Equal(t, activationPermissions, activation.Permissions, "admission controls code generation, not job permissions")
+				assert.Equal(t, conclusionPermissions, conclusion.Permissions, "admission controls code generation, not job permissions")
+				assert.Contains(t, activation.Permissions, "id-token: write")
+				assert.Contains(t, conclusion.Permissions, "id-token: write")
 				_, admissionOutput := activation.Outputs["admission-result"]
 				assert.Equal(t, enabled, admissionOutput)
 				assert.NotContains(t, conclusion.Outputs, "admission_compact_session")
 				assert.Equal(t, enabled, strings.Contains(strings.Join(conclusion.Steps, ""), "Report admission conclusion"))
 				if enabled {
-					assert.Contains(t, activation.Permissions, "id-token: write")
-					assert.Contains(t, conclusion.Permissions, "id-token: write")
 					assert.Contains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
 				} else {
 					assert.NotContains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
 					assert.NotContains(t, output, "needs.admission.")
 					assert.NotContains(t, output, "needs.activation.outputs.admission-")
 					assert.NotContains(t, activation.Needs, "admission")
-					assert.NotContains(t, activation.Permissions, "id-token: write")
-					assert.NotContains(t, conclusion.Permissions, "id-token: write")
 				}
 				var rendered map[string]any
 				require.NoError(t, yaml.Unmarshal([]byte(output), &rendered))

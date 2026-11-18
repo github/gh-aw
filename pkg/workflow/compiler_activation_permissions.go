@@ -137,9 +137,7 @@ func (c *Compiler) buildActivationPermissions(ctx *activationJobBuildContext) (s
 func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext) map[PermissionScope]PermissionLevel {
 	permsMap := map[PermissionScope]PermissionLevel{
 		PermissionContents: PermissionRead,
-	}
-	if ctx.data.AdmissionEnabled {
-		permsMap[PermissionIdToken] = PermissionWrite
+		PermissionIdToken:  PermissionWrite,
 	}
 	if isWorkQueueWorker(ctx.data) {
 		permsMap[PermissionContents] = PermissionWrite

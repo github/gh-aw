@@ -105,7 +105,7 @@ func TestTokenBrokerCompileOptIn(t *testing.T) {
 				}
 				if usesBroker {
 					assert.Equal(t, "write", job.Permissions["id-token"], name)
-				} else if (name != "activation" && name != "conclusion") || !data.AdmissionEnabled {
+				} else if name != "activation" && name != "conclusion" {
 					assert.NotContains(t, job.Permissions, "id-token", name)
 				}
 			}
@@ -220,7 +220,7 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 						invalidations++
 					}
 				}
-				if name != "safe_outputs" && ((name != "activation" && name != "conclusion") || !data.AdmissionEnabled) {
+				if name != "safe_outputs" && name != "activation" && name != "conclusion" {
 					assert.NotContains(t, job.Permissions, "id-token", name)
 				}
 			}

@@ -167,7 +167,7 @@ func configuredUsageSafeJobNames(data *WorkflowData) []string {
 }
 
 // computeConclusionJobPermissions resolves the GITHUB_TOKEN permissions for the conclusion
-// job: safe-outputs permissions plus the scopes required by configured OTLP OIDC,
+// job: safe-outputs permissions plus its stable OIDC capability,
 // session job-duration collection, and any issue-creating conclusion mechanism.
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
@@ -191,15 +191,11 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		if conclusionDetectionMayCreateIssue(data) {
 			conclusionPerms.Set(PermissionIssues, PermissionWrite)
 		}
-		if data.AdmissionEnabled || hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
-			conclusionPerms.Set(PermissionIdToken, PermissionWrite)
-		}
+		conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 		addReactionCleanupJobPermissions(data, conclusionPerms)
 		return conclusionPerms
 	}
-	if data.AdmissionEnabled || hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
-		conclusionPerms.Set(PermissionIdToken, PermissionWrite)
-	}
+	conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 	if isWorkQueueEnabled(data) {
 		if level, ok := conclusionPerms.Get(PermissionContents); !ok || level == PermissionNone {
 			conclusionPerms.Set(PermissionContents, PermissionRead)

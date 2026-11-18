@@ -354,7 +354,7 @@ Use an admission authority when static per-run and daily limits are not enoughâ€
 
 #### Enable the Admission Gate
 
-1. Check that `.github/workflows/aw.json` doesn't set `"admission": false`. Admission steps are compiled by default, and an explicit repository setting overrides `on.admission` in workflow frontmatter.
+1. Set `"admission": true` in the existing `.github/workflows/aw.json` object, preserving its other settings. Admission code is omitted by default, and an explicit repository setting overrides `on.admission` in workflow frontmatter without changing job permissions.
 
 2. Recompile affected workflows with `gh aw compile` if their lock files don't already contain the admission steps, and commit the generated `.lock.yml` files.
 
