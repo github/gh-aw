@@ -2063,8 +2063,7 @@ on:
     # (optional)
     all: "read"
 
-  # Generate admission steps in activation and conclusion (default: false).
-  # An explicit admission setting in aw.json takes precedence.
+  # Deprecated and ignored. Admission steps are always generated.
   # (optional)
   admission: true
 

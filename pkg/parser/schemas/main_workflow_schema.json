@@ -2852,8 +2852,9 @@
             },
             "admission": {
               "type": "boolean",
-              "default": false,
-              "description": "Generate admission steps in activation and conclusion. An explicit admission setting in aw.json takes precedence."
+              "default": true,
+              "deprecated": true,
+              "description": "Deprecated and ignored. Admission steps are always generated."
             },
             "stale-check": {
               "oneOf": [

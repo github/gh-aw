@@ -13,17 +13,10 @@ func admissionBudgetOutputsEnabled(data *WorkflowData) bool {
 	return data != nil && data.AdmissionEnabled && !data.DryRun
 }
 
-func (c *Compiler) isAdmissionEnabled(frontmatter map[string]any) bool {
-	repoConfig, err := c.loadRepoConfig()
-	if err == nil && repoConfig != nil && repoConfig.Admission != nil {
-		return *repoConfig.Admission
-	}
-	if on, ok := frontmatter["on"].(map[string]any); ok {
-		if enabled, ok := on["admission"].(bool); ok {
-			return enabled
-		}
-	}
-	return false
+func (c *Compiler) isAdmissionEnabled() bool {
+	// Load repository configuration so deprecated settings can be reported.
+	_, _ = c.loadRepoConfig()
+	return true
 }
 
 func (c *Compiler) buildConclusionAdmissionStep(data *WorkflowData) []string {

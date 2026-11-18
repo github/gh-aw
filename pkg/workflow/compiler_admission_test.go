@@ -21,7 +21,6 @@ import (
 )
 
 func TestAdmissionCompilationSetting(t *testing.T) {
-	var activationPermissions, conclusionPermissions string
 	for _, repo := range []string{"", "{}", "false", "true"} {
 		for _, workflow := range []string{"", "false", "true"} {
 			t.Run("repo="+repo+"/workflow="+workflow, func(t *testing.T) {
@@ -43,9 +42,15 @@ func TestAdmissionCompilationSetting(t *testing.T) {
 				source += "---\nAdmission compilation setting\n"
 				data, err := compiler.ParseWorkflowString(source, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
-				enabled := repo == "true" || (repo != "false" && workflow == "true")
-				require.Equal(t, enabled, data.AdmissionEnabled)
-				assert.Zero(t, compiler.GetWarningCount())
+				require.True(t, data.AdmissionEnabled)
+				expectedWarnings := 0
+				if repo == "true" || repo == "false" {
+					expectedWarnings++
+				}
+				if workflow != "" {
+					expectedWarnings++
+				}
+				assert.Equal(t, expectedWarnings, compiler.GetWarningCount())
 				output, err := compiler.CompileToYAML(data, filepath.Join(root, "workflow.md"))
 				require.NoError(t, err)
 				var header strings.Builder
@@ -53,13 +58,13 @@ func TestAdmissionCompilationSetting(t *testing.T) {
 				manifest, err := ExtractGHAWManifestFromLockFile(header.String())
 				require.NoError(t, err)
 				require.NotNil(t, manifest)
-				assert.Equal(t, enabled, manifest.Admission)
+				assert.True(t, manifest.Admission)
 				manifestJSON, err := manifest.ToJSON()
 				require.NoError(t, err)
 				var manifestFields map[string]json.RawMessage
 				require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifestFields))
-				assert.Equal(t, strconv.FormatBool(enabled), string(manifestFields["admission"]))
-				assert.Contains(t, manifestFields, "admission", "disabled admission must be recorded explicitly")
+				assert.Equal(t, "true", string(manifestFields["admission"]))
+				assert.Contains(t, manifestFields, "admission")
 				roundtrip, err := ExtractGHAWManifestFromLockFile("# gh-aw-manifest: " + manifestJSON + "\n")
 				require.NoError(t, err)
 				assert.Equal(t, manifest, roundtrip)
@@ -71,25 +76,16 @@ func TestAdmissionCompilationSetting(t *testing.T) {
 				require.True(t, exists)
 				conclusion, exists := compiler.jobManager.GetJob("conclusion")
 				require.True(t, exists)
-				if activationPermissions == "" {
-					activationPermissions, conclusionPermissions = activation.Permissions, conclusion.Permissions
-				}
-				assert.Equal(t, activationPermissions, activation.Permissions, "admission controls code generation, not job permissions")
-				assert.Equal(t, conclusionPermissions, conclusion.Permissions, "admission controls code generation, not job permissions")
+				_, admissionOutput := activation.Outputs["admission-result"]
+				assert.True(t, admissionOutput)
+				assert.NotContains(t, conclusion.Outputs, "admission_compact_session")
+				assert.Contains(t, strings.Join(conclusion.Steps, ""), "Report admission conclusion")
 				assert.Contains(t, activation.Permissions, "id-token: write")
 				assert.Contains(t, conclusion.Permissions, "id-token: write")
-				_, admissionOutput := activation.Outputs["admission-result"]
-				assert.Equal(t, enabled, admissionOutput)
-				assert.NotContains(t, conclusion.Outputs, "admission_compact_session")
-				assert.Equal(t, enabled, strings.Contains(strings.Join(conclusion.Steps, ""), "Report admission conclusion"))
-				if enabled {
-					assert.Contains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
-				} else {
-					assert.NotContains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
-					assert.NotContains(t, output, "needs.admission.")
-					assert.NotContains(t, output, "needs.activation.outputs.admission-")
-					assert.NotContains(t, activation.Needs, "admission")
-				}
+				assert.Contains(t, strings.Join(activation.Steps, ""), "activation_admission.cjs")
+				assert.NotContains(t, output, "needs.admission.")
+				assert.Contains(t, output, "needs.activation.outputs.admission-")
+				assert.NotContains(t, activation.Needs, "admission")
 				var rendered map[string]any
 				require.NoError(t, yaml.Unmarshal([]byte(output), &rendered))
 				require.IsType(t, map[string]any{}, rendered["on"])
@@ -131,10 +127,10 @@ func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
 					compiler.SetSkipValidation(true)
 					compiler.SetDryRun(dryRun)
 					require.NoError(t, compiler.CompileWorkflow(path))
-					require.Zero(t, compiler.GetWarningCount())
+					require.Equal(t, 1, compiler.GetWarningCount())
 					lock, err := os.ReadFile(filepath.Join(dir, "admission.lock.yml"))
 					require.NoError(t, err)
-					require.Equal(t, admission, strings.Contains(string(lock), "needs.activation.outputs.admission-"))
+					require.Contains(t, string(lock), "needs.activation.outputs.admission-")
 
 					_, admissionJob := compiler.jobManager.GetJob("admission")
 					assert.False(t, admissionJob)
@@ -152,14 +148,10 @@ func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
 						"GH_AW_ADMISSION_MAX_AI_CREDITS_THREAT_DETECTION": "admission-max-ai-credits-threat-detection",
 						"GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS":            "admission-max-ai-credits-evals",
 					} {
-						if admission {
-							assert.Equal(t, "${{ steps.admission.outputs."+strings.TrimPrefix(output, "admission-")+" }}", activation.Outputs[output])
-						} else {
-							assert.NotContains(t, activation.Outputs, output)
-						}
-						assert.Equal(t, admission, strings.Contains(conclusionSteps, env+": ${{ needs.activation.outputs."+output+" }}"), env)
+						assert.Equal(t, "${{ steps.admission.outputs."+strings.TrimPrefix(output, "admission-")+" }}", activation.Outputs[output])
+						assert.Contains(t, conclusionSteps, env+": ${{ needs.activation.outputs."+output+" }}", env)
 					}
-					assert.Equal(t, admission, strings.Contains(conclusionSteps, "Report admission conclusion"))
+					assert.Contains(t, conclusionSteps, "Report admission conclusion")
 					assert.NotContains(t, conclusion.Outputs, "admission_compact_session")
 
 					jobs := []string{"agent"}
@@ -170,8 +162,8 @@ func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
 						job, exists := compiler.jobManager.GetJob(name)
 						require.True(t, exists, name)
 						steps := strings.Join(job.Steps, "")
-						assert.Equal(t, admission && !dryRun && name != "evals", strings.Contains(steps, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"), name)
-						assert.Equal(t, admission && !dryRun && name != "evals", strings.Contains(steps, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits"), name)
+						assert.Equal(t, !dryRun && name != "evals", strings.Contains(steps, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"), name)
+						assert.Equal(t, !dryRun && name != "evals", strings.Contains(steps, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits"), name)
 					}
 				})
 			}
@@ -510,16 +502,12 @@ Admission ordering
 			assert.NotContains(t, activation.If, "admission")
 			assert.NotContains(t, activation.If, "cancelled()")
 			steps := strings.Join(activation.Steps, "")
-			if admission {
-				check := strings.Index(steps, "name: Check workflow admission")
-				require.NotEqual(t, -1, check)
-				assert.Less(t, strings.Index(steps, "id: setup"), check)
-				for _, later := range []string{"name: Author pre-step", "name: Author step", "id: daily-ai-credits-workflow-guardrail"} {
-					require.Contains(t, steps, later)
-					assert.Less(t, check, strings.Index(steps, later), later)
-				}
-			} else {
-				assert.NotContains(t, steps, "id: admission")
+			check := strings.Index(steps, "name: Check workflow admission")
+			require.NotEqual(t, -1, check)
+			assert.Less(t, strings.Index(steps, "id: setup"), check)
+			for _, later := range []string{"name: Author pre-step", "name: Author step", "id: daily-ai-credits-workflow-guardrail"} {
+				require.Contains(t, steps, later)
+				assert.Less(t, check, strings.Index(steps, later), later)
 			}
 			agent, exists := compiler.jobManager.GetJob("agent")
 			require.True(t, exists)
@@ -548,7 +536,7 @@ func TestAdmissionRejectsCodeGenerationSwitch(t *testing.T) {
 			source := "---\non: workflow_dispatch\nadmission-gate: " + value + "\n---\nTest workflow\n"
 			require.NoError(t, os.WriteFile(file, []byte(source), 0o644))
 			err := NewCompiler().CompileWorkflow(file)
-			require.ErrorContains(t, err, "admission-gate", "only on.admission is a supported workflow opt-in")
+			require.ErrorContains(t, err, "admission-gate", "admission-gate is unsupported")
 		})
 	}
 }
