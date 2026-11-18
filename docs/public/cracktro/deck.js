@@ -4088,7 +4088,15 @@
         n2.textContent = Math.round(38 * ez);
         n3.textContent = Math.round(212 * ez);
       },
-      el: h("section", { class: "slide pfx" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))), tta, links, tags, cards),
+      el: h(
+        "section",
+        { class: "slide pfx" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))),
+        tta,
+        links,
+        tags,
+        cards
+      ),
     });
   }
 
@@ -5225,7 +5233,13 @@
     });
 
     const cards = SC.map((s, i) =>
-      h("button", { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${s.t} (← → step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) }, h("b", {}, i + 1), h("span", { class: "h4" }, s.t), h("span", { class: "p" }, s.d))
+      h(
+        "button",
+        { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${s.t} (← → step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
+        h("b", {}, i + 1),
+        h("span", { class: "h4" }, s.t),
+        h("span", { class: "p" }, s.d)
+      )
     );
     const body = h("div", { class: "atk-body" });
     const term = h("div", { class: "atk-term" }, h("header", {}, h("i"), h("i"), h("i"), h("span", {}, "agent · sandboxed · read-only token")), body);
@@ -5980,6 +5994,66 @@
       spawn = 0,
       total = 0,
       deck = [];
+    // Canvas shadows re-blur their whole bounds on every draw (each ring is ~700px square), which saturated the
+    // main thread. Static glows are baked once into sprites; the rotating rings get faint wider strokes instead.
+    const bake = (w, hh, paint) => {
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = hh;
+      paint(c.getContext("2d"));
+      return c;
+    };
+    const flowDots = {};
+    const flowDot = col =>
+      (flowDots[col] ||= bake(48, 48, g => {
+        g.fillStyle = col;
+        g.shadowColor = col + "55";
+        g.shadowBlur = 10;
+        g.fillRect(20, 20, 8, 8);
+      }));
+    const SHOT = 34; // dot radius plus the reach of its blur
+    let shotSprite;
+    const shotDot = () =>
+      (shotSprite ||= bake(SHOT * 2 + 40, SHOT * 2, g => {
+        g.fillStyle = "#ff7b72";
+        g.shadowColor = "#f8514955";
+        g.shadowBlur = 16;
+        g.beginPath();
+        g.arc(SHOT, SHOT, 7, 0, 7);
+        g.fill();
+        g.strokeStyle = "#f8514966";
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(SHOT, SHOT);
+        g.lineTo(SHOT + 40, SHOT);
+        g.stroke();
+      }));
+    // the core's glow pulses its blur from 18 to 36: one baked sprite per step (2.6px apart)
+    const CS = 160,
+      CORE_STEPS = 7,
+      cores = [];
+    const coreSprite = pulse => {
+      const k = Math.round(pulse * CORE_STEPS);
+      return (cores[k] ||= bake(CS * 2, CS * 2, g => {
+        const gr = g.createRadialGradient(CS, CS, 10, CS, CS, CORE + 40);
+        gr.addColorStop(0, "#3fb95055");
+        gr.addColorStop(0.7, "#3fb95018");
+        gr.addColorStop(1, "#3fb95000");
+        g.fillStyle = gr;
+        g.beginPath();
+        g.arc(CS, CS, CORE + 40, 0, 7);
+        g.fill();
+        g.fillStyle = "#0d1117";
+        g.strokeStyle = "#3fb950";
+        g.lineWidth = 3;
+        g.shadowColor = "#3fb95055";
+        g.shadowBlur = 18 + (k / CORE_STEPS) * 18;
+        g.beginPath();
+        g.arc(CS, CS, CORE, 0, 7);
+        g.fill();
+        g.stroke();
+      }));
+    };
     const draw = t => {
       ctx.clearRect(0, 0, 1920, 1080);
       // compile path: triage.md → core → triage.lock.yml
@@ -6006,25 +6080,29 @@
           y = q * q * 470 + 2 * q * p * 470 + p * p * (CY - 20);
           col = "#9198a1";
         }
-        ctx.fillStyle = col;
-        ctx.shadowColor = col + "55";
-        ctx.shadowBlur = 10;
-        ctx.fillRect(x - 4, y - 4, 8, 8);
+        ctx.drawImage(flowDot(col), x - 24, y - 24);
       }
-      ctx.shadowBlur = 0;
       // layers: rotating dashed shells that flare when they catch something
       layers.forEach((l, i) => {
+        const alpha = 0.28 + l.flash * 0.72,
+          width = 3 + l.flash * 4,
+          sigma = (8 + l.flash * 30) / 2,
+          halo = [width + sigma * 1.5, width + sigma * 3.5];
         ctx.save();
         ctx.translate(CX, CY);
         ctx.rotate(l.rot + t * 0.00012 * (i % 2 ? -1 : 1) * (1 + i * 0.25));
         ctx.strokeStyle = l.c;
-        ctx.globalAlpha = 0.28 + l.flash * 0.72;
-        ctx.lineWidth = 3 + l.flash * 4;
-        ctx.shadowColor = l.c + "55";
-        ctx.shadowBlur = 8 + l.flash * 30;
         ctx.setLineDash([l.r * 0.42, 14 + i * 3]);
         ctx.beginPath();
         ctx.arc(0, 0, l.r, 0, Math.PI * 2);
+        // glow: the line's ink at the old shadow's 1/3 alpha, spread over two wider strokes like a blur
+        ctx.globalAlpha = (alpha * width) / 3 / (halo[0] + halo[1]);
+        for (const w of halo) {
+          ctx.lineWidth = w;
+          ctx.stroke();
+        }
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = width;
         ctx.stroke();
         ctx.restore();
         const a = -Math.PI / 2 - 0.62;
@@ -6047,24 +6125,7 @@
       ctx.setLineDash([]);
       // core: the hardened lock file
       const pulse = 0.5 + 0.5 * Math.sin(t / 420);
-      const g = ctx.createRadialGradient(CX, CY, 10, CX, CY, CORE + 40);
-      g.addColorStop(0, "#3fb95055");
-      g.addColorStop(0.7, "#3fb95018");
-      g.addColorStop(1, "#3fb95000");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(CX, CY, CORE + 40, 0, 7);
-      ctx.fill();
-      ctx.fillStyle = "#0d1117";
-      ctx.strokeStyle = "#3fb950";
-      ctx.lineWidth = 3;
-      ctx.shadowColor = "#3fb95055";
-      ctx.shadowBlur = 18 + pulse * 18;
-      ctx.beginPath();
-      ctx.arc(CX, CY, CORE, 0, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.drawImage(coreSprite(pulse), CX - CS, CY - CS);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#3fb950";
@@ -6082,19 +6143,12 @@
         const x = CX + Math.cos(s.a) * s.d,
           y = CY + Math.sin(s.a) * s.d;
         ctx.globalAlpha = Math.min(1, (s.d0 - s.d) / 50 + 0.15);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(s.a);
+        ctx.drawImage(shotDot(), -SHOT, -SHOT);
+        ctx.restore();
         ctx.fillStyle = "#ff7b72";
-        ctx.shadowColor = "#f8514955";
-        ctx.shadowBlur = 16;
-        ctx.beginPath();
-        ctx.arc(x, y, 7, 0, 7);
-        ctx.fill();
-        ctx.strokeStyle = "#f8514966";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.cos(s.a) * 40, y + Math.sin(s.a) * 40);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
         ctx.font = "500 17px 'Monaspace Neon', ui-monospace, Menlo, monospace";
         const right = Math.cos(s.a) >= 0;
         ctx.textAlign = right ? "left" : "right";
@@ -6395,10 +6449,27 @@
     ];
     const LX = [8, 172, 336, 500];
     const TRACE = [
-      [0, "Init"], [0, "Start"], [0, "Activate"], [0, "Finish"],
-      [1, "Start"], [1, "Checkout:main"], [1, "Checkout:private_dependency"], [1, "CheckoutComplete"], [1, "Git:diff:main"], [1, "ToolCall:inference"], [1, "AgentRequest"], [1, "Fail"],
-      [2, "Start"], [2, "Consume"], [2, "Detect"], [2, "Finish"],
-      [3, "Start"], [3, "Validate"], [3, "MintAppToken"], [3, "PrepareEffect:issue"], [3, "Execute"],
+      [0, "Init"],
+      [0, "Start"],
+      [0, "Activate"],
+      [0, "Finish"],
+      [1, "Start"],
+      [1, "Checkout:main"],
+      [1, "Checkout:private_dependency"],
+      [1, "CheckoutComplete"],
+      [1, "Git:diff:main"],
+      [1, "ToolCall:inference"],
+      [1, "AgentRequest"],
+      [1, "Fail"],
+      [2, "Start"],
+      [2, "Consume"],
+      [2, "Detect"],
+      [2, "Finish"],
+      [3, "Start"],
+      [3, "Validate"],
+      [3, "MintAppToken"],
+      [3, "PrepareEffect:issue"],
+      [3, "Execute"],
     ];
     const DETECT = 14,
       PTS = TRACE.map(([l], i) => ({ x: LX[l] + 12, y: 146 + i * 20 }));
@@ -6603,7 +6674,12 @@
         });
         dot.style.opacity = head(u, T.fault + 300, 90, false) || head(u, T.wit + 400, 110, true) ? 1 : 0;
       },
-      el: h("section", { class: "slide tso" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "TLA+ and TLC check every schedule of the compiled workflow"), h("h2", {}, letters("Model-"), letters("checked", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide tso" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "TLA+ and TLC check every schedule of the compiled workflow"), h("h2", {}, letters("Model-"), letters("checked", "l-grad"))),
+        svg
+      ),
     });
   }
 
@@ -20458,7 +20534,9 @@
     g += edge("wqA", "M1280 203 C 1400 203 1470 190 1470 142", `hot:${r + 1000}:${CYC}`) + sw("wqm-el cb", 1350, 193, "CAS ✓", `on:${r + 1600}:${CYC}`);
     g += `<path class="wqm-e" id="wqB"${K(`bad:${r + 1900}:${CYC}`)} d="M1280 283 H1450" marker-end="url(#wqmO)"/>` + sw("wqm-el co", 1366, 273, "CAS ✗ stale base", `on:${r + 2300}:${CYC}`);
     g += `<g class="wqm-sw"${K(`on:${r + 2300}:${CYC}`)}><circle class="wqm-ghost" cx="1470" cy="283" r="16"/><text class="wqm-cl co" x="1470" y="289">✗</text></g>`;
-    g += edge("wqR", "M1486 283 C 1580 283 1620 220 1620 142", `hot:${r + 2700}:${CYC}`) + sw("wqm-el cb", 1632, 236, "replay, retry ✓", `on:${r + 3000}:${CYC}`).replace('class="wqm-sw wqm-el cb"', 'class="wqm-sw wqm-el cb" style="text-anchor:start"');
+    g +=
+      edge("wqR", "M1486 283 C 1580 283 1620 220 1620 142", `hot:${r + 2700}:${CYC}`) +
+      sw("wqm-el cb", 1632, 236, "replay, retry ✓", `on:${r + 3000}:${CYC}`).replace('class="wqm-sw wqm-el cb"', 'class="wqm-sw wqm-el cb" style="text-anchor:start"');
     g += sw("wqm-inv", 1134, 336, "SingleEffectiveClaim · BrokenCAS breaks TerminalPersistence", `on:${r + 3300}:${CYC}`);
     // 03 DAG and external gates: C joins on A and B; D also waits for a merged pull request
     r = S[2];
@@ -20473,10 +20551,24 @@
     g += `<g class="wqm-st wqm-pr"${K(`bad:${r + 2400}:${r + 3200}`, `hot:${r + 3200}:${CYC}`)}><rect x="640" y="600" width="170" height="44" rx="22"/></g>`;
     g += sw("wqm-ss", 725, 628, "PR: open", `on:0:${r + 2400}`) + sw("wqm-ss co", 725, 628, "PR: closed ✗", `on:${r + 2400}:${r + 3200}`) + sw("wqm-ss cb", 725, 628, "PR: merged ✓", `on:${r + 3200}:${CYC}`);
     const sub = (x, yy, steps) => steps.map(([txt, cls, a, b]) => sw(`wqm-ss ${cls}`, x, yy, txt, `on:${a}:${b}`)).join("");
-    g += sub(500, 491, [["running", "", 0, r + 700], ["Result ✓", "cb", r + 700, CYC]]);
-    g += sub(500, 581, [["running", "", 0, r + 1400], ["Result ✓", "cb", r + 1400, CYC]]);
-    g += sub(720, 536, [["waits: A, B", "", 0, r + 1800], ["join claimed ◆", "cp", r + 1800, r + 2200], ["Result ✓", "cb", r + 2200, CYC]]);
-    g += sub(950, 591, [["gated", "", 0, r + 2400], ["gated: not merged", "co", r + 2400, r + 3500], ["admitted ✓", "cb", r + 3500, CYC]]);
+    g += sub(500, 491, [
+      ["running", "", 0, r + 700],
+      ["Result ✓", "cb", r + 700, CYC],
+    ]);
+    g += sub(500, 581, [
+      ["running", "", 0, r + 1400],
+      ["Result ✓", "cb", r + 1400, CYC],
+    ]);
+    g += sub(720, 536, [
+      ["waits: A, B", "", 0, r + 1800],
+      ["join claimed ◆", "cp", r + 1800, r + 2200],
+      ["Result ✓", "cb", r + 2200, CYC],
+    ]);
+    g += sub(950, 591, [
+      ["gated", "", 0, r + 2400],
+      ["gated: not merged", "co", r + 2400, r + 3500],
+      ["admitted ✓", "cb", r + 3500, CYC],
+    ]);
     g += sw("wqm-el cp", 720, 480, "DAGJoinWitness", `on:${r + 1800}:${CYC}`);
     g += sw("wqm-inv", 424, 694, "DependencyAuthorization · ExternalTruth: closed ≠ merged", `on:${r + 3500}:${CYC}`);
     // 04 mutants must fail their invariant; witnesses must reach a negated goal
@@ -22690,7 +22782,14 @@
         idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
       },
     ];
-    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${p.tab[0]} (← → switch process)`, onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
+    const tabs = PROCS.map((p, i) =>
+      h(
+        "button",
+        { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${p.tab[0]} (← → switch process)`, onclick: () => (pick(i), sfx.step()) },
+        h("i", {}, String(i + 1)),
+        h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))
+      )
+    );
     const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
     const docIco = h("span", {}),
       docT = h("div", {}),

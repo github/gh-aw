@@ -1,7 +1,8 @@
 // Regression test for the cracktro slide performance guard: a calm runtime-only deck passes, and each
 // runaway behaviour in the fixture (leaked interval, endless rAF loop, off-screen animation, growing DOM,
 // busy tick) fails the guard with the right check on the right slide.
-// Chrome-driven tests need Chrome or Chromium (CHROME_PATH) and skip without one; progress and timeout tests do not.
+// #supply-chain-hardening is checked in the real deck and, without a browser, by running its slide code.
+// Chrome-driven tests need Chrome or Chromium (CHROME_PATH) and skip without one; the other tests do not.
 import assert from "node:assert/strict";
 import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -42,6 +43,87 @@ test("runaway slides fail the guard with attributed findings", { skip }, async (
   has("max-dwell-growth", "grower");
   has("max-busy", "burner");
   has("max-tour-growth-intervals", "(revisit)");
+});
+
+test("#supply-chain-hardening stays within the default budgets in the real deck", { skip }, async () => {
+  const json = join(tmpdir(), `cracktro-perf-${process.pid}-supply-chain.json`);
+  const code = await run(["--slides", "supply-chain-hardening", "--revisits", "0", "--json", json], () => {});
+  const report = JSON.parse(readFileSync(json, "utf8"));
+  rmSync(json, { force: true });
+  assert.deepEqual(report.violations, []);
+  assert.ok(report.rows[0].busy <= 0.5, `busy ${report.rows[0].busy}`);
+  assert.equal(code, 0);
+});
+
+// Runs the real #supply-chain-hardening slide block from deck.js against a recording 2D context. Canvas
+// shadowBlur re-blurs a shape's whole bounding box on every draw; its six blurred ~700px rings kept the
+// main thread over half busy, so steady-state frames must draw no blurred shapes and reuse baked sprites.
+const runSupplyChainSlide = () => {
+  const lines = readFileSync(join(docs, "public/cracktro/deck.js"), "utf8").split("\n");
+  const start = lines.findIndex(l => l.startsWith("  // Supply chain hardening:"));
+  const end = lines.findIndex((l, i) => i > start && /^ {2}\/\/ \S/.test(l));
+  assert.ok(start >= 0 && end > start, "slide block not found in deck.js");
+  const canvases = [];
+  const recorder = () => {
+    const ops = [],
+      state = { shadowBlur: 0 },
+      stack = [];
+    const own = {
+      save: () => stack.push({ ...state }),
+      restore: () => Object.assign(state, stack.pop()),
+      createRadialGradient: () => ({ addColorStop() {} }),
+    };
+    const ctx = new Proxy(state, {
+      get: (_, k) => own[k] || (k in state ? state[k] : (...args) => ops.push({ op: k, blur: state.shadowBlur, args })),
+      set: (_, k, v) => ((state[k] = v), true),
+    });
+    return { ctx, ops };
+  };
+  const el = (tag, attrs = {}) => {
+    const e = { tag, attrs, classList: { add() {}, remove() {} }, querySelector: () => ({}) };
+    if (tag === "canvas") {
+      e.rec = recorder();
+      e.getContext = () => e.rec.ctx;
+      canvases.push(e);
+    }
+    return e;
+  };
+  const slides = [];
+  new Function("slides", "h", "letters", "resetIndex", "document", lines.slice(start, end).join("\n"))(
+    slides,
+    el,
+    () => el("span"),
+    () => {},
+    { createElement: tag => el(tag) }
+  );
+  const [slide] = slides;
+  const stage = canvases.find(c => c.attrs.class === "ch-cv");
+  let t = 1000;
+  const frames = n => {
+    stage.rec.ops.length = 0;
+    for (let i = 0; i < n; i++) slide.tick((t += 1000 / 60));
+    return stage.rec.ops;
+  };
+  return { slide, canvases, frames };
+};
+
+test("#supply-chain-hardening keeps animating without per-frame shadow blurs", () => {
+  const { slide, canvases, frames } = runSupplyChainSlide();
+  slide.enter(1);
+  frames(180); // one full core pulse bakes every glow sprite
+  const baked = canvases.length;
+  const ops = frames(300);
+  assert.deepEqual(
+    ops.filter(o => o.blur > 0).map(o => o.op),
+    [],
+    "steady frames drew shapes with shadowBlur"
+  );
+  assert.equal(canvases.length, baked, "glow sprites were rebuilt instead of reused");
+  const count = op => ops.filter(o => o.op === op).length;
+  assert.ok(count("drawImage") >= 300, "core glow sprite not drawn every frame");
+  assert.ok(count("stroke") >= 300 * 6 * 3, "rotating shells and their glow strokes not drawn every frame");
+  const blocked = ops.filter(o => o.op === "fillText" && o.args[1] === 975 && o.args[2] === 654).map(o => +o.args[0]);
+  assert.ok(blocked.at(-1) > blocked[0], `blocked counter stalled at ${blocked[0]}`);
 });
 
 test("heartbeat reports elapsed time and the current phase until stopped", async () => {

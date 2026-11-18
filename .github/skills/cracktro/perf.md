@@ -24,7 +24,7 @@ For every slide: navigate with the deck's own `go()`, wait `--settle` (1300 ms, 
 
 | Budget flag (default) | Measures | Typical cause |
 |---|---|---|
-| `--max-busy` (0.75) | Main-thread busy fraction: CDP `Performance.getMetrics` TaskDuration ÷ wall time; includes script, style, layout, paint and, in headless software rendering, canvas raster (a deliberate full-stage canvas animation measures about 0.5, saturation about 1) | Heavy `tick`, full-screen canvas redraws every frame |
+| `--max-busy` (0.5) | Main-thread busy fraction: CDP `Performance.getMetrics` TaskDuration ÷ wall time; includes script, style, layout, paint and, in headless software rendering, canvas raster (full-stage canvas slides measure 0.2–0.35, saturation about 1) | Heavy `tick`, per-frame `shadowBlur` on large canvas shapes, full-screen canvas redraws every frame |
 | `--min-fps` (30) | Frames delivered per second; max frame gap in the report | Long tasks, jank |
 | `--max-offscreen-animations` (0) | Running CSS/Web animations inside slides that are not shown, attributed to their slide | `el.animate()` never cancelled; CSS outside `.slide` |
 | `--max-foreign-callbacks` (1/s) | Timer and rAF callbacks per second still firing for a slide that is not shown | `setInterval`/rAF loops started in `enter` or `tick` and never stopped |
@@ -41,4 +41,5 @@ Thresholds are runaway bounds, not tuning targets. Change a default only with me
 - Hidden slides stay in the DOM with `visibility: hidden`; the runtime pauses every CSS animation (and `::before`/`::after`) outside `.active`/`.leaving`, so infinite CSS loops need no cleanup. Scope entry effects to `.active` (mechanics.md).
 - Web Animations (`el.animate`), `setInterval`, `setTimeout` chains and rAF loops are not paused: drive them from `tick` (runs only for the current slide), or stop them when `enter` runs again and keep them bounded.
 - The background canvas renders base fill and glows at quarter resolution and repaints the grid only when its size, angle or colour changes; keep any new full-screen drawing cached or low-resolution.
+- Canvas `shadowBlur` re-blurs the shape's whole bounding box on every draw, in software on the main thread. Bake static glows once into an offscreen sprite and `drawImage` it; for moving or rotating outlines draw the glow as faint wider strokes (#supply-chain-hardening does both).
 - After a fix: `node --check` edited deck files, rerun the guard on the affected slides, then the whole deck, and capture `.stage` screenshots of changed slides (SKILL.md Preview loop).

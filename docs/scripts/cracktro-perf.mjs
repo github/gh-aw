@@ -16,8 +16,9 @@ const DOCS = fileURLToPath(new URL("..", import.meta.url));
 // Budgets; every value is overridable with the flag of the same name (see --help).
 export const BUDGETS = {
   // main-thread busy fraction while idling on one slide (Performance TaskDuration / wall time); headless software
-  // rendering puts all canvas raster here, so a deliberate full-stage canvas animation measures about 0.5 and saturation about 1
-  "max-busy": 0.75,
+  // rendering puts all canvas raster here: full-stage canvas slides measure 0.2-0.35, saturation about 1, and
+  // per-frame shadowBlur on large shapes is the usual way past 0.5
+  "max-busy": 0.5,
   "min-fps": 30, // frames delivered per second while idling on one slide
   "max-offscreen-animations": 0, // running CSS/Web animations inside slides that are not on screen
   "max-foreign-callbacks": 1, // timer/rAF callbacks per second still firing for slides that are not on screen
