@@ -186,9 +186,9 @@ source permission verification or that the staged issue was delivered.
 ]]></body>
   </consumer>
   <sources>
-    <source>https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve</source>
-    <source>https://learn.microsoft.com/en-us/azure/search/search-security-rbac-client-code</source>
-    <source>https://raw.githubusercontent.com/microsoft/azure-ai-search-foundry-iq-live-knowledge-sources/f4c9985e064e185db18a7d5e9445e2b0fe7c310b/src/liveks/mcp_client.py</source>
+    <source href="https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve"/>
+    <source href="https://learn.microsoft.com/en-us/azure/search/search-security-rbac-client-code"/>
+    <source href="https://raw.githubusercontent.com/microsoft/azure-ai-search-foundry-iq-live-knowledge-sources/f4c9985e064e185db18a7d5e9445e2b0fe7c310b/src/liveks/mcp_client.py"/>
   </sources>
 </connector-documentation>
 -->

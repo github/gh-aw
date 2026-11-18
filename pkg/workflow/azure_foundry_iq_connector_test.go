@@ -36,7 +36,7 @@ func foundryIQPlan(t *testing.T) *connectors.Plan {
 	return data.Connectors["azure-foundry-iq"].Agent
 }
 
-func TestFoundryIQDocumentationConsumer(t *testing.T) {
+func TestAzureFoundryIQDocumentationConsumer(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/azure-foundry-iq.md")
 	require.NoError(t, err)
 	comment := commentedConnectorDocumentation(t, string(source))
@@ -58,7 +58,7 @@ func TestFoundryIQDocumentationConsumer(t *testing.T) {
 	require.Empty(t, strings.TrimSpace(body))
 }
 
-func TestFoundryIQInvalidCallsBeforeCredentials(t *testing.T) {
+func TestAzureFoundryIQInvalidCallsBeforeCredentials(t *testing.T) {
 	plan := foundryIQPlan(t)
 	runtime := connectors.Runtime{
 		Phase: "agent", AllowedOrigins: plan.Origins(),
@@ -91,7 +91,7 @@ func TestFoundryIQInvalidCallsBeforeCredentials(t *testing.T) {
 	require.Error(t, err, "importing an endpoint is not network approval")
 }
 
-func TestFoundryIQHostedMCP(t *testing.T) {
+func TestAzureFoundryIQHostedMCP(t *testing.T) {
 	plan := foundryIQPlan(t)
 	for _, test := range []struct {
 		name        string
@@ -173,7 +173,7 @@ func TestFoundryIQHostedMCP(t *testing.T) {
 	}
 }
 
-func TestFoundryIQBundledNodeRuntime(t *testing.T) {
+func TestAzureFoundryIQBundledNodeRuntime(t *testing.T) {
 	plan := foundryIQPlan(t)
 	encoded, err := plan.Encode()
 	require.NoError(t, err)
