@@ -64,6 +64,8 @@ describe("create_prompt", () => {
 
   it.each([
     ["\uFEFF---\r\non: workflow_dispatch\r\n---\r\nBody\r\n", "Body\r\n"],
+    ['---\non: workflow_dispatch\ndescription: "Literal <!-- marker"\n---\nBody --> remains.\n', "Body --> remains.\n"],
+    ['---\non: workflow_dispatch\ndescription: "Literal <!-- marker"\n---\nBody --> remains.\n---\nMore body\n', "Body --> remains.\n---\nMore body\n"],
     ["Introduction\n---\nExample prose, not YAML\n---\nConclusion", "Introduction\n---\nExample prose, not YAML\n---\nConclusion\n"],
   ])("removes only author document frontmatter during rendering", (content, expected) => {
     const workflows = path.join(tempDir, ".github/workflows");
