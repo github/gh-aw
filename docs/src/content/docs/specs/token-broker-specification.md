@@ -92,7 +92,7 @@ The endpoint MUST be an absolute HTTPS URL with a hostname and without user info
 
 Credential-consuming jobs MUST have `id-token: write` within the caller's permission envelope. Trusted credential-consuming runtime code MUST retain control of the OIDC bootstrap environment. Broker opt-in MUST NOT grant unrelated jobs OIDC access. The Actions bootstrap bearer token is used only with GitHub's OIDC acquisition endpoint; the client MUST NOT send it to the broker.
 
-Admission success, admission absence, and admission's `ignore` outage policy MUST NOT authorize broker issuance or make broker failures fail open. Broker authentication MUST NOT replace credentials for unrelated GitHub operations.
+Admission success, admission absence, and admission's `ignore` outage policy MUST NOT authorize broker issuance or make broker failures fail open. Broker authentication MUST NOT replace credentials for jobs or capabilities that have not opted in.
 
 ### 3.1. Repository-scoped GitHub configuration
 
@@ -125,6 +125,14 @@ The compiler MUST reject `repos` when the corresponding `token-broker.github` co
 The compiler MUST bind each scope to its consuming job and trusted runtime integration. Agent and write-capable safe-output consumers MUST run in separate jobs with independently authorized OIDC identities. The agent and the safe-outputs MCP server that accepts agent-generated requests MUST NOT receive a write credential, a write-capable OIDC bootstrap environment, or access to a write exchange proxy. Only the trusted safe-output executor, after validating the requested operation and target against the configured safe-output policy, MAY request and use a write credential.
 
 For GitHub consumers, trusted compiler-generated configuration MUST carry the selected context and scope to the corresponding runtime integration; an inherited URL, task opt-in marker, or agent-provided payload MUST NOT enable or broaden this integration. The broker MUST independently verify the context and scope as specified in Section 5.4. Workflow configuration is a request for authority, not proof of authorization.
+
+### 3.2. Replacement of the built-in Actions token
+
+For an enabled GitHub context, the returned broker token MUST replace the built-in GitHub Actions token (`GITHUB_TOKEN`, also exposed through `github.token` and `secrets.GITHUB_TOKEN`) wherever the compiler/runtime would otherwise supply that token for the context's GitHub operations. It is the context's GitHub credential, not an additional credential used only for cross-repository calls. The compiler/runtime MUST bind GitHub API clients, GitHub MCP authentication, CLI token environments such as `GH_TOKEN` and `GITHUB_TOKEN`, and compiler-managed action token inputs to the broker credential wherever those consumers would otherwise use the built-in token. This binding does not change GitHub's immutable expression-context values; consumers MUST NOT implicitly select those values instead of the broker credential.
+
+The replacement MUST preserve the context's repository and permission restrictions, including for operations against the workflow's own repository. Exchange, renewal, authorization, or scope failures MUST fail closed; consumers MUST NOT retry with or fall back to the built-in token. Consumers outside the opted-in context MUST preserve their existing authentication. The Actions OIDC bootstrap bearer remains separate and MUST NOT be replaced with the broker token.
+
+Runtime delivery MUST preserve the credential-handling requirements in Section 6.3 and Appendix C. A consumer that cannot accept the broker credential without violating those requirements MUST fail closed rather than silently retain the built-in token.
 
 ## 4. Exchange Protocol
 
@@ -377,6 +385,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-021 | Both | Changing any target repository, permission level, or execution context prevents cache/in-flight reuse. Equivalent reordered scopes may coalesce. Renewal rechecks policy; invalidation revokes all scopes for only the issuing job. |
 | T-TBR-022 | Server | Instrument the GitHub adapter: explicit repository IDs and permissions reach issuance. Broader, narrower, or installation-wide backend results are rejected and revoked; only implicit metadata read is accepted as additional authority. |
 | T-TBR-023 | Both | The configured endpoint supports `invalidate-token` for every issued capability. A fresh authorized OIDC identity revokes only the specified token; repeat revocation and an owned expired token return 204. Missing/invalid identity returns 401; unknown and foreign tokens return indistinguishable 403 responses without revoking foreign tokens. Malformed requests fail safely, token-bearing bodies remain redacted, and 204 is returned only after revocation is effective. |
+| T-TBR-024 | Both | In each enabled GitHub context, instrument API clients, MCP authentication, CLI environments, and compiler-managed action token inputs that normally use the built-in Actions token. They use the broker token for both the workflow repository and other selected repositories. Built-in-token fallbacks and implicit expression-context defaults are not used after exchange/renewal failure or scope denial. Disabled contexts and the OIDC bootstrap bearer remain unchanged; unsupported credential-delivery paths fail closed without leaking tokens. |
 
 Implementers MUST record pass/fail/not-applicable per class and capability, with non-sensitive evidence and policy settings. Tests SHOULD include skew, calendar, concurrency, and revocation boundary conditions. Optional features marked not applicable MUST NOT hide failed mandatory requirements.
 
@@ -459,6 +468,7 @@ These choices do not permit extra wire fields, weakened identity verification, o
 
 - Added the proposed `github` capability for one token covering multiple explicitly authorized repositories with a shared repository-permission map.
 - Kept broker context opt-ins separate from scope: job permissions supply access levels, with broker-only `permissions.repos` and `safe-outputs.permissions.repos` selecting repositories.
+- Required the broker credential to replace the built-in Actions token throughout each enabled GitHub context, without built-in-token fallback.
 - Restricted agent credentials to read access and write credentials to independently authorized trusted safe-output jobs.
 - Defined GitHub App installation scoping, all-or-nothing authorization, scope-isolated caching, renewal, invalidation, and compliance scenarios.
 - Required compiler-generated job-exit cleanup to invalidate every broker-issued token, including renewed tokens and exchanges whose responses were lost.
