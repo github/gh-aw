@@ -1,19 +1,85 @@
 {
-  "generated_at": "2026-11-18T00:39:38Z",
-  "run_id": "pr-triage-2026-11-18T00:39:38Z",
+  "generated_at": "2026-11-18T06:26:27Z",
+  "run_id": "pr-triage-2026-11-18T06:26:27Z",
   "source": "pr-triage",
-  "open_copilot_prs": 0,
-  "eligible_total": 0,
-  "cooldown_skipped": [],
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
-  "action_counts": {},
-  "selected_candidates": [],
-  "batches": [],
-  "skipped_prs": [],
-  "notes": [
-    "No open pull requests are authored by app/github-copilot in github/gh-aw."
+  "open_copilot_prs": 7,
+  "eligible_total": 2,
+  "cooldown_skipped": [
+    78960,
+    78959,
+    78958,
+    78952,
+    78951
   ],
-  "review_status": "no_eligible_prs"
+  "category_counts": {
+    "bug": 1,
+    "test": 1
+  },
+  "risk_counts": {
+    "medium": 1,
+    "low": 1
+  },
+  "priority_counts": {
+    "medium": 1,
+    "low": 1
+  },
+  "action_counts": {
+    "fast_track": 1,
+    "auto_merge": 1
+  },
+  "selected_candidates": [
+    {
+      "number": 78941,
+      "title": "Align model overlay parsed-to-raw fallback behavior",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 58,
+      "action": "fast_track",
+      "ci": "passing"
+    },
+    {
+      "number": 78940,
+      "title": "Expand lifecycle tests for identity, validation, and merge behavior",
+      "category": "test",
+      "risk": "low",
+      "priority": "low",
+      "score": 41,
+      "action": "auto_merge",
+      "ci": "passing"
+    }
+  ],
+  "batches": [],
+  "skipped_prs": [
+    {
+      "number": 78960,
+      "title": "[WIP] Update golang.org/x/mod from v0.42.0 to v0.43.0",
+      "reason": "1h cooldown"
+    },
+    {
+      "number": 78959,
+      "title": "Investigate workflow conclusion failures",
+      "reason": "1h cooldown"
+    },
+    {
+      "number": 78958,
+      "title": "[linter-miner] Add mapcopyloop analyzer",
+      "reason": "1h cooldown"
+    },
+    {
+      "number": 78952,
+      "title": "Confirm pip and uv package validation safeguards",
+      "reason": "1h cooldown"
+    },
+    {
+      "number": 78951,
+      "title": "Update `golang.org/x/term` to v0.48.0",
+      "reason": "1h cooldown"
+    }
+  ],
+  "notes": [
+    "Two eligible gh-aw-bot PRs remained after the 1-hour cooldown; both have successful CI runs.",
+    "No 3+ PR cluster met the batch threshold, so no batch labels were assigned."
+  ],
+  "review_status": "triaged"
 }

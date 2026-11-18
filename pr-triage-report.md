@@ -1,25 +1,36 @@
-### Executive Summary
+### Executive summary
 
-- Eligible open app/github-copilot PRs: 0
-- Open PRs scanned: 0
-- PRs skipped by 1h cooldown: 0
-- Recommended action: none; no app/github-copilot PRs are currently eligible for triage.
+- Eligible open `app/github-copilot` PRs: 2
+- PRs skipped by the 1h cooldown: 5
+- Open PRs scanned: 7
+- Categories: bug=1, test=1
+- Risk: medium=1, low=1
+- Priority: medium=1, low=1
+- Action: fast_track=1, auto_merge=1
 
-### Distribution
+### Top-priority PRs
 
-#### Category
-- None: 0
+- #78941 — Align model overlay parsed-to-raw fallback behavior — medium risk, score 58, action `fast_track`
+- #78940 — Expand lifecycle tests for identity, validation, and merge behavior — low risk, score 41, action `auto_merge`
 
-#### Risk
-- None: 0
+### Auto-merge candidates
 
-#### Priority
-- None: 0
+- #78940
 
-#### Action
-- None: 0
+### Fast-track items
 
-### Key trends
+- #78941
 
-- No open PRs are currently authored by `app/github-copilot` in `github/gh-aw`.
-- No labels, comments, or batch assignments were created because there are no eligible PRs.
+### Batch opportunities
+
+- No 3+ PR clusters met the batch threshold; no batch labels assigned.
+
+### Close candidates
+
+- None
+
+### Key trends and next actions
+
+- Both eligible PRs have passing CI status.
+- The remaining open Copilot PRs are still within the 1h cooldown window and were intentionally omitted from actioning.
+- Continue with human review for the model-overlay fix and let the lifecycle test PR merge on the normal path.

@@ -1,16 +1,21 @@
 {
-  "run_id": "pr-triage-2026-11-18T00:39:38Z",
-  "source": "pr-triage",
-  "generated_at": "2026-11-18T00:39:38Z",
-  "eligible_total": 0,
-  "open_copilot_prs": 0,
-  "cooldown_skipped": 0,
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
-  "action_counts": {},
-  "top_prs": [],
-  "auto_merge_candidates": [],
-  "batch_ids": [],
-  "close_candidates": []
+  "generated_at": "2026-11-18T06:26:27Z",
+  "eligible_total": 2,
+  "cooldown_skipped": 5,
+  "open_prs_scanned": 7,
+  "prio": {
+    "medium": 1,
+    "low": 1
+  },
+  "selected_prs": [
+    {
+      "number": 78941,
+      "action": "fast_track"
+    },
+    {
+      "number": 78940,
+      "action": "auto_merge"
+    }
+  ],
+  "batches": []
 }
