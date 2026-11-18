@@ -65,15 +65,17 @@ const isNativePath = value => typeof value === "string" && /^sandbox\/agent\/log
  * Source-local positions disambiguate repeated native IDs and expanded records.
  * Equal timestamps and untimed observations retain deterministic source order.
  * @param {SessionSource[]} sources
+ * @param {string} [engine]
  * @returns {import("./types/unified_session").UnifiedSession}
  */
-function mergeSessionSources(sources) {
+function mergeSessionSources(sources, engine) {
   return orderSessionSources(
     sources.map(source => ({
       ...source,
       events: source.events.map((event, index) => {
         const timestampMs = sessionTimestamp(event, source.timestampUnit);
-        const normalized = normalizeUnifiedSessionEvent(event, source.phase);
+        const copilotSource = source.component === "agent" && (engine === "copilot" || isNativePath(source.path));
+        const normalized = normalizeUnifiedSessionEvent(event, source.phase, copilotSource);
         const native = event.provenance;
         const sourceIndex =
           source.component === "agent" &&
@@ -930,7 +932,7 @@ function collectUnifiedSession({
   /** @type {import("./types/agent_session").SessionFileFormatEvent} */
   const format = { type: "session.format", data: { version: SESSION_FILE_FORMAT_VERSION } };
   sources.push({ component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", events: [format, ...warnings, ...routingEstimates, summary] });
-  const events = correlateHarnessAttempts(mergeSessionSources(sources));
+  const events = correlateHarnessAttempts(mergeSessionSources(sources, engine));
   const formatIndex = events.findIndex(event => event.type === "session.format" && event.provenance.component === "collector" && event.provenance.index === 0);
   // File metadata leads the stream without inventing a timestamp for it.
   const [header] = events.splice(formatIndex, 1);

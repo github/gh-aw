@@ -5,7 +5,7 @@
 const { computeInferenceAIC, findModelPricing } = require("./model_costs.cjs");
 const { COPILOT_WORKFLOW_EVENT_FIELDS } = require("./copilot_workflow_events.cjs");
 const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
-const { sessionContext } = require("./agent_session.cjs");
+const { isTokenCount, sessionContext } = require("./agent_session.cjs");
 const { normalizeMcpConfigurationData } = require("./mcp_configuration.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { getMcpRateLimitHint, getRpcRateLimitHint } = require("./mcp_rate_limit.cjs");
@@ -700,9 +700,10 @@ function normalizeRankedChoices(choices) {
  * Unknown extension data remains opaque for forward compatibility.
  * @param {SessionEvent} event
  * @param {string} [phase]
+ * @param {boolean} [copilotSource] Set by the collector for raw sources; omitted when reprojecting unified data.
  * @returns {SessionEvent}
  */
-function normalizeUnifiedSessionEvent(event, phase) {
+function normalizeUnifiedSessionEvent(event, phase, copilotSource) {
   /** @type {any} */
   const source = event.data;
   if (event.type === "session.result") {
@@ -731,6 +732,19 @@ function normalizeUnifiedSessionEvent(event, phase) {
   }
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = event.type === "mcp.configuration" ? normalizeMcpConfigurationData(source) : known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (event.type === "session.shutdown" && (copilotSource === true || (copilotSource === undefined && source.aiCreditsScope === "Copilot session"))) {
+    const snapshot = copilotSource ? source.accountingSnapshot : source;
+    const status = snapshot?.aiCreditsStatus;
+    const total = snapshot?.totalNanoAiu;
+    data.aiCreditsScope = "Copilot session";
+    if ((status === "complete" || status === "partial") && isTokenCount(total) && (source.totalNanoAiu === undefined || source.totalNanoAiu === total)) {
+      data.aiCreditsStatus = status;
+      data.totalNanoAiu = total;
+    } else {
+      data.aiCreditsStatus = "unavailable";
+      delete data.totalNanoAiu;
+    }
+  }
   if (event.type === "session.init" || event.type === "session.start") {
     for (const field of ["agentVersion", "provider"]) {
       if (typeof data[field] !== "string") delete data[field];

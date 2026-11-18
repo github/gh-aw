@@ -894,6 +894,8 @@ export interface UnifiedSessionEventDataMap {
     errorReason?: JsonValue;
     premiumRequests?: JsonValue;
     totalNanoAiu?: JsonValue;
+    aiCreditsStatus?: "complete" | "partial" | "unavailable";
+    aiCreditsScope?: "Copilot session";
     totalApiDurationMs?: JsonValue;
     sessionStartTime?: JsonValue;
     currentModel?: JsonValue;

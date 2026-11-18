@@ -133,7 +133,7 @@ function eventDetail(event) {
     case "session.info":
       return scalarFields(data, ["status", "model", "message", "sourceType", "kind", "isAuthenticating", "rateLimitInfo"]);
     case "session.shutdown":
-      return fields(data, ["shutdownType", "errorReason", "currentModel", "premiumRequests", "totalApiDurationMs", "totalNanoAiu"]);
+      return fields(data, ["shutdownType", "errorReason", "currentModel", "premiumRequests", "totalApiDurationMs", "totalNanoAiu", "aiCreditsStatus", "aiCreditsScope"]);
     case "session.task_complete":
       return fields(data, ["success"]);
     case "session.mode_changed":

@@ -1884,6 +1884,32 @@ describe("Unified conclusion session", () => {
     expect(summary).toContain("Tools: 1/1 succeeded");
   });
 
+  it.each([
+    ["complete", { aiCreditsStatus: "complete", totalNanoAiu: 833979000 }, 833979000, { aiCreditsStatus: "complete", totalNanoAiu: 833979000 }],
+    ["verified zero", { aiCreditsStatus: "complete", totalNanoAiu: 0 }, 0, { aiCreditsStatus: "complete", totalNanoAiu: 0 }],
+    ["partial subtotal", { aiCreditsStatus: "partial", totalNanoAiu: 17 }, 17, { aiCreditsStatus: "partial", totalNanoAiu: 17 }],
+    ["unavailable zero", { aiCreditsStatus: "unavailable", totalNanoAiu: 0 }, 0, { aiCreditsStatus: "unavailable" }],
+    ["missing snapshot", undefined, 0, { aiCreditsStatus: "unavailable" }],
+    ["missing amount", { aiCreditsStatus: "complete" }, 0, { aiCreditsStatus: "unavailable" }],
+    ["contradictory total", { aiCreditsStatus: "complete", totalNanoAiu: 0 }, 17, { aiCreditsStatus: "unavailable" }],
+  ])("publishes %s Copilot terminal credits without substituting a proxy estimate", (_label, accountingSnapshot, totalNanoAiu, expected) => {
+    write("agent-session.jsonl", [
+      { type: "session.start", data: { sessionId: "native" } },
+      { type: "session.shutdown", data: { accountingSnapshot, totalNanoAiu } },
+    ]);
+    write("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", [{ event: "token_usage", model: "fixture-model", ai_credits_total: 12.5 }]);
+    const outputPath = path.join(root, "usage/aw_session.jsonl");
+    writeUnifiedSession({ rootDir: root, engine: "copilot", outputPath });
+    const content = fs.readFileSync(outputPath, "utf8");
+    const events = content.trimEnd().split("\n").map(JSON.parse);
+    expect(validateSession(content)).toBe(events.length);
+    const [shutdown] = events.filter(event => event.type === "session.shutdown");
+    expect(shutdown.data).toEqual({ aiCreditsScope: "Copilot session", ...expected });
+    expect(normalizeUnifiedSessionEvent(shutdown).data).toEqual(shutdown.data);
+    expect(events.find(event => event.type === "firewall.token_usage")?.data.totalAic).toBe(12.5);
+    expect(JSON.stringify(events)).not.toContain("primaryAic");
+  });
+
   it.each([[`{"type":"session.start","data":{"sessionId":"native"}}\n`], [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`]])(
     "falls back to stdio when native Copilot events are incomplete",
     nativeContent => {

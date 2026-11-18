@@ -250,6 +250,8 @@
                 "errorReason": { "$ref": "#/definitions/JsonValue" },
                 "premiumRequests": { "$ref": "#/definitions/JsonValue" },
                 "totalNanoAiu": { "$ref": "#/definitions/JsonValue" },
+                "aiCreditsStatus": { "type": "string", "enum": ["complete", "partial", "unavailable"] },
+                "aiCreditsScope": { "type": "string", "const": "Copilot session" },
                 "totalApiDurationMs": { "$ref": "#/definitions/JsonValue" },
                 "sessionStartTime": { "$ref": "#/definitions/JsonValue" },
                 "currentModel": { "$ref": "#/definitions/JsonValue" }
