@@ -275,7 +275,11 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 	}
 
 	if failedCount > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Container pins could not be updated: "+strings.Join(sliceutil.SortedKeys(failureReasons), "; ")+"."))
+		failureSummary := "Container pins could not be updated: " + strings.Join(sliceutil.SortedKeys(failureReasons), "; ") + "."
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(failureSummary))
+		if !opts.failOnResolveErrors {
+			reportUpdateWarning(ctx, "containers", fmt.Errorf("%s (%d image(s))", failureSummary, failedCount))
+		}
 	}
 
 	if len(updatedImages) > 0 || prunedCount > 0 {

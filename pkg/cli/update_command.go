@@ -175,7 +175,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 			var summary *updatePRSummary
 			if createPR {
 				var err error
-				summary, err = newUpdatePRSummary(cmd.Context(), opts.WorkflowsDir)
+				summary, err = newUpdatePRSummary(cmd.Context(), opts.WorkflowsDir, opts.WorkflowNames...)
 				if err != nil {
 					return err
 				}
@@ -237,7 +237,16 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 // RunUpdateWorkflows updates workflows from their source repositories.
 // Each workflow is compiled immediately after update.
 func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runErr error) { //nolint:largefunc
-	finish, err := observeUpdateChanges(ctx, opts.WorkflowsDir)
+	var snapshotTargets []string
+	if updateReporter(ctx) != nil {
+		var err error
+		snapshotTargets, err = updatePRPackageSnapshotTargets(ctx, opts.WorkflowNames)
+		if err != nil {
+			reportUpdateWarning(ctx, "change_observation", err)
+			snapshotTargets = nil
+		}
+	}
+	finish, err := observeUpdateChanges(ctx, opts.WorkflowsDir, snapshotTargets...)
 	if err != nil {
 		return err
 	}
@@ -422,7 +431,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 
 	var summary *updatePRSummary
 	if createPR {
-		summary, err = newUpdatePRSummary(ctx, opts.WorkflowsDir)
+		summary, err = newUpdatePRSummary(ctx, opts.WorkflowsDir, opts.WorkflowNames...)
 		if err != nil {
 			return err
 		}

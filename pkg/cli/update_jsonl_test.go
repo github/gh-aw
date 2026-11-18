@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -85,6 +86,25 @@ func TestUpdateJSONLLocalNoopAndError(t *testing.T) {
 	}
 }
 
+func TestUpdateJSONLUsesStdoutWhenRootRedirectsHumanOutput(t *testing.T) {
+	initUpdateJSONLRepo(t)
+	var commandErr error
+	stdout, _ := captureOutput(t, func() error {
+		root := &cobra.Command{Use: "gh"}
+		root.SetOut(os.Stderr)
+		root.SetErr(io.Discard)
+		root.AddCommand(NewUpdateCommand(validateEngineStub))
+		root.SetArgs([]string{"update", "--jsonl", "--no-compile"})
+		commandErr = root.Execute()
+		return nil
+	})
+	require.NoError(t, commandErr)
+	events := decodeUpdateEvents(t, stdout)
+	require.Len(t, events, 2)
+	assert.Equal(t, "command_started", events[0].Event)
+	assert.Equal(t, "command_completed", events[1].Event)
+}
+
 func TestUpdateJSONLSourceCommandActualChanges(t *testing.T) {
 	dir := initUpdateJSONLRepo(t)
 	for _, customDir := range []string{".github/workflows", filepath.Join(dir, "custom")} {
@@ -156,6 +176,7 @@ func TestUpgradeJSONLActualCommandNoopAndCodemods(t *testing.T) {
 		if event.Event == "codemod" {
 			applied = true
 			require.NotEmpty(t, event.Codemods)
+			assert.Equal(t, ".github/workflows/review.md", event.Path)
 		}
 		if event.Event == "change" && event.Kind == "workflow" {
 			changed = true
@@ -240,6 +261,45 @@ func TestUpdateJSONLSnapshotsExcludePreexistingChangesAndReportPins(t *testing.T
 	assert.NotContains(t, output.String(), "existing.md")
 }
 
+func TestUpdateJSONLSnapshotsWithoutGitAndExternalTargets(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	workflowDir := filepath.Join(t.TempDir(), "workflows")
+	target := filepath.Join(t.TempDir(), "custom", "workflows", "package.md")
+	require.NoError(t, os.MkdirAll(workflowDir, 0755))
+	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0755))
+	require.NoError(t, os.WriteFile(target, []byte("---\nsource: owner/repo/package.md@v1\n---\nbefore\n"), 0600))
+
+	var output bytes.Buffer
+	reporter := &updateJSONLReporter{writer: &output, command: "update"}
+	ctx := context.WithValue(context.Background(), updateJSONLKey{}, reporter)
+	finish, err := observeUpdateChanges(ctx, workflowDir, target)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(target, []byte("---\nsource: owner/repo/package.md@v1\n---\nafter\n"), 0600))
+	require.NoError(t, finish())
+
+	events := decodeUpdateEvents(t, output.String())
+	require.Len(t, events, 1)
+	assert.Equal(t, "workflow", events[0].Kind)
+	expectedPath, err := filepath.Rel(root, target)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.ToSlash(expectedPath), events[0].Path)
+	assert.Equal(t, 1, reporter.changed)
+}
+
+func TestUpdateJSONLChangedFilesDeduplicatePaths(t *testing.T) {
+	var output bytes.Buffer
+	reporter := &updateJSONLReporter{writer: &output, command: "update"}
+	ctx := context.WithValue(context.Background(), updateJSONLKey{}, reporter)
+	for _, kind := range []string{"workflow", "artifact", "source"} {
+		require.NoError(t, emitUpdateEvent(ctx, updateJSONLEvent{Event: "change", Path: ".github/workflows/review.md", Kind: kind}))
+	}
+	require.NoError(t, reporter.complete(ctx, false, nil))
+	events := decodeUpdateEvents(t, output.String())
+	require.Len(t, events, 4)
+	assert.Equal(t, 1, *events[3].ChangedFiles)
+}
+
 func TestUpdateJSONLBranchSourceCommitChange(t *testing.T) {
 	initUpdateJSONLRepo(t)
 	path := ".github/workflows/review.md"
@@ -306,26 +366,27 @@ func TestUpdateJSONLRelaunchForwarding(t *testing.T) {
 		`{"schema_version":1,"command":"upgrade","event":"command_completed"}` + "\n"} {
 		forwarder := &updateJSONLForwarder{ctx: context.Background()}
 		_, err := forwarder.Write([]byte(invalid))
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.NoError(t, forwarder.finish())
 	}
 	var output bytes.Buffer
 	reporter := &updateJSONLReporter{writer: &output, command: "upgrade"}
 	ctx := context.WithValue(context.Background(), updateJSONLKey{}, reporter)
 	forwarder := &updateJSONLForwarder{ctx: ctx}
-	data := []byte("{\"schema_version\":1,\"command\":\"upgrade\",\"event\":\"change\",\"kind\":\"workflow\"}\n")
-	_, err := forwarder.Write(data[:20])
+	data := []byte("{\"schema_version\":1,\"command\":\"upgrade\",\"event\":\"change\",\"kind\":\"workflow\",\"path\":\".github/workflows/review.md\"}\n")
+	_, err := forwarder.Write(append([]byte("legacy diagnostic\n"), data[:20]...))
 	require.NoError(t, err)
 	_, err = forwarder.Write(data[20:])
 	require.NoError(t, err)
 	require.NoError(t, forwarder.finish())
 	assert.Equal(t, 1, reporter.changed)
-	assert.Equal(t, data, output.Bytes())
+	assert.JSONEq(t, string(data), output.String())
 	_, err = forwarder.Write([]byte("{\"schema_version\":1,\"command\":\"upgrade\",\"event\":\"future_additive_event\",\"new_field\":true}\n"))
 	require.NoError(t, err, "new schema-v1 events from a newer CLI must not break self-upgrade")
-	assert.Equal(t, data, output.Bytes(), "unknown events are ignored, not re-encoded with lost fields")
+	assert.JSONEq(t, string(data), output.String(), "unknown events are ignored, not re-encoded with lost fields")
 	_, err = forwarder.Write([]byte("{"))
 	require.NoError(t, err)
-	require.ErrorContains(t, forwarder.finish(), "incomplete")
+	require.NoError(t, forwarder.finish(), "incomplete incidental output is ignored")
 }
 
 func TestUpdateJSONLCreatedIssueResponse(t *testing.T) {
@@ -338,6 +399,16 @@ func TestUpdateJSONLCreatedIssueResponse(t *testing.T) {
 	assert.Equal(t, "created", events[0].Status)
 	assert.Equal(t, "https://github.com/acme/repo/issues/42", events[0].URL)
 	assert.Equal(t, "acme/repo", events[0].Repository)
+	assert.Empty(t, events[0].Error)
+
+	output.Reset()
+	err := reportCreatedOrgIssue(ctx, "acme/repo", []byte("not json"))
+	require.Error(t, err)
+	events = decodeUpdateEvents(t, output.String())
+	require.Len(t, events, 1)
+	assert.Equal(t, "created", events[0].Status)
+	assert.Empty(t, events[0].URL)
+	assert.Contains(t, events[0].Error, "could not be decoded")
 }
 
 func TestUpdateJSONLWorkflowFailureWarnings(t *testing.T) {
@@ -374,6 +445,14 @@ func TestUpdateJSONLWorkflowFailureWarnings(t *testing.T) {
 }
 
 func TestUpdateJSONLRelaunchSubprocess(t *testing.T) {
+	if os.Getenv("GH_AW_JSONL_RELAUNCH_CANCEL_HELPER") == "1" {
+		interrupts := make(chan os.Signal, 1)
+		signal.Notify(interrupts, os.Interrupt)
+		_ = os.WriteFile(os.Getenv("GH_AW_JSONL_RELAUNCH_READY_FILE"), []byte("ready"), 0600)
+		<-interrupts
+		_ = os.WriteFile(os.Getenv("GH_AW_JSONL_RELAUNCH_CLEANUP_FILE"), []byte("cleaned"), 0600)
+		os.Exit(0)
+	}
 	if os.Getenv("GH_AW_JSONL_RELAUNCH_HELPER") == "1" {
 		if !slices.Contains(os.Args, "--jsonl-continuation") || !slices.Contains(os.Args, "--skip-extension-upgrade") {
 			os.Exit(2)
@@ -404,6 +483,43 @@ func TestUpdateJSONLRelaunchSubprocess(t *testing.T) {
 	assert.Equal(t, 1, *events[2].ChangedFiles, "the outer invocation must count relaunched changes")
 }
 
+func TestUpdateJSONLRelaunchCancellationAllowsCleanup(t *testing.T) {
+	t.Setenv("GH_AW_JSONL_RELAUNCH_CANCEL_HELPER", "1")
+	cleanupFile := filepath.Join(t.TempDir(), "cleanup")
+	readyFile := filepath.Join(t.TempDir(), "ready")
+	t.Setenv("GH_AW_JSONL_RELAUNCH_CLEANUP_FILE", cleanupFile)
+	t.Setenv("GH_AW_JSONL_RELAUNCH_READY_FILE", readyFile)
+	before := os.Args
+	t.Cleanup(func() { os.Args = before })
+	os.Args = []string{"test", "-test.run=^TestUpdateJSONLRelaunchSubprocess$", "--", "upgrade", "--jsonl"}
+	executable, err := os.Executable()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd := &cobra.Command{Use: "upgrade", RunE: func(cmd *cobra.Command, _ []string) error {
+		return relaunchUpgradeWithContext(cmd.Context(), "--skip-extension-upgrade", executable)
+	}}
+	cmd.SetContext(ctx)
+	addUpdateJSONLFlag(cmd)
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"--jsonl"})
+	result := make(chan error, 1)
+	go func() {
+		result <- cmd.Execute()
+	}()
+	assert.Eventually(t, func() bool {
+		_, statErr := os.Stat(readyFile)
+		return statErr == nil
+	}, 10*time.Second, 10*time.Millisecond, "child should install its interrupt handler")
+	cancel()
+	err = <-result
+	require.ErrorIs(t, err, context.Canceled)
+	cleanup, err := os.ReadFile(cleanupFile)
+	require.NoError(t, err)
+	assert.Equal(t, "cleaned", string(cleanup))
+}
+
 func TestUpdateJSONLWorkerSubprocess(t *testing.T) {
 	const url = "https://github.com/acme/repo/pull/42"
 	if os.Getenv("GH_AW_JSONL_WORKER_HELPER") == "1" {
@@ -413,6 +529,7 @@ func TestUpdateJSONLWorkerSubprocess(t *testing.T) {
 		}})
 		os.Exit(1)
 	}
+
 	t.Setenv("GH_AW_JSONL_WORKER_HELPER", "1")
 	result := runOrgRolloutWorker(context.Background(), "acme/repo", orgRolloutOptions{
 		args: []string{"-test.run=^TestUpdateJSONLWorkerSubprocess$", "--"}, dryRun: true,
@@ -429,6 +546,24 @@ func TestUpdateJSONLWorkerSubprocess(t *testing.T) {
 	assert.Equal(t, "pull_request", events[0].Event)
 	assert.Equal(t, "failed", events[1].Status)
 	assert.NotContains(t, output.String(), "untrusted repository output")
+}
+
+func TestOrgRolloutOutputPreservesLargeResultFrame(t *testing.T) {
+	const limit = 1024
+	payload := strings.Repeat("x", 8*1024*1024+1)
+	resultData, err := json.Marshal(orgRolloutResult{
+		Status: "created",
+		Events: []updateJSONLEvent{{SchemaVersion: 1, Command: "update", Event: "warning", Error: payload}},
+	})
+	require.NoError(t, err)
+	output := &orgRolloutOutput{limit: limit}
+	_, err = output.Write([]byte("ordinary diagnostic\n" + orgRolloutResultPrefix + string(resultData) + "\n"))
+	require.NoError(t, err)
+	result, err := parseOrgRolloutResult(output.result)
+	require.NoError(t, err)
+	require.Len(t, result.Events, 1)
+	assert.Len(t, result.Events[0].Error, len(payload))
+	assert.LessOrEqual(t, len(output.tail), limit)
 }
 
 func TestUpdateJSONLCommandReuseRestoresContext(t *testing.T) {

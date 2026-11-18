@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
@@ -358,7 +359,7 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 				opts.summary.recordFix(file, fixes)
 			}
 			if reporter := updateReporter(opts.ctx); reporter != nil {
-				reporter.recordError(emitUpdateEvent(opts.ctx, updateJSONLEvent{Event: "codemod", Path: filepath.ToSlash(file), Codemods: fixes}))
+				reporter.recordError(emitUpdateEvent(opts.ctx, updateJSONLEvent{Event: "codemod", Path: updateJSONLRelativePath(file), Codemods: fixes}))
 			}
 		}
 
@@ -610,6 +611,7 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 	// plus a hardcoded flag; exec.Command passes arguments directly to execve(2) without
 	// invoking a shell, so shell-injection (CWE-78) is not possible regardless of argv content.
 	cmd := exec.CommandContext(ctx, exe, newArgs...)
+	configureUpgradeRelaunchCancellation(cmd)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -634,6 +636,22 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 		return runErr
 	}
 	return nil
+}
+
+func configureUpgradeRelaunchCancellation(cmd *exec.Cmd) {
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		if err := cmd.Process.Signal(os.Interrupt); err != nil {
+			killErr := cmd.Process.Kill()
+			if killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
+				return errors.Join(err, killErr)
+			}
+		}
+		return nil
+	}
+	cmd.WaitDelay = 5 * time.Second
 }
 
 func resolveUpgradeRelaunchExecutable(exeOverride string) (string, error) {

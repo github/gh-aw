@@ -1332,7 +1332,7 @@ gh aw update --org my-org --create-issue --yes  # Auto-accept per-repo confirmat
 
 **Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires `--create-pull-request`; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive/-i`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`, `--jsonl`
 
-`--jsonl` writes structured messages to standard output while keeping human-readable diagnostics on standard error. See the [Update and Upgrade JSONL Specification](../../specs/update-upgrade-jsonl-specification/) for the message contract.
+`--jsonl` writes structured messages to standard output while keeping human-readable diagnostics on standard error. See the [Update and Upgrade JSONL Specification](/gh-aw/specs/update-upgrade-jsonl-specification/) for the message contract.
 
 Org mode (`--org`) previews or creates workflow update pull requests across every repository in an organization. Use `--repos` to limit matches, `--create-issue` to open an issue in each repository with pending updates, and `--yes/-y` to auto-accept per-repository confirmations in CI.
 
@@ -1399,7 +1399,7 @@ gh aw upgrade --org my-org --create-issue --yes  # Auto-accept per-repo confirma
 
 **Options:** `--dir/-d`, `--engine/-e`, `--repo/-r`, `--no-fix`, `--no-actions`, `--no-compile`, `--no-agent`, `--no-mcp`, `--no-skill`, `--disable-codemod`, `--create-pull-request`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires `--create-pull-request`; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive/-i`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--audit`, `--json/-j`, `--jsonl`, `--approve`, `--pre-releases`
 
-`--jsonl` uses the same [structured message contract](../../specs/update-upgrade-jsonl-specification/) as `update`; it is separate from the dependency audit's `--json` format.
+`--jsonl` uses the same [structured message contract](/gh-aw/specs/update-upgrade-jsonl-specification/) as `update`; it is separate from the dependency audit's `--json` format.
 
 The dispatcher skill is updated by default. The Copilot custom agent and setup-steps workflow are created only when a workflow uses Copilot (including when the engine is omitted), or updated if the respective file already exists. An explicit `--engine` overrides workflow engine detection. Use `--no-agent`, `--no-mcp`, or `--no-skill` to skip the corresponding files, even when they already exist.
 

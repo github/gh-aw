@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -39,14 +40,15 @@ type updateJSONLKey struct{}
 type updateJSONLRepoKey struct{}
 
 type updateJSONLReporter struct {
-	mu      sync.Mutex
-	writer  io.Writer
-	command string
-	err     error
-	changed int
-	worker  bool
-	events  []updateJSONLEvent
-	result  *orgRolloutResult
+	mu           sync.Mutex
+	writer       io.Writer
+	command      string
+	err          error
+	changed      int
+	changedPaths map[string]struct{}
+	worker       bool
+	events       []updateJSONLEvent
+	result       *orgRolloutResult
 }
 
 func updateReporter(ctx context.Context) *updateJSONLReporter {
@@ -101,7 +103,16 @@ func (r *updateJSONLReporter) emit(event updateJSONLEvent) error {
 		}
 	}
 	if event.Event == "change" && slices.Contains([]string{"workflow", "lockfile", "artifact"}, event.Kind) {
-		r.changed++
+		if event.Path != "" {
+			if r.changedPaths == nil {
+				r.changedPaths = make(map[string]struct{})
+			}
+			pathKey := event.Repository + "\x00" + event.Path
+			if _, exists := r.changedPaths[pathKey]; !exists {
+				r.changedPaths[pathKey] = struct{}{}
+				r.changed++
+			}
+		}
 	}
 	return nil
 }
@@ -155,7 +166,7 @@ func (s *updateJSONLCommand) execute(cmd *cobra.Command, args []string) (runErr 
 	defer func() { s.restore(cmd, originalContext, originalSilenceUsage, runErr) }()
 	cmd.SilenceUsage = true
 	worker, _ := cmd.Flags().GetBool("rollout-worker")
-	reporter := &updateJSONLReporter{writer: cmd.OutOrStdout(), command: cmd.Name(), worker: worker}
+	reporter := &updateJSONLReporter{writer: updateJSONLWriter(cmd), command: cmd.Name(), worker: worker}
 	ctx := context.WithValue(cmd.Context(), updateJSONLKey{}, reporter)
 	if repo, _ := cmd.Flags().GetString("repo"); repo != "" {
 		ctx = withUpdateRepository(ctx, repo)
@@ -178,6 +189,14 @@ func (s *updateJSONLCommand) execute(cmd *cobra.Command, args []string) (runErr 
 		}
 	}
 	return s.run(cmd, args)
+}
+
+func updateJSONLWriter(cmd *cobra.Command) io.Writer {
+	writer := cmd.OutOrStdout()
+	if stderr, ok := writer.(*os.File); ok && stderr == os.Stderr {
+		return os.Stdout
+	}
+	return writer
 }
 
 func (s *updateJSONLCommand) restore(cmd *cobra.Command, ctx context.Context, silenceUsage bool, runErr error) {
@@ -221,7 +240,7 @@ func (r *updateJSONLReporter) complete(ctx context.Context, continuation bool, r
 
 // Observe the actual net filesystem change, not proposed edits, pre-existing
 // dirty files, or a parsed human success message.
-func observeUpdateChanges(ctx context.Context, dir string) (func() error, error) {
+func observeUpdateChanges(ctx context.Context, dir string, targets ...string) (func() error, error) {
 	if updateReporter(ctx) == nil {
 		return func() error { return nil }, nil
 	}
@@ -230,56 +249,63 @@ func observeUpdateChanges(ctx context.Context, dir string) (func() error, error)
 	}
 	workflowPrefix, err := updateJSONLWorkflowPrefix(dir)
 	if err != nil {
-		return nil, err
+		reportUpdateWarning(ctx, "change_observation", err)
+		return func() error { return nil }, nil
 	}
-	before, err := captureUpdatePRFiles(ctx, dir)
+	before, err := captureUpdatePRFiles(ctx, dir, targets...)
 	if err != nil {
-		return nil, err
+		reportUpdateWarning(ctx, "change_observation", err)
+		return func() error { return nil }, nil
 	}
 	return func() error {
-		after, err := captureUpdatePRFiles(ctx, dir)
+		after, err := captureUpdatePRFiles(ctx, dir, targets...)
 		if err != nil {
+			reportUpdateWarning(ctx, "change_observation", err)
+			return nil
+		}
+		return reportUpdateFileChanges(ctx, workflowPrefix, before, after)
+	}, nil
+}
+
+func reportUpdateFileChanges(ctx context.Context, workflowPrefix string, before, after map[string]updatePRFile) error {
+	for _, path := range updateJSONLFilePaths(before, after) {
+		old, hadOld := before[path]
+		next, hasNext := after[path]
+		if hadOld && hasNext && old.hash == next.hash {
+			continue
+		}
+		kind := "artifact"
+		if strings.HasSuffix(path, ".lock.yml") {
+			kind = "lockfile"
+		} else if strings.HasSuffix(path, ".md") && (old.source != "" || next.source != "" || strings.HasPrefix(path, workflowPrefix) || workflowPrefix == "./") {
+			kind = "workflow"
+		}
+
+		oldHash, nextHash := updateJSONLFileHash(old, hadOld), updateJSONLFileHash(next, hasNext)
+		if err := emitUpdateEvent(ctx, updateJSONLEvent{
+			Event: "change", Path: path, Kind: kind, Operation: updateChangeOperation(hadOld, hasNext),
+			Before: oldHash, After: nextHash, MetadataOnly: old.metadataOnly || next.metadataOnly,
+		}); err != nil {
 			return err
 		}
-		for _, path := range updateJSONLFilePaths(before, after) {
-			old, hadOld := before[path]
-			next, hasNext := after[path]
-			if hadOld && hasNext && old.hash == next.hash {
-				continue
-			}
-			kind := "artifact"
-			if strings.HasSuffix(path, ".lock.yml") {
-				kind = "lockfile"
-			} else if strings.HasSuffix(path, ".md") && (old.source != "" || next.source != "" || strings.HasPrefix(path, workflowPrefix) || workflowPrefix == "./") {
-				kind = "workflow"
-			}
-
-			oldHash, nextHash := updateJSONLFileHash(old, hadOld), updateJSONLFileHash(next, hasNext)
-			if err := emitUpdateEvent(ctx, updateJSONLEvent{
-				Event: "change", Path: path, Kind: kind, Operation: updateChangeOperation(hadOld, hasNext),
-				Before: oldHash, After: nextHash, MetadataOnly: old.metadataOnly || next.metadataOnly,
-			}); err != nil {
-				return err
-			}
-			for _, metadata := range []struct{ kind, before, after string }{
-				{"source", old.source, next.source}, {"source_sha", old.sourceSHA, next.sourceSHA}, {"compiler", old.compiler, next.compiler},
-			} {
-				if metadata.before != metadata.after {
-					if err := emitUpdateEvent(ctx, updateJSONLEvent{
-						Event: "change", Path: path, Kind: metadata.kind,
-						Operation: updateChangeOperation(metadata.before != "", metadata.after != ""),
-						Before:    metadata.before, After: metadata.after,
-					}); err != nil {
-						return err
-					}
+		for _, metadata := range []struct{ kind, before, after string }{
+			{"source", old.source, next.source}, {"source_sha", old.sourceSHA, next.sourceSHA}, {"compiler", old.compiler, next.compiler},
+		} {
+			if metadata.before != metadata.after {
+				if err := emitUpdateEvent(ctx, updateJSONLEvent{
+					Event: "change", Path: path, Kind: metadata.kind,
+					Operation: updateChangeOperation(metadata.before != "", metadata.after != ""),
+					Before:    metadata.before, After: metadata.after,
+				}); err != nil {
+					return err
 				}
 			}
-			if err := emitUpdatePinChanges(ctx, path, old.pins, next.pins); err != nil {
-				return err
-			}
 		}
-		return nil
-	}, nil
+		if err := emitUpdatePinChanges(ctx, path, old.pins, next.pins); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func updateJSONLWorkflowPrefix(dir string) (string, error) {
@@ -289,7 +315,10 @@ func updateJSONLWorkflowPrefix(dir string) (string, error) {
 	}
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
-		return "", err
+		gitRoot, err = os.Getwd()
+		if err != nil {
+			return "", err
+		}
 	}
 	root, err := summaryPhysicalPath(gitRoot)
 	if err != nil {
@@ -300,6 +329,21 @@ func updateJSONLWorkflowPrefix(dir string) (string, error) {
 		return "", err
 	}
 	return filepath.ToSlash(relativeDir) + "/", nil
+}
+
+func updateJSONLRelativePath(path string) string {
+	root, err := gitutil.FindGitRoot()
+	if err != nil {
+		root, err = os.Getwd()
+	}
+	if err != nil {
+		return filepath.ToSlash(path)
+	}
+	relative, err := filepath.Rel(root, path)
+	if err != nil {
+		return filepath.ToSlash(path)
+	}
+	return filepath.ToSlash(relative)
 }
 
 func updateJSONLFilePaths(before, after map[string]updatePRFile) []string {

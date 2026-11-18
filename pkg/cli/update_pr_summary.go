@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"os"
 	"os/exec"
@@ -16,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
@@ -42,6 +45,7 @@ type updatePRCompilerTransition struct {
 type updatePRSummary struct {
 	before  map[string]updatePRFile
 	dir     string
+	targets []string
 	applied []workflowFixInfo
 }
 
@@ -49,16 +53,20 @@ var summaryReleaseVersion = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-
 var summaryDescribeVersion = regexp.MustCompile(`-[0-9]+-g[0-9a-f]+(?:-dirty)?$`)
 var summarySafeRef = regexp.MustCompile(`^[0-9A-Za-z._/@:+-]+$`)
 
-func newUpdatePRSummary(ctx context.Context, dir string) (*updatePRSummary, error) {
+func newUpdatePRSummary(ctx context.Context, dir string, workflowNames ...string) (*updatePRSummary, error) {
 	if dir == "" {
 		dir = constants.GetWorkflowDir()
 	}
 
-	before, err := captureUpdatePRFiles(ctx, dir)
+	targets, err := updatePRPackageSnapshotTargets(ctx, workflowNames)
 	if err != nil {
 		return nil, err
 	}
-	return &updatePRSummary{before: before, dir: dir}, nil
+	before, err := captureUpdatePRFiles(ctx, dir, targets...)
+	if err != nil {
+		return nil, err
+	}
+	return &updatePRSummary{before: before, dir: dir, targets: targets}, nil
 }
 
 func updatePRBody(ctx context.Context, summary *updatePRSummary, opts UpdateWorkflowsOptions) (string, error) {
@@ -71,12 +79,30 @@ func updatePRBody(ctx context.Context, summary *updatePRSummary, opts UpdateWork
 
 // Snapshot file hashes rather than diffs, so pre-existing local edits aren't
 // attributed to this run. Only structured, allowlisted metadata enters the body.
-func captureUpdatePRFiles(ctx context.Context, dir string) (map[string]updatePRFile, error) {
-	rootBytes, err := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		return nil, fmt.Errorf("cannot locate repository for PR summary: %w", err)
+func updatePRPackageSnapshotTargets(ctx context.Context, workflowNames []string) ([]string, error) {
+	_, packages, err := resolveInstalledPackageUpdates(workflowNames)
+	if err != nil || len(packages) == 0 {
+		return nil, err
 	}
-	root, err := filepath.EvalSymlinks(strings.TrimSpace(string(rootBytes)))
+	root, err := gitutil.FindGitRoot()
+	if err != nil {
+		return nil, err
+	}
+	var targets []string
+	for _, pkg := range packages {
+		for _, file := range pkg.record.Files {
+			target := filepath.Join(root, filepath.FromSlash(file.Destination))
+			if err := fileutil.ValidatePathWithinBase(root, target); err != nil {
+				return nil, fmt.Errorf("invalid package snapshot target %q: %w", file.Destination, err)
+			}
+			targets = append(targets, target)
+		}
+	}
+	return targets, nil
+}
+
+func captureUpdatePRFiles(ctx context.Context, dir string, targets ...string) (map[string]updatePRFile, error) {
+	root, hasGitRoot, err := updatePRSnapshotRoot(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -84,24 +110,133 @@ func captureUpdatePRFiles(ctx context.Context, dir string) (map[string]updatePRF
 	if err != nil {
 		return nil, err
 	}
-	args := []string{"-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--",
-		".github", ".gitattributes", ".gitignore", "AGENTS.md", "SKILL.md"}
 	skillDirs, agentDirs := summaryEngineDirs()
-	args = append(args, skillDirs...)
-	args = append(args, agentDirs...)
-	args = append(args, summaryWorkflowPathspec(root, workflowDir)...)
-	paths, err := exec.CommandContext(ctx, "git", args...).Output()
+	pathFiles, err := collectUpdatePRSnapshotPaths(ctx, root, hasGitRoot, workflowDir, targets, skillDirs, agentDirs)
 	if err != nil {
-		return nil, fmt.Errorf("cannot list files for PR summary: %w", err)
+		return nil, err
 	}
-	files := make(map[string]updatePRFile)
-	for path := range strings.SplitSeq(string(paths), "\x00") {
-		if path == "" {
+	return readUpdatePRSnapshotFiles(pathFiles, workflowDir, agentDirs)
+}
+
+func updatePRSnapshotRoot(ctx context.Context) (string, bool, error) {
+	rootBytes, gitErr := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel").Output()
+	if gitErr == nil {
+		root, err := filepath.EvalSymlinks(strings.TrimSpace(string(rootBytes)))
+		if err == nil {
+			return root, true, nil
+		}
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		return "", false, fmt.Errorf("cannot locate snapshot root: %w", err)
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", false, err
+	}
+	return root, false, nil
+}
+
+func collectUpdatePRSnapshotPaths(ctx context.Context, root string, hasGitRoot bool, workflowDir string, targets, skillDirs, agentDirs []string) (map[string]string, error) {
+	pathFiles := make(map[string]string)
+	if hasGitRoot {
+		args := []string{"-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--",
+			".github", ".gitattributes", ".gitignore", "AGENTS.md", "SKILL.md"}
+		args = append(args, skillDirs...)
+		args = append(args, agentDirs...)
+		args = append(args, summaryWorkflowPathspec(root, workflowDir)...)
+		paths, listErr := exec.CommandContext(ctx, "git", args...).Output()
+		if listErr != nil {
+			return nil, fmt.Errorf("cannot list files for PR summary: %w", listErr)
+		}
+		for path := range strings.SplitSeq(string(paths), "\x00") {
+			if path != "" {
+				if err := addUpdatePRSnapshotPath(root, pathFiles, filepath.Join(root, filepath.FromSlash(path))); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	scanRoots := []string{filepath.Join(root, ".github"), filepath.Join(root, ".gitattributes"),
+		filepath.Join(root, ".gitignore"), filepath.Join(root, "AGENTS.md"), filepath.Join(root, "SKILL.md")}
+	for _, dir := range append(skillDirs, agentDirs...) {
+		scanRoots = append(scanRoots, filepath.Join(root, filepath.FromSlash(dir)))
+	}
+	scanRoots = append(scanRoots, workflowDir)
+	scanRoots = append(scanRoots, targets...)
+	for _, scanRoot := range scanRoots {
+		info, statErr := os.Lstat(scanRoot)
+		if errors.Is(statErr, fs.ErrNotExist) {
 			continue
 		}
-		full := filepath.Join(root, filepath.FromSlash(path))
+		if statErr != nil {
+			return nil, fmt.Errorf("cannot inspect snapshot target %s: %w", scanRoot, statErr)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		if info.Mode().IsRegular() {
+			if err := addUpdatePRSnapshotPath(root, pathFiles, scanRoot); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if !info.IsDir() {
+			continue
+		}
+		if err := walkUpdatePRSnapshotTarget(root, scanRoot, pathFiles); err != nil {
+			return nil, fmt.Errorf("cannot enumerate snapshot target %s: %w", scanRoot, err)
+		}
+	}
+	return pathFiles, nil
+}
+
+func addUpdatePRSnapshotPath(root string, pathFiles map[string]string, full string) error {
+	absolute, err := filepath.Abs(full)
+	if err != nil {
+		return err
+	}
+	relative, err := filepath.Rel(root, absolute)
+	if err != nil {
+		return err
+	}
+	pathFiles[filepath.ToSlash(relative)] = absolute
+	return nil
+}
+
+func walkUpdatePRSnapshotTarget(root, scanRoot string, pathFiles map[string]string) error {
+	return filepath.WalkDir(scanRoot, func(full string, entry os.DirEntry, walkErr error) error {
+		if errors.Is(walkErr, fs.ErrNotExist) {
+			return nil
+		}
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		fileInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if fileInfo.Mode().IsRegular() {
+			return addUpdatePRSnapshotPath(root, pathFiles, full)
+		}
+		return nil
+	})
+}
+
+func readUpdatePRSnapshotFiles(pathFiles map[string]string, workflowDir string, agentDirs []string) (map[string]updatePRFile, error) {
+	files := make(map[string]updatePRFile)
+	for path, full := range pathFiles {
 		info, err := os.Lstat(full)
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
@@ -146,7 +281,7 @@ func summaryPhysicalPath(path string) (string, error) {
 		return "", err
 	}
 	resolved, err := filepath.EvalSymlinks(absolute)
-	if !os.IsNotExist(err) {
+	if !errors.Is(err, fs.ErrNotExist) {
 		return resolved, err
 	}
 	// A default workflow directory may not have been created yet.
@@ -193,8 +328,8 @@ func readUpdatePRFile(full, path, workflowDir string) (updatePRFile, error) {
 	}
 	isWorkflow := strings.HasPrefix(full, workflowDir+string(filepath.Separator))
 	isYAML := strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".yaml")
-	isWorkflowYAML := isYAML && (isWorkflow || strings.HasPrefix(path, constants.WorkflowsDirSlash))
-	if filepath.Base(path) == "actions-lock.json" || (isWorkflow && strings.HasSuffix(path, ".md")) || isWorkflowYAML {
+	isWorkflowYAML := isYAML && (isWorkflow || strings.HasSuffix(path, ".lock.yml") || strings.HasPrefix(path, constants.WorkflowsDirSlash))
+	if filepath.Base(path) == "actions-lock.json" || strings.HasSuffix(path, ".md") || isWorkflowYAML {
 		content, err := os.ReadFile(full)
 		if err != nil {
 			return state, err
@@ -433,7 +568,7 @@ func (s *updatePRSummary) recordFix(file string, fixes []string) {
 }
 
 func (s *updatePRSummary) body(ctx context.Context, command string) (string, error) {
-	after, err := captureUpdatePRFiles(ctx, s.dir)
+	after, err := captureUpdatePRFiles(ctx, s.dir, s.targets...)
 	if err != nil {
 		return "", err
 	}

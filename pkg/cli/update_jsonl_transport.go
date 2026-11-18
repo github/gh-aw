@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 )
@@ -12,55 +11,65 @@ import (
 // Re-encode relaunched CLI events to retain one command lifecycle and aggregate
 // changed-file counts without redirecting process-global stdout.
 type updateJSONLForwarder struct {
-	ctx     context.Context
-	pending []byte
-	err     error
+	ctx         context.Context
+	pending     []byte
+	discardLine bool
+	err         error
 }
 
 func (w *updateJSONLForwarder) Write(data []byte) (int, error) {
 	if w.err != nil {
 		return 0, w.err
 	}
-	w.pending = append(w.pending, data...)
-	if len(w.pending) > 8*1024*1024 {
-		w.err = errors.New("upgrade JSON Lines event exceeds 8 MiB")
-		return 0, w.err
+	written := len(data)
+	if w.discardLine {
+		newline := bytes.IndexByte(data, '\n')
+		if newline < 0 {
+			return written, nil
+		}
+		data = data[newline+1:]
+		w.discardLine = false
 	}
+	w.pending = append(w.pending, data...)
 	for {
 		line, rest, found := bytes.Cut(w.pending, []byte{'\n'})
 		if !found {
 			break
 		}
-		var event updateJSONLEvent
-		if err := json.Unmarshal(line, &event); err != nil {
-			w.err = fmt.Errorf("invalid upgrade JSON Lines event: %w", err)
-			return 0, w.err
-		}
-		if event.SchemaVersion != 1 || event.Command != "upgrade" || event.Event == "" ||
-			event.Event == "command_started" || event.Event == "command_completed" {
-			w.err = errors.New("invalid upgrade JSON Lines event contract")
-			return 0, w.err
-		}
-		if !validUpdateForwardEvent(event.Event) {
-			w.pending = rest
-			continue
-		}
-		if err := emitUpdateEvent(w.ctx, event); err != nil {
+		if err := w.forwardLine(line); err != nil {
 			w.err = err
 			return 0, err
 		}
 		w.pending = rest
 	}
-	return len(data), nil
+	if len(w.pending) > 8*1024*1024 {
+		w.pending = nil
+		w.discardLine = true
+	}
+	return written, nil
+}
+
+func (w *updateJSONLForwarder) forwardLine(line []byte) error {
+	var event updateJSONLEvent
+	if err := json.Unmarshal(line, &event); err != nil {
+		return nil
+	}
+	if event.SchemaVersion != 1 || event.Command != "upgrade" || !validUpdateForwardEvent(event.Event) {
+		return nil
+	}
+	return emitUpdateEvent(w.ctx, event)
 }
 
 func (w *updateJSONLForwarder) finish() error {
 	if w.err != nil {
 		return w.err
 	}
-	if len(w.pending) != 0 {
-		return errors.New("incomplete upgrade JSON Lines event")
+	if !w.discardLine && len(w.pending) > 0 {
+		if err := w.forwardLine(w.pending); err != nil {
+			return err
+		}
 	}
+	w.pending = nil
 	return nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -211,12 +212,14 @@ func TestCreatePRWithChangesAutoMerge(t *testing.T) {
 		createFails  bool
 		autoFails    bool
 		cleanupFails bool
+		reportFails  bool
 	}{
 		{name: "disabled"},
 		{name: "enabled", autoMerge: true},
 		{name: "creation fails", autoMerge: true, createFails: true},
 		{name: "activation fails", autoMerge: true, autoFails: true},
 		{name: "activation and cleanup fail", autoMerge: true, autoFails: true, cleanupFails: true},
+		{name: "reporting fails", reportFails: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repoDir := initPRTransferRepo(t)
@@ -264,9 +267,17 @@ func TestCreatePRWithChangesAutoMerge(t *testing.T) {
 				}
 			}
 			var eventsOutput bytes.Buffer
-			ctx := context.WithValue(context.Background(), updateJSONLKey{}, &updateJSONLReporter{writer: &eventsOutput, command: "upgrade"})
+			reporterWriter := io.Writer(&eventsOutput)
+			if tc.reportFails {
+				reporterWriter = &failUpdateJSONLWriter{fail: 1}
+			}
+			reporter := &updateJSONLReporter{writer: reporterWriter, command: "upgrade"}
+			ctx := context.WithValue(context.Background(), updateJSONLKey{}, reporter)
 			url, err := createPRWithChanges(ctx, "test", "Update README", "Title", "Body", false, tc.autoMerge)
-			if tc.createFails {
+			if tc.reportFails {
+				require.ErrorIs(t, reporter.err, io.ErrClosedPipe)
+				require.NoError(t, err, "reporting failure must not change the successful PR creation result")
+			} else if tc.createFails {
 				assert.Empty(t, eventsOutput.String())
 			} else {
 				events := decodeUpdateEvents(t, eventsOutput.String())
