@@ -2283,6 +2283,7 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/gh-aw/safe-jobs/
       - name: Checkout trusted reconciliation code
+        if: format('{0}', github.event_name == 'workflow_dispatch' && inputs.staged) != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         env:
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
@@ -2292,6 +2293,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup safe-output helpers
+        if: format('{0}', github.event_name == 'workflow_dispatch' && inputs.staged) != 'true'
         uses: ./actions/setup
         env:
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
@@ -2299,6 +2301,7 @@ jobs:
           GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
           GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
       - name: Revalidate live provenance and publish essential assignments
+        if: format('{0}', github.event_name == 'workflow_dispatch' && inputs.staged) != 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json

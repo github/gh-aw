@@ -53,6 +53,42 @@ jobs:
 `
 }
 
+func TestSafeOutputAuthorizationWorkflowLaunchCompilation(t *testing.T) {
+	dir := filepath.Join(testutil.TempDir(t, "authorized-call-workflow"), ".github", "workflows")
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	createWorker(t, dir, "worker", "")
+	lock := compileAndReadLock(t, filepath.Join(dir, "gateway.md"), `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  authorization:
+    endpoint: https://authority.example/authorize
+    audience: gh-aw
+  call-workflow:
+    workflows: [worker]
+---
+Call the reviewed worker.
+`)
+	var workflow struct {
+		Jobs map[string]struct {
+			If          string
+			Needs       any
+			Uses        string
+			Permissions map[string]string
+		}
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(lock), &workflow))
+	launch := workflow.Jobs["call-worker"]
+	require.Equal(t, "./.github/workflows/worker.lock.yml", launch.Uses)
+	require.Contains(t, launch.Needs, "authorize-call-worker")
+	require.Contains(t, launch.If, "authorized")
+	require.Equal(t, "write", workflow.Jobs["authorize-call-worker"].Permissions["id-token"])
+	require.NotEqual(t, "write", launch.Permissions["id-token"])
+	require.Contains(t, lock, "call_workflow:launch:worker")
+}
+
 // createWorker writes a worker lock file to the .github/workflows directory.
 func createWorker(t *testing.T, workflowsDir, name, inputs string) {
 	t.Helper()

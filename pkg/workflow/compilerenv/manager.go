@@ -37,9 +37,11 @@ func New(getenv EnvGetter) *Manager {
 var defaultManager = New(os.Getenv)
 
 const (
-	DefaultAdmissionURL      = "GH_AW_DEFAULT_ADMISSION_URL"
-	DefaultAdmissionAudience = "GH_AW_DEFAULT_ADMISSION_AUDIENCE"
-	DefaultAdmissionOnOutage = "GH_AW_DEFAULT_ADMISSION_ON_OUTAGE"
+	DefaultAdmissionURL                    = "GH_AW_DEFAULT_ADMISSION_URL"
+	DefaultAdmissionAudience               = "GH_AW_DEFAULT_ADMISSION_AUDIENCE"
+	DefaultAdmissionOnOutage               = "GH_AW_DEFAULT_ADMISSION_ON_OUTAGE"
+	DefaultSafeOutputAuthorizationURL      = "GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_URL"
+	DefaultSafeOutputAuthorizationAudience = "GH_AW_DEFAULT_SAFE_OUTPUT_AUTHORIZATION_AUDIENCE"
 
 	// DefaultArtifactRetentionDays is the runtime Actions variable used when
 	// artifact_retention_days is not configured in aw.json.
