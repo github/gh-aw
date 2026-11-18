@@ -45,18 +45,25 @@ tools:
             items:
               type: string
           outcome:
-            enum: [issue_created, noop]
+            enum: [issue_created, pull_request_created, noop]
         additionalProperties: false
       max-record-kb: 8
       max-patch-kb: 10
   bash: true
+  edit: null
 safe-outputs:
-  create-issue:
+  create-pull-request:
     title-prefix: "[awf-feature-surfacing] "
     labels: [automation, awf, compiler, specifications]
-    close-older-issues: true
-    max: 1
     expires: 7d
+    max: 1
+    allowed-files:
+      - ".github/aw/triggers.md"
+      - ".github/aw/syntax*.md"
+      - "pkg/parser/schemas/*.json"
+      - "docs/src/content/docs/**"
+    protected-files:
+      policy: request-review
 timeout-minutes: 30
 strict: true
 imports:
@@ -67,8 +74,8 @@ features:
 evals:
   - id: spec_updates_reviewed
     question: Did the agent review AWF specification and compiler updates for features that should be surfaced in gh-aw?
-  - id: finding_reported_or_noop
-    question: Did the agent create an issue for an actionable surfacing gap, or report that no issue was needed?
+  - id: pr_created_or_noop
+    question: Did the agent create a pull request for actionable surfacing changes, or report that no change was needed?
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}
@@ -95,11 +102,13 @@ Start with the main AWF schema, then expand to nearby specification/compiler sou
 
 Use the generic records projection at `/tmp/gh-aw/ledgers/awf-feature-reviews/ledger.db` as the authoritative cross-run history. Query recent
 review records and use the newest valid record's `reviewed_sha` as the previous review cursor and
-its `open_feature_ids` to avoid duplicate issues. If no valid record exists,
+its `open_feature_ids` to identify already-tracked gaps. Check whether each tracked gap has an open pull request before suppressing work; an issue without an implementing pull request is not a completed change. If no valid record exists,
 use the last 7 days as the initial diff window.
 
 Each record contains the run ID, review timestamp, reviewed commit SHA, schema
-SHA-256, stable open feature IDs, and outcome (`issue_created` or `noop`). Do
+SHA-256, stable open feature IDs, and outcome. The legacy `issue_created` value
+is retained for existing records; new records use `pull_request_created` or
+`noop`. Do
 not store full diffs, source excerpts, or raw analysis notes in the ledger.
 
 ## Procedure
@@ -144,34 +153,34 @@ For each candidate feature, determine if it is already surfaced in:
 
 Use `surfacing-gap-evaluator` for each candidate.
 
-### 4) Decide and output
+### 4) Make changes and output
 
-If one or more actionable surfacing gaps exist, create exactly one issue with:
+For each actionable surfacing gap, make the smallest direct change to the
+relevant user-facing source files (for example, syntax guidance or schema
+descriptions). Do not implement underlying compiler features or make unrelated
+changes. Check existing open pull requests to avoid duplicating work; if an
+open issue tracks the gap but no pull request implements it, make the change
+and reference that issue in the pull request.
 
-- concise summary of new feature(s)
-- evidence (files/commits/schema keys)
-- current surfacing status
-- concrete follow-up tasks (docs/CLI/upgrade/codemod/tests)
-- priority for each task
-
-Use `###` headings and `<details>` for verbose evidence.
-
-If no actionable gap exists, return `noop` with a brief explanation.
+Create exactly one pull request containing the changes, with a concise summary
+of the feature, evidence (files/commits/schema keys), the surfacing gap, and
+what changed. Use `###` headings and `<details>` for verbose evidence. If no
+actionable surfacing gap exists, return `noop` with a brief explanation.
 
 ### 5) Persist the review event
 
-After creating the issue or using `noop`, query for a record whose
+After creating the pull request or using `noop`, query for a record whose
 `payload.run_id` matches `${{ github.run_id }}`. If absent, submit one
 `ledger_append` record with `record_type: awf_spec_surfacing_review`, the run ID,
 UTC timestamp, current commit SHA, schema SHA-256, stable open feature IDs, and
-outcome. Do not edit ledger branches directly or invoke compaction.
+outcome (`pull_request_created` or `noop`). Do not edit ledger branches directly or invoke compaction.
 
 ## Output Quality Bar
 
 - Do not report cosmetic refactors as new features.
-- Do not create duplicate issues for already-tracked feature IDs.
+- Do not create duplicate pull requests for already-tracked feature IDs.
 - Prefer fewer high-confidence items over broad speculation.
-- Never finish without either `create_issue` or `noop`.
+- Never finish without either `create_pull_request` or `noop`.
 
 ## Reporting Guidelines
 

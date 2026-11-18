@@ -2048,6 +2048,135 @@
   .tv-p.done svg .end { opacity: 1; }
   .tv-cap { position: absolute; left: 110px; right: 110px; top: 952px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
 
+  /* --- turn intent into value: the turn intent to automation cards, Markdown → design agent → frozen value function --- */
+  .pf-card.tiv-md { left: 110px; width: 580px; }
+  .pf-md.tiv-md .file { font-size: 17px; }
+  .pf-md.tiv-md pre { min-height: 0; font-size: 19px; }
+  .tiv-md pre > span { transition: opacity .6s; }
+  .tiv-md.dim pre > span { opacity: .3; }
+  .tiv-hl { border-radius: 4px; padding: 0 2px; margin: 0 -2px; background: transparent; transition: background .4s, box-shadow .4s; }
+  .tiv-hl.on { background: color-mix(in srgb, var(--c) 28%, transparent); box-shadow: 0 0 0 1.5px var(--c); }
+  .pf-card.tiv-ai { left: 750px; width: 380px; padding: 22px; --c: #ab7df8; }
+  .tiv-who { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #3d444d; }
+  .tiv-orb { width: 64px; height: 64px; flex: none; box-sizing: border-box; border-radius: 50%; display: grid; place-items: center; background: #0d1117; border: 2px solid #3d444d; transition: border-color .4s, box-shadow .4s; }
+  .tiv-orb svg { width: 34px; height: 34px; fill: #f0f6fc; }
+  .tiv-ai.busy .tiv-orb { border-color: #ab7df8; animation: tiv-pulse .9s ease-in-out infinite; }
+  .tiv-ai.done .tiv-orb { border-color: #ab7df8; box-shadow: 0 0 26px #ab7df855; }
+  @keyframes tiv-pulse { 50% { box-shadow: 0 0 46px #ab7df8cc; } }
+  .tiv-who b { display: block; font-size: 24px; color: #f0f6fc; }
+  .tiv-who code { display: block; margin-top: 6px; font: 500 16px/1.3 var(--mono); color: #d2a8ff; }
+  .tiv-slot { margin-top: 14px; padding: 8px 12px; border-left: 3px solid #3d444d; border-radius: 4px; transition: border-color .4s, background .4s; }
+  .tiv-slot em { display: block; font: 700 13px/1 var(--mono); font-style: normal; letter-spacing: .14em; color: var(--c); opacity: .45; transition: opacity .4s; }
+  .tiv-slot span { display: block; margin-top: 7px; font-size: 20px; line-height: 1.25; color: #f0f6fc; opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .45s; }
+  .tiv-slot.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
+  .tiv-slot.on em, .tiv-slot.on span { opacity: 1; transform: none; }
+  .pf-card.tiv-fn { left: 1190px; width: 620px; --c: #56d4dd; transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1), border-color .5s, box-shadow .5s; }
+  .tiv-fn .file { padding: 18px 22px; border-bottom: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #d1d7e0; }
+  .tiv-fn pre { margin: 0; padding: 18px 22px; height: 306px; font: 500 17px/27px var(--mono); white-space: pre; color: #e6edf3; }
+  .tiv-tok { box-shadow: inset 0 -2px 0 var(--c); }
+  .tiv-go { margin: 0 18px 18px; padding: 10px 14px; border-radius: 10px; background: #56d4dd14; border: 1px solid #56d4dd55; font: 600 16px/1.35 var(--mono); color: #56d4dd; opacity: 0; transform: scale(1.12); transition: opacity .3s, transform .4s cubic-bezier(.2,1.6,.4,1); }
+  .tiv-go.on { opacity: 1; transform: none; }
+  .tiv-go span { display: block; color: #9198a1; font-weight: 500; }
+  .pf-card.tiv-fn.frozen { border-color: #56d4dd; box-shadow: 0 30px 80px -30px #000, 0 0 60px -10px #56d4dd99; }
+  .tiv-ghost { position: absolute; left: 0; top: 0; z-index: 3; padding: 3px 9px; border-radius: 6px; font: 600 19px/1.3 var(--mono); white-space: nowrap; color: #0d1117; background: var(--c); box-shadow: 0 12px 30px -8px var(--c); opacity: 0; pointer-events: none; }
+  .tiv-cap { position: absolute; left: 110px; right: 110px; top: 968px; font: 500 16px/1.35 var(--mono); color: #9198a1; }
+  .tiv-now *, .tiv-now *::after { transition: none !important; }
+
+  /* --- value column: GitHub-native building blocks (pull request, timeline) --- */
+  .vg-card { box-sizing: border-box; border: 1px solid #3d444d; border-radius: 12px; background: #0d1117f2; overflow: hidden; }
+  .vg-badge { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 999px; font-size: 18px; font-weight: 600; color: #fff; background: #238636; white-space: nowrap; transition: background .4s; }
+  .vg-badge.merged { background: #8957e5; }
+  .vg-badge svg { width: 17px; height: 17px; fill: #fff; }
+  .vg-lbl { padding: 3px 11px; border-radius: 999px; border: 1px solid #3d444d; font-size: 15px; font-weight: 600; color: #d1d7e0; }
+  .vg-diff { margin-left: auto; font: 600 18px/1 var(--mono); color: #9198a1; }
+  .vg-diff .add { color: #3fb950; }
+  .vg-diff .del { color: #f85149; }
+  .vg-ev { position: relative; display: grid; grid-template-columns: 46px 1fr; column-gap: 16px; align-items: center; min-height: 58px; padding-bottom: 16px; opacity: .15; transition: opacity .45s; }
+  .vg-ev.on { opacity: 1; }
+  .vg-ev::before { content: ""; position: absolute; left: 22px; top: 46px; bottom: 0; width: 2px; background: #3d444d; }
+  .vg-ev:last-child::before { display: none; }
+  .vg-dot { width: 46px; height: 46px; box-sizing: border-box; border-radius: 50%; display: grid; place-items: center; background: #21262d; border: 2px solid #3d444d; overflow: hidden; font-size: 22px; color: #0d1117; }
+  .vg-dot svg { width: 22px; height: 22px; fill: #d1d7e0; }
+  .vg-dot svg.av { width: 100%; height: 100%; }
+  .vg-dot.open { background: #238636; border-color: #238636; }
+  .vg-dot.merged { border-color: #8957e5; }
+  .vg-dot.ok { background: #1f6feb; border-color: #1f6feb; }
+  .vg-dot.gold { background: #e3b341; border-color: #e3b341; }
+  .vg-dot.open svg, .vg-dot.ok svg { fill: #fff; }
+  .vg-ev b { display: block; font-size: 23px; line-height: 1.2; font-weight: 600; color: #f0f6fc; }
+  .vg-ev span { display: block; margin-top: 4px; font-size: 18px; line-height: 1.3; color: #9198a1; }
+  .vg-ev span strong { color: var(--c, #f0f6fc); font-weight: 700; }
+  .vg-cap { position: absolute; left: 110px; right: 110px; top: 968px; font: 500 16px/1.35 var(--mono); color: #9198a1; }
+  .vg-now *, .vg-now *::after { transition: none !important; }
+
+  /* --- deliver · accept · attribute (column under turn automation into value) --- */
+  .daa-ex { position: absolute; right: 110px; top: 66px; display: flex; align-items: center; gap: 12px; padding: 11px 18px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 17px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #e3b341; }
+  .daa-ex b { color: #f0f6fc; letter-spacing: .04em; text-transform: none; }
+  .active .daa-ex { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .daa-pr, .daa-tl, .daa-days { position: absolute; }
+  .active .daa-pr, .active .daa-tl, .active .daa-days { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + .3s); }
+  .daa-pr { left: 110px; top: 262px; width: 1700px; padding: 18px 24px; }
+  .daa-pr h3 { margin: 0 0 14px; font-size: 30px; line-height: 1.2; font-weight: 600; color: #f0f6fc; }
+  .daa-pr p { display: flex; align-items: center; gap: 14px; margin: 0; font-size: 20px; color: #9198a1; }
+  .daa-pr p b { color: #f0f6fc; font-weight: 600; }
+  .daa-tl { left: 110px; top: 430px; width: 780px; }
+  .daa-days { left: 950px; top: 430px; width: 860px; }
+  .daa-days > i { display: block; font: 600 16px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9198a1; font-style: normal; }
+  .daa-wins { display: flex; justify-content: space-between; margin: 20px 0 10px; font: 600 17px/1 var(--mono); }
+  .daa-wins span { opacity: 0; transition: opacity .4s; }
+  .daa-wins span.on { opacity: 1; }
+  .daa-wins span:first-child { color: #ffa657; }
+  .daa-wins span:last-child { color: #79c0ff; }
+  .daa-strip { display: flex; align-items: center; gap: 6px; }
+  .daa-sq { width: 54px; height: 54px; box-sizing: border-box; border-radius: 8px; display: grid; place-items: center; font: 700 22px/1 var(--mono); border: 2px solid #30363d; background: #161b22; transform: scale(.6); opacity: 0; transition: opacity .3s, transform .35s cubic-bezier(.2,1.6,.4,1); }
+  .daa-sq.on { opacity: 1; transform: none; }
+  .daa-sq.miss { background: #db6d2833; border-color: #ffa657; color: #ffa657; }
+  .daa-sq.full { background: #1f6feb40; border-color: #79c0ff; color: #79c0ff; }
+  .daa-mg { width: 18px; align-self: stretch; display: grid; place-items: center; }
+  .daa-mg::before { content: ""; width: 4px; height: 78px; border-radius: 2px; background: #8957e5; opacity: 0; transition: opacity .4s; }
+  .daa-mg.on::before { opacity: 1; }
+  .daa-legend { display: flex; justify-content: space-between; margin-top: 12px; font-size: 17px; color: #9198a1; }
+  .daa-legend b { color: #d2a8ff; font-weight: 700; }
+  .daa-tada { position: relative; margin-top: 30px; padding: 18px 24px; border: 2px dashed #3d444d; border-radius: 16px; background: #161b22e8; opacity: .15; transform: scale(.96); transition: opacity .4s, transform .5s cubic-bezier(.2,1.6,.4,1), border-color .4s, box-shadow .4s; }
+  .daa-tada.on { opacity: 1; transform: none; border-style: solid; border-color: #e3b341; box-shadow: 0 0 50px #e3b34155; }
+  .daa-tada > i { display: block; font: 600 15px/1 var(--mono); letter-spacing: .14em; color: #e3b341; font-style: normal; }
+  .daa-tada > b { display: block; margin-top: 10px; font-size: 64px; line-height: 1; font-variation-settings: "wght" 800, "wdth" 100; color: #f0f6fc; }
+  .daa-tada > span { display: block; margin-top: 10px; font-size: 19px; color: #c9d1d9; }
+  .daa-sp { position: absolute; left: 50%; top: 50%; font-size: 22px; color: #e3b341; opacity: 0; pointer-events: none; }
+  .daa-tada.on .daa-sp { animation: daa-burst 1.2s ease-out both calc(var(--k) * 40ms); }
+  @keyframes daa-burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.4); } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.2); } }
+
+  /* --- from delivery to value: the full record (column under turn automation into value) --- */
+  .dtv-stats, .dtv-chart { position: absolute; left: 110px; width: 1700px; }
+  .active .dtv-stats, .active .dtv-chart { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + .3s); }
+  .dtv-stats { top: 262px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .dtv-n { padding: 14px 20px; border: 1px solid #3d444d; border-radius: 12px; background: #161b22e8; }
+  .dtv-n b { display: block; font-size: 46px; line-height: 1.05; font-variation-settings: "wght" 750, "wdth" 100; color: #f0f6fc; }
+  .dtv-n span { display: block; margin-top: 6px; font-size: 18px; color: #9198a1; }
+  .dtv-n.gold { border-color: #e3b341; }
+  .dtv-n.gold b { color: #e3b341; }
+  .dtv-chart { top: 404px; }
+  .dtv-svg { display: block; width: 1700px; height: 552px; overflow: visible; }
+  .dtv-svg text { font-family: var(--mono); font-size: 15px; fill: #9198a1; }
+  .dtv-svg .dtv-grid { stroke: #ffffff14; }
+  .dtv-svg .dtv-hd { font-size: 14px; font-weight: 600; letter-spacing: .1em; }
+  .dtv-svg .dtv-cov { fill: none; stroke: #f0f6fc; stroke-width: 3.5; stroke-linejoin: round; }
+  .dtv-svg .dtv-bb { fill: #db6d2840; stroke: #ffa657; stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .dtv-svg .dtv-ab { fill: #1f6feb4d; stroke: #79c0ff; stroke-width: 1.5; }
+  .dtv-svg .dtv-gap { fill: #79c0ff; font-weight: 600; font-size: 14px; }
+  .dtv-svg .dtv-po { fill: #3fb950; }
+  .dtv-svg .dtv-pm { fill: #a371f7; }
+  .dtv-svg .dtv-pn { fill: #d1d7e0; font-weight: 600; font-size: 14px; }
+  .dtv-svg .dtv-hi { fill: #f0f6fc; font-weight: 700; font-size: 18px; }
+  .dtv-svg .dtv-end { fill: #f0f6fc; }
+  .dtv-svg .dtv-cur { stroke: #f0f6fc; stroke-width: 1.5; opacity: .45; }
+  .dtv-svg .dtv-fx { opacity: 0; transition: opacity .3s; }
+  .dtv-svg .dtv-fx.on { opacity: 1; }
+  .dtv-svg .dtv-ex rect { fill: #e3b34112; stroke: #e3b341; stroke-width: 2; stroke-dasharray: 6 4; }
+  .dtv-svg .dtv-ex text { fill: #e3b341; font-size: 15px; font-weight: 700; }
+  .dtv-cap { position: absolute; left: 110px; right: 110px; top: 968px; font: 500 16px/1.35 var(--mono); color: #9198a1; }
+  .dtv-now *, .dtv-now *::after { transition: none !important; }
+
   /* --- turn intent to automation --- */
   .slide-head h2.pf-h { font-size: 100px; }
   .pfx .slide-head h2 { --lg: #5fed83; }
@@ -3963,6 +4092,304 @@
     });
   }
 
+  // Primer Octicons (© GitHub, Inc., MIT license) for the value slides as [grid, ...paths]; OCTI is declared further down
+  const VALUE_ICONS = {
+    pr: [
+      24,
+      "M16 19.25a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0Zm-14.5 0a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0Zm0-14.5a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0ZM4.75 3a1.75 1.75 0 1 0 .001 3.501A1.75 1.75 0 0 0 4.75 3Zm0 14.5a1.75 1.75 0 1 0 .001 3.501A1.75 1.75 0 0 0 4.75 17.5Zm14.5 0a1.75 1.75 0 1 0 .001 3.501 1.75 1.75 0 0 0-.001-3.501Z",
+      "M13.405 1.72a.75.75 0 0 1 0 1.06L12.185 4h4.065A3.75 3.75 0 0 1 20 7.75v8.75a.75.75 0 0 1-1.5 0V7.75a2.25 2.25 0 0 0-2.25-2.25h-4.064l1.22 1.22a.75.75 0 0 1-1.061 1.06l-2.5-2.5a.75.75 0 0 1 0-1.06l2.5-2.5a.75.75 0 0 1 1.06 0ZM4.75 7.25A.75.75 0 0 1 5.5 8v8A.75.75 0 0 1 4 16V8a.75.75 0 0 1 .75-.75Z",
+    ],
+    merge: [
+      16,
+      "M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z",
+    ],
+    copilot: [
+      24,
+      "M23.922 16.992c-.861 1.495-5.859 5.023-11.922 5.023-6.063 0-11.061-3.528-11.922-5.023A.641.641 0 0 1 0 16.736v-2.869a.841.841 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.195 10.195 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952 1.399-1.136 3.392-2.093 6.122-2.093 2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.832.832 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256ZM12.172 11h-.344a4.323 4.323 0 0 1-.355.508C10.703 12.455 9.555 13 7.965 13c-1.725 0-2.989-.359-3.782-1.259a2.005 2.005 0 0 1-.085-.104L4 11.741v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.323 4.323 0 0 1-.355-.508h-.016.016Zm.641-2.935c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z",
+      "M14.5 14.25a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1Zm-5 0a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1Z",
+    ],
+    shield: [
+      24,
+      "M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z",
+      "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z",
+    ],
+    calendar: [
+      24,
+      "M6.75 0a.75.75 0 0 1 .75.75V3h9V.75a.75.75 0 0 1 1.5 0V3h2.75c.966 0 1.75.784 1.75 1.75v16a1.75 1.75 0 0 1-1.75 1.75H3.25a1.75 1.75 0 0 1-1.75-1.75v-16C1.5 3.784 2.284 3 3.25 3H6V.75A.75.75 0 0 1 6.75 0ZM21 9.5H3v11.25c0 .138.112.25.25.25h17.5a.25.25 0 0 0 .25-.25Zm-17.75-5a.25.25 0 0 0-.25.25V8h18V4.75a.25.25 0 0 0-.25-.25Z",
+    ],
+  };
+  // an inline <svg> element, or the same paths as markup scaled to size px and centred on (x, y) inside a larger SVG
+  const valueIcon = (name, cls) => {
+    const [n, ...d] = VALUE_ICONS[name],
+      s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", `0 0 ${n} ${n}`);
+    if (cls) s.setAttribute("class", cls);
+    s.innerHTML = d.map(p => `<path d="${p}"/>`).join("");
+    return s;
+  };
+  const valueGlyph = (name, x, y, size, cls) => {
+    const [n, ...d] = VALUE_ICONS[name];
+    return `<g class="${cls}" transform="translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / n).toFixed(4)})">${d.map(p => `<path d="${p}"/>`).join("")}</g>`;
+  };
+
+  // Turn Intent into Value: Turn Intent to Automation's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
+  {
+    resetIndex();
+    // the pieces that define value: [chip, colour, how the agent reads it]
+    const PIECE = {
+      g: ["GOAL", "#3fb950", "100% of schema fields covered"],
+      p: ["WHAT COUNTS", "#79c0ff", "every top-level schema field"],
+      c: ["HOW TO CHECK", "#d2a8ff", "a field: line in Markdown"],
+      d: ["WHAT IT SHIPS", "#e3b341", "pull requests, followed to merge"],
+    };
+    const ORDER = ["g", "p", "c", "d"];
+    // condensed from .github/workflows/schema-feature-coverage.md: [text, colour, piece]
+    const MD = [
+      [["---", "#656c76"]],
+      [
+        ["on: ", "#ff7b72"],
+        ["weekly", "#a5d6ff"],
+      ],
+      [["safe-outputs:", "#ff7b72"]],
+      [
+        ["  ", "#7ee787"],
+        ["create-pull-request", "#7ee787", "d"],
+        [":", "#7ee787"],
+      ],
+      [["---", "#656c76"]],
+      [
+        ["Ensure ", "#f0f6fc"],
+        ["100% coverage", "#f0f6fc", "g"],
+        [" of schema features.", "#f0f6fc"],
+      ],
+      [
+        ["Every top-level property", "#f0f6fc", "p"],
+        [" in the main", "#f0f6fc"],
+      ],
+      [["JSON schema should appear in at least", "#f0f6fc"]],
+      [["one workflow file:", "#f0f6fc"]],
+      [
+        ["  grep -rl ", "#d1d7e0"],
+        ['"^${field}:"', "#a5d6ff", "c"],
+        [" …", "#d1d7e0"],
+      ],
+      [["For each uncovered field, add a demo", "#f0f6fc"]],
+      [["and open a pull request.", "#f0f6fc"]],
+    ];
+    const marks = {};
+    const pre = h(
+      "pre",
+      {},
+      MD.flatMap((line, i) => [...line.map(([s, c, k]) => (k ? (marks[k] = h("mark", { class: "tiv-hl", "--c": PIECE[k][1], style: { color: c } }, s)) : h("span", { style: { color: c } }, s))), i < MD.length - 1 ? "\n" : null])
+    );
+    const md = h("div", { class: "pf-card pf-md tiv-md" }, h("div", { class: "cap" }, "01 · Workflow"), h("div", { class: "file" }, "📄 .github/workflows/schema-feature-coverage.md"), pre);
+    const slots = ORDER.map(k => h("div", { class: "tiv-slot", "--c": PIECE[k][1] }, h("em", {}, PIECE[k][0]), h("span", {}, PIECE[k][2])));
+    const ai = h(
+      "div",
+      { class: "pf-card tiv-ai" },
+      h("div", { class: "cap" }, "02 · Design agent"),
+      h("div", { class: "tiv-who" }, h("div", { class: "tiv-orb" }, valueIcon("copilot")), h("div", {}, h("b", {}, "Value design agent"), h("code", {}, "/add-operational-value"))),
+      slots
+    );
+    // the frozen function the measured slides replay: [text, colour, piece it encodes] runs per line
+    const CODE = [
+      [["// Schema Feature Coverage · value v1", "#8b949e"]],
+      [
+        ["export const ", "#ff7b72"],
+        ["follows = ", "#e6edf3"],
+        ['"create-pull-request"', "#a5d6ff", "d"],
+        [";", "#e6edf3"],
+      ],
+      [
+        ["export function ", "#ff7b72"],
+        ["value", "#d2a8ff"],
+        ["(commit) {", "#e6edf3"],
+      ],
+      [
+        ["  const ", "#ff7b72"],
+        ["fields = ", "#e6edf3"],
+        ["schemaFields(commit)", "#e6edf3", "p"],
+        [";", "#e6edf3"],
+      ],
+      [
+        ["  if ", "#ff7b72"],
+        ["(!fields.length) ", "#e6edf3"],
+        ["return null", "#ff7b72"],
+        ["; ", "#e6edf3"],
+        ["// unknown, not 0", "#8b949e"],
+      ],
+      [
+        ["  const ", "#ff7b72"],
+        ["docs = workflowMarkdown(commit);", "#e6edf3"],
+      ],
+      [
+        ["  const ", "#ff7b72"],
+        ["covered = fields.filter(f =>", "#e6edf3"],
+      ],
+      [
+        ["    ", "#e6edf3"],
+        ["docs.hasLine(`${f}:`)", "#e6edf3", "c"],
+        [");", "#e6edf3"],
+      ],
+      [
+        ["  return ", "#ff7b72"],
+        ["covered.length / fields.length", "#e6edf3", "g"],
+        [";", "#e6edf3"],
+      ],
+      [["}", "#e6edf3"]],
+    ];
+    const CHARS = CODE.reduce((n, line) => n + line.reduce((m, [s]) => m + s.length, 0) + 1, 0);
+    const code = h("pre", {});
+    const go = h("div", { class: "tiv-go" }, "🔒 frozen before any results", h("span", {}, "deterministic: same commit, same number"));
+    const fn = h("div", { class: "pf-card tiv-fn" }, h("div", { class: "cap" }, "03 · Value function"), h("div", { class: "file" }, "⚙ value function · v1"), code, go);
+    const links = [h("div", { class: "pf-link", style: { left: "690px", width: "60px" }, "--a": "#4493f8", "--b": "#ab7df8" }), h("div", { class: "pf-link", style: { left: "1130px", width: "60px" }, "--a": "#ab7df8", "--b": "#56d4dd" })];
+    const tags = [
+      h("div", { class: "pf-tag", style: { left: "240px" } }, h("em", {}, "Your words"), "the Markdown you already wrote"),
+      h("div", { class: "pf-tag", style: { left: "740px", width: "400px" } }, h("em", {}, "Extract what defines value"), "the rest stays behind"),
+      h("div", { class: "pf-tag", style: { left: "1280px", width: "440px" } }, h("em", {}, "Frozen first"), "reviewed before any history is replayed"),
+    ];
+    const ghosts = ORDER.map(k => h("div", { class: "tiv-ghost", "--c": PIECE[k][1] }, marks[k].textContent));
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value"), h("h2", { class: "pf-h" }, letters("Turn Intent into "), letters("Value", "l-grad"))),
+      links,
+      tags,
+      md,
+      ai,
+      fn,
+      ghosts,
+      h("div", { class: "tiv-cap" }, "ILLUSTRATIVE · Markdown condensed from gh-aw's schema-feature-coverage.md · /add-operational-value is a gh cao skill, a research prototype")
+    );
+    // each piece is highlighted at EXTRACT, leaves 250 ms later and lands in its slot FLY ms after that
+    const EXTRACT = [1900, 2700, 3500, 4300],
+      FLY = 750,
+      TYPE0 = 5700,
+      TYPE1 = 8100,
+      FROZEN = 8500,
+      END = 9100;
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set(),
+      typed = -1,
+      geo = null;
+    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
+    const past = (cond, id, snd) => {
+      if (cond && !seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return cond;
+    };
+    const type = k => {
+      if (k === typed) return;
+      typed = k;
+      code.replaceChildren();
+      let left = k;
+      for (const line of CODE) {
+        for (const [s, c, p] of line) {
+          if (left <= 0) break;
+          const part = s.slice(0, left);
+          left -= part.length;
+          code.append(p ? h("span", { class: "tiv-tok", "--c": PIECE[p][1], style: { color: c } }, part) : h("span", { style: { color: c } }, part));
+        }
+        if (left <= 0) break;
+        code.append("\n");
+        left--;
+      }
+      if (k > 0 && k < CHARS) code.append(h("span", { class: "pf-caret" }));
+    };
+    // stage position of a node: offsets ignore the cards' entrance transforms and the stage scale
+    const off = n => {
+      let x = 0,
+        y = 0;
+      for (; n && n !== el; n = n.offsetParent) {
+        x += n.offsetLeft;
+        y += n.offsetTop;
+      }
+      return [x, y];
+    };
+    const locate = () => ORDER.map((k, i) => [off(marks[k]), off(slots[i].lastElementChild)]);
+    const paint = e => {
+      const on = (node, cond) => node.classList.toggle("on", cond);
+      on(
+        md,
+        past(e >= 300, "md", () => sfx.pop(0))
+      );
+      on(tags[0], e >= 700);
+      on(links[0], e >= 1000);
+      on(
+        ai,
+        past(e >= 1200, "ai", () => sfx.pop(2))
+      );
+      md.classList.toggle("dim", e >= EXTRACT[0]);
+      if (e >= EXTRACT[0] + 250 && !geo) geo = locate();
+      ORDER.forEach((k, i) => {
+        on(
+          marks[k],
+          past(e >= EXTRACT[i], "m" + i, () => sfx.key())
+        );
+        const t = (e - EXTRACT[i] - 250) / FLY,
+          g = ghosts[i];
+        if (!geo || t <= 0 || t >= 1) g.style.opacity = "0";
+        else {
+          const [[ax, ay], [zx, zy]] = geo[i],
+            u = t < 0.5 ? 2 * t * t : 1 - (2 - 2 * t) ** 2 / 2,
+            arc = Math.sin(Math.PI * u);
+          g.style.opacity = "1";
+          g.style.transform = `translate(${(ax + (zx - ax) * u).toFixed(1)}px, ${(ay + (zy - ay) * u - 90 * arc).toFixed(1)}px) scale(${(1 + 0.12 * arc).toFixed(3)})`;
+        }
+        on(
+          slots[i],
+          past(e >= EXTRACT[i] + 250 + FLY, "s" + i, () => sfx.pop(3 + i))
+        );
+      });
+      on(tags[1], e >= EXTRACT[0] + 250 + FLY);
+      ai.classList.toggle("busy", e >= EXTRACT[3] + 250 + FLY && e < TYPE1);
+      ai.classList.toggle("done", e >= TYPE1);
+      on(links[1], e >= TYPE0 - 500);
+      on(
+        fn,
+        past(e >= TYPE0 - 300, "fn", () => sfx.pop(6))
+      );
+      type(Math.round(CHARS * Math.min(1, Math.max(0, (e - TYPE0) / (TYPE1 - TYPE0)))));
+      const frozen = past(e >= FROZEN, "frozen", () => sfx.review());
+      fn.classList.toggle("frozen", frozen);
+      on(go, frozen);
+      on(tags[2], frozen);
+    };
+    slides.push({
+      group: "platform",
+      notes:
+        "Turn Intent into Value, illustrative: the same Markdown that compiles into automation also says what value means. This is gh-aw's own Schema Feature Coverage workflow, condensed. A design agent, the add-operational-value skill from gh cao, a research prototype, extracts only the pieces that define value: the goal, 100 percent coverage; what counts, every top-level property in the main JSON schema; how to check, a line that starts with the field name in workflow Markdown; and what it ships, pull requests, which are followed through to their merge. Everything else stays behind. It turns those pieces into one deterministic value function: the same commit always gives the same number. It measures the repository, so work by people and other agents counts too, and an empty population is unknown, not zero. A person reviews it, and it is frozen before any results are seen, so the numbers cannot choose the question. The slides under Turn Automation into Value replay this function on gh-aw's real history.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        geo = null;
+        el.classList.add("tiv-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("tiv-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
+    });
+  }
+
   // Turn Automation into Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
   {
     resetIndex();
@@ -4074,6 +4501,7 @@
       done = false;
     slides.push({
       group: "platform",
+      key: "value",
       notes:
         "Turn Automation into Value: an illustrative dashboard with synthetic data for a sample repository, twelve weeks after switching on agentic workflows. The backlog burns down instead of following its growing trend, test coverage climbs while escaped bugs fall, and PR lead time drops as deploys per week rise. These numbers are not measured on a real repository; they show the kind of outcomes worth tracking. The AW factory band later shows gh-aw's own measured history.",
       enter() {
@@ -4123,6 +4551,574 @@
         h("div", { class: "tv-panels" }, panels),
         h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
       ),
+    });
+  }
+
+  // Deliver · Accept · Attribute: one Schema Feature Coverage pull request on its GitHub timeline, from delivery and a person's merge, through daily windows around the merge and files that stayed, to +5 attributed fields
+  {
+    resetIndex();
+    // measured: refresh/from-delivery-to-value.mjs (window "Sep 28"), the pull request itself and gh aw audit --adoption; times UTC
+    const CASE = {
+      title: "[schema-coverage] feat: add schema coverage demos for uncovered fields",
+      labels: ["automation", "schema-coverage"],
+      diff: [150, 0, 5],
+      delivered: "2026-09-28T07:08",
+      accepted: "2026-09-28T16:37",
+      parent: [63, 68],
+      // daily at the merge time: 7 before, then day 0 (the merge commit) to day 6
+      samples: [
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [63, 68],
+        [68, 68],
+        [68, 68],
+        [68, 68],
+        [68, 68],
+        [68, 69],
+        [69, 69],
+        [69, 69],
+      ],
+      // first-parent commits on main to the window end, files of the merge, files touched
+      survival: [257, 5, 0],
+      through: "2026-10-05T16:37",
+    };
+    const NS = "http://www.w3.org/2000/svg",
+      day = s => `${new Date(s + "Z").getUTCDate()} ${new Date(s + "Z").toLocaleDateString("en", { month: "short", timeZone: "UTC" })}`,
+      gain = CASE.samples[7][0] - CASE.parent[0],
+      missing = ([c, n]) => n - c;
+    const badge = h("span", { class: "vg-badge" }),
+      sub = h("span", {});
+    const pr = h(
+      "div",
+      { class: "vg-card daa-pr", "--i": 0 },
+      h("h3", {}, CASE.title),
+      h(
+        "p",
+        {},
+        badge,
+        sub,
+        CASE.labels.map(l => h("span", { class: "vg-lbl" }, l)),
+        h("span", { class: "vg-diff" }, h("b", { class: "add" }, `+${CASE.diff[0]}`), " ", h("b", { class: "del" }, `−${CASE.diff[1]}`), ` · ${CASE.diff[2]} files`)
+      )
+    );
+    const mona = document.createElementNS(NS, "svg");
+    mona.setAttribute("viewBox", "0 0 46 46");
+    mona.setAttribute("class", "av");
+    mona.innerHTML = `<image href="assets/avatars/mona.jpg" width="46" height="46"/>`;
+    // [dot class, icon, what happened, step, step colour, detail]
+    const EV = [
+      ["open", valueIcon("pr"), `github-actions[bot] opened it · ${day(CASE.delivered)}, ${CASE.delivered.slice(11)}`, "Delivered", "#3fb950", `${CASE.diff[2]} demo files for uncovered fields`],
+      ["merged", mona, `mona merged it · ${CASE.accepted.slice(11)}`, "Accepted", "#d2a8ff", "a person's decision, in gh-aw's native record"],
+      ["", valueIcon("calendar"), "Two windows open at the merge", "Measured", "#79c0ff", "7 days before and 7 days after, once a day"],
+      ["ok", valueIcon("shield"), `Its ${CASE.survival[1]} files stayed untouched`, "Kept", "#79c0ff", `${CASE.survival[0]} commits to main, through ${day(CASE.through)}`],
+      ["gold", "✦", `+${gain} fields attributed`, "Value", "#e3b341", `${CASE.parent.join("/")} → ${CASE.samples[7].join("/")} covered at the merge`],
+    ];
+    const evs = EV.map(([k, icon, b, step, c, s]) => h("div", { class: "vg-ev", "--c": c }, h("div", { class: "vg-dot " + k }, icon), h("div", {}, h("b", {}, b), h("span", {}, h("strong", {}, step), " · ", s))));
+    const sq = CASE.samples.map(v => h("div", { class: "daa-sq " + (missing(v) ? "miss" : "full") }, String(missing(v))));
+    const mg = h("div", { class: "daa-mg" }),
+      wins = [h("span", {}, "7 days before"), h("span", {}, "7 days after")];
+    const SPARK = [
+      [-260, -70],
+      [-200, -120],
+      [-90, -140],
+      [40, -150],
+      [170, -130],
+      [270, -80],
+      [290, 20],
+      [-280, 30],
+      [-150, 90],
+      [150, 95],
+    ];
+    const tada = h(
+      "div",
+      { class: "daa-tada" },
+      h("i", {}, "ATTRIBUTED VALUE"),
+      h("b", {}, `+${gain} fields`),
+      h("span", {}, "earned by this pull request · event-aligned, not the sole cause"),
+      SPARK.map(([dx, dy], k) => h("span", { class: "daa-sp", "--dx": dx + "px", "--dy": dy + "px", "--k": k }, "✦"))
+    );
+    const days = h(
+      "div",
+      { class: "daa-days", "--i": 2 },
+      h("i", {}, "Schema fields still missing an example · daily"),
+      h("div", { class: "daa-wins" }, wins),
+      h("div", { class: "daa-strip" }, sq.slice(0, 7), mg, sq.slice(7)),
+      h("div", { class: "daa-legend" }, h("span", {}, "sampled at the merge time"), h("span", {}, h("b", {}, "│"), " merge = acceptance")),
+      tada
+    );
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value · one pull request, end to end"), h("h2", { class: "pf-h" }, letters("Deliver · Accept · "), letters("Attribute", "l-grad"))),
+      h("div", { class: "daa-ex" }, "excerpt", h("b", {}, `${day(CASE.accepted.slice(0, 10) + "T00:00")} ± 7 days`), "↓ full record"),
+      pr,
+      h("div", { class: "daa-tl", "--i": 1 }, evs),
+      days,
+      h("div", { class: "vg-cap" }, `MEASURED · gh-aw, replayed 17 Nov 2026 · one Schema Feature Coverage pull request, ${day(CASE.delivered)} 2026, UTC · the maintainer is shown as Mona · textual check, not correctness`)
+    );
+    const EV_AT = [700, 1700, 2900, 6900, 7600],
+      MERGE = 2300,
+      B0 = 3200,
+      A0 = 4000,
+      STEP = 380,
+      END = 8200;
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set(),
+      merged = null;
+    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
+    const past = (cond, id, snd) => {
+      if (cond && !seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return cond;
+    };
+    const paint = e => {
+      evs.forEach((node, i) =>
+        node.classList.toggle(
+          "on",
+          past(e >= EV_AT[i], "e" + i, () => (i === 4 ? sfx.compile() : sfx.pop(i * 2)))
+        )
+      );
+      const m = past(e >= MERGE, "merge", () => sfx.review());
+      if (m !== merged) {
+        merged = m;
+        badge.classList.toggle("merged", m);
+        badge.replaceChildren(valueIcon(m ? "merge" : "pr"), m ? "Merged" : "Open");
+        sub.replaceChildren(h("b", {}, m ? "mona" : "github-actions[bot]"), m ? " merged 1 commit into " : " wants to merge 1 commit into ", h("b", {}, "main"));
+      }
+      wins.forEach(w => w.classList.toggle("on", e >= EV_AT[2]));
+      mg.classList.toggle("on", e >= EV_AT[2]);
+      sq.forEach((node, j) => {
+        const at = j < 7 ? B0 + (6 - j) * 90 : A0 + (j - 7) * STEP;
+        node.classList.toggle("on", past(e >= at, "q" + j, j < 7 ? (j === 6 ? () => sfx.key() : null) : () => sfx.key(0.6)));
+      });
+      tada.classList.toggle("on", e >= EV_AT[4]);
+    };
+    slides.push({
+      group: "platform",
+      under: "value",
+      notes:
+        "Deliver · Accept · Attribute, measured, with the maintainer shown as Mona (illustrative): an excerpt of the full record on the next slide, following one real Schema Feature Coverage pull request on its GitHub timeline. On 28 September 2026 at 07:08 UTC the workflow's safe output opened it, adding five demo files: that is delivery. At 16:37 a maintainer merged it, and gh-aw's native adoption record classifies that as an explicit human decision, not a delivery fallback: that is acceptance. The merge anchors two equal windows, seven days before and seven days after, sampled once a day at the time of the merge, with no maturation lag. Each square counts the schema fields still missing an example: five on every day before. At the exact first parent 63 of 68 fields were covered, on the merge commit 68 of 68. Afterwards the count stayed at zero except for one day, when the schema gained a new field that was covered the next day; that is everyone's work, counted by the outcome but not credited to this pull request. To count, the change must survive the whole window: none of the 257 commits on main up to 5 October touched its five files, and no other merge of this workflow fell within seven days, so nothing is shared. Every gate passes, so this pull request earns an attributed contribution of five fields. It is event-aligned, not exclusive causation, and the check is textual presence, not working examples, fewer defects or saved hours.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        merged = null;
+        el.classList.add("vg-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("vg-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
+    });
+  }
+
+  // From Delivery to Value: the full record of Schema Feature Coverage on gh-aw: pull requests opened and merged, all-author coverage from 71% to 100%, six small seven-day windows, and +5 fields attributed to the one merge that passes every gate
+  {
+    resetIndex();
+    // Schema Feature Coverage, measured with refresh/from-delivery-to-value.mjs: [covered, total] every Sunday 12:00 UTC from 22 Mar 2026; the last row is LAST
+    const COVER = [
+      [32, 45],
+      [32, 47],
+      [32, 49],
+      [32, 51],
+      [32, 53],
+      [33, 53],
+      [34, 53],
+      [37, 56],
+      [41, 58],
+      [47, 56],
+      [45, 55],
+      [51, 57],
+      [51, 55],
+      [55, 56],
+      [57, 57],
+      [58, 59],
+      [58, 60],
+      [60, 62],
+      [60, 62],
+      [60, 62],
+      [61, 63],
+      [61, 65],
+      [62, 67],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [63, 68],
+      [69, 69],
+      [69, 71],
+      [69, 71],
+      [70, 71],
+      [71, 72],
+      [72, 73],
+      [75, 75],
+      [75, 75],
+    ];
+    const LAST = "2026-11-17";
+    // the workflow's marked pull requests: [delivered, merged or null], UTC
+    const OUT = [
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:36", null],
+      ["2026-05-04T07:37", "2026-05-04T13:47"],
+      ["2026-05-04T07:37", "2026-05-04T13:47"],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:48", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-11T07:49", null],
+      ["2026-05-18T07:55", "2026-05-18T12:37"],
+      ["2026-05-18T07:55", "2026-05-18T13:14"],
+      ["2026-05-18T07:55", "2026-05-18T13:57"],
+      ["2026-05-18T07:55", null],
+      ["2026-05-18T07:55", "2026-05-18T12:48"],
+      ["2026-05-18T07:55", "2026-05-18T12:47"],
+      ["2026-05-18T07:56", null],
+      ["2026-05-18T07:56", "2026-05-18T12:47"],
+      ["2026-05-18T07:56", "2026-05-18T12:46"],
+      ["2026-05-18T07:56", "2026-05-18T12:45"],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:22", null],
+      ["2026-06-01T08:23", null],
+      ["2026-06-08T08:18", null],
+      ["2026-06-15T08:39", "2026-06-15T13:21"],
+      ["2026-06-15T08:39", "2026-06-15T13:21"],
+      ["2026-06-15T08:40", "2026-06-15T13:22"],
+      ["2026-06-15T08:40", "2026-06-15T13:20"],
+      ["2026-08-17T06:46", "2026-08-17T11:24"],
+      ["2026-09-28T07:08", "2026-09-28T16:37"],
+      ["2026-10-19T07:09", "2026-10-19T14:15"],
+      ["2026-10-26T07:11", "2026-10-26T11:57"],
+      ["2026-11-02T06:47", "2026-11-02T14:24"],
+    ];
+    // inspected windows: [label, merged PRs, first merge, last merge, example gaps closed, fields retired, before, after-window end, 7 + 7 daily samples]
+    const WIN = [
+      [
+        "May 4",
+        2,
+        "2026-05-04T13:47",
+        "2026-05-04T13:47",
+        2,
+        0,
+        [35, 54],
+        [39, 58],
+        [
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [33, 53],
+          [34, 53],
+          [34, 53],
+          [37, 54],
+          [36, 54],
+          [37, 54],
+          [37, 54],
+          [37, 54],
+          [37, 55],
+          [37, 56],
+        ],
+      ],
+      [
+        "May 18",
+        8,
+        "2026-05-18T12:37",
+        "2026-05-18T13:57",
+        7,
+        1,
+        [41, 58],
+        [47, 56],
+        [
+          [39, 58],
+          [39, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [41, 58],
+          [48, 57],
+          [48, 57],
+          [48, 57],
+          [48, 57],
+          [48, 56],
+          [47, 56],
+          [47, 56],
+        ],
+      ],
+      [
+        "Jun 15",
+        4,
+        "2026-06-15T13:20",
+        "2026-06-15T13:22",
+        4,
+        0,
+        [51, 55],
+        [55, 56],
+        [
+          [50, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [51, 55],
+          [55, 55],
+          [55, 55],
+          [54, 55],
+          [54, 55],
+          [54, 55],
+          [55, 56],
+          [55, 56],
+        ],
+      ],
+      [
+        "Sep 28",
+        1,
+        "2026-09-28T16:37",
+        "2026-09-28T16:37",
+        5,
+        0,
+        [63, 68],
+        [69, 69],
+        [
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [63, 68],
+          [68, 68],
+          [68, 68],
+          [68, 68],
+          [68, 68],
+          [68, 69],
+          [69, 69],
+          [69, 69],
+        ],
+      ],
+      [
+        "Oct 26",
+        1,
+        "2026-10-26T11:57",
+        "2026-10-26T11:57",
+        1,
+        0,
+        [70, 71],
+        [71, 72],
+        [
+          [69, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [70, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 72],
+          [71, 72],
+        ],
+      ],
+      [
+        "Nov 2",
+        1,
+        "2026-11-02T14:24",
+        "2026-11-02T14:24",
+        1,
+        0,
+        [71, 72],
+        [73, 74],
+        [
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 71],
+          [71, 72],
+          [71, 72],
+          [72, 72],
+          [72, 72],
+          [72, 72],
+          [72, 73],
+          [72, 73],
+          [72, 73],
+          [72, 73],
+        ],
+      ],
+    ];
+    // the window whose merge passes every gate, zoomed into on Deliver · Accept · Attribute
+    const EXCERPT = "Sep 28";
+    const DAY = 864e5,
+      T0 = Date.parse("2026-03-22T12:00Z"),
+      T1 = Date.parse(LAST + "T12:00Z");
+    const t = s => Date.parse(s + "Z"),
+      X = ms => 160 + (1530 * (ms - T0)) / (T1 - T0),
+      Y = p => 40 + (100 - p) * 5,
+      pc = ([c, n]) => (100 * c) / n,
+      f1 = n => n.toFixed(1),
+      xi = WIN.findIndex(w => w[0] === EXCERPT);
+    const STATS = [
+      [OUT.length, "pull requests opened by the workflow"],
+      [OUT.filter(o => o[1]).length, "of them merged"],
+      [`${Math.round(pc(COVER[0]))}% → ${Math.round(pc(COVER.at(-1)))}%`, "schema fields with an example · all authors"],
+      [`+${WIN[xi][4]} fields`, "attributed · one merge passed every gate", "gold"],
+    ];
+    const stats = h(
+      "div",
+      { class: "dtv-stats", "--i": 0 },
+      STATS.map(([b, s, k]) => h("div", { class: k ? "dtv-n " + k : "dtv-n" }, h("b", {}, String(b)), h("span", {}, s)))
+    );
+    // one coverage trace: weekly snapshots plus each window's daily samples and endpoints, in time order
+    const pts = COVER.map((v, i) => [i < COVER.length - 1 ? T0 + i * 7 * DAY : T1, v]);
+    for (const [, , f, l, , , b, e, s] of WIN) {
+      s.forEach((v, d) => v && pts.push([(d < 7 ? t(f) : t(l)) + (d - 7) * DAY, v]));
+      pts.push([t(f) - 6e4, b]);
+      if (e) pts.push([t(l) + 7 * DAY, e]);
+    }
+    pts.sort((a, b) => a[0] - b[0]);
+    // pull requests per UTC day: [first time, count]
+    const perDay = list => [...list.reduce((m, s) => m.set(s.slice(0, 10), [m.get(s.slice(0, 10))?.[0] ?? s, (m.get(s.slice(0, 10))?.[1] ?? 0) + 1]), new Map()).values()];
+    let g = `<defs><clipPath id="dtv-clip"><rect x="0" y="0" width="0" height="300"/></clipPath></defs>`;
+    for (const p of [50, 75, 100]) g += `<line class="dtv-grid" x1="160" x2="1690" y1="${Y(p)}" y2="${Y(p)}"/><text x="150" y="${Y(p) + 5}" text-anchor="end">${p}%</text>`;
+    for (let m = 3; m <= 10; m++) {
+      const M = Date.UTC(2026, m, 1);
+      g += `<line class="dtv-grid" x1="${f1(X(M))}" x2="${f1(X(M))}" y1="24" y2="508"/><text x="${f1(X(M))}" y="14" text-anchor="middle">${new Date(M).toLocaleDateString("en", { month: "short", timeZone: "UTC" })}</text>`;
+    }
+    g += `<text class="dtv-hd" x="172" y="66">SCHEMA FIELDS WITH AN EXAMPLE · ALL AUTHORS</text>`;
+    g += `<text class="dtv-hd" x="150" y="336" text-anchor="end">WINDOWS</text><text x="150" y="358" text-anchor="end"><tspan fill="#ffa657">before</tspan> · <tspan fill="#79c0ff">after</tspan></text>`;
+    g += `<text class="dtv-hd" x="150" y="457" text-anchor="end">OPENED</text><text class="dtv-hd" x="150" y="501" text-anchor="end">MERGED</text>`;
+    g += `<text class="dtv-hi" x="168" y="${f1(Y(pc(COVER[0])) - 14)}">${Math.round(pc(COVER[0]))}%</text>`;
+    // [markup, the time the sweep reveals it, sound]: a window shows once its after period is complete
+    const FX = [];
+    WIN.forEach(([, , f, l, gaps, , , end], i) => {
+      const y = 318 + i * 16,
+        F = t(f),
+        L = t(l);
+      FX.push([
+        `<rect class="dtv-bb" x="${f1(X(F - 7 * DAY))}" y="${y - 5}" width="${f1(X(F) - X(F - 7 * DAY))}" height="10" rx="3"/><rect class="dtv-ab" x="${f1(X(L))}" y="${y - 5}" width="${f1(X(L + 7 * DAY) - X(L))}" height="10" rx="3"/><text class="dtv-gap" x="${f1(X(L + 7 * DAY) + 6)}" y="${y + 5}">${end ? `+${gaps}` : "pending"}</text>`,
+        Math.min(L + 7 * DAY, T1),
+      ]);
+    });
+    for (const [s, n] of perDay(OUT.map(o => o[0]))) FX.push([valueGlyph("pr", X(t(s)), 452, 18, "dtv-po") + (n > 1 ? `<text class="dtv-pn" x="${f1(X(t(s)))}" y="434" text-anchor="middle">${n}</text>` : ""), t(s), "d"]);
+    for (const [s, n] of perDay(OUT.filter(o => o[1]).map(o => o[1])))
+      FX.push([valueGlyph("merge", X(t(s)), 496, 18, "dtv-pm") + (n > 1 ? `<text class="dtv-pn" x="${f1(X(t(s)))}" y="523" text-anchor="middle">${n}</text>` : ""), t(s), "m"]);
+    FX.push([`<circle class="dtv-end" cx="${f1(X(T1))}" cy="${f1(Y(pc(COVER.at(-1))))}" r="5"/><text class="dtv-hi" x="1690" y="${f1(Y(pc(COVER.at(-1))) - 14)}" text-anchor="end">${Math.round(pc(COVER.at(-1)))}%</text>`, T1]);
+    g += FX.map(([s], i) => `<g class="dtv-fx" data-fx="${i}">${s}</g>`).join("");
+    g += `<g clip-path="url(#dtv-clip)"><path class="dtv-cov" d="M${pts.map(([T, v]) => `${f1(X(T))} ${f1(Y(pc(v)))}`).join(" L")}"/></g>`;
+    // outline the window Deliver · Accept · Attribute zoomed into
+    const ex0 = X(t(WIN[xi][2]) - 7 * DAY) - 10,
+      ex1 = X(t(WIN[xi][3]) + 7 * DAY) + 30;
+    g += `<g class="dtv-fx dtv-ex" data-ex="1"><rect x="${f1(ex0)}" y="24" width="${f1(ex1 - ex0)}" height="488" rx="8"/><text x="${f1((ex0 + ex1) / 2)}" y="534" text-anchor="middle">↑ excerpt · +${WIN[xi][4]} attributed</text></g>`;
+    g += `<line class="dtv-cur" x1="160" x2="160" y1="24" y2="508"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "dtv-svg");
+    svg.setAttribute("viewBox", "0 0 1700 552");
+    svg.innerHTML = g;
+    const clip = svg.querySelector("#dtv-clip rect"),
+      cur = svg.querySelector(".dtv-cur"),
+      fx = [...svg.querySelectorAll("[data-fx]")].map(node => [node, FX[+node.dataset.fx][1], FX[+node.dataset.fx][2]]),
+      exBox = svg.querySelector("[data-ex]");
+    const el = h(
+      "section",
+      { class: "slide" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How we determine value · the full record, Mar – Nov 2026"), h("h2", { class: "pf-h" }, letters("From Delivery to "), letters("Value", "l-grad"))),
+      stats,
+      h("div", { class: "dtv-chart", "--i": 1 }, svg),
+      h("div", { class: "dtv-cap" }, "MEASURED · gh-aw, replayed 17 Nov 2026 · weekly main snapshots, daily in windows · textual check, not correctness · pull requests found by search · merge = adoption proxy")
+    );
+    const SW0 = 1200,
+      SW1 = 8000,
+      EX = 8500,
+      END = 9100;
+    let t0 = 0,
+      now = 0,
+      quiet = false,
+      seen = new Set();
+    // true when cond holds; plays snd the first time, unless the presenter skipped ahead
+    const past = (cond, id, snd) => {
+      if (cond && !seen.has(id)) {
+        seen.add(id);
+        if (!quiet && snd) snd();
+      }
+      return cond;
+    };
+    const paint = e => {
+      const S = T0 + (T1 - T0) * Math.min(1, Math.max(0, (e - SW0) / (SW1 - SW0))),
+        x = f1(X(S));
+      clip.setAttribute("width", f1(X(S) + 4));
+      cur.setAttribute("x1", x);
+      cur.setAttribute("x2", x);
+      cur.style.opacity = e > SW0 && e < SW1 ? "" : "0";
+      fx.forEach(([node, T, k], i) => node.classList.toggle("on", past(e > SW0 && S >= T, "fx" + i, k === "d" ? () => sfx.pop(2) : k === "m" ? () => sfx.key(0.8) : null)));
+      exBox.classList.toggle(
+        "on",
+        past(e >= EX, "ex", () => sfx.pop(5))
+      );
+    };
+    slides.push({
+      group: "platform",
+      under: "value",
+      notes:
+        "From Delivery to Value, measured on gh-aw's own Schema Feature Coverage workflow: the full record that the previous slide zoomed into. The line replays the frozen value function on 36 weekly snapshots of main from 22 March to 17 November 2026. It counts every author, so people and other agents move it too: from 32 of 45 schema fields with an example, 71 percent, to 75 of 75, with setbacks whenever the schema gained fields; the 39 fields present throughout went from 30 to 39, so the rise is not just schema churn. It is the workflow's own textual check, not compilation or runtime coverage. Below it, the green icons are the 44 pull requests the workflow opened, found by searching for its producer footer, which is not complete native history; a number counts separate pull requests from one run, not separate runs or units of value, and repeated proposals can target fields that are still uncovered. The purple icons are the 19 merges. A merge is only an adoption proxy here: only the 28 September merge has a native explicit-human adoption record, and the other native queries failed on missing historical identity. The six small bars are the inspected windows, seven days before and after, sampled daily, 84 samples. For the May and June same-day batches the before window ends at the first merge and the after window starts at the last, and overlapping effects are never summed. Measured at the exact first parent, those batches closed 13 gaps, while one May merge retired the dependencies field, which is not an example fix; the later inspected merges closed 5, 1 and 1, and merges on 17 August and 19 October closed one each without an inspected window. The outcome is strong and several contributions are witnessed at merge, but attribution needs every gate per output: only the 28 September merge, outlined in gold, passes them all and earns plus five fields. The 2 November merge has no native adoption record, the 26 October merge overlaps another merge's window and is shared, and the same-day batches are grouped. Exclusive causality is never claimed. gh cao is a research prototype, and this is a retrospective replay, not a published value result. Opened pull requests, merges or run success alone are not value.",
+      enter() {
+        t0 = 0;
+        quiet = false;
+        seen = new Set();
+        el.classList.add("dtv-now");
+        paint(0);
+        void el.offsetWidth;
+        el.classList.remove("dtv-now");
+      },
+      onNext() {
+        if (!t0 || now - t0 >= END) return false;
+        t0 = now - END;
+        quiet = true;
+        paint(END);
+        quiet = false;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        paint(t - t0);
+      },
+      el,
     });
   }
 
@@ -10797,7 +11793,14 @@
     g += `<g class="fzs-spike" id="fzsS"><line x1="${cx(0) + 20}" y1="104" x2="104" y2="104"/><text x="112" y="110">${N} runs · 00:00 UTC · the same minute</text><text class="d" x="112" y="136">→ token-API bursts · rate limits · queued runners</text></g>`;
     // minute ruler: avoided zones hatched, measured minutes as bars
     g += `<g class="fzs-min"><text x="${X0 + 24 * CW}" y="520" text-anchor="end">minute · hatched = avoided: hour edges · US :15 :45 · EU :30</text>`;
-    for (const [a, b] of [[0, 4], [12, 18], [27, 33], [42, 48], [55, 59]]) g += `<rect class="no" x="${X0 + a * MW}" y="530" width="${(b - a + 1) * MW}" height="${MB - 530}" rx="3"/>`;
+    for (const [a, b] of [
+      [0, 4],
+      [12, 18],
+      [27, 33],
+      [42, 48],
+      [55, 59],
+    ])
+      g += `<rect class="no" x="${X0 + a * MW}" y="530" width="${(b - a + 1) * MW}" height="${MB - 530}" rx="3"/>`;
     MINS.forEach((n, m) => {
       if (n) g += `<rect class="b" x="${X0 + m * MW + 2}" y="${MB - n * 6}" width="${MW - 4}" height="${n * 6}" rx="2"/>`;
     });
