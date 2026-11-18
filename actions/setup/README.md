@@ -181,6 +181,37 @@ values; the runner-mask policy does not reduce that redaction.
 
 ## Development
 
+### Harness policy contract
+
+`js/harness_policy.cjs` exports
+`createHarnessPolicyDispatcher({ adapter, policies? })`. Trusted, in-process
+policies implement `onEvent(event, context)` and return an action array or
+`undefined`, synchronously or asynchronously. Policy IDs must be unique,
+lowercase identifiers of up to 64 characters (`[a-z][a-z0-9_-]*`).
+
+The adapter supplies an engine name and optional `actions.steer(action)`
+handler. The immutable context advertises only registered capabilities;
+policies can abstain when an action is unsupported. The initial action shape
+is `{ type: "steer", message }`, with a nonempty message. All proposals are
+validated before handlers run in policy and action order. Unsupported actions,
+invalid proposals, and policy or adapter failures reject dispatch explicitly.
+Adapters must use supported native APIs and preserve firewall enforcement;
+capabilities do not grant permissions.
+
+The shared retry runner accepts an optional `policyDispatcher`. After an
+invocation completes and existing failure handling classifies it, the runner
+dispatches `attempt.completed` with a one-based attempt number, selected
+restart/resume strategy, exit code, outcome, and failure classes. Events are
+immutable snapshots without prompts, engine output, or credentials. Skipped
+invocations and thrown execution errors do not manufacture completion events.
+Existing retry counts, backoff, terminal guards, session selection, and
+telemetry remain owned by the retry runner and engine wrappers.
+
+This is an internal extension point, not workflow configuration. No policies,
+native action handlers, model calls, or optimization features are enabled by
+default. Pi and Copilot native adapters and Recovery remain separate follow-up
+work.
+
 ### Decisions client
 
 `js/decisions_client.cjs` exports

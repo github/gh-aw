@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
+const { createHarnessPolicyDispatcher } = require("./harness_policy.cjs");
 const {
   captureExecutionEvidenceConfiguration,
   recordStartupAttempt,
@@ -78,6 +79,123 @@ describe("harness_retry_runner.cjs", () => {
   function gateResult(outcome) {
     return { outcome, questions: [{ question: 1, outcome }], latencyMs: 1 };
   }
+
+  it("preserves exact results, backoff, logs and telemetry with an empty dispatcher", async () => {
+    const options = telemetryOptions([1, 1, 0]);
+    vi.spyOn(Date, "now").mockReturnValue(1234);
+    const output = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    options.log = vi.fn();
+    options.sleepFn = vi.fn();
+    const baseline = await runHarnessRetryLoop(options);
+    const telemetry = fs.readFileSync(options.telemetryPath, "utf8");
+    const markers = [...output.mock.calls];
+    const logs = [...options.log.mock.calls];
+    const sleeps = [...options.sleepFn.mock.calls];
+    output.mockClear();
+    options.log.mockClear();
+    options.sleepFn.mockClear();
+
+    const steer = vi.fn();
+    options.policyDispatcher = createHarnessPolicyDispatcher({ adapter: { engine: "copilot", actions: { steer } } });
+    expect(await runHarnessRetryLoop(options)).toEqual(baseline);
+    expect(fs.readFileSync(options.telemetryPath, "utf8")).toBe(telemetry);
+    expect(output.mock.calls).toEqual(markers);
+    expect(options.log.mock.calls).toEqual(logs);
+    expect(options.sleepFn.mock.calls).toEqual(sleeps);
+    expect(steer).not.toHaveBeenCalled();
+  });
+
+  it("publishes classified attempt results without changing retries, sessions or telemetry", async () => {
+    const options = telemetryOptions([1, 0]);
+    options.getRetryMode = () => "--continue";
+    const sleeps = vi.fn();
+    options.sleepFn = sleeps;
+    const events = [];
+    options.policyDispatcher = createHarnessPolicyDispatcher({
+      adapter: { engine: "copilot" },
+      policies: [
+        {
+          id: "observer",
+          onEvent: event => {
+            events.push(event);
+          },
+        },
+      ],
+    });
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 0, attempts: 2 });
+    expect(events).toEqual([
+      { type: "attempt.completed", attempt: 1, strategy: "restart", exitCode: 1, outcome: "failure", failureClasses: ["rate_limit_error"] },
+      { type: "attempt.completed", attempt: 2, strategy: "resume", exitCode: 0, outcome: "success", failureClasses: [] },
+    ]);
+    expect(sleeps.mock.calls).toEqual([[1]]);
+    expect(JSON.stringify(events)).not.toContain("private output");
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toMatchObject({ attempts: 2, exit_code: 0 });
+  });
+
+  it("publishes cancellation without calling the failure handler or retrying", async () => {
+    const options = telemetryOptions();
+    options.runAttempt = async () => ({ exitCode: 143, output: "private output", hasOutput: true, cancelled: true });
+    options.handleFailure = vi.fn();
+    const onEvent = vi.fn();
+    options.policyDispatcher = createHarnessPolicyDispatcher({ adapter: { engine: "claude" }, policies: [{ id: "observer", onEvent }] });
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 143, attempts: 1 });
+    expect(onEvent).toHaveBeenCalledExactlyOnceWith({ type: "attempt.completed", attempt: 1, strategy: "restart", exitCode: 143, outcome: "cancelled", failureClasses: ["cancelled"] }, { engine: "claude", capabilities: [] });
+    expect(options.handleFailure).not.toHaveBeenCalled();
+  });
+
+  it.each(["deadline", "decision", "throw"])("does not fabricate a completed invocation for a %s exit", async reason => {
+    const options = telemetryOptions();
+    const onEvent = vi.fn();
+    options.policyDispatcher = createHarnessPolicyDispatcher({ adapter: { engine: "pi" }, policies: [{ id: "observer", onEvent }] });
+    if (reason === "deadline") options.softTimeoutGuard = { timeoutMinutes: 1, softDeadlineMs: Date.now() - 1 };
+    if (reason === "decision") options.evaluateDecision = async () => gateResult("deny");
+    if (reason === "throw") {
+      options.runAttempt = async () => {
+        throw new Error("spawn failed");
+      };
+      await expect(runHarnessRetryLoop(options)).rejects.toThrow("spawn failed");
+    } else {
+      await runHarnessRetryLoop(options);
+    }
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it("preserves completed telemetry when an explicitly enabled policy fails", async () => {
+    const options = telemetryOptions([1, 0]);
+    options.policyDispatcher = createHarnessPolicyDispatcher({
+      adapter: { engine: "codex" },
+      policies: [
+        {
+          id: "broken",
+          onEvent: () => {
+            throw new Error("policy failed");
+          },
+        },
+      ],
+    });
+    await expect(runHarnessRetryLoop(options)).rejects.toThrow("policy failed");
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toMatchObject({
+      attempts: 1,
+      exit_code: 1,
+      attempt_results: [{ outcome: "failure", failure_classes: ["rate_limit_error"] }],
+    });
+  });
+
+  it.each(["retry-budget", "terminal-failure", "deadline"])("keeps the existing %s authoritative with an active policy", async limit => {
+    const options = telemetryOptions([1, 0]);
+    const steer = vi.fn();
+    const onEvent = vi.fn(() => {
+      if (limit === "deadline") options.softTimeoutGuard.softDeadlineMs = Date.now() - 1;
+      return [{ type: "steer", message: "Finish the current task." }];
+    });
+    options.policyDispatcher = createHarnessPolicyDispatcher({ adapter: { engine: "pi", actions: { steer } }, policies: [{ id: "example", onEvent }] });
+    if (limit === "retry-budget") options.maxRetries = 0;
+    if (limit === "terminal-failure") options.handleFailure = () => ({ action: "stop" });
+    if (limit === "deadline") options.softTimeoutGuard = { timeoutMinutes: 1, softDeadlineMs: Date.now() + 1000 };
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 1 });
+    expect(onEvent).toHaveBeenCalledOnce();
+    expect(steer).toHaveBeenCalledOnce();
+  });
 
   it.each([
     [5, 10, null, 2, "rate_limit_error"],

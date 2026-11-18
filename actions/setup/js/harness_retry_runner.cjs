@@ -213,6 +213,7 @@ function shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeO
  *   sleepFn?: (ms: number) => Promise<void>,
  *   telemetryPath?: string,
  *   evaluateDecision?: () => Promise<import("./skip_if_decision.cjs").SkipDecision | null>,
+ *   policyDispatcher?: import("./harness_policy.cjs").HarnessPolicyDispatcher,
  * }} options
  * @returns {Promise<{ exitCode: number, attempts: number, lastResult: HarnessAttemptResult | null }>}
  */
@@ -379,12 +380,24 @@ async function runHarnessRetryLoop(options) {
       writeAttemptMarker("finish", attemptResult);
       writeTelemetry();
 
+      const notifyAttemptCompleted = () =>
+        options.policyDispatcher?.dispatch({
+          type: "attempt.completed",
+          attempt: attempts,
+          strategy: attemptResult.strategy,
+          exitCode: result.exitCode,
+          outcome: result.cancelled ? "cancelled" : result.exitCode === 0 ? "success" : "failure",
+          failureClasses: attemptResult.failure_classes,
+        });
+
       if (result.cancelled) {
+        if (options.policyDispatcher) await notifyAttemptCompleted();
         options.log(`attempt ${attempt + 1}: cancelled — not retrying`);
         break;
       }
 
       if (result.exitCode === 0) {
+        if (options.policyDispatcher) await notifyAttemptCompleted();
         options.log(`success on attempt ${attempt + 1}: totalDuration=${formatDuration(Date.now() - options.driverStartTime)}`);
         lastExitCode = 0;
         break;
@@ -416,6 +429,7 @@ async function runHarnessRetryLoop(options) {
         delay = failureDecision.nextDelayMs;
       }
       writeTelemetry();
+      if (options.policyDispatcher) await notifyAttemptCompleted();
       if (failureDecision.action === "retry") {
         continue;
       }
@@ -430,7 +444,7 @@ async function runHarnessRetryLoop(options) {
 
 /**
  * Sandboxed engines without a native retry loop still use the same invocation gate.
- * @param {{runAttempt: () => Promise<HarnessAttemptResult>, harnessName: string, log: (message: string) => void}} options
+ * @param {{runAttempt: () => Promise<HarnessAttemptResult>, harnessName: string, log: (message: string) => void, policyDispatcher?: import("./harness_policy.cjs").HarnessPolicyDispatcher}} options
  */
 function runSingleHarnessInvocation(options) {
   return runHarnessRetryLoop({
