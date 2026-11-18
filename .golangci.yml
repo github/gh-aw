@@ -47,8 +47,9 @@ linters:
         - stringscut
     depguard:
       rules:
-        # golang.org/x/crypto is a direct dependency (used for nacl/box), which
-        # pulls the unmaintained openpgp subpackage into the module graph.
+        # golang.org/x/crypto is a direct dependency (used for nacl/box).
+        # Keep the unmaintained openpgp import path denied even though it is
+        # no longer included in golang.org/x/crypto.
         # openpgp carries advisory GO-2026-5932 with no upstream fix available,
         # so nothing in this repository may import it.
         openpgp:
