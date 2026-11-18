@@ -90,7 +90,12 @@ API visibility failures, and unavailable evidence explicitly.
 Test attained, observed zero, unavailable, malformed, inapplicable, and
 changed-population cases through the production evaluator. Repeat identical
 inputs and compare values and identities. Exercise no-adoption, shared-window,
-and touched-file gates. In the workflow owner's repository, use installed
+and touched-file gates. A lifecycle-only report is not a validated value
+function. In multi-workflow pilots, isolate collection failures, distinguish
+complete zero-delivery runs from missing evidence, and report how many
+measurements actually executed. Keep proposed metric contracts separate from
+working definitions; do not call a design-only candidate implemented.
+In the workflow owner's repository, use installed
 `gh aw value` and that repository's fixture checks; do not require gh-aw's Go
 source, tests, or Makefile. Run focused `TestOperationalValue` tests only when
 changing the gh-aw implementation itself, then its final validation gates.

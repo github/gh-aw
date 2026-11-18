@@ -30,6 +30,10 @@ refreshing or changing it. `--logs-dir` selects another collection directory.
 The lifecycle section includes all retained safe-output types for the selected
 workflow and delivery period, not just pull requests.
 
+The [ten-workflow pilot](../value-pilot/) records real applicability results,
+candidate measurements, and evidence gaps. It distinguishes working lifecycle
+reporting from an independently verified outcome or attributed value.
+
 `lifecycle.coverage: "retained_subset"` means counts describe retained records,
 not the workflow's complete history. Human acceptance and delivery fallbacks
 remain separate. A missing ledger or no matching records produces unavailable

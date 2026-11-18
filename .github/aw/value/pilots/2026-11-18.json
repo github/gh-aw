@@ -1,0 +1,352 @@
+{
+  "schema_version": 1,
+  "kind": "value-applicability-pilot",
+  "repository": "github/gh-aw",
+  "concept_revision": "d75f3e432055b026a1593d6ef568a25e6c8602d8",
+  "observed_at": "2026-11-18T07:20:03Z",
+  "cohort": {
+    "start": "2026-11-01",
+    "end": "2026-11-17",
+    "snapshot_time_utc": "12:00:00",
+    "selection": "Ten active workflows selected for varied objectives and output types, excluding schema-feature-coverage. One recent completed run per workflow before the common cutoff; failures and no-ops were retained.",
+    "sample_size_per_workflow": 1,
+    "scope_limit": "These empirical examples are all from github/gh-aw. This is not a real cross-repository trial or an estimate of workflow value."
+  },
+  "method": {
+    "collection": "gh aw logs --stdin --repo github/gh-aw --adoption --count 1 --artifacts usage,delivery --output OUTPUT/native --json",
+    "report": "gh aw value WORKFLOW --repo github/gh-aw --logs-dir OUTPUT/native --start 2026-11-01 --end 2026-11-17 --json",
+    "identity": "Run IDs and source SHAs come from retained canonical sessions. Lifecycle classifications come from native gh-aw reporting, not pilot-specific rules.",
+    "candidate_contracts": "Metric candidates below are design contracts, not executable value-function definitions. No unsupported evaluator or query syntax is declared.",
+    "side_effects": "Read completed-run artifacts and provider state only; no workflow dispatch, Git history fetch, workflow-source edit, lifecycle fabrication, or retrospective grader mutation."
+  },
+  "summary": {
+    "workflows": 10,
+    "successful_native_collections": 9,
+    "failed_native_collections": 1,
+    "successful_value_commands": 10,
+    "workflows_with_retained_deliveries": 3,
+    "native_delivered_effects": 4,
+    "native_human_accepted_effects": 1,
+    "native_delivery_fallback_effects": 2,
+    "native_pending_effects": 1,
+    "native_complete_zero_delivery_runs": 6,
+    "noop_runs": 4,
+    "incomplete_runs": 2,
+    "configured_value_measurements": 0,
+    "independently_verified_outcome_witnesses": 1,
+    "attributed_value_claims": 0
+  },
+  "findings": [
+    "The nine readable runs contain four verified effects: one human-accepted issue, one pending discussion, and two delivery-fallback effects on one triaged issue. These are not four units of value.",
+    "All ten value reports return measurement_not_configured and attributed_value null. None of the workflows has a reviewed committed numeric projection or a supported objective-specific evaluator.",
+    "All four retained effects are non-PR outputs. The current PR-only attribution rule cannot credit them, even though it preserves their native lifecycle evidence.",
+    "Six complete zero-delivery runs are visible as zero in logs but unavailable in value because the retained delivery ledger has no item records for them. Coverage needs a run-level representation; value must not infer zero from an absent ledger.",
+    "The failed CLI-performance run lacks canonical format/execution identity. Combined collection aborts on this error; independent per-workflow collection preserves the other nine outcomes.",
+    "Recorded built-in tool-success, duration, retry, and loop grades are not workflow-specific outcome measurements. No retained operational-value grader was found.",
+    "No-op and report_incomplete are distinct. Neither a no-op message nor a successful workflow conclusion independently proves correct restraint or attained value.",
+    "File Diet supplies a verified mechanical outcome witness, but issue-to-PR attribution is unsupported and its seven-day post-adoption window is incomplete.",
+    "The checkout is shallow. This pilot did not replay full historical merge windows, estimate causal effects, validate all proposed metrics, or demonstrate saved maintainer time."
+  ],
+  "priorities": [
+    {
+      "rank": 1,
+      "workflow": "daily-file-diet",
+      "reason": "A fixed size policy and exact Git blobs already support an independently recomputable native-unit outcome."
+    },
+    {
+      "rank": 2,
+      "workflow": "dead-code-remover",
+      "reason": "Pinned successful whole-program analyzer output can support subject-level snapshot measurements, with protected/WASM cases handled explicitly."
+    },
+    {
+      "rank": 3,
+      "workflow": "daily-cli-performance",
+      "reason": "The intended outcome has a native benchmark unit, but needs valid benchmark-series evidence rather than agent duration or a main-tree JSON assumption."
+    }
+  ],
+  "workflows": [
+    {
+      "workflow": "daily-doc-healer",
+      "run_id": 43981238321,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/43981238321",
+      "source_sha": "d9eaeb2fe3a86be33a4ba2693dc07fa5a97c25bc",
+      "goal": "Resolve confirmed documentation gaps missed by the regular updater.",
+      "metric_candidate": {
+        "id": "confirmed-documentation-gaps-resolved-v1",
+        "unit": "gaps",
+        "direction": "higher_is_better",
+        "evidence_scope": "reviewed issue-to-documentation-change outcomes",
+        "formula": "Count distinct independently confirmed gap IDs whose required documentation correction is verified in accepted changes.",
+        "requires": ["frozen eligible gap identities", "independent correctness reference", "exact issue/change linkage", "native acceptance and complete survival"]
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "noop",
+        "native_delivered": 0,
+        "value_lifecycle_coverage": "unavailable",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "conditional",
+      "blocker": "This pilot did not establish independent gap identities or a verified correction; a no-op is not proof of correct restraint."
+    },
+    {
+      "workflow": "dead-code-remover",
+      "run_id": 43886415206,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/43886415206",
+      "source_sha": "c304ed3448af527c2a1f457fa574f6432824e9c2",
+      "goal": "Safely remove unreachable Go functions.",
+      "metric_candidate": {
+        "id": "eligible-unreachable-functions-v1",
+        "unit": "functions",
+        "direction": "lower_is_better",
+        "evidence_scope": "independent repository analysis snapshots",
+        "formula": "Count eligible unreachable file:function identities reported by a pinned successful analyzer over both ./cmd/... and ./internal/tools/....",
+        "requires": ["pinned analyzer/toolchain", "successful complete analysis", "protected-function exclusions", "caller and WASM safety checks", "exact before/after subject identities"]
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "noop",
+        "native_delivered": 0,
+        "value_lifecycle_coverage": "unavailable",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "promote-independent-projection",
+      "blocker": "No reviewed committed projection is configured; this pilot did not establish an independently measured before/after removal outcome."
+    },
+    {
+      "workflow": "daily-go-test-parallelizer",
+      "run_id": 44065036647,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/44065036647",
+      "source_sha": "cbf8ba5994a176ceea9e68934f3801bbb72fffe0",
+      "goal": "Reduce test execution time without introducing unsafe parallelism.",
+      "metric_candidate": {
+        "id": "fixed-test-suite-duration-v1",
+        "unit": "ms",
+        "direction": "lower_is_better",
+        "evidence_scope": "controlled test measurements",
+        "formula": "Compare repeated fixed-suite elapsed-time measurements under the same runner, toolchain, test inventory, and concurrency settings.",
+        "requires": ["complete fixed test population", "passing race validation", "comparable before/after runner conditions", "repeated timing observations"]
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "report_incomplete",
+        "native_delivered": 0,
+        "value_lifecycle_coverage": "unavailable",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "conditional",
+      "blocker": "The selected run is incomplete. Counting t.Parallel additions would reward activity, not independently verified speed or safety."
+    },
+    {
+      "workflow": "go-logger",
+      "run_id": 44009171201,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/44009171201",
+      "source_sha": "6a47c8553d4e12ffb27e84b191fc2e3143ecf674",
+      "goal": "Make important diagnostic scenarios observable through meaningful safe debug logging.",
+      "metric_candidate": {
+        "id": "verified-diagnostic-scenarios-v1",
+        "unit": "scenarios",
+        "direction": "higher_is_better",
+        "evidence_scope": "independently specified behavioral fixtures",
+        "formula": "Count frozen diagnostic scenarios whose expected useful debug evidence is independently observed without side effects or sensitive output.",
+        "requires": ["reviewed scenario inventory", "behavioral fixtures", "independent expected messages", "side-effect and redaction checks"]
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "noop",
+        "native_delivered": 0,
+        "value_lifecycle_coverage": "unavailable",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "reject-simple-proxy",
+      "blocker": "Logger imports, log-call counts, or files with logger.New do not establish useful diagnostics; no independent scenario inventory was established for this pilot."
+    },
+    {
+      "workflow": "daily-file-diet",
+      "run_id": 43870412927,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/43870412927",
+      "source_sha": "c304ed3448af527c2a1f457fa574f6432824e9c2",
+      "goal": "Identify oversized non-test Go source files and drive focused refactoring.",
+      "metric_candidate": {
+        "id": "excess-go-source-lines-v1",
+        "unit": "lines_over_799",
+        "direction": "lower_is_better",
+        "evidence_scope": "immutable Git source snapshots",
+        "formula": "For tracked pkg/**/*.go files excluding *_test.go, sum max(0, newline_count(file) - 799).",
+        "requires": ["literal tracked source inventory", "the historical healthy_threshold of 800", "exact before/after Git blobs", "explicit issue-to-change linkage for attribution"],
+        "interpretation": "Mechanical size-policy outcome, not code quality, removed LOC, runtime improvement, or saved time."
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "create_issue",
+        "native_delivered": 1,
+        "native_human_accepted": 1,
+        "target_url": "https://github.com/github/gh-aw/issues/78380",
+        "value_lifecycle_coverage": "retained_subset",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "promote-native-projection",
+      "witness": {
+        "issue": 78380,
+        "implementation_pr": 78635,
+        "implementation_url": "https://github.com/github/gh-aw/pull/78635",
+        "merge_sha": "ecf4e21e9438774092bcd313ddbb1c6fc18e8737",
+        "merged_at": "2026-11-17T06:09:02Z",
+        "before": 403,
+        "after": 0,
+        "improvement": 403,
+        "unit": "lines_over_799",
+        "attributed_value": null,
+        "blobs": [
+          {"path": "pkg/cli/logs_orchestrator_download.go", "status": "removed", "sha": "1bc2f817235c7436dcbfb1297ff6dd9489474feb", "lines": 1202},
+          {"path": "pkg/cli/logs_download_batch_fetch.go", "status": "added", "sha": "3b1d2af7658c3798efe2f1f5df1f4e854f9e0c0d", "lines": 93},
+          {"path": "pkg/cli/logs_download_rounds.go", "status": "added", "sha": "2a0d7104315e8dd9850469370f7105b175ec08a0", "lines": 417},
+          {"path": "pkg/cli/logs_download_run_processing.go", "status": "added", "sha": "9839a4356c76a584fcd1e3ab570a9a3fd350567c", "lines": 381},
+          {"path": "pkg/cli/logs_download_setup.go", "status": "added", "sha": "5b7689a631a931c7bcd647840ec5f542d8230d81", "lines": 199},
+          {"path": "pkg/cli/logs_download_stats.go", "status": "added", "sha": "e9b7a1a4924ebaca2f52ef2a967be6ea52bda3b0", "lines": 151}
+        ]
+      },
+      "blocker": "The current command cannot attribute an issue's downstream PR; the complete seven-day window is not yet available and no production measurement projection is configured."
+    },
+    {
+      "workflow": "daily-code-metrics",
+      "run_id": 43928873951,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/43928873951",
+      "source_sha": "2ecfece9a5c79b4e253772dfb11f96e3d68a277b",
+      "goal": "Provide accurate, useful code-health trends.",
+      "metric_candidate": {
+        "id": "independently-verified-metric-observations-v1",
+        "unit": "metric_points",
+        "direction": "higher_is_better",
+        "evidence_scope": "run-scoped report-quality checks",
+        "formula": "Count required metric observations that agree with independent recomputation over a fixed metric/date/source scope.",
+        "requires": ["complete planned metric/date denominator", "pinned source scope", "independent recomputation", "separate evidence of downstream decisions for longitudinal value"],
+        "interpretation": "Potential run-scoped report-quality metric, not longitudinal value."
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "create_discussion",
+        "native_delivered": 1,
+        "native_pending": 1,
+        "target_url": "https://github.com/github/gh-aw/discussions/78432",
+        "value_lifecycle_coverage": "retained_subset",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "reject-self-referential-value",
+      "blocker": "Publishing charts or a weighted quality score does not prove that the report improved code health; cache/repo-memory observations are not main-tree snapshot inputs."
+    },
+    {
+      "workflow": "issue-triage-agent",
+      "run_id": 43889622699,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/43889622699",
+      "source_sha": "c304ed3448af527c2a1f457fa574f6432824e9c2",
+      "goal": "Correctly classify eligible unassigned, unlabeled issues.",
+      "metric_candidate": {
+        "id": "correctly-triaged-eligible-issues-v1",
+        "unit": "issues",
+        "direction": "higher_is_better",
+        "evidence_scope": "recorded eligibility and independently reviewed object-state transitions",
+        "formula": "Count distinct eligible issue IDs whose applied allowed label matches an independent reference classification.",
+        "requires": ["complete pre-action eligibility snapshot", "independent label reference", "exact applied label evidence", "retention observations when making durable-outcome claims"]
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": ["add_labels", "add_comment"],
+        "native_delivered": 2,
+        "native_delivery_fallback": 2,
+        "native_human_accepted": 0,
+        "distinct_issue_targets": 1,
+        "issue": 77493,
+        "applied_label": "enhancement",
+        "value_lifecycle_coverage": "retained_subset",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "conditional",
+      "blocker": "A label and comment are two effects on one issue, not two correctly triaged issues or human acceptances. Independent label correctness and full eligibility are missing."
+    },
+    {
+      "workflow": "stale-pr-cleanup",
+      "run_id": 43574891405,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/43574891405",
+      "source_sha": "d709722d31c5d2bc21ac35d8d887985a2fa40d77",
+      "goal": "Reduce obsolete PR backlog without discarding genuine work.",
+      "metric_candidate": {
+        "id": "safely-retired-stale-prs-v1",
+        "unit": "pull_requests",
+        "direction": "higher_is_better",
+        "evidence_scope": "independently verified GitHub policy decisions",
+        "formula": "Count distinct closed PRs independently verified to meet the complete staleness, exemption, authorship, and supersession policy.",
+        "requires": ["complete pre-action eligible PR inventory", "all exemption labels and activity clocks", "independent closure justification", "separate warning-only human-PR cases"]
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "noop",
+        "native_delivered": 0,
+        "value_lifecycle_coverage": "unavailable",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "conditional",
+      "blocker": "Closure counts reward potentially harmful actions; this pilot did not establish independent complete eligibility proof for the no-op."
+    },
+    {
+      "workflow": "daily-cli-performance",
+      "run_id": 43890801339,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/43890801339",
+      "source_sha": null,
+      "goal": "Detect and fix compilation-performance regressions.",
+      "metric_candidate": {
+        "id": "simple-workflow-compilation-time-v1",
+        "unit": "ns/op",
+        "direction": "lower_is_better",
+        "evidence_scope": "independent benchmark time series",
+        "formula": "Compare repeated BenchmarkCompileSimpleWorkflow ns/op observations with fixed inputs, runner, toolchain, and measurement protocol.",
+        "requires": ["successful complete benchmark execution", "exact benchmark/source identity", "comparable repeated samples", "independent fix validation"],
+        "interpretation": "Agent execution duration and tool-success grades are not compiler benchmark measurements."
+      },
+      "observed": {
+        "collection": "error",
+        "error": "lifecycle session is missing its format or execution identity",
+        "native_delivered": null,
+        "value_lifecycle_coverage": "unavailable",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "promote-benchmark-scope",
+      "blocker": "The selected run has no canonical identity. Benchmark history lives in repo-memory, outside the current report's main-tree numeric-evidence scope."
+    },
+    {
+      "workflow": "dependabot-burner",
+      "run_id": 44044481567,
+      "run_url": "https://github.com/github/gh-aw/actions/runs/44044481567",
+      "source_sha": "81c6dbe0f99dd44a22a1a2bd11e6c8ef9fed034b",
+      "goal": "Complete validated dependency remediation with less maintainer coordination.",
+      "metric_candidate": {
+        "id": "validated-adopted-dependency-upgrades-v1",
+        "unit": "upgrades",
+        "direction": "higher_is_better",
+        "evidence_scope": "frozen update-batch and accepted repository-state evidence",
+        "formula": "Count distinct eligible manifest/package/target-version entries actually present in a validated, human-adopted change.",
+        "requires": ["complete selected/excluded batch snapshot", "exact target versions in accepted manifests and lockfiles", "successful required validation", "native human adoption and complete survival"],
+        "interpretation": "Verified remediation outcome, not a claim about unmeasured maintainer time saved."
+      },
+      "observed": {
+        "collection": "complete",
+        "terminal_output": "report_incomplete",
+        "native_delivered": 0,
+        "value_lifecycle_coverage": "unavailable",
+        "measurement_status": "measurement_not_configured",
+        "attributed_value": null
+      },
+      "decision": "conditional",
+      "blocker": "The run is incomplete; no validated adopted target state is available. PR-count reduction would not establish successful dependency remediation."
+    }
+  ]
+}
