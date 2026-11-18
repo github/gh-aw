@@ -1,15 +1,24 @@
 ---
 name: operational-value-designer
-description: "Design recorded-session, run-scoped operational value with restricted JavaScript. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
-argument-hint: "OWNER/REPO WORKFLOW-NAME"
+description: "Design longitudinal value functions or run-scoped graders. Usage: /operational-value-designer OWNER/REPO WORKFLOW [longitudinal|run-scoped]."
+argument-hint: "OWNER/REPO WORKFLOW [longitudinal|run-scoped]"
 metadata:
   version: "3.1.0"
 ---
 
 # Operational Value Designer
 
-Design a deterministic, run-scoped operational-value grader from evidence already
-recorded in the unified session.
+Design deterministic, evidence-based value functions.
+
+## Route first
+
+For slides, longitudinal value, or `gh aw value`, read
+[longitudinal-report.md](references/longitudinal-report.md) and author the
+snapshot function. Keep native delivery/adoption shared. Never substitute a
+run-scoped grader for longitudinal value.
+
+For sessions or `graders.operational-value.script`, use the contract below.
+Ask first if the boundary is unclear.
 
 ## Ownership and CAO handoff
 
@@ -21,10 +30,10 @@ GitHub owns object disposition. githubnext/gh-cao may schedule refresh and consu
 gh-aw lifecycle records for longitudinal Value, storage/querying, and Dashboard
 Language; do not duplicate adoption classification in a consumer.
 
-Every workflow can expose delivery and adoption without a campaign or CAO.
+Every workflow exposes delivery/adoption without a campaign or CAO.
 Longitudinal attributed value additionally needs a declared measurement,
 attribution evidence, and complete post-adoption-window survival. CAO is an
-optional scheduler/consumer, not the owner or prerequisite of lifecycle tracking.
+optional scheduler/consumer, not a lifecycle prerequisite.
 
 `safe_output.result` and `safe_output.execution` record run-time facts, not later
 adoption. `graders.operational-value.script` is optional run-scoped evidence; it

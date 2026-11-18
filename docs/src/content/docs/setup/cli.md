@@ -34,6 +34,7 @@ The `--timeout` flag uses different formats depending on the command:
 |---------|----------------|---------|---------|----------------|
 | `audit` | Go duration | `0` | `--timeout 5m` | No additional deadline |
 | `health` | Go duration | `2m` | `--timeout 5m` | Disables its collection deadline |
+| `value` | Positive Go duration | `5m` | `--timeout 10m` | Rejected |
 | `connector test` | Go duration greater than zero and at most `20s` | `20s` | `--timeout 10s` | Rejected |
 | `logs episode` | Go duration | `5m` | `--timeout 10m` | Rejected |
 | `logs`, `forecast` | Integer minutes | `0` | `--timeout 5` | No timeout |
@@ -1043,6 +1044,31 @@ observations. Missing metadata and uncertain accounting are not fabricated.
 ATIF includes private prompts and tool payloads, unlike the bounded Markdown
 summary. Conversion requires no Python/Harbor installation.
 The command and its output formats may change.
+
+#### `value`
+
+Report native delivery and adoption for any workflow using the same records
+and rules as `logs --adoption`. Workflow-specific value functions add historical
+measurements; missing functions leave value unavailable, not zero.
+
+```bash wrap
+gh aw value weekly-research --repo owner/repo --json
+gh aw value docs-updater --value-function value.json --json
+gh aw value schema-feature-coverage --start 2026-03-22 --end 2026-11-17
+```
+
+**Options:** `--start`, `--end`, `--ref`, `--logs-dir`, `--repo/-r`, `--value-function`, `--timeout`, `--json/-j`
+
+Dates select 12:00 UTC snapshots; end defaults to yesterday and start to 30 days
+before end. The operational-value-designer skill authors reviewed functions in
+`.github/aw/value/WORKFLOW.json`; the CLI evaluates them in the
+restricted grader worker over selected repository files. Native delivery and
+adoption do not depend on these functions. PR attribution requires exact native
+human adoption, an isolated merge, and full seven-day file survival. Missing
+proof remains unavailable. The command neither fetches history nor dispatches
+workflows, refreshes lifecycle records, or replays session graders. See the
+[Value report](../../reference/value/) for evidence
+collection, output fields, and limitations.
 
 #### `graders`
 

@@ -176,6 +176,11 @@ measurements; lifecycle refresh never rewrites those results or the unified sess
 CAO can schedule refresh and consume gh-aw records for longitudinal measurement;
 it is not required to inspect delivery or adoption.
 
+For the slides' schema-coverage replay, use
+[`gh aw value`](../value/). It joins native adoption
+records with Git measurements and a complete-window file-survival check,
+without changing the original records or grader scores.
+
 `cost_per_adopted_output` divides observed run or selected-episode AIC by adopted
 items. It is an efficiency ratio, not a value score. Missing cost, incomplete
 episode evidence, or zero adopted items suppress the episode ratio.

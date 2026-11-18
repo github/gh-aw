@@ -90,6 +90,17 @@ Public JSON uses `delivery`, `adoption`, `adoption_summary`, and
 `adoption:zero_touch`, with `adoption_window` and explicit `analyze --adoption`.
 Old flags, selectors, field names, and metric references are not aliases.
 
+`value WORKFLOW` consumes these same retained native records and
+summary projections for any workflow; value functions MUST NOT replace the
+delivery/adoption classifier. Missing measurement definitions leave value
+unavailable without suppressing lifecycle evidence. Workflow-specific snapshot
+functions run in the existing restricted JavaScript worker over explicitly
+selected Git file contents, never in conclusion or with credentials/network.
+The reporting command MUST NOT mutate lifecycle records or historical graders.
+PR attribution additionally requires exact native human adoption, an isolated
+merge, and complete-window Git file survival; other output types retain their
+lifecycle projections without fabricated longitudinal value.
+
 Compact retained observations use the existing logs JSONL schema with
 `kind: output_lifecycle`, independently of run-folder retention. Retention is
 365 days from delivery, at most 20,000 identities and 16 MiB. Concurrent writes
