@@ -34,6 +34,7 @@ The `--timeout` flag uses different formats depending on the command:
 |---------|----------------|---------|---------|----------------|
 | `audit` | Go duration | `0` | `--timeout 5m` | No additional deadline |
 | `health` | Go duration | `2m` | `--timeout 5m` | Disables its collection deadline |
+| `value` | Positive Go duration | `5m` | `--timeout 10m` | Rejected |
 | `connector test` | Go duration greater than zero and at most `20s` | `20s` | `--timeout 10s` | Rejected |
 | `logs episode` | Go duration | `5m` | `--timeout 10m` | Rejected |
 | `logs`, `forecast` | Integer minutes | `0` | `--timeout 5` | No timeout |
@@ -1043,6 +1044,16 @@ observations. Missing metadata and uncertain accounting are not fabricated.
 ATIF includes private prompts and tool payloads, unlike the bounded Markdown
 summary. Conversion requires no Python/Harbor installation.
 The command and its output formats may change.
+
+#### `value`
+
+Read native delivery, adoption, recorded grades and independently measured outcomes.
+
+```bash wrap
+gh aw value weekly-research --repo owner/repo --json
+```
+
+See [Value report](/gh-aw/reference/value/) for collection, options and attribution limits.
 
 #### `graders`
 

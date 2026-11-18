@@ -1,160 +1,29 @@
 ---
 name: operational-value-designer
-description: "Design recorded-session, run-scoped operational value with restricted JavaScript. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
-argument-hint: "OWNER/REPO WORKFLOW-NAME"
+description: "Set up a workflow's operational value report. Usage: /operational-value-designer OWNER/REPO WORKFLOW."
+argument-hint: "OWNER/REPO WORKFLOW"
 metadata:
-  version: "3.1.0"
+  version: "5.3.0"
 ---
 
 # Operational Value Designer
 
-Design a deterministic, run-scoped operational-value grader from evidence already
-recorded in the unified session.
+Set up one `gh aw value WORKFLOW` report in the workflow owner's repository. Do not ask for a mode or register upstream. The installed CLI reads existing measurements, native lifecycle records and recorded primary grades; it does not generate evidence or execute a grader.
 
-## Ownership and CAO handoff
+## Design before adoption
 
-gh-aw owns producer facts, run identity, restricted-JS run-scoped grading,
-artifacts/events, experiments, replay, and shared delivery/adoption/reversal/
-survival rules and provider refresh. Inspect these through `gh aw logs --delivery`,
-`gh aw logs --adoption`, or single-run `gh aw audit --adoption`.
-GitHub owns object disposition. githubnext/gh-cao may schedule refresh and consume
-gh-aw lifecycle records for longitudinal Value, storage/querying, and Dashboard
-Language; do not duplicate adoption classification in a consumer.
+1. Use a clean context containing only workflow intent, constraints, evidence formats and synthetic fixtures. Do not inspect the target cohort's runs, grades, PRs, adoption decisions or later outcomes.
+2. Choose one independently verifiable outcome in its native unit. Fix eligible subject IDs, denominator, direction, baseline, producer, clocks, sampling, lag, durability, overlap, and rules for zero, missing and malformed inputs. Output counts and an agent's own success claims are not value.
+3. Freeze the reviewed definition, recipe and fixtures together. Test improvement, no change, regression, missing input, changed population and malformed data through the production evaluator. If outcomes already informed the design, label that cohort retrospective and apply the frozen rules to a new one. Do not backdate corrections.
 
-Every workflow can expose delivery and adoption without a campaign or CAO.
-Longitudinal attributed value additionally needs a declared measurement,
-attribution evidence, and complete post-adoption-window survival. CAO is an
-optional scheduler/consumer, not the owner or prerequisite of lifecycle tracking.
+## Select existing evidence
 
-`safe_output.result` and `safe_output.execution` record run-time facts, not later
-adoption. `graders.operational-value.script` is optional run-scoped evidence; it
-is neither a prerequisite nor a substitute for longitudinal Value. A current
-survival snapshot does not prove complete-window survival or attributed value.
-Do not add CAO databases, campaign adapters, or dashboard logic to gh-aw.
+- For repository history, use `json-number-v1` for an independently produced committed number or `schema-example-coverage-v1` for textual examples. For measured Git, benchmark, object-state or run observations, use `evidence-number-v1` with `--evidence`. Save `.github/aw/value/WORKFLOW.json` and pass the frozen recipe explicitly. See the [CLI reference](https://github.github.com/gh-aw/reference/value/) for declarations and the [report specification](https://github.github.com/gh-aw/specs/operational-value-specification/) for evidence boundaries. Do not invent a query or evaluator.
+- Reuse recorded `operational-value` grades from `--logs-dir/summary.json`; no definition is required to read them. If a custom session grader is needed, follow [the run-scoped contract](references/run-scoped.md). `graders.operational-value.script` executes only in a separate Actions job; never add JavaScript to the report or conclusion.
+- `safe_output.result` records an applied effect, not later human acceptance. Use native `logs --adoption` (includes delivery) or `audit RUN --adoption` for lifecycle evidence. Do not duplicate adoption classification, require `githubnext/gh-cao`, or treat a delivery fallback as a human decision.
 
-## Reserved grader contract
+## Evaluate after freeze
 
-Use the reserved `graders.operational-value.script` field:
+In a separate context apply the unchanged rules to all eligible cases, including no-ops, regressions and incomplete windows. Preserve run/subject identity, input digests, event and collection clocks. A grade is a run result; a measured outcome is not automatically attributed value. Only a direct human-adopted PR passing all report gates can contribute to the subtotal. Never infer zero from absent evidence.
 
-```yaml
-graders:
-  operational-value:
-    name: Recorded comment application
-    description: Whether this run recorded a successful comment on the configured issue
-    unit: boolean
-    direction: higher_is_better
-    threshold: 1
-    config:
-      repository: OWNER/REPO
-      issueNumber: 123
-    script: |
-      const unavailable = [
-        {id: "comment-application-recorded", value: null},
-        {id: "recorded-comment-count", value: null},
-      ];
-      if (typeof config.repository !== "string" || !config.repository.trim() ||
-          !Number.isInteger(config.issueNumber) || config.issueNumber < 1) return unavailable;
-      const { eventsOfType } = helpers.createSessionLookups(session);
-      const comments = eventsOfType("safe_output.result")
-        .filter(({ data }) => data?.type === "add_comment");
-      if (!comments.length || comments.some(({ data }) =>
-          data?.status !== "success" ||
-          typeof data.repo !== "string" || !data.repo.trim() ||
-          !Number.isInteger(data.number) || data.number < 1 ||
-          typeof data.url !== "string" || !data.url)) return unavailable;
-      return [
-        {id: "comment-application-recorded", value:
-          comments.every(({ data }) =>
-            data.repo === config.repository && data.number === config.issueNumber) ? 1 : 0},
-        {id: "recorded-comment-count", value: comments.length},
-      ];
-```
-
-The synchronous body receives immutable `session`, `config`, and `helpers`.
-Reuse `helpers.createSessionLookups(session)` for statistics and lookups. The
-script runs in the downstream `graders` job, never conclusion.
-
-Return a nonempty ordered array of unique `{id,value}` objects. IDs must be
-nonempty strings; values must be finite numbers or `null`; extra fields are
-rejected. The first metric supplies top-level `operational-value.value`.
-Remaining metrics become diagnostics. The full ordered `metrics` array remains
-in schema-v2 grader artifacts and events. Keep IDs and order stable.
-
-Scripts are limited to 256 KiB. No file, module, process, network, environment,
-credential, clock, random, timer, or input-mutation access exists. Record evidence
-before publication; never return a Promise or the string `"unavailable"`.
-
-Other custom grader IDs still use `graders.<distinct-id>.script` and return one
-finite number, `null`, or an object with `value`; they do not use metric arrays.
-
-## Design procedure
-
-Before implementation, write a compact table with:
-
-- ultimate workflow goal and applicable run subject;
-- outcome ladder from durable effect back to execution activity;
-- strongest observable, attributable, independently verifiable run-time effect;
-- why stronger downstream effects are not knowable at the grading boundary;
-- primary metric, native unit, formula, direction, and threshold;
-- success, zero, `null`, noop, malformed-evidence, and inapplicable rules;
-- exact required unified-session observations;
-- contract adoption commit.
-
-Use the furthest downstream recorded effect that meets all three tests:
-observable now, attributable to this run or exact subject, and independently
-verifiable. Do not reward activity, output existence, token use, or an agent's
-claim of success. A request is not an applied mutation. A handler success is not
-human adoption. Silence does not prove correct restraint.
-
-Return `0` for observed non-attainment. Return `null` when applicability or
-required evidence is absent, malformed, truncated, conflicting, or incomplete.
-Correct restraint may score success only when recorded evidence proves an
-eligible opportunity existed and no action was the right result.
-
-For batches, derive one complete eligible denominator from one recorded snapshot.
-Apply intentional sampling before fixing the denominator. Do not shrink it for
-execution caps or missing work. Bind user-driven runs to the exact repository,
-issue, pull request, ref, URL, mode, or other declared target.
-
-Keep one primary metric. Add diagnostics only when they explain distinct,
-actionable failure modes. Preserve native scale; do not normalize a count,
-duration, amount, or signed quantity merely to fit `[0,1]`.
-
-Freeze intent, script, configuration, and semantic fixtures together. Corrections
-are prospective; never rewrite prior results. The workflow revision and script
-SHA-256 digest identify the adopted implementation.
-
-## Fixtures and verification
-
-Fixtures use `{name,session,config,expected}` and require `attained`, `missed`,
-`unavailable`, and `malformed`; add noop/inapplicable cases when relevant.
-`expected` is the exact ordered array. Test exact inline bytes in a temporary
-`.js` file; never maintain a second production source:
-
-```bash
-bash .github/skills/operational-value-designer/scripts/verify-operational-value-evaluator.sh \
-  /tmp/operational-value.js fixtures.json
-gh aw lint --rules grader-file-io --javascript-module \
-  /path/to/gh-aw/pkg/workflow/taint/javascript .github/workflows/WORKFLOW.md
-gh aw compile .github/workflows/WORKFLOW.md
-cat aw_session.jsonl | gh aw graders run WORKFLOW operational-value
-```
-
-The verifier runs the restricted runtime twice and checks identity, digest, and
-order. A missing native parser warning means unchecked lint coverage.
-
-`graders.operational-value.run` is removed. Invalid declarations must fail with
-migration guidance to `script`; never ignore or translate shell automatically.
-
-<!-- instruction-prefix-end -->
-
-## Generated job check
-
-Inspect the DAG: `graders` depends on successful conclusion, downloads
-`usage/aw_session.jsonl`, has no write/inference/App/OIDC credentials, and uploads
-the separate `graders` artifact.
-
-## Removed Bash migration
-
-Do not wrap shell file/API behavior in JavaScript. Record required evidence in
-the session, then rewrite the predicate as pure JavaScript.
+Deliver the definition, recipe, fixtures, reproducible CLI command and limitations. Surface collection or identity failures; do not dispatch a workflow, rewrite prior results or add a new collector to make a score appear.

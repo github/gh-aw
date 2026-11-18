@@ -45,6 +45,14 @@ func observeLifecycle(ctx context.Context, run WorkflowRun, item CreatedItemRepo
 			}
 		}
 	}
+	applyLifecycleObservation(&report, record)
+	if item.Type == "create_pull_request" && record.Adoption.Coverage == "available" {
+		enrichPullRequestEffort(ctx, item, &report)
+	}
+	return report, ctx.Err()
+}
+
+func applyLifecycleObservation(report *OutcomeReport, record lifecycle.Record) {
 	report.Lifecycle = &record
 	report.Adoption, report.Survival = &record.Adoption, &record.Survival
 	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatus(record.Adoption.State), EvidenceMedium, record.Adoption.Signal)
@@ -59,9 +67,6 @@ func observeLifecycle(ctx context.Context, run WorkflowRun, item CreatedItemRepo
 	if record.Survival.Error != "" {
 		report.Detail += "; survival unavailable: " + record.Survival.Error
 	}
-	if item.Type == "create_pull_request" && record.Adoption.Coverage == "available" {
-		enrichPullRequestEffort(ctx, item, &report)
-	}
 	report.ReversalSignal = record.ReversalSignal
 	if !record.ReversedAt.IsZero() {
 		report.ReversedAt = record.ReversedAt.Format(time.RFC3339Nano)
@@ -69,7 +74,6 @@ func observeLifecycle(ctx context.Context, run WorkflowRun, item CreatedItemRepo
 	if !record.Adoption.At.IsZero() {
 		report.TimeToOutcomeHours = record.Adoption.At.Sub(record.Delivery.At).Hours()
 	}
-	return report, ctx.Err()
 }
 
 func lifecycleEffectReversed(signal string) bool {
