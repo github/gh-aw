@@ -43,6 +43,10 @@ unavailable or partial coverage, not a verified count of zero. Custom safe-job
 results without a recorded delivery timestamp cannot establish dated delivery;
 collection time is not a substitute.
 
+When reading a unified session, the CLI accepts a run ID or attempt recorded as
+a JSON integer (`2`) or a decimal string (`"2"`). Conflicting run IDs or attempts
+are rejected; reading an older representation does not establish delivery.
+
 A recorded skipped safe-output job can establish zero deliveries. Missing optional
 artifacts do not discard execution evidence already present in the download cache.
 

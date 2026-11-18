@@ -65,6 +65,48 @@ func TestLifecycleSessionMirrorsAndCollectionWarnings(t *testing.T) {
 	require.ErrorContains(t, err, "repeated format headers")
 }
 
+func TestLifecycleSessionExecutionIdentity(t *testing.T) {
+	// This numeric run ID cannot round-trip through a float64.
+	const id = `"runId":9007199254740993`
+	for _, tc := range []struct {
+		name, fields string
+		valid        bool
+	}{
+		{"legacy string attempt", id + `,"runAttempt":"2"`, true},
+		{"numeric attempt", id + `,"runAttempt":2`, true},
+		{"snake case", `"run_id":"9007199254740993","run_attempt":"2"`, true},
+		{"matching aliases", id + `,"run_id":"9007199254740993","runAttempt":"2","run_attempt":2`, true},
+		{"adjacent run", `"runId":9007199254740992,"runAttempt":"2"`, false},
+		{"wrong attempt", id + `,"runAttempt":"1"`, false},
+		{"missing attempt", id, false},
+		{"conflicting attempts", id + `,"runAttempt":2,"run_attempt":"1"`, false},
+		{"conflicting runs", id + `,"run_id":42,"runAttempt":2`, false},
+		{"conflicting repeated attempt", id + `,"runAttempt":1,"runAttempt":"2"`, false},
+		{"null alias", id + `,"runAttempt":null,"run_attempt":2`, false},
+		{"nonpositive alias", id + `,"runAttempt":0,"run_attempt":2`, false},
+		{"fractional attempt", id + `,"runAttempt":2.5`, false},
+		{"nonnumeric attempt", id + `,"runAttempt":"two"`, false},
+		{"overflowing attempt", id + `,"runAttempt":"9223372036854775808"`, false},
+		{"wrong repository", id + `,"runAttempt":"2","repository":"other/repo"`, false},
+		{"wrong host", id + `,"runAttempt":"2","serverUrl":"https://other.example"`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := WorkflowRun{DatabaseID: 9007199254740993, Attempt: 2, Repository: "acme/repo", LogsPath: t.TempDir()}
+			info := `{"type":"workflow.info","provenance":{"component":"workflow"},"data":{` + tc.fields + "}}\n"
+			path := filepath.Join(run.LogsPath, "aw_session.jsonl")
+			require.NoError(t, os.WriteFile(path, []byte(unifiedDetectionTestHeader+info), 0o600))
+			items, found, err := readSessionLifecycleItems(t.Context(), run)
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+			assert.False(t, found, "identity alone is not delivery evidence")
+			assert.Empty(t, items)
+		})
+	}
+}
+
 func TestLifecycleCacheRejectsTruncationAndHonorsLockCancellation(t *testing.T) {
 	run := deliveredFixtureRun(t, `{"type":"add_comment","status":"success","timestamp":"2026-11-01T00:00:00Z"}`)
 	_, err := collectRunLifecycle(t.Context(), run, nil, false, false)

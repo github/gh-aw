@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +18,30 @@ import (
 )
 
 var errLifecycleEvidenceIncomplete = errors.New("safe-output session collection is incomplete")
+
+// Unlike optional aw_info metadata, a supplied execution identity cannot be
+// empty, zero, or replaced by a conflicting occurrence of the same field.
+type lifecycleSessionNumber int64
+
+func (n *lifecycleSessionNumber) UnmarshalJSON(raw []byte) error {
+	var value NumericID
+	if err := value.UnmarshalJSON(raw); err != nil {
+		return err
+	}
+	if value <= 0 {
+		return errors.New("lifecycle session identity must be a positive integer")
+	}
+	return n.merge(lifecycleSessionNumber(value))
+}
+
+func (n *lifecycleSessionNumber) merge(alias lifecycleSessionNumber) error {
+	if *n == 0 {
+		*n = alias
+	} else if alias != 0 && *n != alias {
+		return errors.New("conflicting lifecycle session identity values")
+	}
+	return nil
+}
 
 func nameForLifecycleInvocation(dir, root string) string {
 	if dir == root {
@@ -107,28 +130,26 @@ func readSessionLifecycleItems(ctx context.Context, run WorkflowRun) (items []Cr
 				incomplete = incomplete || strings.HasPrefix(filepath.Base(warning.Path), "safe-output")
 			} else if event.Type == "workflow.info" && event.Provenance.Component == "workflow" {
 				var identity struct {
-					RunID      any    `json:"run_id"`
-					RunIDCamel any    `json:"runId"`
-					RunAttempt int    `json:"runAttempt"`
-					Attempt    int    `json:"run_attempt"`
-					Repository string `json:"repository"`
-					ServerURL  string `json:"serverUrl"`
+					RunID      lifecycleSessionNumber `json:"run_id"`
+					RunIDCamel lifecycleSessionNumber `json:"runId"`
+					RunAttempt lifecycleSessionNumber `json:"runAttempt"`
+					Attempt    lifecycleSessionNumber `json:"run_attempt"`
+					Repository string                 `json:"repository"`
+					ServerURL  string                 `json:"serverUrl"`
 				}
 				if err := json.Unmarshal(event.Data, &identity); err != nil {
-					return nil, false, err
+					return nil, false, fmt.Errorf("invalid lifecycle session identity on line %d: %w", line, err)
 				}
-				id := identity.RunID
-				if id == nil {
-					id = identity.RunIDCamel
+				if err := identity.RunID.merge(identity.RunIDCamel); err != nil {
+					return nil, false, fmt.Errorf("run ID: %w", err)
 				}
-				if fmt.Sprint(id) != strconv.FormatInt(run.DatabaseID, 10) {
+				if identity.RunID == 0 || int64(identity.RunID) != run.DatabaseID {
 					return nil, false, errors.New("lifecycle session run identity does not match selected run")
 				}
-				attempt := identity.RunAttempt
-				if attempt == 0 {
-					attempt = identity.Attempt
+				if err := identity.RunAttempt.merge(identity.Attempt); err != nil {
+					return nil, false, fmt.Errorf("run attempt: %w", err)
 				}
-				if run.Attempt > 0 && attempt != run.Attempt {
+				if run.Attempt > 0 && int64(identity.RunAttempt) != int64(run.Attempt) {
 					return nil, false, errors.New("lifecycle session attempt does not match selected run")
 				}
 				repository, _ := repoutil.NormalizeRepoForAPI(logsOutcomeRepository(run))
