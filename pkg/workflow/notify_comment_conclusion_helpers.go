@@ -778,11 +778,6 @@ func buildConclusionJobOutputs(data *WorkflowData) map[string]string {
 	// Add noop/missing_tool/report_incomplete outputs only for non-participants,
 	// since work-queue participants skip those reporting steps.
 	outputs := map[string]string{}
-	if data.AdmissionEnabled {
-		outputs["admission_compact_session"] = "${{ steps.admission-conclusion-metadata.outputs.compact_session }}"
-		outputs["usage_artifact_id"] = "${{ steps.upload-usage-artifact.outputs.artifact-id }}"
-		outputs["usage_artifact_retry_id"] = "${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}"
-	}
 	if isWorkQueueParticipant(data) {
 		return outputs
 	}

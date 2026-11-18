@@ -46,7 +46,6 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 		ctx.steps = append(ctx.steps, buildPolicyStrictEnforcementStep()...)
 	}
 
-	addActivationAdmissionOutputs(ctx)
 	if err := c.addActivationFeedbackAndValidationSteps(ctx); err != nil {
 		return nil, fmt.Errorf("failed to add activation feedback and validation steps: %w", err)
 	}
@@ -82,9 +81,6 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	env := buildDailyAICActivationJobEnv(data)
 	if env == nil {
 		env = map[string]string{}
-	}
-	if data.AdmissionEnabled {
-		env["GH_AW_ADMISSION_RESULT"] = "${{ needs.admission.outputs.result }}"
 	}
 	return &Job{
 		Name:                       string(constants.ActivationJobName),

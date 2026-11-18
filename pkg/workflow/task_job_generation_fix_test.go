@@ -177,10 +177,6 @@ Do conditional work.`
 		if !strings.Contains(activationCondition, "github.ref == 'refs/heads/main'") {
 			t.Error("Expected activation job to have the if condition")
 		}
-		if !strings.Contains(activationCondition, admissionJobResultCondition) {
-			t.Error("Expected activation job to preserve the admission result condition")
-		}
-
 		// Verify main job depends on activation
 		if !strings.Contains(lockContentStr, "needs: activation") {
 			t.Error("Main job should depend on activation job when activation job is generated")
