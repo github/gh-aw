@@ -75,8 +75,14 @@ the band above or below. Some Human agent processes patterns head a column of
 worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to
-the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
-and M to toggle sound. The slide map button (or G) opens a full-screen grid of
+the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, the notes toolbar button (or N) toggles speaker notes,
+and M to toggle sound. Notes explain what the slide shows, why the feature exists,
+and when to use it for technical audiences new to AW. They stay open as you navigate;
+Escape hides them, and long notes scroll without advancing the slide.
+The [speaker-notes skill](../.github/skills/cracktro-speaker-notes/SKILL.md)
+sets the research-informed authoring tone. Notes are public and appear on the
+same screen as the slides, not in a private presenter view.
+The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,
 Ctrl/Cmd+K) opens a full-screen dialog that fuzzy-matches slide titles, the

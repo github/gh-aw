@@ -82,8 +82,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -109,7 +109,7 @@
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
   /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: calc(144px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+  .vnb { position: fixed; right: calc(184px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
   .vnb.on { display: flex; }
   .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -166,25 +166,33 @@
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
      Only opacity changes, so the first tap still lands; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
-  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { opacity: .4; }
-  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .tourp) { transition: none; } }
+  .snd, .fzb, .smb, .ntb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
+  .ntb { right: calc(144px + var(--sr)); }
+  .ntb[aria-pressed="true"] { color: #f0f6fc; border-color: currentColor; box-shadow: inset 0 -3px currentColor; }
+  body.light .ntb[aria-pressed="true"] { color: #1f2328; }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
   .snd.off .x { opacity: 1; }
   .snd.flash { color: #f0f6fc; border-color: #f0f6fc; }
   .notes { position: fixed; left: 24px; right: 24px; bottom: calc(50px + var(--sb)); max-width: 900px; margin: 0 auto; padding: 18px 22px;
-    background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
+    background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none;
+    white-space: pre-line; overflow-wrap: anywhere; max-height: calc(100dvh - 140px); overflow-y: auto; overscroll-behavior: contain; }
   .notes.on { display: block; }
   body:not(.compact-nav) .notes { left: 330px; }
+  @media (max-width: 640px) {
+    .snd, .fzb, .smb, .ntb, .vnb { bottom: calc(52px + var(--sb)); }
+    .notes { bottom: calc(94px + var(--sb)); }
+  }
 
   /* --- slide search (full-screen dialog) --- */
   .fz { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
@@ -416,7 +424,7 @@
         r.header = {
           group: r.group,
           header: true,
-          notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${tops.map(s => label(s) + (s.kids ? ` (with ${s.kids.length} example${s.kids.length > 1 ? "s" : ""} below)` : "")).join(", ")}.`,
+          notes: `What: ${PROTO[r.group] ? `Research prototype: ${PROTO[r.group]}. ` : ""}The ${title} section map shows topic tiles; a down-arrow badge marks worked examples.\nWhy: ${sub}.\nWhen: Use this map to choose a topic, then open a tile or follow its examples.`,
           el: h(
             "section",
             { class: "slide bh", "--bh": c[0], "--bh2": c[2] },
@@ -598,7 +606,27 @@
     });
     smBtn.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="5" height="4" rx="1"/><rect x="10" y="4" width="5" height="4" rx="1"/><rect x="16.5" y="4" width="4" height="4" rx="1"/><rect x="3.5" y="10" width="5" height="4" rx="1"/><rect x="10" y="10" width="5" height="4" rx="1"/><rect x="3.5" y="16" width="5" height="4" rx="1"/><rect x="10" y="16" width="5" height="4" rx="1"/><rect x="16.5" y="16" width="4" height="4" rx="1"/></svg>';
-    const notes = h("div", { class: "notes" });
+    const notes = h("aside", { class: "notes", id: "speaker-notes", "aria-label": "Speaker notes", "aria-live": "polite", tabindex: "0" });
+    const notesBtn = h("button", {
+      class: "ntb",
+      type: "button",
+      "aria-label": "Toggle speaker notes (N)",
+      "aria-keyshortcuts": "N",
+      "aria-controls": "speaker-notes",
+      "aria-pressed": "false",
+      title: "Speaker notes on/off (N)",
+      onclick: e => {
+        e.stopPropagation();
+        toggleNotes();
+      },
+    });
+    notesBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>';
+    function toggleNotes() {
+      const visible = notes.classList.toggle("on");
+      notesBtn.setAttribute("aria-pressed", String(visible));
+      if (!visible && notes.contains(document.activeElement)) notesBtn.focus();
+    }
+    for (const t of ["touchstart", "touchend"]) notes.addEventListener(t, e => e.stopPropagation(), { passive: true });
     // tour pill (top right, only during a tour): the tour title and position open the map; × shows every slide again
     const tourT = h("span", { class: "tourp-t" }),
       tourN = h("span", { class: "tourp-n" });
@@ -641,15 +669,15 @@
     for (const t of ["touchstart", "touchend"]) tourP.addEventListener(t, e => e.stopPropagation(), { passive: true });
     const wash = h("div", { class: "wash" });
     const gridc = h("canvas", { class: "gridc" });
-    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     snd.classList.toggle("off", sfx.muted);
 
-    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; map/search/sound need ~150px on the right.
+    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~190px on the right.
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
       stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 150);
+      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 190);
     };
     addEventListener("resize", fit);
     fit();
@@ -727,7 +755,10 @@
     let view = null;
     const vis = i => !view || view.set.has(i);
     const firstVis = () => slides.findIndex((s, i) => vis(i));
-    const lastVis = () => { for (let i = slides.length - 1; i >= 0; i--) if (vis(i)) return i; return -1; };
+    const lastVis = () => {
+      for (let i = slides.length - 1; i >= 0; i--) if (vis(i)) return i;
+      return -1;
+    };
     const hashFor = n => `#${slides[n].id}${view ? "&" + view.key : ""}`;
 
     // ---------- navigation ----------
@@ -818,6 +849,7 @@
       bandNextBtn.disabled = bandTo(slides[n].band, 1) == null;
       paintColumn(n);
       notes.textContent = slides[n].notes || "";
+      notes.scrollTop = 0;
       if (view) tourN.textContent = `${at + 1}/${len}`;
       history.replaceState(null, "", hashFor(n));
     }
@@ -898,6 +930,7 @@
       /** @type {any} */
       const target = e.target;
       if (fz.open || smp.open) return; // the search and map dialogs handle their own keys
+      if (target.closest?.(".notes") && !["n", "N", "Escape"].includes(e.key)) return;
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         openSearch();
@@ -947,7 +980,8 @@
       } else if (e.key === "Home") go(firstVis());
       else if (e.key === "End") go(lastVis());
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
-      else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
+      else if (e.key === "n" || e.key === "N") toggleNotes();
+      else if (e.key === "Escape" && notes.classList.contains("on")) toggleNotes();
       else if (e.key === "m" || e.key === "M") toggleSound();
       else if (e.key === "g" || e.key === "G") openMap();
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
@@ -955,7 +989,7 @@
     addEventListener("click", e => {
       /** @type {any} */
       const target = e.target;
-      if (fz.open || smp.open || target.closest(".fz, .smp, a, button")) return;
+      if (fz.open || smp.open || target.closest(".fz, .smp, .notes, a, button")) return;
       const tile = target.closest("[data-go]");
       if (tile) return go(+tile.dataset.go);
       e.clientX < innerWidth / 3 ? prev() : next();
@@ -1172,7 +1206,13 @@
     const fz = h(
       "dialog",
       { class: "fz", "aria-label": "Search slides" },
-      h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", "aria-keyshortcuts": "Escape", title: "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
+      h(
+        "div",
+        { class: "fz-box" },
+        h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", "aria-keyshortcuts": "Escape", title: "Close search (Esc)", onclick: () => fz.close() }, "Esc")),
+        fzSt,
+        fzList
+      )
     );
     document.body.append(fz);
     const fzPaint = () => {
@@ -1281,7 +1321,12 @@
       "div",
       { class: "smp-d", role: "group", "aria-label": "Design a view" },
       smpCount,
-      dbtn("Select all", "A", "A", () => smpPick(slides.map((s, i) => i), true)),
+      dbtn("Select all", "A", "A", () =>
+        smpPick(
+          slides.map((s, i) => i),
+          true
+        )
+      ),
       dbtn("Clear", "C", "C", () => smpPick([...smpSel], false)),
       smpTitle,
       smpLink,

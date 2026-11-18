@@ -39,6 +39,7 @@ test("presents the slides listed in slides.md in bands without the removed secti
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
     await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(index + 1));
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(heading);
+    await expect(page.locator(".notes")).toHaveText(/^What: .+\nWhy: .+\nWhen: .+$/);
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
   expect(errors).toEqual([]);
@@ -72,6 +73,71 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(TOTAL));
+});
+
+test("toggles speaker notes from the toolbar and keyboard without advancing slides", async ({ page }) => {
+  await page.goto(`/gh-aw/cracktro/#${slideId("Safe outputs")}`);
+  const toggle = page.getByRole("button", { name: "Toggle speaker notes (N)", exact: true });
+  const notes = page.getByRole("complementary", { name: "Speaker notes" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toHaveAttribute("aria-keyshortcuts", "N");
+  await expect(toggle).toHaveAttribute("aria-controls", "speaker-notes");
+  await expect(notes).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(notes).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`#${slideId("Safe outputs")}$`));
+  const firstNotes = await notes.textContent();
+  await notes.click();
+  await page.keyboard.press("ArrowDown");
+  await expect(page).toHaveURL(new RegExp(`#${slideId("Safe outputs")}$`));
+  await page.keyboard.press("Escape");
+  await expect(notes).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toBeFocused();
+  await page.keyboard.press("N");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(notes).toBeVisible();
+  await expect(notes).not.toHaveText(firstNotes!);
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(notes).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("Enter");
+  await expect(notes).toBeVisible();
+});
+
+test("keeps speaker notes and compact toolbar controls usable on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto(`/gh-aw/cracktro/#${slideId("Daily Improvers")}`);
+  const toggle = page.getByRole("button", { name: "Toggle speaker notes (N)", exact: true });
+  await toggle.click();
+  const notes = page.getByRole("complementary", { name: "Speaker notes" });
+  await expect(notes).toBeVisible();
+  const boxes = await page.locator(".arrows button, .ntb, .smb, .fzb, .snd, .vnb.on").evaluateAll(els =>
+    els.map(el => {
+      const { x, y, width, height } = el.getBoundingClientRect();
+      return { x, y, width, height };
+    })
+  );
+  for (const [i, a] of boxes.entries()) {
+    expect(a.x).toBeGreaterThanOrEqual(0);
+    expect(a.x + a.width).toBeLessThanOrEqual(320);
+    for (const b of boxes.slice(i + 1)) expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
+  }
+  const panel = (await notes.boundingBox())!;
+  expect(panel.y).toBeGreaterThanOrEqual(0);
+  expect(panel.x + panel.width).toBeLessThanOrEqual(320);
+  expect(panel.y + panel.height).toBeLessThanOrEqual(Math.min(...boxes.map(b => b.y)));
+  // Long evidence notes remain scrollable without turning a scroll gesture into navigation.
+  await notes.evaluate(el => {
+    el.textContent = "Speaker cue\n".repeat(100);
+  });
+  await notes.focus();
+  await page.keyboard.press("End");
+  await expect.poll(() => notes.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await expect(page).toHaveURL(new RegExp(`#${slideId("Daily Improvers")}$`));
 });
 
 test("fuzzy-searches slide titles, keywords, summaries and text from the dock's search dialog", async ({ page }) => {
