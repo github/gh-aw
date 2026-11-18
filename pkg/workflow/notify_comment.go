@@ -140,10 +140,13 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	// Admission still runs in dry-run mode; record its decision without applying
 	// its budget to agent, detection, or evals execution.
 	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
-	if data.AdmissionEnabled {
-		steps = append(steps, c.buildConclusionAdmissionMetadataStep(data)...)
-	}
 	steps = append(steps, buildUsageArtifactUploadStep(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
+	if data.AdmissionEnabled {
+		if err := validateAdmissionWorkflowHashes(data); err != nil {
+			return nil, err
+		}
+		steps = append(steps, c.buildConclusionAdmissionStep(data)...)
+	}
 	if c.actionMode.IsScript() {
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
@@ -164,7 +167,7 @@ func configuredUsageSafeJobNames(data *WorkflowData) []string {
 }
 
 // computeConclusionJobPermissions resolves the GITHUB_TOKEN permissions for the conclusion
-// job: safe-outputs permissions plus the scopes required by configured OTLP OIDC,
+// job: safe-outputs permissions plus its stable OIDC capability,
 // session job-duration collection, and any issue-creating conclusion mechanism.
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
@@ -188,15 +191,11 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		if conclusionDetectionMayCreateIssue(data) {
 			conclusionPerms.Set(PermissionIssues, PermissionWrite)
 		}
-		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
-			conclusionPerms.Set(PermissionIdToken, PermissionWrite)
-		}
+		conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 		addReactionCleanupJobPermissions(data, conclusionPerms)
 		return conclusionPerms
 	}
-	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
-		conclusionPerms.Set(PermissionIdToken, PermissionWrite)
-	}
+	conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 	if isWorkQueueEnabled(data) {
 		if level, ok := conclusionPerms.Get(PermissionContents); !ok || level == PermissionNone {
 			conclusionPerms.Set(PermissionContents, PermissionRead)

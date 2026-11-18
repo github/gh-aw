@@ -75,7 +75,9 @@ func (c *Compiler) newActivationJobBuildContext(
 	if err := cacheActivationPreStepPermissions(ctx); err != nil {
 		return nil, err
 	}
-	c.addActivationSetupAndWorkflowCallSteps(ctx, setupActionRef)
+	if err := c.addActivationSetupAndWorkflowCallSteps(ctx, setupActionRef); err != nil {
+		return nil, err
+	}
 	webhookSteps, err := buildWebhookValidationStep(data)
 	if err != nil {
 		return nil, err
@@ -138,16 +140,9 @@ func cacheActivationPreStepPermissions(ctx *activationJobBuildContext) error {
 	return nil
 }
 
-func (c *Compiler) addActivationSetupAndWorkflowCallSteps(ctx *activationJobBuildContext, setupActionRef string) {
+func (c *Compiler) addActivationSetupAndWorkflowCallSteps(ctx *activationJobBuildContext, setupActionRef string) error {
 	ctx.steps = append(ctx.steps, c.generateCheckoutActionsFolder(ctx.data)...)
 	activationSetupTraceID, activationSetupParentSpanID := buildActivationSetupParentSpans(ctx.preActivationJob)
-	if ctx.data.AdmissionEnabled {
-		if activationSetupTraceID == "" {
-			activationSetupTraceID = "${{ needs.admission.outputs.trace-id }}"
-		} else {
-			activationSetupTraceID = "${{ needs.admission.outputs.trace-id || " + stripExpressionWrapper(activationSetupTraceID) + " }}"
-		}
-	}
 	enableArtifactClient := hasMaxDailyAICGuardrail(ctx.data)
 	artifactClientCondition := ""
 	if enableArtifactClient {
@@ -166,7 +161,11 @@ func (c *Compiler) addActivationSetupAndWorkflowCallSteps(ctx *activationJobBuil
 	ctx.outputs["setup-trace-id"] = "${{ steps.setup.outputs.trace-id }}"
 	ctx.outputs["setup-span-id"] = "${{ steps.setup.outputs.span-id }}"
 	ctx.outputs["setup-parent-span-id"] = "${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}"
+	if err := c.addActivationAdmissionStep(ctx); err != nil {
+		return err
+	}
 	c.addActivationWorkflowCallResolutionSteps(ctx)
+	return nil
 }
 
 func buildActivationSetupParentSpans(preActivationJobCreated bool) (traceID string, parentSpanID string) {

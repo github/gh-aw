@@ -484,7 +484,7 @@ func TestInsertPreStepsAfterSetupBeforeCheckout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := insertPreStepsAtEarliestBoundary(tt.steps, tt.preSteps)
+			got := insertPreStepsAtEarliestBoundary(tt.steps, tt.preSteps, false)
 			if !slices.Equal(got, tt.want) {
 				t.Fatalf("insertPreStepsAtEarliestBoundary() mismatch\nwant:\n%q\ngot:\n%q", tt.want, got)
 			}

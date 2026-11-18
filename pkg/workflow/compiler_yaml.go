@@ -153,7 +153,6 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 	if err := c.guardCustomJobDetection(data); err != nil {
 		return err
 	}
-	c.ensureAdmissionSkipSafeConditions()
 
 	if err := c.guardGatewayProvenanceJobs(data); err != nil {
 		return err

@@ -15,7 +15,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
 
 ## 1. Slide
 
-- Marker: `// Deliver · Accept · Attribute:`. CSS prefix `daa-` plus the shared `vg-` parts. Group `platform`, `under: "value"`: the first example in the column under Turn Automation into Value.
+- Marker: `// Deliver · Accept · Attribute:`. CSS prefix `daa-` plus the shared `vg-` parts. Group `engineering`, `under: "value"`: the first example in the column under Turn Intent into Value.
 - Data lives in `CASE` only: `title`, `labels`, `diff` (`[additions, deletions, files]`), `delivered` and `accepted` (UTC minutes), `parent` (`[covered, total]` at the exact first parent), `samples` (7 before, then day 0 = the merge commit to day 6), `survival` (`[first-parent commits, files in the merge, commits touching them]`) and `through` (window end). The timeline text, the squares, the excerpt pill and `+N` are computed.
 - Also: the `.vg-cap` caption and the `notes:` string (every number and date) and the `content-rules.md` Exception bullet "the Deliver · Accept · Attribute slide (`daa-` classes)".
 

@@ -49,7 +49,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Issue relationships | [`IssueRelationshipAuthorization.tla`](IssueRelationshipAuthorization.tla) | Resolved repository authorization before reads, writes, or per-item mention lookups; fixed/triggering parents, staged isolation, and deferred revalidation. |
 | Bundle Git operations | [`SafeOutputGit.tla`](SafeOutputGit.tla) | Explicit prerequisite recovery, offline optional discovery, bounded comparison/history work, credential roles, and separate size/protection provenance. |
 | Host-side MCP compilation | [`MCPCompile.tla`](MCPCompile.tla) | Startup write capability, actor authorization, early option rejection, filesystem isolation, cached-only imports, repository-root cache selection, validation, and write-enabled emission. |
-| Cooperative activation admission | [`ActivationAdmission.tla`](ActivationAdmission.tla) | Optional endpoint, isolated admission/conclusion OIDC capabilities, verified identity, retry/outage classification, independently resolved runtime allowances, privacy, and caller-owned trace correlation. |
+| Cooperative activation admission | [`ActivationAdmission.tla`](ActivationAdmission.tla) | Optional endpoint, activation/conclusion OIDC capabilities, verified identity, retry/outage classification, independently resolved runtime allowances, privacy, and caller-owned trace correlation. |
 | Admission conclusion delivery | [`AdmissionConclusion.tla`](AdmissionConclusion.tla) | Artifact-first compact delivery, hard payload bounds, upload-bound artifact references, full-artifact preservation, fresh OIDC, stable retries, outcome-preserving warnings, and durable deduplicated acceptance. |
 
 The `issue` effect creates at most one validated issue in the main public
@@ -155,8 +155,14 @@ represented by a skipped state-machine slot, not a real runtime job.
 [`ActivationAdmission.tla`](ActivationAdmission.tla) formalizes the
 [admission service contract](../../docs/src/content/docs/specs/admission-service-specification.md),
 including the implemented client's daily-validation precedence, optional
-component allowances, and admission/conclusion OIDC capability isolated from activation. It is a bounded reference model, not a proof of the runtime
-or deployment-owned authority. Admission runs in an endpoint-gated job.
+component allowances, and admission OIDC capability confined to activation and conclusion jobs. It is a bounded reference model, not a proof of the runtime
+or deployment-owned authority. Admission runs in an endpoint-gated step inside
+activation, after trusted setup and before author pre-steps and daily validation.
+An empty endpoint skips the step, not the runner or job bootstrap. When admission is compiled in,
+activation and conclusion jobs retain job-wide `id-token: write` even when their
+authority-request steps are skipped; activation hooks and conclusion actions
+share that capability. The endpoint gate prevents those steps from acquiring
+admission credentials, not other steps in the same job from minting OIDC tokens.
 Activation requires successful or intentionally skipped admission; a successful
 activation is required before agent execution. Independent OIDC features are
 outside this admission-only permission model.
@@ -177,7 +183,7 @@ Request identity and credentials are not handed off; component accounting is unc
 
 | Contract | Checked invariants |
 |---|---|
-| Optional configuration, isolated OIDC capability and activation dependency | `NoEndpointNoRequest`, `InvalidConfigurationBlocks`, `AdmissionJobIsolation`, `AdmissionDependency`, `ActivationGate` |
+| Optional configuration, activation/callback OIDC capability and admission step gate | `NoEndpointNoRequest`, `InvalidConfigurationBlocks`, `AdmissionOIDCScope`, `AdmissionStepGate`, `ActivationGate` |
 | OIDC-only authentication, verified claim/workflow mapping, independently checked rerun initiator, original actor privileges | `OIDCOnly`, `IdentityVerified`, `TriggeringActorVerified`, `OriginalActorPrivileges`, `InvocationBound` |
 | Lost responses, replica changes, token-renewal abstraction, bounded retries, denial/protocol errors, explicit outage policy | `StableRetryDecision`, `RetryBound`, `DenialBlocks`, `MalformedBlocks`, `FatalErrorsBlock`, `OutagePolicyHonored` |
 | Terminal deadline expiry, approved admission bypassing daily validation, daily fallback required for skip/ignored outage | `DeadlineHonored`, `DailyAdmissionPrecedence`, `DailyFallbackEnforced` |
@@ -200,12 +206,12 @@ lost-response recovery through another replica; a verified rerun initiator;
 admission with request trace context but no client export; existing and generated
 caller traces; all four optional-allowance combinations; terminal denial;
 admission despite a blocking daily result; daily blocks after skipped
-admission and ignored outages; early timeout fallback; and an admission job
-failing after approval still preventing activation.
+admission and ignored outages; early timeout fallback; and an admission step
+failing after approval still preventing activation from completing successfully.
 In particular, skipped and fail-open starts deliberately demonstrate
 why this is **cooperative admission, not unbypassable organization policy or a
 hard spending cap**. The model consumes already-resolved runtime settings;
-repository-variable shadowing and an editor removing the job remain outside
+repository-variable shadowing and an editor removing the step remain outside
 the participating-workflow machine.
 
 Use the same checksum-pinned TLA+ Tools v1.7.4 described below:
@@ -258,8 +264,8 @@ this model.
 [`AdmissionConclusion.cfg`](AdmissionConclusion.cfg) model completion independently
 of start-time admission, avoiding a product of unrelated protocol states.
 The eligible conclusion job consumes a symbolic completed agent outcome and a
-valid or invalid redacted unified-session file; an isolated callback job handles
-authority delivery after it finishes. A skipped conclusion job makes no upload
+valid or invalid redacted unified-session file; its final callback step handles
+authority delivery after artifact publication attempts finish. A skipped conclusion job makes no upload
 or authority request.
 
 For an eligible job, generation precedes the first artifact upload. A failed
@@ -274,7 +280,7 @@ to change the captured outcome.
 | Contract | Checked invariants |
 |---|---|
 | Artifact-first order, existing job eligibility, absent endpoint and invalid session/configuration | `ArtifactBeforeConclusion`, `JobEligibility`, `NoEndpointNoRequest`, `InvalidInputNoRequest` |
-| Fresh isolated callback-job OIDC, independently verified identity, compact metadata, hard request bounds and unchanged retries | `ConclusionOIDCOnly`, `InvocationVerified`, `CompactProjection`, `BoundedPayload`, `StablePayload` |
+| Fresh conclusion-job OIDC, independently verified identity, compact metadata, hard request bounds and unchanged retries | `ConclusionOIDCOnly`, `InvocationVerified`, `CompactProjection`, `BoundedPayload`, `StablePayload` |
 | Upload-bound artifact locators and unchanged full session evidence | `ArtifactReferences`, `FullArtifactPreserved` |
 | Three-attempt maximum, terminal deadline, preserved workflow outcome and caller trace | `RetryBound`, `DeadlineHonored`, `BestEffort`, `TraceCorrelation` |
 | Durable acceptance before acknowledgement, deduplicated processing, immutable accepted payload and no billing mutation | `DurableAcceptance`, `SingleProcessing`, `AcceptedSessionImmutable`, `NoFinancialEffects` |

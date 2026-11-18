@@ -15,7 +15,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
 
 ## 1. Slide
 
-- Marker: `// From Delivery to Value:`. CSS prefix `dtv-`. Group `platform`, `under: "value"`: the full record, after Deliver · Accept · Attribute in the column under Turn Automation into Value.
+- Marker: `// From Delivery to Value:`. CSS prefix `dtv-`. Group `engineering`, `under: "value"`: the full record, after Deliver · Accept · Attribute in the column under Turn Intent into Value.
 - Data lives inside that block only:
   1. `COVER` (`[covered, total]` every Sunday 12:00 UTC from 22 Mar 2026) and `LAST` (final cutoff date).
   2. `OUT` (`[delivered, merged or null]`, UTC minutes) and `WIN` (inspected windows: `[label, merged PRs, first merge, last merge, gaps closed, fields retired, before, after-window end, 7 + 7 samples]`).

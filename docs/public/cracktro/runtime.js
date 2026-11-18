@@ -27,6 +27,7 @@
 
   // Fallbacks for decks that omit a theme, band label or sound service.
   const DEFAULT_THEME = { base: [13, 17, 23], pal: ["#0d419d", "#5a32a3", "#196c2e", "#0a8a2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#79c0ff", "#4493f8", "#cae8ff", "#0d419d"], prog: [0] };
+  /** @type {CracktroDeck.Sound} */
   const SILENT = { cut() {}, techno() {}, slide() {}, touch() {}, step() {}, toggle: () => true, muted: true };
 
   // ---------- runtime styles ----------
@@ -43,6 +44,8 @@
      crossing groups: vertical push, up going forward and down going back (same duration and easing) */
   .slide.active { visibility: visible; pointer-events: auto; animation: slide-in .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.leaving { visibility: visible; animation: slide-out .8s cubic-bezier(.26,.86,.44,.985) both; }
+  /* hidden slides stay in the DOM: pause their (often infinite) animations so off-screen loops cost no frames until shown */
+  .slide:not(.active):not(.leaving) *, .slide:not(.active):not(.leaving) *::before, .slide:not(.active):not(.leaving) *::after { animation-play-state: paused !important; }
   @keyframes slide-in { from { transform: translateX(var(--dx, 100%)); } to { transform: none; } }
   @keyframes slide-out { to { transform: translateX(calc(-1 * var(--dx, 100%))); } }
   .slide.active.up-in { animation: up-in .8s cubic-bezier(.26,.86,.44,.985) both; }
@@ -1729,6 +1732,10 @@
     rmq.addEventListener?.("change", e => {
       REDUCED = e.matches;
     });
+    // The base fill and soft glows are drawn at a quarter of the CSS size and scaled up by the browser (no visible
+    // difference, a fraction of the fill cost); the sharp grid repaints only when its size, angle or colour changes.
+    const BG_SCALE = 0.25;
+    let gridKey = "";
 
     function frame(t) {
       const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -1736,11 +1743,13 @@
         ch = innerHeight;
       const bw = Math.round(cw * dpr),
         bh = Math.round(ch * dpr);
-      if (canvas.width !== bw || canvas.height !== bh) {
-        canvas.width = bw;
-        canvas.height = bh;
+      const sw = Math.max(1, Math.round(cw * BG_SCALE)),
+        sh = Math.max(1, Math.round(ch * BG_SCALE));
+      if (canvas.width !== sw || canvas.height !== sh) {
+        canvas.width = sw;
+        canvas.height = sh;
       }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(sw / cw, 0, 0, sh / ch, 0, 0);
 
       const cs = slides[bgN ?? cur] || slides[0],
         th = THEME[cs.group],
@@ -1768,34 +1777,39 @@
       });
 
       // Blueprint grid: `cell` px minor lines, a major line every 5, anchored centre-top, turned (around the screen centre) to the band's `ang`.
-      if (gridc.width !== bw || gridc.height !== bh) {
-        gridc.width = bw;
-        gridc.height = bh;
-      }
-      const g = gridc.getContext("2d");
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.clearRect(0, 0, cw, ch);
       const gTarget = th.ang;
       gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
       if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
       const k = Math.min(cw / W, ch / H),
         minor = bgv[8] * k,
         D = Math.hypot(cw, ch) / 2 + minor;
-      g.translate(cw / 2, ch / 2);
-      g.rotate(gAng);
       const gc = `${bgv[3] | 0},${bgv[4] | 0},${bgv[5] | 0}`,
         lmin = `rgba(${gc},${bgv[6]})`,
         lmaj = `rgba(${gc},${bgv[7]})`;
-      const line = i => (((i % 5) + 5) % 5 ? lmin : lmaj);
-      const snap = gAng ? v => v : v => Math.round(v);
-      for (let i = -Math.ceil(D / minor); i * minor <= D; i++) {
-        g.fillStyle = line(i);
-        g.fillRect(snap(i * minor), -D, 1, 2 * D);
-      }
-      const oy = -ch / 2; // horizontal lines stay anchored to the top edge, as before
-      for (let j = Math.floor((-D - oy) / minor); j * minor + oy <= D; j++) {
-        g.fillStyle = line(j);
-        g.fillRect(-D, snap(j * minor + oy), 2 * D, 1);
+      // eased values settle asymptotically, so the key rounds them: the grid stops repainting once a band change settles
+      const key = [bw, bh, gAng, gc, bgv[6].toFixed(4), bgv[7].toFixed(4), minor.toFixed(2)].join();
+      if (key !== gridKey) {
+        gridKey = key;
+        if (gridc.width !== bw || gridc.height !== bh) {
+          gridc.width = bw;
+          gridc.height = bh;
+        }
+        const g = gridc.getContext("2d");
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, cw, ch);
+        g.translate(cw / 2, ch / 2);
+        g.rotate(gAng);
+        const line = i => (((i % 5) + 5) % 5 ? lmin : lmaj);
+        const snap = gAng ? v => v : v => Math.round(v);
+        for (let i = -Math.ceil(D / minor); i * minor <= D; i++) {
+          g.fillStyle = line(i);
+          g.fillRect(snap(i * minor), -D, 1, 2 * D);
+        }
+        const oy = -ch / 2; // horizontal lines stay anchored to the top edge, as before
+        for (let j = Math.floor((-D - oy) / minor); j * minor + oy <= D; j++) {
+          g.fillStyle = line(j);
+          g.fillRect(-D, snap(j * minor + oy), 2 * D, 1);
+        }
       }
 
       slides[cur]?.tick?.(t);
