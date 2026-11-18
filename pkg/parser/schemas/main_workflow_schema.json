@@ -14576,6 +14576,18 @@
       "description": "Default LLM model, overridden by nested engine.model. Sets the default model used by the agentic engine for this workflow. Acts as a fallback when an engine instance does not specify its own 'model'; a nested 'engine.model' (e.g. safe-outputs.threat-detection.engine.model) takes precedence over this field for that engine instance. Supports full model IDs (e.g. 'claude-3-5-sonnet-20241022', 'gpt-5.4') and model aliases (e.g. 'small', 'large'). Router values ('router', 'router/economy', 'router/balanced', 'router/robust') choose model routing for the main agent instead of a fixed model.",
       "examples": ["gpt-5.4", "claude-3-5-sonnet-20241022", "gpt-4"]
     },
+    "model-routing": {
+      "description": "Optional shortlist for an explicit router model value. Applies only to the main agent's router choices, not to other model requests. Declare this block once, in the main workflow or a shared import.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed-models"],
+      "properties": {
+        "allowed-models": {
+          "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing/oneOf/0/properties/allowed-models",
+          "description": "Specify at least one exact model name or gh-aw alias. The engine's capabilities and models.allowed/blocked still apply; the shortlist changes no request policy."
+        }
+      }
+    },
     "graders": {
       "description": "Graders over the unified session, including reserved operational-value JavaScript. Fast built-ins run in conclusion; executable custom graders run only in the separate graders job.",
       "type": "object",
