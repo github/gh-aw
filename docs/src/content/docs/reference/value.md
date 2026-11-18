@@ -109,11 +109,13 @@ Use the
 to derive, validate, and freeze a measurement and report recipe from workflow intent:
 
 ```text
-/operational-value-designer owner/repo WORKFLOW longitudinal
+/operational-value-designer owner/repo WORKFLOW
 ```
 
-The skill authors declarations and fixtures in the workflow owner's repository;
-it does not require that repository to contain gh-aw's source or Go tooling.
+Use the same invocation for every safe-output type. The skill inspects the workflow's
+goal and evidence and authors any needed definition in its owner's repository.
+Then run `gh aw value WORKFLOW`. The report distinguishes delivery, acceptance,
+recorded grades, and independently measured outcomes; missing evidence stays unavailable.
 The command does not invoke an
 agent or invent a metric. Measurement definitions select named Go evaluators.
 The report starts no JavaScript or query runtime. Run-scoped session graders

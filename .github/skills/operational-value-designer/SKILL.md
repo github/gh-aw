@@ -1,16 +1,16 @@
 ---
 name: operational-value-designer
-description: "Reuse recorded value grades or design workflow-specific measurements; keep session grading separate from longitudinal attribution. Usage: /operational-value-designer OWNER/REPO WORKFLOW [longitudinal|run-scoped]."
-argument-hint: "OWNER/REPO WORKFLOW [longitudinal|run-scoped]"
+description: "Set up a workflow's operational value report from its goal and available evidence. Usage: /operational-value-designer OWNER/REPO WORKFLOW."
+argument-hint: "OWNER/REPO WORKFLOW"
 metadata:
-  version: "5.1.0"
+  version: "5.2.0"
 ---
 
 # Operational Value Designer
 
-Reuse existing operational-value grades for per-run reporting before designing
-another measurement. Author a deterministic contract, fixtures, and report
-recipe only when the requested measurement needs them.
+Start from the workflow's goal and available evidence; do not ask for a mode.
+Reuse recorded grades as run results. Measure the independent outcome when supported;
+otherwise explain what evidence is missing. Return one `gh aw value WORKFLOW` report.
 Only the measurement varies by workflow; never redesign delivery or adoption.
 Work in the workflow owner's repository, not necessarily `github/gh-aw`.
 Definitions, recipes, and fixtures belong there; gh-aw is an installed tool.
