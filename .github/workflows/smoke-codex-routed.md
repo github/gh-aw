@@ -24,10 +24,9 @@ strict: true
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: robust
-    allowed-models: [gpt-5.6-luna, gpt-5.6-terra, gpt-5.6-sol]
+model: router/robust
+model-routing:
+  allowed-models: [gpt-5.6-luna, gpt-5.6-terra, gpt-5.6-sol]
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md
