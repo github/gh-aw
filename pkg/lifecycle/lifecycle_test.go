@@ -161,7 +161,7 @@ func TestLifecycleRejectsConflictingAndUnverifiedEvidence(t *testing.T) {
 	record := testDelivery(t, "create_issue")
 	at := record.Delivery.At.Add(time.Hour)
 	_, err := Observe(record, Observation{State: "accepted", Signal: "completed", At: at, ObservedAt: at})
-	assert.ErrorContains(t, err, "verified decision")
+	require.ErrorContains(t, err, "verified decision")
 	observation := Observation{State: "pending", Signal: "open", ObservedAt: at}
 	first, err := Observe(record, observation)
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestLifecycleRejectsConflictingAndUnverifiedEvidence(t *testing.T) {
 	second, err := Observe(record, observation)
 	require.NoError(t, err)
 	_, err = Merge(first, second)
-	assert.ErrorContains(t, err, "equal-clock")
+	require.ErrorContains(t, err, "equal-clock")
 	failed, err := Observe(first, Observation{ObservedAt: at.Add(time.Minute), Error: "not found or inaccessible"})
 	require.NoError(t, err)
 	assert.Equal(t, first.Adoption.State, failed.Adoption.State)
@@ -188,7 +188,7 @@ func TestLifecycleValidatesRetainedDecisionsAndAcceptanceKinds(t *testing.T) {
 	conflict := accepted
 	conflict.Adoption.Coverage = "unavailable"
 	_, err = Merge(accepted, conflict)
-	assert.ErrorContains(t, err, "equal-clock")
+	require.ErrorContains(t, err, "equal-clock")
 	conflict = accepted
 	conflict.Adoption.HumanVerified = false
 	_, err = Merge(Record{}, conflict)
