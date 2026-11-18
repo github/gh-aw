@@ -806,6 +806,32 @@ test("labels exactly the slides that show experimental features", async ({ page 
   }
 });
 
+test("marks every CAO slide as a research prototype", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/");
+  const slides = await page.evaluate(() =>
+    [...document.querySelectorAll("section.slide")].map(s => {
+      const own = s.cloneNode(true) as Element;
+      own.querySelectorAll(".bh-map").forEach(m => m.remove());
+      const badge = own.querySelector(":scope > .proto");
+      const text = (own.textContent || "").replace(/\s+/g, " ");
+      badge?.remove();
+      return {
+        heading: (s.querySelector("h2")?.textContent || "").replace(/\s+/g, " ").trim(),
+        badge: !!badge,
+        text,
+        cao: /\bCAO\b|gh cao|Central Agentic Ops/.test(own.textContent || ""),
+      };
+    })
+  );
+  expect(slides.filter(s => s.badge).map(s => s.heading)).toEqual(["Central Agentic Ops", "Hyperscale Agentics", "Centralized campaigns", "AW maintenance", "Session data lake", "Ops data for Agents"]);
+  const cao = slides.filter(s => s.badge || s.cao);
+  expect(cao.map(s => s.heading)).toEqual(expect.arrayContaining(["Turn Intent into Value", "Webhook gateway"]));
+  for (const { heading, text, badge } of cao) {
+    expect(text, heading).toMatch(/research prototype/i);
+    if (badge || heading === "Webhook gateway") expect(SLIDES[slideNo(heading) - 1].summary, heading).toMatch(/research prototype/i);
+  }
+});
+
 test("keeps the frame loop running through the routed steps of the enterprise diagrams", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
