@@ -318,7 +318,7 @@ function isWorkflowsScopeTimeoutError(error) {
 async function withRetry(operation, config = {}, operationName = "operation") {
   const fullConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
   validateRetryConfig(operation, fullConfig);
-  const logger = fullConfig.logger || core;
+  const getLogger = () => fullConfig.logger || core;
   const now = fullConfig.now || (() => performance.now());
   let lastError;
   let delay = fullConfig.initialDelayMs;
@@ -328,7 +328,7 @@ async function withRetry(operation, config = {}, operationName = "operation") {
       if (attempt > 0) {
         const jitter = fullConfig.jitterMs > 0 ? Math.floor(Math.random() * fullConfig.jitterMs) : 0;
         const delayWithJitter = Math.min(delay + jitter, fullConfig.maxDelayMs);
-        logger.info(`Retry attempt ${attempt}/${fullConfig.maxRetries} for ${operationName} after ${delayWithJitter}ms delay`);
+        getLogger().info(`Retry attempt ${attempt}/${fullConfig.maxRetries} for ${operationName} after ${delayWithJitter}ms delay`);
         logRetryEvent(lastError, operationName, attempt, delayWithJitter);
         await runWithinRetryBudget(
           signal => {
@@ -342,7 +342,7 @@ async function withRetry(operation, config = {}, operationName = "operation") {
       const result = await runWithinRetryBudget(operation, fullConfig);
 
       if (attempt > 0) {
-        logger.info(`✓ ${operationName} succeeded on retry attempt ${attempt}`);
+        getLogger().info(`✓ ${operationName} succeeded on retry attempt ${attempt}`);
       }
 
       return result;
@@ -352,7 +352,7 @@ async function withRetry(operation, config = {}, operationName = "operation") {
 
       // Check if this error should be retried
       if (error?.code === "ERR_TRANSPORT_INTEGRITY" || (fullConfig.deadline !== undefined && now() >= fullConfig.deadline) || !fullConfig.shouldRetry(error)) {
-        logger.debug(`${operationName} failed with non-retryable error: ${errorMsg}`);
+        getLogger().debug(`${operationName} failed with non-retryable error: ${errorMsg}`);
         throw enhanceError(error, {
           operation: operationName,
           attempt: attempt + 1,
@@ -363,7 +363,7 @@ async function withRetry(operation, config = {}, operationName = "operation") {
 
       // If this was the last attempt, throw the enhanced error
       if (attempt === fullConfig.maxRetries) {
-        logger.warning(`${operationName} failed after ${fullConfig.maxRetries} retry attempts: ${errorMsg}`);
+        getLogger().warning(`${operationName} failed after ${fullConfig.maxRetries} retry attempts: ${errorMsg}`);
         // E010 applies only when retry budget is at least 3 retries.
         const hasEnoughRetriesForE010 = fullConfig.maxRetries >= 3;
         if (hasEnoughRetriesForE010 && isRateLimitError(error)) {
@@ -386,7 +386,7 @@ async function withRetry(operation, config = {}, operationName = "operation") {
       }
 
       // Log the retry attempt
-      logger.warning(`${operationName} failed (attempt ${attempt + 1}/${fullConfig.maxRetries + 1}): ${errorMsg}`);
+      getLogger().warning(`${operationName} failed (attempt ${attempt + 1}/${fullConfig.maxRetries + 1}): ${errorMsg}`);
 
       // Calculate next delay: honour Retry-After header when present, otherwise
       // use exponential backoff.  Either way the result is capped at maxDelayMs.
@@ -394,9 +394,9 @@ async function withRetry(operation, config = {}, operationName = "operation") {
       if (retryAfterMs !== null) {
         const cappedDelay = Math.min(retryAfterMs, fullConfig.maxDelayMs);
         if (cappedDelay < retryAfterMs) {
-          logger.info(`Retry-After header detected for ${operationName}: server requested ${retryAfterMs}ms wait, capped to ${cappedDelay}ms (maxDelayMs)`);
+          getLogger().info(`Retry-After header detected for ${operationName}: server requested ${retryAfterMs}ms wait, capped to ${cappedDelay}ms (maxDelayMs)`);
         } else {
-          logger.info(`Retry-After header detected for ${operationName}: next retry will wait ${cappedDelay}ms`);
+          getLogger().info(`Retry-After header detected for ${operationName}: next retry will wait ${cappedDelay}ms`);
         }
         delay = cappedDelay;
       } else {

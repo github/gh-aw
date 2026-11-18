@@ -88,6 +88,18 @@ describe("error_recovery", () => {
   });
 
   describe("withRetry", () => {
+    it("succeeds on the first attempt without an ambient Actions core or injected logger", async () => {
+      const actionsCore = global.core;
+      delete global.core;
+      const operation = vi.fn().mockResolvedValue("success");
+      try {
+        await expect(withRetry(operation)).resolves.toBe("success");
+        expect(operation).toHaveBeenCalledOnce();
+      } finally {
+        global.core = actionsCore;
+      }
+    });
+
     it("uses an injected logger without an ambient Actions core", async () => {
       const logger = { info: vi.fn(), warning: vi.fn(), debug: vi.fn() };
       vi.stubGlobal("core", undefined);
