@@ -13,6 +13,20 @@ function currentSafeOutputInvocation() {
   return invocationContext.getStore();
 }
 
+/**
+ * Keep isolated MCP bundles free of runner credentials and authorization I/O.
+ * The trusted executor supplies the gate through its private invocation context.
+ * @param {{inputs: unknown, scope?: {binding: string, refs: string[]}, config?: any}} options
+ */
+async function authorizeSafeOutputInvocation(options) {
+  const state = currentSafeOutputInvocation();
+  if (!state?.requirement && !options.config?.authorization) return { state: "not_configured" };
+  if (!state?.requirement || !state.invocation || typeof state.authorize !== "function") {
+    throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
+  }
+  return state.authorize(options);
+}
+
 /** @returns {import("./types/handler-factory").SafeOutputAuthorizationEvidence | undefined} */
 function projectAuthorization(source) {
   if (!source || typeof source !== "object") return undefined;
@@ -181,4 +195,4 @@ function finalizeBufferedReviewExecutions(results, repo, prNumber, review) {
   }
 }
 
-module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputExecutions, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, projectAuthorization };
+module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputExecutions, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, authorizeSafeOutputInvocation, projectAuthorization };

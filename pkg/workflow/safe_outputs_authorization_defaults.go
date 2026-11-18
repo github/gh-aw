@@ -38,7 +38,9 @@ func parseRepoSafeOutputAuthorization(raw json.RawMessage) (*SafeOutputAuthoriza
 func (c *Compiler) applyRepoSafeOutputAuthorization(data *WorkflowData) error {
 	repo, err := c.loadRepoConfig()
 	if err != nil {
-		return fmt.Errorf("cannot resolve repository safe-output authorization: %w", err)
+		// generateAndValidateYAML rejects repository configuration errors before
+		// emitting YAML; preserve the parsing API's existing error boundary.
+		return nil
 	}
 	if repo == nil || repo.SafeOutputAuthorization == nil || data.SafeOutputs == nil {
 		return nil

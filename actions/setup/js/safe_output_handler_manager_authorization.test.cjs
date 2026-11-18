@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const protocol = require("./safe_output_authorization.cjs");
 const nativeModule = require("./create_issue.cjs");
 const { loadHandlers, processMessages } = require("./safe_output_handler_manager.cjs");
-const { currentSafeOutputInvocation, buildSafeOutputExecutions } = require("./safe_output_execution.cjs");
+const { currentSafeOutputInvocation, buildSafeOutputExecutions, authorizeSafeOutputInvocation } = require("./safe_output_execution.cjs");
 const root = path.resolve(`.manager-authorization-${process.pid}`);
 const scriptPath = path.join(root, "gh-aw/actions/protected.cjs");
 const requirement = { endpoint: "https://authority.example/authorize", audience: "safe-outputs", source: "local" };
@@ -352,6 +352,22 @@ describe("manager prepared authorization boundary", () => {
     expect(authorize).not.toHaveBeenCalled();
     expect(results[0]).toMatchObject({ success: true, authorization: { state: "allowed", decision_id: "late-native-decision" } });
     expect(protocol.recordAuthorizationOutcome).toHaveBeenCalledWith(expect.objectContaining({ authorization: expect.objectContaining({ decision_id: "late-native-decision" }), operationStatus: "success" }));
+  });
+
+  it("binds the isolated adapter hook to the trusted late gate before any live effect", async () => {
+    const upload = require("./upload_artifact.cjs");
+    const effect = vi.fn();
+    vi.spyOn(upload, "main").mockResolvedValue(async () => {
+      await authorizeSafeOutputInvocation({ inputs: { files: ["reviewed-file"] } });
+      effect();
+      return { success: true };
+    });
+    const authorize = vi.spyOn(require("./safe_output_authorization_gate.cjs"), "authorizeHandlerInvocation").mockRejectedValue(new protocol.SafeOutputAuthorizationError("denied", { state: "denied", reason_code: "denied" }));
+    const handlers = await loadHandlers({ upload_artifact: { authorization: requirement } });
+    const { results } = await processMessages(handlers, [{ type: "upload_artifact", file: "reviewed-file" }]);
+    expect(authorize).toHaveBeenCalledExactlyOnceWith({ inputs: { files: ["reviewed-file"] } });
+    expect(effect).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ success: false, authorization: { state: "denied", reason_code: "denied" } });
   });
 
   it("blocks buffered publication when the original permission is no longer fresh", async () => {

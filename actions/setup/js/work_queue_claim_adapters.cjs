@@ -23,6 +23,7 @@ const { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery 
 const { validateGitTreeAdapter, createGitTreeEffectHandler, verifyGitTreeDelivery } = require("./work_queue_git_tree_adapter.cjs");
 const { validateGraphqlAdapter, createGraphqlEffectHandler, verifyGraphqlAdapterDelivery } = require("./work_queue_graphql_adapter.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { authorizeSafeOutputInvocation } = require("./safe_output_execution.cjs");
 const { builtinAdapterFields, builtinTargetNumber, adapterVerifierId, adapterEffectFields, matchesDeclaredAdapterExpected } = require("./work_queue_declared_verification.cjs");
 
 const ADAPTER_EFFECT_TYPES = new Set(["create_issue", "update_issue", "close_issue", "add_comment", "add_labels", "remove_labels", "replace_label", "github_rest", "git_tree", "github_graphql"]);
@@ -222,7 +223,7 @@ async function createClaimAdapterHandler(options) {
       if (!matchesDeclaredAdapterExpected(adapter, adapterEffectFields(adapter, projected), verification)) throw new Error("Prepared Claim effect differs from its immutable declared verification expectation");
     }
     await assertClaimAuthorized(projected);
-    const authorization = await require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation({
+    const authorization = await authorizeSafeOutputInvocation({
       config: options,
       inputs: { message: projected, adapter },
       scope: { binding: "invocation", refs: [] },

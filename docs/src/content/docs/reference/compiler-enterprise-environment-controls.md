@@ -58,7 +58,7 @@ runtime authority for eligible outputs. Manage its URL and audience through
 `default_safe_output_authorization_url` and
 `default_safe_output_authorization_audience` in `gh aw env` YAML. Unlike an
 empty admission endpoint, missing authorization values block live execution.
-Staged outputs skip the authority. See [safe-output authorization](../governance/#safe-output-authorization)
+Staged outputs skip the authority. See [safe-output authorization](/gh-aw/reference/governance/#safe-output-authorization)
 for literal repository configuration, merge rules and OIDC requirements.
 
 A valid approval supersedes daily-AIC validation. Its primary and optional detection/evals allowances set the corresponding existing runtime credit limits; omitted optional allowances retain their existing component limits. An empty endpoint skips the admission check and its token acquisition, not activation's runner or bootstrap; an ignored outage retains daily validation and existing limits. Denial and malformed responses block activation. Admission identity and credentials stay within the compiler-owned step; downstream jobs consume only validated outputs. Both `activation` and `conclusion` retain job-wide `id-token: write`, even when admission code is omitted or the endpoint is empty. Activation hooks and other conclusion steps share that permission; the agent does not acquire it through admission. Review existing OIDC relying-party policies accordingly.

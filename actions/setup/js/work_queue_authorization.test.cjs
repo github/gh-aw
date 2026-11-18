@@ -25,7 +25,10 @@ describe("prepared Claim adapter safe-output authorization", () => {
     expect(core.setOutput).toHaveBeenCalledWith("active", "false");
   });
 
-  it("does not initialize the live effect implementation when the authority cannot be contacted", async () => {
+  it.each([
+    ["unavailable authority", true, "missing_credentials"],
+    ["missing trusted executor", false, "trusted prepared invocation context"],
+  ])("does not initialize the live effect implementation with %s", async (_reason, trustedExecutor, expectedError) => {
     const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-claim-authorization-"));
     vi.stubEnv("RUNNER_TEMP", root);
     vi.stubEnv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", undefined);
@@ -37,6 +40,7 @@ describe("prepared Claim adapter safe-output authorization", () => {
     const loadEffectHandler = vi.fn();
     const authorizeClaim = async request => ({ claim_handle: request.claim_handle, authorized: true });
     const state = {
+      authorize: trustedExecutor ? options => require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation(options) : undefined,
       requirement: { endpoint: "https://authority.example.org/authorize", audience: "gh-aw" },
       batchDigest: "b".repeat(64),
       recordIndex: 0,
@@ -60,7 +64,7 @@ describe("prepared Claim adapter safe-output authorization", () => {
         fs.mkdirSync(path.dirname(filename), { recursive: true });
         fs.writeFileSync(filename, JSON.stringify({ version: 3, claim_handle: "h1", type: "custom", messages: [{ input: message, payload: { number: 42, content: "prepared body" } }] }));
         const handler = await createClaimAdapterHandler({ adapter, filename, loadEffectHandler });
-        await expect(withSafeOutputInvocation(state, () => handler(message))).rejects.toThrow("missing_credentials");
+        await expect(withSafeOutputInvocation(state, () => handler(message))).rejects.toThrow(expectedError);
       });
       expect(loadEffectHandler).not.toHaveBeenCalled();
     } finally {

@@ -104,3 +104,25 @@ func TestSafeOutputAuthorizationRepoStagingAndValidation(t *testing.T) {
 		require.Error(t, json.Unmarshal(document, &config))
 	}
 }
+
+func TestSafeOutputAuthorizationInvalidRepoConfigCannotCompile(t *testing.T) {
+	for _, setting := range []string{
+		`{"safe_output_authorization":}`,
+		`{"safe_output_authorization":false}`,
+		`{"safe_output_authorization":{"endpoint":"http://insecure.example","audience":"a"}}`,
+	} {
+		t.Run(setting, func(t *testing.T) {
+			root := t.TempDir()
+			writeAWJSON(t, root, setting)
+			compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+			compiler.gitRoot = root
+			file := filepath.Join(root, "workflow.md")
+			data, err := compiler.ParseWorkflowString("---\non: workflow_dispatch\nsafe-outputs:\n  add-comment:\n---\nAuthorize outputs.\n", file)
+			require.NoError(t, err)
+
+			compiled, err := compiler.CompileToYAML(data, file)
+			require.ErrorContains(t, err, "failed to load aw.json")
+			require.Empty(t, compiled, "invalid repository policy must never produce an unprotected workflow")
+		})
+	}
+}

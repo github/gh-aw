@@ -1286,6 +1286,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     });
     /** @type {any} */
     const invocationState = { invocation, requirement, config: descriptor, batchDigest: invocationBatchDigest, recordIndex: sourceBatch?.indices[index] ?? index, authorization: undefined };
+    invocationState.authorize = options => require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation(options);
     const deferredGate = phase === "primary" && (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (type === "upload_asset" && !!currentClaimHandle()));
     const evidencePath = protocol.authorizationEvidencePath();
     let authorization;
