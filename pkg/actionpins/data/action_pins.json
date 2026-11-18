@@ -73,15 +73,15 @@
       "version": "v6.1.0",
       "sha": "0f4a354dd5547a28c70b7853dbd95d5b67886e73"
     },
-    "actions/setup-go@v7.0.0": {
+    "actions/setup-go@v7.1.0": {
       "repo": "actions/setup-go",
-      "version": "v7.0.0",
-      "sha": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e"
+      "version": "v7.1.0",
+      "sha": "d8cbb8045d7f43706b9177cceb36c1f91a6644d5"
     },
-    "actions/setup-java@v6.2.0": {
+    "actions/setup-java@v6.3.0": {
       "repo": "actions/setup-java",
-      "version": "v6.2.0",
-      "sha": "77dd5b2ce225ea11469928ac317850245a74ae78"
+      "version": "v6.3.0",
+      "sha": "d1374f8ac74474200d16ef8ecee22c7ae7a51880"
     },
     "actions/setup-node@v7.1.0": {
       "repo": "actions/setup-node",
@@ -163,10 +163,10 @@
       "version": "v2.2.0",
       "sha": "0c5077e51419868618aeaa5fe8019c62421857d6"
     },
-    "ruby/setup-ruby@v1.338.0": {
+    "ruby/setup-ruby@v1.341.0": {
       "repo": "ruby/setup-ruby",
-      "version": "v1.338.0",
-      "sha": "b3aaceaef7e0ee231b499e7b5f49c03fc1d32199"
+      "version": "v1.341.0",
+      "sha": "20eb24b0d509e2b9ed9b6d42ddfeb992915e0564"
     },
     "safedep/pmg@v1": {
       "repo": "safedep/pmg",
@@ -1299,16 +1299,6 @@
       "image": "ghcr.io/github/gh-aw-mcpg:v0.5.10",
       "digest": "sha256:629ddcd68a48ab02e7db8af527d2756c6db563b00c1d31d8aa8fcbac96f01c59",
       "pinned_image": "ghcr.io/github/gh-aw-mcpg:v0.5.10@sha256:629ddcd68a48ab02e7db8af527d2756c6db563b00c1d31d8aa8fcbac96f01c59"
-    },
-    "ghcr.io/github/gh-aw-mcpg:v0.5.8": {
-      "image": "ghcr.io/github/gh-aw-mcpg:v0.5.8",
-      "digest": "sha256:e237aabf51d4485474b9355649b811ca6c1db22359eeb1860832fc1fb5a7a347",
-      "pinned_image": "ghcr.io/github/gh-aw-mcpg:v0.5.8@sha256:e237aabf51d4485474b9355649b811ca6c1db22359eeb1860832fc1fb5a7a347"
-    },
-    "ghcr.io/github/gh-aw-mcpg:v0.5.9": {
-      "image": "ghcr.io/github/gh-aw-mcpg:v0.5.9",
-      "digest": "sha256:cce8accd79c9364f0886be8837d74dda2baff1b7d1c9cc6490a7adef727c79f0",
-      "pinned_image": "ghcr.io/github/gh-aw-mcpg:v0.5.9@sha256:cce8accd79c9364f0886be8837d74dda2baff1b7d1c9cc6490a7adef727c79f0"
     },
     "ghcr.io/github/gh-aw-node": {
       "image": "ghcr.io/github/gh-aw-node",
