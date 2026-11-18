@@ -75,6 +75,7 @@ credential references are removed from the agent snapshot.
 | Linear | `tools.linear: [get-issue]` | `linear-add-comment` | One reader and one effect |
 | Jira | `tools.jira: {personal: [getJiraIssue]}` | `jira-add-comment` | One reader and one effect |
 | Azure DevOps | `tools.azure-devops: [get-work-item-description]` | `azure-devops-comment-on-work-item` | One reader and one effect |
+| Web IQ | `tools.azure-web-iq: {search: [web]}` | `create-issue` (GitHub handoff) | One native reader; no provider writer |
 
 Place effect selections under `safe-outputs`. Targeted HTTP MCP mappings select only
 exact native tools the declaration already allows; they cannot add tools, arguments, or
@@ -120,6 +121,7 @@ duplicate detection.
 | Zendesk | Unresolved-ticket metadata to a private engineering-ownership handoff | [zendesk-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/zendesk-golden.md) |
 | Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/notion-golden.md) |
 | Asana | Approved task description to a staged next-step comment | [asana-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md) |
+| Web IQ | Approved public web and news query to a cited research handoff | [azure-web-iq-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-web-iq-golden.md) |
 
 All effects are staged by default; reads still need provider credentials. To adopt a
 fixture, copy its consumer into `.github/workflows/`, keep the declaration at its imported
@@ -907,6 +909,39 @@ scope labels. `gh aw connector asana setup` prints the renewal steps. The connec
 task updates, attachments, search, threaded replies, or webhook receiver. The
 [golden consumer](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md) stages one next-step
 suggestion. Offline compilation and mocks do not establish live authorization or delivery.
+
+## Microsoft Web IQ
+
+Declaration: `.github/workflows/connectors/azure-web-iq.md`.
+
+The [Web IQ MCP server](https://learn.microsoft.com/en-us/web-iq/integrations/mcp) exposes native
+`web`, `news` and `browse` methods through the fixed `https://api.microsoft.ai/v3/mcp` endpoint.
+Select exact methods with `tools.azure-web-iq: {search: [web, news, browse]}`. Bind approved query strings
+through `with.queries` and public HTTPS browse URLs through `with.urls`; defaults grant nothing.
+Search results never add browse grants. These independent allowlists permit any approved query with
+any approved URL; queries do not restrict search-result domains.
+
+Search requires `query`, `maxResults` (1–10), `contentFormat: passage` and `maxLength` (1–3000).
+`web` also requires `safeSearch: strict`; `news` optionally accepts `freshness` as `day`, `week`,
+`month` or `year`. Browse requires `url`, an approved nonblank `query`, `contentFormat: passage`,
+`maxLength` (1–3000) and `liveCrawl: none`. The response byte limit is 131072. The shared hosted
+adapter does not independently validate result fields, counts, freshness or returned URL identity.
+Treat passages as untrusted excerpts and check browse identity and usable content before relying on them.
+
+[Authentication](https://learn.microsoft.com/en-us/web-iq/get-started/authentication) requires an
+externally acquired and renewed Entra app-only access token for `https://api.microsoft.ai/.default`.
+Provision a paid Azure Web IQ resource, connect it in the Web IQ portal, bind an Entra client ID to
+exactly one Web IQ AppID, and enable the selected services. Store the unprefixed token as
+`AZURE_WEB_IQ_READ_ACCESS_TOKEN`; `reader-secret` overrides only its name. Multi-AppID selection and API
+keys are unsupported: the documented `x-apikey` header differs from the contract's `X-API-Key`.
+There is no token exchange, renewal or credential fallback.
+
+The [golden consumer](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-web-iq-golden.md)
+stages one cited GitHub research issue from web and news passages. Staging suppresses publication,
+not billable reads or inference. Approve disclosure of queries, URLs and returned passages; Zero
+Query Logging is not enabled by this connector. No Auto/Auto Advanced, full-page formats, live
+crawling, named-scope management, China endpoint, provider mutation or trigger is declared.
+Compilation and mocks establish neither live access, completeness, freshness nor research quality.
 
 ## Validation and runtime boundaries
 
