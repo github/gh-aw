@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -568,6 +569,31 @@ func TestUpdateContainerPins_FailureSummary(t *testing.T) {
 			assert.Equal(t, digest, pin.Digest)
 		})
 	}
+}
+
+func TestUpdateContainerPinsReportsBestEffortJSONLWarning(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Chdir(tmpDir)
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "test.lock.yml"),
+		[]byte("run: bash download_docker_images.sh ghcr.io/example/agent:v1\n"), 0644))
+	deps := containerPinUpdateDeps{
+		fetchDigest: func(context.Context, string, bool) (string, error) {
+			return "", errors.New("registry unavailable")
+		},
+	}
+	var output bytes.Buffer
+	reporter := &updateJSONLReporter{writer: &output, command: "update"}
+	ctx := context.WithValue(context.Background(), updateJSONLKey{}, reporter)
+	changed, err := updateContainerPins(ctx, deps, workflowsDir, false, containerPinUpdateOptions{})
+	require.NoError(t, err)
+	assert.False(t, changed)
+	events := decodeUpdateEvents(t, output.String())
+	require.Len(t, events, 1)
+	assert.Equal(t, "warning", events[0].Event)
+	assert.Equal(t, "containers", events[0].Kind)
+	assert.Contains(t, events[0].Error, "registry metadata lookup failed")
 }
 
 func TestUpdateContainerPins_Interrupted(t *testing.T) {
