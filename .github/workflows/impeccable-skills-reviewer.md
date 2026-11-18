@@ -35,9 +35,7 @@ engine:
   id: copilot
   copilot-sdk: true
   max-continuations: 6
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 imports:
   - uses: shared/pr-review-base.md
     with:

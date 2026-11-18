@@ -30,9 +30,7 @@ max-turns: 100
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 imports:
   - shared/pr-safe-output-defaults.md
   - ../skills/jqschema/SKILL.md

@@ -17,9 +17,7 @@ tracker-id: daily-elixir-credo-snippet-audit
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 timeout-minutes: 45
 strict: true
 runtimes:

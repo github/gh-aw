@@ -31,9 +31,7 @@ emoji: 🧹
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 name: Instructions Janitor
 strict: true
 timeout-minutes: 20

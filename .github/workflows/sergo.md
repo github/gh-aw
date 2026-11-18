@@ -38,9 +38,7 @@ emoji: 🤖
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 name: "Sergo - Serena Go Expert"
 strict: true
 timeout-minutes: 45

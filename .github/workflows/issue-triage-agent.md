@@ -4,9 +4,7 @@ timeout-minutes: 5
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 on:
   schedule: "daily around 14:00 on weekdays"  # ~2 PM UTC, weekdays only

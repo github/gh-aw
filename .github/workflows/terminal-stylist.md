@@ -12,9 +12,7 @@ permissions:
 
 engine:
   id: pi
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 
 timeout-minutes: 10
 

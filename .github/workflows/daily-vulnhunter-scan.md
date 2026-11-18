@@ -14,9 +14,7 @@ permissions:
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 jobs:
   vulnhunter_bundle:
     runs-on: ubuntu-latest

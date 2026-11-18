@@ -19,9 +19,7 @@ tracker-id: daily-function-namer
 engine:
   id: pi
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 imports:
   - uses: shared/daily-audit-base.md
     with:

@@ -13,9 +13,7 @@ permissions:
 engine:
   id: copilot
   bare: true
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 
 imports:
   - shared/otlp.md

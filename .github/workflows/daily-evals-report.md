@@ -13,9 +13,7 @@ max-daily-ai-credits: 3000
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 tracker-id: daily-evals-report
 sandbox:
   agent:

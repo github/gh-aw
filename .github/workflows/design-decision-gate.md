@@ -82,9 +82,7 @@ max-turns: 30
 engine:
   id: pi
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 safe-outputs:
   add-comment:
     max: 2

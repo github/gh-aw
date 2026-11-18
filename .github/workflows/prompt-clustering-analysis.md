@@ -17,9 +17,7 @@ permissions:
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 
 network:

@@ -34,9 +34,7 @@ emoji: 📝
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 name: Developer Documentation Consolidator
 strict: true
 timeout-minutes: 30

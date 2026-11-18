@@ -21,9 +21,7 @@ max-turns: 50
 engine:
   id: copilot
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 network:
   allowed:
     - defaults

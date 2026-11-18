@@ -18,9 +18,7 @@ permissions:
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 safe-outputs:
   push-to-pull-request-branch:

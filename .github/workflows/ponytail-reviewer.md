@@ -17,9 +17,7 @@ on:
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 permissions:
   contents: read
   pull-requests: read

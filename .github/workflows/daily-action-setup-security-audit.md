@@ -12,9 +12,7 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 max-tool-denials: 3
 strict: true
 tracker-id: daily-action-setup-security-audit

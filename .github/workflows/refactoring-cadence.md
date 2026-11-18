@@ -17,9 +17,7 @@ tracker-id: refactoring-cadence
 engine:
   id: pi
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 imports:
   - uses: shared/skip-if-issue-open.md
     with:

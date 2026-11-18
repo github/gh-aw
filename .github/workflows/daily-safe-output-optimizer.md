@@ -20,9 +20,7 @@ sandbox:
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
   mcp:
     tool-timeout: 10m
 safe-outputs:

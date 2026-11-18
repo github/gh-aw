@@ -14,9 +14,7 @@ permissions:
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 if: needs.sighthound_scan.outputs.actionable_findings_detected == 'true'
 jobs:

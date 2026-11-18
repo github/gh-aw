@@ -16,9 +16,7 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 strict: true
 timeout-minutes: 45
 network:

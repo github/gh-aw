@@ -30,9 +30,7 @@ timeout-minutes: 60
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 imports:
   - uses: shared/daily-audit-base.md

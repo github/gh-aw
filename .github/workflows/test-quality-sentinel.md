@@ -17,9 +17,7 @@ permissions:
 engine:
   id: copilot
   max-continuations: 15
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 skip-if-decision:
   - >-
     Do @/tmp/gh-aw/agent/pr-meta.json, @/tmp/gh-aw/agent/test-diff.txt, and

@@ -21,9 +21,7 @@ emoji: ✍️
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 name: "Typist - Go Type Analysis"
 strict: true
 experiments:

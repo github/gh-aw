@@ -18,9 +18,7 @@ tracker-id: daily-rendering-scripts-verifier
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 strict: true
 
 graders:

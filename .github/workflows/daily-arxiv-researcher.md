@@ -13,9 +13,7 @@ permissions:
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
   durable:
     retention-days: 7
 

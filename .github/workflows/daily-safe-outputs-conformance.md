@@ -13,9 +13,7 @@ tracker-id: safe-outputs-conformance
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 strict: true
 tools:
   cli-proxy: true

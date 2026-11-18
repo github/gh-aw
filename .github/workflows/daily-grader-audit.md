@@ -14,9 +14,7 @@ max-daily-ai-credits: 5000
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
   mcp:
     tool-timeout: 10m
 tools:

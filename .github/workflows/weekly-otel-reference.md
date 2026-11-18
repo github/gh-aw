@@ -11,9 +11,7 @@ permissions:
   copilot-requests: write
 engine:
   id: copilot
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 timeout-minutes: 30
 network:

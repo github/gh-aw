@@ -38,9 +38,7 @@ max-turns: 90  # Reduce from avg 115 turns
 engine:
   id: pi
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 # Shared instructions
 imports:
   - uses: shared/daily-pr-base.md

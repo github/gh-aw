@@ -16,9 +16,7 @@ permissions:
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 features:
   gh-aw-detection: true
 timeout-minutes: 10

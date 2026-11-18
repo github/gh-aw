@@ -15,9 +15,7 @@ max-ai-credits: 250
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 timeout-minutes: 30
 tools:
   github:

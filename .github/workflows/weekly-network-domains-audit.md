@@ -10,9 +10,7 @@ permissions:
   issues: read
 engine:
   id: pi
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 network: defaults
 strict: true
 tracker-id: weekly-network-domains-audit

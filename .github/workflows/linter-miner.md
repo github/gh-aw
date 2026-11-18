@@ -17,9 +17,7 @@ tracker-id: linter-miner
 engine:
   id: copilot
   copilot-sdk: true
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 max-tool-denials: 3
 network:
   allowed:

@@ -39,9 +39,7 @@ emoji: 📝
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 name: Daily Documentation Updater
 strict: true
 experiments:

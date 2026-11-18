@@ -18,9 +18,7 @@ permissions:
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 tools:
   cli-proxy: true

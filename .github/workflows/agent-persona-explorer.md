@@ -7,9 +7,7 @@ max-daily-ai-credits: 10000
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 permissions:
   contents: read
   actions: read

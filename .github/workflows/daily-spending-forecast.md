@@ -13,9 +13,7 @@ permissions:
 engine:
   id: codex
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model: router/economy
 strict: true
 imports:
   - shared/trending-charts-simple.md

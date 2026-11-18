@@ -149,9 +149,7 @@ emoji: 📝
 engine:
   id: claude
   model-provider: github
-  model-routing:
-    goal: cost
-    mode: balanced
+  model: router/balanced
 name: Go Logger Enhancement
 timeout-minutes: 30
 tools:
