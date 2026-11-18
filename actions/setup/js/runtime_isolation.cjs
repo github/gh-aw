@@ -166,7 +166,14 @@ function cleanup(env = process.env) {
     if (!runtimeIdentity) throw new Error("Missing runtime directory identity");
     validate(root, token, runtimeIdentity);
     const suffix = resourceSuffix(root);
-    spawnSync("docker", ["rm", "-f", ...["awmg-mcpg", "awmg-cli-proxy", "awmg-proxy"].map(name => `${name}-${suffix}`)], { stdio: "ignore", timeout: 30000 });
+    const ownerDigest = ownershipDigest(token);
+    const containerNames = ["awmg-mcpg", "awmg-cli-proxy", "awmg-proxy"].map(name => `${name}-${suffix}`);
+    const ownedContainers = [];
+    for (const containerName of containerNames) {
+      const inspected = spawnSync("docker", ["inspect", "--format", "{{ index .Config.Labels \"com.gh.aw.owner\" }}", containerName], { stdio: ["ignore", "pipe", "ignore"], timeout: 30000, encoding: "utf8" });
+      if (inspected.status === 0 && (inspected.stdout || "").trim() === ownerDigest) ownedContainers.push(containerName);
+    }
+    if (ownedContainers.length > 0) spawnSync("docker", ["rm", "-f", ...ownedContainers], { stdio: "ignore", timeout: 30000 });
     fs.rmSync(root, { recursive: true, force: true });
   } catch (error) {
     if (error.code !== "ENOENT") console.warn(`Warning: private runtime cleanup skipped: ${error.message}`);
