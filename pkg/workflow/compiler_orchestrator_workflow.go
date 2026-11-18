@@ -741,6 +741,9 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// Auto-inject create-issues if safe-outputs is configured but has no non-builtin outputs.
 	// This ensures every workflow with safe-outputs has at least one meaningful action handler.
 	applyDefaultCreateIssue(workflowData)
+	if err := resolveWorkflowSafeOutputAuthorizations(workflowData); err != nil {
+		return err
+	}
 
 	// Apply the top-level github-app as a fallback for all nested github-app token minting operations.
 	// This runs last so that all section-specific configurations have been resolved first.

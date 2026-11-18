@@ -341,6 +341,12 @@ func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) str
 			fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.SafeOutputErrorsFilename),
 		)
 	}
+	if data != nil && data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		steps = append(steps, "            /tmp/gh-aw/safe-output-authorization.jsonl\n")
+		if claimArtifacts {
+			steps = append(steps, "            /tmp/gh-aw/claims/*/safe-output-authorization.jsonl\n")
+		}
+	}
 	if includeMergeDecisions {
 		steps = append(steps, "            /tmp/gh-aw/merge-pull-request-decisions.jsonl\n")
 		if claimArtifacts {

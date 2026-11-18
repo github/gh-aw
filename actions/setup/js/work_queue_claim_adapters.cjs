@@ -222,6 +222,11 @@ async function createClaimAdapterHandler(options) {
       if (!matchesDeclaredAdapterExpected(adapter, adapterEffectFields(adapter, projected), verification)) throw new Error("Prepared Claim effect differs from its immutable declared verification expectation");
     }
     await assertClaimAuthorized(projected);
+    const authorization = await require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation({
+      inputs: { message: projected, adapter },
+      scope: { binding: "invocation", refs: [] },
+    });
+    if (authorization.state === "allowed") await assertClaimAuthorized(projected);
     if (!execute) {
       execute =
         adapter["effect-type"] === "github_rest"

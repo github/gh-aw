@@ -15,6 +15,8 @@ var safeScriptsLog = logger.New("workflow:safe_scripts")
 // Scripts run within the consolidated safe-outputs job as part of the handler manager,
 // unlike SafeJobConfig which creates a separate GitHub Actions job.
 type SafeScriptConfig struct {
+	Authorization        *SafeOutputAuthorization    `yaml:"authorization,omitempty"`
+	Staged               *TemplatableBool            `yaml:"staged,omitempty"`
 	Name                 string                      `yaml:"name,omitempty"`
 	Description          string                      `yaml:"description,omitempty"`
 	Inputs               map[string]*InputDefinition `yaml:"inputs,omitempty"`
@@ -44,6 +46,8 @@ func parseSafeScriptsConfig(scriptsMap map[string]any) map[string]*SafeScriptCon
 		}
 
 		safeScript := &SafeScriptConfig{}
+		safeScript.Authorization = parseLocalSafeOutputAuthorization(scriptConfig["authorization"])
+		safeScript.Staged = parseAuthorizationStaged(scriptConfig["staged"])
 
 		// Parse name
 		if name, exists := scriptConfig["name"]; exists {

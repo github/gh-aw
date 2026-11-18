@@ -1645,6 +1645,120 @@ Compile-time validation SHOULD be applied when schema content is statically avai
 
 When `data` validation fails, implementations MUST return actionable field-path errors that identify the failing location (for example, `data.extra` or `data.required[0]`).
 
+#### Safe-output invocation authorization
+
+`safe-outputs.authorization` requires external authorization for every enabled
+non-builtin output. The same object on an individual output, including
+`scripts.<name>`, `actions.<name>` and `jobs.<name>`, protects that output only.
+Authorization is opt-in; absence preserves existing execution behavior.
+
+```yaml
+safe-outputs:
+  authorization:
+    endpoint: https://authority.example.org/api/safe-output-authorization
+    audience: https://authority.example.org/gh-aw-safe-outputs
+  create-issue:
+    max: 1
+```
+
+Both `endpoint` and `audience` are required strings. The endpoint MUST be HTTPS
+without embedded credentials or a fragment. Presence means required
+authorization; `false`, warning-only and fail-open configurations are not
+supported. A local authority identical to the global authority produces one
+requirement. Conflicting authorities MUST fail compilation, including conflicts
+introduced through imports. Agent-provided fields MUST NOT change this trusted
+configuration. `authorization` is reserved metadata, not a tool name.
+
+Global inheritance excludes only descriptors classified by the compiler as
+builtin diagnostics: `noop`, `report-missing-tool`, `report-missing-data` and
+`report-incomplete`, including aliases. Explicit local authorization on these
+diagnostics still applies. Ordinary native outputs such as `create-issue` and
+`add-comment` are not exempt, including when compiler-enabled or carrying
+diagnostic-looking text. Custom names MUST NOT acquire builtin classification.
+
+**Staging:** Effective global or per-output staged mode, including resolved
+expressions, MUST branch before OIDC acquisition, authority requests or execution
+claims. Its authorization state is `skipped_staged`, never `allowed`.
+Configuration validation still applies, but unavailable OIDC credentials or
+authority service MUST NOT prevent a valid preview. Custom module evaluation,
+factory initialization, action hooks and job steps MUST NOT run to produce a
+staged preview. All-statically-staged outputs MUST NOT add OIDC permission solely
+for this feature.
+
+**Execution boundary:** The authorized unit is a prepared invocation of a
+reviewed implementation, not necessarily one network write. Implementations MUST
+bind normalized inputs, resolved defaults and temporary IDs, the executor and its
+implementation revision, execution identity, policy and independently resolved
+targets or artifacts where available. Arbitrary custom code uses invocation-level
+binding with declared scope; it MUST NOT be represented as an independently
+verified exact effect. Changing approved inputs or expanding scope requires a new
+decision.
+
+Native handlers without a separate effect-preparation adapter also advertise
+`binding: invocation`. Their handler-specific sanitization and dynamic API
+lookups remain inside the reviewed implementation; the approval does not attest
+to an independently resolved final network request.
+
+All existing validation, target restrictions, limits, threat detection, protected
+file checks, review requirements and queue Claim checks continue to apply with
+AND semantics. The actual executor MUST gate native, deferred, standalone,
+custom script, action, job, fan-out and queue paths. A payload-export handler
+alone is not the action's execution boundary. Batch executors require a decision
+per logical record and MUST NOT start any author code unless all required
+decisions remain usable. Unconditional pre-output hooks cannot remain an
+unclassified write path when authorization is enabled.
+
+Reusable-workflow fan-out obtains a fresh launch-release decision in a separate
+gate job after payload preparation, retaining the selected record's original
+batch ordinal. This approves submitting the launch to Actions, not when
+downstream execution starts or what the called workflow writes.
+
+**Authority protocol:** The client sends a bounded, versioned HTTPS POST
+authenticated using GitHub OIDC with the configured audience. The request binds
+the host, repository ID, workflow identity and revision, compiled configuration,
+run and attempt, logical invocation identity, implementation and input digests,
+binding level and relevant evidence references. Private bodies, patches, prompts,
+secret-valued inputs and tokens MUST NOT be transmitted or logged; bind digests
+and reviewed secret references instead. The authority independently verifies any
+evidence required by its policy.
+
+The authority MUST atomically claim the logical invocation before allowing it.
+An executable response binds the request digest, invocation, current attempt,
+decision ID, policy revision and validity window. Denial, missing or malformed
+responses, redirects, expired decisions, binding mismatches and unavailability
+MUST block the executor. Limits are 64 KiB per request, 8 KiB per response,
+10 seconds per HTTP request and 20 seconds total for credential acquisition and
+authorization. Permission lifetime is at most 30 seconds, with at least
+2 seconds remaining when released to the executor. Deadlines use monotonic
+elapsed time and validated UTC timestamps. These limits govern starting an
+invocation, not its execution duration.
+
+Consuming requests MUST NOT be automatically retried after transmission. A lost
+response blocks execution even if the authority recorded the claim. Logical
+identity distinguishes separate identical-input records but survives redispatch
+of the same batch. Reruns MUST reconcile unresolved prior execution; a changed
+attempt alone is not permission to repeat an uncertain effect. Existing
+operation-specific safe retry and reconciliation rules remain applicable.
+
+**Evidence:** Authorization state is separate from execution outcome:
+`not_configured`, `exempt_builtin`, `skipped_staged`, `allowed`, `denied`, `error`
+or `not_requested`. Evidence records minimized output and executor identity,
+binding level, requirement source, request digest, decision ID, policy revision,
+timestamps and fixed reason codes. `allowed` means permission to start, not
+successful completion or verified downstream effect. Minimal decision evidence
+MUST be persisted before execution; persistence failure blocks the invocation.
+Post-effect audit failures MUST preserve confirmed, partial or indeterminate
+outcomes and MUST NOT trigger operation replay. Denial blocks dependents without
+preventing independent diagnostics or rolling back completed effects.
+
+This client-side mechanism protects participating trusted workflows. It does not
+provide a production authority, approval UI, credential brokerage or mandatory
+organization-wide enforcement. Protect workflow configuration, runtime pins and
+credentials separately. A workflow author with independent broad credentials can
+bypass a client gate. Final target readback reduces but cannot eliminate races;
+stronger atomicity and revocation require target-side enforcement. Authorization
+of a reusable-workflow launch covers only that launch, not its downstream writes.
+
 ### 5.3 Type-Specific Common Parameters
 
 Every safe output type supports these parameters:

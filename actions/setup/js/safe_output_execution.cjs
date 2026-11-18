@@ -1,6 +1,40 @@
 // @ts-check
 
 const { classifySafeOutputResult, pickOutcomeField } = require("./safe_outputs_status.cjs");
+const { AsyncLocalStorage } = require("node:async_hooks");
+
+const invocationContext = new AsyncLocalStorage();
+
+function withSafeOutputInvocation(context, callback) {
+  return invocationContext.run(context, callback);
+}
+
+function currentSafeOutputInvocation() {
+  return invocationContext.getStore();
+}
+
+/** @returns {import("./types/handler-factory").SafeOutputAuthorizationEvidence | undefined} */
+function projectAuthorization(source) {
+  if (!source || typeof source !== "object") return undefined;
+  const result = {};
+  if (!["not_configured", "exempt_builtin", "skipped_staged", "allowed", "denied", "error", "not_requested"].includes(source.state)) return undefined;
+  result.state = source.state;
+  for (const key of ["reason_code", "decision_id", "policy_revision", "invocation_id", "request_digest"]) {
+    if (typeof source[key] === "string" && /^[A-Za-z0-9_.:/-]{1,256}$/.test(source[key])) result[key] = source[key];
+  }
+  for (const key of ["output_type", "output_name", "run_attempt"]) {
+    if (typeof source[key] === "string" && /^[A-Za-z0-9_.:/-]{1,256}$/.test(source[key])) result[key] = source[key];
+  }
+  if (["manager", "native", "script", "action", "job", "standalone", "workflow", "queue"].includes(source.executor)) result.executor = source.executor;
+  if (["invocation", "resolved_effect"].includes(source.binding)) result.binding = source.binding;
+  if (["global", "local"].includes(source.requirement_source)) result.requirement_source = source.requirement_source;
+  for (const key of ["issued_at", "expires_at"]) {
+    const value = source[key];
+    if (typeof value === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value) result[key] = value;
+  }
+  if (typeof source.evidenceRecorded === "boolean") result.evidenceRecorded = source.evidenceRecorded;
+  return result;
+}
 
 const EXECUTION_STATUSES = new Set(["success", "failed", "skipped", "warning", "cancelled", "deferred", "delegated", "staged", "failure"]);
 const RESULT_URL_FIELDS = [
@@ -73,6 +107,8 @@ function projectSafeOutputData(source) {
   if (typeof source.staged === "boolean") data.staged = source.staged;
   if (typeof source.execution_trace === "string" && source.execution_trace.length <= 1024 && /^[A-Za-z]{4}(?:_[A-Za-z]{4})*$/.test(source.execution_trace)) data.execution_trace = source.execution_trace;
   if (source.operation_outcome === "indeterminate") data.operation_outcome = "indeterminate";
+  const authorization = projectAuthorization(source.authorization);
+  if (authorization) data.authorization = authorization;
   const url = canonicalSafeOutputUrl(source.url);
   if (url) data.url = url;
   return data;
@@ -104,6 +140,7 @@ function buildSafeOutputExecutions(results, staged = false) {
           staged: isStaged,
           operation_outcome: pickOutcomeField(item, "operation_outcome"),
           execution_trace: pickOutcomeField(item, "execution_trace"),
+          authorization: record.authorization,
           url,
         }),
       };
@@ -144,4 +181,4 @@ function finalizeBufferedReviewExecutions(results, repo, prNumber, review) {
   }
 }
 
-module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputExecutions, finalizeBufferedReviewExecutions };
+module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputExecutions, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, projectAuthorization };

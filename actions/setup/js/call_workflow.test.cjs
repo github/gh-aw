@@ -1,6 +1,8 @@
 // @ts-check
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { main } from "./call_workflow.cjs";
+import { createRequire } from "node:module";
+const { withSafeOutputInvocation } = createRequire(import.meta.url)("./safe_output_execution.cjs");
 
 // Mock the core GitHub Actions toolkit
 global.core = {
@@ -85,6 +87,21 @@ describe("call_workflow handler factory", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("not in the allowed workflows list");
     expect(core.setOutput).not.toHaveBeenCalled();
+  });
+
+  it("does not release an authorized launch without a trusted implementation binding", async () => {
+    const handler = await main({ workflows: ["worker-a"] });
+    const result = await withSafeOutputInvocation({ requirement: { endpoint: "https://authority.example.org/authorize", audience: "gh-aw" } }, () => handler({ type: "call_workflow", workflow_name: "worker-a", inputs: {} }));
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("trusted workflow launch implementation");
+    expect(core.setOutput).not.toHaveBeenCalled();
+  });
+
+  it("exports the manager-owned source ordinal rather than an agent-supplied ordinal", async () => {
+    const handler = await main({ workflows: ["worker-a"] });
+    const result = await withSafeOutputInvocation({ recordIndex: 2 }, () => handler({ type: "call_workflow", workflow_name: "worker-a", recordIndex: 999, inputs: {} }));
+    expect(result.success).toBe(true);
+    expect(core.setOutput).toHaveBeenCalledWith("call_workflow_record_index", "2");
   });
 
   it("should reject empty workflow names", async () => {

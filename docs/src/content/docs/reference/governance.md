@@ -123,6 +123,45 @@ jobs:
         run: gh aw compile
 ```
 
+## Safe-output authorization
+
+`safe-outputs.authorization` requires an external authority's permission before
+eligible safe-output invocations start. It is separate from activation admission:
+permission to start a workflow does not authorize its outputs.
+
+```yaml
+safe-outputs:
+  authorization:
+    endpoint: https://authority.example.org/api/safe-output-authorization
+    audience: https://authority.example.org/gh-aw-safe-outputs
+  create-issue:
+    max: 1
+```
+
+The object can instead be placed on an individual native output or under
+`safe-outputs.scripts.<name>`, `actions.<name>` or `jobs.<name>`. A local object
+cannot disable or replace a conflicting global authority. Global inheritance
+exempts only the four builtin diagnostics (`noop`, `report-missing-tool`,
+`report-missing-data`, `report-incomplete` and their aliases); an explicit local
+requirement still applies to them.
+
+Effective staged mode skips authorization and real execution, allowing previews
+without OIDC credentials or a reachable authority. Live authorization fails
+closed: a denied, unavailable, malformed, expired or mismatched decision blocks
+the invocation. Existing target restrictions, policy checks and queue Claim
+authorization remain required.
+
+An approval covers the prepared invocation of the reviewed implementation and
+its bound inputs, not necessarily one API write. Custom code may have multiple
+effects; a reusable-workflow approval covers its launch only. The authority must
+implement durable claims and replay reconciliation; no production authority is
+included. Protect workflow configuration and credentials independently. This
+opt-in client gate is not an organization-wide enforcement or credential-custody
+boundary, and target-side controls remain necessary for atomicity and revocation.
+
+See the [authorization contract](../../specs/safe-outputs-specification/#safe-output-invocation-authorization)
+for protocol limits, execution coverage and evidence states.
+
 ## Runtime Policy Variables
 
 Policy variables (`GH_AW_POLICY_*`) complement the

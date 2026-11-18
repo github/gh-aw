@@ -59,6 +59,7 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 		safeOutputsConfigLog.Print("Added ledger_mutation config so ledger audit entries are ingested")
 	}
 	addStandaloneLedgerConfigs(safeOutputsConfig, data.LedgerConfig)
+	addSafeOutputAuthorizationRuntimeConfig(safeOutputsConfig, data.SafeOutputs)
 
 	if len(safeOutputsConfig) == 0 {
 		return "", nil

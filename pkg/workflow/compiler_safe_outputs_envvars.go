@@ -21,6 +21,29 @@ func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID
 	addJobLevelEngineMetadata(envVars, data)
 	addJobLevelCommandMetadata(envVars, data)
 	c.addJobLevelSafeOutputConfig(envVars, data)
+	if data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
+		envVars["GH_AW_AUTHORIZATION_WORKFLOW_HASH"] = fmt.Sprintf("%q", data.FrontmatterHash+":"+data.BodyHash)
+		config := make(map[string]any)
+		for name, builder := range handlerRegistry {
+			if builder(data.SafeOutputs) != nil {
+				config[name] = make(map[string]any)
+			}
+		}
+		if data.SafeOutputs.DispatchRepository != nil {
+			tools := make(map[string]any)
+			for name := range data.SafeOutputs.DispatchRepository.Tools {
+				tools[name] = make(map[string]any)
+			}
+			config["dispatch_repository"] = map[string]any{"tools": tools}
+		}
+		addSafeOutputAuthorizationRuntimeConfig(config, data.SafeOutputs)
+		if encoded, err := json.Marshal(config); err == nil {
+			envVars["GH_AW_SAFE_OUTPUTS_AUTHORIZATION_CONFIG"] = fmt.Sprintf("%q", string(encoded))
+		}
+		if encoded, err := json.Marshal(data.SafeOutputs.AuthorizationCoverage); err == nil {
+			envVars["GH_AW_SAFE_OUTPUTS_AUTHORIZATION_COVERAGE"] = fmt.Sprintf("%q", string(encoded))
+		}
+	}
 	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
 		if plan := data.Connectors[alias].SafeOutputPlan; plan != "" {
 			envVars[connectorEnvPrefix(alias)+"PLAN"] = quoteYAMLEnvValue(plan)
