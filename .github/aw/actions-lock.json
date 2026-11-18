@@ -73,10 +73,20 @@
       "version": "v6.1.0",
       "sha": "0f4a354dd5547a28c70b7853dbd95d5b67886e73"
     },
+    "actions/setup-go@v7.0.0": {
+      "repo": "actions/setup-go",
+      "version": "v7.0.0",
+      "sha": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e"
+    },
     "actions/setup-go@v7.1.0": {
       "repo": "actions/setup-go",
       "version": "v7.1.0",
       "sha": "d8cbb8045d7f43706b9177cceb36c1f91a6644d5"
+    },
+    "actions/setup-java@v6.2.0": {
+      "repo": "actions/setup-java",
+      "version": "v6.2.0",
+      "sha": "77dd5b2ce225ea11469928ac317850245a74ae78"
     },
     "actions/setup-java@v6.3.0": {
       "repo": "actions/setup-java",
