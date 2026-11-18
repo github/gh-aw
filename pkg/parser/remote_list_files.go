@@ -110,13 +110,12 @@ func getCachedListRepoClone(cacheKey string) (string, bool) {
 // redundant tmpDir is discarded and the existing entry is returned.
 // Do not call from code that already holds gitListCloneCache.mu.
 func cloneAndCacheListRepoClone(ctx context.Context, cfg listRepoCloneConfig) (string, error) {
-	tmpDir, err := os.MkdirTemp("", "gh-aw-list-*")
+	tmpDir, err := gitutil.CreateSourceTempDir("gh-aw-list-*")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	cloneCmd := gitutil.SourceCommandContext(ctx, cfg.repoURL, "clone", "--depth", "1", "--branch", cfg.ref, "--single-branch", "--filter=blob:none", "--no-checkout", cfg.repoURL, tmpDir)
-	cloneOutput, err := cloneCmd.CombinedOutput()
+	cloneOutput, err := gitutil.SourceCommandCombinedOutputContext(ctx, cfg.repoURL, "clone", "--depth", "1", "--branch", cfg.ref, "--single-branch", "--filter=blob:none", "--no-checkout", cfg.repoURL, tmpDir)
 	if err != nil {
 		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
 			remoteLog.Printf("Failed to clean up temp directory %q: %v", tmpDir, cleanupErr)

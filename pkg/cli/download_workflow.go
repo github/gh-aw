@@ -48,8 +48,7 @@ func downloadWorkflowContentViaGit(ctx context.Context, repo, path, ref string, 
 	// this layer; '--' is kept as defence-in-depth per the git(1) specification.
 	// #nosec G204 -- repoURL, ref, and path are from workflow import configuration authored by the
 	// developer; exec.CommandContext with separate args (not shell execution) prevents shell injection.
-	cmd := gitutil.SourceCommandContext(ctx, repoURL, "archive", "--remote="+repoURL, ref, "--", path)
-	archiveOutput, err := cmd.Output()
+	archiveOutput, err := gitutil.SourceCommandOutputContext(ctx, repoURL, "archive", "--remote="+repoURL, ref, "--", path)
 	if err != nil {
 		downloadLog.Printf("git archive failed, falling back to git clone: repo=%s, ref=%s, err=%v", repo, ref, err)
 		// If git archive fails, try with git clone + read file as a fallback
@@ -91,7 +90,7 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 	downloadLog.Printf("Attempting git clone fallback for downloading workflow content: %s/%s@%s", repo, path, ref)
 
 	// Create a temporary directory for the sparse checkout
-	tmpDir, err := os.MkdirTemp("", "gh-aw-git-clone-*")
+	tmpDir, err := gitutil.CreateSourceTempDir("gh-aw-git-clone-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
@@ -139,11 +138,9 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 		// Note: sparse-checkout with SHA refs may not reduce bandwidth as much as with branch refs,
 		// because the server needs to send enough history to reach the specific commit.
 		// However, it still limits the working directory to only the requested file.
-		fetchCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin", ref)
-		if _, err := fetchCmd.CombinedOutput(); err != nil {
+		if _, err := gitutil.SourceCommandCombinedOutputContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin", ref); err != nil {
 			// If fetching specific SHA fails, try fetching all branches with depth 1
-			fetchCmd = gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin")
-			if output, err := fetchCmd.CombinedOutput(); err != nil {
+			if output, err := gitutil.SourceCommandCombinedOutputContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin"); err != nil {
 				return nil, fmt.Errorf("failed to fetch repository: %w\nOutput: %s", err, string(output))
 			}
 		}
@@ -155,8 +152,7 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 		}
 	} else {
 		// For branch/tag refs, fetch the specific ref
-		fetchCmd := gitutil.SourceCommandContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin", ref)
-		if output, err := fetchCmd.CombinedOutput(); err != nil {
+		if output, err := gitutil.SourceCommandCombinedOutputContext(ctx, repoURL, "-C", tmpDir, "fetch", "--depth", "1", "origin", ref); err != nil {
 			return nil, fmt.Errorf("failed to fetch ref %s: %w\nOutput: %s", ref, err, string(output))
 		}
 
