@@ -163,9 +163,9 @@ Uses imported agentic-workflows tool.
 		t.Error("Did not expect release-mode agenticworkflows entrypoint in dev mode (uses container's ENTRYPOINT)")
 	}
 
-	// Verify ${RUNNER_TEMP}/gh-aw is always mounted read-only for security
-	if !strings.Contains(workflowData, `${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro`) {
-		t.Error("Expected ${RUNNER_TEMP}/gh-aw to be mounted read-only in AWF for security")
+	// Verify the private setup root remains mounted read-only for security
+	if !strings.Contains(workflowData, `--mount "${GH_AW_SETUP_ROOT}:${GH_AW_SETUP_ROOT}:ro"`) {
+		t.Error("Expected the private setup root to be mounted read-only in AWF for security")
 	}
 
 	// Verify DEBUG and GITHUB_TOKEN are present

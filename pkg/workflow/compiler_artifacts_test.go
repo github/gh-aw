@@ -908,12 +908,12 @@ Body.
 	assert.Contains(t, uploadSection, "if: always() && steps.redact_secrets.outcome == 'success'")
 
 	for _, expected := range []string{
-		constants.TmpMcpLogsDir,
-		constants.TmpSandboxAgentLogsDir,
-		constants.AgentStdioLogPath,
-		constants.AWFProxyLogsDir.String() + "/",
-		constants.AWFAuditDir.String() + "/",
-		constants.AWFResolvedConfigFilePath.String(),
+		workflowRuntimePath(constants.TmpMcpLogsDir),
+		workflowRuntimePath(constants.TmpSandboxAgentLogsDir),
+		workflowRuntimePath(constants.AgentStdioLogPath),
+		workflowRuntimePath(constants.AWFProxyLogsDir.String()) + "/",
+		workflowRuntimePath(constants.AWFAuditDir.String()) + "/",
+		workflowRuntimePath(constants.AWFResolvedConfigFilePath.String()),
 	} {
 		assert.Contains(t, uploadSection, expected)
 	}

@@ -195,7 +195,7 @@ Test workflow`
 	clearSessionState := strings.Index(detectionSection, "Clear inherited Copilot session state")
 	detectionExecution := strings.Index(detectionSection, "id: detection_agentic_execution")
 	if clearSessionState == -1 ||
-		!strings.Contains(detectionSection, "rm -rf /tmp/gh-aw/sandbox/agent/logs/copilot-session-state") ||
+		!strings.Contains(detectionSection, "rm -rf "+workflowRuntimeShellPath(constants.TmpSandboxAgentLogsDir)+"/copilot-session-state") ||
 		detectionExecution == -1 || clearSessionState > detectionExecution {
 		t.Error("Detection job should clear inherited agent checkpoints before detection")
 	}
@@ -282,14 +282,14 @@ Test workflow`
 
 	// Test 1: The detection execution step must override GITHUB_STEP_SUMMARY to the
 	// detection-specific path (not the agent step summary path).
-	if !strings.Contains(detectionSection, "GITHUB_STEP_SUMMARY: "+constants.ThreatDetectionStepSummaryPath) {
-		t.Errorf("Detection execution step should set GITHUB_STEP_SUMMARY to %q", constants.ThreatDetectionStepSummaryPath)
+	if !strings.Contains(detectionSection, "GITHUB_STEP_SUMMARY: "+workflowRuntimePath(constants.ThreatDetectionStepSummaryPath)) {
+		t.Errorf("Detection execution step should set GITHUB_STEP_SUMMARY to %q", workflowRuntimePath(constants.ThreatDetectionStepSummaryPath))
 	}
-	if strings.Contains(detectionSection, "touch "+AgentStepSummaryPath) {
-		t.Errorf("Detection execution step must not create unused agent step summary %q", AgentStepSummaryPath)
+	if strings.Contains(detectionSection, "touch "+workflowRuntimeShellPath(AgentStepSummaryPath)) {
+		t.Errorf("Detection execution step must not create unused agent step summary %q", workflowRuntimePath(AgentStepSummaryPath))
 	}
-	if strings.Contains(detectionSection, AgentStepSummaryPath) {
-		t.Errorf("Detection execution step must not reference unused agent step summary %q", AgentStepSummaryPath)
+	if strings.Contains(detectionSection, workflowRuntimePath(AgentStepSummaryPath)) {
+		t.Errorf("Detection execution step must not reference unused agent step summary %q", workflowRuntimePath(AgentStepSummaryPath))
 	}
 
 	// Test 2: A dedicated echo step for the detection step summary must be present.
@@ -302,8 +302,8 @@ Test workflow`
 	if agentSection == "" {
 		t.Fatal("Agent job not found in compiled workflow")
 	}
-	if !strings.Contains(agentSection, "GITHUB_STEP_SUMMARY: "+AgentStepSummaryPath) {
-		t.Errorf("Agent job should still use AgentStepSummaryPath %q for GITHUB_STEP_SUMMARY", AgentStepSummaryPath)
+	if !strings.Contains(agentSection, "GITHUB_STEP_SUMMARY: "+workflowRuntimePath(AgentStepSummaryPath)) {
+		t.Errorf("Agent job should still use AgentStepSummaryPath %q for GITHUB_STEP_SUMMARY", workflowRuntimePath(AgentStepSummaryPath))
 	}
 }
 
@@ -447,7 +447,7 @@ Test workflow`
 	}
 
 	// The rw mount for the threat-detection directory must be present
-	if !strings.Contains(detectionSection, "/tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw") {
+	if !strings.Contains(detectionSection, runtimeRootExpression+"/threat-detection:"+runtimeRootExpression+"/threat-detection:rw") {
 		t.Error("External detector path must include read-write mount for /tmp/gh-aw/threat-detection")
 	}
 
@@ -462,11 +462,11 @@ Test workflow`
 			invocationLineEnd = len(detectionSection) - invocationIndex
 		}
 		invocationLine := detectionSection[invocationIndex : invocationIndex+invocationLineEnd]
-		if !strings.Contains(invocationLine, " /tmp/gh-aw/threat-detection") {
+		if !strings.Contains(invocationLine, " "+runtimeRootExpression+"/threat-detection") {
 			t.Error("External detector path must pass /tmp/gh-aw/threat-detection as the positional artifacts directory")
 		}
 	}
-	if !strings.Contains(detectionSection, "--output /tmp/gh-aw/threat-detection/detection_result.json") {
+	if !strings.Contains(detectionSection, "--output "+workflowRuntimePath(constants.ThreatDetectionResultPath)) {
 		t.Error("External detector path must pass --output /tmp/gh-aw/threat-detection/detection_result.json to threat-detect")
 	}
 
@@ -504,10 +504,10 @@ Test workflow`
 		if uploadStepEnd != -1 {
 			uploadStep = detectionSection[uploadStepStart : uploadStepStart+1+uploadStepEnd]
 		}
-		if !strings.Contains(uploadStep, "            "+constants.ThreatDetectionResultPath+"\n") {
-			t.Errorf("External detector path must upload %s", constants.ThreatDetectionResultPath)
+		if !strings.Contains(uploadStep, "            "+workflowRuntimePath(constants.ThreatDetectionResultPath)+"\n") {
+			t.Errorf("External detector path must upload %s", workflowRuntimePath(constants.ThreatDetectionResultPath))
 		}
-		if !strings.Contains(uploadStep, "            "+constants.TmpGhAwDir+"/threat-detection/detection_usage.jsonl\n") {
+		if !strings.Contains(uploadStep, "            "+workflowRuntimePath(constants.TmpGhAwDir+"/threat-detection/detection_usage.jsonl")+"\n") {
 			t.Error("External detector path must upload detection AI Credits accounting")
 		}
 		// The raw engine log (detection.log) and step-summary must NOT be uploaded on the
@@ -843,10 +843,10 @@ Test workflow`
 	if !strings.Contains(detectionSection, "Prepare Codex config for threat-detect") {
 		t.Error("Codex external detector path must prepare Codex config files before execution")
 	}
-	if !strings.Contains(detectionSection, string(constants.ShellMcpServersJsonPath)) {
+	if !strings.Contains(detectionSection, workflowSetupShellPath(string(constants.ShellMcpServersJsonPath))) {
 		t.Error("Codex external detector path must create an empty mcp-servers.json for Codex")
 	}
-	if !strings.Contains(detectionSection, string(constants.TmpMcpConfigDir)+"/config.toml") {
+	if !strings.Contains(detectionSection, workflowSetupShellPath(string(constants.TmpMcpConfigDir))+"/config.toml") {
 		t.Error("Codex external detector path must create a writable CODEX_HOME config.toml")
 	}
 	if !strings.Contains(detectionSection, "model_provider = \"openai-proxy\"") {

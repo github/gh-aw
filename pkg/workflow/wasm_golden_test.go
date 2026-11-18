@@ -24,7 +24,7 @@ var testProjectUTCEnvLineRE = regexp.MustCompile(`(?m)^\s*GH_AW_PROJECT_UTC:.*(?
 // The JSON contains model aliases, domain allowlists, and a container image tag that all change
 // frequently as new models and domains are added. Normalizing the entire payload keeps golden
 // fixtures stable without masking structural changes to the surrounding shell command.
-var testAWFConfigPayloadRE = regexp.MustCompile(`(printf '%s\\n' ")(\{.*\})(" > "\$\{RUNNER_TEMP\}/gh-aw/awf-config\.json")`)
+var testAWFConfigPayloadRE = regexp.MustCompile(`(printf '%s\\n' ")(\{.*\})(" > "(?:\$\{RUNNER_TEMP\}/gh-aw|\$\{GH_AW_SETUP_ROOT\})/awf-config\.json")`)
 var testDefaultAWFInfoVersionRE = regexp.MustCompile(`GH_AW_INFO_AWF_VERSION: "` + regexp.QuoteMeta(string(constants.DefaultFirewallVersion)) + `"`)
 var testDefaultAWFGatewayInfoVersionRE = regexp.MustCompile(`GH_AW_INFO_AWMG_VERSION: "` + regexp.QuoteMeta(string(constants.DefaultMCPGatewayVersion)) + `"`)
 var testDefaultAWFInstallVersionRE = regexp.MustCompile(`(install_awf_binary\.sh"\s+)` + regexp.QuoteMeta(string(constants.DefaultFirewallVersion)) + `\b`)

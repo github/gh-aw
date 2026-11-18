@@ -91,10 +91,23 @@ func conformanceNodeScript(t *testing.T, run string) string {
 
 func runConformanceNode(t *testing.T, env []string, args ...string) ([]byte, error) {
 	t.Helper()
+	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
+	for _, entry := range env {
+		if value, ok := strings.CutPrefix(entry, "CONFORMANCE_STATE="); ok {
+			runtimeRoot = filepath.Join(value, "runtime")
+		}
+		if value, ok := strings.CutPrefix(entry, "GH_AW_RUNTIME_ROOT="); ok {
+			runtimeRoot = value
+		}
+	}
+	setupRoot := filepath.Join(runtimeRoot, "setup")
+	require.NoError(t, os.MkdirAll(runtimeRoot, 0o700))
+	require.NoError(t, os.MkdirAll(setupRoot, 0o700))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	command := exec.CommandContext(ctx, "node", args...)
-	command.Env = append(os.Environ(), env...)
+	command.Env = append(os.Environ(), "GH_AW_RUNTIME_ROOT="+runtimeRoot, "GH_AW_SETUP_ROOT="+setupRoot)
+	command.Env = append(command.Env, env...)
 	return command.CombinedOutput()
 }
 
@@ -377,10 +390,12 @@ func TestAgyNativeConformanceRequiresStagedNoop(t *testing.T) {
 			} {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
 			}
-			encodedPath, err := json.Marshal(logPath)
+			runtimeRoot := filepath.Join(dir, "runtime")
+			require.NoError(t, os.MkdirAll(runtimeRoot, 0o700))
+			logContents, err := os.ReadFile(logPath)
 			require.NoError(t, err)
-			script := strings.ReplaceAll(verify, `"/tmp/gh-aw/agent-stdio.log"`, string(encodedPath))
-			out, err := runConformanceNode(t, []string{"CONFORMANCE_STATE=" + dir, "CONFORMANCE_SAFE_OUTPUTS=" + outputPath}, "-e", script)
+			require.NoError(t, os.WriteFile(filepath.Join(runtimeRoot, "agent-stdio.log"), logContents, 0o600))
+			out, err := runConformanceNode(t, []string{"CONFORMANCE_STATE=" + dir, "CONFORMANCE_SAFE_OUTPUTS=" + outputPath}, "-e", verify)
 			reportPath := filepath.Join(dir, "native-report.json")
 			if item.passed {
 				require.NoError(t, err, "%s", out)
@@ -468,10 +483,12 @@ fs.writeFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, JSON.stringify({ type: "n
 			env := []string{"CONFORMANCE_STATE=" + dir, "CONFORMANCE_SAFE_OUTPUTS=" + outputPath}
 			out, err := runConformanceNode(t, env, "-e", prepare)
 			require.NoError(t, err, "%s", out)
-			encodedPath, err := json.Marshal(logPath)
+			runtimeRoot := filepath.Join(dir, "runtime")
+			require.NoError(t, os.MkdirAll(runtimeRoot, 0o700))
+			logContents, err := os.ReadFile(logPath)
 			require.NoError(t, err)
-			script := strings.ReplaceAll(verify, `"/tmp/gh-aw/agent-stdio.log"`, string(encodedPath))
-			out, err = runConformanceNode(t, env, "-e", script)
+			require.NoError(t, os.WriteFile(filepath.Join(runtimeRoot, "agent-stdio.log"), logContents, 0o600))
+			out, err = runConformanceNode(t, env, "-e", verify)
 			if item.passed {
 				require.NoError(t, err, "%s", out)
 			} else {

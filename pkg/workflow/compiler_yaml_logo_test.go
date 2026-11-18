@@ -3,6 +3,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -12,18 +14,24 @@ import (
 func TestASCIILogoAlignment(t *testing.T) {
 	compiler := NewCompiler()
 
-	// Create a minimal workflow for testing.
-	// RawMarkdown must be non-empty so generateYAML uses the fast-path hash
-	// computation (which does not require the file to exist on disk).
-	data := &WorkflowData{
-		Name:        "test-workflow",
-		On:          "push",
-		Permissions: "contents: read",
-		RawMarkdown: "# test-workflow",
+	workflowPath := filepath.Join(t.TempDir(), "test-workflow.md")
+	workflowContent := `---
+on: push
+engine: copilot
+permissions:
+  contents: read
+---
+# test-workflow`
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+	data, err := compiler.ParseWorkflowFile(workflowPath)
+	if err != nil {
+		t.Fatalf("Failed to parse workflow: %v", err)
 	}
 
 	// Generate YAML
-	yaml, _, _, err := compiler.generateYAML(data, "test.md")
+	yaml, _, _, err := compiler.generateYAML(data, workflowPath)
 	if err != nil {
 		t.Fatalf("Failed to generate YAML: %v", err)
 	}

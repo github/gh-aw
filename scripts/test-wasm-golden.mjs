@@ -207,7 +207,7 @@ function normalizeCopilotDefaultModel(content) {
 // a stable placeholder so that model/domain additions don't break golden comparisons.
 // Mirrors testAWFConfigPayloadRE / normalizeOutput() in pkg/workflow/wasm_golden_test.go.
 function normalizeAWFConfigPayload(content) {
-  return content.replace(/(printf '%s\\n' ")(\{.*\})(" > "\$\{RUNNER_TEMP\}\/gh-aw\/awf-config\.json")/g, "$1AWF_CONFIG_PAYLOAD$3");
+  return content.replace(/(printf '%s\\n' ")(\{.*\})(" > "(?:\$\{RUNNER_TEMP\}\/gh-aw|\$\{GH_AW_SETUP_ROOT\})\/awf-config\.json")/g, "$1AWF_CONFIG_PAYLOAD$3");
 }
 
 // ── Normalize actions/checkout pin ──────────────────────────────────────
