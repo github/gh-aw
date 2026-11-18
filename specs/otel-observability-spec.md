@@ -647,10 +647,10 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 
 | Attribute | Type | Requirement |
 |---|---|---|
-| `gen_ai.operation.name` | string | REQUIRED. |
+| `gen_ai.operation.name` | string | REQUIRED on GenAI operation spans, except where §9.5 prohibits it on the agent conclusion span. |
 | `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. |
 | `gen_ai.system` | string | Compatibility only (§6.7). Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Deprecated by OpenTelemetry. |
-| `gen_ai.agent.name` | string | REQUIRED on the built-in agent span (§9.5); the workflow name. |
+| `gen_ai.agent.name` | string | REQUIRED on the built-in agent span (§9.5), including an agent conclusion span acting as the agent span; the workflow name. |
 | `gen_ai.request.model` | string | CONDITIONALLY REQUIRED when available. |
 | `gen_ai.response.model` | string | RECOMMENDED when returned. |
 | `gen_ai.response.finish_reasons` | string[] | RECOMMENDED when returned. |
@@ -663,6 +663,8 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 | `gen_ai.usage.reasoning.output_tokens` | int | RECOMMENDED when applicable. |
 | `gen_ai.workflow.name` | string | Compatibility only (§6.7); replaced by `gen_ai.agent.name`. |
 | `error.type` | string | CONDITIONALLY REQUIRED on the agent span and agent conclusion span when the agent did not succeed: `timeout`, `cancelled` or `agent_failed`. |
+
+For built-in agent telemetry, `gen_ai.response.finish_reasons` and token usage attributes SHOULD be on the built-in agent span or, when no dedicated agent span is emitted, the agent conclusion span. With the §6.7 opt-in and a dedicated agent span, they MUST NOT be present on the conclusion span (§9.5).
 
 ### 10.4 Tool and MCP Attributes
 
