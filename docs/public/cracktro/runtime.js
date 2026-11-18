@@ -82,8 +82,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ksb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ksb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -109,7 +109,7 @@
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
   /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: calc(144px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+  .vnb { position: fixed; right: calc(184px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
   .vnb.on { display: flex; }
   .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -166,16 +166,27 @@
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
      Only opacity changes, so the first tap still lands; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
-  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { opacity: .4; }
-  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ksb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s; }
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ksb, .tourp) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ksb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ksb, .tourp) { transition: none; } }
+  .snd, .fzb, .smb, .ksb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ksb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ksb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
+  .ksb { right: calc(144px + var(--sr)); }
+  /* compact dock: the row holds the arrows, map, search and sound, so kiosk and the column button sit on a second row above it */
+  body.compact-nav .ksb { bottom: calc(52px + var(--sb)); right: calc(24px + var(--sr)); }
+  body.compact-nav .vnb { bottom: calc(52px + var(--sb)); right: calc(64px + var(--sr)); }
+  body.compact-nav .notes { bottom: calc(92px + var(--sb)); }
+  /* kiosk mode: slides rotate on their own; the chrome hides except the stop button, which fades (with the cursor) when idle */
+  body.kiosk :is(.dots, .arrows, .vnb, .snd, .fzb, .smb, .tourp, .notes, .progress) { display: none !important; }
+  body.kiosk .ksb { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  body.kiosk.nav-idle { cursor: none; }
+  body.kiosk.nav-idle .ksb:not(:focus-visible) { opacity: 0; }
+  body.light.kiosk .ksb { color: #1f2328; border-color: #1f2328; }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
@@ -599,6 +610,15 @@
     smBtn.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="5" height="4" rx="1"/><rect x="10" y="4" width="5" height="4" rx="1"/><rect x="16.5" y="4" width="4" height="4" rx="1"/><rect x="3.5" y="10" width="5" height="4" rx="1"/><rect x="10" y="10" width="5" height="4" rx="1"/><rect x="3.5" y="16" width="5" height="4" rx="1"/><rect x="10" y="16" width="5" height="4" rx="1"/><rect x="16.5" y="16" width="4" height="4" rx="1"/></svg>';
     const notes = h("div", { class: "notes" });
+    // kiosk mode (K): rotates every visible slide in fullscreen; the same dock button stops it
+    const ksb = h("button", {
+      class: "ksb",
+      "aria-pressed": "false",
+      onclick: e => {
+        e.stopPropagation();
+        setKiosk(!kiosk);
+      },
+    });
     // tour pill (top right, only during a tour): the tour title and position open the map; × shows every slide again
     const tourT = h("span", { class: "tourp-t" }),
       tourN = h("span", { class: "tourp-n" });
@@ -641,7 +661,7 @@
     for (const t of ["touchstart", "touchend"]) tourP.addEventListener(t, e => e.stopPropagation(), { passive: true });
     const wash = h("div", { class: "wash" });
     const gridc = h("canvas", { class: "gridc" });
-    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, ksb, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     snd.classList.toggle("off", sfx.muted);
 
     // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; map/search/sound need ~150px on the right.
@@ -681,6 +701,90 @@
       snd.classList.add("flash");
       setTimeout(() => snd.classList.remove("flash"), 400);
     }
+
+    // ---------- kiosk ----------
+    // Kiosk mode walks every visible slide (tour or view, examples included) in deck order, wrapping from the last to
+    // the first, without running slide steps (onNext). It asks for fullscreen from the K key or dock button (a user
+    // gesture); if the browser lacks or refuses it, slides still rotate in the window. Escape, K, the button or leaving
+    // fullscreen stop it; a manual move restarts the countdown. One timer at a time, cleared on every re-arm and stop.
+    const KIOSK_MS = Math.max(1000, Number(config.kioskInterval) || 15000);
+    /** @type {{ t: ReturnType<typeof setTimeout> | null, full: boolean, entered: boolean } | null} */
+    let kiosk = null;
+    /** @type {any} */
+    const doc = document;
+    const fsEl = () => doc.fullscreenElement || doc.webkitFullscreenElement || null;
+    const exitFs = () => {
+      try {
+        (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc)?.catch?.(() => {});
+      } catch {}
+    };
+    const kioskNext = () => {
+      for (let k = 1; k <= slides.length; k++) {
+        const i = (cur + k) % slides.length;
+        if (vis(i)) return i;
+      }
+      return cur;
+    };
+    const kioskArm = () => {
+      if (!kiosk) return;
+      clearTimeout(kiosk.t);
+      kiosk.t = setTimeout(() => {
+        if (!kiosk) return;
+        // hold the slide while any dialog (search, map, a deck's own modal) is open
+        if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
+        kioskArm();
+      }, KIOSK_MS);
+    };
+    const paintKiosk = () => {
+      const label = kiosk ? "Stop kiosk mode" : "Start kiosk mode: rotate slides in fullscreen",
+        keys = kiosk ? "K or Esc" : "K";
+      ksb.setAttribute("aria-pressed", String(!!kiosk));
+      ksb.setAttribute("aria-label", `${label} (${keys})`);
+      ksb.setAttribute("aria-keyshortcuts", kiosk ? "K Escape" : "K");
+      ksb.title = `${label} (${keys})`;
+      ksb.innerHTML = kiosk
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>';
+      document.body.classList.toggle("kiosk", !!kiosk);
+    };
+    function setKiosk(on) {
+      on = !!on;
+      if (on === !!kiosk) return on;
+      if (on) {
+        kiosk = { t: null, full: !!fsEl(), entered: false };
+        const k = kiosk;
+        const de = doc.documentElement,
+          req = de.requestFullscreen || de.webkitRequestFullscreen;
+        if (!k.full && req) {
+          k.entered = true;
+          try {
+            // each session owns its request: one that lands after its session stopped (and no newer one runs) is undone
+            req.call(de)?.then?.(
+              () => kiosk || exitFs(),
+              () => (k.entered = false)
+            );
+          } catch {
+            k.entered = false;
+          }
+        }
+        kioskArm();
+      } else {
+        const k = kiosk;
+        clearTimeout(k.t);
+        kiosk = null;
+        // leave the fullscreen kiosk mode asked for, not one the presenter already had
+        if (k.entered && fsEl()) exitFs();
+      }
+      paintKiosk();
+      return on;
+    }
+    const onFullscreen = () => {
+      if (!kiosk) return;
+      if (fsEl()) kiosk.full = true;
+      else if (kiosk.full) setKiosk(false);
+    };
+    for (const t of ["fullscreenchange", "webkitfullscreenchange"]) document.addEventListener(t, onFullscreen);
+    paintKiosk();
 
     // ---------- tours ----------
     // A tour is a filtered view of the deck: only its slides are walked, dotted and counted; jumping to any other slide
@@ -727,7 +831,10 @@
     let view = null;
     const vis = i => !view || view.set.has(i);
     const firstVis = () => slides.findIndex((s, i) => vis(i));
-    const lastVis = () => { for (let i = slides.length - 1; i >= 0; i--) if (vis(i)) return i; return -1; };
+    const lastVis = () => {
+      for (let i = slides.length - 1; i >= 0; i--) if (vis(i)) return i;
+      return -1;
+    };
     const hashFor = n => `#${slides[n].id}${view ? "&" + view.key : ""}`;
 
     // ---------- navigation ----------
@@ -804,6 +911,7 @@
       cur = n;
       slides[n].enter?.(dir);
       chrome(n);
+      kioskArm();
     }
     // progress, dots, dock buttons, notes and hash for slide n (also refreshed when a tour starts or ends)
     function chrome(n) {
@@ -947,7 +1055,11 @@
       } else if (e.key === "Home") go(firstVis());
       else if (e.key === "End") go(lastVis());
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
-      else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
+      else if ((e.key === "k" || e.key === "K") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setKiosk(!kiosk);
+      else if (e.key === "Escape" && kiosk && !e.defaultPrevented) {
+        e.preventDefault();
+        setKiosk(false);
+      } else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
       else if (e.key === "m" || e.key === "M") toggleSound();
       else if (e.key === "g" || e.key === "G") openMap();
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
@@ -1172,7 +1284,13 @@
     const fz = h(
       "dialog",
       { class: "fz", "aria-label": "Search slides" },
-      h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", "aria-keyshortcuts": "Escape", title: "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
+      h(
+        "div",
+        { class: "fz-box" },
+        h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", "aria-keyshortcuts": "Escape", title: "Close search (Esc)", onclick: () => fz.close() }, "Esc")),
+        fzSt,
+        fzList
+      )
     );
     document.body.append(fz);
     const fzPaint = () => {
@@ -1281,7 +1399,12 @@
       "div",
       { class: "smp-d", role: "group", "aria-label": "Design a view" },
       smpCount,
-      dbtn("Select all", "A", "A", () => smpPick(slides.map((s, i) => i), true)),
+      dbtn("Select all", "A", "A", () =>
+        smpPick(
+          slides.map((s, i) => i),
+          true
+        )
+      ),
       dbtn("Clear", "C", "C", () => smpPick([...smpSel], false)),
       smpTitle,
       smpLink,
@@ -1632,7 +1755,7 @@
       setView(v);
       if (v) go(firstVis());
     };
-    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS) };
+    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk) };
   }
 
   window.CracktroDeck = { h, letters, resetIndex, create };
