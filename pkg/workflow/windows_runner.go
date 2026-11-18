@@ -469,7 +469,7 @@ func rewriteWindowsPathOutputs(stepName, script string) string {
 			if strings.HasPrefix(trimmed, prefix) && strings.HasSuffix(trimmed, suffix) {
 				path := strings.TrimSuffix(strings.TrimPrefix(trimmed, prefix), suffix)
 				if path == constants.TmpGhAwDir || strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
-					hostPath := `"` + constants.GhAwRootDirShell + strings.TrimPrefix(path, constants.TmpGhAwDir) + `"`
+					hostPath := `"` + runtimeRootExpression + strings.TrimPrefix(path, constants.TmpGhAwDir) + `"`
 					replacement := `echo "GH_AW_AGENT_OUTPUT=$(wslpath -w ` + hostPath + `)" >> "$GITHUB_OUTPUT"`
 					line = strings.Replace(line, trimmed, replacement, 1)
 				}
@@ -483,6 +483,10 @@ func rewriteWindowsPathOutputs(stepName, script string) string {
 }
 
 func windowsWSLRunWrapper(script string, environmentVariables []string) []string {
+	return windowsWSLRawRunWrapper(relocateWindowsWSLScript(script), environmentVariables)
+}
+
+func windowsWSLRawRunWrapper(script string, environmentVariables []string) []string {
 	encodedScript, err := encodeWindowsWSLRunScript(script)
 	if err != nil {
 		message := strings.ReplaceAll(err.Error(), "'", "''")
@@ -492,7 +496,7 @@ func windowsWSLRunWrapper(script string, environmentVariables []string) []string
 	return append(wrapper, windowsWSLScriptSetup(encodedScript)...)
 }
 
-func encodeWindowsWSLRunScript(script string) (string, error) {
+func relocateWindowsWSLScript(script string) string {
 	script = relocateRuntimeText(script)
 	for expression, variable := range map[string]string{
 		runtimeRootExpression:              "${GH_AW_RUNTIME_ROOT}",
@@ -503,6 +507,10 @@ func encodeWindowsWSLRunScript(script string) (string, error) {
 	} {
 		script = strings.ReplaceAll(script, expression, variable)
 	}
+	return logicalSetupShellPathRE.ReplaceAllString(script, `"$1"`)
+}
+
+func encodeWindowsWSLRunScript(script string) (string, error) {
 	var compressedScript bytes.Buffer
 	compressor, err := flate.NewWriter(&compressedScript, flate.BestCompression)
 	if err != nil {
@@ -555,6 +563,7 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 		"GH_AW_SAFE_OUTPUTS_CONFIG_PATH",
 		"GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
 		"GH_AW_WSL_WORKING_DIRECTORY", "GH_AW_RUNTIME_ROOT", "GH_AW_SETUP_ROOT", "GH_AW_RUNTIME_TOKEN", "GH_AW_RESOURCE_SUFFIX",
+		"GH_AW_CLI_PROXY_PORT", "GH_AW_DIFC_PROXY_PORT",
 		"HOME",
 		"TEMP",
 		"TMP",

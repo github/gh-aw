@@ -42,13 +42,12 @@ steps:
       GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
     run: |
       # Create output directories
-      mkdir -p /tmp/gh-aw/agent/session-data
-      mkdir -p /tmp/gh-aw/agent/session-data/logs
-      mkdir -p /tmp/gh-aw/cache-memory
+      SESSION_DATA="${GH_AW_RUNTIME_ROOT:?}/agent/session-data"
+      mkdir -p "$SESSION_DATA/logs" "$GH_AW_RUNTIME_ROOT/cache-memory"
       
       # Cache entries use stable names so caches restored from previous runs are reusable
       # regardless of the date they were written on. Freshness is decided by file age.
-      CACHE_DIR="/tmp/gh-aw/cache-memory"
+      CACHE_DIR="$GH_AW_RUNTIME_ROOT/cache-memory"
       CACHE_FILE="$CACHE_DIR/copilot-sessions-latest.json"
       CACHE_SCHEMA_FILE="$CACHE_DIR/copilot-sessions-latest-schema.json"
       CACHE_LOGS_DIR="$CACHE_DIR/session-logs-latest"
@@ -100,23 +99,23 @@ steps:
       if [ "$USE_CACHE" = "true" ]; then
         CACHE_AGE_MINUTES=$(( ( $(date '+%s') - $(date -r "$CACHE_FILE" '+%s') ) / 60 ))
         echo "✓ Found cached session data (${CACHE_AGE_MINUTES} minutes old)"
-        cp "$CACHE_FILE" /tmp/gh-aw/agent/session-data/sessions-list.json
+        cp "$CACHE_FILE" "$SESSION_DATA/sessions-list.json"
         
         # Regenerate schema if missing
         if [ ! -s "$CACHE_SCHEMA_FILE" ]; then
-          ./.github/skills/jqschema/jqschema.sh < /tmp/gh-aw/agent/session-data/sessions-list.json > "$CACHE_SCHEMA_FILE"
+          ./.github/skills/jqschema/jqschema.sh < "$SESSION_DATA/sessions-list.json" > "$CACHE_SCHEMA_FILE"
         fi
-        cp "$CACHE_SCHEMA_FILE" /tmp/gh-aw/agent/session-data/sessions-schema.json
+        cp "$CACHE_SCHEMA_FILE" "$SESSION_DATA/sessions-schema.json"
         
         # Restore cached log files if they exist
         if [ -d "$CACHE_LOGS_DIR" ]; then
           echo "✓ Found cached session logs"
-          cp -r "$CACHE_LOGS_DIR"/* /tmp/gh-aw/agent/session-data/logs/ 2>/dev/null || true
-          echo "Restored $(find /tmp/gh-aw/agent/session-data/logs -type f | wc -l) session log files from cache"
+          cp -r "$CACHE_LOGS_DIR"/* "$SESSION_DATA/logs/" 2>/dev/null || true
+          echo "Restored $(find "$SESSION_DATA/logs" -type f | wc -l) session log files from cache"
         fi
         
         echo "Using cached data written ${CACHE_AGE_MINUTES} minutes ago"
-        echo "Total sessions in cache: $(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json)"
+        echo "Total sessions in cache: $(jq 'length' "$SESSION_DATA/sessions-list.json")"
       else
         echo "⬇ Downloading fresh session data..."
         
@@ -130,10 +129,10 @@ steps:
           --paginate \
           --jq '.workflow_runs[] | select(.path == "dynamic/copilot-swe-agent/copilot") | {id, name, path, head_branch, created_at, updated_at, status, conclusion: (.conclusion // (if .status == "completed" then "unknown" else .status // "unknown" end)), html_url}' \
           | jq -s '.[0:50]' \
-          > /tmp/gh-aw/agent/session-data/sessions-list.json
+          > "$SESSION_DATA/sessions-list.json"
 
         # Generate schema for reference
-        ./.github/skills/jqschema/jqschema.sh < /tmp/gh-aw/agent/session-data/sessions-list.json > /tmp/gh-aw/agent/session-data/sessions-schema.json
+        ./.github/skills/jqschema/jqschema.sh < "$SESSION_DATA/sessions-list.json" > "$SESSION_DATA/sessions-schema.json"
 
         # Download per-session logs for actual Copilot agent runs.
         # CI gate runs (e.g. "Smoke CI", "CGO", "CWI" quality gates) always end with
@@ -141,12 +140,12 @@ steps:
         # contain no Copilot agent activity and have no conversation transcript.
         # Prefer structured events.jsonl artifacts; fall back to [cca-engine] turn= lines
         # in raw Actions job logs when no events.jsonl artifact is available.
-        SESSION_COUNT=$(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json)
-        AGENT_COUNT=$(jq '[.[] | select(.conclusion != "action_required")] | length' /tmp/gh-aw/agent/session-data/sessions-list.json)
+        SESSION_COUNT=$(jq 'length' "$SESSION_DATA/sessions-list.json")
+        AGENT_COUNT=$(jq '[.[] | select(.conclusion != "action_required")] | length' "$SESSION_DATA/sessions-list.json")
         echo "Downloading per-session logs for $AGENT_COUNT agent runs (skipping $((SESSION_COUNT - AGENT_COUNT)) CI gate runs)..."
 
         RUNS_TO_FETCH="${RUNNER_TEMP:-/tmp}/copilot-session-runs-${RUN_TAG}.txt"
-        jq -r '.[] | select(.conclusion != "action_required") | "\(.id) \(.head_branch)"' /tmp/gh-aw/agent/session-data/sessions-list.json > "$RUNS_TO_FETCH"
+        jq -r '.[] | select(.conclusion != "action_required") | "\(.id) \(.head_branch)"' "$SESSION_DATA/sessions-list.json" > "$RUNS_TO_FETCH"
 
         FETCH_STATUS_LOG="${RUNNER_TEMP:-/tmp}/copilot-session-fetch-status-${RUN_TAG}.log"
         rm -f "$FETCH_STATUS_LOG"
@@ -164,8 +163,8 @@ steps:
             artifact_work_dir="${RUNNER_TEMP:-/tmp}/copilot-session-artifacts-${run_id}"
             rm -rf "$artifact_work_dir"
             mkdir -p "$artifact_work_dir"
-            events_tmp="/tmp/gh-aw/agent/session-data/logs/${run_id}-events.jsonl.tmp"
-            events_out="/tmp/gh-aw/agent/session-data/logs/${run_id}-events.jsonl"
+            events_tmp="$SESSION_DATA/logs/${run_id}-events.jsonl.tmp"
+            events_out="$SESSION_DATA/logs/${run_id}-events.jsonl"
             rm -f "$events_tmp" "$events_out"
 
             for artifact_id in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${run_id}/artifacts" \
@@ -185,7 +184,7 @@ steps:
               printf '\n' >> "$events_tmp"
             done < <(find "$artifact_work_dir" -type f -name events.jsonl -print0)
 
-            conversation_out="/tmp/gh-aw/agent/session-data/logs/${run_id}-conversation.txt"
+            conversation_out="$SESSION_DATA/logs/${run_id}-conversation.txt"
             rm -f "$conversation_out"
             while IFS= read -r -d '' conversation_file; do
               cat "$conversation_file" >> "$conversation_out"
@@ -204,8 +203,8 @@ steps:
               # Download raw job logs as a transcript fallback. gh api follows the
               # 302 redirect automatically; inspect every job in case the agent job
               # is not first in the run.
-              conversation_tmp="/tmp/gh-aw/agent/session-data/logs/${run_id}-conversation.txt.tmp"
-              conversation_out="/tmp/gh-aw/agent/session-data/logs/${run_id}-conversation.txt"
+              conversation_tmp="$SESSION_DATA/logs/${run_id}-conversation.txt.tmp"
+              conversation_out="$SESSION_DATA/logs/${run_id}-conversation.txt"
               rm -f "$conversation_tmp" "$conversation_out"
 
               jobs_err="${RUNNER_TEMP:-/tmp}/copilot-session-jobs-${run_id}.err"
@@ -227,7 +226,7 @@ steps:
               rm -f "$jobs_err"
 
               for job_id in $job_ids; do
-                raw_log="/tmp/gh-aw/agent/session-data/logs/${run_id}-${job_id}-raw.log"
+                raw_log="$SESSION_DATA/logs/${run_id}-${job_id}-raw.log"
                 raw_log_err="${RUNNER_TEMP:-/tmp}/copilot-session-log-${run_id}-${job_id}.err"
                 rm -f "$raw_log_err"
                 log_rc=0
@@ -260,15 +259,15 @@ steps:
               rm -f "$conversation_tmp"
             fi
 
-            if [ ! -s "/tmp/gh-aw/agent/session-data/logs/${run_id}-events.jsonl" ] && [ ! -s "/tmp/gh-aw/agent/session-data/logs/${run_id}-conversation.txt" ]; then
+            if [ ! -s "$SESSION_DATA/logs/${run_id}-events.jsonl" ] && [ ! -s "$SESSION_DATA/logs/${run_id}-conversation.txt" ]; then
               echo "::warning::No events.jsonl artifact or conversation transcript could be downloaded for agent run $run_id"
             fi
           fi
         done < "$RUNS_TO_FETCH"
 
-        LOG_RUN_COUNT=$(count_agent_logs /tmp/gh-aw/agent/session-data/sessions-list.json /tmp/gh-aw/agent/session-data/logs)
-        EVENTS_COUNT=$(find /tmp/gh-aw/agent/session-data/logs/ -type f -name "*-events.jsonl" | wc -l)
-        CONVERSATION_COUNT=$(find /tmp/gh-aw/agent/session-data/logs/ -type f -name "*-conversation.txt" | wc -l)
+        LOG_RUN_COUNT=$(count_agent_logs "$SESSION_DATA/sessions-list.json" "$SESSION_DATA/logs")
+        EVENTS_COUNT=$(find "$SESSION_DATA/logs/" -type f -name "*-events.jsonl" | wc -l)
+        CONVERSATION_COUNT=$(find "$SESSION_DATA/logs/" -type f -name "*-conversation.txt" | wc -l)
         echo "Session logs downloaded: $LOG_RUN_COUNT of $AGENT_COUNT agent runs ($EVENTS_COUNT events.jsonl, $CONVERSATION_COUNT transcript fallbacks)"
 
         if [ "$CONVERSATION_COUNT" -eq 0 ] && [ "$EVENTS_COUNT" -eq 0 ] && [ "$AGENT_COUNT" -gt 0 ]; then
@@ -282,11 +281,11 @@ steps:
         # Refresh the log cache first so metadata and logs stay consistent with each other
         rm -rf "$CACHE_LOGS_DIR"
         mkdir -p "$CACHE_LOGS_DIR"
-        cp -r /tmp/gh-aw/agent/session-data/logs/* "$CACHE_LOGS_DIR/" 2>/dev/null || true
+        cp -r "$SESSION_DATA/logs/"* "$CACHE_LOGS_DIR/" 2>/dev/null || true
 
         # Store in cache under stable names so future runs can reuse it on any date
-        cp /tmp/gh-aw/agent/session-data/sessions-list.json "$CACHE_FILE"
-        cp /tmp/gh-aw/agent/session-data/sessions-schema.json "$CACHE_SCHEMA_FILE"
+        cp "$SESSION_DATA/sessions-list.json" "$CACHE_FILE"
+        cp "$SESSION_DATA/sessions-schema.json" "$CACHE_SCHEMA_FILE"
 
         # Drop legacy date-keyed cache entries so the cache does not grow unbounded
         rm -rf "$CACHE_DIR"/session-logs-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] 2>/dev/null || true
@@ -294,22 +293,23 @@ steps:
               "$CACHE_DIR"/copilot-sessions-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-schema.json 2>/dev/null || true
 
         echo "✓ Session data saved to cache: $(basename "$CACHE_FILE")"
-        echo "Total sessions found: $(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json)"
+        echo "Total sessions found: $(jq 'length' "$SESSION_DATA/sessions-list.json")"
       fi
       
       # Normalize restored metadata too, and regenerate its schema.
       jq 'map(.conclusion = (.conclusion // (if .status == "completed" then "unknown" else .status // "unknown" end)))' \
-        /tmp/gh-aw/agent/session-data/sessions-list.json > /tmp/gh-aw/agent/session-data/sessions-list.json.tmp
-      mv /tmp/gh-aw/agent/session-data/sessions-list.json.tmp /tmp/gh-aw/agent/session-data/sessions-list.json
-      ./.github/skills/jqschema/jqschema.sh < /tmp/gh-aw/agent/session-data/sessions-list.json > /tmp/gh-aw/agent/session-data/sessions-schema.json
+        "$SESSION_DATA/sessions-list.json" > "$SESSION_DATA/sessions-list.json.tmp"
+      mv "$SESSION_DATA/sessions-list.json.tmp" "$SESSION_DATA/sessions-list.json"
+      ./.github/skills/jqschema/jqschema.sh < "$SESSION_DATA/sessions-list.json" > "$SESSION_DATA/sessions-schema.json"
 
       # Summaries contain measurements only; never copy tool inputs/results into them.
-      python3 - <<'PY'
+      SESSION_DATA="$SESSION_DATA" python3 - <<'PY'
       import datetime
       import json
+      import os
       from pathlib import Path
 
-      root = Path("/tmp/gh-aw/agent/session-data")
+      root = Path(os.environ["SESSION_DATA"])
 
       def timestamp(value):
           try:
@@ -373,25 +373,25 @@ steps:
       PY
 
       # Always ensure data is available at expected locations for backward compatibility
-      echo "Session data available at: /tmp/gh-aw/agent/session-data/sessions-list.json"
-      echo "Schema available at: /tmp/gh-aw/agent/session-data/sessions-schema.json"
-      echo "Logs available at: /tmp/gh-aw/agent/session-data/logs/"
-      echo "Tool latency and payload summaries available at: /tmp/gh-aw/agent/session-data/tool-summaries.json"
+      echo "Session data available at: $SESSION_DATA/sessions-list.json"
+      echo "Schema available at: $SESSION_DATA/sessions-schema.json"
+      echo "Logs available at: $SESSION_DATA/logs/"
+      echo "Tool latency and payload summaries available at: $SESSION_DATA/tool-summaries.json"
 
-      TELEMETRY_LOG_COUNT=$(find /tmp/gh-aw/agent/session-data/logs -type f \( -name "*-events.jsonl" -o -name "*-conversation.txt" \) | wc -l)
-      TOTAL_SESSION_COUNT=$(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json 2>/dev/null || echo 0)
+      TELEMETRY_LOG_COUNT=$(find "$SESSION_DATA/logs" -type f \( -name "*-events.jsonl" -o -name "*-conversation.txt" \) | wc -l)
+      TOTAL_SESSION_COUNT=$(jq 'length' "$SESSION_DATA/sessions-list.json" 2>/dev/null || echo 0)
       if [ "$TOTAL_SESSION_COUNT" -gt 0 ] && [ "$TELEMETRY_LOG_COUNT" -eq 0 ]; then
-        ACTION_REQUIRED_COUNT=$(jq '[.[] | select(.conclusion == "action_required")] | length' /tmp/gh-aw/agent/session-data/sessions-list.json 2>/dev/null || echo 0)
-        COMPLETED_AGENT_COUNT=$(jq '[.[] | select(.status == "completed" and .conclusion != "action_required")] | length' /tmp/gh-aw/agent/session-data/sessions-list.json 2>/dev/null || echo 0)
+        ACTION_REQUIRED_COUNT=$(jq '[.[] | select(.conclusion == "action_required")] | length' "$SESSION_DATA/sessions-list.json" 2>/dev/null || echo 0)
+        COMPLETED_AGENT_COUNT=$(jq '[.[] | select(.status == "completed" and .conclusion != "action_required")] | length' "$SESSION_DATA/sessions-list.json" 2>/dev/null || echo 0)
         if [ "$COMPLETED_AGENT_COUNT" -eq 0 ]; then
           echo "::warning::Copilot session data fetch produced $TOTAL_SESSION_COUNT session records but no completed agent runs to fetch telemetry for (action_required=$ACTION_REQUIRED_COUNT). Phase 2 analysis will be incomplete; check the workflow run filter if completed Copilot sessions were expected."
         else
-          echo "::warning::Copilot session data fetch produced $TOTAL_SESSION_COUNT session records but no telemetry logs in /tmp/gh-aw/agent/session-data/logs for $COMPLETED_AGENT_COUNT completed agent runs. Phase 2 analysis will be incomplete. Candidate causes: no events.jsonl artifacts are available, or the token cannot download Copilot job logs; configure GH_AW_GITHUB_TOKEN with actions:read if job-log authorization errors appeared above."
+          echo "::warning::Copilot session data fetch produced $TOTAL_SESSION_COUNT session records but no telemetry logs in $SESSION_DATA/logs for $COMPLETED_AGENT_COUNT completed agent runs. Phase 2 analysis will be incomplete. Candidate causes: no events.jsonl artifacts are available, or the token cannot download Copilot job logs; configure GH_AW_GITHUB_TOKEN with actions:read if job-log authorization errors appeared above."
         fi
       fi
 
       # Set outputs for downstream use
-      echo "sessions_count=$(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json)" >> "$GITHUB_OUTPUT"
+      echo "sessions_count=$(jq 'length' "$SESSION_DATA/sessions-list.json")" >> "$GITHUB_OUTPUT"
 ---
 
 <!--

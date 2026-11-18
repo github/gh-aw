@@ -19,12 +19,17 @@ const windowsRuntimeRootExpression = "//wsl.localhost/Ubuntu" + runtimeRootExpre
 
 var logicalRuntimePathRE = regexp.MustCompile(constants.TmpGhAwDir + `($|[^A-Za-z0-9_.-])`)
 var logicalSetupPathRE = regexp.MustCompile(`(?:\$\{\{ runner.temp \}\}|\$\{RUNNER_TEMP\}|\$RUNNER_TEMP)/gh-aw($|[^A-Za-z0-9_.-])`)
+var logicalSetupJSPathRE = regexp.MustCompile(`['"]\$\{\{ env\.GH_AW_SETUP_ROOT \}\}(/[A-Za-z0-9_./-]*)?['"]`)
+var logicalSetupShellPathRE = regexp.MustCompile(`'(\$\{GH_AW_SETUP_ROOT\}[/A-Za-z0-9_.:-]*)'`)
+var isolatedExecutionBindings = strings.NewReplacer(
+	runtimeRootExpression, "${GH_AW_RUNTIME_ROOT}",
+	"${{ env.GH_AW_RESOURCE_SUFFIX }}", "${GH_AW_RESOURCE_SUFFIX}",
+)
 var logicalContainerNameRE = regexp.MustCompile(`\b(awmg-mcpg|awmg-cli-proxy|awmg-proxy)($|[^A-Za-z0-9_.-])`)
 
 // Logical paths remain stable inside generation helpers. Relocate at the final
-// workflow boundary, including quoted heredocs, JavaScript and action inputs.
-// The allocated values contain only trusted path characters, so expression
-// substitution is safe even inside executable strings.
+// workflow boundary. Consumers of executable strings choose how to bind the
+// setup root, which may contain arbitrary RUNNER_TEMP characters.
 func relocateRuntimeText(text string) string {
 	text = strings.ReplaceAll(text, "https://localhost:18443", "https://localhost:${{ env.GH_AW_DIFC_PROXY_PORT }}")
 	text = strings.ReplaceAll(text, "host.docker.internal:18443", "host.docker.internal:${{ env.GH_AW_CLI_PROXY_PORT }}")
@@ -33,11 +38,17 @@ func relocateRuntimeText(text string) string {
 	text = strings.ReplaceAll(text, "process.env.RUNNER_TEMP, 'gh-aw',", "process.env.GH_AW_SETUP_ROOT,")
 	text = strings.ReplaceAll(text, `process.env.RUNNER_TEMP, "gh-aw",`, "process.env.GH_AW_SETUP_ROOT,")
 	text = strings.ReplaceAll(text, "process.env.RUNNER_TEMP, 'gh-aw-setup',", "process.env.GH_AW_SETUP_ROOT,")
+	for _, root := range []string{"gh-aw", "gh-aw-setup"} {
+		text = strings.ReplaceAll(text, "${process.env.RUNNER_TEMP}/"+root+"/actions", "${process.env.GH_AW_SETUP_ROOT}/actions")
+	}
 	text = strings.ReplaceAll(text, constants.GhAwRootDir+"-setup/actions", setupRootExpression+"/actions")
 	text = strings.ReplaceAll(text, constants.GhAwRootDirShell+"-setup/actions", setupRootExpression+"/actions")
 	text = strings.ReplaceAll(text, "$RUNNER_TEMP/gh-aw-setup/actions", setupRootExpression+"/actions")
 	text = strings.ReplaceAll(text, conclusionWorkQueueActivationArtifactDir, setupRootExpression+"/activation")
-	text = strings.ReplaceAll(text, constants.GhAwRootDir+"-protected-capture-", setupRootExpression+"/protected-capture-")
+	for _, root := range []string{constants.GhAwRootDir, constants.GhAwRootDirShell, "$RUNNER_TEMP/gh-aw"} {
+		text = strings.ReplaceAll(text, root+"-protected-capture-", setupRootExpression+"/protected-capture-")
+	}
+	text = strings.ReplaceAll(text, `'"${RUNNER_TEMP}"'/gh-aw/`, `'"`+setupRootExpression+`"'/`)
 	text = logicalSetupPathRE.ReplaceAllString(text, setupRootExpression+"$1")
 	text = logicalRuntimePathRE.ReplaceAllString(text, runtimeRootExpression+"$1")
 	return logicalContainerNameRE.ReplaceAllString(text, "$1-${{ env.GH_AW_RESOURCE_SUFFIX }}$2")
@@ -70,15 +81,15 @@ trap - EXIT
 
 const runtimeEarlyCleanupScript = `set -euo pipefail
 if [[ -z "${GH_AW_RUNTIME_ROOT:-}" || -z "${GH_AW_SETUP_ROOT:-}" || -z "${GH_AW_RUNTIME_TOKEN:-}" ]]; then exit 0; fi
-if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "Invalid runtime cleanup root" >&2; exit 1; fi
-owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)"
+if [[ ! "$GH_AW_RUNTIME_ROOT" =~ ^/tmp/gh-aw-run\.[A-Za-z0-9]+$ ]]; then echo "::warning::Invalid runtime cleanup root"; exit 0; fi
+owner_hash="$(printf '%s' "$GH_AW_RUNTIME_TOKEN" | sha256sum | cut -d ' ' -f1)" || exit 0
 for kind in runtime setup; do
   if [[ "$kind" == runtime ]]; then root="$GH_AW_RUNTIME_ROOT"; identity="${GH_AW_RUNTIME_ID:-}"; else root="$GH_AW_SETUP_ROOT"; identity="${GH_AW_SETUP_ID:-}"; fi
   if [[ ! -e "$root" && ! -L "$root" ]]; then continue; fi
-  if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "Refusing unowned runtime cleanup" >&2; exit 1; fi
+  if [[ -L "$root" || ! -d "$root" || "$(stat -c '%d:%i' "$root")" != "$identity" || "$(stat -c '%u' "$root")" != "$(id -u)" || "$(stat -c '%a' "$root")" != 700 ]]; then echo "::warning::Refusing unowned runtime cleanup"; continue; fi
   marker="$root/.gh-aw-runtime-owner"
-  if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "Refusing runtime cleanup without ownership" >&2; exit 1; fi
-  rm -rf -- "$root"
+  if [[ -L "$marker" || ! -f "$marker" || "$(cat -- "$marker")" != "$owner_hash" ]]; then echo "::warning::Refusing runtime cleanup without ownership"; continue; fi
+  rm -rf -- "$root" || echo "::warning::Could not fully remove isolated $kind directory"
 done
 `
 
@@ -87,7 +98,7 @@ func runtimeEarlyCleanupStep(windows bool) string {
 	step.WriteString("      - name: Clean isolated runtime directories\n        if: ${{ always() && env.GH_AW_SETUP_ACTION_COMPLETE != 'true' }}\n")
 	if windows {
 		step.WriteString("        shell: pwsh\n        run: |\n")
-		for _, line := range windowsWSLRunWrapper(runtimeEarlyCleanupScript, []string{"GH_AW_RUNTIME_ID", "GH_AW_SETUP_ID"}) {
+		for _, line := range windowsWSLRawRunWrapper(runtimeEarlyCleanupScript, []string{"GH_AW_RUNTIME_ID", "GH_AW_SETUP_ID"}) {
 			step.WriteString("          " + line + "\n")
 		}
 		return step.String()
@@ -189,7 +200,10 @@ func runtimeAllocationStep(values map[string]string) string {
 
 func windowsRuntimeAllocationStep(values map[string]string) string {
 	fields, _ := parseWindowsStep(runtimeAllocationStep(values))
-	script := fields["run"].(string)
+	script, ok := fields["run"].(string)
+	if !ok {
+		return ""
+	}
 	script = strings.Replace(script, `"$GH_AW_RUNTIME_ROOT" "$GH_AW_SETUP_ROOT" "$GH_AW_RESOURCE_SUFFIX"`,
 		`"$GH_AW_RUNTIME_ROOT" "$(wslpath -w "$GH_AW_SETUP_ROOT")" "$GH_AW_RESOURCE_SUFFIX"`, 1)
 	script = strings.Replace(script, `mktemp -d "$setup_parent/gh-aw-setup.XXXXXXXXXX"`, "mktemp -d /tmp/gh-aw-setup.XXXXXXXXXX", 1)
@@ -205,7 +219,7 @@ func windowsRuntimeAllocationStep(values map[string]string) string {
 		}
 	}
 	step.WriteString("        run: |\n")
-	for _, line := range windowsWSLRunWrapper(script, names) {
+	for _, line := range windowsWSLRawRunWrapper(script, names) {
 		step.WriteString("          " + line + "\n")
 	}
 	return step.String()
@@ -295,7 +309,7 @@ func runtimeJobIsolationEdits(lines []string, job, steps *yaml.Node, end int, in
 		// WSL tool installation consumes no runtime files.
 		name := runtimeMappingValue(steps.Content[0], "name") //nolint:uncheckedsliceindex // The caller requires a nonempty sequence.
 		if len(steps.Content) < 2 || name == nil || name.Value != "Initialize WSL runtime" {
-			return nil, errors.New("Windows runtime job requires the WSL bootstrap before allocation")
+			return nil, errors.New("windows runtime job requires the WSL bootstrap before allocation")
 		}
 		stepStart = steps.Content[1].Line - 1 //nolint:uncheckedsliceindex // The preceding guard requires two steps.
 		allocation = windowsRuntimeAllocationStep(values)
@@ -308,21 +322,38 @@ func runtimeJobIsolationEdits(lines []string, job, steps *yaml.Node, end int, in
 func runtimeStepRelocationEdits(lines []string, start, end int) []runtimeYAMLEdit {
 	var edits []runtimeYAMLEdit
 	inExecutable := false
+	javascript := false
+	agentExecution := false
 	executableIndent := -1
 	for line := start; line < end; line++ {
 		source := lines[line] //nolint:uncheckedsliceindex // Parsed job positions bound start and end within this source.
 		rewritten := relocateRuntimeText(source)
+		if strings.HasPrefix(source, "      - ") {
+			agentExecution = false
+		}
+		if strings.TrimSpace(source) == "id: agentic_execution" {
+			agentExecution = true
+		}
 		if inExecutable && strings.TrimSpace(source) != "" && leadingSpaces(source) <= executableIndent {
 			inExecutable = false
 		}
 		if matches := blockScalarHeaderRE.FindStringSubmatch(strings.TrimSuffix(source, "\n")); matches != nil {
 			inExecutable = true
+			javascript = matches[2] == "script"
 			executableIndent = len(matches[1]) //nolint:uncheckedsliceindex // A successful match includes the declared capture group.
 		}
-		if inExecutable || singleLineExecutableRE.MatchString(source) {
+		if (inExecutable && javascript) || (singleLineExecutableRE.MatchString(source) && strings.HasPrefix(strings.TrimSpace(source), "script:")) {
+			rewritten = logicalSetupJSPathRE.ReplaceAllString(rewritten, "`$${process.env.GH_AW_SETUP_ROOT}$1`")
+		} else if inExecutable || singleLineExecutableRE.MatchString(source) {
 			// Setup roots inherit arbitrary RUNNER_TEMP characters: keep them
 			// data-bound, never splice them into executable Actions expressions.
 			rewritten = strings.ReplaceAll(rewritten, setupRootExpression, "${GH_AW_SETUP_ROOT}")
+			rewritten = logicalSetupShellPathRE.ReplaceAllString(rewritten, `"$1"`)
+			if agentExecution {
+				// AWF arguments and JSON expand in Bash. Keeping the generated
+				// execution body expression-free avoids Actions' scalar limit.
+				rewritten = isolatedExecutionBindings.Replace(rewritten)
+			}
 		}
 		if rewritten != source {
 			edits = append(edits, runtimeYAMLEdit{start: line, end: line + 1, text: rewritten})

@@ -66,7 +66,7 @@ post-steps:
       const expected = JSON.parse(fs.readFileSync(path.join(host, "expected.json"), "utf8"));
       assert.equal(receipt.fileNonce, expected.fileNonce);
       assert.match(receipt.toolNonce, /^[a-f0-9]{48}$/);
-      const entries = fs.readFileSync("/tmp/gh-aw/agent-stdio.log", "utf8").split(/\r?\n/).flatMap(line => {
+      const entries = fs.readFileSync(path.join(process.env.GH_AW_RUNTIME_ROOT, "agent-stdio.log"), "utf8").split(/\r?\n/).flatMap(line => {
         try { return [JSON.parse(line)]; } catch { return []; }
       });
       const tools = entries.filter(entry => entry.event === "step_update" && entry.step_update?.step_type === "tool");

@@ -168,6 +168,25 @@ describe("private runtime ownership", () => {
     expect(vm.runInNewContext(`${js} file`, { process: { env: { GH_AW_SETUP_ROOT: setup } } })).toBe(`${setup}/actions`);
   });
 
+  it("requires staged modules to be regular files within the owned staging tree", () => {
+    context = fixture();
+    const env = context.environment();
+    context.allocate(env);
+    const root = env.GH_AW_SETUP_ROOT;
+    const destination = path.join(root, "custom staging", "telemetry");
+    const filename = "action_conclusion_otlp.cjs";
+    const modulePath = path.join(destination, filename);
+    fs.mkdirSync(destination, { recursive: true });
+    fs.writeFileSync(modulePath, "");
+    expect(context.stagedModulePath(destination, root, filename)).toBe(modulePath);
+    expect(() => context.stagedModulePath(path.dirname(root), root, filename)).toThrow();
+    fs.symlinkSync(destination, path.join(root, "redirect"));
+    expect(() => context.stagedModulePath(path.join(root, "redirect"), root, filename)).toThrow();
+    fs.renameSync(modulePath, `${modulePath}.original`);
+    fs.symlinkSync(`${modulePath}.original`, modulePath);
+    expect(() => context.stagedModulePath(destination, root, filename)).toThrow();
+  });
+
   it("rolls back newly allocated roots when ownership publication fails", () => {
     context = fixture();
     const env = context.environment();
@@ -184,23 +203,33 @@ describe("Windows WSL dispatch contract (mocked, not live WSL)", () => {
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../wsl.js"), "utf8"), {
       module,
-      process: { env: { GH_AW_SETUP_ROOT: "C:\\runner\\setup", STATE_GH_AW_SETUP_ROOT: "C:\\runner\\setup", GH_AW_RUNTIME_ROOT: "/tmp/gh-aw-run.Test123", GH_AW_RUNTIME_TOKEN: "a".repeat(64), GITHUB_STATE: "C:\\runner\\state" } },
+      process: {
+        env: {
+          GH_AW_SETUP_ROOT: "C:\\runner\\setup",
+          STATE_GH_AW_SETUP_ROOT: "C:\\runner\\setup",
+          STATE_GH_AW_SETUP_DESTINATION: "custom staging/telemetry",
+          GH_AW_RUNTIME_ROOT: "/tmp/gh-aw-run.Test123",
+          GH_AW_RUNTIME_TOKEN: "a".repeat(64),
+          GITHUB_STATE: "C:\\runner\\state",
+        },
+      },
       require(name) {
         expect(name).toBe("node:child_process");
         return {
           spawnSync(command, args, options) {
             calls.push({ command, args, options });
-            return { status: 0, stdout: "/mnt/c/action/setup.sh\n" };
+            return { status: 0, stdout: "/mnt/c/action/index.js\n" };
           },
         };
       },
     });
-    expect(module.exports.runInWSL("bash", "C:\\action\\setup.sh").status).toBe(0);
+    expect(module.exports.runInWSL("node", "C:\\action\\index.js").status).toBe(0);
     expect(calls[0].args.slice(0, 5)).toEqual(["--distribution", "Ubuntu", "--user", "root", "--exec"]);
-    expect(calls[1].args).toEqual(["--distribution", "Ubuntu", "--user", "root", "--exec", "bash", "/mnt/c/action/setup.sh"]);
+    expect(calls[1].args).toEqual(["--distribution", "Ubuntu", "--user", "root", "--exec", "node", "/mnt/c/action/index.js"]);
     expect(calls[1].options.env.WSLENV).toContain("GH_AW_SETUP_ROOT/p");
     expect(calls[1].options.env.WSLENV).toContain("STATE_GH_AW_SETUP_ROOT/p");
     expect(calls[1].options.env.WSLENV).not.toContain("GH_AW_RUNTIME_ROOT/p");
+    expect(calls[1].options.env.WSLENV.split(":")).toContain("STATE_GH_AW_SETUP_DESTINATION");
   });
 });
 

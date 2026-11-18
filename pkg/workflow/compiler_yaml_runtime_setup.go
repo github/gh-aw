@@ -387,7 +387,7 @@ func (c *Compiler) generateCommentMemoryEarlyConfigLines(data *WorkflowData) ([]
 	lines = append(lines, "        with:\n")
 	lines = append(lines, "          script: |\n")
 	lines = append(lines, "            const { renderFiles } = require('${{ runner.temp }}/gh-aw/actions/create_files.cjs');\n")
-	lines = append(lines, "            renderFiles({ files: [{ path: \"gh-aw/safeoutputs/config.json\", content_env: \"GH_AW_EARLY_COMMENT_MEMORY_CONFIG\" }] }, process.env, process.env.RUNNER_TEMP);\n")
+	lines = append(lines, "            renderFiles({ files: [{ path: \"safeoutputs/config.json\", content_env: \"GH_AW_EARLY_COMMENT_MEMORY_CONFIG\" }] }, process.env, process.env.GH_AW_SETUP_ROOT);\n")
 	return lines, true
 }
 

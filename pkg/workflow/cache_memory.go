@@ -89,6 +89,9 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 
 		// Path - always use the new cache directory format
 		fmt.Fprintf(builder, "          path: %s\n", cacheDir)
+		// The separate update job can run on a different OS. Runtime isolation
+		// gives both jobs the same portable tar archive as their cache input.
+		builder.WriteString("          enableCrossOsArchive: true\n")
 
 		builder.WriteString("          restore-keys: |\n")
 		for _, key := range restoreKeys {
@@ -529,6 +532,7 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		saveStep.WriteString("        with:\n")
 		fmt.Fprintf(&saveStep, "          key: %s\n", cacheKey)
 		fmt.Fprintf(&saveStep, "          path: %s\n", cacheDir)
+		saveStep.WriteString("          enableCrossOsArchive: true\n")
 		steps = append(steps, saveStep.String())
 		hasCacheSaveStep = true
 	}

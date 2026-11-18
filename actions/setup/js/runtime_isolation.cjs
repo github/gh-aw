@@ -144,6 +144,17 @@ function validateDestination(directory, setupRoot) {
   }
 }
 
+function stagedModulePath(directory, setupRoot, filename) {
+  if (/[\r\n]/.test(directory)) throw new Error("Invalid setup destination");
+  validateDestination(directory, setupRoot);
+  const resolved = path.resolve(directory);
+  if (fs.realpathSync(directory) !== resolved) throw new Error("Unsafe setup destination");
+  const modulePath = path.join(resolved, filename);
+  const stat = fs.lstatSync(modulePath);
+  if (!stat.isFile() || stat.uid !== currentUID()) throw new Error("Unsafe staged module");
+  return modulePath;
+}
+
 function cleanup(env = process.env) {
   const root = env.STATE_GH_AW_RUNTIME_ROOT || env.GH_AW_RUNTIME_ROOT;
   if (!root) return false;
@@ -214,7 +225,7 @@ function relocate(directory, root, token, suffix, setupRoot) {
   walk(directory);
 }
 
-module.exports = { allocate, cleanup, validate, validateSetup, relocate, relocateText, relocateRuntimePaths, validateDestination };
+module.exports = { allocate, cleanup, validate, validateSetup, relocate, relocateText, relocateRuntimePaths, validateDestination, stagedModulePath };
 
 if (require.main === module) {
   try {

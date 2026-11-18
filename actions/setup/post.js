@@ -94,9 +94,12 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
   // handled inside sendJobConclusionSpan via console.warn.
   try {
     const setupRoot = process.env.STATE_GH_AW_SETUP_ROOT;
-    if (!setupRoot) throw new Error("No invocation-owned setup state");
-    require("./js/runtime_isolation.cjs").validateSetup(setupRoot, process.env.STATE_GH_AW_RUNTIME_TOKEN, process.env.STATE_GH_AW_SETUP_ID);
-    const conclusionScript = path.join(setupRoot, "actions", "action_conclusion_otlp.cjs");
+    const setupId = process.env.STATE_GH_AW_SETUP_ID;
+    const destination = process.env.STATE_GH_AW_SETUP_DESTINATION;
+    if (!setupRoot || !setupId || !destination || path.isAbsolute(destination)) throw new Error("No valid invocation-owned setup state");
+    const { validateSetup, stagedModulePath } = require("./js/runtime_isolation.cjs");
+    validateSetup(setupRoot, process.env.STATE_GH_AW_RUNTIME_TOKEN, setupId);
+    const conclusionScript = stagedModulePath(`${setupRoot}${path.sep}${destination}`, setupRoot, "action_conclusion_otlp.cjs");
     const { run } = require(conclusionScript);
     await run();
   } catch {

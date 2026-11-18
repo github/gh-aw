@@ -23,8 +23,7 @@ function markActionSetupComplete() {
 }
 
 if (process.platform === "win32") {
-  const result = require("./wsl.js").runInWSL("bash", path.join(__dirname, "setup.sh"), [], {
-    GH_AW_SKIP_SETUP_OTLP: "",
+  const result = require("./wsl.js").runInWSL("node", __filename, [], {
     INPUT_SAFE_OUTPUT_CUSTOM_TOKENS: safeOutputCustomTokens,
     INPUT_TRACE_ID: inputTraceId,
     INPUT_PARENT_SPAN_ID: inputParentSpanId,
@@ -32,20 +31,24 @@ if (process.platform === "win32") {
     INPUT_OTLP_OIDC_TOKEN: inputOTLPOIDCToken,
   });
   if (result.error) console.error(`Failed to run setup in WSL: ${result.error.message}`);
-  if (!result.error && result.status === 0) markActionSetupComplete();
   process.exit(result.status ?? 1);
 }
 
+const { allocate, validateSetup, stagedModulePath } = require("./js/runtime_isolation.cjs");
+let ownership;
 try {
-  require("./js/runtime_isolation.cjs").allocate();
+  ownership = allocate();
 } catch (error) {
   console.error(`Failed to allocate private runtime: ${error.message}`);
   process.exit(1);
 }
 
+const setupRoot = ownership.GH_AW_SETUP_ROOT;
+const destination = getActionInput("DESTINATION") || path.join(setupRoot, "actions");
 const result = spawnSync("bash", [path.join(__dirname, "setup.sh")], {
   stdio: "inherit",
   env: Object.assign({}, process.env, {
+    INPUT_DESTINATION: destination,
     INPUT_SAFE_OUTPUT_CUSTOM_TOKENS: safeOutputCustomTokens,
     INPUT_TRACE_ID: inputTraceId,
     INPUT_PARENT_SPAN_ID: inputParentSpanId,
@@ -77,12 +80,16 @@ markActionSetupComplete();
 // Errors are swallowed: trace export failures must never break the workflow.
 (async () => {
   try {
+    validateSetup(setupRoot, ownership.GH_AW_RUNTIME_TOKEN, ownership.GH_AW_SETUP_ID);
+    const setupScript = stagedModulePath(destination, setupRoot, "action_setup_otlp.cjs");
+    // Store a relative path so WSL post can resolve it against the translated setup root.
+    if (process.env.GITHUB_STATE) fs.appendFileSync(process.env.GITHUB_STATE, `GH_AW_SETUP_DESTINATION=${path.relative(setupRoot, destination)}\n`);
     process.env.SETUP_START_MS = String(setupStartMs);
     process.env.INPUT_TRACE_ID = inputTraceId;
     process.env.INPUT_PARENT_SPAN_ID = inputParentSpanId;
     process.env.INPUT_JOB_NAME = inputJobName;
     process.env.INPUT_OTLP_OIDC_TOKEN = inputOTLPOIDCToken;
-    const { run } = require(path.join(process.env.GH_AW_SETUP_ROOT, "actions", "action_setup_otlp.cjs"));
+    const { run } = require(setupScript);
     await run();
   } catch {
     // Non-fatal: silently ignore any OTLP export or output-write errors.

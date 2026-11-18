@@ -3,10 +3,6 @@
 package workflow
 
 import (
-	"bytes"
-	"compress/flate"
-	"encoding/base64"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -316,14 +312,14 @@ func TestRenderStepForRunner(t *testing.T) {
 	for _, expected := range []string{
 		"& $wsl.Source --status",
 		"--install --web-download --distribution Ubuntu --no-launch",
-		"apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git gpgv jq nodejs npm xz-utils",
+		"apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git gpgv jq nodejs npm openssl xz-utils",
 		"WSL is unavailable",
 	} {
 		if !strings.Contains(got, expected) {
 			t.Errorf("Windows job lacks WSL bootstrap requirement %q:\n%s", expected, got)
 		}
 	}
-	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${RUNNER_TEMP}/gh-aw-setup/actions/setup.sh\" --verbose" {
+	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${GH_AW_SETUP_ROOT}/actions/setup.sh\" --verbose" {
 		t.Fatalf("WSL adapter changed the POSIX script: %q", script)
 	}
 
@@ -409,31 +405,6 @@ func TestRenderStepForRunnerPreservesWorkingDirectoryAndExplicitEnvironment(t *t
 	}
 }
 
-func decodeWindowsWSLRunScript(t *testing.T, rendered string) string {
-	t.Helper()
-	const start = "FromBase64String('"
-	index := strings.Index(rendered, start)
-	if index < 0 {
-		t.Fatalf("WSL run wrapper does not contain its encoded script:\n%s", rendered)
-	}
-	encoded := rendered[index+len(start):]
-	end := strings.IndexByte(encoded, '\'')
-	if end < 0 {
-		t.Fatalf("WSL run wrapper has an unterminated encoded script:\n%s", rendered)
-	}
-	compressed, err := base64.StdEncoding.DecodeString(encoded[:end])
-	if err != nil {
-		t.Fatalf("decode compressed WSL run script: %v", err)
-	}
-	reader := flate.NewReader(bytes.NewReader(compressed))
-	defer reader.Close()
-	script, err := io.ReadAll(reader)
-	if err != nil {
-		t.Fatalf("decompress WSL run script: %v", err)
-	}
-	return string(script)
-}
-
 func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
 	job := `    steps:
       - name: Setup Scripts
@@ -455,11 +426,11 @@ func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
           mkdir -p /tmp/gh-aw
 `
 	got := renderStepForRunner(job, "runs-on: windows-latest", "agent")
-	if !strings.Contains(got, "path: ${{ runner.temp }}/gh-aw/agent_output.json") {
-		t.Fatalf("Windows artifact path was not mapped to runner temp:\n%s", got)
+	if !strings.Contains(got, "path: "+windowsRuntimeRootExpression+"/agent_output.json") {
+		t.Fatalf("Windows artifact path was not mapped to the private WSL root:\n%s", got)
 	}
-	if !strings.Contains(got, `ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw`) {
-		t.Fatalf("WSL bootstrap did not map /tmp/gh-aw to runner temp:\n%s", got)
+	if strings.Contains(got, `ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw`) {
+		t.Fatalf("WSL bootstrap still maps the legacy shared runtime root:\n%s", got)
 	}
 	if !strings.Contains(got, "destination: ${{ runner.temp }}/gh-aw-setup/actions") {
 		t.Fatalf("Windows setup scripts were not separated from writable runtime artifacts:\n%s", got)
@@ -467,7 +438,7 @@ func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
 	if !strings.Contains(got, "uses: actions/upload-artifact@v4") {
 		t.Fatalf("Windows artifact action was not preserved:\n%s", got)
 	}
-	if script := decodeWindowsWSLRunScript(t, got); !strings.Contains(script, `GH_AW_SAFE_OUTPUTS=$(wslpath -w "${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl")`) {
+	if script := decodeWindowsWSLRunScript(t, got); !strings.Contains(script, `GH_AW_SAFE_OUTPUTS=$(wslpath -w "${GH_AW_SETUP_ROOT}/safeoutputs/outputs.jsonl")`) {
 		t.Fatalf("Windows native helpers were not given host paths for runtime outputs:\n%s", script)
 	}
 }

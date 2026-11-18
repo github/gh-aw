@@ -87,7 +87,7 @@ engine:
             ...(entry.headers ? { headers: entry.headers } : {}),
           };
         });
-        writeSecureOutput("/tmp/gh-aw/opencode-mcp.json", JSON.stringify({ mcp: { servers } }, null, 2));
+        writeSecureOutput(require("node:path").join(process.env.GH_AW_RUNTIME_ROOT, "opencode-mcp.json"), JSON.stringify({ mcp: { servers } }, null, 2));
     harness-script: |
       const { readFileSync, existsSync } = require("fs");
       const { execFile } = require("child_process");

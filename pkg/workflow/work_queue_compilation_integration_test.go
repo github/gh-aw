@@ -143,12 +143,12 @@ Compile each work-queue workflow phase.
 
 	activation := extractJobSection(compiled, string(constants.ActivationJobName))
 	require.Contains(t, activation, "Snapshot work queue state")
-	require.Contains(t, activation, constants.WorkQueueSnapshotPath)
+	require.Contains(t, activation, relocateRuntimeText(constants.WorkQueueSnapshotPath))
 
 	agent := extractJobSection(compiled, string(constants.AgentJobName))
 	require.Contains(t, agent, `"work-queue"`)
-	require.Contains(t, agent, constants.WorkQueueFinishIntentMount)
-	require.Contains(t, agent, constants.WorkQueueFinishIntentPath)
+	require.Contains(t, agent, "${GH_AW_SETUP_ROOT}/safeoutputs/work-queue:${GH_AW_SETUP_ROOT}/safeoutputs/work-queue:rw")
+	require.Contains(t, agent, relocateRuntimeText(constants.WorkQueueFinishIntentPath))
 	require.Contains(t, agent, "collect_work_queue_intents.cjs")
 	require.Contains(t, agent, "Collect work queue intents")
 	require.Equal(t, 1, strings.Count(agent, "id: redact_secrets\n"))
@@ -159,8 +159,8 @@ Compile each work-queue workflow phase.
 	require.Contains(t, safeOutputs, "contents: write")
 	require.Contains(t, safeOutputs, "actions: write")
 	require.Contains(t, safeOutputs, "work_queue_controls")
-	require.Contains(t, safeOutputs, constants.WorkQueueFinishIntentPath)
-	require.Contains(t, safeOutputs, constants.WorkQueueIntentPath)
+	require.Contains(t, safeOutputs, relocateRuntimeText(constants.WorkQueueFinishIntentPath))
+	require.Contains(t, safeOutputs, relocateRuntimeText(constants.WorkQueueIntentPath))
 	require.Contains(t, safeOutputs, "Download activation artifact for work queue")
 	require.Contains(t, safeOutputs, "Reconcile work queue claim")
 	require.Contains(t, safeOutputs, "requireAssignment: true")
@@ -194,7 +194,7 @@ Compile each work-queue workflow phase.
 	require.Contains(t, conclusion, "Download activation artifact for work queue summary")
 	require.Contains(t, conclusion, "Summarize work queue activity\n        if: always()")
 	require.Contains(t, conclusion, "work_queue_summary.cjs")
-	require.Contains(t, conclusion, "snapshotPath: '${{ runner.temp }}/gh-aw-activation/work-queue.snapshot.json'")
+	require.Contains(t, conclusion, "snapshotPath: `${process.env.GH_AW_SETUP_ROOT}/activation/work-queue.snapshot.json`")
 }
 
 func TestWorkQueueNamedProfileCompilation(t *testing.T) {

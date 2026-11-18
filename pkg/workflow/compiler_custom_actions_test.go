@@ -233,9 +233,9 @@ Test workflow with script mode.
 		t.Error("Expected 'repository: github/gh-aw' in checkout step for script mode")
 	}
 
-	// 2. Checkout should target path: /tmp/gh-aw/actions-source
-	if !strings.Contains(lockStr, "path: /tmp/gh-aw/actions-source") {
-		t.Error("Expected 'path: /tmp/gh-aw/actions-source' in checkout step for script mode")
+	// 2. Checkout should target the invocation's setup root.
+	if !strings.Contains(lockStr, "path: "+setupRootExpression+"/actions-source") {
+		t.Error("Expected private checkout path for script mode")
 	}
 
 	// 3. Checkout should use shallow clone (fetch-depth: 1)
@@ -244,12 +244,12 @@ Test workflow with script mode.
 	}
 
 	// 4. Setup step should run bash script instead of using "uses:"
-	if !strings.Contains(lockStr, "bash /tmp/gh-aw/actions-source/actions/setup/setup.sh") {
+	if !strings.Contains(lockStr, `bash "${GH_AW_SETUP_ROOT}/actions-source/actions/setup/setup.sh"`) {
 		t.Error("Expected setup script to run bash directly in script mode")
 	}
 
 	// 5. Setup step should have INPUT_DESTINATION environment variable
-	if !strings.Contains(lockStr, "INPUT_DESTINATION: ${{ runner.temp }}/gh-aw/actions") {
+	if !strings.Contains(lockStr, "INPUT_DESTINATION: "+setupRootExpression+"/actions") {
 		t.Error("Expected INPUT_DESTINATION environment variable in setup step for script mode")
 	}
 
@@ -270,7 +270,7 @@ Test workflow with script mode.
 	}
 
 	// 9. Cleanup step should be generated for script mode (mirrors post.js)
-	if !strings.Contains(lockStr, "bash /tmp/gh-aw/actions-source/actions/setup/clean.sh") {
+	if !strings.Contains(lockStr, `bash "${GH_AW_SETUP_ROOT}/actions-source/actions/setup/clean.sh"`) {
 		t.Error("Expected 'Clean Scripts' step with clean.sh in script mode")
 	}
 
