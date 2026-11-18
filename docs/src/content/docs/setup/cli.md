@@ -30,11 +30,14 @@ The `gh aw` CLI extension enables developers to create, manage, and execute AI-p
 
 The `--timeout` flag uses different formats depending on the command:
 
-| Commands | Accepted value | Example | Meaning of `0` |
-|----------|----------------|---------|----------------|
-| `audit`, `health` | Go duration | `--timeout 5m` | `audit`: no additional deadline; `health`: disables its collection deadline |
-| `logs`, `forecast` | Integer minutes | `--timeout 5` | No timeout |
-| `trial` | Integer minutes | `--timeout 10` | No timeout (default: 30 minutes) |
+| Command | Accepted value | Default | Example | Meaning of `0` |
+|---------|----------------|---------|---------|----------------|
+| `audit` | Go duration | `0` | `--timeout 5m` | No additional deadline |
+| `health` | Go duration | `2m` | `--timeout 5m` | Disables its collection deadline |
+| `connector test` | Go duration greater than zero and at most `20s` | `20s` | `--timeout 10s` | Rejected |
+| `logs episode` | Go duration | `5m` | `--timeout 10m` | Rejected |
+| `logs`, `forecast` | Integer minutes | `0` | `--timeout 5` | No timeout |
+| `trial` | Integer minutes | `30` | `--timeout 10` | No timeout |
 
 ## Utility and advanced commands
 
@@ -781,11 +784,12 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--delivery`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--adoption`, `--adoption-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--delivery`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--adoption`, `--adoption-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--retained`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
 When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes (for example, `--timeout 10`); the default `0` disables the timeout.
+`--retained` refreshes due retained deliveries without discovering or downloading runs. It requires `--adoption` and `--repo`; `--count` limits delivery checks.
 
 `--evals` and `--graders` each pull in a matching artifact set automatically: `--evals` includes results from `evals.jsonl`, `--graders` includes deterministic grader results and their artifacts. `--audit` generates `audit.json` in each downloaded run's cache directory (comparisons use only the runs downloaded in that invocation). `--ignore-workflow-runs` excludes specific run IDs (or `slug/ID` values, where the slug is informational and matching uses the numeric ID) from an otherwise matching set.
 
@@ -937,11 +941,11 @@ Analyze workflow runs with detailed reports. The `audit` command has two modes: 
 Analyze a single run with a multi-section report. Accepts run IDs and workflow run, job, or step URLs. Auto-detects Copilot coding agent runs. Job URLs extract that job's logs; step URLs extract that step, otherwise the first failing step.
 
 ```bash wrap
-gh aw audit 12345678                                      # By run ID
+gh aw audit 12345678 --repo owner/repo                   # By run ID
 gh aw audit https://github.com/owner/repo/actions/runs/123 # By workflow run URL
 gh aw audit https://github.com/owner/repo/actions/runs/123/job/456 # By job URL (extracts first failing step)
 gh aw audit https://github.com/owner/repo/actions/runs/123/job/456#step:7:1 # By step URL (extracts specific step)
-gh aw audit 12345678 --parse                              # Parse logs to markdown
+gh aw audit 12345678 --repo owner/repo --parse           # Parse logs to markdown
 gh aw audit 12345678 --repo owner/repo                    # Specify repository for bare run ID
 gh aw audit 12345678 --repo owner/repo --models           # Detailed same-run model information
 ```
@@ -949,9 +953,9 @@ gh aw audit 12345678 --repo owner/repo --models           # Detailed same-run mo
 **`--stdin` flag:** Reads run IDs or URLs from stdin (one per line) instead of positional arguments (mutually exclusive). Blank and `#`-prefixed lines are ignored. Bare numeric IDs require `--repo owner/repo`; full URLs carry their own repo context.
 
 ```bash wrap
-echo -e "1234567890\n9876543210" | gh aw audit --stdin   # diff mode: first is base
+echo -e "1234567890\n9876543210" | gh aw audit --stdin --repo owner/repo # diff mode: first is base
 cat run-ids.txt | gh aw audit --stdin --repo owner/repo
-gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandbox agent runtime matches
+gh aw audit 1234567890 --repo owner/repo --runtime cloud-hypervisor # Skip run unless sandbox agent runtime matches
 ```
 
 **Options:** `--adoption`, `--adoption-dir`, `--artifacts`, `--delivery`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
@@ -991,9 +995,9 @@ Logs are saved to `.github/aw/logs/run-{id}/` with filenames indicating the extr
 Compare two or more runs to detect policy regressions, new unauthorized domains, and behavioral drift. Pass multiple run IDs directly to `audit` — the first is the base, the rest are comparisons:
 
 ```bash wrap
-gh aw audit 12345 12346                     # Compare two runs
-gh aw audit 12345 12346 12347 12348         # Compare base against 3 runs
-gh aw audit 12345 12346 --format markdown   # Markdown for PR comments (or --json for CI)
+gh aw audit 12345 12346 --repo owner/repo                     # Compare two runs
+gh aw audit 12345 12346 12347 12348 --repo owner/repo         # Compare base against 3 runs
+gh aw audit 12345 12346 --repo owner/repo --format markdown   # Markdown for PR comments (or --json for CI)
 ```
 
 The diff shows new or removed network domains, status changes (allowed ↔ denied), volume changes (>100%), MCP tool invocation changes, run metrics (tokens, duration, turns, tokens per turn), and per-tool and per-bash-command call breakdowns.
@@ -1547,14 +1551,27 @@ gh aw work-queue stats --repo owner/repo
 | Subcommand | Options and behavior |
 | --- | --- |
 | `sync-issues` | `--request-id ID` selects one committed terminal request for repair of eligible existing Issue mirrors. See [Synchronization and recovery](/gh-aw/reference/work-queue/#synchronization-and-recovery) for projection and authorization rules. |
-| `submit-work` | `--graph-id` sets a nonempty graph namespace (default: canonical payload SHA-256); `--node-key` sets a nonempty node identity within the graph (default: `root`). `--fairness-key` selects an entitled accounting key (default: one shared bucket). |
-| `dispatch-next` | `--max-bytes` limits assignment bytes (default: 49,152), subject to policy and host limits. Grants and reserves assignments without launching workflows. |
+| `replay` (`read`) | `--run-id` or `--file` selects a captured snapshot. `--pool`, `--max-claims`, and `--max-dispatches` add a bounded scheduling prediction to a snapshot replay. |
+| `state` | `--graph`, `--pool`, `--state`, and `--search` filter rows; `--offset` and `--limit` paginate the result. |
+| `inspect` | Exactly one of `--work-id` or `--claim-id` selects the Work or Claim to inspect. |
+| `explain` | `--pool` predicts live eligibility; `--work-id` inspects one Work, `--before-claim ID` explains the exact predecessor state of a committed Claim, and `--request-id` selects a committed request. |
+| `trace` | Exactly one of `--request-id` or `--claim-id` selects history; `--offset` and `--limit` paginate events. |
+| `submit-work` | `--graph-id` sets a nonempty graph namespace (default: canonical payload SHA-256); `--node-key` sets a nonempty node identity within the graph (default: `root`). `--fairness-key` selects an entitled accounting key (default: one shared bucket). `--pool` selects an approved pool; `--priority` sets the entitled priority (1–5); `--worker-profile` selects an approved profile; `--execution-ref` pins an immutable worker SHA; `--expires-at` sets a Unix-millisecond deadline. |
+| `submit-graph` | `--pool`, `--max-claims`, and `--max-dispatches` set the pool and logical-Claim/native-dispatch budgets for an atomically admitted graph. |
+| `dispatch-next` | `--pool`, `--max-claims`, and `--max-dispatches` bound the pool's logical Claim grants and native dispatch reservations. `--max-bytes` limits assignment bytes (default: 49,152), subject to policy and host limits. Does not launch workflows. |
 | `dispatch <dispatcher>` | Starts a verified dispatcher at the repository's default-branch snapshot revision. `--dry-run` previews the route without granting Claims or launching workflows; `--wait` waits for the dispatcher, not verification of worker Results. |
+| `deploy` | `--from-config` is required; `--pool` and `--worker-profile` optionally limit deployment updates. |
+| `policy` | `--epoch` is required; choose `--from-config` or `--file` to supply the policy. |
+| `cancel-work --obsolete` | Selects one checked batch of obsolete worker-contract Work; `--limit` bounds the batch and `--dry-run` previews it without publishing. |
+| `cancel-claim` | `--claim-id` selects Claims to cancel; `--reason` is required. |
+| `reprioritize` | `--work-id` selects Work and `--priority` sets its new priority; `--reason` is required. |
 | `control` | `--name credential_generation` requires `--generation`, an opaque identifier for an equivalent-scope credential generation, never a secret. Pause controls (`admission_paused`, `grants_paused`) require explicit `--paused=true` or `--paused=false`. All controls require `--reason`. |
 | `reconcile` | `--cancel-reserved` requires `--dispatch-id` and cancels only when compare-and-set proves no launch-start marker exists. It cannot force-release a possible native run and cannot be combined with `--work-id`. |
 | `clear` | Requires maintain or admin permission and `--reason CODE`. `--dry-run` validates and previews without publishing; `--hard` resets a paused, fully settled ledger. All modes, including previews, refuse CI. Mutations require interactive confirmation. |
 
 Normal `clear` cancels unfinished snapshot Work without pending deliveries and preserves completed Work, history, fairness debt, and native reservations. It neither stops native runs nor pauses admission or grants. `--hard` requires admission and grants already paused, all reservations released, and all effects settled; it forgets active identities and fairness debt while retaining Git ancestry, so old identities can be submitted again and repeat effects. See [clearing unfinished Work](/gh-aw/reference/work-queue/#clear-unfinished-work) for limits and operator procedures.
+
+Single-item selectors (`inspect --work-id`, `inspect --claim-id`, `explain --work-id`, `explain --before-claim`, and `trace --claim-id`) take one ID. `cancel-claim --claim-id` and `reprioritize --work-id` accept repeated or comma-separated IDs for batch operations.
 
 #### `version`
 
@@ -1596,7 +1613,7 @@ gh aw project new "Project Q1" --owner myorg --with-project-setup # Create with 
 
 **Options:**
 - `--owner` (required): Project owner - use `@me` for current user or specify organization name
-- `--link/-l`: Repository to link project to (format: `owner/repo`)
+- `--link`: Repository to link project to (format: `owner/repo`)
 - `--with-project-setup`: Create standard project views and custom fields
 
 **Token Requirements:**
