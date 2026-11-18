@@ -78,7 +78,7 @@ connectors:
                 required: true
                 minLength: 9
                 maxLength: 2048
-                pattern: ^https://
+                pattern: ^https://(\[[0-9A-Fa-f:.]+\]|[^/?#@:\\\s\[\]]+)(:[0-9]+)?([/?#][^\s]*)?$
               query: *web-iq-query
               contentFormat: *web-iq-content-format
               maxLength: *web-iq-max-length
@@ -103,7 +103,7 @@ import-schema:
     items:
       type: string
     default: []
-    description: Exact approved public HTTPS URLs for browse, at most 2048 characters each; search results never add grants.
+    description: Exact approved public HTTPS URLs for browse, with a nonempty host and no userinfo, at most 2048 characters each; search results never add grants.
   reader-secret:
     type: string
     default: AZURE_WEB_IQ_READ_ACCESS_TOKEN
@@ -142,8 +142,10 @@ import-schema:
   </authentication>
   <import-inputs>
     queries grants exact nonblank query strings for web, news and browse. urls
-    grants exact HTTPS browse URLs. Both default to empty arrays and accept only
-    string items. reader-secret changes the stored access-token name only.
+    grants exact HTTPS browse URLs. Browse rejects URLs with an empty host or
+    authority userinfo locally, even when explicitly granted. Both inputs default
+    to empty arrays and accept only string items. reader-secret changes the
+    stored access-token name only.
     Independent lists permit any approved query with any approved browse URL;
     they do not establish query/URL pairs. Approve only public, non-sensitive
     inputs and URLs without embedded credentials or confidential query values.

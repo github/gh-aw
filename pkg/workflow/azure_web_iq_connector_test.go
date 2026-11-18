@@ -26,7 +26,8 @@ func webIQPlan(t *testing.T, methods ...string) *connectors.Plan {
 	compiler, path := prepareConnectorScenario(t, connectorCompilerScenario{provider: "azure-web-iq"}, false, func(consumer, _ map[string]any) {
 		consumer["tools"].(map[string]any)["azure-web-iq"] = map[string]any{"search": methods}
 		entry := consumer["imports"].([]any)[0].(map[string]any)
-		entry["with"].(map[string]any)["urls"] = []string{webIQURL}
+		// Invalid URLs are granted too so missing grants cannot mask unsafe patterns.
+		entry["with"].(map[string]any)["urls"] = append(webIQValidBrowseURLs(), webIQInvalidBrowseURLs()...)
 	})
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err)
@@ -53,6 +54,48 @@ func webIQArguments(tool string) map[string]any {
 type webIQArgumentCase struct {
 	Tool string         `json:"tool"`
 	Args map[string]any `json:"args"`
+}
+
+func webIQValidBrowseURLs() []string {
+	return []string{
+		webIQURL,
+		"https://example.com",
+		"https://example.com:8443/path",
+		"https://[2001:db8::1]:8443/path",
+		"https://example.com/@public",
+		"https://example.com/?contact=public@example.com",
+		"https://example.com/#@public",
+	}
+}
+
+func webIQInvalidBrowseURLs() []string {
+	return []string{
+		"http://example.com/",
+		"https://",
+		"https:///path",
+		"https://?query=public",
+		"https://#fragment",
+		"https://:443/path",
+		"https://user@example.com/",
+		"https://user:password@example.com/",
+		"https://@example.com/",
+		"https://user%3Apassword@example.com/",
+		"https://user:password@[2001:db8::1]/",
+		"https:///user:password@example.com/",
+		"https://example.com\\path",
+		"https://exa\nmple.com/",
+		"https://example.com/\n",
+	}
+}
+
+func webIQValidArguments() []webIQArgumentCase {
+	cases := []webIQArgumentCase{{"web", webIQArguments("web")}, {"news", webIQArguments("news")}}
+	for _, url := range webIQValidBrowseURLs() {
+		args := webIQArguments("browse")
+		args["url"] = url
+		cases = append(cases, webIQArgumentCase{"browse", args})
+	}
+	return cases
 }
 
 func webIQInvalidArguments() []webIQArgumentCase {
@@ -83,6 +126,11 @@ func webIQInvalidArguments() []webIQArgumentCase {
 			delete(args, key)
 			cases = append(cases, webIQArgumentCase{tool, args})
 		}
+	}
+	for _, url := range webIQInvalidBrowseURLs() {
+		args := webIQArguments("browse")
+		args["url"] = url
+		cases = append(cases, webIQArgumentCase{"browse", args})
 	}
 	cases = append(cases, webIQArgumentCase{"images", map[string]any{}})
 	return cases
@@ -133,7 +181,7 @@ func TestAzureWebIQConnectorTargetedSelection(t *testing.T) {
 	}
 }
 
-func webIQMockRuntime(t *testing.T, result string, status int, calls *int) connectors.Runtime {
+func webIQMockRuntime(t *testing.T, result string, status int, calls *int, wantArgs map[string]any) connectors.Runtime {
 	t.Helper()
 	return connectors.Runtime{Phase: "agent", AllowedOrigins: []string{"https://api.microsoft.ai"},
 		ResolveSecret: func(_ context.Context, phase, name string) (string, error) {
@@ -161,7 +209,7 @@ func webIQMockRuntime(t *testing.T, result string, status int, calls *int) conne
 			}
 			if message.Method == "tools/call" {
 				(*calls)++
-				want, err := json.Marshal(webIQArguments(message.Params.Name))
+				want, err := json.Marshal(wantArgs)
 				require.NoError(t, err)
 				got, err := json.Marshal(message.Params.Arguments)
 				require.NoError(t, err)
@@ -176,12 +224,12 @@ func webIQMockRuntime(t *testing.T, result string, status int, calls *int) conne
 
 func TestAzureWebIQConnectorHostedCalls(t *testing.T) {
 	plan := webIQPlan(t, "web", "news", "browse")
-	for _, tool := range []string{"web", "news", "browse"} {
-		t.Run(tool, func(t *testing.T) {
+	for _, test := range webIQValidArguments() {
+		t.Run(test.Tool, func(t *testing.T) {
 			calls := 0
-			runtime := webIQMockRuntime(t, `{"content":[{"type":"text","text":"Untrusted passage fixture"}]}`, 200, &calls)
-			result, err := plan.CallMCP(t.Context(), runtime, "search", tool, webIQArguments(tool))
-			require.NoError(t, err)
+			runtime := webIQMockRuntime(t, `{"content":[{"type":"text","text":"Untrusted passage fixture"}]}`, 200, &calls, test.Args)
+			result, err := plan.CallMCP(t.Context(), runtime, "search", test.Tool, test.Args)
+			require.NoError(t, err, "%v", test.Args)
 			require.Len(t, result.Content, 1)
 			require.Equal(t, 1, calls, "the native method is forwarded once, without direct origin fetches")
 		})
@@ -196,7 +244,8 @@ func TestAzureWebIQConnectorHostedCalls(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			calls := 0
-			_, err := plan.CallMCP(t.Context(), webIQMockRuntime(t, fixture.body, fixture.status, &calls), "search", "web", webIQArguments("web"))
+			args := webIQArguments("web")
+			_, err := plan.CallMCP(t.Context(), webIQMockRuntime(t, fixture.body, fixture.status, &calls, args), "search", "web", args)
 			require.Error(t, err)
 			require.NotContains(t, err.Error(), "private-error-fixture")
 			require.Equal(t, 1, calls, "failures do not retry or fall back")
@@ -235,11 +284,7 @@ func TestAzureWebIQConnectorBundledNode(t *testing.T) {
 	plan := webIQPlan(t, "web", "news", "browse")
 	encoded, err := plan.Encode()
 	require.NoError(t, err)
-	args := map[string]any{}
-	for _, tool := range []string{"web", "news", "browse"} {
-		args[tool] = webIQArguments(tool)
-	}
-	payload, err := json.Marshal(map[string]any{"plan": encoded, "args": args, "invalid": webIQInvalidArguments()})
+	payload, err := json.Marshal(map[string]any{"plan": encoded, "valid": webIQValidArguments(), "invalid": webIQInvalidArguments()})
 	require.NoError(t, err)
 	runtime, err := filepath.Abs("../../actions/setup/js/connector_runtime.cjs")
 	require.NoError(t, err)
@@ -264,7 +309,7 @@ const env = {GH_AW_CONNECTOR_SECRET_AZURE_WEB_IQ_READ_ACCESS_TOKEN:"synthetic-en
     await assert.rejects(callMCP(fixture.plan,"search",tool,args,{env:noSecrets,fetchImpl:noHTTP}));
   assert.equal(forbiddenSecrets,0);
   assert.equal(forbiddenHTTP,0);
-  for (const [tool,args] of Object.entries(fixture.args)) {
+  for (const {tool,args} of fixture.valid) {
     let calls = 0;
     const fetchImpl = async (target,init) => {
       assert.equal(target,"https://api.microsoft.ai/v3/mcp");
@@ -288,7 +333,7 @@ const env = {GH_AW_CONNECTOR_SECRET_AZURE_WEB_IQ_READ_ACCESS_TOKEN:"synthetic-en
   assert.equal(forbiddenHTTP,0);
   for (const failure of ["denied","oversize","tool-error"]) {
     let calls = 0;
-    await assert.rejects(callMCP(fixture.plan,"search","web",fixture.args.web,{env,fetchImpl:async (target,init) => {
+    await assert.rejects(callMCP(fixture.plan,"search","web",fixture.valid[0].args,{env,fetchImpl:async (target,init) => {
       assert.equal(target,"https://api.microsoft.ai/v3/mcp");
       const message = JSON.parse(init.body);
       if (message.method === "initialize")
