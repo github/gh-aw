@@ -569,29 +569,40 @@ Only the dedicated `front-door-decision` job has `copilot-requests: write`;
 this permission. The selection step passes the built-in workflow token through
 `CI_DECISION_TOKEN`. It runs the selector, shared client, catalog, prompt, and
 deterministic policy from a separate checkout pinned to the PR's trusted base
-SHA. A second checkout of the PR merge commit supplies only local git diff
-evidence through `CI_DIFF_WORKSPACE`; no PR-controlled code runs in this job.
-Both checkouts disable credential persistence. During initial rollout, a missing
+SHA. SHA-pinned GitHub API evidence supplies the PR merge commit's first-parent
+diff without a second checkout; no PR-controlled code runs in this job.
+The checkout disables credential persistence. During initial rollout, a missing
 trusted selector is skipped and older trusted versions fall back to all suites;
 the PR implementation is never used to bootstrap credential-bearing execution.
 No endpoint variable or PAT is needed, and credentials are never sent to another
 host. Missing tokens or denied inference permissions, including restricted fork
 PRs, run all suites.
-A configured token makes exactly one POST containing the diff summary and five
-named predicates, including on invalid local input; there are no retries,
-redirects, or other selector API requests. Checkout, existing CI cache/artifact
+A configured token makes one POST containing the diff summary and five
+named predicates only when trusted policy permits an optional-suite omission.
+Invalid inputs, unavailable or incomplete evidence, policy changes, and
+`no-eligible-omissions` bypass inference and retain all suites. The latter is a
+normal policy outcome (`fallback: false`), not an inference failure.
+There are no retries or redirects. Diff-evidence API requests are counted
+separately. Checkout, existing CI cache/artifact
 actions, and timing collection are outside this selector boundary.
 
 The request includes `diff_summary`, `suite_catalog`, and the versioned prompt.
-The summary uses only the local merge commit's first-parent diff and excludes
-`.lock.yml` files before reading patches. It separates `.js`/`.cjs`, `.go`, and
+The summary uses only the merge commit's first-parent diff, retaining the first
+`.lock.yml` in sorted path order as a representative generated sample and
+excluding all other generated locks before inventory and patch budgets apply.
+The sample does not authorize omissions; lock-only diffs retain all suites.
+It separates `.js`/`.cjs`, `.go`, and
 other files into `javascript`, `go`, and `other` groups. Each group retains its
 filenames and up to 8,000 UTF-8 patch bytes; `patch_truncated` explicitly marks
 partial snippets. Large patches do not discard the file inventory or consume
 another group's patch budget. Decisions must treat missing hunks conservatively.
-Incomplete inventories (more than 2,000 files or a 128 KiB summary), unavailable
-history, and selector-policy changes still force all suites. No fetch or API
-mining repairs a missing diff.
+Incomplete inventories (more than 2,000 retained paths or a 128 KiB summary),
+unavailable history, and selector-policy changes still force all suites.
+The API path uses one immutable-SHA comparison. At its 300-file cap, the selector
+instead paginates the immutable merge commit's files, verifying its SHA and
+first parent against the event on every page before filtering locks. A raw
+3,000-file ceiling, 2 MiB per-response bound, or shared 10-second evidence
+deadline still fails open. Local `CI_DIFF_WORKSPACE` evidence never fetches.
 
 GitHub returns a named safe-to-omit predicate for each optional suite.
 Probabilities at least 0.9 permit omission; probabilities at most 0.1 retain the

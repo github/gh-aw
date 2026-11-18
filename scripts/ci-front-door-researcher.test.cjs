@@ -95,10 +95,13 @@ test("GitHub authentication never authorizes research calls or weaker fallback",
   assert.match(prompt, /Never execute PR code in the credential-bearing job/);
   assert.match(prompt, /Model confidence never overrides the trusted deterministic path policy/);
   assert.match(prompt, /Missing credentials fail open with zero requests/);
-  assert.match(prompt, /exactly one request, with no retries or redirects/);
+  assert.match(prompt, /one decision request only if trusted policy permits an omission/);
+  assert.match(prompt, /otherwise\s+make zero/);
+  assert.match(prompt, /No retries or redirects/);
   assert.match(prompt, /never provision, probe, or call that service/);
   assert.match(prompt, /make no changes: report the gap/);
   assert.match(prompt, /summarizer excludes `\.lock\.yml` files/);
+  assert.match(prompt, /except the first sorted path/);
   assert.match(prompt, /`javascript`, `go`, and `other` groups/);
   assert.match(prompt, /Incomplete filename inventories still fail open/);
 });

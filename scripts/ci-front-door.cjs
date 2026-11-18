@@ -52,11 +52,13 @@ function eligibleOmissions(diff) {
   // The other optional jobs build cmd/gh-aw or internal/tools/actions-build, not
   // the separate WASM main package. Only build-wasm executes the WASM runner.
   const wasmOnly = new Set(["cmd/gh-aw-wasm/compile_recovery.go", "cmd/gh-aw-wasm/compile_recovery_test.go", "cmd/gh-aw-wasm/main.go", "cmd/gh-aw-wasm/main_stub.go", "scripts/test-wasm-golden.mjs"]);
+  const files = diff.files.filter(file => !file.endsWith(".lock.yml"));
+  if (!files.length) return new Set();
   return new Set(
     SUITE_IDS.filter(
       id =>
         !MANDATORY.includes(id) &&
-        diff.files.every(
+        files.every(
           file =>
             /^(?:README|CONTRIBUTING)\.md$/.test(file) ||
             /^docs\/src\/content\/docs\/.+\.mdx?$/.test(file) ||
@@ -151,19 +153,23 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   try {
     validCatalog = validateCatalog(catalog);
   } catch {
-    // Still make the one configured decision request, but never trust its result.
+    // Invalid trusted metadata can never authorize omissions.
   }
   let decisionCalls = 0;
   let response;
   let reason = fullRun ? "full-run" : !validCatalog ? "invalid-catalog" : !validDiffSummary(diff) ? "invalid-diff-summary" : diff.unavailable ? "diff-unavailable" : diff.truncated ? "diff-truncated" : null;
   if (!reason && diff.files.some(file => file.startsWith(".github/ci/") || file.startsWith("scripts/ci-front-door") || file === ".github/workflows/cgo.yml" || file === "actions/setup/js/decisions_client.cjs")) reason = "policy-changed";
-  if (!fullRun) {
+  if (!reason) {
+    const eligible = eligibleOmissions(diff);
+    if (!validCatalog.suites.some(suite => !suite.mandatory && eligible.has(suite.id))) reason = "no-eligible-omissions";
+  }
+  if (!reason) {
     try {
       response = await decide(
         token,
         {
           diff_summary: diff,
-          suite_catalog: validCatalog || { version: 1, suites: SUITE_IDS.map(id => ({ id, description: "Catalog unavailable; run all suites.", historical_duration_seconds: null, mandatory: MANDATORY.includes(id) })) },
+          suite_catalog: validCatalog,
           prompt,
         },
         {
@@ -188,7 +194,7 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   const knownDurations = omitted?.every(suite => suite.historical_duration_seconds !== null);
   return {
     suite_ids: suiteIds,
-    fallback: !fullRun && reason !== null,
+    fallback: !fullRun && reason !== null && reason !== "no-eligible-omissions",
     reason: reason || "selected",
     metrics: {
       selected_suite_count: suiteIds.length,

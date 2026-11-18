@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { test } = require("node:test");
+const { frontDoor } = require("./ci-front-door.cjs");
+const catalog = require("../.github/ci/suite-catalog.json");
 
 const workflow = fs.readFileSync(path.join(__dirname, "../.github/workflows/cgo.yml"), "utf8");
 const jobs = Object.fromEntries([...workflow.matchAll(/^  ([\w-]+):\n([\s\S]*?)(?=^  [\w-]+:\n|$(?![\s\S]))/gm)].map(match => [match[1], match[2]]));
@@ -139,6 +141,49 @@ test("optional suite gates survive skipped or failed decision jobs and all non-P
     }
     assert.equal(evaluate(expression, { checkout: "failure" }), false, id);
     assert.equal(evaluate(expression, { cancelled: true }), false, id);
+  }
+});
+
+test("PR selector results filter actual optional jobs and macOS after output validation", async () => {
+  const matrix = jobs["cross-platform-build"].match(/^        os: \$\{\{ (.+) \}\}$/m)[1];
+  for (const [file, enabled, inferenceCalls] of [
+    ["scripts/workflow-timing.test.cjs", [], 1],
+    ["cmd/gh-aw-wasm/main.go", ["build-wasm"], 1],
+    ["go.mod", optional, 0],
+  ]) {
+    let calls = 0;
+    const selection = await frontDoor({
+      catalog,
+      diff: { files: [file], patch: "", truncated: false, unavailable: false },
+      prompt: "",
+      token: "test-token",
+      decide: async () => {
+        calls++;
+        return { suite_ids: [], confidence: 1 };
+      },
+    });
+    assert.equal(calls, inferenceCalls, file);
+    const suites = validatedSuites(JSON.stringify(selection.suite_ids));
+    for (const id of optional) {
+      assert.equal(evaluate(condition(jobs[id]), { suites }), enabled.includes(id), `${file}: ${id}`);
+    }
+    assert.equal(JSON.stringify(evaluate(matrix, { suites })), JSON.stringify(inferenceCalls ? ["windows-latest"] : ["macos-latest", "windows-latest"]), file);
+    for (const id of mandatory) assert.ok(JSON.parse(suites).includes(id), `${file}: ${id}`);
+  }
+});
+
+test("non-PR full selection enables every optional gate without inference", async () => {
+  const matrix = jobs["cross-platform-build"].match(/^        os: \$\{\{ (.+) \}\}$/m)[1];
+  for (const event of ["push", "schedule", "workflow_dispatch"]) {
+    const selection = await frontDoor({
+      catalog,
+      diff: { files: ["scripts/workflow-timing.test.cjs"], patch: "", truncated: false, unavailable: false },
+      fullRun: true,
+      decide: () => assert.fail("non-PR events must not invoke inference"),
+    });
+    const suites = validatedSuites(JSON.stringify(selection.suite_ids));
+    for (const id of optional) assert.equal(evaluate(condition(jobs[id]), { event, suites, result: "skipped" }), true, `${event}: ${id}`);
+    assert.equal(JSON.stringify(evaluate(matrix, { event, suites, result: "skipped" })), '["macos-latest","windows-latest"]');
   }
 });
 

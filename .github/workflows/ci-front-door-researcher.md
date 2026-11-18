@@ -126,13 +126,14 @@ with model `gpt-6-luna-decisions`. A dedicated inference job supplies
 from the pinned trusted base; use `CI_DIFF_WORKSPACE` only for local PR diff
 evidence. Never execute PR code in the credential-bearing job. No custom endpoint
 or PAT is needed. Missing credentials fail open with zero requests.
-A configured token makes exactly one request, with no retries or redirects.
+Make one decision request only if trusted policy permits an omission; otherwise
+make zero. No retries or redirects.
 The researcher must never provision, probe, or call that service, or request
 credentials. Report authentication failures as prerequisites, not reasons to
-weaken fallback. Do not confuse zero requests on a configuration fallback with
-the one-request budget for valid configured decisions.
+weaken fallback.
 
-The summarizer excludes `.lock.yml` files and separates `.js`/`.cjs`, `.go`, and
+The summarizer excludes `.lock.yml` files except the first sorted path (sample,
+not omission evidence). It separates `.js`/`.cjs`, `.go`, and
 other files into `javascript`, `go`, and `other` groups. Complete filenames remain
 available when a group's bounded patch has `patch_truncated: true`; missing
 hunks never establish safety. Incomplete filename inventories still fail open.

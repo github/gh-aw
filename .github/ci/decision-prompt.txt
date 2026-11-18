@@ -4,8 +4,8 @@ Answer safe-to-omit YES only with probability at least 0.9; otherwise retain the
 Policy permits omissions only when every changed path is:
 - README.md, CONTRIBUTING.md, docs/src/content/docs/**/*.{md,mdx}, or scripts/workflow-timing.test.cjs; or
 - cmd/gh-aw-wasm/{compile_recovery.go,compile_recovery_test.go,main.go,main_stub.go} or scripts/test-wasm-golden.mjs: retain build-wasm, assess other optional suites.
-Any other path prevents omissions. Test-only changes are not automatically irrelevant.
-diff_summary.files is the complete inventory, excluding generated .lock.yml files. groups separates javascript (.js/.cjs), go and other bounded patches.
+Any other non-generated path prevents omissions. Test-only changes are not automatically irrelevant.
+diff_summary.files retains all non-generated paths and only the first sorted .lock.yml as a representative generated sample. The sample does not expand omission eligibility; lock-only diffs retain all suites. groups separates javascript (.js/.cjs), go and other bounded patches.
 patch_truncated means partial hunks, not missing filenames. Missing hunks never prove safety.
 Incomplete inventories, unavailable diffs, policy changes, or any missing, refused, malformed or uncertain answer run all suites.
 Historical durations do not prove safety. Never invent suite IDs.
