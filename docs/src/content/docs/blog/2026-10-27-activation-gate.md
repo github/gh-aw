@@ -16,7 +16,7 @@ gh-aw implements the workflow-side client and compiler wiring. A separately depl
 
 ## A decision before inference
 
-For a workflow compiled with admission and a configured endpoint, the compiler-owned `admission` step runs inside activation, after trusted setup and before author pre-steps and daily validation. It requests a GitHub Actions OIDC identity token for the authority's audience, then posts the invocation identity and compiled workflow hash to `/api/admission`.
+For a workflow with a configured endpoint, a compiler-owned step in `activation` runs after trusted setup and before author pre-steps and daily validation. It requests a GitHub Actions OIDC identity token for the authority's audience, then posts the invocation identity and compiled workflow hash to `/api/admission`.
 
 The authority verifies the identity and evaluates its policy. An approval supplies the primary agent's maximum AI Credits, with optional independent allowances for threat detection and evals:
 

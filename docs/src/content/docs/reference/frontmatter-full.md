@@ -2063,8 +2063,8 @@ on:
     # (optional)
     all: "read"
 
-  # Generate admission steps in activation and conclusion. An explicit admission
-  # setting in aw.json takes precedence.
+  # Generate admission steps in activation and conclusion (default: false).
+  # An explicit admission setting in aw.json takes precedence.
   # (optional)
   admission: true
 

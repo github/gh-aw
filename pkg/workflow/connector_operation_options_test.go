@@ -297,6 +297,7 @@ Review.
 			assert.NotContains(t, output, "${{ secrets.WRITE_KEY }}")
 			assert.NotContains(t, output, "${{ secrets.SECOND_WRITE_KEY }}")
 			assert.NotContains(t, output, "Mint connector GitHub")
+			assertAdmissionOIDCPermissions(t, output)
 			for _, job := range []string{"agent", "safe_outputs"} {
 				assert.NotContains(t, extractJobSection(output, job), "id-token: write", job)
 			}

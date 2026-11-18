@@ -115,6 +115,7 @@ func TestTeamsConnectorPublicDocumentationSample(t *testing.T) {
 			require.NoError(t, err)
 			require.NotContains(t, string(lock), "TEAMS_GRAPH_CONTEXT_ACCESS_TOKEN")
 			require.NotContains(t, string(lock), `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+			assertAdmissionOIDCPermissions(t, string(lock))
 			for _, job := range []string{"agent", "safe_outputs"} {
 				require.NotContains(t, extractJobSection(string(lock), job), "id-token: write", job)
 			}
