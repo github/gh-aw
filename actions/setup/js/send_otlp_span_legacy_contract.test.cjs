@@ -7,26 +7,49 @@ const { sendJobConclusionSpan, sendJobSetupSpan, OTEL_JSONL_PATH } = await impor
 const { OTEL_METRICS_JSONL_PATH } = await import("./otlp_metrics.cjs");
 const golden = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures/otel_legacy_contract.json"), "utf8"));
 const BASE_MS = 1_700_000_000_000;
+const EXPORT_ERROR_DETAILS_FD = 12346;
 const BASE_ENV = [
   "GH_AW_AGENT_CONCLUSION",
+  "GH_AW_AIC",
+  "GH_AW_CURRENT_WORKFLOW_REF",
+  "GH_AW_GITHUB_EVENT_DEPLOYMENT_STATUS_STATE",
+  "GH_AW_INFO_AWF_VERSION",
+  "GH_AW_INFO_AWMG_VERSION",
+  "GH_AW_INFO_BODY_MODIFIED",
+  "GH_AW_INFO_CLI_VERSION",
+  "GH_AW_INFO_FRONTMATTER_EMOJI",
+  "GH_AW_INFO_FRONTMATTER_SOURCE",
+  "GH_AW_INFO_STAGED",
+  "GH_AW_INFO_VERSION",
   "GH_AW_INFO_WORKFLOW_NAME",
   "GH_AW_OTEL_METRICS",
   "GH_AW_OTLP_ENDPOINTS",
+  "GH_AW_SETUP_WORKFLOW_NAME",
+  "GH_AW_TRACKER_ID",
   "GITHUB_ACTOR",
+  "GITHUB_ACTOR_ID",
   "GITHUB_EVENT_NAME",
   "GITHUB_JOB",
   "GITHUB_REF",
   "GITHUB_REF_NAME",
+  "GITHUB_HEAD_REF",
   "GITHUB_REPOSITORY",
   "GITHUB_RUN_ATTEMPT",
   "GITHUB_RUN_ID",
+  "GITHUB_SERVER_URL",
   "GITHUB_SHA",
   "GITHUB_WORKFLOW",
+  "GITHUB_WORKFLOW_REF",
   "GITHUB_AW_OTEL_TRACE_ID",
   "GITHUB_AW_OTEL_PARENT_SPAN_ID",
   "INPUT_JOB_NAME",
+  "OTEL_RESOURCE_ATTRIBUTES",
   "OTEL_SEMCONV_STABILITY_OPT_IN",
   "OTEL_SERVICE_NAME",
+  "RUNNER_ARCH",
+  "RUNNER_ENVIRONMENT",
+  "RUNNER_NAME",
+  "RUNNER_OS",
 ];
 const originalEnv = {};
 
@@ -114,6 +137,7 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
   let originalStatSync;
   let originalAppendFileSync;
   let originalOpenSync;
+  let originalReadSync;
   let originalFchmodSync;
   let originalWriteSync;
   let originalCloseSync;
@@ -132,13 +156,20 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
       GITHUB_JOB: "agent",
       GITHUB_REF: "refs/heads/main",
       GITHUB_REF_NAME: "main",
+      GITHUB_ACTOR_ID: "42",
       GITHUB_REPOSITORY: "github/gh-aw",
       GITHUB_RUN_ATTEMPT: "1",
       GITHUB_RUN_ID: "123456789",
+      GITHUB_SERVER_URL: "https://github.com",
       GITHUB_SHA: "0123456789abcdef0123456789abcdef01234567",
       GITHUB_WORKFLOW: "OTel Legacy Golden",
+      GITHUB_WORKFLOW_REF: "github/gh-aw/.github/workflows/otel-legacy-contract.yml@refs/heads/main",
       INPUT_JOB_NAME: "agent",
       OTEL_SERVICE_NAME: "gh-aw",
+      RUNNER_ARCH: "X64",
+      RUNNER_ENVIRONMENT: "github-hosted",
+      RUNNER_NAME: "otel-contract",
+      RUNNER_OS: "Linux",
     });
     tracePayloads = [];
     metricPayloads = [];
@@ -154,6 +185,7 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
         "/tmp/gh-aw/agent_output.json": { items: [], errors: [] },
         "/tmp/gh-aw/agent_cli_start_ms.txt": BASE_MS,
       };
+      if (String(filePath) === "/tmp/gh-aw/otlp-export-errors.count") return "0";
       if (Object.hasOwn(fixture, String(filePath))) return JSON.stringify(fixture[String(filePath)]);
       return originalReadFileSync.call(fs, filePath, ...args);
     });
@@ -169,8 +201,14 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
     originalFchmodSync = fs.fchmodSync;
     originalWriteSync = fs.writeSync;
     originalCloseSync = fs.closeSync;
-    vi.spyOn(fs, "openSync").mockImplementation((filePath, ...args) => (filePath === OTEL_METRICS_JSONL_PATH ? 12345 : originalOpenSync.call(fs, filePath, ...args)));
+    originalReadSync = fs.readSync;
+    vi.spyOn(fs, "openSync").mockImplementation((filePath, ...args) => {
+      if (filePath === OTEL_METRICS_JSONL_PATH) return 12345;
+      if (String(filePath) === "/tmp/gh-aw/otlp-export-errors.jsonl") return EXPORT_ERROR_DETAILS_FD;
+      return originalOpenSync.call(fs, filePath, ...args);
+    });
     vi.spyOn(fs, "fchmodSync").mockImplementation((fd, ...args) => (fd === 12345 ? undefined : originalFchmodSync.call(fs, fd, ...args)));
+    vi.spyOn(fs, "readSync").mockImplementation((fd, ...args) => (fd === EXPORT_ERROR_DETAILS_FD ? 0 : originalReadSync.call(fs, fd, ...args)));
     vi.spyOn(fs, "writeSync").mockImplementation((fd, content, ...args) => {
       if (fd === 12345) {
         metricPayloads.push(JSON.parse(Buffer.isBuffer(content) ? content.toString("utf8") : String(content)));
@@ -178,7 +216,7 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
       }
       return originalWriteSync.call(fs, fd, content, ...args);
     });
-    vi.spyOn(fs, "closeSync").mockImplementation((fd, ...args) => (fd === 12345 ? undefined : originalCloseSync.call(fs, fd, ...args)));
+    vi.spyOn(fs, "closeSync").mockImplementation((fd, ...args) => (fd === 12345 || fd === EXPORT_ERROR_DETAILS_FD ? undefined : originalCloseSync.call(fs, fd, ...args)));
   });
 
   afterEach(() => {
