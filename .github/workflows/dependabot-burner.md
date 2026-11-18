@@ -46,6 +46,9 @@ network:
     - node
     - python
     - go
+    # packagefeedproxy.microsoft.io (repository .npmrc) redirects tarballs here.
+    - ms-feed-25.pkgs.visualstudio.com
+    - "*.vsblob.vsassets.io"
 cache:
   - key: dependabot-burner-selection-${{ github.run_id }}
     name: Dependabot burner selection context
@@ -478,6 +481,9 @@ batch JSON, retry history, and maintainer-only feedback. Do not delegate.
 - Set every bash `timeout` to at most 300 seconds. A timed-out validation fails
   its group: remove that group's edits, record its PRs as unaddressed, and do
   not rerun or widen the check.
+- Run validation commands sequentially, one bash call per response. Never issue
+  parallel tool calls that read or write the checkout: concurrent Go, npm, and
+  make commands race on `go.mod`, `go.sum`, and lockfiles and fail spuriously.
 - After the first permission denial, stop shell calls. Write a blocked result with
   the concrete unverified items; do not probe variants or claim validation passed.
 - Do not submit create-pull-request or noop safe outputs from this worker.
@@ -519,7 +525,9 @@ the downstream safe-output job determines success.
 4. Apply compatible updates once. Lockfile-only security updates are valid.
    Preserve hashes, digests, Python wheel/platform constraints, and integrity checks.
    Never fabricate hashes or remove pins.
-5. Run `make dependabot && make build` only for changed workflow sources.
+5. Run `make dependabot && make build` only when this wave edited
+   `.github/workflows/*.md` or shared workflow configuration; never for Go,
+   docs npm, action npm, or `requirements-*.txt` edits alone.
    Refresh only affected locks using repository commands and lock headers.
    Use `--ignore-scripts` for npm refreshes; refresh generated workflow npm locks
    with `npm --prefix .github/workflows install --package-lock-only --ignore-scripts` only when needed.
@@ -552,8 +560,14 @@ Validate the touched ecosystems, not unrelated manifests:
   patterns: the full suite exceeds the run's time budget, and wall-clock budget
   tests such as `TestLintPerformanceBudget` are not dependency validation.
 - Named Python requirements: follow lock-header generator/platform constraints;
-  verify hashes with wheel-only `python -m pip download --require-hashes --only-binary=:all:`
-  into a disposable directory. Do not install or execute downloaded packages.
+  verify hashes with wheel-only `python -m pip download --require-hashes --no-deps --only-binary=:all:`
+  plus the header's target flags into a disposable directory. Hashes pin the
+  target wheels, so omitting the flags downloads host wheels and reports false
+  mismatches. Use exactly:
+  - `requirements-agentrx.txt`: `--python-version 3.12 --implementation cp --abi cp312 --platform manylinux_2_28_x86_64 --platform manylinux2014_x86_64`
+  - `requirements-geo-optimizer.txt`: `--python-version 3.11.5 --platform manylinux2014_x86_64`
+  - other files: the flags in that file's header `pip download` line.
+  Do not install or execute downloaded packages.
 - Docker/action pins: verify exact upstream version/digest and bounded diff;
   use existing allowed static checks. Do not push images or start containers.
 
