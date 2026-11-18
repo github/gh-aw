@@ -10,7 +10,10 @@ import (
 // Model costs and policy overlay helpers for workflow builder.
 
 func rawModelsSection(frontmatter map[string]any) map[string]any {
-	modelsMap, _ := frontmatter["models"].(map[string]any)
+	modelsMap, ok := frontmatter["models"].(map[string]any)
+	if !ok {
+		return nil
+	}
 	return modelsMap
 }
 
