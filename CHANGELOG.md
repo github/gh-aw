@@ -97,6 +97,11 @@ GitHub MCP access-control fields. Remove them to restore compilation; they were
 not enforced before, and no local-compiler replacement is available while
 support remains deferred. Do not rely on them for authorization.
 
+`gh aw audit` now requires `--repo owner/repo` for bare numeric run IDs,
+including numeric IDs read with `--stdin`. Add this flag to existing positional
+and stdin invocations. Full workflow-run, job, and step URLs carry their own
+repository context and remain unchanged.
+
 AWF and downloaded Copilot CLI releases now require a reviewed checksum-manifest
 digest bundled in the trusted setup action or supplied as literal
 `sandbox.agent.checksums-sha256` (AWF) / `engine.checksums-sha256` (Copilot)
