@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-10-05",
-    "workflow_name": "Test Quality Sentinel",
-    "workflow_file": "test-quality-sentinel",
-    "total_aic_analyzed": 116.32,
-    "runs_audited": 5,
-    "recommendations_count": 4,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 18
-  },
-  {
     "date": "2026-10-06",
     "workflow_name": "Daily Caveman Optimizer",
     "workflow_file": "daily-caveman-optimizer",
@@ -298,5 +288,15 @@
     "recommendations_count": 5,
     "subagent_candidates": 1,
     "estimated_aic_savings_per_run": 3
+  },
+  {
+    "date": "2026-11-19",
+    "workflow_name": "Ponytail Reviewer",
+    "workflow_file": "ponytail-reviewer",
+    "total_aic_analyzed": 14.34,
+    "runs_audited": 3,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 1.2
   }
 ]
