@@ -189,6 +189,7 @@ func renderLogsOutputCrossRun(processedRuns []ProcessedRun, logsData LogsData, o
 	}
 	// These fields are for JSON output; text is rendered separately by renderLogsEpisodeOutcomes.
 	report.Outcomes = logsData.Outcomes
+	report.AdoptionErrors = logsData.AdoptionErrors
 	report.Delivery = logsData.Delivery
 	report.EpisodeOutcomes = logsData.EpisodeOutcomes
 	report.FailureClusters = logsData.FailureClusters

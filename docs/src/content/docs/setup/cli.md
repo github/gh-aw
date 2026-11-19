@@ -1109,6 +1109,8 @@ gh aw logs --adoption --adoption-dir ./otlp
 The flag applies to selected runs in discovery, multi-workflow, stdin, and
 episode collection. JSON includes `.delivery[]` with applied effects, `.adoption[]`
 with decision observations, and `.episode_adoption` with selected-episode summaries.
+Runs whose execution evidence cannot be evaluated are listed in `.adoption_errors[]`
+and kept with `unavailable` coverage instead of aborting the batch.
 Adoption checks are live
 and require additional API requests even when execution artifacts are cached.
 `--adoption-dir` requires `--adoption` and writes JSONL observations.

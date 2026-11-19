@@ -24,7 +24,11 @@ observations. Artifact downloads and run discovery can still make API requests
 with either flag. No workflow configuration change or workflow dispatch is needed.
 
 Logs JSON exposes `.delivery[]`, `.adoption[]`, and, for selected episode members,
-`.episode_adoption`. Single-run audit JSON exposes `.delivery`, `.adoption[]`, and
+`.episode_adoption`. A run whose execution evidence cannot be evaluated stays in
+`.runs[]` with `unavailable` coverage and is listed in `.adoption_errors[]` with
+its `run_id`, `reason` (`lifecycle_identity_missing` or
+`lifecycle_evidence_invalid`), and `error`; the remaining runs are still
+evaluated. Single-run audit JSON exposes `.delivery`, `.adoption[]`, and
 `.adoption_summary`. Text reports show the same projections. The `delivery`
 artifact set selects compact execution evidence rather than full workflow logs.
 The MCP `logs` and `audit` tools expose matching `delivery` and `adoption`
