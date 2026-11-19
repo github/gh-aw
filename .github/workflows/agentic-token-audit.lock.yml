@@ -3038,12 +3038,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Configure Git credentials
-        env:
-          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
       - name: Download assets
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -3055,6 +3049,13 @@ jobs:
         run: |
           echo "Downloaded asset files:"
           find /tmp/gh-aw/safeoutputs/assets/ -maxdepth 1 -ls
+      - name: Configure Git credentials
+        env:
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_TOKEN: ''
+          GIT_TOKEN: ''
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
       - name: Download agent output artifact
         id: download-agent-output
         continue-on-error: true
@@ -3088,6 +3089,33 @@ jobs:
           GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
           GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}
           GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}
+          GH_AW_ASSET_GIT_AUTH_REQUIRED: 'true'
+          GH_AW_ASSET_GIT_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GIT_CONFIG_COUNT: '7'
+          GIT_CONFIG_KEY_0: credential.helper
+          GIT_CONFIG_VALUE_0: ''
+          GIT_CONFIG_KEY_1: credential.helper
+          GIT_CONFIG_VALUE_1: "!f() { protocol= host=; while IFS= read -r line && [ -n \"$line\" ]; do case \"$line\" in protocol=*) protocol=${line#protocol=} ;; host=*) host=${line#host=} ;; esac; done; server=${GITHUB_SERVER_URL#https://}; if [ \"$server\" != \"$GITHUB_SERVER_URL\" ] && [ \"$protocol\" = https ] && [ \"$host\" = \"$server\" ] && [ -n \"$GH_AW_ASSET_GIT_TOKEN\" ]; then printf 'username=x-access-token\\npassword=%s\\n' \"$GH_AW_ASSET_GIT_TOKEN\"; else printf 'quit=true\\n'; fi; }; f"
+          GIT_CONFIG_KEY_2: http.extraheader
+          GIT_CONFIG_VALUE_2: ''
+          GIT_CONFIG_KEY_3: http.${{ github.server_url }}/.extraheader
+          GIT_CONFIG_VALUE_3: ''
+          GIT_CONFIG_KEY_4: http.followRedirects
+          GIT_CONFIG_VALUE_4: 'false'
+          GIT_CONFIG_KEY_5: http.${{ github.server_url }}/${{ github.repository }}.extraheader
+          GIT_CONFIG_VALUE_5: ''
+          GIT_CONFIG_KEY_6: http.${{ github.server_url }}/${{ github.repository }}.git.extraheader
+          GIT_CONFIG_VALUE_6: ''
+          GIT_TERMINAL_PROMPT: '0'
+          GIT_ASKPASS: 'false'
+          GIT_SSH_COMMAND: 'false'
+          GIT_TRACE: '0'
+          GIT_TRACE_CURL: '0'
+          GIT_TRACE_PACKET: '0'
+          GIT_TRACE2: '0'
+          GIT_TRACE2_EVENT: '0'
+          GIT_TRACE2_PERF: '0'
+          GIT_CURL_VERBOSE: '0'
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
