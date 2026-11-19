@@ -486,7 +486,7 @@ export interface LifecycleAdoptionData {
   adoptionObservedAt: string;
   adoptionSource: string;
   adoptionRuleVersion: string;
-  acceptanceKind?: "explicit_human" | "fallback_delivery";
+  acceptanceKind?: "explicit_human" | "automation" | "fallback_delivery";
   humanVerified: boolean;
   adoptionCoverage: "available" | "unobserved" | "unsupported" | "unavailable";
   survivalState: "observed" | "reversed" | "unknown";

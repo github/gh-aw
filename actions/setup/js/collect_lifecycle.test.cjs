@@ -93,6 +93,33 @@ describe("deterministic retained lifecycle collection", () => {
     expect(collect.mock.calls.at(-1)[0]).toContain("--retained");
   });
 
+  it("counts automation decisions separately from human and delivery-fallback adoption", () => {
+    const options = directories();
+    const actor = { login: "github-actions[bot]", type: "Bot" };
+    const decisions = {
+      "bot-merged": { state: "accepted", signal: "merged", coverage: "available", human_verified: false, acceptance_kind: "automation", actor, at: "2026-11-16T00:00:00Z" },
+      "bot-closed": { state: "rejected", signal: "closed_without_merge", coverage: "available", human_verified: false, acceptance_kind: "automation", actor, at: "2026-11-16T00:00:00Z" },
+    };
+    writeRows(
+      path.join(options.memoryDir, "lifecycle.jsonl"),
+      Object.keys(decisions).map(id => record(id, { type: "create_pull_request" }))
+    );
+    const result = collectLifecycle({
+      ...options,
+      collect: args => (args.includes("--retained") ? refresh(args, item => ({ ...item, adoption: decisions[item.id] })) : { runs: [] }),
+    });
+    expect(result.totals).toMatchObject({ delivered: 2, accepted_human: 0, accepted_automation: 1, accepted_delivery_fallback: 0, rejected: 1, lifecycle: 0 });
+
+    const verified = directories();
+    writeRows(path.join(verified.memoryDir, "lifecycle.jsonl"), [record("bot-merged", { type: "create_pull_request" })]);
+    expect(() =>
+      collectLifecycle({
+        ...verified,
+        collect: args => (args.includes("--retained") ? refresh(args, item => ({ ...item, adoption: { ...decisions[item.id], human_verified: true } })) : { runs: [] }),
+      })
+    ).toThrow("Invalid retained adoption acceptance");
+  });
+
   it("resumes a saved window and preserves its high-water mark across backward pagination", () => {
     const options = directories();
     writeRows(path.join(options.memoryDir, "lifecycle.jsonl"), []);

@@ -32,6 +32,12 @@ type Delivery struct {
 	Source     string    `json:"source"`
 }
 
+// Actor is the provider-reported account that resolved the adopted resource.
+type Actor struct {
+	Login string `json:"login"`
+	Type  string `json:"type,omitempty"`
+}
+
 type Adoption struct {
 	State          string    `json:"state"`
 	Signal         string    `json:"signal"`
@@ -40,6 +46,7 @@ type Adoption struct {
 	Source         string    `json:"source"`
 	RuleVersion    string    `json:"rule_version"`
 	AcceptanceKind string    `json:"acceptance_kind,omitempty"`
+	Actor          Actor     `json:"actor,omitzero"`
 	HumanVerified  bool      `json:"human_verified"`
 	Coverage       string    `json:"coverage"`
 	Error          string    `json:"error,omitempty"`
@@ -138,6 +145,7 @@ type Observation struct {
 	At             time.Time
 	ObservedAt     time.Time
 	AcceptanceKind string
+	Actor          Actor
 	HumanVerified  bool
 	Error          string
 }
@@ -157,9 +165,13 @@ func Observe(record Record, observation Observation) (Record, error) {
 		return Record{}, errors.New("invalid adoption state")
 	}
 	if observation.State == "accepted" && (observation.At.IsZero() ||
-		observation.AcceptanceKind != "explicit_human" && observation.AcceptanceKind != "fallback_delivery" ||
+		observation.AcceptanceKind != "explicit_human" && observation.AcceptanceKind != "fallback_delivery" &&
+			observation.AcceptanceKind != "automation" ||
 		observation.AcceptanceKind == "explicit_human" && !observation.HumanVerified) {
-		return Record{}, errors.New("adoption requires a verified decision or explicit delivery fallback")
+		return Record{}, errors.New("adoption requires a verified decision, an automation decision, or explicit delivery fallback")
+	}
+	if observation.AcceptanceKind == "automation" && (observation.HumanVerified || observation.Actor.Login == "") {
+		return Record{}, errors.New("automation decision requires its actor and cannot claim human verification")
 	}
 	if observation.State == "accepted" {
 		rule, ok := RuleFor(record.Type)
@@ -178,7 +190,8 @@ func Observe(record Record, observation Observation) (Record, error) {
 	record.Adoption = Adoption{
 		State: observation.State, Signal: observation.Signal, At: observation.At.UTC(),
 		ObservedAt: observation.ObservedAt.UTC(), Source: "github-api", RuleVersion: RuleVersion,
-		AcceptanceKind: observation.AcceptanceKind, HumanVerified: observation.HumanVerified, Coverage: "available",
+		AcceptanceKind: observation.AcceptanceKind, Actor: observation.Actor,
+		HumanVerified: observation.HumanVerified, Coverage: "available",
 	}
 	if observation.State == "accepted" {
 		record.Survival = Survival{State: "observed", Signal: "resource_still_accepted", ObservedAt: observation.ObservedAt.UTC(), Coverage: "snapshot"}
@@ -210,7 +223,8 @@ func Merge(previous, incoming Record) (Record, error) {
 	if _, err := Observe(expected, Observation{
 		State: incoming.Adoption.State, Signal: incoming.Adoption.Signal,
 		At: incoming.Adoption.At, ObservedAt: incoming.Adoption.ObservedAt,
-		AcceptanceKind: incoming.Adoption.AcceptanceKind, HumanVerified: incoming.Adoption.HumanVerified,
+		AcceptanceKind: incoming.Adoption.AcceptanceKind, Actor: incoming.Adoption.Actor,
+		HumanVerified: incoming.Adoption.HumanVerified,
 	}); err != nil {
 		return Record{}, err
 	}
