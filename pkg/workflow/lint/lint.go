@@ -247,6 +247,7 @@ func Default() *Runner {
 		PullRequestTargetRolesRule(),
 		UntrustedRolesDetectionRule(),
 		SafeOutputShellExpansionRule(),
+		SafeOutputCredentialsRule(),
 		FirewallSSLBumpRule(),
 		CustomJobDetectionRule(),
 		GraderFileIORule(),

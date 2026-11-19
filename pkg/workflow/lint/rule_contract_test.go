@@ -266,6 +266,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:         "safe-outputs:\n  steps:\n    - run: cat /tmp/value\n",
 			path:         "safe-outputs.steps[0].run",
 		},
+		"safe-output-credentials": {
+			targets: AWAST, strictPolicy: true,
+			unsafe: "safe-outputs:\n  steps:\n    - run: echo X=1 >> \"$GITHUB_ENV\"\n",
+			safe:   "safe-outputs:\n  steps:\n    - run: echo x=1 >> \"$GITHUB_OUTPUT\"\n",
+			path:   "safe-outputs.steps[0].run",
+		},
 		"firewall-ssl-bump": {
 			threatRuleID: "CTR-011",
 			targets:      AWAST,
