@@ -42,6 +42,25 @@ afterEach(() => {
 });
 
 describe("token broker", () => {
+  it("correlates exchanges and invalidation with the current trace and encoded job, but not OIDC issuance", async () => {
+    const fixture = setup({
+      env: { ...makeEnv(), GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16), GITHUB_JOB: "safe outputs/review" },
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? (JSON.parse(init.body).operation === "invalidate" ? new Response(null, { status: 204 }) : success()) : json({ value: OIDC }))),
+    });
+    await fixture.client.getToken("copilot-task");
+    await fixture.client.invalidateTokens();
+    for (const index of [1, 3]) {
+      expect(fixture.fetchImpl.mock.calls[index][1].headers).toMatchObject({
+        traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+        baggage: "cicd.pipeline.task.name=safe%20outputs%2Freview",
+      });
+    }
+    for (const index of [0, 2]) {
+      expect(fixture.fetchImpl.mock.calls[index][1].headers).not.toHaveProperty("traceparent");
+      expect(fixture.fetchImpl.mock.calls[index][1].headers).not.toHaveProperty("baggage");
+    }
+  });
+
   it("requires the compiler-owned top-level boolean for workflow opt-in, never inherited URL alone", () => {
     expect(isTokenBrokerEnabled({})).toBe(false);
     expect(isTokenBrokerEnabled(makeEnv())).toBe(false);

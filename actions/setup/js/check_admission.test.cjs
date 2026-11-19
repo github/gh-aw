@@ -42,6 +42,26 @@ describe("bounded OIDC-only admission client", () => {
     expect(await checkAdmission({ env: {}, fetchImpl })).toEqual({ result: "skipped" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+  it("preserves encoded job identity and current trace across admission retries", async () => {
+    const env = options({ GITHUB_JOB: "activation/review", GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16) }).env;
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce(oidcResponse)
+      .mockImplementationOnce(() => {
+        env.GITHUB_JOB = "changed";
+        return new Response(null, { status: 503 });
+      })
+      .mockImplementationOnce(success);
+    const decision = await settle(checkAdmission({ env, fetchImpl }));
+    for (const [, request] of fetchImpl.mock.calls.slice(1)) {
+      expect(request.headers).toMatchObject({
+        traceparent: expect.stringMatching(new RegExp(`^00-${"a".repeat(32)}-[0-9a-f]{16}-01$`)),
+        baggage: "cicd.pipeline.task.name=activation%2Freview",
+      });
+    }
+    expect(fetchImpl.mock.calls[1][1].headers.traceparent).toBe(`00-${decision.traceId}-${decision.attempts[0].spanId}-01`);
+    expect(fetchImpl.mock.calls[2][1].headers.traceparent).toBe(`00-${decision.traceId}-${decision.attempts[1].spanId}-01`);
+  });
   it.each(["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GH_AW_INFO_WORKFLOW_ID", "GH_AW_ADMISSION_WORKFLOW_HASH", "GITHUB_RUN_ATTEMPT"])("blocks missing %s without a fallback", async key => {
     const fetchImpl = vi.fn();
     await expect(checkAdmission({ ...options({ [key]: "" }), fetchImpl })).rejects.toThrow(FAILURE);

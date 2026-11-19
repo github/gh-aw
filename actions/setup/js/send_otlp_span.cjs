@@ -134,6 +134,21 @@ function buildTraceparent(traceId, spanId) {
 }
 
 /**
+ * Correlation metadata is diagnostic only, never an authorization binding.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {string} [traceId]
+ * @param {string} [spanId]
+ * @returns {Record<string, string>}
+ */
+function buildServiceRequestHeaders(env = process.env, traceId = env.GITHUB_AW_OTEL_TRACE_ID || "", spanId = env.GITHUB_AW_OTEL_PARENT_SPAN_ID || "") {
+  /** @type {Record<string, string>} */
+  const headers = {};
+  if (isValidTraceId(traceId) && isValidSpanId(spanId)) headers.traceparent = buildTraceparent(traceId, spanId);
+  if (env.GITHUB_JOB) headers.baggage = `${OTEL_ATTR_CICD_PIPELINE_TASK_NAME}=${encodeURIComponent(env.GITHUB_JOB)}`;
+  return headers;
+}
+
+/**
  * Convert a Unix timestamp in milliseconds to a nanosecond string suitable for
  * OTLP's `startTimeUnixNano` / `endTimeUnixNano` fields.
  *
@@ -3028,6 +3043,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
 
 module.exports = {
   buildTraceparent,
+  buildServiceRequestHeaders,
   SPAN_KIND_INTERNAL,
   SPAN_KIND_SERVER,
   SPAN_KIND_CLIENT,

@@ -2,6 +2,7 @@
 "use strict";
 
 const { readBoundedBody } = require("./admission_protocol.cjs");
+const { buildServiceRequestHeaders } = require("./send_otlp_span.cjs");
 
 const SKEW_MS = 30000;
 const TIMEOUT_MS = 10000;
@@ -126,7 +127,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
       try {
         response = await fetchImpl(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
+          headers: { ...buildServiceRequestHeaders(snapshot), "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
           body: JSON.stringify(tokenType === "copilot-request" ? { token_type: tokenType, provider, oidc_token: oidcToken } : { token_type: tokenType, oidc_token: oidcToken }),
           redirect: "manual",
           signal: controller.signal,
@@ -191,7 +192,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
       try {
         response = await fetchImpl(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
+          headers: { ...buildServiceRequestHeaders(snapshot), "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
           body: JSON.stringify({ operation: "invalidate", oidc_token: oidcToken }),
           redirect: "manual",
           signal: controller.signal,

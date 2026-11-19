@@ -103,6 +103,17 @@ describe("generic fail-closed safe-output authorization", () => {
     expect(() => authorizationEvidencePath({ RUNNER_TEMP: "" })).toThrow("trusted evidence storage");
   });
 
+  it("propagates the current context and encoded job only to the authorization backend", async () => {
+    const opts = options({ env: { ...env, GITHUB_JOB: "safe outputs/review", GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16) } });
+    await authorizePreparedInvocation(opts);
+    expect(opts.fetchImpl.mock.calls[1][1].headers).toMatchObject({
+      traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+      baggage: "cicd.pipeline.task.name=safe%20outputs%2Freview",
+    });
+    expect(opts.fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("traceparent");
+    expect(opts.fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("baggage");
+  });
+
   it("rejects Windows before credentials or request consumption, while retaining staged and opt-out behavior", async () => {
     const opts = options();
     const platform = Object.getOwnPropertyDescriptor(process, "platform");

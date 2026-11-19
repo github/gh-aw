@@ -75,6 +75,17 @@ afterEach(() => {
 });
 
 describe("hash-bound gateway workflow admission", () => {
+  it("sends the current trace and encoded job without extending the closed admission binding", async () => {
+    const f = fixture();
+    Object.assign(f.env, { GITHUB_JOB: "gateway/admission", GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16) });
+    await f.run();
+    expect(f.fetchImpl.mock.calls[0][1].headers).toMatchObject({
+      traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+      baggage: "cicd.pipeline.task.name=gateway%2Fadmission",
+    });
+    expect(JSON.parse(f.fetchImpl.mock.calls[0][1].body)).not.toHaveProperty("job_id");
+  });
+
   it("passes the compiler header hash unchanged to OIDC and the closed POST without reading repository credentials or content", async () => {
     const f = fixture();
     await expect(f.run()).resolves.toEqual({ verified: true, workflow_hash: frontmatterHash });
