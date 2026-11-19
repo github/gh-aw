@@ -897,14 +897,7 @@ reconstructed from a freshly replayed source snapshot; verification need not
 compress and replay a throwaway replacement checkpoint. Noncanonical, changed
 or malformed historical logs require full validation; a matching checkpoint ID
 alone is never sufficient. No mutable
-projection is shared between reads. Within one trusted job that the compiler
-opts in with `GH_AW_WORK_QUEUE_VERIFICATION_CACHE`, a later step MAY reuse the
-verified head log and checkpoint proofs that an earlier step recorded in a
-private file under the job's `RUNNER_TEMP`, never under `/tmp/gh-aw`, where
-agent artifacts are extracted. Reuse is limited to Git transport for the same
-repository and branch: each read still re-advertises the ref with its own
-credential, replays the head log and walks new commits back to a recorded proof.
-Shared, linked, foreign or malformed cache files are ignored. The synthetic Git-history benchmark includes
+projection is shared between reads. The synthetic Git-history benchmark includes
 135 Work items, 1,200 retained requests, four checkpoint generations and 128
 ancestry commits, with a
 three-second cold-validation budget excluding fixture construction and without
@@ -2341,12 +2334,12 @@ may append the same immutable Result even after native release. Completion,
 agent statements, and an overall successful worker conclusion alone do not
 prove delivery.
 
-The original worker's trusted finalizer measures that budget from the later of
-Completion and the moment it holds the verified ledger, so slow verification
-earlier in the same job cannot consume every attempt before the first. While
-its own run is active it publishes only a verified Result. `DeliveryFailure`
-exhaustion and maintenance expiry remain anchored at the original Completion
-commit.
+The original worker's trusted finalizer starts a separate verifier budget for
+each Claim after loading its verified ledger and checking the native run.
+This window still allows verification after the Completion deadline, but an
+active worker can publish only a verified Result, not a `DeliveryFailure`.
+Failure exhaustion, maintenance recovery, and missing-verifier expiry remain
+anchored at the original Completion commit.
 
 Built-in resource creation needs independent native readback, not just a
 successful handler response or an agent-supplied URL. Discussion delivery must

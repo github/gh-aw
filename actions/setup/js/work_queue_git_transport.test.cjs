@@ -9,7 +9,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { createGitLedgerClient, gitEnvironment, queueLedgerClient, registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
 const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
-const { readWorkQueueLog, publishWorkQueueRequest, VERIFICATION_CACHE_ENV } = require("./work_queue_store.cjs");
+const { readWorkQueueLog, publishWorkQueueRequest } = require("./work_queue_store.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
 const { compactTransactions, newRequest, replayTransactions, serializeProjection, serializeTransactionLog } = require("./work_queue_replay.cjs");
 const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
@@ -63,50 +63,18 @@ function fixture(options = {}) {
     calls.push("API");
     throw new Error("Ledger verification must not call a hosted API");
   };
-  // Each connection is a fresh process-local ledger client with an empty object store and no in-memory proofs.
-  function connect() {
-    const githubClient = {
-      auth: async () => {
-        networkCalls.push("Git");
-        return { type: "token", token: "queue-test-token" };
-      },
-      graphql: forbidden,
-      rest: new Proxy({}, { get: forbidden }),
-    };
-    const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote: directory });
-    registerQueueLedgerClient(githubClient, ledger);
-    cleanups.push(() => ledger.close());
-    return { githubClient, ledger, options: { githubClient, owner: "owner", repo: "repo" } };
-  }
-  const { githubClient, ledger, options: clientOptions } = connect();
-  return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, connect, directory, options: clientOptions, head: () => head };
-}
-
-function useVerificationCache() {
-  const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "queue-verification-"));
-  const previous = [VERIFICATION_CACHE_ENV, "RUNNER_TEMP"].map(name => [name, process.env[name]]);
-  process.env[VERIFICATION_CACHE_ENV] = "true";
-  process.env.RUNNER_TEMP = runnerTemp;
-  cleanups.push(() => {
-    for (const [name, value] of previous) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-    fs.rmSync(runnerTemp, { recursive: true, force: true });
-  });
-  return { runnerTemp, file: path.join(runnerTemp, "gh-aw", "work-queue-verification.json") };
-}
-
-function nestedCheckpoints(f) {
-  const prior = f.head();
-  const first = compactTransactions(f.queue.transactions, prior, f.queue.administrator, f.queue.at);
-  const parent = f.store(first);
-  const second = compactTransactions(first, parent, f.queue.administrator, f.queue.at + 1);
-  return { prior, second, head: f.store(second) };
-}
-
-function deleteRemoteObject(f, oid) {
-  fs.unlinkSync(path.join(f.directory, "objects", oid.slice(0, 2), oid.slice(2)));
+  const githubClient = {
+    auth: async () => {
+      networkCalls.push("Git");
+      return { type: "token", token: "queue-test-token" };
+    },
+    graphql: forbidden,
+    rest: new Proxy({}, { get: forbidden }),
+  };
+  const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote: directory });
+  registerQueueLedgerClient(githubClient, ledger);
+  cleanups.push(() => ledger.close());
+  return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
 }
 
 function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound = false, corruptOldest = false } = {}) {
@@ -409,98 +377,6 @@ describe("Git-only work queue ledger", { timeout: 90000 }, () => {
     f.store(compactTransactions(f.queue.transactions, prior, f.queue.administrator, f.queue.at));
     fs.unlinkSync(path.join(f.git(["rev-parse", "--absolute-git-dir"]), "objects", prior.slice(0, 2), prior.slice(2)));
     await expect(readWorkQueueLog(f.options)).rejects.toThrow(/git_transport_failed/);
-    expect(f.calls).toEqual([]);
-  });
-
-  it("persists checkpoint verification for the job and reuses it from a fresh client", async () => {
-    const f = fixture();
-    const { file } = useVerificationCache();
-    const { prior, second, head } = nestedCheckpoints(f);
-    await readWorkQueueLog(f.options);
-    const cache = JSON.parse(fs.readFileSync(file, "utf8"));
-    expect(cache).toMatchObject({ version: 1, repository: "owner/repo", branch: "work-queue", head: { sha: head, contents: serializeTransactionLog(second) } });
-    expect(cache.proofs.some(proof => proof.startsWith(`owner/repo:${head}:`))).toBe(true);
-    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
-    // A fresh client without the cache must fetch this ancestry and fail closed.
-    deleteRemoteObject(f, prior);
-    const reused = await readWorkQueueLog(f.connect().options);
-    expect(reused.sha).toBe(head);
-    expect(serializeTransactionLog(reused.transactions)).toBe(serializeTransactionLog(second));
-    expect(f.calls).toEqual([]);
-  });
-
-  it("ignores a disabled, foreign, malformed or unsafe verification cache", async () => {
-    const f = fixture();
-    const { runnerTemp, file } = useVerificationCache();
-    const { prior, head } = nestedCheckpoints(f);
-    await readWorkQueueLog(f.options);
-    const valid = JSON.parse(fs.readFileSync(file, "utf8"));
-    deleteRemoteObject(f, prior);
-    const write = (cache, mode = 0o600) => {
-      fs.rmSync(file, { force: true });
-      fs.writeFileSync(file, JSON.stringify(cache), { mode });
-      fs.chmodSync(file, mode);
-    };
-    const target = path.join(runnerTemp, "target.json");
-    fs.writeFileSync(target, JSON.stringify(valid), { mode: 0o600 });
-    for (const variant of [
-      () => {
-        write(valid);
-        process.env[VERIFICATION_CACHE_ENV] = "false";
-      },
-      () => {
-        process.env[VERIFICATION_CACHE_ENV] = "true";
-        write({ ...valid, repository: "other/repo" });
-      },
-      () => write({ ...valid, branch: "other-queue" }),
-      () => write({ ...valid, version: 2 }),
-      () => write(valid, 0o644),
-      () => {
-        fs.rmSync(file, { force: true });
-        fs.symlinkSync(target, file);
-      },
-    ]) {
-      variant();
-      await expect(readWorkQueueLog(f.connect().options)).rejects.toThrow(/git_transport_failed/);
-    }
-    write(valid);
-    expect((await readWorkQueueLog(f.connect().options)).sha).toBe(head);
-    expect(f.calls).toEqual([]);
-  });
-
-  it("extends a cached head by one publication without re-walking checkpoint history", async () => {
-    const f = fixture();
-    const { file } = useVerificationCache();
-    const { second } = nestedCheckpoints(f);
-    await readWorkQueueLog(f.options);
-    const operations = [{ kind: "Control", control: "admission_paused", value: true, reason: "verification_cache_fixture" }];
-    const extended = [
-      ...second,
-      {
-        version: 3,
-        id: "verification-cache-control",
-        previous: second.at(-1).id,
-        request: newRequest("verification-cache-request", "control", f.queue.administrator, { operations }),
-        actor: f.queue.administrator,
-        policy_epoch: f.queue.state.policy_epoch,
-        at: f.queue.at + 2,
-        operations,
-      },
-    ];
-    const head = f.store(extended);
-    const fresh = f.connect();
-    const read = [];
-    const getCommit = fresh.ledger.rest.git.getCommit;
-    fresh.ledger.rest.git.getCommit = async args => {
-      read.push(args.commit_sha);
-      return getCommit(args);
-    };
-    const current = await readWorkQueueLog(fresh.options);
-    expect(current.sha).toBe(head);
-    expect(serializeTransactionLog(current.transactions)).toBe(serializeTransactionLog(extended));
-    // Only the new head is read (its blob and its one-step walk); no ancestor commit is revisited.
-    expect(new Set(read)).toEqual(new Set([head]));
-    expect(JSON.parse(fs.readFileSync(file, "utf8")).head.sha).toBe(head);
     expect(f.calls).toEqual([]);
   });
 

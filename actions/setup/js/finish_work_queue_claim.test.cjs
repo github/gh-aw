@@ -380,8 +380,10 @@ describe("independent trusted Claim finalization", () => {
       const result = await finalizeWorkerResults({ ...options, verifyEffects });
       expect(result.claims.h1.state).toBe(scenario === "verified" ? "result" : "pending");
       const output = stderr.mock.calls.map(call => call[0]).join("");
-      if (scenario === "controls_changed") expect(output).toContain("delivery.verifier.controls_mismatch proof_verified=true digest_present=true controls=1");
-      else expect(output).not.toContain("delivery.verifier.controls_mismatch");
+      if (scenario === "controls_changed") {
+        expect(result.claims.h1.attempts).toBe(1);
+        expect(output).toContain("delivery.verifier.controls_mismatch proof_verified=true digest_present=true controls=1");
+      } else expect(output).not.toContain("delivery.verifier.controls_mismatch");
       for (const secret of ["private-concurrent-control", REPOSITORY, fixture.assignment.dispatch_id, fixture.assignment.claims[0].claim_id, fixture.assignment.claims[0].work_id]) {
         expect(output).not.toContain(secret);
       }
@@ -1332,7 +1334,7 @@ describe("independent trusted Claim finalization", () => {
     }
   });
 
-  it("does not infer termination or release from an expired Completion deadline or a missing native API response", async () => {
+  it("lets the active worker retry after the Completion deadline without inferring termination or release", async () => {
     const { fixture, options } = setup(1);
     finish(options, "h1", "completed");
     await reconcileWorkerClaim(options);
@@ -1374,7 +1376,7 @@ describe("independent trusted Claim finalization", () => {
     expect(fixture.transactions.at(-1).operations[0].evidence).not.toHaveProperty("attempts");
   });
 
-  it("gives the worker's own finalizer its full verification budget after a slow ledger load", async () => {
+  it.each([1, 2])("gives the worker's own finalizer its full verification budget after slow ledger read %i", async slowRead => {
     const { fixture, options } = setup(1);
     finish(options, "h1", "completed");
     await reconcileWorkerClaim(options);
@@ -1383,9 +1385,8 @@ describe("independent trusted Claim finalization", () => {
     let now = completion;
     const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
     const read = options.readWorkQueueLog;
-    // The step's first, cold ledger read outlives the whole Completion deadline.
     const readWorkQueueLog = vi.fn(async (...args) => {
-      if (readWorkQueueLog.mock.calls.length === 1) now = completion + fixture.policy.pools.default.reconciliation.deadline_ms + 78000;
+      if (readWorkQueueLog.mock.calls.length === slowRead) now = completion + fixture.policy.pools.default.reconciliation.deadline_ms + 78000;
       return read(...args);
     });
     const verify = vi.fn(noWriteClaimVerifier(options));
@@ -1402,6 +1403,39 @@ describe("independent trusted Claim finalization", () => {
       const operation = fixture.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Result");
       expect(operation?.evidence.checked_at).toBe(now);
       expect(fixture.state.works.get(workId).barrier).toBe("verified");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it.each(["native readback", "earlier publication"])("starts a separate worker verification window for each Claim despite slow %s", async delay => {
+    const { fixture, options } = setup(2);
+    finish(options, "h1", "completed");
+    finish(options, "h2", "completed");
+    await reconcileWorkerClaim(options);
+    const deadline = fixture.policy.pools.default.reconciliation.deadline_ms;
+    let now = fixture.state.works.get(fixture.assignment.claims[0].work_id).completion_at;
+    const native = fixture.githubClient.rest.actions.getWorkflowRunAttempt;
+    fixture.githubClient.rest.actions.getWorkflowRunAttempt = async args => {
+      if (delay === "native readback") now += deadline;
+      return native(args);
+    };
+    const verify = vi.fn(noWriteClaimVerifier(options));
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      const result = await finalizeWorkerResults({
+        ...options,
+        now: undefined,
+        verifyEffects: verify,
+        publishWorkQueueRequest: async args => {
+          const publication = fixture.append(args.request.kind, args.request.parameters, args.actor, args.request.id, now);
+          if (delay === "earlier publication" && args.request.kind === "result") now += deadline;
+          return publication;
+        },
+      });
+      expect(result.claims.h1.state).toBe("result");
+      expect(result.claims.h2.state).toBe("result");
+      expect(verify.mock.calls.map(([member]) => member.handle)).toEqual(["h1", "h2"]);
     } finally {
       clock.mockRestore();
     }

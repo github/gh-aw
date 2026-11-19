@@ -349,7 +349,6 @@ async function finalizeWorkerResults(options = {}) {
   const configured = runtimeOptions(options);
   const assignment = normalizeAssignment(options.assignment || readWorkerSnapshot(options.snapshotPath));
   const initial = await loadQueue(configured);
-  const ledgerReadyAt = options.now ?? Date.now();
   const { dispatch, profile } = validateStoredAssignment(initial.projection, assignment, { allowReleased: true });
   if (isStagedMode(options) || isStagedMode(options.config))
     return { version: 3, dispatch_id: assignment.dispatch_id, claims: Object.fromEntries(assignment.claims.map(member => [member.handle, { state: "staged_preview", effects: "unknown" }])) };
@@ -409,9 +408,10 @@ async function finalizeWorkerResults(options = {}) {
       let verifiedSnapshot = null;
       const verificationStarted = Date.now();
       integer(work.completion_at, 0, Number.MAX_SAFE_INTEGER, "Completion timestamp");
-      // The worker's trusted finalizer budget starts once it holds the verified ledger; Completion anchors maintenance expiry (DeliveryFailure replay rule).
-      const verificationAnchor = ownRun ? Math.max(work.completion_at, ledgerReadyAt) : work.completion_at;
-      const remainingDeadline = policy.deadline_ms - Math.max(0, (options.now ?? verificationStarted) - verificationAnchor);
+      // Start each worker verifier's window after preflight; maintenance and missing-verifier expiry still use Completion.
+      const checkedBeforeVerification = options.now ?? verificationStarted;
+      const verificationAnchor = ownRun && typeof options.verifyEffects === "function" ? Math.max(work.completion_at, checkedBeforeVerification) : work.completion_at;
+      const remainingDeadline = policy.deadline_ms - Math.max(0, checkedBeforeVerification - verificationAnchor);
       // Maintenance can first observe a terminal worker after the deadline.
       // Give its persisted receipts one bounded readback before expiring them;
       // this does not replay effects or reopen the normal retry budget.
@@ -431,11 +431,12 @@ async function finalizeWorkerResults(options = {}) {
         results[member.handle] = { state: "pending", effects: "unknown", reason: "verification_unavailable" };
         continue;
       }
-      for (; attempts < policy.max_attempts && ((attempts === 0 && finalEvidenceReadback) || Date.now() - verificationStarted < remainingDeadline); attempts++) {
-        log.debug("delivery.verifier.attempt", { attempt: attempts + 1 });
+      while (typeof options.verifyEffects === "function" && attempts < policy.max_attempts && ((attempts === 0 && finalEvidenceReadback) || Date.now() - verificationStarted < remainingDeadline)) {
+        attempts++;
+        log.debug("delivery.verifier.attempt", { attempt: attempts });
         try {
           const remaining = remainingDeadline - (Date.now() - verificationStarted);
-          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts + 1, run: dispatch.run }, attempts === 0 && finalEvidenceReadback && remaining <= 0 ? 15000 : remaining);
+          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts, run: dispatch.run }, attempts === 1 && finalEvidenceReadback && remaining <= 0 ? 15000 : remaining);
         } catch (error) {
           log.failure("delivery.verifier.failed", error);
           verification = null;
@@ -444,7 +445,7 @@ async function finalizeWorkerResults(options = {}) {
         if (verification?.verified === true && !trustedDelivery) verification = null;
         verified = contractSupported && trustedDelivery && verifiedClaimEffects(verification) ? verification : null;
         log.debug("delivery.verifier.checked", {
-          attempt: attempts + 1,
+          attempt: attempts,
           response_present: !!verification,
           trusted: trustedDelivery,
           verified: !!verified,
@@ -455,12 +456,9 @@ async function finalizeWorkerResults(options = {}) {
           verifiedSnapshot = snapshotClaimDelivery(verified);
           break;
         }
-        if (Date.now() - verificationStarted >= remainingDeadline) {
-          attempts++;
-          break;
-        }
-        if (attempts + 1 < policy.max_attempts)
-          await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** attempts, Math.max(0, remainingDeadline - (Date.now() - verificationStarted))));
+        if (Date.now() - verificationStarted >= remainingDeadline) break;
+        if (attempts < policy.max_attempts)
+          await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** (attempts - 1), Math.max(0, remainingDeadline - (Date.now() - verificationStarted))));
       }
       latest = await loadQueue(configured);
       validateStoredAssignment(latest.projection, assignment, { allowReleased: true });
@@ -510,7 +508,7 @@ async function finalizeWorkerResults(options = {}) {
           validateStoredAssignment(state, assignment, { allowReleased: true });
           if (digest(claimControlReceipts(state, assignment, member.handle)) !== verifiedSnapshot.controls_digest) throw new Error("work_queue_control_inventory_changed");
         });
-        results[member.handle] = { state: "result", effects: verifiedSnapshot.effects };
+        results[member.handle] = { state: "result", effects: verifiedSnapshot.effects, attempts };
         log.debug("result.persisted");
       } else {
         let disposition = contractSupported && verificationReceipt && (verification?.effects === "none" || verification?.effects === "partial") ? verification.effects : "unknown";
