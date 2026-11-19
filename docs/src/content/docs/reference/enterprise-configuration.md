@@ -144,7 +144,7 @@ token-broker:
   copilot-task: true
 ```
 
-The compiler emits runtime references to the variable and secret, not the endpoint value. Setting the variable alone does not enable the feature. After opting in and recompiling, changing the endpoint does not require recompilation.
+The compiler emits a runtime reference to the secret, not the endpoint value. Setting the secret alone does not enable the feature. After opting in and recompiling, changing the endpoint does not require recompilation.
 
 The broker contract defines independent authorization for `copilot-request` (Copilot inference) and `copilot-task` (coding-agent task creation and issue assignment). Enable either capability or both. Brokered Copilot inference is supported in threat-detection and evals jobs; each exchange identifies the gh-aw inference provider ID (currently `github`). Main agent inference still requires a renewable AWF credential provider. Do not combine `copilot-request` with `permissions.copilot-requests: write`. The broker validates GitHub's signature, issuer, expiration, audience, repository, workflow identity, and run claims against its enrollment policy; the audience is the configured broker URL. Broker-enabled consumer jobs run an unconditional post-step that requests invalidation scoped to the verified job identity. Restrict runner egress and protect the workflow and configuration that select this destination.
 
@@ -159,7 +159,7 @@ Rollout hardening:
 - **Bot-authored pull requests.** Unlike `GITHUB_TOKEN`, App installation tokens trigger workflows. A pull request opened with a brokered safe-output credential runs repository CI with code proposed by the agent. Require approval before workflows run on bot-authored pull requests, and protect the target branches. The broker denies exchanges from pull-request runs by default, but that does not protect other repository secrets.
 - **Cleanup.** The broker should also revoke credentials when it sees a job complete, because the cleanup step does not run if the runner is lost.
 
-See the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains independent: the admission outage policy does not apply to credential exchange.
+See [Token Broker](/gh-aw/experimental/token-broker/) for an illustrated overview, and the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains independent: the admission outage policy does not apply to credential exchange.
 
 ## Copilot Engine on GHES
 
