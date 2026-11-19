@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"sync/atomic"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+var mcpDiagnosticArgument = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]{0,63}$`)
 
 // CallMCP forwards only selected, exact allowlisted remote tools after enforcing
 // argument and resource constraints locally. Remote readOnly annotations are
@@ -47,12 +50,29 @@ func (p *Plan) CallMCP(ctx context.Context, runtime Runtime, registration, tool 
 	if err != nil {
 		return nil, proxy.sanitizedError("connector HTTP MCP tool request failed")
 	}
-	if result == nil || result.IsError || result.NeedsInput() {
-		return nil, errors.New("connector HTTP MCP tool returned an error or requires unsupported interactive input")
+	if result == nil {
+		return nil, errors.New("connector HTTP MCP tool returned an invalid result")
 	}
 	encoded, err := json.Marshal(result)
 	if err != nil || len(encoded) > server.MaxResponseBytes {
 		return nil, errors.New("connector HTTP MCP result exceeds its byte bound")
+	}
+	if result.IsError {
+		for name, input := range server.Tools[tool].Inputs {
+			if input.Type != "array" || !mcpDiagnosticArgument.MatchString(name) {
+				continue
+			}
+			diagnostic := "'arguments." + name + "' field for the tool call is required and must be a JSON array."
+			for _, content := range result.Content {
+				if text, ok := content.(*mcp.TextContent); ok && strings.Contains(text.Text, diagnostic) {
+					return nil, fmt.Errorf("connector HTTP MCP upstream tool error (untrusted): argument %q is required and must be a JSON array", name)
+				}
+			}
+		}
+		return nil, errors.New("connector HTTP MCP upstream tool error; provider details withheld")
+	}
+	if result.NeedsInput() {
+		return nil, errors.New("connector HTTP MCP tool requires unsupported interactive input")
 	}
 	return result, nil
 }
