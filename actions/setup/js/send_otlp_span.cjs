@@ -20,6 +20,7 @@ const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
+const { buildTraceparent, buildServiceRequestHeaders, isValidTraceId, isValidSpanId } = require("./service_correlation.cjs");
 const {
   OTEL_ATTR_CICD_PIPELINE_NAME,
   OTEL_ATTR_CICD_PIPELINE_RUN_ID,
@@ -123,29 +124,6 @@ function generateTraceId() {
  */
 function generateSpanId() {
   return randomBytes(8).toString("hex");
-}
-
-/** W3C version-00 propagation with locally controlled sampling; no baggage.
- * @param {string} traceId @param {string} spanId
- */
-function buildTraceparent(traceId, spanId) {
-  if (!isValidTraceId(traceId) || !isValidSpanId(spanId)) throw new Error("Invalid trace context");
-  return `00-${traceId}-${spanId}-01`;
-}
-
-/**
- * Correlation metadata is diagnostic only, never an authorization binding.
- * @param {NodeJS.ProcessEnv} [env]
- * @param {string} [traceId]
- * @param {string} [spanId]
- * @returns {Record<string, string>}
- */
-function buildServiceRequestHeaders(env = process.env, traceId = env.GITHUB_AW_OTEL_TRACE_ID || "", spanId = env.GITHUB_AW_OTEL_PARENT_SPAN_ID || "") {
-  /** @type {Record<string, string>} */
-  const headers = {};
-  if (isValidTraceId(traceId) && isValidSpanId(spanId)) headers.traceparent = buildTraceparent(traceId, spanId);
-  if (env.GITHUB_JOB) headers.baggage = `${OTEL_ATTR_CICD_PIPELINE_TASK_NAME}=${encodeURIComponent(env.GITHUB_JOB)}`;
-  return headers;
 }
 
 /**
@@ -1509,36 +1487,6 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
 // ---------------------------------------------------------------------------
 // High-level: job setup span
 // ---------------------------------------------------------------------------
-
-/**
- * Regular expression that matches a valid OTLP trace ID: 32 lowercase hex characters.
- * @type {RegExp}
- */
-const TRACE_ID_RE = /^[0-9a-f]{32}$/;
-
-/**
- * Validate that a string is a well-formed OTLP trace ID (32 lowercase hex chars).
- * @param {string} id
- * @returns {boolean}
- */
-function isValidTraceId(id) {
-  return TRACE_ID_RE.test(id) && !/^0+$/.test(id);
-}
-
-/**
- * Regular expression that matches a valid OTLP span ID: 16 lowercase hex characters.
- * @type {RegExp}
- */
-const SPAN_ID_RE = /^[0-9a-f]{16}$/;
-
-/**
- * Validate that a string is a well-formed OTLP span ID (16 lowercase hex chars).
- * @param {string} id
- * @returns {boolean}
- */
-function isValidSpanId(id) {
-  return SPAN_ID_RE.test(id) && !/^0+$/.test(id);
-}
 
 /**
  * @typedef {Object} SendJobSetupSpanOptions

@@ -123,6 +123,16 @@ describe("service request correlation", () => {
     expect(buildServiceRequestHeaders({})).toEqual({});
   });
 
+  it("omits malformed job baggage without losing valid trace context", () => {
+    expect(
+      buildServiceRequestHeaders({
+        GITHUB_AW_OTEL_TRACE_ID: traceId,
+        GITHUB_AW_OTEL_PARENT_SPAN_ID: spanId,
+        GITHUB_JOB: "\ud800",
+      })
+    ).toEqual({ traceparent: `00-${traceId}-${spanId}-01` });
+  });
+
   it.each(["safe_outputs", "review\r\ninjected: value", "review\t\u0000\u007f\u0085", 'review,"step";key=100% \u00e9'])("produces HTTP-safe baggage without changing job identity (%j)", jobId => {
     const headers = new Headers(buildServiceRequestHeaders({ GITHUB_JOB: jobId }));
     const baggage = headers.get("baggage");

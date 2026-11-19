@@ -2,7 +2,7 @@
 "use strict";
 
 const { readBoundedBody } = require("./admission_protocol.cjs");
-const { buildServiceRequestHeaders } = require("./send_otlp_span.cjs");
+const { buildServiceRequestHeaders } = require("./service_correlation.cjs");
 
 const SKEW_MS = 30000;
 const TIMEOUT_MS = 10000;

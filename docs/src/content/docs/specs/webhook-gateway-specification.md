@@ -30,6 +30,8 @@ The terms **MUST**, **MUST NOT**, and **MAY** describe requirements for conformi
 > [!IMPORTANT]
 > The compiler generates the mandatory App-token provenance and hash-bound admission gates described below, replacing generic role/bot authorization for gateway ingress. This destination implementation does not verify a CAO deployment or establish hosted readiness. An integration MUST remain nonactivating until both the receiver token flow and the approved destination revision satisfy this contract.
 
+The receiver MUST accept the optional string `job_id` and echo its exact value in the admission response whenever the client supplies it. Deploy and verify this receiver support before publishing or activating a workflow revision that sends `job_id`; the client rejects an omitted or changed echo.
+
 ## Bounded security findings
 
 The [TLC-backed threat model](https://github.com/github/gh-aw/blob/main/specs/webhook-gateway/threat-model.md)
@@ -764,7 +766,7 @@ Receiver and compiler/runtime acceptance tests MUST cover the following cases be
 | Invalid batch from the approved App | Reject under existing route, projection, selector, size, and batch rules. |
 | Valid hash-bearing OIDC audience and independently verified compiled artifact at the signed workflow revision | Grant `getToken` access only after current enrollment/admission checks; the App gate remains independently required. |
 | Missing/malformed hash, unsigned hash only, wrong audience base/path, digest mismatch, or conflicting request-body hash | Reject before credential issuance or continuation, even if the requested hash matches a cached older row. |
-| Current/missing trace or job context, reserved characters in job names, or a missing/changed response `job_id` | Send valid current `traceparent`, HTTP-safe job baggage and original JSON `job_id` when available; omit unavailable context; reject an omitted/changed job echo and never use diagnostic metadata instead of signed `check_run_id`. |
+| Current/missing trace or job context, reserved characters in job names, or a missing/changed response `job_id` | Send valid current `traceparent`, HTTP-safe job baggage and original JSON `job_id` when available; omit unavailable context; accept and echo `job_id` exactly before client rollout, and reject an omitted/changed echo without using diagnostic metadata instead of signed `check_run_id`. |
 | Server table is behind the verified executing workflow | Fetch the exact revision, validate approved configuration, and refresh with atomic fencing before granting access; an explicit retryable result is permitted while refresh is pending. |
 | Refresh failure, unsupported/unapproved source, or revoked approval | Fail closed without automatic approval, fallback credentials, or success-shaped continuation. |
 | Repeated OIDC request or asynchronous refresh completion | Require valid authentication and current grants; reuse only the explicitly authorized idempotent outcome under the documented run/attempt/replay policy, never a fresh duplicate credential grant. |

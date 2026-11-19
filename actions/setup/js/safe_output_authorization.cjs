@@ -8,7 +8,7 @@ const { performance } = require("node:perf_hooks");
 const { parseStrictJSON, utf8Compare, validString } = require("./work_queue_codec.cjs");
 const { readBoundedBody } = require("./admission_protocol.cjs");
 const { withRetry } = require("./error_recovery.cjs");
-const { buildServiceRequestHeaders } = require("./send_otlp_span.cjs");
+const { buildServiceRequestHeaders, isWellFormedUnicodeString } = require("./service_correlation.cjs");
 
 const VERSION = "gh-aw.safe-output-authorization.v1";
 const MAX_REQUEST_BYTES = 65536;
@@ -463,7 +463,8 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
     if (!evidencePath) fail("evidence_failed");
     const requestDigest = canonicalDigest(invocation);
     projection.request_digest = requestDigest;
-    const body = canonical({ version: VERSION, request_digest: requestDigest, invocation, ...(env.GITHUB_JOB ? { job_id: env.GITHUB_JOB } : {}) });
+    const jobId = env.GITHUB_JOB;
+    const body = canonical({ version: VERSION, request_digest: requestDigest, invocation, ...(jobId && isWellFormedUnicodeString(jobId) ? { job_id: jobId } : {}) });
     if (Buffer.byteLength(body) > MAX_REQUEST_BYTES) fail("invalid_preparation");
     const start = now();
     const wallStart = wallNow();

@@ -4,7 +4,7 @@
 const { createHash } = require("node:crypto");
 const { ERR_API, ERR_CONFIG, ERR_PERMISSION } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { buildServiceRequestHeaders } = require("./send_otlp_span.cjs");
+const { buildServiceRequestHeaders } = require("./service_correlation.cjs");
 
 const MAX_ADMISSION_BYTES = 16 * 1024;
 const MAX_OIDC_BYTES = 32 * 1024;
