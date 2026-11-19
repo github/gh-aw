@@ -1,8 +1,6 @@
 ---
 on:
   workflow_dispatch:
-permissions:
-  id-token: write
 engine: copilot
 safe-outputs:
   authorization:
