@@ -61,6 +61,19 @@ function isModelResolutionData(data) {
 /** @param {unknown} value @returns {boolean} */
 const isNativePath = value => typeof value === "string" && /^sandbox\/agent\/logs\/copilot-session-state\/[A-Za-z0-9_-]+\/events\.jsonl$/.test(value);
 
+/** @param {SessionEvent} event */
+function hasPersistedNativeAccounting(event) {
+  const p = event.provenance;
+  if (!p || typeof p !== "object" || !("component" in p) || p.component !== "agent" || !("phase" in p) || p.phase !== "agent" || !("path" in p) || typeof p.path !== "string") return false;
+  return isNativePath(p.path) || isNativePath(`sandbox/agent/logs/${p.path}`);
+}
+
+/** @param {SessionEvent} event */
+function withoutAccountingSnapshot(event) {
+  const { accountingSnapshot, ...data } = event.data;
+  return { ...event, data };
+}
+
 /**
  * Source-local positions disambiguate repeated native IDs and expanded records.
  * Equal timestamps and untimed observations retain deterministic source order.
@@ -74,8 +87,11 @@ function mergeSessionSources(sources, engine) {
       ...source,
       events: source.events.map((event, index) => {
         const timestampMs = sessionTimestamp(event, source.timestampUnit);
-        const copilotSource = source.component === "agent" && (engine === "copilot" || isNativePath(source.path));
-        const normalized = normalizeUnifiedSessionEvent(event, source.phase, copilotSource);
+        const agentShutdown = event.type === "session.shutdown" && source.component === "agent";
+        const nativeFile = agentShutdown && isNativePath(source.path.split(path.sep).join("/"));
+        const copilotSource = agentShutdown && (engine === "copilot" || nativeFile);
+        const fallbackShutdown = copilotSource && !nativeFile && !(source.path === "agent-session.jsonl" && hasPersistedNativeAccounting(event));
+        const normalized = normalizeUnifiedSessionEvent(fallbackShutdown ? withoutAccountingSnapshot(event) : event, source.phase, copilotSource);
         const native = event.provenance;
         const sourceIndex =
           source.component === "agent" &&
@@ -496,7 +512,9 @@ function collectUnifiedSession({
   if (canonicalSource && canonicalCopilot) {
     const groups = new Map();
     let activeId;
-    for (const event of canonicalSource.events) {
+    for (const saved of canonicalSource.events) {
+      // An inferred session path groups the conversation, but cannot establish the origin of a shutdown's bill.
+      const event = saved.type === "session.shutdown" && !hasPersistedNativeAccounting(saved) ? withoutAccountingSnapshot(saved) : saved;
       const id = sessionId(event);
       if (id) activeId = id;
       const nativePath = nativeProvenance(event).path;

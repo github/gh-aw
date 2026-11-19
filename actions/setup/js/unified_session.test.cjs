@@ -1893,8 +1893,9 @@ describe("Unified conclusion session", () => {
     ["missing amount", { aiCreditsStatus: "complete" }, 0, { aiCreditsStatus: "unavailable" }],
     ["contradictory total", { aiCreditsStatus: "complete", totalNanoAiu: 0 }, 17, { aiCreditsStatus: "unavailable" }],
   ])("publishes %s Copilot terminal credits without substituting a proxy estimate", (_label, accountingSnapshot, totalNanoAiu, expected) => {
-    write("agent-session.jsonl", [
+    write("sandbox/agent/logs/copilot-session-state/native/events.jsonl", [
       { type: "session.start", data: { sessionId: "native" } },
+      { type: "assistant.message", data: { content: "Done." } },
       { type: "session.shutdown", data: { accountingSnapshot, totalNanoAiu } },
     ]);
     write("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", [{ event: "token_usage", model: "fixture-model", ai_credits_total: 12.5 }]);
@@ -1927,10 +1928,24 @@ describe("Unified conclusion session", () => {
   ])("reconstructs Copilot terminal credits from canonical session identity without workflow metadata: %j", (accountingSnapshot, expected) => {
     write("agent-session.jsonl", [
       { type: "session.init", data: { sessionId: "native", sourceEngine: "copilot" } },
-      { type: "session.shutdown", data: { totalNanoAiu: 0, accountingSnapshot } },
+      { type: "session.shutdown", provenance: { component: "agent", phase: "agent", path: "copilot-session-state/native/events.jsonl", index: 1 }, data: { totalNanoAiu: 0, accountingSnapshot } },
     ]);
     const { events } = collectUnifiedSession({ rootDir: root });
     expect(events.find(event => event.type === "session.shutdown").data).toEqual(expected);
+  });
+
+  it.each(["agent-stdio.log", "pi-streaming.jsonl", "agent-session.jsonl"])("does not publish Copilot terminal credits from fallback %s", file => {
+    const native = { component: "agent", phase: "agent", path: "sandbox/agent/logs/copilot-session-state/native/events.jsonl", index: 0 };
+    write(file, [
+      { type: "session.start", provenance: native, data: { sessionId: "native" } },
+      {
+        type: "session.shutdown",
+        provenance: file === "agent-session.jsonl" ? { ...native, path: "agent-stdio.log" } : native,
+        data: { totalNanoAiu: 17, aiCreditsStatus: "complete", accountingSnapshot: { aiCreditsStatus: "complete", totalNanoAiu: 17 } },
+      },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+    expect(events.find(event => event.type === "session.shutdown")?.data).toEqual({ aiCreditsStatus: "unavailable" });
   });
 
   it.each([[`{"type":"session.start","data":{"sessionId":"native"}}\n`], [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`]])(

@@ -1629,7 +1629,8 @@ per-agent breakdowns to this terminal total. One billion nano-AIU equals one
 credit.
 
 **T-UAS-092 — Copilot credit completeness.** `aiCreditsStatus` MUST be derived
-from the native terminal accounting snapshot. If the status is `complete`,
+from the native terminal accounting snapshot. A fallback log or a session
+path inferred from another record is not evidence of a native charge. If the status is `complete`,
 every observed call has a reported charge; an explicit zero is valid. If the
 status is `partial`, `totalNanoAiu` is a reported subtotal and MUST NOT be
 presented as the final bill. If the snapshot is missing, unavailable, invalid,
