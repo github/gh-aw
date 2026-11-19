@@ -7,9 +7,9 @@ sidebar:
 
 # Token Broker Specification
 
-**Version**: 1.1.0<br />
+**Version**: 2.0.0<br />
 **Status**: Experimental draft<br />
-**Date**: 2026-11-18<br />
+**Date**: 2026-11-19<br />
 **Editors**: GitHub Agentic Workflows maintainers<br />
 **Latest version**: [Token Broker Specification](/gh-aw/specs/token-broker-specification/)
 
@@ -134,7 +134,7 @@ For `copilot-task` and `github-app`, the `provider` member is omitted:
 | `oidc_token` | Nonempty, signed compact JWT issued by the configured trusted GitHub Actions issuer. |
 | `job_id` | The runner's logical `GITHUB_JOB` string, JSON-encoded without percent-encoding. Required when available; callers without job context omit it. Diagnostic metadata only, never proof of a job execution or a credential selector. |
 
-For `copilot-task` and `github-app`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
+For `copilot-task` and `github-app`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing required members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
 
 ### 4.2. Independent capabilities
 
@@ -201,6 +201,14 @@ The broker MUST verify the identity and revoke all credentials it issued to that
 Job-end invalidation is terminal for that job attempt. The broker MUST deny further exchanges for the closed context, even with a still-valid OIDC identity. It MUST NOT report success while any credential issued to that job remains usable downstream, including one minted by an exchange racing with invalidation. To achieve this, it closes the context before revoking, and atomically re-checks closure when recording each issued credential (SV-28, SV-31).
 
 Every issued credential MUST also have a finite expiration enforced by the downstream service, independently of job cleanup. If runner loss prevents invalidation, the credential can remain usable until that expiration. An earlier client cache deadline or an `expires_at` value that the downstream service does not enforce is not a substitute.
+
+### 4.6. Request correlation
+
+Exchange and invalidation POSTs MUST propagate W3C `traceparent` when both current `GITHUB_AW_OTEL_TRACE_ID` and `GITHUB_AW_OTEL_PARENT_SPAN_ID` are valid; invalid or incomplete context is omitted. When nonempty `GITHUB_JOB` is available, both requests MUST include its original value as JSON `job_id` and a single W3C `baggage` member, `cicd.pipeline.task.name=<encoded-job-id>`. This key follows OpenTelemetry's CI/CD task-name convention, not a signed job-execution claim. Header sanitization uses UTF-8 percent-encoding (`encodeURIComponent`), so whitespace, controls, Unicode, baggage delimiters, and literal percent signs cannot become raw header syntax. JSON payload values are not percent-encoded.
+
+The client snapshots job and trace context before acquiring OIDC credentials. It MUST NOT forward arbitrary incoming trace headers, baggage, or exporter credentials, send these correlation headers to the GitHub OIDC issuer, or enable telemetry export solely to propagate context. The broker MUST NOT use `job_id`, baggage, or trace identifiers to authorize issuance, select scope, or replace Section 5's verified job evidence. Backend instrumentation must explicitly record extracted baggage as a span attribute if desired; extraction alone does not do so.
+
+**Deployment compatibility:** Version 2 extends the closed request schema with `job_id`; version-1 servers reject that member. Update backend schema validation before deploying clients that send it. Requests without job context remain valid without the member. Success response schemas, credential authorization, and invalidation scope are unchanged.
 
 ## 5. Identity Verification and Authorization
 
@@ -371,7 +379,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-004 | Server | Missing/non-numeric/expired `exp`, future `nbf`/`iat`, invalid ordering, and excessive age/lifetime return 401 under the configured time policy; test exact boundaries. |
 | T-TBR-005 | Server | Wrong tenant/owner/repository IDs, transfer, workflow revision/ref, environment, fork policy, run/attempt, or job evidence returns 403. Missing required evidence also denies. |
 | T-TBR-006 | Server | Valid identity denied a supported capability returns 403, not unsupported. An unsupported known type with invalid identity returns 401. Neither path invokes issuance. |
-| T-TBR-007 | Server | Extra/duplicate/missing fields, malformed UTF-8/JSON, arrays, wrong types, or a missing/extra provider field return 400; unknown string type returns 422; oversize/media-type failures return 413/415. |
+| T-TBR-007 | Server | Extra/duplicate/missing required fields, malformed UTF-8/JSON, arrays, wrong types, or a missing/extra provider field return 400; unknown string type returns 422; oversize/media-type failures return 413/415. |
 | T-TBR-008 | Both | Success is 200 with exactly two fields, safe nonempty ASCII token, no-store, bounded body, and valid expiration. Client accepts lowercase `t`/`z`, fractional seconds, and numeric offsets through `23:59`; rejects extra/duplicate fields, invalid calendar dates, leap seconds, out-of-range time/offset components, and expiry at/below 30 seconds. |
 | T-TBR-009 | Server | Concurrent use of one valid JWT for multiple authorized capabilities succeeds. Replay across policy boundaries cannot broaden issuance. Test per-context replay rules, rate limits (429), and bounded cache retention. |
 | T-TBR-010 | Client | Same-key requests coalesce; changed capability/repository/job/run/attempt/endpoint cannot inherit a token. Refresh occurs at the 30-second boundary; failure never reuses a stale token. |
@@ -383,6 +391,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-016 | Both | An unconditional job post-step obtains a fresh OIDC identity and invalidates only credentials for its verified execution context; repeat invalidation succeeds, unauthorized scopes do not revoke credentials, and non-204 responses fail safely. |
 | T-TBR-017 | Client | GitHub tools and safe-output broker selections work independently and together. Conflicting section credentials fail compilation; top-level App fallback does not override broker selection. Only consuming jobs exchange credentials and receive broker-related OIDC permission. Tokens remain masked and job-local, and failures never select legacy credentials. |
 | T-TBR-018 | Deployment | After job-end invalidation, the downstream service rejects the job's credentials before their original expiry, the broker denies further exchanges for that job, and a sibling job's credential still works. In a separate run without cleanup, verify that the downstream service rejects the credential at `expires_at`. |
+| T-TBR-019 | Both | Exchange and invalidation carry unchanged JSON `job_id`, header-safe percent-encoded job baggage, and valid current trace context. Missing job/context is omitted, arbitrary inherited metadata is not forwarded, OIDC-issuer requests receive no correlation headers, and unsigned job/trace values never replace verified job-execution evidence. |
 
 Implementers MUST record pass/fail/not-applicable per class and capability, with non-sensitive evidence and policy settings. Tests SHOULD include skew, calendar, concurrency, and revocation boundary conditions. Optional features marked not applicable MUST NOT hide failed mandatory requirements.
 
@@ -397,6 +406,9 @@ Implementers MUST record pass/fail/not-applicable per class and capability, with
 - **[RFC 7517]** [JSON Web Key (JWK)](https://www.rfc-editor.org/rfc/rfc7517).
 - **[OIDC Discovery]** [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html).
 - **[GitHub Actions OIDC]** [OpenID Connect reference](https://docs.github.com/en/actions/reference/security/oidc).
+- **[W3C Trace Context]** [Trace Context Level 2](https://www.w3.org/TR/trace-context-2/).
+- **[W3C Baggage]** [Baggage](https://www.w3.org/TR/baggage/).
+- **[OpenTelemetry CI/CD Attributes]** [CI/CD attribute registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/cicd/).
 
 ### 8.2. Informative references
 
@@ -503,6 +515,12 @@ These choices do not permit extra wire fields, weakened identity verification, o
 | TM-16 | A brokered writer credential opens an agent-authored pull request. Unlike `GITHUB_TOKEN`, App installation tokens trigger workflows. | Agent-authored code runs in the repository's CI with its secrets. | SV-16 and SV-17 deny broker exchanges from that CI. Safe-output pull requests are protected by branch rules and required review before untrusted workflows run. | Repository secrets outside the broker remain reachable from that CI. Require approval for workflows on bot-authored pull requests. |
 
 ## 10. Change Log
+
+### Version 2.0.0 (Draft)
+
+- Added JSON `job_id` to exchange and invalidation requests when runner job context is available. Closed version-1 server schemas must be updated before accepting these clients.
+- Specified current-context `traceparent`, header-safe W3C job baggage using `cicd.pipeline.task.name`, and T-TBR-019 correlation coverage.
+- Kept logical job metadata separate from signed execution identity, credential authorization, and invalidation scope.
 
 ### Version 1.1.0 (Draft)
 

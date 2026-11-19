@@ -123,6 +123,15 @@ describe("service request correlation", () => {
     expect(buildServiceRequestHeaders({})).toEqual({});
   });
 
+  it.each(["safe_outputs", "review\r\ninjected: value", "review\t\u0000\u007f\u0085", 'review,"step";key=100% \u00e9'])("produces HTTP-safe baggage without changing job identity (%j)", jobId => {
+    const headers = new Headers(buildServiceRequestHeaders({ GITHUB_JOB: jobId }));
+    const baggage = headers.get("baggage");
+    expect(baggage).toMatch(/^[\x21-\x7e]+$/);
+    expect(baggage.split(",")).toHaveLength(1);
+    expect(decodeURIComponent(baggage.slice("cicd.pipeline.task.name=".length))).toBe(jobId);
+    expect([...headers.keys()]).toEqual(["baggage"]);
+  });
+
   it.each([
     {},
     { GITHUB_AW_OTEL_TRACE_ID: traceId },
