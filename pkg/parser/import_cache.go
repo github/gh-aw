@@ -61,8 +61,9 @@ func validatePathComponents(owner, repo, path, sha string) error {
 
 // ImportCache manages cached imported workflow files
 type ImportCache struct {
-	baseDir  string // Base directory for cache (typically repo root)
-	readOnly bool
+	baseDir       string // Base directory for cache (typically repo root)
+	readOnly      bool
+	localOnlyRoot string
 }
 
 // SetReadOnly prevents downloads from changing the on-disk import cache.

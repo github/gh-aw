@@ -27,6 +27,8 @@ type Compiler struct {
 	lint                     bool                     // Enable in-memory Actions/AW AST linting for CLI compilation
 	noEmit                   bool                     // If true, validate without generating lock files
 	readOnly                 bool                     // If true, prevent compilation from populating caches or pulling images
+	verificationYAML         *string                  // Captures no-emit output for protected verification
+	verifyAuthorization      bool                     // Requires offline, reproducible compiler inputs
 	strictMode               bool                     // If true, enforce strict validation requirements
 	allowActionRefs          bool                     // If true, unresolved action refs are warnings instead of errors
 	approve                  bool                     // If true, approve safe update changes (skip safe update enforcement)

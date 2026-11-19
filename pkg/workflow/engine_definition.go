@@ -370,6 +370,7 @@ type EngineDefinition struct {
 // EngineCatalog is a collection of EngineDefinition entries backed by an EngineRegistry
 // for runtime adapter resolution.
 type EngineCatalog struct {
+	offline     bool
 	definitions map[string]*EngineDefinition
 	registry    *EngineRegistry
 }
@@ -676,9 +677,11 @@ func (c *EngineCatalog) Resolve(id string, config *EngineConfig) (*ResolvedEngin
 			constants.DocsEnginesURL)
 	}
 
-	if importPath, ok := knownEngineImportFor(id); ok {
-		errMsg += fmt.Sprintf("\n\nTip: %q is a known engine with a shared definition file. Import it before using this engine:\n\nimports:\n  - %s",
-			id, importPath)
+	if !c.offline {
+		if importPath, ok := knownEngineImportFor(id); ok {
+			errMsg += fmt.Sprintf("\n\nTip: %q is a known engine with a shared definition file. Import it before using this engine:\n\nimports:\n  - %s",
+				id, importPath)
+		}
 	}
 
 	return nil, &unknownEngineError{message: errMsg}

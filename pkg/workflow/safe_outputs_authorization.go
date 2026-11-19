@@ -364,17 +364,12 @@ func resolveWorkflowSafeOutputAuthorizations(data *WorkflowData) error {
 		return nil
 	}
 	for _, name := range workQueuePreparedAdapterNames(data) {
-		if config.AuthorizationRequirements[name] != nil {
-			config.AuthorizationCoverage[name+":prepare_claim_adapter"] = config.AuthorizationCoverage[name]
-		}
+		config.AuthorizationCoverage[name+":prepare_claim_adapter"] = config.AuthorizationCoverage[name]
 	}
-	if config.CallWorkflow != nil && config.AuthorizationRequirements["call_workflow"] != nil {
+	if config.CallWorkflow != nil {
 		for _, name := range config.CallWorkflow.Workflows {
 			config.AuthorizationCoverage["call_workflow:launch:"+stringutil.NormalizeSafeOutputIdentifier(name)] = config.AuthorizationCoverage["call_workflow"]
 		}
-	}
-	if config.Authorization == nil {
-		return nil
 	}
 	internal := map[string]bool{
 		commentMemoryHandlerKey:           buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, config.Footer, config.BodyFooter) != nil,
@@ -384,6 +379,11 @@ func resolveWorkflowSafeOutputAuthorizations(data *WorkflowData) error {
 	}
 	for name, enabled := range internal {
 		if !enabled {
+			continue
+		}
+		if config.Authorization == nil {
+			config.AuthorizationRequirements[name] = nil
+			config.AuthorizationCoverage[name] = "unconfigured"
 			continue
 		}
 		requirement := *config.Authorization
