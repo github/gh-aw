@@ -68,6 +68,12 @@ steps:
         const fs = require("node:fs");
         const path = require("node:path");
         const { stagePlanIntents } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_intents.cjs"));
+        const { loadWorkQueueSnapshot } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_mcp_server.cjs"));
+        const queue = loadWorkQueueSnapshot();
+        const activePool = queue.projection.policy?.pools?.["smoke-work-queue"];
+        if (queue.projection.policy && (!activePool || !Number.isInteger(activePool.logical_limit) || activePool.logical_limit < 3 || !Number.isInteger(activePool.native_limit) || activePool.native_limit < 3)) {
+          throw new Error("Installed smoke-work-queue Policy does not allow three Claims; no Work was staged");
+        }
         const node = node_key => ({
           graph_id: `smoke-work-queue:${context.runId}`,
           node_key,
@@ -141,3 +147,12 @@ Trusted processing installs the configured pool and verifies the published
 default-revision smoke worker on first use, without draining existing work.
 Only changes to installed authority or scheduling limits require a quiescent
 administrator Policy update; never reset or reseed an existing queue.
+
+Before staging any Work, the trusted preparation step checks the active pool
+limits. If an installed Policy still allows fewer than three logical or native
+Claims, the run fails before admission and leaves the queue quiescent for the
+Policy update. An uninitialized queue may still be initialized from the published
+configuration. If an earlier smoke version left unfinished Work or reservations,
+pause the dispatcher, resolve or cancel those items using the supported queue
+recovery operations, and wait until the queue is quiescent before installing the
+Policy. Do not clear or reseed the ledger.
