@@ -18,7 +18,10 @@ import (
 	"github.com/github/gh-aw/pkg/repoutil"
 )
 
-var errLifecycleEvidenceIncomplete = errors.New("safe-output session collection is incomplete")
+var (
+	errLifecycleEvidenceIncomplete = errors.New("safe-output session collection is incomplete")
+	errLifecycleIdentityMissing    = errors.New("lifecycle session is missing its format or execution identity")
+)
 
 func nameForLifecycleInvocation(dir, root string) string {
 	if dir == root {
@@ -178,7 +181,7 @@ func readSessionLifecycleItems(ctx context.Context, run WorkflowRun) (items []Cr
 		}
 	}
 	if !headerSeen || !identitySeen {
-		return nil, false, errors.New("lifecycle session is missing its format or execution identity")
+		return nil, false, errLifecycleIdentityMissing
 	}
 	if incomplete {
 		return items, len(items) > 0 || safeOutputsSkipped, errLifecycleEvidenceIncomplete

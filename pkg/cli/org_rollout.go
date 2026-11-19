@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -341,12 +342,11 @@ func startOrgRolloutJobs(ctx context.Context, rows []orgRolloutRow, opts orgRoll
 }
 
 type orgRolloutOutput struct {
-	tail                  []byte
-	result                []byte
-	pending               []byte
-	discardLine           bool
-	resultHasTrailingData bool
-	limit                 int
+	tail        []byte
+	result      []byte
+	pending     []byte
+	discardLine bool
+	limit       int
 }
 
 func (output *orgRolloutOutput) Write(data []byte) (int, error) {
@@ -373,19 +373,14 @@ func (output *orgRolloutOutput) Write(data []byte) (int, error) {
 		}
 		if bytes.HasPrefix(line, []byte(orgRolloutResultPrefix)) {
 			output.result = append(append([]byte(nil), line...), '\n')
-			output.resultHasTrailingData = false
 		} else {
+			output.result = nil
 			output.appendTail(append(append([]byte(nil), line...), '\n'), limit)
-			if len(output.result) > 0 && len(bytes.TrimSpace(line)) > 0 {
-				output.resultHasTrailingData = true
-			}
 		}
 		output.pending = rest
 	}
 	if len(output.pending) > limit && !bytes.HasPrefix(output.pending, []byte(orgRolloutResultPrefix)) {
-		if len(output.result) > 0 && len(bytes.TrimSpace(output.pending)) > 0 {
-			output.resultHasTrailingData = true
-		}
+		output.result = nil
 		output.appendTail(output.pending, limit)
 		output.pending = nil
 		output.discardLine = true
@@ -412,7 +407,15 @@ func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
 		}
 		var result orgRolloutResult
 		payload := bytes.TrimSpace(bytes.TrimPrefix(line, []byte(orgRolloutResultPrefix)))
-		if err := json.Unmarshal(payload, &result); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(payload))
+		var trailing json.RawMessage
+		if err := decoder.Decode(&result); err != nil {
+			return orgRolloutResult{}, fmt.Errorf("invalid worker result: %w", err)
+		}
+		if err := decoder.Decode(&trailing); err != io.EOF {
+			if err == nil {
+				return orgRolloutResult{}, errors.New("invalid worker result: multiple JSON values")
+			}
 			return orgRolloutResult{}, fmt.Errorf("invalid worker result: %w", err)
 		}
 		return result, nil
@@ -483,13 +486,11 @@ func runOrgRolloutWorker(ctx context.Context, repo string, opts orgRolloutOption
 	cmd.Stdout, cmd.Stderr = output, diagnostic
 	cmd.WaitDelay = 5 * time.Second
 	err = cmd.Run()
-	if len(output.result) > 0 && len(bytes.TrimSpace(output.pending)) > 0 {
-		output.resultHasTrailingData = true
+	resultOutput := output.result
+	if len(bytes.TrimSpace(output.pending)) > 0 || output.discardLine {
+		resultOutput = nil
 	}
-	result, parseErr := parseOrgRolloutResult(output.result)
-	if output.resultHasTrailingData {
-		parseErr = errors.New("worker exited without a rollout result")
-	}
+	result, parseErr := parseOrgRolloutResult(resultOutput)
 	if parseErr != nil && err == nil {
 		return orgRolloutResult{Status: "failed", Error: parseErr.Error()}
 	}

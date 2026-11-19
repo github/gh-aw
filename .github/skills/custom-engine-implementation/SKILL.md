@@ -39,7 +39,7 @@ Read the closest examples before making changes:
 
 - `.github/workflows/shared/opencode.md`: npm installation, merged
   configuration, MCP, provider routing, and log parsing
-- `.github/workflows/shared/aider.md`: Python installation and a custom harness
+- `.github/workflows/shared/aider.md`: hash-locked pip installation and a custom harness
   without native MCP
 - `.github/workflows/shared/crush.md`: native MCP configuration adapter and
   harness
@@ -82,7 +82,10 @@ external engines.
 Keep the definition declarative and minimal:
 
 - Select the correct package manager, package name, binary name, version, and
-  verification command under `behaviors.installation`.
+  verification command under `behaviors.installation`. For Python engines,
+  use `package-manager: pip` with a complete `requirements` list of
+  `name`/`version`/`sha256` entries instead of `pre-agent-steps`, and prepend
+  `GH_AW_PYTHON_PACKAGES` to `sys.path` at execution.
 - Put invocation arguments and non-secret environment variables under
   `behaviors.execution`.
 - Use an existing secret strategy and provider environment mode where

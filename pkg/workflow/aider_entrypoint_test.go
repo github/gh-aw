@@ -74,7 +74,7 @@ def main():
 	for _, exitCode := range []string{"0", "7"} {
 		t.Run("exit "+exitCode, func(t *testing.T) {
 			cmd := aiderHarnessCommand(t, t.TempDir(), execution.CommandName, execution.Args...)
-			cmd.Env = append(cmd.Env, "PYTHONPATH="+dir, "AIDER_TEST_EXIT_CODE="+exitCode)
+			cmd.Env = append(cmd.Env, "GH_AW_PYTHON_PACKAGES="+dir, "AIDER_TEST_EXIT_CODE="+exitCode)
 			output, err := cmd.CombinedOutput()
 			if exitCode == "0" {
 				require.NoError(t, err, "%s", output)

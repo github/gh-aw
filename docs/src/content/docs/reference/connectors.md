@@ -117,6 +117,7 @@ credential references are removed from the agent snapshot.
 | Linear | `tools.linear: [get-issue]` | `linear-add-comment` | One reader and one effect |
 | Jira | `tools.jira: {personal: [getJiraIssue]}` | `jira-add-comment` | One reader and one effect |
 | Azure DevOps | `tools.azure-devops: [get-work-item-description]` | `azure-devops-comment-on-work-item` | One reader and one effect |
+| Azure Monitor | `tools.azure-monitor: [get-activity-count]` | `create-issue` (GitHub handoff) | One fixed GET reader; no Azure writer |
 | Web IQ | `tools.azure-web-iq: {search: [web]}` | `create-issue` (GitHub handoff) | One native reader; no provider writer |
 | Foundry IQ | `tools.azure-foundry-iq: {knowledge-base: [knowledge_base_retrieve]}` | GitHub `create-issue`, staged | One read-only native method; no provider writer |
 
@@ -161,6 +162,7 @@ duplicate detection.
 | GitLab | Open/draft merge-request intake and human-review handoff | [gitlab-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/gitlab-golden.md) |
 | PagerDuty | Active-incident handoff with observed facts and suggested responder checks | [pagerduty-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/pagerduty-golden.md) |
 | Datadog | Alert/Warn monitor metadata to a GitHub investigation issue | [datadog-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/datadog-golden.md) |
+| Azure Monitor | Fixed last-hour workspace activity count to a minimal GitHub handoff | [azure-monitor-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-monitor-golden.md) |
 | Zendesk | Unresolved-ticket metadata to a private engineering-ownership handoff | [zendesk-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/zendesk-golden.md) |
 | Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/notion-golden.md) |
 | Asana | Approved task description to a staged next-step comment | [asana-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md) |
@@ -953,6 +955,38 @@ The golden prepares a known active-incident handoff with observed facts and sugg
 unperformed. Copy the local declaration or use a reviewed pinned import, because a relative import does not
 install the provider file. Staging requires the actual YAML flag, not the word "stage" in a prompt. Check
 ambiguous note deliveries independently.
+
+## Azure Monitor
+
+Declaration: `.github/workflows/connectors/azure-monitor.md`.
+
+Select `tools.azure-monitor: [get-activity-count]` to expose `get_activity_count`.
+Bind `workspaces` to one approved lowercase Log Analytics workspace GUID.
+The reader accepts only an exactly granted `workspace-id` and sends a GET to
+`https://api.loganalytics.azure.com/v1/workspaces/{workspace}/query` with fixed
+KQL `AzureActivity | summarize EventCount=count()` and `timespan=PT1H`.
+Only the integer `event-count` is projected from a single-cell result bounded
+to 16384 response bytes. HTTP 200 `PartialError` responses are rejected.
+
+The `reader-secret` input names an Actions secret, default
+`AZURE_MONITOR_READ_ACCESS_TOKEN`, containing an externally acquired Entra
+service-to-service access token, not a client secret or GitHub OIDC JWT.
+[Token acquisition](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api)
+uses audience `https://api.loganalytics.io` and client credentials scope
+`https://api.loganalytics.io/.default`. Workspace-scoped Azure RBAC and
+table access must authorize the query independently; delegated `Data.Read`
+is not an application permission. Token acquisition and renewal are external.
+Runtime-managed Entra client credentials are deferred to a separate change;
+the same external-token limitation currently applies to Foundry IQ and Web IQ.
+Approve only `api.loganalytics.azure.com` in addition to workflow infrastructure.
+
+This count is a minimal workspace activity signal, not raw logs, agent traces,
+health, root cause or proof of external-agent observability. Zero does not
+certify health or complete ingestion. The API does not echo workspace identity;
+the approved request path identifies the target without independent response
+attestation. No arbitrary KQL, time windows, cross-workspace search, Azure writes,
+triggers, hosted MCP or token fallback is supported. The golden stages at most
+one GitHub issue; staging suppresses that write, not the Azure read.
 
 ## Datadog
 

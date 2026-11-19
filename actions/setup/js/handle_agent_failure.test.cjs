@@ -7076,13 +7076,13 @@ describe("handle_agent_failure", () => {
     let buildToolDenialsExceededContext;
     /** @type {string} */
     let tmpDir;
+    /** @type {string} */
+    let sessionStateDir;
 
     beforeEach(() => {
       vi.resetModules();
-      try {
-        fs.rmSync(path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state"), { recursive: true, force: true });
-      } catch {}
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-test-tool-denials-exceeded-"));
+      sessionStateDir = path.join(tmpDir, "copilot-session-state");
       process.env.RUNNER_TEMP = tmpDir;
       ({ loadToolDenialsExceededEvents, buildToolDenialsExceededContext } = require("./handle_agent_failure.cjs"));
     });
@@ -7092,9 +7092,6 @@ describe("handle_agent_failure", () => {
       if (fs.existsSync(tmpDir)) {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
-      try {
-        fs.rmSync(path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state"), { recursive: true, force: true });
-      } catch {}
     });
 
     it("uses longer Markdown delimiters rather than changing literal backticks", () => {
@@ -7110,7 +7107,7 @@ describe("handle_agent_failure", () => {
     });
 
     it("loads guard.tool_denials_exceeded events from copilot session events.jsonl", () => {
-      const sessionDir = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state", "session-1");
+      const sessionDir = path.join(sessionStateDir, "session-1");
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(
         path.join(sessionDir, "events.jsonl"),
@@ -7125,8 +7122,29 @@ describe("handle_agent_failure", () => {
         ].join("\n") + "\n"
       );
 
-      const events = loadToolDenialsExceededEvents();
+      const events = loadToolDenialsExceededEvents(sessionStateDir);
       expect(events).toEqual([{ denialCount: 5, threshold: 5, reason: "permission denied: read", recentToolCalls: ["mcp__safeoutputs.read"], timestamp: "2026-06-06T00:00:01Z" }]);
+    });
+
+    it("uses the shared session directory even when TMPDIR differs", () => {
+      const { TMP_GH_AW_PATH } = require("./constants.cjs");
+      const sharedDir = path.join(TMP_GH_AW_PATH, "sandbox", "agent", "logs", "copilot-session-state");
+      const originalTmpDir = process.env.TMPDIR;
+      process.env.TMPDIR = tmpDir;
+      const exists = vi.spyOn(fs, "existsSync").mockReturnValue(true);
+      const readdir = vi.spyOn(fs, "readdirSync").mockReturnValue([{ name: "session-1", isDirectory: () => true }]);
+      const read = vi.spyOn(fs, "readFileSync").mockReturnValue(JSON.stringify({ type: "guard.tool_denials_exceeded", data: { denialCount: 5, threshold: 5 } }));
+      try {
+        expect(loadToolDenialsExceededEvents()).toHaveLength(1);
+        expect(readdir).toHaveBeenCalledWith(sharedDir, { withFileTypes: true });
+        expect(read).toHaveBeenCalledWith(path.join(sharedDir, "session-1", "events.jsonl"), "utf8");
+      } finally {
+        exists.mockRestore();
+        readdir.mockRestore();
+        read.mockRestore();
+        if (originalTmpDir === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = originalTmpDir;
+      }
     });
 
     it("renders dedicated context for tool denial threshold events", () => {
@@ -7164,7 +7182,7 @@ describe("handle_agent_failure", () => {
     });
 
     it("captures only the last 5 tool calls before guard event", () => {
-      const sessionDir = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state", "session-1");
+      const sessionDir = path.join(sessionStateDir, "session-1");
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(
         path.join(sessionDir, "events.jsonl"),
@@ -7184,7 +7202,7 @@ describe("handle_agent_failure", () => {
         ].join("\n") + "\n"
       );
 
-      const events = loadToolDenialsExceededEvents();
+      const events = loadToolDenialsExceededEvents(sessionStateDir);
       expect(events).toEqual([
         {
           denialCount: 5,
@@ -7197,7 +7215,7 @@ describe("handle_agent_failure", () => {
     });
 
     it("captures shell command details for recent bash tool calls", () => {
-      const sessionDir = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state", "session-1");
+      const sessionDir = path.join(sessionStateDir, "session-1");
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(
         path.join(sessionDir, "events.jsonl"),
@@ -7215,7 +7233,7 @@ describe("handle_agent_failure", () => {
         ].join("\n") + "\n"
       );
 
-      const events = loadToolDenialsExceededEvents();
+      const events = loadToolDenialsExceededEvents(sessionStateDir);
       expect(events).toEqual([
         {
           denialCount: 5,
@@ -7228,7 +7246,7 @@ describe("handle_agent_failure", () => {
     });
 
     it("redacts inputs for recent Go, Make and shell MCP script calls", () => {
-      const sessionDir = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state", "session-1");
+      const sessionDir = path.join(sessionStateDir, "session-1");
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(
         path.join(sessionDir, "events.jsonl"),
@@ -7241,13 +7259,13 @@ describe("handle_agent_failure", () => {
           JSON.stringify({ type: "guard.tool_denials_exceeded", data: { denialCount: 5, threshold: 5, reason: "permission denied: make" } }),
         ].join("\n") + "\n"
       );
-      const events = loadToolDenialsExceededEvents();
+      const events = loadToolDenialsExceededEvents(sessionStateDir);
       expect(events).toHaveLength(1);
       expect(events[0].recentToolCalls).toEqual(["mcpscripts.go([REDACTED])", "mcpscripts.make([REDACTED])", "mcp-scripts.shell([REDACTED])", "mcp__mcpscripts__bash([REDACTED])", "other.read"]);
     });
 
     it("sanitizes backticks in shell command previews", () => {
-      const sessionDir = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state", "session-1");
+      const sessionDir = path.join(sessionStateDir, "session-1");
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(
         path.join(sessionDir, "events.jsonl"),
@@ -7265,7 +7283,7 @@ describe("handle_agent_failure", () => {
         ].join("\n") + "\n"
       );
 
-      const events = loadToolDenialsExceededEvents();
+      const events = loadToolDenialsExceededEvents(sessionStateDir);
       expect(events).toEqual([
         {
           denialCount: 5,

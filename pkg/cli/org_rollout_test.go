@@ -240,7 +240,11 @@ func TestOrgRolloutWorkerProcess(t *testing.T) {
 		fmt.Fprintln(os.Stdout, "repository output "+orgRolloutResultPrefix+`{"Status":"spoofed"}`)
 		require.NoError(t, emitOrgRolloutResult(orgRolloutResult{Status: "planned"}))
 		if os.Getenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT") == "1" {
-			fmt.Fprintln(os.Stdout, "repository-controlled trailing output")
+			if os.Getenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT_NO_NEWLINE") == "1" {
+				fmt.Fprint(os.Stdout, "repository-controlled trailing output")
+			} else {
+				fmt.Fprintln(os.Stdout, "repository-controlled trailing output")
+			}
 		}
 		if os.Getenv("GH_AW_ROLLOUT_HELPER_TRAILING_PARTIAL") == "1" {
 			fmt.Fprint(os.Stdout, "repository-controlled trailing output")
@@ -259,12 +263,16 @@ func TestOrgRolloutWorkerProcess(t *testing.T) {
 	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
 	assert.Equal(t, "failed", result.Status)
 	assert.Contains(t, result.Error, "without a rollout result")
-	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT", "")
-	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_PARTIAL", "1")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT_NO_NEWLINE", "1")
 	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
 	assert.Equal(t, "failed", result.Status)
 	assert.Contains(t, result.Error, "without a rollout result")
 	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT", "")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT_NO_NEWLINE", "")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_PARTIAL", "1")
+	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
+	assert.Equal(t, "failed", result.Status)
+	assert.Contains(t, result.Error, "without a rollout result")
 	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_PARTIAL", "")
 	t.Setenv("GH_AW_ROLLOUT_HELPER_FAIL", "1")
 	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)

@@ -42,7 +42,7 @@ const { parseTokenUsageJsonl, generateTokenUsageSummary } = require("./parse_mcp
 const { readDedupedTokenUsage, getTokenUsagePaths } = require("./parse_token_usage.cjs");
 const { extractShellCommandDetailsFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
-const { GITHUB_API_VERSION, STEP_NAME_START_MCP_GATEWAY } = require("./constants.cjs");
+const { GITHUB_API_VERSION, STEP_NAME_START_MCP_GATEWAY, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { buildEmptyOutputOutcome, buildCompletionEvidence, EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { collectUnifiedSession, isModelEndpointMismatchData } = require("./unified_session.cjs");
@@ -50,7 +50,6 @@ const { validateSessionFileHeader } = require("./unified_session_render.cjs");
 const { isTaskCompleteRegistrationIssue, hasAgentTerminalReasonCompleted, shouldIgnoreTaskCompleteRegistrationReports } = require("./load_agent_output.cjs");
 const fs = require("fs");
 const https = require("https");
-const os = require("os");
 const path = require("path");
 
 const DEFAULT_ACTION_FAILURE_ISSUE_EXPIRES_HOURS = 24 * 7;
@@ -93,7 +92,7 @@ const FAILURE_ISSUE_WINDOW_MS = FAILURE_ISSUE_DEDUP_WINDOW_HOURS * 60 * 60 * 100
 const DEFAULT_OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
 /** Path to the failure categories file written by handle_agent_failure and read by the OTLP conclusion span. */
 const FAILURE_CATEGORIES_PATH = "/tmp/gh-aw/failure_categories.json";
-const COPILOT_SESSION_STATE_DIR = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state");
+const COPILOT_SESSION_STATE_DIR = path.join(TMP_GH_AW_PATH, "sandbox", "agent", "logs", "copilot-session-state");
 const RECENT_TOOL_CALLS_WITH_COMMAND_PREVIEW = new Set(["bash", "shell"]);
 const ELLIPSIS = "...";
 const ELLIPSIS_LENGTH = ELLIPSIS.length;
@@ -1766,17 +1765,17 @@ function buildPermissionDeniedContext(items, workflowId) {
  * Load max-tool-denials guard events from Copilot SDK session events.jsonl files.
  * @returns {Array<{denialCount: number, threshold: number, reason: string, recentToolCalls: Array<string>, timestamp: string}>}
  */
-function loadToolDenialsExceededEvents() {
+function loadToolDenialsExceededEvents(sessionStateDir = COPILOT_SESSION_STATE_DIR) {
   try {
-    if (!fs.existsSync(COPILOT_SESSION_STATE_DIR)) {
+    if (!fs.existsSync(sessionStateDir)) {
       return [];
     }
 
     const events = [];
-    const sessionDirs = fs.readdirSync(COPILOT_SESSION_STATE_DIR, { withFileTypes: true });
+    const sessionDirs = fs.readdirSync(sessionStateDir, { withFileTypes: true });
     for (const entry of sessionDirs) {
       if (!entry.isDirectory()) continue;
-      const eventsPath = path.join(COPILOT_SESSION_STATE_DIR, entry.name, "events.jsonl");
+      const eventsPath = path.join(sessionStateDir, entry.name, "events.jsonl");
       if (!fs.existsSync(eventsPath)) continue;
       const content = fs.readFileSync(eventsPath, "utf8");
       /** @type {Array<string>} */

@@ -16540,13 +16540,38 @@
                   "type": "object",
                   "properties": {
                     "package-manager": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Package manager used to install the engine: 'npm' installs 'package-name' globally; 'pip' installs the hash-locked 'requirements', when declared, before the agent sandbox starts."
                     },
                     "package-name": {
                       "type": "string"
                     },
                     "version": {
                       "type": "string"
+                    },
+                    "requirements": {
+                      "type": "array",
+                      "description": "pip only. Complete hash-locked dependency list, including 'package-name' at the engine version. The runtime installs binary wheels with pip --require-hashes into /tmp/gh-aw/agent/<engine-id>-python/site-packages, verifies the installed version, and exposes the directory to execution as GH_AW_PYTHON_PACKAGES.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Python distribution name."
+                          },
+                          "version": {
+                            "type": "string",
+                            "description": "Exact distribution version. Quote it so YAML keeps it a string."
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$",
+                            "description": "SHA-256 of the wheel to install."
+                          }
+                        },
+                        "required": ["name", "version", "sha256"],
+                        "additionalProperties": false
+                      }
                     },
                     "step-name": {
                       "type": "string"

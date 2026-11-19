@@ -5912,6 +5912,32 @@
             "additionalProperties": false
           }
         },
+        "adoption_errors": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "run_id",
+              "reason",
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        },
         "episode_adoption": {
           "type": [
             "null",
@@ -9859,6 +9885,32 @@
               "items",
               "summary",
               "coverage"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "adoption_errors": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "run_id",
+              "reason",
+              "error"
             ],
             "additionalProperties": false
           }
