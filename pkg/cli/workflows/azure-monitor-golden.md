@@ -32,8 +32,8 @@ Before any authorized live read, replace specimen workspace GUID
 `11111111-2222-4333-8444-555555555555` in both grant and prompt.
 Keep the reviewed Azure Monitor declaration at the imported path. Provision
 `AZURE_MONITOR_READ_ACCESS_TOKEN` with an externally acquired and renewed
-Entra service-to-service access token for `https://api.loganalytics.azure.com`,
-using scope `https://api.loganalytics.azure.com/.default`. The service principal
+Entra service-to-service access token for `https://api.loganalytics.io`,
+using scope `https://api.loganalytics.io/.default`. The service principal
 needs read/query RBAC on this workspace; delegated `Data.Read` is not an
 application permission. No Azure writer token is needed. The connector does
 not log in, exchange a GitHub OIDC JWT or renew tokens.

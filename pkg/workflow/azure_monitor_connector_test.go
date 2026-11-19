@@ -211,9 +211,10 @@ const env = {GH_AW_CONNECTOR_SECRET_AZURE_MONITOR_READ_ACCESS_TOKEN:"synthetic-t
     assert.deepEqual({...result.data},{"event-count":count});
     assert.equal(result.untrusted,true);
   }
+  const rejectsWithoutAssertionFailure = error => !(error instanceof assert.AssertionError);
   for (const [name,body] of Object.entries(fixture.invalidResponses))
-    await assert.rejects(execute(body),undefined,name);
+    await assert.rejects(execute(body),rejectsWithoutAssertionFailure,name);
   for (const status of [302,401,403,429,500])
-    await assert.rejects(execute(fixture.valid,status));
+    await assert.rejects(execute(fixture.valid,status),rejectsWithoutAssertionFailure);
 })();
 `

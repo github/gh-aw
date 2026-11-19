@@ -972,8 +972,8 @@ The `reader-secret` input names an Actions secret, default
 `AZURE_MONITOR_READ_ACCESS_TOKEN`, containing an externally acquired Entra
 service-to-service access token, not a client secret or GitHub OIDC JWT.
 [Token acquisition](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api)
-uses audience `https://api.loganalytics.azure.com` and client credentials scope
-`https://api.loganalytics.azure.com/.default`. Workspace-scoped Azure RBAC and
+uses audience `https://api.loganalytics.io` and client credentials scope
+`https://api.loganalytics.io/.default`. Workspace-scoped Azure RBAC and
 table access must authorize the query independently; delegated `Data.Read`
 is not an application permission. Token acquisition and renewal are external.
 Runtime-managed Entra client credentials are deferred to a separate change;

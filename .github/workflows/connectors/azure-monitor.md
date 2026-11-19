@@ -13,7 +13,7 @@ connectors:
         phase: agent
         header: Authorization
         scheme: bearer
-        scopes: [https://api.loganalytics.azure.com/.default]
+        scopes: [https://api.loganalytics.io/.default]
         token:
           secret: ${{ github.aw.import-inputs.reader-secret }}
     resources:
@@ -70,7 +70,7 @@ import-schema:
   reader-secret:
     type: string
     default: AZURE_MONITOR_READ_ACCESS_TOKEN
-    description: Actions secret containing a current Entra access token for audience https://api.loganalytics.azure.com, without the Bearer prefix; not a client secret or GitHub OIDC JWT.
+    description: Actions secret containing a current Entra access token for audience https://api.loganalytics.io, without the Bearer prefix; not a client secret or GitHub OIDC JWT.
 ---
 
 <!--
@@ -93,9 +93,9 @@ import-schema:
       Acquire a service-to-service token outside this connector with the
       client credentials flow at the tenant's Microsoft identity platform
       v2.0 token endpoint, using scope
-      https://api.loganalytics.azure.com/.default and an approved app
+      https://api.loganalytics.io/.default and an approved app
       credential, preferably a certificate. The token audience is
-      https://api.loganalytics.azure.com. The scope declaration documents
+      https://api.loganalytics.io. The scope declaration documents
       token acquisition requirements; it grants no Azure access.
     </acquisition>
     <storage>
