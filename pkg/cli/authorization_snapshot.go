@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 var authorizationCommitPattern = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
@@ -100,7 +102,7 @@ func writeAuthorizationSnapshot(reader *bufio.Reader, files []authorizationSnaps
 		}
 		total += size
 		target := filepath.Join(destination, filepath.FromSlash(file.name))
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(target), constants.DirPermOwnerOnly); err != nil {
 			return err
 		}
 		if err := writeAuthorizationBlob(reader, target, size); err != nil {
@@ -115,7 +117,7 @@ func writeAuthorizationSnapshot(reader *bufio.Reader, files []authorizationSnaps
 }
 
 func writeAuthorizationBlob(reader io.Reader, target string, size int64) (resultErr error) {
-	file, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o400)
+	file, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, constants.FilePermOwnerReadOnly)
 	if err != nil {
 		return err
 	}
