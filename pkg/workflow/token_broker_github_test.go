@@ -194,10 +194,11 @@ func TestTokenBrokerGitHubOptInIsolation(t *testing.T) {
 		{"absent", "", false, false},
 		{"false", "tools:\n  github:\n    token-broker: false\n", false, false},
 		{"tools-only", "tools:\n  github:\n    token-broker: true\n", true, false},
+		{"tools-shorthand", "tools:\n  github:\n    token-broker:\n", true, false},
 		{"safe-only", "", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fields := tc.fields + "safe-outputs:\n  threat-detection: false\n  token-broker: " + map[bool]string{true: "true", false: "false"}[tc.safeBroker] + "\n  create-issue:\n"
+			fields := tc.fields + "safe-outputs:\n  threat-detection: false\n  token-broker:" + map[bool]string{true: "", false: " false"}[tc.safeBroker] + "\n  create-issue:\n"
 			data, output, jobs := compileGitHubBrokerTest(t, fields)
 			assert.Equal(t, tc.agentBroker || tc.safeBroker, data.TokenBrokerEnabled)
 			if tc.agentBroker {
@@ -295,7 +296,7 @@ func TestTokenBrokerGitHubStandaloneCoverage(t *testing.T) {
 }
 
 func TestTokenBrokerGitHubSchemaAndRoundTrip(t *testing.T) {
-	for _, value := range []any{"true", map[string]any{"provider": "github"}, nil} {
+	for _, value := range []any{"true", map[string]any{"provider": "github"}, 1} {
 		require.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": "workflow_dispatch", "tools": map[string]any{"github": map[string]any{"token-broker": value}}}, "broker.md"))
 		require.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": "workflow_dispatch", "safe-outputs": map[string]any{"token-broker": value}}, "broker.md"))
 	}

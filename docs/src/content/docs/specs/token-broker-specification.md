@@ -78,6 +78,8 @@ Workflow source MUST explicitly select Copilot capabilities using `token-broker.
 
 GitHub API authentication MUST be selected independently using `tools.github.token-broker: true` and/or `safe-outputs.token-broker: true`. Each selects the `github-app` capability for that section; neither requires a top-level Copilot capability. An enabled section-level broker selection MUST NOT be combined with that section's `github-app` or `github-token`, and MUST suppress top-level GitHub App fallback for that section. Omission or `false` MUST preserve existing authentication. Installation selection, repository scope, permissions, and lifetime MUST come from enrolled server policy bound to verified identity, never from caller-selected scope fields.
 
+In these two sections, a present `token-broker:` key with an empty value MUST be equivalent to `token-broker: true`. This shorthand does not select top-level Copilot capabilities.
+
 For GitHub tool consumers, broker policy MUST restrict installation token permissions to read-only. Safe-output consumers MUST receive only the permissions required by their approved effects. Sharing the `github-app` capability name MUST NOT authorize credential reuse between these job contexts.
 
 For opted-in task consumers, the compiler MUST carry the reserved member `_token_broker: {"copilot-task": true}` in the existing `GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG` JSON object. Workflow handlers MUST enable broker authentication only when this member selects `copilot-task` as boolean `true`; missing, false, malformed, or string-valued markers MUST NOT enable it. This marker introduces no new environment variable. A selected capability with a missing or empty `GH_AW_TOKEN_BROKER_URL` MUST fail closed when a credential is requested, rather than disable broker authentication or select a legacy credential.
@@ -192,7 +194,9 @@ The UTF-8 JSON request MUST contain exactly these two unique string members:
 
 The broker MUST verify the identity and revoke all credentials it issued to that exact authorized execution context, including credentials for any provider or capability issued in that job. The operation MUST be idempotent and MUST NOT revoke credentials belonging to another job, run, attempt, repository, or tenant. A successful invalidation MUST return HTTP 204 with an empty body and `Cache-Control: no-store`. The client MUST fail the invalidation step on any other status, without exposing response bodies or transport diagnostics. The server MUST reject malformed requests and MUST NOT disclose whether credentials exist for an unauthorized context.
 
-The invalidation step is cleanup, not a fallback or substitute for short credential lifetimes. If the job is force-terminated before the step can run, short server-enforced lifetimes remain the bound on credential exposure.
+Job-end invalidation is terminal for that job attempt. The broker MUST deny further exchanges for the closed context, even with a still-valid OIDC identity. It MUST NOT report success while any credential issued to that job remains usable downstream, including one minted by an exchange racing with invalidation.
+
+Every issued credential MUST also have a finite expiration enforced by the downstream service, independently of job cleanup. If runner loss prevents invalidation, the credential can remain usable until that expiration. An earlier client cache deadline or an `expires_at` value that the downstream service does not enforce is not a substitute.
 
 ## 5. Identity Verification and Authorization
 
@@ -289,6 +293,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-015 | Server | Rotate trusted signing keys; cached valid keys remain usable within policy, unknown keys trigger bounded refresh, and untrusted/unavailable keys fail closed. |
 | T-TBR-016 | Both | An unconditional job post-step obtains a fresh OIDC identity and invalidates only credentials for its verified execution context; repeat invalidation succeeds, unauthorized scopes do not revoke credentials, and non-204 responses fail safely. |
 | T-TBR-017 | Client | GitHub tools and safe-output broker selections work independently and together. Conflicting section credentials fail compilation; top-level App fallback does not override broker selection. Only consuming jobs exchange credentials and receive broker-related OIDC permission. Tokens remain masked and job-local, and failures never select legacy credentials. |
+| T-TBR-018 | Deployment | After job-end invalidation, the downstream service rejects the job's credentials before their original expiry, the broker denies further exchanges for that job, and a sibling job's credential still works. In a separate run without cleanup, verify that the downstream service rejects the credential at `expires_at`. |
 
 Implementers MUST record pass/fail/not-applicable per class and capability, with non-sensitive evidence and policy settings. Tests SHOULD include skew, calendar, concurrency, and revocation boundary conditions. Optional features marked not applicable MUST NOT hide failed mandatory requirements.
 

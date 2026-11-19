@@ -17,6 +17,11 @@ var (
 	errTokenBrokerRequestPermissionConflict = errors.New("token-broker.copilot-request is incompatible with permissions.copilot-requests: write")
 )
 
+func sectionTokenBrokerEnabled(config map[string]any) bool {
+	value, present := config["token-broker"]
+	return present && (value == nil || value == true)
+}
+
 func usesTokenBrokerInference(data *WorkflowData) bool {
 	if !tokenBrokerRequestEnabled(data) {
 		return false
