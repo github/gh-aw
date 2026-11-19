@@ -142,3 +142,58 @@ func TestCustomEngineThreatDetectionWarning(t *testing.T) {
 		t.Errorf("expected a threat detection warning naming the custom engine and the override key, got:\n%s", stderr)
 	}
 }
+
+func TestExplicitThreatDetectionEngineRewriteWarning(t *testing.T) {
+	tests := []struct {
+		name        string
+		engine      string
+		replacement string
+		disabled    bool
+	}{
+		{name: "custom fallback", engine: "harness-engine", replacement: "copilot"},
+		{name: "declared replacement", engine: "custom-declared", replacement: "codex"},
+		{name: "pi fallback", engine: "pi", replacement: "copilot"},
+		{name: "supported engine", engine: "claude"},
+		{name: "disabled engine", engine: "harness-engine", disabled: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.engineCatalog.Register(&EngineDefinition{ID: "custom-declared", DetectionEngine: "codex"})
+			data := &WorkflowData{
+				AI: "claude",
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{
+					EngineConfig: &EngineConfig{ID: tt.engine}, EngineDisabled: tt.disabled,
+				}},
+			}
+			stderr := testutil.CaptureStderr(t, func() {
+				compiler.emitCustomEngineThreatDetectionWarning(data, "test.md")
+			})
+			if tt.replacement == "" {
+				assert.Empty(t, stderr)
+			} else {
+				assert.Contains(t, stderr, "safe-outputs.threat-detection.engine.id")
+				assert.Contains(t, stderr, `"`+tt.engine+`"`)
+				assert.Contains(t, stderr, `"`+tt.replacement+`"`)
+			}
+		})
+	}
+}
+
+func TestExplicitCustomThreatDetectionEngineCompileWarning(t *testing.T) {
+	workflowPath := writeCustomEngineWorkflow(t, "")
+	content, err := os.ReadFile(workflowPath)
+	require.NoError(t, err)
+	content = []byte(strings.Replace(string(content), "  create-issue:\n", "  create-issue:\n  threat-detection:\n    engine:\n      id: harness-engine\n", 1))
+	require.NoError(t, os.WriteFile(workflowPath, content, 0644))
+
+	compiler := NewCompiler()
+	stderr := testutil.CaptureStderr(t, func() {
+		require.NoError(t, compiler.CompileWorkflow(workflowPath))
+	})
+	assert.Contains(t, stderr, `safe-outputs.threat-detection.engine.id "harness-engine"`)
+	assert.Contains(t, stderr, `will run on "copilot"`)
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	require.NoError(t, err)
+	assert.Contains(t, extractJobSection(string(lockContent), "detection"), "--engine copilot")
+}

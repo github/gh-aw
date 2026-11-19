@@ -485,8 +485,17 @@ func (c *Compiler) emitCustomEngineThreatDetectionWarning(workflowData *Workflow
 	if threatDetection.EngineDisabled {
 		return
 	}
-	// An explicit safe-outputs.threat-detection.engine is the author's own choice.
+	// Report explicit choices that are rewritten, including declared replacements.
 	if threatDetection.EngineConfig != nil && threatDetection.EngineConfig.ID != "" {
+		configuredEngineID := threatDetection.EngineConfig.ID
+		detectionEngineID := c.getThreatDetectionEngineID(workflowData)
+		if configuredEngineID != detectionEngineID {
+			message := fmt.Sprintf(
+				"safe-outputs.threat-detection.engine.id %q is not supported by threat detection and will run on %q instead, which requires that engine's credentials.",
+				configuredEngineID, detectionEngineID)
+			fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+			c.IncrementWarningCount()
+		}
 		return
 	}
 
