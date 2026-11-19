@@ -1,6 +1,6 @@
 ---
 name: Smoke Work Queue Monitor
-description: Check the latest smoke work-queue cycle for dispatch, worker, Claim, delivery and latency-budget failures in read-only mode, benchmark each task and the cycle end to end, and open an issue only when something failed
+description: Use a read-only queue snapshot to check the latest smoke cycle for dispatch, worker, Claim, delivery and latency-budget failures, benchmark each task and the cycle end to end, and open an issue only when something failed
 intent: Close the loop on work queue smoke diagnostics by detecting failed or stuck synthetic Work and reporting it, without changing queue state.
 on:
   schedule: "30 1-23/6 * * *"

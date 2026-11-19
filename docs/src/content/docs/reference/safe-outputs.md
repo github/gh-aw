@@ -11,6 +11,8 @@ Safe outputs separate action requests from execution: the agent requests actions
 
 Configured outputs may publish content, update metadata or merge pull requests automatically. Review requirements depend on the output configuration and applicable policy gates.
 
+`safe-outputs.authorization` can require permission from an external authority before eligible output invocations execute. Missing configuration, authority errors, or denied decisions block protected invocations. Requirements can apply to one output, a workflow, or a repository. See [Safe-output authorization](/gh-aw/reference/governance/#safe-output-authorization) for configuration, diagnostic exemptions, and staged-preview behavior.
+
 When no `safe-outputs:` section is present (or when only [system types](#system-types-auto-enabled) are configured), `create-issue` is automatically enabled with conservative defaults (`max: 1`, labels and title-prefix set to the workflow ID).
 
 Setting `create-issue: false` disables the `create_issue` tool and its automatic reporting instruction while leaving system outputs enabled:
