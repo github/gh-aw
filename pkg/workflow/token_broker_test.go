@@ -57,6 +57,44 @@ func TestTokenBrokerExperimentalWarning(t *testing.T) {
 	}
 }
 
+func TestTokenBrokerSelfHostedJobs(t *testing.T) {
+	var workflow map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(`
+jobs:
+  hosted:
+    runs-on: ubuntu-latest
+    steps:
+      - env: {GH_AW_TOKEN_BROKER_URL: x}
+  labelled:
+    runs-on: [self-hosted, linux]
+    steps:
+      - run: echo
+      - env: {GH_AW_TOKEN_BROKER_URL: x}
+  group:
+    runs-on: {group: runners}
+    env: {GH_AW_TOKEN_BROKER_URL: x}
+  no_broker:
+    runs-on: self-hosted
+    steps:
+      - run: echo
+`), &workflow))
+	assert.Equal(t, []string{"group", "labelled"}, tokenBrokerSelfHostedJobs(workflow))
+}
+
+func TestTokenBrokerHelperPaths(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot"}, TokenBrokerEnabled: true, TokenBrokerCopilotRequest: true}
+	for _, steps := range [][]string{
+		compiler.buildTokenBrokerRequestStep(data, ""),
+		compiler.buildTokenBrokerInvalidationStep(data),
+		compiler.buildGitHubBrokerTokenStep(data, "broker-token"),
+	} {
+		script := strings.Join(steps, "")
+		assert.Contains(t, script, "require('"+SetupActionDestination+"/token_broker.cjs')")
+		assert.NotContains(t, script, "/setup/js/token_broker.cjs")
+	}
+}
+
 func TestTokenBrokerCompileOptIn(t *testing.T) {
 	t.Setenv(tokenBrokerURLEnv, "https://compile-time.invalid/never")
 	for _, tc := range []struct {
@@ -97,7 +135,7 @@ func TestTokenBrokerCompileOptIn(t *testing.T) {
 				usesBroker := false
 				for _, step := range job.Steps {
 					if url, ok := step.Env[tokenBrokerURLEnv]; ok {
-						assert.Equal(t, tokenBrokerURLExpression, url)
+						assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", url)
 						assert.NotContains(t, step.Env, "COPILOT_GITHUB_TOKEN")
 						usesBroker = true
 						consumers++
@@ -155,7 +193,7 @@ func TestTokenBrokerHandlerConfigExplicitOptIn(t *testing.T) {
 				require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG"]), &config))
 				if data.TokenBrokerEnabled {
 					assert.Equal(t, map[string]any{"copilot-task": true}, config["_token_broker"])
-					assert.Equal(t, tokenBrokerURLExpression, step.Env[tokenBrokerURLEnv])
+					assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 				} else {
 					assert.NotContains(t, config, "_token_broker")
 					assert.NotContains(t, step.Env, tokenBrokerURLEnv)
@@ -205,7 +243,7 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 			for name, job := range compiled.Jobs {
 				for _, step := range job.Steps {
 					if step.ID == "process_safe_outputs" {
-						assert.Equal(t, tokenBrokerURLExpression, step.Env[tokenBrokerURLEnv])
+						assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 						assert.Equal(t, "process_safe_outputs", step.ID)
 						assert.Equal(t, "write", job.Permissions["id-token"])
 						var config map[string]any
@@ -215,7 +253,7 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 					}
 					if step.Name == "Invalidate brokered Copilot credentials" {
 						assert.Equal(t, "always()", step.If)
-						assert.Equal(t, tokenBrokerURLExpression, step.Env[tokenBrokerURLEnv])
+						assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 						assert.Equal(t, "write", job.Permissions["id-token"])
 						invalidations++
 					}
@@ -373,7 +411,7 @@ func TestTokenBrokerWithoutTaskConsumer(t *testing.T) {
 
 func TestTokenBrokerDoesNotGrantOIDCToCustomJobs(t *testing.T) {
 	compiler := NewCompiler()
-	source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker:\n  copilot-task: true\nsafe-outputs:\n  assign-to-agent:\n  threat-detection: false\njobs:\n  custom:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo custom\n        env:\n          GH_AW_TOKEN_BROKER_URL: ${{ vars.GH_AW_TOKEN_BROKER_URL || secrets.GH_AW_TOKEN_BROKER_URL }}\n---\nTest."
+	source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker:\n  copilot-task: true\nsafe-outputs:\n  assign-to-agent:\n  threat-detection: false\njobs:\n  custom:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo custom\n        env:\n          GH_AW_TOKEN_BROKER_URL: ${{ secrets.GH_AW_TOKEN_BROKER_URL }}\n---\nTest."
 	data, err := compiler.ParseWorkflowString(source, "broker.md")
 	require.NoError(t, err)
 	_, err = compiler.CompileToYAML(data, "broker.md")
@@ -427,9 +465,10 @@ func assertTokenBrokerInvalidationLast(t *testing.T, job *Job) {
 	t.Helper()
 	var compiled struct {
 		Steps []struct {
-			ID   string `yaml:"id"`
-			Name string `yaml:"name"`
-			If   string `yaml:"if"`
+			ID   string            `yaml:"id"`
+			Name string            `yaml:"name"`
+			If   string            `yaml:"if"`
+			Env  map[string]string `yaml:"env"`
 		} `yaml:"steps"`
 	}
 	require.NoError(t, yaml.Unmarshal([]byte("steps:\n"+strings.Join(job.Steps, "")), &compiled))
@@ -438,10 +477,12 @@ func assertTokenBrokerInvalidationLast(t *testing.T, job *Job) {
 	invalidationIndex := -1
 	for index, step := range compiled.Steps {
 		if step.ID == "token_broker_copilot_request" {
+			assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 			requestIndex = index
 		}
 		if step.Name == "Invalidate brokered Copilot credentials" {
 			assert.Equal(t, "always()", step.If)
+			assert.Equal(t, "${{ secrets.GH_AW_TOKEN_BROKER_URL }}", step.Env[tokenBrokerURLEnv])
 			invalidationIndex = index
 		}
 	}

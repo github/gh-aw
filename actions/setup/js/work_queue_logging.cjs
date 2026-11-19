@@ -45,6 +45,7 @@ const CONTROL_ERROR_CODES = new Set([
   "work_queue_dispatch_credential_client_mismatch",
   "work_queue_dispatch_credential_identity_unavailable",
   "work_queue_dispatch_credential_identity_unverified",
+  "work_queue_dispatch_broker_identity_unavailable",
   "work_queue_dispatch_credential_principal_mismatch",
   "work_queue_dispatch_credential_proof_invalid",
   "work_queue_dispatch_credential_validator_required",
@@ -96,6 +97,8 @@ function queueControlErrorExplanation(code) {
     case "work_queue_dispatch_credential_identity_unavailable":
     case "work_queue_dispatch_credential_identity_unverified":
       return "The dispatch credential's GitHub identity could not be verified. Check the selected token's validity and GitHub API access; do not infer identity from the workflow's human caller.";
+    case "work_queue_dispatch_broker_identity_unavailable":
+      return "The broker did not provide a verified App identity binding. Configure an explicit dispatch-workflow GitHub App or token; do not infer the dispatch principal.";
     case "work_queue_dispatch_credential_principal_mismatch":
       return "The selected token belongs to a different identity than the original assignment permits. Use the approved worker credential; do not reassign the Claim or bypass the identity check.";
     case "work_queue_dispatch_credential_proof_invalid":

@@ -660,6 +660,10 @@ func (e *CopilotEngine) addCopilotGitHubToolEnv(env map[string]string, workflowD
 		githubToolConfig = config
 	}
 	customGitHubToken := getGitHubToken(githubToolConfig)
+	if usesTokenBrokerGitHubTool(workflowData) {
+		env["GITHUB_MCP_SERVER_TOKEN"] = "${{ steps.github-mcp-app-token.outputs.token }}"
+		return
+	}
 	if workflowData.ParsedTools != nil && workflowData.ParsedTools.GitHub != nil && workflowData.ParsedTools.GitHub.GitHubApp != nil {
 		tokenExpression := "${{ steps.github-mcp-app-token.outputs.token }}"
 		if workflowData.ParsedTools.GitHub.GitHubApp.shouldIgnoreMissingKey() {

@@ -88,6 +88,8 @@ func (c *Compiler) addCustomActionGitHubToken(steps *[]string, data *WorkflowDat
 	// Agent token mode: use full precedence chain for agent assignment
 	if config.UseCopilotCodingAgentToken {
 		token = getEffectiveCopilotCodingAgentGitHubToken(resolvedCustomToken)
+	} else if usesTokenBrokerSafeOutputs(data) && resolvedCustomToken == "" {
+		token = "${{ steps.safe-outputs-app-token.outputs.token }}"
 	} else if config.UseCopilotRequestsToken {
 		// Copilot mode: use getEffectiveCopilotRequestsToken with safe-outputs token precedence
 		token = getEffectiveCopilotRequestsToken(resolvedCustomToken)

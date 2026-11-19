@@ -268,6 +268,9 @@ func isGitHubCLIModeEnabled(data *WorkflowData) bool {
 }
 
 func isGitHubAppTokenForCLIProxy(data *WorkflowData) bool {
+	if usesTokenBrokerGitHubTool(data) {
+		return isGitHubCLIModeEnabled(data)
+	}
 	if data == nil || data.ParsedTools == nil || data.ParsedTools.GitHub == nil || data.ParsedTools.GitHub.GitHubApp == nil {
 		return false
 	}

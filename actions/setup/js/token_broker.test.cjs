@@ -57,6 +57,7 @@ describe("token broker", () => {
       '{"_token_broker":"true"}',
       '{"_token_broker":1}',
       '{"_token_broker":{"copilot-task":"true"}}',
+      '{"_token_broker":{"github-app":true}}',
       '{"assign_to_agent":{"_token_broker":{"copilot-task":true}}}',
     ]) {
       expect(isTokenBrokerEnabled({ ...makeEnv(), GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: config })).toBe(false);
@@ -79,11 +80,12 @@ describe("token broker", () => {
     for (const config of [undefined, '{"_token_broker":false}', "invalid-json"]) {
       const fixture = setup({ env: { ...makeEnv(), GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: config } });
       expect(await fixture.client.getToken("copilot-task")).toBe("synthetic-credential");
+      expect(await fixture.client.getToken("github-app")).toBe("synthetic-credential");
     }
     await fails(setup({ env: {} }).client.getToken("copilot-request"), "CONFIGURATION");
   });
 
-  it.each(["copilot-request", "copilot-task"])("exchanges and masks %s without logging or exporting credentials", async tokenType => {
+  it.each(["copilot-request", "copilot-task", "github-app"])("exchanges and masks %s without logging or exporting credentials", async tokenType => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const fixture = setup();
     const before = { ...fixture.env };
@@ -127,13 +129,36 @@ describe("token broker", () => {
     expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ token_type: "copilot-request", provider: "openai", oidc_token: OIDC });
   });
 
-  it("invalidates job-scoped broker credentials using a fresh OIDC identity", async () => {
+  it("isolates GitHub App pending requests and cache from Copilot capabilities without provider or scope selection", async () => {
+    const fixture = setup({
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? success(`synthetic-${JSON.parse(init.body).token_type}`) : json({ value: OIDC }))),
+    });
+    expect(await Promise.all(["copilot-request", "copilot-task", "github-app", "github-app"].map(type => fixture.client.getToken(type)))).toEqual([
+      "synthetic-copilot-request",
+      "synthetic-copilot-task",
+      "synthetic-github-app",
+      "synthetic-github-app",
+    ]);
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
+    for (const type of ["copilot-request", "copilot-task", "github-app"]) {
+      expect(await fixture.client.getToken(type)).toBe(`synthetic-${type}`);
+    }
+    expect(await fixture.client.getToken("github-app", "openai")).toBe("synthetic-github-app");
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
+    const requests = fixture.fetchImpl.mock.calls.filter(([, init]) => init.method === "POST").map(([, init]) => JSON.parse(init.body));
+    expect(requests.find(body => body.token_type === "github-app")).toEqual({ token_type: "github-app", oidc_token: OIDC });
+    const fresh = setup();
+    await getBrokerToken("github-app", fresh.options, "openai");
+    expect(JSON.parse(fresh.fetchImpl.mock.calls[1][1].body)).toEqual({ token_type: "github-app", oidc_token: OIDC });
+  });
+
+  it.each(["copilot-task", "github-app"])("invalidates job-scoped %s broker credentials using a fresh OIDC identity", async tokenType => {
     const fixture = setup({
       fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? (JSON.parse(init.body).operation === "invalidate" ? new Response(null, { status: 204 }) : success()) : json({ value: OIDC }))),
     });
-    await fixture.client.getToken("copilot-task");
+    await fixture.client.getToken(tokenType);
     await fixture.client.invalidateTokens();
-    await fixture.client.getToken("copilot-task");
+    await fixture.client.getToken(tokenType);
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
     expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ operation: "invalidate", oidc_token: OIDC });
     expect(fixture.fetchImpl.mock.calls[3][1]).toMatchObject({ method: "POST", redirect: "manual", headers: { "cache-control": "no-store" } });
@@ -268,14 +293,14 @@ describe("token broker", () => {
     expect(await fixture.client.getToken("copilot-request")).toBe("synthetic-credential");
   });
 
-  it.each([400, 404, 422, 501, 401, 403, 302, 307, 429, 500])("sanitizes broker HTTP %s, without fallback", async status => {
+  it.each([400, 404, 422, 501, 401, 403, 302, 307, 429, 500].flatMap(status => ["copilot-task", "github-app"].map(tokenType => [status, tokenType])))("sanitizes broker HTTP %s for %s, without fallback", async (status, tokenType) => {
     const fixture = setup();
     fixture.fetchImpl.mockResolvedValueOnce(json({ value: OIDC })).mockResolvedValueOnce(new Response("sensitive-detail", { status }));
-    await fails(fixture.client.getToken("copilot-task"), [400, 404, 422, 501].includes(status) ? "UNSUPPORTED" : [401, 403].includes(status) ? "UNAUTHORIZED" : "UNAVAILABLE");
+    await fails(fixture.client.getToken(tokenType), [400, 404, 422, 501].includes(status) ? "UNSUPPORTED" : [401, 403].includes(status) ? "UNAUTHORIZED" : "UNAVAILABLE");
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(2);
     await fixture.client.getToken("copilot-request");
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(4);
-    await fixture.client.getToken("copilot-task");
+    await fixture.client.getToken(tokenType);
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
   });
 
@@ -324,17 +349,42 @@ describe("token broker", () => {
     }
   });
 
-  it.each(["oidc-fetch", "broker-fetch", "oidc-body", "broker-body"])("enforces finite deadline including stalled %s and allows subsequent attempts", async stage => {
-    vi.useFakeTimers();
+  it.each(["oidc-fetch", "broker-fetch", "oidc-body", "broker-body"].flatMap(stage => ["copilot-request", "github-app"].map(tokenType => [stage, tokenType])))(
+    "enforces finite deadline including stalled %s for %s and allows subsequent attempts",
+    async (stage, tokenType) => {
+      vi.useFakeTimers();
+      const fixture = setup();
+      if (stage.startsWith("broker")) fixture.fetchImpl.mockResolvedValueOnce(json({ value: OIDC }));
+      if (stage.endsWith("fetch")) fixture.fetchImpl.mockImplementationOnce(() => new Promise(() => {}));
+      else fixture.fetchImpl.mockResolvedValueOnce(new Response(new ReadableStream({ start() {} })));
+      const result = fails(fixture.client.getToken(tokenType), "UNAVAILABLE");
+      await vi.advanceTimersByTimeAsync(10000);
+      await result;
+      expect(fixture.fetchImpl.mock.calls[0][1].signal.aborted).toBe(true);
+      expect(await fixture.client.getToken(tokenType)).toBe("synthetic-credential");
+    }
+  );
+
+  it.each(["configuration", "oidc", "broker", "response", "mask"])("fails closed for GitHub App %s errors without caching a credential", async stage => {
     const fixture = setup();
-    if (stage.startsWith("broker")) fixture.fetchImpl.mockResolvedValueOnce(json({ value: OIDC }));
-    if (stage.endsWith("fetch")) fixture.fetchImpl.mockImplementationOnce(() => new Promise(() => {}));
-    else fixture.fetchImpl.mockResolvedValueOnce(new Response(new ReadableStream({ start() {} })));
-    const result = fails(fixture.client.getToken("copilot-request"), "UNAVAILABLE");
-    await vi.advanceTimersByTimeAsync(10000);
-    await result;
-    expect(fixture.fetchImpl.mock.calls[0][1].signal.aborted).toBe(true);
-    expect(await fixture.client.getToken("copilot-request")).toBe("synthetic-credential");
+    if (stage === "configuration") fixture.env.GH_AW_TOKEN_BROKER_URL = "";
+    else if (stage === "oidc") fixture.fetchImpl.mockResolvedValueOnce(json({ value: "invalid" }));
+    else {
+      fixture.fetchImpl.mockResolvedValueOnce(json({ value: OIDC }));
+      if (stage === "broker") fixture.fetchImpl.mockRejectedValueOnce(new Error("sensitive-detail"));
+      if (stage === "response") fixture.fetchImpl.mockResolvedValueOnce(json({ token: "synthetic-credential" }));
+      if (stage === "mask")
+        fixture.mask
+          .mockImplementationOnce(() => {})
+          .mockImplementationOnce(() => {
+            throw new Error("sensitive-detail");
+          });
+    }
+    await fails(fixture.client.getToken("github-app"), stage === "configuration" ? "CONFIGURATION" : stage === "oidc" ? "OIDC" : stage === "broker" ? "UNAVAILABLE" : "MALFORMED_RESPONSE");
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(stage === "configuration" ? 0 : stage === "oidc" ? 1 : 2);
+    fixture.env.GH_AW_TOKEN_BROKER_URL = makeEnv().GH_AW_TOKEN_BROKER_URL;
+    expect(await fixture.client.getToken("github-app")).toBe("synthetic-credential");
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(stage === "configuration" ? 2 : stage === "oidc" ? 3 : 4);
   });
 
   it.each(["oidc", "broker", "mask"])("sanitizes raw exceptions from %s", async stage => {

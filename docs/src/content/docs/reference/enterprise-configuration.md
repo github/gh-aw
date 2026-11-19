@@ -130,12 +130,12 @@ After artifact upload and any retry, the callback step in `conclusion` uses a fr
 ## OIDC Token Broker
 
 > [!WARNING]
-> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables either capability emits a warning.
+> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables a broker capability emits a warning.
 
 > [!WARNING]
 > Brokered Copilot inference is supported in threat-detection and evals jobs. Main-agent inference remains blocked pending a renewable credential provider in AWF. Enable task and request capabilities independently; task-only adoption does not change the workflow's inference authentication.
 
-Enterprise administrators can distribute a broker endpoint through an organization Actions variable named `GH_AW_TOKEN_BROKER_URL`, with access limited to enrolled repositories. A repository Actions variable can override the organization value. An Actions secret with the same name is also supported; a nonempty variable takes precedence over the secret. For enterprise-wide deployment, provision the setting in each organization rather than assuming an enterprise Actions-variable scope.
+Enterprise administrators can distribute a broker endpoint through an organization Actions secret named `GH_AW_TOKEN_BROKER_URL`, with access limited to enrolled repositories. A repository Actions secret with the same name takes precedence over the organization secret. Actions variables are not used; migrate any existing variable value to the secret before recompiling workflows.
 
 Workflows must explicitly opt in:
 
@@ -144,13 +144,22 @@ token-broker:
   copilot-task: true
 ```
 
-The compiler emits runtime references to the variable and secret, not the endpoint value. Setting the variable alone does not enable the feature. After opting in and recompiling, changing the endpoint does not require recompilation.
+The compiler emits a runtime reference to the secret, not the endpoint value. Setting the secret alone does not enable the feature. After opting in and recompiling, changing the endpoint does not require recompilation.
 
 The broker contract defines independent authorization for `copilot-request` (Copilot inference) and `copilot-task` (coding-agent task creation and issue assignment). Enable either capability or both. Brokered Copilot inference is supported in threat-detection and evals jobs; each exchange identifies the gh-aw inference provider ID (currently `github`). Main agent inference still requires a renewable AWF credential provider. Do not combine `copilot-request` with `permissions.copilot-requests: write`. The broker validates GitHub's signature, issuer, expiration, audience, repository, workflow identity, and run claims against its enrollment policy; the audience is the configured broker URL. Broker-enabled consumer jobs run an unconditional post-step that requests invalidation scoped to the verified job identity. Restrict runner egress and protect the workflow and configuration that select this destination.
 
 Broker-enabled jobs require `id-token: write`. Reusable workflow callers must grant that permission to the caller job. The runner must reach both the GitHub OIDC endpoint and the broker over HTTPS. Broker failures, including a missing endpoint, must not select a PAT, GitHub App token, or `GITHUB_TOKEN` as a fallback. Unrelated GitHub operations retain their existing authentication.
 
-See the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains independent: the admission outage policy does not apply to credential exchange.
+GitHub API consumers can independently select `tools.github.token-broker: true` or `safe-outputs.token-broker: true` as an alternative to section-level `github-app` or `github-token`. These settings exchange the separate `github-app` capability without distributing App signing credentials to the workflow. The deployment must authorize the installation, repositories, and permissions from verified job identity and enrolled policy. The request supplies no scopes or installation selector. Credentials are acquired separately in each consuming job; static GitHub consumers do not renew them automatically, so credential lifetime must cover the operation.
+
+Rollout hardening:
+
+- **Runners.** Run broker-enabled jobs on GitHub-hosted runners, or on self-hosted runners that start clean for each job. A persistent runner can keep code left by an earlier job, including the agent job, and that code can steal a later job's credentials. The compiler warns when a broker-enabled job selects a self-hosted runner, and the broker should deny runners it has not enrolled.
+- **Reusable workflows.** Broker policy must approve both the calling workflow and the reusable workflow, and scope credentials to the caller's repository. Approving a reusable workflow alone would let any repository that calls it receive credentials.
+- **Bot-authored pull requests.** Unlike `GITHUB_TOKEN`, App installation tokens trigger workflows. A pull request opened with a brokered safe-output credential runs repository CI with code proposed by the agent. Require approval before workflows run on bot-authored pull requests, and protect the target branches. The broker denies exchanges from pull-request runs by default, but that does not protect other repository secrets.
+- **Cleanup.** The broker should also revoke credentials when it sees a job complete, because the cleanup step does not run if the runner is lost.
+
+See [Token Broker](/gh-aw/experimental/token-broker/) for an illustrated overview, and the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains independent: the admission outage policy does not apply to credential exchange.
 
 ## Copilot Engine on GHES
 
