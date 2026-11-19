@@ -111,7 +111,7 @@ The unified session records `durable.restore` (`restored`, `fresh`, or `failed`)
 
 Built-in durable mode rejects replacement commands, custom drivers, and harnesses. Pi's SDK and RPC drivers remain supported. Ordinary CLI arguments work, but session selectors and persistence-disabling flags cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME`. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs), and [imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files. Threat detection uses a separate fresh session.
 
-Checkpoints are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication. Artifacts contain restorable session content that may expose sensitive history to anyone with artifact access, and redaction is heuristic. Enable durable mode only where that suits the repository's artifact access and retention policies.
+Checkpoints are published after secret redaction and integrity validation. Copilot event payloads can be redacted before publication while preserving the session ID and event structure. The checkpoint is rejected if redaction changes other session files or cannot preserve the event structure. Cancellation or hard runner loss can prevent publication. Artifacts contain restorable session content that may expose sensitive history to anyone with artifact access, and redaction is heuristic. Enable durable mode only where that suits the repository's artifact access and retention policies.
 
 ### Pinning a Specific Engine Version
 
