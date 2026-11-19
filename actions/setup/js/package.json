@@ -22,6 +22,7 @@
     "vitest": "^5.1.0"
   },
   "overrides": {
+    "glob": "14.0.2",
     "magic-string": "1.4.2",
     "minimatch@3": "^3.1.5",
     "undici": "^6.23.0",

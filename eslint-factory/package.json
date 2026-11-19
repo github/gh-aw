@@ -13,6 +13,9 @@
     "test": "vitest run"
   },
   "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.3"
+    },
     "source-map-js": "1.2.2"
   },
   "devDependencies": {
