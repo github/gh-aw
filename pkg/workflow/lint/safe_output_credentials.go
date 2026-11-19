@@ -248,7 +248,9 @@ func safeOutputCallWritesInput(call *syntax.CallExpr, script string) bool {
 	if len(call.Args) < 2 {
 		return false
 	}
-	command := strings.ToLower(policyShellArgument(call, 0))
+	commandName := policyShellArgument(call, 0)
+	command := strings.ToLower(commandName)
+	copyOrMove := strings.EqualFold(commandName, "cp") || strings.EqualFold(commandName, "mv")
 	args := call.Args[1:]
 	operands := make([]string, 0, len(args))
 	var targetDirectory string
@@ -260,12 +262,12 @@ func safeOutputCallWritesInput(call *syntax.CallExpr, script string) bool {
 			continue
 		}
 		if !endOptions && strings.HasPrefix(value, "-") {
-			if (command == "cp" || command == "mv") && (value == "-t" || value == "--target-directory") && index+1 < len(args) {
+			if copyOrMove && (value == "-t" || value == "--target-directory") && index+1 < len(args) {
 				index++
 				targetDirectory = shellWordSource(args[index], script)
 				continue
 			}
-			if (command == "cp" || command == "mv") && strings.HasPrefix(value, "--target-directory=") {
+			if copyOrMove && strings.HasPrefix(value, "--target-directory=") {
 				targetDirectory = strings.TrimPrefix(shellWordSource(args[index], script), "--target-directory=")
 				continue
 			}
