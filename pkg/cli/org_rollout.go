@@ -398,6 +398,7 @@ func (output *orgRolloutOutput) appendTail(data []byte, limit int) {
 func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
 	lines := bytes.Split(output, []byte{'\n'})
 	for _, line := range slices.Backward(lines) {
+		line = bytes.TrimSuffix(line, []byte{'\r'})
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}

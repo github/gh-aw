@@ -5,12 +5,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
+const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
+const { maskedValueMatches, overlappingMatchGroups } = require("./mask_value_matcher.cjs");
 
 /** Refuse credentials rather than redacting and corrupting restorable session state. */
 function assertNoSecrets(value, env = process.env) {
   const text = JSON.stringify(value);
   for (const [name, secret] of Object.entries(env)) {
-    if (/(?:TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL)/i.test(name) && secret && secret.length >= 6 && text.includes(JSON.stringify(secret).slice(1, -1))) {
+    if (name !== "GH_AW_SECRET_NAMES" && /(?:TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL)/i.test(name) && secret && secret.length >= 6 && text.includes(JSON.stringify(secret).slice(1, -1))) {
       throw new Error("Durable session contains a credential; refusing persistence");
     }
   }
@@ -93,7 +95,7 @@ function stageFiles({ core, root = "/tmp/gh-aw/agent" }) {
   core.setOutput("present", "true");
 }
 
-function readBundle(root) {
+function readBundle(root, { checkSecrets = true } = {}) {
   const config = configuration(root);
   noSymlinks(config.bundle, root);
   const manifestFile = path.join(config.bundle, "manifest.json");
@@ -116,8 +118,10 @@ function readBundle(root) {
     if (relative === "manifest.json") return;
     const entry = blobs.get(relative);
     const bytes = fs.readFileSync(file);
-    assertNoSecrets(bytes.toString("utf8"));
-    assertNoSecrets(bytes.toString("latin1"));
+    if (checkSecrets) {
+      assertNoSecrets(bytes.toString("utf8"));
+      assertNoSecrets(bytes.toString("latin1"));
+    }
     if (!entry || hash(bytes) !== entry.hash) {
       throw new Error("Durable artifact was damaged or redacted; refusing continuation or publication");
     }
@@ -125,7 +129,7 @@ function readBundle(root) {
     count++;
   });
   if (count !== entries.size) throw new Error("Durable artifact is missing declared session files");
-  return { ...config, entries };
+  return { ...config, entries, manifest };
 }
 
 /** Validate every file before copying any untrusted artifact content. */
@@ -151,4 +155,134 @@ function validateFiles({ core, root = "/tmp/gh-aw/agent" }) {
   core.setOutput("present", "true");
 }
 
-module.exports = { stageFiles, restoreFiles, validateFiles };
+const COPILOT_EVENT_METADATA_FIELDS = new Set(["sessionId", "toolCallId", "toolName", "turnId", "parentToolCallId", "parentToolUseId", "mcpServerName", "role", "model"]);
+
+/** Preserve event envelopes, known top-level metadata, and payload structure. */
+function eventPayloadShape(value, topLevel = false) {
+  if (typeof value === "string") return null;
+  if (Array.isArray(value)) return value.map(child => eventPayloadShape(child));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, topLevel && COPILOT_EVENT_METADATA_FIELDS.has(key) ? child : eventPayloadShape(child)]));
+  }
+  // Distinguish a string replaced with a non-string JSON null.
+  return [typeof value, value];
+}
+
+function copilotEventStructure(text) {
+  const structure = [];
+  for (const event of iterateJsonlEvents(text)) {
+    if (event.type !== "json") {
+      if (event.reason === "blank") continue;
+      throw new Error("Cannot safely redact durable Copilot session events");
+    }
+    const { data, ...envelope } = event.value ?? {};
+    if (typeof envelope.type !== "string" || !data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("Cannot safely redact durable Copilot session events");
+    }
+    structure.push({ envelope, data: eventPayloadShape(data, true) });
+  }
+  return structure;
+}
+
+function safeRedactionDelta(original, redacted, allowedValues) {
+  if (typeof original === "string" && typeof redacted === "string") {
+    if (original === redacted) return true;
+    let sourceOffset = 0;
+    let redactedOffset = 0;
+    let changed = false;
+    for (const match of overlappingMatchGroups(maskedValueMatches(original, allowedValues, undefined, true))) {
+      const unchanged = original.slice(sourceOffset, match.start);
+      if (!redacted.startsWith(unchanged, redactedOffset)) return false;
+      redactedOffset += unchanged.length;
+      const marker = redacted.startsWith("***REDACTED***", redactedOffset) ? "***REDACTED***" : redacted.startsWith("***", redactedOffset) ? "***" : "";
+      if (!marker) return false;
+      redactedOffset += marker.length;
+      sourceOffset = match.end;
+      changed = true;
+    }
+    return changed && redacted.slice(redactedOffset) === original.slice(sourceOffset);
+  }
+  if (Array.isArray(original) && Array.isArray(redacted)) {
+    return original.length === redacted.length && original.every((value, index) => safeRedactionDelta(value, redacted[index], allowedValues));
+  }
+  if (original && redacted && typeof original === "object" && typeof redacted === "object") {
+    const originalKeys = Object.keys(original);
+    const redactedKeys = Object.keys(redacted);
+    return isDeepStrictEqual(originalKeys, redactedKeys) && originalKeys.every(key => safeRedactionDelta(original[key], redacted[key], allowedValues));
+  }
+  return isDeepStrictEqual(original, redacted);
+}
+
+function copilotEventRedactionDeltas(originalText, redactedText, allowedValues) {
+  const originalRecords = iterateJsonlEvents(originalText);
+  const redactedRecords = iterateJsonlEvents(redactedText);
+  while (true) {
+    const original = originalRecords.next();
+    const redacted = redactedRecords.next();
+    if (original.done || redacted.done) return original.done === redacted.done;
+    if (original.value.lineNumber !== redacted.value.lineNumber) return false;
+    const originalLine = original.value.rawLine;
+    const redactedLine = redacted.value.rawLine;
+    const originalEnding = originalLine.endsWith("\r\n") ? "\r\n" : originalLine.endsWith("\n") ? "\n" : "";
+    const redactedEnding = redactedLine.endsWith("\r\n") ? "\r\n" : redactedLine.endsWith("\n") ? "\n" : "";
+    if (originalEnding !== redactedEnding) return false;
+    if (original.value.type !== "json" || redacted.value.type !== "json") {
+      if (original.value.type !== "invalid" || redacted.value.type !== "invalid" || original.value.reason !== "blank" || redacted.value.reason !== "blank" || originalLine !== redactedLine) {
+        return false;
+      }
+      continue;
+    }
+    if (!safeRedactionDelta(original.value.value, redacted.value.value, allowedValues)) return false;
+  }
+}
+
+/**
+ * Rehash only the trusted host redactor's own changes to valid Copilot transcripts.
+ * @param {Iterable<string>} allowedValues
+ */
+function redactCopilotCheckpoint(redact, root = "/tmp/gh-aw/agent", allowedValues = []) {
+  const { bundle, engine, files } = configuration(root);
+  if (engine !== "copilot") return [];
+  noSymlinks(bundle, root);
+  const manifestPath = path.join(bundle, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return [];
+  const { entries, manifest } = readBundle(root, { checkSecrets: false });
+  let changed = false;
+  const updates = [];
+  const transcripts = [];
+  for (const [relative, entry] of entries) {
+    const match = /^(\d+)\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/events\.jsonl$/i.exec(relative);
+    if (!match || path.basename(files[Number(match[1])]) !== "session-state") continue;
+    const file = path.join(bundle, hash(relative) + ".json");
+    transcripts.push(file);
+    const text = entry.bytes.toString("utf8");
+    if (!entry.bytes.equals(Buffer.from(text))) throw new Error("Cannot safely redact durable Copilot session events");
+    const structure = copilotEventStructure(text);
+    const sanitized = redact(text);
+    assertNoSecrets(sanitized);
+    if (text === sanitized) continue;
+    if (!isDeepStrictEqual(structure, copilotEventStructure(sanitized)) || !copilotEventRedactionDeltas(text, sanitized, [...allowedValues])) {
+      throw new Error("Cannot safely redact durable Copilot session events");
+    }
+    const bytes = Buffer.from(sanitized);
+    updates.push({ entry, file, bytes });
+  }
+  for (const { entry, file, bytes } of updates) {
+    fs.writeFileSync(file, bytes);
+    entry.hash = hash(bytes);
+    changed = true;
+  }
+  if (changed) {
+    const metadata = [...entries.values()].map(({ path, hash }) => ({ path, hash }));
+    fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, entries: metadata }) + "\n");
+  }
+  return transcripts;
+}
+
+function invalidateCopilotCheckpoint(root = "/tmp/gh-aw/agent") {
+  const bundle = path.join(root, "durable/bundle");
+  noSymlinks(bundle, root);
+  fs.rmSync(bundle, { recursive: true, force: true });
+}
+
+module.exports = { stageFiles, restoreFiles, validateFiles, redactCopilotCheckpoint, invalidateCopilotCheckpoint };

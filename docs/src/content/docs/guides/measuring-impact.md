@@ -29,7 +29,7 @@ Avoid custom impact formulas. Read the metrics gh-aw already exposes in layers, 
 | Operations | Run count, completion rate, retries, duration | [`gh aw logs`](/gh-aw/setup/cli/#logs) and [`gh aw health`](/gh-aw/setup/cli/#health) |
 | Cost efficiency | AIC and AIC per successful run | [`gh aw logs`](/gh-aw/setup/cli/#logs) and [Cost Management](/gh-aw/reference/cost-management/) |
 | Delivery | Applied effects and execution-evidence coverage | `gh aw logs --delivery` |
-| Adoption | Human/fallback acceptance, rejection, pending decisions, time to adoption | `gh aw logs --adoption` |
+| Adoption | Human/automation/fallback acceptance, rejection, pending decisions, time to adoption | `gh aw logs --adoption` |
 | Attributed value | Declared measurement, attribution evidence, complete-window survival | Recorded measurement and lifecycle evidence; unavailable if any proof is missing |
 | Long-term impact | Backlog, review time, defects, or another repository-specific goal | Repository analytics or organization reporting |
 
@@ -44,7 +44,7 @@ use this measurement loop:
 2. Identify delivered effects with `gh aw logs WORKFLOW --delivery`. No lifecycle configuration is required for built-in safe-output rules.
 3. Allow enough time for repository activity to reveal the result. For example, wait for a proposed pull request to be reviewed or an issue to be resolved.
 4. Evaluate selected runs with `gh aw logs WORKFLOW --adoption`. Run the command again later for outputs that are still `pending`.
-5. Compare similar output types over time. Separate human adoption from delivery fallbacks and track AIC per adopted output, without treating that ratio as attributed value.
+5. Compare similar output types over time. Separate human adoption from automation decisions and delivery fallbacks, and track AIC per adopted output, without treating that ratio as attributed value.
 
 For a quick machine-readable summary:
 

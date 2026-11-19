@@ -337,8 +337,9 @@ If you see any `.md` files at the root (e.g. `agent-performance-latest.md`, `sha
     Record `delivered` and `coverage`; only complete execution evidence establishes zero.
   - `safe_output_adoption`: aggregate `.adoption[].summary` by workflow, deduplicating
     the same run/attempt and delivery IDs across batches. Record `coverage`, `accepted`,
-    `accepted_human`, `accepted_delivery_fallback`, `rejected`, `not_applicable`, `pending`,
-    `lifecycle`, and `unknown`. Human and fallback counts must sum to `accepted`.
+    `accepted_human`, `accepted_automation`, `accepted_delivery_fallback`, `rejected`,
+    `not_applicable`, `pending`, `lifecycle`, and `unknown`. Human, automation, and fallback
+    counts must sum to `accepted`.
   - Keep these lifecycle objects present at workflow and ecosystem levels. Preserve valid partial
     observations with `coverage: "partial"`; use `null` counts and `coverage: "unavailable"` when
     evidence is absent. Never infer pending adoption or zero delivery from missing evidence.
@@ -431,6 +432,7 @@ Create a JSON object following this schema:
         "coverage": "complete",
         "accepted": 11,
         "accepted_human": 1,
+        "accepted_automation": 0,
         "accepted_delivery_fallback": 10,
         "rejected": 1,
         "not_applicable": 0,
@@ -480,6 +482,7 @@ Create a JSON object following this schema:
       "coverage": "complete",
       "accepted": 24,
       "accepted_human": 10,
+      "accepted_automation": 0,
       "accepted_delivery_fallback": 14,
       "rejected": 5,
       "not_applicable": 0,
@@ -657,6 +660,7 @@ separate aggregate file in place of the dated snapshots.
         "coverage": "unavailable",
         "accepted": null,
         "accepted_human": null,
+        "accepted_automation": null,
         "accepted_delivery_fallback": null,
         "rejected": null,
         "not_applicable": null,

@@ -57,10 +57,10 @@ types. Unknown or custom types remain unsupported until a rule is registered.
 
 | State | Meaning |
 | --- | --- |
-| `accepted` | A verified decision or the type's explicit delivery-time fallback established adoption. |
+| `accepted` | A verified human decision, an automation decision, or the type's explicit delivery-time fallback established adoption. |
 | `rejected` | A supported provider observation established rejection or reversal. |
 | `pending` | The proposal is awaiting a qualifying decision. |
-| `lifecycle` | An observed automated decision is not a verified human decision. |
+| `lifecycle` | Legacy retained automated decision without its outcome; replaced on refresh. |
 | `not_applicable` | Infrastructure bookkeeping does not represent repository value. |
 | `unknown` | Evidence or a supported rule is missing. |
 
@@ -70,6 +70,11 @@ and current repository authorization, excluding known bots and the publisher.
 Current authorization does not prove historical authorization or reveal hidden
 machine-user ownership. Unverifiable decisions remain unknown.
 
+When a bot merges or closes the resource, the record keeps the observed outcome,
+such as `accepted`/`merged` or `rejected`/`closed_without_merge`, with
+`acceptance_kind: "automation"`, the deciding `actor` (`login` and `type`), and
+`human_verified: false`. Automation decisions are not human approvals.
+
 Other registered publications, mutations, and delegations can explicitly adopt
 at delivery when their rule permits it. Such records carry
 `acceptance_kind: "fallback_delivery"` and `human_verified: false`; they are not
@@ -77,7 +82,9 @@ human approvals. Supported effect adapters can subsequently observe retention or
 reversal. Other proposal types retain pending/unobserved coverage until their
 provider adapter is implemented.
 
-Summaries separate `accepted_human` from `accepted_delivery_fallback`.
+Summaries separate `accepted_human`, `accepted_automation`, and
+`accepted_delivery_fallback`. Value attribution counts only `explicit_human`
+adoption.
 Provider errors remain evidence diagnostics, not fabricated rejection or deletion.
 A 404 can mean lost visibility and does not prove that an object was deleted.
 

@@ -18,10 +18,12 @@ const MANAGED_ENV_VARS = [
   "GITHUB_RUN_ATTEMPT",
   "GITHUB_ACTOR",
   "GITHUB_REPOSITORY",
+  "GITHUB_WORKFLOW",
   "GITHUB_EVENT_NAME",
   "GITHUB_JOB",
   "GH_AW_AGENT_CONCLUSION",
   "GH_AW_AIC",
+  "OTEL_SEMCONV_STABILITY_OPT_IN",
 ];
 
 const originalEnv = {};
@@ -55,6 +57,8 @@ describe("durable parent OpenTelemetry evidence", () => {
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", "");
     vi.stubEnv("GH_AW_OTLP_IF_MISSING", "ignore");
+    const mkdirSync = fs.mkdirSync;
+    vi.spyOn(fs, "mkdirSync").mockImplementation((dir, ...args) => (String(dir) === "/tmp/gh-aw" ? undefined : mkdirSync.call(fs, dir, ...args)));
     appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
   });
   afterEach(() => {
@@ -106,6 +110,7 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
     process.env.GITHUB_RUN_ATTEMPT = "2";
     process.env.GITHUB_ACTOR = "octocat";
     process.env.GITHUB_REPOSITORY = "github/gh-aw";
+    process.env.GITHUB_WORKFLOW = "Customer OTEL Contract";
     process.env.GITHUB_EVENT_NAME = "workflow_dispatch";
     process.env.GITHUB_JOB = "agent";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
@@ -170,6 +175,7 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
       expect(payload).toHaveProperty("resourceSpans");
       expect(payload).not.toHaveProperty("schema");
       expect(payload).not.toHaveProperty("payload");
+      expect(payload.resourceSpans[0].scopeSpans[0]).not.toHaveProperty("schemaUrl");
     }
 
     const spans = mirroredPayloads.map(firstSpan);
@@ -182,9 +188,19 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
     expect(setupAttrs["gh-aw.repository"]).toBe("github/gh-aw");
     expect(setupAttrs["gh-aw.engine.id"]).toBe("claude");
     expect(setupAttrs["gen_ai.system"]).toBe("anthropic");
+    expect(setupAttrs["gen_ai.provider.name"]).toBe("anthropic");
+    const resourceAttrs = Object.fromEntries(mirroredPayloads[0].resourceSpans[0].resource.attributes.map(attr => [attr.key, attr.value.stringValue]));
+    expect(resourceAttrs["cicd.pipeline.name"]).toBe("Customer OTEL Contract");
+    expect(resourceAttrs["cicd.pipeline.run.id"]).toBe("1234567890");
+    expect(resourceAttrs["cicd.pipeline.task.name"]).toBe("agent");
+    expect(resourceAttrs["vcs.provider.name"]).toBe("github");
+    expect(resourceAttrs["vcs.repository.url.full"]).toBe("https://github.com/github/gh-aw");
+    expect(resourceAttrs["deployment.environment.name"]).toBe("production");
 
     const agentAttrs = attrsByKey(spans[1]);
     expect(agentAttrs["gen_ai.operation.name"]).toBe("chat");
+    expect(agentAttrs["gen_ai.agent.name"]).toBe("Customer OTEL Contract");
+    expect(agentAttrs["gen_ai.provider.name"]).toBe("anthropic");
     expect(agentAttrs["gen_ai.request.model"]).toBe("claude-3-5-sonnet-20241022");
     expect(agentAttrs["gen_ai.system"]).toBe("anthropic");
     expect(agentAttrs["gen_ai.usage.input_tokens"]).toBe(100);

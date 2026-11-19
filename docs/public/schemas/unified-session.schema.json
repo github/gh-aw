@@ -983,7 +983,7 @@
         "adoptionObservedAt": { "type": "string" },
         "adoptionSource": { "type": "string" },
         "adoptionRuleVersion": { "type": "string" },
-        "acceptanceKind": { "type": "string", "enum": ["explicit_human", "fallback_delivery"] },
+        "acceptanceKind": { "type": "string", "enum": ["explicit_human", "automation", "fallback_delivery"] },
         "humanVerified": { "type": "boolean" },
         "adoptionCoverage": { "type": "string", "enum": ["available", "unobserved", "unsupported", "unavailable"] },
         "survivalState": { "type": "string", "enum": ["observed", "reversed", "unknown"] },

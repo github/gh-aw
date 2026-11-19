@@ -60,6 +60,7 @@ type OutcomeSummary struct {
 	Total                   int               `json:"total" console:"header:Total"`
 	Accepted                int               `json:"accepted" console:"header:Accepted"`
 	AcceptedHuman           int               `json:"accepted_human" console:"header:Human"`
+	AcceptedAutomation      int               `json:"accepted_automation" console:"header:Automation"`
 	AcceptedFallback        int               `json:"accepted_delivery_fallback" console:"header:Delivery fallback"`
 	Rejected                int               `json:"rejected" console:"header:Rejected"`
 	Ignored                 int               `json:"-" console:"-"`
@@ -611,6 +612,8 @@ func (s *OutcomeSummary) countOutcome(r OutcomeReport, eval OutcomeEvaluation) {
 			switch r.Adoption.AcceptanceKind {
 			case "explicit_human":
 				s.AcceptedHuman++
+			case "automation":
+				s.AcceptedAutomation++
 			case "fallback_delivery":
 				s.AcceptedFallback++
 			}

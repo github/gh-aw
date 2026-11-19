@@ -433,6 +433,7 @@ describe("parse_token_usage", () => {
         model: "glm-5.3-flash",
         streaming: true,
         input_tokens: 38719,
+        input_tokens_inclusive: 38719,
         output_tokens: 4058,
         cache_read_tokens: 112640,
         cache_write_tokens: 0,
@@ -1348,9 +1349,14 @@ describe("parse_token_usage", () => {
     });
 
     test.each([
-      { records: [{ input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 }], expected: { input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 }, total: 100 },
-      { records: [{ input_tokens: 100, output_tokens: 0 }, { input_tokens: 0 }], expected: { input_tokens: 100 }, total: undefined },
-    ])("preserves proxy token availability through artifacts and OTLP export: $records", async ({ records, expected, total }) => {
+      {
+        records: [{ input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 }],
+        expected: { input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 },
+        inclusiveInput: 105,
+        total: 100,
+      },
+      { records: [{ input_tokens: 100, output_tokens: 0 }, { input_tokens: 0 }], expected: { input_tokens: 100 }, inclusiveInput: undefined, total: undefined },
+    ])("preserves proxy token availability through artifacts and OTLP export: $records", async ({ records, expected, inclusiveInput, total }) => {
       process.env.GH_AW_TMP_DIR = tmpDir;
       const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
       fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
@@ -1362,6 +1368,7 @@ describe("parse_token_usage", () => {
       const usageJSON = originalReadFileSync(path.join(tmpDir, "agent_usage.json"), "utf8");
       const usage = JSON.parse(usageJSON);
       expect(Object.fromEntries(Object.entries(usage).filter(([key]) => key.endsWith("_tokens")))).toEqual(expected);
+      expect(usage.input_tokens_inclusive).toBe(inclusiveInput);
 
       const { sendJobConclusionSpan } = require("./send_otlp_span.cjs");
       vi.stubEnv("INPUT_JOB_NAME", "agent");
@@ -1378,7 +1385,10 @@ describe("parse_token_usage", () => {
         const spans = appendSpy.mock.calls.flatMap(([, content]) => JSON.parse(content).resourceSpans[0].scopeSpans[0].spans);
         const attributes = spans.flatMap(span => span.attributes).filter(attr => attr.key.startsWith("gen_ai.usage."));
         const expectedAttributes = Object.fromEntries(
-          Object.entries(expected).map(([key, value]) => [`gen_ai.usage.${key === "cache_read_tokens" ? "cache_read.input_tokens" : key === "cache_write_tokens" ? "cache_creation.input_tokens" : key}`, value])
+          Object.entries(expected).flatMap(([key, value]) => [
+            [`gen_ai.usage.${key === "cache_read_tokens" ? "cache_read.input_tokens" : key === "cache_write_tokens" ? "cache_creation.input_tokens" : key}`, value],
+            ...(key === "cache_write_tokens" ? [["gen_ai.usage.cache_write.input_tokens", value]] : []),
+          ])
         );
         if (total !== undefined) expectedAttributes["gen_ai.usage.total_tokens"] = total;
         expect(Object.fromEntries(attributes.map(attr => [attr.key, attr.value.intValue]))).toEqual(expectedAttributes);
