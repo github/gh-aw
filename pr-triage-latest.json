@@ -1,150 +1,43 @@
 {
-  "generated_at": "2026-11-18T18:19:03Z",
-  "run_id": "pr-triage-2026-11-18T18:19:03Z",
+  "generated_at": "2026-11-19T18:26:27Z",
+  "run_id": "pr-triage-2026-11-19T18:20:32Z",
   "source": "pr-triage",
-  "open_copilot_prs": 9,
-  "eligible_total": 9,
-  "cooldown_skipped": [
-    79039
-  ],
+  "open_copilot_prs": 0,
+  "eligible_total": 0,
+  "cooldown_skipped": [],
   "category_counts": {
-    "docs": 2,
-    "chore": 4,
-    "bug": 2,
-    "feature": 1,
-    "test": 1
+    "docs": 0,
+    "test": 0,
+    "formatting": 0,
+    "chore": 0,
+    "refactor": 0,
+    "bug": 0,
+    "feature": 0
   },
   "risk_counts": {
-    "low": 6,
-    "medium": 2,
-    "high": 1
+    "low": 0,
+    "medium": 0,
+    "high": 0
   },
   "priority_counts": {
-    "low": 6,
-    "medium": 2,
-    "high": 1
+    "low": 0,
+    "medium": 0,
+    "high": 0
   },
   "action_counts": {
-    "batch_review": 5,
-    "fast_track": 2,
-    "auto_merge": 2
+    "auto_merge": 0,
+    "fast_track": 0,
+    "batch_review": 0,
+    "defer": 0,
+    "close": 0
   },
-  "selected_candidates": [
-    {
-      "number": 79056,
-      "title": "Document the breaking `gh aw audit --repo` requirement",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "score": 32,
-      "action": "batch_review",
-      "ci": "passing"
-    },
-    {
-      "number": 78992,
-      "title": "[deps] Update golang.org/x/crypto to v0.59.0",
-      "category": "chore",
-      "risk": "low",
-      "priority": "low",
-      "score": 28,
-      "action": "batch_review",
-      "ci": "passing"
-    },
-    {
-      "number": 78991,
-      "title": "Clarify network firewall coverage for all built-in engines",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "score": 30,
-      "action": "batch_review",
-      "ci": "passing"
-    },
-    {
-      "number": 78960,
-      "title": "Update golang.org/x/mod to v0.43.0",
-      "category": "chore",
-      "risk": "low",
-      "priority": "low",
-      "score": 27,
-      "action": "batch_review",
-      "ci": "passing"
-    },
-    {
-      "number": 78959,
-      "title": "Investigate workflow conclusion failures",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "score": 84,
-      "action": "fast_track",
-      "ci": "passing"
-    },
-    {
-      "number": 78958,
-      "title": "[linter-miner] Add mapcopyloop analyzer",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 62,
-      "action": "auto_merge",
-      "ci": "passing"
-    },
-    {
-      "number": 78951,
-      "title": "Update `golang.org/x/term` to v0.48.0",
-      "category": "chore",
-      "risk": "low",
-      "priority": "low",
-      "score": 25,
-      "action": "batch_review",
-      "ci": "passing"
-    },
-    {
-      "number": 78941,
-      "title": "Align model overlay parsed-to-raw fallback behavior",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 72,
-      "action": "fast_track",
-      "ci": "passing"
-    },
-    {
-      "number": 78940,
-      "title": "Expand lifecycle tests for identity, validation, and merge behavior",
-      "category": "test",
-      "risk": "low",
-      "priority": "low",
-      "score": 41,
-      "action": "auto_merge",
-      "ci": "passing"
-    }
-  ],
-  "batches": [
-    {
-      "id": "docs-deps-1",
-      "prs": [
-        79056,
-        78991,
-        78960,
-        78951,
-        78992
-      ],
-      "description": "related low-risk docs/dependency updates"
-    }
-  ],
-  "skipped_prs": [
-    {
-      "number": 79039,
-      "title": "Refresh typeutil and intent package specifications",
-      "reason": "1h cooldown"
-    }
-  ],
+  "selected_candidates": [],
+  "batches": [],
+  "skipped_prs": [],
   "notes": [
-    "Nine eligible gh-aw-bot pull requests remained after the 1-hour cooldown window.",
-    "Five low-risk documentation and dependency updates were clustered into a single batch.",
-    "The two reliability bug fixes are the highest-value follow-ups for prompt human review."
+    "No open PRs are currently authored by app/github-copilot in github/gh-aw.",
+    "The current repository scan therefore yields zero eligible PRs for triage labeling or comments.",
+    "The 1-hour cooldown check was applied and did not exclude any app/github-copilot PRs because none were eligible."
   ],
   "review_status": "triaged"
 }
