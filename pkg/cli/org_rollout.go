@@ -358,8 +358,14 @@ func (output *orgRolloutOutput) Write(data []byte) (int, error) {
 	if output.discardLine {
 		newline := bytes.IndexByte(data, '\n')
 		if newline < 0 {
+			if len(bytes.TrimSpace(data)) > 0 {
+				output.result = nil
+			}
 			output.appendTail(data, limit)
 			return written, nil
+		}
+		if len(bytes.TrimSpace(data[:newline])) > 0 {
+			output.result = nil
 		}
 		output.appendTail(append(append([]byte(nil), data[:newline]...), '\n'), limit)
 		data = data[newline+1:]
@@ -374,9 +380,15 @@ func (output *orgRolloutOutput) Write(data []byte) (int, error) {
 		if bytes.HasPrefix(line, []byte(orgRolloutResultPrefix)) {
 			output.result = append(append([]byte(nil), line...), '\n')
 		} else {
+			if len(bytes.TrimSpace(line)) > 0 {
+				output.result = nil
+			}
 			output.appendTail(append(append([]byte(nil), line...), '\n'), limit)
 		}
 		output.pending = rest
+	}
+	if output.result != nil && len(bytes.TrimSpace(output.pending)) > 0 {
+		output.result = nil
 	}
 	if len(output.pending) > limit && !bytes.HasPrefix(output.pending, []byte(orgRolloutResultPrefix)) {
 		output.appendTail(output.pending, limit)
@@ -394,10 +406,10 @@ func (output *orgRolloutOutput) appendTail(data []byte, limit int) {
 }
 
 func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
-	lines := bytes.Split(bytes.TrimSpace(output), []byte{'\n'})
+	lines := bytes.Split(output, []byte{'\n'})
 	for i := len(lines) - 1; i >= 0; i-- {
-		line := bytes.TrimSpace(lines[i])
-		if len(line) == 0 {
+		line := lines[i]
+		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
 		if !bytes.HasPrefix(line, []byte(orgRolloutResultPrefix)) {
