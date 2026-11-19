@@ -652,7 +652,7 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 |---|---|---|
 | `cicd.pipeline.result` | string | RECOMMENDED when known for additive pipeline root spans. |
 | `cicd.pipeline.action.name` | string | RECOMMENDED; use `RUN`. |
-| `gh-aw.run.attempt` | int | RECOMMENDED. |
+| `gh-aw.run.attempt` | string | RECOMMENDED; retains the shipped `GITHUB_RUN_ATTEMPT` string (§17). |
 | `gh-aw.run.actor` | string | OPTIONAL; MUST NOT be a metric dimension. |
 | `gh-aw.event_name` | string | RECOMMENDED when known. |
 | `gh-aw.staged` | boolean | RECOMMENDED when applicable. |
@@ -1172,6 +1172,14 @@ current repository.
 
 The repository enforcement entry point for these checks is `make validate-otel-contract`. This target MUST remain focused on the customer-facing compatibility contract rather than all possible OTEL-related tests.
 
+`make validate-otel-conformance` stages the pinned GenAI model, its core semantic-convention dependency,
+and the typed built-in gh-aw/GitHub/runner extensions in `actions/setup/js/fixtures/genai/extensions.yaml`.
+It retains the upstream GenAI definitions, content schemas and advice policies. Weaver's native V2 checks
+and dependency-attribute lookup validate the complete mixed telemetry without filtering extension findings;
+unknown attributes, incorrect types, metric units/instruments and GenAI requirements remain errors.
+The registry regression tests exercise both accepted mixed telemetry and rejected mutations before the
+live OTLP scenarios run. Generated models, coverage and reports stay in `OTEL_CONFORMANCE_REPORT_DIR`.
+
 ### 17.1.1 Test ID Stubs: Level 1 Compliance
 
 The following test IDs are stubs for Level 1 (Stable Configuration and Export) compliance tests. Implementations MUST provide tests that correspond to each stub before claiming Level 1 conformance.
@@ -1203,7 +1211,7 @@ attribute-level checks mapped directly to Section 10 requirements:
 | **T-OT-015** | §11.2 standard GenAI metrics | `gen_ai.client.inference.usage.*` carry the required attributes, input includes cache tokens, zero values are not recorded, and `gen_ai.invoke_agent.duration` uses the §11.2 buckets | `otlp_metrics.test.cjs` |
 | **T-OT-016** | §6.7 opt-in | With `gen_ai_v1`, the agent span is `invoke_agent <name>`, `INTERNAL`, a sibling of the conclusion span; compatibility-only names and metrics are absent; scope `schemaUrl` is set | `send_otlp_span.test.cjs`, `otlp_metrics.test.cjs` |
 | **T-OT-017** | §8.1 standard resource attributes | `cicd.*`, `vcs.*` and `deployment.environment.name` are present and do not override `OTEL_RESOURCE_ATTRIBUTES`; §8.3 drops them from metrics | `send_otlp_span.test.cjs`, `otlp_metrics.test.cjs` |
-| **T-OT-018** | §6.7, §9.5, §10.5, §11.2 conformance | Built-in telemetry exported over OTLP to Weaver live-check with semantic-conventions-genai at the §18.1 commit has no undeclared violations with the opt-in; without it, every finding is declared with a reason | `actions/setup/js/conformance/` (CI) |
+| **T-OT-018** | §6.7, §9.5, §10.5, §11.2 conformance | Built-in telemetry exported over OTLP to Weaver live-check with semantic-conventions-genai at the §18.1 commit has no undeclared violations with the opt-in; without it, every finding is declared with a reason | `actions/setup/js/fixtures/genai/`, `scripts/genai_registry.test.py` (CI) |
 | **T-OT-019** | §11.2 wire format | Opt-in GenAI spans and metrics (kind, scope `schemaUrl`, monotonic sums, 20-bound histogram) encode byte-for-byte like the reference SDK protocol types | `scripts/test_otlp_protobuf.mjs` |
 | **T-OT-020** | §6.7 backward compatibility | Without `gen_ai_v1` (unset or another value), a success and a failure agent job export every fact of a golden export captured before §6.7; with it, every `gh-aw.*` and `github.*` attribute is kept | `send_otlp_span_legacy_contract.test.cjs` |
 

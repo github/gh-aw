@@ -86,4 +86,16 @@ for (const name of expectedMetricNames) {
   assert.ok(observedMetrics.has(name), `Latest GenAI reports did not observe metric ${name}`);
 }
 
+// Weaver's missing_metric advice has no context, so the runner cannot constrain
+// that compatibility exception by metric name. Check it on the unfiltered report.
+const compatibilityReport = JSON.parse(fs.readFileSync(path.join(reportDir, "agent_success_compat.json"), "utf8"));
+assert.ok(compatibilityReport.samples?.length > 0, "Compatibility report contains no samples");
+for (const sample of compatibilityReport.samples) {
+  for (const finding of collectAdvice(sample)) {
+    if (finding.id === "missing_metric") {
+      assert.equal(finding.signal_name, "gen_ai.client.token.usage", `Unexpected unregistered compatibility metric ${finding.signal_name}`);
+    }
+  }
+}
+
 console.log("Latest GenAI semantic-convention reports contain the required attributes and metrics.");

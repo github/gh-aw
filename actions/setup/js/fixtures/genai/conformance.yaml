@@ -3,7 +3,8 @@ instrumented_library: gh-aw
 instrumentation_library: gh-aw
 otlp_protocol: http/protobuf
 weaver:
-  registry: https://github.com/open-telemetry/semantic-conventions-genai.git@e6658f1[model]
+  registry: ${GH_AW_GENAI_REGISTRY}
+  config: weaver.toml
 
 scenarios:
   agent_success_latest:
@@ -88,9 +89,44 @@ scenarios:
       - id: genai_expected_attribute_missing
         reason: Compatibility mode retains the shipped client span attributes.
       - id: missing_attribute
-        reason: Compatibility mode retains GitHub, gh-aw, and legacy attributes outside the GenAI registry.
+        context:
+          attribute_key: gen_ai.usage.total_tokens
+        reason: Compatibility mode retains the removed total-token attribute (§6.7.1).
       - id: missing_metric
-        reason: Compatibility mode retains gh-aw metrics outside the GenAI registry.
+        context: {}
+        reason: Compatibility mode retains gen_ai.client.token.usage; check_genai_conformance.mjs rejects any other missing metric.
+      - id: deprecated
+        context:
+          attribute_key: deployment.environment
+          deprecation_reason: renamed
+          deprecation_note: Replaced by `deployment.environment.name`.
+        reason: Compatibility mode retains the shipped resource alias (§8.1).
+      - id: deprecated
+        context:
+          attribute_key: gen_ai.system
+          deprecation_reason: uncategorized
+          deprecation_note: |
+            Replaced by `gen_ai.provider.name`, which has moved to the [OpenTelemetry GenAI semantic conventions repository](https://github.com/open-telemetry/semantic-conventions-genai).
+        reason: Compatibility mode retains the shipped provider alias (§6.7.1).
+      - id: deprecated
+        context:
+          attribute_key: gen_ai.workflow.name
+          deprecation_reason: uncategorized
+          deprecation_note: &moved_to_genai |
+            Moved to the [OpenTelemetry GenAI semantic conventions repository](https://github.com/open-telemetry/semantic-conventions-genai).
+        reason: Compatibility mode retains the shipped agent-name alias (§6.7.1).
+      - id: deprecated
+        context:
+          attribute_key: gen_ai.usage.cache_creation.input_tokens
+          deprecation_reason: uncategorized
+          deprecation_note: *moved_to_genai
+        reason: Compatibility mode retains the shipped cache-write alias (§6.7.1).
+      - id: deprecated
+        context:
+          attribute_key: gen_ai.token.type
+          deprecation_reason: uncategorized
+          deprecation_note: *moved_to_genai
+        reason: Compatibility mode retains the shipped token metric dimension (§6.7.1).
     spans:
       - match:
           attributes:

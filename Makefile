@@ -1209,7 +1209,9 @@ validate-otel-conformance:
 	@command -v otel-conformance >/dev/null || { echo "otel-conformance is required; install the pinned conformance runner packages"; exit 1; }
 	@command -v weaver >/dev/null || { echo "Weaver v0.28.0 is required; install it before running conformance"; exit 1; }
 	@mkdir -p "$(OTEL_CONFORMANCE_REPORT_DIR)"
-	@otel-conformance actions/setup/js/fixtures/genai --report-dir "$(OTEL_CONFORMANCE_REPORT_DIR)"
+	@python actions/setup/js/fixtures/genai/prepare_registry.py "$(OTEL_CONFORMANCE_REPORT_DIR)/registry"
+	@python actions/setup/js/scripts/genai_registry.test.py "$(OTEL_CONFORMANCE_REPORT_DIR)/registry"
+	@otel-conformance actions/setup/js/fixtures/genai --report-dir "$(OTEL_CONFORMANCE_REPORT_DIR)" --data-file "$(OTEL_CONFORMANCE_REPORT_DIR)/data.json" --var "GH_AW_GENAI_REGISTRY=$(abspath $(OTEL_CONFORMANCE_REPORT_DIR))/registry"
 	@node actions/setup/js/fixtures/genai/check_genai_conformance.mjs "$(OTEL_CONFORMANCE_REPORT_DIR)"
 
 .PHONY: check-otel-attributes
