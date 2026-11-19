@@ -103,6 +103,29 @@ describe("generic fail-closed safe-output authorization", () => {
     expect(() => authorizationEvidencePath({ RUNNER_TEMP: "" })).toThrow("trusted evidence storage");
   });
 
+  it("propagates the current context and encoded job only to the authorization backend", async () => {
+    const opts = options({ env: { ...env, GITHUB_JOB: "safe outputs/review", GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16) } });
+    await authorizePreparedInvocation(opts);
+    expect(opts.fetchImpl.mock.calls[1][1].headers).toMatchObject({
+      traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+      baggage: "cicd.pipeline.task.name=safe%20outputs%2Freview",
+    });
+    expect(JSON.parse(opts.fetchImpl.mock.calls[1][1].body).job_id).toBe("safe outputs/review");
+    expect(opts.fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("traceparent");
+    expect(opts.fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("baggage");
+  });
+
+  it("does not let malformed job metadata block authorization", async () => {
+    const opts = options({ env: { ...env, GITHUB_JOB: "\ud800", GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16) } });
+    await expect(authorizePreparedInvocation(opts)).resolves.toMatchObject({ state: "allowed" });
+    const [oidcRequest, authorityRequest] = opts.fetchImpl.mock.calls.map(([, request]) => request);
+    expect(oidcRequest.headers).not.toHaveProperty("traceparent");
+    expect(oidcRequest.headers).not.toHaveProperty("baggage");
+    expect(authorityRequest.headers.traceparent).toBe(`00-${"a".repeat(32)}-${"b".repeat(16)}-01`);
+    expect(authorityRequest.headers).not.toHaveProperty("baggage");
+    expect(JSON.parse(authorityRequest.body)).not.toHaveProperty("job_id");
+  });
+
   it("rejects Windows before credentials or request consumption, while retaining staged and opt-out behavior", async () => {
     const opts = options();
     const platform = Object.getOwnPropertyDescriptor(process, "platform");

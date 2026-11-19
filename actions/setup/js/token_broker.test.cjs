@@ -42,6 +42,26 @@ afterEach(() => {
 });
 
 describe("token broker", () => {
+  it("correlates exchanges and invalidation with the current trace and encoded job, but not OIDC issuance", async () => {
+    const fixture = setup({
+      env: { ...makeEnv(), GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16), GITHUB_JOB: "safe outputs/review" },
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? (JSON.parse(init.body).operation === "invalidate" ? new Response(null, { status: 204 }) : success()) : json({ value: OIDC }))),
+    });
+    await fixture.client.getToken("copilot-task");
+    await fixture.client.invalidateTokens();
+    for (const index of [1, 3]) {
+      expect(fixture.fetchImpl.mock.calls[index][1].headers).toMatchObject({
+        traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+        baggage: "cicd.pipeline.task.name=safe%20outputs%2Freview",
+      });
+      expect(JSON.parse(fixture.fetchImpl.mock.calls[index][1].body).job_id).toBe("safe outputs/review");
+    }
+    for (const index of [0, 2]) {
+      expect(fixture.fetchImpl.mock.calls[index][1].headers).not.toHaveProperty("traceparent");
+      expect(fixture.fetchImpl.mock.calls[index][1].headers).not.toHaveProperty("baggage");
+    }
+  });
+
   it("requires the compiler-owned top-level boolean for workflow opt-in, never inherited URL alone", () => {
     expect(isTokenBrokerEnabled({})).toBe(false);
     expect(isTokenBrokerEnabled(makeEnv())).toBe(false);
@@ -97,7 +117,7 @@ describe("token broker", () => {
     const [brokerUrl, brokerInit] = fixture.fetchImpl.mock.calls[1];
     expect(brokerUrl).toBe(fixture.env.GH_AW_TOKEN_BROKER_URL);
     expect(brokerInit).toMatchObject({ method: "POST", redirect: "manual", headers: { "content-type": "application/json" } });
-    expect(JSON.parse(brokerInit.body)).toEqual(tokenType === "copilot-request" ? { token_type: tokenType, provider: "github", oidc_token: OIDC } : { token_type: tokenType, oidc_token: OIDC });
+    expect(JSON.parse(brokerInit.body)).toEqual(tokenType === "copilot-request" ? { token_type: tokenType, provider: "github", oidc_token: OIDC, job_id: "agent" } : { token_type: tokenType, oidc_token: OIDC, job_id: "agent" });
     expect(fixture.mask.mock.calls).toEqual([[OIDC], ["synthetic-credential"]]);
     expect(log).not.toHaveBeenCalled();
     expect(fixture.env).toEqual(before);
@@ -125,8 +145,8 @@ describe("token broker", () => {
     await fixture.client.getToken("copilot-request", "github");
     await fixture.client.getToken("copilot-request", "openai");
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(4);
-    expect(JSON.parse(fixture.fetchImpl.mock.calls[1][1].body)).toEqual({ token_type: "copilot-request", provider: "github", oidc_token: OIDC });
-    expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ token_type: "copilot-request", provider: "openai", oidc_token: OIDC });
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[1][1].body)).toEqual({ token_type: "copilot-request", provider: "github", oidc_token: OIDC, job_id: "agent" });
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ token_type: "copilot-request", provider: "openai", oidc_token: OIDC, job_id: "agent" });
   });
 
   it("isolates GitHub App pending requests and cache from Copilot capabilities without provider or scope selection", async () => {
@@ -146,10 +166,10 @@ describe("token broker", () => {
     expect(await fixture.client.getToken("github-app", "openai")).toBe("synthetic-github-app");
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
     const requests = fixture.fetchImpl.mock.calls.filter(([, init]) => init.method === "POST").map(([, init]) => JSON.parse(init.body));
-    expect(requests.find(body => body.token_type === "github-app")).toEqual({ token_type: "github-app", oidc_token: OIDC });
+    expect(requests.find(body => body.token_type === "github-app")).toEqual({ token_type: "github-app", oidc_token: OIDC, job_id: "agent" });
     const fresh = setup();
     await getBrokerToken("github-app", fresh.options, "openai");
-    expect(JSON.parse(fresh.fetchImpl.mock.calls[1][1].body)).toEqual({ token_type: "github-app", oidc_token: OIDC });
+    expect(JSON.parse(fresh.fetchImpl.mock.calls[1][1].body)).toEqual({ token_type: "github-app", oidc_token: OIDC, job_id: "agent" });
   });
 
   it.each(["copilot-task", "github-app"])("invalidates job-scoped %s broker credentials using a fresh OIDC identity", async tokenType => {
@@ -160,7 +180,7 @@ describe("token broker", () => {
     await fixture.client.invalidateTokens();
     await fixture.client.getToken(tokenType);
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
-    expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ operation: "invalidate", oidc_token: OIDC });
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ operation: "invalidate", oidc_token: OIDC, job_id: "agent" });
     expect(fixture.fetchImpl.mock.calls[3][1]).toMatchObject({ method: "POST", redirect: "manual", headers: { "cache-control": "no-store" } });
     expect(fixture.mask.mock.calls).toEqual([[OIDC], ["synthetic-credential"], [OIDC], [OIDC], ["synthetic-credential"]]);
   });

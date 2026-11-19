@@ -4,6 +4,7 @@
 const { createHash } = require("node:crypto");
 const { ERR_API, ERR_CONFIG, ERR_PERMISSION } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { buildServiceRequestHeaders } = require("./service_correlation.cjs");
 
 const MAX_ADMISSION_BYTES = 16 * 1024;
 const MAX_OIDC_BYTES = 32 * 1024;
@@ -158,6 +159,8 @@ async function verifyGatewayAdmission(actionsCore, env, fetchImpl = fetch) {
   const binding = admissionBinding(env);
   const workflowHash = binding.workflow_hash;
   const audience = `${audienceBase}/gh-aw/gateway/v1/workflow/sha256/${workflowHash}`;
+  const correlationHeaders = buildServiceRequestHeaders(env);
+  const jobId = env.GITHUB_JOB;
   let idToken;
   try {
     idToken = await actionsCore.getIDToken(audience);
@@ -166,11 +169,17 @@ async function verifyGatewayAdmission(actionsCore, env, fetchImpl = fetch) {
   }
   if (typeof idToken === "string" && idToken) actionsCore.setSecret(idToken);
   const claims = oidcClaims(idToken, audience, binding);
-  const request = { schema_version: 1, ...binding, check_run_id: claims.check_run_id };
+  const request = { schema_version: 1, ...binding, check_run_id: claims.check_run_id, ...(jobId ? { job_id: jobId } : {}) };
   const body = JSON.stringify(request);
   if (Buffer.byteLength(body, "utf8") > MAX_ADMISSION_BYTES) reject("the getToken request exceeds its UTF-8 byte limit");
   const decision = parseObject(
-    await requestBytes(endpoint, { method: "POST", headers: { Authorization: `Bearer ${idToken}`, Accept: "application/json", "Content-Type": "application/json" }, body }, MAX_ADMISSION_BYTES, fetchImpl, "getToken admission"),
+    await requestBytes(
+      endpoint,
+      { method: "POST", headers: { ...correlationHeaders, Authorization: `Bearer ${idToken}`, Accept: "application/json", "Content-Type": "application/json" }, body },
+      MAX_ADMISSION_BYTES,
+      fetchImpl,
+      "getToken admission"
+    ),
     "getToken admission"
   );
   const keys = [...Object.keys(request), "allowed"];

@@ -30,6 +30,8 @@ The terms **MUST**, **MUST NOT**, and **MAY** describe requirements for conformi
 > [!IMPORTANT]
 > The compiler generates the mandatory App-token provenance and hash-bound admission gates described below, replacing generic role/bot authorization for gateway ingress. This destination implementation does not verify a CAO deployment or establish hosted readiness. An integration MUST remain nonactivating until both the receiver token flow and the approved destination revision satisfy this contract.
 
+The receiver MUST accept the optional string `job_id` and echo its exact value in the admission response whenever the client supplies it. Deploy and verify this receiver support before publishing or activating a workflow revision that sends `job_id`; the client rejects an omitted or changed echo.
+
 ## Bounded security findings
 
 The [TLC-backed threat model](https://github.com/github/gh-aw/blob/main/specs/webhook-gateway/threat-model.md)
@@ -687,11 +689,16 @@ The client sends one `POST` to the configured endpoint, with `Authorization: Bea
 | `workflow_hash` | Existing compiler `frontmatter_hash` from the metadata header; identical to the compiler-owned step literal and audience suffix. |
 | `run_id`, `run_attempt` | Canonical positive decimal strings from GitHub's run context. |
 | `check_run_id` | Canonical positive decimal string from the issued JWT identifying the owning job. |
+| `job_id` | Runner `GITHUB_JOB` string when available, omitted without job context. Diagnostic logical job ID only; it MUST NOT replace verification of the signed `check_run_id`. |
 | `ref` | The GitHub-owned `refs/heads/...` execution ref. |
 | `event_name` | Literal `repository_dispatch`. |
 | `event_type` | The compiler-defined route for this workflow ID, already checked by App provenance. It is not a signed OIDC claim; the server independently binds it to the approved artifact/admission. |
 
+When the current `GITHUB_AW_OTEL_TRACE_ID` and `GITHUB_AW_OTEL_PARENT_SPAN_ID` are both valid, the POST MUST carry their W3C `traceparent`; invalid or incomplete context is omitted. Nonempty `GITHUB_JOB` MUST also produce a single W3C `baggage` member, `cicd.pipeline.task.name=<encoded-job-id>`. Header sanitization uses UTF-8 percent-encoding (`encodeURIComponent`), including whitespace, CR/LF, Unicode, baggage delimiters and literal percent signs; JSON `job_id` remains unchanged. This OpenTelemetry CI/CD task name is diagnostic only. The client snapshots it before acquiring OIDC and MUST NOT forward arbitrary inherited propagation headers, baggage or exporter credentials, send correlation headers to the OIDC issuer, or enable telemetry export merely to propagate context.
+
 Success is **only** `200 OK` with a UTF-8 JSON object containing exactly every request field unchanged plus boolean `allowed: true`. Missing, different, additional, or credential-bearing fields reject continuation. The endpoint returns an authorization decision, not CAO's dispatch token or a new runtime credential. Only the boolean `verified` is published as a job output; the OIDC and job tokens are never outputs or agent inputs.
+
+Backends MUST allow `job_id` in their closed request schema and echo it unchanged when present; omission or alteration in the response rejects continuation. Callers without job context omit it from both schemas. This metadata extension does not change subscription/dispatch schema version `2` or the admission audience format and numeric schema version `1`.
 
 The backend MUST enforce a bounded closed request schema and validate all copies against the signed identity and independently verified artifact. It MUST authorize the signed `check_run_id` as the expected admission job for this run/attempt, using trusted GitHub job metadata as needed; a caller-provided logical job name is not proof. It MUST correlate the decision with the current backend admission and route. Duplicate requests for the same issuer/repository/workflow revision/hash/run/attempt/check-run/route binding MUST be idempotent and recheck current token validity and approval; conflicting reuse of a signed token identity MUST reject. A stored decision MUST NOT bypass a later revocation.
 
@@ -759,6 +766,7 @@ Receiver and compiler/runtime acceptance tests MUST cover the following cases be
 | Invalid batch from the approved App | Reject under existing route, projection, selector, size, and batch rules. |
 | Valid hash-bearing OIDC audience and independently verified compiled artifact at the signed workflow revision | Grant `getToken` access only after current enrollment/admission checks; the App gate remains independently required. |
 | Missing/malformed hash, unsigned hash only, wrong audience base/path, digest mismatch, or conflicting request-body hash | Reject before credential issuance or continuation, even if the requested hash matches a cached older row. |
+| Current/missing trace or job context, reserved characters in job names, or a missing/changed response `job_id` | Send valid current `traceparent`, HTTP-safe job baggage and original JSON `job_id` when available; omit unavailable context; accept and echo `job_id` exactly before client rollout, and reject an omitted/changed echo without using diagnostic metadata instead of signed `check_run_id`. |
 | Server table is behind the verified executing workflow | Fetch the exact revision, validate approved configuration, and refresh with atomic fencing before granting access; an explicit retryable result is permitted while refresh is pending. |
 | Refresh failure, unsupported/unapproved source, or revoked approval | Fail closed without automatic approval, fallback credentials, or success-shaped continuation. |
 | Repeated OIDC request or asynchronous refresh completion | Require valid authentication and current grants; reuse only the explicitly authorized idempotent outcome under the documented run/attempt/replay policy, never a fresh duplicate credential grant. |
