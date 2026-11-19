@@ -820,12 +820,16 @@ tools:
     knowledge-base: [knowledge_base_retrieve]
 ```
 
-The native method takes `queries`, an array containing exactly one approved question
-of 1 through 2048 Unicode code points. Unknown arguments, extra questions and
+The native method takes `query_variants`, an array containing exactly one approved question
+of 1 through 150 Unicode code points. The server also requests fewer than 12 words.
+Unknown arguments, extra questions and
 ungranted text fail before credentials or HTTP. MCP responses are bounded to 256 KiB.
 The literal API version is `2026-11-01-preview`; no custom tools or source overrides
-are exposed. The [Microsoft MCP client source](https://raw.githubusercontent.com/microsoft/azure-ai-search-foundry-iq-live-knowledge-sources/f4c9985e064e185db18a7d5e9445e2b0fe7c310b/src/liveks/mcp_client.py)
-documents the native array argument.
+are exposed. The preview server's current argument differs from the `queries`
+argument in the older Microsoft MCP client example.
+The adapter distinguishes upstream tool errors from unsupported interactive input.
+For the recognized missing-array-argument diagnostic it reports the argument name;
+other provider error details are withheld because they may contain private data.
 
 `FOUNDRY_IQ_SEARCH_ACCESS_TOKEN` holds a current Entra bearer access token acquired
 externally for `https://search.azure.com/.default`, without the Bearer prefix.

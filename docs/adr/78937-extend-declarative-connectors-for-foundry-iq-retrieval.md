@@ -10,7 +10,7 @@
 
 [ADR-74077](74077-declarative-connectors-replace-native-provider-integrations.md)
 defines the shared declarative connector architecture. Foundry IQ retrieval
-requires a native `queries` string array and a fixed API-version query parameter
+originally used a native `queries` string array and requires a fixed API-version query parameter
 on its hosted HTTP MCP endpoint, neither covered by that record's input contract.
 [PR #78937](https://github.com/github/gh-aw/pull/78937) extends that contract rather
 than introducing a provider-specific runtime handler. The integration must retain
@@ -31,10 +31,15 @@ Use the experimental
 [`azure-foundry-iq` declaration](../../.github/workflows/connectors/azure-foundry-iq.md)
 to expose only `knowledge_base_retrieve` on one compile-time-fixed Search service
 and knowledge base, with literal API version `2026-11-01-preview`. Require exactly
-one approved question per call, bounded to 1 through 2048 Unicode code points,
+one approved question per call, bounded to 1 through 150 Unicode code points,
 and cap responses at 256 KiB. Token acquisition and renewal remain external;
 the connector performs no Azure token exchange, resource provisioning or provider
 mutation. Its golden consumer stages a GitHub issue independently of retrieval.
+
+The preview server now advertises `query_variants` instead of `queries`, with a
+150-character maximum. The import allowlist remains named `queries`; each native
+call maps `query_variants` to that exact grant. The server also requests fewer
+than 12 words per question.
 
 ### Alternatives Considered
 

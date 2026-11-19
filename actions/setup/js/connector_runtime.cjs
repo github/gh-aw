@@ -1383,8 +1383,19 @@ async function callMCP(encoded, registration, tool, args, options = {}) {
     protocol = initialized.protocolVersion;
     await request("notifications/initialized", {});
     const result = await request("tools/call", { name: tool, arguments: normalized }, 2);
-    assert(object(result) && !result.isError && [undefined, "", "complete"].includes(result.resultType) && !result.inputRequests && !result.needsInput, "Connector HTTP MCP tool returned an error or requires unsupported interactive input");
+    assert(object(result), "Connector HTTP MCP tool returned an invalid result");
+    if (!result.isError) assert([undefined, "", "complete"].includes(result.resultType) && !result.inputRequests && !result.needsInput, "Connector HTTP MCP tool requires unsupported interactive input");
     assert(Array.isArray(result.content) && jsonBytes(result) <= server.maxResponseBytes, "Connector HTTP MCP result exceeds its byte bound or has invalid content");
+    if (result.isError) {
+      for (const [name, input] of Object.entries(constraints.inputs)) {
+        if (input.type !== "array" || name.length > 64 || !/^[a-zA-Z][a-zA-Z0-9_-]*$/u.test(name)) continue;
+        const diagnostic = `'arguments.${name}' field for the tool call is required and must be a JSON array.`;
+        if (result.content.some(item => item?.type === "text" && typeof item.text === "string" && item.text.includes(diagnostic))) {
+          return fail(`Connector HTTP MCP upstream tool error (untrusted): argument "${name}" is required and must be a JSON array`);
+        }
+      }
+      return fail("Connector HTTP MCP upstream tool error; provider details withheld");
+    }
     return result;
   } catch (error) {
     if (error instanceof ConnectorError) throw error;
