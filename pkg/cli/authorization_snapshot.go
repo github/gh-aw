@@ -22,9 +22,30 @@ var authorizationCommitPattern = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{6
 
 type authorizationSnapshotEntry struct{ name, oid string }
 
+func authorizationGitEnv() []string {
+	env := []string{
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_CONFIG_GLOBAL=" + os.DevNull,
+		"GIT_CONFIG_COUNT=0",
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_NO_REPLACE_OBJECTS=1",
+		"GIT_NO_LAZY_FETCH=1",
+		"GIT_OPTIONAL_LOCKS=0",
+		"GIT_DISCOVERY_ACROSS_FILESYSTEM=0",
+	}
+	// Omit inherited Git variables entirely: empty repository overrides can
+	// themselves change Git's behavior rather than disabling the overrides.
+	for _, name := range []string{"PATH", "SYSTEMROOT"} {
+		if value := lookupEnv(name); value != "" {
+			env = append(env, name+"="+value)
+		}
+	}
+	return env
+}
+
 func authorizationGit(ctx context.Context, root string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, "git", append([]string{"--no-pager", "-C", root}, args...)...)
-	command.Env = append(os.Environ(), "GIT_NO_REPLACE_OBJECTS=1", "GIT_NO_LAZY_FETCH=1", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	command.Env = authorizationGitEnv()
 	return command.Output()
 }
 
@@ -60,7 +81,7 @@ func materializeAuthorizationSnapshot(ctx context.Context, root, commit, destina
 		input.WriteString(oid + "\n")
 	}
 	command := exec.CommandContext(ctx, "git", "--no-pager", "-C", root, "cat-file", "--batch")
-	command.Env = append(os.Environ(), "GIT_NO_REPLACE_OBJECTS=1", "GIT_NO_LAZY_FETCH=1", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0")
+	command.Env = authorizationGitEnv()
 	command.Stdin = strings.NewReader(input.String())
 	output, err := command.StdoutPipe()
 	if err != nil {

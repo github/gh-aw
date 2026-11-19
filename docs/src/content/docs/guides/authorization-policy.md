@@ -53,7 +53,7 @@ gh aw validate \
   --json > authorization-result.json
 ```
 
-`--authorization-commit` accepts a full lowercase commit object ID; it defaults to the resolved `HEAD` commit. The repository slug reproduces repository-scattered schedules, not repository identity. The report fingerprints the actual compiler executable, baseline bytes, complete candidate tree inventory, workflow sources, imports/includes, candidate locks, and recomputed locks.
+`--authorization-commit` accepts a full lowercase commit object ID; it defaults to the resolved `HEAD` commit. The protected wrapper must bind this argument to the platform-selected candidate, never to agent-supplied arguments or candidate-owned configuration. Do not expose the checker as an agent tool for arbitrary revision inspection. Verify that the report's `candidate_commit` matches the platform-selected revision before publishing a passing check; `HEAD` may identify a different revision. The repository slug reproduces repository-scattered schedules, not repository identity. The report fingerprints the actual compiler executable, baseline bytes, complete candidate tree inventory, workflow sources, imports/includes, candidate locks, and recomputed locks.
 
 The verifier discovers all gh-aw entrypoints in `.github/workflows`, distinguishes shared/import-only documents using existing parsing, and includes every baseline-required workflow. A new entrypoint joins automatically. Deleting, renaming, or converting a required entrypoint into a shared document fails until the protected baseline is independently updated. Positional workflow subsets, directory overrides (including `GH_AW_WORKFLOWS_DIR`), engine/strict overrides, and fail-fast validation are rejected.
 

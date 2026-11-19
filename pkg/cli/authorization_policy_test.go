@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -95,16 +96,61 @@ func compileAuthorizationTestSource(t *testing.T, file string) {
 	require.NoError(t, compiler.CompileWorkflow(file))
 }
 
+func TestAuthorizationGitEnvironmentIsolated(t *testing.T) {
+	root, other := t.TempDir(), t.TempDir()
+	for _, repo := range []string{root, other} {
+		authorizationTestGit(t, "-C", repo, "init", "-q")
+		writeAuthorizationTestFile(t, filepath.Join(repo, "content"), repo)
+		authorizationTestGit(t, "-C", repo, "add", ".")
+		authorizationTestGit(t, "-C", repo, "-c", "core.hooksPath="+os.DevNull, "commit", "-qm", "fixture")
+	}
+	commit := authorizationTestGit(t, "-C", root, "rev-parse", "HEAD")
+	otherBlob := authorizationTestGit(t, "-C", other, "rev-parse", "HEAD:content")
+	invalidConfig := filepath.Join(t.TempDir(), "invalid-config")
+	writeAuthorizationTestFile(t, invalidConfig, "not a valid git config\n")
+	for _, test := range []struct {
+		name string
+		env  map[string]string
+	}{
+		{"repository", map[string]string{"GIT_DIR": filepath.Join(other, ".git"), "GIT_WORK_TREE": other}},
+		{"common directory", map[string]string{"GIT_COMMON_DIR": filepath.Join(other, ".git")}},
+		{"objects", map[string]string{"GIT_OBJECT_DIRECTORY": filepath.Join(other, ".git", "objects")}},
+		{"alternate objects", map[string]string{"GIT_ALTERNATE_OBJECT_DIRECTORIES": filepath.Join(other, ".git", "objects")}},
+		{"config entries", map[string]string{"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.bare", "GIT_CONFIG_VALUE_0": "true"}},
+		{"config parameters", map[string]string{"GIT_CONFIG_PARAMETERS": "'core.bare=true'"}},
+		{"global config", map[string]string{"GIT_CONFIG_GLOBAL": invalidConfig}},
+		{"system config", map[string]string{"GIT_CONFIG_NOSYSTEM": "0", "GIT_CONFIG_SYSTEM": invalidConfig}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for name, value := range test.env {
+				t.Setenv(name, value)
+			}
+			output, err := authorizationGit(context.Background(), root, "rev-parse", "--show-toplevel")
+			require.NoError(t, err)
+			require.Equal(t, root, strings.TrimSpace(string(output)))
+			snapshot := t.TempDir()
+			_, err = materializeAuthorizationSnapshot(context.Background(), root, commit, snapshot)
+			require.NoError(t, err)
+			content, err := os.ReadFile(filepath.Join(snapshot, "content"))
+			require.NoError(t, err)
+			require.Equal(t, root, string(content))
+			_, err = authorizationGit(context.Background(), root, "cat-file", "-e", otherBlob)
+			require.Error(t, err, "objects from an inherited repository or alternate must not be visible")
+		})
+	}
+}
+
 func TestAuthorizationPolicySnapshot(t *testing.T) {
 	for _, test := range []struct {
-		name        string
-		source      string
-		extra       map[string]string
-		mutate      func(*testing.T)
-		afterCommit func(*testing.T)
-		code        string
-		status      string
-		approved    []string
+		name           string
+		source         string
+		extra          map[string]string
+		mutate         func(*testing.T)
+		afterCommit    func(*testing.T)
+		code           string
+		status         string
+		approved       []string
+		explicitCommit bool
 	}{
 		{name: "compliant"},
 		{name: "enrollment removed", source: strings.Replace(authorizationSourceFixture, "  authorization:\n    endpoint: https://authority.example.org/authorize\n    audience: safe-outputs\n", "", 1), code: "authorization_required"},
@@ -127,6 +173,11 @@ func TestAuthorizationPolicySnapshot(t *testing.T) {
 		}, code: "authorization_required"},
 		{name: "working tree cannot redirect snapshot", afterCommit: func(t *testing.T) {
 			writeAuthorizationTestFile(t, ".github/workflows/triage.md", strings.ReplaceAll(authorizationSourceFixture, "authority.example.org", "uncommitted.example.org"))
+		}},
+		{name: "explicit candidate differs from HEAD", explicitCommit: true, afterCommit: func(t *testing.T) {
+			writeAuthorizationTestFile(t, ".github/workflows/triage.md", strings.ReplaceAll(authorizationSourceFixture, "authority.example.org", "unapproved.example.org"))
+			authorizationTestGit(t, "add", ".")
+			authorizationTestGit(t, "-c", "core.hooksPath="+os.DevNull, "commit", "-qm", "different HEAD")
 		}},
 		{name: "candidate policy ignored", extra: map[string]string{"baseline.json": strings.ReplaceAll(authorizationPolicyFixture, "authority.example.org", "unapproved.example.org")}},
 		{name: "export attributes cannot omit source", extra: map[string]string{".gitattributes": ".github/workflows/* export-ignore\n"}},
@@ -186,8 +237,12 @@ func TestAuthorizationPolicySnapshot(t *testing.T) {
 			}
 			authorizationTestGit(t, "add", ".")
 			authorizationTestGit(t, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture")
+			candidateCommit := authorizationTestGit(t, "rev-parse", "HEAD")
 			if test.afterCommit != nil {
 				test.afterCommit(t)
+			}
+			if test.explicitCommit {
+				require.NotEqual(t, candidateCommit, authorizationTestGit(t, "rev-parse", "HEAD"))
 			}
 			beforeStatus := authorizationTestGit(t, "status", "--porcelain")
 			policyPath := filepath.Join(t.TempDir(), "baseline.json")
@@ -196,6 +251,9 @@ func TestAuthorizationPolicySnapshot(t *testing.T) {
 			cmd := NewValidateCommand(func(string) error { t.Fatal("ordinary validation must not run"); return nil })
 			cmd.SetOut(&output)
 			args := []string{"--authorization-policy", policyPath, "--authorization-repository-id", "123456789", "--json"}
+			if test.explicitCommit {
+				args = append(args, "--authorization-commit", candidateCommit)
+			}
 			for _, approved := range test.approved {
 				args = append(args, "--authorization-actions-workflow", approved)
 			}
@@ -213,7 +271,7 @@ func TestAuthorizationPolicySnapshot(t *testing.T) {
 				}
 				require.NotEmpty(t, result.CompilerDigest)
 				require.NotEmpty(t, result.SnapshotDigest)
-				require.NotEmpty(t, result.CandidateCommit)
+				require.Equal(t, candidateCommit, result.CandidateCommit)
 				require.Equal(t, authorizationDigest([]byte(authorizationPolicyFixture)), result.PolicyDigest)
 			} else {
 				require.Error(t, err)
