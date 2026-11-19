@@ -704,7 +704,7 @@ func buildLogsDataWithCollectionCoverage(processedRuns []ProcessedRun, outputDir
 	// the slug cannot be determined.
 	var localRepo string
 	if !collection.disableLocalClassification {
-		localRepo, _ = GetCurrentRepoSlug()
+		localRepo, _ = GetCurrentRepoSlug() //nolint:ignoredlocalerror // Fails open by design; see above.
 	}
 
 	// Build runs data

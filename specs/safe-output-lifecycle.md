@@ -84,7 +84,7 @@ Refresh MUST NOT execute in conclusion or grant grader network access.
 same evaluator in single-run mode; live data MUST NOT enter its static cache.
 `logs episode --adoption` uses the same selected-member join and MUST preserve
 repository, request, pagination, and wall-clock bounds. When one selected run's
-lifecycle evidence cannot be evaluated, `logs` MUST record it in
+lifecycle evidence is malformed or unreadable, `logs` MUST record it in
 `adoption_errors` with `unavailable` coverage and continue with the other runs.
 
 Public JSON uses `delivery`, `adoption`, `adoption_errors`, `adoption_summary`, and
