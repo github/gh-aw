@@ -152,14 +152,27 @@ describe("CLI-backed impact report lifecycle", () => {
             run_id: 1,
             coverage: "partial",
             eval_error: "another effect has no delivery clock",
-            items: [{ type: "create_issue", adoption_status: "accepted", adoption: { acceptance_kind: "explicit_human" } }],
+            items: [
+              { type: "create_issue", adoption_status: "accepted", adoption: { acceptance_kind: "explicit_human" } },
+              { type: "create_issue", adoption_status: "accepted", adoption: { acceptance_kind: "automation", actor: { login: "stale[bot]", type: "Bot" } } },
+            ],
           },
         ],
       })
     );
     prepareIssueLifecycle(root, "acme/repo");
     const summary = JSON.parse(fs.readFileSync(path.join(root, "safe-output-issue-summary.json"), "utf8"));
-    expect(summary).toMatchObject({ partial: true, partial_run_count: 1, evaluated_run_count: 1, unavailable_run_count: 0, total_issue_deliveries: 1, human_adopted_count: 1, delivery_fallback_adopted_count: 0 });
+    expect(summary).toMatchObject({
+      partial: true,
+      partial_run_count: 1,
+      evaluated_run_count: 1,
+      unavailable_run_count: 0,
+      total_issue_deliveries: 2,
+      accepted_count: 2,
+      human_adopted_count: 1,
+      automation_adopted_count: 1,
+      delivery_fallback_adopted_count: 0,
+    });
     expect(fs.readFileSync(path.join(root, "safe-output-issue-evaluations.jsonl"), "utf8")).toContain('"adoption_status":"accepted"');
   });
 

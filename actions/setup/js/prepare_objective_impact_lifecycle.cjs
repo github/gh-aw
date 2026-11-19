@@ -126,6 +126,7 @@ function prepareIssueLifecycle(dataDir, repo) {
     close_issue_count: rows.filter(row => row.type === "close_issue").length,
     accepted_count: rows.filter(row => row.adoption_status === "accepted").length,
     human_adopted_count: rows.filter(row => row.adoption_status === "accepted" && row.adoption?.acceptance_kind === "explicit_human").length,
+    automation_adopted_count: rows.filter(row => row.adoption_status === "accepted" && row.adoption?.acceptance_kind === "automation").length,
     delivery_fallback_adopted_count: rows.filter(row => row.adoption_status === "accepted" && row.adoption?.acceptance_kind === "fallback_delivery").length,
     rejected_count: rows.filter(row => row.adoption_status === "rejected").length,
     pending_count: rows.filter(row => row.adoption_status === "pending").length,
