@@ -129,13 +129,14 @@ func TestLifecycleDeliveryDoesNotQueryDisposition(t *testing.T) {
 
 func TestLifecycleProposalRequiresDecisionEvidence(t *testing.T) {
 	for _, tc := range []struct {
-		name, decision, state, coverage string
+		name, decision, state, coverage, kind string
 	}{
-		{"human", `"closed_at":"2026-11-02T00:00:00Z","closed_by":{"login":"alice","type":"User"}`, "accepted", "available"},
-		{"bot", `"closed_at":"2026-11-02T00:00:00Z","closed_by":{"login":"stale[bot]","type":"Bot"}`, "lifecycle", "available"},
-		{"missing clock", `"closed_by":{"login":"alice","type":"User"}`, "unknown", "available"},
-		{"publisher", `"closed_at":"2026-11-02T00:00:00Z","closed_by":{"login":"publisher","type":"User"}`, "unknown", "available"},
-		{"missing actor", `"closed_at":"2026-11-02T00:00:00Z"`, "unknown", "available"},
+		{"human", `"closed_at":"2026-11-02T00:00:00Z","closed_by":{"login":"alice","type":"User"}`, "accepted", "available", "explicit_human"},
+		{"bot", `"closed_at":"2026-11-02T00:00:00Z","closed_by":{"login":"stale[bot]","type":"Bot"}`, "accepted", "available", "automation"},
+		{"bot without login", `"closed_at":"2026-11-02T00:00:00Z","closed_by":{"type":"Bot"}`, "unknown", "available", ""},
+		{"missing clock", `"closed_by":{"login":"alice","type":"User"}`, "unknown", "available", ""},
+		{"publisher", `"closed_at":"2026-11-02T00:00:00Z","closed_by":{"login":"publisher","type":"User"}`, "unknown", "available", ""},
+		{"missing actor", `"closed_at":"2026-11-02T00:00:00Z"`, "unknown", "available", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			installOutcomeAPIFixture(t, `case "$2" in
@@ -149,7 +150,60 @@ esac`)
 			require.Len(t, report.Items, 1)
 			assert.Equal(t, tc.state, report.Items[0].Adoption.State)
 			assert.Equal(t, tc.coverage, report.Items[0].Adoption.Coverage)
-			assert.Equal(t, tc.state == "accepted", report.Items[0].Adoption.HumanVerified)
+			assert.Equal(t, tc.kind, report.Items[0].Adoption.AcceptanceKind)
+			assert.Equal(t, tc.kind == "explicit_human", report.Items[0].Adoption.HumanVerified)
+		})
+	}
+}
+
+func TestLifecycleProposalRecordsAutomationResolution(t *testing.T) {
+	for _, tc := range []struct {
+		name, output, pull, issue, state, signal, actor string
+	}{
+		{
+			name: "merged pull request", output: "create_pull_request",
+			pull:  `{"html_url":"https://github.com/acme/repo/pull/42","state":"closed","merged":true,"merged_at":"2026-11-02T00:00:00Z","merged_by":{"login":"github-actions[bot]","type":"Bot"},"user":{"login":"github-actions[bot]"}}`,
+			state: "accepted", signal: "merged", actor: "github-actions[bot]",
+		},
+		{
+			name: "closed pull request", output: "create_pull_request",
+			pull:  `{"html_url":"https://github.com/acme/repo/pull/42","state":"closed","merged":false,"closed_at":"2026-11-02T00:00:00Z","user":{"login":"github-actions[bot]"}}`,
+			issue: `{"closed_by":{"login":"stale[bot]","type":"Bot"}}`,
+			state: "rejected", signal: "closed_without_merge", actor: "stale[bot]",
+		},
+		{
+			name: "issue closed as not planned", output: "create_issue",
+			issue: `{"html_url":"https://github.com/acme/repo/issues/42","state":"closed","state_reason":"not_planned","closed_at":"2026-11-02T00:00:00Z","closed_by":{"login":"stale[bot]","type":"Bot"}}`,
+			state: "rejected", signal: "closed_not_planned", actor: "stale[bot]",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			installOutcomeAPIFixture(t, `case "$2" in
+repos/acme/repo/pulls/42) printf '%s' '`+tc.pull+`' ;;
+repos/acme/repo/issues/42) printf '%s' '`+tc.issue+`' ;;
+*) exit 1 ;;
+esac`)
+			run := deliveredFixtureRun(t, `{"type":"`+tc.output+`","number":42,"status":"success","timestamp":"2026-11-01T00:00:00Z"}`)
+			report, err := collectRunOutcomes(t.Context(), run, nil, false)
+			require.NoError(t, err)
+			require.Len(t, report.Items, 1)
+			adoption := report.Items[0].Adoption
+			require.NotNil(t, adoption)
+			assert.Equal(t, tc.state, adoption.State)
+			assert.Equal(t, tc.signal, adoption.Signal)
+			assert.Equal(t, "automation", adoption.AcceptanceKind)
+			assert.Equal(t, lifecycle.Actor{Login: tc.actor, Type: "Bot"}, adoption.Actor)
+			assert.False(t, adoption.HumanVerified)
+			assert.Equal(t, tc.state == "accepted", report.Summary.AcceptedAutomation == 1)
+			assert.Equal(t, tc.state == "rejected", report.Summary.Rejected == 1)
+			assert.Zero(t, report.Summary.AcceptedHuman)
+			assert.Zero(t, report.Summary.Lifecycle)
+			retained, err := loadLifecycleCache(run.Run.LogsPath)
+			require.NoError(t, err)
+			require.Len(t, retained, 1)
+			for _, record := range retained {
+				assert.True(t, adoption.Equal(record.Adoption), "retained adoption must keep the automation actor and resolution")
+			}
 		})
 	}
 }

@@ -1004,7 +1004,7 @@ func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string
 		claimArtifacts := isWorkQueueWorker(data)
 		if claimArtifacts || hasMergeDecisions {
 			var redaction strings.Builder
-			c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data)
+			c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data, false)
 			steps = append(steps, redaction.String())
 		}
 		steps = append(steps, buildSafeOutputManifestUploadStep(agentArtifactPrefix, c.getActionPin, claimArtifacts, data, !isStaged)...)

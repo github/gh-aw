@@ -398,8 +398,8 @@ func renderLogsOutcomes(w io.Writer, data LogsData) error {
 		}
 	}
 	for _, run := range data.Outcomes {
-		if _, err := fmt.Fprintf(w, "\nAdoption for %s (run %d): %d accepted, %d rejected, %d not applicable, %d lifecycle, %d pending, %d unknown, %d errors (%d total; human: %d, delivery fallback: %d)\n",
-			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.NotApplicable, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total, run.Summary.AcceptedHuman, run.Summary.AcceptedFallback); err != nil {
+		if _, err := fmt.Fprintf(w, "\nAdoption for %s (run %d): %d accepted, %d rejected, %d not applicable, %d lifecycle, %d pending, %d unknown, %d errors (%d total; human: %d, automation: %d, delivery fallback: %d)\n",
+			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.NotApplicable, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total, run.Summary.AcceptedHuman, run.Summary.AcceptedAutomation, run.Summary.AcceptedFallback); err != nil {
 			return err
 		}
 		if run.EvalError != "" {

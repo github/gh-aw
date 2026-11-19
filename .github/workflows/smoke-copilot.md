@@ -25,6 +25,8 @@ permissions:
 name: Smoke Copilot
 engine:
   id: copilot
+  durable:
+    retention-days: 7
   fallback-models:
     - copilot/gpt-5.6-luna
     - copilot/claude-sonnet-5

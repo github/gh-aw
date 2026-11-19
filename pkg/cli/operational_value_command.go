@@ -293,7 +293,7 @@ func renderOperationalValueReport(out io.Writer, measurement valueMeasurement, r
 	}
 	if report.Lifecycle.Delivered != nil {
 		delivered = fmt.Sprintf("%d (retained subset)", *report.Lifecycle.Delivered)
-		adopted = fmt.Sprintf("%d human, %d delivery fallback", report.Lifecycle.Adoption.AcceptedHuman, report.Lifecycle.Adoption.AcceptedFallback)
+		adopted = fmt.Sprintf("%d human, %d automation, %d delivery fallback", report.Lifecycle.Adoption.AcceptedHuman, report.Lifecycle.Adoption.AcceptedAutomation, report.Lifecycle.Adoption.AcceptedFallback)
 	}
 	summary := struct {
 		Workflow    string `console:"header:Workflow"`
