@@ -974,18 +974,21 @@ on:
       # Array of strings
 
   # Scheduled trigger events using fuzzy schedules or standard cron expressions.
-  # Supports shorthand string notation (e.g., 'daily', 'daily around 2pm') or array
-  # of schedule objects. Fuzzy schedules automatically distribute execution times to
-  # prevent load spikes.
+  # Supports shorthand string notation (e.g., 'daily', 'daily around 2pm', 'every 2
+  # days', 'every 2w', 'every 2mo') or array of schedule objects. Fuzzy schedules
+  # automatically distribute execution times to prevent load spikes; day, week, and
+  # month intervals also scatter times, and month intervals scatter the day of
+  # month.
   # (optional)
   # Accepted formats:
 
   # Format 1: Shorthand schedule string using fuzzy or cron format. Examples:
   # 'daily', 'daily around 14:00', 'daily between 9:00 and 17:00', 'weekly', 'weekly
   # on monday', 'weekly on friday around 5pm', 'hourly', 'every 2h', 'every 10
-  # minutes', '0 9 * * 1'. Fuzzy schedules distribute execution times to prevent
-  # load spikes. For fixed times, use standard cron syntax. Minimum interval is 5
-  # minutes.
+  # minutes', 'every 2 days', 'every 2w', 'every 2mo', '0 9 * * 1'. Fuzzy schedules
+  # distribute execution times to prevent load spikes; day, week, and month
+  # intervals scatter execution times, and month intervals also scatter the day of
+  # month. For fixed times, use standard cron syntax. Minimum interval is 5 minutes.
   schedule: "example-value"
 
   # Format 2: Array of schedule objects with cron expressions (standard cron or
@@ -2063,8 +2066,8 @@ on:
     # (optional)
     all: "read"
 
-  # Generate admission steps in activation and conclusion (default: false).
-  # An explicit admission setting in aw.json takes precedence.
+  # Generate admission steps in activation and conclusion. An explicit admission
+  # setting in aw.json takes precedence.
   # (optional)
   admission: true
 
@@ -4012,6 +4015,9 @@ engine:
 
     # (optional)
     installation:
+      # Package manager used to install the engine: 'npm' installs 'package-name'
+      # globally; 'pip' installs the hash-locked 'requirements', when declared, before
+      # the agent sandbox starts.
       # (optional)
       package-manager: "example-value"
 
@@ -4020,6 +4026,22 @@ engine:
 
       # (optional)
       version: "example-value"
+
+      # pip only. Complete hash-locked dependency list, including 'package-name' at the
+      # engine version. The runtime installs binary wheels with pip --require-hashes
+      # into /tmp/gh-aw/agent/<engine-id>-python/site-packages, verifies the installed
+      # version, and exposes the directory to execution as GH_AW_PYTHON_PACKAGES.
+      # (optional)
+      requirements: []
+        # Array items:
+          # Python distribution name.
+          name: "My Workflow"
+
+          # Exact distribution version. Quote it so YAML keeps it a string.
+          version: "example-value"
+
+          # SHA-256 of the wheel to install.
+          sha256: "example-value"
 
       # (optional)
       step-name: "example-value"
@@ -5884,6 +5906,12 @@ cache: []
 # permissions in the main job
 # (optional)
 safe-outputs:
+  # (optional)
+  authorization:
+    endpoint: "example-value"
+
+    audience: "example-value"
+
   # ⚠️ Experimental. Create a run-scoped issue and let the agent read user-authored
   # issue comments containing the keyword 'steer'. The issue is reused for agent
   # failure reporting. Requires top-level issues: read permission.
@@ -5940,6 +5968,12 @@ safe-outputs:
   # Format 1: Configuration for automatically creating GitHub issues from AI
   # workflow output. The main job does not need 'issues: write' permission.
   create-issue:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional prefix to add to the beginning of the issue title (e.g., '[ai] ' or
     # '[analysis] ')
     # (optional)
@@ -6358,6 +6392,12 @@ safe-outputs:
   # creating GitHub Copilot coding agent sessions from agentic workflow output using
   # gh agent-task CLI. The main job does not need write permissions.
   create-agent-task:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Base branch for the agent session pull request. Defaults to the current branch
     # or repository default branch.
     # (optional)
@@ -6641,6 +6681,12 @@ safe-outputs:
   # agentic workflow output using gh agent-task CLI. The main job does not need
   # write permissions.
   create-agent-session:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Base branch for the agent session pull request. Defaults to the current branch
     # or repository default branch.
     # (optional)
@@ -6930,6 +6976,12 @@ safe-outputs:
   # (create_fields|create_view), field_definitions (array of field configs when
   # operation=create_fields), view (view config object when operation=create_view).
   update-project:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of project operations to perform (default: 10). Each operation
     # may add a project item, or update its fields. Supports integer or GitHub Actions
     # expression (e.g. '${{ inputs.max }}').
@@ -7263,6 +7315,12 @@ safe-outputs:
   # and optional field_definitions. Returns a temporary project ID for use in
   # subsequent update_project operations.
   create-project:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of create operations to perform (default: 1). Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -7584,6 +7642,12 @@ safe-outputs:
   # summaries with status indicators (on-track, at-risk, off-track, complete,
   # inactive), dates, and progress details.
   create-project-status-update:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of status updates to create (default: 1). Typically 1 per
     # orchestrator run. Supports integer or GitHub Actions expression (e.g. '${{
     # inputs.max }}').
@@ -7851,6 +7915,12 @@ safe-outputs:
   # Format 1: Configuration for creating GitHub discussions from agentic workflow
   # output
   create-discussion:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional prefix for the discussion title
     # (optional)
     title-prefix: "example-value"
@@ -8209,6 +8279,12 @@ safe-outputs:
   # Format 1: Configuration for closing GitHub discussions with comment and
   # resolution from agentic workflow output
   close-discussion:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Only close discussions that have all of these labels
     # (optional)
     required-labels: []
@@ -8497,6 +8573,12 @@ safe-outputs:
   # Format 1: Configuration for updating GitHub discussions from agentic workflow
   # output
   update-discussion:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Target for updates: 'triggering' (default), '*' (any discussion), or explicit
     # discussion number
     # (optional)
@@ -8797,6 +8879,12 @@ safe-outputs:
   # Format 1: Configuration for closing GitHub issues with comment from agentic
   # workflow output
   close-issue:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Only close issues that have all of these labels
     # (optional)
     required-labels: []
@@ -9102,6 +9190,12 @@ safe-outputs:
   # Format 1: Configuration for closing GitHub pull requests without merging, with
   # comment from agentic workflow output
   close-pull-request:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Only close pull requests that have any of these labels
     # (optional)
     required-labels: []
@@ -9386,6 +9480,12 @@ safe-outputs:
   # Format 1: Configuration for marking draft pull requests as ready for review,
   # with comment from agentic workflow output
   mark-pull-request-as-ready-for-review:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Only mark pull requests that have any of these labels
     # (optional)
     required-labels: []
@@ -9670,6 +9770,12 @@ safe-outputs:
   # Format 1: Configuration for approving workflow runs that are awaiting required
   # approval.
   approve-workflow-run:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of workflow runs to approve (default: 1). Supports an integer or
     # GitHub Actions expression.
     # (optional)
@@ -9970,6 +10076,12 @@ safe-outputs:
   # Format 1: Configuration for automatically creating GitHub issue or pull request
   # comments from AI workflow output. The main job does not need write permissions.
   add-comment:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Render safe-output data in a collapsed Structured data details block. Default:
     # false (visible fenced JSON). Requires safe-outputs.data to accept structured
     # data.
@@ -10368,6 +10480,12 @@ safe-outputs:
   # Format 1: Configuration for creating GitHub pull requests from agentic workflow
   # output. Supports creating multiple PRs in a single run when max > 1.
   create-pull-request:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of pull requests to create (default: 1). Each PR requires
     # distinct changes on a separate branch. Supports integer or GitHub Actions
     # expression (e.g. '${{ inputs.max }}').
@@ -11253,6 +11371,12 @@ safe-outputs:
   # Format 1: Configuration for creating GitHub pull request review comments from
   # agentic workflow output
   create-pull-request-review-comment:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of review comments to create (default: 10) Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -11554,6 +11678,12 @@ safe-outputs:
   # create-pull-request-review-comment outputs are collected and submitted as part
   # of this review.
   submit-pull-request-review:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of reviews to submit (default: 1) Supports integer or GitHub
     # Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -11880,6 +12010,12 @@ safe-outputs:
   # Format 1: Configuration for dismissing pull request reviews previously submitted
   # by the current workflow actor.
   dismiss-pull-request-review:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of review dismissals to perform (default: 10) Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -12165,6 +12301,12 @@ safe-outputs:
   # Format 1: Configuration for dismissing pull request reviews previously submitted
   # by the current workflow actor.
   dismiss-review:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of review dismissals to perform (default: 10) Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -12448,6 +12590,12 @@ safe-outputs:
 
   # Format 1: Configuration for replying to existing pull request review comments
   reply-to-pull-request-review-comment:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of replies to create (default: 10) Supports integer or GitHub
     # Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -12739,6 +12887,12 @@ safe-outputs:
   # target-repo, or allowed-repos are specified, cross-repository thread resolution
   # is supported.
   resolve-pull-request-review-thread:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of review threads to resolve (default: 10) Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -13029,6 +13183,12 @@ safe-outputs:
   # Format 1: Configuration for creating repository security advisories (SARIF
   # format) from agentic workflow output
   create-code-scanning-alert:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of security findings to include (default: unlimited) Supports
     # integer or GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -13311,6 +13471,12 @@ safe-outputs:
 
   # Format 1: Configuration for creating autofixes for code scanning alerts
   autofix-code-scanning-alert:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of autofixes to create (default: 10) Supports integer or GitHub
     # Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -13571,6 +13737,12 @@ safe-outputs:
   # Format 1: Configuration for creating GitHub Check Runs to surface agent analysis
   # results on commits and pull requests
   create-check-run:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Check run name shown in the GitHub Checks UI (e.g., 'Security Analysis'). If
     # omitted, defaults to the workflow name.
     # (optional)
@@ -13860,6 +14032,12 @@ safe-outputs:
   # output. Labels must already exist in the repository unless 'create-if-missing'
   # is enabled.
   add-labels:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed labels that can be added. Labels must already exist in
     # the repository unless 'create-if-missing' is enabled. If omitted, any labels are
     # allowed.
@@ -14199,6 +14377,12 @@ safe-outputs:
   # Format 2: Configuration for removing labels from issues/PRs from agentic
   # workflow output.
   remove-labels:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed labels that can be removed. If omitted, any labels can
     # be removed.
     # (optional)
@@ -14512,6 +14696,12 @@ safe-outputs:
   # Format 2: Configuration for adding reviewers to pull requests from agentic
   # workflow output
   add-reviewer:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed reviewer usernames. If omitted, any reviewers are
     # allowed.
     # (optional)
@@ -14816,6 +15006,12 @@ safe-outputs:
   # Format 2: Configuration for assigning issues to milestones from agentic workflow
   # output
   assign-milestone:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed milestone titles that can be assigned. If omitted, any
     # milestones are allowed.
     # (optional)
@@ -15112,6 +15308,12 @@ safe-outputs:
   # Format 2: Configuration for assigning GitHub Copilot coding agent to issues from
   # agentic workflow output
   assign-to-agent:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Default agent name to assign (default: 'copilot')
     # (optional)
     name: "My Workflow"
@@ -15461,6 +15663,12 @@ safe-outputs:
   # Format 2: Configuration for assigning users to issues from agentic workflow
   # output
   assign-to-user:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed usernames. If specified, only these users can be
     # assigned.
     # (optional)
@@ -15770,6 +15978,12 @@ safe-outputs:
   # Format 2: Configuration for removing assignees from issues in agentic workflow
   # output
   unassign-from-user:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed usernames. If specified, only these users can be
     # unassigned.
     # (optional)
@@ -16069,6 +16283,12 @@ safe-outputs:
   # Format 2: Configuration for linking issues as sub-issues from agentic workflow
   # output
   link-sub-issue:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of sub-issue links to create (default: 5) Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -16367,6 +16587,12 @@ safe-outputs:
 
   # Format 1: Configuration for updating GitHub issues from agentic workflow output
   update-issue:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of artifacts attached per updated issue (default: 10). Zero or a
     # negative value disables issue artifacts.
     # (optional)
@@ -16700,6 +16926,12 @@ safe-outputs:
   # Format 1: Configuration for updating GitHub pull requests from agentic workflow
   # output. Both title and body updates are enabled by default.
   update-pull-request:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Target for updates: 'triggering' (default), '*' (any PR), or explicit PR number
     # (optional)
     target: "example-value"
@@ -17018,6 +17250,12 @@ safe-outputs:
   # blocked unless all configured gates pass.
   # (optional)
   merge-pull-request:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Required static scoped patterns for destination (base) branches declared by the
     # owner as non-consequential automated integration targets. Only * and ** glob
     # operators are supported; expressions, negation, character classes, braces,
@@ -17372,6 +17610,12 @@ safe-outputs:
   # Format 2: Configuration for pushing changes to a specific branch from agentic
   # workflow output. Supports pushing to multiple PRs in a single run when max > 1.
   push-to-pull-request-branch:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of push operations to perform (default: 1). Each push targets a
     # different pull request branch. Supports integer or GitHub Actions expression
     # (e.g. '${{ inputs.max }}').
@@ -18074,6 +18318,12 @@ safe-outputs:
   # Format 2: Configuration for hiding comments on GitHub issues, pull requests, or
   # discussions from agentic workflow output
   hide-comment:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of comments to hide (default: 5) Supports integer or GitHub
     # Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -18153,6 +18403,12 @@ safe-outputs:
   # Format 2: Configuration for setting the type of GitHub issues from agentic
   # workflow output
   set-issue-type:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed issue type names (e.g. 'Bug', 'Feature'). If omitted,
     # any type is allowed. Empty string is always allowed to clear the type.
     # (optional)
@@ -18457,6 +18713,12 @@ safe-outputs:
   # Format 2: Configuration for setting one issue field value by field name and
   # value.
   set-issue-field:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional maximum number of set-issue-field operations (default: 5). Supports
     # integer or GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -18753,6 +19015,12 @@ safe-outputs:
   # Format 1: Configuration for dispatching workflow_dispatch events to other
   # workflows. Orchestrators use this to delegate work to worker workflows.
   dispatch-workflow:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # List of workflow names (without .md extension) to allow dispatching. Each
     # workflow must exist in .github/workflows/.
     workflows: []
@@ -19058,564 +19326,20 @@ safe-outputs:
   # fields.
   # (optional)
   dispatch-repository:
-    # Configuration for a single repository dispatch tool
-    trigger-ci:
-      # Human-readable description of what this dispatch tool does
-      # (optional)
-      description: "Description of the workflow"
+    # (optional)
+    authorization:
+      endpoint: "example-value"
 
-      # Target workflow name (for traceability and inclusion in client_payload)
-      workflow: "example-value"
-
-      # The repository_dispatch event_type string sent to the target repository
-      event_type: "example-value"
-
-      # Target repository in 'owner/repo' format. Dispatches to this repository when no
-      # 'allowed_repositories' list is given.
-      # (optional)
-      repository: "example-value"
-
-      # List of allowed target repositories (owner/repo). Supports glob patterns like
-      # 'org/*'.
-      # (optional)
-      allowed_repositories: []
-        # Array of strings
-
-      # Input schema for the dispatch tool. Inputs are validated and compiled into
-      # client_payload.
-      # (optional)
-      inputs:
-        repo-name:
-          # Input type
-          # (optional)
-          type: "string"
-
-          # Input description
-          # (optional)
-          description: "Description of the workflow"
-
-          # Whether this input is required
-          # (optional)
-          required: true
-
-          # Default value for this input
-          # (optional)
-          default: null
-
-          # Allowed options for 'choice' type inputs
-          # (optional)
-          options: []
-            # Array of strings
-
-      # Maximum number of dispatch executions for this tool per run (default: 1, max:
-      # 50). Supports integer or GitHub Actions expression.
-      # (optional)
-      # Accepted formats:
-
-      # Format 1: integer
-      max: 1
-
-      # Format 2: GitHub Actions expression that resolves to an integer at runtime
-      max: "example-value"
-
-      # GitHub token to use for dispatching. Overrides global github-token if specified.
-      # (optional)
-      github-token: "${{ secrets.GITHUB_TOKEN }}"
-
-      # When true, emit step summary messages instead of making GitHub API calls
-      # (preview mode)
-      # (optional)
-      # Accepted formats:
-
-      # Format 1: boolean
-      staged: true
-
-      # Format 2: GitHub Actions expression that resolves to a boolean at runtime
-      staged: "example-value"
-
-      # GitHub App authentication. Mints a short-lived installation access token via
-      # actions/create-github-app-token. Mutually exclusive with github-token.
-      # (optional)
-      github-app:
-        # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
-        # }}').
-        # (optional)
-        app-id: "example-value"
-
-        # GitHub App client ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App
-        # token.
-        # (optional)
-        client-id: "example-value"
-
-        # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
-        # mint a GitHub App token.
-        # (optional)
-        private-key: "example-value"
-
-        # If true, skip token minting when client-id/private-key resolve to empty strings
-        # at runtime. Defaults to false.
-        # (optional)
-        ignore-if-missing: true
-
-        # Optional owner of the GitHub App installation (defaults to current repository
-        # owner if not specified)
-        # (optional)
-        owner: "example-value"
-
-        # Optional list of repositories to grant access to (defaults to current repository
-        # if not specified)
-        # (optional)
-        repositories: []
-          # Array of strings
-
-        # Optional extra GitHub App-only permissions to merge into the minted token. Takes
-        # effect for tools.github.github-app and safe-outputs.github-app; ignored in
-        # on.github-app and the top-level github-app fallback. Use to add GitHub App-only
-        # scopes (e.g. members, organization-administration) not expressible via standard
-        # handler declarations.
-        # (optional)
-        permissions:
-          # Permission level for repository administration (read/none; "write" is rejected
-          # by the compiler). GitHub App-only permission for repository administration.
-          # (optional)
-          administration: "read"
-
-          # Permission level for Codespaces (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          codespaces: "read"
-
-          # Permission level for Codespaces lifecycle administration (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          codespaces-lifecycle-admin: "read"
-
-          # Permission level for Codespaces metadata (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          codespaces-metadata: "read"
-
-          # Permission level for user email addresses (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          email-addresses: "read"
-
-          # Permission level for repository environments (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          environments: "read"
-
-          # Permission level for git signing (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          git-signing: "read"
-
-          # Permission level for organization members (read/none; "write" is rejected by the
-          # compiler). Required for org team membership API calls.
-          # (optional)
-          members: "read"
-
-          # Permission level for organization administration (read/none; "write" is rejected
-          # by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-administration: "read"
-
-          # Permission level for organization announcement banners (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-announcement-banners: "read"
-
-          # Permission level for organization Codespaces (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          organization-codespaces: "read"
-
-          # Permission level for organization Copilot (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          organization-copilot: "read"
-
-          # Permission level for organization custom org roles (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-custom-org-roles: "read"
-
-          # Permission level for organization custom properties (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-custom-properties: "read"
-
-          # Permission level for organization custom repository roles (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-custom-repository-roles: "read"
-
-          # Permission level for organization events (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          organization-events: "read"
-
-          # Permission level for organization webhooks (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          organization-hooks: "read"
-
-          # Permission level for organization members management (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-members: "read"
-
-          # Permission level for organization packages (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          organization-packages: "read"
-
-          # Permission level for organization personal access token requests (read/none;
-          # "write" is rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-personal-access-token-requests: "read"
-
-          # Permission level for organization personal access tokens (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-personal-access-tokens: "read"
-
-          # Permission level for organization plan (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          organization-plan: "read"
-
-          # Permission level for organization self-hosted runners (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-self-hosted-runners: "read"
-
-          # Permission level for organization user blocking (read/none; "write" is rejected
-          # by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-user-blocking: "read"
-
-          # Permission level for repository custom properties (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          repository-custom-properties: "read"
-
-          # Permission level for secret scanning alerts (read/none). Forwarded as
-          # permission-secret-scanning-alerts input for actions/create-github-app-token.
-          # (optional)
-          secret-scanning-alerts: "read"
-
-          # Repository security advisories permission. GitHub App-only; forwarded as
-          # permission-repository-advisories when minting a token.
-          # (optional)
-          repository-advisories: "read"
-
-          # Permission level for repository webhooks (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          repository-hooks: "read"
-
-          # Permission level for single file access (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          single-file: "read"
-
-          # Permission level for team discussions (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          team-discussions: "read"
-
-          # Permission level for Dependabot vulnerability alerts (read/none; "write" is
-          # rejected by the compiler). Also available as a GITHUB_TOKEN scope. When used
-          # with a GitHub App, forwarded as permission-vulnerability-alerts input.
-          # (optional)
-          vulnerability-alerts: "read"
-
-          # Permission level for GitHub Actions workflow files (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          workflows: "read"
+      audience: "example-value"
 
   # Deprecated alias for dispatch-repository.
   # (optional)
   dispatch_repository:
-    # Configuration for a single repository dispatch tool
-    trigger-ci:
-      # Human-readable description of what this dispatch tool does
-      # (optional)
-      description: "Description of the workflow"
+    # (optional)
+    authorization:
+      endpoint: "example-value"
 
-      # Target workflow name (for traceability and inclusion in client_payload)
-      workflow: "example-value"
-
-      # The repository_dispatch event_type string sent to the target repository
-      event_type: "example-value"
-
-      # Target repository in 'owner/repo' format. Dispatches to this repository when no
-      # 'allowed_repositories' list is given.
-      # (optional)
-      repository: "example-value"
-
-      # List of allowed target repositories (owner/repo). Supports glob patterns like
-      # 'org/*'.
-      # (optional)
-      allowed_repositories: []
-        # Array of strings
-
-      # Input schema for the dispatch tool. Inputs are validated and compiled into
-      # client_payload.
-      # (optional)
-      inputs:
-        repo-name:
-          # Input type
-          # (optional)
-          type: "string"
-
-          # Input description
-          # (optional)
-          description: "Description of the workflow"
-
-          # Whether this input is required
-          # (optional)
-          required: true
-
-          # Default value for this input
-          # (optional)
-          default: null
-
-          # Allowed options for 'choice' type inputs
-          # (optional)
-          options: []
-            # Array of strings
-
-      # Maximum number of dispatch executions for this tool per run (default: 1, max:
-      # 50). Supports integer or GitHub Actions expression.
-      # (optional)
-      # Accepted formats:
-
-      # Format 1: integer
-      max: 1
-
-      # Format 2: GitHub Actions expression that resolves to an integer at runtime
-      max: "example-value"
-
-      # GitHub token to use for dispatching. Overrides global github-token if specified.
-      # (optional)
-      github-token: "${{ secrets.GITHUB_TOKEN }}"
-
-      # When true, emit step summary messages instead of making GitHub API calls
-      # (preview mode)
-      # (optional)
-      # Accepted formats:
-
-      # Format 1: boolean
-      staged: true
-
-      # Format 2: GitHub Actions expression that resolves to a boolean at runtime
-      staged: "example-value"
-
-      # GitHub App authentication. Mints a short-lived installation access token via
-      # actions/create-github-app-token. Mutually exclusive with github-token.
-      # (optional)
-      github-app:
-        # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
-        # }}').
-        # (optional)
-        app-id: "example-value"
-
-        # GitHub App client ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App
-        # token.
-        # (optional)
-        client-id: "example-value"
-
-        # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
-        # mint a GitHub App token.
-        # (optional)
-        private-key: "example-value"
-
-        # If true, skip token minting when client-id/private-key resolve to empty strings
-        # at runtime. Defaults to false.
-        # (optional)
-        ignore-if-missing: true
-
-        # Optional owner of the GitHub App installation (defaults to current repository
-        # owner if not specified)
-        # (optional)
-        owner: "example-value"
-
-        # Optional list of repositories to grant access to (defaults to current repository
-        # if not specified)
-        # (optional)
-        repositories: []
-          # Array of strings
-
-        # Optional extra GitHub App-only permissions to merge into the minted token. Takes
-        # effect for tools.github.github-app and safe-outputs.github-app; ignored in
-        # on.github-app and the top-level github-app fallback. Use to add GitHub App-only
-        # scopes (e.g. members, organization-administration) not expressible via standard
-        # handler declarations.
-        # (optional)
-        permissions:
-          # Permission level for repository administration (read/none; "write" is rejected
-          # by the compiler). GitHub App-only permission for repository administration.
-          # (optional)
-          administration: "read"
-
-          # Permission level for Codespaces (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          codespaces: "read"
-
-          # Permission level for Codespaces lifecycle administration (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          codespaces-lifecycle-admin: "read"
-
-          # Permission level for Codespaces metadata (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          codespaces-metadata: "read"
-
-          # Permission level for user email addresses (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          email-addresses: "read"
-
-          # Permission level for repository environments (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          environments: "read"
-
-          # Permission level for git signing (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          git-signing: "read"
-
-          # Permission level for organization members (read/none; "write" is rejected by the
-          # compiler). Required for org team membership API calls.
-          # (optional)
-          members: "read"
-
-          # Permission level for organization administration (read/none; "write" is rejected
-          # by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-administration: "read"
-
-          # Permission level for organization announcement banners (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-announcement-banners: "read"
-
-          # Permission level for organization Codespaces (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          organization-codespaces: "read"
-
-          # Permission level for organization Copilot (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          organization-copilot: "read"
-
-          # Permission level for organization custom org roles (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-custom-org-roles: "read"
-
-          # Permission level for organization custom properties (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-custom-properties: "read"
-
-          # Permission level for organization custom repository roles (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-custom-repository-roles: "read"
-
-          # Permission level for organization events (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          organization-events: "read"
-
-          # Permission level for organization webhooks (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          organization-hooks: "read"
-
-          # Permission level for organization members management (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-members: "read"
-
-          # Permission level for organization packages (read/none; "write" is rejected by
-          # the compiler). GitHub App-only permission.
-          # (optional)
-          organization-packages: "read"
-
-          # Permission level for organization personal access token requests (read/none;
-          # "write" is rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-personal-access-token-requests: "read"
-
-          # Permission level for organization personal access tokens (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-personal-access-tokens: "read"
-
-          # Permission level for organization plan (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          organization-plan: "read"
-
-          # Permission level for organization self-hosted runners (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-self-hosted-runners: "read"
-
-          # Permission level for organization user blocking (read/none; "write" is rejected
-          # by the compiler). GitHub App-only permission.
-          # (optional)
-          organization-user-blocking: "read"
-
-          # Permission level for repository custom properties (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          repository-custom-properties: "read"
-
-          # Permission level for secret scanning alerts (read/none). Forwarded as
-          # permission-secret-scanning-alerts input for actions/create-github-app-token.
-          # (optional)
-          secret-scanning-alerts: "read"
-
-          # Repository security advisories permission. GitHub App-only; forwarded as
-          # permission-repository-advisories when minting a token.
-          # (optional)
-          repository-advisories: "read"
-
-          # Permission level for repository webhooks (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          repository-hooks: "read"
-
-          # Permission level for single file access (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          single-file: "read"
-
-          # Permission level for team discussions (read/none; "write" is rejected by the
-          # compiler). GitHub App-only permission.
-          # (optional)
-          team-discussions: "read"
-
-          # Permission level for Dependabot vulnerability alerts (read/none; "write" is
-          # rejected by the compiler). Also available as a GITHUB_TOKEN scope. When used
-          # with a GitHub App, forwarded as permission-vulnerability-alerts input.
-          # (optional)
-          vulnerability-alerts: "read"
-
-          # Permission level for GitHub Actions workflow files (read/none; "write" is
-          # rejected by the compiler). GitHub App-only permission.
-          # (optional)
-          workflows: "read"
+      audience: "example-value"
 
   # Call reusable workflows via workflow_call fan-out. The compiler generates static
   # conditional jobs; the agent selects which worker to activate. Use this for
@@ -19627,6 +19351,12 @@ safe-outputs:
   # fan-out. The compiler generates conditional `uses:` jobs at compile time; the
   # agent selects which worker to activate at runtime.
   call-workflow:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # List of workflow names (without .md extension) to allow calling. Each workflow
     # must exist in .github/workflows/ and declare a workflow_call trigger.
     workflows: []
@@ -19892,6 +19622,12 @@ safe-outputs:
 
   # Format 1: Configuration for reporting missing tools from agentic workflow output
   report-missing-tool:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of missing tool reports (default: unlimited) Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -20189,6 +19925,12 @@ safe-outputs:
   # goals. Encourages AI agents to be truthful about data gaps instead of
   # hallucinating information.
   report-missing-data:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of missing data reports (default: unlimited) Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -20485,6 +20227,12 @@ safe-outputs:
   # Format 1: Configuration for no-op safe output (logging only, no GitHub API
   # calls). Always available as a fallback to ensure human-visible artifacts.
   noop:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of noop messages (default: 2) Supports integer or GitHub Actions
     # expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -20752,6 +20500,12 @@ safe-outputs:
 
   # Format 1: Configuration for publishing assets to an orphaned git branch
   upload-asset:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Branch name (default: 'assets/${{ github.workflow }}')
     # (optional)
     branch: "example-value"
@@ -21025,6 +20779,12 @@ safe-outputs:
   # Format 1: Configuration for uploading files as run-scoped GitHub Actions
   # artifacts
   upload-artifact:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of upload_artifact tool calls allowed per run (default: 1)
     # (optional)
     max-uploads: 1
@@ -21315,6 +21075,12 @@ safe-outputs:
   # Format 1: Configuration for uploading a code coverage report via
   # actions/upload-code-coverage
   upload-code-coverage:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Trusted queue coverage target; independently resolved to the immutable worker
     # revision before upload.
     # (optional)
@@ -21589,6 +21355,12 @@ safe-outputs:
 
   # Format 1: object
   add-security-advisory-comment:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of advisory comments per run (default: 1).
     # (optional)
     # Accepted formats:
@@ -21850,6 +21622,12 @@ safe-outputs:
 
   # Format 1: object
   create-security-advisory:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of draft advisories per run (default: 1).
     # (optional)
     # Accepted formats:
@@ -22106,6 +21884,12 @@ safe-outputs:
 
   # Format 1: Configuration for updating GitHub release descriptions
   update-release:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of releases to update (default: 1) Supports integer or GitHub
     # Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -23237,6 +23021,9 @@ safe-outputs:
 
         # (optional)
         installation:
+          # Package manager used to install the engine: 'npm' installs 'package-name'
+          # globally; 'pip' installs the hash-locked 'requirements', when declared, before
+          # the agent sandbox starts.
           # (optional)
           package-manager: "example-value"
 
@@ -23245,6 +23032,22 @@ safe-outputs:
 
           # (optional)
           version: "example-value"
+
+          # pip only. Complete hash-locked dependency list, including 'package-name' at the
+          # engine version. The runtime installs binary wheels with pip --require-hashes
+          # into /tmp/gh-aw/agent/<engine-id>-python/site-packages, verifies the installed
+          # version, and exposes the directory to execution as GH_AW_PYTHON_PACKAGES.
+          # (optional)
+          requirements: []
+            # Array items:
+              # Python distribution name.
+              name: "My Workflow"
+
+              # Exact distribution version. Quote it so YAML keeps it a string.
+              version: "example-value"
+
+              # SHA-256 of the wheel to install.
+              sha256: "example-value"
 
           # (optional)
           step-name: "example-value"
@@ -24324,6 +24127,12 @@ safe-outputs:
 
   # Format 1: Configuration for report_incomplete safe output
   report-incomplete:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Maximum number of report_incomplete signals (default: 5). Supports integer or
     # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -24615,6 +24424,12 @@ safe-outputs:
   # single atomic operation. Enables clear state transitions (e.g. 'in-progress' →
   # 'done').
   replace-label:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
     # Optional list of allowed label state transitions. Each entry specifies a (from,
     # to) pair that is permitted. When specified, the agent may ONLY perform the
     # listed transitions, regardless of allowed-add/allowed-remove. Useful for

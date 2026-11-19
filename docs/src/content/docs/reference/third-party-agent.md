@@ -59,7 +59,7 @@ These definitions are examples for integration authors, **not supported gh-aw en
 | Factory Droid | Pins `@factory/cli` 0.248.0 with lifecycle scripts disabled. Uses custom models through the AWF API proxy with placeholder credentials; real provider and Factory keys are excluded from the agent. Supports Copilot, Anthropic, and OpenAI inference, file-based prompts, high autonomy inside the sandbox, and native HTTP MCP. Native MCP retains the gateway session authorization in agent-readable `.factory/mcp.json`; this is not an upstream provider credential or a security boundary against the agent (see [gateway authentication](/gh-aw/reference/mcp-gateway/#71-authorization-header-format)). Removing it prevents authenticated MCP calls. No Factory API key is required. Factory-managed inference, direct-key execution, structured session parsing, gh-aw tool allowlists, max-turn enforcement, and Agent Plugins are unsupported. |
 | Goose | Pins CLI v1.53.0 with archive checksum verification. Uses OpenAI-compatible inference, native authenticated MCP, file-based prompts, and JSONL tool/usage events. Configuration/session state is temporary; keyring is disabled. No native gh-aw `web-fetch`; use MCP or shell. Copilot can use `copilot-requests: write` without a PAT. |
 | Kiro | Sample pins CLI 2.31.1 with the V2 harness; Powers plugins are not supported. |
-| LangGraph | Pins PyPI `langgraph` 1.2.23 with hash-locked LangChain OpenAI/Anthropic wheels on Python 3.12, staged like mini-SWE-agent. Runs a Graph API tool-calling agent (`llm_call` and `tool_node`) with shell, file read, and file write tools over AWF-only Copilot, OpenAI/Codex, or Anthropic inference. A final answer without tool calls is required for success; `max-turns` bounds model calls. LangSmith tracing is disabled. Tools use CLI proxies, not native MCP. The untrusted message trajectory is retained only after secret redaction. No native shell allowlists, edit disabling, checkpointers, Agent Plugins, or structured session parser. |
+| LangGraph | Pins PyPI `langgraph` 1.2.23 with hash-locked LangChain OpenAI/Anthropic wheels on Python 3.12, installed through `installation.requirements`. Runs a Graph API tool-calling agent (`llm_call` and `tool_node`) with shell, file read, and file write tools over AWF-only Copilot, OpenAI/Codex, or Anthropic inference. A final answer without tool calls is required for success; `max-turns` bounds model calls. LangSmith tracing is disabled. Tools use CLI proxies, not native MCP. The untrusted message trajectory is retained only after secret redaction. No native shell allowlists, edit disabling, checkpointers, Agent Plugins, or structured session parser. |
 | mini-SWE-agent | Pins PyPI 2.4.6 on Python 3.12. Uses the non-interactive Python API, text-based shell actions, file-based prompts, and AWF-only Copilot, OpenAI/Codex, or Anthropic inference. Native task submission is required for success; `max-turns` limits model calls. Tools use CLI proxies, not native MCP. The untrusted native trajectory is retained in the unified agent artifact only after secret redaction and recovery-envelope validation, including failed executions. No native shell allowlists, edit disabling, Agent Plugins, repository mini configuration, or structured session parser. |
 
 Read the pinned definition for its exact install and provider contract. Native events and accounting are retained only when observed; process exit zero alone does not prove task completion.
@@ -80,6 +80,38 @@ the definition without `runtimes`, retain its bootstrap steps, and provide Pytho
 ## Defining an engine
 
 A definition contains `engine.id`, metadata, and `engine.behaviors`. Its behaviors install the CLI, configure inference and MCP, invoke it headlessly, and expose logs for session reconstruction. Keep secrets outside the agent sandbox and fail explicitly when required credentials, endpoints, or restrictions cannot be honored.
+
+### Python package installation
+
+Python engines can declare a complete, hash-locked dependency list instead of
+custom install steps. Without `requirements`, `package-manager: pip` remains
+metadata for engines that install themselves. Every distribution, including transitive dependencies, needs an
+exact version and wheel SHA-256; `package-name` must appear at the engine
+version:
+
+```yaml wrap
+engine:
+  id: my-agent
+  version: "1.2.0"
+  behaviors:
+    installation:
+      package-manager: pip
+      package-name: my-agent
+      requirements:
+        - name: my-agent
+          version: "1.2.0"
+          sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        # ...one entry per transitive dependency
+```
+
+Before AWF starts, the compiler runs `pip install --require-hashes
+--only-binary=:all:` into `/tmp/gh-aw/agent/<engine-id>-python/site-packages`,
+rejecting missing, unpinned, or mismatched dependencies, then verifies the
+installed `package-name` version against the effective `engine.version`.
+Execution receives the directory as `GH_AW_PYTHON_PACKAGES`; prepend it to
+`sys.path` rather than setting `PYTHONPATH`. Wheel hashes are platform
+specific. Aider and LangGraph lock CPython 3.12 Linux x86-64 wheels and keep
+`runtimes.python` to provision that interpreter.
 
 Start from a sample with a matching transport rather than copying installation or configuration code into every workflow. Publish the definition with versioned changes and document its credentials, models, tool restrictions, supported platforms, and [unified session](/gh-aw/specs/unified-agent-session-specification/) coverage.
 

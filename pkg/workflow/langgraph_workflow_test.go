@@ -3,8 +3,6 @@
 package workflow
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,11 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,40 +30,45 @@ func loadLangGraphSample(t *testing.T) *EngineDefinition {
 	return &frontmatter.Engine
 }
 
-func langGraphBootstrapScript(t *testing.T) (string, map[string]string) {
+// runPipInstallationStep executes the rendered pip installation step and returns its site-packages directory.
+func runPipInstallationStep(t *testing.T, engine *BehaviorDefinedEngine) string {
 	t.Helper()
-	var frontmatter struct {
-		Steps []struct {
-			Run string            `yaml:"run"`
-			Env map[string]string `yaml:"env"`
-		} `yaml:"pre-agent-steps"`
+	install := engine.pipInstallation()
+	require.NotNil(t, install)
+	rendered := engine.buildPipInstallationSteps(install, &WorkflowData{})
+	require.NotEmpty(t, rendered)
+	var steps []struct {
+		Run string            `yaml:"run"`
+		Env map[string]string `yaml:"env"`
 	}
-	readConformanceFrontmatter(t, langGraphSamplePath, &frontmatter)
-	require.Len(t, frontmatter.Steps, 1)
-	run := frontmatter.Steps[0].Run
-	require.True(t, strings.HasPrefix(run, "python3 -I - <<'PY'\n"))
-	require.True(t, strings.HasSuffix(run, "\nPY\n"))
-	return strings.TrimSuffix(strings.TrimPrefix(run, "python3 -I - <<'PY'\n"), "\nPY\n"), frontmatter.Steps[0].Env
+	require.NoError(t, yaml.Unmarshal([]byte(strings.Join(rendered[0], "\n")), &steps))
+	require.Len(t, steps, 1)
+	cmd := exec.Command("bash", "-c", steps[0].Run)
+	cmd.Env = os.Environ()
+	for name, value := range steps[0].Env {
+		cmd.Env = append(cmd.Env, name+"="+value)
+	}
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	return steps[0].Env["GH_AW_PYTHON_PACKAGES"]
 }
 
 func TestLangGraphSampleLock(t *testing.T) {
 	def := loadLangGraphSample(t)
-	script, env := langGraphBootstrapScript(t)
-	hash := def.Behaviors.Execution.Env["GH_AW_LANGGRAPH_DEPS_LOCK_SHA256"]
-	require.Len(t, hash, 64)
-	assert.Equal(t, hash, env["GH_AW_LANGGRAPH_DEPS_LOCK_SHA256"])
-	assert.Equal(t, def.Behaviors.Execution.Env["GH_AW_LANGGRAPH_DEPS"], env["GH_AW_LANGGRAPH_DEPS"])
-
-	match := regexp.MustCompile(`(?s)requirements = """(.*?)"""`).FindStringSubmatch(script)
-	require.Len(t, match, 2)
-	sum := sha256.Sum256([]byte(match[1]))
-	assert.Equal(t, hash, hex.EncodeToString(sum[:]), "embedded lock must match its trusted hash")
-	for line := range strings.SplitSeq(strings.TrimSpace(match[1]), "\n") {
-		assert.Regexp(t, `^[A-Za-z0-9_.-]+==\S+ --hash=sha256:[0-9a-f]{64}$`, line)
+	install := def.Behaviors.Installation
+	require.NotNil(t, install)
+	assert.Equal(t, "pip", install.PackageManager)
+	assert.Equal(t, "langgraph", install.PackageName)
+	pinned := make(map[string]string)
+	for _, requirement := range install.Requirements {
+		pinned[normalizePythonPackageName(requirement.Name)] = requirement.Version
 	}
-	for _, pkg := range []string{"langgraph==" + def.Version, "langchain_openai==", "langchain_anthropic==", "langchain_core=="} {
-		assert.Contains(t, match[1], "\n"+pkg, "lock must pin %s", pkg)
+	assert.Equal(t, def.Version, pinned["langgraph"])
+	for _, pkg := range []string{"langchain-openai", "langchain-anthropic", "langchain-core", "zstandard"} {
+		assert.Contains(t, pinned, pkg, "lock must pin %s", pkg)
 	}
+	_, err := NewBehaviorDefinedEngine(def)
+	require.NoError(t, err)
 }
 
 func TestLangGraphSampleExecution(t *testing.T) {
@@ -75,9 +78,12 @@ func TestLangGraphSampleExecution(t *testing.T) {
 	assert.True(t, def.Experimental)
 	assert.False(t, engine.GetCapabilities().MCP)
 	assert.True(t, engine.GetCapabilities().MaxTurns)
+	var installation strings.Builder
 	for _, step := range engine.GetInstallationSteps(&WorkflowData{}) {
-		assert.NotContains(t, strings.Join(step, "\n"), "pip install")
+		installation.WriteString(strings.Join(step, "\n") + "\n")
 	}
+	assert.Contains(t, installation.String(), "--require-hashes")
+	assert.Contains(t, installation.String(), "langgraph==1.2.23 --hash=sha256:")
 	for _, test := range []struct{ model, provider string }{
 		{"copilot/claude-haiku-5.5", "github"},
 		{"openai/gpt-4o", "openai"},
@@ -209,14 +215,9 @@ func TestLangGraphPinnedPackageSmoke(t *testing.T) {
 	}
 	def := loadLangGraphSample(t)
 	dir := t.TempDir()
-	deps := filepath.Join(dir, "dependencies")
-	hash := def.Behaviors.Execution.Env["GH_AW_LANGGRAPH_DEPS_LOCK_SHA256"]
-	script, _ := langGraphBootstrapScript(t)
-	bootstrap := exec.Command("python3", "-I", "-c", script)
-	bootstrap.Env = append(os.Environ(), "GH_AW_ENGINE_VERSION="+def.Version,
-		"GH_AW_LANGGRAPH_DEPS="+deps, "GH_AW_LANGGRAPH_DEPS_LOCK_SHA256="+hash)
-	bootstrapOutput, err := bootstrap.CombinedOutput()
-	require.NoError(t, err, "%s", bootstrapOutput)
+	engine, err := NewBehaviorDefinedEngine(def)
+	require.NoError(t, err)
+	packages := runPipInstallationStep(t, engine)
 
 	prompt := "Local LangGraph smoke: print LANGGRAPH_LOCAL_SMOKE and finish."
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt with spaces.md"), []byte(prompt), 0o600))
@@ -259,7 +260,7 @@ func TestLangGraphPinnedPackageSmoke(t *testing.T) {
 	cmd := langGraphHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
 	cmd.Env = append(cmd.Env,
 		"GH_AW_ENGINE_VERSION="+def.Version,
-		"GH_AW_LANGGRAPH_DEPS="+deps, "GH_AW_LANGGRAPH_DEPS_LOCK_SHA256="+hash,
+		"GH_AW_PYTHON_PACKAGES="+packages,
 		"GH_AW_LANGGRAPH_TRAJECTORY="+trajectory,
 		fmt.Sprintf(`LANGGRAPH_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"github","configured":true,"models_url":"%s/v1/models"}]}}`, server.URL))
 	output, err := cmd.CombinedOutput()
@@ -289,7 +290,7 @@ func TestLangGraphPinnedPackageSmoke(t *testing.T) {
 		cmd.Env = append(cmd.Env,
 			"GH_AW_MAX_TURNS=1",
 			"GH_AW_ENGINE_VERSION="+def.Version,
-			"GH_AW_LANGGRAPH_DEPS="+deps, "GH_AW_LANGGRAPH_DEPS_LOCK_SHA256="+hash,
+			"GH_AW_PYTHON_PACKAGES="+packages,
 			"GH_AW_LANGGRAPH_TRAJECTORY="+trajectory,
 			fmt.Sprintf(`LANGGRAPH_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"github","configured":true,"models_url":"%s/v1/models"}]}}`, server.URL))
 		output, err := cmd.CombinedOutput()

@@ -47,6 +47,9 @@ func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, er
 	if err := validateBehaviorOutputFiles(def.Behaviors.OutputFiles); err != nil {
 		return nil, fmt.Errorf("engine definition %q behaviors.output-files: %w", def.ID, err)
 	}
+	if err := validatePipInstallation(def); err != nil {
+		return nil, fmt.Errorf("engine definition %q behaviors.installation: %w", def.ID, err)
+	}
 	if def.Behaviors.Execution != nil && def.Behaviors.Execution.ProtectedSessionCapture && def.Behaviors.LogParser == "" {
 		return nil, fmt.Errorf("engine definition %q enables protected-session-capture without a log-parser", def.ID)
 	}
@@ -178,7 +181,9 @@ func (e *BehaviorDefinedEngine) GetSecretValidationStep(workflowData *WorkflowDa
 		return GitHubActionStep{}
 	}
 	if e.usesUniversalLLMConsumer() {
-		if behavior.Installation == nil {
+		// Hash-locked Python installations replace pre-agent-steps and keep
+		// their prior (absent) universal secret validation.
+		if behavior.Installation == nil || e.pipInstallation() != nil {
 			return GitHubActionStep{}
 		}
 		return e.GetUniversalSecretValidationStep(
@@ -237,6 +242,14 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 	}
 
 	install := behavior.Installation
+	if e.pipInstallation() != nil {
+		var steps []GitHubActionStep
+		if requiresNode {
+			steps = append(steps, generateNodeJsSetupStep(workflowData))
+		}
+		steps = append(steps, e.buildPipInstallationSteps(install, workflowData)...)
+		return BuildNpmEngineInstallStepsWithAWF(steps, workflowData)
+	}
 	if install.PackageManager != "npm" {
 		// Non-npm installations are performed by the engine's own steps, but the AWF
 		// binary is still required to run the agent inside the firewall sandbox.
@@ -647,6 +660,9 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 	}
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	maps.Copy(env, exec.Env)
+	if e.pipInstallation() != nil {
+		env["GH_AW_PYTHON_PACKAGES"] = pythonPackagesSitePath(e.definition.ID)
+	}
 	if exec.ProviderEnvMode == behaviorProviderEnvModeUniversalLLMConsumer {
 		e.applyUniversalProviderEnvForBackend(env, workflowData, firewallEnabled, backend)
 		if firewallEnabled && backend == UniversalLLMBackendCopilot {
@@ -1084,9 +1100,9 @@ func deepCopyEngineBehaviorDefinition(src EngineBehaviorDefinition) EngineBehavi
 		dst.Network = &networkCopy
 	}
 
-	// Installation (only scalar fields; pointer dereference suffices)
 	if src.Installation != nil {
 		installCopy := *src.Installation
+		installCopy.Requirements = slices.Clone(src.Installation.Requirements)
 		dst.Installation = &installCopy
 	}
 
