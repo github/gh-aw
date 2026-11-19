@@ -353,6 +353,23 @@ Server HTTP middleware, reverse proxies, APM agents, and issuer adapters MUST di
 
 Server-side signing/bootstrap credentials MUST remain in protected secret storage. Exchanged credentials MUST NOT be durably stored; any server credential cache MUST be memory-only, short-lived, and isolated by tenant and authorized capability/context/scope. Revocation or policy changes MUST invalidate affected cached authority before further issuance/reuse.
 
+**Operator-authored custom steps, jobs, and actions.** Operator-authored workflow code runs with the full authority of its job. This includes top-level `pre-steps`, `steps`, `pre-agent-steps`, `post-steps`, and `jobs`; `safe-outputs.steps`; and any action referenced through `uses:`, together with its transitive dependencies. In a job that consumes a brokered credential, such code can:
+
+- read the brokered credential through its same-job step output or the environment of a step that consumes it;
+- use `id-token: write`, which is job-wide, to request its own OIDC token and perform an independent exchange for every capability the broker policy grants to that job;
+- use or exfiltrate a credential before cleanup runs. Cleanup limits use after the job ends, but does not restrict use during the job. An exfiltrated credential remains valid until revocation completes or it expires.
+
+`safe-outputs.jobs` MUST NOT inherit `safe-outputs.token-broker`; they use only their own configured credentials and receive no brokered token or broker-granted `id-token: write`.
+
+Static `github-app` and `github-token` credentials carry the same risk. The broker does not create a new trust boundary between steps in one job. Operators MUST therefore review this code before enabling broker consumption, and again whenever it changes. The review MUST confirm that:
+
+1. The code is operator-authored. Agent output, issue or pull request content, and other untrusted input MUST NOT select executable code, action references, refs, credentials, broker URLs, or target repositories.
+2. Every third-party action is pinned to a full-length commit SHA. Actions referenced by mutable tags or branches MUST be treated as unreviewed.
+3. No step writes credentials, OIDC tokens, or bootstrap variables to logs, artifacts, caches, job outputs, or external services.
+4. Custom jobs that do not need brokered credentials are not granted `id-token: write`. Operators SHOULD isolate custom code that does not need the job's credential in a separate job with minimal permissions.
+
+Broker policy SHOULD bind issuance to approved workflow revisions so that an unreviewed change to custom code cannot receive credentials. GitHub OIDC tokens do not identify the requesting step. The broker therefore cannot distinguish the compiler-generated exchange step from other code in the same job.
+
 Operators MUST protect endpoint configuration and approved egress. HTTPS alone does not establish an approved broker: a repository administrator who can replace the URL may redirect a workflow's OIDC exchange to another service. Workflow opt-in is cooperative configuration, not an organization-wide unbypassable control. Backend authorization remains the authoritative boundary.
 
 ### Appendix D: Deployment decisions still required (informative)
@@ -376,6 +393,7 @@ These choices do not permit extra wire fields, weakened identity verification, o
 - Added the independent `github-app` capability for explicit GitHub tools and safe-output authentication.
 - Kept installation and scope selection in deployment policy, with no new caller-controlled request members.
 - Documented masked same-job token transfer and the initial static consumers' renewal limitation.
+- Documented the operator review required for custom steps, jobs, and actions in credential-consuming jobs.
 
 ### Version 1.0.0 (Draft)
 
