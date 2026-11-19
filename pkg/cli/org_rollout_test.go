@@ -242,6 +242,9 @@ func TestOrgRolloutWorkerProcess(t *testing.T) {
 		if os.Getenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT") == "1" {
 			fmt.Fprintln(os.Stdout, "repository-controlled trailing output")
 		}
+		if os.Getenv("GH_AW_ROLLOUT_HELPER_TRAILING_PARTIAL") == "1" {
+			fmt.Fprint(os.Stdout, "repository-controlled trailing output")
+		}
 		os.Exit(0)
 	}
 	t.Setenv("GH_AW_ROLLOUT_HELPER", "1")
@@ -257,6 +260,12 @@ func TestOrgRolloutWorkerProcess(t *testing.T) {
 	assert.Equal(t, "failed", result.Status)
 	assert.Contains(t, result.Error, "without a rollout result")
 	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT", "")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_PARTIAL", "1")
+	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
+	assert.Equal(t, "failed", result.Status)
+	assert.Contains(t, result.Error, "without a rollout result")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT", "")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_PARTIAL", "")
 	t.Setenv("GH_AW_ROLLOUT_HELPER_FAIL", "1")
 	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
 	assert.Equal(t, "failed", result.Status)

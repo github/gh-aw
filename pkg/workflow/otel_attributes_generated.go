@@ -69,19 +69,33 @@ const (
 	OTelAttrGhAwWorkQueueCommittedRelease              = "gh-aw.work_queue.committed.Release"
 	OTelAttrGhAwWorkQueueCommittedDispatch             = "gh-aw.work_queue.committed.Dispatch"
 	OTelAttrDeploymentEnvironment                      = "deployment.environment"
+	OTelAttrCicdPipelineName                           = "cicd.pipeline.name"
+	OTelAttrCicdPipelineRunID                          = "cicd.pipeline.run.id"
+	OTelAttrCicdPipelineRunUrlFull                     = "cicd.pipeline.run.url.full"
+	OTelAttrCicdPipelineTaskName                       = "cicd.pipeline.task.name"
+	OTelAttrDeploymentEnvironmentName                  = "deployment.environment.name"
+	OTelAttrErrorType                                  = "error.type"
 	OTelAttrExceptionMessage                           = "exception.message"
 	OTelAttrExceptionType                              = "exception.type"
+	OTelAttrGenAiAgentName                             = "gen_ai.agent.name"
 	OTelAttrGenAiOperationName                         = "gen_ai.operation.name"
+	OTelAttrGenAiProviderName                          = "gen_ai.provider.name"
 	OTelAttrGenAiRequestModel                          = "gen_ai.request.model"
 	OTelAttrGenAiResponseFinishReasons                 = "gen_ai.response.finish_reasons"
 	OTelAttrGenAiResponseModel                         = "gen_ai.response.model"
 	OTelAttrGenAiSystem                                = "gen_ai.system"
 	OTelAttrGenAiUsageCacheCreationInputTokens         = "gen_ai.usage.cache_creation.input_tokens"
 	OTelAttrGenAiUsageCacheReadInputTokens             = "gen_ai.usage.cache_read.input_tokens"
+	OTelAttrGenAiUsageCacheWriteInputTokens            = "gen_ai.usage.cache_write.input_tokens"
 	OTelAttrGenAiUsageInputTokens                      = "gen_ai.usage.input_tokens"
 	OTelAttrGenAiUsageOutputTokens                     = "gen_ai.usage.output_tokens"
 	OTelAttrGenAiUsageTotalTokens                      = "gen_ai.usage.total_tokens"
+	OTelAttrGenAiTokenModality                         = "gen_ai.token.modality"
 	OTelAttrGenAiWorkflowName                          = "gen_ai.workflow.name"
+	OTelAttrVcsProviderName                            = "vcs.provider.name"
+	OTelAttrVcsRefHeadName                             = "vcs.ref.head.name"
+	OTelAttrVcsRefHeadRevision                         = "vcs.ref.head.revision"
+	OTelAttrVcsRepositoryUrlFull                       = "vcs.repository.url.full"
 	OTelAttrGhAwActionMinutes                          = "gh-aw.action_minutes"
 	OTelAttrGhAwAgentConclusion                        = "gh-aw.agent.conclusion"
 	OTelAttrGhAwAgentExecutionExitCode                 = "gh-aw.agent.execution.exit_code"
@@ -278,19 +292,33 @@ var otelAttributeNamesByValue = map[string]string{
 	"gh-aw.work_queue.committed.Release":                "gh-aw.work_queue.committed.Release",
 	"gh-aw.work_queue.committed.Dispatch":               "gh-aw.work_queue.committed.Dispatch",
 	"deployment.environment":                            "deployment.environment",
+	"cicd.pipeline.name":                                "cicd.pipeline.name",
+	"cicd.pipeline.run.id":                              "cicd.pipeline.run.id",
+	"cicd.pipeline.run.url.full":                        "cicd.pipeline.run.url.full",
+	"cicd.pipeline.task.name":                           "cicd.pipeline.task.name",
+	"deployment.environment.name":                       "deployment.environment.name",
+	"error.type":                                        "error.type",
 	"exception.message":                                 "exception.message",
 	"exception.type":                                    "exception.type",
+	"gen_ai.agent.name":                                 "gen_ai.agent.name",
 	"gen_ai.operation.name":                             "gen_ai.operation.name",
+	"gen_ai.provider.name":                              "gen_ai.provider.name",
 	"gen_ai.request.model":                              "gen_ai.request.model",
 	"gen_ai.response.finish_reasons":                    "gen_ai.response.finish_reasons",
 	"gen_ai.response.model":                             "gen_ai.response.model",
 	"gen_ai.system":                                     "gen_ai.system",
 	"gen_ai.usage.cache_creation.input_tokens":          "gen_ai.usage.cache_creation.input_tokens",
 	"gen_ai.usage.cache_read.input_tokens":              "gen_ai.usage.cache_read.input_tokens",
+	"gen_ai.usage.cache_write.input_tokens":             "gen_ai.usage.cache_write.input_tokens",
 	"gen_ai.usage.input_tokens":                         "gen_ai.usage.input_tokens",
 	"gen_ai.usage.output_tokens":                        "gen_ai.usage.output_tokens",
 	"gen_ai.usage.total_tokens":                         "gen_ai.usage.total_tokens",
+	"gen_ai.token.modality":                             "gen_ai.token.modality",
 	"gen_ai.workflow.name":                              "gen_ai.workflow.name",
+	"vcs.provider.name":                                 "vcs.provider.name",
+	"vcs.ref.head.name":                                 "vcs.ref.head.name",
+	"vcs.ref.head.revision":                             "vcs.ref.head.revision",
+	"vcs.repository.url.full":                           "vcs.repository.url.full",
 	"gh-aw.action_minutes":                              "gh-aw.action_minutes",
 	"gh-aw.agent.conclusion":                            "gh-aw.agent.conclusion",
 	"gh-aw.agent.execution.exit_code":                   "gh-aw.agent.execution.exit_code",
