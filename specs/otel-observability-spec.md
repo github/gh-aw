@@ -4,7 +4,7 @@ description: Formal W3C-style specification for observability contract for GitHu
 version: 0.7.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-18
+last_updated: 2026-11-19
 editors:
   - GitHub gh-aw Team
 ---
@@ -385,6 +385,29 @@ Without `gen_ai_latest_experimental`, the default export MUST be a superset of t
 added: every span (name, kind, parent, status), attribute, resource attribute, metric and data point keeps its value;
 only clock-dependent values may differ (T-OT-020).
 
+#### 6.7.1 Deprecated and Superseded GenAI Notation (Informative)
+
+**Migration status:** "Deprecated upstream" and "removed upstream" describe OpenTelemetry's conventions, not removal
+from gh-aw. The legacy names and span shape below remain supported and emitted by default under §6.7. New
+dashboards and integrations should use the current notation. No gh-aw removal date is set by this version.
+
+| Legacy notation | Status | Current notation and migration |
+|---|---|---|
+| Agent span `gh-aw.<job>.agent` (fallback `gh-aw.job.agent`), kind `CLIENT`, operation `chat`, child of the conclusion span | Legacy gh-aw agent span shape; superseded for agent invocation | With the opt-in: `invoke_agent <gen_ai.agent.name>` (fallback `invoke_agent`), kind `INTERNAL`, operation `invoke_agent`, sibling of the conclusion span (§9.5). Update span-name, kind, operation and parent-child filters together. `chat` and `CLIENT` remain valid for actual model-client operations; they are not generally deprecated. |
+| `gen_ai.system` | Deprecated upstream; compatibility only | Use `gen_ai.provider.name`. Values also change: `github_models` → `github`, `google_vertex_ai` → `gcp.gen_ai`; `anthropic` and `openai` stay unchanged. These values identify the provider, not the engine ID (§10.3). |
+| `gen_ai.workflow.name` | Removed upstream; compatibility only | Use `gen_ai.agent.name` for the agent's workflow name. `gh-aw.workflow.name` remains supported and is not deprecated. |
+| `gen_ai.usage.cache_creation.input_tokens` | No longer defined upstream; compatibility only | Use `gen_ai.usage.cache_write.input_tokens`, with the same count. Do not sum the two aliases. |
+| `gen_ai.usage.total_tokens` | Removed upstream; compatibility only | No standard replacement attribute. Calculate totals from the desired input/output/cache components. The legacy value is the shipped input plus output count; opt-in input already includes cache tokens, so the two totals are not necessarily equivalent. |
+| `gen_ai.client.token.usage` and its `gen_ai.token.type` dimension | Removed upstream; compatibility only | Replace each token-type series with its dedicated counter: `input` → `gen_ai.client.inference.usage.input_tokens`, `output` → `gen_ai.client.inference.usage.output_tokens`, `input_cache_read` → `gen_ai.client.inference.usage.cache_read.input_tokens`, `input_cache_write` → `gen_ai.client.inference.usage.cache_write.input_tokens` (§11.2). The new counters do not need `gen_ai.token.type`. |
+| `gen_ai.usage.input_tokens` | Retained name; changed meaning with the opt-in | Opt-in input includes cache-read and cache-write tokens exactly once; compatibility input keeps the source's shipped meaning. Update token and cost calculations rather than adding cache counts to opt-in input again (§10.3). |
+
+Migrate readers to the additive current names before enabling
+`OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental` on producers. During a mixed-mode rollout, select one
+alias or metric family per record rather than summing compatibility and current output. Input-token calculations
+and agent-span hierarchy need mode-aware handling because their meanings change, not just their names. Preserve
+historical queries for retained legacy data; enabling the opt-in does not rewrite previous exports. Other entries
+in the comma-separated opt-in list can remain unchanged.
+
 ---
 
 ## 7. Context Propagation
@@ -573,7 +596,7 @@ A remote hosted-agent invocation SHOULD use span kind `CLIENT` according to the 
 The built-in agent span (`hasDedicatedAgentSpan`) MUST set `gen_ai.agent.name` to the workflow name and
 `gen_ai.provider.name` (§10.3), and MUST set `error.type` (§10.3) when the agent failed, timed out or was cancelled.
 
-Without the §6.7 opt-in, the built-in agent span keeps its shipped shape for compatibility: name `gh-aw.<job>.agent`,
+**Legacy span notation (superseded for agent invocation; see §6.7.1):** Without the §6.7 opt-in, the built-in agent span keeps its shipped shape for compatibility: name `gh-aw.<job>.agent`,
 kind `CLIENT`, parent the job conclusion span, and `gen_ai.operation.name = "chat"`.
 
 With the §6.7 opt-in, the built-in agent span MUST be named `invoke_agent <gen_ai.agent.name>` (or `invoke_agent`
@@ -651,7 +674,7 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 |---|---|---|
 | `gen_ai.operation.name` | string | REQUIRED on GenAI operation spans, except where §9.5 prohibits it on the agent conclusion span. |
 | `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. |
-| `gen_ai.system` | string | Deprecated by OpenTelemetry and superseded by `gen_ai.provider.name`; compatibility only (§6.7). Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Not deprecated by gh-aw in this version. |
+| `gen_ai.system` | string | **Deprecated upstream; compatibility only.** Use `gen_ai.provider.name`; provider value changes are listed in §6.7.1. Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Not deprecated by gh-aw in this version. |
 | `gen_ai.agent.name` | string | REQUIRED on the built-in agent span (§9.5), including an agent conclusion span acting as the agent span; the workflow name. |
 | `gen_ai.request.model` | string | CONDITIONALLY REQUIRED when available. |
 | `gen_ai.response.model` | string | RECOMMENDED when returned. |
@@ -660,10 +683,10 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 | `gen_ai.usage.output_tokens` | int | RECOMMENDED when returned. |
 | `gen_ai.usage.cache_read.input_tokens` | int | RECOMMENDED when applicable. |
 | `gen_ai.usage.cache_write.input_tokens` | int | RECOMMENDED when applicable. Additive. |
-| `gen_ai.usage.cache_creation.input_tokens` | int | No longer defined by the current GenAI conventions; superseded by `gen_ai.usage.cache_write.input_tokens`. Compatibility only (§6.7); same value as the replacement. |
-| `gen_ai.usage.total_tokens` | int | Removed from the current GenAI conventions; compatibility only (§6.7); input plus output, excluding cache, with no standard replacement. |
+| `gen_ai.usage.cache_creation.input_tokens` | int | **Superseded upstream; compatibility only.** Use `gen_ai.usage.cache_write.input_tokens`, with the same value (§6.7.1). |
+| `gen_ai.usage.total_tokens` | int | **Removed upstream; compatibility only.** Input plus output, excluding cache; no standard replacement attribute. See §6.7.1 before deriving totals from opt-in input. |
 | `gen_ai.usage.reasoning.output_tokens` | int | RECOMMENDED when applicable. |
-| `gen_ai.workflow.name` | string | Removed from the current GenAI conventions and superseded by `gen_ai.agent.name`; compatibility only (§6.7). |
+| `gen_ai.workflow.name` | string | **Removed upstream; compatibility only.** Use `gen_ai.agent.name` (§6.7.1). |
 | `error.type` | string | CONDITIONALLY REQUIRED on the agent span and agent conclusion span when the agent did not succeed: `timeout`, `cancelled` or `agent_failed`. |
 
 For built-in agent telemetry, `gen_ai.response.finish_reasons` and token usage attributes SHOULD be on the built-in agent span or, when no dedicated agent span is emitted, the agent conclusion span. With the §6.7 opt-in and a dedicated agent span, they MUST NOT be present on the conclusion span (§9.5).
@@ -756,9 +779,10 @@ span, with explicit bucket boundaries `[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8,
 and SHOULD carry `gen_ai.agent.name`, `gen_ai.request.model` when known, and `error.type` when the agent did not
 succeed.
 
-`gen_ai.client.token.usage` with `gen_ai.token.type` is compatibility only (§6.7). It has been removed from the
+**Removed upstream; compatibility only:** `gen_ai.client.token.usage` with `gen_ai.token.type` (§6.7). It has been removed from the
 OpenTelemetry GenAI conventions and is superseded by the four `gen_ai.client.inference.usage.*` counters above.
 This version does not deprecate the compatibility metric in gh-aw.
+The per-token-type replacement mapping and double-counting precautions are in §6.7.1.
 
 If an engine exports its own `gen_ai.client.inference.usage.*` for the agent job, the runtime MUST NOT also emit
 them for that run (D11).
@@ -1245,6 +1269,8 @@ which has no release tag, and semantic-conventions v1.45.0.
 
 ### Unreleased
 
+- **Clarified**: Explicit upstream deprecation/removal labels and the §6.7.1 migration map for legacy agent spans,
+  GenAI attributes and token metrics, including provider values, token-count semantics and mixed-mode queries.
 - **Added**: the §6.7 opt-in; the §8.1 standard resource attributes; `gen_ai.provider.name`, `gen_ai.agent.name`,
   `gen_ai.usage.cache_write.input_tokens` and `error.type` on built-in spans; the `gen_ai.client.inference.usage.*`
   and `gen_ai.invoke_agent.duration` metrics.
