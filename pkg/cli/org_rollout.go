@@ -407,8 +407,7 @@ func (output *orgRolloutOutput) appendTail(data []byte, limit int) {
 
 func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
 	lines := bytes.Split(output, []byte{'\n'})
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := lines[i]
+	for _, line := range slices.Backward(lines) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
