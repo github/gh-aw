@@ -24,6 +24,16 @@ var otlpSandboxExcludedEnvVarNames = []string{
 	"GH_AW_OTLP_ALL_HEADERS",
 }
 
+// awfHostRuntimeTmpEnvVarNames are host-only temp-dir variables exported by
+// install_awf_binary.sh. The private host runtime directory is not writable inside
+// the AWF sandbox (whose /tmp is a private tmpfs sharing only /tmp/gh-aw), so the
+// agent must fall back to its own /tmp instead of inheriting them via --env-all.
+var awfHostRuntimeTmpEnvVarNames = []string{
+	"GH_AW_RUNTIME_TMP_DIR",
+	"GH_AW_RUNTIME_TMP_ID",
+	"TMPDIR",
+}
+
 // BuildAWFCommand builds a complete AWF command with all arguments.
 // This consolidates the AWF command building logic that was duplicated across
 // Copilot, Claude, and Codex engines.
@@ -661,7 +671,12 @@ func appendEnvAndMountArgs(config AWFCommandConfig, firewallConfig *FirewallConf
 				}
 			}
 		}
-		sort.Strings(sortedExclude)
+		for _, name := range awfHostRuntimeTmpEnvVarNames {
+			if !slices.Contains(sortedExclude, name) {
+				sortedExclude = append(sortedExclude, name)
+			}
+		}
+		slices.Sort(sortedExclude)
 		for _, excludedVar := range sortedExclude {
 			awfArgs = append(awfArgs, "--exclude-env", excludedVar)
 		}
