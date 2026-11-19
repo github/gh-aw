@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const os = require("node:os");
+const { execFileSync, spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 const { frontDoor, SUITE_IDS, JOB_DEPENDENCIES } = require("./ci-front-door.cjs");
 const catalog = require("../.github/ci/suite-catalog.json");
@@ -169,10 +171,72 @@ test("non-PR main controls retain all checks and never require a successful deci
       assert.equal(evaluate(condition(jobs[id]), { event, ref: "refs/heads/main", result: "skipped" }), true, `${event}: ${id}`);
     }
   }
-  for (const id of ["bench", "fuzz", "security-scan"]) {
+  for (const id of ["fuzz", "security-scan"]) {
     assert.equal(evaluate(condition(jobs[id]), { event: "workflow_dispatch", ref: "refs/heads/feature", result: "skipped" }), false, id);
   }
   assert.match(workflow, /schedule:\n[\s\S]*cron:/);
+});
+
+test("benchmarks are isolated from PR checks, including selector fallback", () => {
+  assert.ok(!jobs.bench);
+  assert.ok(!SUITE_IDS.includes("bench"));
+  assert.equal(validatedSuites('["bench"]'), "");
+  const benchmarks = fs.readFileSync(path.join(__dirname, "../.github/workflows/benchmarks.yml"), "utf8");
+  const triggers = benchmarks.split("\njobs:\n")[0];
+  assert.doesNotMatch(triggers, /\bpull_request(?:_target)?:/);
+  const expression = condition(benchmarks.split("\n  bench:\n")[1]);
+  for (const event of ["pull_request", "pull_request_target", "push", "schedule", "workflow_dispatch"]) {
+    for (const ref of ["refs/heads/main", "refs/heads/feature", "refs/pull/1/merge"]) {
+      assert.equal(evaluate(expression, { event, ref }), ref === "refs/heads/main" && ["push", "schedule", "workflow_dispatch"].includes(event), `${event}: ${ref}`);
+    }
+  }
+});
+
+test("benchmark shards cover every benchmark package once and bound expensive replay iterations", t => {
+  const benchmarks = fs.readFileSync(path.join(__dirname, "../.github/workflows/benchmarks.yml"), "utf8");
+  const script = benchmarks
+    .split("    - name: Run benchmarks\n")[1]
+    .split("      run: |\n")[1]
+    .split("\n    - name:")[0]
+    .replace(/^        /gm, "");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-shards-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const root = path.join(__dirname, "..");
+  fs.writeFileSync(path.join(directory, "make"), '#!/bin/bash\nprintf "%s\\n" "$@" > "$CAPTURE_ARGS"\nprintf "BenchmarkSmoke-1 1 1 ns/op\\n" > bench_results.txt\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(directory, "git"), '#!/bin/bash\nexec "$REAL_GIT" -C "$BENCH_ROOT" "$@"\n', { mode: 0o755 });
+  const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+  const files = execFileSync(realGit, ["grep", "-l", "^func Benchmark", "--", "pkg/*_test.go"], { cwd: root, encoding: "utf8" }).trim().split("\n");
+  const expected = [...new Set(files.map(file => `./${path.dirname(file)}`))].sort();
+  const selected = [];
+  for (const shard of ["cli", "workflow", "workqueue", "other"]) {
+    const capture = path.join(directory, `${shard}.args`);
+    execFileSync("bash", ["-c", script], {
+      cwd: directory,
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, REAL_GIT: realGit, BENCH_ROOT: root, SHARD: shard, CAPTURE_ARGS: capture, GITHUB_STEP_SUMMARY: path.join(directory, "summary") },
+    });
+    const args = fs.readFileSync(capture, "utf8").trim().split("\n");
+    selected.push(
+      ...args
+        .find(arg => arg.startsWith("BENCH_PACKAGES="))
+        .slice("BENCH_PACKAGES=".length)
+        .split(" ")
+    );
+    assert.ok(args.includes(`BENCH_TIME=${shard === "workqueue" ? "1x" : "3x"}`));
+  }
+  assert.deepEqual(selected.sort(), expected);
+});
+
+test("make bench preserves Go failures through tee", t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-failure-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(directory, "go"), '#!/bin/bash\nprintf "FAIL benchmark\\n"\nexit 17\n', { mode: 0o755 });
+  const result = spawnSync("make", ["-f", path.join(__dirname, "../Makefile"), "bench", "VERSION=test"], {
+    cwd: directory,
+    env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(fs.readFileSync(path.join(directory, "bench_results.txt"), "utf8"), /FAIL benchmark/);
 });
 
 test("the entire needs graph is acyclic and timing/cache cleanup waits for all checks", () => {
