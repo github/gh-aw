@@ -72,19 +72,37 @@ model AttributeNames {
   ghAwWorkQueueCommittedRelease: "gh-aw.work_queue.committed.Release";
   ghAwWorkQueueCommittedDispatch: "gh-aw.work_queue.committed.Dispatch";
   deploymentEnvironment: "deployment.environment";
+  cicdPipelineName: "cicd.pipeline.name";
+  cicdPipelineRunId: "cicd.pipeline.run.id";
+  cicdPipelineRunUrlFull: "cicd.pipeline.run.url.full";
+  cicdPipelineTaskName: "cicd.pipeline.task.name";
+  deploymentEnvironmentName: "deployment.environment.name";
+  errorType: "error.type";
   exceptionMessage: "exception.message";
   exceptionType: "exception.type";
+  genAiAgentName: "gen_ai.agent.name";
   genAiOperationName: "gen_ai.operation.name";
+  genAiProviderName: "gen_ai.provider.name";
   genAiRequestModel: "gen_ai.request.model";
   genAiResponseFinishReasons: "gen_ai.response.finish_reasons";
   genAiResponseModel: "gen_ai.response.model";
+  // Deprecated upstream; compatibility only. Use gen_ai.provider.name (spec section 6.7.1).
   genAiSystem: "gen_ai.system";
+  // Superseded upstream; compatibility only. Use gen_ai.usage.cache_write.input_tokens.
   genAiUsageCacheCreationInputTokens: "gen_ai.usage.cache_creation.input_tokens";
   genAiUsageCacheReadInputTokens: "gen_ai.usage.cache_read.input_tokens";
+  genAiUsageCacheWriteInputTokens: "gen_ai.usage.cache_write.input_tokens";
   genAiUsageInputTokens: "gen_ai.usage.input_tokens";
   genAiUsageOutputTokens: "gen_ai.usage.output_tokens";
+  // Removed upstream; compatibility only. No replacement attribute; see spec section 6.7.1.
   genAiUsageTotalTokens: "gen_ai.usage.total_tokens";
+  genAiTokenModality: "gen_ai.token.modality";
+  // Removed upstream; compatibility only. Use gen_ai.agent.name (spec section 6.7.1).
   genAiWorkflowName: "gen_ai.workflow.name";
+  vcsProviderName: "vcs.provider.name";
+  vcsRefHeadName: "vcs.ref.head.name";
+  vcsRefHeadRevision: "vcs.ref.head.revision";
+  vcsRepositoryUrlFull: "vcs.repository.url.full";
   ghAwActionMinutes: "gh-aw.action_minutes";
   ghAwAgentConclusion: "gh-aw.agent.conclusion";
   ghAwAgentExecutionExitCode: "gh-aw.agent.execution.exit_code";

@@ -78,7 +78,8 @@ Read `/tmp/gh-aw/agent/objective-impact-report/`:
 
 Use the current `gh aw logs --adoption` classifications directly. Never infer
 human adoption from successful creation, closure, a bot merge, or label weights.
-Distinguish `explicit_human` from `fallback_delivery`. Infrastructure
+Distinguish `explicit_human`, `automation`, and `fallback_delivery`; only
+`explicit_human` is human adoption. Infrastructure
 `not_applicable` records are not repository value.
 
 An empty evaluations file is valid only when the summary establishes evaluated

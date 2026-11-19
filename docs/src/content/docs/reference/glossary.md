@@ -235,8 +235,8 @@ not delivery evidence. See [Delivery and adoption](/gh-aw/reference/delivery-ado
 ### Adoption
 
 The decision established by a safe-output type's versioned rule. Verified human
-adoption is distinct from an explicitly permitted delivery-time fallback.
-Neither establishes measured attributed value by itself.
+adoption is distinct from an automation decision and an explicitly permitted
+delivery-time fallback. None establishes measured attributed value by itself.
 See [Delivery and adoption](/gh-aw/reference/delivery-adoption/).
 
 ### Adoption State
@@ -248,8 +248,9 @@ availability is separate coverage, not an adoption decision.
 ### Adopted Output
 
 A delivered effect whose rule establishes adoption through verified human
-decision evidence or an explicit delivery-time fallback. Reports identify the
-acceptance kind rather than treating all accepted effects as human approvals.
+decision evidence, an automation decision, or an explicit delivery-time fallback.
+Reports identify the acceptance kind rather than treating all accepted effects as
+human approvals.
 
 ### Adoption Efficiency
 

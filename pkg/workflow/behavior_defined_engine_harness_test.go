@@ -150,7 +150,7 @@ func TestBehaviorDefinedEngineHarnessScript(t *testing.T) {
 		assert.Contains(t, parserStep.String(), "GH_AW_AGENT_OUTPUT: "+protectedSessionCaptureLogPath)
 		assert.Contains(t, parserStep.String(), "GH_AW_PROTECTED_SESSION_CAPTURE: 1")
 		assert.Contains(t, parserStep.String(), "id: parse_agent_logs")
-		NewCompiler().generateTrackedSecretRedactionStep(&parserStep, parserStep.String(), &WorkflowData{})
+		NewCompiler().generateTrackedSecretRedactionStep(&parserStep, parserStep.String(), &WorkflowData{}, false)
 		parserStepYAML := parserStep.String()
 		redactionStepStart := strings.Index(parserStepYAML, "      - name: Redact secrets in logs\n")
 		require.NotEqual(t, -1, redactionStepStart)

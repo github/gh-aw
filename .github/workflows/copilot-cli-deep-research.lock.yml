@@ -1348,8 +1348,11 @@ jobs:
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
-            await main();
+            await main({ redactDurableCopilot: process.env.GH_AW_DURABLE_STAGED === 'true' });
         env:
+          GH_AW_DURABLE_FILES: "[\"/tmp/gh-aw/agent/durable-sessions/copilot/session.json\",\"/tmp/gh-aw/agent/durable-sessions/copilot/session-state\"]"
+          GH_AW_DURABLE_ENGINE: copilot
+          GH_AW_DURABLE_STAGED: ${{ steps.stage_durable_files.outputs.present }}
           GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
@@ -1372,7 +1375,7 @@ jobs:
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Validate durable checkpoint artifact
         id: validate_durable_checkpoint
-        if: always() && steps.stage_durable_files.outcome == 'success' && steps.stage_durable_files.outputs.present == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
+        if: always() && steps.stage_durable_files.outcome == 'success' && steps.stage_durable_files.outputs.present == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.redact_secrets.outputs.durable_checkpoint_safe != 'false'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_DURABLE_ENGINE: "copilot"
