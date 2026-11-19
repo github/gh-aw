@@ -395,6 +395,7 @@ func TestWorkingDirectoryArtifactPatternsAndExclusions(t *testing.T) {
 	}{
 		{"recursive match", "**/*.txt", true},
 		{"excluded secret file", "subdir\n!subdir/token.txt", false},
+		{"CRLF excluded secret file", "subdir\r\n!subdir/token.txt", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

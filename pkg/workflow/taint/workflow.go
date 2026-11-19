@@ -422,7 +422,9 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 		a.emit(Site{Kind: ActionInput, Path: path + ".with." + key, Uses: uses, Input: key}, sources)
 		if actionName(uses) == "actions/upload-artifact" && key == "path" {
 			var contents value
-			patterns := strings.Split(fmt.Sprint(inputs[key]), "\n")
+			patterns := strings.FieldsFunc(fmt.Sprint(inputs[key]), func(r rune) bool {
+				return r == '\r' || r == '\n'
+			})
 			for file, sources := range files {
 				if artifactIncludes(patterns, file) {
 					contents = union(contents, sources)
