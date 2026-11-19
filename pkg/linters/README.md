@@ -85,6 +85,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `strconvparseignorederror` — reports `strconv` parsing calls (`Atoi`, `ParseInt`, etc.) where the error return is discarded with `_`.
 - `stringbytesroundtrip` — reports redundant `string([]byte(s))` or `[]byte(string(b))` round-trip conversions that produce a wasteful intermediate copy.
 - `stringreplaceminusone` — reports `strings.Replace` calls whose `n` argument is `-1`, which should use the more readable `strings.ReplaceAll`.
+- `stringscompareinsortfunc` — reports `strings.Compare(a, b)` as the sole return in an inline comparator passed to `slices.SortFunc`, `SortStableFunc`, `MinFunc`, `MaxFunc`, or `BinarySearchFunc`; use `cmp.Compare(a, b)` instead. Report-only; no automatic fix is provided.
 - `stringsconcatloop` — reports `string +=` concatenation inside `for`/`range` loop bodies, which allocates a new string copy on every iteration (O(n²) memory); use `strings.Builder` instead.
 - `stringscountcontains` — reports `strings.Count(s, sub)` comparisons with `0` or `1` (e.g. `> 0`, `>= 1`, `== 0`, `!= 0`, `< 1`, `<= 0`) and their yoda-order variants that should use `strings.Contains(s, sub)` or `!strings.Contains(s, sub)` instead.
 - `stringsindexcontains` — reports `strings.Index(s, substr)` comparisons with `-1` or `0` (e.g. `!= -1`, `>= 0`, `> -1`, `== -1`, `< 0`, `<= -1`) and their yoda-order variants that should use `strings.Contains(s, substr)` or `!strings.Contains(s, substr)` instead.
@@ -266,6 +267,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `strconvparseignorederror` | Custom `go/analysis` analyzer that flags `strconv` parsing calls where the error return is discarded with `_` |
 | `stringbytesroundtrip` | Custom `go/analysis` analyzer that flags redundant `string([]byte(s))` or `[]byte(string(b))` round-trip conversions that produce a wasteful intermediate copy |
 | `stringreplaceminusone` | Custom `go/analysis` analyzer that flags `strings.Replace` calls with `n=-1` that should use `strings.ReplaceAll` |
+| `stringscompareinsortfunc` | Reports `strings.Compare` in simple inline slices comparators; use `cmp.Compare` |
 | `stringsconcatloop` | Custom `go/analysis` analyzer that flags `string +=` concatenation inside `for`/`range` loops that should use `strings.Builder` |
 | `stringscountcontains` | Custom `go/analysis` analyzer that flags `strings.Count(s, sub)` comparisons with `0` or `1` that should use `strings.Contains` or `!strings.Contains` |
 | `stringsindexcontains` | Custom `go/analysis` analyzer that flags `strings.Index(s, substr)` comparisons with `-1` or `0` that should use `strings.Contains` or `!strings.Contains` |
@@ -433,6 +435,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/strconvparseignorederror` — strconv-parse-ignored-error analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringbytesroundtrip` — string-bytes-round-trip analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringreplaceminusone` — string-replace-minus-one analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc` — strings-compare-in-sortfunc analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringscountcontains` — strings-count-contains analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsindexcontains` — strings-index-contains analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsindexhasprefix` — strings-index-has-prefix analyzer subpackage

@@ -88,6 +88,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/strconvparseignorederror"
 	"github.com/github/gh-aw/pkg/linters/stringbytesroundtrip"
 	"github.com/github/gh-aw/pkg/linters/stringreplaceminusone"
+	"github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc"
 	"github.com/github/gh-aw/pkg/linters/stringsconcatloop"
 	"github.com/github/gh-aw/pkg/linters/stringscountcontains"
 	"github.com/github/gh-aw/pkg/linters/stringsindexcontains"
@@ -135,7 +136,7 @@ type docAnalyzer struct {
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopenreadallpreferreadfile, osremoveuncheckedcleanup, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortbasicslices, sortslice, splitindexzero, splitlines-on-newline, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
-//	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, stringssplitfirst,
+//	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringscompareinsortfunc, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, stringssplitfirst,
 //	timeafterleak, timesleepnocontext, timenowsub,
 //	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring
 func documentedAnalyzers() []docAnalyzer {
@@ -217,6 +218,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"strconvparseignorederror", strconvparseignorederror.Analyzer},
 		{"stringbytesroundtrip", stringbytesroundtrip.Analyzer},
 		{"stringreplaceminusone", stringreplaceminusone.Analyzer},
+		{"stringscompareinsortfunc", stringscompareinsortfunc.Analyzer},
 		{"stringsconcatloop", stringsconcatloop.Analyzer},
 		{"stringscountcontains", stringscountcontains.Analyzer},
 		{"stringsindexcontains", stringsindexcontains.Analyzer},

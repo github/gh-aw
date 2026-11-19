@@ -56,6 +56,7 @@ var notYetEnforced = map[string]string{
 	"sortbasicslices":                  "existing production violations need remediation before CI enforcement",
 	"splitindexzero":                   "existing production violations need remediation before CI enforcement",
 	"splitlinesonnewline":              "existing production violations need remediation before CI enforcement",
+	"stringscompareinsortfunc":         "existing comparator findings need review and remediation before CI enforcement",
 	"stringssplitfirst":                "existing production violations need remediation before CI enforcement",
 	"sprintferrdot":                    "has not yet completed an enforcement-readiness audit",
 	"ssljson":                          "has not yet completed an enforcement-readiness audit",
