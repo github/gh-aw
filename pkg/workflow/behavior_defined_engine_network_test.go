@@ -14,6 +14,7 @@ func TestBehaviorDefinedEngineProxyProviderHostsAreNotAgentEgress(t *testing.T) 
 	for _, path := range []string{
 		"../../.github/workflows/shared/factory.md",
 		"../../.github/workflows/shared/mini-swe-agent.md",
+		"../../.github/workflows/shared/langgraph.md",
 		"../../.github/workflows/shared/aider.md",
 		"../../.github/workflows/shared/crush.md",
 		"../../.github/workflows/shared/deepseek-harness.md",
