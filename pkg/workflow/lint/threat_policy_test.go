@@ -166,6 +166,8 @@ func TestThreatPolicyFailuresAndValueFreeDiagnostics(t *testing.T) {
 		{"safe-output-shell-expansion", "safe-outputs: {steps: PRIVATE_VALUE}"},
 		{"safe-output-shell-expansion", "safe-outputs: {steps: [PRIVATE_VALUE, {run: '$(PRIVATE_VALUE)'}]}"},
 		{"safe-output-shell-expansion", "safe-outputs: {steps: [{run: [PRIVATE_VALUE]}]}"},
+		{"safe-output-credentials", "safe-outputs: {steps: PRIVATE_VALUE}"},
+		{"safe-output-credentials", "safe-outputs: {steps: [PRIVATE_VALUE, {run: 'echo >> $GITHUB_ENV'}]}"},
 		{"firewall-ssl-bump", "sandbox: PRIVATE_VALUE"},
 		{"firewall-ssl-bump", "sandbox: {agent: [PRIVATE_VALUE]}"},
 		{"firewall-ssl-bump", "sandbox: {agent: {args: PRIVATE_VALUE}}"},
