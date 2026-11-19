@@ -401,8 +401,7 @@ func (output *orgRolloutOutput) appendTail(data []byte, limit int) {
 
 func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
 	lines := bytes.Split(output, []byte{'\n'})
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := lines[i]
+	for _, line := range slices.Backward(lines) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
@@ -410,12 +409,12 @@ func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
 			return orgRolloutResult{}, errors.New("worker exited without a rollout result")
 		}
 		var result orgRolloutResult
+		var trailing json.RawMessage
 		payload := bytes.TrimSpace(bytes.TrimPrefix(line, []byte(orgRolloutResultPrefix)))
 		decoder := json.NewDecoder(bytes.NewReader(payload))
 		if err := decoder.Decode(&result); err != nil {
 			return orgRolloutResult{}, fmt.Errorf("invalid worker result: %w", err)
 		}
-		var trailing json.RawMessage
 		if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 			if err == nil {
 				err = errors.New("multiple JSON values")
