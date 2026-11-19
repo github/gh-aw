@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-19T15:56:49.233411+00:00",
+  "generated_at": "2026-11-19T16:00:44.566252+00:00",
   "jar_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
   "java": "openjdk version \"21.0.13.0.2\" 2026-10-22\nOpenJDK Runtime Environment Homebrew (build 21.0.13.0.2)\nOpenJDK 64-Bit Server VM Homebrew (build 21.0.13.0.2, mixed mode, sharing)",
   "source_sha256": {
     "specs/webhook-gateway/WebhookGateway.tla": "e42e69e1a6be8886c83d6d40e38452e1d87616f5afa58e7e4709b84197d3a3f5",
     "specs/webhook-gateway/WebhookGateway.cfg": "da1f6145c95ce44235f3d80c7b4e7efce288f73bd590addb7a3690f3885f256d",
-    "specs/webhook-gateway/check.py": "1d91f077bc4fd1ff5954f4f73d54f0f5386da4d1cfdf482b02cc81c98eff921b",
+    "specs/webhook-gateway/check.py": "c593ab4fcca86aed63f5a69751074b191d559ecdec0386e6d4eba4b5ab17b29d",
     "docs/src/content/docs/specs/webhook-gateway-specification.md": "f5018514369884031a9a228a2f74f3a2a936abd50539de9c4269256073cc2b57",
     "actions/setup/js/check_gateway_provenance.cjs": "155dd98d4dddd1c8dd9b751a90a7805d02276c0e3206c2e827ed7e5689b075b0",
     "actions/setup/js/check_gateway_admission.cjs": "00add887e240ae61377f2f031864179b19176f31750f54316cfbbf6dff7dd92d",
@@ -22,7 +22,7 @@
       "distinct": 23620,
       "remaining": 0,
       "trace": [],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/secure",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/secure",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -43,7 +43,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "da1f6145c95ce44235f3d80c7b4e7efce288f73bd590addb7a3690f3885f256d",
-      "log_sha256": "b0ee25d8ce8188c0f2e6eae0698d4580fd4fa0e81f44920426c7af2ecf06c1f1"
+      "log_sha256": "871844231a9bfa1beacc20c375b5551d6d2ebddd6cc07c68de7254c5b080d333"
     },
     {
       "name": "source-auth",
@@ -54,7 +54,7 @@
       "distinct": 20,
       "remaining": 17,
       "trace": ["Initial predicate", "Receive"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/source-auth",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/source-auth",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -75,7 +75,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "93feef00e0d45d0b221745c6a004c526b78d9e9d88e2f9cfd01ae8e953aaf5b5",
-      "log_sha256": "42ca0c33c59c882ac19405e09f2aa1d150bbba9a025948ea44655ed2b01e9c57"
+      "log_sha256": "6db98a4fcf3c85afbecd33db3d1cfe172a6c7b44b89f09b92ea216d51bfbad39"
     },
     {
       "name": "source-binding",
@@ -86,7 +86,7 @@
       "distinct": 23,
       "remaining": 19,
       "trace": ["Initial predicate", "Receive"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/source-binding",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/source-binding",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -107,7 +107,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "ed3cdecc9c33e3aac25e4956f075d411cc90385b341afd8bcae95e4c062d9525",
-      "log_sha256": "3347774e910ed8093603e0a96963f5ad90bb5f18d9d49386fdba778c8248fa63"
+      "log_sha256": "d184f7314058209d0aeb34a35bd5a2776e13cd8faf345545d5ff5852c7e02f59"
     },
     {
       "name": "predicates",
@@ -118,7 +118,7 @@
       "distinct": 26,
       "remaining": 21,
       "trace": ["Initial predicate", "Receive"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/predicates",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/predicates",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -139,7 +139,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "be7029d31932145a8de81c13e3c57d5a2704968dd2c0d7e19bbff0d14c229d7b",
-      "log_sha256": "dfaf8b43fd1719816d0c99d00f01913e20749524eb7a9bc061fba850d19f8d36"
+      "log_sha256": "085e204b37af12bdf20f82b8667a13c59f2917c4637e041a373f717b2f0aba93"
     },
     {
       "name": "projection",
@@ -150,7 +150,7 @@
       "distinct": 227,
       "remaining": 133,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/projection",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/projection",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -171,7 +171,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "78be8e05521a7d565410596fc1737f6795ec6d84dc1859cedaed8b59d99cda27",
-      "log_sha256": "b55d6aa989bfc60a815e749a037e569f06d577600c6807cc6dc145cd9b87c50e"
+      "log_sha256": "dbf443a83924ebfaccd40e8b0ceea1ae5691008de2c0414405a0622a918d6a25"
     },
     {
       "name": "incomplete-scan",
@@ -182,7 +182,7 @@
       "distinct": 161,
       "remaining": 102,
       "trace": ["Initial predicate", "BeginScan", "Publish"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/incomplete-scan",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/incomplete-scan",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -203,7 +203,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "7b9304d031e9539954d5296cf424a6d6357c4927fba97b388a9f974e00140192",
-      "log_sha256": "b88a77982d2d119dbec9c4f348f06e41148ebce32fdc9105de1ab2ccde99ee40"
+      "log_sha256": "6391b3c9e33b72eca907d0cef4659146b404bd0ecc17498764e846c141d0bc46"
     },
     {
       "name": "stale-publication",
@@ -214,7 +214,7 @@
       "distinct": 165,
       "remaining": 103,
       "trace": ["Initial predicate", "BeginScan", "Revoke", "Publish"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/stale-publication",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/stale-publication",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -235,7 +235,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "052ed69e3875d274a64d66126474baa9afd005dfe20f0bdac084e2cc13537375",
-      "log_sha256": "9e6deb734cb2549a3804a7a0c35307e3f654a98e6992abdd1bfe2afe81b40f3a"
+      "log_sha256": "ecda64238568acb3e2d3af584bc2d3b3b590f49bf9313d95153cab3c622b4dc8"
     },
     {
       "name": "dispatch-recheck",
@@ -246,7 +246,7 @@
       "distinct": 398,
       "remaining": 221,
       "trace": ["Initial predicate", "Receive", "Revoke", "Claim", "Transmit"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/dispatch-recheck",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/dispatch-recheck",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -267,7 +267,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "3bccfb1e8f7f5f2251c7183b228fda0b112478472bffee796f32f7525870b6f5",
-      "log_sha256": "8133dc5ad7bd87dfcdbe58d691fccf6ac11d64b80122b79ec053abed45885ad6"
+      "log_sha256": "cdb605da7ae3cd26c101eb4b9d961c7f3cf1840fcd8e0c4b810291260ed109f8"
     },
     {
       "name": "token-scope",
@@ -278,7 +278,7 @@
       "distinct": 221,
       "remaining": 124,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/token-scope",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/token-scope",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -299,7 +299,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "e557d970ba83505e2105d903da4029d1ca2bca4bc95c18bb029fd73b4cf1892b",
-      "log_sha256": "33048c6736dd1a935e5bbcf687e38e73b61fd7861d840d00e4a7912e853bd958"
+      "log_sha256": "61a5083435cf4dd791e1fc56918b61e68ce3db0b144e8138376a15ce6ab069bc"
     },
     {
       "name": "worker-fence",
@@ -310,7 +310,7 @@
       "distinct": 424,
       "remaining": 236,
       "trace": ["Initial predicate", "Receive", "Claim", "Claim", "Transmit"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/worker-fence",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/worker-fence",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -331,7 +331,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "a2d246598826d1a4cddcf4cde505e8c72c34315f06a31d11c661e22635d691aa",
-      "log_sha256": "95cb1917888944263840a999c3cdf3171a0eba723f95f8b57f0f546c8e7b8d52"
+      "log_sha256": "540cc40c2b8e50744561f04feda538ed5ff6e8d8c431753891517691e3b31c1b"
     },
     {
       "name": "conflicting-replay",
@@ -342,7 +342,7 @@
       "distinct": 68,
       "remaining": 51,
       "trace": ["Initial predicate", "Receive", "ConflictingDuplicate"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/conflicting-replay",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/conflicting-replay",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -363,7 +363,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "ecbea924a7f899cd41d4f4eaa572d47122b1185c67a7ca526bf9c3fca85d720a",
-      "log_sha256": "0a5a5a291328654778de586e2d84c478bb21db4fdd6ec771da138a4373beb19c"
+      "log_sha256": "f04810b04903b15d3e2b8e7c6dd0aa9995d4c8465a42d2d549543b2a37010ea5"
     },
     {
       "name": "retry-uncertain",
@@ -374,7 +374,7 @@
       "distinct": 4385,
       "remaining": 2236,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "LostResponse", "RetryUncertain", "Transmit", "Accepted"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/retry-uncertain",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/retry-uncertain",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -395,7 +395,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "cf94223fab030e8d8f1d3d8ebb60ada880eb054229afe9b3ab92c2f5644793e1",
-      "log_sha256": "30a4bbdfa26290f9291eb06f1cf9867ad3c9ea93cc225020f4c69ef38895c996"
+      "log_sha256": "b419c28ca8bac69c4647e7ac2d2d6f1a6c9c41e603edd7869c7cd9b8dfc9ddfc"
     },
     {
       "name": "forget-receipt",
@@ -406,7 +406,7 @@
       "distinct": 4153,
       "remaining": 2047,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "Accepted", "Crash", "Transmit", "Accepted"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/forget-receipt",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/forget-receipt",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -427,7 +427,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "cd2a8167efdb1765ffbd61e944d7d3b30d2ec8ebdf5e11dfce010a805b8ba109",
-      "log_sha256": "ff47b419982c430510806da37f83993b0d8be4933aeca1f4e7622324c318543d"
+      "log_sha256": "07243d7561be13f9368cd3d10076fa79de9e5bebe88d87a37fa46c4730f651dc"
     },
     {
       "name": "app-provenance",
@@ -438,7 +438,7 @@
       "distinct": 106,
       "remaining": 68,
       "trace": ["Initial predicate", "ExternalDispatch", "Provenance"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/app-provenance",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/app-provenance",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -459,7 +459,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "301a3c48e3fcfbe9f335933d0fdd256d1c14e63e8e34a149a2f4a8fdbc519ef3",
-      "log_sha256": "1472af5c855a1a24c56122077193c991259036b71f38f458a43eac3685b90029"
+      "log_sha256": "6980a07b358947d458583e15c62ae71ea8ea87848ca3771af610b4308521a6b1"
     },
     {
       "name": "oidc",
@@ -470,7 +470,7 @@
       "distinct": 4478,
       "remaining": 2049,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "Accepted", "StartRun", "Provenance", "ServerAdmission"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/oidc",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/oidc",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -491,7 +491,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "ebea1e39a009c73c0fd402afcd2c6b601f5df0b6625d5dd9a7a496a30ef5ca05",
-      "log_sha256": "aecf2c60d72b323492e661026baa59afe003b85f9918c9f06d6f3247f1c15049"
+      "log_sha256": "76ac9b1268060c07133c71ba3462df17fbcfab41c3c8dc17a7b10cc1e5205078"
     },
     {
       "name": "hash",
@@ -502,7 +502,7 @@
       "distinct": 4904,
       "remaining": 2179,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "Accepted", "StartRun", "Provenance", "ServerAdmission"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/hash",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/hash",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -523,7 +523,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "a345311d1239f6e1ad4efaccc00274fe0365acd9d56654e987850176a1e97373",
-      "log_sha256": "cf905a5234de12ce595802acd2c271095ef73ad2e65efd9a82d98e4acc7a86d4"
+      "log_sha256": "b60dd5eacf262b593596ac05dee838f753e3aa966e1fd01041dcaea095c2ef82"
     },
     {
       "name": "artifact",
@@ -534,7 +534,7 @@
       "distinct": 5330,
       "remaining": 2309,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "Accepted", "StartRun", "Provenance", "ServerAdmission"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/artifact",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/artifact",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -555,7 +555,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "48891c4de95323efb7efc97dfee3b4b6080d26a28d7c00c2371fa7c3f83ff889",
-      "log_sha256": "a6323a14b3b1426b539212235ba946fc9c9bd7994a5f71a3b24995e7612fb20b"
+      "log_sha256": "89c8a085c8739522193d89cb51cfc8f7a31999c084070bfc6ac9b9a714fd3fc2"
     },
     {
       "name": "response",
@@ -566,7 +566,7 @@
       "distinct": 8741,
       "remaining": 2984,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "Accepted", "StartRun", "Provenance", "ServerAdmission", "ClientContinuation"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/response",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/response",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -587,7 +587,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "8ab42d4c2d25910cc541fd5b0b0894da458e2a1c73189ea365377c696060afc1",
-      "log_sha256": "fa3620e4b7ae96a23a819d24d663683fd5ef3fe360c1578e28e010cfda2c4560"
+      "log_sha256": "96b8296f1398e0efdf2296cf6f1f54246c350ec49eb9c358c4d5bf458fcdc95c"
     },
     {
       "name": "envelope",
@@ -598,7 +598,7 @@
       "distinct": 12645,
       "remaining": 3373,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "Accepted", "StartRun", "Provenance", "ServerAdmission", "ClientContinuation", "Activate"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/envelope",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/envelope",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -619,7 +619,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "142dd46b94535a125bcd4928b1e637b34235a0a0ecd4562bcb59414bd4c8d70e",
-      "log_sha256": "915ca3fd2533d6f0d1ffb03de85ef258026b8868e3d51d9e996d5b7c94a38388"
+      "log_sha256": "e7d20632956ce92742a75abc7bb2d5ba15a6ccf7f43a9b5e8c7f9d5876c9511d"
     },
     {
       "name": "NoAgent",
@@ -630,7 +630,7 @@
       "distinct": 9885,
       "remaining": 3177,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "Accepted", "StartRun", "Provenance", "ServerAdmission", "ClientContinuation", "Activate"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/NoAgent",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/NoAgent",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -651,7 +651,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "068f94ec498545dd80ecf5a1cf12afce816ed5ad1292c1fcff5d56677edba519",
-      "log_sha256": "bfc97ae307053ac67d389e461d5108cab9221fb5151e320690347d7c1b04261a"
+      "log_sha256": "43570f02845345e8c9001260a9f15173b3bcf325379fb8f14562b9c17f5b6d78"
     },
     {
       "name": "NoUncertainty",
@@ -662,7 +662,7 @@
       "distinct": 420,
       "remaining": 233,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "LostResponse"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/NoUncertainty",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/NoUncertainty",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -683,7 +683,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "eccd9618853fb0161f0573cdf215365815a79d9f4ea92880b37cbf6917cfc40c",
-      "log_sha256": "75116b9b2e7d1c5dd569d206fa7d4ddab77fc94397b1e60a65b4ec77a0724113"
+      "log_sha256": "ad1a0167a949d3b76ab204cf74872f1972ca1cd00a3fbcbeaec2c4b872e24e1f"
     },
     {
       "name": "NoKnownRetry",
@@ -694,7 +694,7 @@
       "distinct": 4028,
       "remaining": 1938,
       "trace": ["Initial predicate", "Receive", "Claim", "Transmit", "KnownNonacceptance", "RetryKnown", "Transmit", "Accepted"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/NoKnownRetry",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/NoKnownRetry",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -715,7 +715,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "c2a8b6510fbd16c95170d50856f9d764575d229bc2e9fd2e6cf379c004e7225f",
-      "log_sha256": "e16d1b9e2a4f831e2568e1f8a91e4dd5d09b64480b816a53b2a56e0a598d1704"
+      "log_sha256": "fe05c14167ec11a7ae3cb656c6466954fe15164a7652d0eca7784dbc349de532"
     },
     {
       "name": "NoDuplicate",
@@ -726,7 +726,7 @@
       "distinct": 67,
       "remaining": 50,
       "trace": ["Initial predicate", "Receive", "Duplicate"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/NoDuplicate",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/NoDuplicate",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -747,7 +747,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "3415a189e0493b31f08858c3890b98ad798772a59351cb4bb762786e2acb10b0",
-      "log_sha256": "10e41087ef54919a6d6037b8314a4c7c20bfafa0ad3a17433797fa4c60fb7192"
+      "log_sha256": "174d0712f4c195e7e2be5f8490f678ad49358230691dc3b45baf41246271c5b0"
     },
     {
       "name": "NoConflict",
@@ -758,7 +758,7 @@
       "distinct": 68,
       "remaining": 51,
       "trace": ["Initial predicate", "Receive", "ConflictingDuplicate"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/NoConflict",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/NoConflict",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -779,7 +779,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "258081f62e395191bc2d94820aa1dec00c814585e5dac9e034d659d688e9d463",
-      "log_sha256": "c2c497062525916cecc6361f9e269fb4fcbb5ce554e9944f41f90aeb8d88005d"
+      "log_sha256": "525639dc04a52534a395ddeee948e1b6f001e0e575820c8c538d0dcf2cecfd5e"
     },
     {
       "name": "NoCrash",
@@ -790,7 +790,7 @@
       "distinct": 17,
       "remaining": 15,
       "trace": ["Initial predicate", "Crash"],
-      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-threat-ids/NoCrash",
+      "cwd": "/private/var/folders/s5/9zj1xyxn77qf90_87s4tctp40000gn/T/webhook-gateway-tlc-review-concat/NoCrash",
       "command": [
         "/opt/homebrew/opt/openjdk@21/bin/java",
         "-XX:+UseParallelGC",
@@ -811,7 +811,7 @@
         "WebhookGateway.tla"
       ],
       "config_sha256": "cc22da5fdaa0863b11ed0beec718d20c399161eda0fe269fbb2fb5b2f1bd24af",
-      "log_sha256": "6a384d404b73b9793bcfac7d3ef55d139de8a3463ae0401fa5e9bca8c3fe9d26"
+      "log_sha256": "60cc09dc07c326cf24970628db91b9414b2ca5650ab3bae48f268b777c0fa5b7"
     }
   ]
 }
