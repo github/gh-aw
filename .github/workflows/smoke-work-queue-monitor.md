@@ -1,6 +1,6 @@
 ---
 name: Smoke Work Queue Monitor
-description: Check the latest smoke work-queue cycle for dispatch, worker, Claim, delivery and latency-budget failures, benchmark each task and the cycle end to end, and open an issue only when something failed
+description: Check the latest smoke work-queue cycle for dispatch, worker, Claim, delivery and latency-budget failures in read-only mode, benchmark each task and the cycle end to end, and open an issue only when something failed
 intent: Close the loop on work queue smoke diagnostics by detecting failed or stuck synthetic Work and reporting it, without changing queue state.
 on:
   schedule: "30 1-23/6 * * *"
@@ -17,8 +17,7 @@ imports:
 tools:
   agentic-workflows:
   cli-proxy: true
-  work-queue:
-    observer: true
+  work-queue: true
   bash:
     - cat /tmp/gh-aw/agent/smoke-benchmark.json
     - work-queue:*

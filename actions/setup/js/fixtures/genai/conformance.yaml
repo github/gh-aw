@@ -87,6 +87,10 @@ scenarios:
         reason: Compatibility mode retains the shipped gh-aw agent span name.
       - id: genai_expected_attribute_missing
         reason: Compatibility mode retains the shipped client span attributes.
+      - id: missing_attribute
+        reason: Compatibility mode retains GitHub, gh-aw, and legacy attributes outside the GenAI registry.
+      - id: missing_metric
+        reason: Compatibility mode retains gh-aw metrics outside the GenAI registry.
     spans:
       - match:
           attributes:
