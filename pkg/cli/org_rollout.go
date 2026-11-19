@@ -375,11 +375,17 @@ func (output *orgRolloutOutput) Write(data []byte) (int, error) {
 			output.result = append(append([]byte(nil), line...), '\n')
 		} else {
 			output.appendTail(append(append([]byte(nil), line...), '\n'), limit)
+			if len(output.result) > 0 && len(bytes.TrimSpace(line)) > 0 {
+				output.result = nil
+			}
 		}
 		output.pending = rest
 	}
 	if len(output.pending) > limit && !bytes.HasPrefix(output.pending, []byte(orgRolloutResultPrefix)) {
 		output.appendTail(output.pending, limit)
+		if len(output.result) > 0 && len(bytes.TrimSpace(output.pending)) > 0 {
+			output.result = nil
+		}
 		output.pending = nil
 		output.discardLine = true
 	}
@@ -394,10 +400,10 @@ func (output *orgRolloutOutput) appendTail(data []byte, limit int) {
 }
 
 func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
-	lines := bytes.Split(bytes.TrimSpace(output), []byte{'\n'})
+	lines := bytes.Split(output, []byte{'\n'})
 	for i := len(lines) - 1; i >= 0; i-- {
-		line := bytes.TrimSpace(lines[i])
-		if len(line) == 0 {
+		line := lines[i]
+		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
 		if !bytes.HasPrefix(line, []byte(orgRolloutResultPrefix)) {
@@ -484,6 +490,9 @@ func runOrgRolloutWorker(ctx context.Context, repo string, opts orgRolloutOption
 	cmd.Stdout, cmd.Stderr = output, diagnostic
 	cmd.WaitDelay = 5 * time.Second
 	err = cmd.Run()
+	if len(bytes.TrimSpace(output.pending)) > 0 {
+		output.result = nil
+	}
 	result, parseErr := parseOrgRolloutResult(output.result)
 	if parseErr != nil && err == nil {
 		return orgRolloutResult{Status: "failed", Error: parseErr.Error()}

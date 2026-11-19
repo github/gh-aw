@@ -17,7 +17,7 @@ const { buildOTLPPayload, SPAN_KIND_INTERNAL } = require("../send_otlp_span.cjs"
 const { buildOTLPMetric, buildOTLPMetricsPayload } = require("../otlp_metrics.cjs");
 const { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } = sdkRequire("@opentelemetry/sdk-trace-base");
 const { resourceFromAttributes } = sdkRequire("@opentelemetry/resources");
-const { ROOT_CONTEXT, SpanStatusCode, TraceFlags, createTraceState, trace } = sdkRequire("@opentelemetry/api");
+const { ROOT_CONTEXT, SpanKind, SpanStatusCode, TraceFlags, createTraceState, trace } = sdkRequire("@opentelemetry/api");
 const { JsonTraceSerializer, ProtobufTraceSerializer } = sdkRequire("@opentelemetry/otlp-transformer");
 // Generated protocol types from the pinned SDK provide an independent wire oracle.
 const generatedProto = sdkRequire("@opentelemetry/otlp-transformer/build/src/generated/root").opentelemetry.proto;

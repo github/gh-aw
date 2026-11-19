@@ -179,8 +179,10 @@ jobs:
             --output "$RUNNER_TEMP/$asset"
           printf '%s  %s\n' '9878e2d56ad82ae441b0b527377a4f6001ae19f4af362fb0a4d951884f59ab61' "$RUNNER_TEMP/$asset" | sha256sum --check --strict
           tar -xJf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/weaver"
-          chmod +x "$RUNNER_TEMP/weaver/weaver"
-          echo "$RUNNER_TEMP/weaver" >> "$GITHUB_PATH"
+          weaver_binary="$(find "$RUNNER_TEMP/weaver" -type f -name weaver -print -quit)"
+          test -n "$weaver_binary"
+          chmod +x "$weaver_binary"
+          echo "$(dirname "$weaver_binary")" >> "$GITHUB_PATH"
       - name: Install isolated conformance runner
         run: |
           python -m venv "$RUNNER_TEMP/otel-conformance-venv"
