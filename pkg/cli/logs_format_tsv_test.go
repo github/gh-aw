@@ -4,6 +4,7 @@ package cli
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -52,5 +53,33 @@ func TestRenderLogsTSVVerboseSummaryPreservesTokenField(t *testing.T) {
 	}
 	if got, want := lines[0], "# 2 runs | 8m0s duration | 1500 tokens | 5 turns | 1 errors | 2 missing_tools | 3 github_api_calls"; got != want {
 		t.Fatalf("Unexpected TSV verbose summary line:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestRenderLogsTSVDistinguishesUnavailableAICFromMeasuredZero(t *testing.T) {
+	t.Parallel()
+	data := LogsData{Runs: []RunData{{RunID: 1}, {RunID: 2, AIC: new(0.0)}, {RunID: 3, AIC: new(0.25)}}}
+	for name, render := range map[string]func(*bytes.Buffer, LogsData){
+		"compact": func(buf *bytes.Buffer, data LogsData) { renderLogsTSVToWriter(buf, data) },
+		"verbose": func(buf *bytes.Buffer, data LogsData) { renderLogsTSVVerboseToWriter(buf, data) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var buf bytes.Buffer
+			render(&buf, data)
+			lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+			if len(lines) < 5 {
+				t.Fatalf("Expected summary, header and three run rows, got:\n%s", buf.String())
+			}
+			column := slices.Index(strings.Split(lines[1], "\t"), "aic")
+			if column < 0 {
+				t.Fatalf("Expected aic column in header %q", lines[1])
+			}
+			for i, want := range []string{"-", "0.000", "0.250"} {
+				if got := strings.Split(lines[i+2], "\t")[column]; got != want {
+					t.Errorf("run %d aic = %q, want %q", i+1, got, want)
+				}
+			}
+		})
 	}
 }

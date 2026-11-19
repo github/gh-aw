@@ -128,3 +128,30 @@ func TestRenderLogsCompactPropagatesEveryWriterFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatCompactAICDistinguishesUnavailableFromMeasuredZero(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "-", formatCompactAIC(nil))
+	assert.Equal(t, "0", formatCompactAIC(new(0.0)))
+	assert.Equal(t, "0.250", formatCompactAIC(new(0.25)))
+	assert.Equal(t, []string{"runs=2"}, appendCompactAICSummary([]string{"runs=2"}, LogsSummary{AICCoverage: "unavailable"}))
+	assert.Equal(t, []string{"aic=0"}, appendCompactAICSummary(nil, LogsSummary{TotalAIC: new(0.0), AICCoverage: "available"}))
+	assert.Equal(t, []string{"aic=0.250", "aic_coverage=partial"}, appendCompactAICSummary(nil, LogsSummary{TotalAIC: new(0.25), AICCoverage: "partial"}))
+}
+
+func TestRenderLogsCompactQualifiesPartialAICSummary(t *testing.T) {
+	t.Parallel()
+	data := compactTestData()
+	data.Summary.TotalAIC = new(0.25)
+	data.Summary.AICCoverage = "partial"
+	for name, render := range map[string]func(io.Writer, LogsData) error{
+		"compact": renderLogsCompactToWriter, "verbose": renderLogsCompactVerboseToWriter,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var buf bytes.Buffer
+			require.NoError(t, render(&buf, data))
+			assert.Contains(t, buf.String(), "aic=0.250 aic_coverage=partial")
+		})
+	}
+}

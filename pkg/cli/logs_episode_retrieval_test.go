@@ -434,7 +434,9 @@ func TestEpisodeRetrievalFiltersOldAttemptsAndAggregatesUsageArtifacts(t *testin
 	data, err := retrieveEpisodeLogs(context.Background(), opts, request)
 	require.NoError(t, err)
 	require.Equal(t, 24, data.Summary.TotalTokens)
-	require.InDelta(t, 1.0, data.Summary.TotalAIC, 0.000001)
+	require.NotNil(t, data.Summary.TotalAIC)
+	require.InDelta(t, 1.0, *data.Summary.TotalAIC, 0.000001)
+	require.Equal(t, "available", data.Summary.AICCoverage)
 
 	runData := f.runs["org/one/2"].workflowRun()
 	runDir := data.Runs[0].LogsPath

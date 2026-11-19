@@ -76,7 +76,7 @@ func renderEpisodeHops(out io.Writer, data LogsData) error {
 		}
 		text = append(text, "Run-level accounting (observed once per run; not allocated to hops):\n"...)
 		for _, cost := range view.RunCosts {
-			text = fmt.Appendf(text, "  Run %d: %d tokens, %.6g AI credits\n", cost.RunID, cost.Tokens, cost.AIC)
+			text = fmt.Appendf(text, "  Run %d: %d tokens, %s\n", cost.RunID, cost.Tokens, formatEpisodeRunAIC(cost.AIC))
 		}
 		text = append(text, '\n')
 	}
@@ -84,6 +84,14 @@ func renderEpisodeHops(out io.Writer, data LogsData) error {
 		return fmt.Errorf("write episode explanation: %w", err)
 	}
 	return nil
+}
+
+// formatEpisodeRunAIC keeps unavailable run cost distinct from a measured zero.
+func formatEpisodeRunAIC(aic *float64) string {
+	if aic == nil {
+		return "AI credits unavailable"
+	}
+	return fmt.Sprintf("%.6g AI credits", *aic)
 }
 
 func renderLogsEpisodeOutcomes(out io.Writer, data LogsData, episodes bool) error {

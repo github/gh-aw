@@ -953,7 +953,7 @@ func TestRunDataJSONIncludesZeroTokenUsageAndAIC(t *testing.T) {
 		WorkflowPath: ".github/workflows/wf-1.md",
 		Status:       "completed",
 		TokenUsage:   0,
-		AIC:          0,
+		AIC:          new(0.0),
 	}
 
 	data, err := json.Marshal(run)
@@ -1286,11 +1286,115 @@ func TestBuildLogsDataAggregatesAIC(t *testing.T) {
 	}
 
 	data := buildLogsData(processedRuns, "/tmp/logs", nil)
-	if data.Summary.TotalAIC != 2.0 {
-		t.Fatalf("Expected TotalAIC = 2.0, got %v", data.Summary.TotalAIC)
+	require.NotNil(t, data.Summary.TotalAIC)
+	assert.InDelta(t, 2.0, *data.Summary.TotalAIC, 1e-9)
+	assert.Equal(t, "available", data.Summary.AICCoverage)
+	require.NotNil(t, data.Runs[0].AIC)
+	assert.InDelta(t, 1.25, *data.Runs[0].AIC, 1e-9)
+}
+
+func TestBuildLogsDataDistinguishesUnavailableAICFromMeasuredZero(t *testing.T) {
+	tests := []struct {
+		name         string
+		usage        []*TokenUsageSummary
+		wantRunAIC   []string
+		wantTotalAIC string
+		wantCoverage string
+	}{
+		{
+			name:         "no usage or cost evidence",
+			usage:        []*TokenUsageSummary{nil, {TotalInputTokens: 100, TotalOutputTokens: 20}},
+			wantRunAIC:   []string{"null", "null"},
+			wantTotalAIC: "null",
+			wantCoverage: "unavailable",
+		},
+		{
+			name:         "measured zero and missing usage",
+			usage:        []*TokenUsageSummary{{AICFound: true}, nil},
+			wantRunAIC:   []string{"0", "null"},
+			wantTotalAIC: "0",
+			wantCoverage: "partial",
+		},
+		{
+			name:         "partial positive cost",
+			usage:        []*TokenUsageSummary{{TotalAIC: 1.5, AICFound: true}, nil, {TotalAIC: 0.25}},
+			wantRunAIC:   []string{"1.5", "null", "0.25"},
+			wantTotalAIC: "1.75",
+			wantCoverage: "partial",
+		},
+		{
+			name:         "all runs measured",
+			usage:        []*TokenUsageSummary{{AICFound: true}, {TotalAIC: 0.5, AICFound: true}},
+			wantRunAIC:   []string{"0", "0.5"},
+			wantTotalAIC: "0.5",
+			wantCoverage: "available",
+		},
 	}
-	if data.Runs[0].AIC != 1.25 {
-		t.Fatalf("Expected run AIC = 1.25, got %v", data.Runs[0].AIC)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			processedRuns := make([]ProcessedRun, 0, len(tt.usage))
+			for i, usage := range tt.usage {
+				processedRuns = append(processedRuns, ProcessedRun{
+					Run:        WorkflowRun{DatabaseID: int64(i + 1), WorkflowName: "wf"},
+					TokenUsage: usage,
+				})
+			}
+
+			encoded, err := json.Marshal(buildLogsData(processedRuns, t.TempDir(), nil))
+			require.NoError(t, err)
+			var got struct {
+				Summary map[string]json.RawMessage   `json:"summary"`
+				Runs    []map[string]json.RawMessage `json:"runs"`
+			}
+			require.NoError(t, json.Unmarshal(encoded, &got))
+
+			require.Len(t, got.Runs, len(tt.wantRunAIC))
+			for i, want := range tt.wantRunAIC {
+				require.Contains(t, got.Runs[i], "aic", "aic must always be present")
+				assert.JSONEq(t, want, string(got.Runs[i]["aic"]), "run %d aic", i+1)
+			}
+			require.Contains(t, got.Summary, "total_aic", "total_aic must always be present")
+			assert.JSONEq(t, tt.wantTotalAIC, string(got.Summary["total_aic"]))
+			assert.JSONEq(t, `"`+tt.wantCoverage+`"`, string(got.Summary["aic_coverage"]))
+		})
+	}
+}
+
+func TestBuildLogsDataCachedRunWithoutUsageKeepsAICUnavailable(t *testing.T) {
+	cached := &RunData{RunID: 7, WorkflowName: "wf", Status: "completed"}
+	data := buildLogsData([]ProcessedRun{{Run: WorkflowRun{DatabaseID: 7, WorkflowName: "wf"}, cachedData: cached}}, t.TempDir(), nil)
+
+	require.Len(t, data.Runs, 1)
+	assert.Nil(t, data.Runs[0].AIC, "a cached run without usage must not report a measured zero")
+	assert.Nil(t, data.Summary.TotalAIC)
+	assert.Equal(t, "unavailable", data.Summary.AICCoverage)
+}
+
+func TestRunSummaryCachePreservesAICAvailability(t *testing.T) {
+	originalVersion := GetVersion()
+	SetVersionInfo("1.0.0-test")
+	defer SetVersionInfo(originalVersion)
+
+	tests := []struct {
+		name  string
+		usage *TokenUsageSummary
+		want  *float64
+	}{
+		{name: "measured zero", usage: &TokenUsageSummary{AICFound: true}, want: new(0.0)},
+		{name: "tokens without cost evidence", usage: &TokenUsageSummary{TotalInputTokens: 10, TotalOutputTokens: 2}},
+		{name: "positive cost", usage: &TokenUsageSummary{TotalAIC: 0.5, AICFound: true}, want: new(0.5)},
+		{name: "no usage"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runDir := t.TempDir()
+			summary := &RunSummary{CLIVersion: GetVersion(), RunID: 1, RunAnalysis: RunAnalysis{TokenUsage: tt.usage}}
+			require.NoError(t, saveRunSummary(runDir, summary, false))
+
+			loaded, ok := loadRunSummary(runDir, false)
+			require.True(t, ok)
+			assert.Equal(t, tt.want, observedRunAIC(loaded.TokenUsage))
+		})
 	}
 }
 

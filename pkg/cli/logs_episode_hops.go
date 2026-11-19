@@ -33,10 +33,11 @@ type EpisodeHopEdge struct {
 }
 
 type EpisodeRunCost struct {
-	RunID      int64   `json:"run_id"`
-	Repository string  `json:"repository,omitempty"`
-	Tokens     int     `json:"tokens"`
-	AIC        float64 `json:"aic"`
+	RunID      int64  `json:"run_id"`
+	Repository string `json:"repository,omitempty"`
+	Tokens     int    `json:"tokens"`
+	// AIC mirrors runs[].aic: null when cost evidence is unavailable, 0 for a measured zero.
+	AIC *float64 `json:"aic"`
 }
 
 type EpisodeExplanation struct {

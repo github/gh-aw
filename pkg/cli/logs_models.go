@@ -338,6 +338,10 @@ type RunSummary struct {
 	RunAnalysis
 	PolicyAnalysis *PolicyAnalysis `json:"policy_analysis,omitempty"` // Firewall policy rule attribution
 	ArtifactsList  []string        `json:"artifacts_list"`            // List of downloaded artifact files
+	// TokenUsageAICFound persists TokenUsage.AICFound, which token usage JSON omits,
+	// so cache hits keep a measured zero AIC distinct from missing cost evidence.
+	// saveRunSummary writes it and loadRunSummary restores it.
+	TokenUsageAICFound bool `json:"token_usage_aic_found,omitempty"`
 }
 
 // DownloadResult represents the result of downloading and processing a workflow run

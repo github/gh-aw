@@ -23,7 +23,7 @@ func episodeCoverageTestRuns() []RunData {
 		runs = append(runs, RunData{
 			RunID: id, Repository: "org/repo", WorkflowName: "worker",
 			CreatedAt:  time.Date(2026, 10, 1, i, 0, 0, 0, time.UTC),
-			TokenUsage: 10, AIC: 0.1,
+			TokenUsage: 10, AIC: new(0.1),
 			AwContext: &AwContext{
 				EpisodeID: "canonical", RunID: parent, Repo: "org/repo",
 				RootRunID: "100", RootWorkflowID: "org/repo/.github/workflows/root.yml@main", RootRepo: "org/repo",

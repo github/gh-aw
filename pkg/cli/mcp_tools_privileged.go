@@ -249,9 +249,10 @@ Read representative_runs or selected_runs audit_path/logs_path before fetching e
 use the audit tool if unavailable. Representatives expose workflow/engine/model context.
 Report cluster IDs, unique affected runs, inspected URLs and remaining uncertainty.
 
-token_usage (input+output) and aic are always present per run. The usage artifact is
-downloaded by default and added to explicit selections. Compact metadata is not complete
-logs; missing evidence does not prove absence of failure.
+token_usage (input+output) and aic are always present per run; aic is null, not 0,
+when cost evidence is unavailable, and summary.aic_coverage qualifies total_aic.
+The usage artifact is downloaded by default and added to explicit selections.
+Compact metadata is not complete logs; missing evidence does not prove absence of failure.
 
 Set delivery for applied safe-output evidence, or adoption to include supported
 provider refresh. Adoption separates verified human decisions from delivery-rule

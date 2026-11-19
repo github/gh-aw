@@ -131,9 +131,7 @@ func renderCompactLogsSummary(w *compactLogsWriter, s LogsSummary) {
 		"turns=" + strconv.Itoa(s.TotalTurns),
 		"errors=" + strconv.Itoa(s.TotalErrors),
 	}
-	if s.TotalAIC > 0 {
-		summaryParts = append(summaryParts, "aic="+formatCompactAIC(s.TotalAIC))
-	}
+	summaryParts = appendCompactAICSummary(summaryParts, s)
 	if s.TotalTokens > 0 {
 		summaryParts = append(summaryParts, "tokens="+strconv.Itoa(s.TotalTokens))
 	}
@@ -364,9 +362,7 @@ func renderCompactLogsVerboseSummary(w *compactLogsWriter, s LogsSummary) {
 		"github_api=" + strconv.Itoa(s.TotalGitHubAPICalls),
 		"episodes=" + strconv.Itoa(s.TotalEpisodes),
 	}
-	if s.TotalAIC > 0 {
-		summaryParts = append(summaryParts, "aic="+formatCompactAIC(s.TotalAIC))
-	}
+	summaryParts = appendCompactAICSummary(summaryParts, s)
 	if len(s.EngineCounts) > 0 {
 		parts := make([]string, 0, len(s.EngineCounts))
 		for engine, count := range s.EngineCounts {
@@ -468,9 +464,26 @@ func formatCompactWSRF(value string) string {
 	return value
 }
 
-func formatCompactAIC(value float64) string {
-	if value <= 0 {
+// appendCompactAICSummary adds the observed AIC total, qualified when only some runs report cost.
+func appendCompactAICSummary(parts []string, s LogsSummary) []string {
+	if s.TotalAIC == nil {
+		return parts
+	}
+	parts = append(parts, "aic="+formatCompactAIC(s.TotalAIC))
+	if s.AICCoverage == "partial" {
+		parts = append(parts, "aic_coverage=partial")
+	}
+	return parts
+}
+
+// formatCompactAIC renders unavailable cost as "-" and a measured zero as "0".
+func formatCompactAIC(aic *float64) string {
+	if aic == nil {
 		return "-"
+	}
+	value := *aic
+	if value <= 0 {
+		return "0"
 	}
 	if value >= 1000 {
 		return fmt.Sprintf("%.1fK", value/1000)

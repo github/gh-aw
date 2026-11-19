@@ -17,7 +17,7 @@ func TestBuildEpisodeDataDoesNotReconstructUnrecordedCalls(t *testing.T) {
 		return RunData{
 			RunID: id, Event: event, Repository: "acme/repo",
 			Ref: "refs/heads/main", SHA: "same-sha", Actor: "octocat", RunAttempt: "1",
-			CreatedAt: start.Add(offset), AIC: float64(id),
+			CreatedAt: start.Add(offset), AIC: new(float64(id)),
 		}
 	}
 	runs := []RunData{
@@ -38,7 +38,7 @@ func TestBuildEpisodeDataDoesNotReconstructUnrecordedCalls(t *testing.T) {
 func TestBuildEpisodeDataConflictingBridgeIsOrderIndependent(t *testing.T) {
 	t.Parallel()
 	a := RunData{RunID: 100, AwContext: &AwContext{EpisodeID: "episode-a"}}
-	bridge := RunData{RunID: 150, AwContext: &AwContext{RunID: "100"}, AIC: 2}
+	bridge := RunData{RunID: 150, AwContext: &AwContext{RunID: "100"}, AIC: new(2.0)}
 	b := RunData{RunID: 200, AwContext: &AwContext{RunID: "150", EpisodeID: "episode-b"}}
 	expectedEpisodes, expectedEdges := buildEpisodeData([]RunData{a, bridge, b}, nil)
 	for _, runs := range [][]RunData{

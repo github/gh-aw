@@ -735,7 +735,13 @@
               "type": "string"
             },
             "total_aic": {
-              "type": "number"
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "aic_coverage": {
+              "type": "string"
             },
             "total_tokens": {
               "type": "integer"
@@ -839,6 +845,8 @@
             "executed_success_runs",
             "total_runs",
             "total_duration",
+            "total_aic",
+            "aic_coverage",
             "total_action_minutes",
             "total_turns",
             "total_errors",
@@ -988,7 +996,10 @@
                 "type": "integer"
               },
               "aic": {
-                "type": "number"
+                "type": [
+                  "null",
+                  "number"
+                ]
               },
               "ambient_context": {
                 "type": [
@@ -5324,7 +5335,10 @@
                           "type": "integer"
                         },
                         "aic": {
-                          "type": "number"
+                          "type": [
+                            "null",
+                            "number"
+                          ]
                         }
                       },
                       "required": [
@@ -9217,7 +9231,10 @@
                           "type": "integer"
                         },
                         "aic": {
-                          "type": "number"
+                          "type": [
+                            "null",
+                            "number"
+                          ]
                         }
                       },
                       "required": [

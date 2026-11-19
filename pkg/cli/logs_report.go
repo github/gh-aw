@@ -110,13 +110,18 @@ type WorkflowContinuation struct {
 
 // LogsSummary contains aggregate metrics across all runs
 type LogsSummary struct {
-	ObsoletePRRuns      int     `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
-	NonExecutionRuns    int     `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
-	ExecutedRuns        int     `json:"executed_runs" console:"-"`
-	ExecutedSuccessRuns int     `json:"executed_success_runs" console:"-"`
-	TotalRuns           int     `json:"total_runs" console:"header:Total Runs"`
-	TotalDuration       string  `json:"total_duration" console:"header:Total Duration"`
-	TotalAIC            float64 `json:"total_aic,omitempty"`
+	ObsoletePRRuns      int    `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
+	NonExecutionRuns    int    `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
+	ExecutedRuns        int    `json:"executed_runs" console:"-"`
+	ExecutedSuccessRuns int    `json:"executed_success_runs" console:"-"`
+	TotalRuns           int    `json:"total_runs" console:"header:Total Runs"`
+	TotalDuration       string `json:"total_duration" console:"header:Total Duration"`
+	// TotalAIC sums runs[].aic over runs with observed AI credits. It is null when no
+	// run has cost evidence; AICCoverage qualifies whether the sum covers every run.
+	TotalAIC *float64 `json:"total_aic" console:"header:Total AIC"`
+	// AICCoverage is "available" when every run has observed AI credits, "partial"
+	// when only some runs do, and "unavailable" when none do.
+	AICCoverage         string  `json:"aic_coverage" console:"header:AIC Coverage"`
 	TotalTokens         int     `json:"total_tokens,omitempty" console:"header:Total Tokens,format:number,omitempty"`
 	TotalActionMinutes  float64 `json:"total_action_minutes" console:"header:Total Action Minutes"`
 	TotalTurns          int     `json:"total_turns" console:"header:Total Turns"`
@@ -206,8 +211,10 @@ type RunData struct {
 	ActionMinutes float64 `json:"action_minutes,omitempty" console:"header:Action Minutes,omitempty"`
 	// TokenUsage is always emitted (even when 0) so consumers of the run list can
 	// discover the field and distinguish "no tokens recorded" from "field absent".
-	TokenUsage                 int                    `json:"token_usage" console:"header:Tokens,format:number,omitempty"`
-	AIC                        float64                `json:"aic"`
+	TokenUsage int `json:"token_usage" console:"header:Tokens,format:number,omitempty"`
+	// AIC is the run's observed AI credits. It is always emitted: null means cost
+	// evidence is unavailable (for example, no usage artifact), while 0 is a measured zero.
+	AIC                        *float64               `json:"aic"`
 	AmbientContext             *AmbientContextMetrics `json:"ambient_context,omitempty" console:"-"`
 	WorkingSet                 *WorkingSetMetrics     `json:"working_set,omitempty" console:"-"`
 	Ledger                     *LedgerActivity        `json:"ledger,omitempty" console:"-"`
@@ -279,7 +286,6 @@ type RunData struct {
 // logsAggregate accumulates cross-run totals while runs are converted to RunData.
 type logsAggregate struct {
 	totalDuration                 time.Duration
-	totalAIC                      float64
 	totalTokens                   int
 	totalActionMinutes            float64
 	totalTurns                    int
@@ -315,7 +321,6 @@ func (agg *logsAggregate) accumulateRunTotals(pr ProcessedRun) {
 		agg.totalDuration += run.Duration
 	}
 	if pr.TokenUsage != nil {
-		agg.totalAIC += pr.TokenUsage.TotalAIC
 		agg.totalSteeringEvents += pr.TokenUsage.TotalSteeringEvents
 	}
 	agg.totalTokens += run.TokenUsage
@@ -330,7 +335,6 @@ func (agg *logsAggregate) accumulateRunTotals(pr ProcessedRun) {
 
 func (agg *logsAggregate) accumulateCachedRunTotals(run RunData) {
 	agg.totalDuration += parseDurationString(run.Duration)
-	agg.totalAIC += run.AIC
 	if run.TokenUsageSummary != nil {
 		agg.totalSteeringEvents += run.TokenUsageSummary.TotalSteeringEvents
 	}
@@ -415,7 +419,6 @@ func (agg *logsAggregate) summary(totalRuns int) LogsSummary {
 	summary := LogsSummary{
 		TotalRuns:                     totalRuns,
 		TotalDuration:                 timeutil.FormatDuration(agg.totalDuration),
-		TotalAIC:                      agg.totalAIC,
 		TotalTokens:                   agg.totalTokens,
 		TotalActionMinutes:            agg.totalActionMinutes,
 		TotalTurns:                    agg.totalTurns,
@@ -595,9 +598,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	if run.Duration > 0 {
 		runData.Duration = timeutil.FormatDuration(run.Duration)
 	}
-	if pr.TokenUsage != nil && pr.TokenUsage.TotalAIC > 0 {
-		runData.AIC = pr.TokenUsage.TotalAIC
-	}
+	runData.AIC = observedRunAIC(pr.TokenUsage)
 	// Compute average TBT from metrics when available; fall back to wall-time / (turns - 1).
 	if run.AvgTimeBetweenTurns > 0 {
 		runData.AvgTimeBetweenTurns = timeutil.FormatDuration(run.AvgTimeBetweenTurns)
@@ -623,7 +624,6 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		Classification:             deriveRunClassification(comparison),
 		FailureKind:                failureKind,
 		TokenUsage:                 run.TokenUsage,
-		AIC:                        0,
 		AmbientContext:             runAmbientContext(pr),
 		WorkingSet:                 pr.WorkingSet,
 		WSRF:                       wsrfDisplayValue(pr.WorkingSet),
@@ -685,6 +685,39 @@ func runAmbientContext(pr ProcessedRun) *AmbientContextMetrics {
 	return pr.TokenUsage.AmbientContext
 }
 
+// observedRunAIC returns a run's observed AI credits, or nil when the usage summary
+// has no AI-credit evidence. A valid explicit zero remains an observed zero.
+func observedRunAIC(usage *TokenUsageSummary) *float64 {
+	if usage == nil || (!usage.AICFound && usage.TotalAIC <= 0) {
+		return nil
+	}
+	return new(usage.TotalAIC)
+}
+
+// addRunAICSummary sums observed runs[].aic into summary.total_aic and reports how
+// many runs that total covers, so missing cost evidence is never counted as zero.
+func addRunAICSummary(summary *LogsSummary, runs []RunData) {
+	observedRuns := 0
+	for _, run := range runs {
+		if run.AIC == nil {
+			continue
+		}
+		if summary.TotalAIC == nil {
+			summary.TotalAIC = new(float64)
+		}
+		*summary.TotalAIC += *run.AIC
+		observedRuns++
+	}
+	switch {
+	case observedRuns == 0:
+		summary.AICCoverage = "unavailable"
+	case observedRuns < len(runs):
+		summary.AICCoverage = "partial"
+	default:
+		summary.AICCoverage = "available"
+	}
+}
+
 // buildLogsData creates structured logs data from processed runs
 func buildLogsData(processedRuns []ProcessedRun, outputDir string, continuation *ContinuationData) LogsData {
 	return buildLogsDataWithCollectionCoverage(processedRuns, outputDir, continuation, logsCollectionCoverageOptions{})
@@ -723,6 +756,7 @@ func buildLogsDataWithCollectionCoverage(processedRuns []ProcessedRun, outputDir
 
 	summary := agg.summary(len(processedRuns))
 	addRunExecutionSummary(&summary, runs)
+	addRunAICSummary(&summary, runs)
 
 	episodes, edges := buildEpisodeData(runs, processedRuns)
 	for _, episode := range episodes {

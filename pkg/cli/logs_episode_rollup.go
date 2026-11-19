@@ -19,7 +19,9 @@ func (acc *episodeAccumulator) addRun(run RunData) {
 	}
 	acc.metadata.TotalRuns++
 	acc.metadata.TotalTokens += run.TokenUsage
-	acc.metadata.TotalAIC += run.AIC
+	if run.AIC != nil {
+		acc.metadata.TotalAIC += *run.AIC
+	}
 	acc.metadata.ManifestEntryCount += run.ManifestEntryCount
 	acc.metadata.TemporaryIDMappings += run.TemporaryIDMappings
 	acc.metadata.ChainedTargetCount += run.ChainedTargetCount

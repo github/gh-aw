@@ -59,6 +59,7 @@ func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
 		}
 		return nil, false
 	}
+	restoreRunSummaryAICFound(&summary)
 
 	logsCacheLog.Printf("Successfully loaded cached run summary: run_id=%d", summary.RunID)
 	if verbose {
@@ -66,6 +67,16 @@ func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
 	}
 
 	return &summary, true
+}
+
+// restoreRunSummaryAICFound restores the in-memory AICFound flag that token usage
+// JSON omits. Summaries written before the flag was persisted keep positive AIC
+// as observed; their zero AIC stays unavailable because it cannot be verified.
+func restoreRunSummaryAICFound(summary *RunSummary) {
+	if summary.TokenUsage == nil {
+		return
+	}
+	summary.TokenUsage.AICFound = summary.TokenUsageAICFound || summary.TokenUsage.TotalAIC > 0
 }
 
 // parseCleanupCutoff resolves a date string (absolute or relative delta) to a
@@ -166,8 +177,11 @@ func saveRunSummary(outputDir string, summary *RunSummary, verbose bool) error {
 	logsCacheLog.Printf("Saving run summary to cache: dir=%s, run_id=%d", outputDir, summary.RunID)
 	summaryPath := filepath.Join(outputDir, runSummaryFileName)
 
+	persisted := *summary
+	persisted.TokenUsageAICFound = summary.TokenUsage != nil && summary.TokenUsage.AICFound
+
 	// Marshal to JSON with indentation for readability
-	data, err := json.MarshalIndent(summary, "", "  ")
+	data, err := json.MarshalIndent(&persisted, "", "  ")
 	if err != nil {
 		logsCacheLog.Printf("Failed to marshal run summary: %v", err)
 		return fmt.Errorf("failed to marshal run summary: %w", err)

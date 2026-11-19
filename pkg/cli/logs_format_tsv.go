@@ -20,6 +20,14 @@ func formatTSVSummaryTokens(totalTokens int) string {
 	return strconv.Itoa(totalTokens)
 }
 
+// formatTSVAIC renders unavailable cost as "-" so it is not mistaken for a measured zero.
+func formatTSVAIC(aic *float64) string {
+	if aic == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.3f", *aic)
+}
+
 // renderLogsTSVToWriter outputs the logs data as tab-separated values to w.
 // This format is ~24x more compact than JSON, making it ideal for agentic consumption
 // where LLM context window tokens are the primary constraint.
@@ -76,7 +84,7 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 			conclusion,
 			duration,
 			strconv.Itoa(r.TokenUsage),
-			fmt.Sprintf("%.3f", r.AIC),
+			formatTSVAIC(r.AIC),
 			strconv.Itoa(r.Turns),
 			strconv.Itoa(r.ErrorCount),
 			r.Event,
@@ -164,7 +172,7 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 			conclusion,
 			duration,
 			strconv.Itoa(r.TokenUsage),
-			fmt.Sprintf("%.3f", r.AIC),
+			formatTSVAIC(r.AIC),
 			strconv.Itoa(r.Turns),
 			strconv.Itoa(r.ErrorCount),
 			strconv.Itoa(r.WarningCount),

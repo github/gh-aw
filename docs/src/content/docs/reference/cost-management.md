@@ -15,6 +15,8 @@ The cost of running an agentic workflow is the sum of two components: **GitHub A
 
 AIC is shown in the `gh aw logs` output table under the **AIC** column, in audit reports alongside raw token counts, and as `{ai_credits_suffix}` in workflow footer templates. For structured output, each run under `.runs[]` includes an `aic` field and each episode under `.episodes[]` includes `total_aic`.
 
+A run's `aic` is `null` when cost evidence is unavailable, such as when the run has no usage artifact, and `0` only for a measured zero. `.summary.total_aic` sums the available run values and is `null` when no run has cost evidence. `.summary.aic_coverage` reports whether that total covers all runs (`available`), some runs (`partial`), or none (`unavailable`).
+
 gh-aw does not bundle or refresh a model pricing catalog, and compilation does not inject catalog rates into the firewall configuration. Explicit frontmatter `models.providers` pricing overrides are still passed to AWF.
 
 > [!NOTE]
@@ -57,10 +59,11 @@ gh aw logs --start-date -1w --json > /tmp/logs.json
 gh aw logs --start-date -30d --json | \
   jq '.runs[] | {workflow: .workflow_name, duration: .duration, tokens: .token_usage, aic: .aic}'
 
-# AIC spend grouped by workflow over the past 30 days
+# AIC spend grouped by workflow over the past 30 days, counting runs without cost evidence
 gh aw logs --start-date -30d --json | \
   jq '[.runs[]] | group_by(.workflow_name) |
-  map({workflow: .[0].workflow_name, runs: length, total_aic: (map(.aic // 0) | add)})'
+  map({workflow: .[0].workflow_name, runs: length, total_aic: (map(.aic // 0) | add),
+       runs_without_aic: (map(select(.aic == null)) | length)})'
 ```
 
 Each run under `.runs[]` includes `duration`, `token_usage`, `aic`, `workflow_name`, and `agent`. For orchestrated workflows, the same JSON includes deterministic lineage under `.episodes[]` and `.edges[]` — see the next section.

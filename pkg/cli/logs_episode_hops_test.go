@@ -28,8 +28,8 @@ func episodeHopTestReport(t *testing.T) LogsData {
 	hops := collectRunEpisodeHops(ProcessedRun{Run: run, EpisodeContexts: infos}, root)
 	require.Len(t, hops, 2, "mirrored metadata must not create additional hops")
 	runs := []RunData{
-		{RunID: 42, Repository: "org/repo", WorkflowName: "Root", AwContext: root, EpisodeHops: hops, TokenUsage: 100, AIC: 0.25},
-		{RunID: 43, Repository: "org/repo", WorkflowName: "Dispatched", AwContext: episodeHopTestContext("dispatched", "reusable", "42"), TokenUsage: 200, AIC: 0.75},
+		{RunID: 42, Repository: "org/repo", WorkflowName: "Root", AwContext: root, EpisodeHops: hops, TokenUsage: 100, AIC: new(0.25)},
+		{RunID: 43, Repository: "org/repo", WorkflowName: "Dispatched", AwContext: episodeHopTestContext("dispatched", "reusable", "42"), TokenUsage: 200, AIC: new(0.75)},
 	}
 	episodes, edges := buildEpisodeData(runs, nil)
 	return LogsData{Runs: runs, Episodes: episodes, Edges: edges}
@@ -55,7 +55,8 @@ func TestEpisodeHopsKeepSharedRunAccountingSeparate(t *testing.T) {
 	var aic float64
 	for _, cost := range view.RunCosts {
 		tokens += cost.Tokens
-		aic += cost.AIC
+		require.NotNil(t, cost.AIC)
+		aic += *cost.AIC
 	}
 	require.Equal(t, 300, tokens)
 	require.InDelta(t, 1.0, aic, 1e-9)
@@ -106,6 +107,28 @@ func TestEpisodeHopsReadCurrentNormalArtifactMetadata(t *testing.T) {
 	require.Len(t, hops, 2)
 	require.True(t, slices.ContainsFunc(hops, func(hop EpisodeHop) bool { return hop.HopID == "reusable" }))
 	require.False(t, slices.ContainsFunc(hops, func(hop EpisodeHop) bool { return hop.HopID == "old" || hop.HopID == "agent" }))
+}
+
+func TestEpisodeHopsViewKeepsUnavailableRunAICDistinct(t *testing.T) {
+	runs := []RunData{
+		{RunID: 42, Repository: "org/repo", WorkflowName: "Root", AwContext: episodeHopTestContext("root", "", "42"), TokenUsage: 100},
+		{RunID: 43, Repository: "org/repo", WorkflowName: "Dispatched", AwContext: episodeHopTestContext("dispatched", "root", "42"), TokenUsage: 200, AIC: new(0.75)},
+	}
+	episodes, _ := buildEpisodeData(runs, nil)
+	require.Len(t, episodes, 1)
+	require.InDelta(t, 0.75, episodes[0].TotalAIC, 1e-9, "unavailable run cost must not be counted as zero")
+	view := episodes[0].Explanation
+	require.NotNil(t, view)
+	require.Len(t, view.RunCosts, 2)
+	encoded, err := json.Marshal(view.RunCosts)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"run_id":42`)
+	require.Contains(t, string(encoded), `"aic":null`)
+
+	var console bytes.Buffer
+	require.NoError(t, renderEpisodeView(&console, LogsData{Runs: runs, Episodes: episodes}, "hops", false))
+	require.Contains(t, console.String(), "Run 42: 100 tokens, AI credits unavailable")
+	require.Contains(t, console.String(), "Run 43: 200 tokens, 0.75 AI credits")
 }
 
 func TestEpisodeHopsViewUsesStandardJSON(t *testing.T) {
@@ -165,6 +188,7 @@ func TestEpisodeHopsBoundedRetrievalPreservesReusableInvocations(t *testing.T) {
 	require.Equal(t, view.Edges[0].SourceRunID, view.Edges[0].TargetRunID)
 	require.Len(t, view.RunCosts, 1)
 	require.Equal(t, 44, view.RunCosts[0].Tokens)
-	require.InDelta(t, 0.5, view.RunCosts[0].AIC, 1e-9)
+	require.NotNil(t, view.RunCosts[0].AIC)
+	require.InDelta(t, 0.5, *view.RunCosts[0].AIC, 1e-9)
 	require.InDelta(t, 0.5, data.Episodes[0].TotalAIC, 1e-9)
 }
