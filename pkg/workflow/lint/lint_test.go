@@ -49,6 +49,31 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 	assert.Equal(t, "secret-leak", runner.Rules()[0].ID)
 }
 
+func TestFindingThreatRuleIDsAreDeepCopied(t *testing.T) {
+	threatIDs := []string{"CTR-017", "CTR-018"}
+	rule := Rule{
+		ID: "copied-threats", Description: "Verify rule threat metadata is independent",
+		FindingThreatRuleIDs: threatIDs, Severity: Warning,
+		Check: func(context.Context, Input) ([]Diagnostic, error) { return nil, nil },
+	}
+	runner, err := New(rule)
+	require.NoError(t, err)
+
+	threatIDs[0] = "CTR-019"
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, runner.Rules()[0].FindingThreatRuleIDs)
+
+	returned := runner.Rules()
+	returned[0].FindingThreatRuleIDs[1] = "CTR-020"
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, runner.Rules()[0].FindingThreatRuleIDs)
+
+	selected, err := runner.Select("copied-threats")
+	require.NoError(t, err)
+	selectedRules := selected.Rules()
+	selectedRules[0].FindingThreatRuleIDs[0] = "CTR-021"
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, selected.Rules()[0].FindingThreatRuleIDs)
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, runner.Rules()[0].FindingThreatRuleIDs)
+}
+
 func TestIndependentRulesAndFailures(t *testing.T) {
 	first := Rule{
 		ID: "structural", Description: "An independent non-taint rule", Severity: Warning,

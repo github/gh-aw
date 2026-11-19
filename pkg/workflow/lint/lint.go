@@ -131,11 +131,19 @@ func New(rules ...Rule) (*Runner, error) {
 		}
 		seen[rule.ID] = struct{}{}
 	}
-	return &Runner{rules: slices.Clone(rules)}, nil
+	return &Runner{rules: cloneRules(rules)}, nil
 }
 
 func (r *Runner) Rules() []Rule {
-	return slices.Clone(r.rules)
+	return cloneRules(r.rules)
+}
+
+func cloneRules(rules []Rule) []Rule {
+	cloned := slices.Clone(rules)
+	for index := range cloned {
+		cloned[index].FindingThreatRuleIDs = slices.Clone(cloned[index].FindingThreatRuleIDs)
+	}
+	return cloned
 }
 
 // Select rejects unknown IDs rather than silently skipping a requested check.

@@ -1,12 +1,18 @@
 package lint
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/workflow/aw"
+	"github.com/github/gh-aw/pkg/workflow/taint"
+	"github.com/rhysd/actionlint"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 // SafeOutputCredentialsRule flags authored safe-outputs.steps that would
@@ -22,17 +28,14 @@ func SafeOutputCredentialsRule() Rule {
 	}
 }
 
-const safeOutputInputPath = `["']?(?:\$\{?GH_AW_AGENT_OUTPUT\}?|\$\{?GH_AW_SAFE_OUTPUTS\}?|/tmp/gh-aw/|\$\{?RUNNER_TEMP\}?/gh-aw/|\$\{\{\s*runner\.temp\s*\}\}/gh-aw/)`
-
 var (
-	safeOutputMintedTokenRE = regexp.MustCompile(`(?i)\bsteps\s*(?:\.\s*([A-Za-z0-9_-]+-app-token)\b|\[\s*['"]([A-Za-z0-9_-]+-app-token)['"]\s*\])`)
-	safeOutputEnvFileRE     = regexp.MustCompile(`\$\{?(?:GITHUB_ENV|GITHUB_PATH)\b`)
-	safeOutputCoreExportRE  = regexp.MustCompile(`\bcore\.(?:exportVariable|addPath)\s*\(`)
-	safeOutputTamperRE      = regexp.MustCompile(
-		`(?:>>?|\btee(?:\s+-a)?|\bsed\s+-[a-zA-Z]*i[a-zA-Z]*(?:\s+(?:'[^']*'|"[^"]*"|\S+))?|\brm(?:\s+-[a-zA-Z]+)*|\btruncate(?:\s+-\S+(?:\s+\S+)?)*)\s*` + safeOutputInputPath,
-	)
-	safeOutputMoveCopyRE    = regexp.MustCompile(`^\s*(?:mv|cp)\s`)
-	safeOutputInputTargetRE = regexp.MustCompile(`^` + safeOutputInputPath)
+	safeOutputStepReferenceRE = regexp.MustCompile(`(?i)\bsteps\s*(?:\.\s*([A-Za-z0-9_-]+)|\[\s*['"]([^'"]+)['"]\s*\])`)
+	safeOutputStatusCheckRE   = regexp.MustCompile(`(?i)^\s*(?:\.\s*(?:outcome|conclusion)\b|\[\s*['"](?:outcome|conclusion)['"]\s*\])`)
+	safeOutputTokenStepIDRE   = regexp.MustCompile(`(?i)(?:^|-)app-token(?:-|$)`)
+	safeOutputInputTargetRE   = regexp.MustCompile(`^(?:\$GH_AW_(?:AGENT_OUTPUT|SAFE_OUTPUTS)(?:/.*)?|\$\{GH_AW_(?:AGENT_OUTPUT|SAFE_OUTPUTS)\}(?:/.*)?|/tmp/gh-aw(?:/.*)?|\$RUNNER_TEMP/gh-aw(?:/.*)?|\$\{RUNNER_TEMP\}/gh-aw(?:/.*)?|\$\{\{\s*runner\.temp\s*\}\}/gh-aw(?:/.*)?)$`)
+	safeOutputEnvRedirectRE   = regexp.MustCompile(`(?i)(?:>>?|>\||&>>?|&>)\s*["']?` + `(?:\$env:\s*GITHUB_(?:ENV|PATH)\b|\$\{env:GITHUB_(?:ENV|PATH)\}|\$\{?GITHUB_(?:ENV|PATH)\}?|\$\{\{\s*github\.(?:env|path)\s*\}\})`)
+	safeOutputEnvCommandRE    = regexp.MustCompile(`(?i)\b(?:set-content|add-content|out-file|tee)(?:\s+-a)?\b[^;\r\n]*` + `(?:\$env:\s*GITHUB_(?:ENV|PATH)\b|\$\{env:GITHUB_(?:ENV|PATH)\}|\$\{?GITHUB_(?:ENV|PATH)\}?|\$\{\{\s*github\.(?:env|path)\s*\}\})`)
+	safeOutputCoreExportRE    = regexp.MustCompile(`\bcore\.(?:exportVariable|addPath)\s*\(`)
 )
 
 func checkSafeOutputCredentials(ctx context.Context, input Input) ([]Diagnostic, error) {
@@ -53,11 +56,18 @@ func checkSafeOutputCredentials(ctx context.Context, input Input) ([]Diagnostic,
 		return nil, err
 	}
 	declared := make(map[string]struct{})
-	for _, raw := range steps {
-		if step, ok := raw.(map[string]any); ok {
-			if id, ok := step["id"].(string); ok {
-				declared[strings.ToLower(id)] = struct{}{}
-			}
+	addDeclaredStepIDs(steps, declared)
+	if jobs, ok := input.Document.Frontmatter["jobs"].(map[string]any); ok {
+		for _, key := range []string{"safe-outputs", "safe_outputs"} {
+			addDeclaredStepIDs(jobs[key], declared)
+		}
+	}
+	for _, key := range []string{"pre-steps", "setup-steps"} {
+		addDeclaredStepIDs(outputs[key], declared)
+	}
+	if jobs, ok := outputs["jobs"].(map[string]any); ok {
+		for _, job := range jobs {
+			addDeclaredStepIDs(job, declared)
 		}
 	}
 	var diagnostics []Diagnostic
@@ -72,13 +82,32 @@ func checkSafeOutputCredentials(ctx context.Context, input Input) ([]Diagnostic,
 			failures = append(failures, fmt.Errorf("safe-output-credentials requires a step mapping at %s", path))
 			continue
 		}
-		diagnostics = append(diagnostics, safeOutputStepCredentialDiagnostics(step, path, declared, severity)...)
+		found, err := safeOutputStepCredentialDiagnostics(ctx, input, step, path, declared, severity)
+		diagnostics = append(diagnostics, found...)
+		failures = append(failures, err)
 	}
 	return diagnostics, errors.Join(failures...)
 }
 
-func safeOutputStepCredentialDiagnostics(step map[string]any, path string, declared map[string]struct{}, severity Severity) []Diagnostic {
+func addDeclaredStepIDs(value any, declared map[string]struct{}) {
+	switch value := value.(type) {
+	case map[string]any:
+		if id, ok := value["id"].(string); ok {
+			declared[strings.ToLower(id)] = struct{}{}
+		}
+		for _, item := range value {
+			addDeclaredStepIDs(item, declared)
+		}
+	case []any:
+		for _, item := range value {
+			addDeclaredStepIDs(item, declared)
+		}
+	}
+}
+
+func safeOutputStepCredentialDiagnostics(ctx context.Context, input Input, step map[string]any, path string, declared map[string]struct{}, severity Severity) ([]Diagnostic, error) {
 	var diagnostics []Diagnostic
+	var failures []error
 	report := func(threatRuleID, path, message string) {
 		diagnostics = append(diagnostics, Diagnostic{ThreatRuleID: threatRuleID, Severity: severity, Path: path, Message: message})
 	}
@@ -94,24 +123,34 @@ func safeOutputStepCredentialDiagnostics(step map[string]any, path string, decla
 		}
 	}
 	script, scriptPath := safeOutputStepScript(step, path)
-	if script != "" && (safeOutputEnvFileRE.MatchString(script) || safeOutputCoreExportRE.MatchString(script)) {
+	if script != "" && (safeOutputWritesEnvironmentFile(script) || safeOutputCoreExportRE.MatchString(script)) {
 		report("CTR-036", scriptPath, "Safe-output step writes GITHUB_ENV or GITHUB_PATH, changing the environment of later handler steps that hold write tokens; use step-level env or GITHUB_OUTPUT instead")
 	}
-	if checkoutPath, persists := safeOutputCheckoutPersists(step, path); persists {
+	checkoutPath, persists, err := safeOutputCheckoutPersists(ctx, step, path)
+	failures = append(failures, err)
+	if persists {
 		report("CTR-037", checkoutPath, "Safe-output step checks out with persisted credentials, replacing the workspace and git credentials prepared for the handlers; set persist-credentials: false and a dedicated path")
 	}
-	if run, ok := step["run"].(string); ok && tampersWithSafeOutputInputs(run) {
+	if run, ok := step["run"].(string); ok && tampersWithSafeOutputInputs(ctx, input, step, path, run) {
 		report("CTR-038", path+".run", "Safe-output step modifies agent output or patch files under /tmp/gh-aw that handlers apply after threat detection; write scratch files to RUNNER_TEMP or the workspace instead")
 	}
-	return diagnostics
+	return diagnostics, errors.Join(failures...)
 }
 
 func referencesMintedToken(value any, declared map[string]struct{}) bool {
 	switch v := value.(type) {
 	case string:
-		for _, match := range safeOutputMintedTokenRE.FindAllStringSubmatch(v, -1) {
-			id := strings.ToLower(strings.Join(match[1:], ""))
-			if _, ok := declared[id]; !ok {
+		for _, match := range safeOutputStepReferenceRE.FindAllStringSubmatchIndex(v, -1) {
+			var id string
+			if match[2] >= 0 {
+				id = v[match[2]:match[3]]
+			} else {
+				id = v[match[4]:match[5]]
+			}
+			if !safeOutputTokenStepIDRE.MatchString(id) || safeOutputStatusCheckRE.MatchString(v[match[1]:]) {
+				continue
+			}
+			if _, ok := declared[strings.ToLower(id)]; !ok {
 				return true
 			}
 		}
@@ -139,44 +178,129 @@ func safeOutputStepScript(step map[string]any, path string) (string, string) {
 	return "", ""
 }
 
-func safeOutputCheckoutPersists(step map[string]any, path string) (string, bool) {
+func safeOutputCheckoutPersists(ctx context.Context, step map[string]any, path string) (string, bool, error) {
 	uses, ok := step["uses"].(string)
-	if !ok {
-		return "", false
-	}
-	uses = strings.TrimSpace(uses)
-	if uses != "actions/checkout" && !strings.HasPrefix(uses, "actions/checkout@") {
-		return "", false
+	if !ok || actionName(uses) != "actions/checkout" {
+		return "", false, nil
 	}
 	with, ok := step["with"].(map[string]any)
 	if !ok {
-		return path + ".uses", true
+		return path + ".uses", true, nil
 	}
-	switch value := with["persist-credentials"].(type) {
-	case bool:
-		return path + ".with.persist-credentials", value
-	case string:
-		return path + ".with.persist-credentials", value != "false"
-	case nil:
-		return path + ".uses", true
+	value, present := with["persist-credentials"]
+	if !present {
+		return path + ".uses", true, nil
 	}
-	return path + ".with.persist-credentials", true
+	enabled, known, err := actionInputBoolean(ctx, value, path+".with.persist-credentials")
+	return path + ".with.persist-credentials", !known || enabled, err
 }
 
-func tampersWithSafeOutputInputs(script string) bool {
-	for line := range strings.Lines(script) {
-		line = strings.TrimRight(line, "\r\n")
-		for _, command := range strings.FieldsFunc(line, func(r rune) bool { return r == ';' || r == '|' || r == '&' }) {
-			if safeOutputTamperRE.MatchString(command) {
-				return true
-			}
-			if safeOutputMoveCopyRE.MatchString(command) {
-				fields := strings.Fields(command)
-				if len(fields) > 2 && slices.ContainsFunc(fields[len(fields)-1:], safeOutputInputTargetRE.MatchString) {
-					return true
-				}
-			}
-		}
+func safeOutputWritesEnvironmentFile(script string) bool {
+	return safeOutputEnvRedirectRE.MatchString(script) || safeOutputEnvCommandRE.MatchString(script)
+}
+
+func tampersWithSafeOutputInputs(ctx context.Context, input Input, step map[string]any, path, script string) bool {
+	if safeOutputRedirectsToInput(ctx, script, path) {
+		return true
 	}
-	return false
+	block := aw.ExecutionBlock{Path: "safe-outputs"}
+	shellStep := aw.ExecutionStep{Fields: step, Path: path}
+	found := false
+	_, _ = policyShellCalls(ctx, input, block, shellStep, func(call *syntax.CallExpr, source string) ([]Diagnostic, error) {
+		if safeOutputCallWritesInput(call, source) {
+			found = true
+		}
+		return nil, nil
+	})
+	return found
+}
+
+func safeOutputRedirectsToInput(ctx context.Context, script, path string) bool {
+	rendered := []byte(script)
+	if err := taint.VisitInterpolations(ctx, script, path, func(start, end, _ int, _ actionlint.ExprNode) error {
+		for index := start; index < end; index++ {
+			rendered[index] = 'x'
+		}
+		return ctx.Err()
+	}); err != nil {
+		return false
+	}
+	tree, err := syntax.NewParser().Parse(bytes.NewReader(rendered), "")
+	if err != nil {
+		return false
+	}
+	found := false
+	syntax.Walk(tree, func(node syntax.Node) bool {
+		redirect, ok := node.(*syntax.Redirect)
+		if !ok || (redirect.Op != syntax.RdrOut && redirect.Op != syntax.AppOut &&
+			redirect.Op != syntax.RdrClob && redirect.Op != syntax.AppClob &&
+			redirect.Op != syntax.RdrAll && redirect.Op != syntax.RdrAllClob) {
+			return true
+		}
+		start, end := redirect.Word.Pos().Offset(), redirect.Word.End().Offset()
+		found = safeOutputInputTarget(script[start:end])
+		return !found
+	})
+	return found
+}
+
+func safeOutputCallWritesInput(call *syntax.CallExpr, script string) bool {
+	if len(call.Args) < 2 {
+		return false
+	}
+	command := strings.ToLower(policyShellArgument(call, 0))
+	args := call.Args[1:]
+	operands := make([]string, 0, len(args))
+	var targetDirectory string
+	endOptions := false
+	for index := 0; index < len(args); index++ {
+		value := policyShellLiteral(args[index])
+		if value == "--" {
+			endOptions = true
+			continue
+		}
+		if !endOptions && strings.HasPrefix(value, "-") {
+			if (command == "cp" || command == "mv") && (value == "-t" || value == "--target-directory") && index+1 < len(args) {
+				index++
+				targetDirectory = shellWordSource(args[index], script)
+				continue
+			}
+			if (command == "cp" || command == "mv") && strings.HasPrefix(value, "--target-directory=") {
+				targetDirectory = strings.TrimPrefix(shellWordSource(args[index], script), "--target-directory=")
+				continue
+			}
+			continue
+		}
+		operands = append(operands, shellWordSource(args[index], script))
+	}
+
+	switch command {
+	case "rm", "truncate", "tee":
+		return slices.ContainsFunc(operands, safeOutputInputTarget)
+	case "sed":
+		inPlace := slices.ContainsFunc(args, func(word *syntax.Word) bool {
+			value := policyShellLiteral(word)
+			return value == "-i" || value == "--in-place" || strings.HasPrefix(value, "-i.")
+		})
+		if !inPlace {
+			return false
+		}
+		return len(operands) > 1 && slices.ContainsFunc(operands[1:], safeOutputInputTarget)
+	case "cp", "mv":
+		if targetDirectory != "" {
+			return safeOutputInputTarget(targetDirectory)
+		}
+		return len(operands) > 1 && safeOutputInputTarget(operands[len(operands)-1])
+	default:
+		return false
+	}
+}
+
+func shellWordSource(word *syntax.Word, script string) string {
+	start, end := word.Pos().Offset(), word.End().Offset()
+	return strings.Trim(script[start:end], `"'`)
+}
+
+func safeOutputInputTarget(target string) bool {
+	return safeOutputInputTargetRE.MatchString(strings.Trim(strings.TrimSpace(target), `"'`))
 }
