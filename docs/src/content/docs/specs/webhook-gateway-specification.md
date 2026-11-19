@@ -19,6 +19,12 @@ sidebar:
 
 This specification defines the compiler-to-receiver and receiver-to-runner contract for `on.gateway-dispatch`. It covers GitHub issues, pull requests, discussions, every comment family, reviews/threads, Projects, security alerts, imported connector triggers, and commands. Arbitrary undeclared custom webhook identifiers are unsupported. It does not register webhook sources and is unrelated to the MCP gateway.
 
+The [bounded TLA+ model and TLC-backed security threat model](https://github.com/github/gh-aw/tree/main/specs/webhook-gateway)
+exercise admission, replay/recovery, discovery fencing and destination trust
+boundaries. They distinguish shipped destination checks from external receiver
+requirements; bounded model checking does not prove implementation conformance
+or hosted readiness.
+
 The terms **MUST**, **MUST NOT**, and **MAY** describe requirements for conforming integrations. Receiver requirements are not claims that gh-aw ships a receiver: provider onboarding, signature verification, source authorization, durable admission, and dispatch remain integration responsibilities. This contract does not establish compatibility with the proposed hosted CAO RFC-033 interchange.
 
 > [!IMPORTANT]
