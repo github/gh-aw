@@ -61,19 +61,37 @@ function isModelResolutionData(data) {
 /** @param {unknown} value @returns {boolean} */
 const isNativePath = value => typeof value === "string" && /^sandbox\/agent\/logs\/copilot-session-state\/[A-Za-z0-9_-]+\/events\.jsonl$/.test(value);
 
+/** @param {SessionEvent} event */
+function hasPersistedNativeAccounting(event) {
+  const p = event.provenance;
+  if (!p || typeof p !== "object" || !("component" in p) || p.component !== "agent" || !("phase" in p) || p.phase !== "agent" || !("path" in p) || typeof p.path !== "string") return false;
+  return isNativePath(p.path) || isNativePath(`sandbox/agent/logs/${p.path}`);
+}
+
+/** @param {SessionEvent} event */
+function withoutAccountingSnapshot(event) {
+  const { accountingSnapshot, ...data } = event.data;
+  return { ...event, data };
+}
+
 /**
  * Source-local positions disambiguate repeated native IDs and expanded records.
  * Equal timestamps and untimed observations retain deterministic source order.
  * @param {SessionSource[]} sources
+ * @param {string} [engine]
  * @returns {import("./types/unified_session").UnifiedSession}
  */
-function mergeSessionSources(sources) {
+function mergeSessionSources(sources, engine) {
   return orderSessionSources(
     sources.map(source => ({
       ...source,
       events: source.events.map((event, index) => {
         const timestampMs = sessionTimestamp(event, source.timestampUnit);
-        const normalized = normalizeUnifiedSessionEvent(event, source.phase);
+        const agentShutdown = event.type === "session.shutdown" && source.component === "agent";
+        const nativeFile = agentShutdown && isNativePath(source.path.split(path.sep).join("/"));
+        const copilotSource = agentShutdown && (engine === "copilot" || nativeFile);
+        const fallbackShutdown = copilotSource && !nativeFile && !(source.path === "agent-session.jsonl" && hasPersistedNativeAccounting(event));
+        const normalized = normalizeUnifiedSessionEvent(fallbackShutdown ? withoutAccountingSnapshot(event) : event, source.phase, copilotSource);
         const native = event.provenance;
         const sourceIndex =
           source.component === "agent" &&
@@ -494,7 +512,9 @@ function collectUnifiedSession({
   if (canonicalSource && canonicalCopilot) {
     const groups = new Map();
     let activeId;
-    for (const event of canonicalSource.events) {
+    for (const saved of canonicalSource.events) {
+      // An inferred session path groups the conversation, but cannot establish the origin of a shutdown's bill.
+      const event = saved.type === "session.shutdown" && !hasPersistedNativeAccounting(saved) ? withoutAccountingSnapshot(saved) : saved;
       const id = sessionId(event);
       if (id) activeId = id;
       const nativePath = nativeProvenance(event).path;
@@ -930,7 +950,7 @@ function collectUnifiedSession({
   /** @type {import("./types/agent_session").SessionFileFormatEvent} */
   const format = { type: "session.format", data: { version: SESSION_FILE_FORMAT_VERSION } };
   sources.push({ component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", events: [format, ...warnings, ...routingEstimates, summary] });
-  const events = correlateHarnessAttempts(mergeSessionSources(sources));
+  const events = correlateHarnessAttempts(mergeSessionSources(sources, engine ?? (canonicalCopilot ? "copilot" : undefined)));
   const formatIndex = events.findIndex(event => event.type === "session.format" && event.provenance.component === "collector" && event.provenance.index === 0);
   // File metadata leads the stream without inventing a timestamp for it.
   const [header] = events.splice(formatIndex, 1);
