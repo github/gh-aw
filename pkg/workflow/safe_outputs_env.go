@@ -265,6 +265,9 @@ func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, da
 }
 
 func resolveSafeOutputGitHubTokenForConfig(data *WorkflowData, configToken string, resolver func(string) string, allowGitHubApp bool) string {
+	if allowGitHubApp && usesTokenBrokerSafeOutputs(data) && configToken == "" {
+		return "${{ steps.safe-outputs-app-token.outputs.token }}"
+	}
 	var safeOutputsToken string
 	var githubApp *GitHubAppConfig
 	if data.SafeOutputs != nil {
@@ -297,6 +300,9 @@ func (c *Compiler) safeOutputGitHubTokenSource(data *WorkflowData) string {
 	}
 
 	safeOutputs := data.SafeOutputs
+	if safeOutputs.TokenBroker {
+		return `"app"`
+	}
 	if safeOutputs.GitHubApp == nil {
 		return safeOutputGitHubTokenSourceForToken(safeOutputs.GitHubToken)
 	}

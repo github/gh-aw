@@ -415,6 +415,7 @@ type GitHubToolConfig struct {
 	Toolset     GitHubToolsets     `yaml:"toolsets,omitempty"`
 	Lockdown    bool               `yaml:"lockdown,omitempty"`
 	GitHubApp   *GitHubAppConfig   `yaml:"github-app,omitempty"` // GitHub App configuration for token minting
+	TokenBroker bool               `yaml:"token-broker,omitempty" json:"token-broker,omitempty"`
 
 	// Guard policy fields (flat syntax under github:)
 	// AllowedRepos defines the access scope for policy enforcement.

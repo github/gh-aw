@@ -94,7 +94,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
 
   /** @param {string} tokenType @param {string} [provider] @returns {Promise<string>} */
   async function getToken(tokenType, provider = "github") {
-    if (tokenType !== "copilot-request" && tokenType !== "copilot-task") throw failure("UNSUPPORTED");
+    if (tokenType !== "copilot-request" && tokenType !== "copilot-task" && tokenType !== "github-app") throw failure("UNSUPPORTED");
     if (tokenType === "copilot-request" && (typeof provider !== "string" || !/^[a-z][a-z0-9_-]{0,63}$/.test(provider))) throw failure("UNSUPPORTED");
     if (!Object.hasOwn(env, "GH_AW_TOKEN_BROKER_URL")) throw failure("CONFIGURATION");
     const snapshot = { ...env };

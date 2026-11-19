@@ -134,6 +134,8 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 		ctx.workflowData.TokenBrokerCopilotTask = config.TokenBroker.CopilotTask
 		ctx.workflowData.TokenBrokerEnabled = config.TokenBroker.CopilotRequest || config.TokenBroker.CopilotTask
 	}
+	ctx.workflowData.TokenBrokerEnabled = ctx.workflowData.TokenBrokerEnabled ||
+		usesTokenBrokerGitHubTool(ctx.workflowData) || usesTokenBrokerSafeOutputs(ctx.workflowData)
 	resolveMaxDailyAICBackendIntoWorkflowData(ctx.workflowData, ctx.frontmatter.Frontmatter, engineSetup.importsResult.MergedMaxDailyAICredits)
 	return nil
 }
@@ -691,7 +693,7 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	}
 
 	// Populate the App field if it's not set in the top-level workflow but is in an included config
-	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.GitHubApp == nil && includedApp != nil {
+	if workflowData.SafeOutputs != nil && !workflowData.SafeOutputs.TokenBroker && workflowData.SafeOutputs.GitHubApp == nil && includedApp != nil {
 		workflowData.SafeOutputs.GitHubApp = includedApp
 	}
 
@@ -752,6 +754,8 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// Apply the top-level github-app as a fallback for all nested github-app token minting operations.
 	// This runs last so that all section-specific configurations have been resolved first.
 	applyTopLevelGitHubAppFallbacks(workflowData)
+	workflowData.TokenBrokerEnabled = workflowData.TokenBrokerEnabled ||
+		usesTokenBrokerGitHubTool(workflowData) || usesTokenBrokerSafeOutputs(workflowData)
 
 	// Extract experiments configuration once; derive the simple variants map from the configs.
 	workflowData.ExperimentConfigs = extractExperimentConfigsFromFrontmatter(frontmatter)

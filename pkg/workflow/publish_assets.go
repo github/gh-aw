@@ -144,10 +144,7 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 	// Step 1: Checkout repository
 	preSteps = buildCheckoutRepository(preSteps, c, "", "")
 
-	// Step 2: Configure Git credentials
-	preSteps = append(preSteps, c.generateGitConfigurationSteps()...)
-
-	// Step 3: Download assets artifact if it exists.
+	// Step 2: Download assets artifact if it exists.
 	// In workflow_call context, use the per-invocation prefix from the agent job to match the uploaded artifact name.
 	assetsArtifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
 	preSteps = append(preSteps, "      - name: Download assets\n")
@@ -234,6 +231,7 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 		PreSteps:      preSteps,
 		PostSteps:     postSteps,
 		Token:         data.SafeOutputs.UploadAssets.GitHubToken,
+		GitHubApp:     data.SafeOutputs.UploadAssets.GitHubApp,
 		Needs:         needs,
 	})
 }

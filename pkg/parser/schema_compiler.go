@@ -152,6 +152,7 @@ var safeOutputMetaFields = map[string]bool{
 	"env":                   true,
 	"github-token":          true,
 	"github-app":            true,
+	"token-broker":          true,
 	"max-patch-size":        true,
 	"jobs":                  true,
 	"runs-on":               true,

@@ -4770,6 +4770,11 @@ tools:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+    # Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token.
+    # Mutually exclusive with github-app and github-token when true.
+    # (optional)
+    token-broker: true
+
     # GitHub MCP server toolset name(s) to enable. Accepts a single toolset name
     # (string) or an array of toolset names.
     # (optional)
@@ -21968,6 +21973,11 @@ safe-outputs:
   # secrets.GITHUB_TOKEN }} or ${{ secrets.CUSTOM_PAT }}
   # (optional)
   github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token.
+  # Mutually exclusive with github-app and github-token when true.
+  # (optional)
+  token-broker: true
 
   # GitHub App credentials for minting installation access tokens. When configured,
   # a token will be generated using the app credentials and used for all safe output

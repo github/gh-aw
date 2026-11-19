@@ -2753,7 +2753,7 @@ describe("native queue launch fencing and conservative recovery", () => {
     }
   });
 
-  it.each([undefined, null, { kind: "unsupported" }, { kind: "github_app" }])("rejects public dispatch credential metadata %j before constructing a client or publishing", async credential => {
+  it.each([undefined, null, { kind: "unsupported" }, { kind: "github_app" }, { kind: "broker_unverified" }])("rejects public dispatch credential metadata %j before constructing a client or publishing", async credential => {
     const { fixture, options, post } = setup({ granted: false });
     const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-public-credential-"));
     const filename = path.join(directory, "intents.jsonl");
@@ -2783,6 +2783,7 @@ describe("native queue launch fencing and conservative recovery", () => {
         core,
       });
       expect(result.receipts).toEqual([expect.objectContaining({ status: "blocked" })]);
+      if (credential?.kind === "broker_unverified") expect(result.receipts[0].explanation).toContain("broker did not provide a verified App identity binding");
       expect(result).toMatchObject({ status: "recovery_required", success: false });
       expect(core.setOutput).toHaveBeenCalledWith("work_queue_controls_status", "recovery_required");
       expect(core.setFailed).toHaveBeenCalled();

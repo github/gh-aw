@@ -12,7 +12,7 @@ func resolveSecurityAdvisoryGitHubToken(config *SafeOutputsConfig, key string, h
 	if token := resolveHandlerGitHubToken(handler.GitHubApp, key, handler.GitHubToken); token != "" {
 		return token
 	}
-	if config.GitHubApp != nil {
+	if config.GitHubApp != nil || config.TokenBroker {
 		return "${{ steps.safe-outputs-app-token.outputs.token }}"
 	}
 	return config.GitHubToken
