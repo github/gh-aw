@@ -48,6 +48,22 @@ jobs:
 	require.NoError(t, compiler.lintCompiledWorkflow(data, safe, "haiku.md"))
 }
 
+func TestCompilerLintDoesNotApplySafeOutputCredentialsRule(t *testing.T) {
+	t.Parallel()
+	document, err := aw.Parse("---\non: workflow_dispatch\nsafe-outputs:\n  steps:\n    - run: echo A=1 >> \"$GITHUB_ENV\"\n---\nTest.\n")
+	require.NoError(t, err)
+	content := `on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo safe
+`
+	require.NoError(t, NewCompiler(WithLint(true)).lintCompiledWorkflow(
+		&WorkflowData{SourceDocument: document}, content, "test.md",
+	))
+}
+
 func TestCompilerLintRejectsInvalidGeneratedAST(t *testing.T) {
 	t.Parallel()
 	require.ErrorContains(t, NewCompiler(WithLint(true)).lintCompiledWorkflow(&WorkflowData{}, "jobs: [", "test.md"), "cannot parse generated Actions AST")

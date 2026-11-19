@@ -2106,6 +2106,13 @@ safe-outputs:
 
 The compiler fails compilation when a job consumes `${{ steps.<id>.outputs.* }}` but never declares a step with that id, or declares it after the first consumer, rather than emitting a lock file with an unresolvable reference.
 
+`safe-outputs.steps:` run after the compiler mints write tokens and configures git credentials for the handlers. To catch accidental misuse of those credentials, the [`safe-output-credentials`](/gh-aw/reference/workflow-linters/) rule in `gh aw lint` reports steps that:
+
+- reference a compiler-minted token such as `steps.safe-outputs-app-token.outputs.token`;
+- write to `$GITHUB_ENV` or `$GITHUB_PATH`, or call `core.exportVariable`/`core.addPath`;
+- run `actions/checkout` without `persist-credentials: false`;
+- modify agent output or patch files under `/tmp/gh-aw`, which handlers apply after threat detection.
+
 ### Using a GitHub App for Authentication (`github-app:`)
 
 Use GitHub App tokens for enhanced security: on-demand token minting, automatic revocation, fine-grained permissions, and better attribution.
