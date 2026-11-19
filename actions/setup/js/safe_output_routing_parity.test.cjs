@@ -469,7 +469,7 @@ describe("real immutable Claim routing", () => {
     const fixture = activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
     await scope.withClaimExecution({ assignment: fixture.assignment, claim_handle: "h1", authorize }, () => manifest.writeSafeOutputErrorReport({ message: "Original handler failure" }));
     const options = managerOptions({
-      finalizeResults: vi.fn(async () => ({ claims: { h1: { state }, h2: { state: "result" } } })),
+      finalizeResults: vi.fn(async () => ({ claims: { h1: { state, attempts: 0 }, h2: { state: "result" } } })),
     });
     const result = await manager.main(options);
     expect(result.settlements).toHaveLength(2);
@@ -482,7 +482,7 @@ describe("real immutable Claim routing", () => {
     expect(report).toMatchObject({
       claim_handle: "h1",
       errorCode: "claim_delivery_unverified",
-      message: `Claim delivery state: ${state}; effects: unknown`,
+      message: `Claim delivery state: ${state}; effects: unknown; attempts: 0`,
       failures: [{ type: "claim_delivery", errorCode: state === "delivery_failed" ? "delivery_failed" : "verification_unresolved" }],
     });
     expect(fs.statSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME)).mode & 0o777).toBe(0o600);

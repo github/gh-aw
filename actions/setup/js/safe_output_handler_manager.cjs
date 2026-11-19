@@ -2693,7 +2693,7 @@ async function main(options = {}) {
           recordSafeOutputFailure(
             {
               errorCode: "claim_delivery_unverified",
-              message: `Claim delivery state: ${result?.state || "pending"}; effects: ${result?.effects || "unknown"}`,
+              message: `Claim delivery state: ${result?.state || "pending"}; effects: ${result?.effects || "unknown"}; attempts: ${result?.attempts ?? "unknown"}`,
               failures: [
                 {
                   type: "claim_delivery",
