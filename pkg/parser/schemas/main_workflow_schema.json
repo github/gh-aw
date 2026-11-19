@@ -14483,6 +14483,11 @@
                     "type": "string",
                     "enum": ["string", "number", "boolean"],
                     "description": "Type of each array item."
+                  },
+                  "maxLength": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Maximum Unicode code points in a string item."
                   }
                 },
                 "additionalProperties": false

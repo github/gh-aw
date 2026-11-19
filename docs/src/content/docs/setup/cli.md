@@ -942,7 +942,7 @@ Analyze workflow runs with detailed reports. The `audit` command has two modes: 
 Analyze a single run with a multi-section report. Accepts run IDs and workflow run, job, or step URLs. Auto-detects Copilot coding agent runs. Job URLs extract that job's logs; step URLs extract that step, otherwise the first failing step.
 
 ```bash wrap
-gh aw audit 12345678 --repo owner/repo                   # By run ID
+gh aw audit 12345678                                   # By run ID in the current repository
 gh aw audit https://github.com/owner/repo/actions/runs/123 # By workflow run URL
 gh aw audit https://github.com/owner/repo/actions/runs/123/job/456 # By job URL (extracts first failing step)
 gh aw audit https://github.com/owner/repo/actions/runs/123/job/456#step:7:1 # By step URL (extracts specific step)
@@ -951,19 +951,19 @@ gh aw audit 12345678 --repo owner/repo                    # Specify repository f
 gh aw audit 12345678 --repo owner/repo --models           # Detailed same-run model information
 ```
 
-**`--stdin` flag:** Reads run IDs or URLs from stdin (one per line) instead of positional arguments (mutually exclusive). Blank and `#`-prefixed lines are ignored. Bare numeric IDs require `--repo owner/repo`; full URLs carry their own repo context.
+**`--stdin` flag:** Reads run IDs or URLs from stdin (one per line) instead of positional arguments (mutually exclusive). Blank and `#`-prefixed lines are ignored. Bare numeric IDs use the current repository unless `--repo owner/repo` is provided; full URLs carry their own repository context. If the current repository cannot be detected, provide `--repo` or a run URL.
 
 ```bash wrap
-echo -e "1234567890\n9876543210" | gh aw audit --stdin --repo owner/repo # diff mode: first is base
+echo -e "1234567890\n9876543210" | gh aw audit --stdin # diff mode in the current repository: first is base
 cat run-ids.txt | gh aw audit --stdin --repo owner/repo
 gh aw audit 1234567890 --repo owner/repo --runtime cloud-hypervisor # Skip run unless sandbox agent runtime matches
 ```
 
-**Options:** `--adoption`, `--adoption-dir`, `--artifacts`, `--delivery`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+**Options:** `--adoption`, `--artifacts`, `--delivery`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
 
 `--models` adds the run's advertised model catalog, discovery completeness, and supported API endpoints alongside the recorded model selection, routing, and usage. With `--json`, the catalog is in `model_catalog`. Missing, invalid, or incomplete inventory is reported explicitly and does not establish model absence. The flag automatically includes the `agent`, `usage`, and `info` artifact sets when `--artifacts` is narrowed. It requires a single run and cannot be combined with `--group` or job/step URLs.
 
-`--delivery` adds recorded safe-output delivery evidence; `--adoption` also refreshes supported GitHub decisions. Both require a single full run, not group, diff, job, or step mode. See [Delivery and adoption](/gh-aw/reference/delivery-adoption/) for rules, coverage, retention, and `--adoption-dir`.
+`--delivery` adds recorded safe-output delivery evidence; `--adoption` also refreshes supported GitHub decisions. Both require a single full run, not group, diff, job, or step mode. To export JSONL observations, use `gh aw logs --adoption --adoption-dir DIR`. See [Delivery and adoption](/gh-aw/reference/delivery-adoption/) for rules, coverage, and retention.
 
 `--search "query"` retrieves evidence from the run's redacted unified session using local BM25 ranking, without changing audit findings. `--search-limit` bounds returned evidence groups (default: `5`, range: `1–20`). Search requires a single run and cannot be combined with `--group` or job/step URLs. See [Searching session evidence](/gh-aw/reference/audit/#searching-session-evidence) for input limits and automatic repetition grouping.
 
