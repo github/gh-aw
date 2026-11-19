@@ -12,7 +12,7 @@ const policyOptions = { repository: options.repository, ref: "a".repeat(40), set
 
 describe("engine conformance queue portfolio", () => {
   it("selects supported engines first, recent changes next and eventually covers every engine", () => {
-    expect(ENGINES).toHaveLength(15);
+    expect(ENGINES).toHaveLength(16);
     const seen = new Set();
     for (let day = 0; day < 42; day++) {
       const date = new Date(Date.parse("2026-01-01T00:00:00Z") + day * 86400000).toISOString().slice(0, 10);
