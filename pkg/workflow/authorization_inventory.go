@@ -10,11 +10,17 @@ import (
 // AuthorizationRoute describes a compiler-resolved output or generated executor.
 // Authority values are deliberately excluded from JSON; callers publish fingerprints.
 type AuthorizationRoute struct {
-	Name          string                   `json:"name"`
-	Executor      string                   `json:"executor"`
-	Coverage      string                   `json:"coverage"`
-	Exempt        bool                     `json:"exempt"`
-	Staged        bool                     `json:"staged"`
+	Name     string `json:"name"`
+	Executor string `json:"executor"`
+	Coverage string `json:"coverage"`
+	Exempt   bool   `json:"exempt"`
+	Staged   bool   `json:"staged"`
+	// EffectAdapter names the trusted resolved-effect adapter contract
+	// supported by this route; empty routes remain invocation-bound.
+	EffectAdapter string `json:"effect_adapter,omitempty"`
+	// ScopeBinding is the binding a live protected invocation requests:
+	// resolved_effect or invocation. Empty when no authority is requested.
+	ScopeBinding  string                   `json:"scope_binding,omitempty"`
 	Authorization *SafeOutputAuthorization `json:"-"`
 }
 
@@ -55,9 +61,20 @@ func InspectEffectiveAuthorization(data *WorkflowData) []AuthorizationRoute {
 		if base == commentMemoryHandlerKey && data.CommentMemoryConfig != nil {
 			staged = staged || templatableBoolIsTrue(data.CommentMemoryConfig.Staged)
 		}
+		adapter := ""
+		if base == name {
+			adapter = safeOutputEffectAdapter(data, name, executor)
+		}
+		binding := ""
+		if requirement != nil && !staged {
+			binding = "invocation"
+			if adapter != "" {
+				binding = "resolved_effect"
+			}
+		}
 		routes = append(routes, AuthorizationRoute{
 			Name: name, Executor: executor, Coverage: coverage, Authorization: requirement,
-			Exempt: builtin && requirement == nil, Staged: staged,
+			Exempt: builtin && requirement == nil, Staged: staged, EffectAdapter: adapter, ScopeBinding: binding,
 		})
 	}
 	slices.SortFunc(routes, func(a, b AuthorizationRoute) int { return strings.Compare(a.Name, b.Name) })

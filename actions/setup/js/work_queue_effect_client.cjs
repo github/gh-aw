@@ -10,6 +10,8 @@ const { expectedGitHubHost, isTrustedGitHubApiUrl } = require("./work_queue_host
 const READ_METHODS = new Set(["get", "list", "getSarif", "getAnalysis", "getComment", "getCommit", "getRef", "getTree", "getBlob", "getArtifact", "getBranch", "getByUsername", "getWorkflowRun", "getWorkflowRunAttempt", "compareCommits"]);
 /** @type {WeakMap<object, {identity: ReturnType<typeof claimIdentity>, options: Record<string, unknown>}>} */
 const claimClients = new WeakMap();
+/** @type {WeakMap<object, () => unknown>} */
+const nativeFetches = new WeakMap();
 const NODE_QUERY = `query WorkQueueEffectTargets($ids: [ID!]!) {
   nodes(ids: $ids) {
     __typename
@@ -87,6 +89,25 @@ function requestSnapshot(target, args, fallbackRoute = "") {
   // defaults change during a native read or Claim authorization callback.
   const forwarded = native ? [{ ...merged, ...fields, url: parsed.url, method: parsed.method, headers: parsed.headers, data: body === undefined ? "" : JSON.stringify(body) }] : args;
   return { route: parsed.url, method: String(parsed.method).toUpperCase(), parameters, body, forwarded, native };
+}
+
+/**
+ * Snapshot REST arguments. Only a registered trusted effect-plan transport may
+ * cross this boundary as a function; it verifies the final wire request itself.
+ * @param {unknown[]} args
+ */
+function cloneRestArgs(args) {
+  return args.map(arg => {
+    /** @type {any} */
+    const options = arg;
+    const request = options && typeof options === "object" ? options.request : undefined;
+    if (!request || typeof request !== "object" || typeof request.fetch !== "function") return structuredClone(arg);
+    if (!require("./safe_output_effect_plan.cjs").isEffectTransport(request.fetch)) throw new Error("Claim clients cannot override the native request transport");
+    const { fetch, ...rest } = request;
+    const clone = structuredClone({ ...options, request: rest });
+    clone.request.fetch = fetch;
+    return clone;
+  });
 }
 
 /** @param {NativeTransport} target @param {unknown[]} args */
@@ -602,7 +623,7 @@ function wrapClaimEffectClient(client, options) {
           const method = String(parameters.method || explicitMethod || defaults.method || (READ_METHODS.has(name) ? "GET" : "POST")).toUpperCase();
           assertApiOrigin(route, parameters, defaults);
           if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-            const immutableArgs = structuredClone(args);
+            const immutableArgs = cloneRestArgs(args);
             const snapshot = requestSnapshot(target, immutableArgs);
             const actualRoute = snapshot.route;
             assertApiOrigin(actualRoute, snapshot.parameters, defaults);
@@ -685,6 +706,9 @@ function wrapClaimEffectClient(client, options) {
   };
   const wrapped = wrap(client, []);
   claimClients.set(wrapped, { identity: factoryIdentity, options: { ...options } });
+  /** @type {any} */
+  const nativeClient = client;
+  nativeFetches.set(wrapped, () => nativeClient.request?.endpoint?.DEFAULTS?.request?.fetch ?? null);
   return wrapped;
 }
 
@@ -701,8 +725,19 @@ async function withClaimEffectClients(options, callback) {
   }
 }
 
+/**
+ * The unauthenticated fetch implementation beneath a wrapped Claim client, so a
+ * trusted effect transport can delegate after its own wire verification.
+ * Returns undefined for clients that are not wrapped Claim roots.
+ * @param {unknown} client
+ */
+function claimClientNativeFetch(client) {
+  const resolve = client && typeof client === "object" ? nativeFetches.get(client) : undefined;
+  return resolve ? resolve() : undefined;
+}
+
 function graphEffectIdentity(query, variables, response) {
   return digest({ query, variables, response });
 }
 
-module.exports = { wrapClaimEffectClient, withClaimEffectClients, graphEffectIdentity };
+module.exports = { wrapClaimEffectClient, withClaimEffectClients, graphEffectIdentity, claimClientNativeFetch };

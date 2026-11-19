@@ -182,7 +182,12 @@ the invocation. Existing target restrictions, policy checks and queue Claim
 authorization remain required.
 
 An approval covers the prepared invocation of the reviewed implementation and
-its bound inputs, not necessarily one API write. Custom code may have multiple
+its bound inputs, not necessarily one API write. The `merge-pull-request` and
+`remove-labels` native routes instead request `resolved_effect` binding: one
+decision approves their frozen, finite request plan, and execution can send
+only those requests. An authority may deny `invocation` binding where it
+requires exact effects; denied resolved requests are never retried as
+invocation binding. Custom code may have multiple
 effects; a reusable-workflow approval covers its launch only. The authority must
 implement durable claims and replay reconciliation; no production authority is
 included. Protect workflow configuration and credentials independently. This

@@ -27,6 +27,19 @@ async function authorizeSafeOutputInvocation(options) {
   return state.authorize(options);
 }
 
+/**
+ * Request the single resolved-effect decision for a trusted adapter's frozen
+ * plan through the executor-supplied gate. There is no invocation fallback.
+ * @param {object} handle
+ */
+async function authorizeSafeOutputEffectPlan(handle) {
+  const state = currentSafeOutputInvocation();
+  if (!state?.requirement || !state.invocation || !state.effectPreparation || typeof state.authorizeEffectPlan !== "function") {
+    throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
+  }
+  return state.authorizeEffectPlan(handle);
+}
+
 /** @returns {import("./types/handler-factory").SafeOutputAuthorizationEvidence | undefined} */
 function projectAuthorization(source) {
   if (!source || typeof source !== "object") return undefined;
@@ -195,4 +208,14 @@ function finalizeBufferedReviewExecutions(results, repo, prNumber, review) {
   }
 }
 
-module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputExecutions, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, authorizeSafeOutputInvocation, projectAuthorization };
+module.exports = {
+  canonicalSafeOutputUrl,
+  projectSafeOutputData,
+  buildSafeOutputExecutions,
+  finalizeBufferedReviewExecutions,
+  withSafeOutputInvocation,
+  currentSafeOutputInvocation,
+  authorizeSafeOutputInvocation,
+  authorizeSafeOutputEffectPlan,
+  projectAuthorization,
+};

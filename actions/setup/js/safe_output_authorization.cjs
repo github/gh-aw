@@ -208,12 +208,16 @@ function references(values) {
 }
 
 /**
+ * `resolved_effect` is accepted only for the exact registered plan created by a
+ * trusted effect-preparation adapter; the enum alone is never evidence.
  * @param {{caller: any, output: any, normalizedInputs: unknown, batchDigest: string, recordIndex: number,
  * scope?: {binding: string, refs: string[], limits_digest?: string},
- * context?: {policy_digest?: string, evidence_refs?: string[], claim_id?: string, delivery_id?: string}}} options
+ * context?: {policy_digest?: string, evidence_refs?: string[], claim_id?: string, delivery_id?: string}, effectPlan?: object}} options
  */
-function prepareInvocation({ caller, output, normalizedInputs, batchDigest, recordIndex, scope = { binding: "invocation", refs: [] }, context = {} }) {
+function prepareInvocation({ caller, output, normalizedInputs, batchDigest, recordIndex, scope = { binding: "invocation", refs: [] }, context = {}, effectPlan = undefined }) {
   try {
+    if (scope?.binding === "resolved_effect") require("./safe_output_effect_plan.cjs").assertEffectPlanScope(effectPlan, normalizedInputs, scope);
+    else if (effectPlan !== undefined) fail("invalid_preparation");
     // Snapshot once: authorization and execution must use the same normalized
     // data; the envelope intentionally retains only its digest.
     const inputDigest = canonicalDigest(normalizedInputs);

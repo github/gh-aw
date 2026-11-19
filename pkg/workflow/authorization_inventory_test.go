@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -102,4 +103,57 @@ func TestAuthorizationCompilerRejectsUncontrolledInputs(t *testing.T) {
 	}
 	_, _, err = NewCompiler().CompileAuthorizationSnapshot(path)
 	require.ErrorContains(t, err, "read-only")
+}
+
+func TestAuthorizationInventoryReportsEffectAdapterBinding(t *testing.T) {
+	authority := authorizationTestAuthority("https://authority.example/a")
+	raw := map[string]any{
+		"authorization":      authority,
+		"merge-pull-request": map[string]any{"allowed-base-branches": []any{"agent-work/*"}},
+		"remove-labels":      map[string]any{},
+		"add-labels":         map[string]any{},
+		"scripts":            map[string]any{"custom": map[string]any{"script": "return async () => ({})"}},
+	}
+	routes := map[string]AuthorizationRoute{}
+	for _, route := range InspectEffectiveAuthorization(&WorkflowData{SafeOutputs: authorizationTestConfig(t, raw)}) {
+		routes[route.Name] = route
+	}
+	require.Equal(t, "gh-aw.merge-pull-request@1", routes["merge_pull_request"].EffectAdapter)
+	require.Equal(t, "resolved_effect", routes["merge_pull_request"].ScopeBinding)
+	require.Equal(t, "manager", routes["merge_pull_request"].Coverage, "coverage strings are unchanged")
+	require.Equal(t, "gh-aw.remove-labels@1", routes["remove_labels"].EffectAdapter)
+	require.Equal(t, "resolved_effect", routes["remove_labels"].ScopeBinding)
+	for _, name := range []string{"add_labels", "custom"} {
+		require.Empty(t, routes[name].EffectAdapter, name)
+		require.Equal(t, "invocation", routes[name].ScopeBinding, name)
+	}
+	require.Empty(t, routes["noop"].ScopeBinding, "exempt diagnostics request no authority")
+
+	raw["staged"] = true
+	for _, route := range InspectEffectiveAuthorization(&WorkflowData{SafeOutputs: authorizationTestConfig(t, raw)}) {
+		require.Empty(t, route.ScopeBinding, route.Name)
+	}
+
+	// A prepared Claim adapter replaces the native route, so it cannot claim exact-effect coverage.
+	delete(raw, "staged")
+	raw["claim-adapters"] = map[string]any{"remove-labels": map[string]any{"mode": "prepared", "effect-type": "remove_labels", "target-repo": "owner/repo"}}
+	data := &WorkflowData{SafeOutputs: authorizationTestConfig(t, raw), Tools: map[string]any{"work-queue": map[string]any{"worker": true}}}
+	require.NoError(t, resolveWorkflowSafeOutputAuthorizations(data))
+	for _, route := range InspectEffectiveAuthorization(data) {
+		if route.Name == "remove_labels" || route.Name == "remove_labels:prepare_claim_adapter" {
+			require.Empty(t, route.EffectAdapter, route.Name)
+			require.Equal(t, "invocation", route.ScopeBinding, route.Name)
+		}
+	}
+}
+
+func TestSafeOutputEffectAdaptersMirrorRuntimeRegistry(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "js", "safe_output_effect_plan.cjs"))
+	require.NoError(t, err)
+	runtime := regexp.MustCompile(`(?m)^  ([a-z_]+): Object\.freeze\(\{\n    id: "([^"]+)",\n    version: ([0-9]+),`).FindAllStringSubmatch(string(source), -1)
+	mirrored := map[string]string{}
+	for _, match := range runtime {
+		mirrored[match[1]] = match[2] + "@" + match[3]
+	}
+	require.Equal(t, safeOutputEffectAdapters, mirrored)
 }

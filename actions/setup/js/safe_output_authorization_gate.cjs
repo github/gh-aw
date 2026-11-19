@@ -6,7 +6,16 @@ const path = require("path");
 const crypto = require("crypto");
 const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { canonicalDigest, buildAuthorizationCaller, prepareInvocation, authorizePreparedInvocation, assertAuthorizationBatchFresh, recordAuthorizationOutcome, authorizationEvidencePath } = require("./safe_output_authorization.cjs");
+const {
+  SafeOutputAuthorizationError,
+  canonicalDigest,
+  buildAuthorizationCaller,
+  prepareInvocation,
+  authorizePreparedInvocation,
+  assertAuthorizationBatchFresh,
+  recordAuthorizationOutcome,
+  authorizationEvidencePath,
+} = require("./safe_output_authorization.cjs");
 
 function handlerAuthorizationRequired(config = {}) {
   const state = require("./safe_output_execution.cjs").currentSafeOutputInvocation();
@@ -39,6 +48,10 @@ async function authorizeHandlerInvocation({ inputs, scope = { binding: "invocati
 async function requireAuthorization({ inputs, scope = { binding: "invocation", refs: [] } }) {
   const state = require("./safe_output_execution.cjs").currentSafeOutputInvocation();
   if (!state?.requirement || !state.invocation) throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
+  // A handler cannot promote itself to resolved_effect, and an adapter-selected
+  // invocation can never downgrade to (or retry as) invocation binding.
+  if (scope?.binding !== "invocation") throw new SafeOutputAuthorizationError("invalid_preparation");
+  if (state.effectPreparation) throw new SafeOutputAuthorizationError("invalid_preparation");
   const invocation = prepareInvocation({
     caller: state.invocation.caller,
     output: state.invocation.output,
@@ -48,6 +61,33 @@ async function requireAuthorization({ inputs, scope = { binding: "invocation", r
     scope,
     context: state.invocation.context,
   });
+  return consumeDecision(state, invocation);
+}
+
+/**
+ * Obtain the single resolved-effect decision for a trusted adapter's frozen plan.
+ * @param {object} handle
+ */
+async function authorizeEffectPlan(handle) {
+  const state = require("./safe_output_execution.cjs").currentSafeOutputInvocation();
+  if (!state?.requirement || !state.invocation || !state.effectPreparation) throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
+  const plans = require("./safe_output_effect_plan.cjs");
+  const { plan, scope } = plans.beginEffectPlanAuthorization(handle, state);
+  const invocation = prepareInvocation({
+    caller: state.invocation.caller,
+    output: state.invocation.output,
+    normalizedInputs: plan,
+    batchDigest: state.batchDigest,
+    recordIndex: state.recordIndex,
+    scope,
+    context: state.invocation.context,
+    effectPlan: handle,
+  });
+  const authorization = await consumeDecision(state, invocation);
+  return plans.bindEffectPlanAuthorization(handle, authorization, invocation);
+}
+
+async function consumeDecision(state, invocation) {
   const evidencePath = authorizationEvidencePath();
   fs.mkdirSync(path.dirname(evidencePath), { recursive: true, mode: 0o700 });
   try {
@@ -241,4 +281,4 @@ async function main(options = {}) {
   return { state: "allowed", decisions, evidencePath };
 }
 
-module.exports = { digestArtifactFiles, executorRecords, handlerAuthorizationRequired, requireAuthorization, authorizeHandlerInvocation, recordExecutorOutcome, main };
+module.exports = { digestArtifactFiles, executorRecords, handlerAuthorizationRequired, requireAuthorization, authorizeHandlerInvocation, authorizeEffectPlan, recordExecutorOutcome, main };

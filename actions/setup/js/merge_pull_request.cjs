@@ -15,6 +15,10 @@ const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { getEffectiveDetectionConclusion, getThreatDetectedMarker, getThreatEngineErrorMarker } = require("./threat_detection_warning.cjs");
 const { mergeAuthorizationEvidence, reconcileMerge } = require("./merge_pull_request_evidence.cjs");
+const { currentEffectPreparation, freezeEffectPlan, sendPlannedEffect, effectTransmitted, settleEffect } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+const { canonicalDigest } = require("./safe_output_authorization.cjs");
+const HANDLER_TYPE = "merge_pull_request";
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
 const MERGEABILITY_PENDING_ERROR_E099 = `${SAFE_OUTPUT_E099}: ${MERGEABILITY_PENDING_ERROR}`;
 
@@ -602,6 +606,67 @@ function resolvePullRequestNumber(message, resolvedTemporaryIds) {
   return { success: true, pullNumber: contextPullNumber, fromTemporaryId: false };
 }
 
+/** @param {unknown} value */
+function observationDigest(value) {
+  return canonicalDigest(JSON.parse(JSON.stringify(value)));
+}
+
+/**
+ * Exact merge payload. Optional fields are omitted when absent and kept when
+ * explicitly null, matching what the SDK would transmit.
+ * @param {any} message
+ * @param {string} headSha
+ */
+function mergeRequestBody(message, headSha) {
+  /** @type {Record<string, unknown>} */
+  const body = { sha: headSha, merge_method: message.merge_method || "merge" };
+  for (const field of ["commit_title", "commit_message"]) {
+    if (message[field] !== undefined) body[field] = message[field];
+  }
+  return body;
+}
+
+/**
+ * Bind both the request locator and independently read resource identities.
+ * @param {any} pr
+ * @param {string} owner
+ * @param {string} repo
+ * @param {number} pullNumber
+ */
+function mergeTargets(pr, owner, repo, pullNumber) {
+  const repository = `${owner}/${repo}`;
+  const repositoryId = pr?.base?.repo?.id;
+  if (pr?.number !== pullNumber || String(pr?.base?.repo?.full_name || "").toLowerCase() !== repository.toLowerCase() || !Number.isSafeInteger(repositoryId) || !Number.isSafeInteger(pr?.id)) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Merge target identity could not be independently resolved`);
+  }
+  return [
+    { kind: "repository", repository, repository_id: String(repositoryId) },
+    { kind: "pull_request", repository, repository_id: String(repositoryId), number: pullNumber, resource_id: String(pr.id), ...(typeof pr.node_id === "string" ? { node_id: pr.node_id } : {}) },
+  ];
+}
+
+/**
+ * The head SHA is enforced atomically by the merge API; everything else is an
+ * observed precondition rechecked before sending and subject to residual races.
+ * @param {any} state
+ * @param {string} headSha
+ * @param {string} policySha
+ * @returns {Array<{id: string, enforcement: "atomic"|"observed", observation: unknown}>}
+ */
+function mergePreconditions(state, headSha, policySha) {
+  const { currentPR, currentPolicy, upstreamPR, currentReviews, currentApprovals, currentChecks } = state;
+  return [
+    { id: "head_sha", enforcement: "atomic", observation: { head_sha: headSha } },
+    { id: "pull_request_state", enforcement: "observed", observation: { snapshot: policySnapshot(currentPR), mergeable: currentPR.mergeable === true } },
+    { id: "base_identity", enforcement: "observed", observation: { ref: currentPR.base?.ref, sha: currentPR.base?.sha, repository_id: currentPR.base?.repo?.id } },
+    {
+      id: "merge_policy",
+      enforcement: "observed",
+      observation: { policy_sha256: policySha, branch_policy: currentPolicy, upstream_pull_request: upstreamPR?.number || null, reviews: currentReviews, approvals: currentApprovals, checks: currentChecks },
+    },
+  ];
+}
+
 /**
  * Handler factory for merge_pull_request.
  * @type {HandlerFactoryFunction}
@@ -708,6 +773,8 @@ async function main(config = {}) {
     const evidence = { data_trust: "untrusted", repository: `${owner}/${repo}`, pull_request_number: pullNumber, evaluated_at: new Date().toISOString(), authorization: mergeAuthorizationEvidence(config, requiredChecks) };
     let phase = "pull_request";
     let mergeAttempted = false;
+    /** @type {import("./safe_output_effect_plan.cjs").EffectPlanHandle|undefined} */
+    let effectHandle;
     let branchChecksDiscovered = false;
     let pullRequestUrl;
 
@@ -972,43 +1039,48 @@ async function main(config = {}) {
       if (!baseBranch) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing target base branch for final policy evaluation`);
       }
-      const currentPR = await getPullRequestWithMergeability(githubClient, owner, repo, pullNumber);
-      if (currentPR) getPullRequestCautions(currentPR);
-      if (!currentPR || !isDeepStrictEqual(policySnapshot(currentPR), evaluatedSnapshot)) {
-        throw new Error(`${SAFE_OUTPUT_E007}: Pull request policy state changed after evaluation; fresh evaluation required`);
-      }
-      if (currentPR.mergeable !== true || currentPR.mergeable_state === "dirty") {
-        throw new Error(`${SAFE_OUTPUT_E007}: Pull request mergeability is not confirmed or has unresolved conflicts after revalidation`);
-      }
-      const currentPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
-      currentPolicy.requiredChecks = [...new Set([...currentPolicy.requiredChecks, ...requiredChecks])].sort();
-      const upstreamPR = await getOpenPullRequestForBranch(githubClient, owner, repo, baseBranch);
-      const currentReviews = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
-      const currentApprovals = await getApprovalEvidence(githubClient, owner, repo, currentPR, requiredApprovers);
-      const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
-      const currentFileProtection = await evaluateProtectedFiles(githubClient, owner, repo, currentPR, config);
-      if (currentFileProtection.action !== "allow") {
-        failureReasons.push({ code: "protected_files_modified", message: "Pull request modifies protected files at final revalidation" });
-        throw new Error(`${SAFE_OUTPUT_E007}: Protected files changed before merging; fresh evaluation required`);
-      }
-      evidence.revalidation = {
-        branch_policy: currentPolicy,
-        upstream_pull_request: upstreamPR?.number || null,
-        reviews: currentReviews,
-        approval_policy: currentApprovals,
-        checks: currentChecks,
-        evaluated_at: new Date().toISOString(),
+      const finalRevalidation = async () => {
+        const currentPR = await getPullRequestWithMergeability(githubClient, owner, repo, pullNumber);
+        if (currentPR) getPullRequestCautions(currentPR);
+        if (!currentPR || !isDeepStrictEqual(policySnapshot(currentPR), evaluatedSnapshot)) {
+          throw new Error(`${SAFE_OUTPUT_E007}: Pull request policy state changed after evaluation; fresh evaluation required`);
+        }
+        if (currentPR.mergeable !== true || currentPR.mergeable_state === "dirty") {
+          throw new Error(`${SAFE_OUTPUT_E007}: Pull request mergeability is not confirmed or has unresolved conflicts after revalidation`);
+        }
+        const currentPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
+        currentPolicy.requiredChecks = [...new Set([...currentPolicy.requiredChecks, ...requiredChecks])].sort();
+        const upstreamPR = await getOpenPullRequestForBranch(githubClient, owner, repo, baseBranch);
+        const currentReviews = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
+        const currentApprovals = await getApprovalEvidence(githubClient, owner, repo, currentPR, requiredApprovers);
+        const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
+        const currentFileProtection = await evaluateProtectedFiles(githubClient, owner, repo, currentPR, config);
+        if (currentFileProtection.action !== "allow") {
+          failureReasons.push({ code: "protected_files_modified", message: "Pull request modifies protected files at final revalidation" });
+          throw new Error(`${SAFE_OUTPUT_E007}: Protected files changed before merging; fresh evaluation required`);
+        }
+        evidence.revalidation = {
+          branch_policy: currentPolicy,
+          upstream_pull_request: upstreamPR?.number || null,
+          reviews: currentReviews,
+          approval_policy: currentApprovals,
+          checks: currentChecks,
+          evaluated_at: new Date().toISOString(),
+        };
+        if (
+          !isDeepStrictEqual(currentPolicy, branchPolicy) ||
+          !upstreamPR ||
+          !isDeepStrictEqual(currentReviews, reviewSummary) ||
+          !isDeepStrictEqual(currentApprovals, approvalEvidence) ||
+          currentChecks.missing.length > 0 ||
+          currentChecks.failing.length > 0
+        ) {
+          throw new Error(`${SAFE_OUTPUT_E007}: Merge policy evidence changed after evaluation; fresh evaluation required`);
+        }
+        return { currentPR, currentPolicy, upstreamPR, currentReviews, currentApprovals, currentChecks };
       };
-      if (
-        !isDeepStrictEqual(currentPolicy, branchPolicy) ||
-        !upstreamPR ||
-        !isDeepStrictEqual(currentReviews, reviewSummary) ||
-        !isDeepStrictEqual(currentApprovals, approvalEvidence) ||
-        currentChecks.missing.length > 0 ||
-        currentChecks.failing.length > 0
-      ) {
-        throw new Error(`${SAFE_OUTPUT_E007}: Merge policy evidence changed after evaluation; fresh evaluation required`);
-      }
+      const revalidated = await finalRevalidation();
+      const { upstreamPR, currentChecks } = revalidated;
       evidence.upstream_pull_request = upstreamPR.number;
       evidence.checks = { required: branchPolicy.requiredChecks, required_apps: requiredCheckApps, ...currentChecks };
       evidence.revalidated_at = new Date().toISOString();
@@ -1030,18 +1102,48 @@ async function main(config = {}) {
         };
       }
 
-      phase = "merge";
-      core.debug('merge_pull_request: {"event":"merge_started","head_bound":true}');
-      mergeAttempted = true;
-      const mergeResponse = await githubClient.rest.pulls.merge({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        sha: pr.head.sha,
-        merge_method: message.merge_method || "merge",
-        commit_title: message.commit_title,
-        commit_message: message.commit_message,
-      });
+      const preparation = currentEffectPreparation(HANDLER_TYPE);
+      let mergeResponse;
+      if (preparation) {
+        // Resolved-effect adapter: freeze the exact merge request, obtain one
+        // decision for it, revalidate observed preconditions after the authority
+        // wait, then send only the frozen request. The head SHA stays atomic.
+        phase = "effect_preparation";
+        const preconditions = mergePreconditions(revalidated, pr.head.sha, evidence.authorization.policy_sha256);
+        effectHandle = freezeEffectPlan(preparation, {
+          targets: mergeTargets(revalidated.currentPR, owner, repo, pullNumber),
+          effects: [{ operation: "pulls.merge", path: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/merge`, body: mergeRequestBody(message, pr.head.sha) }],
+          preconditions,
+        });
+        evidence.effect_plan = { adapter: effectHandle.adapter, plan_digest: effectHandle.plan_digest };
+        phase = "authorization";
+        await authorizeSafeOutputEffectPlan(effectHandle);
+        phase = "revalidation";
+        const afterAuthorization = await finalRevalidation();
+        if (observationDigest(mergePreconditions(afterAuthorization, pr.head.sha, evidence.authorization.policy_sha256)) !== observationDigest(preconditions)) {
+          throw new Error(`${SAFE_OUTPUT_E007}: Merge preconditions changed while awaiting authorization; fresh evaluation required`);
+        }
+        phase = "merge";
+        core.debug('merge_pull_request: {"event":"merge_started","head_bound":true,"binding":"resolved_effect"}');
+        try {
+          mergeResponse = await sendPlannedEffect(effectHandle, 0, { client: githubClient });
+        } finally {
+          mergeAttempted = effectTransmitted(effectHandle, 0);
+        }
+      } else {
+        phase = "merge";
+        core.debug('merge_pull_request: {"event":"merge_started","head_bound":true}');
+        mergeAttempted = true;
+        mergeResponse = await githubClient.rest.pulls.merge({
+          owner,
+          repo,
+          pull_number: pullNumber,
+          sha: pr.head.sha,
+          merge_method: message.merge_method || "merge",
+          commit_title: message.commit_title,
+          commit_message: message.commit_message,
+        });
+      }
       if (mergeResponse.data?.merged !== true && mergeResponse.data?.merged !== false) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing merge outcome in API response`);
       }
@@ -1094,6 +1196,7 @@ async function main(config = {}) {
         evidence.reconciled_at = new Date().toISOString();
         core.debug(`merge_pull_request: ${JSON.stringify({ event: "merge_reconciliation", confirmed: mergedSha !== null })}`);
         if (mergedSha) {
+          if (effectHandle) settleEffect(effectHandle, 0, "confirmed");
           core.info("Read-only reconciliation confirmed the evaluated head is merged");
           return {
             success: true,

@@ -1746,6 +1746,98 @@ Native handlers without a separate effect-preparation adapter also advertise
 lookups remain inside the reviewed implementation; the approval does not attest
 to an independently resolved final network request.
 
+**Resolved-effect adapters:** A compiler/runtime-owned adapter registry
+(`safe_output_effect_plan.cjs`, contract `gh-aw.safe-output-effect-plan.v1`)
+MAY prepare a finite, ordered set of outbound requests, freeze them and bind one
+decision to that plan. Execution MUST NOT add, replace, redirect or re-expand
+approved requests. This does not make the target transactional, make every
+precondition atomic, predict final state or authorize downstream consequences.
+Coverage is per output, route and contract version:
+
+| Output | Adapter | Resolved-effect routes | Invocation-only routes |
+|---|---|---|---|
+| `merge-pull-request` | `gh-aw.merge-pull-request@1` (1 request) | native manager, native per-Claim handler | none |
+| `remove-labels` | `gh-aw.remove-labels@1` (≤32 requests) | native manager, native per-Claim handler | prepared/script Claim adapter override |
+| All other outputs, custom scripts, actions, jobs, standalone, workflow launches, synthetic phases | none | none | all |
+
+`gh aw validate --authorization-policy` reports each route's `effect_adapter` and live
+`scope_binding` as additive v1 fields; `coverage` strings are unchanged.
+
+For a protected, non-staged invocation on a covered route, the manager selects
+resolved preparation before any decision and requests none itself. It mints a
+private one-time preparation capability that is not an `allowed` decision and
+permits no writes. The adapter runs only reviewed read-only preparation and the
+existing local gates, then freezes a plan of adapter identity and route, the
+existing invocation identity (output, executor, implementation digest, batch
+digest, record index, policy digest and Claim/delivery identity), authoritative
+targets, ordered request snapshots, classified preconditions and limits. The
+gate sends exactly one `resolved_effect` request for that plan. Only a
+registered plan handle can select `resolved_effect`; `prepareInvocation`, the
+handler gate and the isolated execution API MUST reject the enum from messages,
+custom code, unregistered callbacks or forged handles before any authority
+request. An adapter-selected invocation MUST NOT request, or after denial retry
+as, `invocation` binding. A preparation failure blocks; it is not a fallback.
+
+The existing wire envelope is unchanged. `input_digest` is the canonical digest
+of the complete non-secret plan; `scope.limits_digest` is the digest of its
+`limits`; `context` keeps policy and Claim bindings. `scope.refs` uses these
+prefixes, bounded by the existing 64 references:
+
+| Reference | Meaning |
+|---|---|
+| `effect-contract:gh-aw.safe-output-effect-plan.v1` | Plan contract version |
+| `effect-adapter:<id>@<version>` | Registered adapter |
+| `effect-route:manager` or `effect-route:claim` | Enforced execution route |
+| `effect-plan:sha256:<hex>` | Plan digest (equals `input_digest`) |
+| `effect-count:<n>` | Number of approved requests |
+| `effect-operation:<operation>` | Distinct operation, e.g. `pulls.merge`, `issues.removeLabel` |
+| `effect-target:repository:<repository_id>` | Independently read repository identity |
+| `effect-target:<issue\|pull_request>:<repository_id>#<number>@<resource_id>` | Locator bound to resource identity |
+| `effect-target:label:<repository_id>@<label_id>` | Label identity (name stays private) |
+| `effect-precondition:<id>:<atomic\|observed>` | Precondition and its enforcement class |
+
+Each request snapshot binds the method, approved API origin, path, query,
+`accept`, `x-github-api-version`, `content-type` when a body exists, and the
+JSON body. Credentials and `user-agent` are excluded. Absent, `null` and empty
+values remain distinct; defaults, sanitization, temporary-ID substitution,
+filtering and deduplication apply before freezing. An oversized plan fails; it
+is never truncated or split. Golden vector: a `remove-labels` plan on the
+`manager` route removing `bug` and `needs triage` from repository `99`, issue
+`#7` (resource `700`), with batch digest `c…c`, record index 0, implementation
+digest `d…d`, policy digest `e…e` and API version `2026-03-10` has digest
+`8a9d6e41223b814e7f91199e530c68e669bafeeeda7b3b26924f8a789587a5a2`
+(`safe_output_effect_plan.test.cjs`).
+
+The authority sees digests and references, not raw bodies, commit messages or
+label names. An authority needing content-dependent policy MUST obtain that
+evidence through an independently approved channel and verify its digest, or
+deny. An authority MAY require `resolved_effect` for a route and deny
+`invocation` requests. Requiring a binding level is authority policy; there is no
+compiler `minimum-binding` setting, and the protected baseline verifier does not
+mandate one.
+
+After the decision, the adapter revalidates mutable preconditions and the Claim,
+then consumes effects in order through an adapter-owned transport. Before each
+send it checks the plan handle, bound decision, invocation context, current
+Claim, next unconsumed index and per-send decision freshness. The transport
+compares the final SDK wire request with the snapshot after all middleware,
+sends it once with redirects refused and SDK retries disabled, and refuses any
+replay. A changed precondition, request or expired grant stops execution; the
+adapter MUST NOT recompute the payload under the old decision, obtain a
+replacement grant or change invocation identity. On the Claim route the
+existing Claim effect client still resolves and authorizes every target; it
+admits only registered plan transports through its request snapshot.
+Confirmed earlier effects are preserved, remaining effects are reported as not
+attempted, and partial or indeterminate invocations are failures for
+dependents. No rollback or whole-invocation retry is implied. One logical
+invocation still maps to one authority claim; effects do not create per-index
+claims.
+
+| Adapter | Atomic precondition | Observed preconditions (residual races) |
+|---|---|---|
+| `merge-pull-request` | Evaluated head SHA sent as the merge `sha` | PR state and policy snapshot, base ref/SHA/repository ID, branch policy, upstream PR, reviews, approvals, checks and local policy fingerprint, rechecked after the authority wait |
+| `remove-labels` | None: the API removes one label by name, without bulk atomicity | Repository/item identity, name-to-label-ID mapping and required-label/title filters, rechecked before every send while accepting earlier approved removals |
+
 Compiler diagnostics use `DEBUG=workflow:safe_outputs_authorization`.
 Runtime diagnostics use the GitHub Actions debug log and report preparation,
 OIDC acquisition, decision requests, release and fixed failure reason codes.

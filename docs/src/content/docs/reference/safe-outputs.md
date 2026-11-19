@@ -688,6 +688,8 @@ Set `issues: false` or `pull-requests: false` to omit the corresponding write pe
 
 When `allowed` is omitted or set to `null`, any labels can be removed. Use `allowed` to restrict removal to specific labels or glob patterns, providing control over which labels agents can manipulate. The `blocked` field takes precedence over `allowed`.
 
+**External authorization**: with `authorization` configured, the handler resolves the repository, issue/PR and label identities, drops labels that are not present, and obtains one `resolved_effect` decision for the exact ordered removal requests. GitHub removes labels by name one request at a time, without atomicity, so identities and filters are rechecked before each request. A drift, expired decision or unconfirmed response stops the remaining removals; confirmed removals are kept and the result fails with `operation_outcome: partial` or `indeterminate`. A `404` counts as absence only after read-only reconciliation. See [resolved-effect adapters](/gh-aw/specs/safe-outputs-specification/#safe-output-invocation-authorization).
+
 **Example use case**: Label lifecycle management where agents add temporary labels during triage and remove them once processed.
 
 ```yaml wrap

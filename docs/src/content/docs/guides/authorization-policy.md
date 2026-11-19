@@ -103,7 +103,7 @@ The versioned JSON object contains:
 | `policy_revision`, `policy_digest`, `policy_fingerprint` | Correlation label, baseline SHA-256, and expected authority fingerprint |
 | `compiler_version`, `compiler_digest` | Pinned compiler version and executable SHA-256 |
 | `eligible`, `exempt`, `staged` | Counts of normalized routes, including generated executors; staged counts statically true staging only |
-| `workflows` | Source, lock, generated-content and dependency digests, plus resolved route bindings and coverage |
+| `workflows` | Source, lock, generated-content and dependency digests, plus resolved route bindings and coverage. Routes also carry optional `effect_adapter` (trusted adapter contract, such as `gh-aw.merge-pull-request@1`) and `scope_binding` (`resolved_effect` or `invocation` for a live protected route); these additive v1 fields do not change `coverage` |
 | `findings` | Stable code, workflow/route when applicable, observed binding, expected fingerprint and remediation message |
 | `ungoverned_workflows` | Independently approved handwritten workflow paths outside gh-aw authorization scope |
 

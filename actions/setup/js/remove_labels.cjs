@@ -18,6 +18,152 @@ const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { normalizeIssueIntentLabelNames } = require("./issue_intents.cjs");
+const { currentEffectPreparation, freezeEffectPlan, describeEffectPlan, sendPlannedEffect, settleEffect, effectPlanOutcome, EffectTransportError } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+
+/**
+ * Read the authoritative repository and issue/PR identities plus current labels.
+ * @param {any} githubClient
+ * @param {{owner: string, repo: string}} repoParts
+ * @param {number} itemNumber
+ */
+async function observeLabelTarget(githubClient, repoParts, itemNumber) {
+  const { data: repository } = await githubClient.rest.repos.get({ owner: repoParts.owner, repo: repoParts.repo });
+  const { data: item } = await githubClient.rest.issues.get({ owner: repoParts.owner, repo: repoParts.repo, issue_number: itemNumber });
+  const expected = `${repoParts.owner}/${repoParts.repo}`.toLowerCase();
+  if (!Number.isSafeInteger(repository?.id) || String(repository?.full_name || "").toLowerCase() !== expected || item?.number !== itemNumber || !Number.isSafeInteger(item?.id)) {
+    throw new Error("Label target identity could not be independently resolved");
+  }
+  /** @type {Map<string, number>} */
+  const labels = new Map();
+  for (const label of item.labels || []) {
+    const name = typeof label === "string" ? label : label?.name;
+    if (typeof name !== "string" || !Number.isSafeInteger(label?.id)) throw new Error("Label identity could not be independently resolved");
+    labels.set(name.toLowerCase(), label.id);
+  }
+  return {
+    identity: { repository_id: String(repository.id), resource_id: String(item.id), kind: item.pull_request ? "pull_request" : "issue", node_id: typeof item.node_id === "string" ? item.node_id : undefined },
+    names: (item.labels || []).map(label => (typeof label === "string" ? label : label.name)),
+    title: typeof item.title === "string" ? item.title : "",
+    labels,
+  };
+}
+
+/**
+ * Exact-effect label removal. The approved plan equals the transmitted request
+ * list; GitHub removes labels by name, one request at a time, with no atomic
+ * precondition, so identities and filters are rechecked before every send.
+ * @param {{preparation: object, githubClient: any, repoParts: {owner: string, repo: string}, itemRepo: string, itemNumber: number, contextType: string, labels: string[], requiredLabels: string[], requiredTitlePrefix: string}} options
+ */
+async function removeLabelsWithEffectPlan({ preparation, githubClient, repoParts, itemRepo, itemNumber, contextType, labels, requiredLabels, requiredTitlePrefix }) {
+  const filtersPass = (observed, removed) => requiredLabels.every(required => observed.names.includes(required) || removed.has(required.toLowerCase())) && (!requiredTitlePrefix || observed.title.startsWith(requiredTitlePrefix));
+  const initial = await observeLabelTarget(githubClient, repoParts, itemNumber);
+  if (!filtersPass(initial, new Set())) {
+    return { success: false, skipped: true, error: "Item does not match required-labels or required-title-prefix filter" };
+  }
+  // Labels already absent are filtered before freezing, matching the legacy
+  // treatment of absent labels; they never become approved requests.
+  // Case variants resolving to one label identity become one request (first occurrence).
+  const seen = new Set();
+  const planned = labels.filter(label => {
+    const id = initial.labels.get(label.toLowerCase());
+    if (id === undefined || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  if (planned.length === 0) {
+    core.info(`No requested labels are present on ${contextType} #${itemNumber} in ${itemRepo}`);
+    return { success: true, number: itemNumber, labelsRemoved: [], message: "No labels to remove", contextType };
+  }
+  const { identity } = initial;
+  const labelIds = planned.map(label => /** @type {number} */ initial.labels.get(label.toLowerCase()));
+  const handle = freezeEffectPlan(preparation, {
+    targets: [
+      { kind: "repository", repository: itemRepo, repository_id: identity.repository_id },
+      { kind: identity.kind, repository: itemRepo, repository_id: identity.repository_id, number: itemNumber, resource_id: identity.resource_id, ...(identity.node_id ? { node_id: identity.node_id } : {}) },
+      ...[...new Set(labelIds)].map(id => ({ kind: "label", repository: itemRepo, repository_id: identity.repository_id, resource_id: String(id) })),
+    ],
+    effects: planned.map(label => ({
+      operation: "issues.removeLabel",
+      path: `/repos/${encodeURIComponent(repoParts.owner)}/${encodeURIComponent(repoParts.repo)}/issues/${itemNumber}/labels/${encodeURIComponent(label)}`,
+    })),
+    preconditions: [
+      { id: "target_identity", enforcement: "observed", observation: identity },
+      { id: "label_identities", enforcement: "observed", observation: labelIds },
+      { id: "item_filters", enforcement: "observed", observation: { required_labels: requiredLabels, required_title_prefix: requiredTitlePrefix } },
+    ],
+  });
+  core.info(`Authorizing exact removal of ${planned.length} label(s) from ${contextType} #${itemNumber} in ${itemRepo}`);
+  await authorizeSafeOutputEffectPlan(handle);
+
+  /** @type {string[]} */
+  const removedLabels = [];
+  /** @type {Array<{label: string, error: string}>} */
+  const failedLabels = [];
+  /** @type {Set<string>} */
+  const applied = new Set();
+  let stopReason = "";
+  for (let index = 0; index < planned.length; index++) {
+    // Earlier approved removals are expected progress, not drift.
+    let observed;
+    try {
+      observed = await observeLabelTarget(githubClient, repoParts, itemNumber);
+    } catch {
+      stopReason = "Label target could not be revalidated";
+      break;
+    }
+    const unchanged =
+      ["repository_id", "resource_id", "kind", "node_id"].every(field => observed.identity[field] === identity[field]) &&
+      planned.every((label, position) => position < index || observed.labels.get(label.toLowerCase()) === labelIds[position]) &&
+      filtersPass(observed, applied);
+    if (!unchanged) {
+      stopReason = "Label target, label identities or filters changed after authorization";
+      break;
+    }
+    const label = planned[index];
+    try {
+      await sendPlannedEffect(handle, index, { client: githubClient });
+      removedLabels.push(label);
+      applied.add(label.toLowerCase());
+    } catch (error) {
+      if (!(error instanceof EffectTransportError) || !error.transmitted) {
+        stopReason = error instanceof EffectTransportError && error.reason_code === "authorization_expired" ? "Authorization expired before the remaining approved removals" : "Approved removal could not be sent";
+        break;
+      }
+      // A 404 or lost response is not proof of absence: reconcile identity and label state.
+      /** @type {Awaited<ReturnType<typeof observeLabelTarget>> | null} */
+      let reconciled = null;
+      try {
+        reconciled = await observeLabelTarget(githubClient, repoParts, itemNumber);
+      } catch {
+        reconciled = null;
+      }
+      const sameTarget = !!reconciled && reconciled.identity.repository_id === identity.repository_id && reconciled.identity.resource_id === identity.resource_id;
+      if (reconciled && sameTarget && !reconciled.labels.has(label.toLowerCase())) {
+        settleEffect(handle, index, "absent");
+        applied.add(label.toLowerCase());
+      } else if (sameTarget && error.reason_code === "rejected" && error.status !== 404) {
+        failedLabels.push({ label, error: getErrorMessage(error.cause ?? error) });
+      } else {
+        settleEffect(handle, index, "indeterminate");
+        stopReason = "Label removal outcome is indeterminate; inspect the live item before any further action. Remaining removals were not attempted.";
+        break;
+      }
+    }
+  }
+  const outcome = effectPlanOutcome(handle);
+  const notAttempted = describeEffectPlan(handle).effects.filter(effect => effect.status === "not_attempted" || effect.status === "blocked").length;
+  if (removedLabels.length > 0) core.info(`Removed ${removedLabels.length} of ${planned.length} approved label(s) from ${contextType} #${itemNumber} in ${itemRepo}`);
+  return {
+    success: outcome === "confirmed",
+    number: itemNumber,
+    labelsRemoved: removedLabels,
+    failedLabels: failedLabels.length > 0 ? failedLabels : undefined,
+    contextType,
+    ...(outcome === "confirmed" ? {} : { error: stopReason || `${failedLabels.length} approved label removal(s) were rejected`, labels_not_attempted: notAttempted }),
+    ...(outcome === "partial" || outcome === "indeterminate" ? { operation_outcome: outcome } : {}),
+  };
+}
 
 /**
  * Main handler factory for remove_labels
@@ -57,6 +203,7 @@ const main = createCountGatedHandler({
      * @returns {Promise<Object>} Result with success/error status
      */
     return async function handleRemoveLabels(message, resolvedTemporaryIds) {
+      const preparation = currentEffectPreparation(HANDLER_TYPE);
       // Resolve and validate target repository
       const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "label");
       if (!repoResult.success) {
@@ -105,7 +252,7 @@ const main = createCountGatedHandler({
       }
 
       const requestedLabels = message.labels ?? [];
-      core.info(`Requested labels to remove: ${JSON.stringify(requestedLabels)}`);
+      core.info(preparation ? `Requested label removals: ${Array.isArray(requestedLabels) ? requestedLabels.length : 0}` : `Requested labels to remove: ${JSON.stringify(requestedLabels)}`);
       let requestedLabelNames;
       try {
         requestedLabelNames = normalizeIssueIntentLabelNames(requestedLabels);
@@ -181,6 +328,10 @@ const main = createCountGatedHandler({
           labelsRemoved: [],
           message: "No labels to remove",
         };
+      }
+
+      if (preparation && !isStaged) {
+        return removeLabelsWithEffectPlan({ preparation, githubClient, repoParts, itemRepo, itemNumber, contextType: contextType || "issue", labels: uniqueLabels, requiredLabels, requiredTitlePrefix });
       }
 
       core.info(`Removing ${uniqueLabels.length} labels from ${contextType} #${itemNumber} in ${itemRepo}: ${JSON.stringify(uniqueLabels)}`);

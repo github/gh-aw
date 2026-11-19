@@ -17,6 +17,7 @@ const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAF
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { projectSafeOutputData, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, projectAuthorization } = require("./safe_output_execution.cjs");
+const effectPlans = require("./safe_output_effect_plan.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
@@ -482,7 +483,10 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
       if (requirement) {
         const state = currentSafeOutputInvocation();
         const deferred =
-          actions.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)));
+          actions.has(type) ||
+          ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) ||
+          (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode))) ||
+          effectPlans.isEffectPreparation(state?.effectPreparation, type, state);
         if (!state || state.requirement !== requirement || state.invocation?.output.type !== type || (state.authorization?.state !== "allowed" && !(deferred && state.authorization?.state === "not_requested"))) {
           throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
         }
@@ -1217,6 +1221,11 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       }
     }
     const preparedAdapter = !!currentClaimHandle() && ["prepared", "script"].includes(trustedConfig.claim_adapters?.[type]?.mode);
+    // Select resolved-effect preparation before any decision: only compiler-owned
+    // native adapters on their reviewed primary routes qualify. Everything else,
+    // including custom code, stays honestly invocation-bound.
+    const effectRoute = phase === "primary" && !preparedAdapter && !scriptTypes.has(type) && !actionTypes.has(type) && HANDLER_MAP[type] ? (currentClaimHandle() ? "claim" : "manager") : null;
+    const effectAdapter = effectRoute ? effectPlans.selectEffectAdapter(type, effectRoute) : null;
     const preparedMessage = normalizeInvocationInputs(message, preparedAdapter ? new Map() : temporaryIdMap, getDefaultTargetRepo(descriptor));
     authorizations.set(index, { state: "error", reason_code: "invalid_preparation" });
     const invocationBatchDigest = sourceBatch?.digests?.[index] || batchDigest || protocol.canonicalDigest(originalMessages);
@@ -1287,11 +1296,18 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     /** @type {any} */
     const invocationState = { invocation, requirement, config: descriptor, batchDigest: invocationBatchDigest, recordIndex: sourceBatch?.indices[index] ?? index, authorization: undefined };
     invocationState.authorize = options => require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation(options);
-    const deferredGate = phase === "primary" && (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (type === "upload_asset" && !!currentClaimHandle()));
+    if (effectAdapter) {
+      invocationState.effectPreparation = effectPlans.createEffectPreparation({ type, route: effectAdapter.route, state: invocationState });
+      invocationState.authorizeEffectPlan = handle => require("./safe_output_authorization_gate.cjs").authorizeEffectPlan(handle);
+    }
+    const deferredGate =
+      !!effectAdapter || (phase === "primary" && (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (type === "upload_asset" && !!currentClaimHandle())));
     const evidencePath = protocol.authorizationEvidencePath();
     let authorization;
     try {
-      authorization = deferredGate ? { state: "not_requested", reason_code: "deferred_executor" } : await protocol.authorizePreparedInvocation({ core, requirement, invocation, staged: false, evidencePath });
+      authorization = deferredGate
+        ? { state: "not_requested", reason_code: effectAdapter ? "deferred_effect_plan" : "deferred_executor" }
+        : await protocol.authorizePreparedInvocation({ core, requirement, invocation, staged: false, evidencePath });
       if (authorization.state === "allowed") permissions.set(index, authorization);
       invocationState.authorization = authorization;
       authorizations.set(index, authorization);
@@ -1742,7 +1758,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
           success: false,
           error: errorMsg,
           ...projectSafeOutputData({ execution_trace: result.execution_trace }),
-          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : result.operation_outcome === "indeterminate" ? { result: { operation_outcome: "indeterminate" } } : {}),
+          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : ["indeterminate", "partial"].includes(result.operation_outcome) ? { result: { operation_outcome: result.operation_outcome } } : {}),
         });
         // Track code-push failures for later comment annotations and conclusion reporting.
         if (CODE_PUSH_TYPES.has(messageType)) {
