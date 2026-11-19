@@ -16,7 +16,7 @@ const { relocateRuntimePaths } = require("./runtime_isolation.cjs");
 /** @param {LiteralState} [state] */
 function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUUID()}_`, values: [], files: {} }) {
   const pattern = new RegExp(`${state.prefix}(\\d+)\x00`, "g");
-  const controlChannelPattern = /<\|(?:system|assistant|user|tool|function|developer)\|>/i;
+  const controlChannelPattern = /<\|(?:im_start|im_sep|im_end|fim_prefix|fim_middle|fim_suffix|ghissue|ghreview|ghisc|ghso|meta_sep|meta_start|meta_end|meta_section|system|assistant|user|tool|function|developer)(?:\||\s)/i;
   /** @param {string} text */
   const restore = text => {
     const restored = relocateRuntimePaths(

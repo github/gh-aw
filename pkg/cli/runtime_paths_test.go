@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 )
 
 func TestMCPRuntimePathsResolvePerInvocation(t *testing.T) {
-	for _, root := range []string{"", "/tmp/gh-aw-run.First123", "/tmp/gh-aw-run.Second456"} {
+	for _, root := range []string{"", newCLIRuntimeRoot(t), newCLIRuntimeRoot(t)} {
 		t.Setenv("GH_AW_RUNTIME_ROOT", root)
 		wantRoot := root
 		if wantRoot == "" {
@@ -36,6 +37,26 @@ func TestMCPRuntimePathsResolvePerInvocation(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, wantRoot+"/logs-cache", cacheDir)
 	}
+}
+
+func TestMCPRuntimePathsRejectUnownedRoots(t *testing.T) {
+	root := newCLIRuntimeRoot(t)
+	t.Setenv("GH_AW_RUNTIME_ROOT", root)
+	t.Setenv("GH_AW_RUNTIME_OWNER", strings.Repeat("b", 64))
+	_, err := cliRuntimePath(mcpLogsCacheDir)
+	require.ErrorContains(t, err, "runtime owner marker does not match")
+
+	t.Setenv("GH_AW_RUNTIME_OWNER", strings.Repeat("a", 64))
+	require.NoError(t, os.Remove(filepath.Join(root, cliRuntimeOwnerFile)))
+	require.NoError(t, os.Symlink(filepath.Join(t.TempDir(), "missing"), filepath.Join(root, cliRuntimeOwnerFile)))
+	_, err = cliRuntimePath(mcpLogsCacheDir)
+	require.ErrorContains(t, err, "runtime owner marker is not a private regular file")
+
+	link := filepath.Join(t.TempDir(), "runtime-link")
+	require.NoError(t, os.Symlink(root, link))
+	t.Setenv("GH_AW_RUNTIME_ROOT", link)
+	_, err = cliRuntimePath(mcpLogsCacheDir)
+	require.ErrorContains(t, err, "invalid GH_AW_RUNTIME_ROOT")
 }
 
 func TestMCPRuntimePathsRejectInvalidRoots(t *testing.T) {
@@ -60,8 +81,19 @@ func TestMCPRuntimePathsRejectInvalidRoots(t *testing.T) {
 	}
 }
 
+func newCLIRuntimeRoot(t *testing.T) string {
+	t.Helper()
+	root, err := os.MkdirTemp("/tmp", "gh-aw-run.")
+	require.NoError(t, err)
+	require.NoError(t, os.Chmod(root, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(root, cliRuntimeOwnerFile), []byte(strings.Repeat("a", 64)), 0o600))
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
+	t.Setenv("GH_AW_RUNTIME_OWNER", strings.Repeat("a", 64))
+	return root
+}
+
 func TestMCPRuntimeAuditDiffPathsResolvePerInvocation(t *testing.T) {
-	for _, root := range []string{"/tmp/gh-aw-run.First123", "/tmp/gh-aw-run.Second456"} {
+	for _, root := range []string{newCLIRuntimeRoot(t), newCLIRuntimeRoot(t)} {
 		t.Setenv("GH_AW_RUNTIME_ROOT", root)
 		called := false
 		execCmd := func(ctx context.Context, args ...string) *exec.Cmd {

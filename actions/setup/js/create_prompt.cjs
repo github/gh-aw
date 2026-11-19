@@ -20,7 +20,8 @@ const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
  * @param {string} text
  */
 function assertNoPromptControlMarkers(section, text) {
-  const controlMarkerPattern = /<\|im_start\|>|<\|im_end\|>|<\|system\|>|<\|assistant\|>|<\|user\|>|BEGIN\s+SYSTEM\s+PROMPT|END\s+SYSTEM\s+PROMPT/iu;
+  const controlMarkerPattern =
+    /<\|(?:im_start|im_sep|im_end|fim_prefix|fim_middle|fim_suffix|ghissue|ghreview|ghisc|ghso|meta_sep|meta_start|meta_end|meta_section|system|assistant|user|tool|function|developer)(?:\||\s)|BEGIN\s+SYSTEM\s+PROMPT|END\s+SYSTEM\s+PROMPT/iu;
   if (controlMarkerPattern.test(text)) {
     throw new Error(`Unsafe control marker detected in ${section} prompt content`);
   }

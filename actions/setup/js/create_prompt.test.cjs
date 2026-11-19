@@ -119,6 +119,22 @@ describe("create_prompt", () => {
     expect(renderPrompt({ items }, env, tempDir)).toBe(payloads.join(""));
   });
 
+  it.each(["<|developer|>", "<|tool|>", "<|function|>", "<|fim_prefix|>", "<|ghreview|>"])("rejects authored control marker %s", async marker => {
+    const workflows = path.join(tempDir, ".github/workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.writeFileSync(path.join(workflows, "author.md"), marker);
+    Object.assign(process.env, {
+      RUNNER_TEMP: tempDir,
+      GITHUB_WORKSPACE: tempDir,
+      GH_AW_PROMPT: path.join(tempDir, "gh-aw/aw-prompts/prompt.txt"),
+      GH_AW_PROMPT_CONFIG: JSON.stringify({ items: [{ author_file: ".github/workflows/author.md" }] }),
+    });
+
+    await main(core);
+
+    expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Unsafe control marker"));
+  });
+
   it("preserves ordering across inline content and prompt files", () => {
     fs.writeFileSync(path.join(tempDir, "system.md"), "file content\n", "utf8");
     const config = {

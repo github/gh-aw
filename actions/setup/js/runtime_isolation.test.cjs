@@ -73,7 +73,9 @@ describe("private runtime ownership", () => {
     expect(first.GH_AW_SETUP_ROOT).not.toBe(second.GH_AW_SETUP_ROOT);
     expect(fs.statSync(context.map(first.GH_AW_RUNTIME_ROOT)).mode & 0o777).toBe(0o700);
     expect(fs.statSync(first.GH_AW_SETUP_ROOT).mode & 0o777).toBe(0o700);
+    expect(first.GH_AW_RUNTIME_OWNER).toBe(crypto.createHash("sha256").update(first.GH_AW_RUNTIME_TOKEN).digest("hex"));
     expect(fs.readFileSync(first.GITHUB_STATE, "utf8")).toContain(`GH_AW_RUNTIME_ID=${first.GH_AW_RUNTIME_ID}`);
+    expect(fs.readFileSync(first.GITHUB_ENV, "utf8")).toContain(`GH_AW_RUNTIME_OWNER=${first.GH_AW_RUNTIME_OWNER}`);
     expect(context.allocate(first).GH_AW_RUNTIME_ROOT).toBe(first.GH_AW_RUNTIME_ROOT);
     fs.writeFileSync(path.join(context.map(second.GH_AW_RUNTIME_ROOT), "marker"), "second");
     const digest = crypto.createHash("sha256").update(first.GH_AW_RUNTIME_TOKEN).digest("hex");

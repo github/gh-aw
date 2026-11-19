@@ -111,6 +111,7 @@ function allocateRoots(env, created) {
   const values = {
     GH_AW_RUNTIME_ROOT: root,
     GH_AW_RUNTIME_TOKEN: token,
+    GH_AW_RUNTIME_OWNER: ownershipDigest(token),
     GH_AW_RESOURCE_SUFFIX: suffix,
     GH_AW_RUNTIME_ID: runtimeIdentity,
     GH_AW_SETUP_ROOT: setupRoot,

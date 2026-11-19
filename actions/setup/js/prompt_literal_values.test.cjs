@@ -52,6 +52,12 @@ describe("literal prompt values and private diagnostics", () => {
     expect(logs()).not.toContain("VALUE_");
   });
 
+  it.each(["<|developer|>", "<|tool|>", "<|function|>", "<|fim_prefix|>", "<|ghreview|>"])("rejects restored control marker %s", marker => {
+    const prefix = "\x00VALUE_test_";
+    const literals = createLiteralValues({ version: 1, prefix, values: [marker], files: {} });
+    expect(() => literals.restore(`${prefix}0\x00`)).toThrow("forbidden control-channel marker");
+  });
+
   it("distinguishes missing and invalid persisted state", () => {
     expect(readLiteralState(file)).toBeNull();
     expect(core.debug).toHaveBeenCalledWith("[promptLiteralValues] No persisted state");
