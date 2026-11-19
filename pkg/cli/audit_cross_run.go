@@ -45,6 +45,7 @@ type CrossRunAuditReport struct {
 	Edges                []EpisodeEdge               `json:"edges,omitempty"`
 	Delivery             []DeliveryData              `json:"delivery,omitempty"`
 	Outcomes             []OutcomesData              `json:"adoption,omitempty"`
+	AdoptionErrors       []AdoptionErrorData         `json:"adoption_errors,omitempty"`
 	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_adoption,omitempty"`
 }
 

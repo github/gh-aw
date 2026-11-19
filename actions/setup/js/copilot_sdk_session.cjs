@@ -25,6 +25,7 @@
 "use strict";
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { TMP_GH_AW_PATH } = require("./constants.cjs");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -233,7 +234,9 @@ async function runCopilotSDKSession({
   // Session state directory — mirrors the source path used by unified_session.cjs.
   // /tmp/gh-aw/sandbox/agent/logs/copilot-session-state/{sessionId}/events.jsonl
   // GH_AW_SESSION_STATE_BASE_DIR may be set in tests to redirect writes to an isolated directory.
-  const defaultSessionStateBase = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state");
+  // Pinned to /tmp/gh-aw (the shared host handoff dir), never os.tmpdir(): TMPDIR may
+  // point at a host-private runtime dir that is not shared with or writable in the sandbox.
+  const defaultSessionStateBase = path.join(TMP_GH_AW_PATH, "sandbox", "agent", "logs", "copilot-session-state");
   const sessionStateBase = sessionStateBaseDir ?? process.env.GH_AW_SESSION_STATE_BASE_DIR ?? defaultSessionStateBase;
 
   /** @type {ReadonlyArray<NonNullable<import("@github/copilot-sdk").CopilotClientOptions["logLevel"]>>} */
