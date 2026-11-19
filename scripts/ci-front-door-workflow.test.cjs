@@ -134,7 +134,7 @@ test("PR model decisions control every check job through the actual output valid
 });
 
 test("invalid outputs and missing, failed or skipped decisions run every check job", () => {
-  for (const raw of ["", "not-json", "null", "{}", '["unknown"]', JSON.stringify([...SUITE_IDS, "unknown"]), '["build","build"]', '["go-tests"]', ...Object.keys(JOB_DEPENDENCIES).map(id => JSON.stringify([id]))]) {
+  for (const raw of ["", "not-json", "null", "{}", '["unknown"]', JSON.stringify([...SUITE_IDS, "unknown"]), '["build","build"]', '["go-tests"]', '["bench"]', ...Object.keys(JOB_DEPENDENCIES).map(id => JSON.stringify([id]))]) {
     assert.equal(validatedSuites(raw), "", raw);
   }
   assert.equal(validatedSuites("[]"), "[]");
@@ -169,7 +169,7 @@ test("non-PR main controls retain all checks and never require a successful deci
       assert.equal(evaluate(condition(jobs[id]), { event, ref: "refs/heads/main", result: "skipped" }), true, `${event}: ${id}`);
     }
   }
-  for (const id of ["bench", "fuzz", "security-scan"]) {
+  for (const id of ["fuzz", "security-scan"]) {
     assert.equal(evaluate(condition(jobs[id]), { event: "workflow_dispatch", ref: "refs/heads/feature", result: "skipped" }), false, id);
   }
   assert.match(workflow, /schedule:\n[\s\S]*cron:/);

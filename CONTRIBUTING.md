@@ -557,11 +557,18 @@ Quick reference:
 ### CI Front Door
 
 CGO filters every check job on PRs through `scripts/ci-front-door.cjs`, including
-Go tests, security checks, linters, conformance, builds, benchmarks, fuzzing, and
+Go tests, security checks, linters, conformance, builds, fuzzing, and
 both macOS and Windows. Only checkout, selection, and timing/cache cleanup are
 unconditional infrastructure. Main-branch pushes,
 manual runs, and the weekly scheduled control run all applicable suites without
 calling the Decision API. CJS and Windows CI are unchanged.
+
+Benchmarks run separately in `benchmarks.yml` on relevant main-branch pushes,
+the weekly schedule, and manual runs on main, never on PRs. CLI benchmarks,
+other packages, and each queue replay size run in parallel with separate
+baseline artifacts from successful main pushes. The benchmark workload and
+three-iteration sampling are unchanged. Use `make bench` locally, or select a
+subset with `BENCH_PACKAGES` and `BENCH_PATTERN`.
 
 The selector uses GitHub Decisions at
 `https://api.githubcopilot.com/v1/decisions` with model `gpt-6-luna-decisions`.
@@ -632,7 +639,7 @@ control for missed regressions.
 `.github/ci/suite-catalog.json` has schema version 1 and entries with a stable
 `id`, short `description`, `mandatory` flag, and
 `historical_duration_seconds` (nonnegative seconds, or `null` for unknown).
-All `mandatory` flags are false. IDs match the 24 selectable CGO check jobs.
+All `mandatory` flags are false. IDs match the 23 selectable CGO check jobs.
 Adding a suite requires updating both the catalog and the runtime's fixed ID
 list, plus job wiring and tests. Never invent historical durations.
 

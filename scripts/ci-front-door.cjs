@@ -16,7 +16,6 @@ const SUITE_IDS = Object.freeze([
   "build",
   "build-wasm",
   "validate-yaml",
-  "bench",
   "check-validator-sizes",
   "lint-go-format",
   "lint-go-golangci",

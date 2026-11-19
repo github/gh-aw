@@ -45,7 +45,6 @@
       "historical_duration_seconds": null,
       "mandatory": false
     },
-    { "id": "bench", "description": "Run Go benchmarks and compare with historical baselines using benchstat for runtime performance regressions.", "historical_duration_seconds": null, "mandatory": false },
     { "id": "check-validator-sizes", "description": "Run the validator source file-size checker; report oversized validation Go files.", "historical_duration_seconds": null, "mandatory": false },
     { "id": "lint-go-format", "description": "Check formatting of Go source and test files with repository Go formatting commands.", "historical_duration_seconds": null, "mandatory": false },
     { "id": "lint-go-golangci", "description": "Run golangci-lint on Go packages in three shards, including compiler, CLI, internal tools, test files, and lint configuration.", "historical_duration_seconds": null, "mandatory": false },

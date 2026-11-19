@@ -215,10 +215,13 @@ test-perf:
 	exit $$EXIT_CODE
 
 # Run benchmarks for performance testing
+BENCH_PACKAGES ?= ./pkg/...
+BENCH_PATTERN ?= .
 .PHONY: bench
+bench: SHELL := /bin/bash -eu -o pipefail
 bench:
 	@echo "Running benchmarks..."
-	go test -bench=. -benchmem -benchtime=3x -run=^$$ ./pkg/... | tee bench_results.txt
+	go test -bench='$(value BENCH_PATTERN)' -benchmem -benchtime=3x -run=^$$ $(BENCH_PACKAGES) | tee bench_results.txt
 
 # Run only critical performance benchmarks for daily monitoring
 # Uses time-based -benchtime (not a fixed low iteration count) so that results are

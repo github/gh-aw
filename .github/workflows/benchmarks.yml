@@ -1,0 +1,161 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+    paths:
+    - '**/*.go'
+    - 'cmd/**'
+    - 'pkg/**'
+    - 'scripts/**'
+    - 'actions/setup/**'
+    - 'go.mod'
+    - 'go.sum'
+    - 'Makefile'
+    - '.github/workflows/benchmarks.yml'
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - shard: packages
+          packages: ./pkg/...
+          pattern: .
+        - shard: cli
+          packages: ./pkg/cli
+          pattern: .
+        - shard: queue-1MiB
+          packages: ./pkg/workqueue
+          pattern: '^BenchmarkQueueColdReplay$/^1MiB$'
+        - shard: queue-16MiB
+          packages: ./pkg/workqueue
+          pattern: '^BenchmarkQueueColdReplay$/^16MiB$'
+        - shard: queue-64MiB
+          packages: ./pkg/workqueue
+          pattern: '^BenchmarkQueueColdReplay$/^64MiB$'
+        - shard: queue-80MiB
+          packages: ./pkg/workqueue
+          pattern: '^BenchmarkQueueColdReplay$/^80MiB$'
+    name: bench (${{ matrix.shard }})
+    env:
+      BENCH_PACKAGES: ${{ matrix.packages }}
+      BENCH_PATTERN: ${{ matrix.pattern }}
+      SHARD: ${{ matrix.shard }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Select remaining packages
+      if: matrix.shard == 'packages'
+      run: |
+        packages=$(go list ./pkg/... | grep -vE '/(cli|workqueue)$' | paste -sd ' ')
+        echo "BENCH_PACKAGES=$packages" >> "$GITHUB_ENV"
+
+    - name: Download previous benchmark baseline
+      id: baseline
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        run_id=$(gh api \
+          "repos/$GITHUB_REPOSITORY/actions/workflows/benchmarks.yml/runs?branch=main&event=push&status=success&per_page=1" \
+          --jq '.workflow_runs[0].id // empty')
+        if [ -z "$run_id" ]; then
+          echo "No successful main benchmark run yet; recording the first baseline."
+          echo "has_baseline=false" >> "$GITHUB_OUTPUT"
+        else
+          artifact_id=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts?per_page=100" \
+            --jq ".artifacts[] | select(.name == \"benchmark-results-$SHARD\" and .expired == false) | .id")
+          if [ -z "$artifact_id" ]; then
+            echo "::warning::No unexpired baseline for $SHARD; recording a new baseline."
+            echo "has_baseline=false" >> "$GITHUB_OUTPUT"
+          else
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+              --name "benchmark-results-$SHARD" --dir baseline
+            test -s baseline/bench_results.txt
+            echo "has_baseline=true" >> "$GITHUB_OUTPUT"
+          fi
+        fi
+
+    - name: Run benchmarks
+      id: benchmarks
+      run: make bench
+
+    - name: Install benchstat
+      if: steps.baseline.outputs.has_baseline == 'true'
+      run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260615155930-9e4b9ddef5b6
+
+    - name: Run benchstat regression check
+      if: steps.baseline.outputs.has_baseline == 'true'
+      run: |
+        if ! comparison=$(benchstat baseline/bench_results.txt bench_results.txt 2>&1); then
+          printf '%s\n' "$comparison"
+          echo "::error::benchstat failed to compare benchmark results"
+          exit 1
+        fi
+        printf '%s\n' "$comparison"
+        {
+          echo "## Benchmark regression check: $SHARD"
+          echo '```'
+          printf '%s\n' "$comparison"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        regression=false
+        while IFS= read -r line; do
+          if [[ "$line" =~ \+([0-9]+(\.[0-9]+)?)% ]]; then
+            if awk -v p="${BASH_REMATCH[1]}" 'BEGIN {exit !(p > 10)}'; then
+              echo "::error::Performance regression >10%: $line"
+              regression=true
+            fi
+          fi
+        done <<< "$comparison"
+        if [ "$regression" = true ]; then
+          exit 1
+        fi
+
+    - name: Display benchmark summary
+      if: always() && steps.benchmarks.outcome == 'success'
+      run: |
+        {
+          echo "## Benchmark results: $SHARD"
+          echo '```'
+          awk '/^Benchmark/ {if (++count <= 20) print}' bench_results.txt
+          echo '```'
+          echo "Full results: benchmark-results-$SHARD"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Save benchmark results
+      if: always() && steps.benchmarks.outcome == 'success'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+      with:
+        name: benchmark-results-${{ matrix.shard }}
+        path: bench_results.txt
+        if-no-files-found: error
+        retention-days: 14
