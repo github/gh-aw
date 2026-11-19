@@ -1636,8 +1636,9 @@ status is `partial`, `totalNanoAiu` is a reported subtotal and MUST NOT be
 presented as the final bill. If the snapshot is missing, unavailable, invalid,
 or contradicts the shutdown total, the implementation MUST emit
 `aiCreditsStatus: "unavailable"` and MUST omit `totalNanoAiu`. In the absence
-of `session.shutdown`, terminal accounting MUST NOT be reported. Artifacts
-without a completeness status MUST NOT be treated as bill verification.
+of `session.shutdown`, terminal accounting MUST NOT be reported. Readers may
+display a legacy `totalNanoAiu` without a status for compatibility. Such a
+number is unverified and MUST NOT be treated as a complete bill.
 
 No terminal total includes work outside the session, such as routing
 classification or a separate detection job. This accounting is not a
