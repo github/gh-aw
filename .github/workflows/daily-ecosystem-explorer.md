@@ -15,10 +15,10 @@ permissions:
   pull-requests: read
   copilot-requests: write
 tracker-id: daily-ecosystem-explorer
+model: copilot/claude-haiku-5.5
 engine:
-  id: copilot
-  copilot-sdk: true
-max-tool-denials: 3
+  id: langgraph
+max-turns: 50
 strict: true
 timeout-minutes: 45
 network:
@@ -33,7 +33,7 @@ tools:
   edit:
   bash: ["*"]
   github:
-    mode: local
+    mode: gh-proxy
     lockdown: false
     min-integrity: approved
     toolsets:
@@ -54,6 +54,7 @@ safe-outputs:
     allowed-files:
       - "docs/src/content/docs/blog/**"
 imports:
+  - shared/langgraph.md
   - shared/github-guard-policy.md
   - shared/otlp.md
   - shared/reporting.md
