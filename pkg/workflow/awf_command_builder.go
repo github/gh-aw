@@ -78,6 +78,10 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 		engineCommand = rewriteNVXEngineCommand(engineCommand)
 		modelsJSONPathExport += "\n" + buildNVXAssetSetup()
 	}
+	if !awfSupportsExcludeEnv(firewallConfig) {
+		// Older AWF needs the host environment itself, but must not pass these paths to the engine.
+		engineCommand = "unset TMPDIR GH_AW_RUNTIME_TMP_DIR GH_AW_RUNTIME_TMP_ID; " + engineCommand
+	}
 	shellWrappedCommand := WrapCommandInShell(engineCommand)
 	preCreateLog := fmt.Sprintf("(umask 177 && touch %s)", shellEscapeArg(config.LogFile))
 	if config.ProtectLogCapture {
