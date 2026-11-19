@@ -36,3 +36,4 @@
 ./pkg/workflow/workflow_run_validation_test.go|2026-11-08
 ./pkg/lifecycle/lifecycle_test.go|2026-11-17
 ./pkg/typeutil/convert_test.go|2026-11-16
+./pkg/agentdrain/spec_test.go|2026-11-19
