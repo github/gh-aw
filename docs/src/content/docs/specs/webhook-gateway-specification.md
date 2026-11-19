@@ -19,10 +19,54 @@ sidebar:
 
 This specification defines the compiler-to-receiver and receiver-to-runner contract for `on.gateway-dispatch`. It covers GitHub issues, pull requests, discussions, every comment family, reviews/threads, Projects, security alerts, imported connector triggers, and commands. Arbitrary undeclared custom webhook identifiers are unsupported. It does not register webhook sources and is unrelated to the MCP gateway.
 
+The [bounded TLA+ model and TLC-backed security threat model](https://github.com/github/gh-aw/tree/main/specs/webhook-gateway)
+exercise admission, replay/recovery, discovery fencing and destination trust
+boundaries. They distinguish shipped destination checks from external receiver
+requirements; bounded model checking does not prove implementation conformance
+or hosted readiness.
+
 The terms **MUST**, **MUST NOT**, and **MAY** describe requirements for conforming integrations. Receiver requirements are not claims that gh-aw ships a receiver: provider onboarding, signature verification, source authorization, durable admission, and dispatch remain integration responsibilities. This contract does not establish compatibility with the proposed hosted CAO RFC-033 interchange.
 
 > [!IMPORTANT]
 > The compiler generates the mandatory App-token provenance and hash-bound admission gates described below, replacing generic role/bot authorization for gateway ingress. This destination implementation does not verify a CAO deployment or establish hosted readiness. An integration MUST remain nonactivating until both the receiver token flow and the approved destination revision satisfy this contract.
+
+## Bounded security findings
+
+The [TLC-backed threat model](https://github.com/github/gh-aw/blob/main/specs/webhook-gateway/threat-model.md)
+records an exhausted secure baseline of **23,620 distinct states**, with all
+18 invariant checks satisfied. Each of 18 deliberately weakened controls
+produces its expected counterexample. Six reachability witnesses establish that
+valid activation, uncertain outcomes, known-nonacceptance retries, duplicate and
+conflicting receipts, and restart are reachable with security invariants enabled.
+These counterexamples demonstrate why the controls are necessary in the model;
+they are not discovered vulnerabilities in the current implementation.
+
+Threat identifiers are stable references for these grouped findings. New findings
+receive new identifiers; existing identifiers are not renumbered or reused.
+
+| Threat ID | Finding from weakened controls | Consequence for this contract |
+| --- | --- | --- |
+| `WGT-001` | Retrying an uncertain dispatch can produce a second GitHub acceptance; forgetting an accepted outcome across restart has the same effect. | [Durability and recovery](#receiver-durability-and-recovery) requires quarantine of uncertain outcomes and durable receipt/outcome retention. Only known nonacceptance permits an automatic bounded retry; `204` proves acceptance, not workflow completion. |
+| `WGT-002` | An older refresh can resurrect a revoked route, and queued work can outlive its approval. | [Discovery publication](#table-shape-matching-and-publication) requires generation fencing; [pre-dispatch checks](#backend-owned-refresh-policy) must revalidate current bindings on every attempt. Revocation cannot recall an already authorized/transmitted request or an issued continuation. |
+| `WGT-003` | A stale worker or a conflicting duplicate can violate the original admission binding. | [Durable worker fencing and immutable content bindings](#receiver-durability-and-recovery) are required; process-local locks and batch-local resource deduplication do not establish cross-dispatch replay safety. |
+| `WGT-004` | A valid signature, enrolled source, matching predicate, or approved App alone does not establish the other trust boundaries; forwarding native content can leak data before destination validation. | [Source admission and minimal projection](#supported-triggers-and-source-data), [App provenance](#github-app-token-provenance), and [workflow admission](#workflow-hash-bound-gettoken-admission) remain independent gates. Destination rejection cannot undo receiver-side disclosure. |
+| `WGT-005` | A familiar configuration hash can coexist with an unapproved compiled artifact; a valid server decision can be misapplied without response correlation or envelope validation. | [Server verification](#server-verification-and-on-demand-refresh) must independently bind the actual artifact at the signed revision. The [continuation profile](#compiler-continuation-profile) and [dispatch envelope](#dispatch-envelope) checks remain mandatory after admission. |
+
+The finite model covers 13 request profiles, one scoped receipt key, two workers,
+at most two dispatch attempts, one approval revocation, and one restart. Signature,
+hash, artifact, projection, and response validity are abstract predicates, not
+proofs of their implementations. There is no fairness, liveness, exactly-once
+delivery, or hosted-readiness guarantee.
+
+Receiver and admission-server controls remain external integration requirements;
+the shipped destination checks do not establish their deployment or conformance.
+Real cryptographic and URL parsing, source-isolation keys, replay-retention
+horizons, exact size/evaluation budgets, resource exhaustion, provider-read
+authorization, prompt injection, and runtime-token cleanup require separate
+implementation review and integration evidence. The generated threat model
+records the full assumptions, residual risks, counterexamples, and reproduction
+commands. These findings clarify existing requirements; they add no wire-schema
+or runtime behavior change.
 
 ## Configuration and experimental status
 
