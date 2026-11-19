@@ -58,6 +58,26 @@ func TestAzureFoundryIQDocumentationConsumer(t *testing.T) {
 	require.Empty(t, strings.TrimSpace(body))
 }
 
+func TestAzureFoundryIQGrantLength(t *testing.T) {
+	for _, test := range []struct {
+		length int
+		valid  bool
+	}{{150, true}, {151, false}} {
+		t.Run(strings.Repeat("x", test.length), func(t *testing.T) {
+			compiler, path := prepareConnectorScenario(t, azureFoundryIQCompilerScenario, false, func(consumer, _ map[string]any) {
+				imports := consumer["imports"].([]any)
+				imports[0].(map[string]any)["with"].(map[string]any)["queries"] = []any{strings.Repeat("é", test.length)}
+			})
+			_, err := compiler.ParseWorkflowFile(path)
+			if test.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "at most 150 Unicode characters")
+			}
+		})
+	}
+}
+
 func TestAzureFoundryIQInvalidCallsBeforeCredentials(t *testing.T) {
 	plan := foundryIQPlan(t)
 	runtime := connectors.Runtime{
@@ -72,22 +92,22 @@ func TestAzureFoundryIQInvalidCallsBeforeCredentials(t *testing.T) {
 		})},
 	}
 	for _, args := range []map[string]any{
-		{}, {"queries": nil}, {"queries": foundryIQQuestion}, {"queries": []any{}},
-		{"queries": []any{foundryIQQuestion, foundryIQQuestion}},
-		{"queries": []any{1}}, {"queries": []any{[]any{foundryIQQuestion}}},
-		{"queries": []any{"An unapproved question"}},
-		{"queries": []any{strings.Repeat("x", 2049)}},
-		{"queries": []any{foundryIQQuestion}, "knowledgeBase": "other-kb"},
+		{}, {"queries": []any{foundryIQQuestion}}, {"query_variants": nil}, {"query_variants": foundryIQQuestion}, {"query_variants": []any{}},
+		{"query_variants": []any{foundryIQQuestion, foundryIQQuestion}},
+		{"query_variants": []any{1}}, {"query_variants": []any{[]any{foundryIQQuestion}}},
+		{"query_variants": []any{"An unapproved question"}},
+		{"query_variants": []any{strings.Repeat("x", 151)}},
+		{"query_variants": []any{foundryIQQuestion}, "knowledgeBase": "other-kb"},
 	} {
 		_, err := plan.CallMCP(t.Context(), runtime, "knowledge-base", "knowledge_base_retrieve", args)
 		require.Error(t, err)
 	}
 	for _, tool := range []string{"*", "retrieve", "create_knowledge_base", "custom-retrieve"} {
-		_, err := plan.CallMCP(t.Context(), runtime, "knowledge-base", tool, map[string]any{"queries": []string{foundryIQQuestion}})
+		_, err := plan.CallMCP(t.Context(), runtime, "knowledge-base", tool, map[string]any{"query_variants": []string{foundryIQQuestion}})
 		require.Error(t, err)
 	}
 	runtime.AllowedOrigins = []string{"https://other.search.windows.net"}
-	_, err := plan.CallMCP(t.Context(), runtime, "knowledge-base", "knowledge_base_retrieve", map[string]any{"queries": []string{foundryIQQuestion}})
+	_, err := plan.CallMCP(t.Context(), runtime, "knowledge-base", "knowledge_base_retrieve", map[string]any{"query_variants": []string{foundryIQQuestion}})
 	require.Error(t, err, "importing an endpoint is not network approval")
 }
 
@@ -99,25 +119,41 @@ func TestAzureFoundryIQHostedMCP(t *testing.T) {
 		status      int
 		toolError   bool
 		wantSuccess bool
+		wantError   string
 	}{
-		{"grounding", 100, 200, false, true},
-		{"oversize", 262145, 200, false, false},
-		{"tool-error", 100, 200, true, false},
-		{"authorization-denial", 100, 403, false, false},
+		{"grounding", 100, 200, false, true, ""},
+		{"oversize", 262145, 200, false, false, ""},
+		{"tool-error", 100, 200, true, false, `argument "query_variants" is required and must be a JSON array`},
+		{"private-tool-error", 100, 200, true, false, "upstream tool error; provider details withheld"},
+		{"interactive", 100, 200, false, false, "requires unsupported interactive input"},
+		{"authorization-denial", 100, 403, false, false, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var calls, failures atomic.Int32
 			upstream := mcp.NewServer(&mcp.Implementation{Name: "azure-foundry-iq-offline", Version: "1"}, nil)
 			upstream.AddTool(&mcp.Tool{Name: "knowledge_base_retrieve", InputSchema: map[string]any{
-				"type": "object", "properties": map[string]any{"queries": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "minItems": 1, "maxItems": 1}},
+				"type": "object", "properties": map[string]any{"query_variants": map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 150}, "minItems": 1, "maxItems": 1}}, "required": []string{"query_variants"}, "additionalProperties": false,
 			}}, func(_ context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				calls.Add(1)
 				var args map[string]any
 				if err := json.Unmarshal(request.Params.Arguments, &args); err != nil {
 					return nil, err
 				}
-				assert.Equal(t, []any{foundryIQQuestion}, args["queries"])
-				return &mcp.CallToolResult{IsError: test.toolError, Content: []mcp.Content{&mcp.TextContent{Text: strings.Repeat("x", test.size)}}}, nil
+				assert.Equal(t, map[string]any{"query_variants": []any{foundryIQQuestion}}, args)
+				if test.name == "interactive" {
+					var result mcp.CallToolResult
+					if err := json.Unmarshal([]byte(`{"content":[],"resultType":"input_required"}`), &result); err != nil {
+						return nil, err
+					}
+					return &result, nil
+				}
+				text := strings.Repeat("x", test.size)
+				if test.name == "tool-error" {
+					text = "private fixture diagnostic: The 'arguments.query_variants' field for the tool call is required and must be a JSON array."
+				} else if test.toolError {
+					text = "private fixture diagnostic"
+				}
+				return &mcp.CallToolResult{IsError: test.toolError, Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil
 			})
 			handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return upstream }, nil)
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -156,12 +192,16 @@ func TestAzureFoundryIQHostedMCP(t *testing.T) {
 					return "fixture-search-token", nil
 				},
 			}
-			result, err := plan.CallMCP(t.Context(), runtime, "knowledge-base", "knowledge_base_retrieve", map[string]any{"queries": []string{foundryIQQuestion}})
+			result, err := plan.CallMCP(t.Context(), runtime, "knowledge-base", "knowledge_base_retrieve", map[string]any{"query_variants": []string{foundryIQQuestion}})
 			if test.wantSuccess {
 				require.NoError(t, err)
 				require.Len(t, result.Content, 1)
 			} else {
 				require.Error(t, err)
+				if test.wantError != "" {
+					require.ErrorContains(t, err, test.wantError)
+					require.NotContains(t, err.Error(), "private fixture diagnostic")
+				}
 			}
 			if test.status == 403 {
 				require.EqualValues(t, 1, failures.Load(), "authorization denial must not retry")
@@ -195,15 +235,16 @@ const noNetwork = async () => { network++; throw new Error("network access forbi
 (async () => {
   for (const [args, message] of [
     [{}, "Required connector argument is missing"],
-    [{queries:null}, "Connector argument must be a bounded string array"],
-    [{queries:input.question}, "Connector argument must be a bounded string array"],
-    [{queries:[]}, "Connector argument must be a bounded string array"],
-    [{queries:[input.question,input.question]}, "Connector argument must be a bounded string array"],
-    [{queries:[1]}, "Connector argument must be a bounded Unicode string"],
-    [{queries:[[input.question]]}, "Connector argument must be a bounded Unicode string"],
-    [{queries:["Unapproved"]}, "Connector argument is outside approved resources"],
-    [{queries:["x".repeat(2049)]}, "Connector argument must be a bounded Unicode string"],
-    [{queries:[input.question],knowledgeBase:"other-kb"}, "Unknown connector argument"]
+    [{queries:[input.question]}, "Unknown connector argument"],
+    [{query_variants:null}, "Connector argument must be a bounded string array"],
+    [{query_variants:input.question}, "Connector argument must be a bounded string array"],
+    [{query_variants:[]}, "Connector argument must be a bounded string array"],
+    [{query_variants:[input.question,input.question]}, "Connector argument must be a bounded string array"],
+    [{query_variants:[1]}, "Connector argument must be a bounded Unicode string"],
+    [{query_variants:[[input.question]]}, "Connector argument must be a bounded Unicode string"],
+    [{query_variants:["Unapproved"]}, "Connector argument is outside approved resources"],
+    [{query_variants:["x".repeat(151)]}, "Connector argument must be a bounded Unicode string"],
+    [{query_variants:[input.question],knowledgeBase:"other-kb"}, "Unknown connector argument"]
   ]) await assert.rejects(callMCP(input.plan, "knowledge-base", "knowledge_base_retrieve", args,
     {env:noSecrets, fetchImpl:noNetwork}), {message});
   assert.equal(secretReads, 0, "invalid arguments must not resolve credentials");
@@ -214,10 +255,10 @@ const noNetwork = async () => { network++; throw new Error("network access forbi
   const tools = JSON.parse(messages.join("").trim()).result.tools;
   assert.equal(tools.length, 1);
   assert.equal(tools[0].name, "knowledge-base__knowledge_base_retrieve");
-  assert.deepEqual(tools[0].inputSchema.properties.queries, {
-    type:"array", minItems:1, maxItems:1, items:{type:"string", minLength:1, maxLength:2048}
+  assert.deepEqual(tools[0].inputSchema.properties.query_variants, {
+    type:"array", minItems:1, maxItems:1, items:{type:"string", minLength:1, maxLength:150}
   });
-  for (const mode of ["success","oversize","tool-error","denied"]) {
+  for (const mode of ["success","oversize","tool-error","private-tool-error","interactive","denied"]) {
     let calls = 0, requests = 0;
     const fetchImpl = async (url, options) => {
       requests++;
@@ -234,14 +275,25 @@ const noNetwork = async () => { network++; throw new Error("network access forbi
       else {
         calls++;
         assert.equal(request.method, "tools/call");
-        assert.deepEqual(request.params, {name:"knowledge_base_retrieve",arguments:{queries:[input.question]}});
-        result = {content:[{type:"text",text:"x".repeat(mode === "oversize" ? 262145 : 100)}],isError:mode === "tool-error"};
+        assert.deepEqual(request.params, {name:"knowledge_base_retrieve",arguments:{query_variants:[input.question]}});
+        const text = mode === "tool-error"
+          ? "private fixture diagnostic: The 'arguments.query_variants' field for the tool call is required and must be a JSON array."
+          : mode === "private-tool-error" ? "private fixture diagnostic" : "x".repeat(mode === "oversize" ? 262145 : 100);
+        result = {content:[{type:"text",text}],isError:mode === "tool-error" || mode === "private-tool-error",
+          ...(mode === "interactive" ? {resultType:"input_required"} : {})};
       }
       return new Response(JSON.stringify({jsonrpc:"2.0",id:request.id,result}), {headers:{"content-type":"application/json"}});
     };
     const options = {env:{GH_AW_CONNECTOR_SECRET_FOUNDRY_IQ_SEARCH_ACCESS_TOKEN:"fixture-search-token"},fetchImpl};
-    const call = callMCP(input.plan, "knowledge-base", "knowledge_base_retrieve", {queries:[input.question]}, options);
+    const call = callMCP(input.plan, "knowledge-base", "knowledge_base_retrieve", {query_variants:[input.question]}, options);
     if (mode === "success") assert.equal((await call).content[0].text.length,100);
+    else if (mode === "tool-error") await assert.rejects(call, error => {
+      assert.match(error.message, /argument "query_variants" is required and must be a JSON array/);
+      assert.doesNotMatch(error.message, /private fixture diagnostic/);
+      return true;
+    });
+    else if (mode === "private-tool-error") await assert.rejects(call, /upstream tool error; provider details withheld/);
+    else if (mode === "interactive") await assert.rejects(call, /requires unsupported interactive input/);
     else await assert.rejects(call);
     assert.equal(calls, mode === "denied" ? 0 : 1);
     if (mode === "denied") assert.equal(requests,1);

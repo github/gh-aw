@@ -2199,7 +2199,28 @@ Some content here.`;
 
     test("preserves measured zero counters across blank lines", () => {
       const summary = parseTokenUsageJsonl('\n \t\n{"input_tokens":0,"output_tokens":0,"cache_read_tokens":0,"cache_write_tokens":0}\n\n');
-      expect(summary.tokenUsage).toEqual({ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 });
+      expect(summary.tokenUsage).toEqual({ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, input_tokens_inclusive: 0 });
+    });
+
+    test("sums inclusive input with explicit and provider-default cache semantics", () => {
+      const summary = parseTokenUsageJsonl(
+        [
+          { provider: "openai", input_tokens: 10, cache_read_tokens: 5, cache_write_tokens: 2 },
+          { provider: "unknown-provider", input_tokens: 10, cache_read_tokens: 5, cache_write_tokens: 2 },
+          { provider: "unknown-provider", input_tokens: 10, cache_read_tokens: 5, cache_write_tokens: 2, input_tokens_include_cache: true },
+          { provider: "openai", input_tokens: 10, cache_read_tokens: 5, cache_write_tokens: 2, input_tokens_include_cache: false },
+        ]
+          .map(entry => JSON.stringify(entry))
+          .join("\n")
+      );
+      expect(summary.tokenUsage.input_tokens_inclusive).toBe(56);
+    });
+
+    test("preserves explicitly inclusive input when cache breakdown is incomplete", () => {
+      const summary = parseTokenUsageJsonl(JSON.stringify({ provider: "unknown-provider", input_tokens: 100, input_tokens_include_cache: true }));
+      expect(summary.tokenUsage.input_tokens_inclusive).toBe(100);
+      expect(summary.tokenUsage).not.toHaveProperty("cache_read_tokens");
+      expect(summary.tokenUsage).not.toHaveProperty("cache_write_tokens");
     });
 
     test.each([false, true])("preserves malformed evidence through request deduplication (malformed first: %s)", malformedFirst => {

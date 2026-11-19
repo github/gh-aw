@@ -4,6 +4,8 @@ description: Validate one synthetic native Claim and finish it without resource 
 intent: Detect failures in native work queue assignment and completion without changing source content, allowing framework queue tracking mutations.
 on:
   workflow_dispatch:
+concurrency:
+  job-discriminator: "${{ github.run_id }}"
 permissions:
   contents: read
   copilot-requests: write
