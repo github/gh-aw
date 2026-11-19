@@ -1,0 +1,37 @@
+{
+ "date": "2026-11-19",
+ "window": "2026-10-20..2026-11-19",
+ "total_prs": 673,
+ "merged": 573,
+ "closed": 96,
+ "open": 4,
+ "merge_rate": 0.857,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "feature": {"total": 76, "merged": 66, "closed": 9, "open": 1, "rate": 0.88},
+  "bug_fix": {"total": 46, "merged": 40, "closed": 6, "open": 0, "rate": 0.87},
+  "security": {"total": 38, "merged": 29, "closed": 9, "open": 0, "rate": 0.763},
+  "testing": {"total": 53, "merged": 51, "closed": 2, "open": 0, "rate": 0.962},
+  "documentation": {"total": 41, "merged": 38, "closed": 3, "open": 0, "rate": 0.927},
+  "refactor": {"total": 16, "merged": 7, "closed": 8, "open": 1, "rate": 0.467},
+  "dependency": {"total": 25, "merged": 24, "closed": 1, "open": 0, "rate": 0.96},
+  "other": {"total": 378, "merged": 318, "closed": 58, "open": 2, "rate": 0.846}
+ },
+ "structural": {
+  "avg_words_merged": 146.8, "avg_words_closed": 97.6,
+  "code_block_merged_rate": 0.907, "code_block_absent_rate": 0.791
+ },
+ "length_buckets_completed": {
+  "0-100": {"total": 364, "merged": 301, "closed": 63, "rate": 0.827},
+  "100-150": {"total": 182, "merged": 157, "closed": 25, "rate": 0.863},
+  "150-250": {"total": 38, "merged": 31, "closed": 5, "rate": 0.861},
+  "250+": {"total": 89, "merged": 84, "closed": 3, "rate": 0.966}
+ },
+ "negative_titles": {
+  "wip_draft": {"total": 11, "merged": 3, "closed": 8, "rate": 0.273},
+  "triage_verify_investigate": {"total": 52, "merged": 30, "closed": 22, "rate": 0.577}
+ },
+ "last_7_days": {"total": 194, "merged": 154, "closed": 36, "open": 4, "rate": 0.811},
+ "category_rules": "v6-title-regex (first-match wins, leading [tag] stripped); comparable to 2026-11-17",
+ "caveat": "PR body used as prompt proxy; 516 of 673 PRs from app/copilot-swe-agent; keyword lift confounded by single-author batch clusters; not causal."
+}
