@@ -1178,12 +1178,13 @@ describe("fixed-endpoint HTTP MCP", () => {
     expect(canceled).toBe(true);
   });
 
-  it.each([{ isError: true }, { resultType: "input_required" }, { inputRequests: { authentication: { private: "provider diagnostic" } } }])(
-    "rejects remote failures and interactive input without publishing provider content",
-    async result => {
-      await expect(callMCP(encode(remoteDocument()), "registration", "getIssue", { record: "approved" }, { env, fetchImpl: remoteFetch({ result }) })).rejects.toThrow(/error or requires unsupported interactive/);
-    }
-  );
+  it.each([
+    [{ isError: true, content: [{ type: "text", text: "private diagnostic" }] }, /upstream tool error; provider details withheld/],
+    [{ resultType: "input_required" }, /requires unsupported interactive input/],
+    [{ inputRequests: { authentication: { private: "provider diagnostic" } } }, /requires unsupported interactive input/],
+  ])("rejects remote failures and interactive input without publishing provider content", async (result, message) => {
+    await expect(callMCP(encode(remoteDocument()), "registration", "getIssue", { record: "approved" }, { env, fetchImpl: remoteFetch({ result }) })).rejects.toThrow(message);
+  });
 
   it.each([
     { jsonrpc: "2.0", id: 2, error: { code: 400, message: "private diagnostic" } },

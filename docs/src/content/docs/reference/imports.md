@@ -159,11 +159,12 @@ Languages: ${{ github.aw.import-inputs.languages }}.
 | `integer` | Whole numeric value | `minimum`, `maximum` |
 | `boolean` | `true`/`false` | — |
 | `choice` | One of a fixed set of strings | `options: [...]` |
-| `array` | Ordered list of values | `items.type` (element type) |
+| `array` | Ordered list of values | `items.type` (element type), `items.maxLength` (string items) |
 | `object` | Key/value map | `properties` (one level deep) |
 
 Each field supports `required: true` and an optional `default` value. Numeric
 and integer fields may set inclusive `minimum` and `maximum` bounds.
+For string array items, `items.maxLength` limits the number of Unicode code points.
 
 ### Accessing inputs in shared workflows
 
@@ -190,7 +191,7 @@ imports:
 ---
 ```
 
-The compiler validates `required` fields, `choice` options, array element types, and object `properties`. Unknown keys are compile-time errors.
+The compiler validates `required` fields, `choice` options, array element types and length bounds, and object `properties`. Unknown keys are compile-time errors.
 
 ## Path Resolution
 
