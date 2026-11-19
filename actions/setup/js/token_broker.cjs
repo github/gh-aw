@@ -128,7 +128,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
         response = await fetchImpl(endpoint, {
           method: "POST",
           headers: { ...buildServiceRequestHeaders(snapshot), "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
-          body: JSON.stringify(tokenType === "copilot-request" ? { token_type: tokenType, provider, oidc_token: oidcToken } : { token_type: tokenType, oidc_token: oidcToken }),
+          body: JSON.stringify({ token_type: tokenType, ...(tokenType === "copilot-request" ? { provider } : {}), oidc_token: oidcToken, ...(snapshot.GITHUB_JOB ? { job_id: snapshot.GITHUB_JOB } : {}) }),
           redirect: "manual",
           signal: controller.signal,
         });
@@ -193,7 +193,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
         response = await fetchImpl(endpoint, {
           method: "POST",
           headers: { ...buildServiceRequestHeaders(snapshot), "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
-          body: JSON.stringify({ operation: "invalidate", oidc_token: oidcToken }),
+          body: JSON.stringify({ operation: "invalidate", oidc_token: oidcToken, ...(snapshot.GITHUB_JOB ? { job_id: snapshot.GITHUB_JOB } : {}) }),
           redirect: "manual",
           signal: controller.signal,
         });

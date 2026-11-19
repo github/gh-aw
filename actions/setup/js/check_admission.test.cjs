@@ -58,6 +58,7 @@ describe("bounded OIDC-only admission client", () => {
         traceparent: expect.stringMatching(new RegExp(`^00-${"a".repeat(32)}-[0-9a-f]{16}-01$`)),
         baggage: "cicd.pipeline.task.name=activation%2Freview",
       });
+      expect(JSON.parse(request.body).job_id).toBe("activation/review");
     }
     expect(fetchImpl.mock.calls[1][1].headers.traceparent).toBe(`00-${decision.traceId}-${decision.attempts[0].spanId}-01`);
     expect(fetchImpl.mock.calls[2][1].headers.traceparent).toBe(`00-${decision.traceId}-${decision.attempts[1].spanId}-01`);

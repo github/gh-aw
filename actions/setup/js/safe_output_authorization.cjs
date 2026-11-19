@@ -463,7 +463,7 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
     if (!evidencePath) fail("evidence_failed");
     const requestDigest = canonicalDigest(invocation);
     projection.request_digest = requestDigest;
-    const body = canonical({ version: VERSION, request_digest: requestDigest, invocation });
+    const body = canonical({ version: VERSION, request_digest: requestDigest, invocation, ...(env.GITHUB_JOB ? { job_id: env.GITHUB_JOB } : {}) });
     if (Buffer.byteLength(body) > MAX_REQUEST_BYTES) fail("invalid_preparation");
     const start = now();
     const wallStart = wallNow();

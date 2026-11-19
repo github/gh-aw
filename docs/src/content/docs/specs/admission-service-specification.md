@@ -180,6 +180,7 @@ traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
   "workflow_call_id": "1234-2:acme/project/.github/workflows/triage.lock.yml@refs/heads/main",
   "run_id": "1234",
   "run_attempt": "2",
+  "job_id": "activation",
   "ref": "refs/heads/main",
   "event_type": "workflow_dispatch",
   "actor": "octocat",
@@ -201,7 +202,7 @@ Proxies and API gateways MUST allow and preserve the standard fields, without ap
 
 ### JSON Request Fields
 
-All ten fields are required exactly once in a UTF-8 JSON object. Every value is a string, including run IDs and attempt numbers. Standard runner sources below are defined in GitHub's [default environment variables](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables); the executing workflow reference uses gh-aw's existing metadata wiring:
+The ten identity fields are required exactly once in a UTF-8 JSON object. The client MUST also include `job_id` whenever `GITHUB_JOB` is available; callers without a job context omit it. Every value is a string, including run IDs and attempt numbers. Standard runner sources below are defined in GitHub's [default environment variables](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables); the executing workflow reference uses gh-aw's existing metadata wiring:
 
 | Field | Meaning and validation |
 |-------|------------------------|
@@ -211,6 +212,7 @@ All ten fields are required exactly once in a UTF-8 JSON object. Every value is 
 | `workflow_call_id` | Derive exactly `<run_id>-<run_attempt>:<workflow_id>`, matching `aw_info.workflow_call_id`; not a separate GitHub claim |
 | `run_id` | `GITHUB_RUN_ID`: canonical ASCII decimal run ID; preserve as a string and compare with signed `run_id` |
 | `run_attempt` | `GITHUB_RUN_ATTEMPT`: canonical ASCII decimal attempt number; MUST match signed `run_attempt` |
+| `job_id` | `GITHUB_JOB`: logical job ID for diagnostics, preserved using JSON string encoding. Not a signed job-execution identity or proof of authorization. |
 | `ref` | `GITHUB_REF`: current GitHub Actions ref; MUST match signed `ref` |
 | `event_type` | `GITHUB_EVENT_NAME`: current event name; MUST match supported signed `event_name` |
 | `actor` | `GITHUB_ACTOR` / `github.actor`: original run actor login; MUST match signed `actor` |
@@ -226,7 +228,7 @@ The client MUST pass both values from the current [GitHub Actions context](https
 
 The client derives fields from the current runner context and executing workflow reference, not caller-supplied `aw_context`. Existing gh-aw populates `GH_AW_INFO_WORKFLOW_ID` from `job.workflow_ref` and builds `aw_info.workflow_call_id` with `buildWorkflowCallId`; admission MUST preserve those semantics. For reusable workflows, `github.workflow_ref` and `GITHUB_WORKFLOW_REF` identify the caller and MUST NOT replace the executing reference. Missing executing identity or run attempt MUST block admission rather than use the metadata helper's empty-reference or default-attempt fallback. The request sends no full event payload, arbitrary inbound context, usage, balances, or policy values. Original triggering-event lineage is not part of this protocol.
 
-The service MUST reject missing, duplicate, unknown, malformed, empty, or oversized fields, non-object bodies, non-string values, unsupported content types, and request query parameters. It MUST impose documented body/header limits and SHOULD support an 8 KiB JSON body. Invalid UTF-8, control characters, invalid repository slugs, non-positive run numbers, or inconsistent invocation IDs receive the uniform denial. Body values MUST NOT be interpreted as executable expressions, outbound URLs, or credential selectors.
+The service MUST reject missing required fields, duplicate, unknown, malformed, empty, or oversized fields, non-object bodies, non-string values, unsupported content types, and request query parameters. It MUST impose documented body/header limits and SHOULD support an 8 KiB JSON body. Invalid UTF-8, control characters, invalid repository slugs, non-positive run numbers, or inconsistent invocation IDs receive the uniform denial. Body values MUST NOT be interpreted as executable expressions, outbound URLs, or credential selectors.
 
 JSON member names and string values in requests and success responses MUST decode to Unicode scalar-value sequences. Unpaired surrogate escapes MUST be rejected, not replaced; valid surrogate pairs remain supported. Decode JSON escapes exactly once and compare decoded identifiers exactly, without case folding or Unicode normalization. Invalid request strings receive the uniform denial; invalid success strings are blocking protocol failures.
 
@@ -274,7 +276,7 @@ The callback reconstructs the same ten identity fields from compiler metadata an
 
 The removed `jobs.admission` and `jobs.conclusion_admission` names remain reserved and MUST reject author configuration. The existing conclusion job continues to reject author-provided setup/pre/regular hooks. Its OIDC permission remains unchanged when the admission callback is omitted, including for work-queue participants.
 
-The complete request is a JSON object containing exactly Section 3's ten admission identity strings plus `session`, `session_compaction`, and `usage_artifact_ids`. `session` contains compact profile version 1 JSONL as defined by the [compact unified session specification](/gh-aw/specs/unified-agent-session-specification/#38-compact-unified-session-normative): at most 128 allowlisted metadata records and 16 KiB of UTF-8 JSONL. Agent conversation, reasoning, prompts, tool input/output and other unbounded payloads MUST NOT be sent. The client MUST derive this projection from the existing generated, redacted unified session using the shared helper, without modifying the full artifact or reparsing raw engine logs.
+The complete request is a JSON object containing Section 3's ten admission identity strings, `job_id` when available, and exactly `session`, `session_compaction`, and `usage_artifact_ids`. `session` contains compact profile version 1 JSONL as defined by the [compact unified session specification](/gh-aw/specs/unified-agent-session-specification/#38-compact-unified-session-normative): at most 128 allowlisted metadata records and 16 KiB of UTF-8 JSONL. Agent conversation, reasoning, prompts, tool input/output and other unbounded payloads MUST NOT be sent. The client MUST derive this projection from the existing generated, redacted unified session using the shared helper, without modifying the full artifact or reparsing raw engine logs.
 
 `session_compaction` MUST contain exactly `version`, `included_events`, `omitted_events`, `oversized_lines`, `scan_truncated`, and `truncated`, mapping the shared helper's corresponding version and coverage fields. The compact profile is intentionally lossy; false truncation flags MUST NOT be interpreted as a complete session or complete usage accounting.
 

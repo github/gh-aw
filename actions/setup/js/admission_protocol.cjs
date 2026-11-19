@@ -69,6 +69,7 @@ function buildAdmissionIdentity(env) {
     workflow_call_id: "",
     run_id: env.GITHUB_RUN_ID || "",
     run_attempt: env.GITHUB_RUN_ATTEMPT || "",
+    ...(env.GITHUB_JOB ? { job_id: env.GITHUB_JOB } : {}),
     ref: env.GITHUB_REF || "",
     event_type: env.GITHUB_EVENT_NAME || "",
     actor: env.GITHUB_ACTOR || "",

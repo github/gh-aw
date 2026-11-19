@@ -687,6 +687,7 @@ The client sends one `POST` to the configured endpoint, with `Authorization: Bea
 | `workflow_hash` | Existing compiler `frontmatter_hash` from the metadata header; identical to the compiler-owned step literal and audience suffix. |
 | `run_id`, `run_attempt` | Canonical positive decimal strings from GitHub's run context. |
 | `check_run_id` | Canonical positive decimal string from the issued JWT identifying the owning job. |
+| `job_id` | Runner `GITHUB_JOB` string when available, omitted without job context. Diagnostic logical job ID only; it MUST NOT replace verification of the signed `check_run_id`. |
 | `ref` | The GitHub-owned `refs/heads/...` execution ref. |
 | `event_name` | Literal `repository_dispatch`. |
 | `event_type` | The compiler-defined route for this workflow ID, already checked by App provenance. It is not a signed OIDC claim; the server independently binds it to the approved artifact/admission. |

@@ -110,6 +110,7 @@ describe("generic fail-closed safe-output authorization", () => {
       traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
       baggage: "cicd.pipeline.task.name=safe%20outputs%2Freview",
     });
+    expect(JSON.parse(opts.fetchImpl.mock.calls[1][1].body).job_id).toBe("safe outputs/review");
     expect(opts.fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("traceparent");
     expect(opts.fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("baggage");
   });

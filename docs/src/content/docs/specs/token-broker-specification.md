@@ -106,13 +106,14 @@ Admission success, admission absence, and admission's `ignore` outage policy MUS
 
 The configured URL is the complete exchange endpoint; no route suffix or discovery request is appended. The client MUST acquire a GitHub Actions OIDC JWT with that exact audience and send one HTTPS POST with `Content-Type: application/json` and `Accept: application/json`. Redirects MUST NOT be followed during OIDC acquisition or exchange. The broker MUST serve the configured endpoint directly without redirects.
 
-An exchange request MUST be a UTF-8 JSON object containing exactly two unique string members, in either order, for `copilot-task` or `github-app`; a `copilot-request` exchange MUST contain exactly three:
+An exchange request MUST be a UTF-8 JSON object containing the two required unique string members for `copilot-task` or `github-app`, or three for `copilot-request`, plus `job_id` whenever the runner provides `GITHUB_JOB`:
 
 ```json
 {
   "token_type": "copilot-request",
   "provider": "github",
-  "oidc_token": "<github-actions-oidc-jwt>"
+  "oidc_token": "<github-actions-oidc-jwt>",
+  "job_id": "agent"
 }
 ```
 
@@ -121,7 +122,8 @@ For `copilot-task` and `github-app`, the `provider` member is omitted:
 ```json
 {
   "token_type": "copilot-task",
-  "oidc_token": "<github-actions-oidc-jwt>"
+  "oidc_token": "<github-actions-oidc-jwt>",
+  "job_id": "agent"
 }
 ```
 
@@ -130,6 +132,7 @@ For `copilot-task` and `github-app`, the `provider` member is omitted:
 | `token_type` | Exactly `copilot-request`, `copilot-task`, or `github-app`, case-sensitive. |
 | `provider` | Required only for `copilot-request`. A nonempty inference-provider identifier matching gh-aw's provider IDs (for example, `github`). It MUST NOT be a provider endpoint or URL. |
 | `oidc_token` | Nonempty, signed compact JWT issued by the configured trusted GitHub Actions issuer. |
+| `job_id` | The runner's logical `GITHUB_JOB` string, JSON-encoded without percent-encoding. Required when available; callers without job context omit it. Diagnostic metadata only, never proof of a job execution or a credential selector. |
 
 For `copilot-task` and `github-app`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
 
@@ -183,12 +186,13 @@ The client exchange deadline MUST be 10 seconds total, including OIDC acquisitio
 
 The client MUST issue an invalidation request to the configured endpoint after each job that can exchange a broker credential. This MUST be a separate POST step with the GitHub Actions `always()` condition, so it runs after success, failure, or cancellation of earlier steps. It MUST request a fresh OIDC identity with the configured audience; it MUST NOT include an exchanged credential in the invalidation request.
 
-The UTF-8 JSON request MUST contain exactly these two unique string members:
+The UTF-8 JSON request MUST contain the two required unique string members plus `job_id` whenever the runner provides `GITHUB_JOB`:
 
 ```json
 {
   "operation": "invalidate",
-  "oidc_token": "<github-actions-oidc-jwt>"
+  "oidc_token": "<github-actions-oidc-jwt>",
+  "job_id": "agent"
 }
 ```
 
@@ -258,7 +262,7 @@ This section is the authoritative list of checks a conforming broker MUST perfor
 
 | ID | Requirement | On failure |
 | --- | --- | --- |
-| SV-06 | An exchange contains exactly `token_type` and `oidc_token`, plus `provider` only when `token_type` is `copilot-request`. An invalidation contains exactly `operation: "invalidate"` and `oidc_token`. Any other member set is malformed. | 400 |
+| SV-06 | An exchange contains `token_type` and `oidc_token`, plus `provider` only when `token_type` is `copilot-request`. An invalidation contains `operation: "invalidate"` and `oidc_token`. Both allow the diagnostic string `job_id` when job context is available. Any other member set is malformed. | 400 |
 | SV-07 | `token_type` is case-sensitive. An unknown well-formed value is rejected before identity verification. | 422 |
 | SV-08 | `provider` matches `^[a-z][a-z0-9_-]{0,63}$` and is only used to look up an allow-list entry. It never selects an endpoint, URL, or backend. | 400 or 403 |
 

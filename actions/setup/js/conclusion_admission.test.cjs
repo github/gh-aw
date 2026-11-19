@@ -81,6 +81,7 @@ describe("admission conclusion notification", () => {
       workflow_call_id: `${base.GITHUB_RUN_ID}-2:${base.GH_AW_INFO_WORKFLOW_ID}`,
       run_id: base.GITHUB_RUN_ID,
       run_attempt: "2",
+      job_id: "conclusion",
       ref: base.GITHUB_REF,
       event_type: base.GITHUB_EVENT_NAME,
       actor: "original",
