@@ -257,7 +257,7 @@ async function main(core) {
       core.setOutput("trace-id", decision.traceId);
       if (decision.endpoints.length) {
         const { buildOTLPPayload, buildGitHubActionsResourceAttributes, sendOTLPToAllEndpoints } = require("./send_otlp_span.cjs");
-        const resourceAttributes = buildGitHubActionsResourceAttributes({ repository: process.env.GITHUB_REPOSITORY || "", runId: process.env.GITHUB_RUN_ID || "", staged: false });
+        const resourceAttributes = buildGitHubActionsResourceAttributes({ repository: process.env.GITHUB_REPOSITORY || "", runId: process.env.GITHUB_RUN_ID || "", workflowName: process.env.GITHUB_WORKFLOW || "", staged: false });
         for (const attempt of decision.attempts) {
           const payload = buildOTLPPayload({
             ...attempt,

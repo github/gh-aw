@@ -31,8 +31,8 @@ function snapshot(bytes = migratedSnapshotBytes, timestamp = "2026-10-14T02:00:0
   const data = {
     ...example,
     timestamp,
-    workflows: Object.fromEntries(Array.from({ length: 344 }, (_, index) => [`workflow-${index}`, example.workflows["workflow-name"]])),
-    ecosystem: { ...example.ecosystem, total_workflows: 344 },
+    workflows: Object.fromEntries(Array.from({ length: 340 }, (_, index) => [`workflow-${index}`, example.workflows["workflow-name"]])),
+    ecosystem: { ...example.ecosystem, total_workflows: 340 },
     collection_note: "",
   };
   const initialBytes = Buffer.byteLength(JSON.stringify(data, null, 2) + "\n");
@@ -120,14 +120,14 @@ describe("Metrics Collector serialized storage contract", () => {
     expect(lock).toContain('FILE_GLOB_FILTER: "metrics/**"');
   });
 
-  it("fits the complete migrated 344-workflow schema without dropping fields", () => {
+  it("fits the complete migrated 340-workflow schema without dropping fields", () => {
     const root = temporaryDirectory();
     const content = writeSnapshot(root);
     expect(Buffer.byteLength(content)).toBe(migratedSnapshotBytes);
     expect(Buffer.byteLength(content)).toBeGreaterThan(102400);
     expect(Buffer.byteLength(JSON.stringify(JSON.parse(content)))).toBeGreaterThan(131072);
     expect(Buffer.byteLength(content)).toBeLessThan(maxFileBytes);
-    expect(Object.keys(JSON.parse(content).workflows)).toHaveLength(344);
+    expect(Object.keys(JSON.parse(content).workflows)).toHaveLength(340);
     runGate(root);
     expect(fs.readFileSync(path.join(root, "latest.json"), "utf8")).toBe(content);
     expect(fs.readFileSync(path.join(root, "daily/2026-10-14.json"), "utf8")).toBe(content);

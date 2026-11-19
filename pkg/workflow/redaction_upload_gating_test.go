@@ -28,7 +28,7 @@ func TestCustomSecretMaskingStepIDs(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.stepOrderTracker = NewStepOrderTracker()
 	var generated strings.Builder
-	compiler.generateTrackedSecretRedactionStep(&generated, "", data)
+	compiler.generateTrackedSecretRedactionStep(&generated, "", data, false)
 	for _, id := range ids {
 		assert.Contains(t, generated.String(), "id: "+id+"\n")
 		assert.Contains(t, secretRedactionSuccessCondition(data), "steps."+id+".outcome == 'success'")

@@ -10,6 +10,16 @@ import (
 // DurableRestoreStepName identifies durable configuration in compiled jobs and run evidence.
 const DurableRestoreStepName = "Restore durable workflow state"
 
+func generateCopilotCheckpointRedactionEnv(yaml *strings.Builder, data *WorkflowData) {
+	files, err := json.Marshal(data.durableExecutionPlan.Files)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode durable files: %v", err))
+	}
+	yaml.WriteString("          GH_AW_DURABLE_FILES: " + strconv.Quote(string(files)) + "\n")
+	yaml.WriteString("          GH_AW_DURABLE_ENGINE: copilot\n")
+	yaml.WriteString("          GH_AW_DURABLE_STAGED: ${{ steps.stage_durable_files.outputs.present }}\n")
+}
+
 func (c *Compiler) generateDurableArtifactRestore(yaml *strings.Builder, data *WorkflowData) {
 	if data.EngineConfig == nil || data.EngineConfig.Durable == nil {
 		return
@@ -66,6 +76,9 @@ func (c *Compiler) generateDurableArtifactUpload(yaml *strings.Builder, data *Wo
 	bundle := durableStateDirectory + "/bundle/"
 	c.stepOrderTracker.RecordArtifactUpload("Upload durable checkpoint artifact", []string{bundle})
 	condition := "always() && steps.stage_durable_files.outcome == 'success' && steps.stage_durable_files.outputs.present == 'true' && " + secretRedactionSuccessCondition(data)
+	if data.EngineConfig != nil && data.EngineConfig.ID == "copilot" {
+		condition += " && steps.redact_secrets.outputs.durable_checkpoint_safe != 'false'"
+	}
 	yaml.WriteString("      - name: Validate durable checkpoint artifact\n")
 	yaml.WriteString("        id: validate_durable_checkpoint\n")
 	yaml.WriteString("        if: " + condition + "\n")
