@@ -747,12 +747,13 @@ Body.
 		"if-no-files-found: ignore",
 		"continue-on-error: true",
 	} {
-		if !strings.Contains(uploadSection, expected) {
-			t.Errorf("Expected %q in fallback upload step, got:\n%s", expected, uploadSection)
+		relocated := relocateRuntimeText(expected)
+		if !strings.Contains(uploadSection, relocated) {
+			t.Errorf("Expected %q in fallback upload step, got:\n%s", relocated, uploadSection)
 		}
 	}
 	assert.NotContains(t, uploadSection, "/graders/")
-	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent artifacts"), "/tmp/gh-aw/agent/harness_retry.json")
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent artifacts"), relocateRuntimeText("/tmp/gh-aw/agent/harness_retry.json"))
 
 	// The fallback artifact must be uploaded before the (large, failure-prone) agent artifact.
 	uploadIdx := strings.Index(lockYAML, "- name: Upload agent output fallback artifact")
@@ -817,15 +818,15 @@ safe-outputs:
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl",
 		"${{ runner.temp }}/gh-aw/awf-resolved-config.json",
 	} {
-		assert.Contains(t, uploadSection, expected)
+		assert.Contains(t, uploadSection, relocateRuntimeText(expected))
 	}
 	assert.NotContains(t, uploadSection, "/tmp/gh-aw/")
 	consolidation := extractWorkflowStepByName(t, string(lockContent), "Consolidate artifacts for ARC/DinD")
 	assert.Less(t, strings.Index(string(lockContent), "Consolidate artifacts for ARC/DinD"), strings.Index(string(lockContent), "id: validate_final_recovery_envelopes"))
 	assert.Less(t, strings.Index(string(lockContent), "id: validate_final_recovery_envelopes"), strings.Index(string(lockContent), "Upload agent output fallback artifact"))
 	assert.Contains(t, uploadSection, "steps.validate_final_recovery_envelopes.outcome == 'success'")
-	assert.Contains(t, consolidation, `cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "${RUNNER_TEMP}/gh-aw/agent/harness_retry.json" || true`)
-	assert.Contains(t, consolidation, `cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "/tmp/gh-aw/agent/harness_retry.json" || true`)
+	assert.Contains(t, consolidation, relocateRuntimeShellText(`cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "${RUNNER_TEMP}/gh-aw/agent/harness_retry.json" || true`))
+	assert.Contains(t, consolidation, relocateRuntimeShellText(`cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "/tmp/gh-aw/agent/harness_retry.json" || true`))
 }
 
 func TestSampledAgentExecutionEvidenceReachesUsageArtifact(t *testing.T) {

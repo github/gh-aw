@@ -607,6 +607,19 @@ func assertAgyConformanceStep(t *testing.T, actual, expected map[string]any) {
 	}
 	for _, key := range []string{"run", "if", "env", "with"} {
 		if value, exists := expected[key]; exists {
+			if key == "env" {
+				expectedEnv, expectedOK := value.(map[string]any)
+				actualEnv, actualOK := actual[key].(map[string]any)
+				if assert.True(t, expectedOK && actualOK, "%s must retain env", name) {
+					for envName, expectedValue := range expectedEnv {
+						if expectedString, ok := expectedValue.(string); ok {
+							expectedValue = relocateRuntimeText(expectedString)
+						}
+						assert.Equal(t, expectedValue, actualEnv[envName], "%s must retain env %s", name, envName)
+					}
+				}
+				continue
+			}
 			assert.Equal(t, value, actual[key], "%s must retain %s", name, key)
 		}
 	}

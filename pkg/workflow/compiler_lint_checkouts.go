@@ -60,10 +60,44 @@ func matchesPRCheckoutBlock(steps []actions.Step, start int, expected []map[stri
 		return false
 	}
 	for index, fields := range expected {
-		step, ok := steps[start+index].(actions.RawStep)    //nolint:uncheckedsliceindex // The block length is checked above.
-		if !ok || !reflect.DeepEqual(step.Fields, fields) { //nolint:reflectdeepequalusage // Raw YAML fields contain nested, heterogeneous maps and slices.
+		step, ok := steps[start+index].(actions.RawStep)                                                                  //nolint:uncheckedsliceindex // The block length is checked above.
+		if !ok || !reflect.DeepEqual(normalizeCheckoutRuntimePaths(step.Fields), normalizeCheckoutRuntimePaths(fields)) { //nolint:reflectdeepequalusage // Raw YAML fields contain nested, heterogeneous maps and slices.
 			return false
 		}
 	}
 	return true
+}
+
+func normalizeCheckoutRuntimePaths(fields map[string]any) map[string]any {
+	normalized, _ := normalizeCheckoutRuntimeValue(fields).(map[string]any)
+	return normalized
+}
+
+func normalizeCheckoutRuntimeValue(value any) any {
+	switch typed := value.(type) {
+	case string:
+		return strings.NewReplacer(
+			runtimeRootExpression, "/tmp/gh-aw",
+			setupRootExpression, "${{ runner.temp }}/gh-aw",
+			"${GH_AW_RUNTIME_ROOT}", "/tmp/gh-aw",
+			"${GH_AW_SETUP_ROOT}", "${RUNNER_TEMP}/gh-aw",
+			"process.env.RUNNER_TEMP, 'gh-aw',", "process.env.GH_AW_SETUP_ROOT,",
+			`process.env.RUNNER_TEMP, "gh-aw",`, "process.env.GH_AW_SETUP_ROOT,",
+			"process.env.RUNNER_TEMP, 'gh-aw-setup',", "process.env.GH_AW_SETUP_ROOT,",
+		).Replace(typed)
+	case map[string]any:
+		normalized := make(map[string]any, len(typed))
+		for key, value := range typed {
+			normalized[key] = normalizeCheckoutRuntimeValue(value)
+		}
+		return normalized
+	case []any:
+		normalized := make([]any, len(typed))
+		for index, value := range typed {
+			normalized[index] = normalizeCheckoutRuntimeValue(value)
+		}
+		return normalized
+	default:
+		return value
+	}
 }

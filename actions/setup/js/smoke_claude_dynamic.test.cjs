@@ -39,7 +39,7 @@ function verifySnapshot({ members = [script, fixture], changedFile, archive } = 
     return require(name);
   };
   new Function("require", "process", verification)(mockRequire, {
-    env: { GITHUB_WORKSPACE: workspace, RUNNER_TEMP: "/runner" },
+    env: { GITHUB_WORKSPACE: workspace, RUNNER_TEMP: "/runner", GH_AW_RUNTIME_ROOT: "/tmp/gh-aw" },
   });
 }
 

@@ -16,6 +16,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func relocateRuntimeShellText(text string) string {
+	text = relocateRuntimeText(text)
+	return strings.NewReplacer(
+		runtimeRootExpression, "${GH_AW_RUNTIME_ROOT}",
+		setupRootExpression, "${GH_AW_SETUP_ROOT}",
+	).Replace(text)
+}
+
 func decodeWindowsWSLRunScript(t *testing.T, rendered string) string {
 	t.Helper()
 	_, tail, ok := strings.Cut(rendered, "FromBase64String('")

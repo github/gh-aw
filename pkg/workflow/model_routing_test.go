@@ -646,7 +646,7 @@ network:
 			require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
 			compiled, err := os.ReadFile(filepath.Join(dir, "routed.lock.yml"))
 			require.NoError(t, err)
-			require.Contains(t, string(compiled), output.String())
+			require.Contains(t, string(compiled), relocateRuntimeText(output.String()))
 		})
 	}
 }

@@ -546,10 +546,10 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 					t.Error("Did not expect --cmd argument in dev mode")
 				}
 
-				// Verify ${RUNNER_TEMP}/gh-aw is always mounted read-only for security
+				// Verify the private setup root is always mounted read-only for security
 				// (protects gh-aw infrastructure files from direct agent writes in all modes)
-				if !strings.Contains(string(lockContent), `${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro`) {
-					t.Error("Expected ${RUNNER_TEMP}/gh-aw to be mounted read-only in AWF for security")
+				if !strings.Contains(string(lockContent), `${GH_AW_SETUP_ROOT}:${GH_AW_SETUP_ROOT}:ro`) {
+					t.Error("Expected GH_AW_SETUP_ROOT to be mounted read-only in AWF for security")
 				}
 				if strings.Contains(string(lockContent), `/usr/bin/gh:/usr/bin/gh:ro`) {
 					t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")

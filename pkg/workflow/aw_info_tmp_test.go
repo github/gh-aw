@@ -94,9 +94,9 @@ This workflow tests that aw_info.json is generated in /tmp directory.
 		t.Error("Expected GH_AW_INFO_FRONTMATTER_EMOJI env var to be set on the step")
 	}
 
-	// Test 3: Verify upload artifact still includes /tmp/gh-aw/aw_info.json path
-	if !strings.Contains(lockStr, "/tmp/gh-aw/aw_info.json") {
-		t.Error("Expected artifact upload to include '/tmp/gh-aw/aw_info.json' path in generated workflow")
+	// Test 3: Verify upload artifact uses the private runtime path
+	if !strings.Contains(lockStr, relocateRuntimeText("/tmp/gh-aw/aw_info.json")) {
+		t.Error("Expected artifact upload to include the isolated aw_info.json path in generated workflow")
 	}
 
 	// Test 4: Verify the old inline aw_info construction is not present
@@ -104,5 +104,5 @@ This workflow tests that aw_info.json is generated in /tmp directory.
 		t.Error("Found old inline awInfo construction in generated workflow; should use generate_aw_info.cjs")
 	}
 
-	t.Logf("Successfully verified aw_info.json is generated in /tmp/gh-aw directory")
+	t.Logf("Successfully verified aw_info.json is generated in the private runtime directory")
 }

@@ -69,15 +69,15 @@ func renderStepForRunnerWithEnvironment(jobYAML, runsOn, jobName string, jobEnvi
 	headerIndex := strings.Index(jobYAML, stepsHeader)
 	if headerIndex < 0 {
 		renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML, jobEnvironmentVariables)
-		if !hasWSLRun {
+		if !hasWSLRun && !needsRuntimeIsolation(jobYAML) {
 			return jobYAML
 		}
-		return renderedSteps
+		return windowsWSLBootstrapStep + renderedSteps
 	}
 
 	headerEnd := headerIndex + len(stepsHeader)
 	renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML[headerEnd:], jobEnvironmentVariables)
-	if !hasWSLRun {
+	if !hasWSLRun && !needsRuntimeIsolation(jobYAML) {
 		return jobYAML
 	}
 	return jobYAML[:headerEnd] + windowsWSLBootstrapStep + renderedSteps

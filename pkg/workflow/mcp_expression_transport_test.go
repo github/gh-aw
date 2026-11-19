@@ -85,7 +85,12 @@ Inspect configured tools.
 			}
 			require.NotNil(t, gateway)
 			run := gateway["run"].(string)
-			assert.NotContains(t, run, "${{", "MCP expressions must not be shell source")
+			runtimeExpressions := strings.NewReplacer(
+				runtimeRootExpression, "",
+				setupRootExpression, "",
+				"${{ env.GH_AW_RESOURCE_SUFFIX }}", "",
+			).Replace(run)
+			assert.NotContains(t, runtimeExpressions, "${{", "MCP expressions must not be shell source")
 			assert.Contains(t, run, `http://host.docker.internal:\${GH_AW_MCP_ENV_GH_AW_MCP_SCRIPTS_PORT}`)
 			assert.Contains(t, run, `\${GH_AW_MCP_ENV_GITHUB_WORKSPACE}`)
 			assert.Contains(t, run, `\${GH_AW_MCP_SCRIPTS_API_KEY}`, "escaped references must still be resolved by the gateway")
@@ -107,6 +112,11 @@ Inspect configured tools.
 					assert.Contains(t, run, " -e "+name, "gateway container must receive binding")
 				}
 			}
+			setupRoot, runtimeRoot := t.TempDir(), t.TempDir()
+			run = strings.NewReplacer(
+				runtimeRootExpression, runtimeRoot,
+				setupRootExpression, setupRoot,
+			).Replace(run)
 			_, heredoc, found := strings.Cut(run, "cat << ")
 			require.True(t, found)
 			header, body, found := strings.Cut(heredoc, "\n")
@@ -114,9 +124,17 @@ Inspect configured tools.
 			body, _, found = strings.Cut(body, "\n"+strings.Fields(header)[0])
 			require.True(t, found)
 			command := exec.Command("bash", "-c", "cat <<EOF\n"+body+"\nEOF")
-			command.Env = append(os.Environ(), "MCP_GATEWAY_PORT=8080")
+			command.Env = append(os.Environ(),
+				"MCP_GATEWAY_PORT=8080",
+				"GH_AW_SETUP_ROOT="+setupRoot,
+				"GH_AW_RUNTIME_ROOT="+runtimeRoot,
+				"GH_AW_RESOURCE_SUFFIX=test123",
+				"GH_AW_RUNTIME_OWNER="+strings.Repeat("a", 64),
+			)
+			var stderr strings.Builder
+			command.Stderr = &stderr
 			output, err := command.Output()
-			require.NoError(t, err)
+			require.NoError(t, err, stderr.String())
 			var config map[string]any
 			require.NoError(t, json.Unmarshal(output, &config), "heredoc must preserve valid JSON")
 			servers := config["mcpServers"].(map[string]any)

@@ -56,6 +56,7 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 
 func preparePRCheckoutLintBlock(steps []string, runsOn string, jobEnvironmentVariables []string) string {
 	block := renderStepForRunnerWithEnvironment(strings.Join(steps, ""), runsOn, string(constants.SafeOutputsJobName), jobEnvironmentVariables)
+	block = strings.TrimPrefix(block, windowsWSLBootstrapStep)
 	finalized, err := finalizeRunnerTempSafety(block)
 	if err != nil {
 		return ""
