@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 )
@@ -79,6 +81,45 @@ func validateTokenBrokerGitHubConfig(data *WorkflowData) error {
 		return errors.New("safe-outputs.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
 	}
 	return nil
+}
+
+// tokenBrokerSelfHostedJobs returns compiled jobs that exchange broker
+// credentials on a self-hosted runner. A persistent runner can carry code
+// planted by an earlier job, such as the agent job, into a credential job.
+func tokenBrokerSelfHostedJobs(workflow map[string]any) []string {
+	jobs, _ := workflow["jobs"].(map[string]any)
+	var names []string
+	for name, raw := range jobs {
+		job, ok := raw.(map[string]any)
+		if !ok || !usesSelfHostedRunner(job["runs-on"]) || !jobUsesTokenBroker(job) {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func jobUsesTokenBroker(job map[string]any) bool {
+	if env, ok := job["env"].(map[string]any); ok {
+		if _, ok := env[tokenBrokerURLEnv]; ok {
+			return true
+		}
+	}
+	steps, _ := job["steps"].([]any)
+	for _, raw := range steps {
+		step, _ := raw.(map[string]any)
+		if env, ok := step["env"].(map[string]any); ok {
+			if _, ok := env[tokenBrokerURLEnv]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func tokenBrokerSelfHostedWarning(jobs []string) string {
+	return fmt.Sprintf("token-broker: jobs [%s] exchange broker credentials on self-hosted runners. Use only ephemeral runners that start clean for each job; a persistent runner lets code left by an earlier job, including the agent job, steal the job's credentials. The broker must also deny unenrolled runners.", strings.Join(jobs, ", "))
 }
 
 // The broker derives installation authority from backend policy, never caller permissions.

@@ -152,6 +152,13 @@ Broker-enabled jobs require `id-token: write`. Reusable workflow callers must gr
 
 GitHub API consumers can independently select `tools.github.token-broker: true` or `safe-outputs.token-broker: true` as an alternative to section-level `github-app` or `github-token`. These settings exchange the separate `github-app` capability without distributing App signing credentials to the workflow. The deployment must authorize the installation, repositories, and permissions from verified job identity and enrolled policy. The request supplies no scopes or installation selector. Credentials are acquired separately in each consuming job; static GitHub consumers do not renew them automatically, so credential lifetime must cover the operation.
 
+Rollout hardening:
+
+- **Runners.** Run broker-enabled jobs on GitHub-hosted runners, or on self-hosted runners that start clean for each job. A persistent runner can keep code left by an earlier job, including the agent job, and that code can steal a later job's credentials. The compiler warns when a broker-enabled job selects a self-hosted runner, and the broker should deny runners it has not enrolled.
+- **Reusable workflows.** Broker policy must approve both the calling workflow and the reusable workflow, and scope credentials to the caller's repository. Approving a reusable workflow alone would let any repository that calls it receive credentials.
+- **Bot-authored pull requests.** Unlike `GITHUB_TOKEN`, App installation tokens trigger workflows. A pull request opened with a brokered safe-output credential runs repository CI with code proposed by the agent. Require approval before workflows run on bot-authored pull requests, and protect the target branches. The broker denies exchanges from pull-request runs by default, but that does not protect other repository secrets.
+- **Cleanup.** The broker should also revoke credentials when it sees a job complete, because the cleanup step does not run if the runner is lost.
+
 See the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains independent: the admission outage policy does not apply to credential exchange.
 
 ## Copilot Engine on GHES

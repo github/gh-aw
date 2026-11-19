@@ -57,6 +57,30 @@ func TestTokenBrokerExperimentalWarning(t *testing.T) {
 	}
 }
 
+func TestTokenBrokerSelfHostedJobs(t *testing.T) {
+	var workflow map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(`
+jobs:
+  hosted:
+    runs-on: ubuntu-latest
+    steps:
+      - env: {GH_AW_TOKEN_BROKER_URL: x}
+  labelled:
+    runs-on: [self-hosted, linux]
+    steps:
+      - run: echo
+      - env: {GH_AW_TOKEN_BROKER_URL: x}
+  group:
+    runs-on: {group: runners}
+    env: {GH_AW_TOKEN_BROKER_URL: x}
+  no_broker:
+    runs-on: self-hosted
+    steps:
+      - run: echo
+`), &workflow))
+	assert.Equal(t, []string{"group", "labelled"}, tokenBrokerSelfHostedJobs(workflow))
+}
+
 func TestTokenBrokerHelperPaths(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot"}, TokenBrokerEnabled: true, TokenBrokerCopilotRequest: true}
