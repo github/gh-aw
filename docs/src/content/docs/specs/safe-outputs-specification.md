@@ -1748,35 +1748,82 @@ to an independently resolved final network request.
 
 **Resolved-effect adapters:** A compiler/runtime-owned adapter registry
 (`safe_output_effect_plan.cjs`, contract `gh-aw.safe-output-effect-plan.v1`)
-MAY prepare a finite, ordered set of outbound requests, freeze them and bind one
+prepares a finite, ordered set of outbound effects, freezes them and binds one
 decision to that plan. Execution MUST NOT add, replace, redirect or re-expand
-approved requests. This does not make the target transactional, make every
+approved effects. This does not make the target transactional, make every
 precondition atomic, predict final state or authorize downstream consequences.
 Coverage is per output, route and contract version:
 
-| Output | Adapter | Resolved-effect routes | Invocation-only routes |
-|---|---|---|---|
-| `merge-pull-request` | `gh-aw.merge-pull-request@1` (1 request) | native manager, native per-Claim handler | none |
-| `remove-labels` | `gh-aw.remove-labels@1` (≤32 requests) | native manager, native per-Claim handler | prepared/script Claim adapter override |
-| All other outputs, custom scripts, actions, jobs, standalone, workflow launches, synthetic phases | none | none | all |
+| Output | Adapter | Planned operations |
+|---|---|---|
+| `add-labels` | `gh-aw.add-labels@1` | `issues.addLabels`, or one `graphql.updateIssueLabels` for issue-intent metadata on issues |
+| `create-issue` | `gh-aw.create-issue@1` | `issues.create`; derived `graphql.setIssueFieldValue`, `issues.addBlockedBy`, same-repository `graphql.addSubIssue` |
+| `create-pull-request` | `gh-aw.create-pull-request@1` | branch effects, `pulls.create`; derived `issues.addLabels`, `pulls.requestReviewers`, `issues.addAssignees`, `pulls.createReview` (REQUEST_CHANGES), `graphql.enablePullRequestAutoMerge` |
+| `merge-pull-request` | `gh-aw.merge-pull-request@1` | `pulls.merge` |
+| `push-to-pull-request-branch` | `gh-aw.push-to-pull-request-branch@1` | branch effects |
+| `remove-labels` | `gh-aw.remove-labels@1` | up to 32 `issues.removeLabel` |
+| `replace-label` | `gh-aw.replace-label@1` | one `issues.setLabels` with the finalized set |
+| `update-issue` | `gh-aw.update-issue@1` | `issues.update`, optional `graphql.updateIssueLabels` |
 
-`gh aw validate --authorization-policy` reports each route's `effect_adapter` and live
-`scope_binding` as additive v1 fields; `coverage` strings are unchanged.
+Branch effects are either one `git.push` ref transition (`signed-commits:
+false`, or an orphan branch) or a signed replay: `git.createRef` at the parent
+when the branch is absent, then one `graphql.createCommitOnBranch` per commit.
+
+Adapters cover the native manager route and the native per-Claim handler.
+Prepared/script Claim adapter overrides, custom scripts, actions and jobs,
+standalone outputs, workflow launches, synthetic phases and every other output
+remain `invocation`-bound. `gh aw validate --authorization-policy` reports each
+route's `effect_adapter` and live `scope_binding`; `coverage` strings are
+unchanged.
 
 For a protected, non-staged invocation on a covered route, the manager selects
 resolved preparation before any decision and requests none itself. It mints a
 private one-time preparation capability that is not an `allowed` decision and
-permits no writes. The adapter runs only reviewed read-only preparation and the
-existing local gates, then freezes a plan of adapter identity and route, the
-existing invocation identity (output, executor, implementation digest, batch
-digest, record index, policy digest and Claim/delivery identity), authoritative
-targets, ordered request snapshots, classified preconditions and limits. The
-gate sends exactly one `resolved_effect` request for that plan. Only a
-registered plan handle can select `resolved_effect`; `prepareInvocation`, the
-handler gate and the isolated execution API MUST reject the enum from messages,
-custom code, unregistered callbacks or forged handles before any authority
-request. An adapter-selected invocation MUST NOT request, or after denial retry
-as, `invocation` binding. A preparation failure blocks; it is not a fallback.
+permits no writes. The adapter runs only reviewed read-only preparation (target
+reads, local git, rendering) and the existing local gates, then freezes a plan
+of adapter identity and route, the existing invocation identity (output,
+executor, implementation digest, batch digest, record index, policy digest and
+Claim/delivery identity), authoritative targets, ordered effect snapshots,
+classified preconditions and limits. The gate sends exactly one
+`resolved_effect` request for that plan. Only a registered plan handle can
+select `resolved_effect`; `prepareInvocation`, the handler gate and the
+isolated execution API MUST reject the enum from messages, custom code,
+unregistered callbacks or forged handles before any authority request. An
+adapter-selected invocation MUST NOT request, or after denial retry as,
+`invocation` binding. A preparation failure blocks; it is not a fallback.
+
+Adapters MUST fail closed, before any decision, when an invocation needs an
+effect they cannot enumerate. Compilation rejects such trusted configuration
+on protected outputs: `create-issue` `close-older-issues`, `group` and
+`group-by-day`; `add-labels` `create-if-missing`; `create-pull-request`
+`close-older-pull-requests`, `fallback-as-issue: true` and `protected-files:
+fallback-to-issue`; `push-to-pull-request-branch` `fallback-as-pull-request:
+true` and `protected-files: fallback-to-issue`. At runtime they refuse
+message-driven effects such as issue artifacts, copilot assignment,
+recreate-ref branch deletion, threat-detection review pull requests and
+protected-file review issues. Default fallback issues and pull requests,
+activation-comment links and CI-trigger commits are not performed on
+resolved-effect routes.
+
+**Effect snapshots:** A REST snapshot binds the method, approved API origin,
+path, query, `accept`, `x-github-api-version`, `content-type` when a body
+exists, and the JSON body. A GraphQL snapshot binds the approved GraphQL URL,
+one allowlisted mutation document owned by the registry, semantic headers such
+as `graphql-features`, and the variables; adapters supply variables only. A git
+snapshot binds a credential-free remote URL on the approved server, a
+`refs/heads/*` ref, the observed old OID (or absence) and the new OID.
+Credentials and `user-agent` are excluded. Absent, `null` and empty values
+remain distinct; defaults, sanitization, temporary-ID substitution, filtering
+and deduplication apply before freezing. An oversized plan fails; it is never
+truncated or split.
+
+**Derived slots:** Identifiers of resources created by an earlier effect in the
+same plan (issue or pull-request number and node ID, created head SHA, commit
+OID) cannot be known before authorization. An effect MAY contain whole-value
+`{{slot}}` placeholders, bound in the plan to an earlier effect index and a
+typed receipt field declared by that operation. Execution substitutes only the
+validated receipt of that confirmed effect; a missing receipt blocks the
+dependent effect. Nothing else in a request may vary.
 
 The existing wire envelope is unchanged. `input_digest` is the canonical digest
 of the complete non-secret plan; `scope.limits_digest` is the digest of its
@@ -1789,54 +1836,73 @@ prefixes, bounded by the existing 64 references:
 | `effect-adapter:<id>@<version>` | Registered adapter |
 | `effect-route:manager` or `effect-route:claim` | Enforced execution route |
 | `effect-plan:sha256:<hex>` | Plan digest (equals `input_digest`) |
-| `effect-count:<n>` | Number of approved requests |
-| `effect-operation:<operation>` | Distinct operation, e.g. `pulls.merge`, `issues.removeLabel` |
+| `effect-count:<n>` | Number of approved effects |
+| `effect-operation:<operation>` | Distinct operation, such as `pulls.merge` or `git.push` |
+| `effect-derived:receipt` | At least one effect uses derived slots |
 | `effect-target:repository:<repository_id>` | Independently read repository identity |
 | `effect-target:<issue\|pull_request>:<repository_id>#<number>@<resource_id>` | Locator bound to resource identity |
 | `effect-target:label:<repository_id>@<label_id>` | Label identity (name stays private) |
+| `effect-target:ref:<repository_id>@<sha256(ref)[0:32]>@<oid\|absent>` | Branch ref and its observed value (name stays private) |
 | `effect-precondition:<id>:<atomic\|observed>` | Precondition and its enforcement class |
 
-Each request snapshot binds the method, approved API origin, path, query,
-`accept`, `x-github-api-version`, `content-type` when a body exists, and the
-JSON body. Credentials and `user-agent` are excluded. Absent, `null` and empty
-values remain distinct; defaults, sanitization, temporary-ID substitution,
-filtering and deduplication apply before freezing. An oversized plan fails; it
-is never truncated or split. Golden vector: a `remove-labels` plan on the
-`manager` route removing `bug` and `needs triage` from repository `99`, issue
-`#7` (resource `700`), with batch digest `c…c`, record index 0, implementation
-digest `d…d`, policy digest `e…e` and API version `2026-03-10` has digest
-`8a9d6e41223b814e7f91199e530c68e669bafeeeda7b3b26924f8a789587a5a2`
+Golden vector: a `remove-labels` plan on the `manager` route removing `bug` and
+`needs triage` from repository `99`, issue `#7` (resource `700`), with batch
+digest `c…c`, record index 0, implementation digest `d…d`, policy digest `e…e`
+and API version `2026-03-10` has digest
+`224ef741b68f587e64f510b0b6bc77d65c41e980330d6c9b2d7c0fa52f978abf`
 (`safe_output_effect_plan.test.cjs`).
 
-The authority sees digests and references, not raw bodies, commit messages or
-label names. An authority needing content-dependent policy MUST obtain that
-evidence through an independently approved channel and verify its digest, or
-deny. An authority MAY require `resolved_effect` for a route and deny
-`invocation` requests. Requiring a binding level is authority policy; there is no
-compiler `minimum-binding` setting, and the protected baseline verifier does not
-mandate one.
+The authority sees digests and references, not raw bodies, commit contents,
+commit messages, branch names or label names. An authority needing
+content-dependent policy MUST obtain that evidence through an independently
+approved channel and verify its digest, or deny. An authority MAY require
+`resolved_effect` for a route and deny `invocation` requests. Requiring a
+binding level is authority policy; there is no compiler `minimum-binding`
+setting, and the protected baseline verifier does not mandate one.
 
-After the decision, the adapter revalidates mutable preconditions and the Claim,
-then consumes effects in order through an adapter-owned transport. Before each
-send it checks the plan handle, bound decision, invocation context, current
-Claim, next unconsumed index and per-send decision freshness. The transport
-compares the final SDK wire request with the snapshot after all middleware,
-sends it once with redirects refused and SDK retries disabled, and refuses any
-replay. A changed precondition, request or expired grant stops execution; the
-adapter MUST NOT recompute the payload under the old decision, obtain a
-replacement grant or change invocation identity. On the Claim route the
-existing Claim effect client still resolves and authorizes every target; it
-admits only registered plan transports through its request snapshot.
-Confirmed earlier effects are preserved, remaining effects are reported as not
-attempted, and partial or indeterminate invocations are failures for
-dependents. No rollback or whole-invocation retry is implied. One logical
-invocation still maps to one authority claim; effects do not create per-index
-claims.
+**Execution:** After the decision, the adapter revalidates mutable
+preconditions and the Claim, then consumes effects in order through
+adapter-owned transports. Before each send it checks the plan handle, bound
+decision, invocation context, current Claim, next unconsumed index and
+per-send decision freshness. The HTTP transport compares the final SDK wire
+request with the resolved snapshot after all middleware, sends it once with
+redirects refused and SDK retries disabled, and refuses any replay. A client
+that bypasses the verifying transport makes the effect indeterminate, never
+confirmed. GraphQL errors are indeterminate because a mutation may have
+partially applied. The git transport refuses a remote rewritten by `insteadOf`
+configuration, runs a fixed `git push --porcelain --no-verify
+--force-with-lease=<ref>:<old> -- <remote> <new>:<ref>` with hooks disabled,
+and confirms the outcome by reading the remote ref back. A changed
+precondition, request or expired grant stops execution; the adapter MUST NOT
+recompute the payload under the old decision, obtain a replacement grant or
+change invocation identity. On the Claim route the existing Claim effect client
+still resolves and authorizes every target; it admits only registered plan
+transports through its REST and GraphQL snapshots. Confirmed earlier effects
+are preserved, remaining effects are reported as not attempted, and partial or
+indeterminate invocations are failures for dependents, including a created
+issue or pull request whose follow-ups did not all complete. No rollback or
+whole-invocation retry is implied. One logical invocation still maps to one
+authority claim; effects do not create per-index claims.
 
 | Adapter | Atomic precondition | Observed preconditions (residual races) |
 |---|---|---|
 | `merge-pull-request` | Evaluated head SHA sent as the merge `sha` | PR state and policy snapshot, base ref/SHA/repository ID, branch policy, upstream PR, reviews, approvals, checks and local policy fingerprint, rechecked after the authority wait |
-| `remove-labels` | None: the API removes one label by name, without bulk atomicity | Repository/item identity, name-to-label-ID mapping and required-label/title filters, rechecked before every send while accepting earlier approved removals |
+| `remove-labels` | None: one label removed by name per request | Repository/item identity, label IDs and required-label/title filters, rechecked before every send while accepting earlier approved removals |
+| `replace-label` | None: `setLabels` replaces the whole set | Item identity, complete label set and filters; a concurrent label change after the final check is overwritten |
+| `add-labels` | None | Item identity and filters; for the intent mutation, the complete label set |
+| `update-issue` | None | Item identity, title, body digest, labels and state; an append is computed from the observed body |
+| `create-issue` | None | Repository, blocker and parent identities |
+| `push-to-pull-request-branch` | `--force-with-lease` old OID or first `expectedHeadOid` | PR open state and captured transport inputs before every send |
+| `create-pull-request` | Lease or `expectedHeadOid` against an absent or observed branch | Captured transport inputs before every send |
+
+Signed replays on a new branch first create the ref at the parent commit, so
+branch-push workflows can observe the parent before the signed commits land.
+Label follow-ups on a just-created pull request are not retried, so a transient
+rejection yields a `partial` outcome rather than success.
+
+A bounded TLA+ model of this protocol, with negative controls for each
+protection and a witness for the residual race, is in
+[`specs/safe-output-authorization`](https://github.com/github/gh-aw/tree/main/specs/safe-output-authorization).
 
 Compiler diagnostics use `DEBUG=workflow:safe_outputs_authorization`.
 Runtime diagnostics use the GitHub Actions debug log and report preparation,

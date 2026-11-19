@@ -3,9 +3,11 @@
 package workflow
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -111,7 +113,7 @@ func TestAuthorizationInventoryReportsEffectAdapterBinding(t *testing.T) {
 		"authorization":      authority,
 		"merge-pull-request": map[string]any{"allowed-base-branches": []any{"agent-work/*"}},
 		"remove-labels":      map[string]any{},
-		"add-labels":         map[string]any{},
+		"add-comment":        map[string]any{},
 		"scripts":            map[string]any{"custom": map[string]any{"script": "return async () => ({})"}},
 	}
 	routes := map[string]AuthorizationRoute{}
@@ -123,7 +125,7 @@ func TestAuthorizationInventoryReportsEffectAdapterBinding(t *testing.T) {
 	require.Equal(t, "manager", routes["merge_pull_request"].Coverage, "coverage strings are unchanged")
 	require.Equal(t, "gh-aw.remove-labels@1", routes["remove_labels"].EffectAdapter)
 	require.Equal(t, "resolved_effect", routes["remove_labels"].ScopeBinding)
-	for _, name := range []string{"add_labels", "custom"} {
+	for _, name := range []string{"add_comment", "custom"} {
 		require.Empty(t, routes[name].EffectAdapter, name)
 		require.Equal(t, "invocation", routes[name].ScopeBinding, name)
 	}
@@ -150,10 +152,36 @@ func TestAuthorizationInventoryReportsEffectAdapterBinding(t *testing.T) {
 func TestSafeOutputEffectAdaptersMirrorRuntimeRegistry(t *testing.T) {
 	source, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "js", "safe_output_effect_plan.cjs"))
 	require.NoError(t, err)
-	runtime := regexp.MustCompile(`(?m)^  ([a-z_]+): Object\.freeze\(\{\n    id: "([^"]+)",\n    version: ([0-9]+),`).FindAllStringSubmatch(string(source), -1)
+	version := regexp.MustCompile(`function adapterContract\(id, maxEffects, operations\) \{\n  return Object\.freeze\(\{ id, version: ([0-9]+),`).FindStringSubmatch(string(source))
+	require.Len(t, version, 2)
+	runtime := regexp.MustCompile(`(?m)^  ([a-z_]+): adapterContract\("([^"]+)",`).FindAllStringSubmatch(string(source), -1)
 	mirrored := map[string]string{}
 	for _, match := range runtime {
-		mirrored[match[1]] = match[2] + "@" + match[3]
+		mirrored[match[1]] = match[2] + "@" + version[1]
 	}
 	require.Equal(t, safeOutputEffectAdapters, mirrored)
+}
+
+func TestEffectAdapterConfigurationRejectsUnplannableEffects(t *testing.T) {
+	authority := authorizationTestAuthority("https://authority.example/a")
+	cases := map[string]map[string]any{
+		"create-issue.close-older-issues":                      {"create-issue": map[string]any{"close-older-issues": true}},
+		"create-issue.group-by-day":                            {"create-issue": map[string]any{"group-by-day": true}},
+		"add-labels.create-if-missing":                         {"add-labels": map[string]any{"create-if-missing": true}},
+		"create-pull-request.fallback-as-issue":                {"create-pull-request": map[string]any{"fallback-as-issue": true}},
+		"push-to-pull-request-branch.protected-files":          {"push-to-pull-request-branch": map[string]any{"protected-files": "fallback-to-issue"}},
+		"push-to-pull-request-branch.fallback-as-pull-request": {"push-to-pull-request-branch": map[string]any{"fallback-as-pull-request": true}},
+	}
+	for name, raw := range cases {
+		protected := map[string]any{"authorization": authority}
+		maps.Copy(protected, raw)
+		config := NewCompiler().extractSafeOutputsConfig(map[string]any{"safe-outputs": protected})
+		require.ErrorContains(t, resolveSafeOutputAuthorizations(config), strings.Split(name, ".")[0], name)
+
+		// Unprotected and statically staged outputs keep their existing behavior.
+		require.NoError(t, resolveSafeOutputAuthorizations(NewCompiler().extractSafeOutputsConfig(map[string]any{"safe-outputs": raw})), name)
+		staged := map[string]any{"staged": true}
+		maps.Copy(staged, protected)
+		require.NoError(t, resolveSafeOutputAuthorizations(NewCompiler().extractSafeOutputsConfig(map[string]any{"safe-outputs": staged})), name)
+	}
 }

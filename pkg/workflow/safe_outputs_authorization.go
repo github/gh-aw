@@ -268,6 +268,9 @@ func resolveSafeOutputAuthorizations(config *SafeOutputsConfig) error {
 	if err := buildSafeOutputAuthorizationCoverage(config); err != nil {
 		return err
 	}
+	if err := validateEffectAdapterConfigurations(config); err != nil {
+		return err
+	}
 	safeOutputAuthorizationLog.Printf("Resolved authorization: global=%t outputs=%d coverage=%d", config.Authorization != nil, len(config.AuthorizationRequirements), len(config.AuthorizationCoverage))
 	return nil
 }

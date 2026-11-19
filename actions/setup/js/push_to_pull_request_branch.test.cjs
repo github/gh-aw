@@ -356,6 +356,83 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
     return patchPath;
   }
 
+  describe("resolved-effect execution", () => {
+    it("sends only the planned signed commit, bound to the observed head, and no unplanned effects", async () => {
+      const branch = "feature-branch";
+      createPatchFile(branch);
+      process.env.RUNNER_TEMP = tempDir;
+      const old = "1".repeat(40);
+      const local = "2".repeat(40);
+      const signed = "3".repeat(40);
+      mockExec.getExecOutput = vi.fn().mockImplementation(async (_cmd, args) => {
+        const argList = Array.isArray(args) ? args : [];
+        if (argList[0] === "rev-parse" && String(argList[1]).endsWith("^{commit}")) return { exitCode: 0, stdout: `${old}\n`, stderr: "" };
+        if (argList[0] === "rev-parse") return { exitCode: 0, stdout: `${local}\n`, stderr: "" };
+        if (argList[0] === "rev-list" && argList[1] === "--merges") return { exitCode: 0, stdout: "0\n", stderr: "" };
+        if (argList[0] === "rev-list" && argList[1] === "--parents") return { exitCode: 0, stdout: `${local} ${old}\n`, stderr: "" };
+        if (argList[0] === "rev-list") return { exitCode: 0, stdout: "1\n", stderr: "" };
+        if (argList[0] === "ls-remote") return { exitCode: 0, stdout: `${old}\trefs/heads/feature-branch\n`, stderr: "" };
+        if (argList[0] === "log") return { exitCode: 0, stdout: argList.includes(".github/workflows/") ? "" : "Test commit\n", stderr: "" };
+        if (argList[0] === "bundle" && argList[1] === "unbundle") return { exitCode: 0, stdout: `${"a".repeat(40)} HEAD\n`, stderr: "" };
+        return { exitCode: 0, stdout: "", stderr: "" };
+      });
+      mockGithub.rest.pulls.get.mockResolvedValue({
+        data: { id: 4242, number: 123, state: "open", head: { ref: branch, sha: old, repo: { full_name: "test-owner/test-repo", fork: false } }, base: { repo: { id: 99, full_name: "test-owner/test-repo" } }, title: "Test PR", labels: [] },
+      });
+      mockGithub.rest.repos.get.mockResolvedValue({ data: { id: 99, full_name: "test-owner/test-repo", default_branch: "main" } });
+      const { Octokit } = require("@octokit/core");
+      const sent = [];
+      const fetch = vi.fn(async (url, init) => {
+        sent.push({ url: String(url), body: JSON.parse(init.body) });
+        return new Response(JSON.stringify({ data: { createCommitOnBranch: { commit: { oid: signed } } } }), { status: 200, headers: { "content-type": "application/json" } });
+      });
+      const octo = new Octokit({ request: { fetch } });
+      mockGithub.graphql = octo.graphql;
+      mockGithub.request = octo.request;
+
+      const protocol = require("./safe_output_authorization.cjs");
+      const plans = require("./safe_output_effect_plan.cjs");
+      const { withSafeOutputInvocation } = require("./safe_output_execution.cjs");
+      vi.spyOn(protocol, "assertAuthorizationFresh").mockImplementation(({ authorization }) => authorization);
+      const caller = {
+        host: "https://github.com",
+        repository_id: "123",
+        workflow_ref: "test-owner/test-repo/.github/workflows/t.yml@refs/heads/main",
+        workflow_sha: "a".repeat(40),
+        workflow_hash: "b".repeat(64),
+        run_id: "456",
+        run_attempt: "1",
+      };
+      const output = { type: "push_to_pull_request_branch", name: "push_to_pull_request_branch", executor: "manager", implementation_digest: "d".repeat(64) };
+      const decisions = [];
+      const state = {
+        requirement: { endpoint: "https://authority.example/authorize", audience: "safe-outputs" },
+        batchDigest: "c".repeat(64),
+        recordIndex: 0,
+        invocation: { caller, output, context: {} },
+        authorizeEffectPlan: async handle => {
+          const { plan, scope } = plans.beginEffectPlanAuthorization(handle, state);
+          const invocation = protocol.prepareInvocation({ caller, output, normalizedInputs: plan, batchDigest: state.batchDigest, recordIndex: 0, scope, context: {}, effectPlan: handle });
+          decisions.push(invocation);
+          return plans.bindEffectPlanAuthorization(handle, { state: "allowed", binding: "resolved_effect", invocation_id: invocation.invocation_id }, invocation);
+        },
+      };
+      state.effectPreparation = plans.createEffectPreparation({ type: "push_to_pull_request_branch", route: "manager", state });
+
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await withSafeOutputInvocation(state, () => handler({ branch }, {}));
+
+      expect(result).toMatchObject({ success: true, commit_sha: signed });
+      expect(decisions).toHaveLength(1);
+      expect(decisions[0].scope.refs).toEqual(expect.arrayContaining(["effect-adapter:gh-aw.push-to-pull-request-branch@1", "effect-precondition:branch_head:atomic"]));
+      expect(sent).toHaveLength(1);
+      expect(sent[0].body.variables.input).toMatchObject({ branch: { repositoryNameWithOwner: "test-owner/test-repo", branchName: branch }, expectedHeadOid: old });
+      expect(mockExec.getExecOutput.mock.calls.some(([, args]) => args?.includes("push"))).toBe(false);
+      expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe("merged base provenance", () => {
     const trustedTip = "a".repeat(40);
     const mergedBase = "b".repeat(40);

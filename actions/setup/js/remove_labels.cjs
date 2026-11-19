@@ -20,34 +20,7 @@ const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { normalizeIssueIntentLabelNames } = require("./issue_intents.cjs");
 const { currentEffectPreparation, freezeEffectPlan, describeEffectPlan, sendPlannedEffect, settleEffect, effectPlanOutcome, EffectTransportError } = require("./safe_output_effect_plan.cjs");
 const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
-
-/**
- * Read the authoritative repository and issue/PR identities plus current labels.
- * @param {any} githubClient
- * @param {{owner: string, repo: string}} repoParts
- * @param {number} itemNumber
- */
-async function observeLabelTarget(githubClient, repoParts, itemNumber) {
-  const { data: repository } = await githubClient.rest.repos.get({ owner: repoParts.owner, repo: repoParts.repo });
-  const { data: item } = await githubClient.rest.issues.get({ owner: repoParts.owner, repo: repoParts.repo, issue_number: itemNumber });
-  const expected = `${repoParts.owner}/${repoParts.repo}`.toLowerCase();
-  if (!Number.isSafeInteger(repository?.id) || String(repository?.full_name || "").toLowerCase() !== expected || item?.number !== itemNumber || !Number.isSafeInteger(item?.id)) {
-    throw new Error("Label target identity could not be independently resolved");
-  }
-  /** @type {Map<string, number>} */
-  const labels = new Map();
-  for (const label of item.labels || []) {
-    const name = typeof label === "string" ? label : label?.name;
-    if (typeof name !== "string" || !Number.isSafeInteger(label?.id)) throw new Error("Label identity could not be independently resolved");
-    labels.set(name.toLowerCase(), label.id);
-  }
-  return {
-    identity: { repository_id: String(repository.id), resource_id: String(item.id), kind: item.pull_request ? "pull_request" : "issue", node_id: typeof item.node_id === "string" ? item.node_id : undefined },
-    names: (item.labels || []).map(label => (typeof label === "string" ? label : label.name)),
-    title: typeof item.title === "string" ? item.title : "",
-    labels,
-  };
-}
+const { observeIssueTarget: observeLabelTarget } = require("./safe_output_effect_targets.cjs");
 
 /**
  * Exact-effect label removal. The approved plan equals the transmitted request

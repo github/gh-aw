@@ -3172,6 +3172,151 @@ describe("create_pull_request - configured reviewers", () => {
   });
 });
 
+describe("create_pull_request - resolved-effect execution", () => {
+  let originalEnv;
+
+  beforeEach(() => {
+    originalEnv = { ...process.env };
+    Object.assign(process.env, { GH_AW_WORKFLOW_ID: "test-workflow", GITHUB_REPOSITORY: "test-owner/test-repo", GITHUB_BASE_REF: "main" });
+    global.core = {
+      info: vi.fn(),
+      warning: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      setFailed: vi.fn(),
+      setOutput: vi.fn(),
+      startGroup: vi.fn(),
+      endGroup: vi.fn(),
+      summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) },
+    };
+    global.context = { eventName: "workflow_dispatch", repo: { owner: "test-owner", repo: "test-repo" }, payload: {} };
+    delete require.cache[require.resolve("./create_pull_request.cjs")];
+  });
+
+  afterEach(() => {
+    for (const key of Object.keys(process.env)) if (!(key in originalEnv)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+    delete global.core;
+    delete global.github;
+    delete global.context;
+    delete global.exec;
+    vi.restoreAllMocks();
+  });
+
+  it("creates the branch, pull request and follow-ups only from the approved plan", async () => {
+    const base = "1".repeat(40);
+    const local = "2".repeat(40);
+    const signed = "3".repeat(40);
+    global.exec = {
+      exec: vi.fn().mockResolvedValue(0),
+      getExecOutput: vi.fn(async (_cmd, args) => {
+        const list = Array.isArray(args) ? args : [];
+        if (list[0] === "rev-parse" && String(list[1]).endsWith("^{commit}")) return { exitCode: 0, stdout: `${base}\n`, stderr: "" };
+        if (list[0] === "rev-list" && list[1] === "--parents") return { exitCode: 0, stdout: `${local} ${base}\n`, stderr: "" };
+        if (list[0] === "log" && list[1] === "-1") return { exitCode: 0, stdout: "Initialize\n", stderr: "" };
+        return { exitCode: 0, stdout: "", stderr: "" };
+      }),
+    };
+    const { Octokit } = require("@octokit/core");
+    const sent = [];
+    const fetch = vi.fn(async (url, init) => {
+      const body = JSON.parse(init.body);
+      sent.push({ method: init.method, url: String(url), body });
+      const data = String(url).endsWith("/git/refs")
+        ? { ref: body.ref, object: { sha: body.sha } }
+        : String(url).endsWith("/graphql")
+          ? { data: { createCommitOnBranch: { commit: { oid: signed } } } }
+          : String(url).endsWith("/pulls")
+            ? { id: 4242, number: 42, node_id: "PR_42", html_url: "https://github.com/test-owner/test-repo/pull/42", head: { sha: signed } }
+            : {};
+      return new Response(JSON.stringify(data), { status: 201, headers: { "content-type": "application/json" } });
+    });
+    const octo = new Octokit({ request: { fetch } });
+    global.github = {
+      request: octo.request,
+      graphql: octo.graphql,
+      rest: {
+        pulls: { create: vi.fn(), requestReviewers: vi.fn(), createReview: vi.fn() },
+        repos: { get: vi.fn().mockResolvedValue({ data: { id: 99, full_name: "test-owner/test-repo", default_branch: "main" } }) },
+        issues: { addLabels: vi.fn(), addAssignees: vi.fn() },
+        git: { createRef: vi.fn(), deleteRef: vi.fn() },
+      },
+      graphqlCalls: 0,
+    };
+
+    const protocol = require("./safe_output_authorization.cjs");
+    const plans = require("./safe_output_effect_plan.cjs");
+    const { withSafeOutputInvocation } = require("./safe_output_execution.cjs");
+    vi.spyOn(protocol, "assertAuthorizationFresh").mockImplementation(({ authorization }) => authorization);
+    const caller = {
+      host: "https://github.com",
+      repository_id: "123",
+      workflow_ref: "test-owner/test-repo/.github/workflows/t.yml@refs/heads/main",
+      workflow_sha: "a".repeat(40),
+      workflow_hash: "b".repeat(64),
+      run_id: "456",
+      run_attempt: "1",
+    };
+    const output = { type: "create_pull_request", name: "create_pull_request", executor: "manager", implementation_digest: "d".repeat(64) };
+    const decisions = [];
+    const state = {
+      requirement: { endpoint: "https://authority.example/authorize", audience: "safe-outputs" },
+      batchDigest: "c".repeat(64),
+      recordIndex: 0,
+      invocation: { caller, output, context: {} },
+      authorizeEffectPlan: async handle => {
+        const { plan, scope } = plans.beginEffectPlanAuthorization(handle, state);
+        const invocation = protocol.prepareInvocation({ caller, output, normalizedInputs: plan, batchDigest: state.batchDigest, recordIndex: 0, scope, context: {}, effectPlan: handle });
+        decisions.push({ invocation, sentBefore: sent.length });
+        return plans.bindEffectPlanAuthorization(handle, { state: "allowed", binding: "resolved_effect", invocation_id: invocation.invocation_id }, invocation);
+      },
+    };
+    state.effectPreparation = plans.createEffectPreparation({ type: "create_pull_request", route: "manager", state });
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ reviewers: ["user1"], labels: ["automation"], allow_empty: true });
+    const result = await withSafeOutputInvocation(state, () => handler({ title: "Test PR", body: "Test body" }, {}));
+
+    expect(result).toMatchObject({ success: true, number: 42 });
+    expect(decisions).toEqual([expect.objectContaining({ sentBefore: 0 })]);
+    expect(sent.map(entry => `${entry.method} ${new URL(entry.url).pathname.replace(/\/repos\/test-owner\/test-repo/, "")}`)).toEqual([
+      "POST /git/refs",
+      "POST /graphql",
+      "POST /pulls",
+      "POST /issues/42/labels",
+      "POST /pulls/42/requested_reviewers",
+    ]);
+    expect(sent[0].body).toEqual({ ref: expect.stringMatching(/^refs\/heads\//), sha: base });
+    expect(sent[1].body.variables.input.expectedHeadOid).toBe(base);
+    expect(sent[2].body).toMatchObject({ title: "Test PR", base: "main" });
+    expect(global.github.rest.pulls.create).not.toHaveBeenCalled();
+    expect(global.github.rest.git.deleteRef).not.toHaveBeenCalled();
+
+    // A definitive creation rejection is not reconciled onto an existing pull request.
+    sent.length = 0;
+    fetch.mockImplementation(async (url, init) => {
+      const body = JSON.parse(init.body);
+      sent.push({ method: init.method, url: String(url), body });
+      if (String(url).endsWith("/pulls")) return new Response(JSON.stringify({ message: "A pull request already exists" }), { status: 422, headers: { "content-type": "application/json" } });
+      const data = String(url).endsWith("/git/refs") ? { ref: body.ref, object: { sha: body.sha } } : { data: { createCommitOnBranch: { commit: { oid: signed } } } };
+      return new Response(JSON.stringify(data), { status: 201, headers: { "content-type": "application/json" } });
+    });
+    global.github.rest.pulls.list = vi.fn().mockResolvedValue({ data: [{ number: 7, title: "Test PR", body: "Test body", base: { ref: "main" } }] });
+    const retryState = { ...state, authorization: undefined };
+    retryState.effectPreparation = plans.createEffectPreparation({ type: "create_pull_request", route: "manager", state: retryState });
+    retryState.authorizeEffectPlan = async handle => {
+      const { plan, scope } = plans.beginEffectPlanAuthorization(handle, retryState);
+      const invocation = protocol.prepareInvocation({ caller, output, normalizedInputs: plan, batchDigest: retryState.batchDigest, recordIndex: 0, scope, context: {}, effectPlan: handle });
+      return plans.bindEffectPlanAuthorization(handle, { state: "allowed", binding: "resolved_effect", invocation_id: invocation.invocation_id }, invocation);
+    };
+    const fresh = await main({ reviewers: ["user1"], labels: ["automation"], allow_empty: true });
+    const rejected = await withSafeOutputInvocation(retryState, () => fresh({ title: "Test PR", body: "Test body" }, {}));
+    expect(rejected).toMatchObject({ success: false, operation_outcome: "partial" });
+    expect(global.github.rest.pulls.list).not.toHaveBeenCalled();
+    expect(sent.map(entry => new URL(entry.url).pathname.split("/").pop())).toEqual(["refs", "graphql", "pulls"]);
+  });
+});
+
 describe("create_pull_request - wildcard target-repo", () => {
   let tempDir;
   let originalEnv;

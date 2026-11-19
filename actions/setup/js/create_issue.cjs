@@ -34,6 +34,9 @@ const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token
 const { parseDeduplicateByTitle, normalizeTitleForDedup, normalizeDeduplicationLabels, hasDeduplicationLabels, findDuplicateIssue } = require("./issue_title_dedup.cjs");
 const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const { normalizeIssueArtifacts, sanitizeIssueArtifacts, createIssueArtifacts } = require("./issue_artifacts.cjs");
+const { currentEffectPreparation, freezeEffectPlan, executeEffectPlan, effectReceipt, unsupportedEffect } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+const { observeRepository, repositoryPath } = require("./safe_output_effect_targets.cjs");
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const ISSUE_FIELD_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const RECENTLY_CLOSED_DEDUP_DAYS = 30;
@@ -756,6 +759,99 @@ async function shouldSkipRepoTitleDedupSearch(githubClient, owner, repo) {
 }
 
 /**
+ * Exact-effect issue creation: the finalized create request plus optional
+ * issue fields, blocked-by dependencies and a same-repository sub-issue link.
+ * Follow-ups address the new issue through typed receipts of the create effect.
+ * Fallback comments, artifacts, copilot assignment, grouping and closing older
+ * issues are new effects and are refused on this path.
+ * @param {{preparation: object, githubClient: any, repoParts: {owner: string, repo: string}, qualifiedItemRepo: string, request: any,
+ *   blockedTargets: Array<{repo: string, number: number}>, issueFieldsInput: any[], parent: number|null}} options
+ * @returns {Promise<any>}
+ */
+async function createIssueWithEffectPlan({ preparation, githubClient, repoParts, qualifiedItemRepo, request, blockedTargets, issueFieldsInput, parent }) {
+  const repository = await observeRepository(githubClient, repoParts);
+  const base = repositoryPath(repoParts.owner, repoParts.repo);
+  /** @type {Record<string, unknown>} */
+  const createBody = {};
+  for (const field of ["title", "body", "labels", "assignees", "milestone", "type"]) {
+    if (request[field] !== undefined) createBody[field] = request[field];
+  }
+  const targets = [{ kind: "repository", repository: qualifiedItemRepo, repository_id: repository.repository_id }];
+  /** @type {any[]} */
+  const effects = [{ operation: "issues.create", path: `${base}/issues`, body: createBody }];
+  if (Array.isArray(issueFieldsInput) && issueFieldsInput.length > 0) {
+    effects.push({ operation: "graphql.setIssueFieldValue", variables: { input: { issueId: "{{issue_node}}", issueFields: issueFieldsInput } }, derive: { issue_node: { effect: 0, field: "node_id" } } });
+  }
+  for (const blocked of blockedTargets) {
+    const [owner, repo] = blocked.repo.split("/");
+    const blockerRepository = await observeRepository(githubClient, { owner, repo });
+    const { data: blocker } = await githubClient.rest.issues.get({ owner, repo, issue_number: blocked.number });
+    if (!Number.isSafeInteger(blocker?.id) || blocker.id < 1 || blocker.number !== blocked.number) throw new Error(`${ERR_VALIDATION}: Issue ${blocked.repo}#${blocked.number} did not return a valid issue ID`);
+    targets.push({ kind: "issue", repository: blocked.repo, repository_id: blockerRepository.repository_id, number: blocked.number, resource_id: String(blocker.id) });
+    effects.push({ operation: "issues.addBlockedBy", path: `${base}/issues/{{issue_number}}/dependencies/blocked_by`, body: { issue_id: blocker.id }, derive: { issue_number: { effect: 0, field: "number" } } });
+  }
+  if (parent) {
+    const { data: parentIssue } = await githubClient.rest.issues.get({ owner: repoParts.owner, repo: repoParts.repo, issue_number: parent });
+    if (parentIssue?.number !== parent || !Number.isSafeInteger(parentIssue?.id) || typeof parentIssue.node_id !== "string") throw new Error(`${ERR_VALIDATION}: Parent issue #${parent} could not be independently resolved`);
+    targets.push({ kind: "issue", repository: qualifiedItemRepo, repository_id: repository.repository_id, number: parent, resource_id: String(parentIssue.id), node_id: parentIssue.node_id });
+    effects.push({ operation: "graphql.addSubIssue", variables: { parentId: parentIssue.node_id, subIssueId: "{{issue_node}}" }, derive: { issue_node: { effect: 0, field: "node_id" } } });
+  }
+  const handle = freezeEffectPlan(preparation, {
+    targets,
+    effects,
+    preconditions: [{ id: "target_identity", enforcement: "observed", observation: targets.map(target => [target.kind, target.repository_id, target.resource_id ?? null]) }],
+  });
+  await authorizeSafeOutputEffectPlan(handle);
+  /** @type {any} */
+  let issue = null;
+  const identities = async () => {
+    const observed = [String((await observeRepository(githubClient, repoParts)).repository_id)];
+    for (const target of targets.slice(1)) {
+      const [owner, repo] = target.repository.split("/");
+      const { data } = await githubClient.rest.issues.get({ owner, repo, issue_number: target.number });
+      observed.push(`${(await observeRepository(githubClient, { owner, repo })).repository_id}:${data?.id}:${target.node_id === undefined ? "" : (data?.node_id ?? "")}`);
+    }
+    return observed;
+  };
+  const expected = [repository.repository_id, ...targets.slice(1).map(target => `${target.repository_id}:${target.resource_id}:${target.node_id ?? ""}`)];
+  const run = await executeEffectPlan(handle, {
+    client: githubClient,
+    beforeEach: async () => {
+      if (JSON.stringify(await identities()) !== JSON.stringify(expected)) throw new Error("drift");
+    },
+    onConfirmed: (index, response) => {
+      if (index === 0) issue = response?.data;
+    },
+  });
+  const created = effectReceipt(handle, 0);
+  if (!created?.number) {
+    return {
+      success: false,
+      error: run.outcome === "indeterminate" ? "Issue creation outcome is indeterminate; inspect the repository before any further action. The request was not retried." : "Issue creation was not completed",
+      ...(run.outcome === "indeterminate" ? { operation_outcome: "indeterminate" } : {}),
+    };
+  }
+  const result = {
+    success: run.outcome === "confirmed",
+    repo: qualifiedItemRepo,
+    number: created.number,
+    url: issue?.html_url,
+    id: created.id,
+    metadata: { node_id: created.node_id },
+  };
+  if (run.outcome !== "confirmed") {
+    core.warning(`Issue ${qualifiedItemRepo}#${created.number} was created, but approved follow-up effects did not all complete; remaining effects were not attempted`);
+    return { ...result, error: "Approved follow-up effects for the created issue did not all complete", operation_outcome: run.outcome };
+  }
+  core.info(`Created issue ${qualifiedItemRepo}#${created.number} through the approved effect plan`);
+  return result;
+}
+
+/**
+ * @param {Object} config
+ */
+
+/**
  * Main handler factory for create_issue
  * Returns a message handler function that processes individual create_issue messages
  * @type {HandlerFactoryFunction}
@@ -1190,6 +1286,37 @@ async function main(config = {}) {
       };
     }
     processedCount++;
+
+    const preparation = isStaged ? null : currentEffectPreparation("create_issue");
+    if (preparation) {
+      const unsupported =
+        (artifacts.length > 0 && "issue artifacts") ||
+        (hasCopilot && assignCopilot && "copilot assignment") ||
+        (groupByDayEnabled && (closeOlderKey || workflowId) && "group-by-day comments") ||
+        (closeOlderIssuesEnabled && "close-older-issues") ||
+        (groupEnabled && !effectiveParentIssueNumber && "grouped parent issues");
+      if (unsupported) {
+        processedCount--;
+        return { success: false, error: unsupportedEffect("create_issue", unsupported).message };
+      }
+      const result = await createIssueWithEffectPlan({
+        preparation,
+        githubClient,
+        repoParts,
+        qualifiedItemRepo,
+        request,
+        blockedTargets: blockedBy.targets,
+        issueFieldsInput: preparedIssueFieldsInput,
+        parent: effectiveParentIssueNumber && effectiveParentRepo === qualifiedItemRepo ? effectiveParentIssueNumber : null,
+      });
+      if (result.success) {
+        temporaryIdMap.set(normalizeTemporaryId(String(temporaryId)), { repo: qualifiedItemRepo, number: result.number });
+        createdIssues.push({ number: result.number, html_url: result.url, _repo: qualifiedItemRepo });
+        if (deduplicationEnabled && hasDeduplicationLabels(labels, deduplicateByLabels)) recordSeenTitle(qualifiedItemRepo, title, normalizedTitle);
+        return { ...result, body, temporaryId, _repo: qualifiedItemRepo };
+      }
+      return result;
+    }
 
     // Group-by-day check: if enabled, search for an existing open issue created today.
     // When found, post the new content as a comment on the existing issue instead of

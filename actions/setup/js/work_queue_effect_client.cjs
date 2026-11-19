@@ -589,7 +589,7 @@ function wrapClaimEffectClient(client, options) {
           if (typeof query !== "string") throw new Error("Claim GraphQL request has no explicit operation");
           if (typeof args[0] === "string" && Object.prototype.hasOwnProperty.call(variables, "query")) throw new Error("Claim GraphQL variables cannot override the authorized operation");
           assertApiOrigin(variables.url, variables, target.endpoint?.DEFAULTS);
-          const immutableArgs = structuredClone(args);
+          const immutableArgs = cloneRestArgs(args);
           const snapshot = graphRequestSnapshot(target, immutableArgs);
           if (/\bmutation\b/.test(query.replace(/#[^\n]*/g, ""))) {
             const immutableVariables = snapshot.variables;

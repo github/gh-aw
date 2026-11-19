@@ -6,6 +6,8 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const protocol = require("./safe_output_authorization.cjs");
 const nativeModule = require("./create_issue.cjs");
+// add_comment and close_issue have no exact-effect adapter and stay invocation-bound.
+const invocationModule = require("./add_comment.cjs");
 const { loadHandlers, processMessages } = require("./safe_output_handler_manager.cjs");
 const { currentSafeOutputInvocation, buildSafeOutputExecutions, authorizeSafeOutputInvocation } = require("./safe_output_execution.cjs");
 const root = path.resolve(`.manager-authorization-${process.pid}`);
@@ -116,16 +118,16 @@ describe("manager prepared authorization boundary", () => {
   });
 
   it("never enters native initialization on denial and preserves independent outputs", async () => {
-    const factory = vi.spyOn(nativeModule, "main").mockResolvedValue(vi.fn());
+    const factory = vi.spyOn(invocationModule, "main").mockResolvedValue(vi.fn());
     const authorize = deny();
     const handlers = await loadHandlers({
-      create_issue: { authorization: requirement, builtin: false },
+      add_comment: { authorization: requirement, builtin: false },
       report_incomplete: { builtin: true },
     });
     expect(factory).not.toHaveBeenCalled();
     const { results } = await processMessages(handlers, [
-      { type: "create_issue", output_id: "so_aaaaaaaaaaaa", title: "Blocked" },
-      { type: "create_issue", "depends-on": ["so_aaaaaaaaaaaa"], title: "Dependent" },
+      { type: "add_comment", output_id: "so_aaaaaaaaaaaa", body: "Blocked" },
+      { type: "add_comment", "depends-on": ["so_aaaaaaaaaaaa"], body: "Dependent" },
       { type: "report_incomplete", reason: "Independent diagnostic" },
     ]);
     expect(factory).not.toHaveBeenCalled();
@@ -137,10 +139,10 @@ describe("manager prepared authorization boundary", () => {
   });
 
   it.each(["partial", "indeterminate"])("retains a native %s outcome instead of reporting a retryable failure", async operation_outcome => {
-    vi.spyOn(nativeModule, "main").mockResolvedValue(async () => ({ success: false, operation_outcome }));
+    vi.spyOn(invocationModule, "main").mockResolvedValue(async () => ({ success: false, operation_outcome }));
     allow();
-    const handlers = await loadHandlers({ create_issue: { authorization: requirement } });
-    await processMessages(handlers, [{ type: "create_issue", title: "Native result" }]);
+    const handlers = await loadHandlers({ add_comment: { authorization: requirement } });
+    await processMessages(handlers, [{ type: "add_comment", body: "Native result" }]);
     expect(protocol.recordAuthorizationOutcome).toHaveBeenCalledWith(expect.objectContaining({ operationStatus: operation_outcome }));
   });
 
@@ -204,15 +206,15 @@ describe("manager prepared authorization boundary", () => {
 
   it("binds immutable normalized target inputs and distinguishes duplicate records", async () => {
     const observed = [];
-    vi.spyOn(nativeModule, "main").mockResolvedValue(async message => {
+    vi.spyOn(invocationModule, "main").mockResolvedValue(async message => {
       observed.push(currentSafeOutputInvocation());
       expect(Object.isFrozen(message)).toBe(true);
       expect(Object.isFrozen(message.nested)).toBe(true);
       return { success: true };
     });
     const authorize = allow();
-    const handlers = await loadHandlers({ create_issue: { authorization: requirement } });
-    const message = { type: "create_issue", title: "Identical", nested: { value: 1 } };
+    const handlers = await loadHandlers({ add_comment: { authorization: requirement } });
+    const message = { type: "add_comment", body: "Identical", nested: { value: 1 } };
     await processMessages(handlers, [message, { ...message }]);
     expect(authorize).toHaveBeenCalledTimes(2);
     expect(observed[0].invocation.invocation_id).not.toBe(observed[1].invocation.invocation_id);
@@ -246,11 +248,11 @@ describe("manager prepared authorization boundary", () => {
   });
 
   it("exposes a validated native target selector without claiming resolved-effect binding", async () => {
-    const update = require("./update_issue.cjs");
+    const update = require("./close_issue.cjs");
     vi.spyOn(update, "main").mockResolvedValue(async () => ({ success: true }));
     const authorize = allow();
-    const handlers = await loadHandlers({ update_issue: { authorization: requirement, target: "*", allowed_repos: ["other/*"] } });
-    await processMessages(handlers, [{ type: "update_issue", repo: "other/allowed", issue_number: 42, body: "private target content" }]);
+    const handlers = await loadHandlers({ close_issue: { authorization: requirement, target: "*", allowed_repos: ["other/*"] } });
+    await processMessages(handlers, [{ type: "close_issue", repo: "other/allowed", issue_number: 42, body: "private target content" }]);
     const invocation = authorize.mock.calls[0][0].invocation;
     expect(invocation.scope.binding).toBe("invocation");
     expect(invocation.scope.refs).toContain("validated-repository-selector:other/allowed");
@@ -270,11 +272,11 @@ describe("manager prepared authorization boundary", () => {
 
   it("retains authorization separately from operation failure and post-effect audit errors", async () => {
     const handler = vi.fn().mockResolvedValue({ success: false, error: "operation failed" });
-    vi.spyOn(nativeModule, "main").mockResolvedValue(handler);
+    vi.spyOn(invocationModule, "main").mockResolvedValue(handler);
     allow();
     protocol.recordAuthorizationOutcome.mockReturnValue({ evidenceRecorded: false, reason_code: "evidence_failed" });
-    const handlers = await loadHandlers({ create_issue: { authorization: requirement } });
-    const { results } = await processMessages(handlers, [{ type: "create_issue", title: "One attempt" }]);
+    const handlers = await loadHandlers({ add_comment: { authorization: requirement } });
+    const { results } = await processMessages(handlers, [{ type: "add_comment", body: "One attempt" }]);
     expect(handler).toHaveBeenCalledOnce();
     expect(buildSafeOutputExecutions(results)[0]).toMatchObject({ status: "failed", authorization: { state: "allowed", evidenceRecorded: false } });
   });

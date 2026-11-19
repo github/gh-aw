@@ -109,6 +109,10 @@ beforeEach(() => {
     GH_AW_AUTHORIZATION_WORKFLOW_HASH: caller.workflow_hash,
     GITHUB_RUN_ID: "456",
     GITHUB_RUN_ATTEMPT: "1",
+    GITHUB_REPOSITORY: "github/gh-aw",
+    GH_AW_WORKFLOW_ID: "test",
+    GITHUB_JOB: "safe_outputs",
+    GH_AW_JOB_CHECK_RUN_ID: "77",
     GH_AW_SAFE_OUTPUTS_STAGED: "false",
     ACTIONS_ID_TOKEN_REQUEST_TOKEN: "bootstrap",
     ACTIONS_ID_TOKEN_REQUEST_URL: "https://token.actions.example/token",
@@ -126,11 +130,20 @@ afterEach(() => {
 
 describe("effect plan contract", () => {
   it("publishes the exact initial adapter coverage matrix", () => {
-    expect(plans.effectAdapterCoverage()).toEqual({
-      merge_pull_request: { adapter: "gh-aw.merge-pull-request@1", routes: ["manager", "claim"] },
-      remove_labels: { adapter: "gh-aw.remove-labels@1", routes: ["manager", "claim"] },
+    const coverage = plans.effectAdapterCoverage();
+    expect(Object.fromEntries(Object.entries(coverage).map(([type, entry]) => [type, entry.adapter]))).toEqual({
+      add_labels: "gh-aw.add-labels@1",
+      create_issue: "gh-aw.create-issue@1",
+      create_pull_request: "gh-aw.create-pull-request@1",
+      merge_pull_request: "gh-aw.merge-pull-request@1",
+      push_to_pull_request_branch: "gh-aw.push-to-pull-request-branch@1",
+      remove_labels: "gh-aw.remove-labels@1",
+      replace_label: "gh-aw.replace-label@1",
+      update_issue: "gh-aw.update-issue@1",
     });
-    expect(plans.selectEffectAdapter("create_issue", "manager")).toBeNull();
+    expect(Object.values(coverage).every(entry => JSON.stringify(entry.routes) === JSON.stringify(["manager", "claim"]))).toBe(true);
+    expect(coverage.push_to_pull_request_branch.operations).toEqual(["git.push", "graphql.createCommitOnBranch"]);
+    expect(plans.selectEffectAdapter("add_comment", "manager")).toBeNull();
     expect(plans.selectEffectAdapter("merge_pull_request", "standalone")).toBeNull();
   });
 
@@ -140,7 +153,7 @@ describe("effect plan contract", () => {
       const handle = plans.freezeEffectPlan(state.effectPreparation, removeLabelSpec(["bug", "needs triage"]));
       const described = plans.describeEffectPlan(handle);
       expect(GITHUB_API_VERSION).toBe("2026-03-10");
-      expect(handle.plan_digest).toBe("8a9d6e41223b814e7f91199e530c68e669bafeeeda7b3b26924f8a789587a5a2");
+      expect(handle.plan_digest).toBe("224ef741b68f587e64f510b0b6bc77d65c41e980330d6c9b2d7c0fa52f978abf");
       expect(described.refs).toEqual([
         "effect-contract:gh-aw.safe-output-effect-plan.v1",
         "effect-adapter:gh-aw.remove-labels@1",
@@ -217,6 +230,21 @@ describe("effect plan contract", () => {
       },
     ]);
     expect(authorityFetch.requests).toHaveLength(1);
+  });
+
+  it("never confirms an effect sent by a client that bypasses the verifying transport", async () => {
+    vi.stubGlobal("fetch", authority().fetch);
+    const github = transport(() => new Response(null, { status: 204 }));
+    const bypass = { request: vi.fn(async () => ({ status: 204, data: undefined })) };
+    bypass.request.endpoint = github.request.endpoint;
+    const state = invocationState("remove_labels");
+    await withSafeOutputInvocation(state, async () => {
+      const handle = plans.freezeEffectPlan(state.effectPreparation, removeLabelSpec(["bug", "later"]));
+      await authorizeSafeOutputEffectPlan(handle);
+      const run = await plans.executeEffectPlan(handle, { client: bypass });
+      expect(run).toMatchObject({ outcome: "indeterminate", stop_reason: "indeterminate" });
+    });
+    expect(bypass.request).toHaveBeenCalledOnce();
   });
 
   it("refuses SDK retries of a transmitted request and reports an indeterminate effect", async () => {
@@ -550,5 +578,319 @@ describe("manager resolved-effect execution", () => {
     const { results } = await processMessages(await loadHandlers({ custom: { authorization: requirement } }), [{ type: "custom", scope: "resolved_effect" }]);
     expect(authorityFetch.requests.map(request => request.invocation.scope.binding)).toEqual(["invocation"]);
     expect(results[0]).toMatchObject({ success: false, authorization: { state: "denied", binding: "invocation" } });
+  });
+});
+
+describe("derived receipts, GraphQL and git transports", () => {
+  const { Octokit } = require("@octokit/core");
+
+  function octokit(respond) {
+    const sent = [];
+    const fetch = vi.fn(async (url, init) => {
+      const body = typeof init.body === "string" && init.body ? JSON.parse(init.body) : undefined;
+      sent.push({ url: String(url), method: init.method, headers: { ...init.headers }, body });
+      return respond(String(url), init, body, sent.length);
+    });
+    const client = new Octokit({ auth: "ghs_test", request: { fetch } });
+    return { sent, fetch, client: { request: client.request, graphql: client.graphql } };
+  }
+
+  it("binds later effects to typed receipts of earlier effects only", async () => {
+    vi.stubGlobal("fetch", authority().fetch);
+    const github = octokit((url, _init, body) => (url.endsWith("/issues") ? json({ id: 900, number: 9, node_id: "I_new" }, 201) : body?.query ? json({ data: { addSubIssue: { issue: { id: "P", number: 1 } } } }) : json({}, 201)));
+    const state = invocationState("create_issue");
+    await withSafeOutputInvocation(state, async () => {
+      expect(() =>
+        plans.freezeEffectPlan(plans.createEffectPreparation({ type: "create_issue", route: "manager", state }), {
+          targets: removeLabelSpec().targets,
+          effects: [{ operation: "issues.addBlockedBy", path: "/repos/github/gh-aw/issues/{{issue}}/dependencies/blocked_by", body: { issue_id: 5 }, derive: { issue: { effect: 1, field: "number" } } }],
+          preconditions: [],
+        })
+      ).toThrow("earlier effect");
+      const handle = plans.freezeEffectPlan(state.effectPreparation, {
+        targets: removeLabelSpec().targets,
+        effects: [
+          { operation: "issues.create", path: "/repos/github/gh-aw/issues", body: { title: "T", body: "B" } },
+          { operation: "issues.addBlockedBy", path: "/repos/github/gh-aw/issues/{{issue}}/dependencies/blocked_by", body: { issue_id: 5 }, derive: { issue: { effect: 0, field: "number" } } },
+          { operation: "graphql.addSubIssue", variables: { parentId: "P", subIssueId: "{{node}}" }, derive: { node: { effect: 0, field: "node_id" } } },
+        ],
+        preconditions: [],
+      });
+      expect(plans.describeEffectPlan(handle).refs).toContain("effect-derived:receipt");
+      await authorizeSafeOutputEffectPlan(handle);
+      const run = await plans.executeEffectPlan(handle, { client: github.client });
+      expect(run.outcome).toBe("confirmed");
+    });
+    expect(github.sent.map(entry => `${entry.method} ${entry.url}`)).toEqual([
+      "POST https://api.github.com/repos/github/gh-aw/issues",
+      "POST https://api.github.com/repos/github/gh-aw/issues/9/dependencies/blocked_by",
+      "POST https://api.github.com/graphql",
+    ]);
+    expect(github.sent[2].body).toEqual({ query: plans.GRAPHQL_MUTATIONS["graphql.addSubIssue"].query, variables: { parentId: "P", subIssueId: "I_new" } });
+  });
+
+  it("stops dependents when a receipt is missing and treats GraphQL errors as indeterminate", async () => {
+    vi.stubGlobal("fetch", authority().fetch);
+    const github = octokit((url, _init, body) => (body?.query ? json({ errors: [{ message: "partial" }], data: null }) : json({ id: 900 }, 201)));
+    const state = invocationState("create_issue");
+    await withSafeOutputInvocation(state, async () => {
+      const handle = plans.freezeEffectPlan(state.effectPreparation, {
+        targets: removeLabelSpec().targets,
+        effects: [
+          { operation: "graphql.setIssueFieldValue", variables: { input: { issueId: "I_1", issueFields: [] } } },
+          { operation: "issues.create", path: "/repos/github/gh-aw/issues", body: { title: "T" } },
+        ],
+        preconditions: [],
+      });
+      await authorizeSafeOutputEffectPlan(handle);
+      const run = await plans.executeEffectPlan(handle, { client: github.client });
+      expect(run).toMatchObject({ outcome: "indeterminate", stop_reason: "indeterminate" });
+    });
+    expect(github.sent).toHaveLength(1);
+  });
+
+  function gitExec({ rewrite = false, pushExit = 0, remoteAfter }) {
+    const calls = [];
+    vi.stubGlobal("exec", {
+      getExecOutput: vi.fn(async (_cmd, args) => {
+        calls.push(args);
+        if (args.includes("remote") && args.includes("-v")) {
+          const alias = args[1].split("=")[0].replace(/^remote\.|\.url$/g, "");
+          const url = rewrite ? "https://github.com/attacker/repo.git" : args[1].slice(args[1].indexOf("=") + 1);
+          return { exitCode: 0, stdout: `${alias}\t${url} (fetch)\n${alias}\t${url} (push)\n`, stderr: "" };
+        }
+        if (args.includes("push")) return { exitCode: pushExit, stdout: "", stderr: "" };
+        if (args.includes("ls-remote")) return { exitCode: 0, stdout: remoteAfter ? `${remoteAfter}\trefs/heads/feature\n` : "", stderr: "" };
+        return { exitCode: 0, stdout: "", stderr: "" };
+      }),
+    });
+    return calls;
+  }
+
+  async function gitPlan(gitOptions, old = "a".repeat(40)) {
+    const state = invocationState("push_to_pull_request_branch");
+    return withSafeOutputInvocation(state, async () => {
+      const handle = plans.freezeEffectPlan(state.effectPreparation, {
+        targets: removeLabelSpec().targets,
+        effects: [{ operation: "git.push", git: { remote: "https://github.com/github/gh-aw.git", ref: "refs/heads/feature", old, new: "b".repeat(40) } }],
+        preconditions: [{ id: "branch_head", enforcement: "atomic", observation: old }],
+      });
+      await authorizeSafeOutputEffectPlan(handle);
+      return plans.executeEffectPlan(handle, { git: gitOptions });
+    });
+  }
+
+  it("pushes exactly the approved ref transition under a lease and confirms it by read-back", async () => {
+    vi.stubGlobal("fetch", authority().fetch);
+    const calls = gitExec({ remoteAfter: "b".repeat(40) });
+    await expect(gitPlan({ cwd: root })).resolves.toMatchObject({ outcome: "confirmed" });
+    const push = calls.find(args => args.includes("push"));
+    expect(push).toEqual([
+      "-c",
+      "core.hooksPath=/dev/null",
+      "push",
+      "--porcelain",
+      "--no-verify",
+      "--no-follow-tags",
+      "--recurse-submodules=no",
+      `--force-with-lease=refs/heads/feature:${"a".repeat(40)}`,
+      "--",
+      "https://github.com/github/gh-aw.git",
+      `${"b".repeat(40)}:refs/heads/feature`,
+    ]);
+  });
+
+  it("refuses a rewritten git remote before pushing and classifies a rejected lease", async () => {
+    vi.stubGlobal("fetch", authority().fetch);
+    let calls = gitExec({ rewrite: true });
+    await expect(gitPlan({ cwd: root })).resolves.toMatchObject({ outcome: "failed", stop_reason: "transport_unavailable" });
+    expect(calls.some(args => args.includes("push"))).toBe(false);
+    vi.stubGlobal("fetch", authority().fetch);
+    calls = gitExec({ pushExit: 1, remoteAfter: "a".repeat(40) });
+    await expect(gitPlan({ cwd: root })).resolves.toMatchObject({ outcome: "failed", stop_reason: "rejected" });
+  });
+});
+
+describe("issue, label and branch adapters", () => {
+  const { Octokit } = require("@octokit/core");
+
+  function issueFixture({
+    labels = [
+      { id: 1, name: "bug" },
+      { id: 2, name: "ready" },
+    ],
+    body = "Original body",
+    respond,
+  } = {}) {
+    const item = { id: 700, node_id: "I_kw7", number: 7, title: "Private title", body, state: "open", labels: structuredClone(labels) };
+    const sent = [];
+    const fetch = vi.fn(async (url, init) => {
+      const payload = typeof init.body === "string" && init.body ? JSON.parse(init.body) : undefined;
+      sent.push({ url: String(url), method: init.method, body: payload });
+      if (respond) return respond(String(url), init, payload, item);
+      if (init.method === "PUT" && url.endsWith("/labels")) item.labels = payload.labels.map((name, index) => ({ id: 100 + index, name }));
+      if (init.method === "POST" && url.endsWith("/labels")) item.labels.push(...payload.labels.map((name, index) => ({ id: 200 + index, name })));
+      if (init.method === "PATCH") Object.assign(item, payload);
+      if (init.method === "POST" && url.endsWith("/issues")) return json({ id: 900, number: 9, node_id: "I_new", html_url: "https://github.com/github/gh-aw/issues/9" }, 201);
+      if (String(url).endsWith("/graphql")) return json({ data: {} });
+      return json(init.method === "PUT" || (init.method === "POST" && url.endsWith("/labels")) ? item.labels : item, 200);
+    });
+    const octo = new Octokit({ auth: "ghs_test", request: { fetch } });
+    const client = {
+      request: octo.request,
+      graphql: octo.graphql,
+      rest: {
+        repos: { get: vi.fn(async () => ({ data: { id: 99, full_name: "github/gh-aw", default_branch: "main" } })) },
+        issues: {
+          get: vi.fn(async ({ issue_number }) => ({ data: issue_number === 7 ? structuredClone(item) : { id: 500 + issue_number, number: issue_number, node_id: `I_${issue_number}`, labels: [] } })),
+          listLabelsForRepo: vi.fn(async () => ({ data: [] })),
+          setLabels: vi.fn(),
+          addLabels: vi.fn(),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
+        search: { issuesAndPullRequests: vi.fn(async () => ({ data: { items: [] } })) },
+        rateLimit: { get: vi.fn(async () => ({ data: { resources: {} } })) },
+      },
+      paginate: vi.fn(async () => []),
+    };
+    vi.stubGlobal("github", client);
+    return { item, sent, client };
+  }
+
+  it("replaces a label with exactly one PUT of the finalized set and stops on drift", async () => {
+    const authorityFetch = authority({ requireResolved: true });
+    vi.stubGlobal("fetch", authorityFetch.fetch);
+    const fixture = issueFixture();
+    const config = { replace_label: { authorization: requirement, target: "*", max: 2 } };
+    let { results } = await processMessages(await loadHandlers(config), [{ type: "replace_label", item_number: 7, label_to_remove: "bug", label_to_add: "triaged" }]);
+    expect(results[0]).toMatchObject({ success: true, authorization: { binding: "resolved_effect" } });
+    expect(fixture.sent).toEqual([{ url: "https://api.github.com/repos/github/gh-aw/issues/7/labels", method: "PUT", body: { labels: ["ready", "triaged"] } }]);
+    expect(fixture.client.rest.issues.setLabels).not.toHaveBeenCalled();
+
+    const drifted = issueFixture();
+    vi.stubGlobal("fetch", authority({ beforeDecision: () => drifted.item.labels.push({ id: 3, name: "urgent" }) }).fetch);
+    ({ results } = await processMessages(await loadHandlers(config), [{ type: "replace_label", item_number: 7, label_to_remove: "bug", label_to_add: "triaged" }]));
+    expect(results[0]).toMatchObject({ success: false, authorization: { state: "allowed" } });
+    expect(drifted.sent).toHaveLength(0);
+  });
+
+  it("adds labels with one exact request and refuses label creation before any decision", async () => {
+    const authorityFetch = authority({ requireResolved: true });
+    vi.stubGlobal("fetch", authorityFetch.fetch);
+    const fixture = issueFixture();
+    let { results } = await processMessages(await loadHandlers({ add_labels: { authorization: requirement, target: "*", issue_intent: false } }), [{ type: "add_labels", item_number: 7, labels: ["triaged", "triaged"] }]);
+    expect(results[0]).toMatchObject({ success: true, result: { labelsAdded: ["triaged"] }, authorization: { binding: "resolved_effect" } });
+    expect(fixture.sent).toEqual([{ url: "https://api.github.com/repos/github/gh-aw/issues/7/labels", method: "POST", body: { labels: ["triaged"] } }]);
+
+    const refused = authority();
+    vi.stubGlobal("fetch", refused.fetch);
+    const create = issueFixture();
+    ({ results } = await processMessages(await loadHandlers({ add_labels: { authorization: requirement, target: "*", create_if_missing: true } }), [{ type: "add_labels", item_number: 7, labels: ["new-label"] }]));
+    expect(results[0]).toMatchObject({ success: false, error: expect.stringContaining("create-if-missing") });
+    expect(refused.requests).toHaveLength(0);
+    expect(create.sent).toHaveLength(0);
+  });
+
+  it("updates an issue from its observed body and stops if the body changes during authorization", async () => {
+    vi.stubGlobal("fetch", authority({ requireResolved: true }).fetch);
+    const fixture = issueFixture();
+    const config = { update_issue: { authorization: requirement, target: "*", footer: false } };
+    let { results } = await processMessages(await loadHandlers(config), [{ type: "update_issue", issue_number: 7, body: "Appended", operation: "replace" }]);
+    expect(results[0]).toMatchObject({ success: true, authorization: { binding: "resolved_effect" } });
+    expect(fixture.sent).toHaveLength(1);
+    expect(fixture.sent[0]).toMatchObject({ method: "PATCH", url: "https://api.github.com/repos/github/gh-aw/issues/7", body: { body: expect.stringContaining("Appended") } });
+
+    const drifted = issueFixture();
+    vi.stubGlobal("fetch", authority({ beforeDecision: () => (drifted.item.body = "Edited by someone else") }).fetch);
+    ({ results } = await processMessages(await loadHandlers(config), [{ type: "update_issue", issue_number: 7, body: "Appended", operation: "replace" }]));
+    expect(results[0]).toMatchObject({ success: false, authorization: { state: "allowed" } });
+    expect(drifted.sent).toHaveLength(0);
+  });
+
+  it("creates an issue and binds blocked-by and sub-issue follow-ups to the created issue", async () => {
+    const authorityFetch = authority({ requireResolved: true });
+    vi.stubGlobal("fetch", authorityFetch.fetch);
+    const fixture = issueFixture();
+    const { results } = await processMessages(await loadHandlers({ create_issue: { authorization: requirement, max: 2 } }), [{ type: "create_issue", title: "Private title", body: "Private body", blocked_by: ["#3"], parent: 7 }]);
+    expect(results[0]).toMatchObject({ success: true, authorization: { binding: "resolved_effect" } });
+    expect(fixture.sent.map(entry => `${entry.method} ${entry.url}`)).toEqual([
+      "POST https://api.github.com/repos/github/gh-aw/issues",
+      "POST https://api.github.com/repos/github/gh-aw/issues/9/dependencies/blocked_by",
+      "POST https://api.github.com/graphql",
+    ]);
+    expect(fixture.sent[1].body).toEqual({ issue_id: 503 });
+    expect(fixture.sent[2].body.variables).toEqual({ parentId: "I_kw7", subIssueId: "I_new" });
+    expect(authorityFetch.requests[0].raw).not.toMatch(/Private/);
+  });
+
+  it("stops create-issue effects when a bound parent identity changes during authorization", async () => {
+    const fixture = issueFixture();
+    vi.stubGlobal("fetch", authority({ beforeDecision: () => (fixture.item.id = 701) }).fetch);
+    const { results } = await processMessages(await loadHandlers({ create_issue: { authorization: requirement, max: 2 } }), [{ type: "create_issue", title: "T", body: "B", parent: 7 }]);
+    expect(results[0]).toMatchObject({ success: false, authorization: { state: "allowed" } });
+    expect(fixture.sent).toHaveLength(0);
+  });
+
+  it("refuses create-issue effects it cannot enumerate before any authority request", async () => {
+    const authorityFetch = authority();
+    vi.stubGlobal("fetch", authorityFetch.fetch);
+    const fixture = issueFixture();
+    const { results } = await processMessages(await loadHandlers({ create_issue: { authorization: requirement, close_older_issues: true } }), [{ type: "create_issue", title: "T", body: "B" }]);
+    expect(results[0]).toMatchObject({ success: false, error: expect.stringContaining("close-older-issues") });
+    expect(authorityFetch.requests).toHaveLength(0);
+    expect(fixture.sent).toHaveLength(0);
+  });
+});
+
+describe("signed branch replay planning", () => {
+  const { execFileSync } = require("node:child_process");
+  const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_CONFIG_COUNT: "0" } }).trim();
+
+  it("plans branch creation plus a chained createCommitOnBranch per commit without remote writes", async () => {
+    const base = fs.mkdtempSync(path.join(fs.realpathSync(require("node:os").tmpdir()), "gh-aw-signed-plan-"));
+    try {
+      const origin = path.join(base, "origin.git");
+      const work = path.join(base, "work");
+      git(base, "init", "-q", "--bare", "-b", "main", origin);
+      git(base, "clone", "-q", origin, work);
+      for (const [key, value] of [
+        ["user.name", "t"],
+        ["user.email", "t@example.com"],
+        ["commit.gpgsign", "false"],
+      ])
+        git(work, "config", key, value);
+      fs.writeFileSync(path.join(work, "a.txt"), "base\n");
+      git(work, "add", ".");
+      git(work, "commit", "-q", "-m", "base");
+      git(work, "push", "-q", "origin", "main");
+      git(work, "checkout", "-q", "-b", "feature");
+      fs.writeFileSync(path.join(work, "a.txt"), "one\n");
+      git(work, "commit", "-q", "-am", "first");
+      fs.writeFileSync(path.join(work, "b.txt"), "two\n");
+      git(work, "add", ".");
+      git(work, "commit", "-q", "-m", "second\n\nbody");
+      const baseOid = git(work, "rev-parse", "origin/main");
+      vi.stubGlobal("exec", {
+        getExecOutput: async (command, args, options = {}) => {
+          const result = require("node:child_process").spawnSync(command, args, { cwd: options.cwd, env: { ...(options.env || process.env), GIT_CONFIG_COUNT: "0" }, encoding: "utf8" });
+          if (result.status !== 0 && !options.ignoreReturnCode) throw new Error(result.stderr);
+          return { exitCode: result.status, stdout: result.stdout, stderr: result.stderr };
+        },
+        exec: async () => 0,
+      });
+      const { pushSignedCommits } = require("./push_signed_commits.cjs");
+      const graphql = vi.fn();
+      const plan = await pushSignedCommits({ githubClient: { graphql, rest: {} }, owner: "github", repo: "gh-aw", branch: "feature", baseRef: "origin/main", cwd: work, plan: true });
+      expect(graphql).not.toHaveBeenCalled();
+      expect(git(base, "--git-dir", origin, "branch", "--list", "feature")).toBe("");
+      expect(plan.effects.map(effect => effect.operation)).toEqual(["git.createRef", "graphql.createCommitOnBranch", "graphql.createCommitOnBranch"]);
+      expect(plan.effects[0].body).toEqual({ ref: "refs/heads/feature", sha: baseOid });
+      expect(plan.effects[1].variables.input).toMatchObject({ expectedHeadOid: baseOid, message: { headline: "first" } });
+      expect(plan.effects[2].variables.input).toMatchObject({ expectedHeadOid: "{{head_2}}", message: { headline: "second", body: "body" } });
+      expect(plan.effects[2].derive).toEqual({ head_2: { effect: 1, field: "oid" } });
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true });
+    }
   });
 });

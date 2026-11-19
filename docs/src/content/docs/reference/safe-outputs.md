@@ -11,7 +11,7 @@ Safe outputs separate action requests from execution: the agent requests actions
 
 Configured outputs may publish content, update metadata or merge pull requests automatically. Review requirements depend on the output configuration and applicable policy gates.
 
-`safe-outputs.authorization` can require permission from an external authority before eligible output invocations execute. Missing configuration, authority errors, or denied decisions block protected invocations. Requirements can apply to one output, a workflow, or a repository. See [Safe-output authorization](/gh-aw/reference/governance/#safe-output-authorization) for configuration, diagnostic exemptions, and staged-preview behavior.
+`safe-outputs.authorization` can require permission from an external authority before eligible output invocations execute. Missing configuration, authority errors, or denied decisions block protected invocations. Requirements can apply to one output, a workflow, or a repository. See [Safe-output authorization](/gh-aw/reference/governance/#safe-output-authorization) for configuration, diagnostic exemptions, and staged-preview behavior. `create-issue`, `update-issue`, `add-labels`, `remove-labels`, `replace-label`, `create-pull-request`, `push-to-pull-request-branch` and `merge-pull-request` are authorized as exact effects: one decision approves the finite request plan, and only those requests are sent. `replace-label` sends one `setLabels` request with the finalized label set and stops if the item's labels change while the decision is pending. See [resolved-effect adapters](/gh-aw/specs/safe-outputs-specification/#safe-output-invocation-authorization).
 
 When no `safe-outputs:` section is present (or when only [system types](#system-types-auto-enabled) are configured), `create-issue` is automatically enabled with conservative defaults (`max: 1`, labels and title-prefix set to the workflow ID).
 
@@ -473,6 +473,9 @@ You can use this marker to find all items created by a specific workflow on GitH
 **Search Examples:**
 
 ```
+
+**External authorization**: with `authorization` configured, the handler freezes the exact create request, then optional issue fields, `blocked-by` dependencies and a same-repository parent link that address the new issue through its returned number or node ID. One `resolved_effect` decision covers the plan. Compilation rejects `close-older-issues`, `group` and `group-by-day`, and invocations with artifacts or a `copilot` assignee fail before any decision. The sub-issue fallback comment is not posted. If a follow-up fails, the issue remains, remaining follow-ups are not attempted, and the result fails with `operation_outcome: partial`. See [resolved-effect adapters](/gh-aw/specs/safe-outputs-specification/#safe-output-invocation-authorization).
+
 # Open issues from a specific workflow
 repo:owner/repo is:issue is:open "gh-aw-workflow-id: daily-team-status" in:body
 
@@ -659,6 +662,8 @@ safe-outputs:
     max: 5
 ```
 
+**External authorization**: with `authorization` configured, the handler sends one exact REST add request, or for issue-intent metadata on an issue, one GraphQL label mutation with the merged label set. Compilation rejects `create-if-missing`; no label is created, restored or re-added outside the approved request. See [resolved-effect adapters](/gh-aw/specs/safe-outputs-specification/#safe-output-invocation-authorization).
+
 ### Remove Labels (`remove-labels:`)
 
 Removes labels from issues or PRs. Specify `allowed` to restrict which labels can be removed (specific labels or glob patterns), or `blocked` to prevent removal of specific label patterns. If a label is not present on the item, it will be silently skipped.
@@ -776,6 +781,8 @@ Agent output: `{"type":"update_issue","artifacts":[{"name":"Plan","type":"plan",
 Artifacts are matched by exact, case-sensitive sanitized name on the target issue. A new name creates an artifact; a matching name updates that artifact and adds a version rather than creating a duplicate. If duplicate names already exist, the lowest-numbered artifact is updated. The type must match the existing artifact because the API cannot change it.
 
 The same path guards, sanitization, and pre- and post-sanitization size checks as `create_issue` apply. Target authorization, required filters, cross-repository restrictions, and credentials also apply to artifacts. Staged mode makes no artifact API calls. Attachment failures report the target issue's number and URL and the count already attached or updated; prior issue edits and artifact writes are not rolled back, and the entire update is not retried.
+
+**External authorization**: with `authorization` configured, the handler computes the final fields, including an appended body, from the observed issue and freezes one `PATCH` plus an optional issue-intent label mutation. If the issue's title, body, labels or state change while the decision is pending, the update stops without sending. Invocations with artifacts fail before any decision. See [resolved-effect adapters](/gh-aw/specs/safe-outputs-specification/#safe-output-invocation-authorization).
 
 ### Pull Request Updates (`update-pull-request:`)
 

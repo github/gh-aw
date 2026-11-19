@@ -38,6 +38,9 @@ const { normalizeIssueIntentLabelInputs, buildIssueIntentLabelUpdates } = requir
 const { fetchAllRepoLabels } = require("./github_api_helpers.cjs");
 const { ERR_CONFIG, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { deterministicLabelColor } = require("./create_labels.cjs");
+const { currentEffectPreparation, freezeEffectPlan, executeEffectPlan, unsupportedEffect } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+const { observeIssueTarget, issueTargets, repositoryPath } = require("./safe_output_effect_targets.cjs");
 
 /**
  * @param {{ rationale?: string, confidence?: string, suggest?: boolean } | null | undefined} spec
@@ -230,6 +233,82 @@ async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumbe
       afterLabelDetails,
       labelSpecs.map(spec => spec.name)
     ),
+  };
+}
+
+/**
+ * Exact-effect label addition: one REST add (additive, idempotent) or, for
+ * issue-intent metadata on issues, one GraphQL updateIssue mutation carrying the
+ * merged label set. Label creation, restoration and follow-up adds are new
+ * effects and are never performed on this path.
+ * @param {{preparation: object, githubClient: any, repoParts: {owner: string, repo: string}, itemRepo: string, itemNumber: number, contextType: string,
+ *   uniqueLabels: string[], uniqueLabelSpecs: Array<{name: string}>, useIssueIntentPath: boolean, requiredLabels: string[], requiredTitlePrefix: string}} options
+ */
+async function addLabelsWithEffectPlan({ preparation, githubClient, repoParts, itemRepo, itemNumber, contextType, uniqueLabels, uniqueLabelSpecs, useIssueIntentPath, requiredLabels, requiredTitlePrefix }) {
+  const observed = await observeIssueTarget(githubClient, repoParts, itemNumber);
+  const filtersPass = target => requiredLabels.every(required => target.names.includes(required)) && (!requiredTitlePrefix || target.title.startsWith(requiredTitlePrefix));
+  if (!filtersPass(observed)) return { success: false, skipped: true, error: "Item does not match required-labels or required-title-prefix filter" };
+  const labelSet = target => JSON.stringify([...target.labels.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  const intent = useIssueIntentPath && observed.identity.kind === "issue" && !!observed.identity.node_id;
+  const path = `${repositoryPath(repoParts.owner, repoParts.repo)}/issues/${itemNumber}/labels`;
+  /** @type {any} */
+  let effect;
+  /** @type {string[]} */
+  let newNames = uniqueLabels;
+  if (intent) {
+    const existingNames = observed.names;
+    const existingLower = new Set(existingNames.map(name => name.toLowerCase()));
+    const newSpecs = uniqueLabelSpecs.filter(spec => !existingLower.has(spec.name.toLowerCase()));
+    if (newSpecs.length === 0) return { success: true, number: itemNumber, repo: itemRepo, labelsAdded: [], labels: [], contextType };
+    newNames = newSpecs.map(spec => spec.name);
+    const repoLabels = await fetchAllRepoLabels(githubClient, repoParts.owner, repoParts.repo);
+    const labelIdByName = new Map(repoLabels.map(label => [label.name.toLowerCase(), label.id]));
+    const specLower = new Set(newSpecs.map(spec => spec.name.toLowerCase()));
+    const merged = [...newSpecs, ...existingNames.filter(name => !specLower.has(name.toLowerCase())).map(name => ({ name }))];
+    effect = { operation: "graphql.updateIssueLabels", variables: { issueId: observed.identity.node_id, labels: buildIssueIntentLabelUpdates(merged, labelIdByName) } };
+  } else {
+    effect = { operation: "issues.addLabels", path, body: { labels: uniqueLabels } };
+  }
+  /** @type {Array<{id: string, enforcement: "atomic"|"observed", observation: unknown}>} */
+  const preconditions = [
+    { id: "target_identity", enforcement: "observed", observation: observed.identity },
+    { id: "item_filters", enforcement: "observed", observation: { required_labels: requiredLabels, required_title_prefix: requiredTitlePrefix } },
+  ];
+  if (intent) preconditions.push({ id: "label_set", enforcement: "observed", observation: labelSet(observed) });
+  const handle = freezeEffectPlan(preparation, { targets: issueTargets(observed, itemRepo, itemNumber), effects: [effect], preconditions });
+  await authorizeSafeOutputEffectPlan(handle);
+  const run = await executeEffectPlan(handle, {
+    client: githubClient,
+    beforeEach: async () => {
+      const current = await observeIssueTarget(githubClient, repoParts, itemNumber);
+      if (current.identity.resource_id !== observed.identity.resource_id || !filtersPass(current) || (intent && labelSet(current) !== labelSet(observed))) throw new Error("drift");
+    },
+    reconcile: async (_index, error) => {
+      if (error?.reason_code !== "indeterminate") return null;
+      const current = await observeIssueTarget(githubClient, repoParts, itemNumber);
+      const present = new Set(current.names.map(name => name.toLowerCase()));
+      return current.identity.resource_id === observed.identity.resource_id && !intent && uniqueLabels.every(name => present.has(name.toLowerCase())) ? { status: "confirmed" } : null;
+    },
+  });
+  if (run.outcome !== "confirmed") {
+    return {
+      success: false,
+      error: run.stop_reason === "precondition_changed" ? "Label target or filters changed after authorization; fresh evaluation required" : "Label addition outcome is not confirmed; inspect the live item before any further action",
+      ...(run.outcome === "indeterminate" ? { operation_outcome: "indeterminate" } : {}),
+    };
+  }
+  const after = await observeIssueTarget(githubClient, repoParts, itemNumber).catch(() => null);
+  const afterLower = new Set((after?.names || []).map(name => name.toLowerCase()));
+  const labelsAdded = after ? newNames.filter(name => afterLower.has(name.toLowerCase())) : newNames;
+  core.info(`Added ${labelsAdded.length} label(s) to ${contextType} #${itemNumber} in ${itemRepo} through the approved effect plan`);
+  return {
+    success: true,
+    number: itemNumber,
+    repo: itemRepo,
+    labelsAdded,
+    labels: labelsAdded.map(name => ({ name, ...(after?.labels.has(name.toLowerCase()) ? { database_id: after.labels.get(name.toLowerCase()) } : {}) })),
+    ...(intent ? { labelsSuggested: newNames.filter(name => !afterLower.has(name.toLowerCase())) } : {}),
+    contextType,
   };
 }
 
@@ -496,6 +575,12 @@ const main = createCountGatedHandler({
             contextType,
           },
         };
+      }
+
+      const preparation = currentEffectPreparation(HANDLER_TYPE);
+      if (preparation) {
+        if (createIfMissing) return { success: false, error: unsupportedEffect(HANDLER_TYPE, "create-if-missing label creation").message };
+        return addLabelsWithEffectPlan({ preparation, githubClient, repoParts, itemRepo, itemNumber, contextType: contextType || "issue", uniqueLabels, uniqueLabelSpecs, useIssueIntentPath, requiredLabels, requiredTitlePrefix });
       }
 
       try {

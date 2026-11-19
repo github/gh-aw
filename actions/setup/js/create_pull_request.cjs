@@ -12,7 +12,10 @@ const fs = require("fs");
 /** @type {typeof import("crypto")} */
 const crypto = require("crypto");
 const { updateActivationComment } = require("./update_activation_comment.cjs");
-const { pushSignedCommits } = require("./push_signed_commits.cjs");
+const { pushSignedCommits, branchEffectTransport, lsRemoteHeadOid } = require("./push_signed_commits.cjs");
+const { currentEffectPreparation, freezeEffectPlan, executeEffectPlan, effectReceipt, unsupportedEffect } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+const { observeRepository, repositoryPath } = require("./safe_output_effect_targets.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
@@ -646,6 +649,7 @@ function enforcePullRequestLimits(patchContent, maxFiles = MAX_FILES) {
  * @param {string} [options.remoteToken] - Optional token used for authenticated remote branch checks.
  * @param {string} [options.cwd] - Optional working directory for git operations; scopes git config overrides to the correct checkout.
  * @param {() => void} [options.assertTransportUnchanged]
+ * @param {boolean} [options.refuseDelete] - Refuse remote ref deletion (resolved-effect execution)
  * @returns {Promise<string>} The (possibly renamed) branch name to use going forward.
  */
 async function handleRemoteBranchCollision(branchName, preserveBranchName, options = {}) {
@@ -689,6 +693,7 @@ async function handleRemoteBranchCollision(branchName, preserveBranchName, optio
     // push recreates it from the local HEAD (force-push semantics). This is the
     // intended behavior when recreate-ref is enabled for long-lived
     // reusable branches whose previous PR was merged.
+    if (options.refuseDelete) throw unsupportedEffect(HANDLER_TYPE, "recreate-ref branch deletion");
     if (!githubClient || !owner || !repo) {
       throw new Error(
         `Remote branch "${branchName}" already exists and recreate-ref is enabled, ` +
@@ -735,6 +740,160 @@ async function handleRemoteBranchCollision(branchName, preserveBranchName, optio
   await exec.exec("git", ["branch", "-m", oldBranch, renamedBranch], cwd ? { cwd } : {});
   core.info(`Renamed branch to ${renamedBranch}`);
   return renamedBranch;
+}
+
+/**
+ * Exact-effect pull request creation: the planned branch effects, the exact
+ * pulls.create request and its follow-ups (labels, reviewers, assignees,
+ * REQUEST_CHANGES review, auto-merge), which address the new pull request
+ * through typed receipts. Fallback issues, branch deletion, activation-comment
+ * links, closing older pull requests and CI-trigger commits are never performed.
+ * @param {Record<string, any>} options
+ */
+async function createPullRequestWithEffectPlan(options) {
+  const {
+    preparation,
+    plannedBranch,
+    transport,
+    exec,
+    githubClient,
+    pushGithubClient,
+    repoParts,
+    pushRepoParts,
+    itemRepo,
+    pushRepo,
+    title,
+    body,
+    head,
+    headRepo,
+    baseBranch,
+    defaultBaseBranch,
+    draft,
+    labels,
+    reviewers,
+    teamReviewers,
+    assignees,
+    requestChangesBody,
+    autoMerge,
+    message,
+    temporaryId,
+    branchName,
+    stackTracker,
+    originalAgentBranch,
+  } = options;
+  if (!plannedBranch?.plan) throw new Error("ERR_VALIDATION: no planned branch effects are available for the pull request");
+  const branch = plannedBranch.plan;
+  const preparedDelivery = await preparePullRequestDelivery(exec, baseBranch, defaultBaseBranch);
+  const repository = await observeRepository(githubClient, repoParts);
+  const pushRepository = pushRepo.toLowerCase() === itemRepo.toLowerCase() ? repository : await observeRepository(pushGithubClient, pushRepoParts);
+  const base = repositoryPath(repoParts.owner, repoParts.repo);
+  /** @type {any[]} */
+  const effects = [...branch.effects];
+  const prIndex = effects.length;
+  effects.push({ operation: "pulls.create", path: `${base}/pulls`, body: { title, body, head, ...(headRepo ? { head_repo: headRepo } : {}), base: baseBranch, ...(draft === undefined ? {} : { draft }) } });
+  const pr = { pr: { effect: prIndex, field: "number" } };
+  if (labels.length > 0) effects.push({ operation: "issues.addLabels", path: `${base}/issues/{{pr}}/labels`, body: { labels }, derive: pr });
+  const otherReviewers = reviewers.filter(reviewer => reviewer !== "copilot");
+  if (otherReviewers.length > 0 || teamReviewers.length > 0) {
+    effects.push({ operation: "pulls.requestReviewers", path: `${base}/pulls/{{pr}}/requested_reviewers`, body: { reviewers: otherReviewers, ...(teamReviewers.length > 0 ? { team_reviewers: teamReviewers } : {}) }, derive: pr });
+  }
+  if (reviewers.includes("copilot")) effects.push({ operation: "pulls.requestReviewers", path: `${base}/pulls/{{pr}}/requested_reviewers`, body: { reviewers: [COPILOT_REVIEWER_BOT] }, derive: pr });
+  if (assignees.length > 0) effects.push({ operation: "issues.addAssignees", path: `${base}/issues/{{pr}}/assignees`, body: { assignees }, derive: pr });
+  if (requestChangesBody) {
+    effects.push({
+      operation: "pulls.createReview",
+      path: `${base}/pulls/{{pr}}/reviews`,
+      body: { event: "REQUEST_CHANGES", body: requestChangesBody, commit_id: "{{head}}" },
+      derive: { ...pr, head: { effect: prIndex, field: "head_sha" } },
+    });
+  }
+  if (autoMerge) {
+    effects.push({ operation: "graphql.enablePullRequestAutoMerge", variables: { prId: "{{pr_node}}", ...(autoMerge.mergeMethod ? { mergeMethod: autoMerge.mergeMethod } : {}) }, derive: { pr_node: { effect: prIndex, field: "node_id" } } });
+  }
+  const handle = freezeEffectPlan(preparation, {
+    targets: [
+      { kind: "repository", repository: itemRepo, repository_id: repository.repository_id },
+      ...(pushRepository === repository ? [] : [{ kind: "repository", repository: pushRepo, repository_id: pushRepository.repository_id }]),
+      { kind: "ref", repository: pushRepo, repository_id: pushRepository.repository_id, ref: branch.ref, oid: branch.old },
+    ],
+    effects,
+    preconditions: [
+      { id: "branch_head", enforcement: "atomic", observation: { ref: branch.ref, oid: branch.old } },
+      { id: "base_branch", enforcement: "observed", observation: { base: baseBranch, prepared: preparedDelivery } },
+    ],
+  });
+  await authorizeSafeOutputEffectPlan(handle);
+  const branchOptions = plannedBranch.options;
+  /** @type {any} */
+  let pullRequest = null;
+  const run = await executeEffectPlan(handle, {
+    client: index => (index < prIndex ? pushGithubClient : githubClient),
+    git: branchEffectTransport({ branch: branchOptions.branch, cwd: branchOptions.cwd, gitAuthEnv: branchOptions.gitAuthEnv, pushRemoteUrl: branchOptions.pushRemoteUrl, pushToken: branchOptions.pushToken }),
+    beforeEach: () => transport.assertUnchanged(),
+    reconcile: async (index, error) => {
+      // Definitive rejections were not applied; only lost responses are reconciled.
+      if (error?.reason_code !== "indeterminate") return null;
+      const effect = effects[index];
+      if (effect.operation === "git.createRef") {
+        const observed = await lsRemoteHeadOid(branchOptions.branch, branchOptions.cwd, branchOptions.gitAuthEnv, branchOptions.pushRemoteUrl, branchOptions.pushToken);
+        return observed === effect.body.sha ? { status: "confirmed", receipt: { object: { sha: observed } } } : null;
+      }
+      if (index === prIndex) {
+        const headOwner = head.includes(":") ? head.split(":")[0] : repoParts.owner;
+        const headBranch = head.includes(":") ? head.split(":").slice(1).join(":") : head;
+        const { data } = await githubClient.rest.pulls.list({ owner: repoParts.owner, repo: repoParts.repo, state: "open", head: `${headOwner}:${headBranch}`, base: baseBranch, per_page: 2 });
+        const match = Array.isArray(data) && data.length === 1 ? data[0] : null;
+        const approved = effects[prIndex].body;
+        if (match && match.title === approved.title && match.body === approved.body && match.base?.ref === approved.base && (approved.draft === undefined || match.draft === approved.draft)) {
+          pullRequest = match;
+          return { status: "confirmed", receipt: match };
+        }
+      }
+      return null;
+    },
+    onConfirmed: (index, response) => {
+      if (index === prIndex) pullRequest = response?.data;
+    },
+  });
+  const created = effectReceipt(handle, prIndex);
+  if (!created?.number) {
+    return {
+      success: false,
+      error:
+        run.stop_reason === "precondition_changed"
+          ? "Captured inputs changed after authorization; fresh evaluation required"
+          : "Approved branch or pull request effects did not complete; inspect the repository before any further action. Remaining effects were not attempted.",
+      ...(run.outcome === "partial" || run.outcome === "indeterminate" ? { operation_outcome: run.outcome } : {}),
+    };
+  }
+  const url = pullRequest?.html_url;
+  stackTracker.record({ branch: branchName, number: created.number, url, repo: itemRepo }, { agentBranch: originalAgentBranch, baseBranch });
+  if (run.outcome !== "confirmed") {
+    core.warning(`Pull request #${created.number} was created, but approved follow-up effects did not all complete; remaining effects were not attempted`);
+    return { success: false, number: created.number, url, repo: itemRepo, error: "Approved follow-up effects for the created pull request did not all complete", operation_outcome: run.outcome };
+  }
+  core.info(`Created pull request #${created.number} through the approved effect plan`);
+  return capturePullRequestDelivery(
+    { success: true, number: created.number, url, id: created.id, metadata: { node_id: created.node_id }, managedBody: body, branch_name: branchName, temporaryId, repo: itemRepo, head_repo: pushRepo },
+    message,
+    {
+      prepared: preparedDelivery,
+      id: String(created.id),
+      number: created.number,
+      url,
+      repository: itemRepo,
+      headRepository: pushRepo,
+      branch: branchName,
+      baseBranch,
+      transportBaseBranch: defaultBaseBranch,
+      title,
+      body,
+      draft,
+      labels,
+      assignees,
+    },
+    githubClient
+  );
 }
 
 /**
@@ -876,7 +1035,7 @@ async function main(config = {}) {
   }
 
   const includeFooter = parseBoolTemplatable(config.footer, true);
-  const fallbackAsIssue = config.fallback_as_issue !== false; // Default to true (fallback enabled)
+  const configuredFallbackAsIssue = config.fallback_as_issue !== false; // Default to true (fallback enabled)
   const autoCloseIssue = parseBoolTemplatable(config.auto_close_issue, true); // Default to true (auto-close enabled)
   const closeOlderPullRequestsEnabled = parseBoolTemplatable(config.close_older_pull_requests, false);
   const rawCloseOlderKey = config.close_older_key ? String(config.close_older_key) : "";
@@ -995,6 +1154,18 @@ async function main(config = {}) {
   )(async function handleCreatePullRequest(trace, message, resolvedTemporaryIds, transport) {
     trace("init");
     const exec = transport.guardExec(globalThis.exec);
+    const effectPreparation = currentEffectPreparation(HANDLER_TYPE);
+    // Fallback issues are new effects; resolved-effect execution never substitutes them.
+    const fallbackAsIssue = configuredFallbackAsIssue && !effectPreparation;
+    /** @type {{options: any, plan: any} | null} */
+    let plannedBranch = null;
+    /** @param {any} options */
+    const pushOrPlanBranch = async options => {
+      if (!effectPreparation) return pushSignedCommits(options);
+      plannedBranch = { options, plan: await pushSignedCommits({ ...options, plan: true }) };
+      return plannedBranch.plan.head || undefined;
+    };
+    if (effectPreparation && closeOlderPullRequestsEnabled) return { success: false, error: unsupportedEffect(HANDLER_TYPE, "close-older-pull-requests").message };
     // Check if we've hit the max limit
     if (processedCount >= maxCount) {
       trace("limt");
@@ -1942,6 +2113,7 @@ async function main(config = {}) {
             branchName = await handleRemoteBranchCollision(branchName, preserveBranchName, {
               assertTransportUnchanged: transport.assertUnchanged,
               recreateRef,
+              refuseDelete: !!effectPreparation,
               githubClient: pushGithubClient,
               owner: pushRepoParts.owner,
               repo: pushRepoParts.repo,
@@ -1951,7 +2123,7 @@ async function main(config = {}) {
             });
 
             transport.assertUnchanged();
-            await pushSignedCommits({
+            await pushOrPlanBranch({
               assertTransportUnchanged: transport.assertUnchanged,
               githubClient: pushGithubClient,
               owner: pushRepoParts.owner,
@@ -1996,7 +2168,7 @@ async function main(config = {}) {
                 });
                 const runRetryPush = async () => {
                   transport.assertUnchanged();
-                  return pushSignedCommits({
+                  return pushOrPlanBranch({
                     assertTransportUnchanged: transport.assertUnchanged,
                     githubClient: pushGithubClient,
                     owner: pushRepoParts.owner,
@@ -2347,6 +2519,7 @@ async function main(config = {}) {
               branchName = await handleRemoteBranchCollision(branchName, preserveBranchName, {
                 assertTransportUnchanged: transport.assertUnchanged,
                 recreateRef,
+                refuseDelete: !!effectPreparation,
                 githubClient: pushGithubClient,
                 owner: pushRepoParts.owner,
                 repo: pushRepoParts.repo,
@@ -2356,7 +2529,7 @@ async function main(config = {}) {
               });
 
               transport.assertUnchanged();
-              await pushSignedCommits({
+              await pushOrPlanBranch({
                 assertTransportUnchanged: transport.assertUnchanged,
                 githubClient: pushGithubClient,
                 owner: pushRepoParts.owner,
@@ -2523,6 +2696,7 @@ async function main(config = {}) {
                 branchName = await handleRemoteBranchCollision(branchName, preserveBranchName, {
                   assertTransportUnchanged: transport.assertUnchanged,
                   recreateRef,
+                  refuseDelete: !!effectPreparation,
                   githubClient: pushGithubClient,
                   owner: pushRepoParts.owner,
                   repo: pushRepoParts.repo,
@@ -2532,7 +2706,7 @@ async function main(config = {}) {
                 });
 
                 transport.assertUnchanged();
-                await pushSignedCommits({
+                await pushOrPlanBranch({
                   assertTransportUnchanged: transport.assertUnchanged,
                   githubClient: pushGithubClient,
                   owner: pushRepoParts.owner,
@@ -2601,6 +2775,9 @@ async function main(config = {}) {
       // - Normal case (push succeeded): provides a GitHub compare URL to click and create the PR.
       // - Push-failed case: push was rejected (e.g. missing `workflows` permission); provides
       //   patch artifact download instructions instead of the compare URL.
+      if (manifestProtectionFallback && effectPreparation) {
+        return { success: false, error: unsupportedEffect(HANDLER_TYPE, "protected-file review issues").message };
+      }
       if (manifestProtectionFallback) {
         trace("prot");
         const allFound = manifestProtectionFallback;
@@ -2769,6 +2946,74 @@ async function main(config = {}) {
         if (body.length > MAX_GITHUB_BODY_LENGTH) {
           throw new Error(`Pull request body exceeds GitHub's maximum length of ${MAX_GITHUB_BODY_LENGTH} characters`);
         }
+        /** @type {import("./report_ast.cjs").ReportBlock[][]} */
+        const requestChangesSections = [];
+        if (manifestProtectionRequestReview && manifestProtectionRequestReview.length > 0) {
+          const protectedFilesReviewTemplatePath = getPromptPath("manifest_protection_request_changes_review.md");
+          requestChangesSections.push(
+            buildFallbackIssueBlocks(protectedFilesReviewTemplatePath, {
+              files: {
+                type: "inline_slot",
+                children: protectedFileNames,
+              },
+            })
+          );
+        }
+        if (detectionCaution) {
+          const detectionReason = process.env.GH_AW_DETECTION_REASON || "unknown";
+          const detectionWarningReviewTemplatePath = getPromptPath("threat_warning_request_changes_review.md");
+          requestChangesSections.push(
+            buildFallbackIssueBlocks(detectionWarningReviewTemplatePath, {
+              detectionReason: ["threat_detected", "agent_failure", "parse_error"].includes(detectionReason) ? detectionReason : "unknown",
+              reasonText: getDetectionReasonText(detectionReason),
+              runUrl,
+            })
+          );
+        }
+        const requiresIndependentReview = requestChangesSections.length > 0;
+        /** @type {import("./report_ast.cjs").ReportBlock[]} */
+        const requestChangesChildren = [];
+        for (const section of requestChangesSections) {
+          if (requestChangesChildren.length) requestChangesChildren.push({ type: "separator", agentTainted: false });
+          requestChangesChildren.push(...section);
+        }
+        const requestChangesBody = requiresIndependentReview ? renderSizedReport({ type: "report", title: "Changes require review", children: requestChangesChildren }).body : "";
+        if (effectPreparation) {
+          try {
+            return await createPullRequestWithEffectPlan({
+              preparation: effectPreparation,
+              plannedBranch,
+              transport,
+              exec,
+              githubClient,
+              pushGithubClient,
+              repoParts,
+              pushRepoParts,
+              itemRepo,
+              pushRepo,
+              title,
+              body,
+              head: getPullRequestHeadRef(branchName),
+              headRepo: pushRepo.toLowerCase() === itemRepo.toLowerCase() ? undefined : pushRepo,
+              baseBranch,
+              defaultBaseBranch,
+              draft,
+              labels,
+              reviewers: configReviewers,
+              teamReviewers: configTeamReviewers,
+              assignees: configAssignees || [],
+              requestChangesBody: requiresIndependentReview ? requestChangesBody : null,
+              autoMerge: autoMerge && !requiresIndependentReview ? { mergeMethod: autoMergeMethod } : null,
+              message,
+              temporaryId,
+              branchName,
+              stackTracker,
+              originalAgentBranch,
+            });
+          } catch (planError) {
+            return { success: false, error: `Failed to create pull request: ${getErrorMessage(planError)}` };
+          }
+        }
         transport.assertUnchanged();
         const preparedDelivery = await preparePullRequestDelivery(exec, baseBranch, defaultBaseBranch);
         const { data: pullRequest } = await createOrUpdatePullRequest({
@@ -2876,43 +3121,7 @@ async function main(config = {}) {
           }
         }
 
-        /** @type {import("./report_ast.cjs").ReportBlock[][]} */
-        const requestChangesSections = [];
-        if (manifestProtectionRequestReview && manifestProtectionRequestReview.length > 0) {
-          const protectedFilesReviewTemplatePath = getPromptPath("manifest_protection_request_changes_review.md");
-          requestChangesSections.push(
-            buildFallbackIssueBlocks(protectedFilesReviewTemplatePath, {
-              files: {
-                type: "inline_slot",
-                children: protectedFileNames,
-              },
-            })
-          );
-        }
-        if (detectionCaution) {
-          const detectionReason = process.env.GH_AW_DETECTION_REASON || "unknown";
-          const detectionWarningReviewTemplatePath = getPromptPath("threat_warning_request_changes_review.md");
-          requestChangesSections.push(
-            buildFallbackIssueBlocks(detectionWarningReviewTemplatePath, {
-              detectionReason: ["threat_detected", "agent_failure", "parse_error"].includes(detectionReason) ? detectionReason : "unknown",
-              reasonText: getDetectionReasonText(detectionReason),
-              runUrl,
-            })
-          );
-        }
-        const requiresIndependentReview = requestChangesSections.length > 0;
         if (requiresIndependentReview) {
-          /** @type {import("./report_ast.cjs").ReportBlock[]} */
-          const requestChangesChildren = [];
-          for (const section of requestChangesSections) {
-            if (requestChangesChildren.length) requestChangesChildren.push({ type: "separator", agentTainted: false });
-            requestChangesChildren.push(...section);
-          }
-          const requestChangesBody = renderSizedReport({
-            type: "report",
-            title: "Changes require review",
-            children: requestChangesChildren,
-          }).body;
           /** @type {{ owner: string, repo: string, pull_number: number, event: "REQUEST_CHANGES", body: string, commit_id?: string }} */
           const requestChangesParams = {
             owner: repoParts.owner,

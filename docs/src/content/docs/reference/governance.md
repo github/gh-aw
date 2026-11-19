@@ -182,10 +182,13 @@ the invocation. Existing target restrictions, policy checks and queue Claim
 authorization remain required.
 
 An approval covers the prepared invocation of the reviewed implementation and
-its bound inputs, not necessarily one API write. The `merge-pull-request` and
-`remove-labels` native routes instead request `resolved_effect` binding: one
-decision approves their frozen, finite request plan, and execution can send
-only those requests. An authority may deny `invocation` binding where it
+its bound inputs, not necessarily one API write. The `create-issue`,
+`update-issue`, `add-labels`, `remove-labels`, `replace-label`,
+`create-pull-request`, `push-to-pull-request-branch` and `merge-pull-request`
+native routes instead request `resolved_effect` binding: one decision approves
+their frozen, finite effect plan, and execution can send only those effects.
+Effects these adapters cannot enumerate, such as closing older items or
+fallback issues, are rejected at compile time or refused before the decision. An authority may deny `invocation` binding where it
 requires exact effects; denied resolved requests are never retried as
 invocation binding. Custom code may have multiple
 effects; a reusable-workflow approval covers its launch only. The authority must

@@ -15,7 +15,10 @@ const { withExecutionTrace } = require("./safe_output_trace.cjs");
 const path = require("path");
 const { generateStagedPreview } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { pushSignedCommits } = require("./push_signed_commits.cjs");
+const { pushSignedCommits, branchEffectTransport, lsRemoteHeadOid } = require("./push_signed_commits.cjs");
+const { currentEffectPreparation, freezeEffectPlan, executeEffectPlan, effectReceipt, unsupportedEffect } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+const { observeRepository } = require("./safe_output_effect_targets.cjs");
 const { updateActivationCommentWithCommit, updateActivationComment } = require("./update_activation_comment.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
@@ -586,6 +589,7 @@ async function main(config = {}) {
     { success: "done", failure: "fail", error: "thrw" },
     withTransportIntegrity
   )(async function handlePushToPullRequestBranch(trace, message, resolvedTemporaryIds, transport) {
+    const effectPreparation = currentEffectPreparation(HANDLER_TYPE);
     trace("init");
     const exec = transport.guardExec(globalThis.exec);
     let compilationNotice = getWorkflowCompilationNotice(message, config);
@@ -1132,6 +1136,7 @@ async function main(config = {}) {
         children: [{ type: "expiration", expiresAt: expirationDate.toISOString(), agentTainted: false }],
       });
       const issueReport = appendReportExecutionProvenance(buildIssueReport(issueTitle, issueBody), process.env.GH_AW_WORKFLOW_NAME || "Workflow", runUrl);
+      if (effectPreparation) return { success: false, error: unsupportedEffect(HANDLER_TYPE, "protected-file review issues").message };
 
       try {
         const { data: issue } = await withRetry(
@@ -1605,6 +1610,9 @@ async function main(config = {}) {
       // directly to the existing PR branch. This allows manual review of the changes
       // before they are merged into the target PR.
       const detectionConclusionEnv = getEffectiveDetectionConclusion(process.env.GH_AW_DETECTION_CONCLUSION, process.env.GH_AW_DETECTION_REASON);
+      if (detectionConclusionEnv === "warning" && effectPreparation) {
+        return { success: false, error: unsupportedEffect(HANDLER_TYPE, "threat-detection review pull requests").message };
+      }
       if (detectionConclusionEnv === "warning") {
         trace("revw");
         core.info("⚠️ Threat detection warning: creating review PR instead of direct push");
@@ -1769,18 +1777,20 @@ async function main(config = {}) {
         return buildWorkflowsScopeError("Branch", core);
       }
 
-      // Push the applied commits to the branch using signed GraphQL commits (outside patch try/catch so push failures are not misattributed)
-      try {
-        // GitHub intermittently fails its workflow-permission check with
-        // "Unable to determine if workflow can be created or updated due to timeout; `workflows`
-        // scope may be required." — a transient server-side condition, not a real scope problem.
-        // Retry with exponential backoff before treating the push as failed.
-        const pushedSha = await withTransientPushRetry(async () => {
-          trace("push");
-          const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
-          if (staleReason) throw new StalePullRequestError(staleReason);
-          transport.assertUnchanged();
-          return pushSignedCommits({
+      if (effectPreparation) {
+        const planned = await pushBranchWithEffectPlan({
+          preparation: effectPreparation,
+          trace,
+          transport,
+          githubClient,
+          pushGithubClient,
+          repoParts,
+          pushRepoParts,
+          itemRepo,
+          pushRepo,
+          pullNumber,
+          pullRequest,
+          pushOptions: {
             assertTransportUnchanged: transport.assertUnchanged,
             githubClient: pushGithubClient,
             owner: pushRepoParts.owner,
@@ -1797,163 +1807,198 @@ async function main(config = {}) {
             resolvedTemporaryIds,
             currentRepo: itemRepo,
             validationConfig: config,
-          });
+          },
         });
-        if (pushedSha) {
-          pushedCommitSha = pushedSha;
-          core.info(`pushSignedCommits returned pushed SHA: ${pushedSha}`);
-        }
-        trace("pshd");
-        core.info(`Changes committed and pushed to branch: ${branchName}`);
-      } catch (pushError) {
-        trace("perr");
-        transport.assertUnchanged();
-        if (pushError instanceof StalePullRequestError) {
-          trace("stal");
-          core.info(pushError.message);
-          return { skipped: true, reason: pushError.message };
-        }
-        const pushErrorMessage = getErrorMessage(pushError);
+        if (planned.result) return planned.result;
+        if (planned.head) pushedCommitSha = planned.head;
+      }
 
-        // Missing workflow scope is handled by the preflight above. Any workflow-scope
-        // rejection that reaches this catch is GitHub's transient permission-check timeout.
-        const isWorkflowsScopeTimeout = isWorkflowsScopeRejection(pushErrorMessage);
-
-        // A generic rejection can be a real authentication, permission, or validation failure.
-        const nonFastForwardPatterns = ["non-fast-forward", "(fetch first)"];
-        const isNonFastForward = !isWorkflowsScopeTimeout && nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
-        let userMessage = isNonFastForward
-          ? "Failed to push changes: remote PR branch changed while the workflow was running (non-fast-forward). Re-run the workflow on the latest PR branch state."
-          : isWorkflowsScopeTimeout
-            ? "Failed to push changes: GitHub could not complete its workflow-permission check (transient timeout) after multiple retries. Re-run the workflow to retry the push."
-            : `Failed to push changes: ${pushErrorMessage}`;
-
-        // Diagnose common race where branch was deleted after preflight checks.
+      // Push the applied commits to the branch using signed GraphQL commits (outside patch try/catch so push failures are not misattributed)
+      if (!effectPreparation)
         try {
-          const lsRemoteAfterPushResult = await exec.getExecOutput("git", ["ls-remote", "--exit-code", "--heads", "origin", branchName], {
-            env: { ...process.env, ...gitAuthEnv },
-            ...baseGitOpts,
-            ignoreReturnCode: true,
-          });
-
-          if (lsRemoteAfterPushResult.exitCode === 2) {
-            userMessage = "Failed to push changes: remote PR branch appears to have been deleted while the workflow was running.";
-          } else if (lsRemoteAfterPushResult.exitCode !== 0) {
-            const remoteCheckError = (lsRemoteAfterPushResult.stderr || "").trim();
-            core.warning(`Push failed and branch existence re-check also failed for ${branchName}: ${remoteCheckError || `git ls-remote exited with code ${lsRemoteAfterPushResult.exitCode}`}`);
-          }
-        } catch (diagnosisError) {
-          core.warning(`Push failed and branch existence re-check errored for ${branchName}: ${getErrorMessage(diagnosisError)}`);
-        }
-
-        // Fallback path for diverged branches: create a new pull request so changes
-        // can still be reviewed and merged into the original PR branch.
-        if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest && allowGitPushFallback) {
-          trace("fbpr");
-          const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
-          if (staleReason) {
-            if (isNonFastForward) {
-              core.info(staleReason);
-              return { skipped: true, reason: staleReason };
-            }
-            core.error(`Failed to push changes: ${pushErrorMessage}`);
-            core.warning(staleReason);
-            return { success: false, error: `Failed to push changes: ${pushErrorMessage}`, error_type: "push_failed" };
-          }
-          const fallbackBranchName = normalizeBranchName(`${branchName}-fallback`, String(Date.now()));
-          const fallbackReason = isNonFastForward ? "Non-fast-forward push detected" : "Transient workflow-permission check timeout on push";
-          core.warning(`${fallbackReason}; creating fallback pull request from '${fallbackBranchName}' to '${branchName}'`);
-          try {
-            // Pre-flight: check full branch history for workflow file changes.
-            // Like the review branch path, creating a new fallback branch ref triggers
-            // GitHub's scope check on the full commit history, not just the new commits.
-            // When the workflow files are from pre-existing commits (not the agent's
-            // own changeset), a non-fatal skip is returned instead of a hard error.
-            const preflightError = await runWorkflowScopePreflightCheck(exec, baseGitOpts, allowWorkflows, pullRequest?.base?.ref, "Fallback branch", core, agentChangedFiles);
-            if (preflightError) return preflightError;
-
-            await exec.exec("git", ["checkout", "-b", fallbackBranchName], baseGitOpts);
-            // Use getExecOutput to capture stderr for 'workflows' scope diagnostics.
-            // For fork-backed PRs, push to the head repo remote instead of origin.
-            const fallbackPushRemote = pushRemoteUrl || "origin";
-            await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: fallbackPushRemote, branch: fallbackBranchName, cwd: baseGitOpts.cwd, gitAuthEnv });
-            const fallbackPushOutput = await withGitHubHostToken(
-              pushRemoteUrl ? headGitHubToken : "",
-              async () =>
-                exec.getExecOutput("git", ["push", fallbackPushRemote, fallbackBranchName], {
-                  env: { ...process.env, ...gitAuthEnv },
-                  ...baseGitOpts,
-                  ignoreReturnCode: true,
-                }),
-              baseGitOpts.cwd
-            );
-            if (fallbackPushOutput.exitCode !== 0) {
-              const fallbackPushStderr = (fallbackPushOutput.stderr || "").trim();
-              if (isWorkflowsScopeRejection(fallbackPushStderr)) {
-                const agentWorkflowFiles = agentChangedFiles.filter(isWorkflowYamlFile);
-                if (agentWorkflowFiles.length === 0) {
-                  return buildWorkflowsScopeSkip("Fallback branch", core);
-                }
-                return buildWorkflowsScopeError("Fallback branch", core);
-              }
-              throw new Error(`git push ${fallbackPushRemote} ${fallbackBranchName} failed (exit code ${fallbackPushOutput.exitCode}): ${fallbackPushStderr}`);
-            }
-
-            // For fork-backed PRs, use an owner-qualified head reference.
-            const fallbackHeadRef = pushRemoteUrl ? `${pushRepoParts.owner}:${fallbackBranchName}` : fallbackBranchName;
-
-            const fallbackBody = [
-              ...(compilationNotice ? [compilationNotice, ""] : []),
-              "> [!NOTE]",
-              isNonFastForward
-                ? "> Direct push to the original pull request branch failed because the branch diverged (non-fast-forward)."
-                : "> Direct push to the original pull request branch failed because GitHub could not complete its workflow-permission check (transient timeout).",
-              `> Original PR branch: \`${branchName}\``,
-              "",
-              `This fallback PR contains the prepared changes for PR #${pullNumber}.`,
-              "Merge this fallback PR into the original PR branch to apply them.",
-              "",
-              `Workflow run: ${buildWorkflowRunUrl(context, context.repo)}`,
-            ].join("\n");
-
+          // GitHub intermittently fails its workflow-permission check with
+          // "Unable to determine if workflow can be created or updated due to timeout; `workflows`
+          // scope may be required." — a transient server-side condition, not a real scope problem.
+          // Retry with exponential backoff before treating the push as failed.
+          const pushedSha = await withTransientPushRetry(async () => {
+            trace("push");
+            const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
+            if (staleReason) throw new StalePullRequestError(staleReason);
             transport.assertUnchanged();
-            const { data: fallbackPR } = await githubClient.rest.pulls.create({
-              owner: repoParts.owner,
-              repo: repoParts.repo,
-              title: `[fallback] ${prTitle || `Changes for #${pullNumber}`}`,
-              body: fallbackBody,
-              head: fallbackHeadRef,
-              ...pullRequestHeadRepoParams,
-              base: branchName,
+            return pushSignedCommits({
+              assertTransportUnchanged: transport.assertUnchanged,
+              githubClient: pushGithubClient,
+              owner: pushRepoParts.owner,
+              repo: pushRepoParts.repo,
+              branch: branchName,
+              baseRef: rangeBaseRef,
+              cwd: repoCwd || process.cwd(),
+              gitAuthEnv,
+              pushRemoteUrl,
+              pushToken: headGitHubToken,
+              signedCommits,
+              allowGitPushFallback,
+              requireExistingBranch: true,
+              resolvedTemporaryIds,
+              currentRepo: itemRepo,
+              validationConfig: config,
+            });
+          });
+          if (pushedSha) {
+            pushedCommitSha = pushedSha;
+            core.info(`pushSignedCommits returned pushed SHA: ${pushedSha}`);
+          }
+          trace("pshd");
+          core.info(`Changes committed and pushed to branch: ${branchName}`);
+        } catch (pushError) {
+          trace("perr");
+          transport.assertUnchanged();
+          if (pushError instanceof StalePullRequestError) {
+            trace("stal");
+            core.info(pushError.message);
+            return { skipped: true, reason: pushError.message };
+          }
+          const pushErrorMessage = getErrorMessage(pushError);
+
+          // Missing workflow scope is handled by the preflight above. Any workflow-scope
+          // rejection that reaches this catch is GitHub's transient permission-check timeout.
+          const isWorkflowsScopeTimeout = isWorkflowsScopeRejection(pushErrorMessage);
+
+          // A generic rejection can be a real authentication, permission, or validation failure.
+          const nonFastForwardPatterns = ["non-fast-forward", "(fetch first)"];
+          const isNonFastForward = !isWorkflowsScopeTimeout && nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
+          let userMessage = isNonFastForward
+            ? "Failed to push changes: remote PR branch changed while the workflow was running (non-fast-forward). Re-run the workflow on the latest PR branch state."
+            : isWorkflowsScopeTimeout
+              ? "Failed to push changes: GitHub could not complete its workflow-permission check (transient timeout) after multiple retries. Re-run the workflow to retry the push."
+              : `Failed to push changes: ${pushErrorMessage}`;
+
+          // Diagnose common race where branch was deleted after preflight checks.
+          try {
+            const lsRemoteAfterPushResult = await exec.getExecOutput("git", ["ls-remote", "--exit-code", "--heads", "origin", branchName], {
+              env: { ...process.env, ...gitAuthEnv },
+              ...baseGitOpts,
+              ignoreReturnCode: true,
             });
 
-            core.info(`Created fallback pull request #${fallbackPR.number}: ${fallbackPR.html_url}`);
-            await updateActivationComment(github, context, core, fallbackPR.html_url, fallbackPR.number, "pull_request", { activationCommentLinks });
-
-            return {
-              success: true,
-              fallback_used: true,
-              fallback_type: "pull_request",
-              pull_request_number: fallbackPR.number,
-              pull_request_url: fallbackPR.html_url,
-              branch_name: fallbackBranchName,
-              repo: itemRepo,
-              head_repo: pushRepo,
-              number: fallbackPR.number,
-              url: fallbackPR.html_url,
-            };
-          } catch (fallbackError) {
-            trace("fber");
-            transport.assertUnchanged();
-            const fallbackErrorMessage = getErrorMessage(fallbackError);
-            core.error(`Failed to create fallback pull request: ${fallbackErrorMessage}`);
-            userMessage = `${userMessage} Fallback pull request creation also failed: ${fallbackErrorMessage}`;
+            if (lsRemoteAfterPushResult.exitCode === 2) {
+              userMessage = "Failed to push changes: remote PR branch appears to have been deleted while the workflow was running.";
+            } else if (lsRemoteAfterPushResult.exitCode !== 0) {
+              const remoteCheckError = (lsRemoteAfterPushResult.stderr || "").trim();
+              core.warning(`Push failed and branch existence re-check also failed for ${branchName}: ${remoteCheckError || `git ls-remote exited with code ${lsRemoteAfterPushResult.exitCode}`}`);
+            }
+          } catch (diagnosisError) {
+            core.warning(`Push failed and branch existence re-check errored for ${branchName}: ${getErrorMessage(diagnosisError)}`);
           }
-        }
 
-        core.error(`Failed to push changes: ${pushErrorMessage}`);
-        return { success: false, error_type: "push_failed", error: userMessage };
-      }
+          // Fallback path for diverged branches: create a new pull request so changes
+          // can still be reviewed and merged into the original PR branch.
+          if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest && allowGitPushFallback) {
+            trace("fbpr");
+            const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
+            if (staleReason) {
+              if (isNonFastForward) {
+                core.info(staleReason);
+                return { skipped: true, reason: staleReason };
+              }
+              core.error(`Failed to push changes: ${pushErrorMessage}`);
+              core.warning(staleReason);
+              return { success: false, error: `Failed to push changes: ${pushErrorMessage}`, error_type: "push_failed" };
+            }
+            const fallbackBranchName = normalizeBranchName(`${branchName}-fallback`, String(Date.now()));
+            const fallbackReason = isNonFastForward ? "Non-fast-forward push detected" : "Transient workflow-permission check timeout on push";
+            core.warning(`${fallbackReason}; creating fallback pull request from '${fallbackBranchName}' to '${branchName}'`);
+            try {
+              // Pre-flight: check full branch history for workflow file changes.
+              // Like the review branch path, creating a new fallback branch ref triggers
+              // GitHub's scope check on the full commit history, not just the new commits.
+              // When the workflow files are from pre-existing commits (not the agent's
+              // own changeset), a non-fatal skip is returned instead of a hard error.
+              const preflightError = await runWorkflowScopePreflightCheck(exec, baseGitOpts, allowWorkflows, pullRequest?.base?.ref, "Fallback branch", core, agentChangedFiles);
+              if (preflightError) return preflightError;
+
+              await exec.exec("git", ["checkout", "-b", fallbackBranchName], baseGitOpts);
+              // Use getExecOutput to capture stderr for 'workflows' scope diagnostics.
+              // For fork-backed PRs, push to the head repo remote instead of origin.
+              const fallbackPushRemote = pushRemoteUrl || "origin";
+              await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: fallbackPushRemote, branch: fallbackBranchName, cwd: baseGitOpts.cwd, gitAuthEnv });
+              const fallbackPushOutput = await withGitHubHostToken(
+                pushRemoteUrl ? headGitHubToken : "",
+                async () =>
+                  exec.getExecOutput("git", ["push", fallbackPushRemote, fallbackBranchName], {
+                    env: { ...process.env, ...gitAuthEnv },
+                    ...baseGitOpts,
+                    ignoreReturnCode: true,
+                  }),
+                baseGitOpts.cwd
+              );
+              if (fallbackPushOutput.exitCode !== 0) {
+                const fallbackPushStderr = (fallbackPushOutput.stderr || "").trim();
+                if (isWorkflowsScopeRejection(fallbackPushStderr)) {
+                  const agentWorkflowFiles = agentChangedFiles.filter(isWorkflowYamlFile);
+                  if (agentWorkflowFiles.length === 0) {
+                    return buildWorkflowsScopeSkip("Fallback branch", core);
+                  }
+                  return buildWorkflowsScopeError("Fallback branch", core);
+                }
+                throw new Error(`git push ${fallbackPushRemote} ${fallbackBranchName} failed (exit code ${fallbackPushOutput.exitCode}): ${fallbackPushStderr}`);
+              }
+
+              // For fork-backed PRs, use an owner-qualified head reference.
+              const fallbackHeadRef = pushRemoteUrl ? `${pushRepoParts.owner}:${fallbackBranchName}` : fallbackBranchName;
+
+              const fallbackBody = [
+                ...(compilationNotice ? [compilationNotice, ""] : []),
+                "> [!NOTE]",
+                isNonFastForward
+                  ? "> Direct push to the original pull request branch failed because the branch diverged (non-fast-forward)."
+                  : "> Direct push to the original pull request branch failed because GitHub could not complete its workflow-permission check (transient timeout).",
+                `> Original PR branch: \`${branchName}\``,
+                "",
+                `This fallback PR contains the prepared changes for PR #${pullNumber}.`,
+                "Merge this fallback PR into the original PR branch to apply them.",
+                "",
+                `Workflow run: ${buildWorkflowRunUrl(context, context.repo)}`,
+              ].join("\n");
+
+              transport.assertUnchanged();
+              const { data: fallbackPR } = await githubClient.rest.pulls.create({
+                owner: repoParts.owner,
+                repo: repoParts.repo,
+                title: `[fallback] ${prTitle || `Changes for #${pullNumber}`}`,
+                body: fallbackBody,
+                head: fallbackHeadRef,
+                ...pullRequestHeadRepoParams,
+                base: branchName,
+              });
+
+              core.info(`Created fallback pull request #${fallbackPR.number}: ${fallbackPR.html_url}`);
+              await updateActivationComment(github, context, core, fallbackPR.html_url, fallbackPR.number, "pull_request", { activationCommentLinks });
+
+              return {
+                success: true,
+                fallback_used: true,
+                fallback_type: "pull_request",
+                pull_request_number: fallbackPR.number,
+                pull_request_url: fallbackPR.html_url,
+                branch_name: fallbackBranchName,
+                repo: itemRepo,
+                head_repo: pushRepo,
+                number: fallbackPR.number,
+                url: fallbackPR.html_url,
+              };
+            } catch (fallbackError) {
+              trace("fber");
+              transport.assertUnchanged();
+              const fallbackErrorMessage = getErrorMessage(fallbackError);
+              core.error(`Failed to create fallback pull request: ${fallbackErrorMessage}`);
+              userMessage = `${userMessage} Fallback pull request creation also failed: ${fallbackErrorMessage}`;
+            }
+          }
+
+          core.error(`Failed to push changes: ${pushErrorMessage}`);
+          return { success: false, error_type: "push_failed", error: userMessage };
+        }
 
       // Count new commits pushed for the CI trigger decision
       if (remoteHeadBeforePatch) {
@@ -2018,7 +2063,8 @@ async function main(config = {}) {
     // These are noise — they don't represent meaningful work and would clutter PRs on every scheduled run.
     const commentStaleReason = hasChanges ? await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } }) : null;
     if (commentStaleReason) core.info(commentStaleReason);
-    if (hasChanges && !commentStaleReason) {
+    // Activation-comment links and CI-trigger commits are not part of an approved effect plan.
+    if (hasChanges && !commentStaleReason && !effectPreparation) {
       let isEmptyCommit = false;
       if (rangeBaseRef) {
         try {
@@ -2066,7 +2112,7 @@ async function main(config = {}) {
     // multi-commit branches where workflow files may have been iteratively modified.
     const ciStaleReason = hasChanges ? await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } }) : null;
     if (ciStaleReason) core.info(ciStaleReason);
-    if (hasChanges && !ciStaleReason) {
+    if (hasChanges && !ciStaleReason && !effectPreparation) {
       transport.assertUnchanged();
       const ciTriggerResult = await pushExtraEmptyCommit({
         assertTransportUnchanged: transport.assertUnchanged,
@@ -2096,6 +2142,78 @@ async function main(config = {}) {
       commitSha ? { head_sha: commitSha } : null
     );
   });
+}
+
+/**
+ * Exact-effect push: plan the ref transition (direct git push under a lease, or
+ * a signed createCommitOnBranch chain whose first expectedHeadOid is atomic),
+ * obtain one decision for it, and send only those effects. Review and fallback
+ * pull requests, activation-comment links and CI-trigger commits are never
+ * performed on this path.
+ * @param {{preparation: object, trace: Function, transport: any, githubClient: any, pushGithubClient: any, repoParts: any, pushRepoParts: any, itemRepo: string, pushRepo: string,
+ *   pullNumber: number, pullRequest: any, pushOptions: any}} options
+ * @returns {Promise<{result?: any, head?: string}>}
+ */
+async function pushBranchWithEffectPlan({ preparation, trace, transport, githubClient, pushGithubClient, repoParts, pushRepoParts, itemRepo, pushRepo, pullNumber, pullRequest, pushOptions }) {
+  const staleCheck = () => getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
+  const stale = await staleCheck();
+  if (stale) return { result: { skipped: true, reason: stale } };
+  transport.assertUnchanged();
+  let branch;
+  try {
+    branch = await pushSignedCommits({ ...pushOptions, plan: true });
+  } catch (error) {
+    return { result: { success: false, error_type: "push_failed", error: `Failed to prepare push: ${getErrorMessage(error)}` } };
+  }
+  if (!branch || branch.effects.length === 0) return { head: branch?.head || undefined };
+  const repository = await observeRepository(pushGithubClient, pushRepoParts);
+  const baseRepositoryId = pullRequest?.base?.repo?.id;
+  if (!Number.isSafeInteger(pullRequest?.id) || !Number.isSafeInteger(baseRepositoryId)) throw new Error(`${ERR_SYSTEM}: Pull request identity could not be independently resolved`);
+  const handle = freezeEffectPlan(preparation, {
+    targets: [
+      { kind: "repository", repository: pushRepo, repository_id: repository.repository_id },
+      { kind: "pull_request", repository: itemRepo, repository_id: String(baseRepositoryId), number: pullNumber, resource_id: String(pullRequest.id) },
+      { kind: "ref", repository: pushRepo, repository_id: repository.repository_id, ref: branch.ref, oid: branch.old },
+    ],
+    effects: branch.effects,
+    preconditions: [
+      { id: "branch_head", enforcement: "atomic", observation: { ref: branch.ref, oid: branch.old } },
+      { id: "pull_request_state", enforcement: "observed", observation: { state: pullRequest.state, head_ref: pullRequest.head?.ref, head_repo: pullRequest.head?.repo?.full_name ?? null } },
+    ],
+  });
+  await authorizeSafeOutputEffectPlan(handle);
+  trace("push");
+  const run = await executeEffectPlan(handle, {
+    client: pushGithubClient,
+    git: branchEffectTransport({ branch: pushOptions.branch, cwd: pushOptions.cwd, gitAuthEnv: pushOptions.gitAuthEnv, pushRemoteUrl: pushOptions.pushRemoteUrl, pushToken: pushOptions.pushToken }),
+    beforeEach: async () => {
+      if (await staleCheck()) throw new Error("stale");
+      transport.assertUnchanged();
+    },
+    reconcile: async (index, error) => {
+      const effect = branch.effects[index];
+      if (error?.reason_code !== "indeterminate" || effect.operation !== "git.createRef") return null;
+      const observed = await lsRemoteHeadOid(pushOptions.branch, pushOptions.cwd, pushOptions.gitAuthEnv, pushOptions.pushRemoteUrl, pushOptions.pushToken);
+      return observed === effect.body.sha ? { status: "confirmed", receipt: { object: { sha: observed } } } : null;
+    },
+  });
+  if (run.outcome !== "confirmed") {
+    trace("perr");
+    return {
+      result: {
+        success: false,
+        error_type: "push_failed",
+        error:
+          run.stop_reason === "precondition_changed"
+            ? "Pull request or branch changed after authorization; fresh evaluation required"
+            : "Approved push did not complete; inspect the live branch before any further action. Remaining effects were not attempted.",
+        ...(run.outcome === "partial" || run.outcome === "indeterminate" ? { operation_outcome: run.outcome } : {}),
+      },
+    };
+  }
+  trace("pshd");
+  const last = effectReceipt(handle, branch.effects.length - 1);
+  return { head: typeof last?.oid === "string" ? last.oid : branch.head || undefined };
 }
 
 module.exports = { main, HANDLER_TYPE, getBundlePreApplyFiles, getBundleValidationBase, resolveTrustedBaseTip, resolveBundleTrustedBase };

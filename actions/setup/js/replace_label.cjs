@@ -34,6 +34,9 @@ const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
+const { currentEffectPreparation, freezeEffectPlan, executeEffectPlan } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+const { observeIssueTarget, issueTargets, repositoryPath } = require("./safe_output_effect_targets.cjs");
 
 const POLICY_REJECTION_ERROR_NAME = "ReplaceLabelPolicyRejectionError";
 const SET_LABELS_RETRY_CONFIG = {
@@ -81,6 +84,68 @@ function validateSingleLabel(labelName, allowedPatterns, blockedPatterns, fieldN
     }
   }
   return { valid: true };
+}
+
+/**
+ * Exact-effect replacement: one PUT of the complete finalized label set.
+ * setLabels replaces the whole set without an atomic precondition, so the
+ * observed set and filters are rechecked immediately before sending.
+ * @param {{preparation: object, githubClient: any, repoParts: {owner: string, repo: string}, itemRepo: string, itemNumber: number, contextType: string, labelToRemove: string, labelToAdd: string, requiredLabels: string[], requiredTitlePrefix: string}} options
+ */
+async function replaceLabelWithEffectPlan({ preparation, githubClient, repoParts, itemRepo, itemNumber, contextType, labelToRemove, labelToAdd, requiredLabels, requiredTitlePrefix }) {
+  const observed = await observeIssueTarget(githubClient, repoParts, itemNumber);
+  const filtersPass = target => requiredLabels.every(required => target.names.includes(required)) && (!requiredTitlePrefix || target.title.startsWith(requiredTitlePrefix));
+  if (!filtersPass(observed)) return { success: false, skipped: true, error: "Item does not match required-labels or required-title-prefix filter" };
+  const labelToRemoveIsPresent = observed.names.includes(labelToRemove);
+  const desired = [...new Set([...observed.names.filter(name => name !== labelToRemove), labelToAdd])];
+  const labelSet = [...observed.labels.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const handle = freezeEffectPlan(preparation, {
+    targets: issueTargets(observed, itemRepo, itemNumber),
+    effects: [{ operation: "issues.setLabels", path: `${repositoryPath(repoParts.owner, repoParts.repo)}/issues/${itemNumber}/labels`, body: { labels: desired } }],
+    preconditions: [
+      { id: "target_identity", enforcement: "observed", observation: observed.identity },
+      { id: "label_set", enforcement: "observed", observation: labelSet },
+      { id: "item_filters", enforcement: "observed", observation: { required_labels: requiredLabels, required_title_prefix: requiredTitlePrefix } },
+    ],
+  });
+  await authorizeSafeOutputEffectPlan(handle);
+  /** @type {any} */
+  let updated = null;
+  const run = await executeEffectPlan(handle, {
+    client: githubClient,
+    beforeEach: async () => {
+      const current = await observeIssueTarget(githubClient, repoParts, itemNumber);
+      const currentSet = [...current.labels.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      if (current.identity.resource_id !== observed.identity.resource_id || JSON.stringify(currentSet) !== JSON.stringify(labelSet) || !filtersPass(current)) throw new Error("drift");
+    },
+    reconcile: async (_index, error) => {
+      if (error?.reason_code !== "indeterminate") return null;
+      const current = await observeIssueTarget(githubClient, repoParts, itemNumber);
+      const same = current.identity.resource_id === observed.identity.resource_id && JSON.stringify([...current.names].sort()) === JSON.stringify([...desired].sort());
+      return same ? { status: "confirmed" } : null;
+    },
+    onConfirmed: (_index, response) => {
+      updated = response?.data;
+    },
+  });
+  if (run.outcome !== "confirmed") {
+    return {
+      success: false,
+      error: run.stop_reason === "precondition_changed" ? "Label set or filters changed after authorization; fresh evaluation required" : "Label replacement outcome is not confirmed; inspect the live item before any further action",
+      ...(run.outcome === "indeterminate" ? { operation_outcome: "indeterminate" } : {}),
+    };
+  }
+  core.info(`Replaced label on ${contextType} #${itemNumber} in ${itemRepo} through the approved effect plan`);
+  const updatedNames = Array.isArray(updated) ? updated.map(label => label?.name).filter(Boolean) : desired;
+  return {
+    success: true,
+    number: itemNumber,
+    repo: itemRepo,
+    labelRemoved: labelToRemoveIsPresent ? labelToRemove : null,
+    labelAdded: labelToAdd,
+    contextType,
+    labels: updatedNames,
+  };
 }
 
 /**
@@ -239,6 +304,11 @@ const main = createCountGatedHandler({
             contextType,
           },
         };
+      }
+
+      const preparation = currentEffectPreparation(HANDLER_TYPE);
+      if (preparation) {
+        return replaceLabelWithEffectPlan({ preparation, githubClient, repoParts, itemRepo, itemNumber, contextType: contextType || "issue", labelToRemove, labelToAdd, requiredLabels, requiredTitlePrefix });
       }
 
       // Compute the new label set: current labels minus labelToRemove, plus labelToAdd (deduped).

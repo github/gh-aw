@@ -429,7 +429,8 @@ async function resolveLocalHeadSha(cwd) {
  * @param {Record<string, any>} [opts.validationConfig] - Optional safe-output policy config applied to synthesized GraphQL fileChanges
  * @param {(context: {cwd: string, branch: string, output: string}) => (boolean|Promise<boolean>)} [opts.resolveRebaseConflict]
  * @param {() => void} [opts.assertTransportUnchanged] - Check captured safe-output inputs immediately before remote writes
- * @returns {Promise<string | undefined>} SHA of the commit that landed on the target branch
+ * @param {boolean} [opts.plan=false] - Return exact-effect branch effects instead of performing remote writes
+ * @returns {Promise<any>} SHA of the commit that landed on the target branch, or a branch effect plan in plan mode
  */
 async function pushSignedCommits({
   githubClient,
@@ -450,6 +451,7 @@ async function pushSignedCommits({
   validationConfig,
   resolveRebaseConflict,
   assertTransportUnchanged,
+  plan = false,
 }) {
   const effectiveCurrentRepo = currentRepo || `${owner}/${repo}`;
   const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds, {
@@ -464,6 +466,7 @@ async function pushSignedCommits({
   if (signedCommits === false) {
     if (requireBaseRefMatch) throw new Error(`${ERR_VALIDATION}: signed commits are required for an atomic ledger transition`);
     core.info(`pushSignedCommits: signed-commits disabled (using direct git push) for branch ${branch}`);
+    if (plan) return planGitPush({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, requireExistingBranch });
     const headSha = await pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch });
     core.info(`pushSignedCommits: git push and HEAD resolution completed, HEAD=${headSha}`);
     return headSha;
@@ -478,6 +481,7 @@ async function pushSignedCommits({
       throw new Error(`${ERR_VALIDATION}: pushSignedCommits: cannot push branch '${branch}' without a baseRef when git push fallback is disabled. ` + `Seed the branch with a signed commit first, then retry.`);
     }
     core.info(`pushSignedCommits: empty baseRef detected (orphan branch first push), using git push directly for branch ${branch}`);
+    if (plan) return planGitPush({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, requireExistingBranch });
     try {
       const headSha = await pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch });
       core.info(`pushSignedCommits: git push completed for orphan branch, HEAD=${headSha}`);
@@ -537,7 +541,7 @@ async function pushSignedCommits({
 
   if (shas.length === 0) {
     core.info("pushSignedCommits: no new commits to push via GraphQL");
-    return undefined;
+    return plan ? { effects: [], ref: `refs/heads/${branch}`, old: null, head: null, signed: true } : undefined;
   }
 
   let remoteHeadOid;
@@ -676,7 +680,7 @@ async function pushSignedCommits({
     shas = revListEntries.map(entry => entry.sha);
     if (shas.length === 0) {
       core.info("pushSignedCommits: no new commits to replay after rebase");
-      return undefined;
+      return plan ? { effects: [], ref: `refs/heads/${branch}`, old: null, head: null, signed: true } : undefined;
     }
   }
 
@@ -812,6 +816,10 @@ async function pushSignedCommits({
       validateSynthesizedFileChanges(additions, deletions, validationConfig);
       additionsMap.set(sha, additions);
       deletionsMap.set(sha, deletions);
+    }
+
+    if (plan) {
+      return await planSignedReplay({ owner, repo, branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, shas, additionsMap, deletionsMap, baseRefOid, requireExistingBranch, requireBaseRefMatch });
     }
 
     // All commits passed the mode checks. Replay via GraphQL.
@@ -999,6 +1007,8 @@ async function pushSignedCommits({
     if (err instanceof PushSignedCommitsPolicyViolation) {
       throw new Error(`${ERR_VALIDATION}: pushSignedCommits: refusing unsigned push for branch '${branch}': ${stripLeadingErrorCode(getErrorMessage(err))}`, { cause: err });
     }
+    // Exact-effect planning never substitutes an unsigned push for a planned signed replay.
+    if (plan) throw err;
     if (allowGitPushFallback === false) {
       const detail = getErrorMessage(err);
       throw new Error(`${ERR_API}: pushSignedCommits: signed commit push failed for branch '${branch}' and git push fallback is disabled: ${detail}${getWorkflowPermissionHint(detail)}`, { cause: err });
@@ -1010,4 +1020,115 @@ async function pushSignedCommits({
   }
 }
 
-module.exports = { pushSignedCommits, unquoteCPath };
+/**
+ * Credential-free push URL bound into an exact effect plan.
+ * @param {string|undefined} pushRemoteUrl
+ * @param {string} cwd
+ */
+async function credentialFreeRemote(pushRemoteUrl, cwd) {
+  let remote = pushRemoteUrl;
+  if (!remote) {
+    const { stdout } = await getGitExecOutput(["remote", "get-url", "--push", "origin"], { cwd });
+    remote = stdout.trim();
+  }
+  let url;
+  try {
+    url = new URL(remote);
+  } catch {
+    throw new Error(`${ERR_VALIDATION}: exact-effect git pushes require an HTTPS remote URL`);
+  }
+  url.username = "";
+  url.password = "";
+  return url.href;
+}
+
+/**
+ * Plan a direct git ref update: push exactly the local HEAD under a lease on the
+ * observed remote value. Non-fast-forward updates are refused.
+ * @param {{branch: string, cwd: string, gitAuthEnv?: any, pushRemoteUrl?: string, pushToken?: string, requireExistingBranch?: boolean}} options
+ */
+async function planGitPush({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, requireExistingBranch }) {
+  const ref = `refs/heads/${branch}`;
+  const old = (await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken)) || null;
+  if (requireExistingBranch && !old) throw new Error(`${ERR_API}: Branch ${branch} no longer exists; refusing to recreate it`);
+  const head = await resolveLocalHeadSha(cwd);
+  if (old === head) return { effects: [], ref, old, head, signed: false };
+  if (old) {
+    const ancestor = await getGitExecOutput(["merge-base", "--is-ancestor", old, "HEAD"], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) }, ignoreReturnCode: true });
+    if (ancestor.exitCode !== 0) throw new Error(`${ERR_API}: non-fast-forward update to ${branch} refused`);
+  }
+  const remote = await credentialFreeRemote(pushRemoteUrl, cwd);
+  return { effects: [{ operation: "git.push", git: { remote, ref, old, new: head } }], ref, old, head, signed: false };
+}
+
+/**
+ * Plan a signed replay: optionally create the branch at its parent, then one
+ * createCommitOnBranch per commit. The first expectedHeadOid is a literal atomic
+ * precondition; later ones are typed receipts of the previous commit effect.
+ * @param {{owner: string, repo: string, branch: string, cwd: string, gitAuthEnv?: any, pushRemoteUrl?: string, pushToken?: string, shas: string[],
+ *   additionsMap: Map<string, any[]>, deletionsMap: Map<string, any[]>, baseRefOid?: string, requireExistingBranch?: boolean, requireBaseRefMatch?: boolean}} options
+ */
+async function planSignedReplay({ owner, repo, branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, shas, additionsMap, deletionsMap, baseRefOid, requireExistingBranch, requireBaseRefMatch }) {
+  const ref = `refs/heads/${branch}`;
+  /** @type {any[]} */
+  const effects = [];
+  const remoteHead = (await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken)) || null;
+  let expectedHeadOid = remoteHead;
+  if (!expectedHeadOid) {
+    if (requireExistingBranch) throw new Error(`${ERR_API}: Branch ${branch} no longer exists; refusing to recreate it`);
+    expectedHeadOid = baseRefOid || (await getGitExecOutput(["rev-parse", `${shas[0]}^`], { cwd })).stdout.trim();
+    if (!OID_PATTERN.test(expectedHeadOid || "")) throw new Error(`${ERR_API}: Could not resolve OID for new branch ${branch}`);
+    effects.push({ operation: "git.createRef", path: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs`, body: { ref, sha: expectedHeadOid } });
+  }
+  if (requireBaseRefMatch && expectedHeadOid !== baseRefOid) throw new Error(`${ERR_API}: ledger branch moved after transition validation`);
+  let previous = -1;
+  for (const sha of shas) {
+    const { stdout: msgOut } = await getGitExecOutput(["log", "-1", "--format=%B", sha], { cwd });
+    const message = msgOut.trim();
+    const headline = message.split("\n")[0];
+    const body = message.split("\n").slice(1).join("\n").trim();
+    const chained = previous >= 0;
+    effects.push({
+      operation: "graphql.createCommitOnBranch",
+      variables: {
+        input: {
+          branch: { repositoryNameWithOwner: `${owner}/${repo}`, branchName: branch },
+          message: { headline, ...(body ? { body } : {}) },
+          fileChanges: { additions: additionsMap.get(sha) || [], deletions: deletionsMap.get(sha) || [] },
+          expectedHeadOid: chained ? `{{head_${effects.length}}}` : expectedHeadOid,
+        },
+      },
+      ...(chained ? { derive: { [`head_${effects.length}`]: { effect: previous, field: "oid" } } } : {}),
+    });
+    previous = effects.length - 1;
+  }
+  return { effects, ref, old: remoteHead, head: null, signed: true, parent: expectedHeadOid };
+}
+
+/**
+ * Credentialed git transport options for exact-effect ref updates. Credentials
+ * are applied around the plan module's fixed argv; they never select the target.
+ * @param {{branch: string, cwd: string, gitAuthEnv?: any, pushRemoteUrl?: string, pushToken?: string}} options
+ */
+function branchEffectTransport({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken }) {
+  return {
+    cwd,
+    env: gitAuthEnv || {},
+    authorize: async request => require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: request.remote, branch, cwd, gitAuthEnv }),
+    withCredentials: async run => {
+      if (!pushRemoteUrl || !pushToken) return run();
+      const githubServerUrl = (process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
+      let previous = [];
+      let applied = false;
+      try {
+        previous = await overridePersistedExtraheader(githubServerUrl, pushToken, cwd);
+        applied = true;
+        return await run();
+      } finally {
+        if (applied) await restorePersistedExtraheader(githubServerUrl, previous, cwd);
+      }
+    },
+  };
+}
+
+module.exports = { pushSignedCommits, unquoteCPath, branchEffectTransport, lsRemoteHeadOid };

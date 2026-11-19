@@ -23,6 +23,9 @@ const { fetchAllRepoLabels } = require("./github_api_helpers.cjs");
 const { buildIssueIntentLabelUpdates, getIssueIntentLabelNames, normalizeIssueIntentLabelSpecs } = require("./issue_intents.cjs");
 const { normalizeIssueArtifacts, sanitizeIssueArtifacts, prepareIssueArtifactUpsert, upsertIssueArtifacts } = require("./issue_artifacts.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { currentEffectPreparation, freezeEffectPlan, executeEffectPlan, unsupportedEffect } = require("./safe_output_effect_plan.cjs");
+const { authorizeSafeOutputEffectPlan } = require("./safe_output_execution.cjs");
+const { observeIssueTarget, issueSnapshot, issueTargets, repositoryPath } = require("./safe_output_effect_targets.cjs");
 
 /**
  * Execute the issue update API call
@@ -51,6 +54,25 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
   }
   if (useIssueIntentLabels) {
     delete apiData.labels;
+  }
+
+  const preparation = currentEffectPreparation(HANDLER_TYPE);
+  if (preparation) {
+    if (artifacts?.length) throw unsupportedEffect(HANDLER_TYPE, "issue artifacts");
+    return updateIssueWithEffectPlan({
+      preparation,
+      github,
+      context,
+      issueNumber,
+      apiData,
+      rawBody,
+      operation,
+      includeFooter,
+      bodyFooter,
+      titlePrefix,
+      workflowRepo: _workflowRepo,
+      labelSpecs: useIssueIntentLabels ? labelSpecs : undefined,
+    });
   }
 
   /** @type {any | null} */
@@ -182,6 +204,89 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
     }
   }
   return issue;
+}
+
+/**
+ * Exact-effect issue update: one PATCH of the finalized fields and, for
+ * issue-intent labels, one GraphQL updateIssue mutation. A body append is
+ * computed from the observed body, so the observed issue is a precondition
+ * rechecked before sending; GitHub offers no atomic compare-and-set.
+ * Effect failures are returned as `_effectFailure`, never thrown, so the
+ * factory's transient retry cannot repeat an approved effect.
+ * @param {{preparation: object, github: any, context: any, issueNumber: number, apiData: Record<string, any>, rawBody: string|undefined, operation: string, includeFooter: boolean,
+ *   bodyFooter: any, titlePrefix: string, workflowRepo: any, labelSpecs: any}} options
+ */
+async function updateIssueWithEffectPlan({ preparation, github, context, issueNumber, apiData, rawBody, operation, includeFooter, bodyFooter, titlePrefix, workflowRepo, labelSpecs }) {
+  const repoParts = { owner: context.repo.owner, repo: context.repo.repo };
+  const repository = `${repoParts.owner}/${repoParts.repo}`;
+  const observed = await observeIssueTarget(github, repoParts, issueNumber);
+  if (observed.identity.kind !== "issue") throw new Error(`${ERR_VALIDATION}: #${issueNumber} is not an issue`);
+  if (titlePrefix && !observed.title.startsWith(titlePrefix)) throw new Error(`${ERR_VALIDATION}: Issue title "${observed.title}" does not start with required prefix "${titlePrefix}"`);
+  const body = { ...apiData };
+  if (rawBody !== undefined) {
+    const temporaryProjectMap = loadTemporaryProjectMap();
+    const newContent = temporaryProjectMap.size > 0 ? replaceTemporaryProjectReferences(rawBody, temporaryProjectMap) : rawBody;
+    body.body = buildUpdatedBody({ context, currentBody: observed.body || "", newContent, operation, includeFooter, bodyFooter, workflowRepo, itemType: "issue" });
+  }
+  const effects = [];
+  if (Object.keys(body).length > 0) effects.push({ operation: "issues.update", path: `${repositoryPath(repoParts.owner, repoParts.repo)}/issues/${issueNumber}`, body });
+  if (labelSpecs) {
+    if (!observed.identity.node_id) throw new Error(`${ERR_API}: Failed to resolve GraphQL node ID for issue #${issueNumber}`);
+    const repoLabels = await fetchAllRepoLabels(github, repoParts.owner, repoParts.repo);
+    const labelIdByName = new Map(repoLabels.map(label => [label.name.toLowerCase(), label.id]));
+    effects.push({ operation: "graphql.updateIssueLabels", variables: { issueId: observed.identity.node_id, labels: buildIssueIntentLabelUpdates(labelSpecs, labelIdByName) } });
+  }
+  if (effects.length === 0) return observed.item;
+  const before = issueSnapshot(observed);
+  const handle = freezeEffectPlan(preparation, {
+    targets: issueTargets(observed, repository, issueNumber),
+    effects,
+    preconditions: [
+      { id: "target_identity", enforcement: "observed", observation: observed.identity },
+      { id: "issue_state", enforcement: "observed", observation: before },
+      { id: "title_prefix", enforcement: "observed", observation: titlePrefix },
+    ],
+  });
+  await authorizeSafeOutputEffectPlan(handle);
+  const run = await executeEffectPlan(handle, {
+    client: github,
+    beforeEach: async index => {
+      const current = await observeIssueTarget(github, repoParts, issueNumber);
+      const snapshot = issueSnapshot(current);
+      // Only the planned earlier PATCH may have changed the issue before a later label mutation.
+      const unchanged = index === 0 ? JSON.stringify(snapshot) === JSON.stringify(before) : current.identity.resource_id === observed.identity.resource_id;
+      if (!unchanged || (titlePrefix && index === 0 && !current.title.startsWith(titlePrefix))) throw new Error("drift");
+    },
+    reconcile: async (index, error) => {
+      if (error?.reason_code !== "indeterminate" || effects[index].operation !== "issues.update") return null;
+      const current = await observeIssueTarget(github, repoParts, issueNumber);
+      const names = values => [...(values || [])].map(value => String(typeof value === "string" ? value : value?.login || value?.name || "").toLowerCase()).sort();
+      // Every requested field must read back as approved; unknown fields stay indeterminate.
+      const matches = Object.entries(body).every(([field, value]) => {
+        if (["title", "body", "state", "state_reason"].includes(field)) return current.item[field] === value;
+        if (field === "labels") return JSON.stringify(names(current.item.labels)) === JSON.stringify(names(value));
+        if (field === "assignees") return JSON.stringify(names(current.item.assignees)) === JSON.stringify(names(value));
+        if (field === "milestone") return (current.item.milestone?.number ?? null) === value;
+        return false;
+      });
+      return current.identity.resource_id === observed.identity.resource_id && matches ? { status: "confirmed" } : null;
+    },
+  });
+  if (run.outcome !== "confirmed") {
+    return {
+      ...observed.item,
+      _effectFailure: {
+        error: run.stop_reason === "precondition_changed" ? "Issue changed after authorization; fresh evaluation required" : "Issue update outcome is not confirmed; inspect the live issue before any further action",
+        ...(run.outcome === "partial" || run.outcome === "indeterminate" ? { operation_outcome: run.outcome } : {}),
+      },
+    };
+  }
+  // The effects are confirmed; a failed refresh must not re-enter the factory retry.
+  try {
+    return (await observeIssueTarget(github, repoParts, issueNumber)).item;
+  } catch {
+    return { ...observed.item, ...body };
+  }
 }
 
 /**
@@ -322,6 +427,7 @@ const main = createUpdateHandlerFactory({
         }
       : {}),
     ...(issue._artifactPreflightError ? { success: false, error: issue._artifactPreflightError } : {}),
+    ...(issue._effectFailure ? { success: false, ...issue._effectFailure } : {}),
   }),
   captureExecutionMetadata: {
     captureBefore: async (githubClient, effectiveContext, issueNumber) => fetchIssueState(githubClient, effectiveContext.repo, issueNumber),
