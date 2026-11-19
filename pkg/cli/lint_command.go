@@ -83,7 +83,7 @@ func selectWorkflowLintRules(cmd *cobra.Command) (*workflowlint.Runner, error) {
 	listRules, _ := cmd.Flags().GetBool("list-rules")
 	if listRules {
 		for _, rule := range runner.Rules() {
-			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\t%s\t%s\n", rule.ID, rule.Severity, rule.Targets, rule.Description, rule.ThreatRuleID); err != nil {
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\t%s\t%s\n", rule.ID, rule.Severity, rule.Targets, rule.Description, ruleThreatIDs(rule)); err != nil {
 				return nil, err
 			}
 		}
@@ -193,4 +193,13 @@ func expandLintCandidate(candidate string) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("path %q is not a .md, .yml, or .yaml workflow file or directory", candidate)
 	}
+}
+
+// ruleThreatIDs lists the rule-level threat ID followed by any per-finding IDs.
+func ruleThreatIDs(rule workflowlint.Rule) string {
+	ids := slices.Clone(rule.FindingThreatRuleIDs)
+	if rule.ThreatRuleID != "" {
+		ids = append([]string{rule.ThreatRuleID}, ids...)
+	}
+	return strings.Join(ids, ",")
 }

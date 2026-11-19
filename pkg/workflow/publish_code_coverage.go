@@ -146,6 +146,9 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 	if err != nil {
 		return nil, err
 	}
+	if usesTokenBrokerCodeCoverage(data) {
+		steps = append(steps, c.buildBrokerInvalidationStep(data)...)
+	}
 	var jobEnv map[string]string
 	if safeOutputAuthorizationEnabled(data.SafeOutputs) {
 		jobEnv = c.buildJobLevelSafeOutputEnvVars(data, GetWorkflowIDFromPath(c.markdownPath))
@@ -174,8 +177,10 @@ func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions 
 
 	var steps []string
 	authorizationRequired := data.SafeOutputs.AuthorizationRequirements["upload_code_coverage"] != nil
-	if authorizationRequired {
+	if authorizationRequired || usesTokenBrokerCodeCoverage(data) {
 		steps = append(steps, c.buildSafeOutputsSetupSteps(data)...)
+	}
+	if authorizationRequired {
 		steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
 	}
 
@@ -256,6 +261,11 @@ func (c *Compiler) buildUploadCodeCoverageAuthorizationSteps(data *WorkflowData)
 
 func (c *Compiler) buildUploadCodeCoverageToken(data *WorkflowData, permissions *Permissions) ([]string, string) {
 	cfg := data.SafeOutputs.UploadCodeCoverage
+	if usesTokenBrokerCodeCoverage(data) {
+		permissions.Set(PermissionCodeQuality, PermissionNone)
+		permissions.Set(PermissionIdToken, PermissionWrite)
+		return c.buildGitHubBrokerTokenStep(data, "upload-code-coverage-app-token"), "${{ steps.upload-code-coverage-app-token.outputs.token }}"
+	}
 	var steps []string
 	var coverageToken string
 	effectiveStaticToken := cfg.GitHubToken
@@ -292,4 +302,12 @@ func (c *Compiler) buildUploadCodeCoverageToken(data *WorkflowData, permissions 
 	}
 
 	return steps, coverageToken
+}
+
+func usesTokenBrokerCodeCoverage(data *WorkflowData) bool {
+	if !usesTokenBrokerSafeOutputs(data) || data.SafeOutputs.UploadCodeCoverage == nil {
+		return false
+	}
+	cfg := data.SafeOutputs.UploadCodeCoverage
+	return cfg.GitHubToken == "" && cfg.GitHubApp == nil
 }

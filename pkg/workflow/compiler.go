@@ -213,7 +213,8 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 	// fast-path checks avoid an unnecessary yaml.Unmarshal.
 	needsSchemaCheck := !c.skipValidation
 	needsAppTokenCheck := strings.Contains(strings.ToLower(yamlContent), "actions/create-github-app-token@")
-	needsWorkflowParse := needsSchemaCheck || requireSelfHostedRunners || needsAppTokenCheck
+	needsBrokerRunnerCheck := strings.Contains(yamlContent, tokenBrokerURLEnv)
+	needsWorkflowParse := needsSchemaCheck || requireSelfHostedRunners || needsAppTokenCheck || needsBrokerRunnerCheck
 
 	var parsedWorkflow map[string]any
 	if needsWorkflowParse {
@@ -238,6 +239,13 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 	if requireSelfHostedRunners {
 		if err := validateSelfHostedRunners(parsedWorkflow); err != nil {
 			return "", nil, nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		}
+	}
+
+	if needsBrokerRunnerCheck {
+		if jobs := tokenBrokerSelfHostedJobs(parsedWorkflow); len(jobs) > 0 {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(tokenBrokerSelfHostedWarning(jobs)))
+			c.IncrementWarningCount()
 		}
 	}
 
@@ -344,6 +352,9 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 // writeWorkflowOutput writes the compiled workflow to the lock file
 // and handles console output formatting.
 func (c *Compiler) writeWorkflowOutput(lockFile, yamlContent string, markdownPath string) error {
+	if c.verificationYAML != nil {
+		*c.verificationYAML = yamlContent
+	}
 	// Write to lock file (unless noEmit is enabled)
 	if c.noEmit {
 		workflowLog.Print("Validation completed - no lock file generated (--no-emit enabled)")

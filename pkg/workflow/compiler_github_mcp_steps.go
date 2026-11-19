@@ -184,7 +184,9 @@ func quoteYAMLEnvValue(s string) string {
 // actions/create-github-app-token calls ::add-mask:: on the produced token, and the
 // GitHub Actions runner silently drops masked values when used as job outputs (runner v2.308+).
 func (c *Compiler) generateGitHubMCPAppTokenMintingSteps(data *WorkflowData) []string {
-	// Check if GitHub tool has app configuration
+	if usesTokenBrokerGitHubTool(data) {
+		return c.buildGitHubBrokerTokenStep(data, "github-mcp-app-token")
+	}
 	if data.ParsedTools == nil || data.ParsedTools.GitHub == nil || data.ParsedTools.GitHub.GitHubApp == nil {
 		githubConfigLog.Print("Skipping GitHub MCP app token minting: no github-app configuration on GitHub tool")
 		return nil

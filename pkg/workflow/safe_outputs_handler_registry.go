@@ -28,7 +28,7 @@ func resolveApproveWorkflowRunGitHubToken(cfg *SafeOutputsConfig, config *Approv
 	if token := resolveHandlerGitHubToken(config.GitHubApp, "approve-workflow-run", config.GitHubToken); token != "" {
 		return token
 	}
-	if cfg.GitHubApp != nil {
+	if cfg.GitHubApp != nil || cfg.TokenBroker {
 		return "${{ steps.safe-outputs-app-token.outputs.token }}"
 	}
 	return cfg.GitHubToken

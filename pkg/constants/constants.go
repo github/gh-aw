@@ -137,6 +137,9 @@ const (
 	// contain secrets, credentials, downloaded remote content, or audit/log output.
 	FilePermSensitive fs.FileMode = 0o600
 
+	// FilePermOwnerReadOnly is owner-only read access for immutable snapshots.
+	FilePermOwnerReadOnly fs.FileMode = 0o400
+
 	// FilePermPublic is owner read/write + world read (0o644). Use for files that
 	// are intentionally world-readable (e.g. generated files for inspection).
 	FilePermPublic fs.FileMode = 0o644

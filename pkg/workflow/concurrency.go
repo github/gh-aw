@@ -271,7 +271,7 @@ func hasIssueCommentTrigger(workflowData *WorkflowData) bool {
 // re-trigger the workflow and resolve to the same workflow-level concurrency group
 // as the originating run, causing cancel-in-progress to cancel the original run.
 func hasBotSelfCancelRisk(workflowData *WorkflowData) bool {
-	if workflowData.SafeOutputs == nil || workflowData.SafeOutputs.GitHubApp == nil {
+	if workflowData.SafeOutputs == nil || (workflowData.SafeOutputs.GitHubApp == nil && !workflowData.SafeOutputs.TokenBroker) {
 		return false
 	}
 	return hasIssueCommentTrigger(workflowData)

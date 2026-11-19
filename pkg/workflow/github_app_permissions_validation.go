@@ -227,6 +227,9 @@ func warnGitHubAppPermissionsUnsupportedContexts(workflowData *WorkflowData) {
 }
 
 func hasGitHubAppConfigured(workflowData *WorkflowData) bool {
+	if usesTokenBrokerGitHubTool(workflowData) || usesTokenBrokerSafeOutputs(workflowData) {
+		return true
+	}
 	// Check tools.github.github-app
 	if workflowData.ParsedTools != nil &&
 		workflowData.ParsedTools.GitHub != nil &&

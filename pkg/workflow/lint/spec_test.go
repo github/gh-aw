@@ -182,6 +182,7 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"SandboxConfigRule", lint.SandboxConfigRule},
 		{"FirewallSSLBumpRule", lint.FirewallSSLBumpRule},
 		{"SafeOutputShellExpansionRule", lint.SafeOutputShellExpansionRule},
+		{"SafeOutputCredentialsRule", lint.SafeOutputCredentialsRule},
 		{"ArtifactExecutionRule", lint.ArtifactExecutionRule},
 		{"ArtipackedRule", lint.ArtipackedRule},
 		{"CachePoisoningRule", lint.CachePoisoningRule},

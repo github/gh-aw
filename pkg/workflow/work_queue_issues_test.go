@@ -25,7 +25,7 @@ func TestWorkQueueIssuesProjectorAppTokensStayInHooks(t *testing.T) {
 			require.Equal(t, "always()", minted["if"])
 		}
 		steps = append(steps, "        with:\n")
-		compiler.addWorkQueueProjectorToken(&steps, data)
+		compiler.addWorkQueueProjectorToken(&steps, data, job)
 		result := strings.Join(steps, "")
 		require.Contains(t, result, "id: work-queue-projector-token")
 		require.Contains(t, result, "permission-contents: write")
@@ -37,6 +37,35 @@ func TestWorkQueueIssuesProjectorAppTokensStayInHooks(t *testing.T) {
 			require.Contains(t, result, "if: always()")
 		}
 	}
+}
+
+func TestWorkQueueIssuesBrokerProjectorUsesJobLocalCredential(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		Tools:       map[string]any{"work-queue": map[string]any{"worker": true, "issues": true}},
+		SafeOutputs: &SafeOutputsConfig{TokenBroker: true},
+	}
+	require.NoError(t, validateWorkQueueConfiguration(data))
+	ctx := &activationJobBuildContext{data: data, outputs: map[string]string{}}
+	compiler.addWorkQueueSnapshotStep(ctx)
+	var activation []struct {
+		ID   string            `yaml:"id"`
+		If   string            `yaml:"if"`
+		With map[string]string `yaml:"with"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(strings.Join(ctx.steps, "")), &activation))
+	require.Len(t, activation, 3)
+	require.Equal(t, "work-queue-activation-broker-token", activation[0].ID)
+	require.Contains(t, activation[0].With["script"], "getBrokerToken('github-app'")
+	require.Equal(t, "work_queue_snapshot", activation[1].ID)
+	require.Equal(t, "${{ steps.work-queue-activation-broker-token.outputs.token }}", activation[1].With["github-token"])
+	require.Equal(t, "always()", activation[2].If)
+	require.Contains(t, activation[2].With["script"], "invalidateBrokerTokens")
+
+	conclusion := strings.Join(compiler.buildWorkQueueIssuesStep(data), "")
+	require.Contains(t, conclusion, "github-token: ${{ steps.safe-outputs-app-token.outputs.token }}")
+	require.NotContains(t, conclusion, "secrets.GITHUB_TOKEN")
+	require.NotContains(t, conclusion, "work-queue-projector-token")
 }
 
 func TestWorkQueueIssuesConfiguration(t *testing.T) {

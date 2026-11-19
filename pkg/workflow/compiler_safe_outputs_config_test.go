@@ -29,6 +29,20 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 		checkRequireAgentSuccess bool
 	}{
 		{
+			name: "authorization config",
+			safeOutputs: &SafeOutputsConfig{
+				Authorization: &SafeOutputAuthorization{
+					Endpoint: "https://authority.example/a",
+					Audience: "https://authority.example/gh-aw",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"authorization"},
+		},
+		{
 			name: "create issue config",
 			safeOutputs: &SafeOutputsConfig{
 				CreateIssues: &CreateIssuesConfig{

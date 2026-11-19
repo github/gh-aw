@@ -611,6 +611,7 @@ export default defineConfig({
             { label: "Monitoring with Projects", link: "/experimental/monitoring-with-projects/" },
             { label: "QMD Documentation Search", link: "/experimental/qmd/" },
             { label: "Safe-Outputs Samples", link: "/experimental/safe-outputs-samples/" },
+            { label: "Token Broker", link: "/experimental/token-broker/" },
             { label: "TrialOps", link: "/experimental/trial-ops/" },
             { label: "WASM Compilation", link: "/reference/wasm-compilation/" },
           ],

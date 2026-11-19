@@ -40,6 +40,11 @@ async function main() {
   const descriptor = process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE ? parseStrictJSON(process.env.GH_AW_SAFE_OUTPUT_AUTHORIZATION_GATE) : undefined;
   const isStaged = isStagedMode(descriptor);
 
+  if (!isStaged && process.env.GH_AW_ASSET_GIT_AUTH_REQUIRED === "true" && (!process.env.GH_AW_ASSET_GIT_TOKEN || /[\r\n]/.test(process.env.GH_AW_ASSET_GIT_TOKEN))) {
+    core.setFailed(`${ERR_CONFIG}: Asset publication credential is required`);
+    return;
+  }
+
   // Get the branch name from environment variable (required)
   const branchName = process.env.GH_AW_ASSETS_BRANCH;
   if (!branchName || typeof branchName !== "string") {

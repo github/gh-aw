@@ -35,7 +35,15 @@ func (c *Compiler) workQueueProjectorTokenSteps(data *WorkflowData, job string) 
 	return steps
 }
 
-func (c *Compiler) addWorkQueueProjectorToken(steps *[]string, data *WorkflowData) {
+func (c *Compiler) addWorkQueueProjectorToken(steps *[]string, data *WorkflowData, job string) {
+	if usesTokenBrokerSafeOutputs(data) {
+		if job == "activation" {
+			*steps = append(*steps, "          github-token: ${{ steps.work-queue-activation-broker-token.outputs.token }}\n")
+		} else {
+			*steps = append(*steps, "          github-token: ${{ steps.safe-outputs-app-token.outputs.token }}\n")
+		}
+		return
+	}
 	if data.SafeOutputs == nil || data.SafeOutputs.GitHubApp == nil {
 		c.addSafeOutputGitHubTokenForConfig(steps, data, "")
 		return
@@ -180,7 +188,7 @@ func (c *Compiler) buildWorkQueueIssuesStep(data *WorkflowData) []string {
 		steps = append(steps, "          GH_AW_SAFE_OUTPUTS_STAGED: "+fmt.Sprintf("%q", *value)+"\n")
 	}
 	steps = append(steps, "          GH_AW_WORK_QUEUE_JOB_RESULTS: ${{ toJSON(needs) }}\n", "        with:\n")
-	c.addWorkQueueProjectorToken(&steps, data)
+	c.addWorkQueueProjectorToken(&steps, data, "conclusion")
 	return append(steps,
 		"          script: |\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_issues.cjs');\n",
