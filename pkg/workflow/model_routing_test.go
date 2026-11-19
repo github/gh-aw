@@ -933,7 +933,7 @@ func (c defaultRoutingCompilation) awfConfigs(t *testing.T) []map[string]any {
 	return configs
 }
 
-const defaultRoutingNoticeMarker = "Set engine.model-routing: false to opt out"
+const defaultRoutingNoticeMarker = "Set model-routing: false to opt out"
 
 // requireNoDefaultRouting asserts the compiled lock keeps today's non-routed
 // behavior: no routing config, router image, decision step, conversation step,
@@ -947,9 +947,13 @@ func requireNoDefaultRouting(t *testing.T, c defaultRoutingCompilation) {
 	require.NotContains(t, c.lock, `\"routing\":{`)
 	require.NotContains(t, c.lock, "GH_AW_MODEL_ROUTING: ")
 	require.NotContains(t, c.stderr, defaultRoutingNoticeMarker)
-	stderr := strings.ToLower(c.stderr)
-	require.NotContains(t, stderr, "model routing", "no routing diagnostics for a workflow without the default")
-	require.NotContains(t, stderr, "model-routing", "no routing diagnostics for a workflow without the default")
+	for line := range strings.SplitSeq(strings.ToLower(c.stderr), "\n") {
+		if strings.Contains(line, "engine.model-routing is deprecated.") || strings.Contains(line, "engine.pi.model-routing is deprecated.") {
+			continue
+		}
+		require.NotContains(t, line, "model routing", "no routing diagnostics except legacy migration warnings")
+		require.NotContains(t, line, "model-routing", "no routing diagnostics except legacy migration warnings")
+	}
 	if c.data != nil && c.data.EngineConfig != nil {
 		require.Nil(t, c.data.EngineConfig.ModelRouting)
 	}

@@ -224,7 +224,7 @@ Resolution produces `model.resolution` evidence in `usage/aw_session.jsonl`. See
 
 ### Default model routing
 
-On GitHub Copilot inference, `copilot`, `claude`, `codex`, and `pi` workflows that set no model or routing use `goal: cost` and `mode: auto`, the same as `model: router` (Claude and Codex also require `model-provider: github`). Any explicit `model` (including a router value), `engine.model`, `engine.model-routing`, `engine.fallback-models`, or model `engine.env` variable, including from imports, keeps existing behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable overrides the default at run time for Copilot, Claude, and Codex. Opt out with `engine.model-routing: false`; see [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
+On GitHub Copilot inference, `copilot`, `claude`, `codex`, and `pi` workflows that set no model or routing use `goal: cost` and `mode: auto`, the same as `model: router` (Claude and Codex also require `model-provider: github`). Any explicit `model` (including a router value), `engine.model`, `engine.model-routing`, `engine.fallback-models`, or model `engine.env` variable, including from imports, keeps existing behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable overrides the default at run time for Copilot, Claude, and Codex. Opt out with top-level `model-routing: false`; see [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
 
 ### Ordered model fallback (`fallback-models`)
 
