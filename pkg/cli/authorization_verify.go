@@ -6,11 +6,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow"
@@ -126,14 +124,7 @@ func verifyAuthorizationWorkflow(root, relative string, data *workflow.WorkflowD
 }
 
 func fingerprintAuthorizationImports(root string, data *workflow.WorkflowData, entry *AuthorizationWorkflowResult, result *AuthorizationPolicyResult) {
-	for _, imported := range append(slices.Clone(data.ImportedFiles), data.IncludedFiles...) {
-		if strings.HasPrefix(imported, parser.BuiltinPathPrefix) {
-			continue
-		}
-		importPath := imported
-		if !filepath.IsAbs(importPath) {
-			importPath = filepath.Join(root, filepath.Dir(entry.Source), imported)
-		}
+	for _, importPath := range data.ResolvedDependencyFiles {
 		relative, err := filepath.Rel(root, importPath)
 		if err != nil || !filepath.IsLocal(relative) {
 			result.addFinding("inventory_unresolved", entry.Source, "", "An imported dependency is outside the candidate snapshot.", "")

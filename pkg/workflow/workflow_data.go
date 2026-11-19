@@ -66,6 +66,7 @@ type WorkflowData struct {
 	MaxDailyAICreditsGitHubApp     *GitHubAppConfig  // optional GitHub App for minting the token used by the daily AIC guardrail
 	MaxDailyAICContinueOnError     bool              // when true, unknown/unverifiable daily AIC accounting is a warning instead of failing closed
 	ImportedFiles                  []string          // list of files imported via imports field (rendered as comment in lock file)
+	ResolvedDependencyFiles        []string          // canonical local dependency paths captured during protected verification
 	ImportedMetadataDocuments      map[string]string // compiler-resolved raw imports for JSON metadata generation
 	Skills                         []string          // skill specs from frontmatter (owner/repo@sha or owner/repo/skill/path@sha)
 	SkillReferences                []SkillReference

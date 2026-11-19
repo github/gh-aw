@@ -61,6 +61,8 @@ The verifier discovers all gh-aw entrypoints in `.github/workflows`, distinguish
 
 This initial profile resolves local snapshot imports and compiler-embedded builtin definitions and action pins only. It does not load candidate-owned action-resolution caches, download remote imports, resolve unknown action tags, run package validators, or invoke external workflow linters. Use local reviewed imports and literal action SHAs or compiler-supported explicit source pin mappings. Unresolved dependencies and unsupported compiler inputs fail verification; they are not silently omitted.
 
+Pin remote skills to full commit SHAs. Remote safe-output actions must declare inline `inputs` (use `inputs: {}` for no inputs); even SHA-pinned actions cannot fetch metadata during verification. Local dependency digests use compiler-resolved filenames, not manifest display paths or section selectors.
+
 Relative `stop-after` timestamps depend on historical compilation time and are incomplete in this profile. Use absolute timestamps or source expressions. Absolute timestamps are recomputed from source, never accepted from a candidate lock's metadata. Use the same pinned compiler version and generation inputs when producing reviewed locks.
 
 Snapshot materialization rejects symlinks, submodules, unsupported paths, files larger than 16 MiB, inventories over 50,000 files, and total content over 256 MiB. These cases are incomplete, not compliant. Arrange approved dependencies in the inspected snapshot rather than weakening containment or allowing live dependency resolution.

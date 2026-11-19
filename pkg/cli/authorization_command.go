@@ -82,9 +82,9 @@ func verifyAuthorizationCommand(cmd *cobra.Command, args []string, policyPath st
 		result.addFinding("policy_invalid", "", "", "Cannot read bounded protected policy input.", "")
 		return
 	}
-	result.PolicyDigest = authorizationDigest(data)
+	policyDigest := authorizationDigest(data)
 	expectedDigest, _ := cmd.Flags().GetString("authorization-policy-sha256")
-	if expectedDigest != "" && result.PolicyDigest != "sha256:"+strings.TrimPrefix(expectedDigest, "sha256:") {
+	if expectedDigest != "" && policyDigest != "sha256:"+strings.TrimPrefix(expectedDigest, "sha256:") {
 		result.addFinding("policy_invalid", "", "", "Policy digest does not match the checker-pinned digest.", "")
 		return
 	}
@@ -93,6 +93,7 @@ func verifyAuthorizationCommand(cmd *cobra.Command, args []string, policyPath st
 		result.addFinding("policy_invalid", "", "", err.Error(), "")
 		return
 	}
+	result.PolicyDigest = policyDigest
 	result.PolicyRevision = policy.PolicyRevision
 	result.PolicyFingerprint = authorizationBinding(&policy.Authority)
 	identity, _ := cmd.Flags().GetString("authorization-repository-id")

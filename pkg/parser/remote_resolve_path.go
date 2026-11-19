@@ -33,6 +33,13 @@ func ResolveIncludePath(filePath, baseDir string, cache *ImportCache) (string, e
 	resolved, err := resolveAndValidateLocalIncludePath(normalizedFilePath, resolveBase, securityBase)
 	if err == nil && cache != nil && cache.localOnlyRoot != "" {
 		err = fileutil.ValidatePathWithinBase(cache.localOnlyRoot, resolved)
+		if err == nil {
+			var absolute string
+			absolute, err = filepath.Abs(resolved)
+			if err == nil {
+				cache.resolvedLocalFiles[absolute] = struct{}{}
+			}
+		}
 	}
 	return resolved, err
 }

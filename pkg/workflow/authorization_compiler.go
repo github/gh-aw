@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -39,8 +40,12 @@ func (c *Compiler) CompileAuthorizationSnapshot(path string) (*WorkflowData, str
 		return nil, "", errors.New("authorization source must be contained in the candidate snapshot")
 	}
 	c.SetWorkflowIdentifier(filepath.ToSlash(relative))
+	c.importCache.SetLocalOnlyRoot(c.gitRoot)
 	data, err := c.ParseWorkflowFile(path)
 	if err != nil {
+		return nil, "", err
+	}
+	if err := validateAuthorizationActionMetadata(data); err != nil {
 		return nil, "", err
 	}
 	stopAfter, err := c.extractStopAfterFromOn(data.RawFrontmatter, data)
@@ -54,5 +59,35 @@ func (c *Compiler) CompileAuthorizationSnapshot(path string) (*WorkflowData, str
 	c.verificationYAML = &generated
 	defer func() { c.verificationYAML = nil }()
 	err = c.CompileWorkflowData(data, path)
-	return data, generated, err
+	if err != nil {
+		return nil, "", err
+	}
+	if len(data.ActionResolutionFailures) > 0 {
+		return nil, "", errors.New("protected verification requires all action references to be pinned")
+	}
+	for _, spec := range data.Skills {
+		parsed := parseSkillRefSpec(spec)
+		if parsed.isRemote && !parsed.isFullSHA {
+			return nil, "", fmt.Errorf("protected verification requires a full commit SHA for remote skill %q", spec)
+		}
+	}
+	data.ResolvedDependencyFiles = c.importCache.ResolvedLocalFiles()
+	return data, generated, nil
+}
+
+// Reject missing metadata before job building can consult caches or fetch action.yml.
+func validateAuthorizationActionMetadata(data *WorkflowData) error {
+	if data.SafeOutputs == nil {
+		return nil
+	}
+	for name, config := range data.SafeOutputs.Actions {
+		ref, err := parseActionUsesField(config.Uses)
+		if err != nil {
+			return fmt.Errorf("protected verification requires a valid safe-output action reference: %w", err)
+		}
+		if !ref.IsLocal && config.Inputs == nil {
+			return fmt.Errorf("protected verification requires inline inputs for remote safe-output action %q; remote metadata fetching is disabled", name)
+		}
+	}
+	return nil
 }

@@ -35,6 +35,9 @@ func authorizationGitEnv() []string {
 	}
 	// Omit inherited Git variables entirely: empty repository overrides can
 	// themselves change Git's behavior rather than disabling the overrides.
+	// PATH belongs to the protected wrapper's trusted executable environment,
+	// not the candidate. A child-only PATH cannot secure exec.CommandContext's
+	// parent-side lookup; a fixed Unix path would also break Windows installs.
 	for _, name := range []string{"PATH", "SYSTEMROOT"} {
 		if value := lookupEnv(name); value != "" {
 			env = append(env, name+"="+value)
