@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-19",
+  "snapshot_utc": "2026-11-19T08:44:00Z",
+  "latest_release": "v1.3.1",
+  "commits_30d": 1439,
+  "people_commits_30d": 602,
+  "commits_today_partial": 3,
+  "commits_yesterday": 51,
+  "open_prs": 23,
+  "dependabot_open_prs": 16,
+  "merged_today_in_sample": 3,
+  "changesets": 963,
+  "discussions_today": 5,
+  "cascade_suspected_open": 36,
+  "human_open_issues": 4
+}
