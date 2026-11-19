@@ -162,7 +162,7 @@ def main():
 		t.Run(scenario, func(t *testing.T) {
 			terminal := filepath.Join(t.TempDir(), "terminal")
 			cmd := exec.Command("python3", loadAiderSample(t).Behaviors.Execution.Args...)
-			cmd.Env = append(os.Environ(), "PYTHONPATH="+dir, "GH_AW_PROMPT="+prompt,
+			cmd.Env = append(os.Environ(), "GH_AW_PYTHON_PACKAGES="+dir, "GH_AW_PROMPT="+prompt,
 				"AIDER_TEST_SCENARIO="+scenario, "AIDER_TEST_TERMINAL="+terminal)
 			switch scenario {
 			case "extended-budget":

@@ -136,7 +136,7 @@ def main():
 	require.NoError(t, os.WriteFile(prompt, []byte("  exact prompt\n"), 0o600))
 	execution := loadAiderSample(t).Behaviors.Execution
 	cmd := exec.Command("python3", execution.Args...)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+dir, "GH_AW_PROMPT="+prompt, "AIDER_TEST_SCENARIO="+scenario, "AIDER_MODEL=native-model")
+	cmd.Env = append(os.Environ(), "GH_AW_PYTHON_PACKAGES="+dir, "GH_AW_PROMPT="+prompt, "AIDER_TEST_SCENARIO="+scenario, "AIDER_MODEL=native-model")
 	if providerMessage != nil {
 		messageJSON, err := json.Marshal(providerMessage)
 		require.NoError(t, err)

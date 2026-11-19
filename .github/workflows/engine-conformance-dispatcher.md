@@ -33,6 +33,7 @@ safe-outputs:
       - engine-conformance-gemini
       - engine-conformance-goose
       - engine-conformance-kiro
+      - engine-conformance-langgraph
       - engine-conformance-mini-swe-agent
       - engine-conformance-opencode
       - engine-conformance-pi
