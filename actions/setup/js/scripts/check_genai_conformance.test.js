@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-const checkerPath = path.join(import.meta.dirname, "check_genai_conformance.mjs");
+const checkerPath = path.join(import.meta.dirname, "../fixtures/genai/check_genai_conformance.mjs");
 const reportDirs = [];
 const requiredMetrics = [
   "gen_ai.client.inference.usage.input_tokens",
