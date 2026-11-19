@@ -87,6 +87,7 @@ The `tools:` field configures which tools the coding agent may use.
 - `args:` - Additional command-line arguments (local mode only)
 - `read-only:` - The GitHub MCP server always operates in read-only mode; this field is accepted but has no effect
 - `github-token:` - Custom GitHub token
+- `token-broker:` (experimental) - `true` (or an empty value) exchanges GitHub Actions OIDC for a broker-policy-scoped, read-only GitHub App token for this job; `false` disables it. Do not combine an enabled broker with `tools.github.github-token` or `tools.github.github-app`. The operator must deploy a broker and configure the `GH_AW_TOKEN_BROKER_URL` Actions secret; missing configuration or exchange failure stops the job. See [token broker configuration](https://github.github.com/gh-aw/reference/frontmatter/#token-broker-token-broker).
 - `lockdown:` - Enable lockdown mode to limit content surfaced from public repositories to items authored by users with push access (boolean, default: false)
 - `github-app:` - GitHub App configuration for token minting; when set, mints an installation access token at workflow start that overrides `github-token`
   - `client-id:` - GitHub App client ID (required, e.g., `${{ vars.APP_ID }}`). Use `app-id:` for legacy compatibility.
