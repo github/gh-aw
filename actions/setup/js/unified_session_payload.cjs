@@ -732,11 +732,10 @@ function normalizeUnifiedSessionEvent(event, phase, copilotSource) {
   }
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = event.type === "mcp.configuration" ? normalizeMcpConfigurationData(source) : known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
-  if (event.type === "session.shutdown" && (copilotSource === true || (copilotSource === undefined && source.aiCreditsScope === "Copilot session"))) {
+  if (event.type === "session.shutdown" && (copilotSource === true || (copilotSource === undefined && Object.hasOwn(source, "aiCreditsStatus")))) {
     const snapshot = copilotSource ? source.accountingSnapshot : source;
     const status = snapshot?.aiCreditsStatus;
     const total = snapshot?.totalNanoAiu;
-    data.aiCreditsScope = "Copilot session";
     if ((status === "complete" || status === "partial") && isTokenCount(total) && (source.totalNanoAiu === undefined || source.totalNanoAiu === total)) {
       data.aiCreditsStatus = status;
       data.totalNanoAiu = total;

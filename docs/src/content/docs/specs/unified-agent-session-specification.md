@@ -1622,11 +1622,11 @@ effort. `session.shutdown.data.agentMetrics` is exposed unchanged in
 token counts, and nano-AIU credits. This is an authoritative snapshot, not an
 additional contribution to session usage.
 
-Copilot `session.shutdown` reports `aiCreditsScope: "Copilot session"` and
-`aiCreditsStatus` from the native terminal accounting snapshot. When `complete`,
-`totalNanoAiu` is the reported charge for the session's observed calls (divide
-by 1,000,000,000 for credits); an explicit zero is valid. When `partial`, the
-number is a reported subtotal, not the bill. When the snapshot is missing,
+On Copilot `session.shutdown`, `totalNanoAiu` covers the session, including
+work delegated to child agents. Divide by 1,000,000,000 for credits.
+`aiCreditsStatus` comes from the native terminal accounting snapshot. When
+`complete`, every observed call has a reported charge; an explicit zero is valid.
+When `partial`, the number is a reported subtotal, not the bill. When the snapshot is missing,
 unavailable, invalid, or contradicts the shutdown total, the status is
 `unavailable` and the amount is omitted. No shutdown means no terminal
 accounting. Older artifacts without a completeness status do not verify a bill.

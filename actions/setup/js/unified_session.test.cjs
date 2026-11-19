@@ -1904,10 +1904,33 @@ describe("Unified conclusion session", () => {
     const events = content.trimEnd().split("\n").map(JSON.parse);
     expect(validateSession(content)).toBe(events.length);
     const [shutdown] = events.filter(event => event.type === "session.shutdown");
-    expect(shutdown.data).toEqual({ aiCreditsScope: "Copilot session", ...expected });
-    expect(normalizeUnifiedSessionEvent(shutdown).data).toEqual(shutdown.data);
+    expect(shutdown.data).toEqual(expected);
+    expect(normalizeUnifiedSessionEvent(shutdown).data).toEqual(expected);
+    expect(req("./session_cli.cjs").sessionCLI(["markdown", outputPath])).toContain(`aiCreditsStatus=${expected.aiCreditsStatus}`);
     expect(events.find(event => event.type === "firewall.token_usage")?.data.totalAic).toBe(12.5);
     expect(JSON.stringify(events)).not.toContain("primaryAic");
+  });
+
+  it("does not infer Copilot terminal credits from a legacy total or a different engine", () => {
+    const legacy = { type: "session.shutdown", data: { totalNanoAiu: 0 } };
+    expect(normalizeUnifiedSessionEvent(legacy)).toEqual(legacy);
+    const source = { component: "agent", phase: "agent", path: "agent-session.jsonl", events: [{ ...legacy, data: { ...legacy.data, accountingSnapshot: { aiCreditsStatus: "complete", totalNanoAiu: 0 } } }] };
+    expect(mergeSessionSources([source], "custom")[0].data).toEqual(legacy.data);
+  });
+
+  it.each([
+    [
+      { aiCreditsStatus: "complete", totalNanoAiu: 0 },
+      { aiCreditsStatus: "complete", totalNanoAiu: 0 },
+    ],
+    [undefined, { aiCreditsStatus: "unavailable" }],
+  ])("reconstructs Copilot terminal credits from canonical session identity without workflow metadata: %j", (accountingSnapshot, expected) => {
+    write("agent-session.jsonl", [
+      { type: "session.init", data: { sessionId: "native", sourceEngine: "copilot" } },
+      { type: "session.shutdown", data: { totalNanoAiu: 0, accountingSnapshot } },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.find(event => event.type === "session.shutdown").data).toEqual(expected);
   });
 
   it.each([[`{"type":"session.start","data":{"sessionId":"native"}}\n`], [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`]])(
