@@ -344,6 +344,9 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 // writeWorkflowOutput writes the compiled workflow to the lock file
 // and handles console output formatting.
 func (c *Compiler) writeWorkflowOutput(lockFile, yamlContent string, markdownPath string) error {
+	if c.verificationYAML != nil {
+		*c.verificationYAML = yamlContent
+	}
 	// Write to lock file (unless noEmit is enabled)
 	if c.noEmit {
 		workflowLog.Print("Validation completed - no lock file generated (--no-emit enabled)")

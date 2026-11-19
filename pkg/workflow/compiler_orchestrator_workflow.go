@@ -42,6 +42,7 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 	// registry and catalog must not affect subsequent compilations.
 	c.engineRegistry = NewEngineRegistry()
 	c.engineCatalog = NewEngineCatalog(c.engineRegistry)
+	c.engineCatalog.offline = c.verifyAuthorization
 
 	orchestratorWorkflowLog.Printf("Starting workflow file parsing: %s", markdownPath)
 
