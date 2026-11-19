@@ -1,0 +1,5 @@
+[registry]
+v2 = true
+
+[live-check]
+search_all_attributes = true

@@ -21,7 +21,7 @@ Resource attributes identify the service and workflow run, for example `service.
 | Family | Examples |
 |---|---|
 | Workflow identity and outcome | `gh-aw.workflow.name`, `gh-aw.job.name`, `gh-aw.run.status`, `gh-aw.agent.conclusion` |
-| Model usage | `gen_ai.system`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
+| Model usage | `gen_ai.provider.name`, `gen_ai.agent.name`, `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
 | Cost and budget | `gh-aw.aic`, `gh-aw.max_ai_credits`, `gh-aw.max_ai_credits_exceeded` |
 | Failures and export health | `gh-aw.error_count`, `exception`, `gh-aw.otlp.export_errors` |
 | Routing, firewall, and tools | `gh-aw.model_routing.*`, `gh-aw.firewall.*`, `gh-aw.mcp.*` |
@@ -75,7 +75,7 @@ Choose the owning span first, then the attribute. Missing attributes mean unknow
 |---|---|---|
 | Agent latency | Span duration of `gh-aw.<job>.agent` | Dedicated agent span, when `agent_cli_start_ms` and `agent_output.json` timing allow it |
 | Job wall time | `gh-aw.action_minutes` (minutes) | Conclusion span; computed as `(end - start) / 60000` |
-| Tokens | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens`, `gen_ai.usage.total_tokens` | Dedicated agent span; otherwise the conclusion span of the job that owns usage. `total_tokens` is input plus output only |
+| Tokens | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_write.input_tokens` | Dedicated agent span; otherwise the conclusion span of the job that owns usage. Compatibility mode also emits `gen_ai.usage.cache_creation.input_tokens` and `gen_ai.usage.total_tokens` |
 | AI credits | `gh-aw.aic` (double) | Usage-owning span only; explicit zero is measured, absence is unknown |
 | Budget | `gh-aw.max_ai_credits`, `gh-aw.max_ai_credits_exceeded`, `gh-aw.ai_credits_rate_limit_error` | Agent conclusion path |
 | Turns | `gh-aw.turns` | Conclusion span, when the engine reports a turn count |
@@ -99,7 +99,7 @@ Source evidence is limited to implementation and tests; this table lists emitter
 |---|---|---|---|
 | Job setup | `gh-aw.<job>.setup`, `gh-aw.job.setup` | `actions/setup/js/send_otlp_span.cjs` `sendJobSetupSpan` | Signals, Identity |
 | Job conclusion | `gh-aw.<job>.conclusion`, `gh-aw.job.conclusion` | `send_otlp_span.cjs` `sendJobConclusionSpan`; `action_conclusion_otlp.cjs` | Identity, Query recipes |
-| Agent | `gh-aw.<job>.agent` (dedicated span, `kind` CLIENT) | `send_otlp_span.cjs` `sendJobConclusionSpan` (`hasDedicatedAgentSpan`) | Identity, Query recipes |
+| Agent | Compatibility: `gh-aw.<job>.agent` (`CLIENT`); opt-in: `invoke_agent <workflow>` (`INTERNAL`) | `send_otlp_span.cjs` `sendJobConclusionSpan` (`hasDedicatedAgentSpan`) | Identity, Query recipes |
 | Exceptions | `exception` events | `send_otlp_span.cjs` `buildSpanEvents` | Signals |
 | Graders | `grader.result` events; `gh-aw.graders.*` on the agent conclusion span | `send_otlp_span.cjs` `buildGraderTelemetry`, `selectGraderOutputForJob` | Signals, Identity |
 | Evals | `eval.result`, `eval.status` events; `gh-aw.evals.*` | `send_otlp_span.cjs` `buildEvalTelemetry` | Signals |
@@ -112,16 +112,15 @@ Source evidence is limited to implementation and tests; this table lists emitter
 | Resource identity | `service.*`, `github.*`, `runner.*`, `deployment.environment`, `gh-aw.*` | `send_otlp_span.cjs` `buildGitHubActionsResourceAttributes`; `pkg/workflow/observability_otlp.go` `otelResourceAttributes` | Identity |
 | Attribute names | 200 names | `specs/otel/attributes.tsp`, generated into `actions/setup/js/otel_attributes_generated.cjs` and `pkg/workflow/otel_attributes_generated.go` | Identity |
 
-No OTel metric emitter exists in `actions/`, `pkg/`, `cmd/`, or `scripts/`.
+The JavaScript runtime emits `gh_aw.*` metrics and GenAI token counters when metrics are enabled; metric names and compatibility behavior are described in the public OpenTelemetry reference.
 
 ## Discrepancies with the specification
 
 These describe current behavior. They do not change the normative specification.
 
-- **Metrics (spec §11.2–11.3):** `gh_aw.*` and `cicd.*` metric instruments are not emitted. Treat all measurements as span attributes or events.
-- **Span error type (spec §10.5):** The bare `error.type` key is not emitted. Work-queue spans use the prefixed `gh-aw.work_queue.error.type`. Built-in setup, conclusion, and agent spans use `status.code` and `exception` events.
+- **Span error type (spec §10.5):** Built-in agent and agent-conclusion spans emit the low-cardinality `error.type` on failure, timeout, or cancellation. Work-queue spans use the prefixed `gh-aw.work_queue.error.type`.
 - **Lifecycle events (spec §10.6):** `gh_aw.job.setup.completed`, `gh_aw.agent.retry`, and related events are not emitted.
 - **Outcome spans (spec §13):** The `gh-aw.outcome.*` family appears in the public attribute reference and the spec, but no producer exists in this checkout. The corresponding formal tests in `pkg/workflow/otel_reliability_formal_test.go` are skipped.
-- **Aliases not emitted:** `gen_ai.provider.name`, `gen_ai.usage.reasoning.output_tokens`, and `cicd.*` aliases are not emitted.
+- **Aliases not emitted:** `gen_ai.usage.reasoning.output_tokens` is not emitted.
 - **Local mirror redaction (spec §14.3):** Span payloads from `sendJobSetupSpan`, `sendJobConclusionSpan` (agent and conclusion), and their mirror writes call `appendToOTLPJSONL(payload)` without `sanitizeOTLPPayload`. The wire export (`sendOTLPSpan`) and `logSpan` do sanitize. Source-observed; not confirmed by a runtime test.
 - **Validation status:** `specs/otel/attributes.tsp` already defines 200 attribute names, and they match the generated JavaScript and Go constants (verified by comparison). The TypeSpec compiler is not installed (`specs/otel/node_modules` is absent) and no lock installation is performed in this run. Compiler validation of `specs/otel/messages.tsp` is therefore deferred, and no TypeSpec file was created or changed.

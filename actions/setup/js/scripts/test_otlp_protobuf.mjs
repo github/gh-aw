@@ -13,7 +13,7 @@ assert.ok(process.env.GH_AW_OTEL_SDK_DIR, "Set GH_AW_OTEL_SDK_DIR to the isolate
 const sdkRequire = createRequire(path.join(process.env.GH_AW_OTEL_SDK_DIR, "package.json"));
 const require = createRequire(import.meta.url);
 const { encodeOTLPTraceRequest, encodeOTLPMetricsRequest } = require("../otlp_protobuf.cjs");
-const { buildOTLPPayload } = require("../send_otlp_span.cjs");
+const { buildOTLPPayload, SPAN_KIND_INTERNAL } = require("../send_otlp_span.cjs");
 const { buildOTLPMetric, buildOTLPMetricsPayload } = require("../otlp_metrics.cjs");
 const { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } = sdkRequire("@opentelemetry/sdk-trace-base");
 const { resourceFromAttributes } = sdkRequire("@opentelemetry/resources");
@@ -222,6 +222,63 @@ test("matches SDK protocol types for gh-aw gauge, sum, and histogram metrics wit
   assert.deepEqual(histogram.histogram.dataPoints[0].bucketCounts, ["0", "0", "1", "0", "0"]);
   assert.deepEqual(histogram.histogram.dataPoints[0].explicitBounds, [1, 5, 15, 60]);
   assert.deepEqual(overflow.histogram.dataPoints[0].bucketCounts, ["0", "0", "0", "0", "1"]);
+});
+
+test("matches the SDK for opt-in GenAI spans and metrics with the current schema URL", () => {
+  const previousOptIn = process.env.OTEL_SEMCONV_STABILITY_OPT_IN;
+  process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "other, gen_ai_v1";
+  try {
+    const { buildAttr, SPAN_KIND_INTERNAL } = require("../send_otlp_span.cjs");
+    const traceId = "0123456789abcdef0123456789abcdef";
+    const span = buildOTLPPayload({
+      traceId,
+      spanId: "0123456789abcdef",
+      parentSpanId: "fedcba9876543210",
+      spanName: "invoke_agent CI",
+      serviceName: "gh-aw",
+      scopeVersion: "test",
+      startMs: 1700000000000,
+      endMs: 1700000000123,
+      kind: SPAN_KIND_INTERNAL,
+      statusCode: 0,
+      attributes: [buildAttr("gen_ai.operation.name", "invoke_agent"), buildAttr("gen_ai.agent.name", "CI"), buildAttr("gen_ai.provider.name", "github")],
+    });
+    const traceReference = ExportTraceServiceRequest.encode(ExportTraceServiceRequest.fromObject(toProtoJson(span))).finish();
+    compare(span, traceReference);
+    const decodedSpan = fromProtoJson(decode(encodeOTLPTraceRequest(span))).resourceSpans[0];
+    assert.equal(decodedSpan.scopeSpans[0].schemaUrl, "https://opentelemetry.io/schemas/1.45.0");
+    assert.equal(decodedSpan.scopeSpans[0].spans[0].kind, SPAN_KIND_INTERNAL);
+    assert.equal(decodedSpan.scopeSpans[0].spans[0].status.code, SpanStatusCode.UNSET);
+
+    const timing = { startMs: 1700000000000, endMs: 1700000000123, traceContext: { traceId, spanId: "0123456789abcdef" } };
+    const attributes = [buildAttr("gen_ai.operation.name", "invoke_agent"), buildAttr("gen_ai.provider.name", "github"), buildAttr("gen_ai.token.modality", "unknown"), buildAttr("gen_ai.agent.name", "CI")];
+    const metrics = buildOTLPMetricsPayload({
+      serviceName: "gh-aw",
+      scopeVersion: "test",
+      metrics: [
+        buildOTLPMetric({ name: "gen_ai.client.inference.usage.input_tokens", type: "counter", value: 135, unit: "{token}", attributes, ...timing }),
+        buildOTLPMetric({
+          name: "gen_ai.invoke_agent.duration",
+          type: "histogram",
+          value: 12.5,
+          buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 25.6, 51.2, 102.4, 204.8, 409.6, 900, 1800, 3600, 7200, 14400, 43200, 86400],
+          unit: "s",
+          attributes,
+          ...timing,
+        }),
+      ],
+    });
+    const actualMetrics = encodeOTLPMetricsRequest(metrics);
+    const referenceMetrics = ExportMetricsServiceRequest.encode(ExportMetricsServiceRequest.fromObject(toProtoJson(metrics))).finish();
+    assert.deepEqual(actualMetrics, Buffer.from(referenceMetrics), "metric wire bytes must match the SDK encoder exactly");
+    const decodedMetrics = fromProtoJson(ExportMetricsServiceRequest.toObject(ExportMetricsServiceRequest.decode(actualMetrics), { longs: String, bytes: String })).resourceMetrics[0];
+    assert.equal(decodedMetrics.scopeMetrics[0].schemaUrl, "https://opentelemetry.io/schemas/1.45.0");
+    assert.equal(decodedMetrics.scopeMetrics[0].metrics[0].sum.isMonotonic, true);
+    assert.equal(decodedMetrics.scopeMetrics[0].metrics[1].histogram.dataPoints[0].explicitBounds.length, 20);
+  } finally {
+    if (previousOptIn === undefined) delete process.env.OTEL_SEMCONV_STABILITY_OPT_IN;
+    else process.env.OTEL_SEMCONV_STABILITY_OPT_IN = previousOptIn;
+  }
 });
 
 test("sends SDK-decodable binary payloads through real HTTP and curl transports", async () => {
