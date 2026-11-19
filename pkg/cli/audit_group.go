@@ -32,7 +32,7 @@ type GroupedAuditEntry struct {
 }
 
 func runAuditGrouped(ctx context.Context, args []string, opts auditCommandOptions) error {
-	runRequests, err := resolveGroupedAuditRunRequests(args, opts.repoFlag)
+	runRequests, err := resolveGroupedAuditRunRequests(ctx, args, opts.repoFlag)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ type groupedAuditRunRequest struct {
 	hostname string
 }
 
-func resolveGroupedAuditRunRequests(args []string, repoFlag string) ([]groupedAuditRunRequest, error) {
+func resolveGroupedAuditRunRequests(ctx context.Context, args []string, repoFlag string) ([]groupedAuditRunRequest, error) {
 	baseArg, ok := firstAuditArg(args)
 	if !ok {
 		return nil, errors.New(console.FormatErrorWithSuggestions(
@@ -101,7 +101,7 @@ func resolveGroupedAuditRunRequests(args []string, repoFlag string) ([]groupedAu
 	if err != nil {
 		return nil, fmt.Errorf("invalid run %q: %w", baseArg, err)
 	}
-	if err := applyAuditRepoFlag(repoFlag, baseComponents); err != nil {
+	if err := applyAuditRepoFlag(ctx, repoFlag, baseComponents); err != nil {
 		return nil, err
 	}
 	owner, repo, hostname := baseComponents.Owner, baseComponents.Repo, baseComponents.Host

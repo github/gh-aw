@@ -230,9 +230,13 @@ func previewOrgRepoCheckout(ctx context.Context, repo, checkoutDir string, opts 
 		// identifiers (e.g. v1.2.3) instead of bare short SHAs when possible.
 		currentLabel := resolveVersionLabel(ctx, resolved.sourceSpec.Repo, resolved.currentRef)
 		latestLabel := resolveVersionLabel(ctx, resolved.sourceSpec.Repo, resolved.latestRef)
+		relativePath, err := filepath.Rel(checkoutDir, wf.Path)
+		if err != nil {
+			return orgRepoPreview{}, fmt.Errorf("deriving workflow path relative to checkout: %w", err)
+		}
 		preview.Workflows = append(preview.Workflows, orgWorkflowPreview{
 			Name:       name,
-			Path:       wf.Path,
+			Path:       filepath.ToSlash(relativePath),
 			CurrentRef: currentLabel,
 			LatestRef:  latestLabel,
 			Redirected: len(resolved.redirectHistory) > 0,

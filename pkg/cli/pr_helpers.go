@@ -70,6 +70,9 @@ func createPRWithChanges(ctx context.Context, branchPrefix, commitMessage, prTit
 		_ = switchPRBranch(currentBranch, verbose)
 		return "", fmt.Errorf("failed to create PR: %w", err)
 	}
+	if reporter := updateReporter(ctx); reporter != nil {
+		reporter.recordError(emitUpdateEvent(ctx, updateJSONLEvent{Event: "pull_request", Status: "created", URL: prURL}))
+	}
 
 	var autoMergeErr error
 	if autoMerge {

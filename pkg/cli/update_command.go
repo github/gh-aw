@@ -175,7 +175,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 			var summary *updatePRSummary
 			if createPR {
 				var err error
-				summary, err = newUpdatePRSummary(cmd.Context(), opts.WorkflowsDir)
+				summary, err = newUpdatePRSummary(cmd.Context(), opts.WorkflowsDir, opts.WorkflowNames...)
 				if err != nil {
 					return err
 				}
@@ -229,13 +229,28 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 	cmd.ValidArgsFunction = CompleteWorkflowNames
 	RegisterEngineFlagCompletion(cmd)
 	RegisterDirFlagCompletion(cmd, "dir")
+	addUpdateJSONLFlag(cmd)
 
 	return cmd
 }
 
 // RunUpdateWorkflows updates workflows from their source repositories.
 // Each workflow is compiled immediately after update.
-func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { //nolint:largefunc
+func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runErr error) { //nolint:largefunc
+	var snapshotTargets []string
+	if updateReporter(ctx) != nil {
+		var err error
+		snapshotTargets, err = updatePRPackageSnapshotTargets(ctx, opts.WorkflowNames)
+		if err != nil {
+			reportUpdateWarning(ctx, "change_observation", err)
+			snapshotTargets = nil
+		}
+	}
+	finish, err := observeUpdateChanges(ctx, opts.WorkflowsDir, snapshotTargets...)
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, finish()) }()
 	if opts.Verbose {
 		ctx = ctxutil.WithOperationReporter(ctx, reportUpdateNetworkOperation)
 	}
@@ -256,6 +271,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	// Pass --no-release-bump to revert to only forcing updates for core (actions/*) actions.
 	updateLog.Printf("Updating GitHub Actions versions in actions-lock.json: allowMajor=%v, disableReleaseBump=%v", opts.AllowMajor, opts.DisableReleaseBump)
 	if err := updateActions(ctx, actionDeps, opts.AllowMajor, opts.Verbose, opts.DisableReleaseBump, opts.CoolDown); err != nil {
+		reportUpdateWarning(ctx, "actions", err)
 		// Non-fatal: warn but don't fail the update
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update actions-lock.json: %v", err)))
 	}
@@ -281,6 +297,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 				firstErr = errors.Join(firstErr, compileErr)
 			}
 		} else {
+			reportUpdateWarning(ctx, "workflow_actions", err)
 			// Non-fatal: warn but don't fail the update
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update action references in workflow files: %v", err)))
 		}
@@ -292,7 +309,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	// and new versions are resolved in a single pass.
 	updateLog.Print("Updating container image digest pins")
 	newContainerPins := false
-	var err error
+	err = nil
 	if conflictedWorkflow, scanErr := findWorkflowWithMergeConflictMarkers(opts.WorkflowsDir); scanErr != nil {
 		firstErr = errors.Join(firstErr, fmt.Errorf("unable to scan workflows for merge conflicts: %w", scanErr))
 	} else if conflictedWorkflow != "" {
@@ -303,6 +320,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 		newContainerPins, err = updateContainerPins(ctx, defaultContainerPinUpdateDeps(), opts.WorkflowsDir, opts.Verbose, containerPinUpdateOptions{refreshExisting: true})
 	}
 	if err != nil {
+		reportUpdateWarning(ctx, "containers", err)
 		// Non-fatal: Docker may not be available in all environments.
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update container pins: %v", err)))
 	}
@@ -349,6 +367,7 @@ func recompileAllWorkflows(ctx context.Context, workflowsDir, engineOverride str
 }
 
 func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateWorkflowsOptions, createPR bool, verbose bool) error { //nolint:largefunc
+	ctx = withUpdateRepository(ctx, targetRepo)
 	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
 		ctx = withUpdateGitHubClient(ctx, verbose)
 	}
@@ -357,7 +376,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 		if err != nil {
 			return err
 		}
-		return emitOrgRolloutPreview(preview, len(preview.Workflows) > 0)
+		return emitOrgRolloutPreview(preview, len(preview.Workflows) > 0, ctx)
 	}
 	existing, skip, err := prepareOrgRolloutWorker(ctx, targetRepo, ghawUpdateMarkerPrefix)
 	if err != nil || skip {
@@ -384,7 +403,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 			return err
 		}
 		if len(preview.Workflows) == 0 {
-			return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"})
+			return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"}, ctx)
 		}
 	}
 
@@ -412,7 +431,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 
 	var summary *updatePRSummary
 	if createPR {
-		summary, err = newUpdatePRSummary(ctx, opts.WorkflowsDir)
+		summary, err = newUpdatePRSummary(ctx, opts.WorkflowsDir, opts.WorkflowNames...)
 		if err != nil {
 			return err
 		}
@@ -428,7 +447,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 				return err
 			}
 			if !changed {
-				return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"})
+				return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"}, ctx)
 			}
 		}
 		xmlMarker := buildOrgXMLMarker(ghawUpdateMarkerPrefix, normalizeDisplayVersion(GetVersion()))
@@ -454,7 +473,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 		}
 		if err != nil {
 			if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && prURL != "" {
-				return errors.Join(err, emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL}))
+				return errors.Join(err, emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL}, ctx))
 			}
 			return err
 		}

@@ -279,6 +279,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 	if len(failedActions) > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check %d action(s):", len(failedActions))))
 		for _, f := range failedActions {
+			reportUpdateWarning(ctx, "action", fmt.Errorf("%s: %s", f.name, f.err))
 			fmt.Fprintf(os.Stderr, "  %s: %s\n", f.name, f.err)
 		}
 		fmt.Fprintln(os.Stderr, "")
