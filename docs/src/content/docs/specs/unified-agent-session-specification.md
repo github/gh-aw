@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.11.0"
+version: "2.12.0"
 status: Draft
-publication_date: "2026-11-17"
+publication_date: "2026-11-19"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.11.0<br>
+**Version**: 2.12.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-17<br>
+**Publication Date**: 2026-11-19<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.11.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.12.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -1622,17 +1622,25 @@ effort. `session.shutdown.data.agentMetrics` is exposed unchanged in
 token counts, and nano-AIU credits. This is an authoritative snapshot, not an
 additional contribution to session usage.
 
-On Copilot `session.shutdown`, `totalNanoAiu` covers the session, including
-work delegated to child agents. Divide by 1,000,000,000 for credits.
-`aiCreditsStatus` comes from the native terminal accounting snapshot. When
-`complete`, every observed call has a reported charge; an explicit zero is valid.
-When `partial`, the number is a reported subtotal, not the bill. When the snapshot is missing,
-unavailable, invalid, or contradicts the shutdown total, the status is
-`unavailable` and the amount is omitted. No shutdown means no terminal
-accounting. Older artifacts without a completeness status do not verify a bill.
-Do not add agent breakdowns to the terminal total or assume coverage of work
-outside the session (such as routing classification or a separate detection
-job). This is not a token-price estimate, whole-job cost, or `primaryAic`.
+**T-UAS-091 — Copilot terminal total.** On Copilot `session.shutdown`,
+`totalNanoAiu` MUST represent the total nano-AIU charge for the session,
+including work delegated to child agents. Implementations MUST NOT add
+per-agent breakdowns to this terminal total. One billion nano-AIU equals one
+credit.
+
+**T-UAS-092 — Copilot credit completeness.** `aiCreditsStatus` MUST be derived
+from the native terminal accounting snapshot. If the status is `complete`,
+every observed call has a reported charge; an explicit zero is valid. If the
+status is `partial`, `totalNanoAiu` is a reported subtotal and MUST NOT be
+presented as the final bill. If the snapshot is missing, unavailable, invalid,
+or contradicts the shutdown total, the implementation MUST emit
+`aiCreditsStatus: "unavailable"` and MUST omit `totalNanoAiu`. In the absence
+of `session.shutdown`, terminal accounting MUST NOT be reported. Artifacts
+without a completeness status MUST NOT be treated as bill verification.
+
+No terminal total includes work outside the session, such as routing
+classification or a separate detection job. This accounting is not a
+token-price estimate, whole-job cost, or `primaryAic`.
 `session.task_complete` retains its supplied success flag without duplicating a
 textual summary already mapped to `assistant.message`. Nontextual summaries remain
 available as supplied data. Refusals retain the same request and caller identity
