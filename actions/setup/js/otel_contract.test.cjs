@@ -57,6 +57,8 @@ describe("durable parent OpenTelemetry evidence", () => {
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", "");
     vi.stubEnv("GH_AW_OTLP_IF_MISSING", "ignore");
+    const mkdirSync = fs.mkdirSync;
+    vi.spyOn(fs, "mkdirSync").mockImplementation((dir, ...args) => (String(dir) === "/tmp/gh-aw" ? undefined : mkdirSync.call(fs, dir, ...args)));
     appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
   });
   afterEach(() => {

@@ -95,12 +95,12 @@ function resolveGenAiProvider(engineId) {
   return ENGINE_TO_PROVIDER_MAP[engineId] || engineId;
 }
 
-/** True when OTEL_SEMCONV_STABILITY_OPT_IN contains gen_ai_latest_experimental (spec §6.7). */
-function isGenAiLatestExperimental() {
+/** True when OTEL_SEMCONV_STABILITY_OPT_IN contains gen_ai_v1 (spec §6.7). */
+function isGenAiV1() {
   return (process.env.OTEL_SEMCONV_STABILITY_OPT_IN || "")
     .split(",")
     .map(s => s.trim())
-    .includes("gen_ai_latest_experimental");
+    .includes("gen_ai_v1");
 }
 
 const GEN_AI_SCHEMA_URL = "https://opentelemetry.io/schemas/1.45.0";
@@ -394,7 +394,7 @@ const SPAN_KIND_CONSUMER = 5;
  * @returns {any}
  */
 function buildOTLPSpan({ traceId, spanId, parentSpanId, spanName, startMs, endMs, attributes, statusCode, statusMessage, kind = SPAN_KIND_INTERNAL, events }) {
-  const code = typeof statusCode === "number" ? statusCode : isGenAiLatestExperimental() ? 0 : 1;
+  const code = typeof statusCode === "number" ? statusCode : isGenAiV1() ? 0 : 1;
   /** @type {{ code: number, message?: string }} */
   const status = { code };
   if (statusMessage) {
@@ -544,7 +544,7 @@ function buildGitHubActionsResourceAttributes({
     upsertResourceAttr(buildAttr("gh-aw.awmg.version", awmgVersion));
   }
   const deploymentEnvironment = staged ? "staging" : "production";
-  if (!isGenAiLatestExperimental()) {
+  if (!isGenAiV1()) {
     upsertResourceAttr(buildAttr(OTEL_ATTR_DEPLOYMENT_ENVIRONMENT, deploymentEnvironment));
   } else {
     for (let index = resourceAttributes.length - 1; index >= 0; index--) {
@@ -674,7 +674,7 @@ function buildGitHubActionsRunUrlAttribute(repository, runId) {
 function buildOTLPBatchPayload({ serviceName, scopeVersion, resourceAttributes, spans }) {
   const scopeSpans = {
     scope: { name: "gh-aw", version: scopeVersion || "unknown" },
-    ...(isGenAiLatestExperimental() ? { schemaUrl: GEN_AI_SCHEMA_URL } : {}),
+    ...(isGenAiV1() ? { schemaUrl: GEN_AI_SCHEMA_URL } : {}),
     spans,
   };
   return {
@@ -1675,7 +1675,7 @@ async function sendJobSetupSpan(options = {}) {
   }
 
   if (engineId) {
-    if (!isGenAiLatestExperimental()) {
+    if (!isGenAiV1()) {
       attributes.push(buildAttr("gen_ai.system", ENGINE_TO_SYSTEM_MAP[engineId] || engineId));
     }
     attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, resolveGenAiProvider(engineId)));
@@ -2425,7 +2425,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const bodyModified = typeof awInfo.body_modified === "boolean" ? awInfo.body_modified : parseBooleanEnv(process.env.GH_AW_INFO_BODY_MODIFIED);
   const trackerId = process.env.GH_AW_TRACKER_ID || awInfo.tracker_id || "";
   const jobName = resolveConclusionJobName(spanName);
-  const optIn = isGenAiLatestExperimental();
+  const optIn = isGenAiV1();
   const modelRoutingSummary = jobName === "agent" ? resolveModelRoutingSummary({ infoPath: getGhAwPath("aw_info.json"), ghAwDir: getGhAwPath("") }) : null;
   const jobEmitsOwnTokenUsage = jobName === "agent" || jobName === "detection" || (!!engineId && jobName === engineId);
   const runId = process.env.GITHUB_RUN_ID || "";
@@ -2672,7 +2672,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     // and length-truncation is always queryable in Sentry/dashboards.
     const effectiveStopReason = runtimeMetrics.stopReason || (isAgentTimedOut ? "timeout" : "unknown");
     agentGenAiAttrs.push(buildArrayAttr("gen_ai.response.finish_reasons", [effectiveStopReason]));
-    agentErrorType = isAgentTimedOut ? "timeout" : isAgentCancelled ? "cancelled" : isAgentFailure ? "agent_failed" : "";
+    const hasInferredAgentFailure = !rawRunStatus && (hasAgentExecutionFailureExitCode || outputErrors.length > 0);
+    agentErrorType = isAgentTimedOut ? "timeout" : isAgentCancelled ? "cancelled" : isAgentFailure || hasInferredAgentFailure ? "agent_failed" : "";
     if (agentErrorType) agentGenAiAttrs.push(buildAttr(OTEL_ATTR_ERROR_TYPE, agentErrorType));
   }
 
@@ -3073,7 +3074,7 @@ module.exports = {
   parseOTLPCustomAttributes,
   buildCustomOTLPAttributes,
   resolveGenAiProvider,
-  isGenAiLatestExperimental,
+  isGenAiV1,
   GEN_AI_SCHEMA_URL,
   resolveInclusiveInputTokens,
 };

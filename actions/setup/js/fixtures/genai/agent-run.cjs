@@ -38,7 +38,7 @@ async function main() {
   process.env.GH_AW_INFO_WORKFLOW_NAME = "OpenTelemetry GenAI Conformance";
   process.env.INPUT_JOB_NAME = "agent";
   process.env.OTEL_SERVICE_NAME = "gh-aw";
-  if (mode === "latest") process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "gen_ai_latest_experimental";
+  if (mode === "latest") process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "gen_ai_v1";
   else delete process.env.OTEL_SEMCONV_STABILITY_OPT_IN;
 
   try {

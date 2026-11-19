@@ -226,7 +226,7 @@ test("matches SDK protocol types for gh-aw gauge, sum, and histogram metrics wit
 
 test("matches the SDK for opt-in GenAI spans and metrics with the current schema URL", () => {
   const previousOptIn = process.env.OTEL_SEMCONV_STABILITY_OPT_IN;
-  process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "other, gen_ai_latest_experimental";
+  process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "other, gen_ai_v1";
   try {
     const { buildAttr, SPAN_KIND_INTERNAL } = require("../send_otlp_span.cjs");
     const traceId = "0123456789abcdef0123456789abcdef";

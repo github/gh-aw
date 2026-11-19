@@ -210,6 +210,10 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
     tracePayloads = [];
     metricPayloads = [];
     vi.spyOn(Date, "now").mockReturnValue(BASE_MS + 2000);
+    const mkdirSync = fs.mkdirSync;
+    vi.spyOn(fs, "mkdirSync").mockImplementation((dir, ...args) => (String(dir) === "/tmp/gh-aw" ? undefined : mkdirSync.call(fs, dir, ...args)));
+    const chmodSync = fs.chmodSync;
+    vi.spyOn(fs, "chmodSync").mockImplementation((dir, ...args) => (String(dir) === "/tmp/gh-aw" ? undefined : chmodSync.call(fs, dir, ...args)));
 
     originalReadFileSync = fs.readFileSync;
     originalStatSync = fs.statSync;
@@ -304,7 +308,7 @@ describe("T-OT-020 default GenAI compatibility golden", () => {
     const compatibleFacts = await capture();
     tracePayloads = [];
     metricPayloads = [];
-    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "gen_ai_latest_experimental";
+    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "gen_ai_v1";
 
     expect(await capture()).toEqual(compatibleFacts);
   });

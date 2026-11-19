@@ -250,7 +250,7 @@ describe("buildBuiltinRunMetrics", () => {
     const metric = metrics.buildOTLPMetric({ name: "test", value: 1 });
     vi.stubEnv("OTEL_SEMCONV_STABILITY_OPT_IN", "");
     expect(metrics.buildOTLPMetricsPayload({ serviceName: "gh-aw", metrics: [metric] }).resourceMetrics[0].scopeMetrics[0]).not.toHaveProperty("schemaUrl");
-    vi.stubEnv("OTEL_SEMCONV_STABILITY_OPT_IN", "gen_ai_latest_experimental");
+    vi.stubEnv("OTEL_SEMCONV_STABILITY_OPT_IN", "gen_ai_v1");
     expect(metrics.buildOTLPMetricsPayload({ serviceName: "gh-aw", metrics: [metric] }).resourceMetrics[0].scopeMetrics[0].schemaUrl).toBe("https://opentelemetry.io/schemas/1.45.0");
   });
 

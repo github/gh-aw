@@ -206,7 +206,9 @@ These fields are a compatibility contract. gh-aw may add OpenTelemetry-standard 
 
 The built-in agent span uses OpenTelemetry [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for standard model, token, and finish-reason fields. gh-aw also adds a small number of gh-aw-specific fields.
 
-By default, gh-aw keeps its existing GenAI names and span shape while adding current standard aliases. Set `OTEL_SEMCONV_STABILITY_OPT_IN` to `gen_ai_latest_experimental` in workflow `env:` to use the current experimental GenAI span names and meanings; compatibility-only GenAI names are then omitted. The opt-in does not rename or remove `gh-aw.*` attributes or `gh_aw.*` metrics. The compatibility output remains the default during the staged migration.
+By default, gh-aw keeps its existing GenAI names and span shape while adding current standard aliases. Set `OTEL_SEMCONV_STABILITY_OPT_IN` to `gen_ai_v1` in workflow `env:` to use the current experimental GenAI span names and meanings; compatibility-only GenAI names are then omitted. The opt-in does not rename or remove `gh-aw.*` attributes or `gh_aw.*` metrics. The compatibility output remains the default during the staged migration.
+
+`gen_ai_v1` identifies the gh-aw opt-in contract; it does not imply a stable upstream GenAI release.
 
 For deprecated and superseded notation, use the specification's [GenAI migration map](https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md#671-deprecated-and-superseded-genai-notation-informative). It maps legacy span names, attributes, provider values and token metrics to their replacements, including changed input-token semantics and span parentage. Upstream deprecation does not remove gh-aw compatibility support; migrate queries before enabling the opt-in.
 

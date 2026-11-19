@@ -91,12 +91,13 @@ const {
   buildCustomOTLPAttributes,
   FAILURE_CATEGORIES_PATH,
   resolveGenAiProvider,
-  isGenAiLatestExperimental,
+  isGenAiV1,
   GEN_AI_SCHEMA_URL,
   resolveInclusiveInputTokens,
 } = await import("./send_otlp_span.cjs");
 
 const { readExperimentAssignments, EXPERIMENT_ASSIGNMENTS_PATH } = await import("./experiment_helpers.cjs");
+const otlpMetrics = require("./otlp_metrics.cjs");
 
 // ---------------------------------------------------------------------------
 // isValidTraceId
@@ -1400,7 +1401,7 @@ describe("buildGitHubActionsResourceAttributes", () => {
   });
 
   it("uses only deployment.environment.name for the opt-in", () => {
-    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "http, gen_ai_latest_experimental";
+    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "http, gen_ai_v1";
     const attributes = buildGitHubActionsResourceAttributes({ repository: "owner/repo", runId: "123", staged: false });
     expect(attributes.map(attr => attr.key)).not.toContain("deployment.environment");
     expect(attributes).toContainEqual({ key: "deployment.environment.name", value: { stringValue: "production" } });
@@ -1418,11 +1419,13 @@ describe("GenAI semantic convention helpers", () => {
     expect(resolveGenAiProvider(engine)).toBe(provider);
   });
 
-  it("recognizes the latest opt-in as a trimmed comma-separated value", () => {
-    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "http, gen_ai_latest_experimental ";
-    expect(isGenAiLatestExperimental()).toBe(true);
+  it("recognizes the v1 opt-in as a trimmed comma-separated value", () => {
+    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "http, gen_ai_v1 ";
+    expect(isGenAiV1()).toBe(true);
     process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "http";
-    expect(isGenAiLatestExperimental()).toBe(false);
+    expect(isGenAiV1()).toBe(false);
+    process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "gen_ai_v10";
+    expect(isGenAiV1()).toBe(false);
   });
 
   it.each([
@@ -2909,7 +2912,7 @@ describe("sendJobConclusionSpan", () => {
         GH_AW_MAX_AI_CREDITS: "1000",
         GITHUB_RUN_ID: "123",
         GITHUB_REPOSITORY: "owner/repo",
-        OTEL_SEMCONV_STABILITY_OPT_IN: "http, gen_ai_latest_experimental",
+        OTEL_SEMCONV_STABILITY_OPT_IN: "http, gen_ai_v1",
       })) {
         vi.stubEnv(name, value);
       }
@@ -2986,6 +2989,38 @@ describe("sendJobConclusionSpan", () => {
       }
     });
 
+    it.each([
+      ["", "exit-code"],
+      ["", "output-errors"],
+      ["gen_ai_v1", "exit-code"],
+      ["gen_ai_v1", "output-errors"],
+    ])("classifies inferred agent failures in mode %s from %s", async (mode, evidence) => {
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "");
+      vi.stubEnv("GH_AW_OTEL_METRICS", "true");
+      vi.stubEnv("OTEL_SEMCONV_STABILITY_OPT_IN", mode);
+      const sendMetrics = vi.spyOn(otlpMetrics, "sendOTLPMetrics").mockResolvedValue(true);
+      const readFile = readFileSpy.getMockImplementation();
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/agent_execution_exit_code.txt" && evidence === "exit-code") return "1";
+        if (filePath === "/tmp/gh-aw/agent_output.json" && evidence === "output-errors") return JSON.stringify({ items: [], errors: [{ message: "agent failed" }] });
+        return readFile(filePath);
+      });
+
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
+
+      const payloads = fetchMock.mock.calls.map(([, options]) => JSON.parse(options.body));
+      const spans = payloads.flatMap(payload => (payload.resourceSpans || []).flatMap(resource => resource.scopeSpans.flatMap(scope => scope.spans)));
+      expect(spans).toHaveLength(2);
+      for (const span of spans) {
+        expect(span.status.code).toBe(2);
+        expect(span.attributes).toContainEqual({ key: "error.type", value: { stringValue: "agent_failed" } });
+      }
+      expect(sendMetrics).toHaveBeenCalledOnce();
+      const metrics = sendMetrics.mock.calls[0][0].resourceMetrics.flatMap(resource => resource.scopeMetrics.flatMap(scope => scope.metrics));
+      const duration = metrics.find(metric => metric.name === "gen_ai.invoke_agent.duration");
+      expect(duration.histogram.dataPoints[0].attributes).toContainEqual({ key: "error.type", value: { stringValue: "agent_failed" } });
+    });
+
     it("does not classify a successful agent from the triggering workflow_run conclusion", async () => {
       vi.stubEnv("GH_AW_AGENT_CONCLUSION", "");
       readFileSpy.mockImplementation(filePath => {
@@ -3031,7 +3066,7 @@ describe("sendJobConclusionSpan", () => {
     });
 
     it("resets the semconv mode to unset for later tests", () => {
-      expect(process.env.OTEL_SEMCONV_STABILITY_OPT_IN).toBe("http, gen_ai_latest_experimental");
+      expect(process.env.OTEL_SEMCONV_STABILITY_OPT_IN).toBe("http, gen_ai_v1");
     });
   });
 

@@ -361,18 +361,21 @@ At job completion, instrumentation MUST follow the ordered finalization sequence
 
 `OTEL_SEMCONV_STABILITY_OPT_IN` is a comma-separated list. Entries MUST be compared after trimming whitespace.
 
-When the list contains `gen_ai_latest_experimental`, the runtime MUST emit the current GenAI names and meanings
+When the list contains `gen_ai_v1`, the runtime MUST emit the current GenAI names and meanings
 defined in §9.5, §10.3 and §11.2, and MUST NOT emit the names those sections mark "compatibility only". This mode
 follows OpenTelemetry semantic-conventions-genai, which has no stable release; its output can change when those
 conventions change.
 
-When the list does not contain `gen_ai_latest_experimental`, the runtime MUST emit both the compatibility names and
+When the list does not contain `gen_ai_v1`, the runtime MUST emit both the compatibility names and
 the additive standard names. Attributes and metrics marked "additive" MUST be emitted in both modes.
 
 The opt-in MUST NOT remove, rename or change the value of any gh-aw-defined `gh-aw.*` attribute or `gh_aw.*`
 metric.
 
 Other values in the list MUST be ignored by gh-aw.
+
+`gen_ai_v1` names gh-aw's opt-in contract, not an upstream stable GenAI release. The upstream conventions remain
+experimental at the revisions identified in §18.1.
 
 Compatibility-only names remain supported and are not deprecated by gh-aw in this version, even where they are
 deprecated or removed by OpenTelemetry; each name's upstream status and replacement are identified in its section.
@@ -381,7 +384,7 @@ section. Only after that may a later spec version deprecate them; making the opt
 stops them, is a breaking change in a release after the deprecation and after semantic-conventions-genai publishes a
 release.
 
-Without `gen_ai_latest_experimental`, the default export MUST be a superset of the export before this section was
+Without `gen_ai_v1`, the default export MUST be a superset of the export before this section was
 added: every span (name, kind, parent, status), attribute, resource attribute, metric and data point keeps its value;
 only clock-dependent values may differ (T-OT-020).
 
@@ -402,7 +405,7 @@ dashboards and integrations should use the current notation. No gh-aw removal da
 | `gen_ai.usage.input_tokens` | Retained name; changed meaning with the opt-in | Opt-in input includes cache-read and cache-write tokens exactly once; compatibility input keeps the source's shipped meaning. Update token and cost calculations rather than adding cache counts to opt-in input again (§10.3). |
 
 Migrate readers to the additive current names before enabling
-`OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental` on producers. During a mixed-mode rollout, select one
+`OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_v1` on producers. During a mixed-mode rollout, select one
 alias or metric family per record rather than summing compatibility and current output. Input-token calculations
 and agent-span hierarchy need mode-aware handling because their meanings change, not just their names. Preserve
 historical queries for retained legacy data; enabling the opt-in does not rewrite previous exports. Other entries
@@ -690,6 +693,10 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 | `error.type` | string | CONDITIONALLY REQUIRED on the agent span and agent conclusion span when the agent did not succeed: `timeout`, `cancelled` or `agent_failed`. |
 
 For built-in agent telemetry, `gen_ai.response.finish_reasons` and token usage attributes SHOULD be on the built-in agent span or, when no dedicated agent span is emitted, the agent conclusion span. With the §6.7 opt-in and a dedicated agent span, they MUST NOT be present on the conclusion span (§9.5).
+
+When no agent or triggering workflow conclusion is available, a failure inferred from the agent's nonzero exit
+code or output errors MUST also set `error.type = "agent_failed"` on the agent spans and agent-duration metric.
+A triggering workflow's failure alone MUST NOT classify the agent invocation as failed.
 
 ### 10.4 Tool and MCP Attributes
 
@@ -1138,7 +1145,7 @@ Level 1 and Level 2 compatibility validation MUST cover the following behaviors:
 | Local mirror | `/tmp/gh-aw/otel.jsonl` remains raw OTLP/HTTP JSON lines with `resourceSpans`; it is not replaced by an envelope-only format. |
 | Built-in spans | Setup, conclusion, and built-in agent spans preserve shipped names and stable `gh-aw.*`, `github.*`, and GenAI attributes. |
 | GenAI compatibility | Without the §6.7 opt-in, built-in gh-aw spans continue to emit `gen_ai.system`, `gen_ai.usage.total_tokens`, `gen_ai.usage.cache_creation.input_tokens` and `gen_ai.workflow.name`, and the built-in agent span keeps its shipped name, kind and parent. They also emit the additive standard names. |
-| GenAI opt-in | With `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`, compatibility-only names are absent and the agent span follows §9.5. |
+| GenAI opt-in | With `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_v1`, compatibility-only names are absent and the agent span follows §9.5. |
 | Privacy defaults | Raw prompts, model responses, system instructions, source content, tool arguments, and tool results are not captured by default. |
 | Non-fatal export | Telemetry export and mirror failures do not replace the workflow's functional result after valid setup. |
 
@@ -1194,11 +1201,11 @@ attribute-level checks mapped directly to Section 10 requirements:
 | **T-OT-013** | Proposed stricter §15.2 identifier redaction | If the contract changes to redact authorized §15.4 identifiers, those values are absent from remote payloads, mirrors, artifacts, and diagnostics; metric-dimension restrictions remain | Proposed only; current payload tests expect authorized actor identifiers, and mirror redaction is not guaranteed. Add payload and mirror tests before adopting this requirement |
 | **T-OT-014** | §9.5 agent identity | The built-in agent span has `gen_ai.agent.name` = workflow name and, on failure, `error.type` ∈ {`timeout`,`cancelled`,`agent_failed`} | `send_otlp_span.test.cjs` |
 | **T-OT-015** | §11.2 standard GenAI metrics | `gen_ai.client.inference.usage.*` carry the required attributes, input includes cache tokens, zero values are not recorded, and `gen_ai.invoke_agent.duration` uses the §11.2 buckets | `otlp_metrics.test.cjs` |
-| **T-OT-016** | §6.7 opt-in | With `gen_ai_latest_experimental`, the agent span is `invoke_agent <name>`, `INTERNAL`, a sibling of the conclusion span; compatibility-only names and metrics are absent; scope `schemaUrl` is set | `send_otlp_span.test.cjs`, `otlp_metrics.test.cjs` |
+| **T-OT-016** | §6.7 opt-in | With `gen_ai_v1`, the agent span is `invoke_agent <name>`, `INTERNAL`, a sibling of the conclusion span; compatibility-only names and metrics are absent; scope `schemaUrl` is set | `send_otlp_span.test.cjs`, `otlp_metrics.test.cjs` |
 | **T-OT-017** | §8.1 standard resource attributes | `cicd.*`, `vcs.*` and `deployment.environment.name` are present and do not override `OTEL_RESOURCE_ATTRIBUTES`; §8.3 drops them from metrics | `send_otlp_span.test.cjs`, `otlp_metrics.test.cjs` |
 | **T-OT-018** | §6.7, §9.5, §10.5, §11.2 conformance | Built-in telemetry exported over OTLP to Weaver live-check with semantic-conventions-genai at the §18.1 commit has no undeclared violations with the opt-in; without it, every finding is declared with a reason | `actions/setup/js/conformance/` (CI) |
 | **T-OT-019** | §11.2 wire format | Opt-in GenAI spans and metrics (kind, scope `schemaUrl`, monotonic sums, 20-bound histogram) encode byte-for-byte like the reference SDK protocol types | `scripts/test_otlp_protobuf.mjs` |
-| **T-OT-020** | §6.7 backward compatibility | Without `gen_ai_latest_experimental` (unset or another value), a success and a failure agent job export every fact of a golden export captured before §6.7; with it, every `gh-aw.*` and `github.*` attribute is kept | `send_otlp_span_legacy_contract.test.cjs` |
+| **T-OT-020** | §6.7 backward compatibility | Without `gen_ai_v1` (unset or another value), a success and a failure agent job export every fact of a golden export captured before §6.7; with it, every `gh-aw.*` and `github.*` attribute is kept | `send_otlp_span_legacy_contract.test.cjs` |
 
 
 ### 17.2 Optional Extension Tests

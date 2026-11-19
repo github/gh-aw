@@ -155,7 +155,7 @@ function mergeCustomMetric(existing, incoming, type) {
  * @returns {any}
  */
 function buildOTLPMetricsPayload({ serviceName, scopeVersion, resourceAttributes, metrics }) {
-  const { buildOTLPResourceAttributes, parseOTELResourceAttributes, isGenAiLatestExperimental, GEN_AI_SCHEMA_URL } = require("./send_otlp_span.cjs");
+  const { buildOTLPResourceAttributes, parseOTELResourceAttributes, isGenAiV1, GEN_AI_SCHEMA_URL } = require("./send_otlp_span.cjs");
   const allowedResourceAttributes = new Map();
   for (const attribute of [...parseOTELResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES || ""), ...(resourceAttributes || [])]) {
     if (!METRIC_RESOURCE_ATTRIBUTE_KEYS.has(attribute.key)) continue;
@@ -165,7 +165,7 @@ function buildOTLPMetricsPayload({ serviceName, scopeVersion, resourceAttributes
   }
   const scopeMetrics = {
     scope: { name: "gh-aw", version: scopeVersion || "unknown" },
-    ...(isGenAiLatestExperimental() ? { schemaUrl: GEN_AI_SCHEMA_URL } : {}),
+    ...(isGenAiV1() ? { schemaUrl: GEN_AI_SCHEMA_URL } : {}),
     metrics,
   };
   return {
