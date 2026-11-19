@@ -83,7 +83,7 @@ describe("native work queue smoke verification", () => {
     const monitor = readWorkflow("monitor");
     expect(monitor.checkout["pull-request"]).toBe(false);
     expect(monitor.tools["cli-proxy"]).toBe(true);
-    expect(monitor.tools["work-queue"].observer).toBe(true);
+    expect(monitor.tools["work-queue"]).toBe(true);
     expect(monitor.tools.bash).toContain("work-queue:*");
     expect(monitor.steps[0].with.script).toContain("work_queue_mcp_server.cjs");
 

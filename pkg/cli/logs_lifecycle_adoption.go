@@ -142,8 +142,13 @@ func observeLifecycleProposal(ctx context.Context, run WorkflowRun, item Created
 	observation.At = at
 	publisher := outcomeNestedString(data["user"], "login")
 	login, actorType := outcomeString(actor["login"]), outcomeString(actor["type"])
-	if actorType == "Bot" || isBotUser(login) {
-		observation.State, observation.Signal = "lifecycle", "automation_decision"
+	if login != "" {
+		observation.Actor = lifecycle.Actor{Login: login, Type: actorType}
+	}
+	if login != "" && (actorType == "Bot" || isBotUser(login)) {
+		// Automation resolves the resource without establishing human adoption.
+		observation.AcceptanceKind = "automation"
+		observation.State, observation.Signal = lifecycleProposalResolution(kind, data)
 		return observation
 	}
 	if !lifecycle.IsHuman(actorType, login, []string{publisher}) {
@@ -163,21 +168,24 @@ func observeLifecycleProposal(ctx context.Context, run WorkflowRun, item Created
 	}
 	observation.HumanVerified = true
 	observation.AcceptanceKind = "explicit_human"
+	observation.State, observation.Signal = lifecycleProposalResolution(kind, data)
+	return observation
+}
+
+// lifecycleProposalResolution maps a closed issue or pull request to its adoption outcome.
+func lifecycleProposalResolution(kind string, data map[string]any) (state, signal string) {
 	if kind == "pulls" {
 		if outcomeValue[bool](data["merged"]) {
-			observation.State, observation.Signal = "accepted", "merged"
-		} else {
-			observation.State, observation.Signal = "rejected", "closed_without_merge"
+			return "accepted", "merged"
 		}
-	} else {
-		switch outcomeString(data["state_reason"]) {
-		case "completed":
-			observation.State, observation.Signal = "accepted", "completed"
-		case "not_planned":
-			observation.State, observation.Signal = "rejected", "closed_not_planned"
-		default:
-			observation.State, observation.Signal = "unknown", "missing_resolution_reason"
-		}
+		return "rejected", "closed_without_merge"
 	}
-	return observation
+	switch outcomeString(data["state_reason"]) {
+	case "completed":
+		return "accepted", "completed"
+	case "not_planned":
+		return "rejected", "closed_not_planned"
+	default:
+		return "unknown", "missing_resolution_reason"
+	}
 }

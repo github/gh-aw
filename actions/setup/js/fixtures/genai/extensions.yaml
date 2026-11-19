@@ -1,0 +1,58 @@
+# Typed extensions from specs/otel-observability-spec.md sections 8, 10 and 11.4.
+# Standard attributes and all GenAI definitions come from the pinned registries.
+file_format: definition/2
+attributes:
+  - { key: gh-aw.action_minutes, type: double, brief: Job execution minutes., stability: development }
+  - { key: gh-aw.agent.conclusion, type: string, brief: Agent conclusion., stability: development }
+  - { key: gh-aw.ai_credits_rate_limit_error, type: boolean, brief: AI credit rate limit encountered., stability: development }
+  - { key: gh-aw.cli.version, type: string, brief: CLI version., stability: development }
+  - { key: gh-aw.engine.id, type: string, brief: Engine identifier., stability: development }
+  - { key: gh-aw.episode.id, type: string, brief: Episode identifier., stability: development }
+  - { key: gh-aw.episode.kind, type: string, brief: Episode kind., stability: development }
+  - { key: gh-aw.error_count, type: int, brief: Error count., stability: development }
+  - { key: gh-aw.event_name, type: string, brief: Triggering event., stability: development }
+  - { key: gh-aw.hop.id, type: string, brief: Workflow hop identifier., stability: development }
+  - { key: gh-aw.job.name, type: string, brief: Job name., stability: development }
+  - { key: gh-aw.max_ai_credits_exceeded, type: boolean, brief: AI credit limit exceeded., stability: development }
+  - { key: gh-aw.otlp.export_errors, type: int, brief: Export error count., stability: development }
+  - { key: gh-aw.otlp.export_error_details, type: string, brief: Bounded export error details., stability: development }
+  - { key: gh-aw.otlp.endpoint.class, type: string, brief: Bounded exporter endpoint class., stability: development }
+  - { key: gh-aw.otlp.failure.class, type: string, brief: Bounded exporter failure class., stability: development }
+  - { key: gh-aw.output.item_count, type: int, brief: Safe output item count., stability: development }
+  - { key: gh-aw.permission_denied_count, type: int, brief: Permission denial count., stability: development }
+  - { key: gh-aw.repository, type: string, brief: Repository., stability: development }
+  - { key: gh-aw.run.actor, type: string, brief: Run actor., stability: development }
+  - { key: gh-aw.run.attempt, type: string, brief: Run attempt., stability: development }
+  - { key: gh-aw.run.id, type: string, brief: Run identifier., stability: development }
+  - { key: gh-aw.run.status, type: string, brief: Run status., stability: development }
+  - { key: gh-aw.staged, type: boolean, brief: Staged execution., stability: development }
+  - { key: gh-aw.steering_event_count, type: int, brief: Steering event count., stability: development }
+  - { key: gh-aw.warning_count, type: int, brief: Warning count., stability: development }
+  - { key: gh-aw.workflow.name, type: string, brief: Workflow name., stability: development }
+  - { key: gh-aw.workflow_call.id, type: string, brief: Workflow call identifier., stability: development }
+  - { key: github.actions.run_url, type: string, brief: GitHub Actions run URL., stability: development }
+  - { key: github.actor_id, type: string, brief: Actor identifier., stability: development }
+  - { key: github.event_name, type: string, brief: Event name., stability: development }
+  - { key: github.head_ref, type: string, brief: Pull request head ref., stability: development }
+  - { key: github.job, type: string, brief: Job identifier., stability: development }
+  - { key: github.ref, type: string, brief: Git ref., stability: development }
+  - { key: github.ref_name, type: string, brief: Git ref name., stability: development }
+  - { key: github.repository, type: string, brief: Repository., stability: development }
+  - { key: github.run_attempt, type: string, brief: Run attempt., stability: development }
+  - { key: github.run_id, type: string, brief: Run identifier., stability: development }
+  - { key: github.sha, type: string, brief: Git commit., stability: development }
+  - { key: github.workflow_ref, type: string, brief: Workflow ref., stability: development }
+  - { key: runner.arch, type: string, brief: Runner architecture., stability: development }
+  - { key: runner.environment, type: string, brief: Runner environment., stability: development }
+  - { key: runner.name, type: string, brief: Runner name., stability: development }
+  - { key: runner.os, type: string, brief: Runner operating system., stability: development }
+metrics:
+  - { name: gh_aw.job.duration, instrument: histogram, unit: s, brief: Wall-clock job duration., stability: development }
+  - { name: gh_aw.run.duration, instrument: histogram, unit: s, brief: Compatibility alias for job duration., stability: development }
+  - { name: gh_aw.job.errors, instrument: counter, unit: "{job}", brief: Failed jobs., stability: development }
+  - { name: gh_aw.run.errors, instrument: counter, unit: "{run}", brief: Compatibility alias for failed jobs., stability: development }
+  - { name: gh_aw.tokens.input, instrument: counter, unit: "{token}", brief: Input tokens excluding cache tokens., stability: development }
+  - { name: gh_aw.tokens.output, instrument: counter, unit: "{token}", brief: Output tokens., stability: development }
+  - { name: gh_aw.tokens.cache_read, instrument: counter, unit: "{token}", brief: Cache-read input tokens., stability: development }
+  - { name: gh_aw.tokens.cache_write, instrument: counter, unit: "{token}", brief: Cache-write input tokens., stability: development }
+  - { name: gh_aw.otlp.export.failures, instrument: counter, unit: "{failure}", brief: Failed export attempts., stability: development }

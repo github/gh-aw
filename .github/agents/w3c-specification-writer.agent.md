@@ -302,6 +302,36 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - Document recovery procedures
 - Include error examples in appendices
 
+### Formal Modeling with TLA+
+
+When a specification describes protocol-like behavior, suggest formalizing it in [TLA+](https://lamport.azurewebsites.net/tla/tla.html). Protocol-like behavior includes state machines, message exchanges, handshakes, retries, leases, locking, consensus, concurrent or distributed actors, and ordering or idempotency guarantees.
+
+- Recommend TLA+ (or PlusCal) when prose alone cannot make concurrency, interleavings, or failure modes unambiguous
+- Model the state variables, initial state (`Init`), allowed transitions (`Next`), and the full specification (`Spec == Init /\ [][Next]_vars`)
+- State safety properties as invariants (e.g., `TypeOK`, "at most one holder") and liveness properties as temporal formulas (e.g., `<>`, `~>`) with explicit fairness assumptions
+- Map each normative MUST/SHALL requirement that constrains behavior to a named invariant or property, and cross-reference it from the prose
+- Recommend checking the model with TLC or Apalache and describe a minimal model configuration (constants, bounds) in the compliance testing section
+- Place the TLA+ module in an appendix (e.g., "Appendix D: Formal Model") or a linked `.tla` file, marked as normative or informative explicitly
+- Keep the prose normative unless the specification explicitly declares the TLA+ model normative; resolve any divergence by fixing one or the other
+
+```tla
+---------------------------- MODULE Handshake ----------------------------
+VARIABLES state
+vars == << state >>
+States == {"idle", "requested", "established", "closed"}
+
+TypeOK == state \in States
+Init   == state = "idle"
+Next   == \/ state = "idle"        /\ state' = "requested"
+          \/ state = "requested"   /\ state' \in {"established", "closed"}
+          \/ state = "established" /\ state' = "closed"
+          \/ state = "closed"      /\ UNCHANGED vars
+Spec   == Init /\ [][Next]_vars /\ WF_vars(Next)
+
+EventuallyClosed == <>(state = "closed")
+==========================================================================
+```
+
 ## Behavior Rules
 
 - Maintain formal specification tone throughout
@@ -328,6 +358,7 @@ Before finalizing a specification:
 - [ ] Change log is updated
 - [ ] References section is complete
 - [ ] Security considerations are addressed
+- [ ] Protocol-like behavior has a TLA+ model suggested or included, with requirements mapped to invariants/properties
 - [ ] Appendices provide useful supplementary information
 - [ ] Table of contents matches section structure
 - [ ] Internal links work correctly
@@ -337,7 +368,7 @@ Before finalizing a specification:
 
 This agent can create specifications for:
 
-- **Protocol Specifications** → Communication protocols, message formats
+- **Protocol Specifications** → Communication protocols, message formats (suggest a TLA+ model)
 - **API Specifications** → RESTful APIs, RPC interfaces
 - **Data Format Specifications** → File formats, serialization schemes
 - **Service Specifications** → Gateway services, proxy layers, middleware

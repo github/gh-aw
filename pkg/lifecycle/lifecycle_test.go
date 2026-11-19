@@ -226,6 +226,54 @@ func TestLifecycleValidatesRetainedDecisionsAndAcceptanceKinds(t *testing.T) {
 	}
 }
 
+func TestLifecycleAutomationDecisionRecordsActorWithoutHumanVerification(t *testing.T) {
+	record := testDelivery(t, "create_pull_request")
+	content, err := json.Marshal(record)
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), `"actor"`)
+	at := record.Delivery.At.Add(time.Hour)
+	actor := Actor{Login: "github-actions[bot]", Type: "Bot"}
+	merged, err := Observe(record, Observation{
+		State: "accepted", Signal: "merged", At: at, ObservedAt: at,
+		AcceptanceKind: "automation", Actor: actor,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, actor, merged.Adoption.Actor)
+	assert.False(t, merged.Adoption.HumanVerified)
+	assert.Equal(t, "observed", merged.Survival.State)
+	content, err = json.Marshal(merged)
+	require.NoError(t, err)
+	var restored Record
+	require.NoError(t, json.Unmarshal(content, &restored))
+	retained, err := Merge(Record{}, restored)
+	require.NoError(t, err)
+	assert.Equal(t, actor, retained.Adoption.Actor)
+
+	closed, err := Observe(record, Observation{
+		State: "rejected", Signal: "closed_without_merge", At: at, ObservedAt: at,
+		AcceptanceKind: "automation", Actor: actor,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "rejected", closed.Adoption.State)
+	assert.Equal(t, actor, closed.Adoption.Actor)
+
+	for name, observation := range map[string]Observation{
+		"human verification": {
+			State: "accepted", Signal: "merged", At: at, ObservedAt: at,
+			AcceptanceKind: "automation", Actor: actor, HumanVerified: true,
+		},
+		"missing actor": {
+			State: "rejected", Signal: "closed_without_merge", At: at, ObservedAt: at,
+			AcceptanceKind: "automation", Actor: Actor{Type: "Bot"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Observe(record, observation)
+			require.ErrorContains(t, err, "automation decision requires its actor")
+		})
+	}
+}
+
 func TestLifecycleRejectsInvalidObservations(t *testing.T) {
 	record := testDelivery(t, "create_issue")
 	tests := []struct {

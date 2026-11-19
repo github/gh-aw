@@ -50,7 +50,14 @@ A qualifying human decision MUST have an authoritative event clock, visible
 actor evidence excluding known bots/publishers, and supported authorization
 evidence. The current issue/PR adapter checks current collaborator authorization;
 it cannot attest historical authorization or undisclosed machine-user ownership.
-Missing proof MUST remain unknown. Bot-only resolution is lifecycle activity.
+Missing proof MUST remain unknown.
+
+A bot resolution with a visible actor login MUST record the observed resolution
+(for example, `accepted`/`merged` or `rejected`/`closed_without_merge`) with
+`acceptance_kind: automation`, the deciding `actor` login and type, and
+`human_verified: false`. It is never human adoption. A bot resolution without an
+actor login remains unknown. Retained `lifecycle`/`automation_decision` records
+predate this rule and are replaced when refreshed.
 
 Only rules explicitly allowing fallback may establish adoption at delivery.
 They MUST report `acceptance_kind: fallback_delivery` and MUST NOT claim human
@@ -83,9 +90,11 @@ Refresh MUST NOT execute in conclusion or grant grader network access.
 `logs --adoption` includes delivery and provider refresh. `audit` exposes the
 same evaluator in single-run mode; live data MUST NOT enter its static cache.
 `logs episode --adoption` uses the same selected-member join and MUST preserve
-repository, request, pagination, and wall-clock bounds.
+repository, request, pagination, and wall-clock bounds. When one selected run's
+lifecycle evidence is malformed or unreadable, `logs` MUST record it in
+`adoption_errors` with `unavailable` coverage and continue with the other runs.
 
-Public JSON uses `delivery`, `adoption`, `adoption_summary`, and
+Public JSON uses `delivery`, `adoption`, `adoption_errors`, `adoption_summary`, and
 `episode_adoption`. Experiment references use `adoption:accepted` and
 `adoption:zero_touch`, with `adoption_window` and explicit `analyze --adoption`.
 Old flags, selectors, field names, and metric references are not aliases.

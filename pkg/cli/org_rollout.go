@@ -374,11 +374,13 @@ func (output *orgRolloutOutput) Write(data []byte) (int, error) {
 		if bytes.HasPrefix(line, []byte(orgRolloutResultPrefix)) {
 			output.result = append(append([]byte(nil), line...), '\n')
 		} else {
+			output.result = nil
 			output.appendTail(append(append([]byte(nil), line...), '\n'), limit)
 		}
 		output.pending = rest
 	}
 	if len(output.pending) > limit && !bytes.HasPrefix(output.pending, []byte(orgRolloutResultPrefix)) {
+		output.result = nil
 		output.appendTail(output.pending, limit)
 		output.pending = nil
 		output.discardLine = true
@@ -394,10 +396,10 @@ func (output *orgRolloutOutput) appendTail(data []byte, limit int) {
 }
 
 func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
-	lines := bytes.Split(bytes.TrimSpace(output), []byte{'\n'})
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := bytes.TrimSpace(lines[i])
-		if len(line) == 0 {
+	lines := bytes.Split(output, []byte{'\n'})
+	for _, line := range slices.Backward(lines) {
+		line = bytes.TrimSuffix(line, []byte{'\r'})
+		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
 		if !bytes.HasPrefix(line, []byte(orgRolloutResultPrefix)) {
@@ -406,13 +408,13 @@ func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
 		var result orgRolloutResult
 		payload := bytes.TrimSpace(bytes.TrimPrefix(line, []byte(orgRolloutResultPrefix)))
 		decoder := json.NewDecoder(bytes.NewReader(payload))
+		var trailing json.RawMessage
 		if err := decoder.Decode(&result); err != nil {
 			return orgRolloutResult{}, fmt.Errorf("invalid worker result: %w", err)
 		}
-		var trailing json.RawMessage
-		if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err := decoder.Decode(&trailing); err != io.EOF {
 			if err == nil {
-				err = errors.New("multiple JSON values")
+				return orgRolloutResult{}, errors.New("invalid worker result: multiple JSON values")
 			}
 			return orgRolloutResult{}, fmt.Errorf("invalid worker result: %w", err)
 		}
@@ -484,7 +486,11 @@ func runOrgRolloutWorker(ctx context.Context, repo string, opts orgRolloutOption
 	cmd.Stdout, cmd.Stderr = output, diagnostic
 	cmd.WaitDelay = 5 * time.Second
 	err = cmd.Run()
-	result, parseErr := parseOrgRolloutResult(output.result)
+	resultOutput := output.result
+	if len(bytes.TrimSpace(output.pending)) > 0 || output.discardLine {
+		resultOutput = nil
+	}
+	result, parseErr := parseOrgRolloutResult(resultOutput)
 	if parseErr != nil && err == nil {
 		return orgRolloutResult{Status: "failed", Error: parseErr.Error()}
 	}

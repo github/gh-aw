@@ -206,6 +206,12 @@ These fields are a compatibility contract. gh-aw may add OpenTelemetry-standard 
 
 The built-in agent span uses OpenTelemetry [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for standard model, token, and finish-reason fields. gh-aw also adds a small number of gh-aw-specific fields.
 
+By default, gh-aw keeps its existing GenAI names and span shape while adding current standard aliases. Set `OTEL_SEMCONV_STABILITY_OPT_IN` to `gen_ai_v1` in workflow `env:` to use the current experimental GenAI span names and meanings; compatibility-only GenAI names are then omitted. The opt-in does not rename or remove `gh-aw.*` attributes or `gh_aw.*` metrics. The compatibility output remains the default during the staged migration.
+
+`gen_ai_v1` identifies the gh-aw opt-in contract; it does not imply a stable upstream GenAI release.
+
+For deprecated and superseded notation, use the specification's [GenAI migration map](https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md#671-deprecated-and-superseded-genai-notation-informative). It maps legacy span names, attributes, provider values and token metrics to their replacements, including changed input-token semantics and span parentage. Upstream deprecation does not remove gh-aw compatibility support; migrate queries before enabling the opt-in.
+
 You usually do not need to configure or memorize these built-in attributes. They are mainly useful when building backend queries, dashboards, or deeper debugging workflows. For the exhaustive built-in inventory, see the [OpenTelemetry attribute reference](/gh-aw/reference/open-telemetry-attributes/).
 
 **Trace files and artifacts**
@@ -394,6 +400,10 @@ env:
 
 The compiler injects `${{ vars.GH_AW_OTEL_METRICS || 'true' }}` unless the workflow defines `GH_AW_OTEL_METRICS` itself. To manage the Actions variable by repository, organization, or enterprise scope, use `gh aw env get` and `gh aw env update` with `default_otel_metrics: false`; deleting the variable restores the default-on behavior. Only the literal value `true` enables metrics. When enabled, metrics are sent to `/v1/metrics` as OTLP/HTTP JSON by default, or as protobuf when `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` or `OTEL_EXPORTER_OTLP_PROTOCOL` selects `http/protobuf` (see [Protobuf encoding](#protobuf-encoding-and-azure-monitor)), using the configured OTLP endpoints and their per-endpoint headers, and are mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before export. The unified artifact includes the metrics mirror only when the effective runtime value is `true`. It contains metrics recorded in the agent job before artifact upload, including that job's built-in metrics; built-in metrics from other jobs are exported at post-job time and are not included in an artifact.
 
+The GenAI input counter includes cache-read and cache-write tokens exactly once when the source's cache semantics are known. Data points include `gen_ai.operation.name`, `gen_ai.provider.name`, and `gen_ai.token.modality` (`unknown` when modality is unavailable); zero or unavailable token values are omitted. `gen_ai.invoke_agent.duration` identifies the in-process agent invocation.
+
+Without the GenAI opt-in, `gen_ai.client.token.usage` with `gen_ai.token.type` is retained alongside the standard inference counters. OpenTelemetry removed this compatibility metric from its GenAI conventions; gh-aw does not deprecate it in this version. With the opt-in, that compatibility metric is omitted and its `gh_aw.tokens.*` aliases remain without `gen_ai.token.type`.
+
 Built-in metrics are emitted at job completion. Counters and histograms use delta temporality; durations and counts are job-level measurements.
 Unless noted, built-in metrics include `gh-aw.job.name` and `gh-aw.workflow.name` when available. Run metrics use the run conclusion for `cicd.pipeline.task.run.result`. The `gh_aw.job.errors` unit is `{job}`, while the `gh_aw.run.errors` compatibility metric uses `{run}`.
 
@@ -401,7 +411,9 @@ Unless noted, built-in metrics include `gh-aw.job.name` and `gh-aw.workflow.name
 | --- | --- | --- |
 | `gh_aw.job.duration` | Histogram, `s` | `cicd.pipeline.task.run.result` (job result), `gh-aw.job.name`, `gh-aw.workflow.name`, and (when known) `gh-aw.engine.id` and `gen_ai.request.model`; emitted for each completed job. |
 | `gh_aw.job.errors` | Counter, `{job}` | `cicd.pipeline.task.run.result` (job result), `gh-aw.job.name`, and `gh-aw.workflow.name`; emitted for `failure`, `timed_out`, or `cancelled` jobs. |
-| `gen_ai.client.token.usage` | Counter, `{token}` | `gen_ai.token.type` is `input`, `output`, `input_cache_read`, or `input_cache_write`; model and engine when known. Emitted for available, non-negative token counts when token usage is enabled. |
+| `gen_ai.client.inference.usage.input_tokens`, `gen_ai.client.inference.usage.output_tokens`, `gen_ai.client.inference.usage.cache_read.input_tokens`, `gen_ai.client.inference.usage.cache_write.input_tokens` | Counter, `{token}` | `gen_ai.operation.name`, `gen_ai.provider.name`, and `gen_ai.token.modality` (`unknown` when unavailable); emitted for available, positive token counts. The input count includes cache-read and cache-write tokens once when cache semantics are known. |
+| `gen_ai.client.token.usage` | Compatibility counter, `{token}` | Emitted by default with `gen_ai.token.type` set to `input`, `output`, `input_cache_read`, or `input_cache_write`; omitted with the GenAI opt-in. This superseded metric is not deprecated by this version. |
+| `gen_ai.invoke_agent.duration` | Histogram, `s` | `gen_ai.operation.name=invoke_agent`; emitted for the in-process agent invocation. |
 | `gh_aw.agent.turns` | Histogram, `{turn}` | Job and workflow names; emitted when a non-negative agent turn count is available. |
 | `gh_aw.tool_calls` | Counter, `{call}` | `gh-aw.tool.status` is `ok` or `error`; emitted for nonzero tool-call counts. |
 | `gh_aw.ai.credits.limit_exceeded` | Counter, `{event}` | Job and workflow names; emitted when an AI-credit limit is exceeded. |
@@ -414,10 +426,10 @@ The exporter also emits these compatibility names:
 | --- | --- |
 | `gh_aw.run.duration` | `gh_aw.job.duration` (uses the run conclusion for `cicd.pipeline.task.run.result`) |
 | `gh_aw.run.errors` | `gh_aw.job.errors` (unit `{run}`; emitted according to the run conclusion for `cicd.pipeline.task.run.result`) |
-| `gh_aw.tokens.input` | `gen_ai.client.token.usage` with `gen_ai.token.type=input` |
-| `gh_aw.tokens.output` | `gen_ai.client.token.usage` with `gen_ai.token.type=output` |
-| `gh_aw.tokens.cache_read` | `gen_ai.client.token.usage` with `gen_ai.token.type=input_cache_read` |
-| `gh_aw.tokens.cache_write` | `gen_ai.client.token.usage` with `gen_ai.token.type=input_cache_write` |
+| `gh_aw.tokens.input` | Input token count |
+| `gh_aw.tokens.output` | Output token count |
+| `gh_aw.tokens.cache_read` | Cache-read token count |
+| `gh_aw.tokens.cache_write` | Cache-write token count |
 | `gh_aw.safe_outputs` | `gh_aw.workflow.output.items` |
 
 The `gh_aw.run.*` names remain job-level measurements, not workflow-wide aggregates. Query a canonical metric or its compatibility name, not both, to avoid double counting.

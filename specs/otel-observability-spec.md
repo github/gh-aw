@@ -4,7 +4,7 @@ description: Formal W3C-style specification for observability contract for GitHu
 version: 0.7.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-16
+last_updated: 2026-11-19
 editors:
   - GitHub gh-aw Team
 ---
@@ -357,6 +357,60 @@ When direct gateway export is explicitly configured, credentials MUST be scoped 
 
 At job completion, instrumentation MUST follow the ordered finalization sequence in §16.5 and attempt to flush buffered telemetry within a bounded timeout. Failure to flush MUST NOT replace the workflow's functional result. It MUST produce an exporter diagnostic and SHOULD increment the exporter-failure metric.
 
+### 6.7 Semantic Convention Stability Opt-in
+
+`OTEL_SEMCONV_STABILITY_OPT_IN` is a comma-separated list. Entries MUST be compared after trimming whitespace.
+
+When the list contains `gen_ai_v1`, the runtime MUST emit the current GenAI names and meanings
+defined in §9.5, §10.3 and §11.2, and MUST NOT emit the names those sections mark "compatibility only". This mode
+follows OpenTelemetry semantic-conventions-genai, which has no stable release; its output can change when those
+conventions change.
+
+When the list does not contain `gen_ai_v1`, the runtime MUST emit both the compatibility names and
+the additive standard names. Attributes and metrics marked "additive" MUST be emitted in both modes.
+
+The opt-in MUST NOT remove, rename or change the value of any gh-aw-defined `gh-aw.*` attribute or `gh_aw.*`
+metric.
+
+Other values in the list MUST be ignored by gh-aw.
+
+`gen_ai_v1` names gh-aw's opt-in contract, not an upstream stable GenAI release. The upstream conventions remain
+experimental at the revisions identified in §18.1.
+
+Compatibility-only names remain supported and are not deprecated by gh-aw in this version, even where they are
+deprecated or removed by OpenTelemetry; each name's upstream status and replacement are identified in its section.
+They MUST stay emitted by default for at least three minor releases and six months after the release that adds this
+section. Only after that may a later spec version deprecate them; making the opt-in behaviour the default, which
+stops them, is a breaking change in a release after the deprecation and after semantic-conventions-genai publishes a
+release.
+
+Without `gen_ai_v1`, the default export MUST be a superset of the export before this section was
+added: every span (name, kind, parent, status), attribute, resource attribute, metric and data point keeps its value;
+only clock-dependent values may differ (T-OT-020).
+
+#### 6.7.1 Deprecated and Superseded GenAI Notation (Informative)
+
+**Migration status:** "Deprecated upstream" and "removed upstream" describe OpenTelemetry's conventions, not removal
+from gh-aw. The legacy names and span shape below remain supported and emitted by default under §6.7. New
+dashboards and integrations should use the current notation. No gh-aw removal date is set by this version.
+
+| Legacy notation | Status | Current notation and migration |
+|---|---|---|
+| Agent span `gh-aw.<job>.agent` (fallback `gh-aw.job.agent`), kind `CLIENT`, operation `chat`, child of the conclusion span | Legacy gh-aw agent span shape; superseded for agent invocation | With the opt-in: `invoke_agent <gen_ai.agent.name>` (fallback `invoke_agent`), kind `INTERNAL`, operation `invoke_agent`, sibling of the conclusion span (§9.5). Update span-name, kind, operation and parent-child filters together. `chat` and `CLIENT` remain valid for actual model-client operations; they are not generally deprecated. |
+| `gen_ai.system` | Deprecated upstream; compatibility only | Use `gen_ai.provider.name`. Values also change: `github_models` → `github`, `google_vertex_ai` → `gcp.gen_ai`; `anthropic` and `openai` stay unchanged. These values identify the provider, not the engine ID (§10.3). |
+| `gen_ai.workflow.name` | Removed upstream; compatibility only | Use `gen_ai.agent.name` for the agent's workflow name. `gh-aw.workflow.name` remains supported and is not deprecated. |
+| `gen_ai.usage.cache_creation.input_tokens` | No longer defined upstream; compatibility only | Use `gen_ai.usage.cache_write.input_tokens`, with the same count. Do not sum the two aliases. |
+| `gen_ai.usage.total_tokens` | Removed upstream; compatibility only | No standard replacement attribute. Calculate totals from the desired input/output/cache components. The legacy value is the shipped input plus output count; opt-in input already includes cache tokens, so the two totals are not necessarily equivalent. |
+| `gen_ai.client.token.usage` and its `gen_ai.token.type` dimension | Removed upstream; compatibility only | Replace each token-type series with its dedicated counter: `input` → `gen_ai.client.inference.usage.input_tokens`, `output` → `gen_ai.client.inference.usage.output_tokens`, `input_cache_read` → `gen_ai.client.inference.usage.cache_read.input_tokens`, `input_cache_write` → `gen_ai.client.inference.usage.cache_write.input_tokens` (§11.2). The new counters do not need `gen_ai.token.type`. |
+| `gen_ai.usage.input_tokens` | Retained name; changed meaning with the opt-in | Opt-in input includes cache-read and cache-write tokens exactly once; compatibility input keeps the source's shipped meaning. Update token and cost calculations rather than adding cache counts to opt-in input again (§10.3). |
+
+Migrate readers to the additive current names before enabling
+`OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_v1` on producers. During a mixed-mode rollout, select one
+alias or metric family per record rather than summing compatibility and current output. Input-token calculations
+and agent-span hierarchy need mode-aware handling because their meanings change, not just their names. Preserve
+historical queries for retained legacy data; enabling the opt-in does not rewrite previous exports. Other entries
+in the comma-separated opt-in list can remain unchanged.
+
 ---
 
 ## 7. Context Propagation
@@ -441,7 +495,20 @@ Stable resource attributes include:
 | `github.run_id` | string | REQUIRED when GitHub run ID is available. |
 | `gh-aw.engine.id` | string | RECOMMENDED when an engine ID is known. |
 
-Additive standard aliases MAY include `cicd.pipeline.name`, `cicd.pipeline.run.id`, `cicd.pipeline.run.url.full`, `vcs.repository.url.full`, and `deployment.environment.name`.
+The following standard resource attributes are additive and RECOMMENDED. They MUST NOT replace a value already
+supplied through `OTEL_RESOURCE_ATTRIBUTES`. §8.3 still removes them from metrics.
+
+| Attribute | Value |
+|---|---|
+| `cicd.pipeline.name` | GitHub Actions workflow name (`GITHUB_WORKFLOW`). |
+| `cicd.pipeline.run.id` | Same value as `github.run_id`. |
+| `cicd.pipeline.run.url.full` | Same value as the run URL attribute. |
+| `cicd.pipeline.task.name` | Same value as `github.job`. |
+| `vcs.provider.name` | `github`. |
+| `vcs.repository.url.full` | `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}`. |
+| `vcs.ref.head.name` | Same value as `github.ref_name`. |
+| `vcs.ref.head.revision` | Same value as `github.sha`. |
+| `deployment.environment.name` | Same value as `deployment.environment`. Without the §6.7 opt-in both are emitted; with it only `deployment.environment.name` is emitted. |
 
 ### 8.2 GitHub Compatibility Attributes
 
@@ -462,6 +529,9 @@ The JavaScript metric resource MAY copy only `gh-aw.repository`, `gh-aw.engine.i
 Telemetry emitted by the core runtime MUST use instrumentation scope name `gh-aw` and scope version equal to the `gh-aw` version or commit identifier.
 
 Gateway telemetry SHOULD use a gateway-specific scope such as `gh-aw-mcpg`.
+
+With the §6.7 opt-in, the core runtime SHOULD set the instrumentation scope `schemaUrl` to
+`https://opentelemetry.io/schemas/1.45.0` on trace and metric payloads.
 
 ---
 
@@ -526,7 +596,17 @@ An in-process agent invocation, when emitted as a new dedicated span:
 
 A remote hosted-agent invocation SHOULD use span kind `CLIENT` according to the applicable GenAI agent semantic convention.
 
-Existing gh-aw built-in agent spans MAY continue to use `gen_ai.operation.name = "chat"` for compatibility with deployed dashboards. A future dedicated `invoke_agent` span MUST be additive and MUST NOT remove the existing documented attributes without a migration plan.
+The built-in agent span (`hasDedicatedAgentSpan`) MUST set `gen_ai.agent.name` to the workflow name and
+`gen_ai.provider.name` (§10.3), and MUST set `error.type` (§10.3) when the agent failed, timed out or was cancelled.
+
+**Legacy span notation (superseded for agent invocation; see §6.7.1):** Without the §6.7 opt-in, the built-in agent span keeps its shipped shape for compatibility: name `gh-aw.<job>.agent`,
+kind `CLIENT`, parent the job conclusion span, and `gen_ai.operation.name = "chat"`.
+
+With the §6.7 opt-in, the built-in agent span MUST be named `invoke_agent <gen_ai.agent.name>` (or `invoke_agent`
+when no name is known), MUST use kind `INTERNAL` and `gen_ai.operation.name = "invoke_agent"`, and MUST have the
+same parent as the job conclusion span. The job conclusion span MUST NOT then carry `gen_ai.operation.name`,
+`gen_ai.response.finish_reasons` or token usage. When no dedicated agent span is emitted, the agent job conclusion
+span carries those attributes and uses `gen_ai.operation.name = "invoke_agent"`.
 
 ### 9.6 Model Operation Spans
 
@@ -534,7 +614,9 @@ Each additive logical model operation span SHOULD be a separate child span of th
 
 Each model operation span SHOULD set `gen_ai.provider.name` when the operation calls a GenAI provider, SHOULD include `gen_ai.request.model` when known, SHOULD include `gen_ai.response.model` when returned, and SHOULD include input and output token attributes when provided by the provider.
 
-For compatibility, built-in gh-aw spans MAY continue to emit `gen_ai.system` and `gen_ai.usage.total_tokens`. New standard aliases such as `gen_ai.provider.name` MAY be emitted in addition to, not instead of, the compatibility attributes.
+Built-in gh-aw spans that carry `gen_ai.system` MUST also carry `gen_ai.provider.name`. `gen_ai.system` and
+`gen_ai.usage.total_tokens` are compatibility only: they MUST be emitted without the §6.7 opt-in and MUST NOT be
+emitted with it.
 
 ### 9.7 Tool and MCP Spans
 
@@ -570,7 +652,7 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 |---|---|---|
 | `cicd.pipeline.result` | string | RECOMMENDED when known for additive pipeline root spans. |
 | `cicd.pipeline.action.name` | string | RECOMMENDED; use `RUN`. |
-| `gh-aw.run.attempt` | int | RECOMMENDED. |
+| `gh-aw.run.attempt` | string | RECOMMENDED; retains the shipped `GITHUB_RUN_ATTEMPT` string (§17). |
 | `gh-aw.run.actor` | string | OPTIONAL; MUST NOT be a metric dimension. |
 | `gh-aw.event_name` | string | RECOMMENDED when known. |
 | `gh-aw.staged` | boolean | RECOMMENDED when applicable. |
@@ -593,18 +675,28 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 
 | Attribute | Type | Requirement |
 |---|---|---|
-| `gen_ai.operation.name` | string | REQUIRED. |
-| `gen_ai.system` | string | REQUIRED on built-in gh-aw agent spans when the engine/provider mapping is known. |
-| `gen_ai.provider.name` | string | RECOMMENDED additive alias when a provider is known. |
+| `gen_ai.operation.name` | string | REQUIRED on GenAI operation spans, except where §9.5 prohibits it on the agent conclusion span. |
+| `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. |
+| `gen_ai.system` | string | **Deprecated upstream; compatibility only.** Use `gen_ai.provider.name`; provider value changes are listed in §6.7.1. Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Not deprecated by gh-aw in this version. |
+| `gen_ai.agent.name` | string | REQUIRED on the built-in agent span (§9.5), including an agent conclusion span acting as the agent span; the workflow name. |
 | `gen_ai.request.model` | string | CONDITIONALLY REQUIRED when available. |
 | `gen_ai.response.model` | string | RECOMMENDED when returned. |
 | `gen_ai.response.finish_reasons` | string[] | RECOMMENDED when returned. |
-| `gen_ai.usage.input_tokens` | int | RECOMMENDED when returned. |
+| `gen_ai.usage.input_tokens` | int | RECOMMENDED when returned. Without the opt-in, the raw sum the source reports (shipped meaning). With the opt-in it MUST include cache-read and cache-write tokens once (§11.2), and MUST be omitted when that is unknown. |
 | `gen_ai.usage.output_tokens` | int | RECOMMENDED when returned. |
 | `gen_ai.usage.cache_read.input_tokens` | int | RECOMMENDED when applicable. |
-| `gen_ai.usage.cache_creation.input_tokens` | int | RECOMMENDED when applicable. |
-| `gen_ai.usage.total_tokens` | int | RECOMMENDED compatibility attribute for built-in gh-aw spans when input or output token counts are available. |
+| `gen_ai.usage.cache_write.input_tokens` | int | RECOMMENDED when applicable. Additive. |
+| `gen_ai.usage.cache_creation.input_tokens` | int | **Superseded upstream; compatibility only.** Use `gen_ai.usage.cache_write.input_tokens`, with the same value (§6.7.1). |
+| `gen_ai.usage.total_tokens` | int | **Removed upstream; compatibility only.** Input plus output, excluding cache; no standard replacement attribute. See §6.7.1 before deriving totals from opt-in input. |
 | `gen_ai.usage.reasoning.output_tokens` | int | RECOMMENDED when applicable. |
+| `gen_ai.workflow.name` | string | **Removed upstream; compatibility only.** Use `gen_ai.agent.name` (§6.7.1). |
+| `error.type` | string | CONDITIONALLY REQUIRED on the agent span and agent conclusion span when the agent did not succeed: `timeout`, `cancelled` or `agent_failed`. |
+
+For built-in agent telemetry, `gen_ai.response.finish_reasons` and token usage attributes SHOULD be on the built-in agent span or, when no dedicated agent span is emitted, the agent conclusion span. With the §6.7 opt-in and a dedicated agent span, they MUST NOT be present on the conclusion span (§9.5).
+
+When no agent or triggering workflow conclusion is available, a failure inferred from the agent's nonzero exit
+code or output errors MUST also set `error.type = "agent_failed"` on the agent spans and agent-duration metric.
+A triggering workflow's failure alone MUST NOT classify the agent invocation as failed.
 
 ### 10.4 Tool and MCP Attributes
 
@@ -676,9 +768,31 @@ Derived rates such as acceptance rate, waste rate, failure rate, and zero-touch 
 
 A Level 3 implementation SHOULD emit applicable standard CI/CD metrics, including `cicd.pipeline.run.duration`, `cicd.pipeline.run.active`, `cicd.pipeline.run.errors`, and `cicd.worker.count` when worker inventory is observable.
 
-A Level 3 implementation SHOULD emit `gen_ai.client.operation.duration` for instrumented model-client operations.
+A Level 3 implementation SHOULD emit `gen_ai.client.operation.duration` only for instrumented model-client
+operations other than inference and agent invocation, as the GenAI conventions require.
 
-A Level 3 implementation SHOULD emit `gen_ai.client.token.usage` when input or output token counts are available. `gen_ai.client.token.usage` MUST distinguish input and output tokens with `gen_ai.token.type`.
+A Level 3 implementation SHOULD emit the delta counters `gen_ai.client.inference.usage.input_tokens`,
+`gen_ai.client.inference.usage.output_tokens`, `gen_ai.client.inference.usage.cache_read.input_tokens` and
+`gen_ai.client.inference.usage.cache_write.input_tokens` (unit `{token}`) when the corresponding counts are
+available. Each data point MUST carry `gen_ai.operation.name = "chat"`, `gen_ai.provider.name` and
+`gen_ai.token.modality` (`unknown` when the modality cannot be determined), and SHOULD carry `gen_ai.request.model`
+when known. The input counter MUST include cache-read and cache-write tokens exactly once, using each usage
+record's `input_tokens_include_cache` or else the AI-credits provider default; when unknown it MUST be omitted. A zero or unavailable value MUST NOT be
+recorded.
+
+A Level 3 implementation SHOULD emit `gen_ai.invoke_agent.duration` (histogram, unit `s`) for each built-in agent
+span, with explicit bucket boundaries `[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 25.6, 51.2, 102.4, 204.8, 409.6,
+900, 1800, 3600, 7200, 14400, 43200, 86400]`. Each data point MUST carry `gen_ai.operation.name = "invoke_agent"`
+and SHOULD carry `gen_ai.agent.name`, `gen_ai.request.model` when known, and `error.type` when the agent did not
+succeed.
+
+**Removed upstream; compatibility only:** `gen_ai.client.token.usage` with `gen_ai.token.type` (§6.7). It has been removed from the
+OpenTelemetry GenAI conventions and is superseded by the four `gen_ai.client.inference.usage.*` counters above.
+This version does not deprecate the compatibility metric in gh-aw.
+The per-token-type replacement mapping and double-counting precautions are in §6.7.1.
+
+If an engine exports its own `gen_ai.client.inference.usage.*` for the agent job, the runtime MUST NOT also emit
+them for that run (D11).
 
 ### 11.3 gh-aw Metrics
 
@@ -710,7 +824,12 @@ Built-in job metrics MUST be enabled by default when OTLP is configured. The eff
 |---|---|---|---|---|
 | `gh_aw.job.duration` (`gh_aw.run.duration` compatibility alias) | Histogram | `s` | `gh-aw.job.name`, `gh-aw.workflow.name`, `cicd.pipeline.task.run.result`, `gh-aw.engine.id`, `gen_ai.request.model` when available | Wall-clock job duration; the legacy `run` name does not change its job-level scope. |
 | `gh_aw.job.errors` (`gh_aw.run.errors` compatibility alias) | Counter | `{job}` / `{run}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `cicd.pipeline.task.run.result` | One failed, timed-out, or cancelled job. |
-| `gen_ai.client.token.usage` (`gh_aw.tokens.input`, `gh_aw.tokens.output`, `gh_aw.tokens.cache_read`, and `gh_aw.tokens.cache_write` compatibility aliases) | Counter | `{token}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gen_ai.token.type`, `gen_ai.request.model`, `gh-aw.engine.id` when available | Input, output, cache-read, or cache-write tokens for jobs with their own model usage data. |
+| `gen_ai.client.token.usage` (compatibility only, §6.7; the `gh_aw.tokens.*` aliases are kept in both modes and omit `gen_ai.token.type` with the opt-in) | Counter | `{token}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gen_ai.token.type`, `gen_ai.request.model`, `gh-aw.engine.id` when available | Input, output, cache-read, or cache-write tokens for jobs with their own model usage data. |
+| `gen_ai.client.inference.usage.input_tokens` | Counter | `{token}` | `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.token.modality`, `gen_ai.request.model` when available, `gh-aw.job.name`, `gh-aw.workflow.name` | Input tokens **including** cache read and write, once (`agent_usage.json` `input_tokens_inclusive`). Additive. |
+| `gen_ai.client.inference.usage.output_tokens` | Counter | `{token}` | same as above | Output tokens. Additive. |
+| `gen_ai.client.inference.usage.cache_read.input_tokens` | Counter | `{token}` | same as above | Cache-read input tokens. Additive. |
+| `gen_ai.client.inference.usage.cache_write.input_tokens` | Counter | `{token}` | same as above | Cache-write input tokens. Additive. |
+| `gen_ai.invoke_agent.duration` | Histogram | `s` | `gen_ai.operation.name`, `gen_ai.agent.name`, `gen_ai.request.model` when available, `error.type` on failure, `gh-aw.job.name`, `gh-aw.workflow.name` | Duration of the built-in agent span; §11.2 buckets. Additive. |
 | `gh_aw.agent.turns` | Histogram | `{turn}` | `gh-aw.job.name`, `gh-aw.workflow.name` | Turns per agent invocation when reported. |
 | `gh_aw.tool_calls` | Counter | `{call}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gh-aw.tool.status` | Tool executions grouped by status. |
 | `gh_aw.workflow.output.items` (`gh_aw.safe_outputs` compatibility alias) | Counter | `{item}` | `gh-aw.job.name`, `gh-aw.workflow.name`, `gh-aw.safe_output.type` | Safe-output items produced. |
@@ -720,7 +839,7 @@ Built-in job metrics MUST be enabled by default when OTLP is configured. The eff
 
 The aliases in parentheses carry the same observations as the canonical metric; dashboards SHOULD use either the canonical name or its alias, not sum both.
 
-`gh_aw.job.duration` and `gh_aw.job.errors` describe individual job measurements. They are job-granularity extensions, not aliases for the workflow-run `cicd.pipeline.run.duration` and `cicd.pipeline.run.errors` metrics in §11.2. The token metric uses the existing `gen_ai.client.token.usage` name, and safe-output items use the existing `gh_aw.workflow.output.items` name.
+`gh_aw.job.duration` and `gh_aw.job.errors` describe individual job measurements. They are job-granularity extensions, not aliases for the workflow-run `cicd.pipeline.run.duration` and `cicd.pipeline.run.errors` metrics in §11.2. The `gen_ai.client.inference.usage.*` counters are the standard token metrics; `gen_ai.client.token.usage` is kept without the §6.7 opt-in for deployed dashboards. Dashboards MUST NOT sum the two, because `gen_ai.client.inference.usage.input_tokens` includes cache tokens and `gen_ai.client.token.usage{gen_ai.token.type=input}` does not. Safe-output items use the existing `gh_aw.workflow.output.items` name.
 
 All built-in counters and histograms MUST use delta temporality. The JavaScript custom metric API uses the same temporality.
 
@@ -1025,7 +1144,8 @@ Level 1 and Level 2 compatibility validation MUST cover the following behaviors:
 | Endpoint fan-out | Multiple endpoints are preserved in declaration order, first endpoint compatibility is retained, and one endpoint failure does not suppress attempts to other endpoints. |
 | Local mirror | `/tmp/gh-aw/otel.jsonl` remains raw OTLP/HTTP JSON lines with `resourceSpans`; it is not replaced by an envelope-only format. |
 | Built-in spans | Setup, conclusion, and built-in agent spans preserve shipped names and stable `gh-aw.*`, `github.*`, and GenAI attributes. |
-| GenAI compatibility | Built-in gh-aw spans continue to emit `gen_ai.system` and `gen_ai.usage.total_tokens` when the underlying values are available. |
+| GenAI compatibility | Without the §6.7 opt-in, built-in gh-aw spans continue to emit `gen_ai.system`, `gen_ai.usage.total_tokens`, `gen_ai.usage.cache_creation.input_tokens` and `gen_ai.workflow.name`, and the built-in agent span keeps its shipped name, kind and parent. They also emit the additive standard names. |
+| GenAI opt-in | With `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_v1`, compatibility-only names are absent and the agent span follows §9.5. |
 | Privacy defaults | Raw prompts, model responses, system instructions, source content, tool arguments, and tool results are not captured by default. |
 | Non-fatal export | Telemetry export and mirror failures do not replace the workflow's functional result after valid setup. |
 
@@ -1052,6 +1172,14 @@ current repository.
 
 The repository enforcement entry point for these checks is `make validate-otel-contract`. This target MUST remain focused on the customer-facing compatibility contract rather than all possible OTEL-related tests.
 
+`make validate-otel-conformance` stages the pinned GenAI model, its core semantic-convention dependency,
+and the typed built-in gh-aw/GitHub/runner extensions in `actions/setup/js/fixtures/genai/extensions.yaml`.
+It retains the upstream GenAI definitions, content schemas and advice policies. Weaver's native V2 checks
+and dependency-attribute lookup validate the complete mixed telemetry without filtering extension findings;
+unknown attributes, incorrect types, metric units/instruments and GenAI requirements remain errors.
+The registry regression tests exercise both accepted mixed telemetry and rejected mutations before the
+live OTLP scenarios run. Generated models, coverage and reports stay in `OTEL_CONFORMANCE_REPORT_DIR`.
+
 ### 17.1.1 Test ID Stubs: Level 1 Compliance
 
 The following test IDs are stubs for Level 1 (Stable Configuration and Export) compliance tests. Implementations MUST provide tests that correspond to each stub before claiming Level 1 conformance.
@@ -1074,11 +1202,18 @@ attribute-level checks mapped directly to Section 10 requirements:
 | Test ID | Attribute requirement | Expected value | Verification method |
 |---------|------------------------|----------------|---------------------|
 | **T-OT-008** | §10.2 `gh-aw.job.name` on built-in job spans | The setup span includes `gh-aw.job.name` equal to the GitHub Actions job name | Decode `/tmp/gh-aw/otel.jsonl` or captured OTLP payloads and assert the setup span attribute value exactly matches the workflow job name |
-| **T-OT-009** | §10.3 `gen_ai.system` on built-in agent spans | A known engine emits a non-empty normalized provider/system value | Run a workflow with a built-in agent span, decode exported spans, and assert `gen_ai.system` is present whenever the engine mapping is known |
+| **T-OT-009** | §10.3 `gen_ai.provider.name` (and, without the opt-in, `gen_ai.system`) on built-in agent spans | A known engine emits the §10.3 provider value | Run a workflow with a built-in agent span, decode exported spans, and assert `gen_ai.provider.name` equals the mapped value and, without the opt-in, `gen_ai.system` is also present |
 | **T-OT-010** | §13.3 `gh-aw.adoption.type` on optional downstream outcome-evaluation spans | Exported outcome spans preserve the safe-output type being evaluated | Feed `.adoption[].items[]` from `gh aw logs --adoption --json` to the downstream exporter under test and assert `gh-aw.adoption.type` matches the evaluated manifest item type; not a built-in CLI export |
-| **T-OT-011** | §17 Backward-compatibility: v0.3.0 fields present in v0.4.0 export | All span attribute keys that were present in v0.3.0 (`gh-aw.*`, `github.*`, `gen_ai.system`, `gen_ai.usage.total_tokens`, `OTEL_EXPORTER_OTLP_ENDPOINT`, built-in setup/conclusion span names) **MUST** also be present in a v0.4.0 export at the same semantic positions | Produce a v0.4.0 compliant export from the current implementation; compare the set of attribute keys against the v0.3.0 attribute inventory (defined in Version 0.3.0 change-log entry in Section 19); assert no v0.3.0 attribute has been removed or renamed; assert no built-in span name has changed |
+| **T-OT-011** | §17 Backward-compatibility: v0.3.0 fields present in v0.4.0 export | All span attribute keys that were present in v0.3.0 (`gh-aw.*`, `github.*`, `gen_ai.system`, `gen_ai.usage.total_tokens`, `OTEL_EXPORTER_OTLP_ENDPOINT`, built-in setup/conclusion span names) **MUST** also be present in a v0.4.0 export at the same semantic positions | This test applies to exports without the §6.7 opt-in. Produce a v0.4.0 compliant export from the current implementation; compare the set of attribute keys against the v0.3.0 attribute inventory (defined in Version 0.3.0 change-log entry in Section 19); assert no v0.3.0 attribute has been removed or renamed; assert no built-in span name has changed |
 | **T-OT-012** | §16.6 Exporter-failure test coverage | Non-2xx responses, exhausted network retries, mirror-write failures, and bounded-shutdown-flush failures preserve the completed workflow result and do not report failed delivery as successful | Existing tests cover non-2xx responses, exhausted retries, and mirror-write failures; add a bounded-shutdown-flush failure case to complete coverage |
 | **T-OT-013** | Proposed stricter §15.2 identifier redaction | If the contract changes to redact authorized §15.4 identifiers, those values are absent from remote payloads, mirrors, artifacts, and diagnostics; metric-dimension restrictions remain | Proposed only; current payload tests expect authorized actor identifiers, and mirror redaction is not guaranteed. Add payload and mirror tests before adopting this requirement |
+| **T-OT-014** | §9.5 agent identity | The built-in agent span has `gen_ai.agent.name` = workflow name and, on failure, `error.type` ∈ {`timeout`,`cancelled`,`agent_failed`} | `send_otlp_span.test.cjs` |
+| **T-OT-015** | §11.2 standard GenAI metrics | `gen_ai.client.inference.usage.*` carry the required attributes, input includes cache tokens, zero values are not recorded, and `gen_ai.invoke_agent.duration` uses the §11.2 buckets | `otlp_metrics.test.cjs` |
+| **T-OT-016** | §6.7 opt-in | With `gen_ai_v1`, the agent span is `invoke_agent <name>`, `INTERNAL`, a sibling of the conclusion span; compatibility-only names and metrics are absent; scope `schemaUrl` is set | `send_otlp_span.test.cjs`, `otlp_metrics.test.cjs` |
+| **T-OT-017** | §8.1 standard resource attributes | `cicd.*`, `vcs.*` and `deployment.environment.name` are present and do not override `OTEL_RESOURCE_ATTRIBUTES`; §8.3 drops them from metrics | `send_otlp_span.test.cjs`, `otlp_metrics.test.cjs` |
+| **T-OT-018** | §6.7, §9.5, §10.5, §11.2 conformance | Built-in telemetry exported over OTLP to Weaver live-check with semantic-conventions-genai at the §18.1 commit has no undeclared violations with the opt-in; without it, every finding is declared with a reason | `actions/setup/js/fixtures/genai/`, `scripts/genai_registry.test.py` (CI) |
+| **T-OT-019** | §11.2 wire format | Opt-in GenAI spans and metrics (kind, scope `schemaUrl`, monotonic sums, 20-bound histogram) encode byte-for-byte like the reference SDK protocol types | `scripts/test_otlp_protobuf.mjs` |
+| **T-OT-020** | §6.7 backward compatibility | Without `gen_ai_v1` (unset or another value), a success and a failure agent job export every fact of a golden export captured before §6.7; with it, every `gh-aw.*` and `github.*` attribute is kept | `send_otlp_span_legacy_contract.test.cjs` |
 
 
 ### 17.2 Optional Extension Tests
@@ -1125,7 +1260,14 @@ context is added to outcome spans or links.
 - **[GenAI Spans]** OpenTelemetry GenAI SIG. *Semantic conventions for generative AI spans*. https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-spans.md
 - **[GenAI Agent Spans]** OpenTelemetry GenAI SIG. *Semantic conventions for GenAI agent and framework spans*. https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-agent-spans.md
 - **[GenAI Metrics]** OpenTelemetry GenAI SIG. *Semantic conventions for generative AI metrics*. https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-metrics.md
+- **[GenAI Agent Metrics]** OpenTelemetry GenAI SIG. *Semantic conventions for GenAI metrics: agent metrics*.
+  https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-metrics.md#generative-ai-agent-metrics
+- **[GenAI Token Metrics]** OpenTelemetry GenAI SIG. *Semantic conventions for GenAI token metrics*.
+  https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-token-metrics.md
 - **[MCP Semantic Conventions]** OpenTelemetry GenAI SIG. *Semantic conventions for Model Context Protocol*. https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/mcp.md
+
+This version follows semantic-conventions-genai at commit `e6658f1` (2026-11-06),
+which has no release tag, and semantic-conventions v1.45.0.
 
 ### 18.2 Informative References
 
@@ -1142,6 +1284,15 @@ context is added to outcome spans or links.
 
 ### Unreleased
 
+- **Clarified**: Explicit upstream deprecation/removal labels and the §6.7.1 migration map for legacy agent spans,
+  GenAI attributes and token metrics, including provider values, token-count semantics and mixed-mode queries.
+- **Added**: the §6.7 opt-in; the §8.1 standard resource attributes; `gen_ai.provider.name`, `gen_ai.agent.name`,
+  `gen_ai.usage.cache_write.input_tokens` and `error.type` on built-in spans; the `gen_ai.client.inference.usage.*`
+  and `gen_ai.invoke_agent.duration` metrics.
+- **Changed**: `gen_ai.system`, `gen_ai.usage.total_tokens`, `gen_ai.usage.cache_creation.input_tokens`,
+  `gen_ai.workflow.name` and `gen_ai.client.token.usage` are compatibility names, still supported and on by default
+  (not deprecated, §6.7); with the opt-in, the agent span
+  is `invoke_agent` (`INTERNAL`) and `gen_ai.usage.input_tokens` includes cache tokens.
 - **Added**: Opt-in built-in job metrics and the `logMetric()` API (§11.5, §12.6), including a separate local metrics mirror.
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 - **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
