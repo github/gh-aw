@@ -13,10 +13,12 @@ import (
 // accidentally use or alter the write credentials of the safe_outputs job.
 // These steps are trusted, but they run after the compiler mints write-scoped
 // GitHub App tokens and configures persisted git credentials for the handlers.
+// Each finding carries its own compiler threat ID (CTR-035 through CTR-038).
 func SafeOutputCredentialsRule() Rule {
 	return Rule{
 		ID: "safe-output-credentials", Description: "Keep authored safe-output steps from using or altering the job's write credentials",
-		Severity: Error, Targets: AWAST, Check: checkSafeOutputCredentials,
+		FindingThreatRuleIDs: []string{"CTR-035", "CTR-036", "CTR-037", "CTR-038"},
+		Severity:             Error, Targets: AWAST, Check: checkSafeOutputCredentials,
 	}
 }
 
@@ -77,8 +79,8 @@ func checkSafeOutputCredentials(ctx context.Context, input Input) ([]Diagnostic,
 
 func safeOutputStepCredentialDiagnostics(step map[string]any, path string, declared map[string]struct{}, severity Severity) []Diagnostic {
 	var diagnostics []Diagnostic
-	report := func(path, message string) {
-		diagnostics = append(diagnostics, Diagnostic{Severity: severity, Path: path, Message: message})
+	report := func(threatRuleID, path, message string) {
+		diagnostics = append(diagnostics, Diagnostic{ThreatRuleID: threatRuleID, Severity: severity, Path: path, Message: message})
 	}
 	keys := make([]string, 0, len(step))
 	for key := range step {
@@ -87,19 +89,19 @@ func safeOutputStepCredentialDiagnostics(step map[string]any, path string, decla
 	slices.Sort(keys)
 	for _, key := range keys {
 		if referencesMintedToken(step[key], declared) {
-			report(path+"."+key, "Safe-output step uses a compiler-minted GitHub App token scoped for the safe-output handlers; mint a dedicated least-privilege token in an authored step instead")
+			report("CTR-035", path+"."+key, "Safe-output step uses a compiler-minted GitHub App token scoped for the safe-output handlers; mint a dedicated least-privilege token in an authored step instead")
 			break
 		}
 	}
 	script, scriptPath := safeOutputStepScript(step, path)
 	if script != "" && (safeOutputEnvFileRE.MatchString(script) || safeOutputCoreExportRE.MatchString(script)) {
-		report(scriptPath, "Safe-output step writes GITHUB_ENV or GITHUB_PATH, changing the environment of later handler steps that hold write tokens; use step-level env or GITHUB_OUTPUT instead")
+		report("CTR-036", scriptPath, "Safe-output step writes GITHUB_ENV or GITHUB_PATH, changing the environment of later handler steps that hold write tokens; use step-level env or GITHUB_OUTPUT instead")
 	}
 	if checkoutPath, persists := safeOutputCheckoutPersists(step, path); persists {
-		report(checkoutPath, "Safe-output step checks out with persisted credentials, replacing the workspace and git credentials prepared for the handlers; set persist-credentials: false and a dedicated path")
+		report("CTR-037", checkoutPath, "Safe-output step checks out with persisted credentials, replacing the workspace and git credentials prepared for the handlers; set persist-credentials: false and a dedicated path")
 	}
 	if run, ok := step["run"].(string); ok && tampersWithSafeOutputInputs(run) {
-		report(path+".run", "Safe-output step modifies agent output or patch files under /tmp/gh-aw that handlers apply after threat detection; write scratch files to RUNNER_TEMP or the workspace instead")
+		report("CTR-038", path+".run", "Safe-output step modifies agent output or patch files under /tmp/gh-aw that handlers apply after threat detection; write scratch files to RUNNER_TEMP or the workspace instead")
 	}
 	return diagnostics
 }
