@@ -22,10 +22,10 @@ sandbox:
   agent:
     id: awf
 tracker-id: daily-syntax-error-quality
+model: copilot/claude-haiku-5.5
 engine:
-  id: copilot
-  copilot-sdk: true
-max-tool-denials: 3
+  id: langgraph
+max-turns: 20
 tools:
   cli-proxy: true
   bash: true
@@ -62,6 +62,7 @@ steps:
       fi
       gh aw --version
 imports:
+  - shared/langgraph.md
   - shared/reporting.md
   - shared/otlp.md
 evals:
