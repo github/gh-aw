@@ -1,25 +1,24 @@
 {
-  "last_run_date": "2026-11-18",
+  "last_run_date": "2026-11-19",
   "last_window": {
-    "start": "2026-11-17T07:56:01Z",
-    "end": "2026-11-18T07:56:01Z"
+    "start": "2026-11-18T07:55:42Z",
+    "end": "2026-11-19T07:55:42Z"
   },
   "observed_window": {
-    "coverage": "231 cached records created 2026-11-18T00:59:49Z through 07:53:53Z; count-limited; no fleet refetch",
-    "continuation_start": "2026-11-17T07:56:01Z",
-    "continuation_end": "2026-11-18T00:59:49Z",
-    "continuation_before_run_id": 44212323972
+    "coverage": "463 cached records 2026-11-18T19:37:03Z through 2026-11-19T07:54:02Z; count-limited; no fleet refetch",
+    "missing_start": "2026-11-18T07:55:42Z",
+    "continuation_end": "2026-11-18T19:31:28Z",
+    "continuation_before_run_id": 44382169334
   },
   "key_themes": [
-    "Auditor: four failed and three successful collections in the cached slice; all seven agent jobs skipped, and two later failures followed two successes.",
-    "Health Manager opened P1 78921 after tracker 78066 expired; replacement itself has a one-day expiry.",
-    "ESLint work-queue agent and evals succeeded but Process Safe Outputs failed; Safe Output Health Monitor separately reported incomplete publication."
+    "Eleven cached Auditor collection failures followed one success whose agent was skipped.",
+    "Health Manager and Safe Output Health Monitor failed agent execution; simulator memory preparation and publication failed.",
+    "GitHub issue reads denied by temporary-path permission; previous tracker and intervention state not refreshed."
   ],
   "carry_forward_questions": [
-    "Did Auditor achieve three consecutive collection passes and execute its agent? What caused the current failures?",
-    "Will tracker 78921 remain open while the issue persists?",
-    "Why did ESLint Process Safe Outputs fail, and was the intended output delivered?",
-    "Was the Safe Output Health discussion published after the incomplete report?",
-    "Can the uncollected earlier window be assessed separately?"
+    "Why did Auditor collection fail and has the agent run since?",
+    "Is tracker 78921 still active and was targeted repair effective?",
+    "What caused simulator memory failure and did publication recover?",
+    "Can the missing earlier window and issue interventions be independently assessed?"
   ]
 }
