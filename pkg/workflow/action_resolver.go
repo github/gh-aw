@@ -18,6 +18,7 @@ var resolverLog = logger.New("workflow:action_resolver")
 
 // ActionResolver handles resolving action SHAs using GitHub CLI
 type ActionResolver struct {
+	offline           bool
 	cache             *ActionCache
 	failedResolutions map[string]struct{} // tracks failed resolution attempts in current run (key: "repo@version")
 	usedCacheKeys     map[string]struct{} // tracks cache keys that were hit or newly set during this run
@@ -127,6 +128,9 @@ func (r *ActionResolver) ResolveSHA(ctx context.Context, repo, version string) (
 	}
 
 	resolverLog.Printf("No embedded pin for %s@%s, querying GitHub API", repo, version)
+	if r.offline {
+		return "", errors.New("protected verification cannot resolve an unpinned action dependency")
+	}
 	resolverLog.Printf("This may take a moment as we query GitHub API at /repos/%s/git/ref/tags/%s", gitutil.ExtractBaseRepo(repo), version)
 
 	// Resolve using GitHub CLI
@@ -182,12 +186,10 @@ func lookupEmbeddedActionPin(repo, version string) (string, bool) {
 // independently of network calls.
 func ParseTagRefTSV(line string) (sha, objType string, err error) {
 	line = strings.TrimSpace(line)
-	parts := strings.SplitN(line, "\t", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	sha, objType, ok := strings.Cut(line, "\t")
+	if !ok || sha == "" || objType == "" {
 		return "", "", fmt.Errorf("unexpected format: %q", line)
 	}
-	sha = parts[0]
-	objType = parts[1]
 	if !gitutil.IsValidFullSHACaseInsensitive(sha) {
 		return "", "", fmt.Errorf("invalid SHA format: expected 40 hex characters, got %d (%s)", len(sha), sha)
 	}

@@ -1652,6 +1652,9 @@ non-builtin output. The same object on an individual output, including
 `scripts.<name>`, `actions.<name>` and `jobs.<name>`, protects that output only.
 Authorization is opt-in; absence preserves existing execution behavior.
 
+For independently protected enforcement of enrollment, literal authority bindings,
+and source-to-lock integrity, see [How to protect an authorization baseline](/gh-aw/guides/authorization-policy/).
+
 ```yaml
 safe-outputs:
   authorization:

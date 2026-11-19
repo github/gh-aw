@@ -21,13 +21,27 @@ func ResolveIncludePath(filePath, baseDir string, cache *ImportCache) (string, e
 	}
 
 	if IsWorkflowSpec(filePath) {
+		if cache != nil && cache.localOnlyRoot != "" {
+			return "", errors.New("protected verification requires local dependency inputs")
+		}
 		remoteLog.Printf("Detected workflowspec format: %s", filePath)
 		return downloadIncludeFromWorkflowSpec(filePath, cache)
 	}
 
 	remoteLog.Printf("Using local file resolution for: %s", filePath)
 	resolveBase, securityBase, normalizedFilePath := computeIncludeResolveAndSecurityBases(filePath, baseDir)
-	return resolveAndValidateLocalIncludePath(normalizedFilePath, resolveBase, securityBase)
+	resolved, err := resolveAndValidateLocalIncludePath(normalizedFilePath, resolveBase, securityBase)
+	if err == nil && cache != nil && cache.localOnlyRoot != "" {
+		err = fileutil.ValidatePathWithinBase(cache.localOnlyRoot, resolved)
+		if err == nil {
+			var absolute string
+			absolute, err = filepath.Abs(resolved)
+			if err == nil {
+				cache.resolvedLocalFiles[absolute] = struct{}{}
+			}
+		}
+	}
+	return resolved, err
 }
 
 func resolveBuiltinIncludePath(filePath string) (string, bool, error) {
