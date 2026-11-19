@@ -2621,6 +2621,7 @@ jobs:
       GH_AW_WORK_QUEUE_INTENT_ORIGIN: "${{ needs.agent.outputs.work_queue_origin }}"
       GH_AW_WORK_QUEUE_ROLE: "worker"
       GH_AW_WORK_QUEUE_SNAPSHOT: "/tmp/gh-aw/work-queue.snapshot.json"
+      GH_AW_WORK_QUEUE_VERIFICATION_CACHE: "true"
     outputs:
       activation_comment_links: ${{ steps.process_safe_outputs.outputs.activation_comment_links }}
       code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}

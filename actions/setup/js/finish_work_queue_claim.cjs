@@ -349,13 +349,15 @@ async function finalizeWorkerResults(options = {}) {
   const configured = runtimeOptions(options);
   const assignment = normalizeAssignment(options.assignment || readWorkerSnapshot(options.snapshotPath));
   const initial = await loadQueue(configured);
+  const ledgerReadyAt = options.now ?? Date.now();
   const { dispatch, profile } = validateStoredAssignment(initial.projection, assignment, { allowReleased: true });
   if (isStagedMode(options) || isStagedMode(options.config))
     return { version: 3, dispatch_id: assignment.dispatch_id, claims: Object.fromEntries(assignment.claims.map(member => [member.handle, { state: "staged_preview", effects: "unknown" }])) };
   const trustedContext = await authenticatePublisher({ ...configured, role: "reconciler" });
   const expected = { ...expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository, dispatchPrincipal(dispatch)), run_id: dispatch.run?.run_id };
   if (!dispatch.run) throw new Error("work_queue_binding_not_durable");
-  if (trustedContext.run_id === dispatch.run.run_id && trustedContext.run_attempt !== 1) throw new Error("rerun_not_authorized");
+  const ownRun = trustedContext.run_id === dispatch.run.run_id;
+  if (ownRun && trustedContext.run_attempt !== 1) throw new Error("rerun_not_authorized");
   const results = Object.create(null);
   for (const member of assignment.claims) {
     try {
@@ -393,7 +395,7 @@ async function finalizeWorkerResults(options = {}) {
       }
       const policy = latest.projection.policy.pools[assignment.pool].reconciliation;
       const beforeVerification = validateNativeRun(await fetchNativeRunAttempt(configured.githubClient, expected.repository, dispatch.run.run_id, 1, { sleepFn: configured.sleepFn }), expected);
-      if (trustedContext.run_id !== dispatch.run.run_id && !beforeVerification.terminal) {
+      if (!ownRun && !beforeVerification.terminal) {
         log.debug("delivery.verifier.terminal_evidence_required");
         results[member.handle] = { state: "pending", effects: "unknown", reason: "terminal_evidence_required" };
         continue;
@@ -407,7 +409,9 @@ async function finalizeWorkerResults(options = {}) {
       let verifiedSnapshot = null;
       const verificationStarted = Date.now();
       integer(work.completion_at, 0, Number.MAX_SAFE_INTEGER, "Completion timestamp");
-      const remainingDeadline = policy.deadline_ms - Math.max(0, (options.now ?? verificationStarted) - work.completion_at);
+      // The worker's trusted finalizer budget starts once it holds the verified ledger; Completion anchors maintenance expiry (DeliveryFailure replay rule).
+      const verificationAnchor = ownRun ? Math.max(work.completion_at, ledgerReadyAt) : work.completion_at;
+      const remainingDeadline = policy.deadline_ms - Math.max(0, (options.now ?? verificationStarted) - verificationAnchor);
       // Maintenance can first observe a terminal worker after the deadline.
       // Give its persisted receipts one bounded readback before expiring them;
       // this does not replay effects or reopen the normal retry budget.
@@ -419,6 +423,8 @@ async function finalizeWorkerResults(options = {}) {
         contract_supported: contractSupported,
         verifier_available: typeof options.verifyEffects === "function",
         terminal_before_verification: beforeVerification.terminal,
+        own_run: ownRun,
+        anchor_offset_ms: verificationAnchor - work.completion_at,
       });
       // An explicit expiry opt-in still waits for the Completion deadline before closing the barrier.
       if (typeof options.verifyEffects !== "function" && remainingDeadline > 0) {
@@ -512,12 +518,12 @@ async function finalizeWorkerResults(options = {}) {
         if (disposition === "none" && (!verificationReceipt || !beforeVerification.terminal)) disposition = "unknown";
         if (!native.terminal) {
           log.debug("delivery.settlement.native_run_pending", { attempts, contract_supported: contractSupported });
-          results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid", verifier: verification?.reason ?? null };
+          results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid", verifier: verification?.reason ?? null, attempts };
           continue;
         }
         if (attempts < policy.max_attempts && checkedAt - work.completion_at < policy.deadline_ms) {
           log.debug("delivery.settlement.budget_remaining", { attempts, max_attempts: policy.max_attempts });
-          results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted", verifier: verification?.reason ?? null };
+          results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted", verifier: verification?.reason ?? null, attempts };
           continue;
         }
         const evidence = {
@@ -532,7 +538,7 @@ async function finalizeWorkerResults(options = {}) {
         };
         const operation = { kind: "DeliveryFailure", work_id: member.work_id, claim_id: member.claim_id, completion_id: work.completion_id, reason: "verification_exhausted", disposition, evidence };
         await publishOperations(configured, trustedContext, ["delivery_failure", assignment.dispatch_id, member.handle, work.completion_id], "delivery_failure", [operation]);
-        results[member.handle] = { state: "delivery_failed", effects: disposition, verifier: verification?.reason ?? null };
+        results[member.handle] = { state: "delivery_failed", effects: disposition, verifier: verification?.reason ?? null, attempts };
         log.diagnostic(
           "delivery.failure.persisted",
           {

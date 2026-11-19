@@ -62,6 +62,8 @@ func addJobLevelWorkQueueEnvVars(envVars map[string]string, data *WorkflowData) 
 			envVars["GH_AW_WORK_QUEUE_INTENT_ORIGIN"] = `"${{ needs.agent.outputs.work_queue_origin }}"`
 		}
 		envVars["GH_AW_WORK_QUEUE_SNAPSHOT"] = fmt.Sprintf("%q", constants.WorkQueueSnapshotPath)
+		// Job-level env cannot use the runner context; the runtime derives ${RUNNER_TEMP}/gh-aw/work-queue-verification.json.
+		envVars["GH_AW_WORK_QUEUE_VERIFICATION_CACHE"] = `"true"`
 	}
 }
 

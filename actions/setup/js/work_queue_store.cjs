@@ -3,6 +3,8 @@
 
 const { TextDecoder } = require("node:util");
 const { createHash } = require("node:crypto");
+const fs = require("node:fs");
+const nodePath = require("node:path");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("store");
 const { canonical, digest, identity, integer, queueError } = require("./work_queue_codec.cjs");
 const { actorFromContext, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
@@ -47,6 +49,20 @@ const verifiedCheckpointHistory = new WeakMap();
 const verifiedQueueContents = new WeakMap();
 /** @type {WeakMap<object, Map<string, {work_created?: {sha: string, line: number}, claim_finished?: {sha: string, line: number}}>>} */
 const immutableWorkQueueOrigins = new WeakMap();
+// Trusted steps of one job share checkpoint verification through a private RUNNER_TEMP file. The compiler opts trusted
+// work-queue jobs in; /tmp/gh-aw is never used because download-artifact extracts agent artifacts there.
+const VERIFICATION_CACHE_ENV = "GH_AW_WORK_QUEUE_VERIFICATION_CACHE";
+const VERIFICATION_CACHE_VERSION = 1;
+const VERIFICATION_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+const VERIFIED_CONTENTS_MAX_BYTES = 4 * 1024 * 1024;
+const VERIFIED_PROOFS_MAX = 128;
+const GIT_OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const CHECKPOINT_PROOF = /^(?:[a-f0-9]{40}|[a-f0-9]{64}):[a-f0-9]{64}$/;
+/** @type {WeakSet<object>} */
+const verificationCacheLoaded = new WeakSet();
+// Head last loaded from or written to the job cache; proofs only change when a read walks a new head.
+/** @type {WeakMap<object, string>} */
+const verificationCacheHeads = new WeakMap();
 
 /** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, eventIds?: Array<{work_id: string, claim_id: string}>, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
 
@@ -158,6 +174,7 @@ async function readWorkQueueLogImpl({ githubClient, owner, repo, branch = WORK_Q
 async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = true, eventIds = undefined) {
   const { githubClient, branch, repository, coreApi } = options;
   const scope = queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient));
+  loadVerificationCache(githubClient, scope, repository.full_name.toLowerCase(), branch);
   const previous = verifiedQueueContents.get(githubClient);
   if (!scope || previous?.scope !== scope) verifiedQueueContents.delete(githubClient);
   const cached = scope && previous?.scope === scope ? previous : undefined;
@@ -166,8 +183,10 @@ async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = tru
   const { state, checkpointRecovered } = await replayVerifiedQueueLog(options, sha, contents, verify, recover);
   const transactions = state.transactions;
   const bytes = Buffer.byteLength(contents, "utf8");
-  if (verify && scope && bytes <= 4 * 1024 * 1024 && (queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient))) === scope)
+  if (verify && scope && bytes <= VERIFIED_CONTENTS_MAX_BYTES && (queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient))) === scope) {
     verifiedQueueContents.set(githubClient, { scope, repository: repository.full_name.toLowerCase(), sha, treeSha, contents });
+    persistVerificationCache(githubClient, repository.full_name.toLowerCase(), branch);
+  }
   coreApi?.info(`Work queue: validated ${transactions.length} causal commits`);
   log.debug("ledger.read.complete", { bytes, transactions: transactions.length, works: state.works.size, claims: state.claims.size });
   const eventLookupDeadline = eventIds?.length ? Date.now() + 1000 : undefined;
@@ -182,6 +201,100 @@ async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = tru
     ...(eventLocations ? { eventLocations, eventLookupDeadline } : {}),
     ...(checkpointRecovered ? { checkpointRecovered: true } : {}),
   };
+}
+
+function verificationCachePath() {
+  const runnerTemp = process.env.RUNNER_TEMP;
+  return process.env[VERIFICATION_CACHE_ENV] === "true" && runnerTemp && nodePath.isAbsolute(runnerTemp) ? nodePath.join(runnerTemp, "gh-aw", "work-queue-verification.json") : undefined;
+}
+
+/**
+ * Seeds a fresh Git ledger client with the verified head and checkpoint proofs that an earlier trusted step of this job persisted.
+ * Every read still re-advertises the ref with this client's credentials, so reuse never bypasses the access check;
+ * any mismatch falls back to full verification.
+ * @param {object} githubClient
+ * @param {object | undefined} scope
+ * @param {string} repository lowercase owner/repo
+ * @param {string | undefined} branch
+ */
+function loadVerificationCache(githubClient, scope, repository, branch) {
+  const file = verificationCachePath();
+  if (!file || !scope || typeof branch !== "string" || !queueGitScope(githubClient) || verificationCacheLoaded.has(githubClient)) return;
+  verificationCacheLoaded.add(githubClient);
+  if (verifiedQueueContents.has(githubClient) || verifiedCheckpointHistory.has(githubClient)) return;
+  /** @type {any} */
+  let cache;
+  let bytes = 0;
+  try {
+    const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+    try {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.() || stat.size > VERIFICATION_CACHE_MAX_BYTES) {
+        log.debug("verification.cache.ignored", { unsafe_file: true });
+        return;
+      }
+      bytes = stat.size;
+      cache = JSON.parse(fs.readFileSync(fd, "utf8"));
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (error) {
+    const missing = error instanceof Error && "code" in error && error.code === "ENOENT";
+    log.debug("verification.cache.ignored", { missing, invalid: !missing });
+    return;
+  }
+  const head = cache?.head;
+  const prefix = `${repository}:`;
+  if (
+    cache?.version !== VERIFICATION_CACHE_VERSION ||
+    cache.repository !== repository ||
+    cache.branch !== branch ||
+    typeof head?.sha !== "string" ||
+    !GIT_OID.test(head.sha) ||
+    typeof head.treeSha !== "string" ||
+    !GIT_OID.test(head.treeSha) ||
+    typeof head.contents !== "string" ||
+    !head.contents.endsWith("\n") ||
+    Buffer.byteLength(head.contents, "utf8") > VERIFIED_CONTENTS_MAX_BYTES ||
+    !Array.isArray(cache.proofs) ||
+    cache.proofs.length > VERIFIED_PROOFS_MAX ||
+    cache.proofs.some(proof => typeof proof !== "string" || !proof.startsWith(prefix) || !CHECKPOINT_PROOF.test(proof.slice(prefix.length)))
+  ) {
+    log.debug("verification.cache.ignored", { mismatched: true });
+    return;
+  }
+  verifiedQueueContents.set(githubClient, { scope, repository, sha: head.sha, treeSha: head.treeSha, contents: head.contents });
+  verifiedCheckpointHistory.set(githubClient, { scope, proofs: new Set(cache.proofs) });
+  verificationCacheHeads.set(githubClient, head.sha);
+  log.debug("verification.cache.loaded", { proofs: cache.proofs.length, bytes });
+}
+
+/**
+ * Atomically replaces the job's verification cache with this client's verified head and checkpoint proofs.
+ * @param {object} githubClient
+ * @param {string} repository lowercase owner/repo
+ * @param {string | undefined} branch
+ */
+function persistVerificationCache(githubClient, repository, branch) {
+  const file = verificationCachePath();
+  if (!file || typeof branch !== "string" || !queueGitScope(githubClient)) return;
+  const head = verifiedQueueContents.get(githubClient);
+  const history = verifiedCheckpointHistory.get(githubClient);
+  if (!head || !history || head.scope !== history.scope || head.repository !== repository || verificationCacheHeads.get(githubClient) === head.sha) return;
+  const payload = JSON.stringify({ version: VERIFICATION_CACHE_VERSION, repository, branch, head: { sha: head.sha, treeSha: head.treeSha, contents: head.contents }, proofs: [...history.proofs] });
+  if (Buffer.byteLength(payload, "utf8") > VERIFICATION_CACHE_MAX_BYTES) return;
+  const temporary = `${file}.${process.pid}.tmp`;
+  try {
+    fs.mkdirSync(nodePath.dirname(file), { recursive: true });
+    fs.rmSync(temporary, { force: true });
+    fs.writeFileSync(temporary, payload, { mode: 0o600, flag: "wx" });
+    // Rename replaces the entry atomically: a later step never reads a partial cache.
+    fs.renameSync(temporary, file);
+    verificationCacheHeads.set(githubClient, head.sha);
+    log.debug("verification.cache.persisted", { proofs: history.proofs.size });
+  } catch {
+    log.debug("verification.cache.write_failed", { failed: true });
+  }
 }
 
 /**
@@ -466,7 +579,7 @@ async function verifyCheckpointGitHistory(options, head, transactions) {
   // Traversal runs newest to oldest; retain the head when ancestry exceeds the cache.
   for (const proof of [...pending].reverse()) {
     verified.add(proof);
-    if (verified.size > 128) {
+    if (verified.size > VERIFIED_PROOFS_MAX) {
       const oldest = verified.values().next().value;
       if (oldest !== undefined) verified.delete(oldest);
     }
@@ -856,4 +969,5 @@ module.exports = {
   verifyRepository,
   verifyCheckpointGitHistory,
   validateBranch,
+  VERIFICATION_CACHE_ENV,
 };
