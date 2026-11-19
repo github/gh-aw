@@ -194,7 +194,7 @@ The UTF-8 JSON request MUST contain exactly these two unique string members:
 
 The broker MUST verify the identity and revoke all credentials it issued to that exact authorized execution context, including credentials for any provider or capability issued in that job. The operation MUST be idempotent and MUST NOT revoke credentials belonging to another job, run, attempt, repository, or tenant. A successful invalidation MUST return HTTP 204 with an empty body and `Cache-Control: no-store`. The client MUST fail the invalidation step on any other status, without exposing response bodies or transport diagnostics. The server MUST reject malformed requests and MUST NOT disclose whether credentials exist for an unauthorized context.
 
-Job-end invalidation is terminal for that job attempt. The broker MUST deny further exchanges for the closed context, even with a still-valid OIDC identity. It MUST NOT report success while any credential issued to that job remains usable downstream, including one minted by an exchange racing with invalidation.
+Job-end invalidation is terminal for that job attempt. The broker MUST deny further exchanges for the closed context, even with a still-valid OIDC identity. It MUST NOT report success while any credential issued to that job remains usable downstream, including one minted by an exchange racing with invalidation. To achieve this, it closes the context before revoking, and atomically re-checks closure when recording each issued credential (SV-28, SV-31).
 
 Every issued credential MUST also have a finite expiration enforced by the downstream service, independently of job cleanup. If runner loss prevents invalidation, the credential can remain usable until that expiration. An earlier client cache deadline or an `expires_at` value that the downstream service does not enforce is not a substitute.
 
@@ -239,6 +239,91 @@ For a syntactically valid request of a known type, the server MUST perform these
 5. Validate the returned credential and expiration, then construct the strict success response.
 
 An issuance backend failure MUST NOT cause a different tenant, issuer, capability, or broader credential to be selected.
+
+### 5.4. Server request validation requirements (authoritative)
+
+This section is the authoritative list of checks a conforming broker MUST perform on every exchange and invalidation request. Sections 4–6 give the rationale and detail. Where any text appears to permit a weaker check, the stricter requirement here applies. A failed check MUST end processing without minting, revoking, or disclosing whether credentials exist, and MUST return the status shown.
+
+**Transport and envelope**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-01 | Accept only HTTPS POST to the exact configured endpoint path. Do not redirect. | 404 or 405 |
+| SV-02 | Require `Content-Type: application/json`. | 415 |
+| SV-03 | Read at most 65,536 body bytes, with a finite read deadline. | 413 |
+| SV-04 | Require one UTF-8 JSON object with unique members, no arrays, and only string values. | 400 |
+| SV-05 | Ignore all HTTP authentication headers and cookies. Only the body's `oidc_token` authenticates the caller. | — |
+
+**Request shape**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-06 | An exchange contains exactly `token_type` and `oidc_token`, plus `provider` only when `token_type` is `copilot-request`. An invalidation contains exactly `operation: "invalidate"` and `oidc_token`. Any other member set is malformed. | 400 |
+| SV-07 | `token_type` is case-sensitive. An unknown well-formed value is rejected before identity verification. | 422 |
+| SV-08 | `provider` matches `^[a-z][a-z0-9_-]{0,63}$` and is only used to look up an allow-list entry. It never selects an endpoint, URL, or backend. | 400 or 403 |
+
+**Identity (Section 5.1)**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-09 | `oidc_token` is a compact JWS. Reject `alg: none`, algorithms outside the configured allow-list, and `jku`, `x5u`, `jwk`, or `x5c` header parameters. | 401 |
+| SV-10 | Verify the signature with a key from the operator-configured issuer's JWKS. Refresh keys at a bounded rate and fail closed when no trusted key matches. | 401 |
+| SV-11 | `iss` exactly equals the configured issuer. | 401 |
+| SV-12 | `aud` is a single string exactly equal to the configured endpoint URL. | 401 |
+| SV-13 | `exp`, `nbf`, and `iat` are finite numbers and satisfy every time-bound inequality in Section 5.1 under configured `skew`, `max_age`, and `max_lifetime`. Missing time policy denies issuance. | 401 |
+| SV-14 | Reject PATs, `GITHUB_TOKEN`, App JWTs, installation tokens, and Actions bootstrap bearers presented as `oidc_token`. | 401 |
+
+**Execution context and authorization (Section 5.2)**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-15 | Resolve the tenant only from signed `repository_owner_id` and `repository_id`, never from names. Deny unenrolled IDs. | 403 |
+| SV-16 | Require that signed `workflow_ref` and `workflow_sha` match an approved workflow revision in the enrolled claim profile. When `job_workflow_ref` names a reusable workflow, also require that it and `job_workflow_sha` are approved. Never accept an approved reusable workflow in place of an approved caller. | 403 |
+| SV-17 | Require that `ref`, `ref_type`, `event_name`, and `environment` (when policy requires one) are allowed. Deny pull-request and fork execution unless explicitly allowed. | 403 |
+| SV-18 | Identify the job execution from `run_id`, `run_attempt`, and a signed job-level claim (for example `check_run_id`) or trusted GitHub metadata correlated to them. Never use caller-supplied names, environment variables, or digests. Deny when the policy requires job identity and it cannot be verified. | 403 |
+| SV-19 | Deny when this job attempt has been invalidated (Section 4.5). | 403 |
+| SV-36 | Require that the signed `runner_environment` claim is `github-hosted`, or that operator-attested enrolment shows the job ran on an ephemeral self-hosted runner. Deny persistent self-hosted runners for credential-consuming jobs, because an earlier job can leave code on them. | 403 |
+| SV-20 | Authorize the capability for the verified tenant, workflow revision, and job role. Support for one capability never implies another. | 403, or 501 for a known capability the deployment does not support |
+
+**`github-app` scope**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-21 | Select the App installation only from tenant-bound policy. | 403 |
+| SV-22 | Mint with an explicit repository-ID list and explicit permission map taken from policy for the verified workflow revision and job role. Never mint an installation-wide or default-permission token. | 403 |
+| SV-23 | GitHub tool roles receive read-only permissions only. Safe-output roles receive only the permissions their approved effects require. Reader and writer roles MUST be distinct policy entries. | 403 |
+| SV-24 | Cap credential lifetime at the deployment maximum, and do not exceed the downstream expiry. | 500 (no credential) |
+
+**Issuance and response (Sections 6.1–6.2)**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-25 | Apply rate limits keyed by tenant, job execution, and capability before calling an issuer adapter. | 429 |
+| SV-26 | Call only the issuer adapter for the selected capability. Never fall back to another tenant, installation, capability, or wider scope. | 502 or 503 |
+| SV-27 | Validate that the returned token is printable ASCII without spaces, and that `expires_at` is in the future with more than 30 seconds remaining, before responding. | 502 |
+| SV-28 | Record the issued credential against the job execution so invalidation can revoke it, before returning it. Recording MUST atomically check that the job is not closed. If it is closed, revoke the credential and deny. | 500 or 403 (no credential) |
+| SV-29 | Respond with exactly `token` and `expires_at` and `Cache-Control: no-store`. | — |
+
+**Invalidation (Section 4.5)**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-30 | Apply SV-01 to SV-18 to the invalidation request. | As above |
+| SV-31 | Close the exact job execution to further exchanges, then revoke downstream every credential recorded against it. With SV-28, this ensures an exchange racing the invalidation cannot survive it. Never affect another job, attempt, run, repository, or tenant. | 500 |
+| SV-32 | Be idempotent. Return 204 with an empty body and `Cache-Control: no-store` only after revocation is confirmed. | — |
+| SV-37 | SHOULD close the job execution and revoke its credentials as in SV-31 on trusted job-completion evidence, such as a `workflow_job` `completed` webhook, even when no invalidation request arrives. | — |
+
+**Errors and logging (Appendix C)**
+
+| ID | Requirement | On failure |
+| --- | --- | --- |
+| SV-33 | Verify identity (SV-09 to SV-14) before revealing whether a known capability is supported. Use 401 for identity failure and 403 for policy denial. | — |
+| SV-34 | Failure responses carry `Cache-Control: no-store` and either an empty body or a fixed sanitized message. | — |
+| SV-35 | Never log, trace, or audit raw JWTs, full claim sets, credentials, or upstream response bodies. | — |
+
+Deployments MUST provide negative tests for SV-06 to SV-24, SV-28, SV-31, and SV-36 before claiming conformance (Section 7).
+
+An experimental, informative TLA+ model of these requirements and Appendix E is in `specs/token-broker/` in the gh-aw repository. It found the gaps that SV-16, SV-28, SV-31, SV-36, and SV-37 now close.
 
 ## 6. Credential Issuance and Lifecycle
 
@@ -386,6 +471,33 @@ Before implementation can claim deployment conformance, operators must resolve:
 
 These choices do not permit extra wire fields, weakened identity verification, or claims that an unimplemented inference path works.
 
+### Appendix E: Threat model (informative)
+
+**Assets:** brokered installation and Copilot credentials, Actions OIDC request credentials and tokens, the `GH_AW_TOKEN_BROKER_URL` setting, server-side signing material, and broker policy.
+
+**Trusted:** GitHub's OIDC issuer, the broker deployment and its policy store, the compiler, compiler-generated steps, and operator-authored workflow code after review.
+
+**Untrusted:** agent output, prompt-injected content, issue and pull request content, forks, and any network path outside approved egress.
+
+| # | Threat | Impact | Mitigations | Residual risk |
+| --- | --- | --- | --- | --- |
+| TM-1 | A prompt-injected agent reads OIDC request credentials or a brokered token from its environment. | The agent mints or uses credentials beyond its read-only tools. | GitHub tool brokering requires the AWF sandbox. `ACTIONS_ID_TOKEN_REQUEST_*` and `GH_AW_TOKEN_BROKER_URL` are excluded from the agent container. GitHub tool tokens are read-only by policy. | A sandbox escape exposes the job's credentials. The read-only policy limits the damage. |
+| TM-2 | Agent output steers a write-capable safe-output job to unintended targets. | Unauthorized writes. | Safe-output handlers validate agent proposals against their configuration. Broker policy, not the request, sets repositories and permissions. Threat detection can gate execution. | Writes allowed by the configuration remain possible. Keep safe-output configuration minimal. |
+| TM-3 | Compromised or unreviewed custom steps, jobs, or actions in a brokered job. | Same-job token theft, or independent exchanges using the job-wide `id-token: write`. | Operator review, full-SHA action pinning, and isolating code that needs no credential into separate jobs (Appendix C). `safe-outputs.jobs` do not inherit `safe-outputs.token-broker`. Policy binds issuance to approved workflow revisions. | The broker cannot tell which step is asking. Every step in the job is trusted equally. |
+| TM-4 | A token is exfiltrated during the job. | Use from outside the runner until revocation or expiry. | Masking, no tokens in job outputs or artifacts, approved egress, least-privilege scope, terminal invalidation (Section 4.5), and short downstream expiry. | Use before cleanup cannot be prevented. Exposure is bounded by scope and lifetime. |
+| TM-5 | Cleanup does not run (runner loss, cancellation, timeout). | The credential stays valid after the job. | The credential's own downstream expiry applies regardless of cleanup. The broker SHOULD revoke on observed job completion (SV-37). | Exposure lasts until expiry, normally at most one hour for installation tokens. |
+| TM-6 | A sibling job or a different workflow replays or reuses another job's credential. | Cross-job escalation, for example reader to writer. | Separate exchange per consuming job, caches keyed by verified job execution, and policy binding to workflow revision and role (Section 5.2). Sharing a capability name does not authorize reuse. | Sibling jobs share `run_id`. Binding a role needs signed job identity, which deployments must verify (Appendix D). |
+| TM-7 | The broker URL is replaced with an attacker endpoint. | OIDC token disclosure to a third party, and a forged credential returned to the workflow. | The URL comes only from an Actions secret with no variable fallback. The audience equals the exact URL, so a token minted for one URL is rejected elsewhere. Approved egress. | A repository administrator can redirect the exchange. Backend authorization, not workflow opt-in, is the control. |
+| TM-8 | A fork, unapproved ref, or unenrolled repository requests credentials. | Credentials issued to untrusted code. | Server-side verification of issuer, audience, repository and owner IDs, ref, environment, workflow revision, and event policy (Sections 5.1–5.3). | Misconfigured policy. Deployments must test negative cases (Section 7). |
+| TM-9 | Credentials leak through logs, traces, error messages, or server telemetry. | Credential disclosure. | Masking before use, redacted errors, and no capture of credentials in server middleware or audit logs (Appendix C). | Third-party actions may log carelessly. See TM-3. |
+| TM-10 | The broker is unavailable or returns a malformed response. | Workflow failure, or silent fallback to broader credentials. | Fail closed with no legacy fallback. Admission outcomes never authorize issuance (Section 3). | Availability depends on the broker. |
+| TM-11 | Server signing material is compromised. | Arbitrary installation tokens across the enrolled scope. | Protected secret storage, no keys in Actions, key rotation, and access-controlled audit. | Equivalent to App key compromise, but on one hardened service instead of many repositories. |
+| TM-12 | Work-queue dispatch uses a brokered token without a verified App identity. | Queue claims attributed to the wrong principal. | Brokered dispatch is rejected. An explicit `dispatch-workflow` credential is required. | None within this protocol. |
+| TM-13 | The agent leaves code on a persistent self-hosted runner, and a later safe-output job runs there. | The planted code exchanges the safe-output job's OIDC token for a writer credential. | SV-36 denies persistent self-hosted runners. Use GitHub-hosted or ephemeral runners. | Runner attestation is operator-maintained. |
+| TM-14 | Another repository calls an approved reusable workflow. | The caller receives a credential scoped to the reusable workflow's repository. | SV-16 requires both the caller and the reusable workflow revisions to be approved. Policy scopes credentials to the verified caller repository. | Approving a caller approves every reusable workflow it is allowed to call. |
+| TM-15 | An exchange that passed SV-19 records its credential after invalidation revoked the job's credentials. | A credential survives a successful invalidation. | SV-31 closes before revoking, and SV-28 atomically re-checks closure when recording. | None within this protocol. |
+| TM-16 | A brokered writer credential opens an agent-authored pull request. Unlike `GITHUB_TOKEN`, App installation tokens trigger workflows. | Agent-authored code runs in the repository's CI with its secrets. | SV-16 and SV-17 deny broker exchanges from that CI. Safe-output pull requests are protected by branch rules and required review before untrusted workflows run. | Repository secrets outside the broker remain reachable from that CI. Require approval for workflows on bot-authored pull requests. |
+
 ## 10. Change Log
 
 ### Version 1.1.0 (Draft)
@@ -394,6 +506,9 @@ These choices do not permit extra wire fields, weakened identity verification, o
 - Kept installation and scope selection in deployment policy, with no new caller-controlled request members.
 - Documented masked same-job token transfer and the initial static consumers' renewal limitation.
 - Documented the operator review required for custom steps, jobs, and actions in credential-consuming jobs.
+- Added an informative threat model of potential breaches and mitigations.
+- Added Section 5.4, an authoritative list of server request validation requirements.
+- Added an experimental TLA+ threat model. Its findings tightened SV-16, SV-28, and SV-31, added SV-36 and SV-37, and added TM-13 to TM-16.
 
 ### Version 1.0.0 (Draft)
 
