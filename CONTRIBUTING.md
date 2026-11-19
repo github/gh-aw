@@ -557,11 +557,22 @@ Quick reference:
 ### CI Front Door
 
 CGO filters every check job on PRs through `scripts/ci-front-door.cjs`, including
-Go tests, security checks, linters, conformance, builds, benchmarks, fuzzing, and
+Go tests, security checks, linters, conformance, builds, fuzzing, and
 both macOS and Windows. Only checkout, selection, and timing/cache cleanup are
 unconditional infrastructure. Main-branch pushes,
 manual runs, and the weekly scheduled control run all applicable suites without
 calling the Decision API. CJS and Windows CI are unchanged.
+
+Benchmarks run separately in `.github/workflows/benchmarks.yml`, only on main
+pushes, weekly schedules, or manual main-branch runs, never on PRs. CLI,
+workflow, workqueue, and other benchmark packages run in parallel. Workqueue
+replay uses one iteration per size instead of three; all sizes are retained.
+Routine benchmarks exclude external Zizmor/Poutine scanner invocations, which
+can measure container startup or timeouts rather than Go performance; the
+separate CGO security scan is unchanged. `make bench` still runs the full set
+locally. Use `BENCH_PACKAGES`, `BENCH_TIME`, and `BENCH_SKIP` to narrow a run.
+Each shard publishes its own results and compares with its previous main-branch
+baseline; the first run establishes the new shard baseline.
 
 The selector uses GitHub Decisions at
 `https://api.githubcopilot.com/v1/decisions` with model `gpt-6-luna-decisions`.
