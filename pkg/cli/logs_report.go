@@ -33,6 +33,7 @@ type LogsData struct {
 	Edges                []EpisodeEdge               `json:"edges" console:"-"`
 	EpisodeRetrieval     *EpisodeRetrieval           `json:"episode_retrieval,omitempty" console:"-"`
 	Outcomes             []OutcomesData              `json:"adoption,omitempty" console:"-"`
+	AdoptionErrors       []AdoptionErrorData         `json:"adoption_errors,omitempty" console:"-"`
 	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_adoption,omitempty" console:"-"`
 	ToolUsage            []ToolUsageSummary          `json:"tool_usage,omitempty" console:"title:🛠️  Tool Usage Summary,omitempty"`
 	MCPToolUsage         *MCPToolUsageSummary        `json:"mcp_tool_usage,omitempty" console:"title:🔧 MCP Tool Usage,omitempty"`
@@ -703,7 +704,7 @@ func buildLogsDataWithCollectionCoverage(processedRuns []ProcessedRun, outputDir
 	// the slug cannot be determined.
 	var localRepo string
 	if !collection.disableLocalClassification {
-		localRepo, _ = GetCurrentRepoSlug()
+		localRepo, _ = GetCurrentRepoSlug() //nolint:ignoredlocalerror // Fails open by design; see above.
 	}
 
 	// Build runs data
