@@ -24,7 +24,10 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 	return analyzerutil.Preorder(pass, []ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
-		call := n.(*ast.CallExpr)
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return
+		}
 		funcName := calledFunc(pass, call.Fun, "slices")
 		index := 1
 		switch funcName {
@@ -37,15 +40,15 @@ func run(pass *analysis.Pass) (any, error) {
 		if len(call.Args) != index+1 {
 			return
 		}
-		comparator, ok := astutil.UnwrapParenExpr(call.Args[index]).(*ast.FuncLit)
+		comparator, ok := astutil.UnwrapParenExpr(call.Args[index]).(*ast.FuncLit) //nolint:uncheckedsliceindex // index is nonnegative and len(call.Args) == index+1
 		if !ok || len(comparator.Body.List) != 1 {
 			return
 		}
-		ret, ok := comparator.Body.List[0].(*ast.ReturnStmt)
+		ret, ok := comparator.Body.List[0].(*ast.ReturnStmt) //nolint:uncheckedsliceindex // len(comparator.Body.List) == 1
 		if !ok || len(ret.Results) != 1 {
 			return
 		}
-		compare, ok := astutil.UnwrapParenExpr(ret.Results[0]).(*ast.CallExpr)
+		compare, ok := astutil.UnwrapParenExpr(ret.Results[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // len(ret.Results) == 1
 		if !ok || calledFunc(pass, compare.Fun, "strings") != "Compare" {
 			return
 		}

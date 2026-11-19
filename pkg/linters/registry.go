@@ -80,7 +80,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/strconvparseignorederror"
 	"github.com/github/gh-aw/pkg/linters/stringbytesroundtrip"
 	"github.com/github/gh-aw/pkg/linters/stringreplaceminusone"
-	"github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc"
+	stringscompareinsortfunc "github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc"
 	"github.com/github/gh-aw/pkg/linters/stringsconcatloop"
 	"github.com/github/gh-aw/pkg/linters/stringscountcontains"
 	"github.com/github/gh-aw/pkg/linters/stringsindexcontains"

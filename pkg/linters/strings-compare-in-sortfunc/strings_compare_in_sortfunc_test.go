@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc"
+	stringscompareinsortfunc "github.com/github/gh-aw/pkg/linters/strings-compare-in-sortfunc"
 )
 
 func TestAnalyzer(t *testing.T) {
