@@ -3274,8 +3274,8 @@ engine:
     # Array of strings
 
   # Deprecated. Use a router model value for cost routing, or top-level
-  # model-routing: false to opt out. The cost-speed objective still works during
-  # migration but has no equivalent cost selector. See
+  # model-routing: false to opt out. The cost-speed objective requires an AWF pin
+  # older than v0.29.17 and has no equivalent cost selector. See
   # https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   # Accepted formats:
@@ -3283,7 +3283,8 @@ engine:
   # Format 1: object
   model-routing:
     # Routing objective: cost prefers the cheapest model and effort that meet the
-    # mode's target; cost-speed prefers the fastest model and effort that meet it.
+    # mode's target; cost-speed prefers the fastest model and effort that meet it, but
+    # requires an AWF pin older than v0.29.17.
     goal: "cost"
 
     # Routing quality profile: economy, balanced, and robust set increasing quality
@@ -4349,8 +4350,8 @@ engine:
     cwd: "example-value"
 
     # Deprecated. Use a router model value for cost routing, or top-level
-    # model-routing: false to opt out. The cost-speed objective still works during
-    # migration but has no equivalent cost selector. See
+    # model-routing: false to opt out. The cost-speed objective requires an AWF pin
+    # older than v0.29.17 and has no equivalent cost selector. See
     # https://github.github.com/gh-aw/reference/model-routing/.
     # (optional)
     # Accepted formats:
@@ -4358,7 +4359,8 @@ engine:
     # Format 1: object
     model-routing:
       # Routing objective: cost prefers the cheapest model and effort that meet the
-      # mode's target; cost-speed prefers the fastest model and effort that meet it.
+      # mode's target; cost-speed prefers the fastest model and effort that meet it, but
+      # requires an AWF pin older than v0.29.17.
       goal: "cost"
 
       # Routing quality profile: economy, balanced, and robust set increasing quality
@@ -4773,7 +4775,7 @@ tools:
     # Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token.
     # Mutually exclusive with github-app and github-token when true.
     # (optional)
-    token-broker: true
+    token-broker: null
 
     # GitHub MCP server toolset name(s) to enable. Accepts a single toolset name
     # (string) or an array of toolset names.
@@ -21977,7 +21979,7 @@ safe-outputs:
   # Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token.
   # Mutually exclusive with github-app and github-token when true.
   # (optional)
-  token-broker: true
+  token-broker: null
 
   # GitHub App credentials for minting installation access tokens. When configured,
   # a token will be generated using the app credentials and used for all safe output
@@ -22290,8 +22292,8 @@ safe-outputs:
         # Array of strings
 
       # Deprecated. Use a router model value for cost routing, or top-level
-      # model-routing: false to opt out. The cost-speed objective still works during
-      # migration but has no equivalent cost selector. See
+      # model-routing: false to opt out. The cost-speed objective requires an AWF pin
+      # older than v0.29.17 and has no equivalent cost selector. See
       # https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
       # Accepted formats:
@@ -22299,7 +22301,8 @@ safe-outputs:
       # Format 1: object
       model-routing:
         # Routing objective: cost prefers the cheapest model and effort that meet the
-        # mode's target; cost-speed prefers the fastest model and effort that meet it.
+        # mode's target; cost-speed prefers the fastest model and effort that meet it, but
+        # requires an AWF pin older than v0.29.17.
         goal: "cost"
 
         # Routing quality profile: economy, balanced, and robust set increasing quality
@@ -23365,8 +23368,8 @@ safe-outputs:
         cwd: "example-value"
 
         # Deprecated. Use a router model value for cost routing, or top-level
-        # model-routing: false to opt out. The cost-speed objective still works during
-        # migration but has no equivalent cost selector. See
+        # model-routing: false to opt out. The cost-speed objective requires an AWF pin
+        # older than v0.29.17 and has no equivalent cost selector. See
         # https://github.github.com/gh-aw/reference/model-routing/.
         # (optional)
         # Accepted formats:
@@ -23374,7 +23377,8 @@ safe-outputs:
         # Format 1: object
         model-routing:
           # Routing objective: cost prefers the cheapest model and effort that meet the
-          # mode's target; cost-speed prefers the fastest model and effort that meet it.
+          # mode's target; cost-speed prefers the fastest model and effort that meet it, but
+          # requires an AWF pin older than v0.29.17.
           goal: "cost"
 
           # Routing quality profile: economy, balanced, and robust set increasing quality

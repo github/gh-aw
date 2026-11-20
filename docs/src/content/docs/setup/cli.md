@@ -517,9 +517,22 @@ gh aw validate --dir custom/workflows       # Validate from custom directory
 gh aw validate --engine copilot             # Override AI engine
 ```
 
-**Options:** `--allow-action-refs`, `--dir/-d`, `--engine/-e`, `--fail-fast`, `--json/-j`, `--no-check-update`, `--stats`, `--strict`, `--validate-images`
+**Options:** `--allow-action-refs`, `--authorization-actions-workflow`, `--authorization-commit`, `--authorization-policy`, `--authorization-policy-sha256`, `--authorization-repository`, `--authorization-repository-id`, `--dir/-d`, `--engine/-e`, `--fail-fast`, `--json/-j`, `--no-check-update`, `--stats`, `--strict`, `--validate-images`
 
-Built-in Actions/AW AST lint, external linters (`zizmor`, `actionlint`, `poutine`), `--validate`, and `--no-emit` are always-on defaults and cannot be disabled. Accepts the same workflow ID format as `compile`.
+In ordinary validation, built-in Actions/AW AST lint, external linters (`zizmor`, `actionlint`, `poutine`), `--validate`, and `--no-emit` are always-on defaults and cannot be disabled. Accepts the same workflow ID format as `compile`.
+
+With `--authorization-policy PATH`, the command instead checks the complete immutable candidate snapshot against an externally protected authorization baseline. It resolves eligible output routes and regenerates locks in memory for byte-for-byte comparison, without executing candidate code, contacting an authority, or emitting lock files. This mode requires the complete `.github/workflows` inventory; workflow IDs and compilation or scope overrides are rejected.
+
+| Authorization option | Meaning |
+|---|---|
+| `--authorization-policy PATH` | Select the protected baseline file and authorization verification mode. |
+| `--authorization-policy-sha256 DIGEST` | Check the baseline against a SHA-256 digest pinned by the trusted checker. |
+| `--authorization-repository-id ID` | Required platform repository ID verified by the trusted checker; must match the baseline. |
+| `--authorization-repository OWNER/REPO` | Supply verified repository context for reproducible repository-scattered schedules. |
+| `--authorization-commit SHA` | Select a full immutable candidate commit ID; defaults to `HEAD`. |
+| `--authorization-actions-workflow PATH` | Approve a handwritten Actions workflow path outside gh-aw authorization coverage; repeat for additional paths. |
+
+`--json` returns a versioned report with status `compliant`, `violations`, or `incomplete`; only `compliant` exits zero. A passing result establishes declared baseline compliance and source-to-lock integrity for the inspected snapshot. Deployment requires independently protected checker inputs and configuration. See [Validate an authorization baseline](/gh-aw/guides/authorization-policy/) for the baseline format, supported dependencies, invocation examples, and enforcement limits.
 
 #### `lint`
 
