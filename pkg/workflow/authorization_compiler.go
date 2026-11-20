@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 )
+
+var authorizationCompilerLog = logger.New("workflow:authorization_compiler")
 
 // NewAuthorizationVerificationCompiler compiles candidate data without emitting
 // files, fetching dependencies, or consulting candidate-owned resolution caches.
 // The caller must provide an isolated snapshot and deny network/process execution
 // outside the trusted compiler. Only local imports and embedded action pins resolve.
 func NewAuthorizationVerificationCompiler(root string) *Compiler {
+	authorizationCompilerLog.Printf("Creating authorization verification compiler: root=%s", root)
 	c := NewCompiler(WithNoEmit(true))
 	c.gitRoot = root
 	c.verifyAuthorization = true
@@ -32,11 +36,14 @@ func NewAuthorizationVerificationCompiler(root string) *Compiler {
 // CompileAuthorizationSnapshot uses the ordinary parse/compile pipeline and
 // captures the complete generated lock without writing it.
 func (c *Compiler) CompileAuthorizationSnapshot(path string) (*WorkflowData, string, error) {
+	authorizationCompilerLog.Printf("Compiling authorization snapshot: path=%s", path)
 	if !c.verifyAuthorization || !c.noEmit || !c.readOnly {
+		authorizationCompilerLog.Printf("Rejecting snapshot compilation: verify_authorization=%t, no_emit=%t, read_only=%t", c.verifyAuthorization, c.noEmit, c.readOnly)
 		return nil, "", errors.New("authorization snapshot compilation requires the read-only verification compiler")
 	}
 	relative, err := filepath.Rel(c.gitRoot, path)
 	if err != nil || !filepath.IsLocal(relative) {
+		authorizationCompilerLog.Printf("Rejecting snapshot source outside candidate root: path=%s, root=%s", path, c.gitRoot)
 		return nil, "", errors.New("authorization source must be contained in the candidate snapshot")
 	}
 	c.SetWorkflowIdentifier(filepath.ToSlash(relative))
@@ -63,6 +70,7 @@ func (c *Compiler) CompileAuthorizationSnapshot(path string) (*WorkflowData, str
 		return nil, "", err
 	}
 	if len(data.ActionResolutionFailures) > 0 {
+		authorizationCompilerLog.Printf("Rejecting snapshot: unpinned action references=%d", len(data.ActionResolutionFailures))
 		return nil, "", errors.New("protected verification requires all action references to be pinned")
 	}
 	for _, spec := range data.Skills {
@@ -72,6 +80,7 @@ func (c *Compiler) CompileAuthorizationSnapshot(path string) (*WorkflowData, str
 		}
 	}
 	data.ResolvedDependencyFiles = c.importCache.ResolvedLocalFiles()
+	authorizationCompilerLog.Printf("Authorization snapshot compiled: path=%s, lock_bytes=%d, dependency_files=%d", path, len(generated), len(data.ResolvedDependencyFiles))
 	return data, generated, nil
 }
 
@@ -86,6 +95,7 @@ func validateAuthorizationActionMetadata(data *WorkflowData) error {
 			return fmt.Errorf("protected verification requires a valid safe-output action reference: %w", err)
 		}
 		if !ref.IsLocal && config.Inputs == nil {
+			authorizationCompilerLog.Printf("Rejecting remote safe-output action without inline inputs: name=%q", name)
 			return fmt.Errorf("protected verification requires inline inputs for remote safe-output action %q; remote metadata fetching is disabled", name)
 		}
 	}
