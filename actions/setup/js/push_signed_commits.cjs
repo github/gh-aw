@@ -130,10 +130,10 @@ class PushSignedCommitsBaseMoved extends Error {
   /**
    * @param {string} branch
    * @param {string | undefined} baseRefOid
-   * @param {string} remoteHeadOid
+   * @param {string | undefined} remoteHeadOid
    */
   constructor(branch, baseRefOid, remoteHeadOid) {
-    super(`${ERR_API}: branch ${branch} moved from ${baseRefOid || "(unresolved base)"} to ${remoteHeadOid} after this commit was prepared`);
+    super(`${ERR_API}: branch ${branch} moved from ${baseRefOid || "an unresolved base"} to ${remoteHeadOid || "no readable head"} after this commit was prepared`);
     this.name = "PushSignedCommitsBaseMoved";
   }
 }
@@ -323,12 +323,15 @@ async function lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken
  * @param {string} [opts.pushToken]
  * @param {() => void} [opts.assertTransportUnchanged]
  * @param {boolean} [opts.requireExistingBranch]
+ * @param {string} [opts.expectedRemoteHead] - Push only while the remote branch is exactly this commit
  * @returns {Promise<string>}
  */
-async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch }) {
+async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch, expectedRemoteHead }) {
   const pushOnce = async () => {
     const pushArgs = ["push"];
-    if (requireExistingBranch) {
+    if (expectedRemoteHead) {
+      pushArgs.push(`--force-with-lease=refs/heads/${branch}:${expectedRemoteHead}`);
+    } else if (requireExistingBranch) {
       const expectedHead = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
       if (!expectedHead) throw new Error(`${ERR_API}: Branch ${branch} no longer exists; refusing to recreate it`);
       const ancestor = await getGitExecOutput(["merge-base", "--is-ancestor", expectedHead, "HEAD"], { cwd, ignoreReturnCode: true });
@@ -563,7 +566,7 @@ async function pushSignedCommits({
   } catch {
     // Non-fatal. The existing branch-creation logic handles missing remote refs.
   }
-  if (requireBaseRefMatch && remoteHeadOid && remoteHeadOid !== baseRefOid) {
+  if (requireBaseRefMatch && remoteHeadOid !== baseRefOid) {
     throw new PushSignedCommitsBaseMoved(branch, baseRefOid, remoteHeadOid);
   }
   const firstReplayParentOid = revListEntries[0] && revListEntries[0].fields.length > 1 ? revListEntries[0].fields[1] : undefined;
@@ -864,6 +867,7 @@ async function pushSignedCommits({
         expectedHeadOid = oidResult || "";
         if (!expectedHeadOid) {
           if (requireExistingBranch) throw new Error(`${ERR_API}: Branch ${branch} no longer exists; refusing to recreate it`);
+          if (requireBaseRefMatch) throw new PushSignedCommitsBaseMoved(branch, baseRefOid, undefined);
           // Branch does not exist on the remote yet.
           // createCommitOnBranch requires the branch to already exist – it does NOT auto-create branches.
           // Create the first commit before publishing the ref, so branch-push CI
@@ -1027,7 +1031,17 @@ async function pushSignedCommits({
       throw new Error(`${ERR_API}: pushSignedCommits: signed commit push failed for branch '${branch}' and git push fallback is disabled: ${detail}${getWorkflowPermissionHint(detail)}`, { cause: err });
     }
     core.warning(`pushSignedCommits: GraphQL signed push failed, falling back to git push: ${getErrorMessage(err)}`);
-    const fallbackSha = await pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch });
+    const fallbackSha = await pushBranchAndResolveHead({
+      branch,
+      cwd,
+      gitAuthEnv,
+      pushRemoteUrl,
+      pushToken,
+      assertTransportUnchanged,
+      requireExistingBranch,
+      // The unsigned fallback may only replace the head this commit was prepared on.
+      expectedRemoteHead: requireBaseRefMatch ? baseRefOid : undefined,
+    });
     core.info(`pushSignedCommits: git push fallback completed, using pushed SHA ${fallbackSha}`);
     return fallbackSha;
   }

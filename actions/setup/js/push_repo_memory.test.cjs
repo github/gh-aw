@@ -2679,8 +2679,9 @@ describe("push_repo_memory.cjs - overlapping runs keep each other's rows", () =>
    * @param {ReturnType<typeof createMemoryBranch>} branch
    * @param {Record<string, string>} artifactFiles - This run's copy of the memory files.
    * @param {string} baseCommit - REPO_MEMORY_BASE_COMMIT from the agent job.
+   * @param {Record<string, string>} [extraEnv]
    */
-  async function runPush(branch, artifactFiles, baseCommit) {
+  async function runPush(branch, artifactFiles, baseCommit, extraEnv = {}) {
     const artifactDir = path.join(branch.rootDir, "artifact");
     const workspaceDir = path.join(branch.rootDir, "workspace");
     fs.mkdirSync(artifactDir);
@@ -2730,6 +2731,7 @@ describe("push_repo_memory.cjs - overlapping runs keep each other's rows", () =>
             GH_TOKEN: "test-token",
             GITHUB_RUN_ID: "2",
             REPO_MEMORY_BASE_COMMIT: baseCommit,
+            ...extraEnv,
           },
         },
       });
@@ -2741,14 +2743,15 @@ describe("push_repo_memory.cjs - overlapping runs keep each other's rows", () =>
   }
 
   it("keeps rows another run saved while this run's agent was working", async () => {
-    const branch = createMemoryBranch({ "log.jsonl": "r1\n", "state.json": '{"count":1}\n', "notes.md": "line1\nline2\n" });
+    const branch = createMemoryBranch({ "log.jsonl": "r1\n", "events.JSONL": "e1\n", "state.json": '{"count":1}\n', "notes.md": "line1\nline2\n" });
     try {
-      branch.saveFromOtherRun({ "log.jsonl": "r1\na\n", "state.json": '{"count":2}\n', "notes.md": "A1\nline2\n" });
+      branch.saveFromOtherRun({ "log.jsonl": "r1\na\n", "events.JSONL": "e1\nea\n", "state.json": '{"count":2}\n', "notes.md": "A1\nline2\n" });
 
-      const { core, pushSignedCommits } = await runPush(branch, { "log.jsonl": "r1\nb\n", "state.json": '{"count":1}\n', "notes.md": "B1\nline2\n" }, branch.startCommit);
+      const { core, pushSignedCommits } = await runPush(branch, { "log.jsonl": "r1\nb\n", "events.JSONL": "e1\neb\n", "state.json": '{"count":1}\n', "notes.md": "B1\nline2\n" }, branch.startCommit);
 
       expect(core.setFailed).not.toHaveBeenCalled();
       expect(branch.readBranchFile("log.jsonl")).toBe("r1\na\nb\n");
+      expect(branch.readBranchFile("events.JSONL")).toBe("e1\nea\neb\n");
       // This run did not change state.json, so the other run's version stays.
       expect(branch.readBranchFile("state.json")).toBe('{"count":2}\n');
       // Both runs changed the same line of notes.md, so this run's line wins.
@@ -2781,6 +2784,50 @@ describe("push_repo_memory.cjs - overlapping runs keep each other's rows", () =>
     },
     30_000
   );
+
+  it("keeps another run's rows when both runs started before the branch existed", async () => {
+    // The other run created the branch while this run's agent was working.
+    const branch = createMemoryBranch({ "log.jsonl": "a\n" });
+    try {
+      const { core } = await runPush(branch, { "log.jsonl": "b\n" }, "empty");
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(core.warning).not.toHaveBeenCalled();
+      expect(branch.readBranchFile("log.jsonl")).toBe("a\nb\n");
+    } finally {
+      fs.rmSync(branch.rootDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("does not mistake checkout line endings for this run's edits", async () => {
+    const branch = createMemoryBranch({ ".gitattributes": "*.md text eol=crlf\n", "notes.md": "line1\nline2\n" });
+    try {
+      branch.saveFromOtherRun({ "notes.md": "A1\nline2\n" });
+
+      // The agent's checkout wrote the unchanged file with CRLF line endings.
+      const { core } = await runPush(branch, { "notes.md": "line1\r\nline2\r\n" }, branch.startCommit);
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(branch.readBranchFile("notes.md")).toBe("A1\nline2\n");
+    } finally {
+      fs.rmSync(branch.rootDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("fails the save when merging with another run's rows exceeds the file size limit", async () => {
+    const branch = createMemoryBranch({ "log.jsonl": "r1\n" });
+    try {
+      branch.saveFromOtherRun({ "log.jsonl": "r1\naaaaaa\n" });
+
+      const { core, pushSignedCommits } = await runPush(branch, { "log.jsonl": "r1\nbbbbbb\n" }, branch.startCommit, { MAX_FILE_SIZE: "12" });
+
+      expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("exceeds size limit after merging with other runs' changes: log.jsonl (17 bytes > 12 bytes)"));
+      expect(pushSignedCommits).not.toHaveBeenCalled();
+      expect(branch.readBranchFile("log.jsonl")).toBe("r1\naaaaaa\n");
+    } finally {
+      fs.rmSync(branch.rootDir, { recursive: true, force: true });
+    }
+  }, 30_000);
 
   it("retries instead of committing over a save that lands just before the commit", async () => {
     const branch = createMemoryBranch({ "log.jsonl": "r1\n" });

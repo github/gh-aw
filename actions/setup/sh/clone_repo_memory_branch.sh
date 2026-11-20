@@ -76,8 +76,9 @@ harden_repo_memory_git_state() {
   fi
 }
 
-# head is the commit the agent starts from; push_repo_memory replays the
-# agent's changes relative to it so rows saved meanwhile by other runs survive.
+# head is the commit the agent starts from, or "empty" when the branch does not
+# exist yet; push_repo_memory replays the agent's changes relative to it so rows
+# saved meanwhile by other runs survive.
 write_clone_output() {
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
     printf 'cloned=%s\n' "$1" >> "$GITHUB_OUTPUT"
@@ -154,6 +155,7 @@ unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 
 if [ "$CLONE_SUCCEEDED" = "false" ]; then
   # The remote confirmed that the branch does not exist.
+  write_clone_output false empty
   if [ "$CREATE_ORPHAN" = "true" ]; then
     echo "Branch $BRANCH_NAME does not exist, creating orphan branch"
     mkdir -p "$MEMORY_DIR"
