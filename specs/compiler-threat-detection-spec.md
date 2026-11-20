@@ -845,16 +845,17 @@ Token broker authentication is experimental; enabling any broker capability MUST
 | Boundary | Implementation | Regression Evidence |
 |---|---|---|
 | Credential-source exclusivity, sandbox requirement, inference and permission conflicts | `pkg/workflow/token_broker.go`: `validateTokenBrokerGitHubConfig`, `validateTokenBrokerInference`, `validateTokenBrokerRequestPermissions` | `TestTokenBrokerGitHubCredentialConflicts`, `TestTokenBrokerGitHubRequiresBootstrapIsolation`, `TestTokenBrokerRejectsUnsupportedInference`, `TestTokenBrokerRejectsLegacyInferenceFallback` |
-| Bootstrap variable exclusion and no OIDC for custom jobs | `pkg/workflow/awf_command_builder.go`, `token_broker.go`: `jobUsesTokenBroker` | `TestTokenBrokerBootstrapExcluded`, `TestTokenBrokerDoesNotGrantOIDCToCustomJobs` |
+| Bootstrap variable exclusion | `pkg/workflow/awf_env.go`: `ComputeAWFExcludeEnvVarNames` | `TestTokenBrokerBootstrapExcluded` |
+| Custom-job permissions are not implicitly elevated for broker use | `pkg/workflow/compiler_custom_job_properties.go`: `extractCustomJobCoreProperties` | `TestTokenBrokerDoesNotGrantOIDCToCustomJobs` |
 | Self-hosted runner warning | `pkg/workflow/compiler.go`, `token_broker.go`: `tokenBrokerSelfHostedJobs` | `TestTokenBrokerSelfHostedJobs`, `TestTokenBrokerExperimentalWarning` |
 
 These are compile-time guards, not evidence of broker-side authorization, replay resistance, or runner cleanliness; those obligations belong to the [Token Broker Specification](../docs/src/content/docs/specs/token-broker-specification.md). The bounded TLA+ model in `specs/token-broker/` is informative and is not a conformance artifact. No new `CTR-*` or compliance-test identifier is introduced.
 
 ### 7.13 Protected Safe-Output Authorization Baseline Verification
 
-`gh aw validate --authorization-policy` is a read-only verifier for an externally protected baseline. It MUST fail closed: any unreadable, mismatched, or unverifiable input MUST yield `incomplete` status, never a passing result. The verifier MUST:
+`gh aw validate --authorization-policy` is a read-only verifier for an externally protected baseline. It MUST fail closed: checks that cannot be completed or trusted MUST yield `incomplete`, while detected non-compliance, such as an `authority_mismatch`, `required_workflow_missing`, or `generated_workflow_drift`, MUST yield `violations`. Neither status passes; only `compliant` passes. The verifier MUST:
 
-- require the complete `.github/workflows` inventory (no subsets, directory overrides, or engine overrides), a checker-supplied verified repository ID and slug, and, when pinned, a matching policy SHA-256 digest;
+- require the complete `.github/workflows` inventory (no subsets, directory overrides, or engine overrides) and a checker-supplied verified repository ID matching the policy; accept an optional checker-supplied repository slug, validating it when present, for repository-scattered schedules; and, when pinned, require a matching policy SHA-256 digest;
 - compile an isolated, immutable candidate commit snapshot with a Git environment that ignores inherited repository, object, alternate, and configuration variables;
 - require literal authority bindings (endpoint and audience) that equal the baseline for every eligible safe-output route, rejecting runtime-variable bindings and missing requirements;
 - report generated-lock drift, missing baseline-required workflows, uncovered executors, unresolved imports, and unapproved handwritten executable workflows.
