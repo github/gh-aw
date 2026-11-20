@@ -51,6 +51,7 @@ var notYetEnforced = map[string]string{
 	"osremoveuncheckedcleanup":         "existing cleanup error findings need remediation before CI enforcement",
 	"packagelevelmutableslicemap":      "existing production violations need remediation",
 	"prefercutprefix":                  "existing HasPrefix/TrimPrefix and HasSuffix/TrimSuffix findings need remediation before CI enforcement",
+	"readallunboundedhttpbody":         "new analyzer needs an enforcement-readiness audit before CI enables it",
 	"readerstringconv":                 "existing reader conversions need an enforcement-readiness audit before CI enables it",
 	"reflectdeepequalusage":            "existing reflect.DeepEqual uses need case-by-case review before CI enforcement",
 	"seenmapbool":                      "existing production violations need remediation",

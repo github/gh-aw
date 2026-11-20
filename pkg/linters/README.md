@@ -68,6 +68,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `panic-in-library-code` — reports `panic()` calls in library packages (`pkg/*`) where errors should be returned instead.
 - `prefercutprefix` — reports `strings.HasPrefix`/`HasSuffix` guards followed by matching `strings.TrimPrefix`/`TrimSuffix` calls; use `strings.CutPrefix`/`CutSuffix` to combine the check and trim.
 - `rawloginlib` — reports direct usage of the standard `log` package in library packages, where `pkg/logger` should be used.
+- `readallunboundedhttpbody` — reports `io.ReadAll` calls on an HTTP response `Body` that are not wrapped in `io.LimitReader`, since an unbounded read can exhaust memory.
 - `readerstringconv` — reports `strings.NewReader(string(b))` where `b` is `[]byte` and `bytes.NewReader([]byte(s))` where `s` is a string; prefer `bytes.NewReader(b)` or `strings.NewReader(s)` to avoid copying data only to change reader type. No automatic fix is offered: review concrete reader types and any reliance on a defensive copy of `b`. Named string arguments still need a `string(s)` conversion.
 - `reflect-deepequal-usage` (Go package `reflectdeepequalusage`) — reports `reflect.DeepEqual()` calls, including calls through local function-value aliases, that should use typed equality operators or type-specific comparison functions. Alias resolution is conservative: aliases must have a declaration initializer and no reassignment or address escape; package-level aliases are not resolved.
 - `regexpcompileinfunction` — reports `regexp.Compile` / `regexp.MustCompile` and their POSIX variants called inside functions that should be package-level.
@@ -250,6 +251,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
 | `prefercutprefix` | Custom `go/analysis` analyzer that flags matching `strings.HasPrefix`/`HasSuffix` guards followed by `strings.TrimPrefix`/`TrimSuffix` calls and recommends `strings.CutPrefix`/`CutSuffix` |
 | `rawloginlib` | Custom `go/analysis` analyzer that flags standard-library `log` package calls in library packages |
+| `readallunboundedhttpbody` | Custom `go/analysis` analyzer that flags `io.ReadAll(resp.Body)` calls on HTTP responses that are not bounded with `io.LimitReader` |
 | `readerstringconv` | Custom `go/analysis` analyzer that flags `strings.NewReader(string(b))` and `bytes.NewReader([]byte(s))` conversions and recommends the reader matching the original data |
 | `reflect-deepequal-usage` (`reflectdeepequalusage`) | Custom `go/analysis` analyzer that flags `reflect.DeepEqual()` calls that should use typed equality operators or type-specific comparison functions |
 | `regexpcompileinfunction` | Custom `go/analysis` analyzer that flags regexp compilation inside function bodies |
@@ -324,6 +326,7 @@ import (
 	panicinlibrarycode "github.com/github/gh-aw/pkg/linters/panic-in-library-code"
 	"github.com/github/gh-aw/pkg/linters/prefercutprefix"
 	"github.com/github/gh-aw/pkg/linters/rawloginlib"
+	"github.com/github/gh-aw/pkg/linters/readallunboundedhttpbody"
 	"github.com/github/gh-aw/pkg/linters/regexpcompileinfunction"
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
 	"github.com/github/gh-aw/pkg/linters/sortbasicslices"
@@ -361,6 +364,7 @@ _ = osexitinlibrary.Analyzer
 _ = panicinlibrarycode.Analyzer
 _ = prefercutprefix.Analyzer
 _ = rawloginlib.Analyzer
+_ = readallunboundedhttpbody.Analyzer
 _ = regexpcompileinfunction.Analyzer
 _ = regexpdynamicpattern.Analyzer
 _ = sortbasicslices.Analyzer
@@ -424,6 +428,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/panic-in-library-code` — panic-in-library-code analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/prefercutprefix` — prefer-cut-prefix analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/rawloginlib` — raw-log-in-lib analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/readallunboundedhttpbody` — readall-unbounded-http-body analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/readerstringconv` — reader-string-conversion analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/regexpcompileinfunction` — regexp-compile-in-function analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/regexpdynamicpattern` — regexp-dynamic-pattern analyzer subpackage

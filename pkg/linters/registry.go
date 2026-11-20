@@ -63,6 +63,7 @@ import (
 	panicinlibrarycode "github.com/github/gh-aw/pkg/linters/panic-in-library-code"
 	"github.com/github/gh-aw/pkg/linters/prefercutprefix"
 	"github.com/github/gh-aw/pkg/linters/rawloginlib"
+	"github.com/github/gh-aw/pkg/linters/readallunboundedhttpbody"
 	"github.com/github/gh-aw/pkg/linters/readerstringconv"
 	reflectdeepequalusage "github.com/github/gh-aw/pkg/linters/reflect-deepequal-usage"
 	"github.com/github/gh-aw/pkg/linters/regexpcompileinfunction"
@@ -169,6 +170,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	panicinlibrarycode.Analyzer,
 	prefercutprefix.Analyzer,
 	rawloginlib.Analyzer,
+	readallunboundedhttpbody.Analyzer,
 	readerstringconv.Analyzer,
 	reflectdeepequalusage.Analyzer,
 	regexpcompileinfunction.Analyzer,
