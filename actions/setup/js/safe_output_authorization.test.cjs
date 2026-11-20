@@ -97,6 +97,38 @@ describe("generic fail-closed safe-output authorization", () => {
     }
   }
 
+  it("binds a closed verifier result in the existing request digest and snapshots it", async () => {
+    const verification = {
+      version: "gh-aw.merge-proof.v1",
+      repository: "acme/project",
+      pull_request_number: 123,
+      head_sha: "a".repeat(40),
+      verifier: "invariant-checker",
+      verifier_version: "v1.2.0",
+      configuration_digest: "b".repeat(64),
+      result: "passed",
+      check_run_id: 456,
+      app_id: 789,
+    };
+    const prepare = changes =>
+      makeInvocation({
+        output: { ...output, type: "merge_pull_request" },
+        context: { verification: { ...verification, ...changes } },
+      });
+    const invocation = prepare();
+    const changed = prepare({ configuration_digest: "c".repeat(64) });
+    expect(canonicalDigest({ ...invocation, request_id: "fixed" })).not.toBe(canonicalDigest({ ...changed, request_id: "fixed" }));
+    const opts = options({ invocation });
+    await authorizePreparedInvocation(opts);
+    expect(JSON.parse(opts.fetchImpl.mock.calls[1][1].body).invocation.context.verification).toEqual(verification);
+    for (const changes of [{ result: "Unknown" }, { version: "unsupported" }, { app_id: 0 }, { configuration_digest: "bad" }, { extra: true }]) {
+      expect(() => prepare(changes)).toThrow("invalid_preparation");
+    }
+    verification.result = "Unknown";
+    expect(invocation.context.verification.result).toBe("passed");
+    expect(Object.isFrozen(invocation.context.verification)).toBe(true);
+  });
+
   it("uses only the trusted runner directory for authorization evidence", () => {
     expect(authorizationEvidencePath({ RUNNER_TEMP: directory })).toBe(path.join(directory, "gh-aw", "safe-output-authorization.jsonl"));
     expect(() => authorizationEvidencePath({})).toThrow("trusted evidence storage");

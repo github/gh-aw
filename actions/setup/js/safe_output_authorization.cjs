@@ -211,7 +211,7 @@ function references(values) {
 /**
  * @param {{caller: any, output: any, normalizedInputs: unknown, batchDigest: string, recordIndex: number,
  * scope?: {binding: string, refs: string[], limits_digest?: string},
- * context?: {policy_digest?: string, evidence_refs?: string[], claim_id?: string, delivery_id?: string}}} options
+ * context?: {policy_digest?: string, evidence_refs?: string[], claim_id?: string, delivery_id?: string, verification?: any}}} options
  */
 function prepareInvocation({ caller, output, normalizedInputs, batchDigest, recordIndex, scope = { binding: "invocation", refs: [] }, context = {} }) {
   try {
@@ -222,10 +222,24 @@ function prepareInvocation({ caller, output, normalizedInputs, batchDigest, reco
     closed(scope, ["binding", "refs"], ["limits_digest"]);
     if (!["invocation", "resolved_effect"].includes(scope.binding)) fail("invalid_preparation");
     const scopeSnapshot = { binding: scope.binding, refs: references(scope.refs), ...(scope.limits_digest === undefined ? {} : { limits_digest: hash(scope.limits_digest) }) };
-    closed(context, [], ["policy_digest", "evidence_refs", "claim_id", "delivery_id"]);
+    closed(context, [], ["policy_digest", "evidence_refs", "claim_id", "delivery_id", "verification"]);
     const contextSnapshot = {};
     if (context.policy_digest !== undefined) contextSnapshot.policy_digest = hash(context.policy_digest);
     if (context.evidence_refs !== undefined) contextSnapshot.evidence_refs = references(context.evidence_refs);
+    if (context.verification !== undefined) {
+      const proof = context.verification;
+      closed(proof, ["version", "repository", "pull_request_number", "head_sha", "verifier", "verifier_version", "configuration_digest", "result", "check_run_id", "app_id"]);
+      if (proof.version !== "gh-aw.merge-proof.v1" || proof.result !== "passed" || output.type !== "merge_pull_request") fail("invalid_preparation");
+      if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(text(proof.repository, 256)) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(proof.head_sha)) fail("invalid_preparation");
+      for (const key of ["pull_request_number", "check_run_id", "app_id"]) {
+        if (!Number.isSafeInteger(proof[key]) || proof[key] <= 0) fail("invalid_preparation");
+      }
+      for (const key of ["verifier", "verifier_version"]) {
+        if (!CODE.test(text(proof[key], 256))) fail("invalid_preparation");
+      }
+      hash(proof.configuration_digest);
+      contextSnapshot.verification = { ...proof };
+    }
     for (const key of ["claim_id", "delivery_id"]) {
       if (context[key] !== undefined) {
         if (!CODE.test(text(context[key], 256))) fail("invalid_preparation");

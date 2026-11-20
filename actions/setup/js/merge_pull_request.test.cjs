@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { writeMergePullRequestDecision } from "./safe_output_manifest.cjs";
 import { SAFE_OUTPUT_E007 } from "./error_codes.cjs";
 import { generateSafeOutputSummary } from "./safe_output_summary.cjs";
+const require = createRequire(import.meta.url);
 
 function persistDecision(result) {
   const directory = path.resolve(`.test-merge-pull-request-audit-${Math.random().toString(36).slice(2)}`);
@@ -347,6 +349,223 @@ describe("merge_pull_request policy hardening", () => {
     });
     return handler(message, {});
   }
+
+  describe("trusted deterministic proof binding", () => {
+    let proof;
+    let config;
+    let check;
+    let directory;
+    let fetchImpl;
+    let authorizeEffect;
+    const protocol = require("./safe_output_authorization.cjs");
+
+    beforeEach(() => {
+      pr.head.sha = "a".repeat(40);
+      reviewPR.headRefOid = pr.head.sha;
+      proof = {
+        version: "gh-aw.merge-proof.v1",
+        repository: "github/gh-aw",
+        pull_request_number: 100,
+        head_sha: pr.head.sha,
+        verifier: "invariant-checker",
+        verifier_version: "v1.2.0",
+        configuration_digest: "b".repeat(64),
+        result: "passed",
+      };
+      config = {
+        allowed_base_branches: ["integration"],
+        required_checks: ["verifier"],
+        required_check_apps: { verifier: 5 },
+        proof: { check: "verifier", verifier: proof.verifier, verifier_version: proof.verifier_version, configuration_digest: proof.configuration_digest },
+        authorization: { endpoint: "https://authority.example/authorize", audience: "merge-proof", source: "local" },
+      };
+      check = { id: 101, name: "verifier", app: { id: 5 }, head_sha: pr.head.sha, status: "completed", conclusion: "success", output: { text: JSON.stringify(proof) } };
+      checkResults.mockImplementation(async () => [structuredClone(check)]);
+      client.rest.checks.get = vi.fn().mockImplementation(async () => ({ data: structuredClone(check) }));
+      directory = fs.mkdtempSync(path.resolve(".merge-proof-test-"));
+      for (const [key, value] of Object.entries({
+        RUNNER_TEMP: directory,
+        GITHUB_REPOSITORY_ID: "123",
+        GITHUB_WORKFLOW_REF: "github/gh-aw/.github/workflows/test.lock.yml@refs/heads/main",
+        GITHUB_WORKFLOW_SHA: "c".repeat(40),
+        GH_AW_AUTHORIZATION_WORKFLOW_HASH: "d".repeat(64),
+        GITHUB_RUN_ID: "456",
+        GITHUB_RUN_ATTEMPT: "1",
+        GH_AW_SAFE_OUTPUTS_STAGED: "false",
+        ACTIONS_ID_TOKEN_REQUEST_URL: "https://oidc.example/token",
+        ACTIONS_ID_TOKEN_REQUEST_TOKEN: "bootstrap-fixture",
+      }))
+        vi.stubEnv(key, value);
+      global.core.setSecret = vi.fn();
+      authorizeEffect = vi.fn();
+      fetchImpl = vi.fn(async (_url, options) => {
+        if (options.method === "GET") {
+          const payload = Buffer.from(JSON.stringify({ aud: "merge-proof", exp: Math.floor(Date.now() / 1000) + 60 })).toString("base64url");
+          return Response.json({ value: `header.${payload}.signature` });
+        }
+        const request = JSON.parse(options.body);
+        authorizeEffect(request);
+        return Response.json({
+          version: protocol.VERSION,
+          decision: "allow",
+          request_digest: request.request_digest,
+          invocation_id: request.invocation.invocation_id,
+          run_attempt: "1",
+          policy_revision: "proof-policy-v1",
+          decision_id: "proof-decision-1",
+          issued_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 20000).toISOString(),
+        });
+      });
+      vi.stubGlobal("fetch", fetchImpl);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+      fs.rmSync(directory, { recursive: true, force: true });
+    });
+
+    async function protectedMerge(message = {}) {
+      const { loadHandlers, processMessages } = require("./safe_output_handler_manager.cjs");
+      const handlers = await loadHandlers({ merge_pull_request: config });
+      const { results } = await processMessages(handlers, [{ type: "merge_pull_request", ...message }]);
+      return results[0];
+    }
+
+    it("authorizes the trusted binding and exact merge inputs through the existing manager gate", async () => {
+      const result = await protectedMerge({ proof: { ...proof, result: "Unknown" }, commit_title: "Verified merge" });
+      expect(result.success, JSON.stringify({ result, errors: global.core.error.mock.calls, debug: global.core.debug.mock.calls })).toBe(true);
+      expect(authorizeEffect).toHaveBeenCalledOnce();
+      const invocation = authorizeEffect.mock.calls[0][0].invocation;
+      const verification = { ...proof, check_run_id: 101, app_id: 5 };
+      expect(invocation.context.verification).toEqual(verification);
+      expect(invocation.scope.binding).toBe("resolved_effect");
+      expect(invocation.input_digest).toBe(
+        protocol.canonicalDigest({
+          merge: { owner: "github", repo: "gh-aw", pull_number: 100, sha: pr.head.sha, merge_method: "merge", commit_title: "Verified merge" },
+          verification,
+        })
+      );
+      expect(client.rest.checks.get).toHaveBeenCalledTimes(2);
+      expect(client.rest.pulls.get).toHaveBeenCalledTimes(3);
+      expect(client.rest.pulls.merge).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ sha: proof.head_sha }));
+    });
+
+    it.each(["repository", "pull_request_number", "head_sha", "verifier", "verifier_version", "configuration_digest", "version", "result"])("blocks mismatched or unsupported %s", async field => {
+      check.output.text = JSON.stringify({ ...proof, [field]: field === "result" ? "Unknown" : field === "pull_request_number" ? 999 : "mismatch" });
+      const result = await protectedMerge();
+      expect(result.success).toBe(false);
+      expect(authorizeEffect).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it.each(["failed", "unknown", "Unknown", "unsupported"])("blocks verifier result %s even with check success", async result => {
+      check.output.text = JSON.stringify({ ...proof, result });
+      expect((await protectedMerge()).success).toBe(false);
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it.each(["missing", "missing-output", "forged-app", "failed-check", "malformed", "duplicate-field", "extra-field"])("rejects %s evidence despite an agent-authored passing assertion", async kind => {
+      if (kind === "missing") checkResults.mockResolvedValue([]);
+      if (kind === "missing-output") delete check.output;
+      if (kind === "forged-app") check.app.id = 99;
+      if (kind === "failed-check") check.conclusion = "failure";
+      if (kind === "malformed") check.output.text = '{"result":';
+      if (kind === "duplicate-field") check.output.text = JSON.stringify(proof).replace('"result":"passed"', '"result":"Unknown","result":"passed"');
+      if (kind === "extra-field") check.output.text = JSON.stringify({ ...proof, agent_assertion: true });
+      expect((await protectedMerge({ proof, evidence: proof, evidence_refs: ["agent-proof:passed"] })).success).toBe(false);
+      expect(authorizeEffect).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("rejects a head changed before final revalidation", async () => {
+      client.rest.pulls.get.mockResolvedValueOnce({ data: structuredClone(pr) }).mockResolvedValue({ data: { ...pr, head: { ...pr.head, sha: "e".repeat(40) } } });
+      expect((await protectedMerge()).success).toBe(false);
+      expect(authorizeEffect).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("invalidates proof when the head changes during the authority wait", async () => {
+      authorizeEffect.mockImplementation(() => {
+        pr.head.sha = "e".repeat(40);
+      });
+      expect((await protectedMerge()).success).toBe(false);
+      expect(authorizeEffect).toHaveBeenCalledOnce();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("blocks execution if authorization expires during the final head read", async () => {
+      let reads = 0;
+      client.rest.pulls.get.mockImplementation(async () => {
+        if (++reads === 3) vi.spyOn(Date, "now").mockReturnValue(Date.now() + 25000);
+        return { data: structuredClone(pr) };
+      });
+      expect((await protectedMerge()).success).toBe(false);
+      expect(authorizeEffect).toHaveBeenCalledOnce();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("blocks a verifier check replaced during final revalidation", async () => {
+      checkResults.mockResolvedValueOnce([structuredClone(check)]).mockResolvedValue([{ ...check, id: 102 }]);
+      expect((await protectedMerge()).success).toBe(false);
+      expect(authorizeEffect).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("blocks proof revoked on the same check during final revalidation", async () => {
+      client.rest.checks.get.mockResolvedValueOnce({ data: structuredClone(check) }).mockResolvedValue({ data: { ...check, output: { text: JSON.stringify({ ...proof, result: "Unknown" }) } } });
+      expect((await protectedMerge()).success).toBe(false);
+      expect(authorizeEffect).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("blocks a trusted proof when the external authority denies it", async () => {
+      fetchImpl
+        .mockImplementationOnce(async () => {
+          const payload = Buffer.from(JSON.stringify({ aud: "merge-proof", exp: Math.floor(Date.now() / 1000) + 60 })).toString("base64url");
+          return Response.json({ value: `header.${payload}.signature` });
+        })
+        .mockImplementationOnce(async (_url, options) => {
+          const request = JSON.parse(options.body);
+          return Response.json({
+            version: protocol.VERSION,
+            decision: "deny",
+            request_digest: request.request_digest,
+            invocation_id: request.invocation.invocation_id,
+            run_attempt: "1",
+            policy_revision: "proof-policy-v1",
+            decision_id: "denied-proof",
+            issued_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 20000).toISOString(),
+          });
+        });
+      const result = await protectedMerge();
+      expect(result.success).toBe(false);
+      expect(result.authorization.state).toBe("denied");
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("fails closed without trusted authorization context", async () => {
+      expect((await run(config)).success).toBe(false);
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("validates staged proof without requesting authorization", async () => {
+      config.staged = true;
+      expect((await run(config)).success).toBe(true);
+      expect(authorizeEffect).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+
+    it("blocks Unknown proof in staged mode", async () => {
+      config.staged = true;
+      check.output.text = JSON.stringify({ ...proof, result: "Unknown" });
+      expect((await run(config)).success).toBe(false);
+      expect(authorizeEffect).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    });
+  });
 
   it.each(
     [

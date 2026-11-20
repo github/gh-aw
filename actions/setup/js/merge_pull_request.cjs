@@ -14,7 +14,8 @@ const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
 const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { getEffectiveDetectionConclusion, getThreatDetectedMarker, getThreatEngineErrorMarker } = require("./threat_detection_warning.cjs");
-const { mergeAuthorizationEvidence, reconcileMerge } = require("./merge_pull_request_evidence.cjs");
+const { mergeAuthorizationEvidence, reconcileMerge, collectMergeProof } = require("./merge_pull_request_evidence.cjs");
+const { authorizeSafeOutputInvocation } = require("./safe_output_execution.cjs");
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
 const MERGEABILITY_PENDING_ERROR_E099 = `${SAFE_OUTPUT_E099}: ${MERGEABILITY_PENDING_ERROR}`;
 
@@ -625,6 +626,9 @@ async function main(config = {}) {
   const requiredChecks = Array.isArray(config.required_checks) ? config.required_checks : [];
   const requiredCheckApps = config.required_check_apps || {};
   const requiredApprovers = Array.isArray(config.required_approvers) ? config.required_approvers : [];
+  if (config.proof && (!requiredChecks.includes(config.proof.check) || !Number.isSafeInteger(requiredCheckApps[config.proof.check]) || requiredCheckApps[config.proof.check] <= 0)) {
+    throw new Error(`${SAFE_OUTPUT_E001}: Merge proof requires a required-checks entry pinned in required-check-apps`);
+  }
 
   const allowedBranchPatterns = compilePathGlobs(allowedBranches);
   core.info(
@@ -898,6 +902,10 @@ async function main(config = {}) {
           details: { failing: checkSummary.failing },
         });
       }
+      if (config.proof) {
+        phase = "proof_evidence";
+        evidence.proof = await collectMergeProof(githubClient, owner, repo, pullNumber, pr.head.sha, config, checkSummary.passing);
+      }
 
       if ((pr.requested_reviewers || []).length > 0 || (pr.requested_teams || []).length > 0) {
         failureReasons.push({
@@ -986,6 +994,12 @@ async function main(config = {}) {
       const currentReviews = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
       const currentApprovals = await getApprovalEvidence(githubClient, owner, repo, currentPR, requiredApprovers);
       const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
+      if (config.proof) {
+        const currentProof = await collectMergeProof(githubClient, owner, repo, pullNumber, pr.head.sha, config, currentChecks.passing);
+        if (!isDeepStrictEqual(currentProof, evidence.proof)) {
+          throw new Error(`${SAFE_OUTPUT_E007}: Merge proof changed after evaluation; fresh evaluation required`);
+        }
+      }
       const currentFileProtection = await evaluateProtectedFiles(githubClient, owner, repo, currentPR, config);
       if (currentFileProtection.action !== "allow") {
         failureReasons.push({ code: "protected_files_modified", message: "Pull request modifies protected files at final revalidation" });
@@ -1030,18 +1044,39 @@ async function main(config = {}) {
         };
       }
 
-      phase = "merge";
-      core.debug('merge_pull_request: {"event":"merge_started","head_bound":true}');
-      mergeAttempted = true;
-      const mergeResponse = await githubClient.rest.pulls.merge({
+      const mergeInputs = {
         owner,
         repo,
         pull_number: pullNumber,
         sha: pr.head.sha,
         merge_method: message.merge_method || "merge",
-        commit_title: message.commit_title,
-        commit_message: message.commit_message,
-      });
+        ...(message.commit_title === undefined ? {} : { commit_title: message.commit_title }),
+        ...(message.commit_message === undefined ? {} : { commit_message: message.commit_message }),
+      };
+      if (config.proof) {
+        phase = "proof_authorization";
+        const authorization = await authorizeSafeOutputInvocation({
+          config,
+          inputs: { merge: mergeInputs, verification: evidence.proof },
+          scope: { binding: "resolved_effect", refs: [`repository:${owner}/${repo}`, `pull-request:${pullNumber}`, `head:${pr.head.sha}`, `check-run:${evidence.proof.check_run_id}`] },
+          verification: evidence.proof,
+        });
+        if (authorization.state !== "allowed") {
+          throw new Error(`${SAFE_OUTPUT_E007}: Merge proof requires external authorization of the verified change`);
+        }
+        phase = "revalidation";
+        const { data: authorizedPR } = await githubClient.rest.pulls.get({ owner, repo, pull_number: pullNumber });
+        if (!authorizedPR || !isDeepStrictEqual(policySnapshot(authorizedPR), evaluatedSnapshot) || authorizedPR.mergeable !== true || authorizedPR.mergeable_state === "dirty") {
+          evidence.authorization.final_revalidation = "failed";
+          throw new Error(`${SAFE_OUTPUT_E007}: Pull request policy state changed after proof authorization; fresh evaluation required`);
+        }
+        // The remote authority wait and final head read both consume validity.
+        require("./safe_output_authorization.cjs").assertAuthorizationFresh({ authorization });
+      }
+      phase = "merge";
+      core.debug('merge_pull_request: {"event":"merge_started","head_bound":true}');
+      mergeAttempted = true;
+      const mergeResponse = await githubClient.rest.pulls.merge(mergeInputs);
       if (mergeResponse.data?.merged !== true && mergeResponse.data?.merged !== false) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing merge outcome in API response`);
       }

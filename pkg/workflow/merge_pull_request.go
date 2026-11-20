@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -11,21 +12,32 @@ import (
 )
 
 var mergePullRequestLog = logger.New("workflow:merge_pull_request")
+var mergeProofIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,255}$`)
+var mergeProofDigestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 // MergePullRequestConfig holds configuration for merging pull requests with policy checks.
 type MergePullRequestConfig struct {
 	BaseSafeOutputConfig          `yaml:",inline"`
 	SafeOutputTargetConfig        `yaml:",inline"`
-	SafeOutputAllowedLabelsConfig `yaml:",inline"` // Deprecated: allowed-labels is migrated to required-labels
-	RequiredLabels                []string         `yaml:"required-labels,omitempty"`       // Labels that must ALL be present on the PR
-	AllowedBranches               []string         `yaml:"allowed-branches,omitempty"`      // Glob patterns for source branch names; PR branch must match one
-	AllowedBaseBranches           []string         `yaml:"allowed-base-branches,omitempty"` // Owner-declared non-consequential destinations; required and scoped
-	RequiredTitlePrefix           string           `yaml:"required-title-prefix,omitempty"` // Title prefix the PR must have
-	RequiredChecks                []string         `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
-	RequiredCheckApps             map[string]int64 `yaml:"required-check-apps,omitempty"`   // Expected GitHub App IDs by required check name
-	RequiredApprovers             []string         `yaml:"required-approvers,omitempty"`    // At least one independent human from this allowlist must approve the head
-	ProtectedFilesPolicy          string           `yaml:"protected-files,omitempty"`       // blocked (default) or allowed
-	ProtectedFilesExclude         []string         `yaml:"-"`
+	SafeOutputAllowedLabelsConfig `yaml:",inline"`  // Deprecated: allowed-labels is migrated to required-labels
+	RequiredLabels                []string          `yaml:"required-labels,omitempty"`       // Labels that must ALL be present on the PR
+	AllowedBranches               []string          `yaml:"allowed-branches,omitempty"`      // Glob patterns for source branch names; PR branch must match one
+	AllowedBaseBranches           []string          `yaml:"allowed-base-branches,omitempty"` // Owner-declared non-consequential destinations; required and scoped
+	RequiredTitlePrefix           string            `yaml:"required-title-prefix,omitempty"` // Title prefix the PR must have
+	RequiredChecks                []string          `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
+	RequiredCheckApps             map[string]int64  `yaml:"required-check-apps,omitempty"`   // Expected GitHub App IDs by required check name
+	RequiredApprovers             []string          `yaml:"required-approvers,omitempty"`    // At least one independent human from this allowlist must approve the head
+	ProtectedFilesPolicy          string            `yaml:"protected-files,omitempty"`       // blocked (default) or allowed
+	ProtectedFilesExclude         []string          `yaml:"-"`
+	Proof                         *MergeProofConfig `yaml:"proof,omitempty"`
+}
+
+// MergeProofConfig pins an independent verifier's check and invariant configuration.
+type MergeProofConfig struct {
+	Check               string `yaml:"check" json:"check"`
+	Verifier            string `yaml:"verifier" json:"verifier"`
+	VerifierVersion     string `yaml:"verifier-version" json:"verifier_version"`
+	ConfigurationDigest string `yaml:"configuration-digest" json:"configuration_digest"`
 }
 
 // parseMergePullRequestConfig handles merge-pull-request configuration.
@@ -51,6 +63,14 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 		cfg.AllowedBaseBranches = ParseStringArrayFromConfig(configMap, "allowed-base-branches", mergePullRequestLog)
 		cfg.RequiredTitlePrefix = extractStringFromMap(configMap, "required-title-prefix", mergePullRequestLog)
 		cfg.RequiredChecks = ParseStringArrayFromConfig(configMap, "required-checks", mergePullRequestLog)
+		if proof, ok := configMap["proof"].(map[string]any); ok {
+			cfg.Proof = &MergeProofConfig{
+				Check:               extractStringFromMap(proof, "check", mergePullRequestLog),
+				Verifier:            extractStringFromMap(proof, "verifier", mergePullRequestLog),
+				VerifierVersion:     extractStringFromMap(proof, "verifier-version", mergePullRequestLog),
+				ConfigurationDigest: extractStringFromMap(proof, "configuration-digest", mergePullRequestLog),
+			}
+		}
 		if apps, ok := configMap["required-check-apps"].(map[string]any); ok {
 			cfg.RequiredCheckApps = make(map[string]int64, len(apps))
 			for name, value := range apps {
@@ -98,6 +118,9 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 	if policy := cfg.ProtectedFilesPolicy; policy != "" && policy != "blocked" && policy != "allowed" && !strings.HasPrefix(policy, "${{") {
 		return errors.New("safe-outputs.merge-pull-request.protected-files must be 'blocked', 'allowed', or a GitHub Actions expression. Use 'blocked' to refuse protected-file changes")
 	}
+	if err := validateMergePullRequestProof(cfg); err != nil {
+		return err
+	}
 	for name, appID := range cfg.RequiredCheckApps {
 		if !slices.Contains(cfg.RequiredChecks, name) {
 			return fmt.Errorf("safe-outputs.merge-pull-request.required-check-apps contains check %q not listed in required-checks. Add the check to required-checks", name)
@@ -135,6 +158,25 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 		if slices.Contains(cfg.RequiredChecks, checkName) {
 			return fmt.Errorf("safe-outputs.merge-pull-request.required-checks contains agent-controlled create-check-run name %q. Use an independent CI check name instead", checkName)
 		}
+	}
+	return nil
+}
+
+func validateMergePullRequestProof(cfg *MergePullRequestConfig) error {
+	proof := cfg.Proof
+	if proof == nil {
+		return nil
+	}
+	if !slices.Contains(cfg.RequiredChecks, proof.Check) || cfg.RequiredCheckApps[proof.Check] <= 0 {
+		return errors.New("safe-outputs.merge-pull-request.proof.check must name a required-checks entry pinned in required-check-apps. Use an independent deterministic verifier")
+	}
+	for _, value := range []string{proof.Verifier, proof.VerifierVersion} {
+		if !mergeProofIdentifierPattern.MatchString(value) {
+			return errors.New("safe-outputs.merge-pull-request.proof requires static verifier and verifier-version identifiers")
+		}
+	}
+	if !mergeProofDigestPattern.MatchString(proof.ConfigurationDigest) {
+		return errors.New("safe-outputs.merge-pull-request.proof.configuration-digest must be a lowercase SHA-256 digest of the complete invariant configuration")
 	}
 	return nil
 }

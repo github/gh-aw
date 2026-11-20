@@ -29,15 +29,15 @@ function recordExecutorOutcome(result, operationStatus, coreApi = global.core) {
  * Complete handler-specific preparation at the live effect boundary. The
  * invocation context is compiler/manager-owned, never taken from message fields.
  *
- * @param {{inputs: unknown, scope?: {binding: string, refs: string[]}, config?: any}} options
+ * @param {{inputs: unknown, scope?: {binding: string, refs: string[]}, config?: any, verification?: any}} options
  */
-async function authorizeHandlerInvocation({ inputs, scope = { binding: "invocation", refs: [] }, config = {} }) {
+async function authorizeHandlerInvocation({ inputs, scope = { binding: "invocation", refs: [] }, config = {}, verification }) {
   if (!handlerAuthorizationRequired(config)) return { state: "not_configured" };
-  return requireAuthorization({ inputs, scope });
+  return requireAuthorization({ inputs, scope, verification });
 }
 
-/** @param {{inputs: unknown, scope?: {binding: string, refs: string[]}}} options */
-async function requireAuthorization({ inputs, scope = { binding: "invocation", refs: [] } }) {
+/** @param {{inputs: unknown, scope?: {binding: string, refs: string[]}, verification?: any}} options */
+async function requireAuthorization({ inputs, scope = { binding: "invocation", refs: [] }, verification }) {
   const state = require("./safe_output_execution.cjs").currentSafeOutputInvocation();
   if (!state?.requirement || !state.invocation) throw new Error(ERR_PERMISSION + ": Protected safe-output handlers require their trusted prepared invocation context");
   const invocation = prepareInvocation({
@@ -47,7 +47,7 @@ async function requireAuthorization({ inputs, scope = { binding: "invocation", r
     batchDigest: state.batchDigest,
     recordIndex: state.recordIndex,
     scope,
-    context: state.invocation.context,
+    context: { ...state.invocation.context, ...(verification ? { verification } : {}) },
   });
   const evidencePath = authorizationEvidencePath();
   fs.mkdirSync(path.dirname(evidencePath), { recursive: true, mode: 0o700 });

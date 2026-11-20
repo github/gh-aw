@@ -17,7 +17,7 @@ function currentSafeOutputInvocation() {
 /**
  * Keep isolated MCP bundles free of runner credentials and authorization I/O.
  * The trusted executor supplies the gate through its private invocation context.
- * @param {{inputs: unknown, scope?: {binding: string, refs: string[]}, config?: any}} options
+ * @param {{inputs: unknown, scope?: {binding: string, refs: string[]}, config?: any, verification?: any}} options
  */
 async function authorizeSafeOutputInvocation(options) {
   const state = currentSafeOutputInvocation();

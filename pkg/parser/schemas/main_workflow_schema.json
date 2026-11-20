@@ -11028,6 +11028,18 @@
                   "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
                   "description": "Expected GitHub App ID for each named check. Keys must also appear in required-checks. A missing or different producer blocks merging."
                 },
+                "proof": {
+                  "type": "object",
+                  "required": ["check", "verifier", "verifier-version", "configuration-digest"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "check": { "type": "string", "minLength": 1 },
+                    "verifier": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,255}$" },
+                    "verifier-version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,255}$" },
+                    "configuration-digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                  },
+                  "description": "Opt-in deterministic verifier evidence binding. Requires external authorization and a required check pinned by App ID. The check output.text must contain gh-aw.merge-proof.v1 JSON matching the repository, PR, head, verifier version and configuration digest, with result passed. Unknown, unsupported, missing or mismatched evidence blocks merging."
+                },
                 "required-approvers": {
                   "type": "array",
                   "items": { "type": "string", "minLength": 1 },

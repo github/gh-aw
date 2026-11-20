@@ -149,6 +149,44 @@ func TestMergePullRequestExplicitPolicies(t *testing.T) {
 	require.ErrorContains(t, validateMergePullRequestPolicies(config, "Test Workflow"), "invalid GitHub username")
 }
 
+func TestMergePullRequestProofBinding(t *testing.T) {
+	raw := map[string]any{
+		"allowed-base-branches": []any{"agent-work/*"},
+		"required-checks":       []any{"verifier"},
+		"required-check-apps":   map[string]any{"verifier": 123},
+		"proof": map[string]any{
+			"check": "verifier", "verifier": "invariant-checker", "verifier-version": "v1.2.0",
+			"configuration-digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
+	}
+	cfg := NewCompiler().parseMergePullRequestConfig(map[string]any{"merge-pull-request": raw})
+	config := &SafeOutputsConfig{MergePullRequest: cfg}
+	require.NoError(t, validateMergePullRequestPolicies(config, "Test"))
+	require.ErrorContains(t, resolveSafeOutputAuthorizations(config), "proof requires external authorization")
+	config.Authorization = &SafeOutputAuthorization{Endpoint: "https://authority.example/authorize", Audience: "merge-proof"}
+	require.NoError(t, resolveSafeOutputAuthorizations(config))
+	handler := pullRequestHandlerRegistry["merge_pull_request"](config)
+	encoded, err := json.Marshal(handler["proof"])
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"check":"verifier","verifier":"invariant-checker","verifier_version":"v1.2.0","configuration_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, string(encoded))
+	for _, tc := range []struct {
+		name string
+		edit func(*MergePullRequestConfig)
+		want string
+	}{
+		{"unpinned", func(c *MergePullRequestConfig) { c.RequiredCheckApps = nil }, "pinned"},
+		{"not required", func(c *MergePullRequestConfig) { c.RequiredChecks = nil; c.RequiredCheckApps = nil }, "required-checks"},
+		{"invalid digest", func(c *MergePullRequestConfig) { c.Proof.ConfigurationDigest = "abc" }, "configuration-digest"},
+		{"expression", func(c *MergePullRequestConfig) { c.Proof.VerifierVersion = "${{ inputs.version }}" }, "static"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			invalid := NewCompiler().parseMergePullRequestConfig(map[string]any{"merge-pull-request": raw})
+			tc.edit(invalid)
+			require.ErrorContains(t, validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: invalid}, "Test"), tc.want)
+		})
+	}
+}
+
 func TestMergePullRequestProtectedFiles(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

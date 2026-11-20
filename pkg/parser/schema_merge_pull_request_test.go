@@ -107,6 +107,46 @@ func TestMainWorkflowSchema_MergePullRequestCheckApps(t *testing.T) {
 	}
 }
 
+func TestMainWorkflowSchema_MergePullRequestProof(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		field string
+		value any
+		valid bool
+	}{
+		{"valid", "", nil, true},
+		{"missing version", "verifier-version", nil, false},
+		{"unknown field", "result", "passed", false},
+		{"invalid digest", "configuration-digest", "abc", false},
+		{"expression version", "verifier-version", "${{ inputs.version }}", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			proof := map[string]any{
+				"check": "verifier", "verifier": "invariant-checker", "verifier-version": "v1.2.0",
+				"configuration-digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			}
+			if tc.field != "" {
+				if tc.value == nil {
+					delete(proof, tc.field)
+				} else {
+					proof[tc.field] = tc.value
+				}
+			}
+			frontmatter := map[string]any{
+				"on": "push",
+				"safe-outputs": map[string]any{
+					"merge-pull-request": map[string]any{"allowed-base-branches": []any{"agent-work/*"}, "proof": proof},
+				},
+			}
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/merge-proof.md")
+			if (err == nil) != tc.valid {
+				t.Fatalf("schema validity = %v, want %v: %v", err == nil, tc.valid, err)
+			}
+		})
+	}
+}
+
 func TestMainWorkflowSchema_MergePullRequestAllowedBaseBranches(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

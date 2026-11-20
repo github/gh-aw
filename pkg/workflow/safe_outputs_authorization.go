@@ -259,6 +259,9 @@ func resolveSafeOutputAuthorizations(config *SafeOutputsConfig) error {
 	if err := resolveCustomSafeOutputAuthorizations(config, seen); err != nil {
 		return err
 	}
+	if config.MergePullRequest != nil && config.MergePullRequest.Proof != nil && config.AuthorizationRequirements["merge_pull_request"] == nil {
+		return errors.New("safe-outputs.merge-pull-request.proof requires external authorization. Configure safe-outputs.authorization or merge-pull-request.authorization")
+	}
 	if safeOutputAuthorizationEnabled(config) && len(config.Steps) != 0 {
 		return errors.New("safe-outputs.steps pre-output hooks are not supported with authorization; move reviewed steps into an authorized safe-output job")
 	}

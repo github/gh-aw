@@ -296,6 +296,37 @@ safe-outputs:
 
 **Check producers**: `required-check-apps` maps each required name to a positive GitHub App ID. Every observed check with that name must come from that app, including during final revalidation. Without a mapping, names alone do not authenticate the producer. Several workflows can share an app, so protect CI workflow definitions from the acting agent. Unknown names and invalid IDs are rejected at compile time. The compiler grants `checks: read` even without `required-checks`, because branch requirements are discovered at runtime.
 
+**Proof evidence (opt-in)**: `proof` requires external `authorization` (global, repository-default, or local) and a check listed in both `required-checks` and `required-check-apps`:
+
+```yaml
+proof:
+  check: deterministic-verifier
+  verifier: invariant-checker
+  verifier-version: v1.2.0
+  configuration-digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+```
+
+The independent deterministic verifier publishes a successful check whose `output.text` is exactly one JSON object with these fields (no Markdown wrapper or extra fields):
+
+```json
+{
+  "version": "gh-aw.merge-proof.v1",
+  "repository": "owner/repo",
+  "pull_request_number": 123,
+  "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "verifier": "invariant-checker",
+  "verifier_version": "v1.2.0",
+  "configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "result": "passed"
+}
+```
+
+The lowercase SHA-256 `configuration-digest` identifies the complete invariant set and verifier configuration; its computation and proof semantics belong to the verifier. Pin an immutable verifier version. The configured App and its credentials, verifier implementation, and configuration must be outside the agent's control. App identity alone cannot establish determinism or distinguish workflows sharing an App. Do not configure an agent-writable check producer as trusted.
+
+The handler fetches the selected check directly from GitHub and matches every field against the resolved target and trusted configuration. Agent-supplied proof objects, assertions, and evidence references are not consumed. Missing, failed, malformed, unsupported-version, `Unknown`, or mismatched results block both live and staged merges. Final revalidation requires the same passing check and binding. For a live merge, the existing external authorization request carries that binding in `invocation.context.verification`, with the trusted `check_run_id` and `app_id`; the input digest also binds the exact merge arguments and evidence, and scope is `resolved_effect`. The authority must support this context and deny unrecognized evidence contracts. Authorization denial, timeout, or invalid responses block execution.
+
+After authorization, the handler reads the PR again and rejects changed policy state, including a changed head. The merge API also receives that exact head SHA. Proof does not override other merge gates, authorize protected/default branches, or prove downstream deployment safety. Omitting `proof` preserves existing behavior.
+
 **Approvals**: individual reviews are always read. Any reviewer's latest effective `CHANGES_REQUESTED` review blocks the merge, independent of branch protection. A later approval or dismissal supersedes it. Missing or malformed review evidence also blocks the merge. Without `required-approvers`, the absence of blocking reviews is not affirmative human approval. For higher-impact use, set `required-approvers` to an allowlist of human logins (matching is case-insensitive). At least one must have an `APPROVED` review on the evaluated head SHA. PR authors, bot accounts, and the authenticated merge identity cannot supply this approval.
 
 **Authorization boundary**: labels, titles, and branch names are filters, not human authorization. Keep approval accounts and their credentials outside the acting agent's control. A review reported under a human account is not proof that a person, rather than automation using that account, wrote it.
