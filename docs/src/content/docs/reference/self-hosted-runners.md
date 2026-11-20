@@ -170,7 +170,7 @@ Triage this issue.
 
 ## Configuring the detection job runner
 
-When [threat detection](/gh-aw/reference/threat-detection/) is enabled, the detection job runs on the agent job's runner by default. Override it with `safe-outputs.threat-detection.runs-on`:
+When [threat detection](/gh-aw/reference/threat-detection/) is enabled, the detection job runs on GitHub-hosted `ubuntu-latest` by default, independently of the agent job's runner. For self-hosted-only setups, set `safe-outputs.threat-detection.runs-on` to a self-hosted runner:
 
 ```aw
 ---
@@ -183,7 +183,7 @@ safe-outputs:
 ---
 ```
 
-This is useful when your self-hosted runner lacks outbound internet access for AI detection, or when you want to run the detection job on a cheaper runner.
+The detection job runs on a separate runner from the agent job. Ensure the selected runner has the network access needed for AI detection.
 
 ## Configuring the framework job runner
 
