@@ -52,6 +52,28 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 | `privileged-checkout` | — | AW, Actions | Privileged triggers warn on enabled or dynamic `allow-unsafe-pr-checkout`, PR-head, dispatch, or upstream-head checkout selectors, literal `refs/pull/` refs, and direct `gh pr checkout` or Git calls selecting them. Trusted base checkouts are not flagged. |
 | `artifact-execution` | — | AW, Actions | `workflow_run` warns when cross-run downloads extract into the workspace or an unknown path, or when later direct execution uses their literal destination. |
 
+### Suppressing a diagnostic
+
+A standalone YAML comment can acknowledge a false positive for specific rule IDs on the immediately following field:
+
+```yaml
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # gh-aw: ignore[unpinned-images] -- Reviewed caller supplies an immutable digest.
+    container: ${{ inputs.container-image }}
+    steps:
+      - run: echo ready
+```
+
+Use comma-separated IDs for multiple rules: `# gh-aw: ignore[template-injection, environment-file-injection] -- Reason`. A nonempty reason and exact registered rule IDs are required. Wildcards, empty lists, unknown IDs, and malformed or misplaced directives fail linting.
+
+Place the comment at the field's indentation, with no blank line before the field. Other YAML comments may intervene. Before `- run:`, match the list marker's indentation; only that first field is targeted, not the whole step. A mapping or sequence field includes its authored child fields. Sibling fields and steps, other rules, and analysis failures remain visible. There is no file-wide or disable/enable directive. Comments inside strings, scripts, or the Markdown prompt do not suppress anything.
+
+Directives work in Actions YAML and AW frontmatter. AW comments are not copied into compiled execution graphs: when linting a compiled workflow and its companion AW document, execution diagnostics use comments in the Actions YAML, while AW-only rules use the frontmatter. Suppressions on YAML anchors do not implicitly carry over to alias uses; an alias field needs its own directive.
+
+Suppression acknowledges a diagnostic; it does not establish safety. These comments do not disable independent compiler validation, strict-mode security controls, runtime protections, or external tools such as actionlint and shellcheck.
+
 ### Privileged custom code
 
 `privileged-checkout` and `artifact-execution` warn in strict and non-strict mode, are enabled in the default registry, and are not runtime enforcement. Skipping lint removes their diagnostics; strict `pull_request_target` policies still apply, and trigger-risk acknowledgment does not disable these checks.
