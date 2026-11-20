@@ -469,6 +469,22 @@ MCP over stdio or another non-HTTP transport SHOULD use a documented protocol ca
 
 An MCP client span and MCP server span SHOULD have a valid parent-child or link relationship according to the active transport conventions.
 
+#### 7.7.1 Backend Service Requests
+
+Token-broker exchanges and invalidation, admission (including gateway admission and conclusion delivery), and safe-output authorization requests use the following correlation fields:
+
+| Carrier | Field | Contract |
+|---|---|---|
+| HTTP header | `traceparent` | W3C version-00 context from valid current `GITHUB_AW_OTEL_TRACE_ID` and `GITHUB_AW_OTEL_PARENT_SPAN_ID`, with locally controlled sampling. Admission establishes a trace when absent and uses a distinct span ID for each HTTP attempt; other clients omit invalid or incomplete context. |
+| HTTP header | `baggage` | A single `cicd.pipeline.task.name=<encoded-job-id>` member whenever nonempty `GITHUB_JOB` is available. Use W3C Baggage with OpenTelemetry's CI/CD task-name key. |
+| JSON body | `job_id` | The original nonempty `GITHUB_JOB` string, JSON-encoded without percent-encoding. Omit only when job context is unavailable. |
+
+Header sanitization MUST percent-encode the UTF-8 bytes of the job name using `encodeURIComponent` or an equivalent W3C-compatible encoder. In particular, whitespace, controls (including CR/LF), non-ASCII characters, commas, semicolons, equals signs, double quotes, backslashes, and literal percent signs MUST NOT appear unencoded in the baggage value. Do not strip or replace these characters: percent-decoding MUST recover the original job name. For example, job `safe outputs/review` produces `baggage: cicd.pipeline.task.name=safe%20outputs%2Freview` and JSON `"job_id": "safe outputs/review"`.
+
+Clients MUST NOT forward arbitrary incoming `TRACEPARENT`, `tracestate`, baggage, or exporter credentials to these services. Correlation headers MUST NOT be sent to the GitHub OIDC issuer, and context propagation MUST NOT enable telemetry export. Baggage extraction does not automatically add span attributes; backend instrumentation must explicitly record `cicd.pipeline.task.name` if needed.
+
+Logical job IDs, baggage, and trace identifiers are diagnostic metadata, not signed GitHub job-execution identities or authorization bindings. They MUST NOT replace verification of signed job-level claims such as `check_run_id`. For safe-output authorization, `job_id` is outside the invocation and its `request_digest`; existing digest and logical invocation semantics are unchanged. Closed backend request schemas MUST allow `job_id`, and gateway admission MUST echo it unchanged like the other request members.
+
 ### 7.8 Invalid Context
 
 An invalid incoming `traceparent` MUST be ignored and MUST NOT be partially reused.
@@ -1140,6 +1156,7 @@ Level 1 and Level 2 compatibility validation MUST cover the following behaviors:
 | Frontmatter schema | `observability.otlp.endpoint`, `headers`, `if-missing`, `attributes`, `resource-attributes`, and `github-app` are accepted or rejected according to Section 5. |
 | Compiler environment | The compiler emits `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` when configured, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, `GH_AW_OTLP_ENDPOINTS`, `GITHUB_AW_OTEL_TRACE_ID`, `GITHUB_AW_OTEL_PARENT_SPAN_ID`, and `TRACEPARENT` according to Sections 6 and 7. |
 | Header secrecy | OTLP headers are masked before diagnostics and are absent from generated gateway JSON, job summaries, telemetry records, and artifacts. |
+| Backend request correlation | Token-broker, admission, conclusion, gateway admission and safe-output authorization preserve valid current trace context and send JSON `job_id`; job baggage is HTTP-safe, percent-decodable, and isolated from OIDC issuance and arbitrary inherited metadata. |
 | Default fallback credentials | A default endpoint without its headers secret fails the credential check, and runtime exporters do not send it unauthenticated when the effective `if-missing` policy is `ignore`. |
 | Endpoint fan-out | Multiple endpoints are preserved in declaration order, first endpoint compatibility is retained, and one endpoint failure does not suppress attempts to other endpoints. |
 | Local mirror | `/tmp/gh-aw/otel.jsonl` remains raw OTLP/HTTP JSON lines with `resourceSpans`; it is not replaced by an envelope-only format. |
@@ -1160,6 +1177,7 @@ current repository.
 | Compiler environment | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_EndpointFormNormalization`, `TestFormal_IfMissingPolicyValidation`, `TestFormal_ServiceNameFormation`; `pkg/workflow/observability_otlp_test.go`: `TestInjectOTLPConfig`, `TestInjectOTLPConfig_MultipleEndpoints`, `TestInjectOTLPConfig_OTLPHeadersField`, `TestInjectOTLPConfig_CustomAttributes` |
 | Endpoint and header normalization | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_HeaderMapDeterminism`, `TestFormal_StaticDomainExtraction`, `TestFormal_ExpressionProducesNoAllowlistEntry`, `TestFormal_TopLevelHeadersApplyToStringFormOnly`, `TestFormal_EmptyURLEntriesDiscarded`, `TestFormal_StringHeaderFormPreservedForNonSentry`, `TestFormal_NilAndEmptyHeadersYieldEmptyString`, `TestFormal_InvalidIfMissingFallsBackToDefault`, `TestFormal_AbsentObservabilityProducesNoEndpoints` |
 | Header secrecy | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_SentryAuthHeaderRewrite`; `pkg/workflow/observability_otlp_mask_script_test.go`: `TestMaskOTLPHeadersScript`, `TestMaskOTLPAttributesScript` |
+| Backend request correlation | `actions/setup/js/send_otlp_span.test.cjs`: `service request correlation`; `token_broker.test.cjs`, `check_admission.test.cjs`, `conclusion_admission.test.cjs`, `check_gateway_admission.test.cjs`, `safe_output_authorization.test.cjs`: request header and payload assertions |
 | Default fallback credentials | `pkg/workflow/observability_otlp_default_credentials_script_test.go`: `TestCheckOTLPDefaultCredentialsScript` (including `endpoint without headers fails`); `actions/setup/js/send_otlp_span.test.cjs`: `it("drops an endpoint with a URL but no headers to avoid unauthenticated export", ...)` |
 | Endpoint fan-out | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_FanOutPreservesDeclarationOrder`; `actions/setup/js/send_otlp_span.test.cjs`: `it("continues to other endpoints when one fails", ...)` |
 | Local mirror | `pkg/workflow/otel_observability_formal_test.go`: `TestFormal_MirrorPathConstant`; `actions/setup/js/otel_contract.test.cjs`: `it("preserves customer-facing raw OTLP JSONL and GenAI compatibility attributes", ...)` |
@@ -1251,12 +1269,14 @@ context is added to outcome spans or links.
 
 - **[RFC 2119]** S. Bradner. *Key words for use in RFCs to Indicate Requirement Levels*. March 1997. https://www.ietf.org/rfc/rfc2119.txt
 - **[W3C Trace Context Level 2]** W3C Distributed Tracing Working Group. *Trace Context Level 2*. https://www.w3.org/TR/trace-context-2/
+- **[W3C Baggage]** W3C Distributed Tracing Working Group. *Baggage*. https://www.w3.org/TR/baggage/
 - **[OpenTelemetry Specification]** OpenTelemetry Authors. https://opentelemetry.io/docs/specs/otel/
 - **[OTLP]** OpenTelemetry Authors. *OpenTelemetry Protocol Specification*. https://opentelemetry.io/docs/specs/otlp/
 - **[OpenTelemetry Semantic Conventions]** OpenTelemetry Authors. https://opentelemetry.io/docs/specs/semconv/
 - **[CI/CD Spans]** OpenTelemetry Authors. *Semantic conventions for CI/CD spans*. https://opentelemetry.io/docs/specs/semconv/cicd/cicd-spans/
 - **[CI/CD Metrics]** OpenTelemetry Authors. *Semantic conventions for CI/CD metrics*. https://opentelemetry.io/docs/specs/semconv/cicd/cicd-metrics/
 - **[CI/CD Resources]** OpenTelemetry Authors. *CI/CD resource semantic conventions*. https://opentelemetry.io/docs/specs/semconv/resource/cicd/
+- **[CI/CD Attributes]** OpenTelemetry Authors. *CI/CD attribute registry*. https://opentelemetry.io/docs/specs/semconv/registry/attributes/cicd/
 - **[GenAI Spans]** OpenTelemetry GenAI SIG. *Semantic conventions for generative AI spans*. https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-spans.md
 - **[GenAI Agent Spans]** OpenTelemetry GenAI SIG. *Semantic conventions for GenAI agent and framework spans*. https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-agent-spans.md
 - **[GenAI Metrics]** OpenTelemetry GenAI SIG. *Semantic conventions for generative AI metrics*. https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-metrics.md
@@ -1284,6 +1304,7 @@ which has no release tag, and semantic-conventions v1.45.0.
 
 ### Unreleased
 
+- **Added**: Backend service correlation through W3C `traceparent`, header-safe job baggage using `cicd.pipeline.task.name`, and JSON `job_id` (§7.7.1), with endpoint coverage and trust-boundary requirements.
 - **Clarified**: Explicit upstream deprecation/removal labels and the §6.7.1 migration map for legacy agent spans,
   GenAI attributes and token metrics, including provider values, token-count semantics and mixed-mode queries.
 - **Added**: the §6.7 opt-in; the §8.1 standard resource attributes; `gen_ai.provider.name`, `gen_ai.agent.name`,

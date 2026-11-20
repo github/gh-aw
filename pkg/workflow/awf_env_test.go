@@ -395,3 +395,51 @@ func TestMainAgentRunUsesStandardCreditsExpressionNotDetectionExpression(t *test
 	assert.NotContains(t, stepContent, "vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS",
 		"main-agent run must not use detection credits expression")
 }
+
+func TestHostRuntimeTmpEnvExcludedFromAWFSandboxes(t *testing.T) {
+	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot"}}
+	for _, phase := range []struct {
+		name string
+		data *WorkflowData
+	}{
+		{name: "agent", data: data},
+		{name: "detection", data: buildThreatDetectionWorkflowData(data, "copilot")},
+	} {
+		t.Run(phase.name, func(t *testing.T) {
+			for _, input := range [][]string{{"COPILOT_GITHUB_TOKEN"}, {"COPILOT_GITHUB_TOKEN", "TMPDIR"}} {
+				excluded := ComputeAWFExcludeEnvVarNames(phase.data, input)
+				joined := strings.Join(BuildAWFArgs(AWFCommandConfig{WorkflowData: phase.data, ExcludeEnvVarNames: excluded}), " ")
+				for _, name := range []string{"TMPDIR", "GH_AW_RUNTIME_TMP_DIR", "GH_AW_RUNTIME_TMP_ID"} {
+					assert.Equal(t, 1, strings.Count(joined, "--exclude-env "+name+" "), name)
+				}
+			}
+		})
+	}
+}
+
+func TestHostRuntimeTmpEnvLegacyAWFFallback(t *testing.T) {
+	for _, version := range []struct {
+		value string
+		old   bool
+	}{
+		{value: "v0.25.2", old: true},
+		{value: "v0.25.3"},
+	} {
+		t.Run(version.value, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig:       &EngineConfig{ID: "copilot"},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true, Version: version.value}},
+			}
+			for _, phase := range []*WorkflowData{data, buildThreatDetectionWorkflowData(data, "copilot")} {
+				command := BuildAWFCommand(AWFCommandConfig{WorkflowData: phase, EngineName: "copilot", EngineCommand: "run-agent", LogFile: "/tmp/agent.log"})
+				fallback := "unset TMPDIR GH_AW_RUNTIME_TMP_DIR GH_AW_RUNTIME_TMP_ID; run-agent"
+				if version.old {
+					assert.Contains(t, command, fallback)
+				} else {
+					assert.NotContains(t, command, fallback)
+					assert.Contains(t, command, "--exclude-env TMPDIR")
+				}
+			}
+		})
+	}
+}

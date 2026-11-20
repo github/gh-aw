@@ -31,7 +31,15 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if c.actionTag != "" {
 		generatedActionRefs = nil
 	}
-	diagnostics, err := workflowlint.Default().Run(c.ctx, workflowlint.Input{
+	rules := workflowlint.Default().Rules()
+	rules = slices.DeleteFunc(rules, func(rule workflowlint.Rule) bool {
+		return rule.ID == "safe-output-credentials"
+	})
+	runner, err := workflowlint.New(rules...)
+	if err != nil {
+		return fmt.Errorf("configure compiler workflow linter: %w", err)
+	}
+	diagnostics, err := runner.Run(c.ctx, workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
 		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
 	})

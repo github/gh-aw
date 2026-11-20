@@ -54,6 +54,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 const {
+  buildServiceRequestHeaders,
   isValidTraceId,
   isValidSpanId,
   generateTraceId,
@@ -98,6 +99,60 @@ const {
 
 const { readExperimentAssignments, EXPERIMENT_ASSIGNMENTS_PATH } = await import("./experiment_helpers.cjs");
 const otlpMetrics = require("./otlp_metrics.cjs");
+
+describe("service request correlation", () => {
+  const traceId = "a".repeat(32);
+  const spanId = "b".repeat(16);
+
+  it("propagates the current context and percent-encodes job identity without forwarding other metadata", () => {
+    expect(
+      buildServiceRequestHeaders({
+        GITHUB_AW_OTEL_TRACE_ID: traceId,
+        GITHUB_AW_OTEL_PARENT_SPAN_ID: spanId,
+        GITHUB_JOB: "safe outputs/review\r\n",
+        TRACEPARENT: "untrusted",
+        BAGGAGE: "private=never-forward",
+        OTEL_BAGGAGE: "private",
+        OTEL_EXPORTER_OTLP_HEADERS: "authorization=private",
+      })
+    ).toEqual({ traceparent: `00-${traceId}-${spanId}-01`, baggage: "cicd.pipeline.task.name=safe%20outputs%2Freview%0D%0A" });
+  });
+
+  it("encodes baggage delimiters, literal percent signs, and UTF-8 bytes", () => {
+    expect(buildServiceRequestHeaders({ GITHUB_JOB: "review,step;key=100% \u00e9" }).baggage).toBe("cicd.pipeline.task.name=review%2Cstep%3Bkey%3D100%25%20%C3%A9");
+    expect(buildServiceRequestHeaders({})).toEqual({});
+  });
+
+  it("omits malformed job baggage without losing valid trace context", () => {
+    expect(
+      buildServiceRequestHeaders({
+        GITHUB_AW_OTEL_TRACE_ID: traceId,
+        GITHUB_AW_OTEL_PARENT_SPAN_ID: spanId,
+        GITHUB_JOB: "\ud800",
+      })
+    ).toEqual({ traceparent: `00-${traceId}-${spanId}-01` });
+  });
+
+  it.each(["safe_outputs", "review\r\ninjected: value", "review\t\u0000\u007f\u0085", 'review,"step";key=100% \u00e9'])("produces HTTP-safe baggage without changing job identity (%j)", jobId => {
+    const headers = new Headers(buildServiceRequestHeaders({ GITHUB_JOB: jobId }));
+    const baggage = headers.get("baggage");
+    expect(baggage).toMatch(/^[\x21-\x7e]+$/);
+    expect(baggage.split(",")).toHaveLength(1);
+    expect(decodeURIComponent(baggage.slice("cicd.pipeline.task.name=".length))).toBe(jobId);
+    expect([...headers.keys()]).toEqual(["baggage"]);
+  });
+
+  it.each([
+    {},
+    { GITHUB_AW_OTEL_TRACE_ID: traceId },
+    { GITHUB_AW_OTEL_PARENT_SPAN_ID: spanId },
+    { GITHUB_AW_OTEL_TRACE_ID: "0".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: spanId },
+    { GITHUB_AW_OTEL_TRACE_ID: traceId, GITHUB_AW_OTEL_PARENT_SPAN_ID: "0".repeat(16) },
+    { GITHUB_AW_OTEL_TRACE_ID: "invalid", GITHUB_AW_OTEL_PARENT_SPAN_ID: spanId },
+  ])("omits missing or invalid context without losing job identity (%j)", env => {
+    expect(buildServiceRequestHeaders({ ...env, GITHUB_JOB: "agent" })).toEqual({ baggage: "cicd.pipeline.task.name=agent" });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // isValidTraceId

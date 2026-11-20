@@ -46,6 +46,8 @@ If your workflow already pins a model under `engine`, remove that pin so the top
 
 These are levels, not model names. Two runs at the same level need not use the same model. `model: auto` is different: it leaves model selection to the engine or provider rather than the gh-aw router.
 
+The deprecated nested `engine.model-routing.goal: cost-speed` requires an AWF pin older than v0.29.17. With the default firewall, choose a cost-routing level explicitly; `cost-speed` is not an alias for `cost`.
+
 ## A shortlist of models
 
 To let the main agent choose between specific models, give it a shortlist alongside a literal router value:
@@ -80,11 +82,30 @@ Copilot and Pi can route on GitHub Copilot. Claude and Codex can also route on G
 
 For [Claude on Anthropic](/gh-aw/reference/engines/claude/) or [Codex on OpenAI](/gh-aw/reference/engines/codex/), set a router value explicitly. Routing uses your configured provider and its billing; it does not switch accounts or providers to find a model.
 
+## Which models does the router support?
+
+The [routing tables in Agent Workflow Firewall (AWF) v0.29.17](https://github.com/github/gh-aw-firewall/tree/v0.29.17/containers/router/routing), the version gh-aw uses by default, include these GitHub Copilot model IDs:
+
+<!-- When DefaultFirewallVersion changes, check this list against the new AWF routing tables. -->
+
+| Family | GitHub Copilot model IDs |
+|---|---|
+| Claude | `claude-haiku-5.5`, `claude-sonnet-5`, `claude-sonnet-5.5`, `claude-opus-5.5` |
+| GPT 5.6 | `gpt-5.6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra` |
+| GPT 6 | `gpt-6-astra`, `gpt-6-luna`, `gpt-6-sol` |
+| GPT 6.1 | `gpt-6.1-sol`, `gpt-6.1-terra` |
+| Gemini | `gemini-3.8-flash`, `gemini-4-argon` |
+| MAI | `mai-code-1.1-flash` |
+
+For native OpenAI, the tables use the same GPT IDs. For native Anthropic, they use `claude-haiku-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, and `claude-opus-5-5`.
+
+At least one supported model must be enabled for the workflow's provider account and eligible for its engine, model policy, and shortlist. A model also needs a compatible API endpoint and reasoning effort. **If no model qualifies, the run fails before the main agent starts.** If the workflow pins a different AWF version, check that version's routing tables.
+
 ## Check which model was used
 
 Run `gh aw audit <run-url>` and look at **Model Routing**. Compare the level you requested, the model and effort selected, and the cost with the work the agent actually produced. Use `gh aw logs` to compare several runs before deciding whether to change the level.
 
-If no model qualifies, the run stops before the main agent starts. Use `gh aw audit <run-url> --models` to see which models were available for that run, then check whether your engine, shortlist, or policy ruled them out. Widen the shortlist if appropriate; the router won't pick a model outside it.
+If the router found no eligible model, use `gh aw audit <run-url> --models` to see which models were available for that run, then check whether your engine, shortlist, or policy ruled them out. Widen the shortlist if appropriate; the router won't pick a model outside it.
 
 <span id="migrate-nested-routing"></span>
 

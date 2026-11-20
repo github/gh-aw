@@ -32,8 +32,14 @@
       "id": "token-broker",
       "name": "OIDC token broker",
       "compiler_warning": "token-broker",
-      "docs": ["/reference/enterprise-configuration/"],
+      "docs": ["/experimental/token-broker/"],
+      "docs_group": true,
       "cracktro": [{ "slide": "OIDC token broker", "badge": "deployment-owned broker" }]
+    },
+    {
+      "id": "token-broker-enterprise-configuration",
+      "name": "Token broker enterprise configuration",
+      "docs": ["/reference/enterprise-configuration/"]
     },
     {
       "id": "engine-durable",

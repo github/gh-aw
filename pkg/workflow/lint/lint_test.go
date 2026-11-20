@@ -24,7 +24,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"permission-scope", "version-check", "conditional-import", "private-to-public",
 		"install-scripts", "allowed-labels", "network-scope", "push-target",
 		"tool-scope", "sandbox-config", "image-argument", "checkout-mode", "fork-association",
-		"pull-request-target-roles", "untrusted-roles-detection", "safe-output-shell-expansion", "firewall-ssl-bump",
+		"pull-request-target-roles", "untrusted-roles-detection", "safe-output-shell-expansion", "safe-output-credentials", "firewall-ssl-bump",
 		"custom-job-detection",
 		"grader-file-io",
 		"pull-request-target-checkout", "prompt-expression",
@@ -47,6 +47,31 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 	rules := runner.Rules()
 	rules[0].ID = "changed"
 	assert.Equal(t, "secret-leak", runner.Rules()[0].ID)
+}
+
+func TestFindingThreatRuleIDsAreDeepCopied(t *testing.T) {
+	threatIDs := []string{"CTR-017", "CTR-018"}
+	rule := Rule{
+		ID: "copied-threats", Description: "Verify rule threat metadata is independent",
+		FindingThreatRuleIDs: threatIDs, Severity: Warning,
+		Check: func(context.Context, Input) ([]Diagnostic, error) { return nil, nil },
+	}
+	runner, err := New(rule)
+	require.NoError(t, err)
+
+	threatIDs[0] = "CTR-019"
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, runner.Rules()[0].FindingThreatRuleIDs)
+
+	returned := runner.Rules()
+	returned[0].FindingThreatRuleIDs[1] = "CTR-020"
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, runner.Rules()[0].FindingThreatRuleIDs)
+
+	selected, err := runner.Select("copied-threats")
+	require.NoError(t, err)
+	selectedRules := selected.Rules()
+	selectedRules[0].FindingThreatRuleIDs[0] = "CTR-021"
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, selected.Rules()[0].FindingThreatRuleIDs)
+	assert.Equal(t, []string{"CTR-017", "CTR-018"}, runner.Rules()[0].FindingThreatRuleIDs)
 }
 
 func TestIndependentRulesAndFailures(t *testing.T) {

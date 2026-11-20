@@ -355,7 +355,8 @@ async function finalizeWorkerResults(options = {}) {
   const trustedContext = await authenticatePublisher({ ...configured, role: "reconciler" });
   const expected = { ...expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository, dispatchPrincipal(dispatch)), run_id: dispatch.run?.run_id };
   if (!dispatch.run) throw new Error("work_queue_binding_not_durable");
-  if (trustedContext.run_id === dispatch.run.run_id && trustedContext.run_attempt !== 1) throw new Error("rerun_not_authorized");
+  const ownRun = trustedContext.run_id === dispatch.run.run_id;
+  if (ownRun && trustedContext.run_attempt !== 1) throw new Error("rerun_not_authorized");
   const results = Object.create(null);
   for (const member of assignment.claims) {
     try {
@@ -393,7 +394,7 @@ async function finalizeWorkerResults(options = {}) {
       }
       const policy = latest.projection.policy.pools[assignment.pool].reconciliation;
       const beforeVerification = validateNativeRun(await fetchNativeRunAttempt(configured.githubClient, expected.repository, dispatch.run.run_id, 1, { sleepFn: configured.sleepFn }), expected);
-      if (trustedContext.run_id !== dispatch.run.run_id && !beforeVerification.terminal) {
+      if (!ownRun && !beforeVerification.terminal) {
         log.debug("delivery.verifier.terminal_evidence_required");
         results[member.handle] = { state: "pending", effects: "unknown", reason: "terminal_evidence_required" };
         continue;
@@ -407,7 +408,10 @@ async function finalizeWorkerResults(options = {}) {
       let verifiedSnapshot = null;
       const verificationStarted = Date.now();
       integer(work.completion_at, 0, Number.MAX_SAFE_INTEGER, "Completion timestamp");
-      const remainingDeadline = policy.deadline_ms - Math.max(0, (options.now ?? verificationStarted) - work.completion_at);
+      // Start each worker verifier's window after preflight; maintenance and missing-verifier expiry still use Completion.
+      const checkedBeforeVerification = options.now ?? verificationStarted;
+      const verificationAnchor = ownRun && typeof options.verifyEffects === "function" ? Math.max(work.completion_at, checkedBeforeVerification) : work.completion_at;
+      const remainingDeadline = policy.deadline_ms - Math.max(0, checkedBeforeVerification - verificationAnchor);
       // Maintenance can first observe a terminal worker after the deadline.
       // Give its persisted receipts one bounded readback before expiring them;
       // this does not replay effects or reopen the normal retry budget.
@@ -419,17 +423,20 @@ async function finalizeWorkerResults(options = {}) {
         contract_supported: contractSupported,
         verifier_available: typeof options.verifyEffects === "function",
         terminal_before_verification: beforeVerification.terminal,
+        own_run: ownRun,
+        anchor_offset_ms: verificationAnchor - work.completion_at,
       });
       // An explicit expiry opt-in still waits for the Completion deadline before closing the barrier.
       if (typeof options.verifyEffects !== "function" && remainingDeadline > 0) {
         results[member.handle] = { state: "pending", effects: "unknown", reason: "verification_unavailable" };
         continue;
       }
-      for (; attempts < policy.max_attempts && ((attempts === 0 && finalEvidenceReadback) || Date.now() - verificationStarted < remainingDeadline); attempts++) {
-        log.debug("delivery.verifier.attempt", { attempt: attempts + 1 });
+      while (typeof options.verifyEffects === "function" && attempts < policy.max_attempts && ((attempts === 0 && finalEvidenceReadback) || Date.now() - verificationStarted < remainingDeadline)) {
+        attempts++;
+        log.debug("delivery.verifier.attempt", { attempt: attempts });
         try {
           const remaining = remainingDeadline - (Date.now() - verificationStarted);
-          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts + 1, run: dispatch.run }, attempts === 0 && finalEvidenceReadback && remaining <= 0 ? 15000 : remaining);
+          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts, run: dispatch.run }, attempts === 1 && finalEvidenceReadback && remaining <= 0 ? 15000 : remaining);
         } catch (error) {
           log.failure("delivery.verifier.failed", error);
           verification = null;
@@ -438,7 +445,7 @@ async function finalizeWorkerResults(options = {}) {
         if (verification?.verified === true && !trustedDelivery) verification = null;
         verified = contractSupported && trustedDelivery && verifiedClaimEffects(verification) ? verification : null;
         log.debug("delivery.verifier.checked", {
-          attempt: attempts + 1,
+          attempt: attempts,
           response_present: !!verification,
           trusted: trustedDelivery,
           verified: !!verified,
@@ -449,12 +456,9 @@ async function finalizeWorkerResults(options = {}) {
           verifiedSnapshot = snapshotClaimDelivery(verified);
           break;
         }
-        if (Date.now() - verificationStarted >= remainingDeadline) {
-          attempts++;
-          break;
-        }
-        if (attempts + 1 < policy.max_attempts)
-          await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** attempts, Math.max(0, remainingDeadline - (Date.now() - verificationStarted))));
+        if (Date.now() - verificationStarted >= remainingDeadline) break;
+        if (attempts < policy.max_attempts)
+          await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** (attempts - 1), Math.max(0, remainingDeadline - (Date.now() - verificationStarted))));
       }
       latest = await loadQueue(configured);
       validateStoredAssignment(latest.projection, assignment, { allowReleased: true });
@@ -504,7 +508,7 @@ async function finalizeWorkerResults(options = {}) {
           validateStoredAssignment(state, assignment, { allowReleased: true });
           if (digest(claimControlReceipts(state, assignment, member.handle)) !== verifiedSnapshot.controls_digest) throw new Error("work_queue_control_inventory_changed");
         });
-        results[member.handle] = { state: "result", effects: verifiedSnapshot.effects };
+        results[member.handle] = { state: "result", effects: verifiedSnapshot.effects, attempts };
         log.debug("result.persisted");
       } else {
         let disposition = contractSupported && verificationReceipt && (verification?.effects === "none" || verification?.effects === "partial") ? verification.effects : "unknown";
@@ -512,12 +516,12 @@ async function finalizeWorkerResults(options = {}) {
         if (disposition === "none" && (!verificationReceipt || !beforeVerification.terminal)) disposition = "unknown";
         if (!native.terminal) {
           log.debug("delivery.settlement.native_run_pending", { attempts, contract_supported: contractSupported });
-          results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid", verifier: verification?.reason ?? null };
+          results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid", verifier: verification?.reason ?? null, attempts };
           continue;
         }
         if (attempts < policy.max_attempts && checkedAt - work.completion_at < policy.deadline_ms) {
           log.debug("delivery.settlement.budget_remaining", { attempts, max_attempts: policy.max_attempts });
-          results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted", verifier: verification?.reason ?? null };
+          results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted", verifier: verification?.reason ?? null, attempts };
           continue;
         }
         const evidence = {
@@ -532,7 +536,7 @@ async function finalizeWorkerResults(options = {}) {
         };
         const operation = { kind: "DeliveryFailure", work_id: member.work_id, claim_id: member.claim_id, completion_id: work.completion_id, reason: "verification_exhausted", disposition, evidence };
         await publishOperations(configured, trustedContext, ["delivery_failure", assignment.dispatch_id, member.handle, work.completion_id], "delivery_failure", [operation]);
-        results[member.handle] = { state: "delivery_failed", effects: disposition, verifier: verification?.reason ?? null };
+        results[member.handle] = { state: "delivery_failed", effects: disposition, verifier: verification?.reason ?? null, attempts };
         log.diagnostic(
           "delivery.failure.persisted",
           {

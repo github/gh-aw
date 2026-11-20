@@ -70,13 +70,16 @@ slide that lists the band's slides (click a tile to jump) and a map of all bands
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
 Left/Right (or Space) step through the slides of the main line in reading
-order and wrap between bands, and Page Up/Page Down (or Shift+Up/Down) jump to the first slide of
-the band above or below. Some Human agent processes patterns head a column of
+order and wrap between bands, and Page Up/Page Down (or Shift+Up/Down) move to the band above or
+below like a text cursor: they keep the horizontal position (clamped to the band's length) until
+Left/Right or a jump moves it. Shift+Home (or the first ⟪ button on small screens) returns to the
+first slide of the band. Some Human agent processes patterns head a column of
 worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to
 the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, the notes toolbar button (or N) toggles speaker notes,
-and M to toggle sound. Notes explain what the slide shows, why the feature exists,
+and M to toggle sound. G opens the slide map, whose bottom section is a keyboard manual: a full
+keyboard with the shortcut keys lit and combos joined by arcs, then a list of every shortcut. Notes explain what the slide shows, why the feature exists,
 and when to use it for technical audiences new to AW; notes written as `Label: text` lines
 show each labelled cue as its own block, and other notes stay plain text. They stay open as you navigate;
 Escape hides them, and long notes scroll without advancing the slide.
@@ -90,7 +93,10 @@ view, skipping pattern examples, wrapping from the last slide to the first. The 
 and notes hide; only a stop button and the sound toggle beside it stay, fading after a few idle
 seconds. Starting kiosk mode with sound on lets each band's music play; the toggle (or M)
 mutes or resumes it. K, Escape, the stop
-button or leaving fullscreen stops kiosk mode; while it runs, Escape stops it before it
+button or leaving fullscreen stops kiosk mode. Kiosk mode starts with closed captions on; C (or the
+CC button in the kiosk dock) turns them off or on, and the choice holds for later kiosk runs. Like a muted TV in a bar or airport, a short two-speaker news conversation
+about each slide rolls in as captions at the bottom of the screen, and each slide stays up until its
+conversation ends. C starts kiosk mode if needed, and captions end with it; while it runs, Escape stops it before it
 hides notes. A manual move restarts the countdown, and an open
 dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between

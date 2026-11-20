@@ -2,6 +2,7 @@
 "use strict";
 
 const { readBoundedBody } = require("./admission_protocol.cjs");
+const { buildServiceRequestHeaders } = require("./service_correlation.cjs");
 
 const SKEW_MS = 30000;
 const TIMEOUT_MS = 10000;
@@ -94,7 +95,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
 
   /** @param {string} tokenType @param {string} [provider] @returns {Promise<string>} */
   async function getToken(tokenType, provider = "github") {
-    if (tokenType !== "copilot-request" && tokenType !== "copilot-task") throw failure("UNSUPPORTED");
+    if (tokenType !== "copilot-request" && tokenType !== "copilot-task" && tokenType !== "github-app") throw failure("UNSUPPORTED");
     if (tokenType === "copilot-request" && (typeof provider !== "string" || !/^[a-z][a-z0-9_-]{0,63}$/.test(provider))) throw failure("UNSUPPORTED");
     if (!Object.hasOwn(env, "GH_AW_TOKEN_BROKER_URL")) throw failure("CONFIGURATION");
     const snapshot = { ...env };
@@ -126,8 +127,8 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
       try {
         response = await fetchImpl(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
-          body: JSON.stringify(tokenType === "copilot-request" ? { token_type: tokenType, provider, oidc_token: oidcToken } : { token_type: tokenType, oidc_token: oidcToken }),
+          headers: { ...buildServiceRequestHeaders(snapshot), "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
+          body: JSON.stringify({ token_type: tokenType, ...(tokenType === "copilot-request" ? { provider } : {}), oidc_token: oidcToken, ...(snapshot.GITHUB_JOB ? { job_id: snapshot.GITHUB_JOB } : {}) }),
           redirect: "manual",
           signal: controller.signal,
         });
@@ -191,8 +192,8 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
       try {
         response = await fetchImpl(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
-          body: JSON.stringify({ operation: "invalidate", oidc_token: oidcToken }),
+          headers: { ...buildServiceRequestHeaders(snapshot), "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
+          body: JSON.stringify({ operation: "invalidate", oidc_token: oidcToken, ...(snapshot.GITHUB_JOB ? { job_id: snapshot.GITHUB_JOB } : {}) }),
           redirect: "manual",
           signal: controller.signal,
         });

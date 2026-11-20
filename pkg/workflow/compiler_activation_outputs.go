@@ -240,7 +240,10 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	}
 
 	compilerActivationJobLog.Print("Adding activation-time work queue snapshot")
-	if workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
+	broker := usesTokenBrokerSafeOutputs(ctx.data)
+	if broker {
+		ctx.steps = append(ctx.steps, c.buildGitHubBrokerTokenStep(ctx.data, "work-queue-activation-broker-token")...)
+	} else if workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
 		ctx.steps = append(ctx.steps, c.workQueueProjectorTokenSteps(ctx.data, "activation")...)
 	}
 	ctx.steps = append(ctx.steps,
@@ -261,13 +264,16 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	ctx.steps = append(ctx.steps,
 		"        with:\n",
 	)
-	if workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
-		c.addWorkQueueProjectorToken(&ctx.steps, ctx.data)
+	if broker || workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
+		c.addWorkQueueProjectorToken(&ctx.steps, ctx.data, "activation")
 	}
 	ctx.steps = append(ctx.steps,
 		"          script: |\n",
 		generateGitHubScriptWithRequire("write_work_queue_snapshot.cjs"),
 	)
+	if broker {
+		ctx.steps = append(ctx.steps, c.buildBrokerInvalidationStep(ctx.data)...)
+	}
 	ctx.outputs["work_queue_origin"] = "${{ steps.work_queue_snapshot.outputs.work_queue_origin }}"
 }
 

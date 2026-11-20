@@ -1884,6 +1884,70 @@ describe("Unified conclusion session", () => {
     expect(summary).toContain("Tools: 1/1 succeeded");
   });
 
+  it.each([
+    ["complete", { aiCreditsStatus: "complete", totalNanoAiu: 833979000 }, 833979000, { aiCreditsStatus: "complete", totalNanoAiu: 833979000 }],
+    ["verified zero", { aiCreditsStatus: "complete", totalNanoAiu: 0 }, 0, { aiCreditsStatus: "complete", totalNanoAiu: 0 }],
+    ["partial subtotal", { aiCreditsStatus: "partial", totalNanoAiu: 17 }, 17, { aiCreditsStatus: "partial", totalNanoAiu: 17 }],
+    ["unavailable zero", { aiCreditsStatus: "unavailable", totalNanoAiu: 0 }, 0, { aiCreditsStatus: "unavailable" }],
+    ["missing snapshot", undefined, 0, { aiCreditsStatus: "unavailable" }],
+    ["missing amount", { aiCreditsStatus: "complete" }, 0, { aiCreditsStatus: "unavailable" }],
+    ["contradictory total", { aiCreditsStatus: "complete", totalNanoAiu: 0 }, 17, { aiCreditsStatus: "unavailable" }],
+  ])("publishes %s Copilot terminal credits without substituting a proxy estimate", (_label, accountingSnapshot, totalNanoAiu, expected) => {
+    write("sandbox/agent/logs/copilot-session-state/native/events.jsonl", [
+      { type: "session.start", data: { sessionId: "native" } },
+      { type: "assistant.message", data: { content: "Done." } },
+      { type: "session.shutdown", data: { accountingSnapshot, totalNanoAiu } },
+    ]);
+    write("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", [{ event: "token_usage", model: "fixture-model", ai_credits_total: 12.5 }]);
+    const outputPath = path.join(root, "usage/aw_session.jsonl");
+    writeUnifiedSession({ rootDir: root, engine: "copilot", outputPath });
+    const content = fs.readFileSync(outputPath, "utf8");
+    const events = content.trimEnd().split("\n").map(JSON.parse);
+    expect(validateSession(content)).toBe(events.length);
+    const [shutdown] = events.filter(event => event.type === "session.shutdown");
+    expect(shutdown.data).toEqual(expected);
+    expect(normalizeUnifiedSessionEvent(shutdown).data).toEqual(expected);
+    expect(req("./session_cli.cjs").sessionCLI(["markdown", outputPath])).toContain(`aiCreditsStatus=${expected.aiCreditsStatus}`);
+    expect(events.find(event => event.type === "firewall.token_usage")?.data.totalAic).toBe(12.5);
+    expect(JSON.stringify(events)).not.toContain("primaryAic");
+  });
+
+  it("does not infer Copilot terminal credits from a legacy total or a different engine", () => {
+    const legacy = { type: "session.shutdown", data: { totalNanoAiu: 0 } };
+    expect(normalizeUnifiedSessionEvent(legacy)).toEqual(legacy);
+    const source = { component: "agent", phase: "agent", path: "agent-session.jsonl", events: [{ ...legacy, data: { ...legacy.data, accountingSnapshot: { aiCreditsStatus: "complete", totalNanoAiu: 0 } } }] };
+    expect(mergeSessionSources([source], "custom")[0].data).toEqual(legacy.data);
+  });
+
+  it.each([
+    [
+      { aiCreditsStatus: "complete", totalNanoAiu: 0 },
+      { aiCreditsStatus: "complete", totalNanoAiu: 0 },
+    ],
+    [undefined, { aiCreditsStatus: "unavailable" }],
+  ])("reconstructs Copilot terminal credits from canonical session identity without workflow metadata: %j", (accountingSnapshot, expected) => {
+    write("agent-session.jsonl", [
+      { type: "session.init", data: { sessionId: "native", sourceEngine: "copilot" } },
+      { type: "session.shutdown", provenance: { component: "agent", phase: "agent", path: "copilot-session-state/native/events.jsonl", index: 1 }, data: { totalNanoAiu: 0, accountingSnapshot } },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.find(event => event.type === "session.shutdown").data).toEqual(expected);
+  });
+
+  it.each(["agent-stdio.log", "pi-streaming.jsonl", "agent-session.jsonl"])("does not publish Copilot terminal credits from fallback %s", file => {
+    const native = { component: "agent", phase: "agent", path: "sandbox/agent/logs/copilot-session-state/native/events.jsonl", index: 0 };
+    write(file, [
+      { type: "session.start", provenance: native, data: { sessionId: "native" } },
+      {
+        type: "session.shutdown",
+        provenance: file === "agent-session.jsonl" ? { ...native, path: "agent-stdio.log" } : native,
+        data: { totalNanoAiu: 17, aiCreditsStatus: "complete", accountingSnapshot: { aiCreditsStatus: "complete", totalNanoAiu: 17 } },
+      },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+    expect(events.find(event => event.type === "session.shutdown")?.data).toEqual({ aiCreditsStatus: "unavailable" });
+  });
+
   it.each([[`{"type":"session.start","data":{"sessionId":"native"}}\n`], [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`]])(
     "falls back to stdio when native Copilot events are incomplete",
     nativeContent => {

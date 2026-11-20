@@ -51,6 +51,10 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 	}
 	notifyCommentLog.Printf("Job built successfully: dependencies_count=%d", len(needs))
 	conclusionPerms := computeConclusionJobPermissions(data)
+	if usesTokenBrokerSafeOutputs(data) {
+		conclusionPerms.Set(PermissionIdToken, PermissionWrite)
+		steps = append(steps, c.buildBrokerInvalidationStep(data)...)
+	}
 	return &Job{
 		Name:        "conclusion",
 		If:          RenderCondition(c.buildConclusionJobCondition(data, mainJobName, safeOutputJobNames)),

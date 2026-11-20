@@ -19,6 +19,7 @@ const credentialProofs = new WeakMap();
 function normalizeDispatchCredential(value) {
   if (!value || typeof value !== "object" || Array.isArray(value) || !("kind" in value) || typeof value.kind !== "string") throw new Error("work_queue_dispatch_credential_kind_invalid");
   closed(value, ["kind"], ["app_slug"], "protected dispatch credential");
+  if (value.kind === "broker_unverified") throw queueError("work_queue_dispatch_broker_identity_unavailable", "brokered installation tokens have no verified App identity binding; configure an explicit dispatch credential");
   if (!["github_token", "github_app", "authenticated"].includes(value.kind)) throw new Error("work_queue_dispatch_credential_kind_invalid");
   if (value.kind === "github_app") {
     if (!("app_slug" in value) || typeof value.app_slug !== "string" || !/^[A-Za-z0-9][A-Za-z0-9-]{0,99}$/.test(value.app_slug)) throw new Error("work_queue_dispatch_app_metadata_missing");

@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.30.0<br>
+**Version**: 1.31.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-18<br>
+**Publication Date**: 2026-11-19<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -1652,6 +1652,9 @@ non-builtin output. The same object on an individual output, including
 `scripts.<name>`, `actions.<name>` and `jobs.<name>`, protects that output only.
 Authorization is opt-in; absence preserves existing execution behavior.
 
+For independently protected enforcement of enrollment, literal authority bindings,
+and source-to-lock integrity, see [How to protect an authorization baseline](/gh-aw/guides/authorization-policy/).
+
 ```yaml
 safe-outputs:
   authorization:
@@ -1743,6 +1746,35 @@ Native handlers without a separate effect-preparation adapter also advertise
 lookups remain inside the reviewed implementation; the approval does not attest
 to an independently resolved final network request.
 
+**Semantic consistency:** The workflow hash (`caller.workflow_hash`,
+frontmatter and body), `input_digest` and `context.policy_digest` together
+bind the declaration, the normalized invocation inputs and the effective handler
+policy. In the manager, `input_digest` covers the frozen prepared message, the
+temporary-ID resolution snapshot and resolved defaults such as the pinned target
+repository. The executor MUST consume that same deep-frozen message and
+resolution snapshot, and the frozen policy captured when handlers were loaded;
+mutating the source message, live temporary-ID entries, configuration objects
+or environment-backed defaults during the authority wait MUST NOT redirect or
+expand execution. Every temporary-ID view a protected executor receives,
+including the shared map argument, MUST read resolutions from the bound
+snapshot; temporary IDs the executor creates are still published to the shared
+map for later invocations. Handlers that cache resolutions across invocations
+MUST let each invocation's snapshot replace cached entries. Targets that are
+still unresolved temporary IDs defer before
+any decision is consumed. Semantic consistency is not byte equality:
+deterministic derivations from bound values are permitted after authorization,
+including alias normalization, the configured `target` selector and its
+triggering-event fallback within the same run, label trimming and sanitization,
+deduplication, `allowed`/`blocked` filtering and `max` truncation. These can
+only narrow the bound operation. Live reads such as `required-labels` or
+`required-title-prefix` checks MAY reject execution; they do not establish
+atomic target state, exact-once delivery or label identity. Invalid input or
+filtering that yields no operation performs no write. The manager path is
+covered by regression tests for `remove-labels`; other native handlers share
+the same boundary, but handler-specific transformations, values read from the
+live temporary-ID map argument, queue/Claim adapters and custom executors have
+not been exhaustively assessed.
+
 Compiler diagnostics use `DEBUG=workflow:safe_outputs_authorization`.
 Runtime diagnostics use the GitHub Actions debug log and report preparation,
 OIDC acquisition, decision requests, release and fixed failure reason codes.
@@ -1781,6 +1813,26 @@ binding level and relevant evidence references. Private bodies, patches, prompts
 secret-valued inputs and tokens MUST NOT be transmitted or logged; bind digests
 and reviewed secret references instead. The authority independently verifies any
 evidence required by its policy.
+
+The request object contains `version`, `request_digest`, and `invocation`, plus
+top-level `job_id` whenever nonempty `GITHUB_JOB` is available. `job_id` preserves
+the original job name using JSON string encoding; callers without job context
+omit it. It is diagnostic metadata outside the canonical invocation and its
+`request_digest`, not a signed job identity, policy selector or execution claim.
+Adding it MUST NOT change the digest or logical invocation identity. Authorities
+with closed request schemas MUST allow this member; response schemas are unchanged.
+
+The decision POST MUST carry W3C `traceparent` when the current
+`GITHUB_AW_OTEL_TRACE_ID` and `GITHUB_AW_OTEL_PARENT_SPAN_ID` form a valid context;
+invalid or incomplete context is omitted. When job context is available, it also
+carries W3C `baggage: cicd.pipeline.task.name=<encoded-job-id>`, using
+OpenTelemetry's CI/CD task-name key. Sanitize the header value with UTF-8
+percent-encoding (`encodeURIComponent`), including whitespace, CR/LF, Unicode,
+baggage delimiters and literal percent signs. Do not percent-encode JSON `job_id`.
+Neither carrier authorizes execution or replaces verified GitHub identity.
+Arbitrary inherited trace headers, baggage and exporter credentials MUST NOT be
+forwarded, and these correlation headers MUST NOT be sent to the OIDC issuer.
+Propagation MUST NOT enable telemetry export or change the fail-closed gate.
 
 The authority MUST atomically claim the logical invocation before allowing it.
 An executable response binds the request digest, invocation, current attempt,
@@ -8376,6 +8428,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.31.0** (2026-11-19):
+
+- **Specified**: JSON `job_id`, current-context W3C `traceparent`, and header-safe job baggage on authorization requests, without changing invocation digests or execution identity.
+- **Clarified**: Job metadata is diagnostic only; authorities must allow the new request member, while OIDC issuance and response schemas remain unchanged.
 
 **Version 1.30.0** (2026-11-18):
 

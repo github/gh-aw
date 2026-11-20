@@ -12,19 +12,21 @@ import (
 )
 
 type ruleContract struct {
-	targets       ASTTargets
-	threatRuleID  string
-	unsafe        string
-	safe          string
-	path          string
-	severity      Severity
-	strictPolicy  bool
-	javaScript    bool
-	unsafePrompt  string
-	safePrompt    string
-	actionsUnsafe string
-	actionsSafe   string
-	actionsPath   string
+	targets      ASTTargets
+	threatRuleID string
+	unsafe       string
+	safe         string
+	path         string
+	severity     Severity
+	strictPolicy bool
+	// findingThreatRuleID overrides threatRuleID for rules that map findings individually.
+	findingThreatRuleID string
+	javaScript          bool
+	unsafePrompt        string
+	safePrompt          string
+	actionsUnsafe       string
+	actionsSafe         string
+	actionsPath         string
 }
 
 const contractJob = "jobs:\n  check:\n    runs-on: ubuntu-latest\n"
@@ -266,6 +268,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:         "safe-outputs:\n  steps:\n    - run: cat /tmp/value\n",
 			path:         "safe-outputs.steps[0].run",
 		},
+		"safe-output-credentials": {
+			targets: AWAST, strictPolicy: true, findingThreatRuleID: "CTR-036",
+			unsafe: "safe-outputs:\n  steps:\n    - run: echo X=1 >> \"$GITHUB_ENV\"\n",
+			safe:   "safe-outputs:\n  steps:\n    - run: echo x=1 >> \"$GITHUB_OUTPUT\"\n",
+			path:   "safe-outputs.steps[0].run",
+		},
 		"firewall-ssl-bump": {
 			threatRuleID: "CTR-011",
 			targets:      AWAST,
@@ -396,7 +404,11 @@ func assertRuleContractDiagnostics(t *testing.T, id string, contract ruleContrac
 		severity, expected := want[diagnostic.Path]
 		require.True(t, expected, "unexpected diagnostic at %s", diagnostic.Path)
 		assert.Equal(t, id, diagnostic.RuleID)
-		assert.Equal(t, contract.threatRuleID, diagnostic.ThreatRuleID)
+		wantThreat := contract.threatRuleID
+		if contract.findingThreatRuleID != "" {
+			wantThreat = contract.findingThreatRuleID
+		}
+		assert.Equal(t, wantThreat, diagnostic.ThreatRuleID)
 		assert.Equal(t, severity, diagnostic.Severity)
 		assert.NotEmpty(t, diagnostic.Message)
 		if diagnostic.Path == "workflow" {

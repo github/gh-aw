@@ -29,6 +29,7 @@ var azureFoundryIQCompilerScenario = connectorCompilerScenario{
 
 var connectorCompilerScenarios = []connectorCompilerScenario{
 	azureFoundryIQCompilerScenario,
+	{"azure-monitor", []string{"get_activity_count"}, "AZURE_MONITOR_READ_ACCESS_TOKEN", "create-issue"},
 	{"asana", []string{"get_task"}, "ASANA_READ_ACCESS_TOKEN", "asana-add-comment"},
 	{"linear", []string{"get-issue", "list-comments"}, "LINEAR_READ_API_KEY", "linear-add-comment"},
 	{"jira", []string{"personal__getJiraIssue"}, "JIRA_MCP_PERSONAL_BASIC_AUTH", "jira-add-comment"},

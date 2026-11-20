@@ -306,6 +306,85 @@
   .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
   .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   @keyframes tp-bob { 50% { transform: translateY(-14px); } }
+  /* guide style (gd-): explainer examples under Turn Intent to Workflow (dark only; add body.light overrides if a guide slide moves to a light band); title block top-left, one board that loops a process, a mono caption */
+  .gd-head { position: absolute; left: 110px; top: 100px; width: 1700px; }
+  .gd-head h2 { margin: 18px 0 0; font-size: 72px; line-height: 1.04; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; color: #f0f6fc; }
+  .gd-head h2 em { font-style: normal; color: #4493f8; }
+  .gd-head p { margin: 18px 0 0; max-width: 1560px; font: 400 30px/1.3 "Mona Sans"; font-variation-settings: "wght" 420, "wdth" 100; color: #9198a1; }
+  .gd-head p code, .gd-board code { font: 500 .9em var(--mono); color: #f0f6fc; }
+  .gd-board { position: absolute; left: 110px; top: 340px; width: 1700px; height: 600px; border-radius: 28px; background: #161b22; overflow: hidden;
+    box-shadow: 0 30px 120px #0008, 0 0 0 1px #ffffff14; font-family: "Mona Sans"; font-variation-settings: "wdth" 100; color: #f0f6fc; }
+  .gd-board > svg { position: absolute; inset: 0; width: 1700px; height: 600px; overflow: visible; pointer-events: none; }
+  .gd-cap { position: absolute; left: 110px; top: 972px; font: 500 20px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #9198a1; }
+  .gd-lab { position: absolute; font: 500 19px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9198a1; }
+  .gd-box { position: absolute; border: 2px solid #30363d; border-radius: 16px; background: #0d1117; transition: border-color .25s, background .25s, color .25s; }
+  .gd-box.on { border-color: #4493f8; background: #0d2a52; }
+  .gd-wire { fill: none; stroke: #30363d; stroke-width: 3; transition: stroke .25s; }
+  .gd-wire.on { stroke: #4493f8; stroke-width: 5; stroke-dasharray: 14 10; animation: gd-flow .6s linear infinite; }
+  @keyframes gd-flow { to { stroke-dashoffset: -24; } }
+  .gd-ok { color: #4493f8; } .gd-bad { color: #ffa657; }
+  .slide.gd.active .gd-head > * { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .slide.gd.active .gd-head > :nth-child(2) { animation-delay: .12s; } .slide.gd.active .gd-head > :nth-child(3) { animation-delay: .24s; }
+  .slide.gd.active .gd-board { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both .1s; }
+  .slide.gd.active .gd-cap { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both .36s; }
+  .slide.gd.up-in, .slide.gd.down-in, .slide.gd.leaving { animation: none; }
+  .slide.gd.fadeout { opacity: 1; }
+  .slide.gd:is(.fadeout, .leaving) :is(.gd-head > *, .gd-cap) { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .slide.gd:is(.fadeout, .leaving) .gd-board { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  /* guide: /agentic-workflows router */
+  .gdr-ask { position: absolute; left: 50px; top: 146px; width: 520px; height: 238px; padding: 30px 32px; border: 2px solid #30363d; border-radius: 26px 26px 26px 6px;
+    background: #0d1117; font-size: 36px; line-height: 1.28; font-variation-settings: "wght" 500, "wdth" 100; }
+  .gdr-ask i { display: inline-block; width: 3px; height: 1em; margin-left: 3px; vertical-align: -.12em; background: #4493f8; animation: gdr-blink 1s steps(1) infinite; }
+  @keyframes gdr-blink { 50% { opacity: 0; } }
+  .gdr-hub { left: 660px; top: 168px; width: 340px; height: 194px; display: grid; place-content: center; text-align: center; gap: 12px; border-width: 3px; border-radius: 24px; }
+  .gdr-hub b { font: 700 31px/1 var(--mono); color: #4493f8; }
+  .gdr-hub span { font-size: 22px; color: #9198a1; }
+  .gdr-steps { position: absolute; left: 660px; top: 396px; width: 360px; display: grid; gap: 10px; }
+  .gdr-steps div { display: flex; align-items: center; gap: 14px; font: 500 21px/1 var(--mono); color: #9198a1; transition: color .25s; }
+  .gdr-steps b { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; border: 2px solid currentColor; }
+  .gdr-steps .on { color: #4493f8; } .gdr-steps .on b { background: #4493f8; color: #0d1117; border-color: #4493f8; }
+  .gdr-route { left: 1080px; width: 580px; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; border-radius: 14px; }
+  .gdr-route b { font-size: 27px; font-variation-settings: "wght" 620, "wdth" 100; }
+  .gdr-route code { font-size: 18px !important; color: #9198a1 !important; transition: color .25s; }
+  .gdr-route.on code { color: #79c0ff !important; }
+  /* guide: authoring loop */
+  .gdl-node { width: 236px; height: 76px; display: grid; place-content: center; text-align: center; gap: 6px; font-size: 24px; font-variation-settings: "wght" 600, "wdth" 100; }
+  .gdl-node span { font: 500 16px/1 var(--mono); color: #9198a1; letter-spacing: .04em; }
+  .gdl-mid { position: absolute; left: 230px; top: 248px; width: 260px; text-align: center; }
+  .gdl-mid b { display: block; font: 700 64px/1 var(--mono); color: #f0f6fc; }
+  .gdl-mid span { display: block; margin-top: 10px; font: 500 19px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9198a1; }
+  .gdl-mid.ok b { font-size: 46px; color: #4493f8; }
+  .gdl-dot { fill: #4493f8; }
+  .gdl-spin { transform-origin: 360px 290px; transition: transform .6s cubic-bezier(.4,0,.2,1); }
+  .gdl-file { position: absolute; left: 760px; top: 26px; width: 910px; height: 548px; border-radius: 18px; background: #0d1117; border: 2px solid #30363d; overflow: hidden; }
+  .gdl-tab { height: 48px; padding: 0 22px; display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #30363d; font: 500 19px/1 var(--mono); color: #9198a1; }
+  .gdl-tab b { color: #f0f6fc; font-weight: 600; }
+  .gdl-src { padding: 12px 0 0; font: 500 23px/30px var(--mono); }
+  .gdl-src div { position: relative; height: 30px; padding-left: 74px; white-space: pre; color: #e6edf3; transition: background .25s; }
+  .gdl-src div::before { content: attr(data-n); position: absolute; left: 0; width: 50px; text-align: right; color: #656c76; }
+  .gdl-src .k { color: #ff7b72; } .gdl-src .v { color: #a5d6ff; } .gdl-src .d { color: #656c76; }
+  .gdl-src div.bad { background: #3d1d0066; box-shadow: inset 4px 0 #ffa657; } .gdl-src div.bad::after { content: "✗"; position: absolute; right: 22px; color: #ffa657; }
+  .gdl-src div.fix { background: #0d2a52; box-shadow: inset 4px 0 #4493f8; } .gdl-src div.fix::after { content: "fixed"; position: absolute; right: 22px; font-size: 17px; color: #4493f8; }
+  .gdl-src div.hid { visibility: hidden; }
+  .gdl-term { position: absolute; left: 0; right: 0; bottom: 0; height: 158px; padding: 16px 22px; border-top: 2px solid #30363d; background: #010409; font: 500 19px/1.4 var(--mono); color: #9198a1; }
+  .gdl-term p { margin: 0; } .gdl-term p + p { margin-top: 6px; color: #e6edf3; white-space: normal; }
+  .gdl-term .gd-bad, .gdl-term .gd-ok { font-weight: 700; }
+  /* guide: persona optimization */
+  .gdp-chip { left: 40px; width: 360px; height: 46px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-radius: 23px; font-size: 22px; font-variation-settings: "wght" 540, "wdth" 100; }
+  .gdp-chip svg { width: 22px; height: 22px; fill: #9198a1; flex: none; } .gdp-chip.on svg { fill: #4493f8; }
+  .gdp-step { left: 460px; width: 600px; height: 88px; display: grid; grid-template-columns: 52px 1fr; align-items: center; column-gap: 16px; padding: 0 20px; }
+  .gdp-step > b { grid-row: span 2; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font: 700 22px/1 var(--mono); border: 2px solid #9198a1; color: #9198a1; transition: all .25s; }
+  .gdp-step.on > b { background: #4493f8; border-color: #4493f8; color: #0d1117; }
+  .gdp-step strong { font-size: 26px; font-variation-settings: "wght" 640, "wdth" 100; align-self: end; }
+  .gdp-step span { font-size: 20px; line-height: 1.2; color: #9198a1; align-self: start; margin-top: 4px; }
+  .gdp-kpi { left: 1110px; width: 270px; height: 150px; padding: 18px 22px; }
+  .gdp-kpi b { display: block; font: 700 62px/1 var(--mono); color: #4493f8; }
+  .gdp-kpi span { display: block; margin-top: 12px; font-size: 21px; line-height: 1.2; color: #9198a1; }
+  .gdp-bar { position: absolute; left: 1110px; top: 444px; width: 556px; height: 40px; border-radius: 10px; overflow: hidden; background: repeating-linear-gradient(135deg, #30363d 0 10px, #21262d 10px 20px); }
+  .gdp-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 47%; background: #4493f8; transform-origin: left; }
+  .active .gdp-bar i { animation: gdp-fill 1.2s cubic-bezier(.3,.9,.3,1) both 1s; }
+  @keyframes gdp-fill { from { transform: scaleX(0); } }
+  .gdp-bl { position: absolute; top: 498px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
   .fm-cap b { font-weight: 700; font-stretch: 100%; }
@@ -422,6 +501,37 @@
   .rpa-scan { opacity: 0; } .rpa-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
   .fm-wire.day { stroke-dasharray: 10 8; }
   .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
+  /* Workflows → Process → Factory: one camera zooming out from a workflow to a process to a factory */
+  .wpf .slide-head h2 { font-size: 100px; }
+  .wpf-steps { position: absolute; left: 110px; top: 272px; display: flex; align-items: center; gap: 18px; font: 600 22px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #656c76; }
+  .wpf-steps span { padding: 12px 22px; border-radius: 99px; border: 2px solid #3d444d; transition: color .4s, border-color .4s, background .4s, box-shadow .4s; }
+  .wpf-steps span.done { color: #9198a1; border-color: #3d444d; }
+  .wpf-steps span.on { color: #f0f6fc; border-color: #ab7df8; background: #ab7df824; box-shadow: 0 0 22px #ab7df840; }
+  .wpf-steps i { font-style: normal; color: #656c76; }
+  .wpf-svg { position: absolute; left: 110px; top: 350px; width: 1700px; height: 561px; font-family: "Mona Sans"; }
+  .wpf-n, .wpf-w, .wpf-x, .wpf-dot, .wpf-lbl { transition: opacity .7s; }
+  .wpf-n { opacity: .5; } .wpf-n.on { opacity: 1; }
+  .wpf-n rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: stroke .3s; }
+  .wpf-n.on rect { stroke: #c297ff; filter: drop-shadow(0 0 10px #ab7df8); }
+  .wpf-n.ag.on circle { filter: drop-shadow(0 0 12px #ab7df8); }
+  .wpf-w { stroke: #ab7df8; stroke-width: 2; opacity: .6; }
+  .wpf-x { fill: none; stroke: #79c0ff; stroke-width: 2; stroke-dasharray: 7 6; opacity: .8; }
+  .wpf-dot { fill: #c297ff; filter: drop-shadow(0 0 6px #ab7df8); }
+  .wpf-n.dev circle { fill: #0d1117; stroke: #4493f8; stroke-width: 3; } .wpf-n.dev.on circle { filter: drop-shadow(0 0 12px #4493f8); }
+  .wpf-w { fill: none; }
+  .wpf-bp { opacity: 0; transition: opacity .9s; } .wpf-svg[data-step="2"] .wpf-bp { opacity: 1; }
+  .wpf-bp .fr { fill: none; stroke: #79c0ff; stroke-opacity: .55; stroke-width: 2; } .wpf-bp .fr.t { stroke-width: 1; stroke-opacity: .35; }
+  .wpf-bp .dv { stroke: #79c0ff; stroke-opacity: .45; stroke-dasharray: 10 8; }
+  .wpf-bp text { fill: #79c0ff; font: 600 14px var(--mono); letter-spacing: .12em; } .wpf-bp .bay { font-size: 15px; }
+  .wpf-bp .ln { fill: #9198a1; font-size: 12px; } .wpf-bp .gate { font-size: 13px; text-anchor: middle; letter-spacing: .06em; }
+  .wpf-bp .tb rect { fill: #0d1117cc; stroke: #79c0ff; stroke-opacity: .6; } .wpf-bp .tb line { stroke: #79c0ff; stroke-opacity: .4; } .wpf-bp .tb .k { fill: #f0f6fc; }
+  .wpf-lbl { opacity: 0; } .wpf-lbl .a { fill: #f0f6fc; font: 700 16px "Mona Sans"; text-anchor: middle; } .wpf-lbl .b { fill: #9198a1; font: 500 11px var(--mono); text-anchor: middle; }
+  .wpf-svg[data-step="0"] .wpf-lbl { opacity: 1; }
+  .wpf-svg:not([data-step="2"]) .wpf-x { opacity: 0; }
+  .wpf-svg:not([data-step="2"]) [data-r]:not([data-r="1"]) { opacity: .08; }
+  .wpf-cap { position: absolute; left: 110px; right: 110px; top: 944px; font: 600 34px/1.2 "Mona Sans"; color: #f0f6fc; text-align: center; }
+  .wpf-cap.swap { animation: wpf-in .7s cubic-bezier(.2,.9,.2,1) both; }
+  @keyframes wpf-in { from { opacity: 0; transform: translateY(14px); } }
   .du-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
   .du-t { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
   .du-n { fill: #f0f6fc; font: 800 38px "Mona Sans"; text-anchor: middle; }
@@ -706,6 +816,18 @@
   .otg-n { fill: #f0f6fc; font: 800 48px "Mona Sans"; }
   .otg-ax { fill: #9198a1; font: 500 15px var(--mono); }
   .otg-mark { stroke: #ffffff40; stroke-dasharray: 4 5; }
+  .idr-svg .idr-s { opacity: .18; transition: opacity .4s; } .idr-svg .idr-s.t { opacity: 0; } .idr-svg .idr-s.on { opacity: 1; }
+  .idr-svg .idr-warn { stroke: #db6d28; filter: none; }
+  .idr-cmd { fill: #79c0ff; font: 500 18px var(--mono); }
+  .idr-x { fill: #ffa657; font: 700 30px var(--mono); }
+  .idr-m { fill: #c9d1d9; font: 500 17px var(--mono); }
+  .idr-log, .idr-f { fill: #e6edf3; font: 500 17px var(--mono); }
+  .idr-ns { fill: #79c0ff; font-weight: 700; } .idr-dt { fill: #9198a1; }
+  .idr-hl { fill: #4493f826; stroke: #4493f8; stroke-width: 1.5; }
+  .idr-c { fill: #f0f6fc; font: 700 19px "Mona Sans"; }
+  .idr-n { font-size: 30px; }
+  .idr-code { fill: #e6edf3; font: 500 16px var(--mono); }
+  .idr-back { stroke-dasharray: 8 7; } .idr-back-l { fill: #79c0ff; font: 600 17px var(--mono); }
   .mra-repo { fill: #0d111799; stroke: #3d444d; stroke-width: 2; }
   .mra-repo-t { fill: #9198a1; font: 600 20px var(--mono); }
   .mra-row { transition: transform .6s cubic-bezier(.2,.9,.2,1); }
@@ -1262,6 +1384,22 @@
   .rollout s { text-decoration: none; color: #3d444d; }
   .cg > .xbadge, .xp > .xbadge { top: 24px; }
   .ek > .xbadge { right: 560px; }
+  /* --- gh cao: dispatcher & worker anatomy (reuses an- file, band and callout styles) --- */
+  .dw .an-file { top: 262px; width: 740px; }
+  .dw .an-code { font: 500 20px/28px var(--mono); }
+  .dw .an-ln { height: 28px; }
+  .dw-tag { margin-left: auto; font: 700 14px/1 var(--mono); letter-spacing: .16em; padding: 6px 10px; border-radius: 8px; color: #0d1117; background: var(--c); }
+  .dw .an-call { top: 856px; width: 553px; height: 130px; }
+  .dw .an-call p { font-size: 20px; }
+  .dw-wire { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; overflow: visible; }
+  .dw-wire path { fill: none; stroke: var(--c); stroke-width: 3; stroke-dasharray: 6 8; opacity: 0; transition: opacity .5s; }
+  .dw-wire.on path { opacity: .7; animation: an-flow .8s linear infinite; }
+  .dw-wire circle { fill: var(--c); opacity: 0; transition: opacity .4s; }
+  .dw-wire.on circle { opacity: 1; }
+  .dw-lbl { position: absolute; left: 960px; top: 760px; transform: translate(-50%, -50%) scale(.9); padding: 8px 12px; border-radius: 10px; background: #0d1117; border: 1px solid var(--c);
+    font: 600 16px/1.25 var(--mono); color: var(--c); text-align: center; white-space: nowrap; opacity: 0; transition: opacity .5s, transform .6s cubic-bezier(.3,1.6,.4,1); }
+  .dw-lbl.on { opacity: 1; transform: translate(-50%, -50%); }
+  .dw-lbl small { display: block; font-size: 13px; color: #9198a1; }
   /* --- gh cao: hyperscale agentics --- */
   .hyp-scale, .hyp-cv, .hyp-sinks, .hyp-outs { position: absolute; opacity: 0; }
   .active .hyp-scale, .active .hyp-cv, .active .hyp-sinks, .active .hyp-outs { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
@@ -3974,7 +4112,7 @@
     });
   }
 
-  // Turn Intent to Automation: prompt → markdown → issue (from the gh-aw hero)
+  // Turn Intent to Workflow: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
     const PROMPT = "Create a daily agent that removes code duplication";
@@ -4064,6 +4202,7 @@
     };
     slides.push({
       group: "platform",
+      key: "intent",
       notes:
         "What: A plain-language request to a coding agent becomes a Markdown workflow. gh aw compile, a deterministic Go compiler with no AI involved, turns it into a hardened .lock.yml with pinned actions, a firewall and safe-output jobs; a later run opens a pull request removing duplicated code. This mirrors the gh-aw home page.\nWhy: Same Markdown in, same YAML out, so the result is reviewable and diffable like any other code.\nWhen: Start here when you can describe a recurring job clearly; the animation's one-minute path is illustrative, not a setup guarantee.",
       enter() {
@@ -4141,7 +4280,7 @@
       el: h(
         "section",
         { class: "slide pfx" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Workflow", "l-grad"))),
         tta,
         links,
         tags,
@@ -4190,7 +4329,7 @@
     return `<g class="${cls}" transform="translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / n).toFixed(4)})">${d.map(p => `<path d="${p}"/>`).join("")}</g>`;
   };
 
-  // Turn Automation into Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
+  // Turn Workflow to Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
   {
     resetIndex();
     const N = 12,
@@ -4344,11 +4483,341 @@
       el: h(
         "section",
         { class: "slide tv" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Workflow to "), letters("Value", "l-grad"))),
         h("div", { class: "tv-live" }, "acme/app · week ", wk, " / 12"),
         h("div", { class: "tv-kpis" }, kpis),
         h("div", { class: "tv-panels" }, panels),
         h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
+      ),
+    });
+  }
+
+  // Ask once. The agent picks the guide.: /agentic-workflows routes each request to one focused guide (guide style)
+  {
+    resetIndex();
+    const ROUTES = [
+      ["Create", "create-agentic-workflow.md", "Create a workflow that labels new issues by area"],
+      ["Update", "update-agentic-workflow.md", "Run my triage workflow weekly instead of daily"],
+      ["Debug", "debug-agentic-workflow.md", "Why did last night\u2019s triage run fail?"],
+      ["Optimize", "token-optimization.md", "My workflow is too expensive. Cut its tokens."],
+      ["Upgrade", "upgrade-agentic-workflows.md", "Upgrade my workflows to the latest gh-aw"],
+      ["Report", "report.md", "Post a weekly report of stale pull requests"],
+      ["Share", "create-shared-agentic-workflow.md", "Share this MCP server setup across workflows"],
+    ];
+    const STEPS = ["understand intent", "pick a route", "load the guide", "follow it"];
+    const Y = i => 30 + i * 78;
+    const wrap = h("div");
+    wrap.innerHTML = `<svg viewBox="0 0 1700 600"><path class="gd-wire" d="M570 265 H660"/>${ROUTES.map((_, i) => `<path class="gd-wire" d="M1000 265 C1044 265 1036 ${Y(i) + 32} 1080 ${Y(i) + 32}"/>`).join("")}</svg>`;
+    const [inWire, ...outWires] = wrap.querySelectorAll("path");
+    const text = h("span");
+    const hub = h("div", { class: "gd-box gdr-hub" }, h("b", {}, "/agentic-workflows"), h("span", {}, "dispatcher agent"));
+    const steps = STEPS.map((s, i) => h("div", {}, h("b", {}, String(i + 1)), s));
+    const rows = ROUTES.map(([n, f], i) => h("div", { class: "gd-box gdr-route", style: { top: `${Y(i)}px` } }, h("b", {}, n), h("code", {}, f)));
+    const CYC = 4300;
+    let t0 = 0,
+      last = 0,
+      st = -2;
+    const show = (i, s) => {
+      hub.classList.toggle("on", s >= 0);
+      inWire.classList.toggle("on", s === 0);
+      steps.forEach((el, k) => el.classList.toggle("on", k === s));
+      rows.forEach((el, k) => el.classList.toggle("on", k === i && s >= 1));
+      outWires.forEach((el, k) => el.classList.toggle("on", k === i && s >= 1));
+    };
+    slides.push({
+      group: "platform",
+      under: "intent",
+      id: "agentic-workflows-router",
+      notes:
+        "What: The /agentic-workflows agent is a router, not one giant prompt: it reads the request, picks a route such as create, update, debug, optimize, upgrade, report or share, loads that guide from .github/aw/ and follows it. The requests shown are illustrative.\nWhy: Each guide stays small and focused, so the agent carries the rules for this job instead of every rule at once, and people get one entry point for the whole workflow lifecycle.\nWhen: Start every workflow task with /agentic-workflows and say what you want in plain words; name the workflow or the failing run when you have one.",
+      enter() {
+        t0 = last = 0;
+        st = -2;
+        text.textContent = "";
+        show(-1, -1);
+      },
+      tick(t) {
+        if (!t0) t0 = t + 900;
+        if (t - last < 110) return;
+        last = t;
+        const e = t - t0;
+        if (e < 0) return;
+        const i = Math.floor(e / CYC) % ROUTES.length,
+          p = e % CYC;
+        const ask = ROUTES[i][2];
+        const s = p < 1500 ? -1 : p < 2150 ? 0 : p < 2850 ? 1 : p < 3550 ? 2 : 3;
+        const want = ask.slice(0, s < 0 ? Math.ceil((p / 1400) * ask.length) : ask.length);
+        if (text.textContent !== want) {
+          text.textContent = want;
+          if (s < 0) sfx.key(0.6);
+        }
+        const k = i * 8 + s;
+        if (k !== st) {
+          st = k;
+          show(i, s);
+          if (s === 1) sfx.route(1);
+          if (s === 3) sfx.pop(i);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide gd gdr" },
+        h(
+          "div",
+          { class: "gd-head" },
+          h("div", { class: "kicker" }, "/agentic-workflows · how to use it"),
+          h("h2", {}, "Ask once. ", h("em", {}, "The agent picks the guide.")),
+          h("p", {}, h("code", {}, "/agentic-workflows"), " is a router: it reads your intent, loads the matching guide from ", h("code", {}, ".github/aw/"), " and follows it step by step.")
+        ),
+        h(
+          "div",
+          { class: "gd-board" },
+          wrap.firstChild,
+          h("div", { class: "gd-lab", style: { left: "50px", top: "100px" } }, "You ask"),
+          h("div", { class: "gdr-ask" }, text, h("i")),
+          h("div", { class: "gd-lab", style: { left: "660px", top: "122px" } }, "Router"),
+          hub,
+          h("div", { class: "gdr-steps" }, steps),
+          rows
+        ),
+        h("div", { class: "gd-cap" }, "Illustrative requests · routes from the agentic-workflows agent · also: analyze runs, patterns, CLI, Dependabot, coverage")
+      ),
+    });
+  }
+
+  // The compiler corrects the agent.: the agent writes workflow Markdown, gh aw compile answers with precise fixes, repeat until a lock file (guide style)
+  {
+    resetIndex();
+    const SRC = [
+      [["---", "d"]],
+      [["on:", "k"]],
+      [["  issues:", "k"]],
+      [["    types: ", "k"], ["[opened]", "v"]],
+      [["permissions:", "k"]],
+      [["  contents: ", "k"], ["read", "v"]],
+      [["  issues: ", "k"], ["write", "v"]],
+      [["safe-output:", "k"]],
+      [["  add-labels:", "k"]],
+      [["---", "d"]],
+      [["Label each new issue by area.", ""]],
+    ];
+    const span = ([s, c]) => h("span", c ? { class: c } : {}, s);
+    const lines = SRC.map((l, i) => h("div", { "data-n": String(i + 1) }, l.map(span)));
+    const PERM = 6,
+      SAFE = 7;
+    const setLine = (i, parts) => lines[i].replaceChildren(...parts.map(span));
+    // ring: three nodes clockwise from the top; a dot turns clockwise to the active node
+    const CX = 360,
+      CY = 290,
+      R = 196;
+    const wrap = h("div");
+    wrap.innerHTML = `<svg viewBox="0 0 1700 600"><circle class="gd-wire" cx="${CX}" cy="${CY}" r="${R}"/><g class="gdl-spin"><circle class="gdl-dot" cx="${CX}" cy="${CY - R}" r="12"/></g></svg>`;
+    const spin = wrap.querySelector("g");
+    const node = (label, sub, x, y) => h("div", { class: "gd-box gdl-node", style: { left: `${x - 118}px`, top: `${y - 38}px` } }, label, h("span", {}, sub));
+    const nodes = [
+      node("Agent edits", "workflow .md", CX, CY - R),
+      node("gh aw compile", "schema · strict", CX + R * 0.866, CY + R / 2),
+      node("Agent reads", "did you mean …", CX - R * 0.866, CY + R / 2),
+    ];
+    const big = h("b"),
+      small = h("span"),
+      mid = h("div", { class: "gdl-mid" }, big, small);
+    const t1 = h("p"),
+      t2 = h("p");
+    const term = h("div", { class: "gdl-term" }, t1, t2);
+    const say = (a, b, cls, sign) => {
+      t1.textContent = a;
+      t2.replaceChildren(...(sign ? [h("span", { class: cls }, sign + " ")] : []), b);
+    };
+    const E1 = "triage.md:8:1: error: Unknown property: safe-output. Did you mean 'safe-outputs'?";
+    const E2 = "triage.md:1:1: error: strict mode: write permission 'issues: write' is not allowed for security reasons. Use 'safe-outputs.create-issue', \u2026 to perform write operations safely.";
+    // [ring node, round, typing?, apply()]
+    const PH = [
+      [0, 1, 2200, () => say("agent \u203a writing .github/workflows/triage.md", "")],
+      [1, 1, 1500, () => say("$ gh aw compile triage", "compiling\u2026")],
+      [2, 1, 2100, () => (lines[SAFE].className = "bad", say("$ gh aw compile triage", E1, "gd-bad", "\u2717"))],
+      [0, 2, 1700, () => (setLine(SAFE, [["safe-outputs:", "k"]]), (lines[SAFE].className = "fix"), say("agent \u203a applying the compiler\u2019s hint", "line 8 \u2192 safe-outputs:"))],
+      [1, 2, 1500, () => ((lines[SAFE].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
+      [2, 2, 2600, () => ((lines[PERM].className = "bad"), say("$ gh aw compile triage", E2, "gd-bad", "\u2717"))],
+      [0, 3, 1700, () => (setLine(PERM, [["  issues: ", "k"], ["read", "v"]]), (lines[PERM].className = "fix"), say("agent \u203a writes go through safe outputs", "line 7 \u2192 issues: read"))],
+      [1, 3, 1500, () => ((lines[PERM].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
+      [1, 3, 4200, () => say("$ gh aw compile triage", "Compiled 1 workflow: 1 succeeded \u2192 triage.lock.yml", "gd-ok", "\u2713")],
+    ];
+    const START = PH.map((_, i) => PH.slice(0, i).reduce((a, p) => a + p[2], 0));
+    const TOTAL = START.at(-1) + PH.at(-1)[2];
+    let t0 = 0,
+      last = 0,
+      k = -1,
+      rot = -40,
+      shown = 0;
+    const reset = () => {
+      lines.forEach((l, i) => ((l.className = "hid"), setLine(i, SRC[i])));
+      spin.style.transition = "none";
+      rot = -40;
+      spin.style.transform = `rotate(${rot}deg)`;
+      shown = 0;
+    };
+    slides.push({
+      group: "platform",
+      under: "intent",
+      id: "authoring-loop",
+      notes:
+        "What: An illustrative authoring loop with real, abridged compiler messages for a synthetic issue-triage workflow. The agent writes the Markdown; gh aw compile rejects an unknown property with a did-you-mean hint, then a direct write permission under strict mode, which the compiler reports at the file level as 1:1; the third round compiles to a lock file.\nWhy: The compiler is a deterministic reviewer. Precise, actionable errors let the agent correct itself in seconds, and only validated, hardened workflows reach the lock file.\nWhen: Let the agent run gh aw compile after every edit and feed it the errors; review the Markdown once it compiles cleanly.",
+      enter() {
+        t0 = last = 0;
+        k = -1;
+        reset();
+        nodes.forEach(n => n.classList.remove("on"));
+        mid.className = "gdl-mid";
+        big.textContent = "1";
+        small.textContent = "round";
+        say("", "");
+      },
+      tick(t) {
+        if (!t0) t0 = t + 1000;
+        if (t - last < 110) return;
+        last = t;
+        const e = t - t0;
+        if (e < 0) return;
+        const p = e % TOTAL;
+        let n = PH.length - 1;
+        while (START[n] > p) n--;
+        if (n < k) (reset(), (k = -1));
+        if (n === 0) {
+          const v = Math.min(SRC.length, Math.ceil(((p - START[0]) / (PH[0][2] - 400)) * SRC.length));
+          for (; shown < v; shown++) (lines[shown].className = ""), sfx.key(0.5);
+        }
+        if (n === k) return;
+        if (n > 0) for (; shown < SRC.length; shown++) lines[shown].className = "";
+        // a hidden tab can skip phases: replay them so the source always matches the current phase
+        for (let j = k + 1; j < n; j++) PH[j][3]();
+        k = n;
+        const [at, round] = PH[n];
+        nodes.forEach((el, i) => el.classList.toggle("on", i === at));
+        // the dot rests just before the active node (boxes would hide it on the node) and only moves clockwise
+        rot += (((at * 120 - 40 - rot) % 360) + 360) % 360;
+        spin.style.transition = "";
+        spin.style.transform = `rotate(${rot}deg)`;
+        const done = n === PH.length - 1;
+        mid.className = done ? "gdl-mid ok" : "gdl-mid";
+        big.textContent = done ? "\u2713 lock" : String(round);
+        small.textContent = done ? "triage.lock.yml" : "round";
+        PH[n][3]();
+        if (at === 2) sfx.bug();
+        else if (done) sfx.compile();
+        else if (at === 1) sfx.step();
+      },
+      el: h(
+        "section",
+        { class: "slide gd gdl" },
+        h(
+          "div",
+          { class: "gd-head" },
+          h("div", { class: "kicker" }, "/agentic-workflows · authoring loop"),
+          h("h2", {}, "The compiler ", h("em", {}, "corrects the agent.")),
+          h("p", {}, "The agent writes workflow Markdown, ", h("code", {}, "gh aw compile"), " rejects what is wrong with a precise fix, and the agent applies it until a lock file compiles.")
+        ),
+        h(
+          "div",
+          { class: "gd-board" },
+          wrap.firstChild,
+          nodes,
+          mid,
+          h("div", { class: "gd-lab", style: { left: "40px", top: "524px", width: "420px", lineHeight: "1.5" } }, "start \u203a /agentic-workflows", h("br"), "\u201clabel new issues by area\u201d"),
+          h("div", { class: "gdl-file" }, h("div", { class: "gdl-tab" }, h("b", {}, "triage.md"), ".github/workflows/"), h("div", { class: "gdl-src" }, lines), term)
+        ),
+        h("div", { class: "gd-cap" }, "Illustrative run · real gh aw compile messages (abridged) for a synthetic triage.md · three rounds to a lock file")
+      ),
+    });
+  }
+
+  // Personas test the guide. Agent fixes it.: Agent Persona Explorer scores /agentic-workflows answers and probes the 8,000-byte prefix (guide style, measured)
+  {
+    resetIndex();
+    const PERSONAS = ["Backend Engineer", "Frontend Developer", "DevOps Engineer", "QA Tester", "Product Manager", "Program Manager", "Designer", "Legal / Compliance", "Information Worker"];
+    const PERSON =
+      "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z";
+    const chips = PERSONAS.map((p, i) => {
+      const c = h("div", { class: "gd-box gdp-chip", style: { top: `${60 + i * 58}px` } }, p);
+      c.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 24 24"><path d="${PERSON}"/></svg>`);
+      return c;
+    });
+    const STEPS = [
+      ["Role-play", "A persona asks /agentic-workflows for a workflow"],
+      ["Score", "trigger, tools, security, clarity, completeness"],
+      ["Probe", "Ask again with only the first 8,000 bytes"],
+      ["Report", "A daily issue lists weak or lost rules"],
+      ["Fix", "An agent moves lost rules up; the next run re-scores"],
+    ];
+    const steps = STEPS.map(([a, b], i) => h("div", { class: "gd-box gdp-step", style: { top: `${60 + i * 104}px` } }, h("b", {}, String(i + 1)), h("strong", {}, a), h("span", {}, b)));
+    const KPI = [
+      [133, "persona reports"],
+      [25, "fixed by merged PRs, 22 by Copilot"],
+      [23, "PRs changed agent guidance"],
+      [0, "personas \u00d7 score dimensions", "9\u00d75"],
+    ];
+    const vals = KPI.map(([v, , s]) => h("b", {}, s || "0"));
+    const kpis = KPI.map(([, l], i) => h("div", { class: "gd-box gdp-kpi", style: { left: `${1110 + (i % 2) * 286}px`, top: `${60 + Math.floor(i / 2) * 166}px` } }, vals[i], h("span", {}, l)));
+    const STEP = 1150;
+    let t0 = 0,
+      last = 0,
+      k = -1;
+    slides.push({
+      group: "platform",
+      under: "intent",
+      id: "persona-optimization",
+      notes:
+        "What: Agent Persona Explorer, a daily workflow, role-plays a persona such as a backend engineer, a designer or a compliance lead, asks /agentic-workflows for a workflow, scores the answer on five dimensions and asks again with only the first 8,000 bytes of the agent file. Measured on 15 Nov 2026: 133 reports in total from 8 Jun to 15 Nov 2026, 25 closed by merged pull requests, 22 of them by Copilot and 23 changing agent guidance; the agent file is 17,035 bytes. The persona order and the loop are an illustrative, simplified example.\nWhy: People phrase the same need in many ways. Personas catch guidance that works for only one kind of user, and the prefix probe catches rules a truncated prompt loses.\nWhen: Use persona evaluation when one agent serves many kinds of users, and keep its most important rules in the first bytes.",
+      enter() {
+        t0 = last = 0;
+        k = -1;
+        chips.forEach(c => c.classList.remove("on"));
+        steps.forEach(s => s.classList.remove("on"));
+        KPI.forEach(([v, , s], i) => s || (vals[i].textContent = "0"));
+      },
+      tick(t) {
+        if (!t0) t0 = t + 900;
+        if (t - last < 110) return;
+        last = t;
+        const e = t - t0;
+        if (e < 0) return;
+        const f = Math.min(1, e / 1400),
+          ease = 1 - (1 - f) ** 3;
+        KPI.forEach(([v, , s], i) => s || (vals[i].textContent = String(Math.round(v * ease))));
+        const n = Math.floor(e / STEP);
+        if (n === k) return;
+        k = n;
+        const s = n % STEPS.length,
+          p = Math.floor(n / STEPS.length) % PERSONAS.length;
+        chips.forEach((c, i) => c.classList.toggle("on", i === p));
+        steps.forEach((el, i) => el.classList.toggle("on", i === s));
+        if (s === 4) sfx.review();
+        else sfx.pop(s);
+      },
+      el: h(
+        "section",
+        { class: "slide gd gdp" },
+        h(
+          "div",
+          { class: "gd-head" },
+          h("div", { class: "kicker" }, "Agent Persona Explorer · optimizing /agentic-workflows"),
+          h("h2", {}, "Personas test the guide. ", h("em", {}, "Agent fixes it.")),
+          h("p", {}, "Every day a persona asks ", h("code", {}, "/agentic-workflows"), " for a workflow; the answer is scored and probed against the first 8,000 bytes, and gaps become issues.")
+        ),
+        h(
+          "div",
+          { class: "gd-board" },
+          h("div", { class: "gd-lab", style: { left: "40px", top: "26px" } }, "9 personas"),
+          chips,
+          h("div", { class: "gd-lab", style: { left: "460px", top: "26px" } }, "Daily loop"),
+          steps,
+          h("div", { class: "gd-lab", style: { left: "1110px", top: "26px" } }, "Measured"),
+          kpis,
+          h("div", { class: "gd-lab", style: { left: "1110px", top: "410px" } }, "agentic-workflows agent file"),
+          h("div", { class: "gdp-bar" }, h("i")),
+          h("div", { class: "gdp-bl", style: { left: "1110px", width: "556px", display: "flex", justifyContent: "space-between" } }, h("span", {}, "first 8,000 B probed"), h("span", {}, "17,035 B"))
+        ),
+        h("div", { class: "gd-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 8 Jun\u201315 Nov 2026 (160 d) · personas and loop illustrative")
       ),
     });
   }
@@ -6217,6 +6686,212 @@
       "M12 .25a.75.75 0 0 1 .673.418l3.058 6.197 6.839.994a.75.75 0 0 1 .415 1.279l-4.948 4.823 1.168 6.811a.751.751 0 0 1-1.088.791L12 18.347l-6.117 3.216a.75.75 0 0 1-1.088-.79l1.168-6.812-4.948-4.823a.75.75 0 0 1 .416-1.28l6.838-.993L11.327.668A.75.75 0 0 1 12 .25Z",
     ],
   };
+
+  // Workflows → Process → Factory: zoom out from one workflow (issue → agent → PR) to a process (workflows in sequence) to a factory (processes feeding each other)
+  {
+    resetIndex();
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // Each line is one process: GitHub artifacts, agents on any harness ("@claude") and developer gates ("dev:mona").
+    // Line 1 stays straight on a 220 grid for the workflow and process zooms; the others are laid out like a plant floor.
+    const LINES = [
+      [["calendar", 380, 88], ["@claude", 580, 88], ["issue", 780, 88], ["dev:ducky", 980, 128, "triages"], ["@codex", 1180, 128], ["pr", 1380, 128], ["@pi", 1580, 88], ["comment", 1800, 88]],
+      [["issue", 120, 250], ["@copilot", 340, 250], ["pr", 560, 250], ["@claude", 780, 250], ["comment", 1000, 250], ["@codex", 1220, 250], ["pr", 1440, 250], ["dev:mona", 1660, 250, "approves"], ["merge", 1860, 350]],
+      [["discussion", 170, 430], ["@agy", 370, 430], ["tasklist", 570, 480], ["@copilot", 770, 480], ["issue", 980, 420], ["dev:mona", 1180, 420, "steers"], ["@claude", 1380, 480], ["pr", 1600, 480]],
+      [["calendar", 330, 590], ["@codex", 530, 590], ["file", 740, 590], ["@pi", 950, 590], ["pr", 1160, 590], ["dev:ducky", 1380, 590, "reviews"], ["@agy", 1600, 590], ["package", 1820, 590]],
+    ];
+    // [line, node] → [line, node]: an output of one process triggers a step of another
+    const CROSS = [
+      [0, 2, 1, 3],
+      [0, 5, 1, 5],
+      [1, 4, 2, 5],
+      [2, 2, 3, 1],
+      [2, 7, 1, 8],
+      [3, 4, 2, 6],
+    ];
+    // camera per step [x, y, w, h], all at the svg's 2000:660 aspect
+    const CAM = [
+      [40, 168, 600, 198],
+      [40, 6, 1480, 488],
+      [0, 0, 2000, 660],
+    ];
+    const STEPS = [
+      ["Workflow", "A workflow goes from an issue, to an agent, to a pull request."],
+      ["Process", "A process sequences workflows: each output triggers the next."],
+      ["Factory", "A factory runs processes on any harness, with developers at the gates."],
+    ];
+    const LBL = [
+      [0, "Issue", "the trigger"],
+      [1, "Agent", "any harness, in Actions"],
+      [2, "PR", "safe output"],
+    ];
+    // elbow route between two nodes, as polyline points
+    const route = ([, x1, y1], [, x2, y2]) => {
+      const m = (x1 + x2) / 2;
+      return y1 === y2 ? [[x1, y1], [x2, y2]] : [[x1, y1], [m, y1], [m, y2], [x2, y2]];
+    };
+    const along = (pts, f) => {
+      const seg = pts.slice(1).map((q, i) => Math.abs(q[0] - pts[i][0]) + Math.abs(q[1] - pts[i][1]));
+      let d = f * seg.reduce((x, y) => x + y, 0),
+        i = 0;
+      while (i < seg.length - 1 && d > seg[i]) d -= seg[i++];
+      const u = seg[i] ? d / seg[i] : 0;
+      return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * u, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u];
+    };
+    const BP = "#79c0ff";
+    let g = `<defs><marker id="wpfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="wpfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${BP}"/></marker>
+      <pattern id="wpfGrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="${BP}" stroke-opacity=".13"/></pattern>
+      <pattern id="wpfGrid5" width="200" height="200" patternUnits="userSpaceOnUse"><path d="M200 0H0V200" fill="none" stroke="${BP}" stroke-opacity=".22"/></pattern>
+      <clipPath id="wpfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
+    // blueprint sheet, shown only once the camera reaches the whole factory
+    g += `<g class="wpf-bp"><rect width="2000" height="660" fill="#0d1a2e99"/><rect width="2000" height="660" fill="url(#wpfGrid)"/><rect width="2000" height="660" fill="url(#wpfGrid5)"/>
+      <rect class="fr" x="8" y="8" width="1984" height="644"/><rect class="fr t" x="16" y="16" width="1968" height="628"/>
+      ${[690, 1290].map(x => `<line class="dv" x1="${x}" y1="16" x2="${x}" y2="644"/>`).join("")}
+      ${[[30, "BAY A · INTAKE"], [706, "BAY B · BUILD"], [1306, "BAY C · REVIEW &amp; SHIP"]].map(([x, t]) => `<text class="bay" x="${x}" y="40">${t}</text>`).join("")}
+      ${LINES.map((l, r) => `<text class="ln" x="${l[0][1] - 36}" y="${l[0][2] - 46}">LINE ${r + 1}</text>`).join("")}
+      <g class="tb"><rect x="30" y="532" width="250" height="104"/><line x1="30" y1="566" x2="280" y2="566"/><line x1="30" y1="600" x2="280" y2="600"/>
+      <text class="k" x="42" y="555">AGENTIC FACTORY</text><text x="42" y="589">DWG 01 · REV A · NTS</text><text x="42" y="623">4 LINES · 5 HARNESSES</text></g>`;
+    LINES.forEach(l => l.forEach(([k, x, y, t]) => t && (g += `<text class="gate" x="${x}" y="${y + 58}">${t}</text>`)));
+    g += `</g>`;
+    for (const [r1, c1, r2, c2] of CROSS) {
+      const [, x1, y1] = LINES[r1][c1],
+        [, x2, y2] = LINES[r2][c2],
+        sg = y2 > y1 ? 1 : -1,
+        sy = y1 + sg * 36,
+        ty = y2 - sg * 40,
+        my = (sy + ty) / 2;
+      g += `<path class="wpf-x" d="M${x1 + 14} ${sy} C${x1 + 14} ${my} ${x2} ${my} ${x2} ${ty}" marker-end="url(#wpfB)"/>`;
+    }
+    const PATHS = LINES.map(l => l.slice(1).map((n, c) => route(l[c], n)));
+    LINES.forEach((l, r) =>
+      PATHS[r].forEach(pts => {
+        const q = pts.map(p => p.slice()),
+          n = q.length - 1;
+        q[0][0] += 40;
+        q[n][0] -= 42;
+        g += `<polyline class="wpf-w" data-r="${r}" points="${q.map(p => p.join(",")).join(" ")}" marker-end="url(#wpfP)"/>`;
+      })
+    );
+    LINES.forEach((l, r) =>
+      l.forEach(([k, x, y]) => {
+        if (k[0] === "@") {
+          const a = k.slice(1);
+          g += `<g class="wpf-n ag" data-r="${r}"><circle cx="${x}" cy="${y}" r="34" ${agDisc(a)}/>${ico(a, x, y + 1, 38, agFg(a))}</g>`;
+        } else if (k.startsWith("dev:")) g += `<g class="wpf-n dev" data-r="${r}"><circle cx="${x}" cy="${y}" r="36"/><image href="assets/avatars/${k.slice(4)}.jpg" x="${x - 32}" y="${y - 32}" width="64" height="64" clip-path="url(#wpfClip)"/></g>`;
+        else g += `<g class="wpf-n" data-r="${r}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(k, x, y, 34)}</g>`;
+      })
+    );
+    g += LINES.map((l, r) => `<circle class="wpf-dot" data-r="${r}" r="9" cx="${l[0][1]}" cy="${l[0][2]}"/>`).join("");
+    g += `<g class="wpf-lbl">${LBL.map(([c, a, b]) => `<text class="a" x="${LINES[1][c][1]}" y="${LINES[1][c][2] + 60}">${a}</text><text class="b" x="${LINES[1][c][1]}" y="${LINES[1][c][2] + 78}">${b}</text>`).join("")}</g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "wpf-svg");
+    svg.innerHTML = g;
+    const nodes = LINES.map((_, r) => [...svg.querySelectorAll(`.wpf-n[data-r="${r}"]`)]),
+      dots = [...svg.querySelectorAll(".wpf-dot")],
+      lit = LINES.map(l => l.map(() => false));
+    const chips = STEPS.map(([t]) => h("span", {}, t)),
+      cap = h("div", { class: "wpf-cap" });
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 640,
+      HOLD = 900,
+      PHASE = [0.35, 0, 0.6, 0.2];
+    let step = 0,
+      t0 = 0,
+      cam = null,
+      vb = CAM[0].slice(),
+      popK = -1;
+    const view = () => svg.setAttribute("viewBox", vb.map(n => n.toFixed(1)).join(" "));
+    const setStep = (s, snap) => {
+      step = s;
+      svg.dataset.step = s;
+      if (snap) {
+        vb = CAM[s].slice();
+        cam = null;
+        view();
+      } else cam = { from: vb.slice(), ts: 0 };
+      chips.forEach((c, i) => {
+        c.classList.toggle("on", i === s);
+        c.classList.toggle("done", i < s);
+      });
+      cap.textContent = STEPS[s][1];
+      cap.classList.remove("swap");
+      void cap.offsetWidth;
+      cap.classList.add("swap");
+      t0 = 0;
+      popK = -1;
+      nodes.forEach((row, r) =>
+        row.forEach((n, c) => {
+          n.classList.remove("on");
+          lit[r][c] = false;
+        })
+      );
+    };
+    slides.push({
+      group: "platform",
+      id: "workflows-process-factory",
+      notes:
+        "What: An illustrative zoom-out in three steps. A workflow is one hop: an issue starts an agent, and the agent opens a pull request through safe outputs. Sequence workflows so each output triggers the next and you have a process. Run many processes that feed each other, each step on whichever harness fits it, with developers triaging, steering, reviewing and approving at the gates, and you have a factory.\nWhy: Every factory is made of processes, and every process is made of small, guarded workflows, so you build and improve the factory one workflow at a time while people keep the decisions.\nWhen: Start with one workflow, then wire its output into the next. Press the right arrow to zoom out a level.",
+      enter(dir) {
+        setStep(dir < 0 ? 2 : 0, true);
+      },
+      onNext() {
+        if (step >= 2) return false;
+        setStep(step + 1);
+        sfx.step();
+        return true;
+      },
+      onPrev() {
+        if (step <= 0) return false;
+        setStep(step - 1);
+        sfx.step();
+        return true;
+      },
+      tick(t) {
+        if (cam) {
+          if (!cam.ts) cam.ts = t;
+          const p = Math.min(1, (t - cam.ts) / 1100),
+            e = ease(p);
+          vb = cam.from.map((a, i) => a + (CAM[step][i] - a) * e);
+          view();
+          if (p >= 1) cam = null;
+        }
+        if (!t0) t0 = t;
+        LINES.forEach((l, r) => {
+          const d = dots[r];
+          if (step < 2 && r !== 1) return void (d.style.opacity = 0);
+          const cmax = step < 2 ? [2, 6][step] : l.length - 1,
+            RUN = cmax * STEP,
+            CYC = RUN + HOLD,
+            u = (t - t0 + (step === 2 ? PHASE[r] * CYC : 0)) % CYC,
+            k = Math.min(cmax - 1, Math.floor(u / STEP)),
+            f = u >= RUN ? 1 : ease(Math.min(1, (u - k * STEP) / STEP / 0.8)),
+            [x, y] = along(PATHS[r][k], f);
+          d.setAttribute("cx", x.toFixed(1));
+          d.setAttribute("cy", y.toFixed(1));
+          d.style.opacity = u < RUN ? 1 : 0;
+          for (let c = 0; c < l.length; c++) {
+            const on = c <= cmax && (c <= k || (c === k + 1 && f > 0.95));
+            if (on !== lit[r][c]) {
+              lit[r][c] = on;
+              nodes[r][c].classList.toggle("on", on);
+            }
+          }
+          if (r === 1 && u < RUN && k !== popK) {
+            popK = k;
+            sfx.pop(k);
+          }
+        });
+      },
+      el: h(
+        "section",
+        { class: "slide wpf" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every factory is made of processes"), h("h2", {}, letters("Workflows → Process → "), letters("Factory", "l-grad"))),
+        h("div", { class: "wpf-steps" }, chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))),
+        svg,
+        cap
+      ),
+    });
+  }
   // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
   // fetches the live count once per repo by numeric id (no owner handle in source) and keeps the default on failure.
   const REPO_API = "https://api.github.com/repositories/";
@@ -13426,7 +14101,7 @@
     });
   }
 
-  // Turn Intent into Value: Turn Intent to Automation's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
+  // Turn Intent into Value: Turn Intent to Workflow's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
   {
     resetIndex();
     // the pieces that define value: [chip, colour, how the agent reads it]
@@ -16587,6 +17262,163 @@
     });
   }
 
+  // Dispatcher & worker: the EU CRA campaign's dispatcher and one worker, condensed; both import shared control,
+  // the dispatcher hands one target_repo to each worker, and each prompt keeps only its mission
+  {
+    resetIndex();
+    const C = { ctl: "#56d4dd", wk: "#b3f0f5", pr: "#d1d7e0" };
+    const tok = (k, text) => h("span", { class: "an-tok", "--c": C[k], style: { color: C[k] } }, text);
+    const yamlLine = l => {
+      if (l === "---") return [h("span", { style: { color: "#656c76" } }, l)];
+      const [code, note] = l.split(/(?<=\S)\s+(?=# )/);
+      const m = code.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
+      const kids = m ? [m[1], h("span", { style: { color: m[1] ? "#7ee787" : "#ff7b72" } }, m[2]), h("span", { style: { color: "#a5d6ff" } }, m[3])] : [h("span", { style: { color: /^\s*#/.test(code) ? "#656c76" : "#a5d6ff" } }, code)];
+      if (note) kids.push(h("span", { style: { color: "#656c76" } }, " " + note));
+      return kids;
+    };
+    const heading = text => [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, text)];
+    const control = role => ["imports:", "  - uses: shared/control.md", "    with:", "      campaign: eu-cra-compliance", `      role: ${role}`];
+    // [file, tag, YAML lines, prompt lines, bands: [kind, first line, last line]]
+    const FILES = [
+      [
+        "eu-cra-compliance.md",
+        "dispatcher",
+        ["---", "on: { schedule: hourly }", ...control("orchestrator"), "safe-outputs:", "  dispatch-workflow:", "    workflows:", "      - eu-cra-compliance-supply-chain-sbom-auditor", "      # + 5 more CRA workers", "    max: 48", "---"],
+        [heading("# EU CRA"), ["Rank org repos by product signals, then"], ["pick useful ", tok("wk", "workers"), " per repo. ", tok("pr", "Never audit.")]],
+        [
+          ["ctl", 3, 7],
+          ["wk", 8, 13],
+          ["pr", 15, 17],
+        ],
+      ],
+      [
+        "eu-cra-compliance-supply-chain-sbom-auditor.md",
+        "worker",
+        ["---", "on: workflow_dispatch  # one target_repo", ...control("worker"), "      worker: supply-chain-sbom-auditor", "safe-outputs:", "  create-issue:", "    max: 1", "---"],
+        [heading("# EU CRA / Supply Chain"), ["Audit ", tok("wk", "target/"), " SBOM and provenance evidence."], ["File one issue. ", tok("pr", "Never claim compliance.")]],
+        [
+          ["wk", 2, 2],
+          ["ctl", 3, 8],
+          ["wk", 9, 11],
+          ["pr", 13, 15],
+        ],
+      ],
+    ];
+    const LH = 28,
+      LEFT = [110, 1070],
+      TOP = 262,
+      CODE_TOP = TOP + 56 + 18;
+    const panes = FILES.map(([file, tag, yaml, body, spans], p) => {
+      const lines = [...yaml.map(yamlLine), ...body].map(kids => h("div", { class: "an-ln" }, kids));
+      const bands = spans.map(([k, a, b]) => {
+        const el = h("div", { class: "an-band", "--c": C[k], style: { top: `${18 + (a - 1) * LH}px`, height: `${(b - a + 1) * LH}px` } });
+        return { k, a, b, el };
+      });
+      const el = h(
+        "div",
+        { class: "an-file", style: { left: `${LEFT[p]}px` } },
+        h("div", { class: "file" }, `📄 ${file}`, h("span", { class: "dw-tag", "--c": p ? C.wk : C.ctl }, tag)),
+        h(
+          "div",
+          { class: "an-code" },
+          bands.map(b => b.el),
+          lines
+        )
+      );
+      return { el, lines, bands, toks: [...el.querySelectorAll(".an-tok")] };
+    });
+    const lineY = n => CODE_TOP + (n - 1) * LH + LH / 2;
+    const wire = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    wire.setAttribute("class", "dw-wire");
+    wire.setAttribute("viewBox", "0 0 1920 1080");
+    wire.style.setProperty("--c", C.wk);
+    const y0 = lineY(11),
+      y1 = lineY(2),
+      x0 = LEFT[0] + 740,
+      x1 = LEFT[1];
+    wire.innerHTML = `<path d="M ${x0} ${y0} C ${x0 + 120} ${y0} ${x1 - 120} ${y1} ${x1} ${y1}"/><circle r="9"/>`;
+    const path = wire.querySelector("path"),
+      packet = wire.querySelector("circle");
+    let plen = 0;
+    const lbl = h("div", { class: "dw-lbl", "--c": C.wk }, "target_repo", h("small", {}, "one repo per worker"));
+    const CALLS = [
+      ["ctl", "Import control", "imports:", ["Shared ", h("code", {}, "control.md"), " brings admission, credentials and caps; ", h("code", {}, "role"), " picks the job."]],
+      ["wk", "Workers", "dispatch-workflow", ["The dispatcher ranks repos and dispatches; each worker gets one ", h("code", {}, "target_repo"), "."]],
+      ["pr", "Simple prompt", "markdown body", "Just the mission. Control supplies targets, limits and the report format."],
+    ];
+    const calls = CALLS.map(([k, title, chip, text], i) =>
+      h("div", { class: "an-call", "--c": C[k], style: { left: `${110 + i * 573}px` } }, h("div", { class: "an-num" }, String(i + 1).padStart(2, "0")), h("h3", {}, title, h("code", {}, chip)), h("p", {}, text))
+    );
+    const KINDS = ["ctl", "wk", "pr"];
+    const lit = (i, on) => {
+      const k = KINDS[i];
+      for (const pane of panes)
+        for (const b of pane.bands) {
+          if (b.k !== k) continue;
+          b.el.classList.toggle("on", on);
+          for (let n = b.a - 1; n < b.b; n++) pane.lines[n].classList.toggle("on", on);
+        }
+      calls[i].classList.toggle("on", on);
+      if (k === "wk") [wire, lbl].forEach(e => e.classList.toggle("on", on));
+    };
+    const REVEAL = 0.6,
+      GAP = 1.1,
+      CYCLE = REVEAL + GAP * 3,
+      HOT = 2.6;
+    let t0 = 0,
+      seen = -1,
+      skip = false;
+    slides.push({
+      group: "cao",
+      notes:
+        "What: An illustrative, condensed pair from the EU CRA campaign in gh cao, a research prototype whose interfaces may change. The dispatcher and each worker import the same shared control component with a different role; the dispatcher may only dispatch the listed workers, each worker gets one target repository and files one advisory issue. Only the mission stays in each prompt.\nWhy: Admission, credentials, caps and reporting live in one reviewed file, so campaign authors write short prompts and cannot widen authority.\nWhen: Use this shape when one campaign fans out over many repositories.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        skip = false;
+        if (!plen) plen = path.getTotalLength();
+        KINDS.forEach((_, i) => lit(i, false));
+        [...calls, ...panes.flatMap(p => [...p.bands.map(b => b.el), ...p.toks])].forEach(e => e.classList.remove("hot"));
+      },
+      onNext() {
+        if (seen >= 2) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.min(2, Math.floor((e - REVEAL) / GAP));
+        while (seen < n) {
+          seen++;
+          lit(seen, true);
+          sfx.pop(seen * 2);
+        }
+        if (seen >= 1 && plen) {
+          const pt = path.getPointAtLength(((e * 0.7) % 1) * plen);
+          packet.setAttribute("cx", pt.x);
+          packet.setAttribute("cy", pt.y);
+        }
+        const hot = e >= CYCLE ? KINDS[Math.floor((e - CYCLE) / HOT) % 3] : null;
+        calls.forEach((c, i) => c.classList.toggle("hot", hot === KINDS[i]));
+        for (const pane of panes) {
+          pane.bands.forEach(b => b.el.classList.toggle("hot", hot === b.k));
+          pane.toks.forEach(el => el.classList.toggle("hot", el.style.getPropertyValue("--c") === C[hot]));
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide dw", "--lg": "#56d4dd" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · campaign anatomy · EU CRA"), h("h2", {}, letters("Dispatcher & "), letters("worker", "l-grad"))),
+        panes.map(p => p.el),
+        wire,
+        lbl,
+        calls
+      ),
+    });
+  }
+
   // AW maintenance: gh cao keeps a fleet of agentic workflows healthy; maintenance loops (update, integrity drift, failure clustering, token optimization) sweep a grid of repos back to green, one loop at a time
   {
     resetIndex();
@@ -19541,6 +20373,151 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How OpenTelemetry was built"), h("h2", {}, letters("Query · Ask · "), letters("Grow", "l-grad"))), svg),
+    });
+  }
+
+  // Instrument · Debug · Repeat: debug logging is the agent's debugger; a silent failure becomes a DEBUG-scoped rerun whose stderr namespaces and events the agent follows, and the daily Go Logger workflow keeps adding side-effect-free log.Printf calls (max five Go files, build and fmt, reviewable PR, human merge). The flow and log lines are illustrative
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const tx = (s, x, y, cls, text, a = "start") => `<text class="idr-s t ${cls}" data-s="${s}" x="${x}" y="${y}" text-anchor="${a}">${esc(text)}</text>`;
+    let g = `<defs><marker id="idrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="52"/>`;
+    [
+      [0, 515, "SILENT"],
+      [515, 1225, "RERUN WITH DEBUG"],
+      [1225, VW, "FOLLOW THE EVIDENCE"],
+    ].forEach(([x0, x1, t]) => {
+      g += `<text class="fm-lane-t" x="${(x0 + x1) / 2}" y="35">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="312"/>`;
+    });
+    // silent failure
+    g += `<g class="idr-s" data-s="0"><rect class="rao-card on idr-warn" x="20" y="72" width="470" height="228" rx="14"/></g>`;
+    g += tx(0, 42, 110, "rao-k", "a run fails, nothing explains why");
+    g += tx(0, 42, 150, "idr-cmd", "$ gh aw compile triage.md");
+    g += tx(0, 42, 204, "idr-x", "✗ exit 1");
+    g += tx(0, 42, 246, "idr-m", "no context · which step failed?");
+    g += tx(0, 42, 276, "idr-m", "an agent can only guess");
+    // scoped rerun
+    g += `<path class="fm-wire b idr-s" data-s="1" d="M492 186 H536" marker-end="url(#idrB)"/>`;
+    g += `<g class="idr-s" data-s="1"><rect class="rao-card on" x="540" y="72" width="660" height="228" rx="14" style="--rc:#4493f8"/></g>`;
+    g += tx(1, 562, 110, "rao-k", "scoped rerun · debug lines go to stderr");
+    g += tx(1, 562, 146, "idr-cmd", "$ DEBUG=workflow:* DEBUG_COLORS=0 \\");
+    g += tx(1, 562, 172, "idr-cmd", "    gh aw compile triage.md 2> debug.log");
+    g += `<line class="fm-div" x1="556" y1="190" x2="1184" y2="190"/>`;
+    g += `<rect class="idr-s idr-hl" data-s="5" x="552" y="262" width="636" height="30" rx="6"/>`;
+    [
+      ["workflow:compiler", "parse file=triage.md", "+0ns"],
+      ["workflow:compiler", "frontmatter engine=claud", "+1ms"],
+      ["workflow:agentic_engine", "lookup id=claud found=false", "+0ms"],
+    ].forEach(([ns, msg, dt], i) => {
+      g += `<text class="idr-s t idr-log" data-s="${2 + i}" x="562" y="${222 + i * 30}"><tspan class="idr-ns">${ns}</tspan> ${msg} <tspan class="idr-dt">${dt}</tspan></text>`;
+    });
+    // agent follows the evidence
+    g += `<path class="fm-wire b idr-s" data-s="5" d="M1202 186 H1250" marker-end="url(#idrB)"/>`;
+    g += `<g class="idr-s" data-s="5"><circle cx="1290" cy="186" r="34" fill="#1f6feb"/>${ico("copilot", 1290, 187, 38)}<text class="rao-h" x="1290" y="252" text-anchor="middle">agent</text></g>`;
+    g += `<g class="idr-s" data-s="5"><rect class="rao-card on" x="1340" y="72" width="340" height="228" rx="14" style="--rc:#4493f8"/></g>`;
+    g += tx(5, 1360, 110, "rao-k", "reads stderr, not a guess");
+    [
+      ["namespace", "→ which file"],
+      ["event", "→ which branch"],
+      ["key=value", "→ which state"],
+      ["fix", "→ engine: claude"],
+    ].forEach(([a, b], i) => {
+      g += `<text class="idr-s t idr-f" data-s="${5 + i}" x="1360" y="${152 + i * 38}"><tspan class="idr-ns">${a}</tspan> ${b}</text>`;
+    });
+    // daily instrumentation pipeline
+    g += `<line class="fm-div" x1="0" y1="318" x2="${VW}" y2="318"/>`;
+    g += `<text class="fm-lane-t" x="20" y="360" style="text-anchor:start">INSTRUMENT · DAILY · REVIEWED</text>`;
+    const CH = [
+      ["daily", "schedule"],
+      ["manifest", "bounded pool"],
+      ["≤ 5 Go files", "no _test.go"],
+      ["debug calls", "no side effects"],
+      ["build · fmt", "make"],
+      ["PR", "reviewable"],
+      ["human merge", "people decide"],
+    ];
+    const CW = 150,
+      GAP = 22,
+      CY = 382,
+      cx = i => 20 + i * (CW + GAP);
+    CH.forEach(([a, b], i) => {
+      if (i) g += `<path class="fm-wire b idr-s" data-s="${9 + i}" d="M${cx(i) - GAP + 2} ${CY + 34} H${cx(i) - 3}" marker-end="url(#idrB)"/>`;
+      g += `<g class="idr-s" data-s="${9 + i}"><rect class="rao-card on" x="${cx(i)}" y="${CY}" width="${CW}" height="68" rx="12" style="--rc:#4493f8"/>
+        <text class="idr-c" x="${cx(i) + CW / 2}" y="${CY + 30}" text-anchor="middle">${esc(a)}</text><text class="rao-sub" x="${cx(i) + CW / 2}" y="${CY + 54}" text-anchor="middle">${esc(b)}</text></g>`;
+    });
+    g += `<text class="rao-sub" x="20" y="482">never log tokens, secrets or payloads · logs explain behaviour, they do not prove it correct</text>`;
+    const mx = cx(6) + CW / 2;
+    g += `<path class="fm-wire b idr-s idr-back" data-s="16" d="M${mx} ${CY - 4} V304" marker-end="url(#idrB)"/>`;
+    g += tx(16, mx - 12, 346, "idr-back-l", "merged calls = the next rerun's events", "end");
+    // the real logger API
+    g += `<g class="idr-s" data-s="12"><rect class="rao-card on" x="1240" y="336" width="440" height="160" rx="14" style="--rc:#4493f8"/>
+      <text class="rao-k" x="1260" y="368">pkg/logger · the actual API</text>
+      <text class="idr-code" x="1260" y="404">var log = logger.New("workflow:compiler")</text>
+      <text class="idr-code" x="1260" y="436">log.Printf("parse file=%s", name)</text>
+      <text class="idr-code" x="1260" y="468">if log.Enabled() { /* costly detail */ }</text></g>`;
+    // measured: every [log] PR opened by gh-aw's go-logger workflow, 20 Oct to 18 Nov 2026 (see data-refresh.md)
+    const MEAS = [
+      ["13", "[log] PRs opened"],
+      ["13", "merged"],
+      ["52", "file touches"],
+      ["+280", "lines added"],
+    ];
+    g += `<line class="fm-div" x1="0" y1="512" x2="${VW}" y2="512"/>`;
+    g += `<text class="fm-lane-t" x="20" y="552" style="text-anchor:start">MEASURED · GH-AW GO LOGGER · 20 OCT – 18 NOV 2026</text>`;
+    MEAS.forEach(([n, l], i) => {
+      const x = 20 + i * 262;
+      g += `<rect class="rao-card on" x="${x}" y="570" width="248" height="78" rx="12" style="--rc:#4493f8"/>
+        <text class="idr-c" x="${x + 20}" y="619"><tspan class="idr-ns idr-n">${esc(n)}</tspan> ${esc(l)}</text>`;
+    });
+    g += `<text class="rao-sub" x="1080" y="598">latest: 1 Go file · +7 lines · 4 log calls</text>`;
+    g += `<text class="rao-sub" x="1080" y="624">snapshot 19 Nov 2026 · file touches, not unique files</text>`;
+    g += `<text class="rao-sub" x="1080" y="650">shows delivery, not a debugging speedup</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg rpa-svg idr-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#4493f8");
+    svg.innerHTML = g;
+    const parts = [...svg.querySelectorAll(".idr-s")].map(el => [el, +el.dataset.s]);
+    const STEP = 760,
+      START = 600,
+      TOTAL = 17,
+      HOLD = 4600,
+      CYC = START + TOTAL * STEP + HOLD;
+    let t0 = 0,
+      shown = -2;
+    const paint = k => {
+      for (const [el, s] of parts) el.classList.toggle("on", s <= k);
+    };
+    slides.push({
+      id: "instrument-debug-repeat",
+      group: "process",
+      under: "improvers",
+      notes:
+        "What: An illustrative, synthetic flow. A run fails without context, so the agent reruns it with DEBUG scoped to one namespace and DEBUG_COLORS=0; plain debug lines arrive on stderr, each naming its namespace, event and key=value state, and the agent follows it to a typo in the engine id and fixes it. Below, gh-aw's daily Go Logger workflow takes a bounded manifest, edits at most five Go files with side-effect-free log.Printf calls, runs build and fmt, and opens a pull request a human reviews and merges. Measured: every [log] pull request the workflow opened from 20 Oct to 18 Nov 2026, 13 opened and 13 merged, 52 file touches (changed files summed) and +280 lines; the latest touched one file with four log calls; snapshot 19 Nov 2026. The schedule is daily, but not every day yields a pull request, and these numbers show delivery, not a debugging speedup.\nWhy: Debug logs give an agent evidence instead of guesses. They explain behaviour; they do not prove correctness, and they must never carry tokens or payloads.\nWhen: Use it when agents debug your CLI or service and failures are silent.",
+      enter() {
+        t0 = 0;
+        shown = -2;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const u = (t - t0) % CYC,
+          k = u < START ? -1 : Math.min(TOTAL - 1, Math.floor((u - START) / STEP));
+        if (k === shown) return;
+        if (k > shown && k >= 0) sfx.pop(k);
+        shown = k;
+        paint(k);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Debug logging is the agent's debugger"), h("h2", { style: "--lg:#79c0ff" }, letters("Instrument · Debug · "), letters("Repeat", "l-grad"))),
+        svg
+      ),
     });
   }
 
@@ -23515,6 +24492,11 @@
       "Create a daily agentic workflows that reviews the open telemetry instrumentation in the JavaScript code and suggests 1 improvement…",
       "Create a daily agentic workflows that reviews the open telemetry instrumentation in the JavaScript code and suggests 1 improvement to provide a better otel. Use best judgement from a DevOps perspective.\nUse Claude. Create issue.",
     ],
+    "Instrument · Debug · Repeat": [
+      "go-logger",
+      "Create an agentic workflow that adds logging calls to the .go files - maximum 5 files per pull request…",
+      'Create an agentic workflow that adds logging calls to the .go files\n- maximum 5 files per pull request\n- declare logger in file if needed\n- ignore test files\n- use logger instructions from AGENTS.md\n- make sure the argument do not compute anything to avoid side effects\n- use best judgment to generate meaningful logging messages\n\nTriggers on workflow_dispatch or daily. Creates a pull request with changes, title prefix "[log] "',
+    ],
     "Mine · Refine · Apply": [
       "linter-miner",
       "Create a PR that adds daily a agentic workflow that mines the sergo repo memory to generate new Go linters in the pkg/linters pkg",
@@ -24411,5 +25393,5 @@
 
   // ---------- start ----------
   // runtime.js (CracktroDeck) builds the bands, chrome, navigation, search, slide map and background from this content.
-  window.CracktroDeck.create({ width: W, height: H, css, slides, themes: THEME, bands: BANDS, solo: SOLO, prototypes: PROTO, tours: TOURS, last: "finale", sound: sfx });
+  window.CracktroDeck.create({ width: W, height: H, css, slides, themes: THEME, bands: BANDS, solo: SOLO, prototypes: PROTO, tours: TOURS, last: "finale", sound: sfx, captions: window.CracktroCaptions });
 })();

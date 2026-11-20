@@ -16,7 +16,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
 
 ## 1. Slide
 
-- Marker: `// Skills in review:` (`grep -n "// Skills in review:" docs/public/cracktro/deck.js`). CSS prefix `sir-`. Group `engineering`. Row 55 in `slides.md` (Notes empty: fully measured).
+- Marker: `// Skills in review:` (`grep -n "// Skills in review:" docs/public/cracktro/deck.js`). CSS prefix `sir-`. Group `engineering`. `#skills-in-review` in `slides.md` (no Notes: fully measured).
 - Data lives inside that block only:
   1. `TAGS`: `[tag, colour, comments, retired]`; order is the stacking order of `WEEKS`.
   2. `WEEKS`: one row per week starting on the window start (Monday 4 May), values in `TAGS` order (`other` = everything else).

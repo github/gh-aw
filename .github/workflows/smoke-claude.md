@@ -186,7 +186,7 @@ For tests below, mark a test as passed only if the required tool call succeeds.
 8. **Discussion Interaction Testing**: 
    - Use `gh api repos/${{ github.repository }}/discussions?per_page=1` to get the latest discussion from ${{ github.repository }}
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
-   - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, comic-book style comment stating that the smoke test agent was here
+   - Use the `add_comment` tool with `item_number: <extracted_number>` to add a fun, comic-book style comment stating that the smoke test agent was here
 9. **Agentic Workflows MCP Testing**: 
    - Call the `agentic-workflows` MCP tool using the `status` method with workflow name `smoke-claude` to query workflow status
    - If the tool returns an error or no results, mark this test as ❌ and note "Tool unavailable or workflow not found" but continue to the Output section
@@ -209,18 +209,18 @@ For tests below, mark a test as passed only if the required tool call succeeds.
 **IMPORTANT**: The following tests require an open pull request. First, use the GitHub MCP tool to find an open PR in ${{ github.repository }} (or use the triggering PR if this is a pull_request event). Store the PR number for use in subsequent tests.
 
 13. **Update PR Testing**: Use the `update_pull_request` tool to update the PR's body by appending a test message: "✨ PR Review Safe Output Test - Run ${{ github.run_id }}"
-    - Use `pr_number: <pr_number>` to target the open PR
+    - Use `pull_request_number: <pr_number>` to target the open PR
     - Use `operation: "append"` and `body: "\n\n---\n✨ PR Review Safe Output Test - Run ${{ github.run_id }}"`
     - Verify the tool call succeeds
 
 14. **PR Review Comment Testing**: Use the `create_pull_request_review_comment` tool to add review comments on the PR
     - Find a file in the PR's diff (use GitHub MCP to get PR files)
     - Add at least 2 review comments on different lines with constructive feedback
-    - Use `pr_number: <pr_number>`, `path: "<file_path>"`, `line: <line_number>`, and `body: "<comment_text>"`
+    - Use `pull_request_number: <pr_number>`, `path: "<file_path>"`, `line: <line_number>`, and `body: "<comment_text>"`
     - Verify the tool calls succeed
 
 15. **Submit PR Review Testing**: Use the `submit_pull_request_review` tool to submit a consolidated review
-    - Use `pr_number: <pr_number>`, `event: "COMMENT"`, and `body: "💥 Automated smoke test review - all systems nominal!"`
+    - Use `pull_request_number: <pr_number>`, `event: "COMMENT"`, and `body: "💥 Automated smoke test review - all systems nominal!"`
     - Verify the review is submitted successfully
     - Note: This will bundle all review comments from test #14
     - After submitting, use the GitHub MCP tool to list review threads on the PR and note the thread IDs from review comments you created in test #14 — these will be used in test #16
@@ -233,20 +233,20 @@ For tests below, mark a test as passed only if the required tool call succeeds.
     - If no unresolved threads exist, mark this test as ⚠️ (skipped - no unresolved threads to resolve)
 
 17. **Add Reviewer Testing**: Use the `add_reviewer` tool to add a reviewer to the PR
-    - Use `pr_number: <pr_number>` and `reviewers: ["copilot"]` (or another valid reviewer)
+    - Use `pull_request_number: <pr_number>` and `reviewers: ["copilot"]` (or another valid reviewer)
     - Verify the tool call succeeds
     - Note: May fail if reviewer is already assigned or doesn't have access
 
 18. **Push to PR Branch Testing**: 
     - Create a test file at `smoke-test-files/smoke-claude-push-test.md` in the repository workspace with content "Smoke test push — Run ${{ github.run_id }}"
     - Use the `push_to_pull_request_branch` tool to push this change
-    - Use `pr_number: <pr_number>` and `commit_message: "test: Add smoke test file"`
+    - Use `pull_request_number: <pr_number>` and `message: "test: Add smoke test file"`
     - Verify the push succeeds
     - Note: This test may be skipped if not on a PR branch or if the PR is from a fork
 
 19. **Close PR Testing** (CONDITIONAL - only if a test PR exists):
     - If you can identify a test/bot PR that can be safely closed, use the `close_pull_request` tool
-    - Use `pr_number: <test_pr_number>` and `comment: "Closing as part of smoke test - Run ${{ github.run_id }}"`
+    - Use `pull_request_number: <test_pr_number>` and `body: "Closing as part of smoke test - Run ${{ github.run_id }}"`
     - If no suitable test PR exists, mark this test as ⚠️ (skipped - no safe PR to close)
     - **DO NOT close the triggering PR or any important PRs**
 

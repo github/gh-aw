@@ -8,6 +8,7 @@
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "call_workflow";
 
+const { ERR_PERMISSION } = require("./error_codes.cjs");
 const { buildAwContext } = require("./aw_context.cjs");
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -113,9 +114,9 @@ async function main(config = {}) {
       if (handlerAuthorizationRequired(config)) {
         const implementation = config["workflow-implementations"]?.[workflowName];
         if (!implementation || typeof implementation !== "object" || ["path", "revision", "repository_id"].some(key => typeof implementation[key] !== "string" || !implementation[key])) {
-          throw new Error("Safe-output authorization requires a trusted workflow launch implementation");
+          throw new Error(ERR_PERMISSION + ": Safe-output authorization requires a trusted workflow launch implementation");
         }
-        if (!Number.isSafeInteger(invocation.recordIndex) || invocation.recordIndex < 0) throw new Error("Safe-output authorization requires a trusted workflow launch source ordinal");
+        if (!Number.isSafeInteger(invocation.recordIndex) || invocation.recordIndex < 0) throw new Error(ERR_PERMISSION + ": Safe-output authorization requires a trusted workflow launch source ordinal");
         await requireAuthorization({ inputs: { workflow: workflowName, implementation, inputs } });
       }
 

@@ -1,6 +1,7 @@
 // @ts-check
 "use strict";
 
+const { ERR_VALIDATION } = require("./error_codes.cjs");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -35,55 +36,55 @@ function extractCommentLedgerEntries(body, ledgerName) {
       if (!match) continue;
       const info = match[2].trim();
       const selected = info === language || info.startsWith(`${language} `) || info.startsWith(`${language}\t`);
-      if (selected && (info !== language || match[1][0] !== "`" || match[1].length < 6)) throw new TypeError("Malformed comment-backed ledger fence");
+      if (selected && (info !== language || match[1][0] !== "`" || match[1].length < 6)) throw new TypeError(ERR_VALIDATION + ": Malformed comment-backed ledger fence");
       open = { fence: match[1], selected, lines: [] };
       continue;
     }
     const closing = /^ {0,3}(`+|~+)[ \t]*$/.exec(line);
     if (closing && closing[1][0] === open.fence[0] && closing[1].length >= open.fence.length) {
       if (open.selected) {
-        if (closing[1] !== open.fence) throw new TypeError("Malformed comment-backed ledger fence");
+        if (closing[1] !== open.fence) throw new TypeError(ERR_VALIDATION + ": Malformed comment-backed ledger fence");
         entries.push({ memoryId: ledgerName, content: open.lines.join("\n").trim() });
       }
       open = undefined;
     } else if (open.selected) {
-      if (/^ {0,3}(`{3,}|~{3,})/.test(line)) throw new TypeError("Malformed comment-backed ledger fence");
+      if (/^ {0,3}(`{3,}|~{3,})/.test(line)) throw new TypeError(ERR_VALIDATION + ": Malformed comment-backed ledger fence");
       open.lines.push(line);
     }
   }
-  if (open?.selected) throw new TypeError("Malformed comment-backed ledger fence");
+  if (open?.selected) throw new TypeError(ERR_VALIDATION + ": Malformed comment-backed ledger fence");
   return entries;
 }
 
 function commentConfig() {
   const config = resolveCommentMemoryConfig(loadSafeOutputsConfig());
-  if (!config) throw new TypeError("Comment-backed ledgers require tools.comment-memory");
+  if (!config) throw new TypeError(ERR_VALIDATION + ": Comment-backed ledgers require tools.comment-memory");
   return config;
 }
 
 async function materializeCommentLedger({ githubClient, config, sourceDir, commentMemoryConfig = commentConfig() }) {
   const target = resolveCommentMemoryTarget(commentMemoryConfig);
-  if (!target) throw new TypeError("Comment-backed ledger has no target issue/PR");
+  if (!target) throw new TypeError(ERR_VALIDATION + ": Comment-backed ledger has no target issue/PR");
   let authorId;
   try {
     const credential = { kind: process.env.GH_AW_COMMENT_MEMORY_TOKEN_SOURCE === "github_actions" ? "github_token" : "authenticated" };
     const selectedToken = process.env.GH_AW_COMMENT_MEMORY_TOKEN;
-    if (credential.kind !== "authenticated" && !selectedToken) throw new Error("Comment-backed ledger installation identity requires a bound token");
+    if (credential.kind !== "authenticated" && !selectedToken) throw new Error(ERR_VALIDATION + ": Comment-backed ledger installation identity requires a bound token");
     if (selectedToken) {
       githubClient = await createAuthenticatedGitHubClient({ "github-token": selectedToken });
       const authentication = await githubClient.auth({ type: "token" });
-      if (authentication?.type !== "token" || authentication.token !== selectedToken) throw new Error("Comment-backed ledger credential does not match the selected client");
+      if (authentication?.type !== "token" || authentication.token !== selectedToken) throw new Error(ERR_VALIDATION + ": Comment-backed ledger credential does not match the selected client");
     }
     authorId = await resolveDispatchCredentialPrincipal(githubClient, credential);
   } catch (error) {
-    throw new Error("Cannot verify the authenticated comment-backed ledger writer", { cause: error });
+    throw new Error(ERR_VALIDATION + ": Cannot verify the authenticated comment-backed ledger writer", { cause: error });
   }
   const shardDir = path.join(sourceDir, "ledger", "shards");
   fs.mkdirSync(shardDir, { recursive: true });
   let totalBytes = 0;
   for (let page = 1; page <= COMMENT_MEMORY_MAX_SCAN_PAGES; page++) {
     const { data } = await githubClient.rest.issues.listComments({ owner: target.owner, repo: target.repo, issue_number: target.number, per_page: 100, page });
-    if (!Array.isArray(data)) throw new TypeError("Invalid comment-backed ledger response");
+    if (!Array.isArray(data)) throw new TypeError(ERR_VALIDATION + ": Invalid comment-backed ledger response");
     for (const comment of data) {
       if (String(comment.user?.id) !== authorId) continue;
       if (typeof comment.body !== "string" || !comment.body.includes("<!-- gh-aw-agentic-workflow:")) continue;
@@ -94,16 +95,16 @@ async function materializeCommentLedger({ githubClient, config, sourceDir, comme
         const bytes = Buffer.byteLength(entry.content) + 1;
         batchBytes += bytes;
         totalBytes += bytes;
-        if (batchBytes > COMMENT_MEMORY_MAX_FILE_BYTES || totalBytes > COMMENT_MEMORY_MAX_TOTAL_BYTES) throw new RangeError("Comment-backed ledger exceeds comment-memory size limits; use git storage for larger ledgers");
+        if (batchBytes > COMMENT_MEMORY_MAX_FILE_BYTES || totalBytes > COMMENT_MEMORY_MAX_TOTAL_BYTES) throw new RangeError(ERR_VALIDATION + ": Comment-backed ledger exceeds comment-memory size limits; use git storage for larger ledgers");
         let segment;
         try {
           segment = buildSegment([...iterateJsonl(entry.content, { strict: true })], { maxSegmentBytes: config.max_segment_kb * 1024 });
         } catch (error) {
-          throw new TypeError("Invalid comment-backed ledger JSONL shard", { cause: error });
+          throw new TypeError(ERR_VALIDATION + ": Invalid comment-backed ledger JSONL shard", { cause: error });
         }
         const file = path.join(shardDir, `${segment.id}.jsonl`);
         if (fs.existsSync(file)) {
-          if (!fs.readFileSync(file).equals(segment.content)) throw new TypeError("Conflicting comment-backed ledger shard");
+          if (!fs.readFileSync(file).equals(segment.content)) throw new TypeError(ERR_VALIDATION + ": Conflicting comment-backed ledger shard");
         } else {
           fs.writeFileSync(file, segment.content, { flag: "wx", mode: 0o600 });
         }
@@ -111,7 +112,7 @@ async function materializeCommentLedger({ githubClient, config, sourceDir, comme
     }
     if (data.length < 100) return { target, totalBytes, githubClient };
   }
-  throw new RangeError("Comment-backed ledger scan limit reached; refusing incomplete history");
+  throw new RangeError(ERR_VALIDATION + ": Comment-backed ledger scan limit reached; refusing incomplete history");
 }
 
 async function persistCommentLedgerAppends({ appends, config, githubClient, commentMemoryConfig = commentConfig() }) {
@@ -134,7 +135,7 @@ async function persistCommentLedgerAppends({ appends, config, githubClient, comm
       .sort()
       .map(file => fs.readFileSync(path.join(shardDir, file), "utf8"));
     const bytes = contents.reduce((total, content) => total + Buffer.byteLength(content), 0);
-    if (bytes > COMMENT_MEMORY_MAX_FILE_BYTES || totalBytes + bytes > COMMENT_MEMORY_MAX_TOTAL_BYTES) throw new RangeError("Comment-backed ledger exceeds comment-memory size limits; use git storage for larger ledgers");
+    if (bytes > COMMENT_MEMORY_MAX_FILE_BYTES || totalBytes + bytes > COMMENT_MEMORY_MAX_TOTAL_BYTES) throw new RangeError(ERR_VALIDATION + ": Comment-backed ledger exceeds comment-memory size limits; use git storage for larger ledgers");
     /** @type {import("./report_ast.cjs").ReportBlock[]} */
     const blocks = contents.map(content => ({ type: "code_block", language: `${LEDGER_TAG}:${config.name}`, fenceLength: 6, value: content, agentTainted: true, sizeProtected: true }));
     const body = buildManagedMemoryBody("", config.name, {
@@ -146,7 +147,7 @@ async function persistCommentLedgerAppends({ appends, config, githubClient, comm
     });
     const published = extractCommentLedgerEntries(body, config.name);
     if (published.length !== contents.length || published.some((entry, index) => entry.memoryId !== config.name || entry.content !== contents[index].trimEnd()))
-      throw new TypeError("Comment-backed ledger JSONL was changed by publication sanitization; refusing to publish altered records");
+      throw new TypeError(ERR_VALIDATION + ": Comment-backed ledger JSONL was changed by publication sanitization; refusing to publish altered records");
     enforceCommentLimits(body);
     const { data } = await commentClient.rest.issues.createComment({ owner: target.owner, repo: target.repo, issue_number: target.number, body });
     return { ...result, url: data.html_url };

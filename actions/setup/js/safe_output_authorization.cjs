@@ -8,6 +8,7 @@ const { performance } = require("node:perf_hooks");
 const { parseStrictJSON, utf8Compare, validString } = require("./work_queue_codec.cjs");
 const { readBoundedBody } = require("./admission_protocol.cjs");
 const { withRetry } = require("./error_recovery.cjs");
+const { buildServiceRequestHeaders, isWellFormedUnicodeString } = require("./service_correlation.cjs");
 
 const VERSION = "gh-aw.safe-output-authorization.v1";
 const MAX_REQUEST_BYTES = 65536;
@@ -462,20 +463,22 @@ async function authorizePreparedInvocation({ core, requirement, invocation, stag
     if (!evidencePath) fail("evidence_failed");
     const requestDigest = canonicalDigest(invocation);
     projection.request_digest = requestDigest;
-    const body = canonical({ version: VERSION, request_digest: requestDigest, invocation });
+    const jobId = env.GITHUB_JOB;
+    const body = canonical({ version: VERSION, request_digest: requestDigest, invocation, ...(jobId && isWellFormedUnicodeString(jobId) ? { job_id: jobId } : {}) });
     if (Buffer.byteLength(body) > MAX_REQUEST_BYTES) fail("invalid_preparation");
     const start = now();
     const wallStart = wallNow();
     const deadline = start + TOTAL_TIMEOUT_MS;
     // Anchor UTC freshness to monotonic elapsed time, resisting wall-clock rollback.
     const currentUTC = () => Math.max(wallNow(), wallStart + Math.max(0, now() - start));
+    const correlationHeaders = buildServiceRequestHeaders(env);
     const token = await acquireToken({ core, env, config, fetchImpl, deadline, now, wallNow: currentUTC });
     core?.debug?.(`Safe-output authorization: requesting decision invocation=${projection.invocation_id}`);
     const decision = await boundedRequest(
       async signal => {
         const response = await fetchImpl(config.endpoint, {
           method: "POST",
-          headers: { authorization: `bearer ${token}`, "content-type": "application/json", "cache-control": "no-store" },
+          headers: { ...correlationHeaders, authorization: `bearer ${token}`, "content-type": "application/json", "cache-control": "no-store" },
           body,
           redirect: "manual",
           signal,

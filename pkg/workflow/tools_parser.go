@@ -303,6 +303,7 @@ func parseGitHubTool(val any) *GitHubToolConfig { //nolint:largefunc // Existing
 		}
 
 		// Parse app configuration for GitHub App token minting
+		config.TokenBroker = sectionTokenBrokerEnabled(configMap)
 		if rawApp, exists := configMap["github-app"]; exists {
 			if appMap, ok := rawApp.(map[string]any); ok {
 				config.GitHubApp = parseAppConfig(appMap)
@@ -597,62 +598,44 @@ func parseRepoMemoryTool(val any) *RepoMemoryToolConfig {
 	return &RepoMemoryToolConfig{Raw: val}
 }
 
+// parseTemplatableInt32Tool converts a raw tool configuration value to a TemplatableInt32.
+// Accepts integers and GitHub Actions expressions (e.g. "${{ inputs.tool-timeout }}");
+// non-expression strings and unsupported types yield nil.
+func parseTemplatableInt32Tool(val any) *TemplatableInt32 {
+	var s string
+	switch v := val.(type) {
+	case int:
+		s = strconv.Itoa(v)
+	case int64:
+		s = strconv.FormatInt(v, 10)
+	case uint:
+		s = strconv.FormatUint(uint64(v), 10)
+	case uint64:
+		s = strconv.FormatUint(v, 10)
+	case float64:
+		s = strconv.Itoa(int(v))
+	case string:
+		if !isExpression(v) {
+			return nil // reject non-expression strings
+		}
+		s = v
+	default:
+		return nil
+	}
+	t := TemplatableInt32(s)
+	return &t
+}
+
 // parseTimeoutTool converts raw timeout tool configuration to a TemplatableInt32 value.
 // Accepts integers and GitHub Actions expressions (e.g. "${{ inputs.tool-timeout }}").
 func parseTimeoutTool(val any) *TemplatableInt32 {
-	switch v := val.(type) {
-	case int:
-		t := TemplatableInt32(strconv.Itoa(v))
-		return &t
-	case int64:
-		t := TemplatableInt32(strconv.FormatInt(v, 10))
-		return &t
-	case uint:
-		t := TemplatableInt32(strconv.FormatUint(uint64(v), 10))
-		return &t
-	case uint64:
-		t := TemplatableInt32(strconv.FormatUint(v, 10))
-		return &t
-	case float64:
-		t := TemplatableInt32(strconv.Itoa(int(v)))
-		return &t
-	case string:
-		if isExpression(v) {
-			t := TemplatableInt32(v)
-			return &t
-		}
-		return nil // reject non-expression strings
-	}
-	return nil
+	return parseTemplatableInt32Tool(val)
 }
 
 // parseStartupTimeoutTool converts raw startup-timeout tool configuration to a TemplatableInt32 value.
 // Accepts integers and GitHub Actions expressions (e.g. "${{ inputs.startup-timeout }}").
 func parseStartupTimeoutTool(val any) *TemplatableInt32 {
-	switch v := val.(type) {
-	case int:
-		t := TemplatableInt32(strconv.Itoa(v))
-		return &t
-	case int64:
-		t := TemplatableInt32(strconv.FormatInt(v, 10))
-		return &t
-	case uint:
-		t := TemplatableInt32(strconv.FormatUint(uint64(v), 10))
-		return &t
-	case uint64:
-		t := TemplatableInt32(strconv.FormatUint(v, 10))
-		return &t
-	case float64:
-		t := TemplatableInt32(strconv.Itoa(int(v)))
-		return &t
-	case string:
-		if isExpression(v) {
-			t := TemplatableInt32(v)
-			return &t
-		}
-		return nil // reject non-expression strings
-	}
-	return nil
+	return parseTemplatableInt32Tool(val)
 }
 
 // parseMCPServerConfig converts raw MCP server configuration to MCPServerConfig

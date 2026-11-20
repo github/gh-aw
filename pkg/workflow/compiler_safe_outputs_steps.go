@@ -68,7 +68,7 @@ const globalSafeOutputsAppTokenExpr = "steps.safe-outputs-app-token.outputs.toke
 // prHandlersUseGlobalApp reports whether the PR handlers push to the host repository
 // with the global safe-outputs App token (no per-handler App/token and no other target repo).
 func prHandlersUseGlobalApp(safeOutputs *SafeOutputsConfig) bool {
-	if safeOutputs == nil || safeOutputs.GitHubApp == nil || resolvePRCheckoutTargetRepo(safeOutputs) != "" {
+	if safeOutputs == nil || (safeOutputs.GitHubApp == nil && !safeOutputs.TokenBroker) || resolvePRCheckoutTargetRepo(safeOutputs) != "" {
 		return false
 	}
 	for _, field := range []string{"CreatePullRequests", "PushToPullRequestBranch"} {
@@ -76,7 +76,7 @@ func prHandlersUseGlobalApp(safeOutputs *SafeOutputsConfig) bool {
 			return false
 		}
 	}
-	return safeOutputsGlobalAppTokenMinted(safeOutputs)
+	return safeOutputs.TokenBroker || safeOutputsGlobalAppTokenMinted(safeOutputs)
 }
 
 func prepareSharedPRCheckout(data *WorkflowData) (*CheckoutManager, string) {
@@ -650,6 +650,12 @@ func (c *Compiler) addSafeOutputTokenEnvVars(steps *[]string, data *WorkflowData
 	// update-project, create-project-status-update, or create-project.
 	// Note: If multiple project configs are present, we prefer update-project > create-project-status-update > create-project.
 	projectURL, projectToken := resolveProjectURLAndToken(data.SafeOutputs)
+	// Handler-specific credentials are already passed in the handler configuration.
+	// Do not broadcast one handler's token (or the legacy default) to other handlers
+	// when the shared client uses the broker.
+	if usesTokenBrokerSafeOutputs(data) {
+		projectToken = ""
+	}
 	if projectURL != "" {
 		*steps = append(*steps, fmt.Sprintf("          GH_AW_PROJECT_URL: %q\n", projectURL))
 	}

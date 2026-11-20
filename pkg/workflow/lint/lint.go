@@ -88,8 +88,12 @@ type Rule struct {
 	// ThreatRuleID optionally identifies the corresponding compiler threat
 	// specification rule; a mapping does not imply full rule conformance.
 	ThreatRuleID string
-	Description  string
-	Severity     Severity
+	// FindingThreatRuleIDs lists compiler threat IDs that individual findings
+	// may select when one rule covers several threats. Other finding values
+	// are replaced by ThreatRuleID, so the registry still owns all mappings.
+	FindingThreatRuleIDs []string
+	Description          string
+	Severity             Severity
 	// Zero preserves the Actions-only contract of existing extension rules.
 	Targets ASTTargets
 	Check   func(context.Context, Input) ([]Diagnostic, error)
@@ -114,6 +118,11 @@ func New(rules ...Rule) (*Runner, error) {
 		if rule.ThreatRuleID != "" && !threatRuleIDPattern.MatchString(rule.ThreatRuleID) {
 			return nil, fmt.Errorf("lint rule %q requires a compiler threat ID in CTR-NNN form", rule.ID)
 		}
+		for _, id := range rule.FindingThreatRuleIDs {
+			if !threatRuleIDPattern.MatchString(id) {
+				return nil, fmt.Errorf("lint rule %q requires a compiler threat ID in CTR-NNN form", rule.ID)
+			}
+		}
 		if rule.Targets & ^(ActionsAST|AWAST) != 0 {
 			return nil, errors.New("lint rule targets must be Actions or AW ASTs")
 		}
@@ -122,11 +131,19 @@ func New(rules ...Rule) (*Runner, error) {
 		}
 		seen[rule.ID] = struct{}{}
 	}
-	return &Runner{rules: slices.Clone(rules)}, nil
+	return &Runner{rules: cloneRules(rules)}, nil
 }
 
 func (r *Runner) Rules() []Rule {
-	return slices.Clone(r.rules)
+	return cloneRules(r.rules)
+}
+
+func cloneRules(rules []Rule) []Rule {
+	cloned := slices.Clone(rules)
+	for index := range cloned {
+		cloned[index].FindingThreatRuleIDs = slices.Clone(cloned[index].FindingThreatRuleIDs)
+	}
+	return cloned
 }
 
 // Select rejects unknown IDs rather than silently skipping a requested check.
@@ -193,7 +210,9 @@ func (r *Runner) Run(ctx context.Context, input Input) ([]Diagnostic, error) {
 		}
 		for _, diagnostic := range findings {
 			diagnostic.RuleID = rule.ID
-			diagnostic.ThreatRuleID = rule.ThreatRuleID
+			if !slices.Contains(rule.FindingThreatRuleIDs, diagnostic.ThreatRuleID) {
+				diagnostic.ThreatRuleID = rule.ThreatRuleID
+			}
 			if diagnostic.Severity == "" {
 				diagnostic.Severity = rule.Severity
 			}
@@ -247,6 +266,7 @@ func Default() *Runner {
 		PullRequestTargetRolesRule(),
 		UntrustedRolesDetectionRule(),
 		SafeOutputShellExpansionRule(),
+		SafeOutputCredentialsRule(),
 		FirewallSSLBumpRule(),
 		CustomJobDetectionRule(),
 		GraderFileIORule(),

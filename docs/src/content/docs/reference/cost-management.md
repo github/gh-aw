@@ -22,6 +22,18 @@ gh-aw does not bundle or refresh a model pricing catalog, and compilation does n
 > [!NOTE]
 > AIC values are computed on a best-effort basis using AWF pricing data and may not exactly match your provider's actual billing. Always verify charges in your provider's billing dashboard.
 
+### Native Copilot session credits
+
+Copilot `session.shutdown` records in the unified session expose `data.aiCreditsStatus` alongside `data.totalNanoAiu`. These native Copilot credits are separate from AWF AIC and the `gh aw logs` `aic` field. One billion nano-AIU equals one Copilot credit.
+
+| `aiCreditsStatus` | Meaning |
+|---|---|
+| `complete` | Every observed call has a reported charge. The session total includes delegated work; an explicit zero is valid. |
+| `partial` | `totalNanoAiu` is a reported subtotal; final session cost remains unknown. |
+| `unavailable` | Native terminal accounting is missing, invalid, or contradictory; `totalNanoAiu` is omitted. |
+
+The total already includes child-agent charges, so adding per-agent breakdowns would count them twice. It excludes work outside the session, such as routing classification and a separate threat-detection job. Fallback logs and legacy totals without a status cannot establish complete native accounting. See the [unified session contract](/gh-aw/specs/unified-agent-session-specification/#72-copilot).
+
 ## Cost Components
 
 A typical run includes a short pre-activation job (10–30 seconds) and an agent job (1–15 minutes), each with ~1.5 minutes of runner setup overhead billed at standard [GitHub Actions pricing](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/about-billing-for-github-actions). Inference is charged by the AI provider based on the engine and API token type used.
