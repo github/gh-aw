@@ -15,6 +15,7 @@ Full tool reference per toolset. See [github-mcp-server.md](github-mcp-server.md
 - **Feature flags**: `find_duplicate`, `issue_dependency_read`, and `issue_dependency_write` require upstream feature flags, independent of toolset selection.
 - **Permissions**: `copilot` requires `issues` and `pull-requests` write permissions, including its read-only Automation and task-status tools. `governance` org/enterprise operations need suitable token access; enabling the toolset does not grant it. `projects` requires a PAT — not supported by `GITHUB_TOKEN`.
 - **Remote schema**: `copilot` Automation/task-status parameters are defined by the remote GitHub MCP service; their placement under `copilot` is not confirmed against public upstream toolset registration.
+- **Toolset contracts**: load the matching `### <toolset>` section below whenever you need that toolset's tools or parameters; the names here are not the contracts.
 
 Toolsets: `context`, `code_quality`, `copilot`, `copilot_issue_intents`, `copilot_spaces`, `repos`, `git`, `github_support_docs_search`, `governance`, `issues`, `pull_requests`, `actions`, `code_security`, `dependabot`, `discussions`, `gists`, `labels`, `notifications`, `orgs`, `projects`, `secret_protection`, `security_advisories`, `stargazers`, `users`.
 
