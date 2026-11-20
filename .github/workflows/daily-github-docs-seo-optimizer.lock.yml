@@ -73,15 +73,16 @@ concurrency:
 run-name: "Daily GitHub Docs SEO Optimizer"
 
 env:
-  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || '{}').endpoint || secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
+  GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.daily-github-docs-seo-optimizer
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Daily%20GitHub%20Docs%20SEO%20Optimizer,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
-  OTEL_EXPORTER_OTLP_HEADERS: ${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || '{}').headers || secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
+  OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
   GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}
   GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}
-  GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || ''{}'').endpoint || secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}","headers":"${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || ''{}'').headers || secrets.GH_AW_DEFAULT_OTLP_HEADERS }}"}]'
+  GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}","headers":"${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}"}]'
   GH_AW_OTLP_IF_MISSING: ignore
 
 jobs:
@@ -298,6 +299,7 @@ jobs:
             await main(core);
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -337,6 +339,7 @@ jobs:
             await main({ authorExpressions: {"github.repository":"GH_AW_GITHUB_REPOSITORY","github.run_id":"GH_AW_GITHUB_RUN_ID","github.server_url":"GH_AW_GITHUB_SERVER_URL"} });
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_ENGINE_ID: copilot
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
@@ -380,6 +383,7 @@ jobs:
             });
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -400,6 +404,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
@@ -415,6 +420,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""

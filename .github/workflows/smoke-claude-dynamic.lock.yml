@@ -80,15 +80,16 @@ concurrency:
 run-name: "Smoke Claude Dynamic Workflow"
 
 env:
-  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || '{}').endpoint || secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
+  GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.smoke-claude-dynamic
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Smoke%20Claude%20Dynamic%20Workflow,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=claude'
-  OTEL_EXPORTER_OTLP_HEADERS: ${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || '{}').headers || secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
+  OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
   GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}
   GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}
-  GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || ''{}'').endpoint || secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}","headers":"${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || ''{}'').headers || secrets.GH_AW_DEFAULT_OTLP_HEADERS }}"}]'
+  GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}","headers":"${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}"}]'
   GH_AW_OTLP_IF_MISSING: ignore
 
 jobs:
@@ -313,6 +314,7 @@ jobs:
             await main(core);
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
@@ -348,6 +350,7 @@ jobs:
             await main({ authorExpressions: {"github.run_id":"GH_AW_GITHUB_RUN_ID","needs.pre_activation.outputs.activated":"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED"} });
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_ENGINE_ID: claude
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
@@ -389,6 +392,7 @@ jobs:
             });
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
@@ -408,6 +412,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
@@ -423,6 +428,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
