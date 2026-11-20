@@ -4040,7 +4040,7 @@
     });
   }
 
-  // Turn Intent to Automation: prompt → markdown → issue (from the gh-aw hero)
+  // Turn Intent to Workflow: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
     const PROMPT = "Create a daily agent that removes code duplication";
@@ -4207,7 +4207,7 @@
       el: h(
         "section",
         { class: "slide pfx" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Workflow", "l-grad"))),
         tta,
         links,
         tags,
@@ -4256,7 +4256,7 @@
     return `<g class="${cls}" transform="translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / n).toFixed(4)})">${d.map(p => `<path d="${p}"/>`).join("")}</g>`;
   };
 
-  // Turn Automation into Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
+  // Turn Workflow to Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
   {
     resetIndex();
     const N = 12,
@@ -4410,7 +4410,7 @@
       el: h(
         "section",
         { class: "slide tv" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Workflow to "), letters("Value", "l-grad"))),
         h("div", { class: "tv-live" }, "acme/app · week ", wk, " / 12"),
         h("div", { class: "tv-kpis" }, kpis),
         h("div", { class: "tv-panels" }, panels),
@@ -13865,7 +13865,7 @@
     });
   }
 
-  // Turn Intent into Value: Turn Intent to Automation's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
+  // Turn Intent into Value: Turn Intent to Workflow's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
   {
     resetIndex();
     // the pieces that define value: [chip, colour, how the agent reads it]
