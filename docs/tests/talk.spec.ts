@@ -722,6 +722,36 @@ test("keeps every key on the host side of the zero-secret agents diagram", async
   expect(errors).toEqual([]);
 });
 
+test("pulses glows by fading static layers instead of re-blurring shadows every frame", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Safety and control")}`);
+  // an infinite animation of box-shadow, text-shadow or a blur/drop-shadow filter re-rasterizes its glow on every frame
+  const repainting = await page.evaluate(() => {
+    const flat = (rules: CSSRule[]): CSSRule[] => rules.flatMap(r => ("cssRules" in r ? [r, ...flat([...(r as CSSGroupingRule).cssRules])] : [r]));
+    const rules = flat([...document.styleSheets].flatMap(s => [...s.cssRules]));
+    const painted = new Set(rules.flatMap(r => (r instanceof CSSKeyframesRule && /box-shadow|text-shadow|blur\(|drop-shadow\(/.test(r.cssText) ? [r.name] : [])));
+    return rules.flatMap(r => {
+      if (!(r instanceof CSSStyleRule)) return [];
+      const names = r.style.animationName.split(","),
+        counts = r.style.animationIterationCount.split(",");
+      return names.flatMap((n, i) => (painted.has(n.trim()) && counts[i % counts.length].trim() === "infinite" ? [`${r.selectorText} → ${n.trim()}`] : []));
+    });
+  });
+  expect(repainting).toEqual([]);
+  // the security boxes still pulse: each cross-fades a pair of static glow layers by opacity alone
+  await expect(page.locator(".slide.active h2")).toContainText("Safety and control");
+  const pulses = await page.evaluate(() =>
+    document
+      .getAnimations()
+      .flatMap(a => {
+        const effect = a.effect as KeyframeEffect;
+        return (effect.target as Element)?.closest(".slide.active .sec-box") && effect.pseudoElement && effect.getComputedTiming().iterations === Infinity ? [effect] : [];
+      })
+      .map(effect => [...new Set(effect.getKeyframes().flatMap(k => Object.keys(k).filter(p => !["offset", "computedOffset", "easing", "composite"].includes(p))))])
+  );
+  expect(pulses).toEqual([["opacity"], ["opacity"], ["opacity"], ["opacity"]]);
+});
+
 test.describe("agentic engineering slides", () => {
   const open = async (page: Page, heading: string, ms: number) => {
     const errors: string[] = [];

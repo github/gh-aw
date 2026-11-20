@@ -684,6 +684,7 @@ jobs:
       model_routing_status: ${{ steps.parse-token-usage.outputs.model_routing_status }}
       output: ${{ steps.collect_output.outputs.output }}
       output_types: ${{ steps.collect_output.outputs.output_types }}
+      repo_memory_base_commit_default: ${{ steps.clone_repo_memory_default.outputs.head }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
@@ -782,6 +783,7 @@ jobs:
           path: /tmp/gh-aw
       # Repo memory git-based storage configuration from frontmatter processed below
       - name: Clone repo-memory branch (default)
+        id: clone_repo_memory_default
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -3015,6 +3017,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
+          REPO_MEMORY_BASE_COMMIT: ${{ needs.agent.outputs.repo_memory_base_commit_default }}
           GH_AW_TEMPORARY_ID_MAP_FILE: /tmp/gh-aw/safe-outputs-items/temporary-id-map.json
           ARTIFACT_DIR: /tmp/gh-aw/repo-memory/default
           MEMORY_ID: default
