@@ -191,7 +191,11 @@ else
   git remote remove origin >/dev/null 2>&1 || true
   git remote add origin "$SAFE_ORIGIN_URL"
   harden_repo_memory_git_state "$MEMORY_DIR" "$SAFE_ORIGIN_URL"
-  write_clone_output true "$(git rev-parse --verify HEAD)"
+  if ! CLONED_HEAD="$(git rev-parse --verify HEAD)" || [ -z "$CLONED_HEAD" ]; then
+    echo "ERROR: failed to read the cloned repo-memory commit" >&2
+    exit 1
+  fi
+  write_clone_output true "$CLONED_HEAD"
 fi
 unset AUTH_HEADER
 
