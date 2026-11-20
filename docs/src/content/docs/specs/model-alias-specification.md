@@ -7,9 +7,9 @@ sidebar:
 
 # Model Alias Format Specification
 
-**Version**: 1.6.0\
+**Version**: 1.7.0\
 **Status**: Draft  
-**Publication Date**: 2026-11-18\
+**Publication Date**: 2026-11-20\
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [model-alias-specification](/gh-aw/specs/model-alias-specification/)  
 **Latest Published Version**: This document
@@ -421,7 +421,7 @@ Resolve(target, aliasMap, catalog):
         i.  Strip parameters from E → (eBase, eParams)
         ii. Merge params ← MergeParams(params, eParams)   // caller wins
         iii.If eBase is a key in aliasMap → recurse: Resolve(eBase+MarshalParams(eParams), ...)
-        iv. If eBase is a glob pattern → match against catalog; if any match, return first match + params
+        iv. If eBase is a glob pattern → match against the automatically selectable catalog entries (§8.4.4); if any match, return first match + params
         v.  If eBase is a provider-scoped name (no wildcards) → if present in catalog, return eBase + params
      c. If no entry in L resolved → continue to next step (as if target were a bare name)
   3. If base matches catalog entry exactly → return base + params
@@ -480,6 +480,12 @@ SelectLatestMatch(pattern, catalog):
   return matches[0]
 ```
 
+#### 8.4.4 Automatic Selection Eligibility
+
+A glob match is a model the workflow did not name, so it MUST be limited to models the AWF API proxy allows to be chosen automatically. When an endpoint in the AWF `/reflect` response lists a model in its `routing_models` with `automatic_selection_eligible: false`, the implementation MUST treat that model as absent from the catalog when matching a glob pattern, and continue with the remaining matches or the next alias entry. AWF sets the field to `false` when the provider's own model list says the model cannot serve an agent turn: it is disabled in the model picker (`automatic_selection_reason: model_picker_disabled`), or its supported endpoints include none of Chat Completions, Responses, or Messages (`no_agent_endpoint`), as with an evaluation model that only serves `/v1/decisions`.
+
+AWF owns this rule ([AWF configuration specification §12.8](https://github.com/github/gh-aw-firewall/blob/v0.29.17/docs/awf-config-spec.md#128-automatic-selection-is-restricted-to-models-that-can-serve-an-agent)), so implementations MUST read the field rather than recompute it from other catalog metadata. A model without the field remains eligible, so a `/reflect` response from an AWF version that does not publish it resolves as before. Exact matches are not affected: a configured exact model id (Section 8.8, rule 3) and an alias entry without `*` (Section 8.3, step 2.b.v), such as the built-in `evals` alias, resolve as written. When every glob match is ineligible and no later entry resolves, resolution fails with `model_unavailable` (Section 8.8, rule 6). Implementations SHOULD log the matches they skip.
+
 ### 8.5 Parameter Forwarding
 
 When recursing into an alias, parameters accumulate using caller-wins semantics:
@@ -537,10 +543,10 @@ When `engine.model` is absent or empty, the implementation MUST use `""` (the em
 Resolution runs at runtime, in the engine harness, before the harness launches the engine CLI. The compiler validates the alias map (Section 11) and passes the merged map to the runtime; it does not choose a concrete model. Every engine harness that supports aliases (Copilot, Claude, Codex, Pi main and sub-agent models, and Agy) MUST run the same "resolve configured model" step (`resolveEngineModel` in `actions/setup/js/resolve_model_alias.cjs`) against the AWF `/reflect` catalogue, with these rules:
 
 1. A configured model MAY carry a provider prefix (`copilot/opus`). When it does, the part after the prefix is looked up as the alias key, and only catalogue entries for that provider are considered. The harness's configured provider scopes an unprefixed alias in the same way.
-2. An alias, and any glob inside its entries, resolves to the newest live match (Section 8.4).
+2. An alias, and any glob inside its entries, resolves to the newest live match (Section 8.4), skipping models that are not automatically selectable (Section 8.4.4).
 3. An exact model id MUST NOT be rewritten. A configured value whose id, after removing its provider prefix, exactly matches a live model id in that provider's `/reflect` catalogue is an exact id, even when an alias has the same name (for example `gpt-5-mini` or `gemini-3.8-flash`); the alias map is used only when there is no exact live match. Harnesses that check exact ids before launch fail with `model_unavailable` when the id is not listed; others pass it to the engine unchanged.
 4. Parameters such as `?effort=` carry through as in Section 8.5.
-5. `auto` keeps each engine's own meaning (a Copilot gateway sentinel on Pi and Codex, Claude's own selection on Claude).
+5. `auto` keeps each engine's own meaning (a Copilot gateway sentinel on Pi and Codex, Claude's own selection on Claude). When Claude uses the Copilot provider, the harness picks the newest advertised Sonnet, Opus, or Haiku model for `auto`, skipping models that are not automatically selectable (Section 8.4.4).
 6. When an alias does not resolve, the step fails before the engine starts with cause `model_unavailable`. When the catalogue is incomplete (`models_fetch_complete` is not true, or the provider has no model list), the step refetches `/reflect` once; exact ids still pass through, and aliases fail with `catalog_unavailable`. A value that is both an alias name and a model id counts as an alias here, because the incomplete catalogue cannot show that the id is live.
 7. When no catalogue can exist on the run (AWF is disabled with `sandbox.agent: false`, so `AWF_REFLECT_ENABLED` is not `1`), an id declared in an explicit workflow model overlay passes through unchanged. A version-shaped built-in alias key containing a hyphen followed by a digit also passes through when its unchanged built-in provider-scoped glob matches that key (for example `gpt-5-mini`, `gpt-5.5`, or `gpt-5`). This is native-engine pass-through, not proof of model availability. Pure aliases such as `small` or `opus`, and user-defined glob aliases, fail with `catalog_unavailable`; `auto` keeps rule 5. Rules 3 and 6 apply unchanged when AWF is enabled. No bundled pricing catalog is consulted.
 
@@ -747,6 +753,7 @@ At compile time, an implementation SHOULD:
 - **T-MAF-027**: Given catalog `[copilot/claude-sonnet-4.5-20250310, copilot/claude-sonnet-4.5-20250514]` and pattern `copilot/*sonnet*`, resolution returns `copilot/claude-sonnet-4.5-20250514` (latest date wins when versions are equal)
 - **T-MAF-028**: Given catalog entries with no version string, they are ranked as `0.0.0` and lose to entries with a version
 - **T-MAF-029**: Preserve and match the complete namespaced suffix during exact and glob resolution: `openrouter/anthropic/claude-sonnet-4` matches the identical catalog entry, does not match `openrouter/anthropic/claude-opus-4`, and `openrouter/*` does not match the namespaced entry.
+- **T-MAF-050**: Given a Copilot catalog where `/reflect` marks `gpt-6-luna-decisions` and `gpt-5.6-luna-utility` with `automatic_selection_eligible: false`, `auto` and `gpt-5` resolve to `gpt-5.3-codex`, `gpt-6` fails with `model_unavailable`, and `evals` still resolves to `gpt-6-luna-decisions`. Without the field, resolution is unchanged.
 
 #### 12.1.3 Merge Precedence Tests
 
@@ -783,6 +790,7 @@ At compile time, an implementation SHOULD:
 | Default policy (`""`) | T-MAF-025 | 2 | Required |
 | Semver-aware glob selection (latest wins) | T-MAF-026 | 2 | Required |
 | Date-suffix tiebreaker | T-MAF-027 | 2 | Required |
+| Wildcards skip models that are not automatically selectable | T-MAF-050 | 2 | Required |
 | Main workflow wins merge | T-MAF-030 | 2 | Required |
 | Compile-time circular alias detection | T-MAF-040, 041 | 3 | Required |
 | Runtime circular alias guard | T-MAF-042 | 3 | Required |
@@ -846,6 +854,7 @@ This section maps normative sections of this specification to the implementation
 
 - **T-MAF-010/T-MAF-011**: `pkg/workflow/model_alias_validation_test.go`, `TestParseModelIdentifier_NamespacedModel` — covers valid namespaced identifiers and invalid empty, malformed, whitespace-containing, prohibited-character, and percent-encoded forms.
 - **T-MAF-029**: `actions/setup/js/resolve_model_alias.test.cjs`, `preserves the full namespaced model token when matching` — verifies complete-suffix preservation and matching behavior.
+- **T-MAF-050**: `actions/setup/js/resolve_model_alias.test.cjs`, `alias wildcards and automatic selection eligibility`, and `actions/setup/js/model_fallback.test.cjs`, `skips Claude models AWF marks as not automatically selectable`. Eligibility is applied by `filterAutomaticallySelectable` in `actions/setup/js/resolve_model_alias.cjs`.
 
 ### §7–§10 Alias Map and Resolution
 
@@ -1042,6 +1051,10 @@ Model parameters are compile-time configuration values and are not derived from 
 ---
 
 ## Change Log
+
+### Version 1.7.0 (Draft)
+
+- **Added**: §8.4.4 alias wildcards, and Claude's `auto` on the Copilot provider, skip models that AWF's `/reflect` marks `automatic_selection_eligible: false`. Exact model ids and alias entries without `*` are unaffected, and a catalog without the field resolves as before. Conformance test T-MAF-050.
 
 ### Version 1.6.0 (Draft)
 
