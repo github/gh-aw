@@ -327,13 +327,30 @@
   body.light .smp-tb span { color: #59636e; }
   body.light .smp-d { background: #f6f8fa; border-color: #9ea7b3; }
   body.light .smp-dc { color: #1f2328; }
-  /* keyboard manual (bottom of the map): game-style controls screen, an arrow cluster then a card per group; keycaps are inert kbd */
+  /* keyboard manual (bottom of the map): game-style controls screen, a full keyboard then a card per group; keycaps are inert kbd */
   .smp-kg { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; align-items: start; }
-  .smp-kpad { display: grid; grid-template-areas: ". u ." "l d r"; grid-template-columns: repeat(3, 64px); gap: 6px; justify-content: center; align-content: center; padding: 14px 10px;
-    border: 1px solid #3d444d; border-radius: 8px; background: radial-gradient(circle at 50% 60%, #4493f81f, transparent 70%), #151b23; }
-  .smp-kp { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .smp-keys .smp-kp kbd { width: 52px; height: 46px; font-size: 20px; }
-  .smp-kp span { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+  .smp-kbd { grid-column: 1 / -1; padding: 14px 12px 10px; border: 1px solid #3d444d; border-radius: 8px;
+    background: radial-gradient(ellipse at 50% 55%, #4493f824, transparent 70%), #151b23; }
+  .smp-kbw { overflow-x: auto; }
+  .smp-kbd svg { display: block; width: 100%; min-width: 680px; height: auto; font-family: var(--mono); }
+  .kb-k .kb-sk { fill: #0d1117; stroke: #3d444d; }
+  .kb-k .kb-top { fill: #212830; stroke: #3d444d; }
+  .kb-l { font-size: 10px; font-weight: 600; fill: #9198a1; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+  .kb-t { font-size: 7.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; fill: var(--c); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+  .kb-k.on { cursor: help; }
+  .kb-k.on .kb-sk { fill: #0d419d; stroke: var(--c); }
+  .kb-k.on .kb-top { fill: #1b2a40; stroke: var(--c); }
+  .kb-k.on .kb-l { fill: #f0f6fc; font-size: 11px; }
+  .kb-k.mod .kb-top { stroke-dasharray: 4 3; }
+  .kb-k.hot .kb-top { fill: #4493f8; }
+  .kb-k.hot .kb-l, .kb-k.hot .kb-t { fill: #0d1117; }
+  .kb-arc { cursor: help; }
+  .kb-arc path { fill: none; stroke: var(--c); stroke-width: 2.5; stroke-linecap: round; opacity: .7; filter: drop-shadow(0 0 3px #0d1117); }
+  .kb-arc.seq path { stroke-dasharray: 2 6; }
+  .kb-arc circle { fill: var(--c); stroke: #0d1117; stroke-width: 2; }
+  .kb-arc.hot path { opacity: 1; stroke-width: 4; stroke: #cae8ff; }
+  .kb-arcs:has(.hot) .kb-arc:not(.hot) { opacity: .2; }
+  .smp-kcap { margin: 8px 0 0; min-height: 1.4em; text-align: center; font: 500 12px/1.4 "Mona Sans", sans-serif; color: #c9d1d9; }
   .smp-kb { padding: 10px 12px; border: 1px solid #3d444d; border-top: 3px solid var(--c); border-radius: 8px; background: #151b23; }
   .smp-kb h4 { margin: 0 0 8px; font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
   .smp-kb dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; }
@@ -346,10 +363,23 @@
     font: 600 11px/1 var(--mono); color: #f0f6fc; background: linear-gradient(#2a313c, #1f2630); border: 1px solid #3d444d; border-bottom: 3px solid #0d1117;
     border-radius: 5px; box-shadow: 0 1px 0 #ffffff14 inset; white-space: nowrap; }
   @media (max-width: 640px) { .smp-kg { grid-template-columns: minmax(0, 1fr); } }
-  body.light .smp-kpad, body.light .smp-kb { background: #ffffff; border-color: #9ea7b3; border-top-color: var(--c); }
-  body.light .smp-kpad { background: radial-gradient(circle at 50% 60%, #4493f81f, transparent 70%), #ffffff; border-top-color: #9ea7b3; }
+  body.light .smp-kb { background: #ffffff; border-color: #9ea7b3; border-top-color: var(--c); }
+  body.light .smp-kbd { background: radial-gradient(ellipse at 50% 55%, #4493f81f, transparent 70%), #ffffff; border-color: #9ea7b3; }
+  body.light .kb-k .kb-sk { fill: #d1d9e0; stroke: #9ea7b3; }
+  body.light .kb-k .kb-top { fill: #f6f8fa; stroke: #9ea7b3; }
+  body.light .kb-l { fill: #59636e; }
+  body.light .kb-k.on .kb-sk { fill: #0969da; stroke: #0969da; }
+  body.light .kb-k.on .kb-top { fill: #ddf4ff; stroke: #0969da; }
+  body.light .kb-k.on .kb-l { fill: #1f2328; }
+  body.light .kb-t, body.light .kb-arc circle { fill: #0969da; }
+  body.light .kb-arc path { stroke: #0969da; filter: drop-shadow(0 0 2px #ffffff); }
+  body.light .kb-arc circle { stroke: #ffffff; }
+  body.light .kb-k.hot .kb-top { fill: #0969da; }
+  body.light .kb-k.hot .kb-l, body.light .kb-k.hot .kb-t { fill: #ffffff; }
+  body.light .kb-arc.hot path { stroke: #0550ae; }
+  body.light .smp-kcap { color: #1f2328; }
   body.light .smp-kb dd { color: #1f2328; }
-  body.light .smp-kb h4, body.light .smp-kp span { color: #0969da; }
+  body.light .smp-kb h4 { color: #0969da; }
   body.light .smp-keys kbd { color: #1f2328; background: linear-gradient(#ffffff, #eaeef2); border-color: #9ea7b3; border-bottom-color: #818b98; box-shadow: none; }
   body.light .smp-db, body.light .smp-d input { background: #ffffff; border-color: #9ea7b3; color: #1f2328; }
   body.light .smp-db.go { background: #0969da; border-color: #0969da; color: #ffffff; }
@@ -1489,7 +1519,7 @@
       h("h3", { class: "smp-l", id: "smp-tours-h" }, "Tours", " ", h("small", {}, "filtered views of the deck, shareable by link")),
       smpTourList
     );
-    // Keyboard manual (below the tours): a game-style controls screen, an arrow cluster plus one card per group of
+    // Keyboard manual (below the tours): a game-style controls screen, a full keyboard plus one card per group of
     // shortcuts. Each entry is [keys, action]; a key is a string whose "+" joins a chord ("Shift+Home").
     const KEYMAP = [
       [
@@ -1541,7 +1571,178 @@
         { class: "smp-kc" },
         k.split(/(?<=.)\+(?=.)/).flatMap((p, i) => (i ? [h("i", {}, "+"), h("kbd", {}, p)] : [h("kbd", {}, p)]))
       );
-    const pad = (key, label, area) => h("div", { class: "smp-kp", style: { gridArea: area } }, h("kbd", {}, key), h("span", {}, label));
+    // Full 102-key ISO keyboard (main block, F row, navigation cluster, numpad) drawn in SVG. Keys bound in KEYMAP light
+    // up with a short tag; arcs join each chord's modifier to its key ("1…9+Enter" is a dashed sequence). Each key is
+    // [label, x, y, w?, h?, k?] in key units; k names the KEYMAP key it stands for (default: the label).
+    const KB = (() => {
+      const keys = [["Esc", 0, 0]];
+      for (let i = 0; i < 12; i++) keys.push([`F${i + 1}`, 2 + i + Math.floor(i / 4) * 0.5, 0]);
+      ["PrtSc", "ScrLk", "Pause"].forEach((l, i) => keys.push([l, 15.5 + i, 0]));
+      const row = (y, x, labels) => labels.forEach(l => (Array.isArray(l) ? (keys.push([l[0], x, y, ...l.slice(1)]), (x += l[1] || 1)) : (keys.push([l, x, y]), x++)));
+      row(1.5, 0, ["`", ..."123456789".split("").map(d => [d, 1, 1, "1…9"]), "0", "-", "=", ["Backspace", 2]]);
+      row(2.5, 0, [["Tab", 1.5], ..."QWERTYUIOP[]"]);
+      row(3.5, 0, [["Caps", 1.75], ..."ASDFGHJKL;'#"]);
+      row(4.5, 0, [["Shift", 1.25], "\\", ..."ZXCVBNM,./", ["Shift", 2.75]]);
+      [
+        ["Ctrl", 0, 1.5],
+        ["Alt", 2.5, 1.5],
+        ["Space", 4, 7],
+        ["AltGr", 11, 1.5],
+        ["Ctrl", 13.5, 1.5],
+      ].forEach(([l, x, w]) => keys.push([l, x, 5.5, w]));
+      keys.push(["Enter", 13.5, 2.5, 1.5, 2, "Enter", "iso"]);
+      ["Ins", "Home", "PgUp"].forEach((l, i) => keys.push([l, 15.5 + i, 1.5]));
+      ["Del", "End", "PgDn"].forEach((l, i) => keys.push([l, 15.5 + i, 2.5]));
+      keys.push(["↑", 16.5, 4.5]);
+      ["←", "↓", "→"].forEach((l, i) => keys.push([l, 15.5 + i, 5.5]));
+      ["Num", "/", "*", "-"].forEach((l, i) => keys.push([l, 19 + i, 1.5]));
+      [
+        ["7", "8", "9"],
+        ["4", "5", "6"],
+        ["1", "2", "3"],
+      ].forEach((r, j) => r.forEach((d, i) => keys.push([d, 19 + i, 2.5 + j, 1, 1, "1…9"])));
+      keys.push(["+", 22, 2.5, 1, 2], ["Enter", 22, 4.5, 1, 2], ["0", 19, 5.5, 2], [".", 21, 5.5]);
+      return keys.map(([label, x, y, w = 1, hh = 1, k = label, shape]) => ({ label, x, y, w, h: hh, k, shape }));
+    })();
+    const KEYTAG = {
+      "→": "next",
+      "←": "prev",
+      "↑": "up",
+      "↓": "down",
+      Space: "next",
+      Enter: "next",
+      Backspace: "prev",
+      PgUp: "band",
+      PgDn: "band",
+      Home: "first",
+      End: "last",
+      U: "pattern",
+      G: "map",
+      "/": "search",
+      N: "notes",
+      F: "full",
+      K: "kiosk",
+      M: "sound",
+      X: "leave",
+      Esc: "close",
+      T: "tours",
+      D: "design",
+      A: "all",
+      C: "clear",
+      L: "link",
+      Shift: "mod",
+      Ctrl: "mod ⌘",
+      "1…9": "jump",
+    };
+    const KALIAS = { "⌘": "Ctrl" };
+    const chord = k => k.split(/(?<=.)\+(?=.)/).map(p => KALIAS[p] || p);
+    const smpKeyboard = (() => {
+      const U = 40,
+        NS = "http://www.w3.org/2000/svg";
+      const s = (tag, attrs = {}, ...kids) => {
+        const el = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        el.append(...kids.flat().filter(k => k != null));
+        return el;
+      };
+      const rows = KEYMAP.flatMap(([, r]) => r);
+      const bound = new Set(rows.flatMap(([keys]) => keys.flatMap(chord)));
+      const pts = key => {
+        const [x, y, w, hh, i] = [key.x * U, key.y * U, key.w * U, key.h * U, 3];
+        // ISO Enter: 1.5u wide on its top row, 1.25u on the row below
+        return key.shape === "iso"
+          ? [
+              [x + i, y + i],
+              [x + w - i, y + i],
+              [x + w - i, y + hh - i],
+              [x + 0.25 * U + i, y + hh - i],
+              [x + 0.25 * U + i, y + U - i],
+              [x + i, y + U - i],
+            ]
+          : [
+              [x + i, y + i],
+              [x + w - i, y + i],
+              [x + w - i, y + hh - i],
+              [x + i, y + hh - i],
+            ];
+      };
+      const centre = key => [(key.x + (key.shape ? 0.75 : key.w / 2)) * U, (key.y + (key.shape ? 0.5 : key.h / 2)) * U];
+      const anchor = key => [centre(key)[0], key.y * U + 5];
+      // a chord joins the nearest pair of its keys outside the numpad (right Shift to the arrows, 9 to Enter) so arcs stay short
+      const nearest = (a, b) => {
+        let best;
+        for (const p of KB.filter(key => key.k === a && key.x < 19))
+          for (const q of KB.filter(key => key.k === b && key.x < 19)) {
+            const d = Math.hypot(p.x - q.x, p.y - q.y);
+            if (!best || d < best[0]) best = [d, p, q];
+          }
+        return best.slice(1);
+      };
+      const combos = new Map();
+      for (const [keys, act] of rows)
+        for (const key of keys) {
+          const parts = chord(key);
+          if (parts.length < 2) continue;
+          const id = parts.join("+");
+          if (!combos.has(id)) combos.set(id, { parts, acts: [], seq: parts[0] === "1…9" });
+          if (!combos.get(id).acts.includes(act)) combos.get(id).acts.push(act);
+        }
+      const arcs = [...combos.values()].map(c => {
+        const [[x1, y1], [x2, y2]] = nearest(c.parts[0], c.parts[1]).map(anchor);
+        const lift = 0.6 * U + Math.abs(x2 - x1) * 0.3;
+        return s(
+          "g",
+          { class: `kb-arc${c.seq ? " seq" : ""}`, "data-parts": c.parts.join(" ") },
+          s("path", { d: `M${x1} ${y1} Q${(x1 + x2) / 2} ${Math.min(y1, y2) - lift} ${x2} ${y2}` }),
+          s("circle", { cx: x1, cy: y1, r: 4 }),
+          s("circle", { cx: x2, cy: y2, r: 4 })
+        );
+      });
+      const keyEls = KB.map(key => {
+        const p = pts(key),
+          [cx, cy] = centre(key),
+          on = bound.has(key.k),
+          tag = on && KEYTAG[key.k];
+        const poly = dy => p.map(([x, y]) => `${x},${y + dy}`).join(" ");
+        return s(
+          "g",
+          { class: `kb-k${on ? " on" : ""}${key.k === "Shift" || key.k === "Ctrl" ? " mod" : ""}`, "data-k": key.k },
+          s("polygon", { class: "kb-sk", points: poly(0) }),
+          s("polygon", { class: "kb-top", points: poly(-3) }),
+          s("text", { x: cx, y: cy - (tag ? 6 : 2), class: "kb-l" }, key.label),
+          tag ? s("text", { x: cx, y: cy + 9, class: "kb-t" }, tag) : null
+        );
+      });
+      const svg = s(
+        "svg",
+        { viewBox: `-8 -12 ${23 * U + 16} ${6.5 * U + 20}`, role: "img", "aria-label": "Full keyboard: lit keys have shortcuts, arcs join a modifier or digits to their key; the cards below list every shortcut" },
+        s("g", {}, keyEls),
+        s("g", { class: "kb-arcs" }, arcs)
+      );
+      const HINT = "Point at a key or an arc to see what it does";
+      const cap = h("p", { class: "smp-kcap" }, HINT);
+      const actsFor = k => rows.filter(([keys]) => keys.some(key => chord(key).includes(k))).map(([keys, act]) => `${keys.filter(key => chord(key).includes(k)).join(", ")}: ${act}`);
+      const light = (keys, arcSel, text) => {
+        svg.querySelectorAll(".hot").forEach(el => el.classList.remove("hot"));
+        keys.forEach(k => svg.querySelectorAll(`.kb-k[data-k="${CSS.escape(k)}"]`).forEach(el => el.classList.add("hot")));
+        arcSel.forEach(el => el.classList.add("hot"));
+        cap.textContent = text;
+      };
+      svg.addEventListener("pointerover", e => {
+        const arc = e.target.closest(".kb-arc"),
+          key = e.target.closest(".kb-k.on");
+        if (arc) {
+          const parts = arc.dataset.parts.split(" ");
+          light(parts, [arc], `${parts.join(arc.classList.contains("seq") ? " then " : "+")}: ${combos.get(parts.join("+")).acts.join(" · ")}`);
+        } else if (key) {
+          const k = key.dataset.k,
+            linked = [...svg.querySelectorAll(".kb-arc")].filter(a => a.dataset.parts.split(" ").includes(k));
+          light([k, ...linked.flatMap(a => a.dataset.parts.split(" "))], linked, actsFor(k).join(" · "));
+        } else light([], [], HINT);
+      });
+      svg.addEventListener("pointerleave", () => light([], [], HINT));
+      return h("div", { class: "smp-kbd" }, h("div", { class: "smp-kbw" }, svg), cap);
+    })();
     const smpKeys = h(
       "section",
       { class: "smp-row smp-keys", "--c": "#4493f8", "aria-labelledby": "smp-keys-h" },
@@ -1549,14 +1750,7 @@
       h(
         "div",
         { class: "smp-kg" },
-        h(
-          "div",
-          { class: "smp-kpad", role: "img", "aria-label": "Arrow keys: left previous slide, right next slide, up and down move between columns and bands" },
-          pad("↑", "up", "u"),
-          pad("←", "prev", "l"),
-          pad("↓", "down", "d"),
-          pad("→", "next", "r")
-        ),
+        smpKeyboard,
         KEYMAP.map(([title, rows]) =>
           h(
             "div",

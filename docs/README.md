@@ -78,8 +78,8 @@ worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to
 the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, the notes toolbar button (or N) toggles speaker notes,
-and M to toggle sound. G opens the slide map, whose bottom section is a keyboard manual
-listing every shortcut. Notes explain what the slide shows, why the feature exists,
+and M to toggle sound. G opens the slide map, whose bottom section is a keyboard manual: a full
+keyboard with the shortcut keys lit and combos joined by arcs, then a list of every shortcut. Notes explain what the slide shows, why the feature exists,
 and when to use it for technical audiences new to AW; notes written as `Label: text` lines
 show each labelled cue as its own block, and other notes stay plain text. They stay open as you navigate;
 Escape hides them, and long notes scroll without advancing the slide.
