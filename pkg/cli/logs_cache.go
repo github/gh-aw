@@ -131,27 +131,9 @@ func cleanupOldRunFolders(outputDir string, cutoff time.Time, verbose bool) (int
 		}
 
 		runDir := filepath.Join(outputDir, entry.Name())
-
-		// Determine the run date: prefer the GitHub run creation timestamp from
-		// run_summary.json so the cutoff is relative to when the workflow actually
-		// ran, not when we downloaded or processed it.
-		var runDate time.Time
-		summaryPath := filepath.Join(runDir, runSummaryFileName)
-		if data, readErr := os.ReadFile(summaryPath); readErr == nil {
-			var summary RunSummary
-			if jsonErr := json.Unmarshal(data, &summary); jsonErr == nil && !summary.Run.CreatedAt.IsZero() {
-				runDate = summary.Run.CreatedAt
-			}
-		}
-
-		// Fall back to directory modification time when the summary is unavailable.
-		if runDate.IsZero() {
-			info, statErr := entry.Info()
-			if statErr != nil {
-				logsCacheLog.Printf("Failed to stat run directory %s: %v", entry.Name(), statErr)
-				continue
-			}
-			runDate = info.ModTime()
+		runDate, ok := cachedRunFolderDate(entry, runDir)
+		if !ok {
+			continue
 		}
 
 		if runDate.Before(cutoff) {
@@ -170,6 +152,22 @@ func cleanupOldRunFolders(outputDir string, cutoff time.Time, verbose bool) (int
 
 	logsCacheLog.Printf("Removed %d old run folders (cutoff: %s)", removed, cutoff.Format(time.RFC3339))
 	return removed, nil
+}
+
+func cachedRunFolderDate(entry os.DirEntry, runDir string) (time.Time, bool) {
+	summaryPath := filepath.Join(runDir, runSummaryFileName)
+	if data, err := os.ReadFile(summaryPath); err == nil {
+		var summary RunSummary
+		if err := json.Unmarshal(data, &summary); err == nil && !summary.Run.CreatedAt.IsZero() {
+			return summary.Run.CreatedAt, true
+		}
+	}
+	info, err := entry.Info()
+	if err != nil {
+		logsCacheLog.Printf("Failed to stat run directory %s: %v", entry.Name(), err)
+		return time.Time{}, false
+	}
+	return info.ModTime(), true
 }
 
 // saveRunSummary saves a run summary to disk

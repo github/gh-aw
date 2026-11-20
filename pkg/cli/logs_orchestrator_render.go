@@ -166,9 +166,13 @@ func writeLogsAuditsAndTrain(processedRuns []ProcessedRun, opts renderLogsOutput
 
 func renderLogsOutputTSV(logsData LogsData, verbose bool) error {
 	if verbose {
-		renderLogsTSVVerbose(logsData)
+		if err := renderLogsTSVVerbose(logsData); err != nil {
+			return fmt.Errorf("failed to render logs TSV: %w", err)
+		}
 	} else {
-		renderLogsTSV(logsData)
+		if err := renderLogsTSV(logsData); err != nil {
+			return fmt.Errorf("failed to render logs TSV: %w", err)
+		}
 	}
 	if err := renderFailureReportToWriter(os.Stderr, logsData.FailureClusters, logsData.FailureInvestigation, "# ", verbose); err != nil {
 		return fmt.Errorf("failed to render failure clusters: %w", err)

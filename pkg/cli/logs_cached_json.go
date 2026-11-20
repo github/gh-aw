@@ -411,12 +411,7 @@ func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDa
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {
-	if record.Kind == cachedLogsJSONLKindLifecycle {
-		if record.SchemaVersion != cachedLogsJSONLLifecycleSchemaVersion {
-			logsCacheLog.Printf("Ignoring incompatible cached lifecycle JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
-			return nil
-		}
-	} else if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+	if record.SchemaVersion != cachedLogsJSONLRecordSchemaVersion(record.Kind) {
 		logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
 		return nil
 	}
@@ -474,6 +469,13 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		cache.runs[run.RunID] = run
 	}
 	return nil
+}
+
+func cachedLogsJSONLRecordSchemaVersion(kind string) int {
+	if kind == cachedLogsJSONLKindLifecycle {
+		return cachedLogsJSONLLifecycleSchemaVersion
+	}
+	return cachedLogsJSONLSchemaVersion
 }
 
 type cachedLogsJSONLWriter struct {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"slices"
@@ -855,7 +856,12 @@ func summarizeMCPAuditPartialResults(partial map[string]any) map[string]any {
 
 func decodeAuditReport(outputStr string) (any, map[string]any) {
 	var report any
-	if json.Unmarshal([]byte(outputStr), &report) != nil {
+	decoder := json.NewDecoder(strings.NewReader(outputStr))
+	if decoder.Decode(&report) != nil {
+		return nil, nil
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
 		return nil, nil
 	}
 	partial, ok := report.(map[string]any)

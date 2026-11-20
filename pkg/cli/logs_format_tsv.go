@@ -37,28 +37,32 @@ func formatTSVAIC(aic *float64) string {
 //	Line 1: Summary line (total_runs, total_duration, total_tokens, total_turns, total_errors)
 //	Line 2: Column headers
 //	Lines 3+: One line per run with tab-separated fields
-func renderLogsTSVToWriter(w io.Writer, data LogsData) {
+func renderLogsTSVToWriter(w io.Writer, data LogsData) error {
 	logsTSVLog.Printf("Rendering %d runs as TSV", data.Summary.TotalRuns)
 
 	s := data.Summary
-	// Summary line with key aggregates
-	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors\n",
-		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors)
-
-	if len(data.Runs) == 0 {
-		return
+	if _, err := fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors\n",
+		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors); err != nil {
+		return err
 	}
-
-	// Header
-	headers := []string{
+	if len(data.Runs) == 0 {
+		return nil
+	}
+	if err := writeTSVRow(w, []string{
 		"run_id", "workflow", "engine", "status", "duration",
 		"tokens", "aic", "turns", "errors",
 		"event", "branch", "created_at", "classification", "url",
+	}); err != nil {
+		return err
 	}
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	if err := renderLogsTSVRunRows(w, data.Runs); err != nil {
+		return err
+	}
+	return renderLogsTSVFooter(w, data)
+}
 
-	// Rows
-	for _, r := range data.Runs {
+func renderLogsTSVRunRows(w io.Writer, runs []RunData) error {
+	for _, r := range runs {
 		conclusion := r.Conclusion
 		if conclusion == "" {
 			conclusion = r.Status
@@ -71,82 +75,99 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 		if classification == "" {
 			classification = "-"
 		}
-		// Shorten URL to just the run path for density
 		url := r.URL
 		if idx := strings.Index(url, "/actions/runs/"); idx > 0 {
 			url = url[idx:]
 		}
-
 		fields := []string{
-			strconv.FormatInt(r.RunID, 10),
-			r.WorkflowName,
-			r.EngineID,
-			conclusion,
-			duration,
-			strconv.Itoa(r.TokenUsage),
-			formatTSVAIC(r.AIC),
-			strconv.Itoa(r.Turns),
-			strconv.Itoa(r.ErrorCount),
-			r.Event,
-			r.Branch,
-			r.CreatedAt.Format("2006-01-02T15:04"),
-			classification,
-			url,
+			strconv.FormatInt(r.RunID, 10), r.WorkflowName, r.EngineID, conclusion, duration,
+			strconv.Itoa(r.TokenUsage), formatTSVAIC(r.AIC), strconv.Itoa(r.Turns),
+			strconv.Itoa(r.ErrorCount), r.Event, r.Branch, r.CreatedAt.Format("2006-01-02T15:04"),
+			classification, url,
 		}
-		fmt.Fprintln(w, strings.Join(fields, "\t"))
-	}
-
-	// Append observability insights as comments (high signal density)
-	if len(data.Observability) > 0 {
-		fmt.Fprintln(w, "# insights:")
-		for _, obs := range data.Observability {
-			fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary)
+		if err := writeTSVRow(w, fields); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
-	// Append firewall summary if present
+func renderLogsTSVFooter(w io.Writer, data LogsData) error {
+	if err := renderTSVInsights(w, data.Observability); err != nil {
+		return err
+	}
 	if data.FirewallLog != nil && data.FirewallLog.TotalRequests > 0 {
-		fmt.Fprintf(w, "# firewall: %d requests (%d allowed, %d blocked)\n",
-			data.FirewallLog.TotalRequests, data.FirewallLog.AllowedRequests, data.FirewallLog.BlockedRequests)
+		if _, err := fmt.Fprintf(w, "# firewall: %d requests (%d allowed, %d blocked)\n",
+			data.FirewallLog.TotalRequests, data.FirewallLog.AllowedRequests, data.FirewallLog.BlockedRequests); err != nil {
+			return err
+		}
 	}
-
-	// Append engine distribution if multiple engines
 	if len(data.Summary.EngineCounts) > 1 {
 		parts := make([]string, 0, len(data.Summary.EngineCounts))
 		for engine, count := range data.Summary.EngineCounts {
 			parts = append(parts, fmt.Sprintf("%s:%d", engine, count))
 		}
-		fmt.Fprintf(w, "# engines: %s\n", strings.Join(parts, " "))
+		if _, err := fmt.Fprintf(w, "# engines: %s\n", strings.Join(parts, " ")); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func renderTSVInsights(w io.Writer, insights []ObservabilityInsight) error {
+	if len(insights) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(w, "# insights:"); err != nil {
+		return err
+	}
+	for _, obs := range insights {
+		if _, err := fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeTSVRow(w io.Writer, fields []string) error {
+	_, err := fmt.Fprintln(w, strings.Join(fields, "\t"))
+	return err
 }
 
 // renderLogsTSV outputs the logs data as tab-separated values to os.Stdout.
-func renderLogsTSV(data LogsData) {
-	renderLogsTSVToWriter(os.Stdout, data)
+func renderLogsTSV(data LogsData) error {
+	return renderLogsTSVToWriter(os.Stdout, data)
 }
 
 // renderLogsTSVVerboseToWriter outputs a more detailed TSV with additional columns for audit use to w.
-func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
+func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) error {
 	logsTSVLog.Printf("Rendering %d runs as verbose TSV", data.Summary.TotalRuns)
 
 	s := data.Summary
-	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors | %d missing_tools | %d github_api_calls\n",
-		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors, s.TotalMissingTools, s.TotalGitHubAPICalls)
-
-	if len(data.Runs) == 0 {
-		return
+	if _, err := fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors | %d missing_tools | %d github_api_calls\n",
+		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors, s.TotalMissingTools, s.TotalGitHubAPICalls); err != nil {
+		return err
 	}
-
-	headers := []string{
+	if len(data.Runs) == 0 {
+		return nil
+	}
+	if err := writeTSVRow(w, []string{
 		"run_id", "workflow", "engine", "status", "duration",
 		"tokens", "aic", "turns", "errors",
 		"warnings", "missing_tools", "missing_data", "github_api",
 		"event", "branch", "actor", "created_at", "tbt",
 		"classification", "action_min", "display_title", "url",
+	}); err != nil {
+		return err
 	}
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	if err := renderLogsTSVVerboseRunRows(w, data.Runs); err != nil {
+		return err
+	}
+	return renderTSVInsights(w, data.Observability)
+}
 
-	for _, r := range data.Runs {
+func renderLogsTSVVerboseRunRows(w io.Writer, runs []RunData) error {
+	for _, r := range runs {
 		conclusion := r.Conclusion
 		if conclusion == "" {
 			conclusion = r.Status
@@ -164,43 +185,22 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 			classification = "-"
 		}
 		displayTitle := stringutil.Truncate(r.DisplayTitle, 50)
-
 		fields := []string{
-			strconv.FormatInt(r.RunID, 10),
-			r.WorkflowName,
-			r.EngineID,
-			conclusion,
-			duration,
-			strconv.Itoa(r.TokenUsage),
-			formatTSVAIC(r.AIC),
-			strconv.Itoa(r.Turns),
-			strconv.Itoa(r.ErrorCount),
-			strconv.Itoa(r.WarningCount),
-			strconv.Itoa(r.MissingToolCount),
-			strconv.Itoa(r.MissingDataCount),
-			strconv.Itoa(r.GitHubAPICalls),
-			r.Event,
-			r.Branch,
-			r.Actor,
-			r.CreatedAt.Format("2006-01-02T15:04"),
-			tbt,
-			classification,
-			fmt.Sprintf("%.0f", r.ActionMinutes),
-			displayTitle,
-			r.URL,
+			strconv.FormatInt(r.RunID, 10), r.WorkflowName, r.EngineID, conclusion, duration,
+			strconv.Itoa(r.TokenUsage), formatTSVAIC(r.AIC), strconv.Itoa(r.Turns),
+			strconv.Itoa(r.ErrorCount), strconv.Itoa(r.WarningCount), strconv.Itoa(r.MissingToolCount),
+			strconv.Itoa(r.MissingDataCount), strconv.Itoa(r.GitHubAPICalls), r.Event, r.Branch,
+			r.Actor, r.CreatedAt.Format("2006-01-02T15:04"), tbt, classification,
+			fmt.Sprintf("%.0f", r.ActionMinutes), displayTitle, r.URL,
 		}
-		fmt.Fprintln(w, strings.Join(fields, "\t"))
-	}
-
-	if len(data.Observability) > 0 {
-		fmt.Fprintln(w, "# insights:")
-		for _, obs := range data.Observability {
-			fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary)
+		if err := writeTSVRow(w, fields); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 // renderLogsTSVVerbose outputs a more detailed TSV with additional columns to os.Stdout.
-func renderLogsTSVVerbose(data LogsData) {
-	renderLogsTSVVerboseToWriter(os.Stdout, data)
+func renderLogsTSVVerbose(data LogsData) error {
+	return renderLogsTSVVerboseToWriter(os.Stdout, data)
 }
