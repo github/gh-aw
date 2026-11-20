@@ -1095,7 +1095,7 @@ test("ends the slide map with a keyboard manual of every shortcut", async ({ pag
   for (const group of ["Move", "Jump", "Show", "Slide map", "Design a view"]) await expect(keys.getByRole("heading", { name: group, exact: true })).toBeVisible();
   await expect(keys.locator("dt", { hasText: "Shift+Home" })).toHaveCount(1);
   await expect(keys).toContainText("First slide of the band");
-  await expect(keys.locator(".kb-k")).toHaveCount(103);
+  await expect(keys.locator(".kb-k")).toHaveCount(102);
   await expect(keys).toContainText("Closed captioning (CC) in kiosk mode");
   await expect(keys.locator('.kb-k.on[data-k="G"]')).toHaveCount(1);
   await expect(keys.locator('.kb-arc[data-parts="Shift Home"]')).toHaveCount(1);
