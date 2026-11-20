@@ -53,6 +53,7 @@ func TestGitHubScriptTemplateInjectionFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
 	}
+
 	workflow := templateInjectionWorkflow("echo public", false)
 	workflow.Jobs[0].Steps[0] = actions.RawStep{Fields: map[string]any{
 		"uses": "actions/github-script@v8",
@@ -63,4 +64,40 @@ func TestGitHubScriptTemplateInjectionFailures(t *testing.T) {
 	assert.Equal(t, Error, diagnostics[0].Severity)
 	assert.Equal(t, Warning, diagnostics[1].Severity)
 	assert.NotContains(t, fmt.Sprint(diagnostics), "PRIVATE_VALUE")
+}
+
+func TestExecutableActionInputs(t *testing.T) {
+	for _, tt := range []struct {
+		uses, key string
+	}{
+		{"actions/github-script", "script"},
+		{"amadevus/pwsh-script", "script"},
+		{"jannekem/run-python-script-action", "script"},
+		{"cardinalby/js-eval-action", "expression"},
+		{"addnab/docker-run-action", "run"},
+	} {
+		t.Run(tt.uses, func(t *testing.T) {
+			for _, typed := range []bool{false, true} {
+				workflow := templateInjectionWorkflow("", typed)
+				uses := tt.uses + "@0123456789abcdef0123456789abcdef01234567"
+				workflow.Env = map[string]actions.Expression{"BODY": actions.Context("github.event.comment.body")}
+				var step actions.Step = actions.RawStep{Fields: map[string]any{
+					"uses": uses, "with": map[string]any{tt.key: "code\n${{ env.BODY }}"},
+				}}
+				if typed {
+					step = actions.ActionStep{Uses: uses, With: map[string]actions.Expression{tt.key: actions.Literal("code\n${{ env.BODY }}")}}
+				}
+				workflow.Jobs[0].Steps = []actions.Step{step}
+				diagnostics := runTemplateInjection(t, workflow)
+				require.Len(t, diagnostics, 1)
+				assert.Equal(t, "jobs.test.steps[0].with."+tt.key, diagnostics[0].Path)
+				assert.Equal(t, 2, diagnostics[0].Line)
+			}
+			workflow := templateInjectionWorkflow("", false)
+			workflow.Jobs[0].Steps = []actions.Step{actions.RawStep{Fields: map[string]any{
+				"uses": "lookalike/" + tt.uses + "@v1", "with": map[string]any{tt.key: "${{ inputs.command }}"},
+			}}}
+			assert.Empty(t, runTemplateInjection(t, workflow))
+		})
+	}
 }

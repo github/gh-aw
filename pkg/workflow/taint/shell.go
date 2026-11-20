@@ -38,6 +38,9 @@ type constantState struct {
 }
 
 func (a *analyzer) script(text string, fields map[string]any, path string, bindings, persisted, files scope) error {
+	if err := a.executableText(text, path, bindings); err != nil {
+		return err
+	}
 	if name, ok := fields["shell"].(string); ok && (name == "node" || name == "node {0}") {
 		return a.javascriptInline(text, path, bindings, files, false)
 	}
@@ -73,6 +76,11 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		constantUnknown: make(map[string]bool),
 	}
 	s.setConstants("GITHUB_OUTPUT", []string{"$GITHUB_OUTPUT"}, false)
+	if a.rule.IsSink(Site{Kind: EnvironmentFile}) {
+		for _, name := range []string{"GITHUB_ENV", "GITHUB_PATH"} {
+			s.setConstants(name, []string{"$" + name}, false)
+		}
+	}
 	for key, sources := range bindings {
 		if name, ok := strings.CutPrefix(key, "shell."); ok {
 			s.vars[name] = sources

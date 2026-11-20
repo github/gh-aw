@@ -415,14 +415,20 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(inputs)) {
-		sources, err := a.text(fmt.Sprint(inputs[key]), path+".with."+key, bindings)
+		inputPath := path + ".with." + key
+		if a.rule.IsExecutableInput != nil && a.rule.IsExecutableInput(Site{Uses: uses, Input: key}) {
+			if err := a.executableText(fmt.Sprint(inputs[key]), inputPath, bindings); err != nil {
+				return err
+			}
+		}
+		sources, err := a.text(fmt.Sprint(inputs[key]), inputPath, bindings)
 		if err != nil {
 			return err
 		}
 		a.emit(Site{Kind: ActionInput, Path: path + ".with." + key, Uses: uses, Input: key}, sources)
 		if actionName(uses) == "actions/upload-artifact" && key == "path" {
 			var contents value
-			patterns := strings.Split(fmt.Sprint(inputs[key]), "\n")
+			patterns := strings.FieldsFunc(fmt.Sprint(inputs[key]), func(r rune) bool { return r == '\n' || r == '\r' })
 			for file, sources := range files {
 				if artifactIncludes(patterns, file) {
 					contents = union(contents, sources)

@@ -31,7 +31,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"gateway-dispatch-literals",
 		"artipacked", "cache-poisoning", "excessive-permissions", "obfuscation",
 		"bash-case-pattern",
-		"privileged-checkout", "artifact-execution",
+		"privileged-checkout", "artifact-execution", "unpinned-images", "environment-file-injection",
 	}, ruleIDs)
 	selected, err := runner.Select("secret-leak", "secret-leak")
 	require.NoError(t, err)
@@ -155,11 +155,20 @@ jobs:
 	require.NoError(t, err)
 	diagnostics, err := Default().Run(context.Background(), Input{Workflow: workflow})
 	require.NoError(t, err)
-	require.Len(t, diagnostics, 2)
-	assert.Equal(t, Error, diagnostics[0].Severity)
-	assert.Equal(t, Warning, diagnostics[1].Severity)
-	assert.NotContains(t, diagnostics[0].Message, "TOKEN")
-	assert.Contains(t, diagnostics[1].Message, "Incomplete")
+	require.Len(t, diagnostics, 3)
+	var disclosures, gaps int
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == Error {
+			disclosures++
+			assert.Equal(t, "secret-leak", diagnostic.RuleID)
+			assert.NotContains(t, diagnostic.Message, "TOKEN")
+		} else {
+			gaps++
+			assert.Contains(t, diagnostic.Message, "Incomplete")
+		}
+	}
+	assert.Equal(t, 1, disclosures)
+	assert.Equal(t, 2, gaps)
 }
 
 func TestSecretRuleCoverageWarningLocation(t *testing.T) {

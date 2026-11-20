@@ -19,7 +19,7 @@ func TemplateInjectionRule() Rule {
 	return Rule{
 		ID:           "template-injection",
 		ThreatRuleID: "CTR-006",
-		Description:  "Detect attacker-controlled Actions expressions interpolated into run or github-script code",
+		Description:  "Detect attacker-controlled Actions expressions interpolated into run or known executable action inputs",
 		Severity:     Error,
 		Targets:      ActionsAST | AWAST,
 		Check:        checkTemplateInjection,
@@ -63,8 +63,9 @@ func checkTemplateInjection(ctx context.Context, input Input) ([]Diagnostic, err
 			}
 		}
 	}
-	sortDiagnostics(checker.diagnostics)
-	return checker.diagnostics, nil
+	diagnostics, err := templateInjectionOutputFlows(ctx, input, checker.diagnostics)
+	sortDiagnostics(diagnostics)
+	return diagnostics, err
 }
 
 type templateInjectionChecker struct {
@@ -80,6 +81,7 @@ func (c *templateInjectionChecker) step(ctx context.Context, step actions.Step, 
 	var env map[string][]taint.Source
 	var err error
 	javascript := false
+	scriptPath := path + ".run"
 	switch value := step.(type) {
 	case actions.RunStep:
 		script = value.Run
@@ -87,17 +89,19 @@ func (c *templateInjectionChecker) step(ctx context.Context, step actions.Step, 
 	case actions.RawStep:
 		return c.rawStep(ctx, value.Fields, path, bindings)
 	case actions.ActionStep:
-		if actionName(value.Uses) != "actions/github-script" {
+		key, js := executableActionInput(value.Uses)
+		if key == "" {
 			return nil
 		}
-		expression, exists := value.With["script"]
+		expression, exists := value.With[key]
 		if !exists {
 			return nil
 		}
-		javascript = true
+		javascript = js
+		scriptPath = path + ".with." + key
 		script, err = actions.RenderExpression(expression, job, workflow, true)
 		if err != nil {
-			return fmt.Errorf("cannot render executable script at %s.with.script; correct the action input before linting", path)
+			return fmt.Errorf("cannot render executable script at %s; correct the action input before linting", scriptPath)
 		}
 		env, err = c.environment(ctx, value.Env, path+".env", job, workflow, bindings)
 	default:
@@ -106,10 +110,6 @@ func (c *templateInjectionChecker) step(ctx context.Context, step actions.Step, 
 	if err != nil {
 		return err
 	}
-	scriptPath := path + ".run"
-	if javascript {
-		scriptPath = path + ".with.script"
-	}
 	return c.checkScript(ctx, script, scriptPath, javascript, env)
 }
 
@@ -117,18 +117,19 @@ func (c *templateInjectionChecker) rawStep(ctx context.Context, fields map[strin
 	raw, exists := fields["run"]
 	scriptPath, javascript, kind := path+".run", false, "run script"
 	if !exists {
-		if actionName(fields["uses"]) != "actions/github-script" {
+		key, js := executableActionInput(fields["uses"])
+		if key == "" {
 			return nil
 		}
 		with, err := policyMapping(fields["with"], path+".with")
 		if err != nil {
 			return err
 		}
-		raw, exists = with["script"]
+		raw, exists = with[key]
 		if !exists {
 			return nil
 		}
-		scriptPath, javascript, kind = path+".with.script", true, "github-script code"
+		scriptPath, javascript, kind = path+".with."+key, js, "executable action input"
 	}
 	script, ok := raw.(string)
 	if !ok {

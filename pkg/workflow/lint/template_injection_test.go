@@ -27,6 +27,69 @@ func runTemplateInjection(t *testing.T, workflow *actions.Workflow) []Diagnostic
 	return diagnostics
 }
 
+func TestTemplateInjectionOutputFlows(t *testing.T) {
+	for _, tt := range []struct {
+		name, producer, consumer string
+		want                     bool
+	}{
+		{"step output", `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`, `echo "${{ steps.capture.outputs.value }}"`, true},
+		{"constant output", `printf 'value=fixed\n' >> "$GITHUB_OUTPUT"`, `echo "${{ steps.capture.outputs.value }}"`, false},
+		{"safe consumer", `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`, `printf '%s\n' "$VALUE"`, false},
+		{"filtered output", `printf 'value=%s\n' '${{ contains(github.event.comment.body, 'x') }}' >> "$GITHUB_OUTPUT"`, `echo "${{ steps.capture.outputs.value }}"`, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			workflow := templateInjectionWorkflow("", false)
+			workflow.Jobs[0].Steps = []actions.Step{
+				actions.RawStep{Fields: map[string]any{"id": "capture", "env": map[string]any{"BODY": "${{ github.event.comment.body }}"}, "run": tt.producer}},
+				actions.RawStep{Fields: map[string]any{"env": map[string]any{"VALUE": "${{ steps.capture.outputs.value }}"}, "run": tt.consumer}},
+			}
+			diagnostics := runTemplateInjection(t, workflow)
+			var findings []Diagnostic
+			for _, diagnostic := range diagnostics {
+				if diagnostic.Severity == Error {
+					findings = append(findings, diagnostic)
+				}
+			}
+			if tt.want {
+				require.Len(t, findings, 1)
+				assert.Equal(t, "jobs.test.steps[1].run", findings[0].Path)
+				assert.Equal(t, "jobs.test.steps[0].env.BODY", findings[0].Related[0].Path)
+			} else {
+				assert.Empty(t, findings)
+			}
+		})
+	}
+}
+
+func TestTemplateInjectionJobOutputFlows(t *testing.T) {
+	workflow, err := actions.Parse([]byte(`
+jobs:
+  producer:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.capture.outputs.value }}
+    steps:
+      - id: capture
+        env: {BODY: '${{ github.event.comment.body }}'}
+        run: printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"
+  consumer:
+    needs: producer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: console.log("${{ needs.producer.outputs.value }}")
+      - uses: cardinalby/js-eval-action@v1
+        with:
+          expression: '"${{ needs.producer.outputs.value }}"'
+`))
+	require.NoError(t, err)
+	diagnostics := runTemplateInjection(t, workflow)
+	require.Len(t, diagnostics, 2)
+	assert.Equal(t, "jobs.consumer.steps[0].with.script", diagnostics[0].Path)
+	assert.Equal(t, "jobs.consumer.steps[1].with.expression", diagnostics[1].Path)
+}
+
 func TestTemplateInjectionSources(t *testing.T) {
 	for _, expr := range []string{
 		"github.event.issue.title", "github.event.issue.body", "github.event.issue.user.login",

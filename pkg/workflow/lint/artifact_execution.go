@@ -219,9 +219,16 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 	}
 	switch command {
 	case "bash", "sh", "python", "python3", "node", "source", ".":
-		if file := artifactInterpreterOperand(command, len(call.Args), argument); file != "" {
-			return []string{artifactResolvePath(directory, file)}
+		var files []string
+		if command == "node" {
+			for _, file := range artifactNodePreloads(len(call.Args), argument) {
+				files = append(files, artifactResolvePath(directory, file))
+			}
 		}
+		if file := artifactInterpreterOperand(command, len(call.Args), argument); file != "" {
+			files = append(files, artifactResolvePath(directory, file))
+		}
+		return files
 	case "npm":
 		if len(call.Args) > 1 {
 			switch argument(1) {
@@ -243,6 +250,39 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 		}
 	}
 	return nil
+}
+
+func artifactNodePreloads(count int, argument func(int) string) []string {
+	var files []string
+	for index := 1; index < count; index++ {
+		value := argument(index)
+		if value == "" || value == "--" || !strings.HasPrefix(value, "-") {
+			break
+		}
+		option, payload, attached := strings.Cut(value, "=")
+		if strings.HasPrefix(value, "-r") && value != "-r" {
+			option, payload, attached = "-r", strings.TrimPrefix(value, "-r"), true
+		}
+		switch option {
+		case "-r", "--require", "--import", "--loader", "--experimental-loader":
+			if !attached {
+				index++
+				payload = argument(index)
+			}
+			if payload != "" && !strings.HasPrefix(payload, "node:") && !strings.HasPrefix(payload, "data:") {
+				files = append(files, strings.TrimPrefix(payload, "file://"))
+			}
+		default:
+			takesValue, noScript := artifactInterpreterOption("node", value)
+			if noScript {
+				return files
+			}
+			if takesValue {
+				index++
+			}
+		}
+	}
+	return files
 }
 
 // Select only the script operand, not option payloads or arguments passed to it.
@@ -307,6 +347,9 @@ func artifactInterpreterOption(command, value string) (takesValue, noScript bool
 		}
 		return artifactInterpreterShortOption(value, "WX", "cmhV")
 	case "node":
+		if strings.HasPrefix(value, "-r") && value != "-r" {
+			return false, false
+		}
 		switch option {
 		case "-e", "--eval", "-p", "--print", "-pe", "-ep", "--run", "-h", "--help", "-v", "--version":
 			return false, true

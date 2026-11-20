@@ -261,6 +261,8 @@ func Default() *Runner {
 		ToolScopeRule(),
 		SandboxConfigRule(),
 		ImageArgumentRule(),
+		UnpinnedImagesRule(),
+		EnvironmentFileInjectionRule(),
 		CheckoutModeRule(),
 		ForkAssociationRule(),
 		PullRequestTargetRolesRule(),

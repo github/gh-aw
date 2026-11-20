@@ -20,22 +20,28 @@ func ImageArgumentRule() Rule {
 }
 
 func checkImageArguments(ctx context.Context, input Input) ([]Diagnostic, error) {
+	return checkImages(ctx, input, true, func(raw any, path string, _ map[string]any) ([]Diagnostic, error) {
+		return imageOperand(raw, path)
+	})
+}
+
+func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, string, map[string]any) ([]Diagnostic, error)) ([]Diagnostic, error) {
 	if err := integrityInput(ctx, input); err != nil {
 		return nil, err
 	}
 	var diagnostics []Diagnostic
 	var failures []error
-	check := func(raw any, path string) {
-		found, err := imageOperand(raw, path)
+	check := func(raw any, path string, strategy map[string]any) {
+		found, err := inspect(raw, path, strategy)
 		diagnostics = append(diagnostics, found...)
 		failures = append(failures, err)
 	}
-	checkServices := func(services map[string]any, path string) error {
+	checkServices := func(services map[string]any, path string, strategy map[string]any) error {
 		for _, name := range slices.Sorted(maps.Keys(services)) {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			check(services[name], path+"."+name)
+			check(services[name], path+"."+name, strategy)
 		}
 		return nil
 	}
@@ -45,8 +51,8 @@ func checkImageArguments(ctx context.Context, input Input) ([]Diagnostic, error)
 				return diagnostics, errors.Join(append(failures, err)...)
 			}
 			path := "jobs." + string(job.ID)
-			check(job.Container, path+".container")
-			failures = append(failures, checkServices(job.Services, path+".services"))
+			check(job.Container, path+".container", job.Strategy)
+			failures = append(failures, checkServices(job.Services, path+".services", job.Strategy))
 		}
 	} else {
 		blocks, err := aw.ExecutionBlocks(ctx, input.Document)
@@ -55,13 +61,15 @@ func checkImageArguments(ctx context.Context, input Input) ([]Diagnostic, error)
 			if err := ctx.Err(); err != nil {
 				return diagnostics, errors.Join(append(failures, err)...)
 			}
-			check(block.Fields["container"], block.FieldPath("container"))
+			strategy, strategyErr := policyMapping(block.Fields["strategy"], block.FieldPath("strategy"))
+			failures = append(failures, strategyErr)
+			check(block.Fields["container"], block.FieldPath("container"), strategy)
 			services, err := policyMapping(block.Fields["services"], block.FieldPath("services"))
 			failures = append(failures, err)
-			failures = append(failures, checkServices(services, block.FieldPath("services")))
+			failures = append(failures, checkServices(services, block.FieldPath("services"), strategy))
 		}
 	}
-	if input.Document != nil {
+	if mcp && input.Document != nil {
 		servers, err := authoredPolicyMapping(ctx, input, "mcp-servers")
 		failures = append(failures, err)
 		for _, name := range slices.Sorted(maps.Keys(servers)) {
@@ -70,7 +78,7 @@ func checkImageArguments(ctx context.Context, input Input) ([]Diagnostic, error)
 			}
 			server, err := policyMapping(servers[name], "mcp-servers."+name)
 			failures = append(failures, err)
-			check(server["container"], "mcp-servers."+name+".container")
+			check(server["container"], "mcp-servers."+name+".container", nil)
 		}
 	}
 	return diagnostics, errors.Join(failures...)

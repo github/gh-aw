@@ -113,5 +113,6 @@ func checkAuthoredTemplateInjection(ctx context.Context, input Input) ([]Diagnos
 			failures = append(failures, err)
 		}
 	}
-	return checker.diagnostics, errors.Join(failures...)
+	diagnostics, flowErr := templateInjectionOutputFlows(ctx, input, checker.diagnostics)
+	return diagnostics, errors.Join(append(failures, flowErr)...)
 }

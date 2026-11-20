@@ -127,12 +127,16 @@ func (s *shell) write(target string, sources value, payload string, line int, co
 			s.files[target] = union(s.files[target], sources)
 			s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
 		} else if name != "" {
+			s.a.emit(Site{Kind: EnvironmentFile, Path: s.path, Line: line}, sources)
 			key := "env." + strings.ToLower(name)
 			s.persisted[key] = union(s.persisted[key], sources)
 			s.persisted["shell."+name] = union(s.persisted["shell."+name], sources)
 		} else if len(sources) > 0 {
+			s.a.emit(Site{Kind: EnvironmentFile, Path: s.path, Line: line}, sources)
 			s.a.gap(s.path, "dynamic GITHUB_ENV names are not modeled")
 		}
+	case "$GITHUB_PATH":
+		s.a.emit(Site{Kind: EnvironmentFile, Path: s.path, Line: line}, sources)
 	case "", "/dev/null":
 	default:
 		s.files[target] = union(s.files[target], sources)
