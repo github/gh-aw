@@ -65,7 +65,7 @@ jq -c '.adoption[0] | {kind: .adoption.acceptance_kind, human: .adoption.human_v
 ```bash
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # async
-# browser canvas: http://127.0.0.1:4329/cracktro/#N (N = this slide's row in slides.md), press → to finish, screenshot .stage
+# browser canvas: http://127.0.0.1:4329/cracktro/#deliver-accept-attribute, press → to finish, screenshot .stage
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```
 

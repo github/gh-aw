@@ -253,9 +253,17 @@ func loadExperimentAnalysisInputs(
 	experimentsLog.Printf("Loaded %d experiment config(s) for %s", len(frontmatter.ExperimentConfigs), config.ExperimentName)
 	reconcileExperimentDetailsWithConfigs(details, frontmatter.ExperimentConfigs)
 	if config.RepoOverride != "" {
-		return frontmatter, details, loadRemoteMetricEvalResults(config.RepoOverride, details.WorkflowID), nil
+		metricEvalResults, err := loadRemoteMetricEvalResults(config.RepoOverride, details.WorkflowID)
+		if err != nil {
+			return frontmatter, details, nil, err
+		}
+		return frontmatter, details, metricEvalResults, nil
 	}
-	return frontmatter, details, loadLocalMetricEvalResults(details.WorkflowID), nil
+	metricEvalResults, err := loadLocalMetricEvalResults(details.WorkflowID)
+	if err != nil {
+		return frontmatter, details, nil, err
+	}
+	return frontmatter, details, metricEvalResults, nil
 }
 
 // reconcileExperimentDetailsWithConfigs filters each experiment's persisted variant counts
@@ -407,9 +415,12 @@ func loadEvalObservationSetsForAnalysis(
 	}
 	var evalRecords []evalResultRecord
 	if repoOverride != "" {
-		evalRecords = loadRemoteEvalResultRecords(repoOverride, details.WorkflowID)
+		evalRecords, err = loadRemoteEvalResultRecords(repoOverride, details.WorkflowID)
 	} else {
-		evalRecords = loadLocalEvalResultRecords(details.WorkflowID)
+		evalRecords, err = loadLocalEvalResultRecords(details.WorkflowID)
+	}
+	if err != nil {
+		return nil, nil, err
 	}
 	sets := buildEvalMetricObservationSets(details.Experiments, details.Runs, refs, evalRecords)
 	guardrailSets := buildEvalGuardrailObservationSets(details, guardrailRefs, evalRecords)

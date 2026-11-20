@@ -833,6 +833,12 @@ func TestFetchAndSaveRemoteIncludes_SharedIncludeStaysUnderSharedDir(t *testing.
 	assert.FileExists(t, filepath.Join(tmpDir, ".github", "shared", "helper.md"))
 }
 
+func TestFetchAndSaveRemoteIncludes_ReturnsScannerErrors(t *testing.T) {
+	spec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: "github/gh-aw"}}
+	err := fetchAndSaveRemoteIncludesWithOptions(t.Context(), strings.Repeat("x", 64*1024+1), includesFetchOptions{spec: spec})
+	require.ErrorContains(t, err, "failed to scan workflow content for includes")
+}
+
 // TestFetchAndSaveRemoteFrontmatterImports_InvalidRepoSlug verifies that an invalid
 // RepoSlug (not in owner/repo format) causes the function to return early without error.
 func TestFetchAndSaveRemoteFrontmatterImports_InvalidRepoSlug(t *testing.T) {
