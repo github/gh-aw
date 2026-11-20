@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,14 +60,14 @@ func runConclusion(t *testing.T, executable string, args []string, overrides ...
 	exit := 0
 	if err != nil {
 		var failure *exec.ExitError
-		require.True(t, errors.As(err, &failure), "%v: %s", err, data)
+		require.ErrorAs(t, err, &failure, "%s", data)
 		exit = failure.ExitCode()
 	}
 	parse := func(file string) map[string]string {
 		data, err := os.ReadFile(file)
 		require.NoError(t, err)
 		result := map[string]string{}
-		for _, line := range strings.Split(strings.TrimSuffix(string(data), "\n"), "\n") {
+		for line := range strings.SplitSeq(string(data), "\n") {
 			if line != "" {
 				key, value, ok := strings.Cut(line, "=")
 				require.True(t, ok, "unexpected command-file line: %q", line)
@@ -134,7 +133,7 @@ func TestConcludeThreatDetectionScript_RecordedVerdict(t *testing.T) {
 					require.NotContains(t, got.log, "discarded companion details")
 					require.NotContains(t, got.log, "untrusted-log-text")
 					require.NotContains(t, got.log, "##[")
-					for _, line := range strings.Split(got.log, "\n") {
+					for line := range strings.SplitSeq(got.log, "\n") {
 						require.False(t, strings.HasPrefix(strings.TrimSpace(line), "::notice::"), "unexpected command: %s", line)
 					}
 					if strings.Contains(tc.verdict, `"warnings"`) {
@@ -184,7 +183,7 @@ func TestConcludeThreatDetectionScript_V053RoundTrip(t *testing.T) {
 				require.NoError(t, err, "%s", data)
 			} else {
 				var failure *exec.ExitError
-				require.True(t, errors.As(err, &failure), "%v: %s", err, data)
+				require.ErrorAs(t, err, &failure, "%s", data)
 				require.Equal(t, tc.producerExit, failure.ExitCode(), "%s", data)
 			}
 			writeConclusionInput(t, filepath.Join(dir, "detection.log"), string(data))
@@ -259,7 +258,7 @@ func TestConcludeThreatDetectionScript_HostOutcomes(t *testing.T) {
 			require.Equal(t, tc.exit, got.exit, got.log)
 			require.Equal(t, tc.conclusion, got.outputs["conclusion"])
 			require.Equal(t, tc.reason, got.outputs["reason"])
-			require.Equal(t, "", got.outputs["threat_kinds"])
+			require.Empty(t, got.outputs["threat_kinds"])
 			require.Equal(t, tc.conclusion == "skipped", got.outputs["success"] == "true")
 			require.Empty(t, got.env, "early wrapper outcomes historically do not export variables")
 			require.Contains(t, got.summary, tc.summary)
