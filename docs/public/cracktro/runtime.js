@@ -741,7 +741,7 @@
       "aria-keyshortcuts": "C",
       onclick: e => {
         e.stopPropagation();
-        setCap(!capOn);
+        toggleCap();
       },
     });
     ccb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10.5 10a2.5 2.5 0 1 0 0 4M17.5 10a2.5 2.5 0 1 0 0 4"/></svg>';
@@ -791,7 +791,9 @@
     const ccRows = h("div", { class: "cc-box" }, h("div"), h("div"), h("div"));
     const ccF = h("div", { class: "cc-f" }, ccRows);
     const ccEl = h("div", { class: "cc", "aria-hidden": "true" }, ccF);
-    let capOn = false;
+    // kiosk mode starts captioned; turning CC off keeps it off for later kiosk runs until it is turned back on
+    let capOn = false,
+      capPref = true;
     document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
     const paintSound = () => {
@@ -908,6 +910,7 @@
           }
         }
         kioskArm();
+        if (capPref) setCap(true);
       } else {
         const k = kiosk;
         clearTimeout(k.t);
@@ -1219,7 +1222,7 @@
       else if (e.key === "End") go(lastVis());
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
       else if ((e.key === "k" || e.key === "K") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setKiosk(!kiosk);
-      else if ((e.key === "c" || e.key === "C") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setCap(!capOn);
+      else if ((e.key === "c" || e.key === "C") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) toggleCap();
       else if (e.key === "Escape" && kiosk && !e.defaultPrevented) {
         e.preventDefault();
         setKiosk(false);
@@ -2077,7 +2080,7 @@
     for (const t of ["touchstart", "touchend"]) smp.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
     // ---------- closed captioning ----------
-    // C (or the CC dock button in kiosk mode) captions kiosk mode like a muted TV in a bar or an airport gate: two
+    // Kiosk mode starts captioned; C (or the CC dock button in kiosk mode) toggles it. Captions run kiosk mode like a muted TV in a bar or an airport gate: two
     // speakers talk each slide through as roll-up speech-to-text, >> marking each change of speaker. Their lines are
     // precomputed per slide id in config.captions.scripts (alternating speakers); a slide without one reads its heading
     // and slides.md summary. Each slide stays up until its conversation ends (at least the kiosk interval). Captions
@@ -2172,6 +2175,7 @@
       kioskArm();
       return on;
     }
+    const toggleCap = () => setCap((capPref = !capOn));
     paintCap();
 
     // ---------- animated background ----------
@@ -2282,7 +2286,7 @@
       setView(v);
       if (v) go(firstVis());
     };
-    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk), captions: on => setCap(on ?? !capOn) };
+    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk), captions: on => setCap((capPref = on ?? !capOn)) };
   }
 
   window.CracktroDeck = { h, letters, resetIndex, create };

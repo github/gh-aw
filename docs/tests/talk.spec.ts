@@ -1561,14 +1561,14 @@ test.describe("reusable runtime", () => {
     expect(errors).toEqual([]);
   });
 
-  test("rolls closed captions in kiosk mode from the CC button or C, and ends them with kiosk mode", async ({ page }) => {
+  test("starts kiosk mode with closed captions on, toggles them from the CC button or C, and ends them with kiosk mode", async ({ page }) => {
     await page.clock.install();
     await fakeFullscreen(page);
     const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
     const cc = page.locator(".ccb");
     const box = page.locator(".cc-box");
     await expect(cc).toBeHidden();
-    await page.keyboard.press("c");
+    await page.keyboard.press("k");
     await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
     await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
     await expect(cc).toBeVisible();
@@ -1583,7 +1583,15 @@ test.describe("reusable runtime", () => {
     await expect(cc).toHaveAttribute("title", "Turn on closed captions (CC) (C)");
     await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
     await expect(box).toBeHidden();
-    await cc.click();
+    // turned off, captions stay off for the next kiosk run; C turns them back on (and starts kiosk mode if needed)
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("c");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
     await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
     await page.keyboard.press("Escape");
     await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
