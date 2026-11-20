@@ -318,8 +318,8 @@ func parseGitHubTool(val any) *GitHubToolConfig { //nolint:largefunc // Existing
 			}
 		} else if repos, ok := configMap["repos"]; ok {
 			// Deprecated: use 'allowed-repos' instead of 'repos'.
-			// The deprecation warning is emitted by the generic schema-driven walker in
-			// warnDeprecatedFrontmatterFields; no extra hard-coded warning is needed here.
+			// The deprecation warning is emitted by the generic schema-driven walker;
+			// coexistence with allowed-repos is reported there as well.
 			config.AllowedRepos, config.reposParseErr = parseGitHubReposScope(repos)
 			if config.reposParseErr != nil {
 				config.reposParseErr = fmt.Errorf("github.repos: %w", config.reposParseErr)

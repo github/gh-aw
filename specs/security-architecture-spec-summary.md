@@ -2,9 +2,9 @@
 
 **Document**: `security-architecture-spec.md`  
 **Architecture baseline**: 1.0.0
-**Current specification revision**: 1.1.9 / November 5, 2026
+**Current specification revision**: 1.1.10 / November 11, 2026
 **Status**: Candidate Recommendation  
-**Date**: November 5, 2026
+**Date**: November 11, 2026
 **Last full validation**: v1.0.0 / 2026-07-15
 **Current targeted lock check**: 2026-11-03 (partial; see [validation report](security-architecture-spec-validation.md))
 
@@ -15,13 +15,12 @@ The GitHub Agentic Workflows Security Architecture Specification is a formal W3C
 ### Appendix G Test Mapping (v1.1.9 / 2026-11-05)
 
 The full specification's v1.1.9 revision updates Appendix G.10 test-path mappings
-and clarifies partial-coverage limits. It was published November 5, 2026; this
-summary's current specification revision and date match that header and change
-log.
+and clarifies partial-coverage limits. It was published November 5, 2026; the
+current specification revision and date are listed in the summary header above.
 
 ### Floating-Head Opt-In (v1.1.8 / 2026-10-28)
 
-`checkout.pull-request-floating-head: true` explicitly selects the current API PR head instead of the triggering revision; it is not revision approval. The default remains event revision binding. The opt-in retains SHA fetch and verification, fetch-time head checks, authorization, and checkout-disable policies. Formal revalidation remains pending.
+`checkout.pull-request-floating-head: true` explicitly selects the current API PR head instead of the triggering revision; it is not revision approval. The default remains event revision binding. The opt-in retains SHA fetch and verification, fetch-time head checks, authorization, and checkout-disable policies. The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09; unmodeled revision-isolation and freshness properties remain runtime-only (see [§7b](security-architecture-spec-validation.md#7b-pr-checkout-authorization-and-revision-isolation-section-113---rs-05a)).
 
 ### RS-05a Update (v1.1.7 / 2026-10-27)
 

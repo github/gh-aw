@@ -132,6 +132,10 @@ context that was supplied to policy compilation.
 | `F8_SuggestionIsNonAuthoritative` | `TestFormalFixture_SuggestedAttributionDoesNotSelectPolicy` | A supplied heuristic suggestion cannot select a relaxed policy |
 | `F9_UnmappedAttributionFailsClosed` | `TestFormalFixture_UnmappedLabelsFailClosed` | A linked root whose labels do not match configured intent receives the safest policy |
 
+Add a Behavioral Coverage Map row whenever a new fixture is added to
+`specs/intent-attribution-compliance/`, linking the fixture invariant to its
+formal test.
+
 ## Usage
 
 1. Copy or verify the test file at `pkg/intent/compliance_fixtures_formal_test.go`.

@@ -527,6 +527,12 @@ The staged-mode preview SHOULD identify the `label_to_add` value that would be r
 
 Review changes to the REST failure and retry semantics in [Section 7](#7-error-handling) against the shared [delivery and adoption contract](safe-output-lifecycle.md). Provider failures, including `404`, MUST NOT establish rejection or deletion without supporting evidence.
 
+Synchronize implementation and test changes with these requirements:
+
+- Changes to the label-replacement pipeline MUST be checked against `actions/setup/js/replace_label.cjs` and its tests in `actions/setup/js/replace_label.test.cjs` (RL-036, RL-049a, RL-057–RL-059).
+- Changes to retry behavior MUST be checked against `actions/setup/js/error_recovery.cjs` (`RATE_LIMIT_RETRY_CONFIG`) and its use in `actions/setup/js/replace_label.cjs` (RL-048).
+- Changes to RL-048 coverage MUST be reflected in the §9.4 index and tested in `actions/setup/js/replace_label.test.cjs`.
+
 ---
 
 ## 9. Compliance Testing

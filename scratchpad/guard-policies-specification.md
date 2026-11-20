@@ -575,6 +575,7 @@ This section maps normative sections of this specification to the implementation
 | GP-04 empty array rejection | Empty `allowed-repos` array detection and error | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`) |
 | GP-11 cross-field consistency | Any explicit `allowed-repos` value without `min-integrity` MUST fail validation, including `allowed-repos: "all"` | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`), `pkg/workflow/tools_validation_test.go` (`missing min-integrity field`, `allowed-repos non-all without min-integrity fails`) |
 | GP-10 lockdown precedence | Lockdown + guard-policy conflict detection and warning | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`, `emitGitHubLockdownGuardPolicyWarning`) |
+| GP-S004 legacy field isolation | `allowed-repos` takes precedence; compiler warns that coexisting `repos` is ignored | `pkg/workflow/tools_parser.go` (`parseGitHubTool`), `pkg/workflow/compiler_orchestrator_tools.go` (`warnDeprecatedFrontmatterFields`), `pkg/workflow/tools_validation_github_test.go` |
 | Strict-compilation report | Per-workflow summary of allowed repositories, integrity, user and label policies, and lockdown precedence | `pkg/cli/compile_guard_policy_report.go`, `pkg/cli/compile_guard_policy_report_test.go` |
 
 **2026-11-16 sync note**: GP-01's `allowed-repos` forms are parsed by
@@ -597,7 +598,10 @@ covered by `pkg/workflow/tools_validation_test.go`.
 
 The deprecated `repos` field (YAML key: `repos`) is handled alongside `allowed-repos` in:
 
-- **`pkg/workflow/mcp_github_config.go`** — The `deriveSafeOutputsGuardPolicyFromGitHub()` function reads `"allowed-repos"` first and falls back to `"repos"` when `"allowed-repos"` is absent (lines: `repos, hasRepos := githubTool["allowed-repos"]` then `repos, hasRepos = githubTool["repos"]`).
+- **`pkg/workflow/tools_parser.go`** — `parseGitHubTool()` reads `"allowed-repos"` first and falls back to `"repos"` only when `"allowed-repos"` is absent. If both are present, the compiler warns that `"repos"` is ignored, as required by GP-S004.
+- **`pkg/workflow/compiler_orchestrator_tools.go`** — `warnDeprecatedFrontmatterFields()` emits the GP-S004 coexistence warning.
+- **`pkg/workflow/tools_validation_github_test.go`** — `TestGitHubAllowedReposTakesPrecedenceOverDeprecatedRepos` verifies the selected value and warning.
+- **`pkg/workflow/mcp_github_config.go`** — The `deriveSafeOutputsGuardPolicyFromGitHub()` function reads `"allowed-repos"` first and falls back to `"repos"` when `"allowed-repos"` is absent.
 - **`pkg/workflow/tools_types.go`** — `GitHubToolConfig` declares both `AllowedRepos` (`yaml:"allowed-repos,omitempty"`) and the deprecated `Repos` (`yaml:"repos,omitempty"`) fields.
 
 **Migration command**: `gh aw fix` applies a codemod that replaces `repos:` with `allowed-repos:` in workflow frontmatter. The codemod is idempotent and safe to run multiple times.
@@ -627,6 +631,13 @@ When requirements GP-01–GP-11 (or any later additions) change, update the foll
 3. **`pkg/workflow/mcp_github_config.go`** — Update `deriveSafeOutputsGuardPolicyFromGitHub()` to match any changes to GP-05 or GP-08 derivation rules.
 
 4. **`pkg/workflow/tools_types.go`** — Update `GitHubToolConfig`, `GitHubReposScope`, and `GitHubIntegrityLevel` type definitions and struct tags when field names, types, or constraints change.
+
+### After Changing GP-S004
+
+Review `parseGitHubTool()` and the coexistence warning in
+`warnDeprecatedFrontmatterFields()`; keep
+`TestGitHubAllowedReposTakesPrecedenceOverDeprecatedRepos` aligned with the
+rule that `allowed-repos` wins and the ignored `repos` field is named.
 
 ### After Changing the Safe-Outputs Derivation Rules (§5)
 

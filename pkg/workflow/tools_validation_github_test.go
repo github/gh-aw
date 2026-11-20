@@ -78,6 +78,29 @@ func TestValidateGitHubGuardPolicyNormalizesDeprecatedReposField(t *testing.T) {
 		"deprecated 'repos' alias must be normalized into 'allowed-repos'")
 }
 
+func TestGitHubAllowedReposTakesPrecedenceOverDeprecatedRepos(t *testing.T) {
+	frontmatter := map[string]any{
+		"tools": map[string]any{
+			"github": map[string]any{
+				"repos":         []any{"legacy/repo"},
+				"allowed-repos": []any{"current/repo"},
+				"min-integrity": "approved",
+			},
+		},
+	}
+	tools := NewTools(frontmatter["tools"].(map[string]any))
+	require.NoError(t, validateGitHubGuardPolicy(tools, "test-workflow"))
+	assert.Equal(t, GitHubReposScope{"current/repo"}, tools.GitHub.AllowedRepos)
+
+	compiler := NewCompiler()
+	stderrOutput := captureStderr(func() {
+		compiler.warnDeprecatedFrontmatterFields(frontmatter)
+	})
+
+	assert.Contains(t, stderrOutput, "'tools.github.repos' is ignored")
+	assert.Contains(t, stderrOutput, "'tools.github.allowed-repos' is set")
+}
+
 // TestEmitGitHubLockdownGuardPolicyWarningWhenValidationFails verifies that the
 // lockdown warning is still emitted when guard-policy validation fails, so the
 // warning and error paths are not mutually exclusive.

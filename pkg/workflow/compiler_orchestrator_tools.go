@@ -664,6 +664,18 @@ func (c *Compiler) warnDeprecatedFrontmatterFields(frontmatter map[string]any) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
 		c.IncrementWarningCount()
 	}
+	if tools, ok := frontmatter["tools"].(map[string]any); ok {
+		if github, ok := tools["github"].(map[string]any); ok {
+			_, hasAllowedRepos := github["allowed-repos"]
+			_, hasRepos := github["repos"]
+			if hasAllowedRepos && hasRepos {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+					"'tools.github.repos' is ignored when 'tools.github.allowed-repos' is set.",
+				))
+				c.IncrementWarningCount()
+			}
+		}
+	}
 	deprecatedFields, err := parser.GetMainWorkflowDeprecatedFieldsDeep()
 	if err != nil {
 		orchestratorToolsLog.Printf("Failed to load deprecated fields from schema: %v", err)

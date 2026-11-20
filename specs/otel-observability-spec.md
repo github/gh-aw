@@ -1242,7 +1242,7 @@ Level 3 extension tests MUST prove that the extension is additive. They MUST NOT
 
 ### 17.3 Implementation Map
 
-The following implementation areas are authoritative for version 0.4.0 compatibility:
+The following implementation areas are authoritative for the frozen version 0.4.0 compatibility baseline. Version 0.7.0 adds extensions without replacing this baseline:
 
 | Contract area | Implementation and tests |
 |---|---|
