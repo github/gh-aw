@@ -79,6 +79,28 @@ describe("harness_retry_runner.cjs", () => {
     return { outcome, questions: [{ question: 1, outcome }], latencyMs: 1 };
   }
 
+  it("normalizes guard-zero before success and records the engine's terminal veto", async () => {
+    const options = telemetryOptions([0]);
+    options.runAttempt = async () => ({ exitCode: 0, output: "guard", hasOutput: true, runtimeGuardFired: true, retryAfterMs: 5 });
+    options.handleFailure = vi.fn(({ result }) => {
+      expect(result.exitCode).toBe(1);
+      result.failureClasses = ["engine_guard"];
+      return { action: "stop" };
+    });
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 1, lastResult: { exitCode: 1, retryAfterMs: 5 } });
+    expect(options.handleFailure).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[0]).toMatchObject({ exit_code: 1, outcome: "failure", failure_classes: ["engine_guard"] });
+  });
+
+  it("preserves cancellation precedence over a guard-zero failure handler", async () => {
+    const options = telemetryOptions([0]);
+    options.runAttempt = async () => ({ exitCode: 0, output: "", hasOutput: false, runtimeGuardFired: true, cancelled: true });
+    options.handleFailure = vi.fn();
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 1 });
+    expect(options.handleFailure).not.toHaveBeenCalled();
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[0]).toMatchObject({ exit_code: 1, outcome: "cancelled", failure_classes: ["cancelled"] });
+  });
+
   it.each([
     [5, 10, null, 2, "rate_limit_error"],
     [11, 10, null, 1, "rate_limit_wait_exceeded"],
