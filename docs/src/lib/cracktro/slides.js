@@ -1,22 +1,27 @@
-// Canonical Cracktro slide list (.github/skills/cracktro/slides.md): parser and talk-page metadata injection.
+// Canonical Cracktro slide list (.github/skills/cracktro/slides.md): parser, talk-page metadata injection and the
+// generated kiosk closed-captions script (captions.js).
 // Dependency-free so the Astro config, the dev server and the Playwright tests share one implementation.
 
 import { readFileSync } from "node:fs";
 
 export const SLIDES_FILE = new URL("../../../../.github/skills/cracktro/slides.md", import.meta.url);
 
-const HEADER = "| Id | Heading | Notes | Summary | Keywords |";
-const SEPARATOR = "|---|---|---|---|---|";
-const NOTES = new Set(["", "illustrative"]);
+// A slide: `### <Heading> {#<id>}`, then `#### <Field>` sections in FIELDS order (Notes optional).
+const SLIDE = /^### (.*?)\s*\{#([^}]*)\}\s*$/;
+const FIELD = /^#### (.*?)\s*$/;
+const FIELDS = ["Notes", "Summary", "Keywords", "Captions"];
+const NOTES = new Set(["illustrative"]);
 // A stable `#id` link anchor: lowercase kebab-case.
 const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const FENCE = /^\s*(```|~~~)/;
 
 /**
- * @typedef {{ id: string, heading: string, illustrative: boolean, summary: string, keywords: string[], line: number }} Slide
+ * @typedef {{ id: string, heading: string, illustrative: boolean, summary: string, keywords: string[], captions: string[], line: number }} Slide
  */
 
 /**
- * Parses the slide table. Throws `source:line: message` on any malformed, invalid, empty, unknown or duplicate entry.
+ * Parses the slide list. Throws `source:line: message` on any malformed, invalid, empty, unknown or duplicate entry.
+ * Text before the first `###` heading outside a code fence is free-form documentation.
  * @param {string} text
  * @param {string} [source]
  * @returns {Slide[]}
@@ -26,12 +31,46 @@ export function parseSlides(text, source = "slides.md") {
   const fail = (/** @type {number} */ index, /** @type {string} */ message) => {
     throw new Error(`${source}:${index + 1}: ${message}`);
   };
-  const isRow = (/** @type {string} */ line) => line.trimStart().startsWith("|");
 
-  const headerIndex = lines.findIndex(isRow);
-  if (headerIndex < 0) throw new Error(`${source}: missing slide table (expected header "${HEADER}")`);
-  if (lines[headerIndex] !== HEADER) fail(headerIndex, `expected table header "${HEADER}", found "${lines[headerIndex]}"`);
-  if (lines[headerIndex + 1] !== SEPARATOR) fail(headerIndex + 1, `expected separator "${SEPARATOR}"`);
+  let start = 0;
+  for (let fenced = false; start < lines.length; start++) {
+    if (FENCE.test(lines[start])) fenced = !fenced;
+    else if (!fenced && lines[start].startsWith("### ")) break;
+  }
+  if (start === lines.length) throw new Error(`${source}: no slides (expected "### <Heading> {#<id>}" sections)`);
+
+  /** @type {{ index: number, heading: string, id: string, fields: Map<string, { index: number, lines: { index: number, text: string }[] }> }[]} */
+  const blocks = [];
+  /** @type {{ index: number, lines: { index: number, text: string }[] } | undefined} */
+  let field;
+  for (let index = start; index < lines.length; index++) {
+    const line = lines[index];
+    if (line.startsWith("#")) {
+      const slide = SLIDE.exec(line);
+      const name = FIELD.exec(line)?.[1];
+      if (slide) {
+        blocks.push({ index, heading: slide[1], id: slide[2], fields: new Map() });
+        field = undefined;
+        continue;
+      }
+      if (name !== undefined) {
+        const block = blocks[blocks.length - 1];
+        const label = `"${block.heading}"`;
+        const order = FIELDS.indexOf(name);
+        if (order < 0) fail(index, `unknown field "${name}" for ${label} (expected ${FIELDS.join(", ")})`);
+        if (block.fields.has(name)) fail(index, `duplicate field "${name}" for ${label}`);
+        const later = [...block.fields.keys()].find(other => FIELDS.indexOf(other) > order);
+        if (later) fail(index, `field "${name}" for ${label} must come before "${later}" (order: ${FIELDS.join(", ")})`);
+        field = { index, lines: [] };
+        block.fields.set(name, field);
+        continue;
+      }
+      fail(index, `expected "### <Heading> {#<id>}" or "#### <Field>", found "${line}"`);
+    }
+    if (!line.trim()) continue;
+    if (!field) fail(index, `text outside a "#### <Field>" section of "${blocks[blocks.length - 1].heading}": ${line}`);
+    field.lines.push({ index, text: line });
+  }
 
   /** @type {Slide[]} */
   const slides = [];
@@ -41,41 +80,41 @@ export function parseSlides(text, source = "slides.md") {
   const headings = new Map();
   /** @type {Map<string, number>} */
   const summaries = new Map();
-  let index = headerIndex + 2;
-  for (; index < lines.length && isRow(lines[index]); index++) {
-    const line = lines[index];
-    if (!line.startsWith("| ") || !line.endsWith(" |")) fail(index, `malformed row, expected "${HEADER}": ${line}`);
-    const cells = line
-      .slice(1, -1)
-      .split("|")
-      .map(cell => cell.trim());
-    if (cells.length !== 5) fail(index, `expected 5 cells, found ${cells.length} (cells must not contain "|"): ${line}`);
-    const [id, heading, notes, summary, keywordCell] = cells;
+  for (const { index, heading, id, fields } of blocks) {
+    if (!heading) fail(index, "empty Heading");
     if (!ID.test(id)) fail(index, `invalid Id "${id}" for "${heading}" (expected lowercase kebab-case)`);
     if (ids.has(id)) fail(index, `duplicate Id "${id}" (first on line ${ids.get(id)})`);
-    if (!heading) fail(index, "empty Heading");
-    if (!NOTES.has(notes)) fail(index, `unknown Notes value "${notes}" (expected empty or "illustrative")`);
-    if (!summary) fail(index, `empty Summary for "${heading}"`);
-    const keywords = keywordCell.split(",").map(keyword => keyword.trim());
-    if (keywords.some(keyword => !keyword)) fail(index, `empty keyword for "${heading}" (Keywords is a non-empty, comma-separated list)`);
+    for (const name of FIELDS.slice(1)) if (!fields.has(name)) fail(index, `missing "#### ${name}" for "${heading}"`);
+    const join = (/** @type {string} */ name) => fields.get(name)?.lines.map(line => line.text.trim()).join(" ") ?? "";
+    const at = (/** @type {string} */ name) => /** @type {number} */ (fields.get(name)?.index);
+    const notes = join("Notes");
+    if (fields.has("Notes") && !NOTES.has(notes)) fail(at("Notes"), `unknown Notes value "${notes}" (expected "illustrative", or omit Notes)`);
+    const summary = join("Summary");
+    if (!summary) fail(at("Summary"), `empty Summary for "${heading}"`);
+    const keywords = join("Keywords").split(",").map(keyword => keyword.trim());
+    if (keywords.some(keyword => !keyword)) fail(at("Keywords"), `empty keyword for "${heading}" (Keywords is a non-empty, comma-separated list)`);
     const seen = new Set();
     for (const keyword of keywords) {
-      if (seen.has(keyword.toLowerCase())) fail(index, `duplicate keyword "${keyword}" for "${heading}"`);
+      if (seen.has(keyword.toLowerCase())) fail(at("Keywords"), `duplicate keyword "${keyword}" for "${heading}"`);
       seen.add(keyword.toLowerCase());
     }
+    // Captions: one "- " list item per speaker turn; indented lines continue the turn.
+    /** @type {string[]} */
+    const captions = [];
+    for (const line of /** @type {{ index: number, lines: { index: number, text: string }[] }} */ (fields.get("Captions")).lines) {
+      if (/^[-*](?:\s|$)/.test(line.text)) captions.push(line.text.slice(1).trim());
+      else if (captions.length && /^\s/.test(line.text)) captions[captions.length - 1] = `${captions[captions.length - 1]} ${line.text.trim()}`.trim();
+      else fail(line.index, `Captions for "${heading}" must be a "- " list, one speaker turn per item: ${line.text}`);
+      if (!captions[captions.length - 1]) fail(line.index, `empty caption turn for "${heading}"`);
+    }
+    if (captions.length < 2) fail(at("Captions"), `Captions for "${heading}" need at least two speaker turns ("- " list items)`);
     const headingKey = heading.toLowerCase();
     if (headings.has(headingKey)) fail(index, `duplicate Heading "${heading}" (first on line ${headings.get(headingKey)})`);
-    if (summaries.has(summary)) fail(index, `duplicate Summary for "${heading}" (first on line ${summaries.get(summary)})`);
+    if (summaries.has(summary)) fail(at("Summary"), `duplicate Summary for "${heading}" (first on line ${summaries.get(summary)})`);
     ids.set(id, index + 1);
     headings.set(headingKey, index + 1);
-    summaries.set(summary, index + 1);
-    slides.push({ id, heading, illustrative: notes === "illustrative", summary, keywords, line: index + 1 });
-  }
-  if (!slides.length) fail(headerIndex, "slide table has no rows");
-  for (; index < lines.length; index++) {
-    if (!lines[index].trim()) continue;
-    if (isRow(lines[index])) fail(index, "table row outside the slide table (one table only, no blank lines inside it)");
-    fail(index, `malformed row, expected "${HEADER}": ${lines[index]}`);
+    summaries.set(summary, at("Summary") + 1);
+    slides.push({ id, heading, illustrative: notes === "illustrative", summary, keywords, captions, line: index + 1 });
   }
   return slides;
 }
@@ -139,4 +178,14 @@ export function injectSlideMetadata(html, slides, pageUrl) {
   data.hasPart = slideParts(slides, pageUrl);
   const start = /** @type {number} */ block.index;
   return html.slice(0, start) + block[1] + serializeJsonLd(data) + block[3] + html.slice(start + block[0].length);
+}
+
+/**
+ * The deck's `captions.js`: `window.CracktroCaptions.scripts` maps each slide id, in order, to its caption turns.
+ * Generated by the docs build and dev server; JSON escaping keeps it a single, inert script statement.
+ * @param {Slide[]} slides
+ */
+export function renderCaptions(slides) {
+  const scripts = Object.fromEntries(slides.map(slide => [slide.id, slide.captions]));
+  return `// Generated from .github/skills/cracktro/slides.md (Captions) by the docs build; do not edit.\nwindow.CracktroCaptions = ${serializeJsonLd({ scripts })};\n`;
 }
