@@ -306,7 +306,7 @@
   .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
   .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   @keyframes tp-bob { 50% { transform: translateY(-14px); } }
-  /* guide style (gd-): explainer examples under Turn Intent to Automation (dark only; add body.light overrides if a guide slide moves to a light band); title block top-left, one board that loops a process, a mono caption */
+  /* guide style (gd-): explainer examples under Turn Intent to Workflow (dark only; add body.light overrides if a guide slide moves to a light band); title block top-left, one board that loops a process, a mono caption */
   .gd-head { position: absolute; left: 110px; top: 100px; width: 1700px; }
   .gd-head h2 { margin: 18px 0 0; font-size: 72px; line-height: 1.04; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; color: #f0f6fc; }
   .gd-head h2 em { font-style: normal; color: #4493f8; }
@@ -501,6 +501,37 @@
   .rpa-scan { opacity: 0; } .rpa-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
   .fm-wire.day { stroke-dasharray: 10 8; }
   .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
+  /* Workflows → Process → Factory: one camera zooming out from a workflow to a process to a factory */
+  .wpf .slide-head h2 { font-size: 100px; }
+  .wpf-steps { position: absolute; left: 110px; top: 272px; display: flex; align-items: center; gap: 18px; font: 600 22px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #656c76; }
+  .wpf-steps span { padding: 12px 22px; border-radius: 99px; border: 2px solid #3d444d; transition: color .4s, border-color .4s, background .4s, box-shadow .4s; }
+  .wpf-steps span.done { color: #9198a1; border-color: #3d444d; }
+  .wpf-steps span.on { color: #f0f6fc; border-color: #ab7df8; background: #ab7df824; box-shadow: 0 0 22px #ab7df840; }
+  .wpf-steps i { font-style: normal; color: #656c76; }
+  .wpf-svg { position: absolute; left: 110px; top: 350px; width: 1700px; height: 561px; font-family: "Mona Sans"; }
+  .wpf-n, .wpf-w, .wpf-x, .wpf-dot, .wpf-lbl { transition: opacity .7s; }
+  .wpf-n { opacity: .5; } .wpf-n.on { opacity: 1; }
+  .wpf-n rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: stroke .3s; }
+  .wpf-n.on rect { stroke: #c297ff; filter: drop-shadow(0 0 10px #ab7df8); }
+  .wpf-n.ag.on circle { filter: drop-shadow(0 0 12px #ab7df8); }
+  .wpf-w { stroke: #ab7df8; stroke-width: 2; opacity: .6; }
+  .wpf-x { fill: none; stroke: #79c0ff; stroke-width: 2; stroke-dasharray: 7 6; opacity: .8; }
+  .wpf-dot { fill: #c297ff; filter: drop-shadow(0 0 6px #ab7df8); }
+  .wpf-n.dev circle { fill: #0d1117; stroke: #4493f8; stroke-width: 3; } .wpf-n.dev.on circle { filter: drop-shadow(0 0 12px #4493f8); }
+  .wpf-w { fill: none; }
+  .wpf-bp { opacity: 0; transition: opacity .9s; } .wpf-svg[data-step="2"] .wpf-bp { opacity: 1; }
+  .wpf-bp .fr { fill: none; stroke: #79c0ff; stroke-opacity: .55; stroke-width: 2; } .wpf-bp .fr.t { stroke-width: 1; stroke-opacity: .35; }
+  .wpf-bp .dv { stroke: #79c0ff; stroke-opacity: .45; stroke-dasharray: 10 8; }
+  .wpf-bp text { fill: #79c0ff; font: 600 14px var(--mono); letter-spacing: .12em; } .wpf-bp .bay { font-size: 15px; }
+  .wpf-bp .ln { fill: #9198a1; font-size: 12px; } .wpf-bp .gate { font-size: 13px; text-anchor: middle; letter-spacing: .06em; }
+  .wpf-bp .tb rect { fill: #0d1117cc; stroke: #79c0ff; stroke-opacity: .6; } .wpf-bp .tb line { stroke: #79c0ff; stroke-opacity: .4; } .wpf-bp .tb .k { fill: #f0f6fc; }
+  .wpf-lbl { opacity: 0; } .wpf-lbl .a { fill: #f0f6fc; font: 700 16px "Mona Sans"; text-anchor: middle; } .wpf-lbl .b { fill: #9198a1; font: 500 11px var(--mono); text-anchor: middle; }
+  .wpf-svg[data-step="0"] .wpf-lbl { opacity: 1; }
+  .wpf-svg:not([data-step="2"]) .wpf-x { opacity: 0; }
+  .wpf-svg:not([data-step="2"]) [data-r]:not([data-r="1"]) { opacity: .08; }
+  .wpf-cap { position: absolute; left: 110px; right: 110px; top: 944px; font: 600 34px/1.2 "Mona Sans"; color: #f0f6fc; text-align: center; }
+  .wpf-cap.swap { animation: wpf-in .7s cubic-bezier(.2,.9,.2,1) both; }
+  @keyframes wpf-in { from { opacity: 0; transform: translateY(14px); } }
   .du-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
   .du-t { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
   .du-n { fill: #f0f6fc; font: 800 38px "Mona Sans"; text-anchor: middle; }
@@ -4081,7 +4112,7 @@
     });
   }
 
-  // Turn Intent to Automation: prompt → markdown → issue (from the gh-aw hero)
+  // Turn Intent to Workflow: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
     const PROMPT = "Create a daily agent that removes code duplication";
@@ -4249,7 +4280,7 @@
       el: h(
         "section",
         { class: "slide pfx" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Workflow", "l-grad"))),
         tta,
         links,
         tags,
@@ -4298,7 +4329,7 @@
     return `<g class="${cls}" transform="translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / n).toFixed(4)})">${d.map(p => `<path d="${p}"/>`).join("")}</g>`;
   };
 
-  // Turn Automation into Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
+  // Turn Workflow to Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
   {
     resetIndex();
     const N = 12,
@@ -4452,7 +4483,7 @@
       el: h(
         "section",
         { class: "slide tv" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Workflow to "), letters("Value", "l-grad"))),
         h("div", { class: "tv-live" }, "acme/app · week ", wk, " / 12"),
         h("div", { class: "tv-kpis" }, kpis),
         h("div", { class: "tv-panels" }, panels),
@@ -6655,6 +6686,212 @@
       "M12 .25a.75.75 0 0 1 .673.418l3.058 6.197 6.839.994a.75.75 0 0 1 .415 1.279l-4.948 4.823 1.168 6.811a.751.751 0 0 1-1.088.791L12 18.347l-6.117 3.216a.75.75 0 0 1-1.088-.79l1.168-6.812-4.948-4.823a.75.75 0 0 1 .416-1.28l6.838-.993L11.327.668A.75.75 0 0 1 12 .25Z",
     ],
   };
+
+  // Workflows → Process → Factory: zoom out from one workflow (issue → agent → PR) to a process (workflows in sequence) to a factory (processes feeding each other)
+  {
+    resetIndex();
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // Each line is one process: GitHub artifacts, agents on any harness ("@claude") and developer gates ("dev:mona").
+    // Line 1 stays straight on a 220 grid for the workflow and process zooms; the others are laid out like a plant floor.
+    const LINES = [
+      [["calendar", 380, 88], ["@claude", 580, 88], ["issue", 780, 88], ["dev:ducky", 980, 128, "triages"], ["@codex", 1180, 128], ["pr", 1380, 128], ["@pi", 1580, 88], ["comment", 1800, 88]],
+      [["issue", 120, 250], ["@copilot", 340, 250], ["pr", 560, 250], ["@claude", 780, 250], ["comment", 1000, 250], ["@codex", 1220, 250], ["pr", 1440, 250], ["dev:mona", 1660, 250, "approves"], ["merge", 1860, 350]],
+      [["discussion", 170, 430], ["@agy", 370, 430], ["tasklist", 570, 480], ["@copilot", 770, 480], ["issue", 980, 420], ["dev:mona", 1180, 420, "steers"], ["@claude", 1380, 480], ["pr", 1600, 480]],
+      [["calendar", 330, 590], ["@codex", 530, 590], ["file", 740, 590], ["@pi", 950, 590], ["pr", 1160, 590], ["dev:ducky", 1380, 590, "reviews"], ["@agy", 1600, 590], ["package", 1820, 590]],
+    ];
+    // [line, node] → [line, node]: an output of one process triggers a step of another
+    const CROSS = [
+      [0, 2, 1, 3],
+      [0, 5, 1, 5],
+      [1, 4, 2, 5],
+      [2, 2, 3, 1],
+      [2, 7, 1, 8],
+      [3, 4, 2, 6],
+    ];
+    // camera per step [x, y, w, h], all at the svg's 2000:660 aspect
+    const CAM = [
+      [40, 168, 600, 198],
+      [40, 6, 1480, 488],
+      [0, 0, 2000, 660],
+    ];
+    const STEPS = [
+      ["Workflow", "A workflow goes from an issue, to an agent, to a pull request."],
+      ["Process", "A process sequences workflows: each output triggers the next."],
+      ["Factory", "A factory runs processes on any harness, with developers at the gates."],
+    ];
+    const LBL = [
+      [0, "Issue", "the trigger"],
+      [1, "Agent", "any harness, in Actions"],
+      [2, "PR", "safe output"],
+    ];
+    // elbow route between two nodes, as polyline points
+    const route = ([, x1, y1], [, x2, y2]) => {
+      const m = (x1 + x2) / 2;
+      return y1 === y2 ? [[x1, y1], [x2, y2]] : [[x1, y1], [m, y1], [m, y2], [x2, y2]];
+    };
+    const along = (pts, f) => {
+      const seg = pts.slice(1).map((q, i) => Math.abs(q[0] - pts[i][0]) + Math.abs(q[1] - pts[i][1]));
+      let d = f * seg.reduce((x, y) => x + y, 0),
+        i = 0;
+      while (i < seg.length - 1 && d > seg[i]) d -= seg[i++];
+      const u = seg[i] ? d / seg[i] : 0;
+      return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * u, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u];
+    };
+    const BP = "#79c0ff";
+    let g = `<defs><marker id="wpfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="wpfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${BP}"/></marker>
+      <pattern id="wpfGrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="${BP}" stroke-opacity=".13"/></pattern>
+      <pattern id="wpfGrid5" width="200" height="200" patternUnits="userSpaceOnUse"><path d="M200 0H0V200" fill="none" stroke="${BP}" stroke-opacity=".22"/></pattern>
+      <clipPath id="wpfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
+    // blueprint sheet, shown only once the camera reaches the whole factory
+    g += `<g class="wpf-bp"><rect width="2000" height="660" fill="#0d1a2e99"/><rect width="2000" height="660" fill="url(#wpfGrid)"/><rect width="2000" height="660" fill="url(#wpfGrid5)"/>
+      <rect class="fr" x="8" y="8" width="1984" height="644"/><rect class="fr t" x="16" y="16" width="1968" height="628"/>
+      ${[690, 1290].map(x => `<line class="dv" x1="${x}" y1="16" x2="${x}" y2="644"/>`).join("")}
+      ${[[30, "BAY A · INTAKE"], [706, "BAY B · BUILD"], [1306, "BAY C · REVIEW &amp; SHIP"]].map(([x, t]) => `<text class="bay" x="${x}" y="40">${t}</text>`).join("")}
+      ${LINES.map((l, r) => `<text class="ln" x="${l[0][1] - 36}" y="${l[0][2] - 46}">LINE ${r + 1}</text>`).join("")}
+      <g class="tb"><rect x="30" y="532" width="250" height="104"/><line x1="30" y1="566" x2="280" y2="566"/><line x1="30" y1="600" x2="280" y2="600"/>
+      <text class="k" x="42" y="555">AGENTIC FACTORY</text><text x="42" y="589">DWG 01 · REV A · NTS</text><text x="42" y="623">4 LINES · 5 HARNESSES</text></g>`;
+    LINES.forEach(l => l.forEach(([k, x, y, t]) => t && (g += `<text class="gate" x="${x}" y="${y + 58}">${t}</text>`)));
+    g += `</g>`;
+    for (const [r1, c1, r2, c2] of CROSS) {
+      const [, x1, y1] = LINES[r1][c1],
+        [, x2, y2] = LINES[r2][c2],
+        sg = y2 > y1 ? 1 : -1,
+        sy = y1 + sg * 36,
+        ty = y2 - sg * 40,
+        my = (sy + ty) / 2;
+      g += `<path class="wpf-x" d="M${x1 + 14} ${sy} C${x1 + 14} ${my} ${x2} ${my} ${x2} ${ty}" marker-end="url(#wpfB)"/>`;
+    }
+    const PATHS = LINES.map(l => l.slice(1).map((n, c) => route(l[c], n)));
+    LINES.forEach((l, r) =>
+      PATHS[r].forEach(pts => {
+        const q = pts.map(p => p.slice()),
+          n = q.length - 1;
+        q[0][0] += 40;
+        q[n][0] -= 42;
+        g += `<polyline class="wpf-w" data-r="${r}" points="${q.map(p => p.join(",")).join(" ")}" marker-end="url(#wpfP)"/>`;
+      })
+    );
+    LINES.forEach((l, r) =>
+      l.forEach(([k, x, y]) => {
+        if (k[0] === "@") {
+          const a = k.slice(1);
+          g += `<g class="wpf-n ag" data-r="${r}"><circle cx="${x}" cy="${y}" r="34" ${agDisc(a)}/>${ico(a, x, y + 1, 38, agFg(a))}</g>`;
+        } else if (k.startsWith("dev:")) g += `<g class="wpf-n dev" data-r="${r}"><circle cx="${x}" cy="${y}" r="36"/><image href="assets/avatars/${k.slice(4)}.jpg" x="${x - 32}" y="${y - 32}" width="64" height="64" clip-path="url(#wpfClip)"/></g>`;
+        else g += `<g class="wpf-n" data-r="${r}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(k, x, y, 34)}</g>`;
+      })
+    );
+    g += LINES.map((l, r) => `<circle class="wpf-dot" data-r="${r}" r="9" cx="${l[0][1]}" cy="${l[0][2]}"/>`).join("");
+    g += `<g class="wpf-lbl">${LBL.map(([c, a, b]) => `<text class="a" x="${LINES[1][c][1]}" y="${LINES[1][c][2] + 60}">${a}</text><text class="b" x="${LINES[1][c][1]}" y="${LINES[1][c][2] + 78}">${b}</text>`).join("")}</g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "wpf-svg");
+    svg.innerHTML = g;
+    const nodes = LINES.map((_, r) => [...svg.querySelectorAll(`.wpf-n[data-r="${r}"]`)]),
+      dots = [...svg.querySelectorAll(".wpf-dot")],
+      lit = LINES.map(l => l.map(() => false));
+    const chips = STEPS.map(([t]) => h("span", {}, t)),
+      cap = h("div", { class: "wpf-cap" });
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 640,
+      HOLD = 900,
+      PHASE = [0.35, 0, 0.6, 0.2];
+    let step = 0,
+      t0 = 0,
+      cam = null,
+      vb = CAM[0].slice(),
+      popK = -1;
+    const view = () => svg.setAttribute("viewBox", vb.map(n => n.toFixed(1)).join(" "));
+    const setStep = (s, snap) => {
+      step = s;
+      svg.dataset.step = s;
+      if (snap) {
+        vb = CAM[s].slice();
+        cam = null;
+        view();
+      } else cam = { from: vb.slice(), ts: 0 };
+      chips.forEach((c, i) => {
+        c.classList.toggle("on", i === s);
+        c.classList.toggle("done", i < s);
+      });
+      cap.textContent = STEPS[s][1];
+      cap.classList.remove("swap");
+      void cap.offsetWidth;
+      cap.classList.add("swap");
+      t0 = 0;
+      popK = -1;
+      nodes.forEach((row, r) =>
+        row.forEach((n, c) => {
+          n.classList.remove("on");
+          lit[r][c] = false;
+        })
+      );
+    };
+    slides.push({
+      group: "platform",
+      id: "workflows-process-factory",
+      notes:
+        "What: An illustrative zoom-out in three steps. A workflow is one hop: an issue starts an agent, and the agent opens a pull request through safe outputs. Sequence workflows so each output triggers the next and you have a process. Run many processes that feed each other, each step on whichever harness fits it, with developers triaging, steering, reviewing and approving at the gates, and you have a factory.\nWhy: Every factory is made of processes, and every process is made of small, guarded workflows, so you build and improve the factory one workflow at a time while people keep the decisions.\nWhen: Start with one workflow, then wire its output into the next. Press the right arrow to zoom out a level.",
+      enter(dir) {
+        setStep(dir < 0 ? 2 : 0, true);
+      },
+      onNext() {
+        if (step >= 2) return false;
+        setStep(step + 1);
+        sfx.step();
+        return true;
+      },
+      onPrev() {
+        if (step <= 0) return false;
+        setStep(step - 1);
+        sfx.step();
+        return true;
+      },
+      tick(t) {
+        if (cam) {
+          if (!cam.ts) cam.ts = t;
+          const p = Math.min(1, (t - cam.ts) / 1100),
+            e = ease(p);
+          vb = cam.from.map((a, i) => a + (CAM[step][i] - a) * e);
+          view();
+          if (p >= 1) cam = null;
+        }
+        if (!t0) t0 = t;
+        LINES.forEach((l, r) => {
+          const d = dots[r];
+          if (step < 2 && r !== 1) return void (d.style.opacity = 0);
+          const cmax = step < 2 ? [2, 6][step] : l.length - 1,
+            RUN = cmax * STEP,
+            CYC = RUN + HOLD,
+            u = (t - t0 + (step === 2 ? PHASE[r] * CYC : 0)) % CYC,
+            k = Math.min(cmax - 1, Math.floor(u / STEP)),
+            f = u >= RUN ? 1 : ease(Math.min(1, (u - k * STEP) / STEP / 0.8)),
+            [x, y] = along(PATHS[r][k], f);
+          d.setAttribute("cx", x.toFixed(1));
+          d.setAttribute("cy", y.toFixed(1));
+          d.style.opacity = u < RUN ? 1 : 0;
+          for (let c = 0; c < l.length; c++) {
+            const on = c <= cmax && (c <= k || (c === k + 1 && f > 0.95));
+            if (on !== lit[r][c]) {
+              lit[r][c] = on;
+              nodes[r][c].classList.toggle("on", on);
+            }
+          }
+          if (r === 1 && u < RUN && k !== popK) {
+            popK = k;
+            sfx.pop(k);
+          }
+        });
+      },
+      el: h(
+        "section",
+        { class: "slide wpf" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every factory is made of processes"), h("h2", {}, letters("Workflows → Process → "), letters("Factory", "l-grad"))),
+        h("div", { class: "wpf-steps" }, chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))),
+        svg,
+        cap
+      ),
+    });
+  }
   // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
   // fetches the live count once per repo by numeric id (no owner handle in source) and keeps the default on failure.
   const REPO_API = "https://api.github.com/repositories/";
@@ -13864,7 +14101,7 @@
     });
   }
 
-  // Turn Intent into Value: Turn Intent to Automation's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
+  // Turn Intent into Value: Turn Intent to Workflow's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
   {
     resetIndex();
     // the pieces that define value: [chip, colour, how the agent reads it]
