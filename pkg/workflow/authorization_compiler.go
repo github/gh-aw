@@ -95,7 +95,7 @@ func validateAuthorizationActionMetadata(data *WorkflowData) error {
 			return fmt.Errorf("protected verification requires a valid safe-output action reference: %w", err)
 		}
 		if !ref.IsLocal && config.Inputs == nil {
-			authorizationCompilerLog.Printf("Rejecting remote safe-output action without inline inputs: name=%s", name)
+			authorizationCompilerLog.Printf("Rejecting remote safe-output action without inline inputs: name=%q", name)
 			return fmt.Errorf("protected verification requires inline inputs for remote safe-output action %q; remote metadata fetching is disabled", name)
 		}
 	}
