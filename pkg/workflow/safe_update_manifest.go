@@ -146,7 +146,7 @@ func NewGHAWManifest(secretNames []string, actionRefs []string, failures []GHAWM
 	sortedSkills := normalizeManifestSpecs(skillSpecs)
 	sortedPlugins := normalizeManifestSpecs(pluginSpecs)
 
-	hasPR, hasPRTarget := detectPullRequestEvents(onField)
+	hasPR, hasPRTarget := extractPullRequestEventPresenceFromOnField(onField)
 
 	return &GHAWManifest{
 		Version:              currentGHAWManifestVersion,
@@ -196,30 +196,6 @@ func normalizeManifestContainers(containers []GHAWManifestContainer) []GHAWManif
 		}
 	})
 	return sorted
-}
-
-func detectPullRequestEvents(onField any) (hasPR bool, hasPRTarget bool) {
-	switch v := onField.(type) {
-	case string:
-		return v == "pull_request", v == "pull_request_target"
-	case []any:
-		for _, item := range v {
-			event, ok := item.(string)
-			if !ok {
-				continue
-			}
-			if event == "pull_request" {
-				hasPR = true
-			}
-			if event == "pull_request_target" {
-				hasPRTarget = true
-			}
-		}
-	case map[string]any:
-		_, hasPR = v["pull_request"]
-		_, hasPRTarget = v["pull_request_target"]
-	}
-	return hasPR, hasPRTarget
 }
 
 func collectMemoryValidationScripts(data *WorkflowData) []GHAWManifestMemoryValidationScript {
