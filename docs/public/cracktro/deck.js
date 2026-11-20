@@ -1274,6 +1274,22 @@
   .rollout s { text-decoration: none; color: #3d444d; }
   .cg > .xbadge, .xp > .xbadge { top: 24px; }
   .ek > .xbadge { right: 560px; }
+  /* --- gh cao: dispatcher & worker anatomy (reuses an- file, band and callout styles) --- */
+  .dw .an-file { top: 262px; width: 740px; }
+  .dw .an-code { font: 500 20px/28px var(--mono); }
+  .dw .an-ln { height: 28px; }
+  .dw-tag { margin-left: auto; font: 700 14px/1 var(--mono); letter-spacing: .16em; padding: 6px 10px; border-radius: 8px; color: #0d1117; background: var(--c); }
+  .dw .an-call { top: 856px; width: 553px; height: 130px; }
+  .dw .an-call p { font-size: 20px; }
+  .dw-wire { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; overflow: visible; }
+  .dw-wire path { fill: none; stroke: var(--c); stroke-width: 3; stroke-dasharray: 6 8; opacity: 0; transition: opacity .5s; }
+  .dw-wire.on path { opacity: .7; animation: an-flow .8s linear infinite; }
+  .dw-wire circle { fill: var(--c); opacity: 0; transition: opacity .4s; }
+  .dw-wire.on circle { opacity: 1; }
+  .dw-lbl { position: absolute; left: 960px; top: 760px; transform: translate(-50%, -50%) scale(.9); padding: 8px 12px; border-radius: 10px; background: #0d1117; border: 1px solid var(--c);
+    font: 600 16px/1.25 var(--mono); color: var(--c); text-align: center; white-space: nowrap; opacity: 0; transition: opacity .5s, transform .6s cubic-bezier(.3,1.6,.4,1); }
+  .dw-lbl.on { opacity: 1; transform: translate(-50%, -50%); }
+  .dw-lbl small { display: block; font-size: 13px; color: #9198a1; }
   /* --- gh cao: hyperscale agentics --- */
   .hyp-scale, .hyp-cv, .hyp-sinks, .hyp-outs { position: absolute; opacity: 0; }
   .active .hyp-scale, .active .hyp-cv, .active .hyp-sinks, .active .hyp-outs { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
@@ -16595,6 +16611,169 @@
         ),
         cv,
         h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])
+      ),
+    });
+  }
+
+  // Dispatcher & worker: the EU CRA campaign's dispatcher and one worker, condensed; both import shared control,
+  // the dispatcher hands one target_repo to each worker, and each prompt keeps only its mission
+  {
+    resetIndex();
+    const C = { ctl: "#56d4dd", wk: "#b3f0f5", pr: "#d1d7e0" };
+    const tok = (k, text) => h("span", { class: "an-tok", "--c": C[k], style: { color: C[k] } }, text);
+    const yamlLine = l => {
+      if (l === "---") return [h("span", { style: { color: "#656c76" } }, l)];
+      const [code, note] = l.split(/(?<=\S)\s+(?=# )/);
+      const m = code.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
+      const kids = m ? [m[1], h("span", { style: { color: m[1] ? "#7ee787" : "#ff7b72" } }, m[2]), h("span", { style: { color: "#a5d6ff" } }, m[3])] : [h("span", { style: { color: /^\s*#/.test(code) ? "#656c76" : "#a5d6ff" } }, code)];
+      if (note) kids.push(h("span", { style: { color: "#656c76" } }, " " + note));
+      return kids;
+    };
+    const heading = text => [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, text)];
+    const control = role => [
+      "imports:",
+      "  - uses: shared/control.md",
+      "    with:",
+      "      campaign: eu-cra-compliance",
+      `      role: ${role}`,
+    ];
+    // [file, tag, YAML lines, prompt lines, bands: [kind, first line, last line]]
+    const FILES = [
+      [
+        "eu-cra-compliance.md",
+        "dispatcher",
+        ["---", "on: { schedule: hourly }", ...control("orchestrator"), "safe-outputs:", "  dispatch-workflow:", "    workflows:", "      - eu-cra-compliance-supply-chain-sbom-auditor", "      # + 5 more CRA workers", "    max: 48", "---"],
+        [heading("# EU CRA"), ["Rank org repos by product signals, then"], ["pick useful ", tok("wk", "workers"), " per repo. ", tok("pr", "Never audit.")]],
+        [
+          ["ctl", 3, 7],
+          ["wk", 8, 13],
+          ["pr", 15, 17],
+        ],
+      ],
+      [
+        "eu-cra-compliance-supply-chain-sbom-auditor.md",
+        "worker",
+        ["---", "on: workflow_dispatch  # one target_repo", ...control("worker"), "      worker: supply-chain-sbom-auditor", "safe-outputs:", "  create-issue:", "    max: 1", "---"],
+        [heading("# EU CRA / Supply Chain"), ["Audit ", tok("wk", "target/"), " SBOM and provenance evidence."], ["File one issue. ", tok("pr", "Never claim compliance.")]],
+        [
+          ["wk", 2, 2],
+          ["ctl", 3, 8],
+          ["wk", 9, 11],
+          ["pr", 13, 15],
+        ],
+      ],
+    ];
+    const LH = 28,
+      LEFT = [110, 1070],
+      TOP = 262,
+      CODE_TOP = TOP + 56 + 18;
+    const panes = FILES.map(([file, tag, yaml, body, spans], p) => {
+      const lines = [...yaml.map(yamlLine), ...body].map(kids => h("div", { class: "an-ln" }, kids));
+      const bands = spans.map(([k, a, b]) => {
+        const el = h("div", { class: "an-band", "--c": C[k], style: { top: `${18 + (a - 1) * LH}px`, height: `${(b - a + 1) * LH}px` } });
+        return { k, a, b, el };
+      });
+      const el = h(
+        "div",
+        { class: "an-file", style: { left: `${LEFT[p]}px` } },
+        h("div", { class: "file" }, `📄 ${file}`, h("span", { class: "dw-tag", "--c": p ? C.wk : C.ctl }, tag)),
+        h(
+          "div",
+          { class: "an-code" },
+          bands.map(b => b.el),
+          lines
+        )
+      );
+      return { el, lines, bands, toks: [...el.querySelectorAll(".an-tok")] };
+    });
+    const lineY = n => CODE_TOP + (n - 1) * LH + LH / 2;
+    const wire = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    wire.setAttribute("class", "dw-wire");
+    wire.setAttribute("viewBox", "0 0 1920 1080");
+    wire.style.setProperty("--c", C.wk);
+    const y0 = lineY(11),
+      y1 = lineY(2),
+      x0 = LEFT[0] + 740,
+      x1 = LEFT[1];
+    wire.innerHTML = `<path d="M ${x0} ${y0} C ${x0 + 120} ${y0} ${x1 - 120} ${y1} ${x1} ${y1}"/><circle r="9"/>`;
+    const path = wire.querySelector("path"),
+      packet = wire.querySelector("circle");
+    let plen = 0;
+    const lbl = h("div", { class: "dw-lbl", "--c": C.wk }, "target_repo", h("small", {}, "one repo per worker"));
+    const CALLS = [
+      ["ctl", "Import control", "imports:", ["Shared ", h("code", {}, "control.md"), " brings admission, credentials and caps; ", h("code", {}, "role"), " picks the job."]],
+      ["wk", "Workers", "dispatch-workflow", ["The dispatcher ranks repos and dispatches; each worker gets one ", h("code", {}, "target_repo"), "."]],
+      ["pr", "Simple prompt", "markdown body", "Just the mission. Control supplies targets, limits and the report format."],
+    ];
+    const calls = CALLS.map(([k, title, chip, text], i) =>
+      h("div", { class: "an-call", "--c": C[k], style: { left: `${110 + i * 573}px` } }, h("div", { class: "an-num" }, String(i + 1).padStart(2, "0")), h("h3", {}, title, h("code", {}, chip)), h("p", {}, text))
+    );
+    const KINDS = ["ctl", "wk", "pr"];
+    const lit = (i, on) => {
+      const k = KINDS[i];
+      for (const pane of panes)
+        for (const b of pane.bands) {
+          if (b.k !== k) continue;
+          b.el.classList.toggle("on", on);
+          for (let n = b.a - 1; n < b.b; n++) pane.lines[n].classList.toggle("on", on);
+        }
+      calls[i].classList.toggle("on", on);
+      if (k === "wk") [wire, lbl].forEach(e => e.classList.toggle("on", on));
+    };
+    const REVEAL = 0.6,
+      GAP = 1.1,
+      CYCLE = REVEAL + GAP * 3,
+      HOT = 2.6;
+    let t0 = 0,
+      seen = -1,
+      skip = false;
+    slides.push({
+      group: "cao",
+      notes:
+        "What: An illustrative, condensed pair from the EU CRA campaign in gh cao, a research prototype whose interfaces may change. The dispatcher and each worker import the same shared control component with a different role; the dispatcher may only dispatch the listed workers, each worker gets one target repository and files one advisory issue. Only the mission stays in each prompt.\nWhy: Admission, credentials, caps and reporting live in one reviewed file, so campaign authors write short prompts and cannot widen authority.\nWhen: Use this shape when one campaign fans out over many repositories.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        skip = false;
+        if (!plen) plen = path.getTotalLength();
+        KINDS.forEach((_, i) => lit(i, false));
+        [...calls, ...panes.flatMap(p => [...p.bands.map(b => b.el), ...p.toks])].forEach(e => e.classList.remove("hot"));
+      },
+      onNext() {
+        if (seen >= 2) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.min(2, Math.floor((e - REVEAL) / GAP));
+        while (seen < n) {
+          seen++;
+          lit(seen, true);
+          sfx.pop(seen * 2);
+        }
+        if (seen >= 1 && plen) {
+          const pt = path.getPointAtLength(((e * 0.7) % 1) * plen);
+          packet.setAttribute("cx", pt.x);
+          packet.setAttribute("cy", pt.y);
+        }
+        const hot = e >= CYCLE ? KINDS[Math.floor((e - CYCLE) / HOT) % 3] : null;
+        calls.forEach((c, i) => c.classList.toggle("hot", hot === KINDS[i]));
+        for (const pane of panes) {
+          pane.bands.forEach(b => b.el.classList.toggle("hot", hot === b.k));
+          pane.toks.forEach(el => el.classList.toggle("hot", el.style.getPropertyValue("--c") === C[hot]));
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide dw", "--lg": "#56d4dd" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · campaign anatomy · EU CRA"), h("h2", {}, letters("Dispatcher & "), letters("worker", "l-grad"))),
+        panes.map(p => p.el),
+        wire,
+        lbl,
+        calls
       ),
     });
   }
