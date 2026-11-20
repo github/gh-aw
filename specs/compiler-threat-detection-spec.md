@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.104
+**Version**: 1.0.105
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.104` | Unreleased |
+| `1.0.60`–`1.0.105` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -831,6 +831,57 @@ compiler wiring and local/mocked behavior, not live AWF deployment, provider
 availability, or absence of semantic false skips. Linux-only guarded-file
 tests remain explicit coverage gaps on other platforms. No new `CTR-*` or
 compiler compliance-test identifier is introduced.
+
+### 7.12 Experimental Token Broker Credential Boundary
+
+Token broker authentication is experimental; enabling any broker capability MUST emit the standard compiler experimental-feature warning. The compiler MUST fail closed on configurations that would expose or mix broker credentials:
+
+- `tools.github.token-broker: true` and `safe-outputs.token-broker: true` MUST each be rejected when combined with `github-app` or `github-token` at the same level.
+- `tools.github.token-broker: true` MUST require an enabled AWF sandbox that supports `--exclude-env`, so Actions OIDC request variables and the broker URL are excluded from the agent.
+- `token-broker.copilot-request` MUST be rejected for Copilot inference in the main agent job and when combined with `permissions.copilot-requests: write`.
+- Custom jobs that merely set the broker URL variable MUST NOT receive `id-token` permission.
+- Jobs that exchange broker credentials on self-hosted runners MUST produce a compiler warning, because a persistent runner can carry code planted by an earlier job into a credential job.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Credential-source exclusivity, sandbox requirement, inference and permission conflicts | `pkg/workflow/token_broker.go`: `validateTokenBrokerGitHubConfig`, `validateTokenBrokerInference`, `validateTokenBrokerRequestPermissions` | `TestTokenBrokerGitHubCredentialConflicts`, `TestTokenBrokerGitHubRequiresBootstrapIsolation`, `TestTokenBrokerRejectsUnsupportedInference`, `TestTokenBrokerRejectsLegacyInferenceFallback` |
+| Bootstrap variable exclusion | `pkg/workflow/awf_env.go`: `ComputeAWFExcludeEnvVarNames` | `TestTokenBrokerBootstrapExcluded` |
+| Custom-job permissions are not implicitly elevated for broker use | `pkg/workflow/compiler_custom_job_properties.go`: `extractCustomJobCoreProperties` | `TestTokenBrokerDoesNotGrantOIDCToCustomJobs` |
+| Self-hosted runner warning | `pkg/workflow/compiler.go`, `token_broker.go`: `tokenBrokerSelfHostedJobs` | `TestTokenBrokerSelfHostedJobs`, `TestTokenBrokerExperimentalWarning` |
+
+These are compile-time guards, not evidence of broker-side authorization, replay resistance, or runner cleanliness; those obligations belong to the [Token Broker Specification](../docs/src/content/docs/specs/token-broker-specification.md). The bounded TLA+ model in `specs/token-broker/` is informative and is not a conformance artifact. No new `CTR-*` or compliance-test identifier is introduced.
+
+### 7.13 Protected Safe-Output Authorization Baseline Verification
+
+`gh aw validate --authorization-policy` is a read-only verifier for an externally protected baseline. It MUST fail closed: checks that cannot be completed or trusted MUST yield `incomplete`, while detected non-compliance, such as an `authority_mismatch`, `required_workflow_missing`, or `generated_workflow_drift`, MUST yield `violations`. Neither status passes; only `compliant` passes. The verifier MUST:
+
+- require the complete `.github/workflows` inventory (no subsets, directory overrides, or engine overrides) and a checker-supplied verified repository ID matching the policy; accept an optional checker-supplied repository slug, validating it when present, for repository-scattered schedules; and, when pinned, require a matching policy SHA-256 digest;
+- compile an isolated, immutable candidate commit snapshot with a Git environment that ignores inherited repository, object, alternate, and configuration variables;
+- require literal authority bindings (endpoint and audience) that equal the baseline for every eligible safe-output route, rejecting runtime-variable bindings and missing requirements;
+- report generated-lock drift, missing baseline-required workflows, uncovered executors, unresolved imports, and unapproved handwritten executable workflows.
+
+Finding codes are `authorization_required`, `mutable_authority_binding`, `authority_mismatch`, `required_workflow_missing`, `generated_workflow_drift`, `executor_uncovered`, `inventory_unresolved`, `verification_incomplete`, and `policy_invalid`.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Policy parsing, pinning, and fail-closed command flow | `pkg/cli/authorization_command.go`, `authorization_policy.go` | `TestAuthorizationPolicySchema`, `TestAuthorizationPolicyCommandFailsClosed`, `TestAuthorizationCommandPolicyDigestDisclosure` |
+| Isolated snapshot and Git environment | `pkg/cli/authorization_snapshot.go` | `TestAuthorizationGitEnvironmentIsolated`, `TestAuthorizationPolicySnapshot` |
+| Binding comparison, lock drift, inventory, and import provenance | `pkg/cli/authorization_verify.go` | `TestAuthorizationPolicySnapshot`, `TestAuthorizationDependencyProvenance` |
+
+The verifier proves that the compiled safe-output authority bindings match the baseline; it does not prove that the authority endpoint enforces policy or that handwritten workflows outside gh-aw authorization scope are safe. No new `CTR-*` or compliance-test identifier is introduced.
+
+### 7.14 Host Runtime Temporary Paths and Source-Download Git Isolation
+
+Host-only runtime temporary variables (`GH_AW_RUNTIME_TMP_DIR`, `GH_AW_RUNTIME_TMP_ID`, `TMPDIR`) exported by AWF installation are not writable inside the AWF sandbox. The compiler MUST exclude them from every AWF phase (agent and detection) when the pinned AWF supports `--exclude-env`, and MUST unset them before the engine command when it does not.
+
+Git operations on disposable source downloads MUST use the hardened command context in `pkg/gitutil/source_command.go`: no hooks, fsmonitor, templates, credential helpers, or non-HTTPS protocols; no inherited `GIT_*` variables; ignored system and global configuration; and credentials supplied only through per-process configuration, never argv, clone URLs, or on-disk configuration.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Host runtime temp-variable exclusion and legacy fallback | `pkg/workflow/awf_command_builder.go`: `awfHostRuntimeTmpEnvVarNames`, `BuildAWFCommand` | `TestHostRuntimeTmpEnvExcludedFromAWFSandboxes`, `TestHostRuntimeTmpEnvLegacyAWFFallback` |
+| Hardened source-download Git | `pkg/gitutil/source_command.go`: `SourceCommandContext`, `sourceCommandEnvironment` | `pkg/gitutil/source_command_test.go`: `TestSourceCommandContextClone`, `TestSourceCommandContextRejectsExecutableTransports`, `TestCreateSourceTempDirWithRelativeTMPDIR` |
+
+Exclusion prevents inheritance of the variable names only; it does not protect credentials held in another process's memory. No new `CTR-*` or compliance-test identifier is introduced.
 
 ## 8. Compliance Testing
 
