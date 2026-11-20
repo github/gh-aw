@@ -1791,17 +1791,17 @@
   .zs-cut.on { opacity: 1; }
   .zs-phase { fill: #f0f6fc; font: 600 18px var(--mono); text-anchor: end; }
   .zs-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc55); }
-  .so-box { position: absolute; top: 300px; width: 500px; height: 620px; padding: 30px 34px; border-radius: 22px; border: 2px solid var(--c);
+  .so-box { position: absolute; top: 0; width: 420px; height: 620px; padding: 30px 22px; border-radius: 22px; border: 2px solid var(--c);
     background: #0d1117ee; box-shadow: 0 0 50px -24px color-mix(in srgb, var(--c) 33%, transparent), inset 0 0 60px -50px color-mix(in srgb, var(--c) 33%, transparent); opacity: 0; transition: box-shadow .5s, border-color .5s; }
   .active .so-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 400ms); }
   .so-box.hot { box-shadow: 0 0 90px -10px color-mix(in srgb, var(--c) 33%, transparent), inset 0 0 90px -40px color-mix(in srgb, var(--c) 33%, transparent); }
   .so-box i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
-  .so-box h3 { margin: 16px 0 22px; font-size: 50px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .so-box h3 { margin: 16px 0 22px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
   .so-who { display: flex; align-items: center; gap: 16px; font-size: 25px; color: #d1d7e0; }
   .so-av { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; flex: none; background: #8957e5; }
   .so-av.det { background: #3d444d; }
   .so-av svg { width: 36px; height: 36px; }
-  .so-perm { margin-left: auto; font: 600 17px/1 var(--mono); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+  .so-perm { margin-left: auto; white-space: nowrap; font: 600 17px/1 var(--mono); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
   /* the agent's box is a cage: bars that flash orange (blocked) when it tries to write directly */
   .so-cage { position: absolute; inset: 0; border-radius: 20px; pointer-events: none; opacity: .5; transition: opacity .3s;
     background: repeating-linear-gradient(90deg, transparent 0 46px, #a371f733 46px 50px); }
@@ -1811,7 +1811,7 @@
   .so.p-deny:not(.p-safe) .so-b0 { border-color: #db6d28; box-shadow: 0 0 90px -10px #db6d2855, inset 0 0 90px -40px #db6d2855; }
   .so.p-deny:not(.p-safe) .so-b0 .so-shake { animation: so-shake .45s linear both; }
   @keyframes so-shake { 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
-  .so-term { margin-top: 22px; padding: 16px 14px; border-radius: 12px; background: #010409; border: 1px solid #30363d; font: 500 17px/1.55 var(--mono); color: #d1d7e0; min-height: 132px; }
+  .so-term { margin-top: 22px; padding: 16px 10px; border-radius: 12px; background: #010409; border: 1px solid #30363d; font: 500 17px/1.55 var(--mono); color: #d1d7e0; min-height: 132px; }
   .so-term div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .so-term .l2, .so-term .l3 { opacity: 0; transition: opacity .3s; }
   .so-term .l2 { color: #ffa657; }
@@ -1826,19 +1826,35 @@
     font: 700 18px/28px var(--mono); border: 2px solid #3d444d; color: #3d444d; transition: all .3s; }
   .so-checks li.ok { color: #f0f6fc; }
   .so-checks li.ok::before { content: "✓"; border-color: #4493f8; background: #4493f8; color: #0d1117; box-shadow: 0 0 16px #4493f855; }
-  .so-arrow { position: absolute; top: 560px; width: 100px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
+  .so-arrow { position: absolute; top: 260px; width: 70px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
   .active .so-arrow { animation: sec-arr .5s ease-out both calc(var(--i) * 500ms + 900ms), nudge 1.6s ease-in-out infinite calc(var(--i) * 500ms + 1400ms); }
-  .so-call { position: absolute; top: 508px; width: 100px; text-align: center; white-space: nowrap; font: 600 12px/1.2 var(--mono); color: #9198a1; opacity: 0; }
+  .so-call { position: absolute; top: 208px; width: 70px; text-align: center; white-space: nowrap; font: 600 12px/1.2 var(--mono); color: #9198a1; opacity: 0; }
   .active .so-call { animation: rise .5s ease-out both calc(var(--i) * 500ms + 1100ms); }
   /* the proposed issue travels box to box */
-  .so-card { position: absolute; top: 742px; width: 420px; height: 150px; padding: 18px 22px; border-radius: 14px; background: #161b22; border: 2px dashed #4493f8;
+  .so-card { position: absolute; top: 442px; width: 380px; height: 150px; padding: 18px 22px; border-radius: 14px; background: #161b22; border: 2px dashed #4493f8;
     box-shadow: 0 10px 40px -10px #000; opacity: 0; transform: scale(.85); overflow: hidden; z-index: 3;
     transition: left .9s cubic-bezier(.6,0,.2,1), opacity .4s, transform .5s cubic-bezier(.3,1.6,.4,1), border-color .4s, box-shadow .4s; }
   .so.p-safe .so-card { opacity: 1; transform: none; }
   .so.p-safe .so-card.moving { transform: translateY(-26px) rotate(-2deg); }
   .so-card .t { display: flex; align-items: center; gap: 12px; font: 600 25px/1.2 "Mona Sans"; color: #f0f6fc; }
   .so-card .t svg { width: 28px; height: 28px; flex: none; }
-  .so-card .lb { margin-top: 12px; display: flex; gap: 10px; }
+  .so-card .lb { margin-top: 12px; display: flex; gap: 10px; opacity: 0; transition: opacity .4s; }
+  .so.p-run .so-card .lb { opacity: 1; }
+  .so-card .pfx { display: none; color: #79c0ff; }
+  .so.p-run .so-card .pfx { display: inline; }
+  /* front matter on the left, the propose -> scan -> write flow scaled on the right */
+  .so-flow { position: absolute; left: 770px; top: 320px; width: 1400px; height: 620px; transform: scale(.771); transform-origin: 0 0; }
+  .so-y { position: absolute; left: 70px; top: 320px; width: 660px; padding: 0 0 18px; border-radius: 18px; border: 2px solid #4493f8; background: #010409ee;
+    box-shadow: 0 0 60px -26px #4493f855; opacity: 0; overflow: hidden; }
+  .active .so-y { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 200ms; }
+  .so-y .cm-h { display: flex; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid #30363d; font: 600 17px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
+  .so-y .cm-h b { color: #79c0ff; font-weight: 600; }
+  .so-yr { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 24px; border-left: 4px solid transparent; transition: background .4s, border-color .4s; }
+  .so-yr code { font: 500 21px/1.35 var(--mono); color: #d1d7e0; white-space: pre; }
+  .so-yr code b { font-weight: 600; color: #79c0ff; }
+  .so-yr span { font: 500 17px/1.2 "Mona Sans"; color: #9198a1; text-align: right; white-space: nowrap; }
+  .so.p-safe:not(.p-to1) .so-yr.y-ci, .so.p-run .so-yr.y-ap { background: #4493f81f; border-left-color: #4493f8; }
+  .so.p-safe:not(.p-to1) .so-yr.y-ci span, .so.p-run .so-yr.y-ap span { color: #f0f6fc; }
   .so-card .lb span { font: 600 16px/1 var(--mono); padding: 6px 12px; border-radius: 99px; border: 1px solid #3d444d; background: #ffffff0d; color: #d1d7e0; }
 
   /* --- agent memory: integrity-filtered inputs → agent recalls and works → trusted jobs persist the memories --- */
@@ -6166,7 +6182,7 @@
   {
     const AG = pickAgent();
     resetIndex();
-    const BX = [110, 710, 1310];
+    const BX = [0, 490, 980];
     const CMD = 'gh issue create -t "Flaky test"';
     const typed = h("span", { class: "cur" });
     const status = h("span", { class: "st" }, "proposed");
@@ -6174,7 +6190,7 @@
       "div",
       { class: "so-card" },
       h("div", { class: "so-beam" }),
-      h("div", { class: "t" }, h("span", { class: "so-ico", "data-ico": "issue", "data-fill": "#f0f6fc" }), "Flaky test in cart handler"),
+      h("div", { class: "t" }, h("span", { class: "so-ico", "data-ico": "issue", "data-fill": "#f0f6fc" }), h("span", {}, h("span", { class: "pfx" }, "[flaky] "), "Flaky test in cart")),
       h("div", { class: "lb" }, h("span", {}, "bug"), h("span", {}, "agentic")),
       status
     );
@@ -6225,14 +6241,37 @@
       CYC = 14000,
       CHECK0 = 5500,
       CHECKDT = 420;
+    // [indent, key, value, note, row class]: real safe-outputs options from the workflow schema
+    const YAML = [
+      [0, "safe-outputs", "", "declared writes only"],
+      [1, "create-issue", "", "a typed tool, not a token", "y-ci"],
+      [2, "title-prefix", '"[flaky] "', "job prepends it", "y-ap"],
+      [2, "labels", "[bug, agentic]", "job attaches them", "y-ap"],
+      [2, "max", "3", "≤ 3 issues per run", "y-ap"],
+      [2, "close-older-issues", "true", "retires stale ones"],
+      [1, "add-comment", "", "another declared type"],
+      [2, "target", "triggering", "this issue or PR only"],
+      [2, "hide-older-comments", "true", "minimizes old ones"],
+    ];
+    const yaml = h(
+      "div",
+      { class: "so-y" },
+      h("div", { class: "cm-h" }, h("b", {}, "triage.md"), "FRONT MATTER"),
+      YAML.map(([n, k, v, note, cls]) => h("div", { class: `so-yr ${cls || ""}` }, h("code", {}, "  ".repeat(n), h("b", {}, k), ":", v ? ` ${v}` : ""), h("span", {}, note)))
+    );
     const el = h(
       "section",
       { class: "slide so" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents propose, jobs write"), h("h2", {}, letters("Safe "), letters("outputs", "l-grad"))),
-      boxes,
-      [0, 1].map(i => h("div", { class: "so-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
-      [0, 1].map(i => h("div", { class: "so-call", "--i": i, style: { left: `${BX[i] + 500}px` } }, i ? "verdict" : "create-issue")),
-      card
+      yaml,
+      h(
+        "div",
+        { class: "so-flow" },
+        boxes,
+        [0, 1].map(i => h("div", { class: "so-arrow", "--i": i, style: { left: `${BX[i] + 420}px` } }, "→")),
+        [0, 1].map(i => h("div", { class: "so-call", "--i": i, style: { left: `${BX[i] + 420}px` } }, i ? "verdict" : "create-issue")),
+        card
+      )
     );
     let t0 = 0,
       cyc = -1,
@@ -6241,7 +6280,7 @@
       iconsDrawn = false;
     const place = (i, instant) => {
       if (instant) card.style.transition = "none";
-      card.style.left = `${BX[i] + 40}px`;
+      card.style.left = `${BX[i] + 20}px`;
       if (instant) {
         void card.offsetWidth;
         card.style.transition = "";
@@ -6256,7 +6295,7 @@
       key: "safe-outputs",
       group: "security",
       notes:
-        "What: An illustrative run with a synthetic issue. The read-only agent's direct write is refused, so it proposes the issue through a typed safe output. An isolated threat-detection job with no tools checks the proposal; only on a clean verdict does a separate job, the only one with issues: write, create it.\nWhy: Model output never mutates the repository directly, and every write is limited to the types and counts declared in front matter.\nWhen: Use safe outputs for every repository write an agent needs: issues, comments, pull requests, labels.",
+        "What: An illustrative run with a synthetic issue. Front matter declares safe-outputs: create-issue with title-prefix, labels and max: 3, plus add-comment limited by target: triggering. The read-only agent's direct write is refused, so it proposes the issue through the typed create_issue tool. An isolated threat-detection job with no tools checks the proposal; only on a clean verdict does a separate job with issues: write create it, adding the declared prefix and labels.\nWhy: Model output never mutates the repository directly; the YAML, not the prompt, fixes which types, how many (max), where (target) and what extras (labels, title-prefix) a run may write. Options such as close-older-issues and hide-older-comments keep reruns tidy.\nWhen: Declare a safe output for every repository write an agent needs: issues, comments, pull requests, labels. Start with low max values and widen them deliberately.",
       enter() {
         if (!iconsDrawn) {
           iconsDrawn = true;
