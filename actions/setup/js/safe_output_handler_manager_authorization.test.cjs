@@ -96,6 +96,141 @@ describe("manager prepared authorization boundary", () => {
     });
   });
 
+  it("defers protected draft-project updates until the referenced draft item exists", async () => {
+    const createProject = require("./create_project.cjs");
+    const updateProject = require("./update_project.cjs");
+    vi.spyOn(createProject, "main").mockResolvedValue(async () => ({
+      success: true,
+      temporaryId: "aw_later",
+      temporaryIdEntry: { draftItemId: "draft-item-1" },
+    }));
+    const updateFactory = vi.spyOn(updateProject, "main").mockResolvedValue(async message => ({ success: true, observed: message }));
+    const authorize = allow();
+    const handlers = await loadHandlers({
+      create_project: {},
+      update_project: { authorization: requirement },
+    });
+
+    const { results } = await processMessages(handlers, [
+      { type: "update_project", project: "org/project/1", content_type: "draft_issue", draft_issue_id: "aw_later" },
+      { type: "create_project", project: "org/project/1" },
+    ]);
+
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(updateFactory).toHaveBeenCalledOnce();
+    expect(results.find(result => result.type === "update_project")).toMatchObject({
+      success: true,
+      authorization: { state: "allowed" },
+    });
+  });
+
+  it.each([
+    ["contentNumber", "issue"],
+    ["issue", "issue"],
+    ["pull_request", "pull_request"],
+  ])("defers update_project's effective %s target before authorization", async (field, contentType) => {
+    const createIssue = require("./create_issue.cjs");
+    const updateProject = require("./update_project.cjs");
+    vi.spyOn(createIssue, "main").mockResolvedValue(async () => ({ success: true, temporaryId: "aw_later", repo: "org/repo", number: 21 }));
+    const updateFactory = vi.spyOn(updateProject, "main").mockResolvedValue(async message => ({ success: true, observed: message }));
+    const authorize = allow();
+    const handlers = await loadHandlers({
+      create_issue: {},
+      update_project: { authorization: requirement },
+    });
+
+    const { results } = await processMessages(handlers, [
+      { type: "update_project", project: "org/project/1", content_type: contentType, [field]: "AW_later" },
+      { type: "create_issue", title: "Later" },
+    ]);
+
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(updateFactory).toHaveBeenCalledOnce();
+    expect(results.find(result => result.type === "update_project")).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
+  it("does not defer ignored project content targets in draft-issue mode", async () => {
+    const updateProject = require("./update_project.cjs");
+    const updateFactory = vi.spyOn(updateProject, "main").mockResolvedValue(async () => ({ success: true }));
+    const authorize = allow();
+    const handlers = await loadHandlers({ update_project: { authorization: requirement } });
+
+    const { results } = await processMessages(handlers, [{ type: "update_project", project: "org/project/1", content_type: "draft_issue", draft_title: "Draft", draft_issue_id: "AW_missing", content_number: "AW_missing" }]);
+
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(updateFactory).toHaveBeenCalledOnce();
+    expect(results[0]).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
+  it("uses the strict temporary-number resolver for merge_pull_request targets", async () => {
+    const mergePullRequest = require("./merge_pull_request.cjs");
+    const factory = vi.spyOn(mergePullRequest, "main");
+    const authorize = deny();
+    const handlers = await loadHandlers({ merge_pull_request: { authorization: requirement, target: "*" } });
+
+    const { results } = await processMessages(handlers, [{ type: "merge_pull_request", pull_request_number: '"AW_later"' }]);
+
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(factory).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ success: false, authorization: { state: "denied" } });
+    expect(results[0].deferred).not.toBe(true);
+  });
+
+  it("preserves a resolved temporary target for its native resolver", async () => {
+    vi.stubEnv("GH_AW_TARGET_REPO_SLUG", "org/repo");
+    const createIssue = require("./create_issue.cjs");
+    const assignToAgent = require("./assign_to_agent.cjs");
+    vi.spyOn(createIssue, "main").mockResolvedValue(async () => ({ success: true, temporaryId: "aw_later", repo: "other/allowed", number: 21 }));
+    const { loadTemporaryIdMapFromResolved, resolveRepoIssueTarget } = require("./temporary_id.cjs");
+    const handler = vi.fn(async (message, resolvedTemporaryIds) => ({
+      success: true,
+      target: resolveRepoIssueTarget(message.issue_number, loadTemporaryIdMapFromResolved(resolvedTemporaryIds), "org", "repo").resolved,
+    }));
+    vi.spyOn(assignToAgent, "main").mockResolvedValue(handler);
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const authorize = allow();
+    authorize.mockImplementation(async () => {
+      expect(prepare.mock.calls[0][0].normalizedInputs.message.issue_number).toBe("#AW_later");
+      expect(prepare.mock.calls[0][0].normalizedInputs.resolvedTemporaryIds.aw_later).toMatchObject({ repo: "other/allowed", number: 21 });
+      return { state: "allowed", expires_at: new Date(Date.now() + 30000).toISOString() };
+    });
+    const handlers = await loadHandlers({
+      create_issue: {},
+      assign_to_agent: { authorization: requirement, target: "*", allowed_repos: ["other/*"] },
+    });
+
+    const { results } = await processMessages(handlers, [
+      { type: "assign_to_agent", issue_number: "#AW_later", agent: "copilot" },
+      { type: "create_issue", title: "Later" },
+    ]);
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(results.find(result => result.type === "assign_to_agent")).toMatchObject({ success: true });
+    expect(handler).toHaveBeenCalledOnce();
+    expect(results.find(result => result.type === "assign_to_agent").result.target).toEqual({ owner: "other", repo: "allowed", number: 21 });
+  });
+
+  it("does not defer target fields ignored by wildcard precedence or configured parent selection", async () => {
+    const removeLabels = require("./remove_labels.cjs");
+    const linkSubIssue = require("./link_sub_issue.cjs");
+    const removeFactory = vi.spyOn(removeLabels, "main").mockResolvedValue(async () => ({ success: true }));
+    const linkFactory = vi.spyOn(linkSubIssue, "main").mockResolvedValue(async () => ({ success: true }));
+    const authorize = allow();
+    const handlers = await loadHandlers({
+      remove_labels: { authorization: requirement, target: "*" },
+      link_sub_issue: { authorization: requirement, target: "42" },
+    });
+
+    const { results } = await processMessages(handlers, [
+      { type: "remove_labels", item_number: 21, issue_number: '"AW_later"', labels: ["bug"] },
+      { type: "link_sub_issue", parent_issue_number: "AW_later", sub_issue_number: 22 },
+    ]);
+
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(removeFactory).toHaveBeenCalledOnce();
+    expect(linkFactory).toHaveBeenCalledOnce();
+    expect(results.every(result => result.success)).toBe(true);
+  });
+
   it.each(["update_discussion", "close_discussion"])("does not defer quoted targets unsupported by %s", async type => {
     const authorize = deny();
     const handlers = await loadHandlers({ [type]: { authorization: requirement, target: "*" } });
