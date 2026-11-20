@@ -218,6 +218,28 @@ function canonicalMemoryContent(treePath, content, workspaceDir) {
 }
 
 /**
+ * The bytes Git would check out for stored content at this path, so that
+ * staging the file applies its attributes exactly once.
+ *
+ * @param {string} treePath
+ * @param {Buffer} content - Content as Git stores it.
+ * @param {string} workspaceDir
+ * @returns {Buffer}
+ */
+function checkoutMemoryContent(treePath, content, workspaceDir) {
+  const stored = execGitSyncResult(["hash-object", "-w", "--no-filters", "--stdin"], { cwd: workspaceDir, input: content });
+  const blobId = String(stored.stdout || "").trim();
+  if (stored.status !== 0 || !COMMIT_ID_PATTERN.test(blobId)) {
+    throw new Error(`Failed to store ${treePath}: ${String(stored.stderr || "").trim()}`);
+  }
+  const result = execGitSyncResult(["cat-file", "--filters", `--path=${treePath}`, blobId], { cwd: workspaceDir, encoding: "buffer" });
+  if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+    throw new Error(`Failed to convert ${treePath} for the working tree: ${String(result.stderr || "").trim()}`);
+  }
+  return result.stdout;
+}
+
+/**
  * Three-way merge of one memory file changed both by this run and by another
  * run. JSONL keeps the rows of both sides, like the merge=union policy of the
  * retry path; other files keep this run's lines where the two sides conflict.
@@ -281,9 +303,14 @@ function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
   if (!commit) return { steps: null, reason: "the agent job did not record the commit it started from" };
   if (commit !== EMPTY_START) {
     if (!COMMIT_ID_PATTERN.test(commit)) return { steps: null, reason: "the recorded starting commit is not a commit ID" };
-    if (execGitSyncResult(["merge-base", "--is-ancestor", commit, "HEAD"], { cwd: workspaceDir }).status !== 0) {
-      return { steps: null, reason: `the starting commit ${commit} is no longer in the branch history` };
-    }
+    const notInHistory = { steps: null, reason: `the starting commit ${commit} is no longer in the branch history` };
+    const present = execGitSyncResult(["cat-file", "-e", `${commit}^{commit}`], { cwd: workspaceDir });
+    if (present.status === null) throw new Error(`Failed to look up the starting commit ${commit}: ${getErrorMessage(present.error)}`);
+    if (present.status !== 0) return notInHistory;
+    // Only a definite answer may fall back to copying; anything else stops the save.
+    const ancestry = execGitSyncResult(["merge-base", "--is-ancestor", commit, "HEAD"], { cwd: workspaceDir });
+    if (ancestry.status === 1) return notInHistory;
+    if (ancestry.status !== 0) throw new Error(`Failed to check that ${commit} is in the branch history: ${String(ancestry.stderr || "").trim() || getErrorMessage(ancestry.error)}`);
   }
 
   const head = execGitSync(["rev-parse", "HEAD"], { cwd: workspaceDir, stdio: "pipe" }).trim();
@@ -297,7 +324,11 @@ function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
   const steps = new Map();
   for (const file of files) {
     const treePath = file.relativePath.replace(/\\/g, "/");
-    const { blobId: localBlob, content: local } = blobIdOf(treePath, readMemoryFile(file.source));
+    // Written files are staged again later, so they must stay in working-tree form.
+    const raw = readMemoryFile(file.source);
+    const { blobId: localBlob, content: local } = blobIdOf(treePath, raw);
+    /** @param {Buffer} stored */
+    const forCheckout = stored => (hasAttributes ? checkoutMemoryContent(treePath, stored, workspaceDir) : stored);
     const baseBlob = baseBlobs.get(treePath);
     const headBlob = headBlobs.get(treePath);
 
@@ -310,11 +341,11 @@ function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
       // Sparse checkouts may not materialize the head's version in the working tree.
       const destPath = path.join(workspaceDir, file.relativePath);
       const inPlace = fs.existsSync(destPath) && blobIdOf(treePath, readMemoryFile(destPath)).blobId === headBlob;
-      steps.set(file.relativePath, inPlace ? { action: "keep" } : { action: "write", content: readBlob(headBlob, workspaceDir) });
+      steps.set(file.relativePath, inPlace ? { action: "keep" } : { action: "write", content: forCheckout(readBlob(headBlob, workspaceDir)) });
       continue;
     }
     if (!headBlob || headBlob === baseBlob) {
-      steps.set(file.relativePath, { action: "write", content: local });
+      steps.set(file.relativePath, { action: "write", content: raw });
       continue;
     }
 
@@ -327,10 +358,10 @@ function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
     });
     if (merged) {
       core.info(`Merged ${treePath} with changes another run saved after this run started`);
-      steps.set(file.relativePath, { action: "write", content: merged });
+      steps.set(file.relativePath, { action: "write", content: forCheckout(merged) });
     } else {
       core.info(`Cannot merge ${treePath} as text; keeping this run's version`);
-      steps.set(file.relativePath, { action: "write", content: local });
+      steps.set(file.relativePath, { action: "write", content: raw });
     }
   }
   return { steps, reason: "" };
@@ -794,6 +825,12 @@ async function main() {
       if (!isMissingBranch) {
         // Re-throw so the outer catch reports the real cause.
         throw fetchError;
+      }
+      // A recorded starting commit means the branch existed when this run's
+      // agent cloned it, so it was deleted since; do not recreate it.
+      if (COMMIT_ID_PATTERN.test(String(process.env.REPO_MEMORY_BASE_COMMIT || "").trim())) {
+        await setPushRepoMemoryFailure(`Branch ${branchName} was deleted after this run started from it; not recreating it from this run's files.`);
+        return;
       }
 
       // Branch doesn't exist – attempt to seed it via the GitHub REST API so

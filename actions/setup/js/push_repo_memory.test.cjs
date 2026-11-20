@@ -2814,6 +2814,34 @@ describe("push_repo_memory.cjs - overlapping runs keep each other's rows", () =>
     }
   }, 30_000);
 
+  it("saves this run's edit once under a working-tree-encoding attribute", async () => {
+    const branch = createMemoryBranch({ ".gitattributes": "*.txt working-tree-encoding=ISO-8859-1\n", "notes.txt": Buffer.from("café\n", "latin1") });
+    try {
+      // The agent's checkout holds the file in its working-tree encoding.
+      const { core } = await runPush(branch, { "notes.txt": Buffer.from("café 2\n", "latin1") }, branch.startCommit);
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(branch.readBranchFile("notes.txt")).toBe("café 2\n");
+    } finally {
+      fs.rmSync(branch.rootDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("does not recreate a branch deleted after this run's agent cloned it", async () => {
+    const branch = createMemoryBranch({ "log.jsonl": "r1\n" });
+    try {
+      branch.git(["--git-dir", branch.remoteDir, "update-ref", "-d", `refs/heads/${branchName}`]);
+
+      const { core, pushSignedCommits } = await runPush(branch, { "log.jsonl": "r1\nb\n" }, branch.startCommit);
+
+      expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(`Branch ${branchName} was deleted after this run started from it`));
+      expect(pushSignedCommits).not.toHaveBeenCalled();
+      expect(branch.git(["--git-dir", branch.remoteDir, "branch", "--list", branchName]).trim()).toBe("");
+    } finally {
+      fs.rmSync(branch.rootDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it("fails the save when merging with another run's rows exceeds the file size limit", async () => {
     const branch = createMemoryBranch({ "log.jsonl": "r1\n" });
     try {
