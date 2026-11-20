@@ -391,3 +391,154 @@ describe("manager prepared authorization boundary", () => {
     expect(protocol.recordAuthorizationOutcome).not.toHaveBeenCalled();
   });
 });
+
+describe("remove_labels authorization-to-execution consistency", () => {
+  function recordingGithub(item = { labels: [], title: "" }) {
+    const removals = [];
+    const client = {
+      rest: {
+        issues: {
+          get: vi.fn(async () => ({ data: item })),
+          removeLabel: vi.fn(async ({ owner, repo, issue_number, name }) => {
+            removals.push(`${owner}/${repo}#${issue_number}:${name}`);
+            return {};
+          }),
+        },
+      },
+    };
+    vi.stubGlobal("github", client);
+    return { client, removals };
+  }
+
+  /** Assert that the authority request digest is the digest of the canonical inputs captured at preparation. */
+  function boundInputs(prepare, authorize, call = 0) {
+    const inputs = prepare.mock.calls[call][0].normalizedInputs;
+    expect(authorize.mock.calls[call][0].invocation.input_digest).toBe(protocol.canonicalDigest(inputs));
+    return inputs;
+  }
+
+  it("removes only a policy-narrowed subset of the bound labels on the bound explicit target", async () => {
+    vi.stubEnv("GH_AW_TARGET_REPO_SLUG", "org/repo");
+    const { removals } = recordingGithub();
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const config = { remove_labels: { authorization: requirement, target: "*", allowed: ["bug", "wontfix", "blocked-*"], blocked: ["blocked-*"], max: 5 } };
+    const message = { type: "remove_labels", item_number: 7, labels: ["bug", "bug", " wontfix ", "blocked-x", "enhancement"] };
+    const authorize = allow();
+    authorize.mockImplementation(async ({ invocation }) => {
+      // Values changed during the authority wait must not redirect or expand execution.
+      message.item_number = 99;
+      message.labels.push("enhancement", "security");
+      message.repo = "other/repo";
+      config.remove_labels.allowed.push("*");
+      config.remove_labels.target = "triggering";
+      process.env.GH_AW_TARGET_REPO_SLUG = "org/changed";
+      return { state: "allowed", invocation_id: invocation.invocation_id, expires_at: new Date(Date.now() + 30000).toISOString() };
+    });
+    const handlers = await loadHandlers(config);
+    const { results } = await processMessages(handlers, [message]);
+    const inputs = boundInputs(prepare, authorize);
+    expect(inputs.message).toMatchObject({ item_number: 7, labels: ["bug", "bug", " wontfix ", "blocked-x", "enhancement"] });
+    expect(removals).toEqual(["org/repo#7:bug", "org/repo#7:wontfix"]);
+    const boundLabels = new Set(inputs.message.labels.map(label => label.trim()));
+    expect(removals.every(removal => boundLabels.has(removal.split(":")[1]))).toBe(true);
+    expect(results[0]).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
+  it.each([
+    ["explicit item_number", { target: "*" }, { item_number: 11 }, "org/repo#11"],
+    ["issue_number alias", { target: "*" }, { issue_number: 12 }, "org/repo#12"],
+    ["pr_number alias", { target: "*" }, { pr_number: 13 }, "org/repo#13"],
+    ["pull_number alias", { target: "*" }, { pull_number: 14 }, "org/repo#14"],
+    ["configured number", { target: "15" }, { item_number: 99 }, "org/repo#15"],
+    ["triggering default", {}, { item_number: 99 }, "org/repo#9"],
+    ["wildcard triggering fallback", { target: "*" }, {}, "org/repo#9"],
+    ["allowed cross-repository selector", { target: "*", allowed_repos: ["other/*"] }, { repo: "other/allowed", item_number: 16 }, "other/allowed#16"],
+  ])("executes on the target justified by bound inputs and trusted context: %s", async (_name, options, fields, target) => {
+    vi.stubGlobal("context", { repo: { owner: "org", repo: "repo" }, eventName: "issues", payload: { issue: { number: 9 } } });
+    const { removals } = recordingGithub();
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const authorize = allow();
+    const handlers = await loadHandlers({ remove_labels: { authorization: requirement, ...options } });
+    await processMessages(handlers, [{ type: "remove_labels", labels: ["bug"], ...fields }]);
+    const inputs = boundInputs(prepare, authorize);
+    expect(inputs.message).toMatchObject(fields);
+    expect(removals).toEqual([`${target}:bug`]);
+  });
+
+  it.each(["aw_target", "AW_target", '"aw_target"'])("does not let a resolution entry mutated during the authority wait redirect the bound target: %s", async reference => {
+    const { removals } = recordingGithub();
+    const entry = { repo: "org/repo", number: 42 };
+    vi.spyOn(nativeModule, "main").mockResolvedValue(async () => ({ success: true, temporaryId: "aw_target", temporaryIdEntry: entry }));
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const authorize = allow();
+    authorize.mockImplementation(async ({ invocation }) => {
+      entry.number = 99;
+      return { state: "allowed", invocation_id: invocation.invocation_id, expires_at: new Date(Date.now() + 30000).toISOString() };
+    });
+    const handlers = await loadHandlers({ create_issue: {}, remove_labels: { authorization: requirement, target: "*" } });
+    const { results } = await processMessages(handlers, [
+      { type: "create_issue", title: "Parent" },
+      { type: "remove_labels", item_number: reference, labels: ["bug"] },
+    ]);
+    const inputs = boundInputs(prepare, authorize);
+    expect(inputs.resolvedTemporaryIds.aw_target).toEqual({ repo: "org/repo", number: 42 });
+    expect(removals).toEqual(["org/repo#42:bug"]);
+    expect(results.find(record => record.type === "remove_labels")).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
+  it("defers an unresolved temporary target before consuming its single decision", async () => {
+    const { removals } = recordingGithub();
+    vi.spyOn(nativeModule, "main").mockResolvedValue(async () => ({ success: true, temporaryId: "aw_later", repo: "org/repo", number: 21 }));
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const authorize = allow();
+    const handlers = await loadHandlers({ create_issue: {}, remove_labels: { authorization: requirement, target: "*" } });
+    const { results } = await processMessages(handlers, [
+      { type: "remove_labels", item_number: "aw_later", labels: ["bug"] },
+      { type: "create_issue", title: "Later" },
+    ]);
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(boundInputs(prepare, authorize).message.item_number).toBe(21);
+    expect(removals).toEqual(["org/repo#21:bug"]);
+    expect(results.find(record => record.type === "remove_labels")).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
+  it.each([
+    ["invalid labels payload", { labels: "bug" }, false],
+    ["labels filtered by policy", { labels: ["enhancement", "blocked-x"] }, true],
+    ["required label not present", { labels: ["bug"], required: true }, false],
+  ])("performs no write when validation or policy filtering yields no operation: %s", async (_name, { labels, required }, success) => {
+    const { client } = recordingGithub({ labels: [{ name: "other" }], title: "" });
+    allow();
+    const handlers = await loadHandlers({ remove_labels: { authorization: requirement, target: "*", allowed: ["bug"], blocked: ["blocked-*"], ...(required ? { required_labels: ["triage"] } : {}) } });
+    const { results } = await processMessages(handlers, [{ type: "remove_labels", item_number: 7, labels }]);
+    expect(client.rest.issues.removeLabel).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ success, authorization: { state: "allowed" } });
+  });
+
+  it("performs no write and never initializes the handler on denial", async () => {
+    const { client } = recordingGithub();
+    const factory = vi.spyOn(require("./remove_labels.cjs"), "main");
+    deny();
+    const handlers = await loadHandlers({ remove_labels: { authorization: requirement, target: "*" } });
+    const { results } = await processMessages(handlers, [{ type: "remove_labels", item_number: 7, labels: ["bug"] }]);
+    expect(factory).not.toHaveBeenCalled();
+    expect(client.rest.issues.removeLabel).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ success: false, authorization: { state: "denied" } });
+  });
+
+  it.each([
+    ["global", { remove_labels: { target: "*" }, authorization: { ...requirement, source: "global" } }, true],
+    ["per-output", { remove_labels: { authorization: requirement, target: "*", staged: true } }, false],
+  ])("previews %s staged protected removals without authority requests or mutations", async (_name, config, globalStaged) => {
+    if (globalStaged) vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
+    const { client } = recordingGithub();
+    const factory = vi.spyOn(require("./remove_labels.cjs"), "main");
+    const authorize = deny();
+    const handlers = await loadHandlers(config);
+    const { results } = await processMessages(handlers, [{ type: "remove_labels", item_number: 7, labels: ["bug"] }]);
+    expect(authorize).not.toHaveBeenCalled();
+    expect(factory).not.toHaveBeenCalled();
+    expect(client.rest.issues.removeLabel).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ success: true, staged: true, authorization: { state: "skipped_staged" } });
+  });
+});

@@ -1746,6 +1746,30 @@ Native handlers without a separate effect-preparation adapter also advertise
 lookups remain inside the reviewed implementation; the approval does not attest
 to an independently resolved final network request.
 
+**Semantic consistency:** The workflow hash (`caller.workflow_hash`,
+frontmatter and body), `input_digest` and `context.policy_digest` together
+bind the declaration, the normalized invocation inputs and the effective handler
+policy. In the manager, `input_digest` covers the frozen prepared message, the
+temporary-ID resolution snapshot and resolved defaults such as the pinned target
+repository. The executor MUST consume that same deep-frozen message and
+resolution snapshot, and the frozen policy captured when handlers were loaded;
+mutating the source message, live temporary-ID entries, configuration objects
+or environment-backed defaults during the authority wait MUST NOT redirect or
+expand execution. Targets that are still unresolved temporary IDs defer before
+any decision is consumed. Semantic consistency is not byte equality:
+deterministic derivations from bound values are permitted after authorization,
+including alias normalization, the configured `target` selector and its
+triggering-event fallback within the same run, label trimming and sanitization,
+deduplication, `allowed`/`blocked` filtering and `max` truncation. These can
+only narrow the bound operation. Live reads such as `required-labels` or
+`required-title-prefix` checks MAY reject execution; they do not establish
+atomic target state, exact-once delivery or label identity. Invalid input or
+filtering that yields no operation performs no write. The manager path is
+covered by regression tests for `remove-labels`; other native handlers share
+the same boundary, but handler-specific transformations, values read from the
+live temporary-ID map argument, queue/Claim adapters and custom executors have
+not been exhaustively assessed.
+
 Compiler diagnostics use `DEBUG=workflow:safe_outputs_authorization`.
 Runtime diagnostics use the GitHub Actions debug log and report preparation,
 OIDC acquisition, decision requests, release and fixed failure reason codes.

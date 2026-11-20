@@ -1267,6 +1267,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       }
     }
     const policy = { configuration: redactSensitiveConfig(descriptor), defaults: redactSensitiveConfig(defaults), requirement };
+    // The executor consumes this deep-frozen snapshot, never live resolution entries.
+    const boundInputs = freezeInvocationValue(JSON.parse(JSON.stringify({ message: preparedMessage, resolvedTemporaryIds, defaults })));
     const invocation = protocol.prepareInvocation({
       caller,
       output: {
@@ -1275,7 +1277,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
         executor: descriptor.authorization_executor || (scriptTypes.has(type) ? "script" : "manager"),
         implementation_digest: require("node:crypto").createHash("sha256").update(fs.readFileSync(implementationPath)).digest("hex"),
       },
-      normalizedInputs: JSON.parse(JSON.stringify({ message: preparedMessage, resolvedTemporaryIds, defaults })),
+      normalizedInputs: boundInputs,
       batchDigest: invocationBatchDigest,
       recordIndex: sourceBatch?.indices[index] ?? index,
       scope: { binding: "invocation", refs },
@@ -1301,7 +1303,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       if (require("node:crypto").createHash("sha256").update(fs.readFileSync(implementationPath)).digest("hex") !== invocation.output.implementation_digest) {
         throw new Error("Safe-output implementation changed after preparation");
       }
-      const result = await withSafeOutputInvocation(invocationState, () => handler(preparedMessage, Object.freeze({ ...resolvedTemporaryIds }), temporaryIdMap));
+      const result = await withSafeOutputInvocation(invocationState, () => handler(preparedMessage, boundInputs.resolvedTemporaryIds, temporaryIdMap));
       const actualAuthorization = invocationState.authorization;
       authorizations.set(index, actualAuthorization);
       if (actualAuthorization?.state === "allowed" && result?.deferred) {
