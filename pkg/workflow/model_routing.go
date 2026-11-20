@@ -451,14 +451,8 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 		return NewValidationError("model-routing.allowed-models", "", "the configured firewall cannot restrict only the router's candidates",
 			fmt.Sprintf("Use AWF and an apiProxy image with routing.candidateModels support (%s or newer).", constants.AWFRoutingCandidateModelsMinVersion))
 	}
-	if routing.Goal != "cost" && routing.Goal != "cost-speed" {
-		return NewValidationError("engine.model-routing.goal", routing.Goal, "unsupported model-routing goal",
-			fmt.Sprintf("Use cost. The deprecated cost-speed goal requires an AWF pin older than %s.", constants.AWFCostOnlyModelRoutingMinVersion))
-	}
-	if routing.Goal == "cost-speed" && awfVersionAtLeast(getFirewallConfig(workflowData), constants.AWFCostOnlyModelRoutingMinVersion) {
-		return NewValidationError("engine.model-routing.goal", routing.Goal,
-			fmt.Sprintf("AWF %s and newer support only cost routing", constants.AWFCostOnlyModelRoutingMinVersion),
-			"Set engine.model-routing.goal to cost and choose economy, balanced, robust, or auto for engine.model-routing.mode. The retired cost-speed goal is not an alias for cost.")
+	if err := validateModelRoutingGoal(workflowData, routing.Goal); err != nil {
+		return err
 	}
 	if routing.Mode != "economy" && routing.Mode != "balanced" && routing.Mode != "robust" && routing.Mode != "auto" {
 		return NewValidationError("engine.model-routing.mode", routing.Mode, "unsupported model-routing mode", "Use economy, balanced, robust, or auto.")
@@ -494,12 +488,24 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 	} else if err := modelRoutingDefaultCandidatesPolicyError(engineName, modelRoutingNamespace(workflowData, engineName), allowed, blocked); err != nil {
 		return NewValidationError("engine.model-routing.allowed-models", "", "model-routing candidates violate model policy", err.Error())
 	}
-	firewallConfig := getFirewallConfig(workflowData)
-	version := getAWFImageTag(firewallConfig)
+	version := getAWFImageTag(getFirewallConfig(workflowData))
 	if !versionAtLeast(version, string(constants.DefaultFirewallVersion), string(constants.AWFModelRoutingMinVersion)) {
 		return NewValidationError("engine.model-routing", version, fmt.Sprintf("task-level model routing requires AWF %s or newer", constants.AWFModelRoutingMinVersion), fmt.Sprintf("The effective AWF version is %s. Set sandbox.agent.version or firewall.version to %s or newer.", version, constants.AWFModelRoutingMinVersion))
 	}
 	return validateModelRoutingRuntimeCompatibility(workflowData)
+}
+
+func validateModelRoutingGoal(workflowData *WorkflowData, goal string) error {
+	if goal != "cost" && goal != "cost-speed" {
+		return NewValidationError("engine.model-routing.goal", goal, "unsupported model-routing goal",
+			fmt.Sprintf("Use cost. The deprecated cost-speed goal requires an AWF pin older than %s.", constants.AWFCostOnlyModelRoutingMinVersion))
+	}
+	if goal == "cost-speed" && awfVersionAtLeast(getFirewallConfig(workflowData), constants.AWFCostOnlyModelRoutingMinVersion) {
+		return NewValidationError("engine.model-routing.goal", goal,
+			fmt.Sprintf("AWF %s and newer support only cost routing", constants.AWFCostOnlyModelRoutingMinVersion),
+			"Set engine.model-routing.goal to cost and choose economy, balanced, robust, or auto for engine.model-routing.mode. The retired cost-speed goal is not an alias for cost.")
+	}
+	return nil
 }
 
 func generateModelRoutingConversationStep(yaml *strings.Builder, data *WorkflowData) {
