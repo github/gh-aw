@@ -2,6 +2,7 @@
 // @safe-outputs-exempt SEC-005: workflow callers invoke main() without target overrides, so writes use only the current GitHub Actions repository context.
 "use strict";
 
+const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Ledger, canonicalJSON, configuredLedgerLimits } = require("./ledger_store.cjs");
@@ -30,20 +31,20 @@ function readTransactions(file = process.env.GH_AW_LEDGER_TRANSACTIONS) {
   try {
     fd = fs.openSync(resolved, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
     const stat = fs.fstatSync(fd);
-    if (!stat.isFile() || stat.size > MAX_TRANSACTION_BYTES) throw new TypeError("Invalid ledger transaction artifact");
+    if (!stat.isFile() || stat.size > MAX_TRANSACTION_BYTES) throw new TypeError(ERR_VALIDATION + ": Invalid ledger transaction artifact");
     artifact = JSON.parse(fs.readFileSync(fd, "utf8"));
   } catch (error) {
     if (error instanceof TypeError && error.message === "Invalid ledger transaction artifact") throw error;
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       const artifactName = process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME || "ledger transaction artifact";
-      throw new Error(`Missing validated ledger transaction artifact at ${resolved}; ensure safe_outputs uploads ${artifactName} before push_ledger_changes`, { cause: error });
+      throw new Error(`${ERR_VALIDATION}: Missing validated ledger transaction artifact at ${resolved}; ensure safe_outputs uploads ${artifactName} before push_ledger_changes`, { cause: error });
     }
-    throw new Error("Failed to read validated ledger transaction artifact", { cause: error });
+    throw new Error(ERR_VALIDATION + ": Failed to read validated ledger transaction artifact", { cause: error });
   } finally {
     if (fd !== undefined) fs.closeSync(fd);
   }
   if (!artifact || artifact.version !== 1 || !artifact.ledgers || typeof artifact.ledgers !== "object" || Array.isArray(artifact.ledgers)) {
-    throw new TypeError("Invalid validated ledger transaction artifact");
+    throw new TypeError(ERR_VALIDATION + ": Invalid validated ledger transaction artifact");
   }
   return artifact;
 }
@@ -54,12 +55,12 @@ function readLedgerConfig(value = process.env.GH_AW_LEDGER_CONFIG_BASE64) {
   try {
     ledgers = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
   } catch (error) {
-    throw new TypeError("Invalid trusted ledger configuration", { cause: error });
+    throw new TypeError(ERR_VALIDATION + ": Invalid trusted ledger configuration", { cause: error });
   }
-  if (!Array.isArray(ledgers)) throw new TypeError("Invalid trusted ledger configuration");
+  if (!Array.isArray(ledgers)) throw new TypeError(ERR_VALIDATION + ": Invalid trusted ledger configuration");
   const names = new Set();
   for (const ledger of ledgers) {
-    if (ledger && Object.hasOwn(ledger, "replay")) throw new TypeError("Custom ledger replay is no longer supported; use a built-in ledger type");
+    if (ledger && Object.hasOwn(ledger, "replay")) throw new TypeError(ERR_VALIDATION + ": Custom ledger replay is no longer supported; use a built-in ledger type");
     if (
       !ledger ||
       (ledger.storage !== undefined && !["git", "comment-memory"].includes(ledger.storage)) ||
@@ -76,7 +77,7 @@ function readLedgerConfig(value = process.env.GH_AW_LEDGER_CONFIG_BASE64) {
       ledger.max_patch_kb < 1 ||
       ledger.max_patch_kb > 10240
     ) {
-      throw new TypeError("Invalid trusted ledger definition");
+      throw new TypeError(ERR_VALIDATION + ": Invalid trusted ledger definition");
     }
     names.add(ledger.name);
   }
@@ -85,14 +86,14 @@ function readLedgerConfig(value = process.env.GH_AW_LEDGER_CONFIG_BASE64) {
 
 function validateTransactions(artifact, ledgerConfigs) {
   if (!artifact || artifact.version !== 1 || !artifact.ledgers || typeof artifact.ledgers !== "object" || Array.isArray(artifact.ledgers)) {
-    throw new TypeError("Invalid validated ledger transaction artifact");
+    throw new TypeError(ERR_VALIDATION + ": Invalid validated ledger transaction artifact");
   }
   if (Object.keys(artifact).some(key => !["ledgers", "transaction_id", "version"].includes(key))) {
-    throw new TypeError("Invalid validated ledger transaction artifact");
+    throw new TypeError(ERR_VALIDATION + ": Invalid validated ledger transaction artifact");
   }
   const configs = new Map(ledgerConfigs.map(config => [config.name, config]));
   if (Object.keys(artifact.ledgers).length && (typeof artifact.transaction_id !== "string" || !artifact.transaction_id)) {
-    throw new TypeError("Invalid ledger transaction ID");
+    throw new TypeError(ERR_VALIDATION + ": Invalid ledger transaction ID");
   }
   const seenIndices = new Set();
   const seenIds = new Set();
@@ -100,7 +101,7 @@ function validateTransactions(artifact, ledgerConfigs) {
   let total = 0;
   for (const [name, ledger] of Object.entries(artifact.ledgers)) {
     const config = configs.get(name);
-    if (!config || !ledger || !Array.isArray(ledger.appends) || Object.keys(ledger).some(key => key !== "appends")) throw new TypeError("Invalid ledger transaction list");
+    if (!config || !ledger || !Array.isArray(ledger.appends) || Object.keys(ledger).some(key => key !== "appends")) throw new TypeError(ERR_VALIDATION + ": Invalid ledger transaction list");
     for (const append of ledger.appends) {
       total++;
       if (
@@ -117,16 +118,16 @@ function validateTransactions(artifact, ledgerConfigs) {
         Array.isArray(append.record) ||
         Object.keys(append).sort().join(",") !== "index,ledger,record,transaction_id"
       ) {
-        throw new TypeError("Invalid validated ledger append");
+        throw new TypeError(ERR_VALIDATION + ": Invalid validated ledger append");
       }
       seenIndices.add(append.index);
       const record = append.record;
       if (typeof record.id !== "string" || record.id !== finalId(artifact.transaction_id, append.index) || seenIds.has(record.id)) {
-        throw new TypeError("Invalid deterministic ledger record ID");
+        throw new TypeError(ERR_VALIDATION + ": Invalid deterministic ledger record ID");
       }
       seenIds.add(record.id);
       for (const key of Object.keys(record)) {
-        if (RESERVED_RECORD_KEYS.has(key)) throw new TypeError(`Ledger record contains reserved field "${key}"`);
+        if (RESERVED_RECORD_KEYS.has(key)) throw new TypeError(`${ERR_VALIDATION}: Ledger record contains reserved field "${key}"`);
       }
       const payload = { ...record };
       delete payload.id;
@@ -135,17 +136,17 @@ function validateTransactions(artifact, ledgerConfigs) {
         validateOperation(payload, config);
       } else if (config.schema) {
         const schemaError = validateValueAgainstSchema(payload, config.schema);
-        if (schemaError) throw new TypeError("Ledger record does not match configured schema");
+        if (schemaError) throw new TypeError(ERR_VALIDATION + ": Ledger record does not match configured schema");
       }
       const recordBytes = Buffer.byteLength(JSON.stringify(record), "utf8");
-      if (recordBytes > config.max_record_kb * 1024) throw new RangeError("Ledger record exceeds max-record-kb");
+      if (recordBytes > config.max_record_kb * 1024) throw new RangeError(ERR_VALIDATION + ": Ledger record exceeds max-record-kb");
       const currentPatchBytes = (patchBytes.get(name) || 0) + recordBytes;
-      if (currentPatchBytes > config.max_patch_kb * 1024) throw new RangeError("Ledger append batch exceeds max-patch-kb");
+      if (currentPatchBytes > config.max_patch_kb * 1024) throw new RangeError(ERR_VALIDATION + ": Ledger append batch exceeds max-patch-kb");
       patchBytes.set(name, currentPatchBytes);
     }
   }
   if (total !== seenIndices.size || Array.from({ length: total }, (_, index) => !seenIndices.has(index)).some(Boolean)) {
-    throw new TypeError("Ledger transaction indices are incomplete");
+    throw new TypeError(ERR_VALIDATION + ": Ledger transaction indices are incomplete");
   }
   return configs;
 }
@@ -156,12 +157,12 @@ function validateRecordShape(record) {
     const entry = stack.pop();
     if (!entry) continue;
     const { value, depth } = entry;
-    if (depth > MAX_RECORD_DEPTH) throw new RangeError("Ledger record exceeds maximum nesting depth");
+    if (depth > MAX_RECORD_DEPTH) throw new RangeError(ERR_VALIDATION + ": Ledger record exceeds maximum nesting depth");
     if (!value || typeof value !== "object") continue;
     const keys = Object.keys(value);
-    if (keys.length > MAX_RECORD_FIELDS) throw new RangeError("Ledger record exceeds maximum field count");
+    if (keys.length > MAX_RECORD_FIELDS) throw new RangeError(ERR_VALIDATION + ": Ledger record exceeds maximum field count");
     for (const key of keys) {
-      if (Buffer.byteLength(key, "utf8") > MAX_RECORD_KEY_BYTES) throw new RangeError("Ledger record field name is too long");
+      if (Buffer.byteLength(key, "utf8") > MAX_RECORD_KEY_BYTES) throw new RangeError(ERR_VALIDATION + ": Ledger record field name is too long");
       if (value[key] && typeof value[key] === "object") stack.push({ value: value[key], depth: depth + 1 });
     }
   }
@@ -252,7 +253,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
           }
         : undefined,
     });
-    if (pushed === false) throw new Error(`Failed to persist records to ${branchName}`);
+    if (pushed === false) throw new Error(`${ERR_VALIDATION}: Failed to persist records to ${branchName}`);
     return { persisted, already_present: alreadyPresent, reconciled: alreadyPresent, persisted_ids: persistedIds };
   } finally {
     if (ledger) ledger.close();
@@ -270,7 +271,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
     });
     try {
       const state = ledger.reconstruct();
-      if (state.diagnostics.length) throw new TypeError("Invalid canonical ledger history");
+      if (state.diagnostics.length) throw new TypeError(ERR_VALIDATION + ": Invalid canonical ledger history");
       return state.records;
     } finally {
       ledger.close();
@@ -285,7 +286,7 @@ function repoUrl(host, owner, repo) {
 // Both persistence backends validate the complete transition before writing a shard.
 function appendLedgerRecords(ledger, appends, config) {
   const current = ledger.reconstruct();
-  if (current.diagnostics.length) throw new TypeError("Invalid canonical ledger history");
+  if (current.diagnostics.length) throw new TypeError(ERR_VALIDATION + ": Invalid canonical ledger history");
   if (config.type) {
     const reducer = createReducer(config);
     for (const record of current.records) reducer.apply(record.payload, record);
@@ -301,7 +302,7 @@ function appendLedgerRecords(ledger, appends, config) {
   for (const append of appends) {
     const payload = config.type === "notes" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
     const prior = current.records.find(record => (config.type === "notes" ? record.id === append.record.id : record.payload?.id === append.record.id));
-    if (prior && canonicalJSON(prior.payload) !== canonicalJSON(payload)) throw new TypeError("Conflicting ledger record ID");
+    if (prior && canonicalJSON(prior.payload) !== canonicalJSON(payload)) throw new TypeError(ERR_VALIDATION + ": Conflicting ledger record ID");
     if (prior) alreadyPresent++;
     else pending.push({ append, payload });
   }
@@ -382,7 +383,7 @@ async function main(options = {}) {
     try {
       fs.appendFileSync(output, `ledger_result=${JSON.stringify(result)}\n`);
     } catch (error) {
-      throw new Error("Failed to write ledger persistence result", { cause: error });
+      throw new Error(ERR_VALIDATION + ": Failed to write ledger persistence result", { cause: error });
     }
   }
   return result;
@@ -390,7 +391,7 @@ async function main(options = {}) {
 
 if (require.main === module) {
   main().catch(error => {
-    core.setFailed(error instanceof Error ? error.message : "Ledger persistence failed");
+    core.setFailed(error instanceof Error ? error.message : `${ERR_SYSTEM}: Ledger persistence failed`);
   });
 }
 
