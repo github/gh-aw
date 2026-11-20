@@ -26,6 +26,7 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.105 | Mapping-only: adds Sections 7.12–7.14 for the experimental token-broker credential boundary, protected safe-output authorization baseline verification (`validate --authorization-policy`), and host runtime temp-variable exclusion with hardened source-download Git. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.104 | Adds CTR-035 through CTR-038 for accidental misuse of safe-output write credentials by authored `safe-outputs.steps` (minted token reuse, `GITHUB_ENV`/`GITHUB_PATH` mutation, credential-persisting checkout, handler input tampering), enforced by the `safe-output-credentials` Actions/AW lint rule with per-finding threat IDs via `Rule.FindingThreatRuleIDs`, and conformance tests T-CTR-050 through T-CTR-053. |
 | 1.0.103 | Aligns the false-positive suppression SLA as MUST within 10 business days for non-strict rejection controls, clarifies that Section 6 `T-CTR-*` identifiers are test IDs rather than catalog rules, and assigns the open CTR-032 destination-filtering obligation to Safe Outputs maintainers under T-CTR-047. Destination-filtering evidence remains outstanding; no implementation behavior changed. |
 | 1.0.102 | Audit-only normative clarification mapping existing behavior: `merge-pull-request` requires a scoped, owner-declared `allowed-base-branches` list (compiler, schema, and runtime validation; #77371), and CTR-006 `template-injection` treats actor and user/login metadata as attacker-controlled (#77516). No new threat identifier, permission, or compiler behavior change. |
@@ -111,6 +112,20 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-11-20)
+
+Reviewed commits from the last two days (most recent: #79351, #79361, #79342, #79334, #79321, #79105, #79295, #79287, #79268, #79280, #79277, #79282, #79283) touching compiler, CLI, and runtime security boundaries.
+
+Findings and disposition:
+
+- Safe-output credential misuse lint (#79268): already covered by CTR-035–CTR-038 (spec 1.0.104); no change.
+- Token-broker authentication for GitHub tools and safe outputs (#79105): already enforced by `validateTokenBrokerGitHubConfig`, `validateTokenBrokerInference`, `validateTokenBrokerRequestPermissions`, `tokenBrokerSelfHostedJobs`, and the AWF bootstrap exclusion, with tests in `token_broker_test.go` and `token_broker_github_test.go`. Added Section 7.12 mapping. No new `CTR-*` rule.
+- Protected authorization baseline verification (#79287): already fail-closed in `pkg/cli/authorization_*.go` with tests. Added Section 7.13 mapping and finding codes. No new `CTR-*` rule.
+- Host runtime TMPDIR excluded from AWF sandbox env (#79277) and hardened disposable source-download Git (#79067): already implemented in `awf_command_builder.go` and `pkg/gitutil/source_command.go` with tests. Added Section 7.14 mapping. No new `CTR-*` rule.
+- Azure Monitor connector (#79282), webhook gateway specification and TLA+ models (#79283), native Copilot credit reporting (#79295), LangGraph engine (#79280), and trace-context propagation (#79351): no new compiler detection class; designs, runtime, or telemetry only.
+- No `threat-detection-suppress` annotations exist in workflow sources outside this optimizer prompt, so no suppression SLA action applies.
+- Go tests could not be executed (the required Go 1.27.4 toolchain is unavailable offline; local Go is 1.26.11). Only specification and changelog text changed; no implementation was modified.
 
 ### Mapping Audit (2026-11-14)
 
