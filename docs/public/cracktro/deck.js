@@ -4592,10 +4592,19 @@
       [["---", "d"]],
       [["on:", "k"]],
       [["  issues:", "k"]],
-      [["    types: ", "k"], ["[opened]", "v"]],
+      [
+        ["    types: ", "k"],
+        ["[opened]", "v"],
+      ],
       [["permissions:", "k"]],
-      [["  contents: ", "k"], ["read", "v"]],
-      [["  issues: ", "k"], ["write", "v"]],
+      [
+        ["  contents: ", "k"],
+        ["read", "v"],
+      ],
+      [
+        ["  issues: ", "k"],
+        ["write", "v"],
+      ],
       [["safe-output:", "k"]],
       [["  add-labels:", "k"]],
       [["---", "d"]],
@@ -4614,11 +4623,7 @@
     wrap.innerHTML = `<svg viewBox="0 0 1700 600"><circle class="gd-wire" cx="${CX}" cy="${CY}" r="${R}"/><g class="gdl-spin"><circle class="gdl-dot" cx="${CX}" cy="${CY - R}" r="12"/></g></svg>`;
     const spin = wrap.querySelector("g");
     const node = (label, sub, x, y) => h("div", { class: "gd-box gdl-node", style: { left: `${x - 118}px`, top: `${y - 38}px` } }, label, h("span", {}, sub));
-    const nodes = [
-      node("Agent edits", "workflow .md", CX, CY - R),
-      node("gh aw compile", "schema · strict", CX + R * 0.866, CY + R / 2),
-      node("Agent reads", "did you mean …", CX - R * 0.866, CY + R / 2),
-    ];
+    const nodes = [node("Agent edits", "workflow .md", CX, CY - R), node("gh aw compile", "schema · strict", CX + R * 0.866, CY + R / 2), node("Agent reads", "did you mean …", CX - R * 0.866, CY + R / 2)];
     const big = h("b"),
       small = h("span"),
       mid = h("div", { class: "gdl-mid" }, big, small);
@@ -4635,11 +4640,23 @@
     const PH = [
       [0, 1, 2200, () => say("agent \u203a writing .github/workflows/triage.md", "")],
       [1, 1, 1500, () => say("$ gh aw compile triage", "compiling\u2026")],
-      [2, 1, 2100, () => (lines[SAFE].className = "bad", say("$ gh aw compile triage", E1, "gd-bad", "\u2717"))],
+      [2, 1, 2100, () => ((lines[SAFE].className = "bad"), say("$ gh aw compile triage", E1, "gd-bad", "\u2717"))],
       [0, 2, 1700, () => (setLine(SAFE, [["safe-outputs:", "k"]]), (lines[SAFE].className = "fix"), say("agent \u203a applying the compiler\u2019s hint", "line 8 \u2192 safe-outputs:"))],
       [1, 2, 1500, () => ((lines[SAFE].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
       [2, 2, 2600, () => ((lines[PERM].className = "bad"), say("$ gh aw compile triage", E2, "gd-bad", "\u2717"))],
-      [0, 3, 1700, () => (setLine(PERM, [["  issues: ", "k"], ["read", "v"]]), (lines[PERM].className = "fix"), say("agent \u203a writes go through safe outputs", "line 7 \u2192 issues: read"))],
+      [
+        0,
+        3,
+        1700,
+        () => (
+          setLine(PERM, [
+            ["  issues: ", "k"],
+            ["read", "v"],
+          ]),
+          (lines[PERM].className = "fix"),
+          say("agent \u203a writes go through safe outputs", "line 7 \u2192 issues: read")
+        ),
+      ],
       [1, 3, 1500, () => ((lines[PERM].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
       [1, 3, 4200, () => say("$ gh aw compile triage", "Compiled 1 workflow: 1 succeeded \u2192 triage.lock.yml", "gd-ok", "\u2713")],
     ];
@@ -4685,7 +4702,7 @@
         if (n < k) (reset(), (k = -1));
         if (n === 0) {
           const v = Math.min(SRC.length, Math.ceil(((p - START[0]) / (PH[0][2] - 400)) * SRC.length));
-          for (; shown < v; shown++) (lines[shown].className = ""), sfx.key(0.5);
+          for (; shown < v; shown++) ((lines[shown].className = ""), sfx.key(0.5));
         }
         if (n === k) return;
         if (n > 0) for (; shown < SRC.length; shown++) lines[shown].className = "";
@@ -4735,8 +4752,7 @@
   {
     resetIndex();
     const PERSONAS = ["Backend Engineer", "Frontend Developer", "DevOps Engineer", "QA Tester", "Product Manager", "Program Manager", "Designer", "Legal / Compliance", "Information Worker"];
-    const PERSON =
-      "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z";
+    const PERSON = "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z";
     const chips = PERSONAS.map((p, i) => {
       const c = h("div", { class: "gd-box gdp-chip", style: { top: `${60 + i * 58}px` } }, p);
       c.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 24 24"><path d="${PERSON}"/></svg>`);
@@ -6694,10 +6710,47 @@
     // Each line is one process: GitHub artifacts, agents on any harness ("@claude") and developer gates ("dev:mona").
     // Line 1 stays straight on a 220 grid for the workflow and process zooms; the others are laid out like a plant floor.
     const LINES = [
-      [["calendar", 380, 88], ["@claude", 580, 88], ["issue", 780, 88], ["dev:ducky", 980, 128, "triages"], ["@codex", 1180, 128], ["pr", 1380, 128], ["@pi", 1580, 88], ["comment", 1800, 88]],
-      [["issue", 120, 250], ["@copilot", 340, 250], ["pr", 560, 250], ["@claude", 780, 250], ["comment", 1000, 250], ["@codex", 1220, 250], ["pr", 1440, 250], ["dev:mona", 1660, 250, "approves"], ["merge", 1860, 350]],
-      [["discussion", 170, 430], ["@agy", 370, 430], ["tasklist", 570, 480], ["@copilot", 770, 480], ["issue", 980, 420], ["dev:mona", 1180, 420, "steers"], ["@claude", 1380, 480], ["pr", 1600, 480]],
-      [["calendar", 330, 590], ["@codex", 530, 590], ["file", 740, 590], ["@pi", 950, 590], ["pr", 1160, 590], ["dev:ducky", 1380, 590, "reviews"], ["@agy", 1600, 590], ["package", 1820, 590]],
+      [
+        ["calendar", 380, 88],
+        ["@claude", 580, 88],
+        ["issue", 780, 88],
+        ["dev:ducky", 980, 128, "triages"],
+        ["@codex", 1180, 128],
+        ["pr", 1380, 128],
+        ["@pi", 1580, 88],
+        ["comment", 1800, 88],
+      ],
+      [
+        ["issue", 120, 250],
+        ["@copilot", 340, 250],
+        ["pr", 560, 250],
+        ["@claude", 780, 250],
+        ["comment", 1000, 250],
+        ["@codex", 1220, 250],
+        ["pr", 1440, 250],
+        ["dev:mona", 1660, 250, "approves"],
+        ["merge", 1860, 350],
+      ],
+      [
+        ["discussion", 170, 430],
+        ["@agy", 370, 430],
+        ["tasklist", 570, 480],
+        ["@copilot", 770, 480],
+        ["issue", 980, 420],
+        ["dev:mona", 1180, 420, "steers"],
+        ["@claude", 1380, 480],
+        ["pr", 1600, 480],
+      ],
+      [
+        ["calendar", 330, 590],
+        ["@codex", 530, 590],
+        ["file", 740, 590],
+        ["@pi", 950, 590],
+        ["pr", 1160, 590],
+        ["dev:ducky", 1380, 590, "reviews"],
+        ["@agy", 1600, 590],
+        ["package", 1820, 590],
+      ],
     ];
     // [line, node] → [line, node]: an output of one process triggers a step of another
     const CROSS = [
@@ -6727,7 +6780,17 @@
     // elbow route between two nodes, as polyline points
     const route = ([, x1, y1], [, x2, y2]) => {
       const m = (x1 + x2) / 2;
-      return y1 === y2 ? [[x1, y1], [x2, y2]] : [[x1, y1], [m, y1], [m, y2], [x2, y2]];
+      return y1 === y2
+        ? [
+            [x1, y1],
+            [x2, y2],
+          ]
+        : [
+            [x1, y1],
+            [m, y1],
+            [m, y2],
+            [x2, y2],
+          ];
     };
     const along = (pts, f) => {
       const seg = pts.slice(1).map((q, i) => Math.abs(q[0] - pts[i][0]) + Math.abs(q[1] - pts[i][1]));
@@ -6747,7 +6810,13 @@
     g += `<g class="wpf-bp"><rect width="2000" height="660" fill="#0d1a2e99"/><rect width="2000" height="660" fill="url(#wpfGrid)"/><rect width="2000" height="660" fill="url(#wpfGrid5)"/>
       <rect class="fr" x="8" y="8" width="1984" height="644"/><rect class="fr t" x="16" y="16" width="1968" height="628"/>
       ${[690, 1290].map(x => `<line class="dv" x1="${x}" y1="16" x2="${x}" y2="644"/>`).join("")}
-      ${[[30, "BAY A · INTAKE"], [706, "BAY B · BUILD"], [1306, "BAY C · REVIEW &amp; SHIP"]].map(([x, t]) => `<text class="bay" x="${x}" y="40">${t}</text>`).join("")}
+      ${[
+        [30, "BAY A · INTAKE"],
+        [706, "BAY B · BUILD"],
+        [1306, "BAY C · REVIEW &amp; SHIP"],
+      ]
+        .map(([x, t]) => `<text class="bay" x="${x}" y="40">${t}</text>`)
+        .join("")}
       ${LINES.map((l, r) => `<text class="ln" x="${l[0][1] - 36}" y="${l[0][2] - 46}">LINE ${r + 1}</text>`).join("")}
       <g class="tb"><rect x="30" y="532" width="250" height="104"/><line x1="30" y1="566" x2="280" y2="566"/><line x1="30" y1="600" x2="280" y2="600"/>
       <text class="k" x="42" y="555">AGENTIC FACTORY</text><text x="42" y="589">DWG 01 · REV A · NTS</text><text x="42" y="623">4 LINES · 5 HARNESSES</text></g>`;
@@ -6777,7 +6846,8 @@
         if (k[0] === "@") {
           const a = k.slice(1);
           g += `<g class="wpf-n ag" data-r="${r}"><circle cx="${x}" cy="${y}" r="34" ${agDisc(a)}/>${ico(a, x, y + 1, 38, agFg(a))}</g>`;
-        } else if (k.startsWith("dev:")) g += `<g class="wpf-n dev" data-r="${r}"><circle cx="${x}" cy="${y}" r="36"/><image href="assets/avatars/${k.slice(4)}.jpg" x="${x - 32}" y="${y - 32}" width="64" height="64" clip-path="url(#wpfClip)"/></g>`;
+        } else if (k.startsWith("dev:"))
+          g += `<g class="wpf-n dev" data-r="${r}"><circle cx="${x}" cy="${y}" r="36"/><image href="assets/avatars/${k.slice(4)}.jpg" x="${x - 32}" y="${y - 32}" width="64" height="64" clip-path="url(#wpfClip)"/></g>`;
         else g += `<g class="wpf-n" data-r="${r}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(k, x, y, 34)}</g>`;
       })
     );
@@ -6886,7 +6956,11 @@
         "section",
         { class: "slide wpf" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every factory is made of processes"), h("h2", {}, letters("Workflows → Process → "), letters("Factory", "l-grad"))),
-        h("div", { class: "wpf-steps" }, chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))),
+        h(
+          "div",
+          { class: "wpf-steps" },
+          chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))
+        ),
         svg,
         cap
       ),
