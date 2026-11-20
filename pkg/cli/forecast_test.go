@@ -87,24 +87,28 @@ func TestIntegerMinuteTimeoutFlagsExplainUnits(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		cmd  *cobra.Command
-		want string
+		name        string
+		cmd         *cobra.Command
+		want        string
+		wantDefault string
 	}{
 		{
-			name: "logs",
-			cmd:  NewLogsCommand(),
-			want: "Total download timeout in integer minutes across all targets (use a plain number such as 10; 0 = no timeout)",
+			name:        "logs",
+			cmd:         NewLogsCommand(),
+			want:        "Total download timeout in integer minutes across all targets (use a plain number such as 10; 0 = no timeout)",
+			wantDefault: "0",
 		},
 		{
-			name: "forecast",
-			cmd:  NewForecastCommand(),
-			want: "Gracefully stop forecast computation after this many integer minutes (use a plain number such as 10; 0 = no timeout)",
+			name:        "forecast",
+			cmd:         NewForecastCommand(),
+			want:        "Gracefully stop forecast computation after this many integer minutes (use a plain number such as 10; 0 = no timeout)",
+			wantDefault: "0",
 		},
 		{
-			name: "trial",
-			cmd:  NewTrialCommand(func(string) error { return nil }),
-			want: "Execution timeout in integer minutes (use a plain number such as 10; 0 = no timeout)",
+			name:        "trial",
+			cmd:         NewTrialCommand(func(string) error { return nil }),
+			want:        "Execution timeout in integer minutes (use a plain number such as 10; 0 = no timeout)",
+			wantDefault: "30",
 		},
 	}
 
@@ -114,9 +118,7 @@ func TestIntegerMinuteTimeoutFlagsExplainUnits(t *testing.T) {
 			require.NotNil(t, timeoutFlag, "%s command should register --timeout", tt.name)
 			assert.Equal(t, tt.want, timeoutFlag.Usage)
 			assert.Equal(t, "int", timeoutFlag.Value.Type())
-			if tt.name == "forecast" {
-				assert.Equal(t, "0", timeoutFlag.DefValue)
-			}
+			assert.Equal(t, tt.wantDefault, timeoutFlag.DefValue)
 		})
 	}
 }
