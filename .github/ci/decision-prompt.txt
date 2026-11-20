@@ -5,4 +5,4 @@ Answer safe-to-omit YES only with probability at least 0.9 when the evidence est
 Runtime retains prerequisites of selected jobs: test requires verify-integration-build; canary-go requires test; security, security-scan and cross-platform-build require build.
 Checkout, selection, and timing/cache cleanup are infrastructure outside the catalog.
 diff_summary.files retains all non-generated paths and only the first sorted .lock.yml as a representative generated sample. Other generated locks are filtered, not omitted source evidence. groups separates javascript (.js/.cjs), go and other bounded patches; patch_truncated marks partial hunks, not missing filenames.
-Invalid/incomplete inventories, unavailable diffs, selector-policy changes, or any missing, refused, malformed or uncertain answer run all jobs. Historical durations do not prove safety. Never invent job IDs.
+An uncertain answer retains that job and its prerequisites, not the whole batch. Invalid/incomplete inventories, unavailable diffs, selector-policy changes, or any missing, refused or malformed answer run all jobs. Historical durations do not prove safety. Never invent job IDs.
