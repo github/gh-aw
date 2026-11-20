@@ -32,7 +32,7 @@ The engine, inference provider, and enabled tools determine where repository con
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Top-level `max-turns` | Yes | Yes | Yes | Yes | Yes | No |
 | `max-continuations` | Yes | No | No | No | No | No |
-| `tools.web-fetch` | SDK only | Anthropic only | Yes | Yes | Yes | Cannot disable |
+| `tools.web-fetch` | Compat MCP (CLI), custom (SDK) | Native (Anthropic), compat MCP (Copilot) | Yes | Yes | Explicit MCP server | Cannot disable |
 | Native `tools.web-search` | No | Anthropic only | Yes | No | No | Cannot disable |
 | Native `engine.agent` selection | Yes | No | No | No | No | No |
 | `engine.api-target` | Yes | Yes | Yes | Yes | Yes | No |

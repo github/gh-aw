@@ -27,9 +27,10 @@ tools:
 ---
 Test Copilot web tool availability.
 `, strict, sdk, tool, value), "copilot-web-tools.md")
-						if sdk && tool == "web-fetch" {
+						if tool == "web-fetch" {
 							require.NoError(t, err)
 							require.NotNil(t, data)
+							require.Equal(t, !sdk, compatWebFetchEnabled(data))
 							return
 						}
 
@@ -77,13 +78,12 @@ Use imported fetch configuration.
 					data, err = compiler.ParseWorkflowString(markdown, path)
 				}
 
+				require.NoError(t, err)
 				if sdk {
-					require.NoError(t, err)
 					require.True(t, data.EngineConfig.CopilotSDK)
 					require.True(t, buildCopilotSDKToolConfig(data, nil).Capabilities.WebFetch)
 				} else {
-					require.ErrorContains(t, err, "tools.web-fetch")
-					require.ErrorContains(t, err, "COPILOT_OFFLINE=true")
+					require.True(t, compatWebFetchEnabled(data))
 				}
 			}
 		})
@@ -118,7 +118,7 @@ engine:
 ---
 Test Claude web tool availability.
 `, strict, config.engine, config.model, tool, value), "claude-web-tools.md")
-						if config.wantErr {
+						if config.wantErr && tool == "web-search" {
 							require.ErrorContains(t, err, "tools."+tool)
 							require.ErrorContains(t, err, "GitHub Copilot inference")
 							require.ErrorContains(t, err, "COPILOT_OFFLINE=true")
@@ -159,7 +159,7 @@ func TestClaudeCopilotWebToolsImportedEngineConfig(t *testing.T) {
 					} else {
 						data, err = compiler.ParseWorkflowString(markdown, path)
 					}
-					if provider == "github" {
+					if provider == "github" && tool == "web-search" {
 						require.ErrorContains(t, err, "tools."+tool)
 						require.ErrorContains(t, err, "COPILOT_OFFLINE=true")
 						require.Nil(t, data)

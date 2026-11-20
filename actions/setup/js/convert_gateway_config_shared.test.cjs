@@ -287,6 +287,36 @@ describe("runGatewayConversion", () => {
     global.core = originalCore;
   });
 
+  it.each(["Copilot", "Claude"])("injects compat after HTTP conversion for %s", engine => {
+    process.env.GH_AW_COMPAT_WEB_FETCH = "1";
+    const transformServer = vi.fn((_name, entry) => ({ ...entry, type: "http" }));
+    const serialize = vi.fn(servers => JSON.stringify({ mcpServers: servers }));
+    const output = runGatewayConversion({ format: engine, engine, outputPath: path.join(dir, "local.json"), transformServer, serialize });
+    const config = JSON.parse(output);
+    expect(transformServer).toHaveBeenCalledTimes(1);
+    expect(config.mcpServers.compat).toEqual({
+      type: engine === "Copilot" ? "local" : "stdio",
+      command: "node",
+      args: [expect.stringMatching(/compat_mcp_server\.cjs$/)],
+      env: { NODE_PATH: expect.stringMatching(/compat\/node_modules$/) },
+      ...(engine === "Copilot" ? { tools: ["web_fetch"] } : {}),
+    });
+    expect(config.mcpServers.compat.url).toBeUndefined();
+    expect(serialize.mock.calls[0][0].compat).toEqual(config.mcpServers.compat);
+  });
+
+  it("rejects collisions even when the gateway server is filtered", () => {
+    process.env.GH_AW_COMPAT_WEB_FETCH = "1";
+    process.env.GH_AW_MCP_CLI_SERVERS = '["compat"]';
+    fs.writeFileSync(process.env.MCP_GATEWAY_OUTPUT, JSON.stringify({ mcpServers: { compat: {} } }));
+    expect(() => runGatewayConversion({ format: "Copilot", engine: "Copilot", outputPath: path.join(dir, "collision.json"), transformServer: (_name, entry) => entry, serialize: JSON.stringify })).toThrow("reserved");
+  });
+
+  it("rejects converters without local stdio support", () => {
+    process.env.GH_AW_COMPAT_WEB_FETCH = "1";
+    expect(() => runGatewayConversion({ format: "Pi", engine: "Pi", outputPath: path.join(dir, "unsupported.json"), transformServer: (_name, entry) => entry, serialize: JSON.stringify })).toThrow("not supported");
+  });
+
   it("loads, filters, serializes, securely writes, and reports a converted configuration", () => {
     const sentinel = "sentinel-authorization";
     const outputPath = path.join(dir, "output/config.json");

@@ -74,10 +74,12 @@ Engine behavior differs:
 
 - **Claude**: Web search is off by default and enabled only when `web-search:` is declared.
 - **Codex**: Enabled when either `web-search:` or `web-fetch:` is declared; the two cannot be disabled independently. With neither, Codex runs with `-c web_search="disabled"`. Use `network.hosted-web` to restrict hosted retrieval.
-- **Copilot**: Runs in offline BYOK mode, so native web tools are disabled. Compilation rejects `web-search:` and, in CLI mode, `web-fetch:`. With `engine.copilot-sdk: true`, `web-fetch:` works through a proxy-aware custom tool that follows `network.allowed`; this does not enable native search.
+- **Copilot**: Runs in offline BYOK mode, so native web tools are disabled. `web-fetch:` uses the first-party `compat` MCP server in CLI mode, or the existing custom tool with `engine.copilot-sdk: true`. Both fetch through the agent firewall and follow `network.allowed`. Compilation still rejects `web-search:`.
 - **Gemini** and **Pi**: No built-in web search. `web-search:` has no effect and `gh aw compile` prints a warning.
 
-Copilot, Gemini, and Pi need a third-party MCP server for search (Copilot CLI mode also needs one for fetch). See [Using Web Search](/gh-aw/reference/web-search/).
+The `compat` server runs as an engine-local stdio process inside the firewall, not as a gateway backend. Its `web_fetch` tool accepts `{url, prompt}`, like Claude Code's `WebFetch`. It returns up to 20,000 characters of simplified page content; the calling engine applies the prompt, not a separate LLM. Requests have a 30-second timeout, at most five redirects, and a 10 MiB response limit. Copilot CLI and Claude on GitHub Copilot inference select this fallback automatically; it requires the agent firewall. Other MCP consumers without supported local stdio wiring must configure a fetch server explicitly.
+
+Copilot, Gemini, and Pi need a third-party MCP server for search. See [Using Web Search](/gh-aw/reference/web-search/).
 
 ### Playwright Tool (`playwright:`)
 

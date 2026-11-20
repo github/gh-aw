@@ -195,6 +195,23 @@ function runGatewayConversion(options) {
   const urlPrefix = options.getUrlPrefix ? options.getUrlPrefix(context) : context.urlPrefix;
   logCLIFilters(context.cliServers);
   const servers = filterAndTransformServers(context.servers, context.cliServers, (name, entry) => options.transformServer(name, entry, urlPrefix, context));
+  // Add local tools only after gateway transformations: they must be spawned by
+  // the engine inside its firewall, not registered as host-side backends.
+  if (process.env.GH_AW_COMPAT_WEB_FETCH === "1") {
+    if (options.engine !== "Copilot" && options.engine !== "Claude") {
+      throw new Error(`compat WebFetch is not supported by the ${options.engine} MCP configuration converter`);
+    }
+    if (Object.hasOwn(context.servers, "compat")) {
+      throw new Error("The MCP server name 'compat' is reserved for compiler-managed compatibility tools");
+    }
+    servers.compat = {
+      type: options.engine === "Copilot" ? "local" : "stdio",
+      command: "node",
+      args: [path.join(__dirname, "compat_mcp_server.cjs")],
+      env: { NODE_PATH: path.join(__dirname, "..", "compat", "node_modules") },
+      ...(options.engine === "Copilot" ? { tools: ["web_fetch"] } : {}),
+    };
+  }
   const output = options.serialize(servers, context, urlPrefix);
 
   logServerStats(context.servers, Object.keys(servers).length);

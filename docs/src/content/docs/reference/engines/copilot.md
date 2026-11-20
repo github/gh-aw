@@ -17,7 +17,7 @@ Without a `model`, `engine.model`, or `engine.model-routing`, a Copilot workflow
 
 ## Capabilities and limitations
 
-Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlists. Compilation rejects native `tools.web-search` and CLI-mode `tools.web-fetch`; use MCP instead. SDK mode provides a proxy-aware `web-fetch` tool. Offline BYOK disables native web tools.
+Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlists. Offline BYOK disables native web tools. CLI-mode `tools.web-fetch` uses the first-party `compat` MCP server inside the agent firewall; SDK mode retains its proxy-aware custom fetch tool. Both follow `network.allowed`. Compilation still rejects native `tools.web-search`; configure an MCP search server instead.
 
 Sandboxed CLI sessions derive URL approvals from finalized AWF network rules, including `network_allowed` additions. Domain rules cover apex/subdomains and HTTP/HTTPS unless restricted by protocol/port. These approvals do not grant shell access or bypass the firewall.
 

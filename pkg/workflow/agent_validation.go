@@ -263,7 +263,7 @@ func (c *Compiler) validateCopilotWebToolsSupport(engine CodingAgentEngine, data
 	engineConfig := data.EngineConfig
 	collector := NewErrorCollector(c.failFast)
 	for _, tool := range []string{"web-fetch", "web-search"} {
-		if !isCopilotToolValueEnabled(data.Tools, tool) || (!claudeOnCopilot && tool == "web-fetch" && engineConfig != nil && engineConfig.CopilotSDK) {
+		if !isCopilotToolValueEnabled(data.Tools, tool) || (tool == "web-fetch" && (compatWebFetchEnabled(data) || (!claudeOnCopilot && engineConfig != nil && engineConfig.CopilotSDK))) {
 			continue
 		}
 		message := fmt.Sprintf("Copilot's native '%s' tool is unavailable because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)", tool)

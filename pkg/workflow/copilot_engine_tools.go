@@ -178,16 +178,20 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		// web-fetch -> web_fetch
 		args = append(args, "--allow-tool", "web_fetch")
 	}
+	if compatWebFetchEnabled(workflowData) {
+		args = append(args, "--allow-tool", "compat")
+	}
 
 	// Built-in tool names that should be skipped when processing MCP servers
 	// Note: GitHub is NOT included here because it needs MCP configuration in CLI mode
-	// Note: web-fetch is NOT included here because it needs explicit --allow-tool argument
+	// Web fetch permissions (SDK tool or compat server) were handled above.
 	// Note: native web-search is unavailable in offline BYOK mode
 	builtInTools := map[string]struct {
 	}{
 		"bash":         {},
 		"edit":         {},
 		"web-search":   {},
+		"web-fetch":    {},
 		"playwright":   {},
 		"cache-memory": {},
 		"drive-memory": {},

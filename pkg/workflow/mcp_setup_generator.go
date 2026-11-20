@@ -115,7 +115,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 	// If no MCP tools, skip setup unless the engine still needs MCP gateway/config bootstrap.
 	// Codex with AWF firewall enabled requires MCP config generation to set its OpenAI proxy
 	// provider, even when no MCP tools are configured (e.g. threat-detection jobs).
-	needsSetupWithoutMCPTools := len(mcpTools) == 0 && engine.GetID() == "codex" && isFirewallEnabled(workflowData)
+	needsSetupWithoutMCPTools := len(mcpTools) == 0 && ((engine.GetID() == "codex" && isFirewallEnabled(workflowData)) || compatWebFetchEnabled(workflowData))
 	if codex, ok := engine.(*CodexEngine); ok {
 		step, err := codex.renderConfigurationStep(workflowData, mcpTools, len(mcpTools) == 0 && !needsSetupWithoutMCPTools)
 		if err != nil {
@@ -130,6 +130,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		mcpSetupGeneratorLog.Print("No MCP tools configured, skipping MCP setup")
 		return nil
 	}
+	generateCompatWebFetchSetup(yaml, workflowData)
 
 	hasAgenticWorkflows := slices.Contains(mcpTools, "agentic-workflows")
 	generateAgenticWorkflowsInstallStep(c, yaml, hasAgenticWorkflows, workflowData)

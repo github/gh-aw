@@ -473,6 +473,9 @@ func (e *CopilotEngine) buildCopilotFirewallCommand(workflowData *WorkflowData, 
 	// AWF v0.15.0+ uses chroot mode by default, and sudo's secure_path may strip PATH additions.
 	// Prepend GetNpmBinPathSetup() and the MCP CLI bin path so the container can resolve node and CLI proxies.
 	engineCommand := fmt.Sprintf("%s && %s", GetNpmBinPathSetup(), copilotCommand)
+	if compatWebFetchEnabled(workflowData) {
+		engineCommand = fmt.Sprintf("%s && %s", compatMCPRuntimeSetup("$HOME/.copilot/mcp-config.json", "$HOME/.copilot/mcp-config.json"), engineCommand)
+	}
 	if mcpCLIPath := GetMCPCLIPathSetup(workflowData); mcpCLIPath != "" {
 		engineCommand = fmt.Sprintf("%s && %s", mcpCLIPath, engineCommand)
 	}

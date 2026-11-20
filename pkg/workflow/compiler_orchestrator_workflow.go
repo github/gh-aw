@@ -119,6 +119,9 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
+	if err := validateCompatWebFetch(ctx.workflowData); err != nil {
+		return c.formatToolsProcessingError(ctx.cleanPath, err)
+	}
 	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, ctx.workflowData); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}

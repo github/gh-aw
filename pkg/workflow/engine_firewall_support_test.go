@@ -347,8 +347,8 @@ Test firewall-bound tool validation.
 	t.Run("non-strict mode rejects unavailable tools", func(t *testing.T) {
 		compiler := NewCompiler(WithFailFast(false))
 		_, err := compiler.ParseWorkflowString(workflow("copilot", false), "non-strict-tools.md")
-		require.ErrorContains(t, err, "tools.web-fetch")
 		require.ErrorContains(t, err, "tools.web-search")
+		require.NotContains(t, err.Error(), "tools.web-fetch")
 		assert.Equal(t, 0, compiler.GetWarningCount())
 	})
 
@@ -356,7 +356,7 @@ Test firewall-bound tool validation.
 		compiler := NewCompiler(WithFailFast(false))
 		_, err := compiler.ParseWorkflowString(workflow("copilot", true), "strict-copilot-tools.md")
 		require.Error(t, err)
-		require.ErrorContains(t, err, "tools.web-fetch")
+		require.NotContains(t, err.Error(), "tools.web-fetch")
 		require.ErrorContains(t, err, "tools.web-search")
 		require.ErrorContains(t, err, "offline BYOK mode")
 		require.NotContains(t, err.Error(), "engine: claude")

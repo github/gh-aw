@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -257,11 +258,20 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 	if HasMCPServers(workflowData) {
 		claudeLog.Print("Adding MCP configuration")
 		mcpConfigArg = ` --mcp-config "${RUNNER_TEMP}/gh-aw/mcp-config/mcp-servers.json"`
+		if compatWebFetchEnabled(workflowData) {
+			mcpConfigArg = ` --mcp-config "` + claudeCompatMCPConfigPath + `"`
+		}
 	}
 
 	// Note: we use --allowed-tools (not the simpler --tools from v2.0.31+) because it provides
 	// fine-grained control: Bash(git:*), MCP tool prefixes, path-specific tools, etc.
 	allowedTools = e.computeAllowedClaudeToolsStringWithDynamicWorkflows(toolsWithMountedCLIs, workflowData.SafeOutputs, workflowData.CacheMemoryConfig, workflowData.DriveMemoryConfig, workflowData.MCPScripts, workflowData.SandboxConfig, dynamicWorkflowsEnabled(e, workflowData.EngineConfig))
+	if compatWebFetchEnabled(workflowData) {
+		granted := strings.Split(allowedTools, ",")
+		granted = slices.DeleteFunc(granted, func(tool string) bool { return tool == "WebFetch" })
+		granted = append(granted, "mcp__compat__web_fetch")
+		allowedTools = strings.Join(granted, ",")
+	}
 	if allowedTools != "" {
 		claudeArgs = append(claudeArgs, "--allowed-tools", allowedTools)
 	}
@@ -403,6 +413,9 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
 		// We prepend GetNpmBinPathSetup() to the engine command so it runs inside the AWF container.
 		npmPathSetup := GetNpmBinPathSetup()
 		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, npmPathSetup, claudeCommand)
+		if compatWebFetchEnabled(workflowData) {
+			claudeCommandWithPath = fmt.Sprintf("%s && %s", compatMCPRuntimeSetup("${RUNNER_TEMP}/gh-aw/mcp-config/mcp-servers.json", claudeCompatMCPConfigPath), claudeCommandWithPath)
+		}
 		if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
 			claudeCommandWithPath = claudeCopilotAPIKeyExport() + " && " + claudeCommandWithPath
 		}
