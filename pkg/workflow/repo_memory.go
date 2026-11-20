@@ -982,7 +982,6 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	fmt.Fprintf(&step, "          MEMORY_ID: %s\n", memory.ID)           //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          TARGET_REPO: %s\n", targetRepo)        //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          BRANCH_NAME: %s\n", memory.BranchName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	fmt.Fprintf(&step, "          REPO_MEMORY_BASE_COMMIT: ${{ needs.%s.outputs.%s }}\n", constants.AgentJobName, repoMemoryBaseCommitOutput(memory.ID)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	if ledgerMemory, ok := dailyAICRepoMemoryEntry(data); ok && ledgerMemory.ID == memory.ID {
 		step.WriteString("          GH_AW_DAILY_AIC_REPO_MEMORY_WRITER: ${{ steps.daily-aic-repo-memory-reset.outcome == 'success' }}\n")
 	}
@@ -1041,7 +1040,8 @@ func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob 
 	}
 	env := fmt.Sprintf("          GH_TOKEN: %s\n", token) +
 		"          GITHUB_RUN_ID: ${{ github.run_id }}\n" +
-		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n"
+		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n" +
+		fmt.Sprintf("          REPO_MEMORY_BASE_COMMIT: ${{ needs.%s.outputs.%s }}\n", constants.AgentJobName, repoMemoryBaseCommitOutput(memory.ID))
 	if memory.Validation != nil && memory.Validation.Script != "" {
 		env += fmt.Sprintf("          GH_AW_MEMORY_SOURCE_JOB_RESULT: ${{ needs.%s.result }}\n", constants.AgentJobName)
 	}

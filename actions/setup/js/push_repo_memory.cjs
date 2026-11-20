@@ -184,6 +184,18 @@ function readBlob(blobId, workspaceDir) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {Buffer}
+ */
+function readMemoryFile(filePath) {
+  try {
+    return fs.readFileSync(filePath);
+  } catch (error) {
+    throw new Error(`Failed to read memory file ${filePath}: ${getErrorMessage(error)}`, { cause: error });
+  }
+}
+
+/**
  * Three-way merge of one memory file changed both by this run and by another
  * run. JSONL keeps the rows of both sides, like the merge=union policy of the
  * retry path; other files keep this run's lines where the two sides conflict.
@@ -193,17 +205,31 @@ function readBlob(blobId, workspaceDir) {
  */
 function mergeRepoMemoryFile({ relativePath, latest, base, local, workspaceDir }) {
   if ([latest, base, local].some(content => content.includes(0) || !isUtf8(content))) return null;
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-merge-"));
+  /** @type {string} */
+  let tempDir;
+  try {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-merge-"));
+  } catch (error) {
+    throw new Error(`Failed to create a temporary directory to merge ${relativePath}: ${getErrorMessage(error)}`, { cause: error });
+  }
   try {
     const [latestPath, basePath, localPath] = ["latest", "base", "local"].map(name => path.join(tempDir, name));
-    fs.writeFileSync(latestPath, latest);
-    fs.writeFileSync(basePath, base);
-    fs.writeFileSync(localPath, local);
+    try {
+      fs.writeFileSync(latestPath, latest);
+      fs.writeFileSync(basePath, base);
+      fs.writeFileSync(localPath, local);
+    } catch (error) {
+      throw new Error(`Failed to stage ${relativePath} for merging: ${getErrorMessage(error)}`, { cause: error });
+    }
     const favor = relativePath.endsWith(".jsonl") ? "--union" : "--theirs";
     const result = execGitSyncResult(["merge-file", "-p", favor, latestPath, basePath, localPath], { cwd: workspaceDir, encoding: "buffer" });
     return result.status === 0 && Buffer.isBuffer(result.stdout) ? result.stdout : null;
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      core.info(`Could not remove temporary merge directory ${tempDir}: ${getErrorMessage(error)}`);
+    }
   }
 }
 
@@ -237,7 +263,7 @@ function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
   const steps = new Map();
   for (const file of files) {
     const treePath = file.relativePath.replace(/\\/g, "/");
-    const local = fs.readFileSync(file.source);
+    const local = readMemoryFile(file.source);
     const localBlob = gitBlobId(local, commit);
     const baseBlob = baseBlobs.get(treePath);
     const headBlob = headBlobs.get(treePath);
@@ -249,7 +275,7 @@ function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
       }
       // Sparse checkouts may not materialize the head's version in the working tree.
       const destPath = path.join(workspaceDir, file.relativePath);
-      const inPlace = fs.existsSync(destPath) && gitBlobId(fs.readFileSync(destPath), commit) === headBlob;
+      const inPlace = fs.existsSync(destPath) && gitBlobId(readMemoryFile(destPath), commit) === headBlob;
       steps.set(file.relativePath, inPlace ? { action: "keep" } : { action: "write", content: readBlob(headBlob, workspaceDir) });
       continue;
     }
