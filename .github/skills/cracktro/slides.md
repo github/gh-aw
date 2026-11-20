@@ -1612,6 +1612,27 @@ expires, expiry, close, cleanup, hide, noise
 - So that means less clutter in everyone's inbox, then?
 - Exactly. Safe outputs carry their own end, and human attention is protected from the noise.
 
+### Draft issues {#draft-issues-by-intent}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+Proposal, not yet supported: create-issue could carry issue intent so an agent's labels arrive as suggestions with rationale and confidence that a maintainer accepts or dismisses, as update handlers such as add-labels already allow.
+
+#### Keywords
+
+issue intent, issue-intent, create-issue, suggest, rationale, confidence, suggested labels, human review, triage, proposal
+
+#### Captions
+
+- A proposal from the triage desk: agent-created issues whose metadata waits for a human.
+- Today, intent fields such as rationale, confidence and suggest work on updates like adding labels, but not when an issue is created.
+- So the proposed issue would be a private draft?
+- No. The issue is public; only its suggested labels wait until a maintainer accepts or dismisses them.
+
 ### Index & search {#index-and-search}
 
 #### Notes

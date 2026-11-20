@@ -2077,6 +2077,32 @@
   .eph-log { margin-top: 14px; }
   .eph-log div { margin-top: 9px; font: 500 18px/1.2 var(--mono); color: #6e7681; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .eph-log div:first-child { color: #f0f6fc; }
+  .dfi { --lg: #79c0ff; }
+  .dfi-tag { position: absolute; right: 110px; top: 96px; padding: 16px 26px; border: 3px dashed #db6d28; border-radius: 16px; background: #1c1209; color: #ffa657; font: 700 26px/1.25 var(--mono); letter-spacing: .08em; text-align: right; }
+  .dfi-tag small { display: block; font-size: 18px; font-weight: 500; letter-spacing: .02em; color: #f0b98a; }
+  .dfi-card { position: absolute; box-sizing: border-box; border: 2px solid var(--c); border-radius: 22px; background: #0d1117ee; padding: 22px 28px; }
+  .dfi-card > i { display: block; font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; white-space: nowrap; }
+  .dfi-card pre { margin: 14px 0 0; font: 500 22px/1.42 var(--mono); color: #e6edf3; white-space: pre; }
+  .dfi-card pre b { color: #79c0ff; font-weight: 600; }
+  .dfi-card pre em { color: #ffa657; font-style: normal; }
+  .dfi-card pre s { color: #6e7681; text-decoration: none; }
+  .dfi-cfg { left: 110px; top: 330px; width: 840px; height: 196px; }
+  .dfi-call { left: 110px; top: 548px; width: 840px; height: 332px; }
+  .dfi-flow { left: 990px; top: 330px; width: 820px; height: 550px; }
+  .dfi-issue { margin-top: 16px; border: 1px solid #30363d; border-radius: 14px; padding: 18px 22px; background: #161b22; }
+  .dfi-issue h4 { margin: 0; font-size: 34px; line-height: 1.1; font-variation-settings: "wght" 700, "wdth" 100; color: #f0f6fc; }
+  .dfi-open { display: inline-block; margin-top: 10px; padding: 4px 14px; border-radius: 99px; background: #1f6feb33; border: 1px solid #4493f8; color: #79c0ff; font: 600 17px/1.3 var(--mono); }
+  .dfi-sug { margin-top: 14px; padding: 14px 16px; border: 2px dashed #4493f8; border-radius: 12px; }
+  .dfi-sug .t { font: 600 20px/1.3 var(--mono); color: #79c0ff; }
+  .dfi-sug .r { margin-top: 6px; font: 500 19px/1.35 var(--mono); color: #9198a1; }
+  .dfi-acts { display: flex; gap: 14px; margin-top: 12px; }
+  .dfi-acts span { padding: 6px 16px; border-radius: 10px; font: 600 18px/1.3 var(--mono); }
+  .dfi-acts .ok { border: 2px solid #4493f8; color: #79c0ff; }
+  .dfi-acts .no { border: 2px dashed #db6d28; color: #ffa657; }
+  .dfi-steps { display: flex; gap: 10px; margin-top: 20px; font: 600 19px/1.25 var(--mono); color: #c9d1d9; }
+  .dfi-steps span { flex: 1; padding: 10px 12px; border-top: 3px solid #4493f8; background: #4493f810; border-radius: 6px; }
+  .dfi-foot { position: absolute; left: 110px; top: 912px; width: 1700px; font: 500 21px/1.4 var(--mono); color: #9198a1; }
+  .dfi-foot b { color: #79c0ff; font-weight: 600; }
   .eph-foot { left: 110px; top: 870px; width: 1700px; height: 76px; padding: 0 30px; display: flex; align-items: center; gap: 22px; font: 500 22px/1 var(--mono); color: #9198a1; white-space: nowrap; }
   .eph-foot b { color: #79c0ff; font-weight: 600; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
@@ -13180,6 +13206,72 @@
         withE.textContent = open;
         now.style.left = `${378 + day * DW}px`;
       },
+      el,
+    });
+  }
+
+  // Draft issues by intent (proposal): create-issue does not support issue intent yet; illustrates labels arriving as pending suggestions (rationale, confidence, suggest) that a maintainer accepts or dismisses, as add-labels and other update handlers already do
+  {
+    resetIndex();
+    const P = "  // proposed";
+    const el = h(
+      "section",
+      { class: "slide dfi" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Issue intent · suggestions a human accepts"), h("h2", {}, letters("Draft issues", "l-grad"))),
+      h("div", { class: "dfi-tag" }, "PROPOSED · NOT SUPPORTED YET", h("small", {}, "create-issue does not accept intent yet")),
+      h(
+        "div",
+        { class: "dfi-card dfi-cfg", "--c": "#79c0ff" },
+        h("i", {}, "FRONT MATTER · CONFIG"),
+        h("pre", {}, h("b", {}, "safe-outputs:"), "\n  ", h("b", {}, "create-issue:"), "\n    issue-intent: true", h("em", {}, "   # proposed · ignored today"))
+      ),
+      h(
+        "div",
+        { class: "dfi-card dfi-call", "--c": "#79c0ff" },
+        h("i", {}, "AGENT TOOL CALL · PAYLOAD"),
+        h(
+          "pre",
+          {},
+          h("b", {}, "create_issue"),
+          '({\n  title: "Flaky checkout test",\n  body: "Fails 3 of 10 runs on main …",\n  labels: [{ name: "bug",',
+          h("em", {}, P),
+          '\n    rationale: "Same assertion fails on retries",\n    confidence: "MEDIUM",\n    suggest: true }]\n})',
+          h("s", {}, "   // label metadata shape from add_labels")
+        )
+      ),
+      h(
+        "div",
+        { class: "dfi-card dfi-flow", "--c": "#79c0ff" },
+        h("i", {}, "HUMAN REVIEW · ILLUSTRATIVE"),
+        h(
+          "div",
+          { class: "dfi-issue" },
+          h("h4", {}, "Flaky checkout test"),
+          h("span", { class: "dfi-open" }, "● Open · public issue"),
+          h(
+            "div",
+            { class: "dfi-sug" },
+            h("div", { class: "t" }, "◌ label bug · suggested · MEDIUM"),
+            h("div", { class: "r" }, "“Same assertion fails on retries”"),
+            h("div", { class: "dfi-acts" }, h("span", { class: "ok" }, "✓ accept → applied"), h("span", { class: "no" }, "✕ dismiss → never applied"))
+          )
+        ),
+        h("div", { class: "dfi-steps" }, h("span", {}, "1 agent proposes"), h("span", {}, "2 issue opens, metadata pending"), h("span", {}, "3 maintainer decides"))
+      ),
+      h(
+        "div",
+        { class: "dfi-foot" },
+        h("b", {}, "Today: "),
+        "rationale · confidence · suggest work on add-labels, set-issue-type, set-issue-field, assign-to-user, assign-to-agent and close-issue (on by default; issue-intent: false opts out). ",
+        h("b", {}, "Draft-like, not a draft: "),
+        "the issue is public; only its suggested metadata waits."
+      )
+    );
+    slides.push({
+      group: "engineering",
+      id: "draft-issues-by-intent",
+      notes:
+        "What: An illustrative proposal, not a shipped feature: create-issue does not accept issue intent today. On the left, the config key and the agent's payload; on the right, the issue opens with its label shown as a pending suggestion, with rationale and confidence, for a maintainer to accept or dismiss.\nWhy: Agents guess metadata. Suggestions let people keep the final say on triage while the agent still does the legwork. The issue itself is public, so this is draft-like metadata, not a private draft.\nWhen: Today, use suggest on add-labels, set-issue-type or assign-to-user after the issue exists.",
       el,
     });
   }
