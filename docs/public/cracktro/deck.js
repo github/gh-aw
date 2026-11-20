@@ -4520,8 +4520,9 @@
           text.textContent = want;
           if (s < 0) sfx.key(0.6);
         }
-        if (s !== st) {
-          st = s;
+        const k = i * 8 + s;
+        if (k !== st) {
+          st = k;
           show(i, s);
           if (s === 1) sfx.route(1);
           if (s === 3) sfx.pop(i);
@@ -4598,7 +4599,7 @@
       t2.replaceChildren(...(sign ? [h("span", { class: cls }, sign + " ")] : []), b);
     };
     const E1 = "triage.md:8:1: error: Unknown property: safe-output. Did you mean 'safe-outputs'?";
-    const E2 = "triage.md:1:1: error: strict mode: write permission 'issues: write' is not allowed for security reasons. Use 'safe-outputs.\u2026' to perform write operations safely.";
+    const E2 = "triage.md:1:1: error: strict mode: write permission 'issues: write' is not allowed for security reasons. Use 'safe-outputs.create-issue', \u2026 to perform write operations safely.";
     // [ring node, round, typing?, apply()]
     const PH = [
       [0, 1, 2200, () => say("agent \u203a writing .github/workflows/triage.md", "")],
@@ -4630,7 +4631,7 @@
       under: "intent",
       id: "authoring-loop",
       notes:
-        "What: An illustrative authoring loop with real compiler messages for a synthetic issue-triage workflow. The agent writes the Markdown; gh aw compile rejects an unknown property with a did-you-mean hint, then a direct write permission under strict mode; the third round compiles to a lock file.\nWhy: The compiler is a deterministic reviewer. Precise, actionable errors let the agent correct itself in seconds, and only validated, hardened workflows reach the lock file.\nWhen: Let the agent run gh aw compile after every edit and feed it the errors; review the Markdown once it compiles cleanly.",
+        "What: An illustrative authoring loop with real, abridged compiler messages for a synthetic issue-triage workflow. The agent writes the Markdown; gh aw compile rejects an unknown property with a did-you-mean hint, then a direct write permission under strict mode, which the compiler reports at the file level as 1:1; the third round compiles to a lock file.\nWhy: The compiler is a deterministic reviewer. Precise, actionable errors let the agent correct itself in seconds, and only validated, hardened workflows reach the lock file.\nWhen: Let the agent run gh aw compile after every edit and feed it the errors; review the Markdown once it compiles cleanly.",
       enter() {
         t0 = last = 0;
         k = -1;
@@ -4656,7 +4657,9 @@
           for (; shown < v; shown++) (lines[shown].className = ""), sfx.key(0.5);
         }
         if (n === k) return;
-        if (k < 0 && n > 0) for (; shown < SRC.length; shown++) lines[shown].className = "";
+        if (n > 0) for (; shown < SRC.length; shown++) lines[shown].className = "";
+        // a hidden tab can skip phases: replay them so the source always matches the current phase
+        for (let j = k + 1; j < n; j++) PH[j][3]();
         k = n;
         const [at, round] = PH[n];
         nodes.forEach((el, i) => el.classList.toggle("on", i === at));
@@ -4692,7 +4695,7 @@
           h("div", { class: "gd-lab", style: { left: "40px", top: "524px", width: "420px", lineHeight: "1.5" } }, "start \u203a /agentic-workflows", h("br"), "\u201clabel new issues by area\u201d"),
           h("div", { class: "gdl-file" }, h("div", { class: "gdl-tab" }, h("b", {}, "triage.md"), ".github/workflows/"), h("div", { class: "gdl-src" }, lines), term)
         ),
-        h("div", { class: "gd-cap" }, "Illustrative run · real gh aw compile messages for a synthetic triage.md · three rounds to a lock file")
+        h("div", { class: "gd-cap" }, "Illustrative run · real gh aw compile messages (abridged) for a synthetic triage.md · three rounds to a lock file")
       ),
     });
   }
@@ -4717,7 +4720,7 @@
     ];
     const steps = STEPS.map(([a, b], i) => h("div", { class: "gd-box gdp-step", style: { top: `${60 + i * 104}px` } }, h("b", {}, String(i + 1)), h("strong", {}, a), h("span", {}, b)));
     const KPI = [
-      [133, "daily persona reports"],
+      [133, "persona reports"],
       [25, "fixed by merged PRs, 22 by Copilot"],
       [23, "PRs changed agent guidance"],
       [0, "personas \u00d7 score dimensions", "9\u00d75"],
@@ -4733,7 +4736,7 @@
       under: "intent",
       id: "persona-optimization",
       notes:
-        "What: Agent Persona Explorer, a daily workflow, role-plays a persona such as a backend engineer, a designer or a compliance lead, asks /agentic-workflows for a workflow, scores the answer on five dimensions and asks again with only the first 8,000 bytes of the agent file. Measured on 15 Nov 2026: 133 daily reports since 8 Jun 2026, 25 closed by merged pull requests, 22 of them by Copilot and 23 changing agent guidance; the agent file is 17,035 bytes. The persona order and the loop are an illustrative, simplified example.\nWhy: People phrase the same need in many ways. Personas catch guidance that works for only one kind of user, and the prefix probe catches rules a truncated prompt loses.\nWhen: Use persona evaluation when one agent serves many kinds of users, and keep its most important rules in the first bytes.",
+        "What: Agent Persona Explorer, a daily workflow, role-plays a persona such as a backend engineer, a designer or a compliance lead, asks /agentic-workflows for a workflow, scores the answer on five dimensions and asks again with only the first 8,000 bytes of the agent file. Measured on 15 Nov 2026: 133 reports in total from 8 Jun to 15 Nov 2026, 25 closed by merged pull requests, 22 of them by Copilot and 23 changing agent guidance; the agent file is 17,035 bytes. The persona order and the loop are an illustrative, simplified example.\nWhy: People phrase the same need in many ways. Personas catch guidance that works for only one kind of user, and the prefix probe catches rules a truncated prompt loses.\nWhen: Use persona evaluation when one agent serves many kinds of users, and keep its most important rules in the first bytes.",
       enter() {
         t0 = last = 0;
         k = -1;
