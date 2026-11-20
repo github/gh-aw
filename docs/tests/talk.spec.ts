@@ -1076,6 +1076,18 @@ test("opens every hard-coded tour from the hash with all its slides found", asyn
   expect(warnings.filter(w => w.includes("CracktroDeck"))).toEqual([]);
 });
 
+test("ends the slide map with a keyboard manual of every shortcut", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/");
+  await page.keyboard.press("g");
+  const keys = page.getByRole("region", { name: "Keyboard" });
+  await expect(page.locator(".smp-body > :last-child")).toHaveClass(/smp-keys/);
+  for (const group of ["Move", "Jump", "Show", "Slide map", "Design a view"]) await expect(keys.getByRole("heading", { name: group, exact: true })).toBeVisible();
+  await expect(keys.locator("dt", { hasText: "Shift+Home" })).toHaveCount(1);
+  await expect(keys).toContainText("First slide of the band");
+  await expect(keys.locator(".smp-kpad kbd")).toHaveCount(4);
+  await expect(keys.getByRole("button")).toHaveCount(0);
+});
+
 test("keeps an example in a view only together with its pattern slide", async ({ page }) => {
   const view = (s: string[]) => Buffer.from(JSON.stringify({ s })).toString("base64url");
   await page.goto(`/gh-aw/cracktro/#github-agentic-workflows&view=${view(["github-agentic-workflows", "repo-assist"])}`);

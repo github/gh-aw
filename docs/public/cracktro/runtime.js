@@ -327,6 +327,30 @@
   body.light .smp-tb span { color: #59636e; }
   body.light .smp-d { background: #f6f8fa; border-color: #9ea7b3; }
   body.light .smp-dc { color: #1f2328; }
+  /* keyboard manual (bottom of the map): game-style controls screen, an arrow cluster then a card per group; keycaps are inert kbd */
+  .smp-kg { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; align-items: start; }
+  .smp-kpad { display: grid; grid-template-areas: ". u ." "l d r"; grid-template-columns: repeat(3, 64px); gap: 6px; justify-content: center; align-content: center; padding: 14px 10px;
+    border: 1px solid #3d444d; border-radius: 8px; background: radial-gradient(circle at 50% 60%, #4493f81f, transparent 70%), #151b23; }
+  .smp-kp { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .smp-keys .smp-kp kbd { width: 52px; height: 46px; font-size: 20px; }
+  .smp-kp span { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+  .smp-kb { padding: 10px 12px; border: 1px solid #3d444d; border-top: 3px solid var(--c); border-radius: 8px; background: #151b23; }
+  .smp-kb h4 { margin: 0 0 8px; font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+  .smp-kb dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; }
+  .smp-kb dl > div { display: contents; }
+  .smp-kb dt { display: flex; flex-wrap: wrap; gap: 4px; }
+  .smp-kb dd { margin: 0; font: 500 12px/1.35 "Mona Sans", sans-serif; color: #c9d1d9; }
+  .smp-kc { display: inline-flex; align-items: center; gap: 2px; }
+  .smp-kc i { font: 600 10px/1 var(--mono); font-style: normal; color: #9198a1; }
+  .smp-keys kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box;
+    font: 600 11px/1 var(--mono); color: #f0f6fc; background: linear-gradient(#2a313c, #1f2630); border: 1px solid #3d444d; border-bottom: 3px solid #0d1117;
+    border-radius: 5px; box-shadow: 0 1px 0 #ffffff14 inset; white-space: nowrap; }
+  @media (max-width: 640px) { .smp-kg { grid-template-columns: minmax(0, 1fr); } }
+  body.light .smp-kpad, body.light .smp-kb { background: #ffffff; border-color: #9ea7b3; border-top-color: var(--c); }
+  body.light .smp-kpad { background: radial-gradient(circle at 50% 60%, #4493f81f, transparent 70%), #ffffff; border-top-color: #9ea7b3; }
+  body.light .smp-kb dd { color: #1f2328; }
+  body.light .smp-kb h4, body.light .smp-kp span { color: #0969da; }
+  body.light .smp-keys kbd { color: #1f2328; background: linear-gradient(#ffffff, #eaeef2); border-color: #9ea7b3; border-bottom-color: #818b98; box-shadow: none; }
   body.light .smp-db, body.light .smp-d input { background: #ffffff; border-color: #9ea7b3; color: #1f2328; }
   body.light .smp-db.go { background: #0969da; border-color: #0969da; color: #ffffff; }
   body.light .smp.design .smp-t[aria-pressed="true"] { border-color: #0969da; background: #0969da14; }
@@ -1465,6 +1489,88 @@
       h("h3", { class: "smp-l", id: "smp-tours-h" }, "Tours", " ", h("small", {}, "filtered views of the deck, shareable by link")),
       smpTourList
     );
+    // Keyboard manual (below the tours): a game-style controls screen, an arrow cluster plus one card per group of
+    // shortcuts. Each entry is [keys, action]; a key is a string whose "+" joins a chord ("Shift+Home").
+    const KEYMAP = [
+      [
+        "Move",
+        [
+          [["→", "Space", "Enter"], "Next slide"],
+          [["←", "Backspace"], "Previous slide"],
+          [["↑", "↓"], "Up or down a column, or to the next band; keeps your place in the line"],
+          [["Shift+↑", "Shift+↓", "PgUp", "PgDn"], "Previous or next band"],
+          [["U"], "Back to the pattern of an example"],
+        ],
+      ],
+      [
+        "Jump",
+        [
+          [["Shift+Home"], "First slide of the band"],
+          [["Home", "End"], "First or last slide"],
+          [["1…9+Enter"], "Slide by number"],
+          [["/", "Ctrl+K", "⌘+K"], "Search slides"],
+          [["G"], "Slide map (this screen)"],
+        ],
+      ],
+      ["Show", [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], ...(config.sound ? [[["M"], "Sound on or off"]] : []), [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]]],
+      [
+        "Slide map",
+        [
+          [["←", "→", "↑", "↓"], "Move between tiles"],
+          [["Home", "End"], "First or last tile"],
+          [["Enter"], "Open the slide"],
+          [["T"], "Tours"],
+          [["D"], "Design a view"],
+          [["Esc", "G"], "Close the map"],
+        ],
+      ],
+      [
+        "Design a view",
+        [
+          [["A"], "Select every slide"],
+          [["C"], "Clear the selection"],
+          [["L"], "Copy the link"],
+          [["Ctrl+Enter"], "Apply the view"],
+          [["Esc"], "Leave design mode"],
+        ],
+      ],
+    ];
+    const keycap = k =>
+      h(
+        "span",
+        { class: "smp-kc" },
+        k.split(/(?<=.)\+(?=.)/).flatMap((p, i) => (i ? [h("i", {}, "+"), h("kbd", {}, p)] : [h("kbd", {}, p)]))
+      );
+    const pad = (key, label, area) => h("div", { class: "smp-kp", style: { gridArea: area } }, h("kbd", {}, key), h("span", {}, label));
+    const smpKeys = h(
+      "section",
+      { class: "smp-row smp-keys", "--c": "#4493f8", "aria-labelledby": "smp-keys-h" },
+      h("h3", { class: "smp-l", id: "smp-keys-h" }, "Keyboard", " ", h("small", {}, "every shortcut; on touch screens, swipe left, right, up and down")),
+      h(
+        "div",
+        { class: "smp-kg" },
+        h(
+          "div",
+          { class: "smp-kpad", role: "img", "aria-label": "Arrow keys: left previous slide, right next slide, up and down move between columns and bands" },
+          pad("↑", "up", "u"),
+          pad("←", "prev", "l"),
+          pad("↓", "down", "d"),
+          pad("→", "next", "r")
+        ),
+        KEYMAP.map(([title, rows]) =>
+          h(
+            "div",
+            { class: "smp-kb" },
+            h("h4", {}, title),
+            h(
+              "dl",
+              {},
+              rows.map(([keys, act]) => h("div", {}, h("dt", {}, keys.map(keycap)), h("dd", {}, act)))
+            )
+          )
+        )
+      )
+    );
     const smpCount = h("span", { class: "smp-dc", "aria-live": "polite" });
     const smpTitle = h("input", { type: "text", class: "smp-dt", placeholder: "View title (optional)", maxLength: 80, "aria-label": "View title", oninput: () => smpPaint() });
     const smpLink = h("input", { type: "text", class: "smp-dl", readOnly: true, "aria-label": "Link to this view", onfocus: e => e.target.select() });
@@ -1641,7 +1747,8 @@
             h("div", { class: "smp-tiles" }, tiles)
           );
         }),
-        smpTours
+        smpTours,
+        smpKeys
       );
     };
     // nearest tile on the next visual line above or below (tiles wrap, so bands can span several lines)
