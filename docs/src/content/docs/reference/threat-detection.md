@@ -116,7 +116,7 @@ safe-outputs:
 | `prompt` | string | Custom instructions appended to default detection prompt |
 | `engine` | string/object/false | AI engine config (`"copilot"`, full config object, or `false` for no AI) |
 | `ca-cert` | string/false | Absolute host path to a CA certificate for the detection API proxy. Inherits `sandbox.agent.ca-cert` when unset or empty and the detection engine matches the agent engine; set to `false` to disable inheritance. Requires AWF v0.28.10 or later. |
-| `runs-on` | string/array/object | Runner for the detection job (default: inherits from workflow `runs-on`) |
+| `runs-on` | string/array/object | Runner for the detection job (default: GitHub-hosted `ubuntu-latest`; does not inherit the workflow `runs-on`) |
 | `artifact-base-url` | string | HTTPS base URL for a mirror of the pinned detector release assets. The compiler appends the pinned release tag and asset name; the embedded digest cannot be overridden. |
 | `steps` | array | Additional GitHub Actions steps to run **before** AI analysis (pre-steps) |
 | `post-steps` | array | Additional GitHub Actions steps to run **after** AI analysis (post-steps) |

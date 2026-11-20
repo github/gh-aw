@@ -1,12 +1,12 @@
 # Guide slide style
 
-The secondary house style of the `/agentic-workflows` guide examples hanging under Turn Intent to Automation: Ask once. The agent picks the guide (`gdr-`), The compiler corrects the agent (`gdl-`) and Personas test the guide. Agent fixes it (`gdp-`). Load it to add or restyle a slide that explains **how to use** a gh-aw tool or process. Also follow `brand.md` (colour, type) and `mechanics.md` (columns, `under`).
+The secondary house style of the `/agentic-workflows` guide examples hanging under Turn Intent to Workflow: Ask once. The agent picks the guide (`gdr-`), The compiler corrects the agent (`gdl-`) and Personas test the guide. Agent fixes it (`gdp-`). Load it to add or restyle a slide that explains **how to use** a gh-aw tool or process. Also follow `brand.md` (colour, type) and `mechanics.md` (columns, `under`).
 
 A guide slide teaches one usage pattern: the band's canvas, a title block (kicker, two-part heading, one plain sentence), one board that loops the process, and a mono caption stating what is illustrative or measured. Compared with `concept-style.md`, guide slides explain a mechanism step by step, may carry measured data, and use blue instead of green.
 
 ## Ingredients
 
-1. **Column examples.** Guide slides take `group: "platform"` and `under: "intent"`, hanging in a column below Turn Intent to Automation (`key: "intent"`); kids follow source order. In `slides.md` their sections follow the head's section. A guide slide in another band hangs under that band's matching column head (same `group`).
+1. **Column examples.** Guide slides take `group: "platform"` and `under: "intent"`, hanging in a column below Turn Intent to Workflow (`key: "intent"`); kids follow source order. In `slides.md` their sections follow the head's section. A guide slide in another band hangs under that band's matching column head (same `group`).
 2. **Theme.** The slide inherits its band's `THEME`; guide styles are dark-only for now; add `body.light` overrides if a guide slide moves to a light band.
 3. **Title block (`gd-head`).** `.kicker` naming the tool and the topic (`/agentic-workflows · authoring loop`), an `h2` whose second sentence is an `<em>` answer in blue, then one `p` (30px) explaining the mechanism with inline `code`. The `h2` text is the `slides.md` Heading.
 4. **One board (`gd-board`).** A 1700×600 rounded panel at `left: 110px; top: 340px`, children absolutely positioned in board pixels. Draw wires in one inline `<svg viewBox="0 0 1700 600">` (built via `innerHTML`; `h()` makes HTML only). Shared parts: `gd-lab` (mono uppercase label), `gd-box` (+ `.on`), `gd-wire` (+ `.on`: blue, flowing dash), `gd-ok` (blue `✓`) and `gd-bad` (orange `✗`).

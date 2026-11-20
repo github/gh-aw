@@ -1,4 +1,5 @@
 // @ts-check
+// @safe-outputs-exempt USE-001 — OTLP telemetry payload builder, not a safe-output handler; validation errors are internal programming errors that are never surfaced as safe-output outcomes. References to safe_output are metric attribute names only.
 "use strict";
 
 const fs = require("fs");

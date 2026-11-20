@@ -266,7 +266,7 @@ test("moves through the bands like a cursor, up/down keeping the horizontal posi
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last main-line slide of the band above, skipping its column of examples
   await page.keyboard.press("ArrowLeft");
-  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Workflow to Value")));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("ArrowUp");
@@ -275,11 +275,11 @@ test("moves through the bands like a cursor, up/down keeping the horizontal posi
   await page.goto(`/gh-aw/cracktro/#${slideNo("Continuous Red Teaming")}`);
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous Red Teaming")));
   await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Workflow to Value")));
   await page.keyboard.press("PageUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("PageDown");
-  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Workflow to Value")));
   await page.keyboard.press("PageDown");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous Red Teaming")));
   // Shift+Home returns to the first slide of the band

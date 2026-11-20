@@ -157,7 +157,7 @@ runners, OIDC, Entra ID, Vault, GitHub Apps, marketplace, reusable workflows, cu
 - What about the identity plumbing, things like Entra ID and Vault OIDC, or custom jobs?
 - All reused, along with reusable workflow calls. Every piece of your Actions infrastructure keeps doing its job.
 
-### Turn Intent to Automation {#turn-intent-to-automation}
+### Turn Intent to Workflow {#turn-intent-to-workflow}
 
 #### Summary
 
@@ -169,7 +169,7 @@ compile, lock file, gh aw compile, natural language, authoring, create workflow
 
 #### Captions
 
-- Tonight's how-to story: turning a sentence of intent into a working automation.
+- Tonight's how-to story: turning a sentence of intent into a working workflow.
 - You describe the job in plain language, and an agent writes the Markdown workflow for you.
 - Then what? Does that Markdown just run as is, straight off the page?
 - Not quite. gh aw compile deterministically turns it into a hardened Actions lock file, and that is what runs.
@@ -237,7 +237,7 @@ Agent Persona Explorer, personas, evaluation, scoring, prefix probe, 8000 bytes,
 - What happens when an answer falls short?
 - It checks what fits in the first eight thousand bytes, files the gaps, and an agent fixes the guidance.
 
-### Turn Automation into Value {#turn-automation-into-value}
+### Turn Workflow to Value {#turn-workflow-to-value}
 
 #### Notes
 
@@ -257,6 +257,27 @@ ROI, metrics, outcomes, backlog burndown, delivery speed, value
 - The answer comes from tracking outcomes, things like backlog burndown, quality and delivery speed.
 - So the measure is results on the board, not just how busy the robots look?
 - Exactly. Outcomes are what show the value of agentic workflows, and teams can track them over time.
+
+### Workflows → Process → Factory {#workflows-process-factory}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+Every factory is made of processes: a workflow goes from an issue to an agent to a pull request, sequencing workflows makes a process, and processes that feed each other, on any harness with developers at the gates, make a factory.
+
+#### Keywords
+
+workflows, process, factory, sequencing, composition, chaining, safe outputs, zoom out, blueprint, harnesses, engines, human in the loop
+
+#### Captions
+
+- Zooming out tonight: how single workflows add up to something much bigger.
+- Start small. One workflow takes an issue, hands it to an agent and comes back with a pull request.
+- And when you line several of those up, one after another?
+- Sequence them and you have a process. Let processes feed each other, on any harness, with developers at the gates, and you have a factory.
 
 ### Security {#security}
 
