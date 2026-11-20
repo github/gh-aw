@@ -6,6 +6,25 @@ import path from "node:path";
 const { transformPiEntry, main } = await import("./convert_gateway_config_pi.cjs");
 
 describe("Pi MCP gateway adapter", () => {
+  it("adds compat as a local stdio server after gateway HTTP transformation", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-compat-converter-"));
+    const input = path.join(dir, "gateway.json");
+    fs.writeFileSync(input, JSON.stringify({ mcpServers: {} }));
+    vi.stubEnv("RUNNER_TEMP", dir);
+    vi.stubEnv("MCP_GATEWAY_OUTPUT", input);
+    vi.stubEnv("MCP_GATEWAY_DOMAIN", "host.docker.internal");
+    vi.stubEnv("MCP_GATEWAY_PORT", "8080");
+    vi.stubEnv("GH_AW_COMPAT_WEB_FETCH", "1");
+    try {
+      const { mcpServers } = JSON.parse(main());
+      expect(mcpServers.compat).toMatchObject({ type: "stdio", command: "node", args: [expect.stringMatching(/compat_mcp_server\.cjs$/)] });
+      expect(mcpServers.compat.url).toBeUndefined();
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     ["1", true],
     ["", false],

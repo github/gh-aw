@@ -287,7 +287,7 @@ describe("runGatewayConversion", () => {
     global.core = originalCore;
   });
 
-  it.each(["Copilot", "Claude"])("injects compat after HTTP conversion for %s", engine => {
+  it.each(["Copilot", "Claude", "Pi"])("injects compat after HTTP conversion for %s", engine => {
     process.env.GH_AW_COMPAT_WEB_FETCH = "1";
     const transformServer = vi.fn((_name, entry) => ({ ...entry, type: "http" }));
     const serialize = vi.fn(servers => JSON.stringify({ mcpServers: servers }));
@@ -314,7 +314,7 @@ describe("runGatewayConversion", () => {
 
   it("rejects converters without local stdio support", () => {
     process.env.GH_AW_COMPAT_WEB_FETCH = "1";
-    expect(() => runGatewayConversion({ format: "Pi", engine: "Pi", outputPath: path.join(dir, "unsupported.json"), transformServer: (_name, entry) => entry, serialize: JSON.stringify })).toThrow("not supported");
+    expect(() => runGatewayConversion({ format: "Custom", engine: "Custom", outputPath: path.join(dir, "unsupported.json"), transformServer: (_name, entry) => entry, serialize: JSON.stringify })).toThrow("not supported");
   });
 
   it("loads, filters, serializes, securely writes, and reports a converted configuration", () => {

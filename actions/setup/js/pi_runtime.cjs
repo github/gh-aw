@@ -9,6 +9,7 @@ const { writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { INLINE_SKILL_MANIFEST, resolveWorkflowSkillPaths, writeWorkflowSkillArgs } = require("./pi_workflow_skills.cjs");
 const { openPiDurableSession } = require("./durable_native_session.cjs");
+const { bindCompatEnvironment, isManagedCompatServer } = require("./compat_mcp_config.cjs");
 
 const DEFAULT_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const DEFAULT_SESSION_DIR = "/tmp/gh-aw/agent/pi-sessions";
@@ -193,6 +194,7 @@ function preparePiRuntime(config = parsePiConfig()) {
   } catch (error) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
   }
+  if (isManagedCompatServer(gateway.mcpServers?.compat)) gateway = bindCompatEnvironment(gateway);
   for (const [name, server] of Object.entries(gateway.mcpServers || {})) {
     server.exposure = config.mcp?.exposure || server.exposure || "deferred";
     if (config.mcp?.toolExposure?.[name]) server.toolExposure = config.mcp.toolExposure[name];

@@ -22,7 +22,7 @@ Threat detection defaults to Copilot regardless of Pi's provider. Supply its sep
 
 ## Capabilities and limitations
 
-Pi supports native MCP tools and resources, codemode, tool search, provider-prefixed models, and workflow-installed Pi packages. Native MCP connects only to the compiler-managed gateway; provider and GitHub credentials remain outside the sandbox.
+Pi supports native MCP tools and resources, codemode, tool search, provider-prefixed models, and workflow-installed Pi packages. Native MCP connects to the compiler-managed gateway. The first-party `compat` server is the exception: `tools.web-fetch` adds an engine-local stdio fetch tool inside the agent firewall, following `network.allowed`. This fallback is unavailable on NVX. Provider and GitHub credentials remain outside the sandbox.
 
 Safe-output instructions use native MCP by default. Workflows with `tools.bash: false` must explicitly set `tools.cli-proxy: false` and use native tools. Explicit `tools.cli-proxy: true` selects CLI-only instructions for mounted safe-output tools, just as it does for other MCP-capable engines. GitHub `gh-proxy` mode changes GitHub reads only; it does not disable native safe-output tools.
 

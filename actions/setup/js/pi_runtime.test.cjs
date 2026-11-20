@@ -261,6 +261,34 @@ describe("Pi runtime configuration", () => {
     expect(fs.statSync(path.join(dir, "agent/mcp.json")).mode & 0o777).toBe(0o600);
   });
 
+  it("binds the compiler-managed compat stdio server inside the firewall", () => {
+    fs.mkdirSync(path.join(dir, "gh-aw/mcp-config"), { recursive: true });
+    const compat = { type: "stdio", command: "node", args: [path.join(import.meta.dirname, "compat_mcp_server.cjs")], env: { NODE_PATH: "/runtime/compat/node_modules" } };
+    fs.writeFileSync(path.join(dir, "gh-aw/mcp-config/mcp-servers.json"), JSON.stringify({ mcpServers: { compat } }));
+    vi.stubEnv("HTTPS_PROXY", "http://awf-runtime:3128");
+    vi.stubEnv("NODE_EXTRA_CA_CERTS", "/runtime/ca.pem");
+    preparePiRuntime({ mcp: { exposure: "direct" } });
+    const mcp = JSON.parse(fs.readFileSync(path.join(dir, "agent/mcp.json"), "utf8"));
+    expect(mcp.mcpServers.compat).toMatchObject({
+      type: "stdio",
+      command: process.execPath,
+      exposure: "direct",
+      args: compat.args,
+      env: { NODE_PATH: "/runtime/compat/node_modules", HTTPS_PROXY: "http://awf-runtime:3128", NODE_EXTRA_CA_CERTS: "/runtime/ca.pem" },
+    });
+    expect(mcp.mcpServers.compat.inheritEnv).not.toBe(false);
+    expect(mcp.mcpServers.compat.url).toBeUndefined();
+  });
+
+  it("preserves an ordinary custom MCP server named compat without web-fetch", () => {
+    fs.mkdirSync(path.join(dir, "gh-aw/mcp-config"), { recursive: true });
+    const compat = { type: "http", url: "http://gateway/mcp/compat", headers: { Authorization: "scoped-token" } };
+    fs.writeFileSync(path.join(dir, "gh-aw/mcp-config/mcp-servers.json"), JSON.stringify({ mcpServers: { compat } }));
+    preparePiRuntime({ mcp: { exposure: "direct" } });
+    const mcp = JSON.parse(fs.readFileSync(path.join(dir, "agent/mcp.json"), "utf8"));
+    expect(mcp.mcpServers.compat).toEqual({ ...compat, exposure: "direct" });
+  });
+
   it("exposes smoke-test MCP tools directly without changing gateway authorization", () => {
     const servers = {
       safeoutputs: { url: "http://gateway/mcp/safeoutputs", headers: { Authorization: "scoped-test-token" } },

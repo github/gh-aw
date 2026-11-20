@@ -259,7 +259,7 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 		claudeLog.Print("Adding MCP configuration")
 		mcpConfigArg = ` --mcp-config "${RUNNER_TEMP}/gh-aw/mcp-config/mcp-servers.json"`
 		if compatWebFetchEnabled(workflowData) {
-			mcpConfigArg = ` --mcp-config "` + claudeCompatMCPConfigPath + `"`
+			mcpConfigArg = ` --mcp-config "` + claudeCompatMCPConfigPath(workflowData) + `"`
 		}
 	}
 
@@ -414,7 +414,7 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
 		npmPathSetup := GetNpmBinPathSetup()
 		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, npmPathSetup, claudeCommand)
 		if compatWebFetchEnabled(workflowData) {
-			claudeCommandWithPath = fmt.Sprintf("%s && %s", compatMCPRuntimeSetup("${RUNNER_TEMP}/gh-aw/mcp-config/mcp-servers.json", claudeCompatMCPConfigPath), claudeCommandWithPath)
+			claudeCommandWithPath = fmt.Sprintf("%s && %s && %s", npmPathSetup, compatMCPRuntimeSetup(constants.ShellMcpServersJsonPath, claudeCompatMCPConfigPath(workflowData)), claudeCommand)
 		}
 		if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
 			claudeCommandWithPath = claudeCopilotAPIKeyExport() + " && " + claudeCommandWithPath

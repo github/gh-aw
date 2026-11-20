@@ -2,9 +2,23 @@
 "use strict";
 
 const fs = require("node:fs");
+const path = require("node:path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const COMPAT_ENV_NAMES = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR"];
+
+/** @param {any} server @returns {boolean} */
+function isManagedCompatServer(server) {
+  return Boolean(
+    server &&
+    ["stdio", "local"].includes(server.type) &&
+    ["node", process.execPath].includes(server.command) &&
+    Array.isArray(server.args) &&
+    server.args.length === 1 &&
+    server.args[0] === path.join(__dirname, "compat_mcp_server.cjs") &&
+    typeof server.env?.NODE_PATH === "string"
+  );
+}
 
 /**
  * Bind only proxy and CA settings from the AWF runtime, not the setup host.
@@ -14,7 +28,7 @@ const COMPAT_ENV_NAMES = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_prox
  */
 function bindCompatEnvironment(config, env = process.env) {
   const compat = config.mcpServers?.compat;
-  if (!compat || !["node", process.execPath].includes(compat.command) || !Array.isArray(compat.args) || !compat.args[0]?.endsWith("/compat_mcp_server.cjs")) {
+  if (!isManagedCompatServer(compat)) {
     throw new Error("Missing compiler-managed compat MCP server");
   }
   const runtimeEnv = { NODE_PATH: compat.env.NODE_PATH };
@@ -42,7 +56,13 @@ function prepareCompatMCPConfig(source, destination) {
   } finally {
     fs.closeSync(input);
   }
-  const output = fs.openSync(destination, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW, 0o600);
+  let output;
+  try {
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    output = fs.openSync(destination, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW, 0o600);
+  } catch (error) {
+    throw new Error(`Failed to open compat MCP configuration destination: ${getErrorMessage(error)}`, { cause: error });
+  }
   try {
     const stat = fs.fstatSync(output);
     if (!stat.isFile() || stat.nlink !== 1) throw new Error("MCP configuration destination must be a regular, non-linked file");
@@ -67,4 +87,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { COMPAT_ENV_NAMES, bindCompatEnvironment, prepareCompatMCPConfig };
+module.exports = { COMPAT_ENV_NAMES, isManagedCompatServer, bindCompatEnvironment, prepareCompatMCPConfig };
