@@ -119,6 +119,44 @@ Behavior:
 
 Set variables with `gh aw env update` or `gh variable set`. Set either value as a secret with `gh secret set`.
 
+#### Configure defaults in one command
+
+`gh aw env otel` tests an OTLP endpoint and saves the endpoint and headers as encrypted Actions secrets, plus `OTEL_EXPORTER_OTLP_PROTOCOL` and `GH_AW_OTEL_METRICS` as Actions variables. It changes only these four settings. The endpoint secret takes precedence over an existing endpoint variable at the same scope.
+
+```bash
+gh aw env otel
+```
+
+The interactive command uses the current repository, prompts for the endpoint, displays the targets for confirmation, and reads comma-separated `key=value` headers with input hidden. Supply a complete authentication header value, and percent-encode commas inside values. Do not put header credentials in command arguments or shell history.
+
+For noninteractive setup, read headers from a protected file or a secret manager's stdout:
+
+```bash wrap
+gh aw env otel --repo my-org/my-repo \
+  --endpoint https://collector.example.com \
+  --protocol http/protobuf --headers-stdin --yes < otlp-headers.txt
+```
+
+| Option | Behavior |
+| --- | --- |
+| `--repo owner/repo`, `--org slug`, `--enterprise slug` | Repeat target flags to configure multiple targets with the same endpoint and credentials; without target flags, use the current repository |
+| `--scope repo\|org\|ent` | Restrict the target type; contradictory target flags fail |
+| `--visibility all\|private\|selected` | Organization repository access; defaults to `private`. Invalid with repository targets |
+| `--selected owner/repo` | Required for organization `selected` visibility; repeat for repositories belonging to the target organization |
+| `--endpoint URL` | HTTPS base endpoint or complete `/v1/traces` URL; credentials, fragments, and control characters are rejected. Plain HTTP is limited to literal loopback IP addresses |
+| `--protocol http/json\|http/protobuf` | Request encoding; defaults to `http/json` |
+| `--metrics=false` | Disable metrics; otherwise metrics are enabled |
+| `--headers-stdin` | Read the header secret from stdin, up to 48 KiB; requires `--endpoint` and `--yes` for noninteractive use |
+| `--yes` | Approve the displayed targets without prompting |
+
+Enterprise scope enumerates the enterprise organizations visible to the authenticated user through GitHub GraphQL and configures organization-level secrets and variables in each one. GitHub does not provide an enterprise-level Actions secrets API. Enterprise `--visibility all` or `private` applies that repository visibility to each organization. With enterprise `--visibility selected --selected my-org`, only named member organizations are configured, with private repository visibility. Enumeration requires enterprise read access; preflight fails if Actions secret/variable access is unavailable in an enumerated organization. The displayed targets are the configuration boundary: organizations hidden from enumeration or added later are not configured automatically.
+
+Before any setting is saved, the command sends an authenticated **empty traces export** to `/v1/traces`, using the selected protocol. It checks HTTP 200 and the bounded OTLP response, rejecting malformed responses and partial success with rejected spans. Warning-only partial success is accepted without exposing collector messages. This verifies route and credential acceptance, **not actual span ingestion**, logs, metrics, or connectivity from GitHub runners. The test has a 10-second deadline and a 64 KiB response limit, never follows redirects, and withholds response bodies and raw network errors. Sentry endpoint headers are normalized to `x-sentry-auth` before testing and saving.
+
+The command preflights encryption keys, variable access, and selected memberships for all targets before writing. GitHub updates are not transactional: a later write failure can leave earlier settings saved, and the command reports that possibility. Repository-level settings can override organization defaults, and explicit workflow OTLP settings still override defaults. Recompile workflows once if their existing lock files do not contain the default lookups.
+
+Multiple targets do not mean multiple default collectors: runtime defaults support one endpoint/header pair. Use the frontmatter endpoint list for [multiple exporters](/gh-aw/reference/frontmatter/#observability-observability).
+
 ### Google Workload Identity Federation
 
 For Google Cloud Telemetry, configure Google Workload Identity Federation instead of a static authorization header. gh-aw mints and exchanges a GitHub OIDC token in every span-emitting job, and automatically grants those jobs `id-token: write`. The workload identity principal needs permission to write telemetry and, when `service-account` is set, permission to impersonate that service account.
