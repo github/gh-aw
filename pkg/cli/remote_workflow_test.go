@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -668,20 +669,17 @@ imports:
 
 func TestRunRemoteDependencyStepsPolicies(t *testing.T) {
 	tests := []struct {
-		name            string
-		label           string
-		fatalWhenStrict bool
-		fatalAlways     bool
-		warnWhenVerbose bool
-		warnAlways      bool
-		warnBeforeFatal bool
+		name        string
+		label       string
+		fatalAlways bool
+		warnAlways  bool
 	}{
-		{name: "includes", label: "include dependencies", fatalWhenStrict: true, warnWhenVerbose: true},
-		{name: "frontmatter imports", label: "frontmatter import dependencies", fatalWhenStrict: true, warnWhenVerbose: true},
-		{name: "runtime imports", label: "runtime-import dependencies", fatalWhenStrict: true, warnAlways: true},
-		{name: "dispatch workflows", label: "dispatch workflow dependencies", fatalAlways: true, warnWhenVerbose: true, warnBeforeFatal: true},
-		{name: "call workflows", label: "call-workflow worker dependencies", fatalAlways: true, warnWhenVerbose: true, warnBeforeFatal: true},
-		{name: "resources", label: "resource dependencies", fatalAlways: true, warnWhenVerbose: true, warnBeforeFatal: true},
+		{name: "includes", label: "include dependencies"},
+		{name: "frontmatter imports", label: "frontmatter import dependencies"},
+		{name: "runtime imports", label: "runtime-import dependencies", warnAlways: true},
+		{name: "dispatch workflows", label: "dispatch workflow dependencies", fatalAlways: true},
+		{name: "call workflows", label: "call-workflow worker dependencies", fatalAlways: true},
+		{name: "resources", label: "resource dependencies", fatalAlways: true},
 	}
 
 	stepNames := []string{"includes", "frontmatter imports", "runtime imports", "dispatch workflows", "call workflows", "resources"}
@@ -708,16 +706,28 @@ func TestRunRemoteDependencyStepsPolicies(t *testing.T) {
 						callWorkflow:   fetch(stepNames[4], 4),
 						resources:      fetch(stepNames[5], 5),
 					}
-					steps := remoteDependencySteps(fetchers, verbose)
+					steps := remoteDependencySteps(fetchers)
 					warningCount := 0
 					for i := range steps {
-						steps[i].warn = func(error) {
+						warn := steps[i].warn
+						steps[i].warn = func(err error, verbose bool) {
 							warningCount++
+							warn(err, verbose)
 						}
 					}
 
-					err := runRemoteDependencySteps(steps, strict, verbose)
-					fatal := tc.fatalAlways || (strict && tc.fatalWhenStrict)
+					reader, writer, err := os.Pipe()
+					require.NoError(t, err)
+					originalStderr := os.Stderr
+					os.Stderr = writer
+					err = runRemoteDependencySteps(steps, strict, verbose)
+					os.Stderr = originalStderr
+					require.NoError(t, writer.Close())
+					output, readErr := io.ReadAll(reader)
+					require.NoError(t, reader.Close())
+					require.NoError(t, readErr)
+
+					fatal := tc.fatalAlways || strict
 					wantExecuted := stepNames
 					if fatal {
 						wantExecuted = stepNames[:failureIndex+1]
@@ -730,14 +740,29 @@ func TestRunRemoteDependencyStepsPolicies(t *testing.T) {
 						require.NoError(t, err)
 					}
 					wantWarnings := 0
-					if fatal && tc.warnBeforeFatal {
-						if verbose && tc.warnWhenVerbose {
+					if fatal {
+						if tc.fatalAlways && verbose {
 							wantWarnings = 1
 						}
-					} else if !fatal && (tc.warnAlways || (verbose && tc.warnWhenVerbose)) {
+					} else if tc.warnAlways || verbose {
 						wantWarnings = 1
 					}
 					assert.Equal(t, wantWarnings, warningCount, "warning policy for failing dependency")
+					if tc.name == "runtime imports" {
+						outputText := string(output)
+						if strict {
+							assert.Empty(t, outputText)
+						} else {
+							activationWarning := "Failed to fetch runtime-import dependencies; activation may fail"
+							assert.Contains(t, outputText, activationWarning)
+							if verbose {
+								assert.Contains(t, outputText, "fetch failed")
+								assert.Less(t, strings.Index(outputText, activationWarning), strings.Index(outputText, "fetch failed"))
+							} else {
+								assert.NotContains(t, outputText, "fetch failed")
+							}
+						}
+					}
 				})
 			}
 		}

@@ -797,44 +797,36 @@ type remoteDependencyFetchers struct {
 }
 
 type remoteDependencyStep struct {
-	label           string
-	run             func() error
-	fatalWhenStrict bool
-	fatalAlways     bool
-	warnWhenVerbose bool
-	warnAlways      bool
-	warnBeforeFatal bool
-	warn            func(error)
+	label       string
+	run         func() error
+	fatalAlways bool
+	warnAlways  bool
+	warn        func(error, bool)
 }
 
-func remoteDependencyWarning(message string) func(error) {
-	return func(err error) {
+func remoteDependencyWarning(message string) func(error, bool) {
+	return func(err error, _ bool) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(message, err)))
 	}
 }
 
-func remoteDependencySteps(fetchers remoteDependencyFetchers, verbose bool) []remoteDependencyStep {
+func remoteDependencySteps(fetchers remoteDependencyFetchers) []remoteDependencyStep {
 	return []remoteDependencyStep{
 		{
-			label:           "include dependencies",
-			run:             fetchers.includes,
-			fatalWhenStrict: true,
-			warnWhenVerbose: true,
-			warn:            remoteDependencyWarning("Failed to fetch include dependencies: %v"),
+			label: "include dependencies",
+			run:   fetchers.includes,
+			warn:  remoteDependencyWarning("Failed to fetch include dependencies: %v"),
 		},
 		{
-			label:           "frontmatter import dependencies",
-			run:             fetchers.frontmatter,
-			fatalWhenStrict: true,
-			warnWhenVerbose: true,
-			warn:            remoteDependencyWarning("Failed to fetch frontmatter import dependencies: %v"),
+			label: "frontmatter import dependencies",
+			run:   fetchers.frontmatter,
+			warn:  remoteDependencyWarning("Failed to fetch frontmatter import dependencies: %v"),
 		},
 		{
-			label:           "runtime-import dependencies",
-			run:             fetchers.runtimeImports,
-			fatalWhenStrict: true,
-			warnAlways:      true,
-			warn: func(err error) {
+			label:      "runtime-import dependencies",
+			run:        fetchers.runtimeImports,
+			warnAlways: true,
+			warn: func(err error, verbose bool) {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Failed to fetch runtime-import dependencies; activation may fail"))
 				if verbose {
 					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
@@ -842,28 +834,22 @@ func remoteDependencySteps(fetchers remoteDependencyFetchers, verbose bool) []re
 			},
 		},
 		{
-			label:           "dispatch workflow dependencies",
-			run:             fetchers.dispatch,
-			fatalAlways:     true,
-			warnWhenVerbose: true,
-			warnBeforeFatal: true,
-			warn:            remoteDependencyWarning("Failed to fetch dispatch workflow dependencies: %v"),
+			label:       "dispatch workflow dependencies",
+			run:         fetchers.dispatch,
+			fatalAlways: true,
+			warn:        remoteDependencyWarning("Failed to fetch dispatch workflow dependencies: %v"),
 		},
 		{
-			label:           "call-workflow worker dependencies",
-			run:             fetchers.callWorkflow,
-			fatalAlways:     true,
-			warnWhenVerbose: true,
-			warnBeforeFatal: true,
-			warn:            remoteDependencyWarning("Failed to fetch call-workflow worker dependencies: %v"),
+			label:       "call-workflow worker dependencies",
+			run:         fetchers.callWorkflow,
+			fatalAlways: true,
+			warn:        remoteDependencyWarning("Failed to fetch call-workflow worker dependencies: %v"),
 		},
 		{
-			label:           "resource dependencies",
-			run:             fetchers.resources,
-			fatalAlways:     true,
-			warnWhenVerbose: true,
-			warnBeforeFatal: true,
-			warn:            remoteDependencyWarning("Failed to fetch resource dependencies: %v"),
+			label:       "resource dependencies",
+			run:         fetchers.resources,
+			fatalAlways: true,
+			warn:        remoteDependencyWarning("Failed to fetch resource dependencies: %v"),
 		},
 	}
 }
@@ -871,15 +857,15 @@ func remoteDependencySteps(fetchers remoteDependencyFetchers, verbose bool) []re
 func runRemoteDependencySteps(steps []remoteDependencyStep, strict, verbose bool) error {
 	for _, step := range steps {
 		if err := step.run(); err != nil {
-			fatal := step.fatalAlways || (strict && step.fatalWhenStrict)
+			fatal := step.fatalAlways || strict
 			if fatal {
-				if step.warnBeforeFatal && verbose && step.warnWhenVerbose {
-					step.warn(err)
+				if step.fatalAlways && verbose {
+					step.warn(err, verbose)
 				}
 				return fmt.Errorf("failed to fetch %s: %w", step.label, err)
 			}
-			if step.warnAlways || (verbose && step.warnWhenVerbose) {
-				step.warn(err)
+			if step.warnAlways || verbose {
+				step.warn(err, verbose)
 			}
 		}
 	}
@@ -917,5 +903,5 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 		},
 	}
 
-	return runRemoteDependencySteps(remoteDependencySteps(fetchers, verbose), strict, verbose)
+	return runRemoteDependencySteps(remoteDependencySteps(fetchers), strict, verbose)
 }
