@@ -24,7 +24,7 @@ Values are read when a resolver is called. The package also builds GitHub Action
 | `BuildDefaultMaxDailyAICreditsExpression`, `BuildDefaultMaxAICreditsExpression` | Resolve daily and per-run AIC credit defaults from GitHub variables. |
 | `BuildDefaultDetectionMaxAICreditsExpression`, `BuildDefaultEvalsMaxAICreditsExpression` | Resolve detection and evaluation AIC credit defaults from GitHub variables. |
 | `BuildDefaultMaxTurnsExpression` | Resolves the max-turns variable, using an empty fallback to preserve an unlimited setting. |
-| `BuildDefaultOTLPEndpointExpression`, `BuildDefaultOTLPHeadersExpression` | Resolve the endpoint/header pair atomically from `GH_AW_DEFAULT_OTLP_CONFIG`, with legacy endpoint and header fallbacks. |
+| `BuildDefaultOTLPEndpointExpression`, `BuildDefaultOTLPHeadersExpression` | Read legacy endpoint and header fallbacks. Setup resolves the intact `GH_AW_DEFAULT_OTLP_CONFIG` secret as an atomic pair and masks its components before exporting them. |
 | `BuildModelOverrideExpression`, `BuildModelOverrideExpressionEmptyFallback` | Build phase model expressions with either a built-in fallback or an empty fallback for runtime selection. |
 
 The exported variable-name constants identify the corresponding enterprise overrides and policy variables. Configuration precedence and individual override behavior are documented in the parent [`workflow` package specification](../README.md).

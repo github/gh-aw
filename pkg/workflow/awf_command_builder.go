@@ -18,6 +18,9 @@ import (
 const copilotAWFSessionStateDir = constants.TmpGhAwDir + "/sandbox/agent/session-state"
 
 var otlpSandboxExcludedEnvVarNames = []string{
+	"GH_AW_DEFAULT_OTLP_CONFIG",
+	"GH_AW_DEFAULT_OTLP_ENDPOINT",
+	"GH_AW_DEFAULT_OTLP_HEADERS",
 	"OTEL_EXPORTER_OTLP_ENDPOINT",
 	"OTEL_EXPORTER_OTLP_HEADERS",
 	"GH_AW_OTLP_ENDPOINTS",

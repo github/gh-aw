@@ -102,15 +102,15 @@ concurrency:
 run-name: "Windows Runner Integration Test"
 
 env:
-  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || '{}').endpoint || secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
+  GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}
+  GH_AW_DEFAULT_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
+  GH_AW_DEFAULT_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   GH_AW_OTEL_METRICS: ${{ vars.GH_AW_OTEL_METRICS || 'true' }}
   OTEL_SERVICE_NAME: gh-aw.windows
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Windows%20Runner%20Integration%20Test,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=codex'
-  OTEL_EXPORTER_OTLP_HEADERS: ${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || '{}').headers || secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
   GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}
   GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}
-  GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || ''{}'').endpoint || secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}","headers":"${{ fromJSON(secrets.GH_AW_DEFAULT_OTLP_CONFIG || ''{}'').headers || secrets.GH_AW_DEFAULT_OTLP_HEADERS }}"}]'
   GH_AW_OTLP_IF_MISSING: ignore
 
 jobs:
@@ -415,6 +415,9 @@ jobs:
             await main(core);
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
+          GH_AW_DEFAULT_OTLP_ENDPOINT: ""
+          GH_AW_DEFAULT_OTLP_HEADERS: ""
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -426,6 +429,7 @@ jobs:
           GH_AW_INCLUDE_PR_CONTEXT: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}
           GH_AW_INPUTS_TOPIC: ${{ inputs.topic }}
           GH_AW_OTEL_METRICS: ""
+          GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -460,6 +464,9 @@ jobs:
             await main({ authorExpressions: {"github.repository":"GH_AW_GITHUB_REPOSITORY","inputs.topic":"GH_AW_INPUTS_TOPIC","needs.pre_activation.outputs.activated":"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED","needs.pre_activation.outputs.matched_command":"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND"} });
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
+          GH_AW_DEFAULT_OTLP_ENDPOINT: ""
+          GH_AW_DEFAULT_OTLP_HEADERS: ""
           GH_AW_ENGINE_ID: codex
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
@@ -475,6 +482,7 @@ jobs:
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
           GH_AW_OTEL_METRICS: ""
+          GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -521,6 +529,9 @@ jobs:
             });
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
+          GH_AW_DEFAULT_OTLP_ENDPOINT: ""
+          GH_AW_DEFAULT_OTLP_HEADERS: ""
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -535,6 +546,7 @@ jobs:
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
           GH_AW_OTEL_METRICS: ""
+          GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -550,7 +562,11 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
         env:
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
+          GH_AW_DEFAULT_OTLP_ENDPOINT: ""
+          GH_AW_DEFAULT_OTLP_HEADERS: ""
           GH_AW_OTEL_METRICS: ""
+          GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -565,7 +581,11 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
         env:
+          GH_AW_DEFAULT_OTLP_CONFIG: ""
+          GH_AW_DEFAULT_OTLP_ENDPOINT: ""
+          GH_AW_DEFAULT_OTLP_HEADERS: ""
           GH_AW_OTEL_METRICS: ""
+          GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
@@ -1638,7 +1658,7 @@ jobs:
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
-          $compressedScript = [System.Convert]::FromBase64String('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')
+          $compressedScript = [System.Convert]::FromBase64String('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')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
@@ -2861,7 +2881,7 @@ jobs:
             fi
           fi
           # shellcheck disable=SC1003,SC2016,SC2086
-          awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GH_AW_RUNTIME_TMP_DIR --exclude-env GH_AW_RUNTIME_TMP_ID --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --exclude-env TMPDIR --mount /tmp/gh-aw:/tmp/gh-aw:rw --mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw --log-level info --session-state-dir /tmp/gh-aw/sandbox/agent/session-state --skip-pull \
+          awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_DEFAULT_OTLP_CONFIG --exclude-env GH_AW_DEFAULT_OTLP_ENDPOINT --exclude-env GH_AW_DEFAULT_OTLP_HEADERS --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GH_AW_RUNTIME_TMP_DIR --exclude-env GH_AW_RUNTIME_TMP_ID --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --exclude-env TMPDIR --mount /tmp/gh-aw:/tmp/gh-aw:rw --mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw --log-level info --session-state-dir /tmp/gh-aw/sandbox/agent/session-state --skip-pull \
             -- /bin/bash -c 'set +o histexpand; export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && threat-detect --engine copilot --output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection-inputs' 2>&1 | tee -a /tmp/gh-aw/threat-detection/detection.log
       - name: Copy detection firewall logs
         if: always() && steps.detection_guard.outputs.run_detection == 'true'

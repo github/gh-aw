@@ -156,6 +156,7 @@ func normalizeDryRunTriggers(on *yaml.Node) error {
 
 func isDryRunTelemetryEnv(name string) bool {
 	return strings.HasPrefix(name, "OTEL_") ||
+		strings.HasPrefix(name, "GH_AW_DEFAULT_OTLP_") ||
 		strings.HasPrefix(name, "GH_AW_OTLP_") ||
 		strings.HasPrefix(name, "GITHUB_AW_OTEL_") ||
 		name == "TRACEPARENT" || name == "TRACESTATE" || name == "BAGGAGE" ||

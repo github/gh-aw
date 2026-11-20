@@ -315,20 +315,17 @@ func BuildDefaultMaxTurnsExpression() string {
 	return fmt.Sprintf("${{ vars.%s || '' }}", DefaultMaxTurns)
 }
 
-// BuildDefaultOTLPEndpointExpression builds an expression that resolves the OTLP
-// endpoint at runtime from the GH_AW_DEFAULT_OTLP_ENDPOINT GitHub secret, falling
-// back to the variable for compatibility. The expression evaluates to an empty
-// string when both are unset, which downstream runtime code treats as
-// "observability disabled".
+// BuildDefaultOTLPEndpointExpression reads the legacy endpoint secret or variable.
+// Setup uses it only when the intact atomic configuration secret is absent.
 func BuildDefaultOTLPEndpointExpression() string {
-	return fmt.Sprintf("${{ fromJSON(secrets.%s || '{}').endpoint || secrets.%s || vars.%s }}", DefaultOTLPConfig, DefaultOTLPEndpoint, DefaultOTLPEndpoint)
+	return fmt.Sprintf("${{ secrets.%s || vars.%s }}", DefaultOTLPEndpoint, DefaultOTLPEndpoint)
 }
 
 // BuildDefaultOTLPHeadersExpression builds a secrets expression that resolves the
-// OTLP exporter headers at runtime from the atomic endpoint/headers secret, falling
-// back to the legacy GH_AW_DEFAULT_OTLP_HEADERS secret.
+// legacy OTLP exporter headers. Atomic defaults are passed intact and resolved
+// inside setup after registering their individual values as runner secrets.
 func BuildDefaultOTLPHeadersExpression() string {
-	return fmt.Sprintf("${{ fromJSON(secrets.%s || '{}').headers || secrets.%s }}", DefaultOTLPConfig, DefaultOTLPHeaders)
+	return fmt.Sprintf("${{ secrets.%s }}", DefaultOTLPHeaders)
 }
 
 // BuildModelOverrideExpression builds a vars expression with primary model var, enterprise

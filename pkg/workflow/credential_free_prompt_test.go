@@ -86,6 +86,24 @@ func TestCredentialFreePromptPreservesShellSteps(t *testing.T) {
 	assert.NotContains(t, output.String(), "GH_AW_PROMPT_SCRIPT")
 }
 
+func TestCredentialFreePromptExcludesRuntimeOTLPDefaults(t *testing.T) {
+	data := &WorkflowData{}
+	NewCompiler().injectOTLPConfig(data)
+	var output strings.Builder
+	require.NoError(t, writeCredentialFreePromptSteps(&output, `
+- name: Validate prompt
+  run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+`, data, nil))
+	var steps []WorkflowStep
+	require.NoError(t, yaml.Unmarshal([]byte(output.String()), &steps))
+	require.Len(t, steps, 1)
+	for _, key := range otlpSandboxExcludedEnvVarNames {
+		assert.Contains(t, steps[0].Env, key, "runtime credentials must be explicitly cleared")
+		assert.Empty(t, steps[0].Env[key])
+		require.ErrorContains(t, validatePromptSecretBindings(data, "${{ env."+key+" }}"), "credential")
+	}
+}
+
 func TestCredentialFreePromptPreservesIndentedChunks(t *testing.T) {
 	content := strings.Repeat("x", 20889) + "\n   Continuation text\n145. Step 145: do the thing\n"
 	chunks := splitContentIntoChunks(content)

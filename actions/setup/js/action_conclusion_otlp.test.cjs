@@ -14,6 +14,7 @@ const mockCore = {
   error: vi.fn(),
   setFailed: vi.fn(),
   setOutput: vi.fn(),
+  setSecret: vi.fn(),
 };
 global.core = mockCore;
 
@@ -29,7 +30,19 @@ const { run, buildSpanName, parseJobStartMs } = req("./action_conclusion_otlp.cj
 const mockSendJobConclusionSpan = vi.fn();
 
 /** Env vars read by this module — cleared before each test */
-const MANAGED_ENV_VARS = ["GH_AW_OTLP_ENDPOINTS", "GH_AW_JOB_RESULT", "GH_AW_OTEL_CONCLUSION_PREUPLOAD", "INPUT_JOB_NAME", "INPUT_JOB-NAME", "GITHUB_AW_OTEL_JOB_START_MS"];
+const MANAGED_ENV_VARS = [
+  "GH_AW_OTLP_ENDPOINTS",
+  "GH_AW_JOB_RESULT",
+  "GH_AW_OTEL_CONCLUSION_PREUPLOAD",
+  "INPUT_JOB_NAME",
+  "INPUT_JOB-NAME",
+  "GITHUB_AW_OTEL_JOB_START_MS",
+  "GH_AW_DEFAULT_OTLP_CONFIG",
+  "GH_AW_DEFAULT_OTLP_ENDPOINT",
+  "GH_AW_DEFAULT_OTLP_HEADERS",
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_HEADERS",
+];
 
 describe("action_conclusion_otlp.cjs", () => {
   /** @type {Record<string, string | undefined>} */
@@ -60,6 +73,22 @@ describe("action_conclusion_otlp.cjs", () => {
 
   it("should export run as a function", () => {
     expect(typeof run).toBe("function");
+  });
+
+  it("resolves and masks atomic defaults before conclusion spans and session-log reports", async () => {
+    const config = { endpoint: "https://conclusion.example.com", headers: "Authorization=Bearer report-private-token" };
+    process.env.GH_AW_DEFAULT_OTLP_CONFIG = JSON.stringify(config);
+    process.env.INPUT_JOB_NAME = "conclusion";
+    mockSendJobConclusionSpan.mockImplementationOnce(async () => {
+      expect(mockCore.setSecret).toHaveBeenCalledWith("report-private-token");
+      expect(sendOtlpModule.parseOTLPEndpoints()).toEqual([{ url: config.endpoint, headers: config.headers }]);
+    });
+
+    await run();
+
+    expect(mockSendJobConclusionSpan).toHaveBeenCalledOnce();
+    expect(sessionLogs.sendSessionLogs).toHaveBeenCalledOnce();
+    expect(mockCore.info).toHaveBeenCalledWith('[otlp] sending conclusion span "gh-aw.conclusion.conclusion" to configured endpoints');
   });
 
   it("exports session logs only from the conclusion job", async () => {

@@ -78,7 +78,7 @@ func validatePromptSecretBindings(data *WorkflowData, localImports string) error
 			continue
 		}
 		name := ref[1] //nolint:uncheckedsliceindex // The context and variable name are checked above.
-		credential := false
+		credential := data.OTLPUsesEnterpriseDefaults && slices.Contains(otlpSandboxExcludedEnvVarNames, strings.ToUpper(name))
 		switch strings.ToUpper(name) {
 		case "GITHUB_TOKEN", "GH_TOKEN", "COPILOT_GITHUB_TOKEN", "GH_AW_GITHUB_TOKEN", "GH_AW_GITHUB_MCP_SERVER_TOKEN", "ACTIONS_RUNTIME_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN":
 			credential = true
@@ -151,6 +151,14 @@ func writeCredentialFreePromptSteps(output *strings.Builder, content string, dat
 		for key := range parseEnvYAMLSection(data.Env) {
 			if _, selected := step.Env[key]; !selected {
 				step.Env[key] = ""
+			}
+		}
+		if data.OTLPUsesEnterpriseDefaults {
+			// Setup exports these at runtime, so they are absent from data.Env.
+			for _, key := range otlpSandboxExcludedEnvVarNames {
+				if _, selected := step.Env[key]; !selected {
+					step.Env[key] = ""
+				}
 			}
 		}
 	}

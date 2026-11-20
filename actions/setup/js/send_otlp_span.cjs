@@ -1295,6 +1295,7 @@ function getOTLPIfMissingMode(value) {
  * @returns {OTLPEndpointEntry[]}
  */
 function parseOTLPEndpoints() {
+  require("./otlp_default_config.cjs").resolveOTLPDefaultConfig();
   const raw = process.env.GH_AW_OTLP_ENDPOINTS || "";
   if (!raw) return [];
   try {

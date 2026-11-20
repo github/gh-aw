@@ -315,7 +315,7 @@ For OTLP observability, precedence is:
 2. `observability.otlp` from imported shared workflows
 3. `secrets.GH_AW_DEFAULT_OTLP_CONFIG` as an atomic endpoint/header pair, falling back to the legacy endpoint secret/variable and headers secret (action runtime)
 
-The compiler always emits OTLP environment variables. When no endpoint is configured in frontmatter or an import, it resolves the paired secret first so repository and organization values cannot supply mismatched endpoint/header settings. Without that secret, it uses
+The compiler always emits OTLP environment variables. When no endpoint is configured in frontmatter or an import, it passes the paired secret intact to setup so repository and organization values cannot supply mismatched endpoint/header settings. Setup parses the JSON and masks its endpoint, headers, and derived credentials before exporting them for subsequent agent and conclusion/report steps; Actions expressions never extract unmasked secret substrings. A present but invalid or incomplete pair never borrows legacy fields. Without that secret, it uses
 `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` and `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}`
 for compatibility. The legacy endpoint secret takes precedence over the variable; clear both the endpoint secret and variable to disable export. When no endpoint is configured, OTLP export
 becomes a no-op; an endpoint without matching headers is dropped by every span-emitting job

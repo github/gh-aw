@@ -357,7 +357,8 @@ func isOTLPHeadersPresent(data *WorkflowData) bool {
 		return false
 	}
 	return strings.Contains(data.Env, "OTEL_EXPORTER_OTLP_HEADERS") ||
-		strings.Contains(data.Env, "GH_AW_OTLP_ALL_HEADERS")
+		strings.Contains(data.Env, "GH_AW_OTLP_ALL_HEADERS") ||
+		strings.Contains(data.Env, compilerenv.DefaultOTLPConfig)
 }
 
 // generateOTLPHeadersMaskStep returns a GitHub Actions step that runs
@@ -789,8 +790,9 @@ func allOTLPHeaders(entries []otlpEndpointEntry) string {
 //
 // When no endpoint is configured anywhere in the frontmatter (main workflow or
 // imports), the endpoint and headers are resolved together from the atomic
-// GH_AW_DEFAULT_OTLP_CONFIG secret, with legacy endpoint/header settings as
-// fallbacks. The expressions resolve at run time, so an organization or enterprise
+// GH_AW_DEFAULT_OTLP_CONFIG secret inside setup, with legacy endpoint/header settings
+// as fallbacks. The compiler passes the complete secret, never extracted fields,
+// so setup can mask derived credentials before exporting them. An organization or enterprise
 // can enable telemetry for every agentic workflow without editing individual
 // workflows. When no default is set, OTLP export is a no-op.
 func resolveOTLPEndpointEntries(workflowData *WorkflowData) (entries []otlpEndpointEntry, usesEnterpriseDefaults bool) {
@@ -885,7 +887,7 @@ func buildOTLPPayloadEnvLines(workflowData *WorkflowData, entries []otlpEndpoint
 	if !workflowEnvHasKey(existingEnv, "GH_AW_OTLP_LOGS_MAX_BYTES") {
 		lines += "\n  GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}"
 	}
-	if encoded := encodeOTLPEndpoints(entries); encoded != "" {
+	if encoded := encodeOTLPEndpoints(entries); encoded != "" && !workflowData.OTLPUsesEnterpriseDefaults {
 		if workflowEnvHasKey(existingEnv, "GH_AW_OTLP_ENDPOINTS") {
 			otlpLog.Printf("Skipping GH_AW_OTLP_ENDPOINTS injection: already defined by user")
 		} else {
@@ -922,6 +924,31 @@ func buildOTLPPayloadEnvLines(workflowData *WorkflowData, entries []otlpEndpoint
 	return lines
 }
 
+func buildOTLPBaseEnvLines(workflowData *WorkflowData, firstEndpoint, firstHeaders, existingEnv string) string {
+	var envKeyLines []string
+	addEnvLine := func(key, line string) {
+		if workflowEnvHasKey(existingEnv, key) {
+			otlpLog.Printf("Skipping %s injection: already defined by user", key)
+			return
+		}
+		envKeyLines = append(envKeyLines, line)
+	}
+	if workflowData.OTLPUsesEnterpriseDefaults {
+		// Pass the whole secret through unchanged: Actions masks the JSON secret,
+		// not substrings extracted by expressions. Setup masks and exports the pair.
+		addEnvLine(compilerenv.DefaultOTLPConfig, fmt.Sprintf("  %s: ${{ secrets.%s }}", compilerenv.DefaultOTLPConfig, compilerenv.DefaultOTLPConfig))
+		addEnvLine(compilerenv.DefaultOTLPEndpoint, "  "+compilerenv.DefaultOTLPEndpoint+": "+firstEndpoint)
+		addEnvLine(compilerenv.DefaultOTLPHeaders, "  "+compilerenv.DefaultOTLPHeaders+": "+firstHeaders)
+	} else {
+		addEnvLine("OTEL_EXPORTER_OTLP_ENDPOINT", "  OTEL_EXPORTER_OTLP_ENDPOINT: "+firstEndpoint)
+	}
+	addEnvLine(compilerenv.OTLPProtocol, fmt.Sprintf("  %s: ${{ vars.%s }}", compilerenv.OTLPProtocol, compilerenv.OTLPProtocol))
+	addEnvLine(compilerenv.OTLPMetrics, fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics))
+	addEnvLine("OTEL_SERVICE_NAME", "  OTEL_SERVICE_NAME: "+otelServiceName(workflowData))
+	addEnvLine("OTEL_RESOURCE_ATTRIBUTES", "  OTEL_RESOURCE_ATTRIBUTES: '"+escapeYAMLSingleQuoted(otelResourceAttributes(workflowData))+"'")
+	return strings.Join(envKeyLines, "\n")
+}
+
 func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 	entries, usesEnterpriseDefaults := resolveOTLPEndpointEntries(workflowData)
 	workflowData.OTLPUsesEnterpriseDefaults = usesEnterpriseDefaults
@@ -933,7 +960,6 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 
 	firstEndpoint := entries[0].URL
 	firstHeaders := entries[0].Headers
-	serviceName := otelServiceName(workflowData)
 	ifMissingMode := getOTLPIfMissingMode(workflowData.ParsedFrontmatter, workflowData.RawFrontmatter)
 	if usesEnterpriseDefaults && ifMissingMode == "" {
 		// The enterprise default endpoint is opt-in through Actions variables, so an
@@ -945,23 +971,12 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 	//    The endpoint remains for backward compatibility with the MCP gateway and
 	//    legacy scripts. Existing env captures only the user's original env block.
 	existingEnv := workflowData.Env
-	var envKeyLines []string
-	addEnvLine := func(key, line string) {
-		if workflowEnvHasKey(existingEnv, key) {
-			otlpLog.Printf("Skipping %s injection: already defined by user", key)
-			return
-		}
-		envKeyLines = append(envKeyLines, line)
-	}
-	addEnvLine("OTEL_EXPORTER_OTLP_ENDPOINT", "  OTEL_EXPORTER_OTLP_ENDPOINT: "+firstEndpoint)
-	addEnvLine(compilerenv.OTLPProtocol, fmt.Sprintf("  %s: ${{ vars.%s }}", compilerenv.OTLPProtocol, compilerenv.OTLPProtocol))
-	addEnvLine(compilerenv.OTLPMetrics, fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics))
-	addEnvLine("OTEL_SERVICE_NAME", "  OTEL_SERVICE_NAME: "+serviceName)
-	addEnvLine("OTEL_RESOURCE_ATTRIBUTES", "  OTEL_RESOURCE_ATTRIBUTES: '"+escapeYAMLSingleQuoted(otelResourceAttributes(workflowData))+"'")
-	otlpEnvLines := strings.Join(envKeyLines, "\n")
+	otlpEnvLines := buildOTLPBaseEnvLines(workflowData, firstEndpoint, firstHeaders, existingEnv)
 
 	// 3. Inject per-endpoint headers env vars.
-	otlpEnvLines += buildOTLPHeaderEnvLines(entries, existingEnv)
+	if !usesEnterpriseDefaults {
+		otlpEnvLines += buildOTLPHeaderEnvLines(entries, existingEnv)
+	}
 
 	// 4. Inject GH_AW_OTLP_ENDPOINTS (JSON array) so JavaScript can fan out spans,
 	//    GH_AW_OTLP_IF_MISSING for the resolved missing-configuration policy, and

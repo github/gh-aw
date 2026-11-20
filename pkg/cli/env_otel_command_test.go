@@ -63,12 +63,15 @@ func TestEnvOTELGHInput(t *testing.T) {
 	assert.Empty(t, out)
 	assert.NotContains(t, err.Error(), "private-credential")
 	defaultsExecGH = func(...string) *exec.Cmd {
-		c := exec.Command("gh")
+		c := exec.Command(os.Args[0], "-test.run=^TestEnvOTELGHHelper$")
+		c.Env = append(os.Environ(), "GH_AW_OTEL_TEST_HELPER=1")
 		c.Err = exec.ErrDot
 		return c
 	}
-	_, err = envOTELGH(t.Context(), nil, "api")
+	out, err = envOTELGH(t.Context(), []byte("private-credential"), "api")
 	require.ErrorContains(t, err, "could not resolve gh")
+	assert.Empty(t, out)
+	assert.NotContains(t, err.Error(), "private-credential")
 }
 
 func TestEnvOTELTargets(t *testing.T) {
@@ -85,6 +88,9 @@ func TestEnvOTELTargets(t *testing.T) {
 		{"contradiction", envOTELOptions{scope: "repo", orgs: []string{"one"}}, true},
 		{"bad-scope", envOTELOptions{scope: "other"}, true},
 		{"bad-repo", envOTELOptions{repos: []string{"github.com/one/two"}}, true},
+		{"dot-repo", envOTELOptions{repos: []string{"one/."}}, true},
+		{"parent-repo", envOTELOptions{repos: []string{"one/.."}}, true},
+		{"punctuation-owner", envOTELOptions{repos: []string{"_one/repo"}}, true},
 		{"bad-org", envOTELOptions{orgs: []string{"../one"}}, true},
 		{"selected-missing", envOTELOptions{orgs: []string{"one"}, visibility: "selected"}, true},
 		{"selected", envOTELOptions{orgs: []string{"one"}, visibility: "selected", selected: []string{"one/repo"}}, false},
@@ -332,7 +338,7 @@ func TestEnvOTELSaveTargets(t *testing.T) {
 		{"org-selected", []defaultsTarget{{scope: "org", org: "one", visibility: "selected"}}, []string{"one/repo"}, false, false, 3},
 		{"selected-other-org", []defaultsTarget{{scope: "org", org: "one", visibility: "selected"}}, []string{"other/repo"}, false, false, 0},
 		{"later-preflight", []defaultsTarget{{scope: "repo", repoOwner: "one", repoName: "repo"}, {scope: "org", org: "two", visibility: "all"}}, nil, true, false, 0},
-		{"save-failure", []defaultsTarget{{scope: "repo", repoOwner: "one", repoName: "repo"}}, nil, false, true, 1},
+		{"save-failure", []defaultsTarget{{scope: "repo", repoOwner: "one", repoName: "repo"}, {scope: "repo", repoOwner: "one", repoName: "other"}}, nil, false, true, 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -363,12 +369,13 @@ func TestEnvOTELSaveTargets(t *testing.T) {
 				}
 				writes++
 				require.True(t, probed)
-				if tc.saveFail {
+				if tc.saveFail && writes == tc.writeCount {
 					return nil, errors.New("save failed")
 				}
 				var payload map[string]any
 				require.NoError(t, json.Unmarshal(input, &payload))
 				if strings.Contains(line, "/secrets/") {
+					assert.Contains(t, line, "/secrets/GH_AW_DEFAULT_OTLP_CONFIG")
 					data, err := base64.StdEncoding.DecodeString(payload["encrypted_value"].(string))
 					require.NoError(t, err)
 					plaintext, ok := box.OpenAnonymous(nil, data, public, private)
@@ -408,7 +415,9 @@ func TestEnvOTELSaveTargets(t *testing.T) {
 			if tc.writeCount == 0 || tc.saveFail {
 				require.Error(t, err)
 				if tc.saveFail {
-					require.ErrorContains(t, err, "one/repo")
+					require.ErrorContains(t, err, "one/other")
+					require.ErrorContains(t, err, "target 2 of 2")
+					require.ErrorContains(t, err, "earlier settings may be saved")
 				}
 			} else {
 				require.NoError(t, err)
@@ -453,6 +462,57 @@ func TestEnvOTELPreflightErrorsNameTargets(t *testing.T) {
 		require.ErrorContains(t, err, "one")
 		require.ErrorContains(t, err, "one/.github")
 	})
+}
+
+func TestEnvOTELSaveAtomicConfiguration(t *testing.T) {
+	public, private, err := box.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	plan := envOTELPlan{
+		target: defaultsTarget{scope: "repo", repoOwner: "one", repoName: "repo"},
+		key:    repoPublicKey{ID: "1", Key: base64.StdEncoding.EncodeToString(public[:])},
+	}
+	for _, failure := range []struct {
+		name string
+		at   int
+	}{{"secret", 1}, {"protocol", 2}, {"metrics", 3}, {"success", 0}} {
+		t.Run(failure.name, func(t *testing.T) {
+			writes := 0
+			envOTELMockGH(t, func(args []string, input []byte) ([]byte, error) {
+				if len(input) == 0 {
+					return nil, nil
+				}
+				writes++
+				line := strings.Join(args, " ")
+				var payload map[string]any
+				require.NoError(t, json.Unmarshal(input, &payload))
+				if writes == 1 {
+					assert.Contains(t, line, "-X PUT repos/one/repo/actions/secrets/GH_AW_DEFAULT_OTLP_CONFIG")
+					encrypted, err := base64.StdEncoding.DecodeString(payload["encrypted_value"].(string))
+					require.NoError(t, err)
+					plaintext, ok := box.OpenAnonymous(nil, encrypted, public, private)
+					require.True(t, ok)
+					assert.JSONEq(t, `{"endpoint":"https://new-collector.example","headers":"Auth=private-credential"}`, string(plaintext))
+				} else {
+					assert.Contains(t, line, "/variables")
+					assert.Contains(t, []string{"OTEL_EXPORTER_OTLP_PROTOCOL", "GH_AW_OTEL_METRICS"}, payload["name"])
+				}
+				if writes == failure.at {
+					return nil, errors.New("write failed")
+				}
+				return nil, nil
+			})
+			err := envOTELSave(t.Context(), plan, envOTELOptions{
+				endpoint: "https://new-collector.example", protocol: "http/json", metrics: true,
+			}, "Auth=private-credential")
+			if failure.at > 0 {
+				require.ErrorContains(t, err, "write failed")
+				assert.Equal(t, failure.at, writes)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, 3, writes)
+			}
+		})
+	}
 }
 
 func TestEnvOTELEnterpriseExpansion(t *testing.T) {
@@ -506,15 +566,33 @@ func TestEnvOTELMultipleSelectedTargets(t *testing.T) {
 	require.Error(t, err)
 	_, err = envOTELOrgSelections(targets, []string{"one/repo", "two/repo", "orphan/repo"})
 	require.Error(t, err)
-	selected, err := envOTELOrgSelections(targets[:1], []string{"one/.github"})
-	require.NoError(t, err)
-	envOTELMockGH(t, func(args []string, _ []byte) ([]byte, error) {
-		assert.Contains(t, strings.Join(args, " "), "repos/one/.github")
-		return []byte("123"), nil
-	})
-	ids, err := envOTELSelected(t.Context(), targets[0], selected["one"])
-	require.NoError(t, err)
-	assert.Equal(t, []int64{123}, ids)
+	for _, repo := range []string{".github", "_private", "-archive", ".", "..", "nested/repo"} {
+		t.Run("selected-"+repo, func(t *testing.T) {
+			name := "one/" + repo
+			selected, err := envOTELOrgSelections(targets[:1], []string{name})
+			invalid := repo == "." || repo == ".." || strings.Contains(repo, "/")
+			if invalid {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			calls := 0
+			envOTELMockGH(t, func(args []string, _ []byte) ([]byte, error) {
+				calls++
+				assert.Contains(t, strings.Join(args, " "), "repos/"+name)
+				return []byte("123"), nil
+			})
+			if invalid {
+				_, err = envOTELSelected(t.Context(), targets[0], []string{name})
+				require.Error(t, err)
+				assert.Zero(t, calls)
+			} else {
+				ids, err := envOTELSelected(t.Context(), targets[0], selected["one"])
+				require.NoError(t, err)
+				assert.Equal(t, []int64{123}, ids)
+			}
+		})
+	}
 	envOTELMockGH(t, func(args []string, input []byte) ([]byte, error) {
 		if strings.Contains(strings.Join(args, " "), "slug=first") {
 			return []byte("one\n"), nil
@@ -545,12 +623,19 @@ func TestEnvOTELCLISuccess(t *testing.T) {
 			if payload["name"] == "GH_AW_OTEL_METRICS" {
 				assert.Equal(t, "true", payload["value"])
 			}
-			if strings.Contains(strings.Join(args, " "), "GH_AW_DEFAULT_OTLP_HEADERS") {
+			if strings.Contains(strings.Join(args, " "), "/secrets/") {
+				assert.Contains(t, strings.Join(args, " "), "/secrets/GH_AW_DEFAULT_OTLP_CONFIG")
 				encrypted, err := base64.StdEncoding.DecodeString(payload["encrypted_value"].(string))
 				require.NoError(t, err)
 				plaintext, ok := box.OpenAnonymous(nil, encrypted, public, private)
 				require.True(t, ok)
-				assert.Equal(t, "Auth=private-credential%20with+plus%2Ccomma", string(plaintext))
+				var config struct {
+					Endpoint string `json:"endpoint"`
+					Headers  string `json:"headers"`
+				}
+				require.NoError(t, json.Unmarshal(plaintext, &config))
+				assert.NotEmpty(t, config.Endpoint)
+				assert.Equal(t, "Auth=private-credential%20with+plus%2Ccomma", config.Headers)
 			}
 		}
 		return nil, nil

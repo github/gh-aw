@@ -39,7 +39,7 @@ func envOTELValidate(endpoint, protocol, rawHeaders string) (*url.URL, http.Head
 }
 
 func envOTELURL(endpoint string) (*url.URL, error) {
-	invalidURL := errors.New("invalid OTLP endpoint: use an absolute HTTPS URL without credentials, fragments, whitespace, or control characters (HTTP allowed only on literal loopback)")
+	invalidURL := errors.New("invalid OTLP endpoint: use an absolute HTTPS URL without credentials, fragments, whitespace, or control characters; percent-encode quotes and backslashes (HTTP allowed only on literal loopback)")
 	if len(endpoint) > 8192 || strings.ContainsAny(endpoint, `"\\`) || strings.ContainsFunc(endpoint, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
 		return nil, invalidURL
 	}
@@ -264,7 +264,7 @@ func envOTELProtoFields(data []byte, partial bool) error {
 			return protowire.ParseError(n)
 		}
 		data = data[n:]
-		if field <= 0 || field >= protowire.MaxValidNumber || partial && (field == 1 && wire != protowire.VarintType || field == 2 && wire != protowire.BytesType) || !partial && field == 1 && wire != protowire.BytesType {
+		if !field.IsValid() || partial && (field == 1 && wire != protowire.VarintType || field == 2 && wire != protowire.BytesType) || !partial && field == 1 && wire != protowire.BytesType {
 			return errors.New("invalid protobuf field")
 		}
 		if wire == protowire.VarintType && partial && field == 1 {
