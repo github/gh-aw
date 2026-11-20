@@ -20,6 +20,7 @@ env: &shared
     Authorization=private
     X-Tenant=private
   GH_AW_OTLP_ENDPOINTS: '[{"url":"https://traces.example.com"}]'
+  GH_AW_DEFAULT_OTLP_CONFIG: private-config
   GITHUB_AW_OTEL_TRACE_ID: private-trace
   GITHUB_AW_OTEL_PARENT_SPAN_ID: private-span
   TRACEPARENT: private-parent
@@ -36,7 +37,7 @@ jobs:
     env: *shared
     container:
       image: node:24
-      env: {OTEL_SERVICE_NAME: container, TRACEPARENT: private-parent, KEEP: container}
+      env: {OTEL_SERVICE_NAME: container, TRACEPARENT: private-parent, GH_AW_DEFAULT_OTLP_CONFIG: private-config, KEEP: container}
     services:
       server:
         image: node:24
@@ -48,6 +49,7 @@ jobs:
       - env:
           OTEL_SERVICE_NAME: first
           BAGGAGE: private-baggage
+          GH_AW_DEFAULT_OTLP_CONFIG: private-config
           KEEP: first
         run: echo first
       - run: |
@@ -103,6 +105,7 @@ jobs:
 	assert.NotContains(t, content, "private-parent")
 	assert.NotContains(t, content, "private-state")
 	assert.NotContains(t, content, "private-baggage")
+	assert.NotContains(t, content, "private-config")
 	assert.Contains(t, content, `echo "OTEL_SERVICE_NAME: this is script content"`)
 	assert.Contains(t, content, "env: &shared")
 	assert.Contains(t, content, `ANTHROPIC_CUSTOM_HEADERS: "x-aw-gw-github-repo: ${{ github.repository }}"`)
@@ -313,6 +316,7 @@ engine:
   id: copilot
   env:
     OTEL_SERVICE_NAME: engine
+    GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.ENGINE_OTLP_CONFIG }}
     TRACEPARENT: engine-parent
     CLAUDE_CODE_ENABLE_TELEMETRY: "1"
     DO_NOT_TRACK: "0"
@@ -374,6 +378,7 @@ tools:
 					assert.NotContains(t, compiled, "secrets.GH_AW_DEFAULT_OTLP_")
 					assert.NotContains(t, compiled, "secrets.OTLP_HEADERS")
 					assert.NotContains(t, compiled, "USER_TELEMETRY_ONLY")
+					assert.NotContains(t, compiled, "ENGINE_OTLP_CONFIG")
 					assert.NotContains(t, compiled, "Check OTLP telemetry configuration")
 					assert.NotContains(t, compiled, "Mask OTLP")
 					assert.NotContains(t, compiled, "Mint OTLP")
