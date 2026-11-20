@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-20T12:26:57Z",
-  "run_id": "pr-triage-2026-11-20T12:26:57Z",
+  "generated_at": "2026-11-20T18:20:16Z",
+  "run_id": "pr-triage-2026-11-20T18:20:16Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "eligible_total": 0,
@@ -36,8 +36,8 @@
   "skipped_prs": [],
   "notes": [
     "No open PRs are currently authored by app/github-copilot in github/gh-aw.",
-    "The triage queue is empty; no PR labels, comments, or batch assignments were created.",
-    "This run preserves a clean queue for the next cycle when eligible copilot-authored PRs appear."
+    "No eligible app/github-copilot PRs were found in the triage window.",
+    "The queue is empty; no labels, comments, or batch assignments were created."
   ],
   "review_status": "triaged"
 }
