@@ -22,6 +22,7 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 - `docs/public/cracktro/index.html`: loads `ops-visuals.js`, `runtime.js`, `deck.js` (classic scripts; `file://` works); holds SEO/Open Graph/Twitter meta (absolute published-deck URLs).
 - `docs/public/cracktro/og-image.png`: 1200x630 title-slide social card, UI hidden; keep it outside `assets/` (avatars only).
 - `docs/public/cracktro/runtime.js`: talk-agnostic `window.CracktroDeck` runtime (stage, chrome, band headers, navigation, search, map, background). Keep talk content out.
+- `docs/public/cracktro/captions.js`: kiosk CC per Id.
 - `docs/public/cracktro/deck.js`: about 950 KB: deck CSS, slides, prompts, themes, bands, synth. **Never read it whole.** `grep -n` `// ---------- <section> ----------` and `// <Slide title>` markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg` and `mona-full.png` (full-body Mona): the only assets a test allows. Diagrams are inline SVG in `deck.js`.
 - `.github/skills/cracktro/slides.md`: ordered slides: Heading, Notes (`illustrative` or empty), Summary, Keywords; band headers included.

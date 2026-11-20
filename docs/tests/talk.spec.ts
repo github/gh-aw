@@ -617,7 +617,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${SLIDES[0].id}$`));
 
-  const assets = ["runtime.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["runtime.js", "captions.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -626,6 +626,17 @@ test("ships local assets with the docs and links to the talk from the footer", a
   }
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.fonts.check('16px "Monaspace Neon"'))).toBe(true);
+});
+
+test("scripts closed captions for every slide, in deck order", () => {
+  const scope: { CracktroCaptions?: { scripts: Record<string, string[]> } } = {};
+  new Function("window", readFileSync(new URL("../public/cracktro/captions.js", import.meta.url), "utf8"))(scope);
+  const scripts = scope.CracktroCaptions!.scripts;
+  expect(Object.keys(scripts)).toEqual(SLIDES.map(slide => slide.id));
+  for (const [id, lines] of Object.entries(scripts)) {
+    expect(lines.length, id).toBeGreaterThanOrEqual(2);
+    for (const line of lines) expect(line.trim().length, id).toBeGreaterThan(0);
+  }
 });
 
 test("publishes a social card for link previews", async ({ page, request }) => {
@@ -645,8 +656,8 @@ test("publishes synthetic examples without profile assets or private source refe
     const normalized = asset.replaceAll("\\", "/");
     expect(normalized === "avatars" || allowedAvatar.test(`assets/${normalized}`), asset).toBe(true);
   }
-  // index.html loads runtime.js before deck.js; check both, in load order.
-  const source = (await Promise.all(["runtime.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
+  // index.html loads runtime.js, captions.js, then deck.js; check all, in load order.
+  const source = (await Promise.all(["runtime.js", "captions.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
   expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://api.github.com/repositories/", "https://github.com/chrizbo/agentics-beyond-code"]);
@@ -1149,6 +1160,7 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
     tours: { ends: { title: "Both ends", summary: "first and last", slides: ["hello", "goodbye"] }, part: { title: "Just the part", bands: ["part"] }, ghost: { slides: ["nope"] } },
     last: last === "none" ? null : last || "outro",
     kioskInterval: +query.get("kiosk") || undefined,
+    captions: query.has("cc") ? { scripts: { hello: ["Good evening, the top story.", "Thanks, glad to be here."] } } : undefined,
     sound,
   });
 </script></body></html>`;
@@ -1528,6 +1540,36 @@ test.describe("reusable runtime", () => {
     expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).not.toContain("unlock");
     await sound.click();
     await expect(sound).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("rolls closed captions in kiosk mode from the CC button or C, and ends them with kiosk mode", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const cc = page.locator(".ccb");
+    const box = page.locator(".cc-box");
+    await expect(cc).toBeHidden();
+    await page.keyboard.press("c");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await expect(cc).toBeVisible();
+    await expect(cc).toHaveAttribute("aria-pressed", "true");
+    await expect(cc).toHaveAttribute("title", "Turn off closed captions (CC) (C)");
+    await page.clock.runFor(8000);
+    await expect(box).toContainText(">> GOOD EVENING");
+    await expect(box).toContainText(">> THANKS");
+    // the button turns captions off and back on without leaving kiosk mode
+    await cc.click();
+    await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
+    await expect(cc).toHaveAttribute("title", "Turn on closed captions (CC) (C)");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(box).toBeHidden();
+    await cc.click();
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
     expect(errors).toEqual([]);
   });
 

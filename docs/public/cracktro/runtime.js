@@ -174,10 +174,10 @@
   body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { opacity: .4; }
   body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb, .ntb, .ksb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  .snd, .fzb, .smb, .ntb, .ksb, .ccb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
   .ntb { right: calc(144px + var(--sr)); }
@@ -192,6 +192,19 @@
   body.kiosk.nav-idle { cursor: none; }
   body.kiosk.nav-idle :is(.ksb, .snd):not(:focus-visible) { opacity: 0; }
   body.light.kiosk :is(.ksb, .snd) { color: #1f2328; border-color: #1f2328; }
+  /* closed captioning (CC): kiosk mode with the muted-TV captions of a bar or an airport gate. Two speakers talk each
+     slide through as roll-up speech-to-text, uppercase in black boxes over the bottom of the ${W}x${H} frame. */
+  .ccb { display: none; }
+  body.kiosk .ccb { display: block; right: calc(104px + var(--sr)); opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  body.kiosk.nav-idle .ccb:not(:focus-visible) { opacity: 0; }
+  body.light.kiosk .ccb { color: #1f2328; border-color: #1f2328; }
+  .ccb[aria-pressed="true"] { box-shadow: inset 0 -3px currentColor; }
+  .cc { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; display: none; }
+  body.cc-on .cc { display: block; }
+  .cc-f { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
+  .cc-box { position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: flex-start; }
+  .cc-box div { padding: 4px 18px; background: #000000e0; color: #fff; font: 600 38px/1.3 var(--mono); letter-spacing: .02em; text-transform: uppercase; white-space: pre; }
+  .cc-box div:empty { display: none; }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
@@ -721,6 +734,17 @@
         setKiosk(!kiosk);
       },
     });
+    // closed captioning (C, CC): kiosk mode as a captioned news TV; its dock button shows only while kiosk mode runs
+    const ccb = h("button", {
+      class: "ccb",
+      "aria-pressed": "false",
+      "aria-keyshortcuts": "C",
+      onclick: e => {
+        e.stopPropagation();
+        setCap(!capOn);
+      },
+    });
+    ccb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10.5 10a2.5 2.5 0 1 0 0 4M17.5 10a2.5 2.5 0 1 0 0 4"/></svg>';
     // tour pill (top right, only during a tour): the tour title and position open the map; × shows every slide again
     const tourT = h("span", { class: "tourp-t" }),
       tourN = h("span", { class: "tourp-n" });
@@ -763,7 +787,12 @@
     for (const t of ["touchstart", "touchend"]) tourP.addEventListener(t, e => e.stopPropagation(), { passive: true });
     const wash = h("div", { class: "wash" });
     const gridc = h("canvas", { class: "gridc" });
-    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, ksb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    // closed-captioning overlay (see "closed captioning" below): three roll-up caption rows in a frame scaled like the stage
+    const ccRows = h("div", { class: "cc-box" }, h("div"), h("div"), h("div"));
+    const ccF = h("div", { class: "cc-f" }, ccRows);
+    const ccEl = h("div", { class: "cc", "aria-hidden": "true" }, ccF);
+    let capOn = false;
+    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
     const paintSound = () => {
       snd.classList.toggle("off", !!sfx.muted);
@@ -775,7 +804,7 @@
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
-      stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+      ccF.style.transform = stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
       document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 230);
     };
     addEventListener("resize", fit);
@@ -843,7 +872,7 @@
         // hold the slide while any dialog (search, map, a deck's own modal) is open
         if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
         kioskArm();
-      }, KIOSK_MS);
+      }, capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS);
     };
     const paintKiosk = () => {
       const label = kiosk ? "Stop kiosk mode" : "Start kiosk mode: rotate slides in fullscreen",
@@ -883,6 +912,7 @@
         const k = kiosk;
         clearTimeout(k.t);
         kiosk = null;
+        if (capOn) setCap(false);
         // leave the fullscreen kiosk mode asked for, not one the presenter already had
         if (k.entered && fsEl()) exitFs();
       }
@@ -1024,6 +1054,7 @@
       goalKeep = -1;
       slides[n].enter?.(dir);
       chrome(n);
+      if (capOn) capEnter();
       kioskArm();
     }
     // progress, dots, dock buttons, notes and hash for slide n (also refreshed when a tour starts or ends)
@@ -1188,6 +1219,7 @@
       else if (e.key === "End") go(lastVis());
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
       else if ((e.key === "k" || e.key === "K") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setKiosk(!kiosk);
+      else if ((e.key === "c" || e.key === "C") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setCap(!capOn);
       else if (e.key === "Escape" && kiosk && !e.defaultPrevented) {
         e.preventDefault();
         setKiosk(false);
@@ -1542,7 +1574,7 @@
           [["G"], "Slide map (this screen)"],
         ],
       ],
-      ["Show", [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], ...(config.sound ? [[["M"], "Sound on or off"]] : []), [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]]],
+      ["Show", [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], ...(config.sound ? [[["M"], "Sound on or off"]] : []), [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]]],
       [
         "Slide map",
         [
@@ -1622,6 +1654,7 @@
       N: "notes",
       F: "full",
       K: "kiosk",
+      C: "CC",
       M: "sound",
       X: "leave",
       Esc: "close",
@@ -2039,6 +2072,104 @@
     });
     for (const t of ["touchstart", "touchend"]) smp.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
+    // ---------- closed captioning ----------
+    // C (or the CC dock button in kiosk mode) captions kiosk mode like a muted TV in a bar or an airport gate: two
+    // speakers talk each slide through as roll-up speech-to-text, >> marking each change of speaker. Their lines are
+    // precomputed per slide id in config.captions.scripts (alternating speakers); a slide without one reads its heading
+    // and slides.md summary. Each slide stays up until its conversation ends (at least the kiosk interval). Captions
+    // advance from the runtime frame loop: no timers, three DOM rows.
+    const CAP = config.captions || {},
+      CAP_WPS = 3.2, // caption words per second, the pace of live speech-to-text
+      CAP_COLS = 40; // characters per caption row
+    const capLines = i => {
+      const s = slides[i],
+        lines = CAP.scripts?.[s.id];
+      if (Array.isArray(lines) && lines.length) return lines;
+      const summary = (fzIndex ??= fzBuild())[i]?.summary;
+      return [`Now showing: ${headingText(s) || label(s)}.`, summary || (s.notes || "").split("\n")[0].replace(/^[A-Z][A-Za-z]{0,15}:\s+/, "")].filter(Boolean);
+    };
+    // deterministic pseudo-random bursts of 1-3 words, so a slide's airtime is known before it airs
+    const capRnd = k => {
+      const x = Math.sin(k * 12.9898 + 78.233) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    const capPlans = new Map();
+    const capPlan = i => {
+      if (capPlans.has(i)) return capPlans.get(i);
+      const ev = [];
+      let at = 1200,
+        k = i * 97;
+      capLines(i).forEach((line, turn) => {
+        if (turn) at += 900;
+        ev.push({ at, turn });
+        const words = String(line).toUpperCase().split(/\s+/).filter(Boolean);
+        for (let w = 0; w < words.length; ) {
+          const n = 1 + Math.floor(capRnd(k++) * 3);
+          ev.push({ at, turn, text: words.slice(w, w + n).join(" ") });
+          at += (n / CAP_WPS) * 1000 * (0.7 + capRnd(k++) * 0.6);
+          w += n;
+        }
+      });
+      const plan = { ev, dur: at + 3000 };
+      capPlans.set(i, plan);
+      return plan;
+    };
+    const capDwell = i => capPlan(i).dur;
+    let cc = null;
+    const ccPaint = () => [...ccRows.children].forEach((d, k) => (d.textContent = cc ? (cc.rows[cc.rows.length - 3 + k] ?? "") : ""));
+    const ccPut = text => {
+      const last = cc.rows.length - 1;
+      if (cc.rows[last].length + 1 + text.length > CAP_COLS && cc.rows[last] !== ">>") cc.rows.push(text);
+      else cc.rows[last] += ` ${text}`;
+      if (cc.rows.length > 3) cc.rows.splice(0, cc.rows.length - 3);
+    };
+    function capEnter() {
+      cc = { t0: performance.now(), plan: capPlan(cur), i: 0, rows: [""] };
+      ccPaint();
+    }
+    function capFrame() {
+      if (!cc) return;
+      const now = performance.now(),
+        { plan, t0 } = cc;
+      let dirty = false;
+      for (; cc.i < plan.ev.length && t0 + plan.ev[cc.i].at <= now; cc.i++) {
+        const e = plan.ev[cc.i];
+        if (e.text == null) {
+          if (e.turn) cc.rows.push(">>");
+          else cc.rows[cc.rows.length - 1] = ">>";
+        } else if (REDUCED) {
+          // reduced motion: the whole line lands at once
+          for (; cc.i < plan.ev.length && plan.ev[cc.i].text != null && plan.ev[cc.i].turn === e.turn; cc.i++) ccPut(plan.ev[cc.i].text);
+          cc.i--;
+        } else ccPut(e.text);
+        dirty = true;
+      }
+      if (dirty) ccPaint();
+    }
+    const paintCap = () => {
+      const lbl = capOn ? "Turn off closed captions (CC)" : "Turn on closed captions (CC)";
+      ccb.setAttribute("aria-pressed", String(capOn));
+      ccb.setAttribute("aria-label", `${lbl} (C)`);
+      ccb.title = `${lbl} (C)`;
+      document.body.classList.toggle("cc-on", capOn);
+    };
+    function setCap(on) {
+      on = !!on;
+      if (on === capOn) return on;
+      capOn = on;
+      if (on) {
+        if (!kiosk) setKiosk(true);
+        capEnter();
+      } else {
+        cc = null;
+        ccPaint();
+      }
+      paintCap();
+      kioskArm();
+      return on;
+    }
+    paintCap();
+
     // ---------- animated background ----------
     const ctx = canvas.getContext("2d");
     const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
@@ -2133,6 +2264,7 @@
         }
       }
 
+      if (capOn) capFrame();
       slides[cur]?.tick?.(t);
       requestAnimationFrame(frame);
     }
@@ -2146,7 +2278,7 @@
       setView(v);
       if (v) go(firstVis());
     };
-    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk) };
+    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk), captions: on => setCap(on ?? !capOn) };
   }
 
   window.CracktroDeck = { h, letters, resetIndex, create };

@@ -93,7 +93,10 @@ view, skipping pattern examples, wrapping from the last slide to the first. The 
 and notes hide; only a stop button and the sound toggle beside it stay, fading after a few idle
 seconds. Starting kiosk mode with sound on lets each band's music play; the toggle (or M)
 mutes or resumes it. K, Escape, the stop
-button or leaving fullscreen stops kiosk mode; while it runs, Escape stops it before it
+button or leaving fullscreen stops kiosk mode. C (or the CC button in the kiosk dock) turns
+closed captions on or off: like a muted TV in a bar or airport, a short two-speaker news conversation
+about each slide rolls in as captions at the bottom of the screen, and each slide stays up until its
+conversation ends. C starts kiosk mode if needed, and captions end with it; while it runs, Escape stops it before it
 hides notes. A manual move restarts the countdown, and an open
 dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between

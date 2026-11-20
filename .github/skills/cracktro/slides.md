@@ -12,7 +12,7 @@ Columns (one table, one row per line; `|` is not allowed inside a cell):
 
 `docs/src/lib/cracktro/slides.js` parses this file and fails on a malformed row, an invalid Id, an empty Heading, Summary or keyword, an unknown Notes value or a duplicate. The docs build injects every row into the talk page's JSON-LD (`hasPart`: position, name, description, keywords, `#<id>` URL); the deck's fuzzy search (`/`) reads keywords from there, and `docs/tests/talk.spec.ts` checks the deck's ids, headings and that metadata against this list.
 
-Editing: add, remove or move one row per slide in the same change as `deck.js`, and rewrite the Summary and Keywords whenever the slide's message changes. Keep the Id; never renumber anything.
+Editing: add, remove or move one row per slide in the same change as `deck.js`, and rewrite the Summary and Keywords whenever the slide's message changes; keep `docs/public/cracktro/captions.js` in step (same Ids and order, its lines retelling the Summary). Keep the Id; never renumber anything.
 
 | Id | Heading | Notes | Summary | Keywords |
 |---|---|---|---|---|
