@@ -149,6 +149,51 @@ func TestMergePullRequestExplicitPolicies(t *testing.T) {
 	require.ErrorContains(t, validateMergePullRequestPolicies(config, "Test Workflow"), "invalid GitHub username")
 }
 
+func TestMergePullRequestProofEvidence(t *testing.T) {
+	compiler := NewCompiler()
+	cfg := compiler.parseMergePullRequestConfig(map[string]any{
+		"merge-pull-request": map[string]any{
+			"allowed-base-branches": []any{"agent-work/*"},
+			"required-checks":       []any{"verify"},
+			"required-check-apps":   map[string]any{"verify": 123},
+			"authorization":         true,
+			"proof-evidence": map[string]any{
+				"check": "verify", "verifier-version": "1.2.3",
+				"configuration-sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			},
+		},
+	})
+	require.NotNil(t, cfg.ProofEvidence)
+	config := &SafeOutputsConfig{MergePullRequest: cfg}
+	require.NoError(t, validateMergePullRequestPolicies(config, "Test"))
+	handler := pullRequestHandlerRegistry["merge_pull_request"](config)
+	encoded, err := json.Marshal(handler["proof_evidence"])
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"check":"verify","verifier_version":"1.2.3","configuration_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}`, string(encoded))
+	for _, tc := range []struct {
+		name   string
+		change func(*MergePullRequestConfig)
+		want   string
+	}{
+		{"missing required check", func(c *MergePullRequestConfig) { c.RequiredChecks = nil }, "required-checks"},
+		{"missing producer", func(c *MergePullRequestConfig) { c.RequiredCheckApps = nil }, "required-check-apps"},
+		{"missing authority", func(c *MergePullRequestConfig) { c.Authorization = nil }, "requires authorization"},
+		{"invalid version", func(c *MergePullRequestConfig) { c.ProofEvidence.VerifierVersion = "${{ inputs.version }}" }, "static verifier-version"},
+		{"invalid digest", func(c *MergePullRequestConfig) { c.ProofEvidence.ConfigurationSHA256 = "not-a-digest" }, "configuration-sha256"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			changed := *cfg
+			proof := *cfg.ProofEvidence
+			changed.ProofEvidence = &proof
+			tc.change(&changed)
+			require.ErrorContains(t, validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: &changed}, "Test"), tc.want)
+		})
+	}
+	config.Authorization = cfg.Authorization
+	cfg.Authorization = nil
+	require.NoError(t, validateMergePullRequestPolicies(config, "Test"))
+}
+
 func TestMergePullRequestProtectedFiles(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

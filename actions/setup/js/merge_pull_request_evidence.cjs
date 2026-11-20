@@ -2,6 +2,68 @@
 
 const { createHash } = require("node:crypto");
 const { resolveTargetRepoConfig } = require("./repo_helpers.cjs");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
+const { SAFE_OUTPUT_E007 } = require("./error_codes.cjs");
+
+/**
+ * Only the selected, producer-pinned GitHub check supplies proof, never the
+ * agent message. The verifier owns the semantics of its configuration digest.
+ * @param {any} run
+ * @param {NonNullable<import('./types/handler-factory').HandlerConfig['proof_evidence']>} policy
+ * @param {string} repository
+ * @param {number} pullNumber
+ * @param {string} headSha
+ */
+function readMergeProofEvidence(run, policy, repository, pullNumber, headSha) {
+  /** @returns {never} */
+  const reject = () => {
+    throw new Error(`${SAFE_OUTPUT_E007}: Missing, unsupported, failed or mismatched merge proof evidence; obtain a passed result from the configured deterministic verifier for this exact head and configuration`);
+  };
+  if (!run || !Number.isSafeInteger(run.id) || run.id <= 0 || run.head_sha !== headSha || run.status !== "completed" || run.conclusion !== "success") reject();
+  let proof;
+  try {
+    proof = parseStrictJSON(run.output?.summary, { maxBytes: 8192 });
+  } catch {
+    reject();
+  }
+  const expected = {
+    version: "gh-aw.merge-proof.v1",
+    repository,
+    pull_request_number: pullNumber,
+    head_sha: headSha,
+    verifier_version: policy.verifier_version,
+    configuration_sha256: policy.configuration_sha256,
+    result: "passed",
+  };
+  if (
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(headSha) ||
+    !proof ||
+    typeof proof !== "object" ||
+    Array.isArray(proof) ||
+    Object.keys(proof).length !== Object.keys(expected).length ||
+    Object.entries(expected).some(([key, value]) => proof[key] !== value)
+  )
+    reject();
+  return Object.freeze({ ...expected, check_run_id: run.id, app_id: run.app.id });
+}
+
+/** @param {ReturnType<typeof readMergeProofEvidence>} proof */
+function mergeProofScope(proof) {
+  return {
+    binding: "resolved_effect",
+    refs: [
+      `repository:${proof.repository}`,
+      `pull-request:${proof.repository}#${proof.pull_request_number}`,
+      `head-sha:${proof.head_sha}`,
+      `check-run:${proof.repository}/${proof.check_run_id}`,
+      `check-app:${proof.app_id}`,
+      `verifier-version:${proof.verifier_version}`,
+      `configuration-sha256:${proof.configuration_sha256}`,
+      `verification-result:${proof.result}`,
+      `sha256:${createHash("sha256").update(JSON.stringify(proof)).digest("hex")}`,
+    ],
+  };
+}
 
 /**
  * Fingerprint resolved policy, never credentials or agent-supplied merge options.
@@ -24,6 +86,7 @@ function mergeAuthorizationEvidence(config, requiredChecks) {
     required_title_prefix: config.required_title_prefix || "",
     required_checks: sorted(requiredChecks),
     required_check_apps: Object.entries(config.required_check_apps || {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    ...(config.proof_evidence ? { proof_evidence: config.proof_evidence } : {}),
     required_approvers: sorted((config.required_approvers || []).map(login => login.toLowerCase())),
     protected_files_policy: config.protected_files_policy || "blocked",
     protected_files: sorted(config.protected_files),
@@ -67,4 +130,4 @@ async function reconcileMerge(client, owner, repo, pullNumber, headSha) {
   return null;
 }
 
-module.exports = { mergeAuthorizationEvidence, reconcileMerge };
+module.exports = { mergeAuthorizationEvidence, reconcileMerge, readMergeProofEvidence, mergeProofScope };

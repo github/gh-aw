@@ -41,6 +41,11 @@ interface SafeOutputAuthorizationEvidence {
 interface HandlerConfig {
   /** Trusted compiled requirement, never an agent tool argument. */
   authorization?: SafeOutputAuthorizationRequirement;
+  proof_evidence?: {
+    check: string;
+    verifier_version: string;
+    configuration_sha256: string;
+  };
   /** Maximum issue artifacts per issue (default: 10); non-positive values disable artifacts. */
   max_issue_artifacts?: number;
   /** Compiled maximum UTF-8 bytes per issue artifact body (default: 1048576). */

@@ -28,6 +28,19 @@ async function authorizeSafeOutputInvocation(options) {
   return state.authorize(options);
 }
 
+function assertSafeOutputAuthorizationFresh() {
+  const state = currentSafeOutputInvocation();
+  if (!state?.requirement || !state.invocation || typeof state.assertAuthorizationFresh !== "function") {
+    throw new Error(ERR_PERMISSION + ": Protected safe-output handlers require their trusted prepared invocation context");
+  }
+  try {
+    state.assertAuthorizationFresh();
+  } catch (error) {
+    if (error.authorization) state.authorization = error.authorization;
+    throw error;
+  }
+}
+
 /** @returns {import("./types/handler-factory").SafeOutputAuthorizationEvidence | undefined} */
 function projectAuthorization(source) {
   if (!source || typeof source !== "object") return undefined;
@@ -196,4 +209,14 @@ function finalizeBufferedReviewExecutions(results, repo, prNumber, review) {
   }
 }
 
-module.exports = { canonicalSafeOutputUrl, projectSafeOutputData, buildSafeOutputExecutions, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, authorizeSafeOutputInvocation, projectAuthorization };
+module.exports = {
+  canonicalSafeOutputUrl,
+  projectSafeOutputData,
+  buildSafeOutputExecutions,
+  finalizeBufferedReviewExecutions,
+  withSafeOutputInvocation,
+  currentSafeOutputInvocation,
+  authorizeSafeOutputInvocation,
+  assertSafeOutputAuthorizationFresh,
+  projectAuthorization,
+};

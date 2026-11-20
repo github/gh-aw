@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -11,21 +12,31 @@ import (
 )
 
 var mergePullRequestLog = logger.New("workflow:merge_pull_request")
+var mergeProofVersionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
+var mergeProofDigestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 // MergePullRequestConfig holds configuration for merging pull requests with policy checks.
 type MergePullRequestConfig struct {
 	BaseSafeOutputConfig          `yaml:",inline"`
 	SafeOutputTargetConfig        `yaml:",inline"`
-	SafeOutputAllowedLabelsConfig `yaml:",inline"` // Deprecated: allowed-labels is migrated to required-labels
-	RequiredLabels                []string         `yaml:"required-labels,omitempty"`       // Labels that must ALL be present on the PR
-	AllowedBranches               []string         `yaml:"allowed-branches,omitempty"`      // Glob patterns for source branch names; PR branch must match one
-	AllowedBaseBranches           []string         `yaml:"allowed-base-branches,omitempty"` // Owner-declared non-consequential destinations; required and scoped
-	RequiredTitlePrefix           string           `yaml:"required-title-prefix,omitempty"` // Title prefix the PR must have
-	RequiredChecks                []string         `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
-	RequiredCheckApps             map[string]int64 `yaml:"required-check-apps,omitempty"`   // Expected GitHub App IDs by required check name
-	RequiredApprovers             []string         `yaml:"required-approvers,omitempty"`    // At least one independent human from this allowlist must approve the head
-	ProtectedFilesPolicy          string           `yaml:"protected-files,omitempty"`       // blocked (default) or allowed
-	ProtectedFilesExclude         []string         `yaml:"-"`
+	SafeOutputAllowedLabelsConfig `yaml:",inline"`          // Deprecated: allowed-labels is migrated to required-labels
+	RequiredLabels                []string                  `yaml:"required-labels,omitempty"`       // Labels that must ALL be present on the PR
+	AllowedBranches               []string                  `yaml:"allowed-branches,omitempty"`      // Glob patterns for source branch names; PR branch must match one
+	AllowedBaseBranches           []string                  `yaml:"allowed-base-branches,omitempty"` // Owner-declared non-consequential destinations; required and scoped
+	RequiredTitlePrefix           string                    `yaml:"required-title-prefix,omitempty"` // Title prefix the PR must have
+	RequiredChecks                []string                  `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
+	RequiredCheckApps             map[string]int64          `yaml:"required-check-apps,omitempty"`   // Expected GitHub App IDs by required check name
+	ProofEvidence                 *MergeProofEvidenceConfig `yaml:"proof-evidence,omitempty"`
+	RequiredApprovers             []string                  `yaml:"required-approvers,omitempty"` // At least one independent human from this allowlist must approve the head
+	ProtectedFilesPolicy          string                    `yaml:"protected-files,omitempty"`    // blocked (default) or allowed
+	ProtectedFilesExclude         []string                  `yaml:"-"`
+}
+
+// MergeProofEvidenceConfig pins the verifier check and the invariant configuration it evaluates.
+type MergeProofEvidenceConfig struct {
+	Check               string `yaml:"check" json:"check"`
+	VerifierVersion     string `yaml:"verifier-version" json:"verifier_version"`
+	ConfigurationSHA256 string `yaml:"configuration-sha256" json:"configuration_sha256"`
 }
 
 // parseMergePullRequestConfig handles merge-pull-request configuration.
@@ -51,6 +62,13 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 		cfg.AllowedBaseBranches = ParseStringArrayFromConfig(configMap, "allowed-base-branches", mergePullRequestLog)
 		cfg.RequiredTitlePrefix = extractStringFromMap(configMap, "required-title-prefix", mergePullRequestLog)
 		cfg.RequiredChecks = ParseStringArrayFromConfig(configMap, "required-checks", mergePullRequestLog)
+		if proof, ok := configMap["proof-evidence"].(map[string]any); ok {
+			cfg.ProofEvidence = &MergeProofEvidenceConfig{
+				Check:               extractStringFromMap(proof, "check", mergePullRequestLog),
+				VerifierVersion:     extractStringFromMap(proof, "verifier-version", mergePullRequestLog),
+				ConfigurationSHA256: extractStringFromMap(proof, "configuration-sha256", mergePullRequestLog),
+			}
+		}
 		if apps, ok := configMap["required-check-apps"].(map[string]any); ok {
 			cfg.RequiredCheckApps = make(map[string]int64, len(apps))
 			for name, value := range apps {
@@ -92,6 +110,9 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 		return nil
 	}
 	cfg := config.MergePullRequest
+	if err := validateMergeProofEvidence(config); err != nil {
+		return err
+	}
 	if err := validateMergePullRequestBaseBranches(cfg.AllowedBaseBranches); err != nil {
 		return err
 	}
@@ -135,6 +156,24 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 		if slices.Contains(cfg.RequiredChecks, checkName) {
 			return fmt.Errorf("safe-outputs.merge-pull-request.required-checks contains agent-controlled create-check-run name %q. Use an independent CI check name instead", checkName)
 		}
+	}
+	return nil
+}
+
+func validateMergeProofEvidence(config *SafeOutputsConfig) error {
+	cfg := config.MergePullRequest
+	proof := cfg.ProofEvidence
+	if proof == nil {
+		return nil
+	}
+	if !slices.Contains(cfg.RequiredChecks, proof.Check) || cfg.RequiredCheckApps[proof.Check] <= 0 {
+		return errors.New("safe-outputs.merge-pull-request.proof-evidence.check must name a required-checks entry pinned in required-check-apps. Use an independent deterministic verifier's GitHub App")
+	}
+	if !mergeProofVersionPattern.MatchString(proof.VerifierVersion) || !mergeProofDigestPattern.MatchString(proof.ConfigurationSHA256) {
+		return errors.New("safe-outputs.merge-pull-request.proof-evidence requires a static verifier-version (1-128 letters, digits, dots, underscores or hyphens) and a lowercase 64-character configuration-sha256 digest")
+	}
+	if cfg.Authorization == nil && config.Authorization == nil {
+		return errors.New("safe-outputs.merge-pull-request.proof-evidence requires authorization. Configure the existing external safe-output authority globally or on merge-pull-request")
 	}
 	return nil
 }

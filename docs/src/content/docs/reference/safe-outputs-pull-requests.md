@@ -296,6 +296,42 @@ safe-outputs:
 
 **Check producers**: `required-check-apps` maps each required name to a positive GitHub App ID. Every observed check with that name must come from that app, including during final revalidation. Without a mapping, names alone do not authenticate the producer. Several workflows can share an app, so protect CI workflow definitions from the acting agent. Unknown names and invalid IDs are rejected at compile time. The compiler grants `checks: read` even without `required-checks`, because branch requirements are discovered at runtime.
 
+**Proof evidence (opt-in)**: `proof-evidence` binds an independent deterministic verifier's result to the authorized merge. Its `check` must appear in both `required-checks` and `required-check-apps`. External `authorization` is required, locally or inherited from the workflow or repository. Without `proof-evidence`, existing merge behavior is unchanged.
+
+```yaml wrap
+safe-outputs:
+  merge-pull-request:
+    allowed-base-branches: ["agent-work/*"]
+    authorization: true # existing external authority; configure its endpoint and audience
+    required-checks: ["invariant-verifier"]
+    required-check-apps:
+      invariant-verifier: 12345 # independent verifier's GitHub App ID
+    proof-evidence:
+      check: invariant-verifier
+      verifier-version: "1.2.3"
+      configuration-sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+```
+
+The selected check run's `output.summary` must contain only this JSON object (at most 8 KiB, no Markdown fences, duplicate keys, or extra fields):
+
+```json
+{
+  "version": "gh-aw.merge-proof.v1",
+  "repository": "owner/repo",
+  "pull_request_number": 42,
+  "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "verifier_version": "1.2.3",
+  "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "result": "passed"
+}
+```
+
+Every field must match the resolved repository, PR number, live head, and trusted workflow configuration. Only `passed` is supported; missing, malformed, failed, `Unknown`, and unsupported results block merging even if the check conclusion is `success`. Agent-supplied evidence fields are never consumed. The verifier must compute the configuration digest over the complete invariant set and relevant configuration; `gh-aw` compares this opaque digest and does not implement domain-specific proof semantics.
+
+The existing external authorization request uses `scope.binding: resolved_effect`. Its `scope.refs` carry the repository, PR, head, check-run ID, producer App ID, verifier version, configuration digest, `passed` result, and a SHA-256 digest of the complete binding. The same binding and exact merge inputs are covered by `input_digest`; existing caller and policy bindings remain in force. No separate authorization service or protocol is introduced. After the authority allows the request, final merge revalidation rereads the PR and selected check evidence. A changed head or proof binding invalidates the proof; an expired authorization also blocks execution. The merge API still atomically requires the evaluated head SHA.
+
+Keep the verifier App credentials, verifier implementation, invariant configuration, and workflow policy outside the acting agent's control. App pinning alone cannot distinguish workflows sharing one App or make an agent-controlled check deterministic. This integration does not authorize default/protected-branch merges, relax file protections, or supply production deployment controls. Staged previews neither request authorization nor merge and are not evidence of a verified effect.
+
 **Approvals**: individual reviews are always read. Any reviewer's latest effective `CHANGES_REQUESTED` review blocks the merge, independent of branch protection. A later approval or dismissal supersedes it. Missing or malformed review evidence also blocks the merge. Without `required-approvers`, the absence of blocking reviews is not affirmative human approval. For higher-impact use, set `required-approvers` to an allowlist of human logins (matching is case-insensitive). At least one must have an `APPROVED` review on the evaluated head SHA. PR authors, bot accounts, and the authenticated merge identity cannot supply this approval.
 
 **Authorization boundary**: labels, titles, and branch names are filters, not human authorization. Keep approval accounts and their credentials outside the acting agent's control. A review reported under a human account is not proof that a person, rather than automation using that account, wrote it.

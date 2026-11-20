@@ -275,6 +275,11 @@ interface MergePullRequestConfig extends SafeOutputConfig {
   "required-title-prefix"?: string;
   "required-checks"?: string[];
   "required-check-apps"?: Record<string, number>;
+  "proof-evidence"?: {
+    check: string;
+    "verifier-version": string;
+    "configuration-sha256": string;
+  };
   "required-approvers"?: string[];
   "allowed-labels"?: string[];
   "allowed-branches"?: string[];

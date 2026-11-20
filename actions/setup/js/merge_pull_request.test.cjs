@@ -4,6 +4,9 @@ import path from "node:path";
 import { writeMergePullRequestDecision } from "./safe_output_manifest.cjs";
 import { SAFE_OUTPUT_E007 } from "./error_codes.cjs";
 import { generateSafeOutputSummary } from "./safe_output_summary.cjs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 function persistDecision(result) {
   const directory = path.resolve(`.test-merge-pull-request-audit-${Math.random().toString(36).slice(2)}`);
@@ -329,6 +332,7 @@ describe("merge_pull_request policy hardening", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.resetModules();
     vi.clearAllMocks();
     delete global.core;
@@ -347,6 +351,231 @@ describe("merge_pull_request policy hardening", () => {
     });
     return handler(message, {});
   }
+
+  const proofPolicy = { check: "deterministic-verifier", verifier_version: "1.2.3", configuration_sha256: "c".repeat(64) };
+  const proofConfig = {
+    proof_evidence: proofPolicy,
+    required_checks: [proofPolicy.check],
+    required_check_apps: { [proofPolicy.check]: 123 },
+    authorization: { endpoint: "https://authority.example/authorize", audience: "merge" },
+  };
+
+  function verifierRun(overrides = {}) {
+    pr.head.sha = "a".repeat(40);
+    reviewPR.headRefOid = pr.head.sha;
+    return {
+      id: 17,
+      name: proofPolicy.check,
+      app: { id: 123 },
+      head_sha: pr.head.sha,
+      status: "completed",
+      conclusion: "success",
+      output: {
+        summary: JSON.stringify({
+          version: "gh-aw.merge-proof.v1",
+          repository: "github/gh-aw",
+          pull_request_number: 100,
+          head_sha: pr.head.sha,
+          verifier_version: proofPolicy.verifier_version,
+          configuration_sha256: proofPolicy.configuration_sha256,
+          result: "passed",
+          ...overrides,
+        }),
+      },
+    };
+  }
+
+  async function runProof(message = {}, config = {}) {
+    await import("./merge_pull_request.cjs");
+    const { withSafeOutputInvocation } = require("./safe_output_execution.cjs");
+    const state = {
+      requirement: proofConfig.authorization,
+      invocation: {},
+      authorize: vi.fn().mockResolvedValue({ state: "allowed" }),
+      assertAuthorizationFresh: vi.fn(),
+    };
+    const result = await withSafeOutputInvocation(state, () => run({ ...proofConfig, ...config }, message));
+    return { result, state };
+  }
+
+  it("binds a trusted passed proof to resolved-effect authorization and the merged head", async () => {
+    checkResults.mockResolvedValue([verifierRun()]);
+    const { result, state } = await runProof({ merge_method: "squash", commit_title: "Verified change" });
+    expect(result.success).toBe(true);
+    expect(state.authorize).toHaveBeenCalledOnce();
+    const request = state.authorize.mock.calls[0][0];
+    expect(request.inputs).toEqual({
+      merge: { owner: "github", repo: "gh-aw", pull_number: 100, sha: pr.head.sha, merge_method: "squash", commit_title: "Verified change" },
+      proof_evidence: {
+        version: "gh-aw.merge-proof.v1",
+        repository: "github/gh-aw",
+        pull_request_number: 100,
+        head_sha: pr.head.sha,
+        verifier_version: "1.2.3",
+        configuration_sha256: "c".repeat(64),
+        result: "passed",
+        check_run_id: 17,
+        app_id: 123,
+      },
+    });
+    expect(request.scope.binding).toBe("resolved_effect");
+    expect(request.scope.refs).toEqual(
+      expect.arrayContaining(["repository:github/gh-aw", "pull-request:github/gh-aw#100", `head-sha:${pr.head.sha}`, "verifier-version:1.2.3", `configuration-sha256:${"c".repeat(64)}`, "verification-result:passed"])
+    );
+    expect(state.assertAuthorizationFresh).toHaveBeenCalledOnce();
+    expect(client.rest.pulls.merge).toHaveBeenCalledWith(expect.objectContaining(request.inputs.merge));
+    expect(checkResults).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidates proof when the head changes during external authorization", async () => {
+    checkResults.mockResolvedValue([verifierRun()]);
+    await import("./merge_pull_request.cjs");
+    const { withSafeOutputInvocation } = require("./safe_output_execution.cjs");
+    const state = {
+      requirement: proofConfig.authorization,
+      invocation: {},
+      authorize: vi.fn(async () => {
+        pr.head.sha = "b".repeat(40);
+        return { state: "allowed" };
+      }),
+      assertAuthorizationFresh: vi.fn(),
+    };
+    const result = await withSafeOutputInvocation(state, () => run(proofConfig));
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("policy state changed");
+    expect(state.authorize).toHaveBeenCalledOnce();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Unknown", { result: "Unknown" }],
+    ["failed", { result: "failed" }],
+    ["unsupported result", { result: "unsat" }],
+    ["unsupported version", { version: "gh-aw.merge-proof.v2" }],
+    ["repository", { repository: "other/repo" }],
+    ["PR", { pull_request_number: 101 }],
+    ["head", { head_sha: "b".repeat(40) }],
+    ["verifier", { verifier_version: "2.0.0" }],
+    ["invariants", { configuration_sha256: "d".repeat(64) }],
+    ["extra field", { assertion: "trust me" }],
+  ])("blocks %s proof evidence before requesting authorization", async (_name, overrides) => {
+    checkResults.mockResolvedValue([verifierRun(overrides)]);
+    const { result, state } = await runProof();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("merge proof evidence");
+    expect(state.authorize).not.toHaveBeenCalled();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing check", "missing summary", "malformed", "duplicate key", "agent producer", "failed check", "pending check"])("rejects %s even with forged agent proof", async mode => {
+    const check = verifierRun();
+    const forged = JSON.parse(check.output.summary);
+    if (mode === "missing summary") delete check.output.summary;
+    if (mode === "malformed") check.output.summary = "not JSON";
+    if (mode === "duplicate key") check.output.summary = check.output.summary.replace('"result":"passed"', '"result":"Unknown","result":"passed"');
+    if (mode === "agent producer") check.app.id = 456;
+    if (mode === "failed check") check.conclusion = "failure";
+    if (mode === "pending check") check.status = "in_progress";
+    checkResults.mockResolvedValue(mode === "missing check" ? [] : [check]);
+    const { result, state } = await runProof({ proof_evidence: forged, decision_evidence: forged, required_check_apps: { [proofPolicy.check]: 456 } });
+    expect(result.success).toBe(false);
+    expect(state.authorize).not.toHaveBeenCalled();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each(["Unknown", "replacement run"])("blocks %s appearing during final proof revalidation", async mode => {
+    const initial = verifierRun();
+    const changed = mode === "Unknown" ? verifierRun({ result: "Unknown" }) : { ...initial, id: 18 };
+    checkResults.mockResolvedValueOnce([initial]).mockResolvedValueOnce([changed]);
+    const { result, state } = await runProof();
+    expect(result.success).toBe(false);
+    expect(state.authorize).toHaveBeenCalledOnce();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it("does not execute a protected proof merge without trusted authorization context", async () => {
+    checkResults.mockResolvedValue([verifierRun()]);
+    expect((await run(proofConfig)).success).toBe(false);
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it("previews passing proof without requesting authorization or merging", async () => {
+    checkResults.mockResolvedValue([verifierRun()]);
+    const { result, state } = await runProof({}, { staged: true });
+    expect(result).toMatchObject({ success: true, staged: true, merged: false });
+    expect(state.authorize).not.toHaveBeenCalled();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each(["allow", "deny", "changed head", "Unknown"])("enforces proof through the real manager and external authorization protocol: %s", async mode => {
+    checkResults.mockResolvedValue([verifierRun(mode === "Unknown" ? { result: "Unknown" } : {})]);
+    const directory = path.resolve(`.test-merge-proof-authorization-${Math.random().toString(36).slice(2)}`);
+    for (const [key, value] of Object.entries({
+      RUNNER_TEMP: directory,
+      GITHUB_SERVER_URL: "https://github.com",
+      GITHUB_REPOSITORY_ID: "123",
+      GITHUB_WORKFLOW_REF: "github/gh-aw/.github/workflows/test.lock.yml@refs/heads/main",
+      GITHUB_WORKFLOW_SHA: "a".repeat(40),
+      GH_AW_AUTHORIZATION_WORKFLOW_HASH: "b".repeat(64),
+      GITHUB_RUN_ID: "456",
+      GITHUB_RUN_ATTEMPT: "1",
+      GH_AW_SAFE_OUTPUTS_STAGED: "false",
+      ACTIONS_ID_TOKEN_REQUEST_URL: "https://oidc.example/token",
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: "fixture-bootstrap",
+    }))
+      vi.stubEnv(key, value);
+    global.core.setSecret = vi.fn();
+    global.core.setOutput = vi.fn();
+    let envelope;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url, request) => {
+        if (request.method === "GET") {
+          const payload = Buffer.from(JSON.stringify({ aud: proofConfig.authorization.audience, exp: Math.floor(Date.now() / 1000) + 300 })).toString("base64url");
+          return Response.json({ value: `fixture.${payload}.signature` });
+        }
+        envelope = JSON.parse(request.body);
+        if (mode === "changed head") pr.head.sha = "b".repeat(40);
+        return Response.json({
+          version: envelope.version,
+          decision: mode === "deny" ? "deny" : "allow",
+          request_digest: envelope.request_digest,
+          invocation_id: envelope.invocation.invocation_id,
+          run_attempt: envelope.invocation.caller.run_attempt,
+          policy_revision: "policy-1",
+          decision_id: "decision-1",
+          issued_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 15000).toISOString(),
+        });
+      })
+    );
+    try {
+      const { loadHandlers, processMessages } = require("./safe_output_handler_manager.cjs");
+      const handlers = await loadHandlers({ merge_pull_request: { allowed_base_branches: ["integration"], ...proofConfig } });
+      const { results } = await processMessages(handlers, [{ type: "merge_pull_request", merge_method: "squash", proof_evidence: { result: "passed" } }]);
+      expect(results[0].success).toBe(mode === "allow");
+      expect(client.rest.pulls.merge).toHaveBeenCalledTimes(mode === "allow" ? 1 : 0);
+      expect(global.fetch).toHaveBeenCalledTimes(mode === "Unknown" ? 0 : 2);
+      if (mode !== "Unknown") {
+        expect(envelope.invocation.scope).toMatchObject({
+          binding: "resolved_effect",
+          refs: expect.arrayContaining([`head-sha:${"a".repeat(40)}`, "verification-result:passed", "check-run:github/gh-aw/17"]),
+        });
+        expect(results[0].authorization.state).toBe(mode === "deny" ? "denied" : "allowed");
+        const inputDigest = require("./safe_output_authorization.cjs").canonicalDigest({
+          merge: { owner: "github", repo: "gh-aw", pull_number: 100, sha: "a".repeat(40), merge_method: "squash" },
+          proof_evidence: {
+            ...JSON.parse(verifierRun().output.summary),
+            check_run_id: 17,
+            app_id: 123,
+          },
+        });
+        expect(envelope.invocation.input_digest).toBe(inputDigest);
+      }
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
 
   it.each(
     [

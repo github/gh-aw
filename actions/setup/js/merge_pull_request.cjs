@@ -14,7 +14,8 @@ const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
 const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { getEffectiveDetectionConclusion, getThreatDetectedMarker, getThreatEngineErrorMarker } = require("./threat_detection_warning.cjs");
-const { mergeAuthorizationEvidence, reconcileMerge } = require("./merge_pull_request_evidence.cjs");
+const { mergeAuthorizationEvidence, reconcileMerge, readMergeProofEvidence, mergeProofScope } = require("./merge_pull_request_evidence.cjs");
+const { authorizeSafeOutputInvocation, assertSafeOutputAuthorizationFresh } = require("./safe_output_execution.cjs");
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
 const MERGEABILITY_PENDING_ERROR_E099 = `${SAFE_OUTPUT_E099}: ${MERGEABILITY_PENDING_ERROR}`;
 
@@ -441,12 +442,12 @@ async function getBranchPolicy(githubClient, owner, repo, baseBranch) {
  * @param {string} headSha
  * @param {string[]} requiredChecks
  * @param {Record<string, number>} [requiredCheckApps]
- * @returns {Promise<{missing: string[], failing: Array<{name: string, status: string, conclusion: string|null}>, passing: Array<{name: string, check_run_id: number, head_sha: string, app_id: number|null}>}>}
+ * @param {{policy: NonNullable<import('./types/handler-factory').HandlerConfig['proof_evidence']>, pullNumber: number}} [proof]
  */
-async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requiredChecks, requiredCheckApps = {}) {
+async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requiredChecks, requiredCheckApps = {}, proof) {
   core.info(`Evaluating required checks on ${headSha}: ${requiredChecks.join(", ") || "(none)"}`);
   if (requiredChecks.length === 0) {
-    return { missing: [], failing: [], passing: [] };
+    return { missing: [], failing: [], passing: [], proof_evidence: undefined };
   }
 
   const checkRuns = await githubClient.paginate(githubClient.rest.checks.listForRef, {
@@ -521,7 +522,8 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
     }
   }
 
-  return { missing, failing, passing };
+  const proofEvidence = proof ? readMergeProofEvidence(byName.get(proof.policy.check), proof.policy, `${owner}/${repo}`, proof.pullNumber, headSha) : undefined;
+  return { missing, failing, passing, ...(proof ? { proof_evidence: proofEvidence } : {}) };
 }
 
 /**
@@ -625,6 +627,18 @@ async function main(config = {}) {
   const requiredChecks = Array.isArray(config.required_checks) ? config.required_checks : [];
   const requiredCheckApps = config.required_check_apps || {};
   const requiredApprovers = Array.isArray(config.required_approvers) ? config.required_approvers : [];
+  const proofPolicy = config.proof_evidence;
+  if (
+    proofPolicy &&
+    (!requiredChecks.includes(proofPolicy.check) ||
+      !Number.isSafeInteger(requiredCheckApps[proofPolicy.check]) ||
+      requiredCheckApps[proofPolicy.check] <= 0 ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(proofPolicy.verifier_version) ||
+      !/^[a-f0-9]{64}$/.test(proofPolicy.configuration_sha256) ||
+      !config.authorization)
+  ) {
+    throw new Error(`${SAFE_OUTPUT_E001}: proof-evidence requires a producer-pinned required check, a static verifier version and configuration digest, and external authorization`);
+  }
 
   const allowedBranchPatterns = compilePathGlobs(allowedBranches);
   core.info(
@@ -877,7 +891,8 @@ async function main(config = {}) {
       evidence.branch_policy = branchPolicy;
       phase = "required_checks";
       evidence.checks = { required: branchPolicy.requiredChecks, required_apps: requiredCheckApps };
-      const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
+      const proofRequest = proofPolicy ? { policy: proofPolicy, pullNumber } : undefined;
+      const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps, proofRequest);
       if (branchChecksDiscovered && branchPolicy.requiredChecks.length > 0) evidence.authorization.required_checks = checkSummary.missing.length === 0 && checkSummary.failing.length === 0 ? "passed" : "failed";
       core.debug(
         `merge_pull_request: ${JSON.stringify({ event: "check_evidence", required: branchPolicy.requiredChecks.length, passing: checkSummary.passing.length, missing: checkSummary.missing.length, failing: checkSummary.failing.length })}`
@@ -966,6 +981,27 @@ async function main(config = {}) {
         };
       }
 
+      const mergeInputs = {
+        owner,
+        repo,
+        pull_number: pullNumber,
+        sha: pr.head.sha,
+        merge_method: message.merge_method || "merge",
+        ...(message.commit_title === undefined ? {} : { commit_title: message.commit_title }),
+        ...(message.commit_message === undefined ? {} : { commit_message: message.commit_message }),
+      };
+      if (checkSummary.proof_evidence && !isStaged) {
+        phase = "authorization";
+        const authorization = await authorizeSafeOutputInvocation({
+          config,
+          inputs: { merge: mergeInputs, proof_evidence: checkSummary.proof_evidence },
+          scope: mergeProofScope(checkSummary.proof_evidence),
+        });
+        if (authorization.state !== "allowed") {
+          throw new Error(`${SAFE_OUTPUT_E007}: Merge proof requires external authorization of the resolved effect`);
+        }
+      }
+
       phase = "revalidation";
       evidence.authorization.final_revalidation = "failed";
       core.debug('merge_pull_request: {"event":"revalidation_started"}');
@@ -985,7 +1021,7 @@ async function main(config = {}) {
       const upstreamPR = await getOpenPullRequestForBranch(githubClient, owner, repo, baseBranch);
       const currentReviews = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
       const currentApprovals = await getApprovalEvidence(githubClient, owner, repo, currentPR, requiredApprovers);
-      const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
+      const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps, proofRequest);
       const currentFileProtection = await evaluateProtectedFiles(githubClient, owner, repo, currentPR, config);
       if (currentFileProtection.action !== "allow") {
         failureReasons.push({ code: "protected_files_modified", message: "Pull request modifies protected files at final revalidation" });
@@ -1004,6 +1040,7 @@ async function main(config = {}) {
         !upstreamPR ||
         !isDeepStrictEqual(currentReviews, reviewSummary) ||
         !isDeepStrictEqual(currentApprovals, approvalEvidence) ||
+        !isDeepStrictEqual(currentChecks.proof_evidence, checkSummary.proof_evidence) ||
         currentChecks.missing.length > 0 ||
         currentChecks.failing.length > 0
       ) {
@@ -1031,17 +1068,10 @@ async function main(config = {}) {
       }
 
       phase = "merge";
+      if (proofPolicy) assertSafeOutputAuthorizationFresh();
       core.debug('merge_pull_request: {"event":"merge_started","head_bound":true}');
       mergeAttempted = true;
-      const mergeResponse = await githubClient.rest.pulls.merge({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        sha: pr.head.sha,
-        merge_method: message.merge_method || "merge",
-        commit_title: message.commit_title,
-        commit_message: message.commit_message,
-      });
+      const mergeResponse = await githubClient.rest.pulls.merge(mergeInputs);
       if (mergeResponse.data?.merged !== true && mergeResponse.data?.merged !== false) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing merge outcome in API response`);
       }

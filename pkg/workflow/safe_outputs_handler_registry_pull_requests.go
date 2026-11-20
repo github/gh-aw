@@ -104,6 +104,9 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 		if len(c.RequiredCheckApps) > 0 {
 			handler["required_check_apps"] = c.RequiredCheckApps
 		}
+		if c.ProofEvidence != nil {
+			handler["proof_evidence"] = c.ProofEvidence
+		}
 		return handler
 	},
 	"close_pull_request": func(cfg *SafeOutputsConfig) map[string]any {

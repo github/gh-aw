@@ -11028,6 +11028,17 @@
                   "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
                   "description": "Expected GitHub App ID for each named check. Keys must also appear in required-checks. A missing or different producer blocks merging."
                 },
+                "proof-evidence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["check", "verifier-version", "configuration-sha256"],
+                  "properties": {
+                    "check": { "type": "string", "minLength": 1 },
+                    "verifier-version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+                    "configuration-sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                  },
+                  "description": "Opt-in deterministic verifier evidence from a required check pinned in required-check-apps. Requires external authorization. The check output summary must bind the repository, PR number, exact head, verifier version, configuration digest and passed result using gh-aw.merge-proof.v1."
+                },
                 "required-approvers": {
                   "type": "array",
                   "items": { "type": "string", "minLength": 1 },

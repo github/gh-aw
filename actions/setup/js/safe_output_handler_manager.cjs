@@ -629,7 +629,10 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
       if (requirement) {
         const state = currentSafeOutputInvocation();
         const deferred =
-          actions.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)));
+          actions.has(type) ||
+          ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) ||
+          (type === "merge_pull_request" && !!config[type]?.proof_evidence) ||
+          (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)));
         if (!state || state.requirement !== requirement || state.invocation?.output.type !== type || (state.authorization?.state !== "allowed" && !(deferred && state.authorization?.state === "not_requested"))) {
           throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
         }
@@ -1451,7 +1454,14 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     /** @type {any} */
     const invocationState = { invocation, requirement, config: descriptor, batchDigest: invocationBatchDigest, recordIndex: sourceBatch?.indices[index] ?? index, authorization: undefined };
     invocationState.authorize = options => require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation(options);
-    const deferredGate = phase === "primary" && (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (type === "upload_asset" && !!currentClaimHandle()));
+    invocationState.assertAuthorizationFresh = () => protocol.assertAuthorizationFresh({ authorization: invocationState.authorization });
+    const deferredGate =
+      phase === "primary" &&
+      (preparedAdapter ||
+        actionTypes.has(type) ||
+        ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) ||
+        (type === "merge_pull_request" && !!descriptor.proof_evidence) ||
+        (type === "upload_asset" && !!currentClaimHandle()));
     const evidencePath = protocol.authorizationEvidencePath();
     let authorization;
     try {
