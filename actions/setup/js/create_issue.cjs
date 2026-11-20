@@ -313,7 +313,8 @@ function createParentIssueTemplate(groupId, titlePrefix, workflowName, workflowS
       },
     ],
   });
-  if (expiresHours > 0) children.push({ type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt: new Date(Date.now() + expiresHours * 60 * 60 * 1000).toISOString(), agentTainted: false }] });
+  if (Number.isFinite(expiresHours) && expiresHours > 0)
+    children.push({ type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt: new Date(Date.now() + expiresHours * 60 * 60 * 1000).toISOString(), agentTainted: false }] });
   return { type: "report", title, children };
 }
 

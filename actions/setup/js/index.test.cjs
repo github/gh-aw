@@ -110,6 +110,17 @@ describe("custom safe-output issue API", () => {
     }
   });
 
+  it("preserves fractional-hour expiry deadlines through the custom issue API", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-20T10:00:00Z"));
+    try {
+      await createIssue({ title: "Finding", body: "Details", expiresHours: 0.5 });
+      expect(github.rest.issues.create.mock.calls[0][0].body).toContain("<!-- gh-aw-expires: 2026-11-20T10:30:00.000Z -->");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.each([0, -1, NaN, Infinity, "48"])("rejects invalid custom expiry %s without an API write", async expiresHours => {
     await expect(createIssue({ title: "Finding", body: "Details", expiresHours })).rejects.toThrow("positive finite number");
     expect(github.rest.issues.create).not.toHaveBeenCalled();
