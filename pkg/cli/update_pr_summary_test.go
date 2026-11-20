@@ -561,7 +561,7 @@ func TestUpgradeRelaunchForwardsMultilinePRMessage(t *testing.T) {
 			require.NoError(t, err)
 			defer func() { require.NoError(t, reader.Close()) }()
 			os.Stdout = writer
-			err = relaunchWithSameArgs("--skip-extension-upgrade", "/bin/echo")
+			err = relaunchUpgradeWithContext(context.Background(), "--skip-extension-upgrade", "/bin/echo")
 			require.NoError(t, writer.Close())
 			require.NoError(t, err)
 			output, err := io.ReadAll(reader)
