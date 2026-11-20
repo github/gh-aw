@@ -70,8 +70,10 @@ slide that lists the band's slides (click a tile to jump) and a map of all bands
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
 Left/Right (or Space) step through the slides of the main line in reading
-order and wrap between bands, and Page Up/Page Down (or Shift+Up/Down) jump to the first slide of
-the band above or below. Some Human agent processes patterns head a column of
+order and wrap between bands, and Page Up/Page Down (or Shift+Up/Down) move to the band above or
+below like a text cursor: they keep the horizontal position (clamped to the band's length) until
+Left/Right or a jump moves it. Shift+Home (or the first ⟪ button on small screens) returns to the
+first slide of the band. Some Human agent processes patterns head a column of
 worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to

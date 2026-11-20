@@ -550,11 +550,12 @@
       b._nav = fn;
       return b;
     };
+    const lineStartBtn = arrowBtn("First slide of the band", "Shift+Home", "Shift+Home", "M5 5v14M13 6l-6 6 6 6M20 6l-6 6 6 6", () => lineStart());
     const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
     const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft Backspace", "M15 5l-7 7 7 7", () => prev());
     const nextBtn = arrowBtn("Next slide", "→", "ArrowRight Space Enter", "M9 5l7 7-7 7", () => next());
     const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
-    const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
+    const arrows = h("div", { class: "arrows" }, lineStartBtn, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
     // arrow and the example count, so the audience knows there is a line below; it steps down the column and,
     // on the last example, turns into an up arrow back to the pattern.
@@ -965,6 +966,8 @@
       void el.offsetWidth; // restart CSS animations on re-entry
       el.classList.add("active");
       cur = n;
+      if (n !== goalKeep) goal = Math.max(0, posOf(n));
+      goalKeep = -1;
       slides[n].enter?.(dir);
       chrome(n);
       kioskArm();
@@ -980,6 +983,7 @@
       nextBtn.disabled = nextTop(n) == null;
       bandPrevBtn.disabled = bandTo(slides[n].band, -1) == null;
       bandNextBtn.disabled = bandTo(slides[n].band, 1) == null;
+      lineStartBtn.disabled = n === mainLine(slides[n].band)[0];
       paintColumn(n);
       renderNotes(slides[n].notes || "");
       notes.scrollTop = 0;
@@ -987,7 +991,7 @@
       history.replaceState(null, "", hashFor(n));
     }
     // Left/right walk the main line of slides (column heads, never their examples) and wrap across bands;
-    // up/down walk a column, and past its ends (or off any column) jump to the header of the band above/below.
+    // up/down walk a column, and past its ends (or off any column) move to the band above/below, keeping the horizontal position.
     // In a tour only its slides count (an example is only ever in a tour together with its pattern).
     const pat = n => (slides[n].parent ? slides.indexOf(slides[n].parent) : -1);
     const onMain = i => vis(i) && pat(i) < 0;
@@ -1008,9 +1012,24 @@
       }
       return null;
     };
+    // the visible main line of band b (header first, then column heads and plain slides, never examples)
+    const mainLine = b => slides.reduce((a, s, i) => (s.band === b && onMain(i) && a.push(i), a), []);
+    const posOf = n => mainLine(slides[n].band).indexOf(top(n));
+    // Like a text cursor, up/down keep the horizontal position: `goal` is the main-line position of the last
+    // slide reached any other way, and a band move lands on that position, clamped to the band's length.
+    let goal = 0,
+      goalKeep = -1;
     const band = d => {
       const i = bandTo(slides[cur].band, d);
-      if (i != null) go(i);
+      if (i == null) return;
+      const line = mainLine(slides[i].band),
+        to = line.length ? line[Math.min(goal, line.length - 1)] : i;
+      goalKeep = to;
+      go(to);
+    };
+    const lineStart = () => {
+      const line = mainLine(slides[cur].band);
+      if (line.length) go(line[0]);
     };
     // the visible part of a slide's column, pattern first, or null when there is nothing to walk
     const colList = s => {
@@ -1110,7 +1129,8 @@
       } else if (e.key === "u" || e.key === "U") {
         const col = colOf(slides[cur]);
         if (col) go(slides.indexOf(col));
-      } else if (e.key === "Home") go(firstVis());
+      } else if (e.key === "Home" && e.shiftKey) lineStart();
+      else if (e.key === "Home") go(firstVis());
       else if (e.key === "End") go(lastVis());
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
       else if ((e.key === "k" || e.key === "K") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setKiosk(!kiosk);
