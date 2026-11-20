@@ -58,7 +58,10 @@ func runRetainedAdoptionCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if opts.JSONOutput {
-		return renderLogsJSON(LogsData{RetainedAdoption: &data, Runs: []RunData{}, LogsLocation: opts.OutputDir}, opts.Verbose)
+		return renderLogsJSON(LogsData{
+			RetainedAdoption: &data, Runs: []RunData{}, LogsLocation: opts.OutputDir,
+			Summary: LogsSummary{AICCoverage: "unavailable"},
+		}, opts.Verbose)
 	}
 	_, err = fmt.Fprint(os.Stdout, console.RenderStructStdout(data))
 	return err

@@ -347,6 +347,7 @@ func buildLogsEmptyResult(cause error) (*mcp.CallToolResult, any, error) {
 		Message:  cause.Error(),
 	}
 	emptyData.Summary.TotalDuration = "0ns"
+	emptyData.Summary.AICCoverage = "unavailable"
 	jsonBytes, jsonErr := json.Marshal(emptyData)
 	if jsonErr != nil {
 		return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, cause.Error(), nil)

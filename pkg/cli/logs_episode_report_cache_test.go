@@ -148,6 +148,29 @@ func TestEpisodeReportCacheRejectsCorruptSnapshotsWithoutRequests(t *testing.T) 
 	require.ErrorContains(t, err, "positive")
 }
 
+func TestEpisodeReportCacheRejectsLegacyNullableAICSnapshot(t *testing.T) {
+	opts := episodeRetrievalTestOptions(t)
+	path, err := episodeReportCachePath(opts)
+	require.NoError(t, err)
+	require.Contains(t, path, "report-v2-")
+
+	report := LogsData{
+		Runs:     []RunData{{RunID: opts.SeedRunID}},
+		Episodes: []EpisodeData{{EpisodeID: "canonical", RunIDs: []int64{opts.SeedRunID}}},
+		EpisodeRetrieval: &EpisodeRetrieval{
+			EpisodeID: "canonical", CollectedAt: time.Now().UTC(),
+		},
+	}
+	encoded, err := json.Marshal(episodeReportCache{Version: 1, Data: report})
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, writeSensitiveFile(path, encoded))
+
+	_, found, err := readEpisodeReportCache(path, opts.SeedRunID)
+	require.ErrorContains(t, err, "invalid episode cache")
+	require.False(t, found)
+}
+
 func TestEpisodeReportCacheConcurrentPublication(t *testing.T) {
 	fixture := newEpisodeRetrievalFixture(t)
 	fixture.add("org/one", 2, "canonical", "org/one", 2)

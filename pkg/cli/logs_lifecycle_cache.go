@@ -89,7 +89,7 @@ func loadLifecycleRecords(path string) (map[string]lifecycle.Record, error) {
 		if err != nil {
 			return nil, fmt.Errorf("decode retained lifecycle evidence: %w", err)
 		}
-		if record.SchemaVersion != cachedLogsJSONLSchemaVersion || record.Kind != cachedLogsJSONLKindLifecycle || record.Lifecycle == nil {
+		if record.SchemaVersion != cachedLogsJSONLLifecycleSchemaVersion || record.Kind != cachedLogsJSONLKindLifecycle || record.Lifecycle == nil {
 			return nil, errors.New("incompatible lifecycle cache record; recollect delivery evidence into a new output directory")
 		}
 		if len(records) >= maxLifecycleCacheItems {
@@ -128,7 +128,7 @@ func writeLifecycleRecords(path string, records map[string]lifecycle.Record) err
 			return errors.New("lifecycle cache exceeds the 20000-item limit; use a separate output directory")
 		}
 		if err := encoder.Encode(cachedLogsJSONLRecord{
-			SchemaVersion: cachedLogsJSONLSchemaVersion, Kind: cachedLogsJSONLKindLifecycle, Lifecycle: &record,
+			SchemaVersion: cachedLogsJSONLLifecycleSchemaVersion, Kind: cachedLogsJSONLKindLifecycle, Lifecycle: &record,
 		}); err != nil {
 			return err
 		}
@@ -150,7 +150,7 @@ func (w *cachedLogsJSONLWriter) AppendLifecycle(record lifecycle.Record) error {
 		return nil
 	}
 	data, err := json.Marshal(cachedLogsJSONLRecord{
-		SchemaVersion: cachedLogsJSONLSchemaVersion, Kind: cachedLogsJSONLKindLifecycle, Lifecycle: &record,
+		SchemaVersion: cachedLogsJSONLLifecycleSchemaVersion, Kind: cachedLogsJSONLKindLifecycle, Lifecycle: &record,
 	})
 	if err != nil {
 		return err

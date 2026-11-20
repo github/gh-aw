@@ -23,6 +23,7 @@ import (
 type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
 const cachedLogsJSONLSchemaVersion = 8
+const cachedLogsJSONLLifecycleSchemaVersion = 7
 
 const (
 	cachedLogsJSONLKindRun          = "run"
@@ -199,7 +200,7 @@ func loadCachedLogsJSONLFiles(paths []string) (*cachedLogsJSONLCache, error) {
 		}
 		for _, record := range cache.lifecycles {
 			if err := merged.addRecord(cachedLogsJSONLRecord{
-				SchemaVersion: cachedLogsJSONLSchemaVersion, Kind: cachedLogsJSONLKindLifecycle, Lifecycle: &record,
+				SchemaVersion: cachedLogsJSONLLifecycleSchemaVersion, Kind: cachedLogsJSONLKindLifecycle, Lifecycle: &record,
 			}, 0); err != nil {
 				return nil, err
 			}
@@ -410,7 +411,12 @@ func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDa
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {
-	if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+	if record.Kind == cachedLogsJSONLKindLifecycle {
+		if record.SchemaVersion != cachedLogsJSONLLifecycleSchemaVersion {
+			logsCacheLog.Printf("Ignoring incompatible cached lifecycle JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
+			return nil
+		}
+	} else if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
 		logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
 		return nil
 	}

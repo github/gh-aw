@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,6 +72,23 @@ esac`)
 func TestRetainedAdoptionRequiresAnExistingLedger(t *testing.T) {
 	_, err := refreshRetainedAdoption(t.Context(), t.TempDir(), "acme/repo", 1)
 	require.ErrorContains(t, err, "restore lifecycle.jsonl")
+}
+
+func TestRetainedAdoptionJSONMarksAICUnavailable(t *testing.T) {
+	outputDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(outputDir, "lifecycle.jsonl"), nil, 0o600))
+	cmd := NewLogsCommand()
+	cmd.SetContext(t.Context())
+	require.NoError(t, cmd.ParseFlags([]string{
+		"--retained", "--adoption", "--repo", "acme/repo", "--output", outputDir, "--json",
+	}))
+
+	stdout, _ := captureOutput(t, func() error {
+		return runRetainedAdoptionCommand(cmd, nil)
+	})
+	var data LogsData
+	require.NoError(t, json.Unmarshal([]byte(stdout), &data))
+	assert.Equal(t, "unavailable", data.Summary.AICCoverage)
 }
 
 func TestRetainedAdoptionRejectsUnrelatedCommandModes(t *testing.T) {

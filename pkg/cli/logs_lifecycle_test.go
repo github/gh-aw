@@ -269,6 +269,11 @@ func TestLifecycleCachedJSONLRoundTripAndConflict(t *testing.T) {
 	cache, err := loadCachedLogsJSONL(cachePath)
 	require.NoError(t, err)
 	require.Len(t, cache.lifecycles, 1)
+	content, err := os.ReadFile(cachePath)
+	require.NoError(t, err)
+	var cachedRecord cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(content, &cachedRecord))
+	assert.Equal(t, cachedLogsJSONLLifecycleSchemaVersion, cachedRecord.SchemaVersion)
 	var record lifecycle.Record
 	for _, item := range cache.lifecycles {
 		record = item

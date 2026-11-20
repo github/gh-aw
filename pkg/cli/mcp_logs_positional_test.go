@@ -106,6 +106,7 @@ func TestLogsToolFlagShapedMissingWorkflowReturnsEmptyResult(t *testing.T) {
 			var data LogsData
 			require.NoError(t, json.Unmarshal([]byte(text.Text), &data))
 			assert.Empty(t, data.Runs)
+			assert.Equal(t, "unavailable", data.Summary.AICCoverage)
 			assert.Contains(t, data.Message, "workflow '"+workflowName+"' not found")
 		})
 	}

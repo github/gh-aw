@@ -16,7 +16,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-const episodeReportCacheVersion = 1
+const episodeReportCacheVersion = 2
 
 type episodeReportCache struct {
 	Version int      `json:"version"`
