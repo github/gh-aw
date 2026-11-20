@@ -306,7 +306,7 @@
   .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
   .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   @keyframes tp-bob { 50% { transform: translateY(-14px); } }
-  /* guide style (gd-): a light, gridless explainer row; title block top-left, one board that loops a process, a mono caption */
+  /* guide style (gd-): explainer examples under Turn Intent to Automation (dark; body.light variants kept for light bands); title block top-left, one board that loops a process, a mono caption */
   .gd-head { position: absolute; left: 110px; top: 100px; width: 1700px; }
   .gd-head h2 { margin: 18px 0 0; font-size: 72px; line-height: 1.04; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; color: #f0f6fc; }
   .gd-head h2 em { font-style: normal; color: #4493f8; }
@@ -4188,6 +4188,7 @@
     };
     slides.push({
       group: "platform",
+      key: "intent",
       notes:
         "What: A plain-language request to a coding agent becomes a Markdown workflow. gh aw compile, a deterministic Go compiler with no AI involved, turns it into a hardened .lock.yml with pinned actions, a firewall and safe-output jobs; a later run opens a pull request removing duplicated code. This mirrors the gh-aw home page.\nWhy: Same Markdown in, same YAML out, so the result is reviewable and diffable like any other code.\nWhen: Start here when you can describe a recurring job clearly; the animation's one-minute path is illustrative, not a setup guarantee.",
       enter() {
@@ -4477,7 +4478,7 @@
     });
   }
 
-  // /agentic-workflows: /agentic-workflows routes each request to one focused guide (guide style)
+  // Ask once. The agent picks the guide.: /agentic-workflows routes each request to one focused guide (guide style)
   {
     resetIndex();
     const ROUTES = [
@@ -4510,7 +4511,8 @@
       outWires.forEach((el, k) => el.classList.toggle("on", k === i && s >= 1));
     };
     slides.push({
-      group: "guide",
+      group: "platform",
+      under: "intent",
       id: "agentic-workflows-router",
       notes:
         "What: The /agentic-workflows agent is a router, not one giant prompt: it reads the request, picks a route such as create, update, debug, optimize, upgrade, report or share, loads that guide from .github/aw/ and follows it. The requests shown are illustrative.\nWhy: Each guide stays small and focused, so the agent carries the rules for this job instead of every rule at once, and people get one entry point for the whole workflow lifecycle.\nWhen: Start every workflow task with /agentic-workflows and say what you want in plain words; name the workflow or the failing run when you have one.",
@@ -4548,8 +4550,8 @@
         h(
           "div",
           { class: "gd-head" },
-          h("div", { class: "kicker" }, "Ask once · the agent picks the guide"),
-          h("h2", {}, "/agentic-workflows"),
+          h("div", { class: "kicker" }, "/agentic-workflows · how to use it"),
+          h("h2", {}, "Ask once. ", h("em", {}, "The agent picks the guide.")),
           h("p", {}, h("code", {}, "/agentic-workflows"), " is a router: it reads your intent, loads the matching guide from ", h("code", {}, ".github/aw/"), " and follows it step by step.")
         ),
         h(
@@ -4641,7 +4643,8 @@
       shown = 0;
     };
     slides.push({
-      group: "guide",
+      group: "platform",
+      under: "intent",
       id: "authoring-loop",
       notes:
         "What: An illustrative authoring loop with real compiler messages for a synthetic issue-triage workflow. The agent writes the Markdown; gh aw compile rejects an unknown property with a did-you-mean hint, then a direct write permission under strict mode; the third round compiles to a lock file.\nWhy: The compiler is a deterministic reviewer. Precise, actionable errors let the agent correct itself in seconds, and only validated, hardened workflows reach the lock file.\nWhen: Let the agent run gh aw compile after every edit and feed it the errors; review the Markdown once it compiles cleanly.",
@@ -4743,7 +4746,8 @@
       last = 0,
       k = -1;
     slides.push({
-      group: "guide",
+      group: "platform",
+      under: "intent",
       id: "persona-optimization",
       notes:
         "What: Agent Persona Explorer, a daily workflow, role-plays a persona such as a backend engineer, a designer or a compliance lead, asks /agentic-workflows for a workflow, scores the answer on five dimensions and asks again with only the first 8,000 bytes of the agent file. Measured on 15 Nov 2026: 133 daily reports since 8 Jun 2026, 25 closed by merged pull requests, 22 of them by Copilot and 23 changing agent guidance; the agent file is 17,035 bytes. The persona order and the loop are an illustrative, simplified example.\nWhy: People phrase the same need in many ways. Personas catch guidance that works for only one kind of user, and the prefix probe catches rules a truncated prompt loses.\nWhen: Use persona evaluation when one agent serves many kinds of users, and keep its most important rules in the first bytes.",
@@ -24441,8 +24445,6 @@
     },
     // Trust the process: a concept slide, plain soft grey with no grid (light), one heavy review bell against quick merge blips.
     trust: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: Math.PI / 8, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#4493f8"], music: "trust", prog: [0] },
-    // /agentic-workflows guide row: the secondary guide style, plain soft grey with no grid (light), Primer blue accent, typing into a routing chime.
-    guide: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: -Math.PI / 10, cell: 32, accent: ["#79c0ff", "#0969da", "#ddf4ff", "#4493f8"], music: "guide", prog: [0, 2, -3] },
     // Cost Optimization: gray base, gold grid turned 45° the other way (-π/4), coins.
     cost: { base: [13, 17, 23], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4, cell: 32, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "cost", prog: [0, 2, 4, -3] },
     // Agentic Engineering: Copilot purple, grid tilted 30°, an engine rev.
@@ -24488,7 +24490,7 @@
     data: ["AW factory", "How gh-aw builds gh-aw"],
   };
   // Header-less rows of a single slide.
-  const SOLO = { intro: "Title", guide: "/agentic-workflows", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
+  const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
   // Bands that are not shipped product: every slide (header included) carries a corner badge.
   const PROTO = { cao: "gh cao" };
   // Tours: shareable filtered views (#<slide id>&tour=<name>), listed at the bottom of the slide map (G).
@@ -24502,7 +24504,6 @@
         "agentic-workflows",
         "ci-cd-meets-continuous-ai",
         "anatomy-of-a-workflow",
-        "agentic-workflows-router",
         "security",
         "safe-outputs",
         "zero-secret-agents",
@@ -24518,7 +24519,7 @@
       ],
     },
     security: { title: "Security deep dive", summary: "defence in depth for agents", bands: ["security"], slides: ["github-agentic-workflows", "finale"] },
-    builders: { title: "For workflow authors", summary: "write, run and improve workflows", bands: ["platform", "guide", "process", "engineering"], slides: ["github-agentic-workflows", "finale"] },
+    builders: { title: "For workflow authors", summary: "write, run and improve workflows", bands: ["platform", "process", "engineering"], slides: ["github-agentic-workflows", "finale"] },
     cost: { title: "Cost and observability", summary: "measure, budget and route", bands: ["cost"], slides: ["github-agentic-workflows", "opentelemetry", "distributed-tracing", "finale"] },
     enterprise: {
       title: "For enterprises",
@@ -24734,12 +24735,6 @@
         bell(55, t + 0.2, 0.05, 2.4);
         [72, 76, 79, 84, 79, 84, 88, 91].forEach((m, i) => tone(m, t + 0.5 + i * 0.08, { type: "triangle", dur: 0.12, vol: 0.05, cutoff: 3200 }));
         pad([60, 64, 67, 72], t + 1.3, 1.8, 0.03, "triangle", 2400);
-      },
-      // /agentic-workflows guide row: a short run of keystrokes, a rising routing chime, then a calm resolving pad
-      guide: t => {
-        [0, 0.09, 0.17, 0.27, 0.34].forEach(d => click(t + 0.15 + d, 2200, 0.05, 2));
-        [67, 71, 74, 79].forEach((m, i) => bell(m, t + 0.65 + i * 0.1, 0.035, 1.1));
-        pad([55, 62, 67, 71], t + 0.9, 2, 0.025, "triangle", 2400);
       },
       // intro: a wide major swell with a rising shimmer
       title: t => {

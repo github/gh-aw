@@ -20,7 +20,6 @@ const slideId = (heading: string) => SLIDES[slideNo(heading) - 1].id;
 const CURRENT = '.dots button.on[aria-label^="Slide "]';
 const at = (n: number) => `Slide ${n}`;
 const SECURITY = slideNo("Security");
-const GUIDE = slideNo("/agentic-workflows");
 const HANDOFFS = slideNo("Event-driven Hand-offs");
 
 test.use({ reducedMotion: "reduce" });
@@ -262,12 +261,8 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveAttribute("aria-label", at(GUIDE));
-  await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
-  await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveAttribute("aria-label", at(GUIDE));
-  // left from a row's first slide wraps to the last main-line slide of the band above, skipping its column of examples
+  // left from a band header wraps to the last main-line slide of the band above, skipping its column of examples
   await page.keyboard.press("ArrowLeft");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
   await page.keyboard.press("ArrowUp");
@@ -278,7 +273,7 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await page.keyboard.press("PageDown");
   await expect(count).toHaveAttribute("aria-label", at(2));
   await page.keyboard.press("PageDown");
-  await expect(count).toHaveAttribute("aria-label", at(GUIDE));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.keyboard.press("PageUp");
   await expect(count).toHaveAttribute("aria-label", at(2));
 });
@@ -293,7 +288,7 @@ test("gives every navigation button a keyboard shortcut", async ({ page }) => {
   expect(untitled).toEqual([]);
   // Shift+Down switches bands even on a column head
   await page.keyboard.press("Shift+ArrowDown");
-  await expect(count).toHaveAttribute("aria-label", at(GUIDE));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.keyboard.press("Shift+ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(2));
   // a typed slide number then Enter jumps there
@@ -422,11 +417,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await page.goto(`/gh-aw/cracktro/#${interior}`);
   await expect(count).toHaveAttribute("aria-label", at(interior));
   await nextBand.click();
-  await expect(count).toHaveAttribute("aria-label", at(GUIDE));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
   await expect(count).toHaveAttribute("aria-label", at(SECURITY + 2));
-  await prevBand.click();
-  await expect(count).toHaveAttribute("aria-label", at(GUIDE));
   await prevBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
   await prevBand.click();
@@ -442,7 +435,7 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await expect(count).toHaveAttribute("aria-label", at(3));
   await nextBand.focus();
   await page.keyboard.press("Enter");
-  await expect(count).toHaveAttribute("aria-label", at(GUIDE));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 
   // at 320px the four arrows pack right-aligned beneath the notes, map, search and sound row
   const rects = (sel: string) =>
@@ -509,7 +502,7 @@ test.describe("compact navigation on touch screens", () => {
     await page.getByRole("button", { name: "Next slide", exact: true }).tap();
     await expect(count).toHaveAttribute("aria-label", at(slideNo("Anatomy of a workflow")));
     await page.getByRole("button", { name: "Next band", exact: true }).tap();
-    await expect(count).toHaveAttribute("aria-label", at(GUIDE));
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 
     // rapid taps: every touchend is cancelled (no synthetic click, no double-tap zoom), never reaches
     // the window swipe handlers, and moves exactly one band per tap
