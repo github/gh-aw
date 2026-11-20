@@ -105,7 +105,7 @@ function generateFooterWithExpiration(options) {
   let footer = footerText;
 
   // Add expiration line inside the quoted section if configured
-  if (Number.isFinite(expiresHours) && expiresHours > 0) {
+  if (typeof expiresHours === "number" && Number.isFinite(expiresHours) && expiresHours > 0) {
     const expirationDate = new Date(Date.now() + expiresHours * 60 * 60 * 1000);
     const expirationLine = createExpirationLine(expirationDate);
     footer = `${footer.trimEnd()}\n> ${expirationLine}`;
@@ -132,7 +132,7 @@ function generateFooterWithExpiration(options) {
  * @returns {string} Footer with expiration inserted before XML marker
  */
 function addExpirationToFooter(footer, expiresHours, entityType) {
-  if (!Number.isFinite(expiresHours) || expiresHours <= 0) {
+  if (typeof expiresHours !== "number" || !Number.isFinite(expiresHours) || expiresHours <= 0) {
     return footer;
   }
 
