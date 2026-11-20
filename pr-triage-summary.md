@@ -1,25 +1,42 @@
-### Executive Summary
+### Executive summary
 
-- Eligible open app/github-copilot PRs: 0
-- Open PRs scanned: 0
-- PRs skipped by 1h cooldown: 0
-- Recommended action: none; no app/github-copilot PRs are currently eligible for triage.
+- Eligible open `app/github-copilot` PRs: 0
+- Open `app/github-copilot` PRs scanned: 0
+- PRs skipped by the 1h cooldown: 0
+- Categories: none
+- Risk: none
+- Priority: none
+- Action: none
 
-### Distribution
+### Distribution by category / risk / priority / action
 
-#### Category
-- None: 0
+- Category: none
+- Risk: none
+- Priority: none
+- Action: none
 
-#### Risk
-- None: 0
+### Top-priority PRs
 
-#### Priority
-- None: 0
+- None
 
-#### Action
-- None: 0
+### Auto-merge candidates
 
-### Key trends
+- None
 
-- No open PRs are currently authored by `app/github-copilot` in `github/gh-aw` according to the current triage state.
-- No labels, comments, or batch assignments were created because there are no eligible PRs.
+### Fast-track items
+
+- None
+
+### Batch opportunities
+
+- None
+
+### Close candidates
+
+- None
+
+### Key trends and next actions
+
+- There are currently no open PRs authored by `app/github-copilot` in `github/gh-aw`.
+- No PRs are currently ready for label assignment, comments, or batch review.
+- Re-run triage when new eligible agent-authored PRs appear.
