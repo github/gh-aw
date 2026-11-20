@@ -1,7 +1,7 @@
 "use strict";
 
 const { normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
-const { buildCatalogFromReflect, selectLatestGlobMatch, splitModelIdentifier } = require("./resolve_model_alias.cjs");
+const { buildCatalogFromReflect, filterAutomaticallySelectable, selectLatestGlobMatch, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 
 const MODEL_FALLBACK_ENV_VAR = "GH_AW_MODEL_FALLBACK";
 
@@ -93,7 +93,7 @@ function resolveClaudeAutoModel(model, provider, options = {}) {
     throw new Error(`Claude auto model selection is not supported for provider '${provider}'`);
   }
   const endpoints = options.reflectData?.endpoints?.filter(endpoint => endpoint?.configured === true && REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(endpoint.provider))) || [];
-  const catalog = buildCatalogFromReflect({ endpoints });
+  const catalog = buildCatalogFromReflect(filterAutomaticallySelectable({ endpoints }));
   // Claude's Messages API cannot use Copilot's general-purpose auto picker.
   for (const family of ["sonnet", "opus", "haiku"]) {
     const selected = selectLatestGlobMatch(`claude-*${family}*`, catalog);

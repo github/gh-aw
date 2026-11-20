@@ -212,7 +212,7 @@ Threat detection defaults to zero retries; configure its engine explicitly to ch
 
 Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provider's live AWF `/reflect` catalog before execution:
 
-- Built-in aliases (such as `opus`/`small`), workflow-defined `models:`, and their globs select the newest live match.
+- Built-in aliases (such as `opus`/`small`), workflow-defined `models:`, and their globs select the newest live match. Globs skip models AWF marks as not automatically selectable, such as a Decisions-only evaluation model; alias entries without `*`, such as `evals`, are unaffected.
 - A `provider/` prefix restricts the lookup; otherwise the engine's configured provider applies.
 - Exact live IDs take precedence over same-named aliases, and unrecognized IDs are not rewritten. Pi checks exact IDs before launch; Copilot, Claude, and Codex fail on the first unavailable-model request.
 - `?effort=` parameters are retained; `auto` keeps its engine-specific meaning.
