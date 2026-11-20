@@ -666,6 +666,84 @@ imports:
 	}
 }
 
+func TestRunRemoteDependencyStepsPolicies(t *testing.T) {
+	tests := []struct {
+		name            string
+		label           string
+		fatalWhenStrict bool
+		fatalAlways     bool
+		warnWhenVerbose bool
+		warnAlways      bool
+		warnBeforeFatal bool
+	}{
+		{name: "includes", label: "include dependencies", fatalWhenStrict: true, warnWhenVerbose: true},
+		{name: "frontmatter imports", label: "frontmatter import dependencies", fatalWhenStrict: true, warnWhenVerbose: true},
+		{name: "runtime imports", label: "runtime-import dependencies", fatalWhenStrict: true, warnAlways: true},
+		{name: "dispatch workflows", label: "dispatch workflow dependencies", fatalAlways: true, warnWhenVerbose: true, warnBeforeFatal: true},
+		{name: "call workflows", label: "call-workflow worker dependencies", fatalAlways: true, warnWhenVerbose: true, warnBeforeFatal: true},
+		{name: "resources", label: "resource dependencies", fatalAlways: true, warnWhenVerbose: true, warnBeforeFatal: true},
+	}
+
+	stepNames := []string{"includes", "frontmatter imports", "runtime imports", "dispatch workflows", "call workflows", "resources"}
+	for failureIndex, tc := range tests {
+		for _, strict := range []bool{false, true} {
+			for _, verbose := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/strict=%t/verbose=%t", tc.name, strict, verbose), func(t *testing.T) {
+					var executed []string
+					fetchFailure := errors.New("fetch failed")
+					fetch := func(name string, index int) func() error {
+						return func() error {
+							executed = append(executed, name)
+							if index == failureIndex {
+								return fetchFailure
+							}
+							return nil
+						}
+					}
+					fetchers := remoteDependencyFetchers{
+						includes:       fetch(stepNames[0], 0),
+						frontmatter:    fetch(stepNames[1], 1),
+						runtimeImports: fetch(stepNames[2], 2),
+						dispatch:       fetch(stepNames[3], 3),
+						callWorkflow:   fetch(stepNames[4], 4),
+						resources:      fetch(stepNames[5], 5),
+					}
+					steps := remoteDependencySteps(fetchers, verbose)
+					warningCount := 0
+					for i := range steps {
+						steps[i].warn = func(error) {
+							warningCount++
+						}
+					}
+
+					err := runRemoteDependencySteps(steps, strict, verbose)
+					fatal := tc.fatalAlways || (strict && tc.fatalWhenStrict)
+					wantExecuted := stepNames
+					if fatal {
+						wantExecuted = stepNames[:failureIndex+1]
+					}
+					assert.Equal(t, wantExecuted, executed, "steps run after the failing dependency")
+					if fatal {
+						require.EqualError(t, err, "failed to fetch "+tc.label+": fetch failed")
+						require.ErrorIs(t, err, fetchFailure)
+					} else {
+						require.NoError(t, err)
+					}
+					wantWarnings := 0
+					if fatal && tc.warnBeforeFatal {
+						if verbose && tc.warnWhenVerbose {
+							wantWarnings = 1
+						}
+					} else if !fatal && (tc.warnAlways || (verbose && tc.warnWhenVerbose)) {
+						wantWarnings = 1
+					}
+					assert.Equal(t, wantWarnings, warningCount, "warning policy for failing dependency")
+				})
+			}
+		}
+	}
+}
+
 func TestFetchAndSaveRemoteIncludes_PathTraversalRejected(t *testing.T) {
 	mockFetch := func(_ context.Context, _ string, _ *WorkflowSpec, _ bool) ([]byte, string, error) {
 		return []byte("# include body\n"), "", nil

@@ -772,13 +772,13 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 }
 
 // fetchAllRemoteDependencies fetches all remote dependencies for a workflow:
-// includes (@include directives), frontmatter imports, dispatch workflows, and resources.
+// includes (@include directives), frontmatter imports, runtime imports, dispatch workflows,
+// call-workflow workers, and resources.
 // This is the single entry point shared by both the add and trial commands.
 //
 // Error handling is intentionally asymmetric:
-//   - @include and frontmatter import errors are best-effort: failures emit a warning when
-//     verbose is true but do not stop the overall operation.
-//   - Dispatch-workflow and resource errors are fatal and are returned to the caller.
+//   - Include, frontmatter import, and runtime-import errors are fatal only in strict mode.
+//   - Dispatch, call-workflow, and resource errors are always fatal.
 func fetchAllRemoteDependencies(ctx context.Context, content string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker) error {
 	return fetchAllRemoteDependenciesWithOptions(ctx, content, spec, targetDir, verbose, force, tracker, false)
 }
@@ -787,70 +787,135 @@ func fetchAllRemoteDependenciesStrict(ctx context.Context, content string, spec 
 	return fetchAllRemoteDependenciesWithOptions(ctx, content, spec, targetDir, verbose, force, tracker, true)
 }
 
-func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker, strict bool) error {
-	remoteWorkflowLog.Printf("Fetching all remote dependencies: spec=%s, targetDir=%s, force=%v", spec.String(), targetDir, force)
-	// Fetch and save @include directive dependencies (best-effort: errors are not fatal).
-	if err := fetchAndSaveRemoteIncludesWithOptions(ctx, content, includesFetchOptions{
-		spec:      spec,
-		targetDir: targetDir,
-		verbose:   verbose,
-		force:     force,
-		tracker:   tracker,
-		strict:    strict,
-	}); err != nil {
-		if strict {
-			return fmt.Errorf("failed to fetch include dependencies: %w", err)
-		}
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch include dependencies: %v", err)))
-		}
+type remoteDependencyFetchers struct {
+	includes       func() error
+	frontmatter    func() error
+	runtimeImports func() error
+	dispatch       func() error
+	callWorkflow   func() error
+	resources      func() error
+}
+
+type remoteDependencyStep struct {
+	label           string
+	run             func() error
+	fatalWhenStrict bool
+	fatalAlways     bool
+	warnWhenVerbose bool
+	warnAlways      bool
+	warnBeforeFatal bool
+	warn            func(error)
+}
+
+func remoteDependencyWarning(message string) func(error) {
+	return func(err error) {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(message, err)))
 	}
-	// Fetch and save frontmatter 'imports:' dependencies so they are available
-	// locally during compilation. Keeping these as relative paths (not workflowspecs)
-	// ensures the compiler resolves them from disk rather than downloading from GitHub.
-	// Best-effort: errors are not fatal.
-	if err := fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx, content, spec, targetDir, verbose, force, tracker, strict); err != nil {
-		if strict {
-			return fmt.Errorf("failed to fetch frontmatter import dependencies: %w", err)
-		}
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch frontmatter import dependencies: %v", err)))
-		}
+}
+
+func remoteDependencySteps(fetchers remoteDependencyFetchers, verbose bool) []remoteDependencyStep {
+	return []remoteDependencyStep{
+		{
+			label:           "include dependencies",
+			run:             fetchers.includes,
+			fatalWhenStrict: true,
+			warnWhenVerbose: true,
+			warn:            remoteDependencyWarning("Failed to fetch include dependencies: %v"),
+		},
+		{
+			label:           "frontmatter import dependencies",
+			run:             fetchers.frontmatter,
+			fatalWhenStrict: true,
+			warnWhenVerbose: true,
+			warn:            remoteDependencyWarning("Failed to fetch frontmatter import dependencies: %v"),
+		},
+		{
+			label:           "runtime-import dependencies",
+			run:             fetchers.runtimeImports,
+			fatalWhenStrict: true,
+			warnAlways:      true,
+			warn: func(err error) {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Failed to fetch runtime-import dependencies; activation may fail"))
+				if verbose {
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+				}
+			},
+		},
+		{
+			label:           "dispatch workflow dependencies",
+			run:             fetchers.dispatch,
+			fatalAlways:     true,
+			warnWhenVerbose: true,
+			warnBeforeFatal: true,
+			warn:            remoteDependencyWarning("Failed to fetch dispatch workflow dependencies: %v"),
+		},
+		{
+			label:           "call-workflow worker dependencies",
+			run:             fetchers.callWorkflow,
+			fatalAlways:     true,
+			warnWhenVerbose: true,
+			warnBeforeFatal: true,
+			warn:            remoteDependencyWarning("Failed to fetch call-workflow worker dependencies: %v"),
+		},
+		{
+			label:           "resource dependencies",
+			run:             fetchers.resources,
+			fatalAlways:     true,
+			warnWhenVerbose: true,
+			warnBeforeFatal: true,
+			warn:            remoteDependencyWarning("Failed to fetch resource dependencies: %v"),
+		},
 	}
-	// Fetch and save required runtime-import dependencies so installs include the
-	// explicit runtime-import closure without copying unrelated .github contents.
-	if err := fetchAndSaveRemoteRuntimeImports(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {
-		if strict {
-			return fmt.Errorf("failed to fetch runtime-import dependencies: %w", err)
+}
+
+func runRemoteDependencySteps(steps []remoteDependencyStep, strict, verbose bool) error {
+	for _, step := range steps {
+		if err := step.run(); err != nil {
+			fatal := step.fatalAlways || (strict && step.fatalWhenStrict)
+			if fatal {
+				if step.warnBeforeFatal && verbose && step.warnWhenVerbose {
+					step.warn(err)
+				}
+				return fmt.Errorf("failed to fetch %s: %w", step.label, err)
+			}
+			if step.warnAlways || (verbose && step.warnWhenVerbose) {
+				step.warn(err)
+			}
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Failed to fetch runtime-import dependencies; activation may fail"))
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
-		}
-	}
-	// Fetch and save workflows referenced in safe-outputs.dispatch-workflow so they are
-	// available locally. Workflow names using GitHub Actions expression syntax are skipped.
-	if err := fetchAndSaveRemoteDispatchWorkflows(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch dispatch workflow dependencies: %v", err)))
-		}
-		return fmt.Errorf("failed to fetch dispatch workflow dependencies: %w", err)
-	}
-	// Fetch and save worker workflows referenced in safe-outputs.call-workflow so they are
-	// available locally. Workflow names using GitHub Actions expression syntax are skipped.
-	if err := fetchAndSaveRemoteCallWorkflows(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker dependencies: %v", err)))
-		}
-		return fmt.Errorf("failed to fetch call-workflow worker dependencies: %w", err)
-	}
-	// Fetch files listed in the 'resources:' frontmatter field (additional workflow or
-	// action files that should be present alongside this workflow).
-	if err := fetchAndSaveRemoteResources(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch resource dependencies: %v", err)))
-		}
-		return fmt.Errorf("failed to fetch resource dependencies: %w", err)
 	}
 	return nil
+}
+
+func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker, strict bool) error {
+	remoteWorkflowLog.Printf("Fetching all remote dependencies: spec=%s, targetDir=%s, force=%v", spec.String(), targetDir, force)
+
+	fetchers := remoteDependencyFetchers{
+		includes: func() error {
+			return fetchAndSaveRemoteIncludesWithOptions(ctx, content, includesFetchOptions{
+				spec:      spec,
+				targetDir: targetDir,
+				verbose:   verbose,
+				force:     force,
+				tracker:   tracker,
+				strict:    strict,
+			})
+		},
+		frontmatter: func() error {
+			return fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx, content, spec, targetDir, verbose, force, tracker, strict)
+		},
+		runtimeImports: func() error {
+			return fetchAndSaveRemoteRuntimeImports(ctx, content, spec, targetDir, verbose, force, tracker)
+		},
+		dispatch: func() error {
+			return fetchAndSaveRemoteDispatchWorkflows(ctx, content, spec, targetDir, verbose, force, tracker)
+		},
+		callWorkflow: func() error {
+			return fetchAndSaveRemoteCallWorkflows(ctx, content, spec, targetDir, verbose, force, tracker)
+		},
+		resources: func() error {
+			return fetchAndSaveRemoteResources(ctx, content, spec, targetDir, verbose, force, tracker)
+		},
+	}
+
+	return runRemoteDependencySteps(remoteDependencySteps(fetchers, verbose), strict, verbose)
 }
