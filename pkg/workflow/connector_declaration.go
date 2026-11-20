@@ -79,23 +79,11 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 	azure := map[string]*ConnectorAzureOIDC{}
 	for name, credential := range declaration.Credentials {
 		spec.Credentials[name] = credential.Credential
-		if strings.HasPrefix(credential.Secret, connectorAppSecretPrefix) {
-			return nil, fmt.Errorf("connector secret names beginning with %s are reserved", connectorAppSecretPrefix)
-		}
-		sources := 0
-		for _, configured := range []bool{credential.Secret != "", credential.Token != nil, credential.GitHubApp != nil, credential.GitHubOIDC != nil, credential.AzureOIDC != nil} {
-			if configured {
-				sources++
-			}
-		}
-		if sources > 1 {
-			return nil, fmt.Errorf("connector credential %q requires exactly one token, github-app, github-oidc, azure-oidc or legacy secret route", name)
+		if err := credential.validateRoute(name); err != nil {
+			return nil, err
 		}
 		if credential.Token != nil {
 			credential.Secret = credential.Token.Secret
-			if credential.Secret == "" || strings.HasPrefix(credential.Secret, connectorAppSecretPrefix) {
-				return nil, fmt.Errorf("connector token route %q requires a non-reserved secret name", name)
-			}
 		}
 		if credential.GitHubApp != nil {
 			apps[name] = credential.GitHubApp
@@ -108,9 +96,6 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 		if credential.AzureOIDC != nil {
 			azure[name] = credential.AzureOIDC
 			credential.Secret = connectorAppSecret(alias, name)
-		}
-		if credential.Phase == "inference" && (sources != 1 || credential.GitHubApp != nil || credential.GitHubOIDC != nil) {
-			return nil, fmt.Errorf("connector inference credential %q requires a token or azure-oidc route", name)
 		}
 		if credential.Secret != "" {
 			credentials[name] = connectors.SecretRef{Secret: credential.Secret}
@@ -130,6 +115,28 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 		return nil, err
 	}
 	return registration, nil
+}
+
+func (credential ConnectorCredential) validateRoute(name string) error {
+	if strings.HasPrefix(credential.Secret, connectorAppSecretPrefix) {
+		return fmt.Errorf("connector secret names beginning with %s are reserved", connectorAppSecretPrefix)
+	}
+	sources := 0
+	for _, configured := range []bool{credential.Secret != "", credential.Token != nil, credential.GitHubApp != nil, credential.GitHubOIDC != nil, credential.AzureOIDC != nil} {
+		if configured {
+			sources++
+		}
+	}
+	if sources > 1 {
+		return fmt.Errorf("connector credential %q requires exactly one token, github-app, github-oidc, azure-oidc or legacy secret route", name)
+	}
+	if credential.Token != nil && (credential.Token.Secret == "" || strings.HasPrefix(credential.Token.Secret, connectorAppSecretPrefix)) {
+		return fmt.Errorf("connector token route %q requires a non-reserved secret name", name)
+	}
+	if credential.Phase == "inference" && (sources != 1 || credential.GitHubApp != nil || credential.GitHubOIDC != nil) {
+		return fmt.Errorf("connector inference credential %q requires a token or azure-oidc route", name)
+	}
+	return nil
 }
 
 func validateConnectorDocumentationURLs(alias string, references []string) error {
