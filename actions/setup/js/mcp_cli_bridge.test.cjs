@@ -898,6 +898,25 @@ describe("mcp_cli_bridge.cjs", () => {
     expect(stdoutChunks.join("")).not.toContain("Allowed values");
   });
 
+  it("escapes enum control characters within the JSON-mode help line budget", () => {
+    showToolHelp("safeoutputs", "submit_pull_request_review", [
+      {
+        name: "submit_pull_request_review",
+        inputSchema: {
+          properties: {
+            event: { type: "string", enum: ["line\n".repeat(25), "a\r\nb\t\u0000\u001b\u007f\u0085\u2028\u2029", "COMMENT"] },
+            comments: { type: "array", items: { type: "object" } },
+          },
+        },
+      },
+    ]);
+
+    const output = stdoutChunks.join("");
+    expect(output).toContain("<json object>");
+    expect(output).toContain(`  --event: ${"line\\n".repeat(25)}, a\\r\\nb\\t\\u0000\\u001b\\u007f\\u0085\\u2028\\u2029, COMMENT`);
+    expect(output.trimEnd().split("\n").length).toBeLessThanOrEqual(30);
+  });
+
   it("keeps help within the line budget when many options have enums", () => {
     const properties = {};
     for (let i = 1; i <= 24; i++) {

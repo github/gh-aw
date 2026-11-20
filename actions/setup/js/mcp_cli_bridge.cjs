@@ -1440,7 +1440,10 @@ function renderEnumOptionLines(optionEntries) {
     if (!schema || !Array.isArray(schema.enum) || schema.enum.length === 0) {
       continue;
     }
-    lines.push(`  --${key}: ${schema.enum.map(String).join(", ")}`);
+    const values = schema.enum.map(value =>
+      String(value).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, char => (char.charCodeAt(0) < 0x20 ? JSON.stringify(char).slice(1, -1) : `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`))
+    );
+    lines.push(`  --${key}: ${values.join(", ")}`);
     if (lines.length >= TOOL_HELP_MAX_ENUM_OPTIONS) {
       break;
     }
