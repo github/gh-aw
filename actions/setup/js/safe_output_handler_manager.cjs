@@ -17,7 +17,16 @@ const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAF
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { projectSafeOutputData, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, projectAuthorization } = require("./safe_output_execution.cjs");
-const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
+const {
+  hasUnresolvedTemporaryIds,
+  replaceTemporaryIdReferences,
+  replaceArtifactUrlReferences,
+  normalizeTemporaryId,
+  extractTemporaryIdReferences,
+  getCreatedTemporaryId,
+  resolveIssueNumber,
+  resolveNumberFromTemporaryId,
+} = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
@@ -154,6 +163,7 @@ const CODE_PUSH_TYPES = new Set(["push_to_pull_request_branch", "create_pull_req
 /** @type {Set<string>} Project-safe-output handlers that should default to GH_AW_PROJECT_GITHUB_TOKEN when no per-handler github-token is configured. */
 const PROJECT_HANDLER_TYPES = new Set(["create_project", "create_project_status_update", "update_project"]);
 const MENTION_HANDLER_TYPES = new Set(["add_comment", "close_discussion", "create_discussion", "create_issue", "create_pull_request", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"]);
+const TEMPORARY_TARGET_FIELDS = new Set(["item_number", "issue_number", "pr_number", "pull_number", "pull_request_number", "pr-number", "parent_issue_number", "sub_issue_number", "discussion_number", "content_number"]);
 /** @type {Record<string, string>} */
 const TARGET_SELECTOR_KINDS = {
   add_comment: "issue_or_pull_request",
@@ -1263,8 +1273,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     }
     // Targets that are still temporary cannot consume an authority decision.
     for (const [key, value] of Object.entries(message)) {
-      if (typeof value !== "string" || !/(?:number|_id)$/.test(key) || key === "temporary_id" || key === "output_id") continue;
-      if (/^#?aw_[A-Za-z0-9_]+$/.test(value) && !temporaryIdMap.has(normalizeTemporaryId(value))) {
+      if (typeof value !== "string" || !TEMPORARY_TARGET_FIELDS.has(key)) continue;
+      const target = key === "discussion_number" ? resolveNumberFromTemporaryId(value, resolvedTemporaryIds) : resolveIssueNumber(value, temporaryIdMap);
+      if (target.wasTemporaryId && !target.resolved) {
         return { deferred: true, reason: "Waiting for temporary target resolution" };
       }
     }
@@ -1319,7 +1330,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       }
     }
     const policy = { configuration: redactSensitiveConfig(descriptor), defaults: redactSensitiveConfig(defaults), requirement };
-    // The executor consumes this deep-frozen snapshot, never live resolution entries.
+    // Bind a frozen snapshot; the handler gets a mutable message copy and snapshot-backed resolutions.
     const boundInputs = freezeInvocationValue(structuredClone(projectInvocationJsonValue({ message: preparedMessage, resolvedTemporaryIds, defaults })));
     const invocation = protocol.prepareInvocation({
       caller,
