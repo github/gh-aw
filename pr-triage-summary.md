@@ -21,5 +21,5 @@
 
 ### Key trends
 
-- No open PRs are currently authored by `app/github-copilot` in `github/gh-aw`.
+- No open PRs are currently authored by `app/github-copilot` in `github/gh-aw` according to the current triage state.
 - No labels, comments, or batch assignments were created because there are no eligible PRs.

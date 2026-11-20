@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-19T18:26:27Z",
-  "run_id": "pr-triage-2026-11-19T18:20:32Z",
+  "generated_at": "2026-11-20T00:35:41Z",
+  "run_id": "pr-triage-2026-11-20T00:35:41Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "eligible_total": 0,
@@ -35,9 +35,9 @@
   "batches": [],
   "skipped_prs": [],
   "notes": [
-    "No open PRs are currently authored by app/github-copilot in github/gh-aw.",
-    "The current repository scan therefore yields zero eligible PRs for triage labeling or comments.",
-    "The 1-hour cooldown check was applied and did not exclude any app/github-copilot PRs because none were eligible."
+    "GitHub PR listing could not be validated via authenticated GitHub API from this environment.",
+    "No eligible app/github-copilot PRs are currently recorded in the repo triage state for github/gh-aw.",
+    "No labels, comments, or batch assignments were created because the eligible set is empty."
   ],
   "review_status": "triaged"
 }
