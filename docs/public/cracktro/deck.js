@@ -17277,13 +17277,7 @@
       return kids;
     };
     const heading = text => [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, text)];
-    const control = role => [
-      "imports:",
-      "  - uses: shared/control.md",
-      "    with:",
-      "      campaign: eu-cra-compliance",
-      `      role: ${role}`,
-    ];
+    const control = role => ["imports:", "  - uses: shared/control.md", "    with:", "      campaign: eu-cra-compliance", `      role: ${role}`];
     // [file, tag, YAML lines, prompt lines, bands: [kind, first line, last line]]
     const FILES = [
       [

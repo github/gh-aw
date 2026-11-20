@@ -21,7 +21,7 @@ func LegacyModelRoutingWarning(frontmatter map[string]any) string {
 	case map[string]any:
 		var migration string
 		if routing["goal"] == "cost-speed" {
-			migration = "The cost-speed objective is also deprecated and has no direct replacement. It still selects for speed; choose a cost level deliberately: model: router, router/economy, router/balanced, or router/robust."
+			migration = "The cost-speed objective is also deprecated and has no direct replacement. It requires an AWF pin older than v0.29.17; choose a cost level deliberately: model: router, router/economy, router/balanced, or router/robust."
 		} else {
 			selector := "router"
 			switch routing["mode"] {

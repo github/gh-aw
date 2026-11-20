@@ -10,7 +10,7 @@ sidebar:
 **Version**: 0.1.0  
 **Status**: Working Draft  
 **Date**: 2026-05-10  
-**Last Updated**: 2026-11-17<br>
+**Last Updated**: 2026-11-20<br>
 **Editors**: GitHub gh-aw Team
 
 ---
@@ -156,6 +156,10 @@ The following fields previously existed in schema but were missed in spec CLI ma
 | `rateLimiting.maxGithubApiPointsRest` | `--max-github-api-points-rest` (requires `security.difcProxy.host`; AWF enforces this dependency at runtime rather than in JSON Schema) | `pkg/workflow/awf_config_test.go` (`TestValidateAWFConfigJSON_GitHubAPIPointBudgets`) |
 | `rateLimiting.maxGithubApiPointsGraphql` | `--max-github-api-points-graphql` (requires `security.difcProxy.host`; AWF enforces this dependency at runtime rather than in JSON Schema) | `pkg/workflow/awf_config_test.go` (`TestValidateAWFConfigJSON_GitHubAPIPointBudgets`) |
 | `experimental.modelRouting` | config-only (required and `true` when `apiProxy.routing` is present) | `pkg/workflow/awf_config_test.go` (`TestValidateAWFConfigJSON_ModelRoutingGate`) |
+
+AWF v0.29.17 restricts `apiProxy.routing.objective.goal` to `cost`. Its backward-compatible reader accepts legacy routing-table bundles, not `cost-speed` requests. gh-aw rejects `cost-speed` for effective AWF versions v0.29.17 and newer while retaining it in the embedded schema for older pinned versions. Existing feature minimums remain unchanged; `AWFCostOnlyModelRoutingMinVersion` gates this retirement.
+
+The v0.29.17 published schema, runtime schema, and release schema asset also add optional `apiProxy.routing.topK` (integer, 1–32). gh-aw does not emit this field; exposing ranked routing options remains follow-up work. The upstream spec additionally documents CLI-only `--home` and the optional Azure Foundry provider port; neither requires a new compiler-emitted config field.
 
 Agents SHOULD treat this class of mismatch as a regression signal and open a corrective PR when detected.
 

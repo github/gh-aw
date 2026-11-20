@@ -298,10 +298,14 @@ func TestCompileLegacyRoutingMigrationWarnings(t *testing.T) {
 		{"cost-speed", "balanced", "no direct replacement"},
 	} {
 		for _, shared := range []bool{false, true} {
+			base := routerValueBase
+			if tc.goal == "cost-speed" {
+				base += "sandbox:\n  agent:\n    version: v0.29.16\n"
+			}
 			setting := "engine:\n  id: copilot\n  model-routing:\n    goal: " + tc.goal + "\n    mode: " + tc.mode + "\n    allowed-models: [gpt-5.6-luna]\n"
-			files := map[string]string{"main.md": routerValueBase + setting + "---\nReport.\n"}
+			files := map[string]string{"main.md": base + setting + "---\nReport.\n"}
 			if shared {
-				files = map[string]string{"main.md": routerValueBase + "imports: [shared/route.md]\n---\nReport.\n", "shared/route.md": "---\n" + setting + "---\n"}
+				files = map[string]string{"main.md": base + "imports: [shared/route.md]\n---\nReport.\n", "shared/route.md": "---\n" + setting + "---\n"}
 			}
 			got := compileDefaultRoutingFiles(t, files)
 			objective, candidates := routedObjective(t, got)
@@ -309,6 +313,9 @@ func TestCompileLegacyRoutingMigrationWarnings(t *testing.T) {
 			require.Equal(t, []any{"github-copilot/gpt-5.6-luna"}, candidates)
 			require.Equal(t, 1, strings.Count(got.stderr, "engine.model-routing is deprecated"))
 			require.Contains(t, got.stderr, tc.want)
+			if tc.goal == "cost-speed" {
+				require.Contains(t, got.stderr, "requires an AWF pin older than v0.29.17")
+			}
 			require.Contains(t, got.stderr, "top-level model-routing.allowed-models")
 			if shared {
 				require.Contains(t, got.stderr, "shared/route.md")
