@@ -7,7 +7,7 @@ A guide slide teaches one usage pattern: the band's canvas, a title block (kicke
 ## Ingredients
 
 1. **Column examples.** Guide slides take `group: "platform"` and `under: "intent"`, hanging in a column below Turn Intent to Automation (`key: "intent"`); kids follow source order. In `slides.md` their rows follow the head's row. A guide slide in another band hangs under that band's matching column head (same `group`).
-2. **Theme.** The slide inherits its band's `THEME`; the `gd-` base rules are dark, and `body.light` rules recolour them for a light band.
+2. **Theme.** The slide inherits its band's `THEME`; guide styles are dark-only for now; add `body.light` overrides if a guide slide moves to a light band.
 3. **Title block (`gd-head`).** `.kicker` naming the tool and the topic (`/agentic-workflows · authoring loop`), an `h2` whose second sentence is an `<em>` answer in blue, then one `p` (30px) explaining the mechanism with inline `code`. The `h2` text is the `slides.md` Heading.
 4. **One board (`gd-board`).** A 1700×600 rounded panel at `left: 110px; top: 340px`, children absolutely positioned in board pixels. Draw wires in one inline `<svg viewBox="0 0 1700 600">` (built via `innerHTML`; `h()` makes HTML only). Shared parts: `gd-lab` (mono uppercase label), `gd-box` (+ `.on`), `gd-wire` (+ `.on`: blue, flowing dash), `gd-ok` (blue `✓`) and `gd-bad` (orange `✗`).
 5. **One looping process.** `tick(t)` drives a timed phase table (`PH` or a fixed cycle), throttled to 110 ms, starting ~1 s after entry; `enter()` resets every element. Show real artefacts where they exist (guide file names, real `gh aw compile` messages, measured counts), typed or revealed one step at a time.
@@ -26,15 +26,13 @@ A guide slide teaches one usage pattern: the band's canvas, a title block (kicke
 
 Neutral canvas and text, one blue accent; orange only for an error or a problem, always with a `✗`/`✓` or text label (never red/green).
 
-| Role | Dark | Light (`body.light` overrides) |
-|---|---|---|
-| Heading / answer `em` | `#f0f6fc` / `#4493f8` | `#1f2328` / `#0969da` |
-| Muted | `#9198a1` | `#424a53`, `#59636e` |
-| Board | `#161b22` | `#ffffff`, shadow `0 30px 90px #1f232826, 0 0 0 1px #1f23281f` |
-| Box / active box | `#0d1117` / blue border, tint | `#f6f8fa` / `#0969da` border, `#ddf4ff` |
-| Error | `#ffa657` | `#bc4c00` |
-
-Code panels (editor, terminal) stay dark in light mode, like a real editor.
+| Role | Dark |
+|---|---|
+| Heading / answer `em` | `#f0f6fc` / `#4493f8` |
+| Muted | `#9198a1` |
+| Board | `#161b22` |
+| Box / active box | `#0d1117` / blue border, tint |
+| Error | `#ffa657` |
 
 ## Motion
 

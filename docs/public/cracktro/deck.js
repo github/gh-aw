@@ -306,7 +306,7 @@
   .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
   .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   @keyframes tp-bob { 50% { transform: translateY(-14px); } }
-  /* guide style (gd-): explainer examples under Turn Intent to Automation (dark; body.light variants kept for light bands); title block top-left, one board that loops a process, a mono caption */
+  /* guide style (gd-): explainer examples under Turn Intent to Automation (dark only; add body.light overrides if a guide slide moves to a light band); title block top-left, one board that loops a process, a mono caption */
   .gd-head { position: absolute; left: 110px; top: 100px; width: 1700px; }
   .gd-head h2 { margin: 18px 0 0; font-size: 72px; line-height: 1.04; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; color: #f0f6fc; }
   .gd-head h2 em { font-style: normal; color: #4493f8; }
@@ -385,23 +385,6 @@
   .active .gdp-bar i { animation: gdp-fill 1.2s cubic-bezier(.3,.9,.3,1) both 1s; }
   @keyframes gdp-fill { from { transform: scaleX(0); } }
   .gdp-bl { position: absolute; top: 498px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
-  /* light guide rows */
-  body.light .gd-head h2 { color: #1f2328; } body.light .gd-head h2 em { color: #0969da; }
-  body.light .gd-head p, body.light .gd-cap, body.light .gd-lab { color: #424a53; }
-  body.light .gd-head p code, body.light .gd-board code { color: #1f2328; }
-  body.light .gd-board { background: #ffffff; color: #1f2328; box-shadow: 0 30px 90px #1f232826, 0 0 0 1px #1f23281f; }
-  body.light .gd-box, body.light .gdr-ask { background: #f6f8fa; border-color: #d0d7de; }
-  body.light .gd-box.on { border-color: #0969da; background: #ddf4ff; }
-  body.light .gd-wire { stroke: #d0d7de; } body.light .gd-wire.on { stroke: #0969da; } body.light .gdl-dot { fill: #0969da; }
-  body.light .gd-ok, body.light .gdl-mid.ok b, body.light .gdr-hub b, body.light .gdr-steps .on, body.light .gdp-kpi b { color: #0969da; }
-  body.light .gd-bad { color: #bc4c00; }
-  body.light .gdr-ask i, body.light .gdr-steps .on b, body.light .gdp-step.on > b, body.light .gdp-bar i { background: #0969da; border-color: #0969da; color: #ffffff; }
-  body.light :is(.gdr-hub span, .gdr-steps div, .gdr-route code, .gdl-node span, .gdl-mid span, .gdp-step span, .gdp-kpi span, .gdp-bl) { color: #59636e !important; }
-  body.light .gdr-steps .on, body.light .gdr-route.on code { color: #0969da !important; }
-  body.light .gdl-mid b { color: #1f2328; }
-  body.light .gdp-chip svg { fill: #59636e; } body.light .gdp-chip.on svg { fill: #0969da; }
-  body.light .gdp-step > b { border-color: #59636e; color: #59636e; }
-  body.light .gdp-bar { background: repeating-linear-gradient(135deg, #d0d7de 0 10px, #eaeef2 10px 20px); }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
   .fm-cap b { font-weight: 700; font-stretch: 100%; }
