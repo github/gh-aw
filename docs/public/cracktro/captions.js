@@ -44,6 +44,24 @@ window.CracktroCaptions = {
       "Then what? Does that Markdown just run as is, straight off the page?",
       "Not quite. gh aw compile deterministically turns it into a hardened Actions lock file, and that is what runs.",
     ],
+    "agentic-workflows-router": [
+      "Next up: one slash command, many jobs. Ask the agentic workflows agent once and it picks the guide.",
+      "Right, it works like a router. It reads your plain request and chooses create, update, debug, optimize or upgrade.",
+      "So I do not need to know which guide to open?",
+      "No. It loads that focused guide and follows it, so the right instructions arrive for the right job.",
+    ],
+    "authoring-loop": [
+      "Now a look inside the authoring loop, where the compiler keeps the agent honest.",
+      "The agent writes the workflow Markdown, then gh aw compile checks it and rejects any mistakes.",
+      "And the errors actually help? Not just a wall of red text?",
+      "They are precise: did-you-mean hints and strict-mode permission fixes. The agent applies them until it compiles to a lock file.",
+    ],
+    "persona-optimization": [
+      "Our next story: personas put the guide to the test every single day.",
+      "An explorer agent role-plays many kinds of users and scores each answer on five dimensions.",
+      "What happens when an answer falls short?",
+      "It checks what fits in the first eight thousand bytes, files the gaps, and an agent fixes the guidance.",
+    ],
     "turn-automation-into-value": [
       "The money question tonight: are these agentic workflows actually worth it for a team?",
       "The answer comes from tracking outcomes, things like backlog burndown, quality and delivery speed.",

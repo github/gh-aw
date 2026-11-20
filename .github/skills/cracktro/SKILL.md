@@ -22,7 +22,6 @@ Published at `https://github.github.com/gh-aw/cracktro/`: a dependency-free deck
 - `docs/public/cracktro/index.html`: loads `ops-visuals.js`, `runtime.js`, `deck.js` (classic scripts; `file://` works); holds SEO/Open Graph/Twitter meta (absolute published-deck URLs).
 - `docs/public/cracktro/og-image.png`: 1200x630 title-slide social card, UI hidden; keep it outside `assets/` (avatars only).
 - `docs/public/cracktro/runtime.js`: talk-agnostic `window.CracktroDeck` runtime (stage, chrome, band headers, navigation, search, map, background). Keep talk content out.
-- `docs/public/cracktro/captions.js`: kiosk CC per Id.
 - `docs/public/cracktro/deck.js`: about 950 KB: deck CSS, slides, prompts, themes, bands, synth. **Never read it whole.** `grep -n` `// ---------- <section> ----------` and `// <Slide title>` markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg` and `mona-full.png` (full-body Mona): the only assets a test allows. Diagrams are inline SVG in `deck.js`.
 - `.github/skills/cracktro/slides.md`: ordered slides: Heading, Notes (`illustrative` or empty), Summary, Keywords; band headers included.
@@ -39,6 +38,7 @@ Optional tail: `## More files` (fonts, tests, parser, README), `## Layout` (`dec
 | `data-refresh.md` | Adding, changing or refreshing a data slide; refresh mini-skills and the slide→`refresh/<slug>.md` index. |
 | `brand.md` | Any colour, gradient, glow, title or font change; brand/Primer palette, semantic hues, regularization pass. |
 | `concept-style.md` | Adding or restyling a concept slide like The factory mindset or Trust the process (light header-less row, problem/answer statements, one live metaphor, horizontal split motion). |
+| `guide-style.md` | Adding or restyling a guide slide like the `/agentic-workflows` router, authoring loop or persona optimization (column under Turn Intent to Automation, title block, one looping board, blue accent). |
 | `asset-generator.md` | Setting up or using the `asset-generator` MCP (og/social cards, wallpapers, charts, `create_slide_deck`); where outputs may live. |
 | `perf.md` | Changing `runtime.js` rendering or adding slide animations, timers, `tick` work or runtime DOM; run the performance guard before and after. |
 
@@ -87,6 +87,7 @@ A PR that adds or changes a slide must show it: upload a 16:9 `.stage` capture (
 ## More files
 
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
+- `docs/public/cracktro/captions.js`: kiosk closed captions (C): per-Id two-speaker lines retelling each Summary; keep Ids and order in step with `slides.md`.
 - `docs/tests/talk.spec.ts`: Playwright tests of the deck, runtime, parser and built JSON-LD against `slides.md`.
 - `docs/src/lib/cracktro/`: `slides.js` parses `slides.md` and renders JSON-LD; `integration.js` (Astro) applies it.
 - `docs/README.md` "Interactive talk": user-facing description (keys, public-content rules).
