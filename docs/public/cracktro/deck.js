@@ -1644,7 +1644,9 @@
   .ek-pill.y rect { stroke: #6e7681; fill: #ffffff0d; } .ek-pill.y text { fill: #d1d7e0; }
   .ek-task { fill: #161b22; stroke: #8b949e; stroke-width: 1.5; stroke-dasharray: 6 5; }
   .ek-wall { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
-  .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e55); } }
+  .ek-glow { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; pointer-events: none; opacity: 0; }
+  .ek-glow rect { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; filter: drop-shadow(0 0 18px #f0883e55); }
+  .active .ek-glow { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { opacity: 1; } }
   .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
   .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x, .ek-ft { opacity: 0; transition: opacity .4s, transform .4s; }
   .ek-shield circle { fill: #0d1117; stroke: #4493f8; stroke-width: 2; }
@@ -15415,6 +15417,12 @@
       b += `<text class="big" x="1496" y="66">ENCLAVE · FOOTPRINT</text><text x="1496" y="110">PLAN · SINGLE USE</text><text x="1716" y="110">DWG EK-01</text>`;
       bp.innerHTML = b;
     }
+    // the wall's pulsing glow, blurred once in its own layer and faded by opacity so it never repaints the diagram
+    const glow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    glow.setAttribute("class", "ek-glow");
+    glow.setAttribute("viewBox", "0 0 1800 600");
+    glow.setAttribute("aria-hidden", "true");
+    glow.innerHTML = `<rect x="880" y="40" width="420" height="510" rx="24"/>`;
     // [time, path, stage label, sound]
     const STEPS = [
       [400, "ekP1", "Waiting for task", () => sfx.pop(0)],
@@ -15483,7 +15491,14 @@
         dot.setAttribute("class", "ek-dot " + (s[1] === "ekP4" ? "r" : s[1] === "ekP3" ? "o" : ""));
         dot.style.opacity = 1;
       },
-      el: h("section", { class: "slide ek" }, bp, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide ek" },
+        bp,
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))),
+        glow,
+        svg
+      ),
     });
   }
 
