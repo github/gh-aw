@@ -44,6 +44,7 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | Multi-device tester | `refresh/multi-device-tester.md` |
 | Findings that land | `refresh/findings-that-land.md` |
 | Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
+| Personas test the guide. Agent fixes it. | `refresh/personas-probe-patch.md` (step 5.6) |
 | Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
 | CLI vs MCP | `refresh/cli-vs-mcp.md` |
 | Skills in review | `refresh/skills-in-review.md` |
