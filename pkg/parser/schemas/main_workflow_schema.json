@@ -16994,7 +16994,7 @@
     },
     "http_mcp_auth": {
       "type": "object",
-      "description": "Upstream authentication configuration for the HTTP MCP server. When configured, the gateway dynamically acquires tokens and injects them as Authorization headers on every outgoing request to this server. Currently only GitHub Actions OIDC is supported.",
+      "description": "Upstream HTTP MCP authentication. The gateway acquires GitHub OIDC tokens directly or exchanges them for Microsoft Entra tokens. Azure federation requires a custom gateway build until released.",
       "properties": {
         "type": {
           "type": "string",
@@ -17003,11 +17003,50 @@
         },
         "audience": {
           "type": "string",
-          "description": "The intended audience for the OIDC token (the 'aud' claim). If omitted, defaults to the server's url field.",
-          "format": "uri"
+          "description": "GitHub assertion audience. Defaults to the server URL for direct OIDC or api://AzureADTokenExchange for Azure. Accepts an Actions expression.",
+          "anyOf": [{ "format": "uri" }, { "pattern": "^\\$\\{\\{[\\s\\S]+\\}\\}$" }]
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["azure"],
+          "description": "Exchange the GitHub assertion for a Microsoft Entra token. Omit for direct GitHub OIDC."
+        },
+        "azure-tenant-id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Entra tenant ID. Required for provider: azure. Accepts Actions expressions."
+        },
+        "azure-client-id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Federated Entra application client ID. Required for provider: azure. Accepts Actions expressions."
+        },
+        "azure-scope": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Entra token scope. Defaults to https://cognitiveservices.azure.com/.default; Azure AI Gateway requires its own scope."
+        },
+        "azure-cloud": {
+          "type": "string",
+          "enum": ["public", "usgovernment", "china"],
+          "description": "Azure authority cloud. Defaults to public."
         }
       },
       "required": ["type"],
+      "allOf": [
+        {
+          "if": { "required": ["provider"], "properties": { "provider": { "const": "azure" } } },
+          "then": { "required": ["azure-tenant-id", "azure-client-id"] },
+          "else": {
+            "not": {
+              "anyOf": [{ "required": ["azure-tenant-id"] }, { "required": ["azure-client-id"] }, { "required": ["azure-scope"] }, { "required": ["azure-cloud"] }]
+            }
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "github_token": {

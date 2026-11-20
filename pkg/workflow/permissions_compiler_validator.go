@@ -184,6 +184,9 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 	if err := validateHTTPMCPOIDCAwfVersion(workflowData); err != nil {
 		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := validateHTTPMCPAzureOIDCGateway(workflowData); err != nil {
+		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	if err := validateCodexCopilotAwfVersion(workflowData); err != nil {
 		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}

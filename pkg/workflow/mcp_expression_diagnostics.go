@@ -19,7 +19,7 @@ func mcpConfigExpressionDiagnostics(toolName string, config map[string]any) ([]s
 
 func mcpConfigExpressionDiagnosticsAtPath(configPath string, config map[string]any) ([]string, error) {
 	var warnings []string
-	for _, field := range []string{"url", "args", "entrypointArgs", "mounts", "headers", "env", "container", "version", "entrypoint", "command", "registry", "proxy-args", "ca-cert-file", "allowed"} {
+	for _, field := range []string{"url", "args", "entrypointArgs", "mounts", "headers", "env", "auth", "container", "version", "entrypoint", "command", "registry", "proxy-args", "ca-cert-file", "allowed"} {
 		preserveLegacy := field == "headers" || field == "env"
 		err := inspectMCPStringValues(configPath+"."+field, config[field], func(path, value string) error {
 			var rendered string

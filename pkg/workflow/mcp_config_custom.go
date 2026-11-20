@@ -396,11 +396,27 @@ func renderMCPAuthProperty(yaml *strings.Builder, isLast bool, mcpConfig *parser
 		return
 	}
 	fmt.Fprintf(yaml, "%s\"auth\": {\n", renderer.IndentLevel)
-	if mcpConfig.Auth.Audience != "" {
-		fmt.Fprintf(yaml, "%s  \"type\": \"%s\",\n", renderer.IndentLevel, mcpConfig.Auth.Type)
-		fmt.Fprintf(yaml, "%s  \"audience\": \"%s\"\n", renderer.IndentLevel, mcpConfig.Auth.Audience)
-	} else {
-		fmt.Fprintf(yaml, "%s  \"type\": \"%s\"\n", renderer.IndentLevel, mcpConfig.Auth.Type)
+	auth := mcpConfig.Auth
+	fields := []struct{ key, value string }{
+		{"type", auth.Type},
+		{"provider", auth.Provider},
+		{"audience", auth.Audience},
+		{"azureTenantId", auth.AzureTenantID},
+		{"azureClientId", auth.AzureClientID},
+		{"azureScope", auth.AzureScope},
+		{"azureCloud", auth.AzureCloud},
+	}
+	var properties []struct{ key, value string }
+	for _, field := range fields {
+		if field.value != "" {
+			properties = append(properties, field)
+		}
+	}
+	authRenderer := renderer
+	authRenderer.IndentLevel += "  "
+	for i, field := range properties {
+		value, _ := replaceMCPExpressions(field.value, false)
+		renderMCPJSONScalar(yaml, authRenderer, field.key, value, i == len(properties)-1)
 	}
 	fmt.Fprintf(yaml, "%s}%s\n", renderer.IndentLevel, renderMCPComma(isLast))
 }
@@ -545,19 +561,14 @@ func extractMCPHTTPFields(config MapToolConfig, toolName string, result *parser.
 		result.Headers = headers
 	}
 	if authVal, hasAuth := config.GetAny("auth"); hasAuth {
-		if authMap, ok := authVal.(map[string]any); ok {
-			authConfig := &types.MCPAuthConfig{}
-			if authType, ok := authMap["type"].(string); ok {
-				authConfig.Type = authType
-			}
-			if audience, ok := authMap["audience"].(string); ok {
-				authConfig.Audience = audience
-			}
-			if authConfig.Type != "" {
-				result.Auth = authConfig
-			}
-		} else if authCfg, ok := authVal.(*types.MCPAuthConfig); ok {
+		if authCfg, ok := authVal.(*types.MCPAuthConfig); ok {
 			result.Auth = authCfg
+		} else {
+			auth, err := parser.ParseMCPAuthConfig(authVal, toolName)
+			if err != nil {
+				return err
+			}
+			result.Auth = auth
 		}
 	}
 	return nil
