@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,15 +83,42 @@ func TestNewForecastCommand_DaysFlagDocumentsAllowedValues(t *testing.T) {
 	assert.NotContains(t, cmd.Long, "interval.  Use this", "Long description should not contain duplicate spacing")
 }
 
-func TestNewForecastCommand_TimeoutFlag(t *testing.T) {
+func TestIntegerMinuteTimeoutFlagsExplainUnits(t *testing.T) {
 	t.Parallel()
-	cmd := NewForecastCommand()
-	require.NotNil(t, cmd)
 
-	timeoutFlag := cmd.Flags().Lookup("timeout")
-	require.NotNil(t, timeoutFlag, "forecast command should register --timeout")
-	assert.Equal(t, "Gracefully stop forecast computation after this many minutes (0 = no timeout)", timeoutFlag.Usage)
-	assert.Equal(t, "0", timeoutFlag.DefValue)
+	tests := []struct {
+		name string
+		cmd  *cobra.Command
+		want string
+	}{
+		{
+			name: "logs",
+			cmd:  NewLogsCommand(),
+			want: "Total download timeout in integer minutes across all targets (use a plain number such as 10; 0 = no timeout)",
+		},
+		{
+			name: "forecast",
+			cmd:  NewForecastCommand(),
+			want: "Gracefully stop forecast computation after this many integer minutes (use a plain number such as 10; 0 = no timeout)",
+		},
+		{
+			name: "trial",
+			cmd:  NewTrialCommand(func(string) error { return nil }),
+			want: "Execution timeout in integer minutes (use a plain number such as 10; 0 = no timeout)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			timeoutFlag := tt.cmd.Flags().Lookup("timeout")
+			require.NotNil(t, timeoutFlag, "%s command should register --timeout", tt.name)
+			assert.Equal(t, tt.want, timeoutFlag.Usage)
+			assert.Equal(t, "int", timeoutFlag.Value.Type())
+			if tt.name == "forecast" {
+				assert.Equal(t, "0", timeoutFlag.DefValue)
+			}
+		})
+	}
 }
 
 // ── Duration enrichment ───────────────────────────────────────────────────────
