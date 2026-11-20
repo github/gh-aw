@@ -452,7 +452,13 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 			fmt.Sprintf("Use AWF and an apiProxy image with routing.candidateModels support (%s or newer).", constants.AWFRoutingCandidateModelsMinVersion))
 	}
 	if routing.Goal != "cost" && routing.Goal != "cost-speed" {
-		return NewValidationError("engine.model-routing.goal", routing.Goal, "unsupported model-routing goal", "Use cost or cost-speed.")
+		return NewValidationError("engine.model-routing.goal", routing.Goal, "unsupported model-routing goal",
+			fmt.Sprintf("Use cost. The deprecated cost-speed goal requires an AWF pin older than %s.", constants.AWFCostOnlyModelRoutingMinVersion))
+	}
+	if routing.Goal == "cost-speed" && awfVersionAtLeast(getFirewallConfig(workflowData), constants.AWFCostOnlyModelRoutingMinVersion) {
+		return NewValidationError("engine.model-routing.goal", routing.Goal,
+			fmt.Sprintf("AWF %s and newer support only cost routing", constants.AWFCostOnlyModelRoutingMinVersion),
+			"Set engine.model-routing.goal to cost and choose economy, balanced, robust, or auto for engine.model-routing.mode. The retired cost-speed goal is not an alias for cost.")
 	}
 	if routing.Mode != "economy" && routing.Mode != "balanced" && routing.Mode != "robust" && routing.Mode != "auto" {
 		return NewValidationError("engine.model-routing.mode", routing.Mode, "unsupported model-routing mode", "Use economy, balanced, robust, or auto.")

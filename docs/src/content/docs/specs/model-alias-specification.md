@@ -619,6 +619,8 @@ A literal router value MAY be combined with a single top-level `model-routing.al
 
 Top-level `model-routing: false` in a workflow or shared import MUST disable implicit routing without selecting a model or changing model override precedence. It MUST NOT be combined with a literal router selector or a shortlist. `true` is not a selector. Compilers SHOULD warn on authored `engine.model-routing` declarations, including imports. For `goal: cost-speed` they MUST NOT substitute a cost objective or advertise an equivalent router selector.
 
+AWF v0.29.17 and newer reject `cost-speed`. Compilers MUST diagnose this goal for those effective AWF versions while preserving support for older AWF pins.
+
 A main-agent model that is a single expression, reading only contexts the activation job resolves as later jobs do, on a workflow eligible for routing MAY resolve to a router value at run time. The activation job MUST resolve it once, route the run at that level, and give later jobs the resolved value; any other reserved identifier MUST stop the run before the agent starts. A variable, or an expression on an ineligible workflow, that resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ---

@@ -15760,7 +15760,7 @@
               "description": "Ordered alternative models after model-specific failures, supported by engines with a built-in retry harness. Each model receives its own harness retry budget. Cannot be combined with model-routing or a custom driver or harness."
             },
             "model-routing": {
-              "description": "Deprecated. Use a router model value for cost routing, or top-level model-routing: false to opt out. The cost-speed objective still works during migration but has no equivalent cost selector. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "description": "Deprecated. Use a router model value for cost routing, or top-level model-routing: false to opt out. The cost-speed objective requires an AWF pin older than v0.29.17 and has no equivalent cost selector. See https://github.github.com/gh-aw/reference/model-routing/.",
               "oneOf": [
                 {
                   "type": "object",
@@ -15770,7 +15770,7 @@
                     "goal": {
                       "type": "string",
                       "enum": ["cost", "cost-speed"],
-                      "description": "Routing objective: cost prefers the cheapest model and effort that meet the mode's target; cost-speed prefers the fastest model and effort that meet it."
+                      "description": "Routing objective: cost prefers the cheapest model and effort that meet the mode's target; cost-speed prefers the fastest model and effort that meet it, but requires an AWF pin older than v0.29.17."
                     },
                     "mode": {
                       "type": "string",
