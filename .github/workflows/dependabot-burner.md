@@ -513,7 +513,13 @@ downstream safe outputs determine success.
    config, not generated declarations. Named `requirements-*.txt` are not
    compiler-generated: use companion `.in` files if present; otherwise update the
    standalone lock from its patch and header's wheel/platform constraints.
-   Never invent manifests. Edit other source manifests/Dockerfiles and locks directly.
+   For `.github/workflows/requirements.txt`, trace each changed package to its
+   `pip install`, `pip3 install`, `uv pip install`, or `uvx` declaration in workflow
+   markdown, including imported shared files. Update the source declaration, never
+   the generated requirements file; if no matching source declaration is found,
+   block that PR rather than inventing a pin or editing generated output. Then
+   regenerate the manifest with `make dependabot` and inspect its diff. Never
+   invent manifests. Edit other source manifests/Dockerfiles and locks directly.
 4. Apply compatible updates once, including lockfile-only security updates.
    Preserve hashes, digests, Python wheel/platform constraints, integrity checks
    and pins; never fabricate hashes.
@@ -534,7 +540,9 @@ Validate touched ecosystems only:
 
 - Workflow sources: run `make dependabot && make build` only for edits to
   `.github/workflows/*.md` or shared workflow configuration, never for Go, docs npm,
-  action npm, or `requirements-*.txt` alone. Refresh generated npm locks if needed.
+  action npm, or `requirements-*.txt` alone. `make dependabot` recompiles workflow
+  dependency manifests, including `.github/workflows/requirements.txt`; refresh
+  generated npm locks if needed.
 - Docs npm: `npm --prefix docs install --package-lock-only --ignore-scripts`, then
   `npm --prefix docs ci --ignore-scripts --legacy-peer-deps`.
   Do not build docs (needs WASM/GitHub API); replacement-PR CI does that.
