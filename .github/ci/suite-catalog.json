@@ -10,7 +10,7 @@
     },
     {
       "id": "test",
-      "description": "Full Go unit tests with coverage across six test-name shards, including package CLI/workflow tests, fixtures, and their runtime inputs. Requires verify-integration-build.",
+      "description": "Full Go unit tests with coverage across 12 test-name shards, including package CLI/workflow tests, fixtures, and their runtime inputs. Requires verify-integration-build.",
       "historical_duration_seconds": null,
       "mandatory": false
     },
