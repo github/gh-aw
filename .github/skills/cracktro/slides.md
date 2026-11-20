@@ -425,18 +425,19 @@ illustrative
 
 #### Summary
 
-Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs.
+Front matter declares each allowed write under safe-outputs, with options such as max, labels, title-prefix and target; the agent only proposes, threat detection reviews each proposal, and a separate scoped job applies only those declared outputs.
 
 #### Keywords
 
-writes, threat detection, safe-outputs, scoped jobs, permissions, proposals
+writes, threat detection, safe-outputs, scoped jobs, permissions, proposals, YAML, front matter, create-issue, add-comment, max, title-prefix, labels, target, triggering, close-older-issues, hide-older-comments, limits
 
 #### Captions
 
 - Tonight we explain safe outputs, the system that decides what an agent is allowed to change.
+- It starts in the front matter: each allowed write is a typed entry, with limits like max, labels and target.
 - Agents only propose writes. Threat detection then reviews each proposal before anything happens.
 - So who actually presses the button once a proposal is cleared?
-- A separate, scoped job applies only the outputs that were declared. The agent itself never writes.
+- A separate, scoped job applies only the declared outputs, adding the configured prefix and labels. The agent itself never writes.
 
 ### Model-checked {#model-checked}
 
