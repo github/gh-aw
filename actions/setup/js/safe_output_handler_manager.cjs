@@ -1268,6 +1268,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     }
     const policy = { configuration: redactSensitiveConfig(descriptor), defaults: redactSensitiveConfig(defaults), requirement };
     // The executor consumes this deep-frozen snapshot, never live resolution entries.
+    // eslint-disable-next-line gh-aw-custom/prefer-structured-clone -- The bound snapshot must match the JSON semantics accepted by canonicalDigest.
     const boundInputs = freezeInvocationValue(JSON.parse(JSON.stringify({ message: preparedMessage, resolvedTemporaryIds, defaults })));
     const invocation = protocol.prepareInvocation({
       caller,
