@@ -6284,7 +6284,7 @@
     ],
   };
 
-  // Workflows → Process → Factory: zoom out from one workflow (GitHub → agent → GitHub) to a process (workflows in sequence) to a factory (processes feeding each other)
+  // Workflows → Process → Factory: zoom out from one workflow (issue → agent → PR) to a process (workflows in sequence) to a factory (processes feeding each other)
   {
     resetIndex();
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
@@ -6312,14 +6312,14 @@
       [0, 0, 2000, 660],
     ];
     const STEPS = [
-      ["Workflow", "A workflow goes from GitHub, to an agent, back to GitHub."],
+      ["Workflow", "A workflow goes from an issue, to an agent, to a pull request."],
       ["Process", "A process sequences workflows: each output triggers the next."],
       ["Factory", "A factory runs processes on any harness, with developers at the gates."],
     ];
     const LBL = [
-      [0, "GitHub", "issue opened"],
+      [0, "Issue", "the trigger"],
       [1, "Agent", "any harness, in Actions"],
-      [2, "GitHub", "safe output: PR"],
+      [2, "PR", "safe output"],
     ];
     // elbow route between two nodes, as polyline points
     const route = ([, x1, y1], [, x2, y2]) => {
@@ -6428,7 +6428,7 @@
       id: "workflows-process-factory",
       key: "factory",
       notes:
-        "What: An illustrative zoom-out in three steps. A workflow is one hop: a GitHub event starts an agent, and the agent writes back to GitHub through safe outputs. Sequence workflows so each output triggers the next and you have a process. Run many processes that feed each other, each step on whichever harness fits it, with developers triaging, steering, reviewing and approving at the gates, and you have a factory.\nWhy: Every factory is made of processes, and every process is made of small, guarded workflows, so you build and improve the factory one workflow at a time while people keep the decisions.\nWhen: Start with one workflow, then wire its output into the next. Press the right arrow to zoom out a level; press down for a factory at work.",
+        "What: An illustrative zoom-out in three steps. A workflow is one hop: an issue starts an agent, and the agent opens a pull request through safe outputs. Sequence workflows so each output triggers the next and you have a process. Run many processes that feed each other, each step on whichever harness fits it, with developers triaging, steering, reviewing and approving at the gates, and you have a factory.\nWhy: Every factory is made of processes, and every process is made of small, guarded workflows, so you build and improve the factory one workflow at a time while people keep the decisions.\nWhen: Start with one workflow, then wire its output into the next. Press the right arrow to zoom out a level; press down for a factory at work.",
       enter(dir) {
         setStep(dir < 0 ? 2 : 0, true);
       },
