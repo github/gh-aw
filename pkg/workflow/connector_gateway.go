@@ -180,7 +180,7 @@ func normalizeConnectorGatewayOn(frontmatter map[string]any, registrations map[s
 func connectorWebhookSubscriptions(configs map[string]*WorkflowConnector, workflowID string) ([]WebhookSubscription, error) {
 	var subscriptions []WebhookSubscription
 	for _, alias := range sliceutil.SortedKeys(configs) {
-		if len(configs[alias].Plan.TriggerNames()) == 0 {
+		if configs[alias].Plan == nil || len(configs[alias].Plan.TriggerNames()) == 0 {
 			continue
 		}
 		triggerPlan, err := configs[alias].Plan.ForPhase("trigger")

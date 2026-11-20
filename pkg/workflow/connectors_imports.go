@@ -94,6 +94,9 @@ func importedConnectorRegistrations(frontmatter map[string]any, imports []parser
 			return nil, err
 		}
 	}
+	if err := consumeConnectorInferenceSelection(frontmatter, registrations); err != nil {
+		return nil, err
+	}
 	if err := connectorGatewaySelections(frontmatter, registrations); err != nil {
 		return nil, err
 	}

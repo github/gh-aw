@@ -11,6 +11,73 @@ the portal URL itself is not an inference endpoint.
 
 ## Connect a model
 
+### Import the inference connector
+
+Import
+[the Azure AI Gateway declaration](https://github.com/github/gh-aw/blob/main/.github/workflows/connectors/azure-ai-gateway.md)
+and explicitly select its inference profile:
+
+```aw wrap
+engine:
+  id: copilot
+  model: gpt-5.2
+  inference:
+    connector: azure-ai-gateway
+    profile: responses
+    model: deployment-checklist
+permissions:
+  contents: read
+  id-token: write
+imports:
+  - uses: ".github/workflows/connectors/azure-ai-gateway.md"
+    with:
+      gateway-host: example.ai.gateway.azure.com
+      models: [deployment-checklist]
+network:
+  allowed: [defaults, example.ai.gateway.azure.com]
+```
+
+Replace the hostname, model metadata and wire alias with the reviewed Catalog
+deployment. Keep the declaration at the imported local path, or use a reviewed
+commit-pinned remote import. Importing alone does not configure inference or
+approve network access. The connector currently supports Copilot, not the
+other engines.
+
+The `responses` and `completions` profiles use Entra federation. Set
+`AZURE_TENANT_ID` and `AZURE_CLIENT_ID` Actions variables, configure the
+application's GitHub federated credential, and grant asset-specific runtime
+access to the selected model. The connector sets the explicit gateway scope
+`https://ai.gateway.azure.com/.default`; existing engine OIDC safeguards apply.
+The tenant and client can instead be supplied with the `azure-tenant-id` and
+`azure-client-id` import bindings.
+
+For a gateway key, select `responses-key` or `completions-key` and store it as
+`AZURE_AI_GATEWAY_KEY` (or bind `key-secret` to another secret **name**). Remove
+`id-token: write` when no selected feature needs it. Only the selected profile's
+credential is used; there is no credential fallback.
+
+Use the protocol the deployed alias supports. `engine.model` supplies Copilot
+model metadata; `engine.inference.model` is the exact approved wire alias.
+Native provider/auth/env overrides, routing and fallbacks cannot be combined
+with connector inference. MCP configuration is separate.
+
+Run `gh aw connector azure-ai-gateway setup --phase inference` for offline
+provisioning guidance, then compile a consumer with `gh aw compile --strict
+--no-emit`. See the
+[source-only checklist example](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-ai-gateway-golden.md).
+These checks do not contact Azure or establish live compatibility. Executing
+even a staged consumer sends prompts/context to the gateway and incurs model
+charges.
+
+The [connector specification](/gh-aw/specs/connector-specification/#54-inference-provider-configuration)
+defines profile selection, model grants and rejected overrides. Its
+[bounded inference model](/gh-aw/specs/connector-specification/#inference-binding-model)
+checks symbolic selection, phase separation and terminal authentication denial,
+including a witness that staged writes do not disable inference. It does not
+verify Entra cryptography, runtime protocol compatibility or model quality.
+
+### Configure BYOK directly
+
 For Copilot BYOK, use the model's OpenAI-compatible SDK base URL and a gateway
 key stored as a GitHub Actions secret:
 

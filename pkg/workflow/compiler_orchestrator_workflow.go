@@ -125,6 +125,9 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err := c.validateResolvedEngineEnvSecrets(ctx); err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}
+	if err := validateResolvedConnectorInference(ctx.workflowData, connectorConfigs, engineSetup.importsResult.MergedEnvSources); err != nil {
+		return c.formatEngineSetupError(ctx, err)
+	}
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
 	ctx.workflowData.Connectors = connectorConfigs
 	ctx.workflowData.engineDefinition = c.engineCatalog.Get(engineSetup.engineSetting)

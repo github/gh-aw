@@ -18,6 +18,7 @@ type ConnectorDeclaration struct {
 	Endpoints    map[string]string               `json:"endpoints"`
 	Credentials  map[string]ConnectorCredential  `json:"credentials"`
 	Resources    map[string][]string             `json:"resources,omitempty"`
+	Inference    map[string]connectors.Inference `json:"inference,omitempty"`
 	Triggers     map[string]connectors.Trigger   `json:"triggers,omitempty"`
 	Tools        map[string]connectors.ReadTool  `json:"tools,omitempty"`
 	MCPServers   map[string]connectors.HTTPMCP   `json:"mcp-servers,omitempty"`
@@ -30,6 +31,7 @@ type ConnectorCredential struct {
 	GitHubApp  *ConnectorGitHubApp  `json:"github-app,omitempty"`
 	GitHubOIDC *ConnectorGitHubOIDC `json:"github-oidc,omitempty"`
 	Token      *ConnectorToken      `json:"token,omitempty"`
+	AzureOIDC  *ConnectorAzureOIDC  `json:"azure-oidc,omitempty"`
 }
 
 func normalizeConnectorDeclaration(alias string, value any) (map[string]any, bool, error) {
@@ -69,23 +71,25 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 		Endpoints: declaration.Endpoints, Credentials: map[string]connectors.Credential{},
 		Triggers: declaration.Triggers, MCP: declaration.Tools, HTTPMCP: declaration.MCPServers,
 		SafeOutputs: declaration.SafeOutputs,
+		Inference:   declaration.Inference,
 	}
 	credentials := map[string]connectors.SecretRef{}
 	apps := map[string]*ConnectorGitHubApp{}
 	oidc := map[string]*ConnectorGitHubOIDC{}
+	azure := map[string]*ConnectorAzureOIDC{}
 	for name, credential := range declaration.Credentials {
 		spec.Credentials[name] = credential.Credential
 		if strings.HasPrefix(credential.Secret, connectorAppSecretPrefix) {
 			return nil, fmt.Errorf("connector secret names beginning with %s are reserved", connectorAppSecretPrefix)
 		}
 		sources := 0
-		for _, configured := range []bool{credential.Secret != "", credential.Token != nil, credential.GitHubApp != nil, credential.GitHubOIDC != nil} {
+		for _, configured := range []bool{credential.Secret != "", credential.Token != nil, credential.GitHubApp != nil, credential.GitHubOIDC != nil, credential.AzureOIDC != nil} {
 			if configured {
 				sources++
 			}
 		}
 		if sources > 1 {
-			return nil, fmt.Errorf("connector credential %q requires exactly one token, github-app, github-oidc or legacy secret route", name)
+			return nil, fmt.Errorf("connector credential %q requires exactly one token, github-app, github-oidc, azure-oidc or legacy secret route", name)
 		}
 		if credential.Token != nil {
 			credential.Secret = credential.Token.Secret
@@ -101,12 +105,19 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 			oidc[name] = credential.GitHubOIDC
 			credential.Secret = connectorAppSecret(alias, name)
 		}
+		if credential.AzureOIDC != nil {
+			azure[name] = credential.AzureOIDC
+			credential.Secret = connectorAppSecret(alias, name)
+		}
+		if credential.Phase == "inference" && (sources != 1 || credential.GitHubApp != nil || credential.GitHubOIDC != nil) {
+			return nil, fmt.Errorf("connector inference credential %q requires a token or azure-oidc route", name)
+		}
 		if credential.Secret != "" {
 			credentials[name] = connectors.SecretRef{Secret: credential.Secret}
 		}
 	}
 	resources := nonemptyConnectorResources(declaration.Resources)
-	fields := map[string]any{"experimental": declaration.Experimental, "spec": spec, "credentials": credentials, "resources": resources, "github-apps": apps, "oidc-tokens": oidc}
+	fields := map[string]any{"experimental": declaration.Experimental, "spec": spec, "credentials": credentials, "resources": resources, "github-apps": apps, "oidc-tokens": oidc, "azure-oidc": azure}
 	if declaration.Docs != nil {
 		fields["docs"] = declaration.Docs
 	}

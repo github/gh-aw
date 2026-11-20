@@ -3451,6 +3451,17 @@ engine:
   env:
     {}
 
+  # Explicit workflow inference selection. Model is an exact granted wire alias,
+  # separate from engine.model metadata. Initially supports Copilot
+  # OpenAI-compatible BYOK only.
+  # (optional)
+  inference:
+    connector: "example-value"
+
+    profile: "example-value"
+
+    model: "example-value"
+
   # Engine-level authentication configuration for AWF API proxy sidecar integration
   # (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_*
   # environment variables.
@@ -22468,6 +22479,17 @@ safe-outputs:
       # (optional)
       env:
         {}
+
+      # Explicit workflow inference selection. Model is an exact granted wire alias,
+      # separate from engine.model metadata. Initially supports Copilot
+      # OpenAI-compatible BYOK only.
+      # (optional)
+      inference:
+        connector: "example-value"
+
+        profile: "example-value"
+
+        model: "example-value"
 
       # Engine-level authentication configuration for AWF API proxy sidecar integration
       # (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_*

@@ -14868,6 +14868,8 @@
         "resources": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
         "github-apps": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorGitHubApp" } },
         "oidc-tokens": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorGitHubOIDC" } },
+        "azure-oidc": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorAzureOIDC" } },
+        "selected-inference": { "$ref": "#/$defs/connectorInferenceSelection" },
         "on": { "$ref": "#/$defs/connectorCapabilities" },
         "tools": { "$ref": "#/$defs/connectorCapabilities" },
         "safe-outputs": { "$ref": "#/$defs/connectorCapabilities" },
@@ -14922,13 +14924,14 @@
             "required": ["phase", "header", "scheme", "scopes"],
             "additionalProperties": false,
             "properties": {
-              "phase": { "enum": ["agent", "safe-output"] },
+              "phase": { "enum": ["agent", "safe-output", "inference"] },
               "header": { "enum": ["Authorization", "X-API-Key", "PRIVATE-TOKEN"] },
               "scheme": { "enum": ["bearer", "token", "basic", "raw"] },
               "scopes": { "type": "array", "minItems": 1, "items": { "type": "string" } },
               "secret": { "type": "string", "minLength": 1, "description": "GitHub Actions secret name, not a credential value or expression." },
               "github-app": { "$ref": "#/$defs/connectorGitHubApp" },
               "github-oidc": { "$ref": "#/$defs/connectorGitHubOIDC" },
+              "azure-oidc": { "$ref": "#/$defs/connectorAzureOIDC" },
               "token": {
                 "type": "object",
                 "required": ["secret"],
@@ -14939,6 +14942,23 @@
           }
         },
         "resources": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "inference": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/connectorName" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["endpoint", "path", "protocol", "credential", "models"],
+            "properties": {
+              "endpoint": { "$ref": "#/$defs/connectorName" },
+              "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+              "protocol": { "enum": ["openai-responses", "openai-chat-completions"] },
+              "credential": { "$ref": "#/$defs/connectorName" },
+              "models": { "$ref": "#/$defs/connectorName" }
+            }
+          }
+        },
         "triggers": { "$ref": "#/$defs/connectorTriggers" },
         "tools": { "$ref": "#/$defs/connectorDefinitions" },
         "mcp-servers": { "$ref": "#/$defs/connectorDefinitions" },
@@ -14957,6 +14977,30 @@
         "owner": { "type": "string" },
         "repositories": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
         "permissions": { "type": "object", "additionalProperties": { "enum": ["read", "write", "none"] } }
+      }
+    },
+    "connectorInferenceSelection": {
+      "description": "Explicit workflow inference selection. Model is an exact granted wire alias, separate from engine.model metadata. Initially supports Copilot OpenAI-compatible BYOK only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connector", "profile", "model"],
+      "properties": {
+        "connector": { "$ref": "#/$defs/connectorName" },
+        "profile": { "$ref": "#/$defs/connectorName" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "connectorAzureOIDC": {
+      "description": "Inference-only Azure Entra federation through the existing AWF engine transport. Scope is explicit; no Azure OpenAI default is assumed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["azure-tenant-id", "azure-client-id", "azure-scope"],
+      "properties": {
+        "azure-tenant-id": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S" },
+        "azure-client-id": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S" },
+        "azure-scope": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S" },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 2048, "format": "uri" },
+        "azure-cloud": { "enum": ["public", "usgovernment", "china"] }
       }
     },
     "connectorDocumentationURLs": {
@@ -15958,6 +16002,7 @@
                 "type": "string"
               }
             },
+            "inference": { "$ref": "#/$defs/connectorInferenceSelection" },
             "auth": {
               "type": "object",
               "description": "Engine-level authentication configuration for AWF API proxy sidecar integration (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_* environment variables.",

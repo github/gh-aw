@@ -81,7 +81,7 @@ func validateConnectorGitHubApps(alias string, registration ConnectorRegistratio
 	for name, ref := range registration.Credentials {
 		if strings.HasPrefix(ref.Secret, connectorAppSecretPrefix) &&
 			(ref.Secret != connectorAppSecret(alias, name) ||
-				(registration.GitHubApps[name] == nil && registration.OIDCTokens[name] == nil)) {
+				(registration.GitHubApps[name] == nil && registration.OIDCTokens[name] == nil && registration.AzureOIDC[name] == nil)) {
 			return errors.New("connector minted-token references cannot alias another credential")
 		}
 	}
