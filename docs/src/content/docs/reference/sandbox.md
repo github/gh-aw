@@ -178,7 +178,7 @@ Use `allow-host-ports` only for ports that cannot be represented by `services:`.
 
 #### Environment Variables
 
-AWF passes all environment variables via `--env-all`. The host `PATH` is captured as `AWF_HOST_PATH` and restored inside the container, preserving setup action tool paths.
+AWF forwards environment variables via `--env-all` with compiler-managed exclusions. Host-only temporary-directory variables (`TMPDIR`, `GH_AW_RUNTIME_TMP_DIR`, and `GH_AW_RUNTIME_TMP_ID`) are excluded from agent and threat-detection sandboxes, allowing each sandbox to use its own temporary directory. Host-side steps retain the private runtime directory. The host `PATH` is captured as `AWF_HOST_PATH` and restored inside the container, preserving setup action tool paths.
 
 > [!NOTE]
 > Go's "trimmed" binaries require `GOROOT` - AWF automatically captures it after `actions/setup-go`.

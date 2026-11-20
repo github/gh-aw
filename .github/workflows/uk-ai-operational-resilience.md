@@ -44,6 +44,7 @@ tools:
   edit:
 safe-outputs:
   create-issue:
+    expires: 2d
     max: 2
     labels: [security, high-priority, ai-generated, cookie]
     title-prefix: "[uk-ai-resilience] "

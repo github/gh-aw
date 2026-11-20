@@ -36,8 +36,6 @@ func TestTrialGitCredentialCheckoutIdentity(t *testing.T) {
 	}
 	require.Contains(t, strings.Join(c.generateGitConfigurationStepsForData(nil), ""),
 		`GH_AW_GIT_REPOSITORY: "org/trial"`)
-	require.Contains(t, strings.Join(c.generateGitConfigurationSteps(), ""),
-		`GH_AW_GIT_REPOSITORY: "org/trial"`)
 	t.Run("explicit current checkout of workflow repo in subdirectory", func(t *testing.T) {
 		data := &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Path: "current", Current: true}}}
 		content := strings.Join(c.generateGitConfigurationStepsForData(data), "")

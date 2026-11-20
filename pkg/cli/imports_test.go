@@ -470,6 +470,19 @@ engine: copilot
 	}
 }
 
+func TestProcessIncludesWithWorkflowSpecReturnsNestedScannerErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	longLine := strings.Repeat("x", 64*1024+1)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "local.md"), []byte(longLine), 0o644))
+	workflow := &WorkflowSpec{
+		RepoSpec:     RepoSpec{RepoSlug: "owner/repo"},
+		WorkflowPath: ".github/workflows/test.md",
+	}
+
+	_, err := processIncludesWithWorkflowSpec("@include local.md\n", workflow, "", tmpDir, tmpDir, false)
+	require.ErrorContains(t, err, "failed to scan nested includes")
+}
+
 // TestProcessIncludesWithWorkflowSpec_DuplicateInclude verifies that a body-level
 // {{#import}} directive that appears more than once is preserved in full for each
 // occurrence, rather than being silently dropped on the second occurrence by the

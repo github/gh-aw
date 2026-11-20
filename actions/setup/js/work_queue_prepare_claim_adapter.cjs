@@ -2,6 +2,7 @@
 "use strict";
 // @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository and assertClaimAuthorized gates preparation; this module writes only local Claim artifacts.
 
+const { ERR_VALIDATION } = require("./error_codes.cjs");
 const fs = require("fs");
 const path = require("path");
 const { normalizeAssignment, normalizeClaimScope, readClaimScopeContext, withClaimExecution, assertClaimAuthorized, claimArtifactPath, assertClaimArtifactDirectory } = require("./work_queue_claim_scope.cjs");
@@ -13,7 +14,7 @@ async function prepareAdapterContext(options) {
   const assignment = normalizeAssignment(options.assignment);
   const adapter = validateAdapter(options.adapter);
   const index = Number(options.index);
-  if (!Number.isSafeInteger(index) || index < 0 || index > 15) throw new Error("Claim adapter slot must be within the original bounded assignment");
+  if (!Number.isSafeInteger(index) || index < 0 || index > 15) throw new Error(ERR_VALIDATION + ": Claim adapter slot must be within the original bounded assignment");
   const member = assignment.claims[index];
   if (!member) return { active: false };
   return withClaimExecution({ assignment, claim_handle: member.handle, authorize: options.authorize }, async () => {
@@ -54,10 +55,10 @@ async function main(options = {}) {
     return { active: false, staged: true };
   }
   const scope = readClaimScopeContext();
-  if (!scope?.assignment) throw new Error("Claim adapter preparation requires the authenticated immutable worker snapshot");
+  if (!scope?.assignment) throw new Error(ERR_VALIDATION + ": Claim adapter preparation requires the authenticated immutable worker snapshot");
   const { loadAgentOutput } = require("./load_agent_output.cjs");
   const output = loadAgentOutput({ partitioning: true });
-  if (!output.success) throw new Error(`Claim adapter preparation cannot load agent output${output.error ? ": " + output.error : ""}`);
+  if (!output.success) throw new Error(`${ERR_VALIDATION}: Claim adapter preparation cannot load agent output${output.error ? ": " + output.error : ""}`);
   const adapter = parseStrictJSON(process.env.GH_AW_CLAIM_ADAPTER_CONFIG || "{}");
   const result = await prepareAdapterContext({
     ...options,

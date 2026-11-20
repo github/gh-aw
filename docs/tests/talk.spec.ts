@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync, readdirSync } from "node:fs";
-import { injectSlideMetadata, loadSlides, parseSlides, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
+import { injectSlideMetadata, loadSlides, parseSlides, renderCaptions, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
 
-// The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its row position, its link the stable #id.
+// The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its position, its link the stable #id.
 const SLIDES = loadSlides();
 const PAGE_URL = "https://github.github.com/gh-aw/cracktro/";
 const SOURCE_HTML = readFileSync(new URL("../public/cracktro/index.html", import.meta.url), "utf8");
@@ -249,7 +249,7 @@ test("jumps to any slide from the dock's full-screen slide map", async ({ page }
   expect(errors).toEqual([]);
 });
 
-test("moves through the bands, up/down landing on each band's first slide", async ({ page }) => {
+test("moves through the bands like a cursor, up/down keeping the horizontal position", async ({ page }) => {
   const count = page.locator(CURRENT);
   await page.goto("/gh-aw/cracktro/#1");
   await page.keyboard.press("ArrowDown");
@@ -257,40 +257,49 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
-  // down walks the Continuous AI column first, then leaves for the next band
+  // down walks the Continuous AI column first, then leaves for the same position in the next band
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+  await page.keyboard.press("ArrowLeft");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last main-line slide of the band above, skipping its column of examples
   await page.keyboard.press("ArrowLeft");
-  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Workflow to Value")));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
-  // Page Up/Page Down always switch bands
-  await page.keyboard.press("PageDown");
-  await expect(count).toHaveAttribute("aria-label", at(2));
-  await page.keyboard.press("PageDown");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  // the position survives a shorter band: it clamps to its end, and moving back restores the remembered position
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Continuous Red Teaming")}`);
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous Red Teaming")));
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Workflow to Value")));
   await page.keyboard.press("PageUp");
-  await expect(count).toHaveAttribute("aria-label", at(2));
+  await expect(count).toHaveAttribute("aria-label", at(1));
+  await page.keyboard.press("PageDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Workflow to Value")));
+  await page.keyboard.press("PageDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous Red Teaming")));
+  // Shift+Home returns to the first slide of the band
+  await page.keyboard.press("Shift+Home");
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 });
 
 test("gives every navigation button a keyboard shortcut", async ({ page }) => {
   const count = page.locator(CURRENT);
   await page.goto("/gh-aw/cracktro/#3");
-  for (const name of ["Previous band", "Previous slide", "Next slide", "Next band", "Slide map (G)", "Search slides (/)", "Toggle sound (M)"])
+  for (const name of ["First slide of the band", "Previous band", "Previous slide", "Next slide", "Next band", "Slide map (G)", "Search slides (/)", "Toggle sound (M)"])
     await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-keyshortcuts", /\S/);
   // every button (chrome, map tiles, header tiles, in-slide controls) has a title naming its shortcut
   const untitled = await page.locator("button:not(.vnb), [data-go]").evaluateAll(els => els.filter(el => !/\(.+\)/.test(el.getAttribute("title") || "")).map(el => el.className));
   expect(untitled).toEqual([]);
-  // Shift+Down switches bands even on a column head
+  // Shift+Down switches bands even on a column head, keeping the horizontal position
   await page.keyboard.press("Shift+ArrowDown");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
   await page.keyboard.press("Shift+ArrowUp");
-  await expect(count).toHaveAttribute("aria-label", at(2));
+  await expect(count).toHaveAttribute("aria-label", at(3));
   // a typed slide number then Enter jumps there
   for (const k of [...String(HANDOFFS), "Enter"]) await page.keyboard.press(k);
   await expect(count).toHaveAttribute("aria-label", at(HANDOFFS));
@@ -412,16 +421,19 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await expect(nextBand).toBeEnabled();
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
-  // from an interior slide, next band lands on the header below and previous band on the header above
+  // from an interior slide, next/previous band keep the horizontal position and the first button returns to the band's start
   const interior = slideNo("Anatomy of a workflow");
+  const lineStartBtn = page.getByRole("button", { name: "First slide of the band", exact: true });
   await page.goto(`/gh-aw/cracktro/#${interior}`);
   await expect(count).toHaveAttribute("aria-label", at(interior));
+  await expect(lineStartBtn).toBeEnabled();
   await nextBand.click();
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
-  await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
   await expect(count).toHaveAttribute("aria-label", at(SECURITY + 2));
   await prevBand.click();
+  await expect(count).toHaveAttribute("aria-label", at(interior));
+  await lineStartBtn.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
+  await expect(lineStartBtn).toBeDisabled();
   await prevBand.click();
   await expect(count).toHaveAttribute("aria-label", at(1));
   await expect(prevBand).toBeDisabled();
@@ -435,9 +447,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await expect(count).toHaveAttribute("aria-label", at(3));
   await nextBand.focus();
   await page.keyboard.press("Enter");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
 
-  // at 320px the four arrows pack right-aligned beneath the notes, map, search and sound row
+  // at 320px the five arrows pack right-aligned beneath the notes, map, search and sound row
   const rects = (sel: string) =>
     page.locator(sel).evaluateAll(els =>
       els.map(e => {
@@ -447,14 +459,13 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
     );
   const arrowBoxes = await rects(".arrows button");
   const toolBoxes = await rects(".ntb, .smb, .fzb, .snd");
-  expect(arrowBoxes).toHaveLength(4);
+  expect(arrowBoxes).toHaveLength(5);
   expect(toolBoxes).toHaveLength(4);
-  for (let i = 1; i < 4; i++) expect(arrowBoxes[i].left).toBeGreaterThan(arrowBoxes[i - 1].right);
+  for (let i = 1; i < 5; i++) expect(arrowBoxes[i].left).toBeGreaterThan(arrowBoxes[i - 1].right);
   const toolRight = Math.max(...toolBoxes.map(b => b.right));
-  expect(Math.abs(arrowBoxes[3].right - toolRight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(arrowBoxes[4].right - toolRight)).toBeLessThanOrEqual(1);
   expect(toolRight).toBeLessThanOrEqual(320);
   expect(arrowBoxes[0].left).toBeGreaterThanOrEqual(0);
-  expect(Math.abs(arrowBoxes[0].left - Math.min(...toolBoxes.map(b => b.left)))).toBeLessThanOrEqual(1);
   expect(Math.min(...arrowBoxes.map(b => b.top))).toBeGreaterThanOrEqual(Math.max(...toolBoxes.map(b => b.bottom)));
   // kiosk and the column button extend that row to the left, inside the screen and clear of every dock control and each other
   await page.goto(`/gh-aw/cracktro/#${slideNo("Daily Improvers")}`);
@@ -606,7 +617,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${SLIDES[0].id}$`));
 
-  const assets = ["runtime.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["runtime.js", "captions.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -615,6 +626,21 @@ test("ships local assets with the docs and links to the talk from the footer", a
   }
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.fonts.check('16px "Monaspace Neon"'))).toBe(true);
+});
+
+test("generates the kiosk closed captions from slides.md, in deck order, as one inert script", () => {
+  const run = (source: string) => {
+    const scope: { CracktroCaptions?: { scripts: Record<string, string[]> } } = {};
+    new Function("window", source)(scope);
+    return scope.CracktroCaptions!.scripts;
+  };
+  const scripts = run(renderCaptions(SLIDES));
+  expect(Object.keys(scripts)).toEqual(SLIDES.map(slide => slide.id));
+  for (const slide of SLIDES) expect(scripts[slide.id], slide.id).toEqual(slide.captions);
+  const hostile = parseSlides(["### A {#a}", "#### Summary", "First.", "#### Keywords", "k", "#### Captions", "- </script>\u2028x", '- `${x}` & "q"'].join("\n"));
+  const source = renderCaptions(hostile);
+  expect(source).not.toMatch(/<\/script|\u2028/);
+  expect(run(source)).toEqual({ a: ["</script>\u2028x", '`${x}` & "q"'] });
 });
 
 test("publishes a social card for link previews", async ({ page, request }) => {
@@ -634,8 +660,8 @@ test("publishes synthetic examples without profile assets or private source refe
     const normalized = asset.replaceAll("\\", "/");
     expect(normalized === "avatars" || allowedAvatar.test(`assets/${normalized}`), asset).toBe(true);
   }
-  // index.html loads runtime.js before deck.js; check both, in load order.
-  const source = (await Promise.all(["runtime.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
+  // index.html loads runtime.js, captions.js, then deck.js; check all, in load order.
+  const source = (await Promise.all(["runtime.js", "captions.js", "deck.js"].map(async file => (await request.get(`/gh-aw/cracktro/${file}`)).text()))).join("\n");
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
   expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://api.github.com/repositories/", "https://github.com/chrizbo/agentics-beyond-code"]);
@@ -941,49 +967,71 @@ test("splits inline skills and agents, defers context and preserves step navigat
 });
 
 test.describe("slides.md metadata", () => {
-  const table = (...rows: string[]) => ["# Slides", "", "| Id | Heading | Notes | Summary | Keywords |", "|---|---|---|---|---|", ...rows, ""].join("\n");
+  const ORDER = ["Notes", "Summary", "Keywords", "Captions"];
+  // One slide section: "### <title>" then "#### <Field>" sections; undefined omits a field.
+  const entry = (title: string, fields: Record<string, string | undefined> = {}) => {
+    const all: Record<string, string | undefined> = { Summary: "First.", Keywords: "k", Captions: "- c\n- d", ...fields };
+    const names = [...ORDER.filter(name => name in all), ...Object.keys(all).filter(name => !ORDER.includes(name))];
+    return [`### ${title}`, "", ...names.filter(name => all[name] !== undefined).flatMap(name => [`#### ${name}`, "", ...all[name]!.split("\n"), ""])];
+  };
+  // Slides start on line 3; with default fields each takes 15 lines (the next starts on line 18).
+  const md = (...lines: string[][]) => ["# Slides", "", ...lines.flat()].join("\n");
 
-  test("parses every row with a unique id, a unique, public summary and keywords", () => {
+  test("parses every slide with a unique id, a unique, public summary and keywords", () => {
     expect(SLIDES.length).toBeGreaterThan(0);
-    expect(parseSlides(table("| a | A |  | First. | one |", "| b-2 | B | illustrative | Second. | two words, CI/CD ,x |"))).toEqual([
-      { id: "a", heading: "A", illustrative: false, summary: "First.", keywords: ["one"], line: 5 },
-      { id: "b-2", heading: "B", illustrative: true, summary: "Second.", keywords: ["two words", "CI/CD", "x"], line: 6 },
+    const text = [
+      "# Slides",
+      "",
+      "```markdown",
+      "### Example {#example}",
+      "```",
+      "",
+      ...entry("A {#a}", { Keywords: "one" }),
+      ...entry("B {#b-2}", { Notes: "illustrative", Summary: "Second\npart.", Keywords: "two words, CI/CD ,x", Captions: "- c\n  more\n- d" }),
+    ].join("\n");
+    expect(parseSlides(text)).toEqual([
+      { id: "a", heading: "A", illustrative: false, summary: "First.", keywords: ["one"], captions: ["c", "d"], line: 7 },
+      { id: "b-2", heading: "B", illustrative: true, summary: "Second part.", keywords: ["two words", "CI/CD", "x"], captions: ["c more", "d"], line: 22 },
     ]);
     for (const slide of SLIDES) {
       expect(`${slide.heading} ${slide.summary} ${slide.keywords.join(" ")}`, slide.heading).not.toMatch(PRIVATE_REFS);
-      expect(`${slide.summary} ${slide.keywords.join(" ")}`, slide.heading).not.toMatch(/https?:|@[\w-]|#\d/);
+      expect(`${slide.summary} ${slide.keywords.join(" ")} ${slide.captions.join(" ")}`, slide.heading).not.toMatch(/https?:|@[\w-]|#\d/);
+      expect(slide.captions.join(" "), slide.heading).not.toMatch(PRIVATE_REFS);
     }
   });
 
   test("rejects malformed slide lists with the offending line", () => {
     const cases: [string, RegExp][] = [
-      [table("| a | A | First. | k |"), /:5: expected 5 cells, found 4/],
-      [table("| a | A |  | First. | k | extra |"), /:5: expected 5 cells, found 6/],
-      [table("| a | A |  | First. | k"), /:5: malformed row/],
-      [table("| A | A |  | First. | k |"), /:5: invalid Id "A" for "A"/],
-      [table("|  | A |  | First. | k |"), /:5: invalid Id "" for "A"/],
-      [table("| a | A |  | First. | k |", "| a | B |  | Second. | k |"), /:6: duplicate Id "a" \(first on line 5\)/],
-      [table("| a |  |  | First. | k |"), /:5: empty Heading/],
-      [table("| a | A |  |  | k |"), /:5: empty Summary for "A"/],
-      [table("| a | A |  | First. |  |"), /:5: empty keyword for "A"/],
-      [table("| a | A |  | First. | k,, l |"), /:5: empty keyword for "A"/],
-      [table("| a | A |  | First. | Key, key |"), /:5: duplicate keyword "key" for "A"/],
-      [table("| a | A | synthetic | First. | k |"), /:5: unknown Notes value "synthetic"/],
-      [table("| a | A |  | First. | k |", "| b | A |  | Second. | k |"), /:6: duplicate Heading "A" \(first on line 5\)/],
-      [table("| a | Human agent processes |  | First. | k |", "| b | Human Agent Processes |  | Second. | k |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
-      [table("| a | A |  | Same. | k |", "| b | B |  | Same. | k |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
-      [table("| a | A |  | First. | k |", "b | B | illustrative | Last slide. | k |"), /:6: malformed row, expected "\| Id \| Heading \| Notes \| Summary \| Keywords \|": b \| B \| illustrative \| Last slide\. \| k \|/],
-      [table("| a | A |  | First. | k |", "", "| b | B |  | Second. | k |"), /:7: table row outside the slide table/],
-      [table(), /:3: slide table has no rows/],
-      ["| Heading | Notes | Summary | Keywords |\n|---|---|---|---|\n| A |  | First. | k |\n", /:1: expected table header/],
-      ["| Id | Heading | Notes | Summary | Keywords |\n|---|---|---|---|\n", /:2: expected separator/],
-      ["no table", /missing slide table/],
+      [md(entry("A {#A}")), /:3: invalid Id "A" for "A"/],
+      [md(entry("A {#}")), /:3: invalid Id "" for "A"/],
+      [md(entry("A {#a}"), entry("B {#a}", { Summary: "Second." })), /:18: duplicate Id "a" \(first on line 3\)/],
+      [md(entry(" {#a}")), /:3: empty Heading/],
+      [md(entry("A")), /:3: expected "### <Heading> \{#<id>\}" or "#### <Field>", found "### A"/],
+      [md(entry("A {#a}"), ["## Later"]), /:18: expected "### <Heading> \{#<id>\}" or "#### <Field>", found "## Later"/],
+      [md(entry("A {#a}", { Summary: "" })), /:5: empty Summary for "A"/],
+      [md(entry("A {#a}", { Keywords: "" })), /:9: empty keyword for "A"/],
+      [md(entry("A {#a}", { Keywords: "k,, l" })), /:9: empty keyword for "A"/],
+      [md(entry("A {#a}", { Keywords: "Key, key" })), /:9: duplicate keyword "key" for "A"/],
+      [md(entry("A {#a}", { Notes: "synthetic" })), /:5: unknown Notes value "synthetic"/],
+      [md(entry("A {#a}", { Keywords: undefined })), /:3: missing "#### Keywords" for "A"/],
+      [md(entry("A {#a}", { Extra: "x" })), /:18: unknown field "Extra" for "A"/],
+      [md(entry("A {#a}"), ["#### Summary", "", "Again."]), /:18: duplicate field "Summary" for "A"/],
+      [md(entry("A {#a}"), ["#### Notes", "", "illustrative"]), /:18: field "Notes" for "A" must come before "Summary"/],
+      [md(["### A {#a}", "stray"]), /:4: text outside a "#### <Field>" section of "A": stray/],
+      [md(entry("A {#a}"), entry("A {#b}", { Summary: "Second." })), /:18: duplicate Heading "A" \(first on line 3\)/],
+      [md(entry("Human agent processes {#a}"), entry("Human Agent Processes {#b}", { Summary: "Second." })), /:18: duplicate Heading "Human Agent Processes" \(first on line 3\)/],
+      [md(entry("A {#a}", { Summary: "Same." }), entry("B {#b}", { Summary: "Same." })), /:20: duplicate Summary for "B" \(first on line 5\)/],
+      [md(entry("A {#a}", { Captions: "- Only one turn." })), /:13: Captions for "A" need at least two speaker turns/],
+      [md(entry("A {#a}", { Captions: "- c\n-\n- d" })), /:16: empty caption turn for "A"/],
+      [md(entry("A {#a}", { Captions: "c >> d" })), /:15: Captions for "A" must be a "- " list/],
+      ["# Slides\n\n```\n### A {#a}\n```\n", /no slides/],
+      ["no slides here", /no slides/],
     ];
     for (const [text, error] of cases) expect(() => parseSlides(text, "slides.md"), String(error)).toThrow(error);
   });
 
   test("injects escaped, idempotent JSON-LD and leaves the rest of the page untouched", () => {
-    const hostile = parseSlides(table("| a | A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. | </script>, a&b |"));
+    const hostile = parseSlides(md(entry("A </script><script>alert(1)</script> {#a}", { Summary: "Uses $& and $1 & <b>tags</b>\u2028.", Keywords: "</script>, a&b" })));
     const html = injectSlideMetadata(SOURCE_HTML, hostile, PAGE_URL);
     expect(html.match(/<\/script>/gi)).toHaveLength(SOURCE_HTML.match(/<\/script>/gi)!.length);
     expect(html).not.toContain("<b>");
@@ -1065,6 +1113,23 @@ test("opens every hard-coded tour from the hash with all its slides found", asyn
   expect(warnings.filter(w => w.includes("CracktroDeck"))).toEqual([]);
 });
 
+test("ends the slide map with a keyboard manual of every shortcut", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/");
+  await page.keyboard.press("g");
+  const keys = page.getByRole("region", { name: "Keyboard" });
+  await expect(page.locator(".smp-body > :last-child")).toHaveClass(/smp-keys/);
+  for (const group of ["Move", "Jump", "Show", "Slide map", "Design a view"]) await expect(keys.getByRole("heading", { name: group, exact: true })).toBeVisible();
+  await expect(keys.locator("dt", { hasText: "Shift+Home" })).toHaveCount(1);
+  await expect(keys).toContainText("First slide of the band");
+  await expect(keys.locator(".kb-k")).toHaveCount(102);
+  await expect(keys).toContainText("Closed captioning (CC) in kiosk mode");
+  await expect(keys.locator('.kb-k.on[data-k="G"]')).toHaveCount(1);
+  await expect(keys.locator('.kb-arc[data-parts="Shift Home"]')).toHaveCount(1);
+  await keys.locator('.kb-k[data-k="G"]').hover();
+  await expect(keys.locator(".smp-kcap")).toContainText("Slide map");
+  await expect(keys.getByRole("button")).toHaveCount(0);
+});
+
 test("keeps an example in a view only together with its pattern slide", async ({ page }) => {
   const view = (s: string[]) => Buffer.from(JSON.stringify({ s })).toString("base64url");
   await page.goto(`/gh-aw/cracktro/#github-agentic-workflows&view=${view(["github-agentic-workflows", "repo-assist"])}`);
@@ -1122,6 +1187,16 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
     tours: { ends: { title: "Both ends", summary: "first and last", slides: ["hello", "goodbye"] }, part: { title: "Just the part", bands: ["part"] }, ghost: { slides: ["nope"] } },
     last: last === "none" ? null : last || "outro",
     kioskInterval: +query.get("kiosk") || undefined,
+    captions: query.has("cc")
+      ? {
+          scripts: {
+            hello:
+              query.get("cc") === "long"
+                ? ["Opening words come first in this long turn, then many more words follow on and on across several caption rows until the closing words."]
+                : ["Good evening, the top story.", "Thanks, glad to be here."],
+          },
+        }
+      : undefined,
     sound,
   });
 </script></body></html>`;
@@ -1174,6 +1249,8 @@ test.describe("reusable runtime", () => {
     await page.keyboard.press("PageUp");
     await expect(heading(page)).toHaveText("Hello");
     await page.keyboard.press("PageDown");
+    await expect(heading(page)).toHaveText("Beta");
+    await page.keyboard.press("Shift+Home");
     await expect(heading(page)).toHaveText("Part one");
     await page.keyboard.press("Home");
     await expect(heading(page)).toHaveText("Hello");
@@ -1499,6 +1576,62 @@ test.describe("reusable runtime", () => {
     expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).not.toContain("unlock");
     await sound.click();
     await expect(sound).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("starts kiosk mode with closed captions on, toggles them from the CC button or C, and ends them with kiosk mode", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const cc = page.locator(".ccb");
+    const box = page.locator(".cc-box");
+    await expect(cc).toBeHidden();
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await expect(cc).toBeVisible();
+    await expect(cc).toHaveAttribute("aria-pressed", "true");
+    await expect(cc).toHaveAttribute("title", "Turn off closed captions (CC) (C)");
+    await page.clock.runFor(8000);
+    await expect(box).toContainText(">> GOOD EVENING");
+    await expect(box).toContainText(">> THANKS");
+    // the button turns captions off and back on without leaving kiosk mode
+    await cc.click();
+    await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
+    await expect(cc).toHaveAttribute("title", "Turn on closed captions (CC) (C)");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(box).toBeHidden();
+    // turned off, captions stay off for the next kiosk run; C turns them back on (and starts kiosk mode if needed)
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("c");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
+    expect(errors).toEqual([]);
+  });
+
+  test("rolls a long caption turn up a row at a time under reduced motion, showing its opening before it scrolls off", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc=long&fs=none#hello");
+    const box = page.locator(".cc-box");
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await page.clock.runFor(1500);
+    await expect(box).toContainText(">> OPENING WORDS");
+    await expect(box).not.toContainText("CLOSING WORDS");
+    // step to the end of the turn: its closing row arrives before the slide's dwell ends
+    for (let t = 0; t < 40 && !(await box.textContent())?.includes("CLOSING WORDS."); t++) await page.clock.runFor(500);
+    await expect(box).toContainText("CLOSING WORDS.");
+    await expect(box).not.toContainText("OPENING WORDS");
     expect(errors).toEqual([]);
   });
 
