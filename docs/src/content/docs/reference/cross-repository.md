@@ -15,6 +15,11 @@ Cross-repository features fall into three categories:
 
 All require additional authentication.
 
+For confidential fix generation without runtime access to upstream, use
+[`gh aw private-clone`](/gh-aw/reference/private-clone/) to package a source
+snapshot, selected security context, and operator-supplied workflows into a
+standalone private remediation repository.
+
 ## Cross-Repository Checkout (`checkout:`)
 
 The `checkout:` frontmatter field controls how `actions/checkout` is invoked in the agent job. Use it to check out one or more repositories, override fetch depth or sparse-checkout settings, fetch additional refs (e.g., all open PR branches), or disable checkout entirely with `checkout: false`.

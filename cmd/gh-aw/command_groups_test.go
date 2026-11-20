@@ -18,6 +18,7 @@ func TestCommandGroupAssignments(t *testing.T) {
 	}{
 		// Setup Commands
 		{name: "init command in setup group", commandName: "init", expectedGroup: "setup", shouldHaveGroup: true},
+		{name: "private-clone command in setup group", commandName: "private-clone", expectedGroup: "setup", shouldHaveGroup: true},
 		{name: "new command in setup group", commandName: "new", expectedGroup: "setup", shouldHaveGroup: true},
 		{name: "add command in setup group", commandName: "add", expectedGroup: "setup", shouldHaveGroup: true},
 		{name: "add-wizard command in setup group", commandName: "add-wizard", expectedGroup: "setup", shouldHaveGroup: true},
