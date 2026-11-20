@@ -1376,7 +1376,9 @@ function showToolHelp(serverName, toolName, tools) {
     lines.push(`Options (${Object.keys(props).length}):`);
     const optionEntries = Object.entries(props);
     const hasRequiredOptions = required.size > 0;
-    const maxOptionLines = Math.max(1, TOOL_HELP_MAX_LINES - lines.length - (hasRequiredOptions ? 1 : 0));
+    const enumLines = renderEnumOptionLines(optionEntries);
+    const reservedLines = (hasRequiredOptions ? 1 : 0) + (enumLines.length > 0 ? enumLines.length + 1 : 0);
+    const maxOptionLines = Math.max(1, TOOL_HELP_MAX_LINES - lines.length - reservedLines);
     lines.push(
       ...formatCompactNameLines(
         optionEntries.map(([key]) => `--${key}${required.has(key) ? "*" : ""}`),
@@ -1385,6 +1387,11 @@ function showToolHelp(serverName, toolName, tools) {
     );
     if (hasRequiredOptions) {
       lines.push("Required options are marked with *.");
+    }
+    if (enumLines.length > 0) {
+      // The full tool description is truncated above, so surface enum constraints here:
+      // workflow-specific narrowing (e.g. allowed-events) would otherwise be invisible to the agent.
+      lines.push("Allowed values (any other value is rejected):", ...enumLines);
     }
   }
 
@@ -1415,6 +1422,30 @@ function shouldShowToolHelpForEmptyArgs(serverName, toolArgs, matchedTool) {
   // and must be allowed to call through to MCP so their output item is recorded.
   const required = matchedTool && matchedTool.inputSchema && Array.isArray(matchedTool.inputSchema.required) ? matchedTool.inputSchema.required : [];
   return required.length > 0;
+}
+
+/** Maximum number of enum-constrained options listed in tool help. */
+const TOOL_HELP_MAX_ENUM_OPTIONS = 6;
+
+/**
+ * Render one `--option: A, B, C` line per option whose schema restricts it to a fixed
+ * set of values, so the restriction is visible in `<tool> --help`.
+ *
+ * @param {Array<[string, any]>} optionEntries - [name, schema] pairs from inputSchema.properties
+ * @returns {string[]}
+ */
+function renderEnumOptionLines(optionEntries) {
+  const lines = [];
+  for (const [key, schema] of optionEntries) {
+    if (!schema || !Array.isArray(schema.enum) || schema.enum.length === 0) {
+      continue;
+    }
+    lines.push(`  --${key}: ${schema.enum.map(String).join(", ")}`);
+    if (lines.length >= TOOL_HELP_MAX_ENUM_OPTIONS) {
+      break;
+    }
+  }
+  return lines;
 }
 
 /**

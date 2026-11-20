@@ -865,6 +865,54 @@ describe("mcp_cli_bridge.cjs", () => {
     expect(output).toContain("--field_2*");
   });
 
+  it("lists allowed enum values for constrained options", () => {
+    showToolHelp("safeoutputs", "submit_pull_request_review", [
+      {
+        name: "submit_pull_request_review",
+        description: "WRITE-ONCE: Submit a pull request review. ".repeat(10),
+        inputSchema: {
+          properties: {
+            body: { type: "string" },
+            event: { type: "string", enum: ["COMMENT", "REQUEST_CHANGES"] },
+          },
+        },
+      },
+    ]);
+
+    const outputLines = stdoutChunks.join("").trimEnd().split("\n");
+    const output = outputLines.join("\n");
+    expect(output).toContain("Allowed values (any other value is rejected):");
+    expect(output).toContain("  --event: COMMENT, REQUEST_CHANGES");
+    expect(output).not.toContain("--body:");
+    expect(output).not.toContain("APPROVE");
+    expect(outputLines.length).toBeLessThanOrEqual(30);
+  });
+
+  it("omits the allowed values section when no option has an enum", () => {
+    showToolHelp("safeoutputs", "add_comment", [
+      {
+        name: "add_comment",
+        inputSchema: { properties: { body: { type: "string" } }, required: ["body"] },
+      },
+    ]);
+    expect(stdoutChunks.join("")).not.toContain("Allowed values");
+  });
+
+  it("keeps help within the line budget when many options have enums", () => {
+    const properties = {};
+    for (let i = 1; i <= 24; i++) {
+      properties[`field_${i}`] = { type: "string", enum: ["a", "b"] };
+    }
+
+    showToolHelp("safeoutputs", "create_issue", [{ name: "create_issue", description: "Create an issue.", inputSchema: { properties, required: ["field_1"] } }]);
+
+    const outputLines = stdoutChunks.join("").trimEnd().split("\n");
+    const output = outputLines.join("\n");
+    expect(outputLines.length).toBeLessThanOrEqual(30);
+    expect(output).toContain("--field_24");
+    expect(output).toContain("  --field_1: a, b");
+  });
+
   it("documents inline JSON escaping and stdin without helper recommendations", () => {
     showToolHelp("safeoutputs", "add_comment", [
       {
