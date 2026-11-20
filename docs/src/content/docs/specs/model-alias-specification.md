@@ -18,7 +18,7 @@ sidebar:
 
 ## Abstract
 
-This specification defines the Model Alias Format (MAF) for GitHub Agentic Workflows (AWF). It establishes normative requirements for model identifier syntax, URL-style parameter encoding for model configuration (such as reasoning effort and temperature), and the multi-layer fallback resolution algorithm that AWF applies when selecting a concrete model at compile time. The specification is intended for workflow authors, AWF implementors, and tool integrations that consume or produce model name strings.
+This specification defines the Model Alias Format (MAF) for GitHub Agentic Workflows (AWF). It establishes normative requirements for model identifier syntax, URL-style parameter encoding for model configuration (such as reasoning effort and temperature), and the multi-layer fallback resolution algorithm that AWF applies when selecting a concrete model at run time, before the engine starts (Section 8.8). The specification is intended for workflow authors, AWF implementors, and tool integrations that consume or produce model name strings.
 
 ## Status of This Document
 
@@ -923,7 +923,7 @@ This section provides a normative reference table for all MUST/SHALL requirement
 
 ## 16. Operations
 
-This section defines the caller-facing runtime lifecycle for resolving a model alias at compile time.
+This section defines the caller-facing lifecycle for resolving a model alias at run time, before the engine starts (Section 8.8).
 
 1. **Invoke Resolution**: The implementation MUST parse the caller-provided model identifier into base identifier and parameter map before attempting alias expansion.
 2. **Initialize Guards**: The implementation MUST initialize a depth counter (starting at 0) and a per-call visited-set before traversing alias references.
@@ -1055,6 +1055,7 @@ Model parameters are compile-time configuration values and are not derived from 
 ### Version 1.7.0 (Draft)
 
 - **Added**: §8.4.4 alias wildcards, and Claude's `auto` on the Copilot provider, skip models that AWF's `/reflect` marks `automatic_selection_eligible: false`. Exact model ids and alias entries without `*` are unaffected, and a catalog without the field resolves as before. Conformance test T-MAF-050.
+- **Fixed**: The Abstract and §16 said alias resolution selects a model at compile time; it runs at run time, before the engine starts (§8.8).
 
 ### Version 1.6.0 (Draft)
 

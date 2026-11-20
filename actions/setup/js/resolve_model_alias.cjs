@@ -541,8 +541,7 @@ function resolveConfiguredModel(options) {
     return exact;
   }
 
-  const buildCatalog = (/** @type {any} */ reflectData) => (scope ? buildProviderCatalog({ reflectData, catalog: options.catalog, provider: scope }) : Array.isArray(options.catalog) ? options.catalog : buildCatalogFromReflect(reflectData));
-  const catalog = buildCatalog(options.reflectData);
+  const catalog = scope ? buildProviderCatalog({ reflectData: options.reflectData, catalog: options.catalog, provider: scope }) : Array.isArray(options.catalog) ? options.catalog : buildCatalogFromReflect(options.reflectData);
   if (isLiveModelId(aliasKey, catalog)) {
     // A live exact id wins over an alias with the same name (for example gpt-5-mini).
     logger(`${logPrefix}: '${configuredModel}' is a live model id${scope ? ` (provider=${scope})` : ""}; not resolving it as an alias`);
@@ -558,7 +557,18 @@ function resolveConfiguredModel(options) {
   }
 
   const selectableReflectData = filterAutomaticallySelectable(options.reflectData);
-  const wildcardCatalog = Array.isArray(options.catalog) || selectableReflectData === options.reflectData ? catalog : buildCatalog(selectableReflectData);
+  let wildcardCatalog = catalog;
+  if (selectableReflectData !== options.reflectData) {
+    // Entries /reflect marks ineligible, removed from whichever catalogue is in use (built or caller-supplied).
+    const fromReflect = (/** @type {any} */ reflectData) => (scope ? buildProviderCatalog({ reflectData, provider: scope }) : buildCatalogFromReflect(reflectData));
+    const selectable = new Set(fromReflect(selectableReflectData).map(entry => entry.toLowerCase()));
+    const blocked = new Set(
+      fromReflect(options.reflectData)
+        .map(entry => entry.toLowerCase())
+        .filter(entry => !selectable.has(entry))
+    );
+    wildcardCatalog = catalog.filter(entry => !blocked.has(entry.toLowerCase()));
+  }
   const resolved = resolveModelAlias(aliasKey + marshalParams(params), aliasMap, catalog, { logger, wildcardCatalog });
   if (!resolved) {
     if (!scope && !Array.isArray(options.catalog) && hasIncompleteCandidateCatalog(aliasKey, aliasMap, options.reflectData)) {

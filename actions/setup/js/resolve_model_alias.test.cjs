@@ -530,6 +530,12 @@ describe("alias wildcards and automatic selection eligibility", () => {
     expect(resolve(configuredModel, { provider: "copilot" })).toBe("gpt-5.3-codex");
   });
 
+  it("filters a caller-supplied catalogue with the /reflect eligibility", () => {
+    const ids = ROUTING_MODELS.map(model => model.model_id);
+    expect(resolve("auto", { catalog: ids.map(id => `copilot/${id}`) })).toBe("gpt-5.3-codex");
+    expect(resolve("auto", { catalog: ids, provider: "copilot" })).toBe("gpt-5.3-codex");
+  });
+
   it("fails an alias whose only wildcard matches are not automatically selectable", () => {
     expect(() => resolve("gpt-6")).toThrow(expect.objectContaining({ reason: "model_unavailable" }));
   });
