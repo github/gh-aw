@@ -4,6 +4,7 @@ package parser
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -74,4 +75,16 @@ func TestRelativizeIncludedFilePath(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestExtractBodyLevelImportPathsReturnsScannerErrors(t *testing.T) {
+	content := "{{#runtime-import tools.md}}\n" + strings.Repeat("x", 64*1024+1)
+	_, err := ExtractBodyLevelImportPaths(content, "")
+	require.ErrorContains(t, err, "failed to scan workflow body for runtime imports")
+}
+
+func TestProcessIncludesForFieldReturnsScannerErrors(t *testing.T) {
+	content := strings.Repeat("x", 64*1024+1) + "\n@include tools.md"
+	_, _, err := processIncludesForField(content, "", nil, "", nil)
+	require.ErrorContains(t, err, "failed to scan content while expanding imports")
 }

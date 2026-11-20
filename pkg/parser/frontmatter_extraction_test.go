@@ -3,6 +3,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -185,6 +186,12 @@ Nested content`,
 			assert.Equal(t, tt.expected, result, "ExtractMarkdownSection() should return the expected section content")
 		})
 	}
+}
+
+func TestExtractMarkdownSectionReturnsScannerErrors(t *testing.T) {
+	content := "# Setup\n" + strings.Repeat("x", 64*1024+1)
+	_, err := ExtractMarkdownSection(content, "Setup")
+	require.ErrorContains(t, err, "failed to scan markdown while extracting section")
 }
 
 func TestGenerateDefaultWorkflowName(t *testing.T) {

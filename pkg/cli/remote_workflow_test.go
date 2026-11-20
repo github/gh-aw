@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -728,6 +729,12 @@ func TestFetchAndSaveRemoteIncludes_SharedIncludeStaysUnderSharedDir(t *testing.
 	})
 	require.NoError(t, err)
 	assert.FileExists(t, filepath.Join(tmpDir, ".github", "shared", "helper.md"))
+}
+
+func TestFetchAndSaveRemoteIncludes_ReturnsScannerErrors(t *testing.T) {
+	spec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: "github/gh-aw"}}
+	err := fetchAndSaveRemoteIncludesWithOptions(t.Context(), strings.Repeat("x", 64*1024+1), includesFetchOptions{spec: spec})
+	require.ErrorContains(t, err, "failed to scan workflow content for includes")
 }
 
 // TestFetchAndSaveRemoteFrontmatterImports_InvalidRepoSlug verifies that an invalid

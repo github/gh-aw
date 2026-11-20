@@ -353,6 +353,10 @@ func parseAndDisplayZizmorOutputWithOptions(stdout, stderr string, verbose bool,
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return 0, 0, fmt.Errorf("failed to scan zizmor stderr: %w", err)
+	}
+
 	// Parse JSON findings from stdout
 	var findings []zizmorFinding
 	totalWarnings := 0

@@ -161,10 +161,10 @@ var bodyLevelRuntimeImportRe = regexp.MustCompile(`^\{\{#runtime-import(\?)?[ \t
 // Paths that already start with ".github/" are kept as-is.
 // Deprecated {{#import}} and legacy @include / @import directives are ignored;
 // they are handled (with deprecation warnings) by include_processor.go.
-func ExtractBodyLevelImportPaths(content, baseDir string) []BodyLevelImport {
+func ExtractBodyLevelImportPaths(content, baseDir string) ([]BodyLevelImport, error) {
 	// Fast path: no {{#runtime-import}} directives present.
 	if !strings.Contains(content, "{{#runtime-import") {
-		return nil
+		return nil, nil
 	}
 
 	repoRoot := findGitHubRepoRoot(baseDir)
@@ -217,7 +217,10 @@ func ExtractBodyLevelImportPaths(content, baseDir string) []BodyLevelImport {
 			Optional: false, // optional directives are skipped above; only required imports are promoted
 		})
 	}
-	return results
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan workflow body for runtime imports: %w", err)
+	}
+	return results, nil
 }
 
 func ExpandIncludesForEngines(content, baseDir string, caches ...*ImportCache) ([]string, error) {
@@ -302,6 +305,9 @@ func processIncludesForField(content, baseDir string, extractFunc func(string) (
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, "", fmt.Errorf("failed to scan content while expanding imports: %w", err)
+	}
 	return results, result.String(), nil
 }
 

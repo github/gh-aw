@@ -485,7 +485,10 @@ func (c *Compiler) resolveMarkdownArtifacts(
 	if len(importPaths) > 0 {
 		orchestratorToolsLog.Printf("Found %d import paths for runtime-import macros", len(importPaths))
 	}
-	bodyImports := parser.ExtractBodyLevelImportPaths(effectiveMarkdown, markdownDir)
+	bodyImports, err := parser.ExtractBodyLevelImportPaths(effectiveMarkdown, markdownDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan body-level runtime imports: %w", err)
+	}
 	if len(bodyImports) > 0 {
 		orchestratorToolsLog.Printf("Found %d body-level {{#runtime-import}} directive(s) to promote to lock-file macros", len(bodyImports))
 		for _, bodyImport := range bodyImports {

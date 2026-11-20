@@ -26,23 +26,31 @@ type evalResultRecord struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func loadLocalMetricEvalResults(workflowID string) map[string]MetricEvalResults {
-	return summarizeMetricEvalResults(parseEvalResultRecords(loadLocalEvalResultsData(workflowID)))
+func loadLocalMetricEvalResults(workflowID string) (map[string]MetricEvalResults, error) {
+	records, err := parseEvalResultRecords(loadLocalEvalResultsData(workflowID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse local eval results: %w", err)
+	}
+	return summarizeMetricEvalResults(records), nil
 }
 
-func loadRemoteMetricEvalResults(repoOverride, workflowID string) map[string]MetricEvalResults {
-	return summarizeMetricEvalResults(parseEvalResultRecords(loadRemoteEvalResultsData(repoOverride, workflowID)))
+func loadRemoteMetricEvalResults(repoOverride, workflowID string) (map[string]MetricEvalResults, error) {
+	records, err := parseEvalResultRecords(loadRemoteEvalResultsData(repoOverride, workflowID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse remote eval results: %w", err)
+	}
+	return summarizeMetricEvalResults(records), nil
 }
 
 // loadLocalEvalResultRecords returns the raw per-run eval answer records for workflowID,
 // used to attribute eval-backed experiment metrics to variants by run ID.
-func loadLocalEvalResultRecords(workflowID string) []evalResultRecord {
+func loadLocalEvalResultRecords(workflowID string) ([]evalResultRecord, error) {
 	return parseEvalResultRecords(loadLocalEvalResultsData(workflowID))
 }
 
 // loadRemoteEvalResultRecords returns the raw per-run eval answer records for workflowID
 // from repoOverride, used to attribute eval-backed experiment metrics to variants by run ID.
-func loadRemoteEvalResultRecords(repoOverride, workflowID string) []evalResultRecord {
+func loadRemoteEvalResultRecords(repoOverride, workflowID string) ([]evalResultRecord, error) {
 	return parseEvalResultRecords(loadRemoteEvalResultsData(repoOverride, workflowID))
 }
 
@@ -82,9 +90,9 @@ func loadRemoteEvalResultsData(repoOverride, workflowID string) []byte {
 }
 
 // parseEvalResultRecords parses evals.jsonl content into individual per-run eval answer records.
-func parseEvalResultRecords(data []byte) []evalResultRecord {
+func parseEvalResultRecords(data []byte) ([]evalResultRecord, error) {
 	if len(data) == 0 {
-		return nil
+		return nil, nil
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var records []evalResultRecord
@@ -93,7 +101,10 @@ func parseEvalResultRecords(data []byte) []evalResultRecord {
 			records = append(records, record)
 		}
 	}
-	return records
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan eval result records: %w", err)
+	}
+	return records, nil
 }
 
 // parseEvalResultRecordLine parses one evals.jsonl line. It returns false for blank,
