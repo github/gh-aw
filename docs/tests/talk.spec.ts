@@ -20,7 +20,7 @@ const slideId = (heading: string) => SLIDES[slideNo(heading) - 1].id;
 const CURRENT = '.dots button.on[aria-label^="Slide "]';
 const at = (n: number) => `Slide ${n}`;
 const SECURITY = slideNo("Security");
-const GUIDE = slideNo("Ask once. The agent picks the guide.");
+const GUIDE = slideNo("/agentic-workflows");
 const HANDOFFS = slideNo("Event-driven Hand-offs");
 
 test.use({ reducedMotion: "reduce" });

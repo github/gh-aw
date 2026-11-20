@@ -4477,7 +4477,7 @@
     });
   }
 
-  // Ask once. The agent picks the guide.: /agentic-workflows routes each request to one focused guide (guide style)
+  // /agentic-workflows: /agentic-workflows routes each request to one focused guide (guide style)
   {
     resetIndex();
     const ROUTES = [
@@ -4548,8 +4548,8 @@
         h(
           "div",
           { class: "gd-head" },
-          h("div", { class: "kicker" }, "/agentic-workflows · how to use it"),
-          h("h2", {}, "Ask once. ", h("em", {}, "The agent picks the guide.")),
+          h("div", { class: "kicker" }, "Ask once · the agent picks the guide"),
+          h("h2", {}, "/agentic-workflows"),
           h("p", {}, h("code", {}, "/agentic-workflows"), " is a router: it reads your intent, loads the matching guide from ", h("code", {}, ".github/aw/"), " and follows it step by step.")
         ),
         h(

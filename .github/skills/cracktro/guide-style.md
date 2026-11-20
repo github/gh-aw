@@ -1,6 +1,6 @@
 # Guide slide style
 
-The secondary house style of the `/agentic-workflows` guide row: Ask once. The agent picks the guide (`gdr-`), The compiler corrects the agent (`gdl-`) and Personas test the guide. Copilot fixes it (`gdp-`). Load it to add or restyle a slide that explains **how to use** a gh-aw tool or process. Also follow `brand.md` (colour, type) and `mechanics.md` (bands, `THEME`, `MUSIC`).
+The secondary house style of the `/agentic-workflows` guide row: /agentic-workflows (`gdr-`), The compiler corrects the agent (`gdl-`) and Personas test the guide. Agent fixes it (`gdp-`). Load it to add or restyle a slide that explains **how to use** a gh-aw tool or process. Also follow `brand.md` (colour, type) and `mechanics.md` (bands, `THEME`, `MUSIC`).
 
 A guide slide teaches one usage pattern: a light, gridless canvas, a title block (kicker, two-part heading, one plain sentence), one white board that loops the process, and a mono caption stating what is illustrative or measured. Compared with `concept-style.md`, guide slides explain a mechanism step by step, may carry measured data, and use blue instead of green.
 
