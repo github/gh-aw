@@ -3639,6 +3639,67 @@ process.exit(1);`,
   });
 
   describe("post-result watchdog suppression when terminal safe-output already produced", () => {
+    it.each([false, true].flatMap(sdk => [false, true].map(currentOutput => ({ sdk, currentOutput }))))("scopes late-exit success and watchdog arming to each attempt: %j", ({ sdk, currentOutput }) => {
+      const directory = makeHarnessTempDir("copilot-attempt-output-");
+      const safeOutputsPath = path.join(directory, "safe-outputs.jsonl");
+      const callsPath = path.join(directory, "calls.jsonl");
+      const preloadPath = path.join(directory, "attempt-fixture.cjs");
+      fs.writeFileSync(
+        preloadPath,
+        `
+const fs = require("fs");
+const sidecar = require(${JSON.stringify(require.resolve("./copilot_sdk_sidecar.cjs"))});
+sidecar.startCopilotSDKServer = async () => ({});
+sidecar.stopCopilotSDKServer = async () => {};
+require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).resolveMultiProviderFromReflect = () => ({
+  model:"github/test-model", providers:[{name:"github",type:"openai",baseUrl:""}],
+  models:[{id:"test-model",provider:"github"}],
+});
+require(${JSON.stringify(require.resolve("./process_runner.cjs"))}).runProcess = async options => {
+  const file = process.env.GH_AW_SAFE_OUTPUTS;
+  const before = options.postResultWatchdog.shouldArm();
+  if (options.attempt === 0 || ${currentOutput}) {
+    fs.appendFileSync(file, JSON.stringify({type:"add_comment",body:"attempt " + options.attempt}) + "\\n");
+  }
+  const armed = options.postResultWatchdog.shouldArm();
+  fs.appendFileSync(process.env.COPILOT_HARNESS_STUB_CALLS, JSON.stringify({attempt:options.attempt,before,armed}) + "\\n");
+  return {
+    exitCode:1, hasOutput:true,
+    output:options.attempt === 0 ? "Authentication failed with provider at http://localhost:10002 (HTTP 401)." : "partial work",
+    watchdogFired:options.attempt > 0 && armed,
+  };
+};`
+      );
+      try {
+        const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, "unused-driver.cjs", "unused-copilot", "--prompt", "test"], {
+          cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+          env: {
+            ...harnessChildEnv,
+            NODE_OPTIONS: `${harnessChildEnv.NODE_OPTIONS || ""} --require=${JSON.stringify(preloadPath)}`,
+            COPILOT_SDK_URI: sdk ? "http://127.0.0.1:1" : "",
+            COPILOT_MODEL: "",
+            GH_AW_SAFE_OUTPUTS: safeOutputsPath,
+            GH_AW_HARNESS_TELEMETRY_DIR: directory,
+            GH_AW_HARNESS_MAX_RETRIES: "1",
+            COPILOT_HARNESS_STUB_CALLS: callsPath,
+          },
+          encoding: "utf8",
+          timeout: 15000,
+        });
+        expect(result.status, result.stderr).toBe(currentOutput ? 0 : 1);
+        expect(fs.readFileSync(callsPath, "utf8").trim().split("\n").map(JSON.parse)).toEqual([
+          { attempt: 0, before: false, armed: true },
+          { attempt: 1, before: false, armed: currentOutput },
+        ]);
+        expect(result.stderr.includes("late-activity exit suppressed")).toBe(currentOutput);
+        const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+        expect(telemetry.attempt_results).toHaveLength(2);
+        expect(telemetry.exit_code).toBe(currentOutput ? 0 : 1);
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
     it("exits 0 without retrying when a terminal safe-output was already produced and run fails with partial_execution", () => {
       const tempDir = makeHarnessTempDir("copilot-watchdog-suppression-");
       const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");

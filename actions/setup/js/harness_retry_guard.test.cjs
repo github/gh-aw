@@ -1,12 +1,14 @@
 // @ts-check
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const {
   detectNonRetryableHarnessGuard,
   detectExhaustedAWFInvocationBudget,
+  observeInvocationBudget,
+  resolveRetryAfterDecision,
   buildSoftTimeoutGuard,
   isMaxRunsExceededError,
   isAuthenticationFailedError,
@@ -16,6 +18,55 @@ const {
 const { parseModelEndpointMismatch, MODEL_ENDPOINT_MISMATCH_PATTERN, shouldSuppressGuardCategory } = require("./harness_error_patterns.cjs");
 
 describe("harness_retry_guard.cjs", () => {
+  describe("shared operational decisions", () => {
+    beforeEach(() => vi.stubEnv("GH_AW_SAFE_OUTPUTS", ""));
+    afterEach(() => vi.unstubAllEnvs());
+    it("adds fresh invocation evidence once without replacing other failure classes", async () => {
+      const guard = { maxRunsExceeded: false };
+      const result = { exitCode: 1, output: "", hasOutput: true, failureClasses: ["authentication_failed"] };
+      const fetchReflect = vi.fn(async () => ({ ok: true, reflectData: { runs: { enabled: true, max_runs: 2, invocation_count: 2, remaining_runs: 0 } } }));
+      const log = vi.fn();
+      const options = { guard, result, attempt: 1, nativeTerminalRateLimitError: true, env: { AWF_REFLECT_ENABLED: "1" }, fetchReflect, log };
+      await observeInvocationBudget(options);
+      await observeInvocationBudget(options);
+      expect(guard.maxRunsExceeded).toBe(true);
+      expect(result.failureClasses).toEqual(["authentication_failed", "invocation_cap_exceeded"]);
+      expect(fetchReflect).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves engine classification untouched without confirmed exhaustion", async () => {
+      const guard = { maxRunsExceeded: false };
+      const result = { exitCode: 1, output: "", hasOutput: false, failureClasses: ["no_output"] };
+      await observeInvocationBudget({ guard, result, attempt: 0, nativeTerminalRateLimitError: false, log: vi.fn() });
+      expect(guard.maxRunsExceeded).toBe(false);
+      expect(result.failureClasses).toEqual(["no_output"]);
+    });
+
+    it.each([0, 100, 2147483647])("accepts bounded timer waits: %s", retryAfterMs => {
+      const log = vi.fn();
+      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs };
+      expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 2147483648, softTimeoutGuard: null, harnessName: "Test", log })).toEqual({ action: "retry", nextDelayMs: retryAfterMs });
+      expect(result.failureClasses).toEqual(["rate_limit_error"]);
+      expect(log).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([-1, NaN, Infinity, 0.5, 2147483648])("rejects invalid or overflowing waits: %s", retryAfterMs => {
+      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs };
+      expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: Number.MAX_SAFE_INTEGER, softTimeoutGuard: null, harnessName: "Test", log: () => {} })).toEqual({ action: "stop" });
+      expect(result.failureClasses).toEqual(["rate_limit_wait_exceeded"]);
+    });
+
+    it("rejects a wait exactly reaching the soft deadline", () => {
+      const now = vi.spyOn(Date, "now").mockReturnValue(100);
+      try {
+        const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 10 };
+        expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 10, softTimeoutGuard: { softDeadlineMs: 110 }, harnessName: "Test", log: () => {} })).toEqual({ action: "stop" });
+      } finally {
+        now.mockRestore();
+      }
+    });
+  });
   describe("detectExhaustedAWFInvocationBudget", () => {
     const options = { nativeTerminalRateLimitError: true, env: { AWF_REFLECT_ENABLED: "1" } };
     const exhaustedReflect = {
