@@ -63,7 +63,7 @@ test("push reports a missing ledger transaction artifact handoff", async () => {
   process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME = "gh-aw-ledger-transactions";
   try {
     await assert.rejects(main({ file, ledgerConfigs }), error => {
-      assert.equal(error.message, `Missing validated ledger transaction artifact at ${path.resolve(file)}; ensure safe_outputs uploads gh-aw-ledger-transactions before push_ledger_changes`);
+      assert.equal(error.message, `ERR_VALIDATION: Missing validated ledger transaction artifact at ${path.resolve(file)}; ensure safe_outputs uploads gh-aw-ledger-transactions before push_ledger_changes`);
       assert.equal(error.cause.code, "ENOENT");
       return true;
     });
@@ -294,7 +294,7 @@ test.each(["b".repeat(40), undefined, false])("appends canonical ledger state wi
         },
       });
     if (pushed === false) {
-      await assert.rejects(persist, /Failed to persist records to ledgers\/findings/);
+      await assert.rejects(persist, /ERR_SYSTEM: Failed to persist records to ledgers\/findings/);
       return;
     }
     const persisted = await persist();
@@ -371,6 +371,15 @@ test("readTransactions rejects malformed JSON and symlink artifacts", () => {
   const file = path.join(directory, "artifact.json");
   const link = path.join(directory, "link.json");
   try {
+    fs.writeFileSync(file, "");
+    fs.truncateSync(file, 12 * 1024 * 1024 + 1);
+    assert.throws(
+      () => readTransactions(file),
+      error => {
+        assert.equal(error.message, "ERR_VALIDATION: Invalid ledger transaction artifact");
+        return true;
+      }
+    );
     fs.writeFileSync(file, "{");
     assert.throws(() => readTransactions(file), /Failed to read validated ledger transaction artifact/);
     fs.writeFileSync(file, JSON.stringify(transaction()));
