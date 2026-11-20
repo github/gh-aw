@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-18",
+  "last_updated": "2026-11-20",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/workflow-linters.md",
@@ -47,7 +47,7 @@
       "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
       "created": "2026-11-12",
       "status": "pending",
-      "issue": "newInvalidDependencyNameError (line 154) hardcodes 'Example: dependencies: [requests]' for all package managers; pass manager and example per call site"
+      "issue": "newInvalidDependencyNameError (line 154) hardcodes 'Example: dependencies: [requests]' for all package managers; pass example per call site. Also apt unpinned error labels manager 'shell' (line 132); use 'apt'. Tests assert substrings only, so both are safe to change. Reported 2026-11-20"
     },
     {
       "file": "cmd/gh-aw/main.go",

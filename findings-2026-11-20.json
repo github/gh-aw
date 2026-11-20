@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-20",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/blog/2026-10-05-weekly-update.md",
+      "docs/src/content/docs/reference/glossary.md"
+    ],
+    "cli": [
+      "gh aw (main help)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/smoke-test-tools.md",
+      ".github/workflows/breaking-change-checker.md"
+    ],
+    "validation": [
+      "pkg/workflow/mcp_scripts_dependencies_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "Glossary --actions-lock incompatibility list matches pkg/cli/compile_validation.go",
+    "Glossary GH_AW_DEFAULT_* anchor resolves to its heading",
+    "Weekly-update blog reads cleanly; one unverified claim (two noop calls by default)"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
+      "priority": "high",
+      "issue": "apt unpinned error reports manager as 'shell' (line 132); invalid-name error hardcodes 'Example: dependencies: [requests]' for every manager (line 154)"
+    },
+    {
+      "file": ".github/workflows/smoke-test-tools.md",
+      "priority": "medium",
+      "issue": "run-failure message (line 60) uses {status} as missing-tool wording; status holds run outcome text only. Lock file is derived and needs make recompile"
+    }
+  ]
+}
