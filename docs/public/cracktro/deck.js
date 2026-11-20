@@ -49,10 +49,14 @@
   .ga-copy { position: absolute; left: 110px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; gap: 26px; }
   .ga-copy h2 { margin: 0; font-size: 96px; line-height: .92; white-space: nowrap; font-variation-settings: "wght" 700, "wdth" 100; }
   .ga-copy h2 { --lg: #5fed83; }
-  .badge { align-self: flex-start; font: 500 22px/1 "Mona Sans"; color: #3fb950; background: #2ea04326;
-    border: 1px solid #2ea04366; padding: 10px 18px; border-radius: 2em; box-shadow: 0 0 30px #2ea04333; }
-  .active .badge { animation: rise .7s both .1s, pulse 2.4s ease-in-out infinite 1s; }
-  @keyframes pulse { 50% { box-shadow: 0 0 50px #2ea04355; } }
+  .badge { position: relative; align-self: flex-start; font: 500 22px/1 "Mona Sans"; color: #3fb950; background: #2ea04326;
+    border: 1px solid #2ea04366; padding: 10px 18px; border-radius: 2em; }
+  /* the pulse cross-fades two static glows by opacity instead of re-blurring box-shadow every frame */
+  .badge::before, .badge::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; }
+  .badge::before { box-shadow: 0 0 30px #2ea04333; } .badge::after { box-shadow: 0 0 50px #2ea04355; opacity: 0; }
+  .active .badge { animation: rise .7s both .1s; }
+  .active .badge::before { animation: glow-fade 2.4s ease-in-out infinite 1s; } .active .badge::after { animation: glow-pulse 2.4s ease-in-out infinite 1s; }
+  @keyframes glow-fade { 50% { opacity: 0; } } @keyframes glow-pulse { 50% { opacity: 1; } }
   .shot-wrap { position: absolute; right: 90px; top: 150px; width: 1080px; height: 780px; }
   .shot { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; background: #0d1117; border: 1px solid #3d444d;
     box-shadow: 0 60px 140px -20px #000, 0 0 0 1px #000, 0 0 120px -30px #3fb95055; }
@@ -78,8 +82,11 @@
   .ga-card.run .box { stroke: #d29922; }
   .ga-card.ok .box { stroke: #2ea043; }
   .ga-card.ag .box { fill: #1d1730; stroke: #8957e5; }
-  .ga-card.ag.run .box { stroke: #ab7df8; animation: ga-glow 1.2s ease-in-out infinite; }
-  @keyframes ga-glow { 50% { filter: drop-shadow(0 0 22px #a371f755); } }
+  .ga-card.ag.run .box { stroke: #ab7df8; }
+  /* the running agent card's glow: blurred once in an overlay masked to its outside, pulsed by opacity */
+  .ga-glow { position: absolute; left: 0; top: 48px; width: 100%; height: calc(100% - 48px); pointer-events: none; opacity: 0; }
+  .ga-glow rect { fill: #1d1730; filter: drop-shadow(0 0 22px #a371f755); }
+  .ga-glow.run { animation: glow-pulse 1.2s ease-in-out infinite; }
   .ga-card .ga-tag { fill: #ab7df8; opacity: 0; transition: opacity .4s; }
   .ga-card.ag .ga-tag { opacity: 1; }
   .ga-card .ring { fill: none; stroke: #6e7681; stroke-width: 3; transform-box: fill-box; transform-origin: center; }
@@ -1553,11 +1560,17 @@
     70% { opacity: .3; } 100% { opacity: 0; transform: translate(-30px, -16px); } }
   .sec-box:not(.sandbox) { background: #12080ae0; box-shadow: 0 0 50px -24px color-mix(in srgb, var(--c) 33%, transparent), inset 0 0 60px -50px color-mix(in srgb, var(--c) 33%, transparent); border-color: color-mix(in srgb, var(--c) 70%, transparent); }
   .sec-box.out { background: #0a1424f0; border-color: #4493f8; }
-  .active .sec-box.out { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 2100ms, calm 4s ease-in-out infinite 3s; }
-  @keyframes calm { 0%, 100% { box-shadow: 0 0 60px -14px #4493f844, inset 0 0 80px -40px #4493f833; } 50% { box-shadow: 0 0 90px -10px #4493f855, inset 0 0 100px -40px #4493f844; } }
+  .active .sec-box.out { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 2100ms; }
+  /* calm/safe glows: two static shadow layers behind the content, cross-faded by opacity instead of animating box-shadow on the 500px boxes */
+  .sec-box.out, .sec-box.sandbox { box-shadow: none; isolation: isolate; }
+  .sec-box.out::before, .sec-box.out::after, .sec-box.sandbox::before, .sec-box.sandbox::after { content: ""; position: absolute; inset: -2px; border: 2px solid transparent; border-radius: inherit; z-index: -1; pointer-events: none; }
+  .sec-box.sandbox::before, .sec-box.sandbox::after { inset: -3px; border-width: 3px; }
+  .sec-box.out::before { box-shadow: 0 0 60px -14px #4493f844, inset 0 0 80px -40px #4493f833; } .sec-box.out::after { box-shadow: 0 0 90px -10px #4493f855, inset 0 0 100px -40px #4493f844; opacity: 0; }
+  .active .sec-box.out::before { animation: glow-fade 4s ease-in-out infinite 3s; } .active .sec-box.out::after { animation: glow-pulse 4s ease-in-out infinite 3s; }
   .sec-box.sandbox { background: #0b1a10f0; border-width: 3px; z-index: 2; }
-  .active .sec-box.sandbox { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 1300ms, safe 3.2s ease-in-out infinite 2.2s; }
-  @keyframes safe { 0%, 100% { box-shadow: 0 0 70px -10px #3fb95044, inset 0 0 90px -40px #3fb95033; } 50% { box-shadow: 0 0 100px 0 #3fb95055, inset 0 0 120px -40px #3fb95044; } }
+  .active .sec-box.sandbox { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 1300ms; }
+  .sec-box.sandbox::before { box-shadow: 0 0 70px -10px #3fb95044, inset 0 0 90px -40px #3fb95033; } .sec-box.sandbox::after { box-shadow: 0 0 100px 0 #3fb95055, inset 0 0 120px -40px #3fb95044; opacity: 0; }
+  .active .sec-box.sandbox::before { animation: glow-fade 3.2s ease-in-out infinite 2.2s; } .active .sec-box.sandbox::after { animation: glow-pulse 3.2s ease-in-out infinite 2.2s; }
   .sec-shield { position: absolute; right: 26px; top: 26px; font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #0d1117;
     background: #3fb950; padding: 8px 12px; border-radius: 99px; box-shadow: 0 0 24px #3fb95055; }
   .sec-box.sandbox ul { gap: 10px; }
@@ -1644,7 +1657,9 @@
   .ek-pill.y rect { stroke: #6e7681; fill: #ffffff0d; } .ek-pill.y text { fill: #d1d7e0; }
   .ek-task { fill: #161b22; stroke: #8b949e; stroke-width: 1.5; stroke-dasharray: 6 5; }
   .ek-wall { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
-  .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e55); } }
+  .ek-glow { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; pointer-events: none; opacity: 0; }
+  .ek-glow rect { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; filter: drop-shadow(0 0 18px #f0883e55); }
+  .active .ek-glow { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { opacity: 1; } }
   .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
   .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x, .ek-ft { opacity: 0; transition: opacity .4s, transform .4s; }
   .ek-shield circle { fill: #0d1117; stroke: #4493f8; stroke-width: 2; }
@@ -1727,8 +1742,10 @@
   .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both var(--d); }
   .zs-vm { fill: #1c1233f2; stroke: #a371f7; stroke-width: 4; }
   .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
-  .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 2.6s; }
-  @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f755); } }
+  /* the micro-VM's pulsing seal glow, blurred once in its own layer behind the diagram and faded by opacity */
+  .zs-glow { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; pointer-events: none; opacity: 0; }
+  .zs-glow rect { fill: #1c1233f2; stroke: #a371f7; stroke-width: 4; filter: drop-shadow(0 0 22px #a371f755); }
+  .active .zs-glow { animation: glow-pulse 3.2s ease-in-out infinite 2.6s; }
   .zs-lock circle { fill: #0d1117; stroke: #a371f7; stroke-width: 3; filter: drop-shadow(0 0 10px #a371f755); }
   .zs-lock .zs-li { fill: #d2a8ff; }
   .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
@@ -2245,11 +2262,12 @@
   .tiv-hl.on { background: color-mix(in srgb, var(--c) 28%, transparent); box-shadow: 0 0 0 1.5px var(--c); }
   .pf-card.tiv-ai { left: 750px; width: 380px; padding: 22px; --c: #ab7df8; }
   .tiv-who { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #3d444d; }
-  .tiv-orb { width: 64px; height: 64px; flex: none; box-sizing: border-box; border-radius: 50%; display: grid; place-items: center; background: #0d1117; border: 2px solid #3d444d; transition: border-color .4s, box-shadow .4s; }
+  .tiv-orb { position: relative; width: 64px; height: 64px; flex: none; box-sizing: border-box; border-radius: 50%; display: grid; place-items: center; background: #0d1117; border: 2px solid #3d444d; transition: border-color .4s, box-shadow .4s; }
+  .tiv-orb::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; box-shadow: 0 0 46px #ab7df8cc; opacity: 0; pointer-events: none; }
   .tiv-orb svg { width: 34px; height: 34px; fill: #f0f6fc; }
-  .tiv-ai.busy .tiv-orb { border-color: #ab7df8; animation: tiv-pulse .9s ease-in-out infinite; }
+  .tiv-ai.busy .tiv-orb { border-color: #ab7df8; }
+  .tiv-ai.busy .tiv-orb::after { animation: glow-pulse .9s ease-in-out infinite; }
   .tiv-ai.done .tiv-orb { border-color: #ab7df8; box-shadow: 0 0 26px #ab7df855; }
-  @keyframes tiv-pulse { 50% { box-shadow: 0 0 46px #ab7df8cc; } }
   .tiv-who b { display: block; font-size: 24px; color: #f0f6fc; }
   .tiv-who code { display: block; margin-top: 6px; font: 500 16px/1.3 var(--mono); color: #d2a8ff; }
   .tiv-slot { margin-top: 14px; padding: 8px 12px; border-left: 3px solid #3d444d; border-radius: 4px; transition: border-color .4s, background .4s; }
@@ -3538,6 +3556,13 @@
       ${[0, 1, 2, 3, 4, 5].map(i => `<text class="ga-mono ga-ln" x="64" y="${540 + i * 28}" font-size="18"></text>`).join("")}`;
     const gq = s => gaSvg.querySelector(s),
       gqa = s => [...gaSvg.querySelectorAll(s)];
+    const gaGlow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    gaGlow.setAttribute("class", "ga-glow");
+    gaGlow.setAttribute("viewBox", "0 0 1080 732");
+    gaGlow.setAttribute("aria-hidden", "true");
+    gaGlow.innerHTML = `<mask id="gaGlowM" maskUnits="userSpaceOnUse" x="-80" y="${GA_Y - 80}" width="${GA_W + 160}" height="280"><rect x="-80" y="${GA_Y - 80}" width="${GA_W + 160}" height="280" fill="#fff"/><rect x="0" y="${GA_Y}" width="${GA_W}" height="120" rx="12" fill="#000"/></mask>
+      <g><g mask="url(#gaGlowM)"><rect x="0" y="${GA_Y}" width="${GA_W}" height="120" rx="12"/></g></g>`;
+    const gaGlowG = gaGlow.querySelector("g");
     const gaCards = gqa(".ga-card"),
       gaEdges = gqa(".ga-edge"),
       gaLines = gqa(".ga-ln");
@@ -3610,6 +3635,9 @@
         c.classList.toggle("run", st[i] === 1);
         c.classList.toggle("ok", st[i] === 2);
       });
+      // the agent card only runs in the settled agentic layout, so its glow takes the card's position once as it starts
+      if (st[1] === 1 && !gaGlow.classList.contains("run")) gaGlowG.setAttribute("transform", gaCards[1].getAttribute("transform"));
+      gaGlow.classList.toggle("run", st[1] === 1);
       const started = e >= 0;
       [started, st[0] === 2, st[0] === 2, st[1] === 2, st[2] === 2].forEach((on, i) => gaEdges[i].classList.toggle("on", on));
       gaSvg.classList.toggle("ga-done", done);
@@ -3679,6 +3707,7 @@
             { class: "shot" },
             h("div", { class: "bar" }, h("i", { style: { background: "#3d444d" } }), h("i", { style: { background: "#3d444d" } }), h("i", { style: { background: "#3d444d" } }), h("div", { class: "url" }, DOCS_URL.replace("https://", ""))),
             gaSvg,
+            gaGlow,
             h("div", { class: "glare" })
           )
         )
@@ -5516,6 +5545,11 @@
       g += `<text class="zs-phase" id="zsPhase" x="1476" y="34"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
       svg.innerHTML = g;
     };
+    const glow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    glow.setAttribute("class", "zs-glow");
+    glow.setAttribute("viewBox", "0 0 1800 600");
+    glow.setAttribute("aria-hidden", "true");
+    glow.innerHTML = `<rect x="0" y="0" width="300" height="450" rx="18"/>`;
     let built = false,
       t0 = 0,
       cyc = -1,
@@ -5605,7 +5639,7 @@
           dot.style.opacity = 1;
         } else dot.style.opacity = 0;
       },
-      el: h("section", { class: "slide zs" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Nothing to steal inside the sandbox"), h("h2", {}, letters("Zero-secret "), letters("agents", "l-grad"))), svg),
+      el: h("section", { class: "slide zs" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Nothing to steal inside the sandbox"), h("h2", {}, letters("Zero-secret "), letters("agents", "l-grad"))), glow, svg),
     });
   }
 
@@ -15415,6 +15449,12 @@
       b += `<text class="big" x="1496" y="66">ENCLAVE · FOOTPRINT</text><text x="1496" y="110">PLAN · SINGLE USE</text><text x="1716" y="110">DWG EK-01</text>`;
       bp.innerHTML = b;
     }
+    // the wall's pulsing glow, blurred once in its own layer and faded by opacity so it never repaints the diagram
+    const glow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    glow.setAttribute("class", "ek-glow");
+    glow.setAttribute("viewBox", "0 0 1800 600");
+    glow.setAttribute("aria-hidden", "true");
+    glow.innerHTML = `<rect x="880" y="40" width="420" height="510" rx="24"/>`;
     // [time, path, stage label, sound]
     const STEPS = [
       [400, "ekP1", "Waiting for task", () => sfx.pop(0)],
@@ -15483,7 +15523,14 @@
         dot.setAttribute("class", "ek-dot " + (s[1] === "ekP4" ? "r" : s[1] === "ekP3" ? "o" : ""));
         dot.style.opacity = 1;
       },
-      el: h("section", { class: "slide ek" }, bp, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide ek" },
+        bp,
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))),
+        glow,
+        svg
+      ),
     });
   }
 
