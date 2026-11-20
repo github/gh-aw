@@ -1,4 +1,11 @@
-# Agent Performance Analyzer - Latest Run (2026-11-17)
+# Agent Performance Analyzer - Latest Run (2026-11-20)
+
+## 2026-11-20 run (noop)
+- Data basis: last complete scored snapshot is `metrics/daily/2026-11-17.json` (368 workflows, 618 executed, 78.0% success, 195 primary outputs, 88.35M tokens; re-verified). 11-18, 11-19, 11-20 snapshots and `latest.json` are partial and not scored.
+- Tracker states re-verified via `github issue_read` (state fields only): #78066 CLOSED not_planned, closed_at 2026-11-17T14:40:35Z (created 11-15T12:53Z; ~2d, matches `expires: 2d`). Correction: earlier notes give 12:53Z as the close time; 12:53Z is the expiry time. #77984 CLOSED not_planned 11-16T04:48Z. #78921, #78922, #78923 CLOSED not_planned 11-19T04:40Z (created 11-18T04:39Z, ~24h, matches `expires: 1d`). #78259, #78416, #78418, #78429 CLOSED not_planned 11-17 (created 11-16). No open tracker is verifiable: open-issue list fully integrity-filtered (30 of 30 hidden).
+- Likely self-filed: #78066 carries the `cookie` label and a 2d expiry, and the 11-15 run logged 2 issues. Inferred, not verified via author. If so, this workflow's own `expires: 2d` also auto-closes its trackers while failures persist.
+- Inconsistency confirmed for mattpocock-skills-reviewer, comments_added by complete day: 11-13 0, 11-14 0, 11-15 39, 11-17 0 (11-16 partial 49). Exec 19/32/52/33.
+- Decision: noop. The expiry-closure recommendation (2026-09-21, 2026-11-14, 2026-11-17) already covers this. Filing a new issue would duplicate it. Next weekly discussion due 2026-11-22.
 
 Data basis: `metrics/latest.json` (collection_status complete; window 2026-11-16T02:33Z to 2026-11-17T02:33Z). Quality and engagement fields are null, so scores use executed-run success rate only. No output sampling was done.
 Totals (11-17): 618 executed, 78.0% successful, 88.3M tokens, 195 safe outputs.
@@ -67,3 +74,4 @@ Weekly report already published 11-15; next weekly due 11-22. No new discussion 
 - 2026-11-16: ranking from complete 11-15 snapshot. Verified trackers. Corrected aw_cj01, DDG tokens, and labels. noop.
 - 2026-11-17: ranking from complete 11-17 snapshot. Verified trackers via github issue_read. Corrected DGTP prompt note. Recorded expiry-closure pattern. noop.
 - 2026-11-18: re-verified 11-17 complete snapshot (618 executed, 482 successful, 88.35M tokens, 195 primary outputs; all match). 11-18 snapshot partial (2.25h window), not scored. Corrected ai-moderator under-creation; added zero-output candidates. noop.
+- 2026-11-20: 11-17 snapshot re-verified; 9 tracker states re-verified; #78066 closed_at corrected; mattpocock inconsistency confirmed over 5 complete/partial days. noop.
