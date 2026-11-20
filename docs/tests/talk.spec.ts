@@ -1178,7 +1178,16 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
     tours: { ends: { title: "Both ends", summary: "first and last", slides: ["hello", "goodbye"] }, part: { title: "Just the part", bands: ["part"] }, ghost: { slides: ["nope"] } },
     last: last === "none" ? null : last || "outro",
     kioskInterval: +query.get("kiosk") || undefined,
-    captions: query.has("cc") ? { scripts: { hello: ["Good evening, the top story.", "Thanks, glad to be here."] } } : undefined,
+    captions: query.has("cc")
+      ? {
+          scripts: {
+            hello:
+              query.get("cc") === "long"
+                ? ["Opening words come first in this long turn, then many more words follow on and on across several caption rows until the closing words."]
+                : ["Good evening, the top story.", "Thanks, glad to be here."],
+          },
+        }
+      : undefined,
     sound,
   });
 </script></body></html>`;
@@ -1596,6 +1605,24 @@ test.describe("reusable runtime", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
     await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
+    expect(errors).toEqual([]);
+  });
+
+  test("rolls a long caption turn up a row at a time under reduced motion, showing its opening before it scrolls off", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc=long&fs=none#hello");
+    const box = page.locator(".cc-box");
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await page.clock.runFor(1500);
+    await expect(box).toContainText(">> OPENING WORDS");
+    await expect(box).not.toContainText("CLOSING WORDS");
+    // step to the end of the turn: its closing row arrives before the slide's dwell ends
+    for (let t = 0; t < 40 && !(await box.textContent())?.includes("CLOSING WORDS."); t++) await page.clock.runFor(500);
+    await expect(box).toContainText("CLOSING WORDS.");
+    await expect(box).not.toContainText("OPENING WORDS");
     expect(errors).toEqual([]);
   });
 

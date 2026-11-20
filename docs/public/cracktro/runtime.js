@@ -85,8 +85,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -2124,9 +2124,13 @@
     const capDwell = i => capPlan(i).dur;
     let cc = null;
     const ccPaint = () => [...ccRows.children].forEach((d, k) => (d.textContent = cc ? (cc.rows[cc.rows.length - 3 + k] ?? "") : ""));
+    const ccWraps = text => {
+      const row = cc.rows[cc.rows.length - 1];
+      return row.length + 1 + text.length > CAP_COLS && row !== ">>";
+    };
     const ccPut = text => {
       const last = cc.rows.length - 1;
-      if (cc.rows[last].length + 1 + text.length > CAP_COLS && cc.rows[last] !== ">>") cc.rows.push(text);
+      if (ccWraps(text)) cc.rows.push(text);
       else cc.rows[last] += ` ${text}`;
       if (cc.rows.length > 3) cc.rows.splice(0, cc.rows.length - 3);
     };
@@ -2145,9 +2149,9 @@
           if (e.turn) cc.rows.push(">>");
           else cc.rows[cc.rows.length - 1] = ">>";
         } else if (REDUCED) {
-          // reduced motion: the whole line lands at once
-          for (; cc.i < plan.ev.length && plan.ev[cc.i].text != null && plan.ev[cc.i].turn === e.turn; cc.i++) ccPut(plan.ev[cc.i].text);
-          cc.i--;
+          // reduced motion: a whole row lands at once, on the plan's timing, so no row scrolls off unread
+          ccPut(e.text);
+          for (let n; (n = plan.ev[cc.i + 1]) && n.text != null && n.turn === e.turn && !ccWraps(n.text); cc.i++) ccPut(n.text);
         } else ccPut(e.text);
         dirty = true;
       }
