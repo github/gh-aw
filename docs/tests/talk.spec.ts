@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync, readdirSync } from "node:fs";
-import { injectSlideMetadata, loadSlides, parseSlides, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
+import { injectSlideMetadata, loadSlides, parseSlides, renderCaptions, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
 
 // The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its row position, its link the stable #id.
 const SLIDES = loadSlides();
@@ -628,15 +628,19 @@ test("ships local assets with the docs and links to the talk from the footer", a
   expect(await page.evaluate(() => document.fonts.check('16px "Monaspace Neon"'))).toBe(true);
 });
 
-test("scripts closed captions for every slide, in deck order", () => {
-  const scope: { CracktroCaptions?: { scripts: Record<string, string[]> } } = {};
-  new Function("window", readFileSync(new URL("../public/cracktro/captions.js", import.meta.url), "utf8"))(scope);
-  const scripts = scope.CracktroCaptions!.scripts;
+test("generates the kiosk closed captions from slides.md, in deck order, as one inert script", () => {
+  const run = (source: string) => {
+    const scope: { CracktroCaptions?: { scripts: Record<string, string[]> } } = {};
+    new Function("window", source)(scope);
+    return scope.CracktroCaptions!.scripts;
+  };
+  const scripts = run(renderCaptions(SLIDES));
   expect(Object.keys(scripts)).toEqual(SLIDES.map(slide => slide.id));
-  for (const [id, lines] of Object.entries(scripts)) {
-    expect(lines.length, id).toBeGreaterThanOrEqual(2);
-    for (const line of lines) expect(line.trim().length, id).toBeGreaterThan(0);
-  }
+  for (const slide of SLIDES) expect(scripts[slide.id], slide.id).toEqual(slide.captions);
+  const hostile = parseSlides(["| Id | Heading | Notes | Summary | Keywords | Captions |", "|---|---|---|---|---|---|", "| a | A |  | First. | k | </script>\u2028x >> `${x}` & \"q\" |", ""].join("\n"));
+  const source = renderCaptions(hostile);
+  expect(source).not.toMatch(/<\/script|\u2028/);
+  expect(run(source)).toEqual({ a: ["</script>\u2028x", '`${x}` & "q"'] });
 });
 
 test("publishes a social card for link previews", async ({ page, request }) => {
@@ -963,49 +967,52 @@ test("splits inline skills and agents, defers context and preserves step navigat
 });
 
 test.describe("slides.md metadata", () => {
-  const table = (...rows: string[]) => ["# Slides", "", "| Id | Heading | Notes | Summary | Keywords |", "|---|---|---|---|---|", ...rows, ""].join("\n");
+  const table = (...rows: string[]) => ["# Slides", "", "| Id | Heading | Notes | Summary | Keywords | Captions |", "|---|---|---|---|---|---|", ...rows, ""].join("\n");
 
   test("parses every row with a unique id, a unique, public summary and keywords", () => {
     expect(SLIDES.length).toBeGreaterThan(0);
-    expect(parseSlides(table("| a | A |  | First. | one |", "| b-2 | B | illustrative | Second. | two words, CI/CD ,x |"))).toEqual([
-      { id: "a", heading: "A", illustrative: false, summary: "First.", keywords: ["one"], line: 5 },
-      { id: "b-2", heading: "B", illustrative: true, summary: "Second.", keywords: ["two words", "CI/CD", "x"], line: 6 },
+    expect(parseSlides(table("| a | A |  | First. | one | c >> d |", "| b-2 | B | illustrative | Second. | two words, CI/CD ,x | c >> d |"))).toEqual([
+      { id: "a", heading: "A", illustrative: false, summary: "First.", keywords: ["one"], captions: ["c", "d"], line: 5 },
+      { id: "b-2", heading: "B", illustrative: true, summary: "Second.", keywords: ["two words", "CI/CD", "x"], captions: ["c", "d"], line: 6 },
     ]);
     for (const slide of SLIDES) {
       expect(`${slide.heading} ${slide.summary} ${slide.keywords.join(" ")}`, slide.heading).not.toMatch(PRIVATE_REFS);
-      expect(`${slide.summary} ${slide.keywords.join(" ")}`, slide.heading).not.toMatch(/https?:|@[\w-]|#\d/);
+      expect(`${slide.summary} ${slide.keywords.join(" ")} ${slide.captions.join(" ")}`, slide.heading).not.toMatch(/https?:|@[\w-]|#\d/);
+      expect(slide.captions.join(" "), slide.heading).not.toMatch(PRIVATE_REFS);
     }
   });
 
   test("rejects malformed slide lists with the offending line", () => {
     const cases: [string, RegExp][] = [
-      [table("| a | A | First. | k |"), /:5: expected 5 cells, found 4/],
-      [table("| a | A |  | First. | k | extra |"), /:5: expected 5 cells, found 6/],
-      [table("| a | A |  | First. | k"), /:5: malformed row/],
-      [table("| A | A |  | First. | k |"), /:5: invalid Id "A" for "A"/],
-      [table("|  | A |  | First. | k |"), /:5: invalid Id "" for "A"/],
-      [table("| a | A |  | First. | k |", "| a | B |  | Second. | k |"), /:6: duplicate Id "a" \(first on line 5\)/],
-      [table("| a |  |  | First. | k |"), /:5: empty Heading/],
-      [table("| a | A |  |  | k |"), /:5: empty Summary for "A"/],
-      [table("| a | A |  | First. |  |"), /:5: empty keyword for "A"/],
-      [table("| a | A |  | First. | k,, l |"), /:5: empty keyword for "A"/],
-      [table("| a | A |  | First. | Key, key |"), /:5: duplicate keyword "key" for "A"/],
-      [table("| a | A | synthetic | First. | k |"), /:5: unknown Notes value "synthetic"/],
-      [table("| a | A |  | First. | k |", "| b | A |  | Second. | k |"), /:6: duplicate Heading "A" \(first on line 5\)/],
-      [table("| a | Human agent processes |  | First. | k |", "| b | Human Agent Processes |  | Second. | k |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
-      [table("| a | A |  | Same. | k |", "| b | B |  | Same. | k |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
-      [table("| a | A |  | First. | k |", "b | B | illustrative | Last slide. | k |"), /:6: malformed row, expected "\| Id \| Heading \| Notes \| Summary \| Keywords \|": b \| B \| illustrative \| Last slide\. \| k \|/],
-      [table("| a | A |  | First. | k |", "", "| b | B |  | Second. | k |"), /:7: table row outside the slide table/],
+      [table("| a | A | First. | k | c >> d |"), /:5: expected 6 cells, found 5/],
+      [table("| a | A |  | First. | k | c >> d | extra |"), /:5: expected 6 cells, found 7/],
+      [table("| a | A |  | First. | k | c >> d"), /:5: malformed row/],
+      [table("| A | A |  | First. | k | c >> d |"), /:5: invalid Id "A" for "A"/],
+      [table("|  | A |  | First. | k | c >> d |"), /:5: invalid Id "" for "A"/],
+      [table("| a | A |  | First. | k | c >> d |", "| a | B |  | Second. | k | c >> d |"), /:6: duplicate Id "a" \(first on line 5\)/],
+      [table("| a |  |  | First. | k | c >> d |"), /:5: empty Heading/],
+      [table("| a | A |  |  | k | c >> d |"), /:5: empty Summary for "A"/],
+      [table("| a | A |  | First. |  | c >> d |"), /:5: empty keyword for "A"/],
+      [table("| a | A |  | First. | k,, l | c >> d |"), /:5: empty keyword for "A"/],
+      [table("| a | A |  | First. | Key, key | c >> d |"), /:5: duplicate keyword "key" for "A"/],
+      [table("| a | A | synthetic | First. | k | c >> d |"), /:5: unknown Notes value "synthetic"/],
+      [table("| a | A |  | First. | k | c >> d |", "| b | A |  | Second. | k | c >> d |"), /:6: duplicate Heading "A" \(first on line 5\)/],
+      [table("| a | Human agent processes |  | First. | k | c >> d |", "| b | Human Agent Processes |  | Second. | k | c >> d |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
+      [table("| a | A |  | Same. | k | c >> d |", "| b | B |  | Same. | k | c >> d |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
+      [table("| a | A |  | First. | k | c >> d |", "b | B | illustrative | Last slide. | k |"), /:6: malformed row, expected "\| Id \| Heading \| Notes \| Summary \| Keywords \| Captions \|": b \| B \| illustrative \| Last slide\. \| k \|/],
+      [table("| a | A |  | First. | k | c >> d |", "", "| b | B |  | Second. | k | c >> d |"), /:7: table row outside the slide table/],
       [table(), /:3: slide table has no rows/],
       ["| Heading | Notes | Summary | Keywords |\n|---|---|---|---|\n| A |  | First. | k |\n", /:1: expected table header/],
-      ["| Id | Heading | Notes | Summary | Keywords |\n|---|---|---|---|\n", /:2: expected separator/],
+      ["| Id | Heading | Notes | Summary | Keywords | Captions |\n|---|---|---|---|---|\n", /:2: expected separator/],
+      [table("| a | A |  | First. | k | Only one turn. |"), /:5: Captions for "A" need at least two speaker turns separated by ">>"/],
+      [table("| a | A |  | First. | k | c >>  >> d |"), /:5: empty caption turn for "A"/],
       ["no table", /missing slide table/],
     ];
     for (const [text, error] of cases) expect(() => parseSlides(text, "slides.md"), String(error)).toThrow(error);
   });
 
   test("injects escaped, idempotent JSON-LD and leaves the rest of the page untouched", () => {
-    const hostile = parseSlides(table("| a | A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. | </script>, a&b |"));
+    const hostile = parseSlides(table("| a | A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. | </script>, a&b | c >> d |"));
     const html = injectSlideMetadata(SOURCE_HTML, hostile, PAGE_URL);
     expect(html.match(/<\/script>/gi)).toHaveLength(SOURCE_HTML.match(/<\/script>/gi)!.length);
     expect(html).not.toContain("<b>");
