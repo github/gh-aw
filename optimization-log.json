@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-10-06",
-    "workflow_name": "Daily Caveman Optimizer",
-    "workflow_file": "daily-caveman-optimizer",
-    "total_aic_analyzed": 118.48,
-    "runs_audited": 5,
-    "recommendations_count": 4,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 90
-  },
-  {
     "date": "2026-10-07",
     "workflow_name": "PR Code Quality Reviewer",
     "workflow_file": "pr-code-quality-reviewer",
@@ -298,5 +288,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 1.2
+  },
+  {
+    "date": "2026-11-20",
+    "workflow_name": "PureLock",
+    "workflow_file": "purelock",
+    "total_aic_analyzed": 108.87,
+    "runs_audited": 1,
+    "recommendations_count": 5,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 70
   }
 ]
