@@ -453,13 +453,6 @@
   .wpf-cap { position: absolute; left: 110px; right: 110px; top: 944px; font: 600 34px/1.2 "Mona Sans"; color: #f0f6fc; text-align: center; }
   .wpf-cap.swap { animation: wpf-in .7s cubic-bezier(.2,.9,.2,1) both; }
   @keyframes wpf-in { from { opacity: 0; transform: translateY(14px); } }
-  /* A factory at work: improvers → clustering → assignment → Pull Request Review² → merge */
-  .wpx-svg { left: 110px; top: 290px; width: 1700px; height: 620px; }
-  .wpx-t { fill: #f0f6fc; font: 600 20px "Mona Sans"; text-anchor: middle; }
-  .wpx-svg .fm-task.on circle { filter: drop-shadow(0 0 14px var(--c)); }
-  .wpx-svg .mra-dev.on circle { filter: drop-shadow(0 0 14px #4493f8); }
-  .wpx-day { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
-  .wpx-cap { position: absolute; left: 110px; right: 110px; top: 952px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
   .du-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
   .du-t { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
   .du-n { fill: #f0f6fc; font: 800 38px "Mona Sans"; text-anchor: middle; }
@@ -6426,9 +6419,8 @@
     slides.push({
       group: "platform",
       id: "workflows-process-factory",
-      key: "factory",
       notes:
-        "What: An illustrative zoom-out in three steps. A workflow is one hop: an issue starts an agent, and the agent opens a pull request through safe outputs. Sequence workflows so each output triggers the next and you have a process. Run many processes that feed each other, each step on whichever harness fits it, with developers triaging, steering, reviewing and approving at the gates, and you have a factory.\nWhy: Every factory is made of processes, and every process is made of small, guarded workflows, so you build and improve the factory one workflow at a time while people keep the decisions.\nWhen: Start with one workflow, then wire its output into the next. Press the right arrow to zoom out a level; press down for a factory at work.",
+        "What: An illustrative zoom-out in three steps. A workflow is one hop: an issue starts an agent, and the agent opens a pull request through safe outputs. Sequence workflows so each output triggers the next and you have a process. Run many processes that feed each other, each step on whichever harness fits it, with developers triaging, steering, reviewing and approving at the gates, and you have a factory.\nWhy: Every factory is made of processes, and every process is made of small, guarded workflows, so you build and improve the factory one workflow at a time while people keep the decisions.\nWhen: Start with one workflow, then wire its output into the next. Press the right arrow to zoom out a level.",
       enter(dir) {
         setStep(dir < 0 ? 2 : 0, true);
       },
@@ -6487,172 +6479,6 @@
         h("div", { class: "wpf-steps" }, chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))),
         svg,
         cap
-      ),
-    });
-  }
-
-  // A factory at work: daily improvers file issues, a clustering workflow groups them, an assigner hands each cluster to Pull Request Review², a developer merges
-  {
-    resetIndex();
-    const VW = 1700,
-      VH = 620;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const agent = (id, x, y, who, label, ly = y + 60, r = 34) =>
-      `<g class="fm-task" id="${id}"><circle cx="${x}" cy="${y}" r="${r}" ${agDisc(who)}/>${ico(who, x, y + 1, r * 1.12, agFg(who))}${label ? `<text class="wpx-t" x="${x}" y="${ly}">${label}</text>` : ""}</g>`;
-    const dev = (id, x, y, who, label, ly) => `<g class="fm-task mra-dev" id="${id}"><circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/${who}.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#fwkClip)"/><text class="wpx-t" x="${x}" y="${ly}">${label}</text></g>`;
-    const box = (id, x, y, icon, label) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}${label ? `<text class="wpx-t" x="${x}" y="${y + 60}">${label}</text>` : ""}</g>`;
-    const IY = [150, 310, 470];
-    // [edge id, path, color, label, lx, ly, anchor]
-    const EDGES = [
-      ...IY.map((y, k) => [`fwI${k}`, `M128 ${y} H262`, "p", k ? [] : ["files issues"], 195, y - 16, "middle"]),
-      ["fwC0", "M338 150 C430 150 420 310 484 310", "p", ["groups by theme"], 440, 190, "start"],
-      ["fwC1", "M338 310 H484", "p", [], 0, 0, "start"],
-      ["fwC2", "M338 470 C430 470 420 310 484 310", "p", [], 0, 0, "start"],
-      ["fwK0", "M556 300 C630 300 630 220 702 220", "p", [], 0, 0, "start"],
-      ["fwK1", "M556 320 C630 320 630 400 702 400", "p", [], 0, 0, "start"],
-      ["fwA0", "M778 220 C870 220 860 310 924 310", "p", [], 0, 0, "start"],
-      ["fwA1", "M778 400 C870 400 860 310 924 310", "p", [], 0, 0, "start"],
-      ["fwA2", "M960 346 V440", "b", [], 0, 0, "start"],
-      ["fwP0", "M996 470 C1090 470 1070 190 1124 182", "p", ["assigns"], 1062, 400, "end"],
-      ["fwP1", "M1160 216 V294", "p", ["opens PR"], 1176, 262, "start"],
-      ["fwP2", "M1198 318 C1290 318 1300 250 1358 250", "p", [], 0, 0, "start"],
-      ["fwP3", "M1198 342 C1290 342 1300 410 1358 410", "p", [], 0, 0, "start"],
-      ["fwP4", "M1372 224 C1336 166 1252 166 1198 178", "p", ["findings"], 1290, 156, "middle"],
-      ["fwP5", "M1198 330 H1562", "b", ["clean PR"], 1445, 320, "middle"],
-      ["fwP6", "M1600 366 V452", "b", ["merges"], 1618, 415, "start"],
-      ["fwD", "M1600 526 V596 H22 V150 H52", "p day", ["every day, the improvers run again"], 850, 586, "middle"],
-    ];
-    // [edges travelled together, nodes lit on arrival, duration]
-    const SEQ = [
-      [["fwI0", "fwI1", "fwI2"], ["fwIss0", "fwIss1", "fwIss2"]],
-      [["fwC0", "fwC1", "fwC2"], ["fwClu"]],
-      [["fwK0", "fwK1"], ["fwCA", "fwCB"]],
-      [["fwA0", "fwA1"], ["fwAsg"]],
-      [["fwA2"], ["fwGate"]],
-      [["fwP0"], ["fwCop"]],
-      [["fwP1"], ["fwPR"]],
-      [["fwP2", "fwP3"], ["fwRev0", "fwRev1"]],
-      [["fwP4"], ["fwCop"]],
-      [["fwP5"], ["fwDev"]],
-      [["fwP6"], ["fwMerge"]],
-      [["fwD"], [], 1800],
-    ];
-    const LANE = { fwImp: 0, fwIss: 0, fwClu: 1, fwCA: 1, fwCB: 1, fwAsg: 2, fwGate: 2, fwCop: 3, fwPR: 3, fwRev: 3, fwDev: 4, fwMerge: 4 };
-    let g = `<defs><clipPath id="fwkClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
-      <marker id="fwkP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <marker id="fwkB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    [
-      [0, 400, "DAILY IMPROVERS"],
-      [400, 860, "CLUSTER"],
-      [860, 1080, "ASSIGN"],
-      [1080, 1500, "PULL REQUEST REVIEW²"],
-      [1500, VW, "MERGE"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="fwLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
-    });
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#fwk${c.startsWith("p") ? "P" : "B"})"/>`;
-      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    [
-      ["Test improver", "claude"],
-      ["Perf improver", "codex"],
-      ["Docs improver", "pi"],
-    ].forEach(([l, a], k) => (g += agent(`fwImp${k}`, 90, IY[k], a, l) + box(`fwIss${k}`, 300, IY[k], "issue")));
-    g += agent("fwClu", 520, 310, "agy", "Issue clusterer") + box("fwCA", 740, 220, "tasklist", "cluster A") + box("fwCB", 740, 400, "tasklist", "cluster B");
-    g += agent("fwAsg", 960, 310, "codex", "Cluster assigner", 260) + dev("fwGate", 960, 480, "ducky", "prioritizes", 540);
-    g += agent("fwCop", 1160, 180, "copilot", "Copilot", 128) + box("fwPR", 1160, 330, "pr");
-    g += agent("fwRev0", 1390, 250, "claude", "", 0, 28) + dev("fwRev1", 1390, 410, "mona", "Agent + human", 470);
-    g += `<g class="fm-task mra-dev" id="fwDev"><circle cx="1600" cy="330" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="1569" y="299" width="62" height="62" clip-path="url(#fwkClip)"/><text class="wpx-t" x="1600" y="282">Developer</text></g>`;
-    g += box("fwMerge", 1600, 490, "merge");
-    g += `<g>${ico("calendar", 30, 92, 26, "#ab7df8")}<text class="wpx-day" id="fwDay" x="52" y="101">DAY 1</text></g>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg wpx-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const dots = [0, 1, 2].map(() => {
-      const d = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      d.setAttribute("class", "fm-dot");
-      d.setAttribute("r", "8");
-      svg.append(d);
-      return d;
-    });
-    const $ = id => svg.querySelector("#" + id);
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 1000,
-      START = 900,
-      HOLD = 800,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1;
-    const light = nid => {
-      $(nid).classList.add("on");
-      $("fwLane" + LANE[nid.replace(/\d+$/, "")]).classList.add("on");
-    };
-    slides.push({
-      group: "platform",
-      id: "a-factory-at-work",
-      under: "factory",
-      notes:
-        "What: An illustrative factory assembled from processes shown later in the talk. Several daily improvers, each on a different harness, file issues; a clustering workflow groups related issues by theme; an assigner workflow proposes the next cluster and a developer prioritizes it; the Pull Request Review² process has Copilot open a pull request while an agent reviewer and a developer send findings back until it is clean; a developer merges it. The next day the improvers run again.\nWhy: Each workflow stays small and single-purpose and can run on whichever harness fits it. The value comes from the sequence, and developers intervene where judgement matters: priority, review and merge.\nWhen: Once several improvers run, add clustering and assignment so their findings arrive as a few focused pull requests instead of many small ones.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          $("fwDay").textContent = `DAY ${c + 1}`;
-          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
-          [0, 1, 2].forEach(k => light(`fwImp${k}`));
-          popK = -1;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        dots.forEach(d => (d.style.opacity = 0));
-        if (u < START || u >= END) return;
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eids, nids, dur = STEP] = SEQ[k],
-          f = (u - T[k]) / dur;
-        for (let j = 0; j < k; j++) SEQ[j][1].forEach(light);
-        eids.forEach((eid, i) => {
-          const p = $(eid),
-            q = p.getPointAtLength(p.getTotalLength() * ease(Math.min(1, f / 0.8))),
-            d = dots[i];
-          p.classList.add("hot");
-          d.style.opacity = 1;
-          d.setAttribute("cx", q.x);
-          d.setAttribute("cy", q.y);
-          d.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        });
-        if (f >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          nids.forEach(light);
-        }
-      },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Improvers → clustering → assignment → PR Review² → merge"), h("h2", {}, letters("A factory "), letters("at work", "l-grad"))),
-        svg,
-        h("div", { class: "wpx-cap" }, "Illustrative flow · agents on several harnesses do the work; developers prioritize, review and merge")
       ),
     });
   }
