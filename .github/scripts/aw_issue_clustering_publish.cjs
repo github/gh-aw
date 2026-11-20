@@ -336,7 +336,7 @@ async function ensureLabel(github, owner, repo, staged, core) {
   else await github.rest.issues.createLabel({ owner, repo, name: label, color: "1D76DB", description: "Essential AW-generated issue clusters: assign one to resolve related findings" });
 }
 
-async function reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue) {
+async function reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue, expiresHours) {
   const existing = new Map(corpus.managed.map(item => [metadata(item).key, item]));
   const wanted = new Set(clusters.map(cluster => cluster.key));
   const retiring = [...existing].filter(([key]) => !wanted.has(key)).map(([, item]) => item);
@@ -389,7 +389,7 @@ async function reconcile(github, owner, repo, clusters, corpus, staged, core, cr
       const live = await collectIssues(github, owner, repo);
       requireValid(live.filter(issue => issue.state === "open" && managed(issue)).length < 10, "Active queue is full; refusing an eleventh issue");
       requireValid(typeof createIssue === "function", "Attributed issue-creation API is required");
-      const created = await createIssue({ owner, repo, title, body: content, labels: [label, "automation", "agentic-workflows", "cookie"] });
+      const created = await createIssue({ owner, repo, title, body: content, expiresHours, labels: [label, "automation", "agentic-workflows", "cookie"] });
       requireValid(!created.staged, "Issue creation was unexpectedly staged during live reconciliation");
       url = created.issue.html_url;
     }
@@ -547,6 +547,8 @@ async function publishDashboard(github, owner, repo, body, staged, core) {
 
 async function publish({ github, context, core, createIssue }) {
   const { owner, repo } = context.repo;
+  const expiresHours = Number(process.env.GH_AW_ISSUE_EXPIRES_HOURS);
+  requireValid(Number.isFinite(expiresHours) && expiresHours > 0 && expiresHours <= 48, "GH_AW_ISSUE_EXPIRES_HOURS must be configured in workflow YAML between 0 (exclusive) and 48 hours");
   const output = JSON.parse(fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, "utf8"));
   const items = (output.items || []).filter(item => item.type === "publish_essential_issues");
   requireValid(items.length === 1, "Exactly one publish_essential_issues plan required");
@@ -578,7 +580,7 @@ async function publish({ github, context, core, createIssue }) {
   requireValid(dashboardBody(preview, refreshed, corpus, context.runId, corpus.cleanup, staged).length < 60000, "Dashboard body too large");
   const cleanup = await cleanupCompleted(github, owner, repo, corpus, staged, core);
   await ensureLabel(github, owner, repo, staged, core);
-  const result = await reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue);
+  const result = await reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue, expiresHours);
   const body = dashboardBody(result, refreshed, corpus, context.runId, cleanup, staged);
   await publishDashboard(github, owner, repo, body, staged, core);
   await core.summary.addRaw(body).write();
