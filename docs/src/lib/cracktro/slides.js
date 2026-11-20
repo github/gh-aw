@@ -85,13 +85,19 @@ export function parseSlides(text, source = "slides.md") {
     if (!ID.test(id)) fail(index, `invalid Id "${id}" for "${heading}" (expected lowercase kebab-case)`);
     if (ids.has(id)) fail(index, `duplicate Id "${id}" (first on line ${ids.get(id)})`);
     for (const name of FIELDS.slice(1)) if (!fields.has(name)) fail(index, `missing "#### ${name}" for "${heading}"`);
-    const join = (/** @type {string} */ name) => fields.get(name)?.lines.map(line => line.text.trim()).join(" ") ?? "";
-    const at = (/** @type {string} */ name) => /** @type {number} */ (fields.get(name)?.index);
+    const join = (/** @type {string} */ name) =>
+      fields
+        .get(name)
+        ?.lines.map(line => line.text.trim())
+        .join(" ") ?? "";
+    const at = (/** @type {string} */ name) => /** @type {number} */ fields.get(name)?.index;
     const notes = join("Notes");
     if (fields.has("Notes") && !NOTES.has(notes)) fail(at("Notes"), `unknown Notes value "${notes}" (expected "illustrative", or omit Notes)`);
     const summary = join("Summary");
     if (!summary) fail(at("Summary"), `empty Summary for "${heading}"`);
-    const keywords = join("Keywords").split(",").map(keyword => keyword.trim());
+    const keywords = join("Keywords")
+      .split(",")
+      .map(keyword => keyword.trim());
     if (keywords.some(keyword => !keyword)) fail(at("Keywords"), `empty keyword for "${heading}" (Keywords is a non-empty, comma-separated list)`);
     const seen = new Set();
     for (const keyword of keywords) {
@@ -101,7 +107,7 @@ export function parseSlides(text, source = "slides.md") {
     // Captions: one "- " list item per speaker turn; indented lines continue the turn.
     /** @type {string[]} */
     const captions = [];
-    for (const line of /** @type {{ index: number, lines: { index: number, text: string }[] }} */ (fields.get("Captions")).lines) {
+    for (const line of /** @type {{ index: number, lines: { index: number, text: string }[] }} */ fields.get("Captions").lines) {
       if (/^[-*](?:\s|$)/.test(line.text)) captions.push(line.text.slice(1).trim());
       else if (captions.length && /^\s/.test(line.text)) captions[captions.length - 1] = `${captions[captions.length - 1]} ${line.text.trim()}`.trim();
       else fail(line.index, `Captions for "${heading}" must be a "- " list, one speaker turn per item: ${line.text}`);

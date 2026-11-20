@@ -49,10 +49,14 @@
   .ga-copy { position: absolute; left: 110px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; gap: 26px; }
   .ga-copy h2 { margin: 0; font-size: 96px; line-height: .92; white-space: nowrap; font-variation-settings: "wght" 700, "wdth" 100; }
   .ga-copy h2 { --lg: #5fed83; }
-  .badge { align-self: flex-start; font: 500 22px/1 "Mona Sans"; color: #3fb950; background: #2ea04326;
-    border: 1px solid #2ea04366; padding: 10px 18px; border-radius: 2em; box-shadow: 0 0 30px #2ea04333; }
-  .active .badge { animation: rise .7s both .1s, pulse 2.4s ease-in-out infinite 1s; }
-  @keyframes pulse { 50% { box-shadow: 0 0 50px #2ea04355; } }
+  .badge { position: relative; align-self: flex-start; font: 500 22px/1 "Mona Sans"; color: #3fb950; background: #2ea04326;
+    border: 1px solid #2ea04366; padding: 10px 18px; border-radius: 2em; }
+  /* the pulse cross-fades two static glows by opacity instead of re-blurring box-shadow every frame */
+  .badge::before, .badge::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; }
+  .badge::before { box-shadow: 0 0 30px #2ea04333; } .badge::after { box-shadow: 0 0 50px #2ea04355; opacity: 0; }
+  .active .badge { animation: rise .7s both .1s; }
+  .active .badge::before { animation: glow-fade 2.4s ease-in-out infinite 1s; } .active .badge::after { animation: glow-pulse 2.4s ease-in-out infinite 1s; }
+  @keyframes glow-fade { 50% { opacity: 0; } } @keyframes glow-pulse { 50% { opacity: 1; } }
   .shot-wrap { position: absolute; right: 90px; top: 150px; width: 1080px; height: 780px; }
   .shot { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; background: #0d1117; border: 1px solid #3d444d;
     box-shadow: 0 60px 140px -20px #000, 0 0 0 1px #000, 0 0 120px -30px #3fb95055; }
@@ -78,8 +82,11 @@
   .ga-card.run .box { stroke: #d29922; }
   .ga-card.ok .box { stroke: #2ea043; }
   .ga-card.ag .box { fill: #1d1730; stroke: #8957e5; }
-  .ga-card.ag.run .box { stroke: #ab7df8; animation: ga-glow 1.2s ease-in-out infinite; }
-  @keyframes ga-glow { 50% { filter: drop-shadow(0 0 22px #a371f755); } }
+  .ga-card.ag.run .box { stroke: #ab7df8; }
+  /* the running agent card's glow: blurred once in an overlay masked to its outside, pulsed by opacity */
+  .ga-glow { position: absolute; left: 0; top: 48px; width: 100%; height: calc(100% - 48px); pointer-events: none; opacity: 0; }
+  .ga-glow rect { fill: #1d1730; filter: drop-shadow(0 0 22px #a371f755); }
+  .ga-glow.run { animation: glow-pulse 1.2s ease-in-out infinite; }
   .ga-card .ga-tag { fill: #ab7df8; opacity: 0; transition: opacity .4s; }
   .ga-card.ag .ga-tag { opacity: 1; }
   .ga-card .ring { fill: none; stroke: #6e7681; stroke-width: 3; transform-box: fill-box; transform-origin: center; }
@@ -1553,11 +1560,17 @@
     70% { opacity: .3; } 100% { opacity: 0; transform: translate(-30px, -16px); } }
   .sec-box:not(.sandbox) { background: #12080ae0; box-shadow: 0 0 50px -24px color-mix(in srgb, var(--c) 33%, transparent), inset 0 0 60px -50px color-mix(in srgb, var(--c) 33%, transparent); border-color: color-mix(in srgb, var(--c) 70%, transparent); }
   .sec-box.out { background: #0a1424f0; border-color: #4493f8; }
-  .active .sec-box.out { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 2100ms, calm 4s ease-in-out infinite 3s; }
-  @keyframes calm { 0%, 100% { box-shadow: 0 0 60px -14px #4493f844, inset 0 0 80px -40px #4493f833; } 50% { box-shadow: 0 0 90px -10px #4493f855, inset 0 0 100px -40px #4493f844; } }
+  .active .sec-box.out { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 2100ms; }
+  /* calm/safe glows: two static shadow layers behind the content, cross-faded by opacity instead of animating box-shadow on the 500px boxes */
+  .sec-box.out, .sec-box.sandbox { box-shadow: none; isolation: isolate; }
+  .sec-box.out::before, .sec-box.out::after, .sec-box.sandbox::before, .sec-box.sandbox::after { content: ""; position: absolute; inset: -2px; border: 2px solid transparent; border-radius: inherit; z-index: -1; pointer-events: none; }
+  .sec-box.sandbox::before, .sec-box.sandbox::after { inset: -3px; border-width: 3px; }
+  .sec-box.out::before { box-shadow: 0 0 60px -14px #4493f844, inset 0 0 80px -40px #4493f833; } .sec-box.out::after { box-shadow: 0 0 90px -10px #4493f855, inset 0 0 100px -40px #4493f844; opacity: 0; }
+  .active .sec-box.out::before { animation: glow-fade 4s ease-in-out infinite 3s; } .active .sec-box.out::after { animation: glow-pulse 4s ease-in-out infinite 3s; }
   .sec-box.sandbox { background: #0b1a10f0; border-width: 3px; z-index: 2; }
-  .active .sec-box.sandbox { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 1300ms, safe 3.2s ease-in-out infinite 2.2s; }
-  @keyframes safe { 0%, 100% { box-shadow: 0 0 70px -10px #3fb95044, inset 0 0 90px -40px #3fb95033; } 50% { box-shadow: 0 0 100px 0 #3fb95055, inset 0 0 120px -40px #3fb95044; } }
+  .active .sec-box.sandbox { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 1300ms; }
+  .sec-box.sandbox::before { box-shadow: 0 0 70px -10px #3fb95044, inset 0 0 90px -40px #3fb95033; } .sec-box.sandbox::after { box-shadow: 0 0 100px 0 #3fb95055, inset 0 0 120px -40px #3fb95044; opacity: 0; }
+  .active .sec-box.sandbox::before { animation: glow-fade 3.2s ease-in-out infinite 2.2s; } .active .sec-box.sandbox::after { animation: glow-pulse 3.2s ease-in-out infinite 2.2s; }
   .sec-shield { position: absolute; right: 26px; top: 26px; font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #0d1117;
     background: #3fb950; padding: 8px 12px; border-radius: 99px; box-shadow: 0 0 24px #3fb95055; }
   .sec-box.sandbox ul { gap: 10px; }
@@ -1644,7 +1657,9 @@
   .ek-pill.y rect { stroke: #6e7681; fill: #ffffff0d; } .ek-pill.y text { fill: #d1d7e0; }
   .ek-task { fill: #161b22; stroke: #8b949e; stroke-width: 1.5; stroke-dasharray: 6 5; }
   .ek-wall { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
-  .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e55); } }
+  .ek-glow { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; pointer-events: none; opacity: 0; }
+  .ek-glow rect { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; filter: drop-shadow(0 0 18px #f0883e55); }
+  .active .ek-glow { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { opacity: 1; } }
   .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
   .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x, .ek-ft { opacity: 0; transition: opacity .4s, transform .4s; }
   .ek-shield circle { fill: #0d1117; stroke: #4493f8; stroke-width: 2; }
@@ -1727,8 +1742,10 @@
   .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both var(--d); }
   .zs-vm { fill: #1c1233f2; stroke: #a371f7; stroke-width: 4; }
   .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
-  .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 2.6s; }
-  @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f755); } }
+  /* the micro-VM's pulsing seal glow, blurred once in its own layer behind the diagram and faded by opacity */
+  .zs-glow { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; pointer-events: none; opacity: 0; }
+  .zs-glow rect { fill: #1c1233f2; stroke: #a371f7; stroke-width: 4; filter: drop-shadow(0 0 22px #a371f755); }
+  .active .zs-glow { animation: glow-pulse 3.2s ease-in-out infinite 2.6s; }
   .zs-lock circle { fill: #0d1117; stroke: #a371f7; stroke-width: 3; filter: drop-shadow(0 0 10px #a371f755); }
   .zs-lock .zs-li { fill: #d2a8ff; }
   .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
@@ -1774,17 +1791,17 @@
   .zs-cut.on { opacity: 1; }
   .zs-phase { fill: #f0f6fc; font: 600 18px var(--mono); text-anchor: end; }
   .zs-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc55); }
-  .so-box { position: absolute; top: 300px; width: 500px; height: 620px; padding: 30px 34px; border-radius: 22px; border: 2px solid var(--c);
+  .so-box { position: absolute; top: 0; width: 420px; height: 620px; padding: 30px 22px; border-radius: 22px; border: 2px solid var(--c);
     background: #0d1117ee; box-shadow: 0 0 50px -24px color-mix(in srgb, var(--c) 33%, transparent), inset 0 0 60px -50px color-mix(in srgb, var(--c) 33%, transparent); opacity: 0; transition: box-shadow .5s, border-color .5s; }
   .active .so-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 400ms); }
   .so-box.hot { box-shadow: 0 0 90px -10px color-mix(in srgb, var(--c) 33%, transparent), inset 0 0 90px -40px color-mix(in srgb, var(--c) 33%, transparent); }
   .so-box i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
-  .so-box h3 { margin: 16px 0 22px; font-size: 50px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .so-box h3 { margin: 16px 0 22px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
   .so-who { display: flex; align-items: center; gap: 16px; font-size: 25px; color: #d1d7e0; }
   .so-av { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; flex: none; background: #8957e5; }
   .so-av.det { background: #3d444d; }
   .so-av svg { width: 36px; height: 36px; }
-  .so-perm { margin-left: auto; font: 600 17px/1 var(--mono); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+  .so-perm { margin-left: auto; white-space: nowrap; font: 600 17px/1 var(--mono); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
   /* the agent's box is a cage: bars that flash orange (blocked) when it tries to write directly */
   .so-cage { position: absolute; inset: 0; border-radius: 20px; pointer-events: none; opacity: .5; transition: opacity .3s;
     background: repeating-linear-gradient(90deg, transparent 0 46px, #a371f733 46px 50px); }
@@ -1794,7 +1811,7 @@
   .so.p-deny:not(.p-safe) .so-b0 { border-color: #db6d28; box-shadow: 0 0 90px -10px #db6d2855, inset 0 0 90px -40px #db6d2855; }
   .so.p-deny:not(.p-safe) .so-b0 .so-shake { animation: so-shake .45s linear both; }
   @keyframes so-shake { 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
-  .so-term { margin-top: 22px; padding: 16px 14px; border-radius: 12px; background: #010409; border: 1px solid #30363d; font: 500 17px/1.55 var(--mono); color: #d1d7e0; min-height: 132px; }
+  .so-term { margin-top: 22px; padding: 16px 10px; border-radius: 12px; background: #010409; border: 1px solid #30363d; font: 500 17px/1.55 var(--mono); color: #d1d7e0; min-height: 132px; }
   .so-term div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .so-term .l2, .so-term .l3 { opacity: 0; transition: opacity .3s; }
   .so-term .l2 { color: #ffa657; }
@@ -1809,19 +1826,35 @@
     font: 700 18px/28px var(--mono); border: 2px solid #3d444d; color: #3d444d; transition: all .3s; }
   .so-checks li.ok { color: #f0f6fc; }
   .so-checks li.ok::before { content: "✓"; border-color: #4493f8; background: #4493f8; color: #0d1117; box-shadow: 0 0 16px #4493f855; }
-  .so-arrow { position: absolute; top: 560px; width: 100px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
+  .so-arrow { position: absolute; top: 260px; width: 70px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
   .active .so-arrow { animation: sec-arr .5s ease-out both calc(var(--i) * 500ms + 900ms), nudge 1.6s ease-in-out infinite calc(var(--i) * 500ms + 1400ms); }
-  .so-call { position: absolute; top: 508px; width: 100px; text-align: center; white-space: nowrap; font: 600 12px/1.2 var(--mono); color: #9198a1; opacity: 0; }
+  .so-call { position: absolute; top: 208px; width: 70px; text-align: center; white-space: nowrap; font: 600 12px/1.2 var(--mono); color: #9198a1; opacity: 0; }
   .active .so-call { animation: rise .5s ease-out both calc(var(--i) * 500ms + 1100ms); }
   /* the proposed issue travels box to box */
-  .so-card { position: absolute; top: 742px; width: 420px; height: 150px; padding: 18px 22px; border-radius: 14px; background: #161b22; border: 2px dashed #4493f8;
+  .so-card { position: absolute; top: 442px; width: 380px; height: 150px; padding: 18px 22px; border-radius: 14px; background: #161b22; border: 2px dashed #4493f8;
     box-shadow: 0 10px 40px -10px #000; opacity: 0; transform: scale(.85); overflow: hidden; z-index: 3;
     transition: left .9s cubic-bezier(.6,0,.2,1), opacity .4s, transform .5s cubic-bezier(.3,1.6,.4,1), border-color .4s, box-shadow .4s; }
   .so.p-safe .so-card { opacity: 1; transform: none; }
   .so.p-safe .so-card.moving { transform: translateY(-26px) rotate(-2deg); }
   .so-card .t { display: flex; align-items: center; gap: 12px; font: 600 25px/1.2 "Mona Sans"; color: #f0f6fc; }
   .so-card .t svg { width: 28px; height: 28px; flex: none; }
-  .so-card .lb { margin-top: 12px; display: flex; gap: 10px; }
+  .so-card .lb { margin-top: 12px; display: flex; gap: 10px; opacity: 0; transition: opacity .4s; }
+  .so.p-run .so-card .lb { opacity: 1; }
+  .so-card .pfx { display: none; color: #79c0ff; }
+  .so.p-run .so-card .pfx { display: inline; }
+  /* front matter on the left, the propose -> scan -> write flow scaled on the right */
+  .so-flow { position: absolute; left: 770px; top: 320px; width: 1400px; height: 620px; transform: scale(.771); transform-origin: 0 0; }
+  .so-y { position: absolute; left: 70px; top: 320px; width: 660px; padding: 0 0 18px; border-radius: 18px; border: 2px solid #4493f8; background: #010409ee;
+    box-shadow: 0 0 60px -26px #4493f855; opacity: 0; overflow: hidden; }
+  .active .so-y { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 200ms; }
+  .so-y .cm-h { display: flex; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid #30363d; font: 600 17px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
+  .so-y .cm-h b { color: #79c0ff; font-weight: 600; }
+  .so-yr { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 24px; border-left: 4px solid transparent; transition: background .4s, border-color .4s; }
+  .so-yr code { font: 500 21px/1.35 var(--mono); color: #d1d7e0; white-space: pre; }
+  .so-yr code b { font-weight: 600; color: #79c0ff; }
+  .so-yr span { font: 500 17px/1.2 "Mona Sans"; color: #9198a1; text-align: right; white-space: nowrap; }
+  .so.p-safe:not(.p-to1) .so-yr.y-ci, .so.p-run .so-yr.y-ap { background: #4493f81f; border-left-color: #4493f8; }
+  .so.p-safe:not(.p-to1) .so-yr.y-ci span, .so.p-run .so-yr.y-ap span { color: #f0f6fc; }
   .so-card .lb span { font: 600 16px/1 var(--mono); padding: 6px 12px; border-radius: 99px; border: 1px solid #3d444d; background: #ffffff0d; color: #d1d7e0; }
 
   /* --- agent memory: integrity-filtered inputs → agent recalls and works → trusted jobs persist the memories --- */
@@ -2245,11 +2278,12 @@
   .tiv-hl.on { background: color-mix(in srgb, var(--c) 28%, transparent); box-shadow: 0 0 0 1.5px var(--c); }
   .pf-card.tiv-ai { left: 750px; width: 380px; padding: 22px; --c: #ab7df8; }
   .tiv-who { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #3d444d; }
-  .tiv-orb { width: 64px; height: 64px; flex: none; box-sizing: border-box; border-radius: 50%; display: grid; place-items: center; background: #0d1117; border: 2px solid #3d444d; transition: border-color .4s, box-shadow .4s; }
+  .tiv-orb { position: relative; width: 64px; height: 64px; flex: none; box-sizing: border-box; border-radius: 50%; display: grid; place-items: center; background: #0d1117; border: 2px solid #3d444d; transition: border-color .4s, box-shadow .4s; }
+  .tiv-orb::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; box-shadow: 0 0 46px #ab7df8cc; opacity: 0; pointer-events: none; }
   .tiv-orb svg { width: 34px; height: 34px; fill: #f0f6fc; }
-  .tiv-ai.busy .tiv-orb { border-color: #ab7df8; animation: tiv-pulse .9s ease-in-out infinite; }
+  .tiv-ai.busy .tiv-orb { border-color: #ab7df8; }
+  .tiv-ai.busy .tiv-orb::after { animation: glow-pulse .9s ease-in-out infinite; }
   .tiv-ai.done .tiv-orb { border-color: #ab7df8; box-shadow: 0 0 26px #ab7df855; }
-  @keyframes tiv-pulse { 50% { box-shadow: 0 0 46px #ab7df8cc; } }
   .tiv-who b { display: block; font-size: 24px; color: #f0f6fc; }
   .tiv-who code { display: block; margin-top: 6px; font: 500 16px/1.3 var(--mono); color: #d2a8ff; }
   .tiv-slot { margin-top: 14px; padding: 8px 12px; border-left: 3px solid #3d444d; border-radius: 4px; transition: border-color .4s, background .4s; }
@@ -3538,6 +3572,13 @@
       ${[0, 1, 2, 3, 4, 5].map(i => `<text class="ga-mono ga-ln" x="64" y="${540 + i * 28}" font-size="18"></text>`).join("")}`;
     const gq = s => gaSvg.querySelector(s),
       gqa = s => [...gaSvg.querySelectorAll(s)];
+    const gaGlow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    gaGlow.setAttribute("class", "ga-glow");
+    gaGlow.setAttribute("viewBox", "0 0 1080 732");
+    gaGlow.setAttribute("aria-hidden", "true");
+    gaGlow.innerHTML = `<mask id="gaGlowM" maskUnits="userSpaceOnUse" x="-80" y="${GA_Y - 80}" width="${GA_W + 160}" height="280"><rect x="-80" y="${GA_Y - 80}" width="${GA_W + 160}" height="280" fill="#fff"/><rect x="0" y="${GA_Y}" width="${GA_W}" height="120" rx="12" fill="#000"/></mask>
+      <g><g mask="url(#gaGlowM)"><rect x="0" y="${GA_Y}" width="${GA_W}" height="120" rx="12"/></g></g>`;
+    const gaGlowG = gaGlow.querySelector("g");
     const gaCards = gqa(".ga-card"),
       gaEdges = gqa(".ga-edge"),
       gaLines = gqa(".ga-ln");
@@ -3610,6 +3651,9 @@
         c.classList.toggle("run", st[i] === 1);
         c.classList.toggle("ok", st[i] === 2);
       });
+      // the agent card only runs in the settled agentic layout, so its glow takes the card's position once as it starts
+      if (st[1] === 1 && !gaGlow.classList.contains("run")) gaGlowG.setAttribute("transform", gaCards[1].getAttribute("transform"));
+      gaGlow.classList.toggle("run", st[1] === 1);
       const started = e >= 0;
       [started, st[0] === 2, st[0] === 2, st[1] === 2, st[2] === 2].forEach((on, i) => gaEdges[i].classList.toggle("on", on));
       gaSvg.classList.toggle("ga-done", done);
@@ -3679,6 +3723,7 @@
             { class: "shot" },
             h("div", { class: "bar" }, h("i", { style: { background: "#3d444d" } }), h("i", { style: { background: "#3d444d" } }), h("i", { style: { background: "#3d444d" } }), h("div", { class: "url" }, DOCS_URL.replace("https://", ""))),
             gaSvg,
+            gaGlow,
             h("div", { class: "glare" })
           )
         )
@@ -4592,10 +4637,19 @@
       [["---", "d"]],
       [["on:", "k"]],
       [["  issues:", "k"]],
-      [["    types: ", "k"], ["[opened]", "v"]],
+      [
+        ["    types: ", "k"],
+        ["[opened]", "v"],
+      ],
       [["permissions:", "k"]],
-      [["  contents: ", "k"], ["read", "v"]],
-      [["  issues: ", "k"], ["write", "v"]],
+      [
+        ["  contents: ", "k"],
+        ["read", "v"],
+      ],
+      [
+        ["  issues: ", "k"],
+        ["write", "v"],
+      ],
       [["safe-output:", "k"]],
       [["  add-labels:", "k"]],
       [["---", "d"]],
@@ -4614,11 +4668,7 @@
     wrap.innerHTML = `<svg viewBox="0 0 1700 600"><circle class="gd-wire" cx="${CX}" cy="${CY}" r="${R}"/><g class="gdl-spin"><circle class="gdl-dot" cx="${CX}" cy="${CY - R}" r="12"/></g></svg>`;
     const spin = wrap.querySelector("g");
     const node = (label, sub, x, y) => h("div", { class: "gd-box gdl-node", style: { left: `${x - 118}px`, top: `${y - 38}px` } }, label, h("span", {}, sub));
-    const nodes = [
-      node("Agent edits", "workflow .md", CX, CY - R),
-      node("gh aw compile", "schema · strict", CX + R * 0.866, CY + R / 2),
-      node("Agent reads", "did you mean …", CX - R * 0.866, CY + R / 2),
-    ];
+    const nodes = [node("Agent edits", "workflow .md", CX, CY - R), node("gh aw compile", "schema · strict", CX + R * 0.866, CY + R / 2), node("Agent reads", "did you mean …", CX - R * 0.866, CY + R / 2)];
     const big = h("b"),
       small = h("span"),
       mid = h("div", { class: "gdl-mid" }, big, small);
@@ -4635,11 +4685,23 @@
     const PH = [
       [0, 1, 2200, () => say("agent \u203a writing .github/workflows/triage.md", "")],
       [1, 1, 1500, () => say("$ gh aw compile triage", "compiling\u2026")],
-      [2, 1, 2100, () => (lines[SAFE].className = "bad", say("$ gh aw compile triage", E1, "gd-bad", "\u2717"))],
+      [2, 1, 2100, () => ((lines[SAFE].className = "bad"), say("$ gh aw compile triage", E1, "gd-bad", "\u2717"))],
       [0, 2, 1700, () => (setLine(SAFE, [["safe-outputs:", "k"]]), (lines[SAFE].className = "fix"), say("agent \u203a applying the compiler\u2019s hint", "line 8 \u2192 safe-outputs:"))],
       [1, 2, 1500, () => ((lines[SAFE].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
       [2, 2, 2600, () => ((lines[PERM].className = "bad"), say("$ gh aw compile triage", E2, "gd-bad", "\u2717"))],
-      [0, 3, 1700, () => (setLine(PERM, [["  issues: ", "k"], ["read", "v"]]), (lines[PERM].className = "fix"), say("agent \u203a writes go through safe outputs", "line 7 \u2192 issues: read"))],
+      [
+        0,
+        3,
+        1700,
+        () => (
+          setLine(PERM, [
+            ["  issues: ", "k"],
+            ["read", "v"],
+          ]),
+          (lines[PERM].className = "fix"),
+          say("agent \u203a writes go through safe outputs", "line 7 \u2192 issues: read")
+        ),
+      ],
       [1, 3, 1500, () => ((lines[PERM].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
       [1, 3, 4200, () => say("$ gh aw compile triage", "Compiled 1 workflow: 1 succeeded \u2192 triage.lock.yml", "gd-ok", "\u2713")],
     ];
@@ -4685,7 +4747,7 @@
         if (n < k) (reset(), (k = -1));
         if (n === 0) {
           const v = Math.min(SRC.length, Math.ceil(((p - START[0]) / (PH[0][2] - 400)) * SRC.length));
-          for (; shown < v; shown++) (lines[shown].className = ""), sfx.key(0.5);
+          for (; shown < v; shown++) ((lines[shown].className = ""), sfx.key(0.5));
         }
         if (n === k) return;
         if (n > 0) for (; shown < SRC.length; shown++) lines[shown].className = "";
@@ -4735,8 +4797,7 @@
   {
     resetIndex();
     const PERSONAS = ["Backend Engineer", "Frontend Developer", "DevOps Engineer", "QA Tester", "Product Manager", "Program Manager", "Designer", "Legal / Compliance", "Information Worker"];
-    const PERSON =
-      "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z";
+    const PERSON = "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z";
     const chips = PERSONAS.map((p, i) => {
       const c = h("div", { class: "gd-box gdp-chip", style: { top: `${60 + i * 58}px` } }, p);
       c.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 24 24"><path d="${PERSON}"/></svg>`);
@@ -5500,6 +5561,11 @@
       g += `<text class="zs-phase" id="zsPhase" x="1476" y="34"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
       svg.innerHTML = g;
     };
+    const glow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    glow.setAttribute("class", "zs-glow");
+    glow.setAttribute("viewBox", "0 0 1800 600");
+    glow.setAttribute("aria-hidden", "true");
+    glow.innerHTML = `<rect x="0" y="0" width="300" height="450" rx="18"/>`;
     let built = false,
       t0 = 0,
       cyc = -1,
@@ -5589,7 +5655,7 @@
           dot.style.opacity = 1;
         } else dot.style.opacity = 0;
       },
-      el: h("section", { class: "slide zs" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Nothing to steal inside the sandbox"), h("h2", {}, letters("Zero-secret "), letters("agents", "l-grad"))), svg),
+      el: h("section", { class: "slide zs" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Nothing to steal inside the sandbox"), h("h2", {}, letters("Zero-secret "), letters("agents", "l-grad"))), glow, svg),
     });
   }
 
@@ -6116,7 +6182,7 @@
   {
     const AG = pickAgent();
     resetIndex();
-    const BX = [110, 710, 1310];
+    const BX = [0, 490, 980];
     const CMD = 'gh issue create -t "Flaky test"';
     const typed = h("span", { class: "cur" });
     const status = h("span", { class: "st" }, "proposed");
@@ -6124,7 +6190,7 @@
       "div",
       { class: "so-card" },
       h("div", { class: "so-beam" }),
-      h("div", { class: "t" }, h("span", { class: "so-ico", "data-ico": "issue", "data-fill": "#f0f6fc" }), "Flaky test in cart handler"),
+      h("div", { class: "t" }, h("span", { class: "so-ico", "data-ico": "issue", "data-fill": "#f0f6fc" }), h("span", {}, h("span", { class: "pfx" }, "[flaky] "), "Flaky test in cart")),
       h("div", { class: "lb" }, h("span", {}, "bug"), h("span", {}, "agentic")),
       status
     );
@@ -6175,14 +6241,37 @@
       CYC = 14000,
       CHECK0 = 5500,
       CHECKDT = 420;
+    // [indent, key, value, note, row class]: real safe-outputs options from the workflow schema
+    const YAML = [
+      [0, "safe-outputs", "", "declared writes only"],
+      [1, "create-issue", "", "a typed tool, not a token", "y-ci"],
+      [2, "title-prefix", '"[flaky] "', "job prepends it", "y-ap"],
+      [2, "labels", "[bug, agentic]", "job attaches them", "y-ap"],
+      [2, "max", "3", "≤ 3 issues per run", "y-ap"],
+      [2, "close-older-issues", "true", "retires stale ones"],
+      [1, "add-comment", "", "another declared type"],
+      [2, "target", "triggering", "this issue or PR only"],
+      [2, "hide-older-comments", "true", "minimizes old ones"],
+    ];
+    const yaml = h(
+      "div",
+      { class: "so-y" },
+      h("div", { class: "cm-h" }, h("b", {}, "triage.md"), "FRONT MATTER"),
+      YAML.map(([n, k, v, note, cls]) => h("div", { class: `so-yr ${cls || ""}` }, h("code", {}, "  ".repeat(n), h("b", {}, k), ":", v ? ` ${v}` : ""), h("span", {}, note)))
+    );
     const el = h(
       "section",
       { class: "slide so" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents propose, jobs write"), h("h2", {}, letters("Safe "), letters("outputs", "l-grad"))),
-      boxes,
-      [0, 1].map(i => h("div", { class: "so-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
-      [0, 1].map(i => h("div", { class: "so-call", "--i": i, style: { left: `${BX[i] + 500}px` } }, i ? "verdict" : "create-issue")),
-      card
+      yaml,
+      h(
+        "div",
+        { class: "so-flow" },
+        boxes,
+        [0, 1].map(i => h("div", { class: "so-arrow", "--i": i, style: { left: `${BX[i] + 420}px` } }, "→")),
+        [0, 1].map(i => h("div", { class: "so-call", "--i": i, style: { left: `${BX[i] + 420}px` } }, i ? "verdict" : "create-issue")),
+        card
+      )
     );
     let t0 = 0,
       cyc = -1,
@@ -6191,7 +6280,7 @@
       iconsDrawn = false;
     const place = (i, instant) => {
       if (instant) card.style.transition = "none";
-      card.style.left = `${BX[i] + 40}px`;
+      card.style.left = `${BX[i] + 20}px`;
       if (instant) {
         void card.offsetWidth;
         card.style.transition = "";
@@ -6206,7 +6295,7 @@
       key: "safe-outputs",
       group: "security",
       notes:
-        "What: An illustrative run with a synthetic issue. The read-only agent's direct write is refused, so it proposes the issue through a typed safe output. An isolated threat-detection job with no tools checks the proposal; only on a clean verdict does a separate job, the only one with issues: write, create it.\nWhy: Model output never mutates the repository directly, and every write is limited to the types and counts declared in front matter.\nWhen: Use safe outputs for every repository write an agent needs: issues, comments, pull requests, labels.",
+        "What: An illustrative run with a synthetic issue. Front matter declares safe-outputs: create-issue with title-prefix, labels and max: 3, plus add-comment limited by target: triggering. The read-only agent's direct write is refused, so it proposes the issue through the typed create_issue tool. An isolated threat-detection job with no tools checks the proposal; only on a clean verdict does a separate job with issues: write create it, adding the declared prefix and labels.\nWhy: Model output never mutates the repository directly; the YAML, not the prompt, fixes which types, how many (max), where (target) and what extras (labels, title-prefix) a run may write. Options such as close-older-issues and hide-older-comments keep reruns tidy.\nWhen: Declare a safe output for every repository write an agent needs: issues, comments, pull requests, labels. Start with low max values and widen them deliberately.",
       enter() {
         if (!iconsDrawn) {
           iconsDrawn = true;
@@ -6694,10 +6783,47 @@
     // Each line is one process: GitHub artifacts, agents on any harness ("@claude") and developer gates ("dev:mona").
     // Line 1 stays straight on a 220 grid for the workflow and process zooms; the others are laid out like a plant floor.
     const LINES = [
-      [["calendar", 380, 88], ["@claude", 580, 88], ["issue", 780, 88], ["dev:ducky", 980, 128, "triages"], ["@codex", 1180, 128], ["pr", 1380, 128], ["@pi", 1580, 88], ["comment", 1800, 88]],
-      [["issue", 120, 250], ["@copilot", 340, 250], ["pr", 560, 250], ["@claude", 780, 250], ["comment", 1000, 250], ["@codex", 1220, 250], ["pr", 1440, 250], ["dev:mona", 1660, 250, "approves"], ["merge", 1860, 350]],
-      [["discussion", 170, 430], ["@agy", 370, 430], ["tasklist", 570, 480], ["@copilot", 770, 480], ["issue", 980, 420], ["dev:mona", 1180, 420, "steers"], ["@claude", 1380, 480], ["pr", 1600, 480]],
-      [["calendar", 330, 590], ["@codex", 530, 590], ["file", 740, 590], ["@pi", 950, 590], ["pr", 1160, 590], ["dev:ducky", 1380, 590, "reviews"], ["@agy", 1600, 590], ["package", 1820, 590]],
+      [
+        ["calendar", 380, 88],
+        ["@claude", 580, 88],
+        ["issue", 780, 88],
+        ["dev:ducky", 980, 128, "triages"],
+        ["@codex", 1180, 128],
+        ["pr", 1380, 128],
+        ["@pi", 1580, 88],
+        ["comment", 1800, 88],
+      ],
+      [
+        ["issue", 120, 250],
+        ["@copilot", 340, 250],
+        ["pr", 560, 250],
+        ["@claude", 780, 250],
+        ["comment", 1000, 250],
+        ["@codex", 1220, 250],
+        ["pr", 1440, 250],
+        ["dev:mona", 1660, 250, "approves"],
+        ["merge", 1860, 350],
+      ],
+      [
+        ["discussion", 170, 430],
+        ["@agy", 370, 430],
+        ["tasklist", 570, 480],
+        ["@copilot", 770, 480],
+        ["issue", 980, 420],
+        ["dev:mona", 1180, 420, "steers"],
+        ["@claude", 1380, 480],
+        ["pr", 1600, 480],
+      ],
+      [
+        ["calendar", 330, 590],
+        ["@codex", 530, 590],
+        ["file", 740, 590],
+        ["@pi", 950, 590],
+        ["pr", 1160, 590],
+        ["dev:ducky", 1380, 590, "reviews"],
+        ["@agy", 1600, 590],
+        ["package", 1820, 590],
+      ],
     ];
     // [line, node] → [line, node]: an output of one process triggers a step of another
     const CROSS = [
@@ -6727,7 +6853,17 @@
     // elbow route between two nodes, as polyline points
     const route = ([, x1, y1], [, x2, y2]) => {
       const m = (x1 + x2) / 2;
-      return y1 === y2 ? [[x1, y1], [x2, y2]] : [[x1, y1], [m, y1], [m, y2], [x2, y2]];
+      return y1 === y2
+        ? [
+            [x1, y1],
+            [x2, y2],
+          ]
+        : [
+            [x1, y1],
+            [m, y1],
+            [m, y2],
+            [x2, y2],
+          ];
     };
     const along = (pts, f) => {
       const seg = pts.slice(1).map((q, i) => Math.abs(q[0] - pts[i][0]) + Math.abs(q[1] - pts[i][1]));
@@ -6747,7 +6883,13 @@
     g += `<g class="wpf-bp"><rect width="2000" height="660" fill="#0d1a2e99"/><rect width="2000" height="660" fill="url(#wpfGrid)"/><rect width="2000" height="660" fill="url(#wpfGrid5)"/>
       <rect class="fr" x="8" y="8" width="1984" height="644"/><rect class="fr t" x="16" y="16" width="1968" height="628"/>
       ${[690, 1290].map(x => `<line class="dv" x1="${x}" y1="16" x2="${x}" y2="644"/>`).join("")}
-      ${[[30, "BAY A · INTAKE"], [706, "BAY B · BUILD"], [1306, "BAY C · REVIEW &amp; SHIP"]].map(([x, t]) => `<text class="bay" x="${x}" y="40">${t}</text>`).join("")}
+      ${[
+        [30, "BAY A · INTAKE"],
+        [706, "BAY B · BUILD"],
+        [1306, "BAY C · REVIEW &amp; SHIP"],
+      ]
+        .map(([x, t]) => `<text class="bay" x="${x}" y="40">${t}</text>`)
+        .join("")}
       ${LINES.map((l, r) => `<text class="ln" x="${l[0][1] - 36}" y="${l[0][2] - 46}">LINE ${r + 1}</text>`).join("")}
       <g class="tb"><rect x="30" y="532" width="250" height="104"/><line x1="30" y1="566" x2="280" y2="566"/><line x1="30" y1="600" x2="280" y2="600"/>
       <text class="k" x="42" y="555">AGENTIC FACTORY</text><text x="42" y="589">DWG 01 · REV A · NTS</text><text x="42" y="623">4 LINES · 5 HARNESSES</text></g>`;
@@ -6777,7 +6919,8 @@
         if (k[0] === "@") {
           const a = k.slice(1);
           g += `<g class="wpf-n ag" data-r="${r}"><circle cx="${x}" cy="${y}" r="34" ${agDisc(a)}/>${ico(a, x, y + 1, 38, agFg(a))}</g>`;
-        } else if (k.startsWith("dev:")) g += `<g class="wpf-n dev" data-r="${r}"><circle cx="${x}" cy="${y}" r="36"/><image href="assets/avatars/${k.slice(4)}.jpg" x="${x - 32}" y="${y - 32}" width="64" height="64" clip-path="url(#wpfClip)"/></g>`;
+        } else if (k.startsWith("dev:"))
+          g += `<g class="wpf-n dev" data-r="${r}"><circle cx="${x}" cy="${y}" r="36"/><image href="assets/avatars/${k.slice(4)}.jpg" x="${x - 32}" y="${y - 32}" width="64" height="64" clip-path="url(#wpfClip)"/></g>`;
         else g += `<g class="wpf-n" data-r="${r}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(k, x, y, 34)}</g>`;
       })
     );
@@ -6886,7 +7029,11 @@
         "section",
         { class: "slide wpf" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every factory is made of processes"), h("h2", {}, letters("Workflows → Process → "), letters("Factory", "l-grad"))),
-        h("div", { class: "wpf-steps" }, chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))),
+        h(
+          "div",
+          { class: "wpf-steps" },
+          chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))
+        ),
         svg,
         cap
       ),
@@ -15341,6 +15488,12 @@
       b += `<text class="big" x="1496" y="66">ENCLAVE · FOOTPRINT</text><text x="1496" y="110">PLAN · SINGLE USE</text><text x="1716" y="110">DWG EK-01</text>`;
       bp.innerHTML = b;
     }
+    // the wall's pulsing glow, blurred once in its own layer and faded by opacity so it never repaints the diagram
+    const glow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    glow.setAttribute("class", "ek-glow");
+    glow.setAttribute("viewBox", "0 0 1800 600");
+    glow.setAttribute("aria-hidden", "true");
+    glow.innerHTML = `<rect x="880" y="40" width="420" height="510" rx="24"/>`;
     // [time, path, stage label, sound]
     const STEPS = [
       [400, "ekP1", "Waiting for task", () => sfx.pop(0)],
@@ -15409,7 +15562,14 @@
         dot.setAttribute("class", "ek-dot " + (s[1] === "ekP4" ? "r" : s[1] === "ekP3" ? "o" : ""));
         dot.style.opacity = 1;
       },
-      el: h("section", { class: "slide ek" }, bp, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide ek" },
+        bp,
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))),
+        glow,
+        svg
+      ),
     });
   }
 

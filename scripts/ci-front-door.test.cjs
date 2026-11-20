@@ -182,6 +182,29 @@ test("known-safe documentation omissions require model approval at the unchanged
   assert.throws(() => selectSuites({ suite_ids: [], confidence: 1 }, catalog, { ...diff, files: [] }), /invalid-diff/);
 });
 
+test("uncertain answers retain only their suites and prerequisites without discarding confident omissions", async () => {
+  for (const probability of [0.1, 0.11, 0.5, 0.89, 0.9]) {
+    const value = decisionResponse();
+    value.answers.find(answer => answer.name === "security").probability = probability;
+    const { result, calls } = await exercise({}, { value });
+    assert.deepEqual(result.suite_ids, probability < 0.9 ? ["build", "build-wasm", "security"] : ["build-wasm"]);
+    assert.equal(result.fallback, false);
+    assert.equal(result.reason, "selected");
+    assert.equal(calls.length, 1);
+    assert.equal(result.metrics.decision_api_requests, 1);
+  }
+});
+
+test("an entirely uncertain batch retains every suite without a validation fallback", async () => {
+  for (const confidence of [0.5, 0.89]) {
+    const { result, calls } = await exercise({}, { value: decisionResponse({ confidence }) });
+    assert.deepEqual(result.suite_ids, SUITE_IDS);
+    assert.equal(result.fallback, false);
+    assert.equal(result.reason, "selected");
+    assert.equal(calls.length, 1);
+  }
+});
+
 test("malformed and incomplete flat or grouped inventories cannot authorize omissions", async () => {
   const grouped = {
     ...diff,
@@ -257,8 +280,6 @@ test("invalid responses fail open after one request, without retrying", async ()
     { answers: decisionResponse().answers.map(answer => ({ type: "refusal", name: answer.name })) },
     { answers: decisionResponse().answers.map(answer => ({ ...answer, probability: null })) },
     { answers: decisionResponse().answers.map(answer => ({ ...answer, probability: 1.01 })) },
-    decisionResponse({ confidence: 0.89 }),
-    decisionResponse({ confidence: 0.5 }),
   ]) {
     const { result, calls } = await exercise({}, { value });
     assert.equal(calls.length, 1);

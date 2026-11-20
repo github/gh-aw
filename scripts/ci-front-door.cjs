@@ -139,9 +139,11 @@ async function postDecision(token, input, { fetchImpl = fetch, onRequest = () =>
     },
   });
   if (result.answers.some(answer => answer.type !== "predicate")) throw new Error("invalid-response");
+  const omitted = result.answers.filter(answer => answer.probability >= 0.9);
   return {
     suite_ids: result.answers.filter(answer => answer.probability < 0.9).map(answer => answer.name),
-    confidence: Math.min(...result.answers.map(answer => Math.max(answer.probability, 1 - answer.probability))),
+    // Uncertain answers retain their suites; confidence certifies only omissions.
+    confidence: Math.min(1, ...omitted.map(answer => answer.probability)),
   };
 }
 

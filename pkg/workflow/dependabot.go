@@ -20,6 +20,7 @@ const dependabotConfigRelativePath = ".github/dependabot.yml"
 
 // PackageJSON represents the structure of a package.json file
 type PackageJSON struct {
+	Comment         string            `json:"_comment,omitempty"`
 	Name            string            `json:"name"`
 	Private         bool              `json:"private"`
 	License         string            `json:"license,omitempty"`
