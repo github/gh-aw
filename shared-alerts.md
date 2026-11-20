@@ -325,7 +325,7 @@
 - Systemic: Workflow Health safe-output issues use `expires: 1d` and auto-close as not_planned while failures persist. Recommendation to maintainers (2026-09-21, 2026-11-14) still applies. No new issue filed to avoid duplication.
 
 ## Correction — 2026-11-18T04:30Z (Workflow Health Manager)
-- **#78066 is CLOSED not_planned (2026-11-17T14:40Z), not open.** The 2026-11-17 "Verified OPEN" line and 2026-11-15 WH entries are stale. Auditor still fails: 21 failures in last 24 runs (gh run list). Do not cite #78066 as an open tracker.
+- **#78066 is CLOSED by expiry (2026-11-17T12:53Z, run 44105641215), not not_planned. See the 2026-11-20 correction.** The 2026-11-17 "Verified OPEN" line and 2026-11-15 WH entries are stale. Auditor still fails: 21 failures in last 24 runs (gh run list). Do not cite #78066 as an open tracker.
 - **Auditor "7 consecutive failures since 11-16T21:28Z" is STALE.** Successes at 00:45Z and 01:27Z on 2026-11-18 broke that streak. Current streak: 2 (03:29Z, 02:30Z).
 - Root cause for Auditor is still unverified (logs HTTP 403 DIFC). The "time_budget" attribution remains a hypothesis.
 - Conclusion-job `Handle agent failure` pattern (dependabot-burner, visual-regression-checker) is still live on 2026-11-18 after #77984 closed not_planned. Cite as live, not as fixed.
@@ -334,3 +334,10 @@
 ## Update — 2026-11-18T04:30Z (Workflow Health Manager)
 - Filed a P1 Auditor tracker because #78066 was closed while the workflow is still failing, and the dashboard.
 - The `Handle agent failure` pattern is re-flagged in the dashboard only (no separate tracker) to avoid duplicating the closed #77984 chain.
+
+## 2026-11-20 (workflow-health-manager, run 44674692240)
+- **Correction:** #78066, #77641, #77062, #78921, #78922 and #78923 were closed by the create-issue `expires: 1d` setting, not by a human not_planned decision. Treat these trackers as expired, not as declined.
+- **Root cause of recurring closures:** workflow-health-manager.md sets `safe-outputs.create-issue.expires: 1d`. A new maintenance issue is filed to fix this.
+- **Auditor:** still failing 11 of 12 hourly runs since 2026-11-19 17:27Z; latest success 03:30Z. Root cause unverified (logs 403 DIFC). New P1 tracker filed.
+- **Handle agent failure (conclusion job):** dependabot-burner failed 6 of 6 recent runs (last 2026-11-18); visual-regression-checker failed 5 of 6 (success 2026-11-19 18:12Z). New P1 tracker filed. #77984 remains closed and is not a pending fix.
+- Trend: 7d/30d unavailable (partial snapshots 11-16, 11-18, 11-19, 11-20).
