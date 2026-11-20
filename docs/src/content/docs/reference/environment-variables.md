@@ -5,7 +5,7 @@ sidebar:
   order: 650
 ---
 
-Environment variables in GitHub Agentic Workflows can be defined at multiple scopes, each serving a specific purpose in the workflow lifecycle. Variables defined at more specific scopes override those at more general scopes, following GitHub Actions conventions while adding AWF-specific contexts.
+Environment variables in GitHub Agentic Workflows can be set at several scopes. More specific scopes override more general ones, following GitHub Actions conventions, with added AWF-specific contexts.
 
 ## Environment Variable Scopes
 
@@ -27,7 +27,7 @@ GitHub Agentic Workflows supports environment variables in 13 distinct contexts:
 | **Safe Outputs Job** | `safe-outputs.jobs.<name>.env` | Specific safe-output job | Job-specific config |
 | **GitHub Actions Step** | `githubActionsStep.env` | Pre-defined steps | Step configuration |
 
-Strict mode rejects credential expressions in workflow-level `env`, including `secrets` references and `github.token` in either dot or bracket notation. Whole-context `github` references and context-wide wildcard projections such as `github.*` and `toJSON(github.*)` are also treated as credential references. Non-strict mode emits a warning. The same validation applies to non-exempt keys in `engine.env`. Supported credential keys in `engine.env` remain allowed; strict mode requires AWF v0.25.3 or newer to exclude those values from the agent sandbox.
+In strict mode, credential expressions in workflow-level `env` are rejected. This covers `secrets` references, `github.token` (dot or bracket notation), whole-context `github` references, and wildcard projections such as `github.*` or `toJSON(github.*)`. Non-strict mode emits a warning instead. The same checks apply to non-exempt keys in `engine.env`. Supported credential keys in `engine.env` remain allowed; strict mode requires AWF v0.25.3 or newer to exclude them from the agent sandbox.
 
 Invalid expressions in `env` or `engine.env` fail compilation in either mode. Actions bracket indexes use single-quoted strings, for example `github['repository']`; double-quoted indexes are invalid.
 
@@ -40,21 +40,6 @@ Invalid expressions in `env` or `engine.env` fail compilation in either mode. Ac
 env:
   NODE_ENV: production
   API_ENDPOINT: https://api.example.com
----
-```
-
-**Job-specific overrides:**
-
-```yaml wrap
----
-jobs:
-  validation:
-    env:
-      VALIDATION_MODE: strict
-    steps:
-      - run: npm run build
-        env:
-          BUILD_ENV: production  # Overrides job and workflow levels
 ---
 ```
 
@@ -86,14 +71,14 @@ safe-outputs:
 
 ## Agent Step Summary (`GITHUB_STEP_SUMMARY`)
 
-Agents can write markdown content to the `$GITHUB_STEP_SUMMARY` environment variable to publish a formatted summary visible in the GitHub Actions run view.
+Agents can write markdown to `$GITHUB_STEP_SUMMARY` to publish a summary in the GitHub Actions run view.
 
-Inside the AWF sandbox, `$GITHUB_STEP_SUMMARY` is redirected to a file at `/tmp/gh-aw/agent-step-summary.md`. After agent execution completes, the framework automatically appends the contents of that file to the real GitHub step summary. Secret redaction runs before the content is published.
+Inside the AWF sandbox, `$GITHUB_STEP_SUMMARY` points to `/tmp/gh-aw/agent-step-summary.md`. After the agent finishes, the framework appends that file to the real step summary, applying secret redaction first.
 
 > [!NOTE]
 > The first 2000 characters of the summary are appended. If the content is longer, a `[truncated: ...]` notice is included. Write your most important content first.
 
-Example: an agent writing a brief analysis result to the step summary:
+Example:
 
 ```bash
 echo "## Analysis complete" >> "$GITHUB_STEP_SUMMARY"
@@ -104,103 +89,81 @@ The output appears in the **Summary** tab of the GitHub Actions workflow run.
 
 ## System-Injected Runtime Variables
 
-GitHub Agentic Workflows automatically injects the following environment variables into every agentic engine execution step (both the main agent run and the threat detection run). These variables are read-only from the agent's perspective and are useful for writing workflows or agents that need to detect their execution context.
+The compiler injects these variables into every engine execution step, both the main agent run and the threat-detection run. Agents can use them to detect their execution context. They are read-only from the agent's perspective.
 
 | Variable | Value | Description |
 | ---------- | ------- | ------------- |
-| `GITHUB_AW` | `"true"` | Present in every gh-aw engine execution step. Agents can check for this variable to confirm they are running inside a GitHub Agentic Workflow. |
-| `GH_AW_PHASE` | `"agent"` or `"detection"` | Identifies which execution phase is active. `"agent"` for the main run; `"detection"` for the threat-detection safety check run that precedes the main run. |
-| `GH_AW_VERSION` | e.g. `"0.40.1"` | The gh-aw compiler version that generated the workflow. Useful for conditional logic that depends on a minimum feature version. |
-
-These variables appear alongside other `GH_AW_*` context variables in the compiled workflow:
-
-```yaml
-env:
-  GITHUB_AW: "true"
-  GH_AW_PHASE: agent        # or "detection"
-  GH_AW_VERSION: "0.40.1"
-  GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-```
+| `GITHUB_AW` | `"true"` | Set in every engine execution step. Check it to confirm the process runs inside a GitHub Agentic Workflow. |
+| `GH_AW_PHASE` | `"agent"` or `"detection"` | Current phase: `"agent"` for the main run, `"detection"` for the threat-detection check that runs first. |
+| `GH_AW_VERSION` | e.g. `"0.40.1"` | Compiler version that generated the workflow. Useful for minimum-version checks. |
 
 > [!NOTE]
 > These variables are injected by the compiler and cannot be overridden by user-defined `env:` blocks in the workflow frontmatter.
 
 ## Harness Settings and Runtime Tuning Variables
 
-The built-in Copilot, Claude, and Codex harnesses expose a small set of supported runtime controls. Prefer the structured `engine.harness` frontmatter fields when possible; set the underlying environment variables only when you need a value that is supplied by a GitHub Actions expression or shared across a workflow.
+The built-in Copilot, Claude, and Codex harnesses expose a small set of runtime controls. Prefer the structured `engine.harness` frontmatter fields. Set the environment variables directly only when a value comes from a GitHub Actions expression or must be shared across a workflow.
 
 ### Shared harness retry settings
 
-These settings apply to the built-in Copilot, Claude, and Codex harnesses.
-
 | Variable | Frontmatter field | Default | Units / range | Description |
 | --- | --- | --- | --- | --- |
-| `GH_AW_HARNESS_MAX_RETRIES` | `engine.harness.max-retries` | `3` | retry attempts after the initial run; minimum `0`, maximum `100` | Maximum number of harness retries. `0` disables retries. Invalid values use the default; values above `100` are clamped to `100`. |
+| `GH_AW_HARNESS_MAX_RETRIES` | `engine.harness.max-retries` | `3` | retry attempts after the initial run; minimum `0`, maximum `100` | Maximum retries. `0` disables retries. Invalid values use the default; values above `100` are clamped. |
 | `GH_AW_HARNESS_INITIAL_DELAY_MS` | `engine.harness.initial-delay-ms` | `5000` | milliseconds; minimum `1` | Delay before the first retry. Invalid values use the default. |
 | `GH_AW_HARNESS_BACKOFF_MULTIPLIER` | `engine.harness.backoff-multiplier` | `2` | decimal multiplier; minimum `1` | Multiplier applied after each retry. Invalid values use the default. |
-| `GH_AW_HARNESS_MAX_DELAY_MS` | `engine.harness.max-delay-ms` | `60000` | milliseconds; minimum `1` | Maximum retry delay. Invalid values use the default. If set below `GH_AW_HARNESS_INITIAL_DELAY_MS`, it is clamped up to the initial delay. |
+| `GH_AW_HARNESS_MAX_DELAY_MS` | `engine.harness.max-delay-ms` | `60000` | milliseconds; minimum `1` | Maximum retry delay. Invalid values use the default. Values below `GH_AW_HARNESS_INITIAL_DELAY_MS` are clamped up to it. |
 
 ### Shared post-result watchdog
 
-`GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS` configures the post-result stdio inactivity watchdog used by the built-in Copilot, Claude, and Codex harnesses. It is measured in **milliseconds**. The default is `120000` ms (2 minutes), the minimum is `50` ms, and the maximum is `600000` ms (10 minutes). Unset, non-numeric, zero, and negative values use the default; positive values outside the supported range are clamped.
+`GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS` sets the post-result stdio inactivity watchdog for the built-in Copilot, Claude, and Codex harnesses, in **milliseconds**. The default is `120000` (2 minutes), the minimum is `50`, and the maximum is `600000` (10 minutes). Unset, non-numeric, zero, and negative values use the default; positive values outside the range are clamped.
 
-The watchdog is dormant until the agent emits a terminal safe output. `noop` and ordinary task outputs such as comments, labels, pushes, and pull request creation are terminal. Diagnostic safe outputs such as `report_missing_tool`, `report_missing_data`, and `report_incomplete` are not terminal and do not arm the watchdog by themselves.
+The watchdog stays dormant until the agent emits a terminal safe output. `noop` and ordinary task outputs (comments, labels, pushes, pull request creation) are terminal. Diagnostic outputs (`report_missing_tool`, `report_missing_data`, `report_incomplete`) are not terminal and do not arm it.
 
-After the watchdog arms, any stdout or stderr activity resets the inactivity clock. A quiet child process can therefore be terminated even while it is doing useful CPU or I/O work, such as a monorepo scan, build, or test command that produces no logs. If the watchdog fires after a terminal safe output already exists, the harness may still treat the run as successful because the requested safe output was already produced.
+Once armed, any stdout or stderr activity resets the clock. A quiet process doing useful CPU or I/O work, such as a silent monorepo scan or build, can therefore be terminated. If it fires after a terminal output already exists, the harness may still count the run as successful.
 
-For literal frontmatter values, use `engine.harness.watchdog-timeout` in seconds. For raw environment variables, use milliseconds:
+To allow quiet work after an intermediate safe output, set the variable in workflow-level `env:`. The agent can read workflow-level `env`, so do not put secrets there:
 
 ```yaml wrap
 ---
 env:
-  # Allow quiet monorepo scans and builds after an intermediate safe output.
-  # Workflow-level env is visible to the agent; do not put secrets here.
   GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS: "600000"
 ---
 ```
 
-```yaml wrap
----
-engine:
-  id: copilot
-  harness:
-    # Same timeout expressed as a literal frontmatter value in seconds.
-    watchdog-timeout: 600
----
-```
+In frontmatter, the same timeout is `engine.harness.watchdog-timeout: 600` (seconds).
 
 ### Shared stall watchdog
 
-`GH_AW_HARNESS_STALL_WARNING_MS` configures the driver-level stall watchdog shared by all built-in harnesses. It is measured in **milliseconds**. The default is `300000` ms (5 minutes), the minimum is `1000` ms, and the maximum is `3600000` ms (1 hour). Unset and non-numeric values use the default; positive values outside the supported range are clamped; zero or negative values disable the warnings.
+`GH_AW_HARNESS_STALL_WARNING_MS` sets the driver-level stall watchdog shared by all built-in harnesses, in **milliseconds**. The default is `300000` (5 minutes), the minimum is `1000`, and the maximum is `3600000` (1 hour). Unset and non-numeric values use the default; out-of-range positive values are clamped; zero or negative values disable warnings.
 
-Unlike the post-result watchdog, the stall watchdog never terminates the agent process. Whenever the agent CLI produces no stdout or stderr output for the configured interval, the harness logs a warning in the `Execute ... CLI` step, for example:
+Unlike the post-result watchdog, the stall watchdog never terminates the agent. When the agent CLI produces no stdout or stderr for the interval, the harness logs a warning in the `Execute ... CLI` step, for example:
 
 ```text wrap
 [copilot-harness] attempt 1: stall watchdog: no output from '/usr/bin/copilot' for 5m 0s (elapsed=5m 1s pid=1234 warnings=1) - the step may be hung; GitHub Actions will cancel this step in about 14m 59s (timeout-minutes=20)
 ```
 
-The warning repeats on each interval while the silence continues, and a `stall watchdog: output resumed after ...` line is logged once output comes back. This makes a hung step diagnosable from the step log alone, without cross-referencing job or step metadata. The final `process closed` line reports `stallWarnings=<count>` when any warning fired.
+Warnings repeat each interval while the silence continues. A `stall watchdog: output resumed after ...` line is logged when output returns, so a hung step can be diagnosed from its log alone. The final `process closed` line reports `stallWarnings=<count>` if any warning fired.
 
 ### Engine-specific harness settings
 
 | Variable | Engine | Default | Units / range | Description |
 | --- | --- | --- | --- | --- |
-| `GH_AW_HARNESS_LONG_RUN_TOKEN_THRESHOLD` | Copilot | `10000` | tokens; minimum `0` | Token threshold used to classify long-running partial executions as `long_run_exit` instead of a generic partial execution. Invalid or negative values use the default. |
-| `GH_AW_HARNESS_STARTUP_RETRIES` | All engine harnesses | `1` | retry attempts; range `0`-`2` | Additional fresh-run retry budget for startup failures before the harness records session progress. Invalid values use the default; out-of-range integers are clamped. `GH_AW_CLAUDE_STARTUP_RETRIES` is still accepted as a Claude-compatible fallback when the shared variable is unset. |
-| `GH_AW_CLAUDE_ALLOW_FRESH_RESTART` | Claude harness | `false` | exact string `true` enables | Opts replay-safe workflows into restarting from the original prompt after partial execution cannot be resumed. Filesystem changes and staged outputs are retained, so work may be repeated. |
-| `CLAUDE_CODE_MAX_RETRIES` | Claude CLI | `0` for primary/evals execution | retry attempts | Native CLI transient-error retries. gh-aw disables these by default because its harness owns the retry loop. Explicit `engine.env` values override this setting; external detection retains the CLI default. |
+| `GH_AW_HARNESS_LONG_RUN_TOKEN_THRESHOLD` | Copilot | `10000` | tokens; minimum `0` | Token threshold for classifying a partial execution as `long_run_exit` rather than a generic partial. Invalid or negative values use the default. |
+| `GH_AW_HARNESS_STARTUP_RETRIES` | All engine harnesses | `1` | retry attempts; range `0`-`2` | Extra fresh-run retries for startup failures, before session progress is recorded. Invalid values use the default; out-of-range integers are clamped. `GH_AW_CLAUDE_STARTUP_RETRIES` is a fallback when this variable is unset. |
+| `GH_AW_CLAUDE_ALLOW_FRESH_RESTART` | Claude harness | `false` | exact string `true` enables | Lets replay-safe workflows restart from the original prompt when a partial run cannot resume. Filesystem changes and staged outputs are kept, so work may repeat. |
+| `CLAUDE_CODE_MAX_RETRIES` | Claude CLI | `0` for primary/evals execution | retry attempts | Native CLI transient-error retries. gh-aw disables them by default because its harness owns the retry loop. Explicit `engine.env` values override this; external detection keeps the CLI default. |
 
 Copilot SDK driver settings such as `COPILOT_SDK_SEND_TIMEOUT_MS` are documented in [Copilot SDK Support](/gh-aw/reference/engines/copilot/#copilot-sdk-support) and the [Copilot SDK Driver Specification](/gh-aw/specs/copilot-sdk-driver-specification/).
 
 ### Internal runtime variables
 
-`GH_AW_TIMEOUT_MINUTES` is compiler-managed. gh-aw derives it from the workflow `timeout-minutes` frontmatter value and passes it to harness and driver code so soft timeouts and SDK send timeouts stay below the GitHub Actions job timeout. Do not set `GH_AW_TIMEOUT_MINUTES` directly; set `timeout-minutes` in frontmatter instead.
+`GH_AW_TIMEOUT_MINUTES` is compiler-managed. It is derived from the workflow `timeout-minutes` frontmatter value so soft timeouts and SDK send timeouts stay below the Actions job timeout. Set `timeout-minutes` in frontmatter instead of this variable.
 
-`GH_AW_CLAUDE_DISABLE_REPO_EDITS` is compiler-managed. The compiler sets it to the exact string `true` when `tools.edit: false`, overriding `engine.env` values. The built-in Claude harness denies `Edit` within `GITHUB_WORKSPACE` and removes `Write`, `MultiEdit`, and `NotebookEdit` globally, including when a permission-mode override is selected. Separately scoped memory edits remain available through `Edit`. Do not set this variable directly; configure `tools.edit` instead. Custom harnesses must implement their own edit policy.
+`GH_AW_CLAUDE_DISABLE_REPO_EDITS` is compiler-managed. It is set to `true` when `tools.edit: false`, overriding `engine.env` values. The built-in Claude harness then denies `Edit` within `GITHUB_WORKSPACE` and removes `Write`, `MultiEdit`, and `NotebookEdit` globally, even under a permission-mode override. Scoped memory edits remain available through `Edit`. Configure `tools.edit` rather than setting this variable. Custom harnesses must implement their own edit policy.
 
 ### Setup helper process timeouts
 
-The JavaScript setup helpers bound child processes, archive operations, and setup-time network requests with positive millisecond timeouts. These defaults protect workflows from indefinitely hung setup commands, but very large repositories or artifact payloads can require larger budgets. Set the relevant variable to a positive integer number of milliseconds; unset, zero, negative, or non-numeric values use the default. Values above Node's maximum timer delay of `2147483647` ms (about 24.8 days) are clamped to that maximum.
+The JavaScript setup helpers time out child processes, archive operations, and setup-time network requests. Large repositories or artifacts may need bigger budgets. Set a positive integer in milliseconds; unset, zero, negative, or non-numeric values use the default. Values above Node's maximum timer delay (`2147483647` ms, about 24.8 days) are clamped to it.
 
 | Variable | Default | Applies to |
 | --- | --- | --- |
@@ -221,7 +184,7 @@ The JavaScript setup helpers bound child processes, archive operations, and setu
 
 ### MCP gateway readiness polling
 
-The MCP gateway startup step polls the gateway `/health` endpoint with exponential backoff until the gateway reports ready. Each retry parameter can be overridden; unset, zero, negative, or non-numeric values fall back to the default with a warning.
+The MCP gateway startup step polls `/health` with exponential backoff until the gateway is ready. Unset, zero, negative, or non-numeric values fall back to the default with a warning.
 
 | Variable | Default | Applies to |
 | --- | --- | --- |
@@ -235,7 +198,7 @@ These values are cross-validated at startup:
 
 - A backoff multiplier below `1` is raised to `1` (constant delay).
 - A delay cap below the initial delay is raised to the initial delay.
-- Unless a valid attempt count is explicitly configured, the attempt count increases so the cumulative retry delay covers the backend startup timeout (including `tools.startup-timeout`) plus 25 seconds for backend cleanup and final server registration. Explicit and automatically sized attempt counts are capped at `10000`; an insufficient retry budget emits a warning. Health and readiness probes share the startup deadline, so increasing attempts does not extend that deadline.
+- Unless a valid attempt count is set explicitly, the count grows so cumulative retry delay covers the backend startup timeout (including `tools.startup-timeout`) plus 25 seconds for cleanup and registration. Explicit and auto-sized counts are capped at `10000`; an insufficient budget emits a warning. Health and readiness probes share the startup deadline, so more attempts do not extend it.
 
 ## CLI Configuration Variables
 
@@ -250,20 +213,17 @@ These variables configure the `gh aw` CLI tool. Set them in your local shell env
 | `GH_AW_ACTION_MODE` | auto-detected | Overrides how JavaScript is embedded in compiled workflows. Valid values: `dev`, `release`, `script`, `action`. When unset, the CLI auto-detects the appropriate mode. |
 | `GH_AW_FEATURES` | empty | Comma-separated list of experimental feature flags to enable globally. Values in workflow `features:` frontmatter take precedence over this variable. |
 | `GH_AW_MAX_CONCURRENT_DOWNLOADS` | `10` | Maximum number of parallel log and artifact downloads for `gh aw logs`. Valid range: `1`–`100`. |
-| `GH_AW_MCP_SERVER` | unset | When set, disables the automatic update check. Set automatically when `gh aw` runs as an MCP server subprocess — no manual configuration needed. |
+| `GH_AW_MCP_SERVER` | unset | Disables the automatic update check. Set automatically when `gh aw` runs as an MCP server subprocess. |
 
 **Enabling debug logging:**
 
-Compiled workflows leave MCP debug logging disabled for normal runs. GitHub Actions debug mode (`runner.debug == '1'`, including **Re-run jobs** with **Enable debug logging**) automatically enables verbose MCP logs. An explicit workflow or job `DEBUG` value takes precedence and is forwarded to the gateway and built-in MCP servers.
+Compiled workflows leave MCP debug logging off for normal runs. GitHub Actions debug mode (`runner.debug == '1'`, including **Re-run jobs** with **Enable debug logging**) turns on verbose MCP logs automatically. An explicit workflow or job `DEBUG` value takes precedence and is forwarded to the gateway and built-in MCP servers.
 
-The built-in JavaScript MCP loggers use their server names as namespaces, including `safeoutputs` and `mcpscripts`. Patterns are comma- or whitespace-separated, support `*` wildcards, and give `-` exclusions precedence regardless of order. For example, `DEBUG=safeoutputs,mcpscripts` selects those servers, while `DEBUG=*,-safeoutputs` excludes safe-outputs diagnostics from both stderr and `server.log`. Error summaries, required audit records, and structured safe-output files are not disabled by these filters; error stack traces require a matching debug namespace.
+The built-in JavaScript MCP loggers use server names as namespaces (`safeoutputs`, `mcpscripts`). Patterns are comma- or whitespace-separated, support `*`, and let `-` exclusions win regardless of order. For example, `DEBUG=*,-safeoutputs` removes safe-outputs diagnostics from stderr and `server.log`. Error summaries, required audit records, and structured safe-output files are unaffected; error stack traces need a matching namespace.
 
 ```bash
 # All namespaces
 DEBUG=* gh aw compile
-
-# Specific namespaces
-DEBUG=cli:*,workflow:* gh aw compile
 
 # Without colors
 DEBUG_COLORS=0 DEBUG=* gh aw compile
@@ -273,35 +233,22 @@ DEBUG_COLORS=0 DEBUG=* gh aw compile
 
 ## Model Override Variables
 
-These variables override the default AI model used for agent runs and threat detection. Set them as GitHub Actions repository or organization variables to apply org-wide defaults without modifying workflow frontmatter.
+Set these repository or organization variables to change the default agent and threat-detection model without editing frontmatter.
 
 > [!NOTE]
 > The `engine.model:` field in workflow frontmatter takes precedence over these variables.
 
 ### Compiler-managed default behavior
 
-Model defaults now use two different resolution paths:
-
-- **Compiler process environment (compile time):**
-  `GH_AW_DEFAULT_DETECTION_MODEL`
-- **GitHub `vars.*` expressions (runtime in compiled workflow):**
-  `GH_AW_DEFAULT_MODEL_COPILOT`,
-  `GH_AW_DEFAULT_MODEL_CLAUDE`,
-  `GH_AW_DEFAULT_MODEL_CODEX`
-
-At compile time, gh-aw emits runtime model expressions like:
+Model defaults resolve through two paths: `GH_AW_DEFAULT_DETECTION_MODEL` at compile time, and `GH_AW_DEFAULT_MODEL_COPILOT`, `GH_AW_DEFAULT_MODEL_CLAUDE`, and `GH_AW_DEFAULT_MODEL_CODEX` as runtime `vars.*` expressions. At compile time, gh-aw emits expressions such as:
 
 ```yaml
 COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || '<engine default model>' }}
 ```
 
-Use `gh aw env get` / `gh aw env update` to batch-manage
-these `GH_AW_DEFAULT_*` variables at repo, org, or enterprise scope with
-`default_`-prefixed YAML keys such as `default_max_ai_credits`,
-`default_max_turn_cache_misses`,
-`default_detection_max_ai_credits`, `default_max_daily_ai_credits`, and `default_model_copilot`.
+Use `gh aw env get` and `gh aw env update` to manage these `GH_AW_DEFAULT_*` variables in bulk at repo, org, or enterprise scope. Their `default_`-prefixed YAML keys include `default_max_ai_credits`, `default_max_turn_cache_misses`, `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, and `default_model_copilot`.
 
-OTLP metrics are enabled by default when configured. Set `default_otel_metrics: false` in the `gh aw env` defaults file to disable them at a scope; delete that variable to restore the default. A workflow-level `GH_AW_OTEL_METRICS` value takes precedence.
+OTLP metrics are on by default when configured. Set `default_otel_metrics: false` in the `gh aw env` defaults file to disable them at a scope; delete the variable to restore the default. A workflow-level `GH_AW_OTEL_METRICS` value takes precedence.
 
 ### Agent runs
 
@@ -321,9 +268,9 @@ OTLP metrics are enabled by default when configured. Set `default_otel_metrics: 
 | `GH_AW_MODEL_DETECTION_CLAUDE` | Anthropic Claude |
 | `GH_AW_MODEL_DETECTION_CODEX` | OpenAI Codex |
 
-For both inline and external detection, an explicit `safe-outputs.threat-detection.engine.model` takes precedence over the inherited workflow model. If neither is configured, a compile-time `GH_AW_DEFAULT_DETECTION_MODEL` override takes precedence; otherwise detection uses `vars.GH_AW_MODEL_DETECTION_<ENGINE>`, then `vars.GH_AW_DEFAULT_MODEL_<ENGINE>`, then the engine's built-in detection default. These variables use the resolved detection engine, which can differ from the main workflow engine.
+For inline and external detection, an explicit `safe-outputs.threat-detection.engine.model` overrides the inherited workflow model. Otherwise, detection resolves in this order: compile-time `GH_AW_DEFAULT_DETECTION_MODEL`, then `vars.GH_AW_MODEL_DETECTION_<ENGINE>`, then `vars.GH_AW_DEFAULT_MODEL_<ENGINE>`, then the engine's built-in detection default. The detection engine can differ from the main engine, and these variables follow it.
 
-Claude and Codex have no engine-specific detection default, so their fallback is the firewall's `detection` alias. Copilot's built-in detection fallback is cost-optimized (currently a mini model). The `detection` alias is resolved by the firewall at runtime and is not a pinned model. Use an explicit detection model or a model override variable to select a specific model. This does not change the [threat detection failure policy](/gh-aw/reference/threat-detection/).
+Claude and Codex have no engine-specific detection default, so they use the firewall's `detection` alias. That alias is resolved at runtime and is not pinned. Copilot's built-in fallback is cost-optimized (currently a mini model). To pin a specific model, set an explicit detection model or a model override variable. This does not change the [threat detection failure policy](/gh-aw/reference/threat-detection/).
 
 Set a model override as an organization variable:
 
@@ -337,7 +284,7 @@ See [Engines](/gh-aw/reference/engines/) for available engine identifiers and mo
 
 ## Guard Policy Fallback Variables
 
-These variables provide fallback values for guard policy fields when the corresponding `tools.github.*` configuration is absent from workflow frontmatter. Set them as GitHub Actions organization or repository variables to enforce a consistent policy across all workflows.
+These variables supply fallback values for `tools.github.*` guard policy fields that frontmatter does not set. Use organization or repository variables for a consistent policy across workflows.
 
 > [!NOTE]
 > Explicit `tools.github.*` values in workflow frontmatter always take precedence over these variables.
@@ -360,7 +307,7 @@ See [Tools Reference](/gh-aw/reference/tools/) for complete guard policy documen
 
 ## Runtime Policy Variables
 
-These variables enforce runtime policy decisions in compiled workflows without requiring recompilation.
+These variables enforce policy at runtime, without recompiling workflows.
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -370,7 +317,7 @@ These variables enforce runtime policy decisions in compiled workflows without r
 
 ## Precedence Rules
 
-Environment variables follow a **most-specific-wins** model, consistent with GitHub Actions. Variables at more specific scopes completely override variables with the same name at less specific scopes.
+Environment variables follow a **most-specific-wins** model, as in GitHub Actions. A more specific scope fully overrides a less specific one with the same name.
 
 ### General Precedence (Highest to Lowest)
 
@@ -390,9 +337,9 @@ These scopes are independent and operate in different contexts: `engine.env`, `c
 
 ### `sandbox.mcp.env` validation and transport
 
-Variables under `sandbox.mcp.env` configure the MCP gateway process, but they are not injected into the startup shell script as raw `export NAME=VALUE` lines. Instead, gh-aw transports them through compiler-controlled step environment variables and reconstructs the final gateway container `-e NAME=VALUE` arguments at runtime. This keeps values out of shell interpolation paths and avoids command-injection hazards from special characters.
+Variables under `sandbox.mcp.env` configure the MCP gateway process. They are not written into the startup script as raw `export` lines. gh-aw passes them through compiler-controlled step variables and rebuilds the gateway's `-e NAME=VALUE` arguments at runtime, which keeps values out of shell interpolation and avoids command-injection risks.
 
-Names in `sandbox.mcp.env` must match `^[A-Z_][A-Z0-9_]*$`. The internal `GH_AW_MCP_GATEWAY_` namespace is reserved for gh-aw transport metadata and cannot be used for custom variables.
+Names must match `^[A-Z_][A-Z0-9_]*$`. The `GH_AW_MCP_GATEWAY_` prefix is reserved for gh-aw transport metadata and cannot be used for custom variables.
 
 ```yaml wrap
 sandbox:
@@ -402,7 +349,7 @@ sandbox:
       LOG_LEVEL: trace
 ```
 
-Use `sandbox.mcp.env` for gateway-facing configuration only. For MCP server credentials or per-tool settings, prefer `tools.<name>.env` or `mcp-scripts.<name>.env`.
+Use `sandbox.mcp.env` only for gateway-facing settings. For MCP server credentials or per-tool settings, prefer `tools.<name>.env` or `mcp-scripts.<name>.env`.
 
 ### Override Example
 
@@ -428,8 +375,8 @@ jobs:
 ## Learn More
 
 - [Frontmatter Reference](/gh-aw/reference/frontmatter/) - Complete frontmatter configuration
-- [Governance Guide](/gh-aw/reference/governance/) - Roll out and manage defaults across enterprise, organization, and repository scopes
-- [Compiler Enterprise Environment Controls](/gh-aw/reference/compiler-enterprise-environment-controls/) - Enterprise defaults for timeout, max-turns, detection model, model fallback, and max-ai-credits guardrails
+- [Governance Guide](/gh-aw/reference/governance/) - Rolling out defaults at enterprise, organization, and repository scope
+- [Compiler Enterprise Environment Controls](/gh-aw/reference/compiler-enterprise-environment-controls/) - Enterprise guardrails for timeouts, turns, detection model, and AI credits
 - [Cost Management](/gh-aw/reference/cost-management/) - Practical model and token guardrail rollout guidance
 - [Tools](/gh-aw/reference/tools/) - MCP tool configuration and guard policies
 - [GitHub Actions Environment Variables](https://docs.github.com/en/actions/learn-github-actions/variables) - GitHub Actions documentation

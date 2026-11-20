@@ -81,6 +81,12 @@ describe("admission configuration and identity", () => {
     expect(body.workflow_call_id).toBe(`${identityEnv.GITHUB_RUN_ID}-2:${identityEnv.GH_AW_INFO_WORKFLOW_ID}`);
     expect(body.ref).toBe('refs/heads/🦊"\\x');
   });
+  it("JSON-encodes available job identity without header percent-encoding", () => {
+    const jobId = 'review/"\\\u00e9';
+    expect(JSON.parse(buildAdmissionIdentity({ ...identityEnv, GITHUB_JOB: jobId })).job_id).toBe(jobId);
+    expect(JSON.parse(buildAdmissionIdentity(identityEnv))).not.toHaveProperty("job_id");
+    expect(() => buildAdmissionIdentity({ ...identityEnv, GITHUB_JOB: "invalid\njob" })).toThrow(FAILURE);
+  });
   it.each(["", "0", "01", "-1", "+1", " 1", "1.0", "1e3", "١"])("rejects noncanonical run/attempt strings", value => {
     for (const key of ["GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"]) expect(() => buildAdmissionIdentity({ ...identityEnv, [key]: value })).toThrow(FAILURE);
   });

@@ -2334,6 +2334,13 @@ may append the same immutable Result even after native release. Completion,
 agent statements, and an overall successful worker conclusion alone do not
 prove delivery.
 
+The original worker's trusted finalizer starts a separate verifier budget for
+each Claim after loading its verified ledger and checking the native run.
+This window still allows verification after the Completion deadline, but an
+active worker can publish only a verified Result, not a `DeliveryFailure`.
+Failure exhaustion, maintenance recovery, and missing-verifier expiry remain
+anchored at the original Completion commit.
+
 Built-in resource creation needs independent native readback, not just a
 successful handler response or an agent-supplied URL. Discussion delivery must
 verify the created discussion's immutable identity, permitted repository,

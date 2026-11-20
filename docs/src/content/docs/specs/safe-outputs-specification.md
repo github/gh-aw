@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.30.0<br>
+**Version**: 1.31.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-18<br>
+**Publication Date**: 2026-11-19<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -1784,6 +1784,26 @@ binding level and relevant evidence references. Private bodies, patches, prompts
 secret-valued inputs and tokens MUST NOT be transmitted or logged; bind digests
 and reviewed secret references instead. The authority independently verifies any
 evidence required by its policy.
+
+The request object contains `version`, `request_digest`, and `invocation`, plus
+top-level `job_id` whenever nonempty `GITHUB_JOB` is available. `job_id` preserves
+the original job name using JSON string encoding; callers without job context
+omit it. It is diagnostic metadata outside the canonical invocation and its
+`request_digest`, not a signed job identity, policy selector or execution claim.
+Adding it MUST NOT change the digest or logical invocation identity. Authorities
+with closed request schemas MUST allow this member; response schemas are unchanged.
+
+The decision POST MUST carry W3C `traceparent` when the current
+`GITHUB_AW_OTEL_TRACE_ID` and `GITHUB_AW_OTEL_PARENT_SPAN_ID` form a valid context;
+invalid or incomplete context is omitted. When job context is available, it also
+carries W3C `baggage: cicd.pipeline.task.name=<encoded-job-id>`, using
+OpenTelemetry's CI/CD task-name key. Sanitize the header value with UTF-8
+percent-encoding (`encodeURIComponent`), including whitespace, CR/LF, Unicode,
+baggage delimiters and literal percent signs. Do not percent-encode JSON `job_id`.
+Neither carrier authorizes execution or replaces verified GitHub identity.
+Arbitrary inherited trace headers, baggage and exporter credentials MUST NOT be
+forwarded, and these correlation headers MUST NOT be sent to the OIDC issuer.
+Propagation MUST NOT enable telemetry export or change the fail-closed gate.
 
 The authority MUST atomically claim the logical invocation before allowing it.
 An executable response binds the request digest, invocation, current attempt,
@@ -8379,6 +8399,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.31.0** (2026-11-19):
+
+- **Specified**: JSON `job_id`, current-context W3C `traceparent`, and header-safe job baggage on authorization requests, without changing invocation digests or execution identity.
+- **Clarified**: Job metadata is diagnostic only; authorities must allow the new request member, while OIDC issuance and response schemas remain unchanged.
 
 **Version 1.30.0** (2026-11-18):
 
