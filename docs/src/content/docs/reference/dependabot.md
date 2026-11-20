@@ -43,7 +43,7 @@ updates:
 | **pip** | `requirements.txt` | - |
 | **Go** | `go.mod` | - |
 
-Generated manifests identify themselves as generated and direct tools to run `gh aw upgrade` to update them. The notice uses comments in `requirements.txt` and `go.mod`, and a `_comment` field in `package.json` because JSON does not support comments. The npm-generated `package-lock.json` is unchanged.
+Generated manifests identify themselves as generated and direct tools to run `gh aw upgrade` followed by `gh aw compile --dependabot` to update them. The notice uses comments in `requirements.txt` and `go.mod`, and a `_comment` field in `package.json` because JSON does not support comments. The npm-generated `package-lock.json` is unchanged.
 
 All ecosystems update `.github/dependabot.yml` with weekly update schedules. Existing configurations are preserved; only missing ecosystems are added.
 
