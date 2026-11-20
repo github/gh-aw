@@ -102,3 +102,5 @@
 {"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-18T09:20:45.103Z","runid":"44273963415"}
 {"id":"concurrency_analyzed","question":"Did the agent analyze safe-outputs MCP server tools for thread-safety and race conditions?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-19T09:24:14.495Z","runid":"44494553540"}
 {"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-19T09:24:14.495Z","runid":"44494553540"}
+{"id":"concurrency_analyzed","question":"Did the agent analyze safe-outputs MCP server tools for thread-safety and race conditions?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-20T09:21:32.417Z","runid":"44709064542"}
+{"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-20T09:21:32.417Z","runid":"44709064542"}
