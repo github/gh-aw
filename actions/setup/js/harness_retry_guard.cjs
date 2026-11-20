@@ -63,11 +63,11 @@ async function observeInvocationBudget({ guard, attempt, nativeTerminalRateLimit
  * @param {{
  *   attempt: number, result: import("./harness_retry_runner.cjs").HarnessAttemptResult,
  *   maxDelayMs: number, softTimeoutGuard: { softDeadlineMs: number } | null,
- *   harnessName: string, log: (message: string) => void,
+ *   harnessName: string, log: (message: string) => void, terminal?: boolean,
  * }} options
  * @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision | null}
  */
-function resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGuard, harnessName, log }) {
+function resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGuard, harnessName, log, terminal = false }) {
   const wait = result.retryAfterMs;
   if (wait == null) return null;
   const invalidWait = !Number.isSafeInteger(wait) || wait < 0;
@@ -80,6 +80,7 @@ function resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGua
     emitInfrastructureIncomplete(`${harnessName} HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`, { logger: log });
     return { action: "stop" };
   }
+  if (terminal) return null;
   result.failureClasses = ["rate_limit_error"];
   log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${wait}ms before next attempt`);
   return { action: "retry", nextDelayMs: wait };

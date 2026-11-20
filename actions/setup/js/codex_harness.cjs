@@ -79,7 +79,7 @@ const {
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
-const { hasAttemptTerminalSafeOutput, stopForAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
+const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
@@ -254,17 +254,6 @@ const DEFAULT_CONTEXT_REBUILD_FACTOR_LIMIT = 25;
 const DEFAULT_CONTEXT_REBUILD_MIN_CUMULATIVE_INPUT_TOKENS = 1000000;
 const DEFAULT_CONTEXT_REBUILD_POLL_INTERVAL_MS = 15000;
 const DEFAULT_CONTEXT_REBUILD_TERM_GRACE_MS = 5000;
-
-/**
- * Return the current byte size of the safe-outputs file, or 0 if the file does not
- * yet exist.  Used as a per-attempt baseline so the watchdog only arms on output
- * appended by the current attempt, not a record left by an earlier retry.
- * @param {string} safeOutputsPath
- * @returns {number}
- */
-function getSafeOutputsByteOffset(safeOutputsPath) {
-  return require("./harness_safe_outputs.cjs").getSafeOutputsByteOffset(safeOutputsPath);
-}
 
 /**
  * Emit a timestamped diagnostic log line to stderr.
@@ -1235,15 +1224,10 @@ async function main() {
       // as a success.  The agent completed its work and wrote its output — the hang on exit is
       // a cosmetic failure, not a task failure.  Check this before logging "attempt failed" so
       // the log stream does not contradict itself for what is ultimately a successful run.
-      const terminalDecision = stopForAttemptTerminalSafeOutput({
-        eligible: result.watchdogFired === true,
-        safeOutputsPath,
-        byteOffset: result.safeOutputsByteOffset ?? 0,
-        terminalOptions: { includeMissingData: true, includeReportIncomplete: true },
-        log,
-        message: `attempt ${attempt + 1}: post-result watchdog fired after terminal safe-output was emitted — treating as success (late-activity exit suppressed)`,
-      });
-      if (terminalDecision) return terminalDecision;
+      if (result.watchdogFired === true && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { includeMissingData: true, includeReportIncomplete: true, logger: log })) {
+        log(`attempt ${attempt + 1}: post-result watchdog fired after terminal safe-output was emitted — treating as success (late-activity exit suppressed)`);
+        return { action: "stop", exitCode: 0 };
+      }
 
       const isRateLimit = isRateLimitError(result.output);
       const isCybersecurityPolicyRejection = isGitHubProviderCybersecurityPolicyRejection(result.output, process.env.GH_AW_LLM_PROVIDER, "codex");

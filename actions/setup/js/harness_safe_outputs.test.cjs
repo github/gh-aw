@@ -2,10 +2,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput, stopForAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
+const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { claudeSafeOutputsOffset } = require("./claude_runtime.cjs");
 let directory;
 afterEach(() => {
@@ -15,7 +16,7 @@ afterEach(() => {
 });
 
 function outputFile() {
-  directory = fs.mkdtempSync(path.join(process.cwd(), ".harness-safe-outputs-"));
+  directory = fs.mkdtempSync(path.join(os.tmpdir(), "harness-safe-outputs-"));
   return path.join(directory, "safe-outputs.jsonl");
 }
 
@@ -43,7 +44,11 @@ describe("attempt-scoped safe-output observation", () => {
     vi.spyOn(fs, "statSync").mockImplementation(() => {
       throw error;
     });
-    expect(getSafeOutputsByteOffset("file")).toBe(0);
+    const offset = getSafeOutputsByteOffset("file");
+    expect(offset).toBeNaN();
+    const readFileSync = vi.fn(() => '{"type":"add_comment","body":"old"}\n');
+    expect(hasAttemptTerminalSafeOutput("file", offset, { readFileSync })).toBe(false);
+    expect(readFileSync).not.toHaveBeenCalled();
     expect(() => claudeSafeOutputsOffset("file")).toThrow("Failed to inspect Claude safe-outputs file: denied");
   });
 
@@ -58,16 +63,5 @@ describe("attempt-scoped safe-output observation", () => {
     fs.writeFileSync(file, JSON.stringify({ type, message: "diagnostic" }) + "\n");
     expect(hasAttemptTerminalSafeOutput(file, 0)).toBe(false);
     expect(hasAttemptTerminalSafeOutput(file, 0, { includeMissingData: true, includeReportIncomplete: true })).toBe(true);
-  });
-
-  it("only suppresses eligible exits with a current terminal record", () => {
-    const file = outputFile();
-    fs.writeFileSync(file, '{"type":"add_comment","body":"old"}\n');
-    const options = { eligible: true, safeOutputsPath: file, byteOffset: getSafeOutputsByteOffset(file), log: vi.fn(), message: "late exit success" };
-    expect(stopForAttemptTerminalSafeOutput(options)).toBeNull();
-    fs.appendFileSync(file, '{"type":"add_comment","body":"current"}\n');
-    expect(stopForAttemptTerminalSafeOutput({ ...options, eligible: false })).toBeNull();
-    expect(stopForAttemptTerminalSafeOutput(options)).toEqual({ action: "stop", exitCode: 0 });
-    expect(options.log.mock.calls.filter(([message]) => message === options.message)).toHaveLength(1);
   });
 });

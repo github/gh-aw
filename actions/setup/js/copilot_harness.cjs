@@ -102,7 +102,7 @@ const {
   REFLECT_PROVIDER_ALIASES,
 } = require("./awf_reflect.cjs");
 const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
-const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput, stopForAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
+const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, hasWorkflowToolPermissionDenial, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 const {
   detectNonRetryableHarnessGuard,
@@ -2376,15 +2376,11 @@ async function main() {
           // run means the agent completed its task (wrote safe-output) but produced no console
           // output before the watchdog terminated the idle process.
           const isExpectedLateExit = failureClass === "partial_execution" || failureClass === "long_run_exit" || (failureClass === "no_output" && result.watchdogFired) || (failureClass === "authentication_failed" && result.watchdogFired);
-          const lateExitReason = result.watchdogFired ? "post-result watchdog fired after terminal safe-output was emitted" : "partial execution after terminal safe-output was already produced";
-          const terminalDecision = stopForAttemptTerminalSafeOutput({
-            eligible: !!isExpectedLateExit,
-            safeOutputsPath,
-            byteOffset: result.safeOutputsByteOffset ?? 0,
-            log,
-            message: `attempt ${attempt + 1}: ${lateExitReason} — treating as success (late-activity exit suppressed)`,
-          });
-          if (terminalDecision) return terminalDecision;
+          if (isExpectedLateExit && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { logger: log })) {
+            const lateExitReason = result.watchdogFired ? "post-result watchdog fired after terminal safe-output was emitted" : "partial execution after terminal safe-output was already produced";
+            log(`attempt ${attempt + 1}: ${lateExitReason} — treating as success (late-activity exit suppressed)`);
+            return { action: "stop", exitCode: 0 };
+          }
 
           if (proxyAICreditsRejection) {
             log(`attempt ${attempt + 1}: AWF API proxy rejected the request with HTTP 403 max-AI-credits (${proxyAICreditsRejection.aiCredits}/${proxyAICreditsRejection.maxAICredits}) — trusted budget-abort evidence`);
@@ -2468,6 +2464,12 @@ async function main() {
 
           if (isWorkflowToolPermissionDenied) {
             return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output), workflowToolPermissionDenied: isWorkflowToolPermissionDenied });
+          }
+
+          if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
+            emitInfrastructureIncomplete("Copilot failed after staging task output. Preserving existing outputs and stopping to avoid replaying completed work.", { logger: log });
+            log(`attempt ${attempt + 1}: task output already staged — preserving output and not retrying`);
+            return { action: "stop" };
           }
 
           if (isMCPPolicy) {
@@ -2567,7 +2569,7 @@ async function main() {
           if (result.retryAfterMs != null) {
             if (attempt >= maxRetries) {
               // No runner retry decision remains: retain the terminal wait-cap diagnostic here.
-              const decision = resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGuard, harnessName: "Copilot harness", log });
+              const decision = resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGuard, harnessName: "Copilot harness", log, terminal: true });
               if (decision?.action === "stop") return decision;
               log(`all ${maxRetries} retries exhausted after HTTP 429 — not retrying`);
               return { action: "stop" };

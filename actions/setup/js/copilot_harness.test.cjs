@@ -3680,7 +3680,7 @@ require(${JSON.stringify(require.resolve("./process_runner.cjs"))}).runProcess =
             COPILOT_MODEL: "",
             GH_AW_SAFE_OUTPUTS: safeOutputsPath,
             GH_AW_HARNESS_TELEMETRY_DIR: directory,
-            GH_AW_HARNESS_MAX_RETRIES: "1",
+            GH_AW_HARNESS_MAX_RETRIES: "3",
             COPILOT_HARNESS_STUB_CALLS: callsPath,
           },
           encoding: "utf8",
@@ -3692,6 +3692,7 @@ require(${JSON.stringify(require.resolve("./process_runner.cjs"))}).runProcess =
           { attempt: 1, before: false, armed: currentOutput },
         ]);
         expect(result.stderr.includes("late-activity exit suppressed")).toBe(currentOutput);
+        if (!currentOutput) expect(result.stderr).toContain("task output already staged — preserving output and not retrying");
         const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
         expect(telemetry.attempt_results).toHaveLength(2);
         expect(telemetry.exit_code).toBe(currentOutput ? 0 : 1);

@@ -17,7 +17,8 @@ function getSafeOutputsByteOffset(outputPath, options = {}) {
   try {
     return fs.statSync(outputPath).size;
   } catch (error) {
-    if (!options.strict || (error && typeof error === "object" && "code" in error && error.code === "ENOENT")) return 0;
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return 0;
+    if (!options.strict) return NaN;
     throw new Error(`Failed to inspect ${options.errorLabel || "safe-outputs file"}: ${getErrorMessage(error)}`, { cause: error });
   }
 }
@@ -32,19 +33,4 @@ function hasAttemptTerminalSafeOutput(outputPath, byteOffset, options = {}) {
   return !!outputPath && Number.isSafeInteger(byteOffset) && byteOffset >= 0 && hasTerminalSafeOutput(outputPath, { ...options, byteOffset });
 }
 
-/**
- * Engines select eligible late exits and veto guards before invoking this helper.
- * @param {{
- *   eligible: boolean, safeOutputsPath: string, byteOffset: number,
- *   terminalOptions?: Parameters<typeof hasTerminalSafeOutput>[1],
- *   log: (message: string) => void, message: string,
- * }} options
- * @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision | null}
- */
-function stopForAttemptTerminalSafeOutput({ eligible, safeOutputsPath, byteOffset, terminalOptions, log, message }) {
-  if (!eligible || !hasAttemptTerminalSafeOutput(safeOutputsPath, byteOffset, { ...terminalOptions, logger: log })) return null;
-  log(message);
-  return { action: "stop", exitCode: 0 };
-}
-
-module.exports = { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput, stopForAttemptTerminalSafeOutput };
+module.exports = { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput };

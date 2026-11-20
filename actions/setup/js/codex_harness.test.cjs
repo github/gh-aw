@@ -1312,6 +1312,18 @@ process.exit(1);});`;
       }
     });
 
+    it.each([NaN, "12"])("does not treat output as current with an invalid offset: %s", safeOutputsByteOffset => {
+      const dir = makeHarnessTempDir("codex-rebuild-invalid-offset-");
+      const safeOutputsPath = path.join(dir, "safe-outputs.jsonl");
+      fs.writeFileSync(safeOutputsPath, '{"type":"noop","message":"old"}\n', "utf8");
+      try {
+        const decision = evaluateContextRebuildCircuitBreakerForAttempt({ rebuild_factor: 4, cumulative_input_tokens: 2000 }, { maxRebuildFactor: 4, minCumulativeInputTokens: 1000 }, { safeOutputsPath, safeOutputsByteOffset });
+        expect(decision.terminate).toBe(true);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
     it("does not trip for null, empty, or non-finite working sets", () => {
       const config = { maxRebuildFactor: 4, minCumulativeInputTokens: 1000 };
       expect(evaluateContextRebuildCircuitBreaker(null, config).terminate).toBe(false);

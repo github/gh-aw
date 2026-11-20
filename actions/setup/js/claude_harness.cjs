@@ -64,7 +64,7 @@ const {
 } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
-const { hasAttemptTerminalSafeOutput, stopForAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
+const { hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
@@ -708,14 +708,10 @@ async function main() {
         emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
         return { action: "stop" };
       }
-      const terminalDecision = stopForAttemptTerminalSafeOutput({
-        eligible: result.watchdogFired === true,
-        safeOutputsPath,
-        byteOffset: result.safeOutputsByteOffset ?? 0,
-        log,
-        message: "post-result watchdog stopped an idle process after terminal safe-output — treating as success",
-      });
-      if (terminalDecision) return terminalDecision;
+      if (result.watchdogFired === true && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { logger: log })) {
+        log("post-result watchdog stopped an idle process after terminal safe-output — treating as success");
+        return { action: "stop", exitCode: 0 };
+      }
       const classifierOutput = claudeFailureEvidence(result.output);
       const isCybersecurityPolicyRejection = isGitHubProviderCybersecurityPolicyRejection(result.output, process.env.GH_AW_LLM_PROVIDER, "claude");
       const isOverloaded = isOverloadedError(classifierOutput);

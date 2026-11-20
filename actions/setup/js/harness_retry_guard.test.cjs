@@ -51,6 +51,20 @@ describe("harness_retry_guard.cjs", () => {
       expect(log).toHaveBeenCalledTimes(1);
     });
 
+    it("does not report a retry or alter failure classes on an exhausted attempt", () => {
+      const log = vi.fn();
+      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 100, failureClasses: ["partial_execution"] };
+      expect(resolveRetryAfterDecision({ result, attempt: 3, maxDelayMs: 100, softTimeoutGuard: null, harnessName: "Test", log, terminal: true })).toBeNull();
+      expect(result.failureClasses).toEqual(["partial_execution"]);
+      expect(log).not.toHaveBeenCalled();
+    });
+
+    it("still rejects excessive waits on an exhausted attempt", () => {
+      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 101 };
+      expect(resolveRetryAfterDecision({ result, attempt: 3, maxDelayMs: 100, softTimeoutGuard: null, harnessName: "Test", log: vi.fn(), terminal: true })).toEqual({ action: "stop" });
+      expect(result.failureClasses).toEqual(["rate_limit_wait_exceeded"]);
+    });
+
     it.each([-1, NaN, Infinity, 0.5, 2147483648])("rejects invalid or overflowing waits: %s", retryAfterMs => {
       const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs };
       expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: Number.MAX_SAFE_INTEGER, softTimeoutGuard: null, harnessName: "Test", log: () => {} })).toEqual({ action: "stop" });
