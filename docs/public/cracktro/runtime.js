@@ -1521,6 +1521,9 @@
     );
     // Keyboard manual (below the tours): a game-style controls screen, a full keyboard plus one card per group of
     // shortcuts. Each entry is [keys, action]; a key is a string whose "+" joins a chord ("Shift+Home").
+    /** @type {Array<[string[], string]>} */
+    const SOUND_KEYS = config.sound ? [[["M"], "Sound on or off"]] : [];
+    /** @type {Array<[string, Array<[string[], string]>]>} */
     const KEYMAP = [
       [
         "Move",
@@ -1542,7 +1545,7 @@
           [["G"], "Slide map (this screen)"],
         ],
       ],
-      ["Show", [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], ...(config.sound ? [[["M"], "Sound on or off"]] : []), [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]]],
+      ["Show", [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]]],
       [
         "Slide map",
         [
@@ -1575,6 +1578,7 @@
     // up with a short tag; arcs join each chord's modifier to its key ("1…9+Enter" is a dashed sequence). Each key is
     // [label, x, y, w?, h?, k?] in key units; k names the KEYMAP key it stands for (default: the label).
     const KB = (() => {
+      /** @type {any[][]} */
       const keys = [["Esc", 0, 0]];
       for (let i = 0; i < 12; i++) keys.push([`F${i + 1}`, 2 + i + Math.floor(i / 4) * 0.5, 0]);
       ["PrtSc", "ScrLk", "Pause"].forEach((l, i) => keys.push([l, 15.5 + i, 0]));
@@ -1670,6 +1674,7 @@
       const anchor = key => [centre(key)[0], key.y * U + 5];
       // a chord joins the nearest pair of its keys outside the numpad (right Shift to the arrows, 9 to Enter) so arcs stay short
       const nearest = (a, b) => {
+        /** @type {[number, any, any] | undefined} */
         let best;
         for (const p of KB.filter(key => key.k === a && key.x < 19))
           for (const q of KB.filter(key => key.k === b && key.x < 19)) {
