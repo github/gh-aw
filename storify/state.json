@@ -1,24 +1,25 @@
 {
-  "last_run_date": "2026-11-19",
+  "last_run_date": "2026-11-20",
   "last_window": {
-    "start": "2026-11-18T07:55:42Z",
-    "end": "2026-11-19T07:55:42Z"
+    "start": "2026-11-19T07:55:22Z",
+    "end": "2026-11-20T07:55:22Z"
   },
   "observed_window": {
-    "coverage": "463 cached records 2026-11-18T19:37:03Z through 2026-11-19T07:54:02Z; count-limited; no fleet refetch",
-    "missing_start": "2026-11-18T07:55:42Z",
-    "continuation_end": "2026-11-18T19:31:28Z",
-    "continuation_before_run_id": 44382169334
+    "coverage": "394 cached records 2026-11-19T16:14:34Z through 2026-11-20T07:54:05Z; count-limited; no fleet refetch",
+    "missing_start": "2026-11-19T07:55:22Z",
+    "continuation_end": "2026-11-19T16:00:57Z",
+    "continuation_before_run_id": 44563846624
   },
   "key_themes": [
-    "Eleven cached Auditor collection failures followed one success whose agent was skipped.",
-    "Health Manager and Safe Output Health Monitor failed agent execution; simulator memory preparation and publication failed.",
-    "GitHub issue reads denied by temporary-path permission; previous tracker and intervention state not refreshed."
+    "Auditor had 12 failed and four successful collections in cached slice, with agent skipped on successful collections; a failure recurred after two successes.",
+    "Health Manager raised new tracker and tracker-expiry issue; Issue Monster requested assignment.",
+    "Three smoke dispatcher runs and ESLint dispatcher showed failed trusted control processing, with causes unverified.",
+    "Simulator memory preparation and repo-memory push failed again."
   ],
   "carry_forward_questions": [
-    "Why did Auditor collection fail and has the agent run since?",
-    "Is tracker 78921 still active and was targeted repair effective?",
-    "What caused simulator memory failure and did publication recover?",
-    "Can the missing earlier window and issue interventions be independently assessed?"
+    "What actual error caused Auditor collection failures, and will the agent execute after collection?",
+    "Does tracker 79418 stay open through recovery, and is expiry issue 79421 fixed?",
+    "Why did dispatcher trusted control processing fail in each workflow?",
+    "Does simulator memory isolation and publication recover?"
   ]
 }
