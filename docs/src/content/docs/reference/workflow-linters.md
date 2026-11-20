@@ -78,6 +78,16 @@ Output-flow analysis reuses the symbolic shell model, preserving known event/inp
 
 As with secret-flow coverage, the compiler omits environment-file and output-flow coverage warnings from its warning count. `gh aw lint` retains them. Confirmed findings still fail compilation.
 
+### False-positive boundaries
+
+| Check | Safe cases and conservative limits |
+|---|---|
+| Artifact preloads | Only explicit relative paths, absolute paths, and local file URLs for ESM imports/loaders are resolved as local preload files. CommonJS `--require` does not accept file URLs. Bare package specifiers are not workspace-relative paths; package resolution is not modeled. `--version`, `-v`, and `--v8-options` do not execute preloads. `--help` and `--check` can still load preloads and are not blanket exemptions. |
+| Executable action inputs | Only the reviewed action/input pairs above are code sinks. Lookalike action names and unrelated data inputs are not sinks. Runtime environment access and expressions returning booleans do not trigger executable interpolation findings. |
+| Output interpolation | Quoted runtime environment access, boolean comparisons, and boolean predicate results remain data. Taint is conservatively unioned across shell branches and assignments; overwrites and arbitrary sanitizers do not prove a value safe. Unknown outputs do not become attacker-controlled solely because another output is tainted, except where unresolved or multiline records require wildcard tracking. |
+| Environment files | Literal filenames such as `'$GITHUB_ENV'` and `'$GITHUB_PATH'` are ordinary files, not runner command files. Expanded runner variables and their modeled aliases are checked. Constants and boolean-filtered values are allowed; quoting untrusted multiline data or using a fixed heredoc delimiter is not sanitization. |
+| Image pins | An explicitly empty service `image` disables that service and is allowed; an empty job-container image is not. A matrix `exclude` entry naming only the image axis removes that alternative, but a later `include` can restore it. Partial multi-axis exclusions remain conservative; unresolved expressions produce coverage warnings, not proof of mutable images. |
+
 ### Historical zizmor regressions
 
 These checks build on the audits, rule names, and remediation guidance of [zizmor](https://github.com/zizmorcore/zizmor), an [MIT-licensed](https://github.com/zizmorcore/zizmor/blob/main/LICENSE) scanner, which deserves credit for them. The fixes below are gh-aw's regression evidence. gh-aw implements selected checks independently in Go and does not invoke zizmor. The [upstream audit documentation](https://docs.zizmor.sh/audits/) is authoritative for zizmor behavior.

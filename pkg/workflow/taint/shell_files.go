@@ -8,6 +8,13 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// NUL cannot occur in a filesystem path. These symbols preserve the distinction
+// between an expanded runner variable and a literal filename such as '$GITHUB_ENV'.
+const (
+	runnerEnvTarget  = "\x00github-env"
+	runnerPathTarget = "\x00github-path"
+)
+
 func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out value) {
 	switch redir.Op.String() {
 	case ">", ">>", "&>", "&>>":
@@ -111,6 +118,10 @@ func (s *shell) readFileWord(word *syntax.Word) value {
 }
 
 func (s *shell) write(target string, sources value, payload string, line int, command syntax.Command) {
+	target, handled := s.environmentFileWrite(target, sources, line)
+	if handled {
+		return
+	}
 	site := Site{Path: s.path, Line: line}
 	switch target {
 	case "$GITHUB_STEP_SUMMARY":
@@ -127,19 +138,36 @@ func (s *shell) write(target string, sources value, payload string, line int, co
 			s.files[target] = union(s.files[target], sources)
 			s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
 		} else if name != "" {
-			s.a.emit(Site{Kind: EnvironmentFile, Path: s.path, Line: line}, sources)
 			key := "env." + strings.ToLower(name)
 			s.persisted[key] = union(s.persisted[key], sources)
 			s.persisted["shell."+name] = union(s.persisted["shell."+name], sources)
 		} else if len(sources) > 0 {
-			s.a.emit(Site{Kind: EnvironmentFile, Path: s.path, Line: line}, sources)
 			s.a.gap(s.path, "dynamic GITHUB_ENV names are not modeled")
 		}
 	case "$GITHUB_PATH":
-		s.a.emit(Site{Kind: EnvironmentFile, Path: s.path, Line: line}, sources)
 	case "", "/dev/null":
 	default:
 		s.files[target] = union(s.files[target], sources)
+	}
+}
+
+func (s *shell) environmentFileWrite(target string, sources value, line int) (string, bool) {
+	site := Site{Kind: EnvironmentFile, Path: s.path, Line: line}
+	if !s.a.rule.IsSink(site) {
+		return target, false
+	}
+	switch target {
+	case runnerEnvTarget:
+		s.a.emit(site, sources)
+		return "$GITHUB_ENV", false
+	case runnerPathTarget:
+		s.a.emit(site, sources)
+		return target, true
+	case "$GITHUB_ENV", "$GITHUB_PATH":
+		s.files[target] = union(s.files[target], sources)
+		return target, true
+	default:
+		return target, false
 	}
 }
 

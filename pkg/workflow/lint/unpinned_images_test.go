@@ -41,6 +41,15 @@ func TestUnpinnedImages(t *testing.T) {
 	}
 }
 
+func TestDisabledServiceImage(t *testing.T) {
+	for _, target := range []ASTTargets{ActionsAST, AWAST} {
+		source := contractJob + "    services: {db: {image: ''}}\n" + contractSafeSteps
+		assert.Empty(t, integrityTestRun(t, UnpinnedImagesRule(), ruleContractInput(t, source, target, false)))
+		source = contractJob + "    container: {image: ''}\n" + contractSafeSteps
+		require.Len(t, integrityTestRun(t, UnpinnedImagesRule(), ruleContractInput(t, source, target, false)), 1)
+	}
+}
+
 func TestUnpinnedMatrixImages(t *testing.T) {
 	pinned := "node@sha256:" + strings.Repeat("a", 64)
 	for _, tt := range []struct {
@@ -51,6 +60,9 @@ func TestUnpinnedMatrixImages(t *testing.T) {
 		{"{image: ['" + pinned + "', 'node:22']}", true},
 		{"{include: [{image: '" + pinned + "'}]}", false},
 		{"{image: ['" + pinned + "'], include: [{image: 'node:latest'}]}", true},
+		{"{image: ['" + pinned + "', 'node:latest'], exclude: [{image: 'node:latest'}]}", false},
+		{"{image: ['" + pinned + "', 'node:latest'], exclude: [{image: 'node:latest'}], include: [{image: 'node:latest'}]}", true},
+		{"{image: ['" + pinned + "', 'node:latest'], os: [linux, windows], exclude: [{image: 'node:latest', os: linux}]}", true},
 		{"${{ fromJSON(inputs.matrix) }}", true},
 		{"{image: ['${{ vars.IMAGE }}']}", true},
 	} {

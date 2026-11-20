@@ -19,6 +19,11 @@ func TestEnvironmentFileInjection(t *testing.T) {
 		{`{ echo 'VALUE<<EOF'; printf '%s\n' "$BODY"; echo EOF; } >> "$GITHUB_ENV"`, true},
 		{`printf 'VALUE=fixed\n' >> "$GITHUB_ENV"`, false},
 		{`echo /opt/trusted/bin >> "$GITHUB_PATH"`, false},
+		{`printf '%s\n' "$BODY" >> '$GITHUB_ENV'`, false},
+		{`printf '%s\n' "$BODY" | tee -a '$GITHUB_PATH'`, false},
+		{`target='$GITHUB_ENV'; printf '%s\n' "$BODY" >> "$target"`, false},
+		{`target="$GITHUB_ENV"; printf '%s\n' "$BODY" >> "$target"`, true},
+		{`printf '%s\n' "$BODY" > '$GITHUB_ENV'; cat '$GITHUB_ENV' >> "$GITHUB_ENV"`, true},
 		{`printf '%s\n' "$BODY"`, false},
 		{`printf '%s\n' '${{ contains(github.event.comment.body, 'x') }}' >> "$GITHUB_ENV"`, false},
 	} {

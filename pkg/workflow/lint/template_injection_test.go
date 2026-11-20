@@ -35,6 +35,9 @@ func TestTemplateInjectionOutputFlows(t *testing.T) {
 		{"step output", `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`, `echo "${{ steps.capture.outputs.value }}"`, true},
 		{"constant output", `printf 'value=fixed\n' >> "$GITHUB_OUTPUT"`, `echo "${{ steps.capture.outputs.value }}"`, false},
 		{"safe consumer", `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`, `printf '%s\n' "$VALUE"`, false},
+		{"comparison consumer", `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`, `echo "${{ steps.capture.outputs.value == 'expected' }}"`, false},
+		{"boolean consumer", `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`, `echo "${{ contains(steps.capture.outputs.value, 'x') }}"`, false},
+		{"unrelated output", `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`, `echo "${{ steps.other.outputs.value }}"`, false},
 		{"filtered output", `printf 'value=%s\n' '${{ contains(github.event.comment.body, 'x') }}' >> "$GITHUB_OUTPUT"`, `echo "${{ steps.capture.outputs.value }}"`, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

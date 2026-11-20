@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/url"
 	"path"
 	"strings"
 
@@ -221,7 +222,11 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 	case "bash", "sh", "python", "python3", "node", "source", ".":
 		var files []string
 		if command == "node" {
-			for _, file := range artifactNodePreloads(len(call.Args), argument) {
+			preloads, metadataOnly := artifactNodePreloads(len(call.Args), argument)
+			if metadataOnly {
+				return nil
+			}
+			for _, file := range preloads {
 				files = append(files, artifactResolvePath(directory, file))
 			}
 		}
@@ -252,7 +257,7 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 	return nil
 }
 
-func artifactNodePreloads(count int, argument func(int) string) []string {
+func artifactNodePreloads(count int, argument func(int) string) ([]string, bool) {
 	var files []string
 	for index := 1; index < count; index++ {
 		value := argument(index)
@@ -264,25 +269,46 @@ func artifactNodePreloads(count int, argument func(int) string) []string {
 			option, payload, attached = "-r", strings.TrimPrefix(value, "-r"), true
 		}
 		switch option {
+		case "-v", "--version", "--v8-options":
+			return nil, true
+		case "-h", "--help", "-c", "--check":
+			continue
 		case "-r", "--require", "--import", "--loader", "--experimental-loader":
 			if !attached {
 				index++
 				payload = argument(index)
 			}
-			if payload != "" && !strings.HasPrefix(payload, "node:") && !strings.HasPrefix(payload, "data:") {
-				files = append(files, strings.TrimPrefix(payload, "file://"))
+			if file := artifactNodePreloadPath(option, payload); file != "" {
+				files = append(files, file)
 			}
 		default:
 			takesValue, noScript := artifactInterpreterOption("node", value)
 			if noScript {
-				return files
+				return files, false
 			}
 			if takesValue {
 				index++
 			}
 		}
 	}
-	return files
+	return files, false
+}
+
+func artifactNodePreloadPath(option, payload string) string {
+	if strings.HasPrefix(payload, "file:") {
+		if option == "-r" || option == "--require" {
+			return ""
+		}
+		location, err := url.Parse(payload)
+		if err != nil || location.Opaque != "" || (location.Host != "" && location.Host != "localhost") {
+			return ""
+		}
+		payload = location.Path
+	}
+	if path.IsAbs(payload) || strings.HasPrefix(payload, "./") || strings.HasPrefix(payload, "../") {
+		return payload
+	}
+	return ""
 }
 
 // Select only the script operand, not option payloads or arguments passed to it.
@@ -351,7 +377,7 @@ func artifactInterpreterOption(command, value string) (takesValue, noScript bool
 			return false, false
 		}
 		switch option {
-		case "-e", "--eval", "-p", "--print", "-pe", "-ep", "--run", "-h", "--help", "-v", "--version":
+		case "-e", "--eval", "-p", "--print", "-pe", "-ep", "--run", "-h", "--help", "-v", "--version", "--v8-options", "-c", "--check":
 			return false, true
 		case "-r", "--require", "--import", "--loader", "--experimental-loader",
 			"-C", "--conditions", "--log-file", "--input-type", "--inspect-port",

@@ -77,9 +77,8 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 	}
 	s.setConstants("GITHUB_OUTPUT", []string{"$GITHUB_OUTPUT"}, false)
 	if a.rule.IsSink(Site{Kind: EnvironmentFile}) {
-		for _, name := range []string{"GITHUB_ENV", "GITHUB_PATH"} {
-			s.setConstants(name, []string{"$" + name}, false)
-		}
+		s.setConstants("GITHUB_ENV", []string{runnerEnvTarget}, false)
+		s.setConstants("GITHUB_PATH", []string{runnerPathTarget}, false)
 	}
 	for key, sources := range bindings {
 		if name, ok := strings.CutPrefix(key, "shell."); ok {

@@ -98,6 +98,11 @@ func TestExecutableActionInputs(t *testing.T) {
 				"uses": "lookalike/" + tt.uses + "@v1", "with": map[string]any{tt.key: "${{ inputs.command }}"},
 			}}}
 			assert.Empty(t, runTemplateInjection(t, workflow))
+			workflow.Jobs[0].Steps = []actions.Step{actions.RawStep{Fields: map[string]any{
+				"uses": tt.uses + "@v1", "env": map[string]any{"BODY": "${{ inputs.command }}"},
+				"with": map[string]any{tt.key: "${{ contains(inputs.command, 'x') }}", "data": "${{ inputs.command }}"},
+			}}}
+			assert.Empty(t, runTemplateInjection(t, workflow), "boolean code inputs and unrelated data inputs are not injection")
 		})
 	}
 }

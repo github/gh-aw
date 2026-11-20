@@ -61,23 +61,16 @@ func matrixImageAlternatives(image string, strategy map[string]any) ([]any, bool
 	axes := maps.Clone(matrix)
 	delete(axes, "include")
 	delete(axes, "exclude")
-	var includes []any
-	if raw, exists := matrix["include"]; exists {
-		var ok bool
-		includes, ok = raw.([]any)
-		if !ok {
-			return nil, false
-		}
+	includes, includesKnown := matrixImageRows(matrix["include"])
+	excludes, excludesKnown := matrixImageRows(matrix["exclude"])
+	if !includesKnown || !excludesKnown {
+		return nil, false
 	}
-	for _, raw := range includes {
-		if row, ok := raw.(map[string]any); ok {
-			for key := range row {
-				if _, exists := axes[key]; !exists {
-					axes[key] = nil
-				}
+	for _, row := range includes {
+		for key := range row {
+			if _, exists := axes[key]; !exists {
+				axes[key] = nil
 			}
-		} else {
-			return nil, false
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(axes)) {
@@ -96,14 +89,37 @@ func matrixImageAlternatives(image string, strategy map[string]any) ([]any, bool
 		default:
 			return nil, false
 		}
-		for _, raw := range includes {
-			if row, ok := raw.(map[string]any); ok {
-				if value, exists := row[key]; exists {
-					alternatives = append(alternatives, value)
-				}
+		alternatives = slices.DeleteFunc(alternatives, func(value any) bool {
+			text, ok := value.(string)
+			return ok && slices.ContainsFunc(excludes, func(row map[string]any) bool {
+				return len(row) == 1 && row[key] == text
+			})
+		})
+		for _, row := range includes {
+			if value, exists := row[key]; exists {
+				alternatives = append(alternatives, value)
 			}
 		}
 		return alternatives, len(alternatives) > 0
 	}
 	return nil, false
+}
+
+func matrixImageRows(raw any) ([]map[string]any, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	values, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	var rows []map[string]any
+	for _, value := range values {
+		row, ok := value.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		rows = append(rows, row)
+	}
+	return rows, true
 }

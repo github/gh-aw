@@ -11,6 +11,29 @@ import (
 const artifactTrigger = "on: {workflow_run: {workflows: [CI], branches: [main]}}\n"
 const artifactDownloadSteps = "    steps:\n      - uses: actions/download-artifact@v4\n        with: {github-token: '${{ github.token }}', run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n"
 
+func TestArtifactNodePreloadPaths(t *testing.T) {
+	for _, tt := range []struct {
+		option, payload, expected string
+	}{
+		{"--require", "./incoming/setup.cjs", "./incoming/setup.cjs"},
+		{"--require", "incoming/setup.cjs", ""},
+		{"--require", "file:///incoming/setup.cjs", ""},
+		{"-r", "file:///incoming/setup.cjs", ""},
+		{"--import", "file:///incoming/setup.mjs", "/incoming/setup.mjs"},
+		{"--loader", "file://localhost/incoming/setup.mjs", "/incoming/setup.mjs"},
+		{"--import", "file:///incoming/%73etup.mjs", "/incoming/setup.mjs"},
+		{"--import", "file://elsewhere/incoming/setup.mjs", ""},
+		{"--import", "file:incoming/setup.mjs", ""},
+		{"--import", "file:///incoming/%invalid", ""},
+		{"--import", "node:fs", ""},
+		{"--import", "data:text/javascript,void(0)", ""},
+	} {
+		t.Run(tt.option+"/"+tt.payload, func(t *testing.T) {
+			assert.Equal(t, tt.expected, artifactNodePreloadPath(tt.option, tt.payload))
+		})
+	}
+}
+
 func TestArtifactExecutionSinks(t *testing.T) {
 	for _, tt := range []struct {
 		script, fields string
@@ -84,6 +107,18 @@ func TestArtifactExecutionSinks(t *testing.T) {
 		{"node -r./trusted/setup.js incoming/run.js", "", 1},
 		{"node trusted/run.js --require ./incoming/setup.js", "", 0},
 		{"node --require ./trusted/setup.js trusted/run.js", "", 0},
+		{"node --require incoming/setup.js trusted/run.js", "", 0},
+		{"node --import incoming/setup.mjs trusted/run.js", "", 0},
+		{"node --require ./incoming/setup.js --version", "", 0},
+		{"node --require ./incoming/setup.js -v", "", 0},
+		{"node --require ./incoming/setup.js --v8-options", "", 0},
+		{"node --version --require ./incoming/setup.js", "", 0},
+		{"node --require ./incoming/setup.js --help", "", 1},
+		{"node --require ./incoming/setup.js --check trusted/run.js", "", 1},
+		{"node --check incoming/run.js", "", 0},
+		{"node --check --require ./incoming/setup.js trusted/run.js", "", 1},
+		{"node incoming/run.js --version", "", 1},
+		{"node -r fs -e '1'", "", 0},
 		{"node --log-file incoming/run.js trusted/run.js", "", 0},
 		{"node --log-file foo.log run.js", "working-directory: incoming", 1},
 		{"node --eval incoming/run.js", "", 0},

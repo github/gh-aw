@@ -41,6 +41,9 @@ func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, s
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+			if disabledServiceImage(services[name]) {
+				continue
+			}
 			check(services[name], path+"."+name, strategy)
 		}
 		return nil
@@ -82,6 +85,15 @@ func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, s
 		}
 	}
 	return diagnostics, errors.Join(failures...)
+}
+
+func disabledServiceImage(raw any) bool {
+	service, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	image, literal := service["image"].(string)
+	return literal && image == ""
 }
 
 func imageOperand(raw any, field string) ([]Diagnostic, error) {
