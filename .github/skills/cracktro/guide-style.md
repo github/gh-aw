@@ -6,13 +6,13 @@ A guide slide teaches one usage pattern: the band's canvas, a title block (kicke
 
 ## Ingredients
 
-1. **Column examples.** Guide slides take `group: "platform"` and `under: "intent"`, hanging in a column below Turn Intent to Workflow (`key: "intent"`); kids follow source order. In `slides.md` their rows follow the head's row. A guide slide in another band hangs under that band's matching column head (same `group`).
+1. **Column examples.** Guide slides take `group: "platform"` and `under: "intent"`, hanging in a column below Turn Intent to Workflow (`key: "intent"`); kids follow source order. In `slides.md` their sections follow the head's section. A guide slide in another band hangs under that band's matching column head (same `group`).
 2. **Theme.** The slide inherits its band's `THEME`; guide styles are dark-only for now; add `body.light` overrides if a guide slide moves to a light band.
 3. **Title block (`gd-head`).** `.kicker` naming the tool and the topic (`/agentic-workflows · authoring loop`), an `h2` whose second sentence is an `<em>` answer in blue, then one `p` (30px) explaining the mechanism with inline `code`. The `h2` text is the `slides.md` Heading.
 4. **One board (`gd-board`).** A 1700×600 rounded panel at `left: 110px; top: 340px`, children absolutely positioned in board pixels. Draw wires in one inline `<svg viewBox="0 0 1700 600">` (built via `innerHTML`; `h()` makes HTML only). Shared parts: `gd-lab` (mono uppercase label), `gd-box` (+ `.on`), `gd-wire` (+ `.on`: blue, flowing dash), `gd-ok` (blue `✓`) and `gd-bad` (orange `✗`).
 5. **One looping process.** `tick(t)` drives a timed phase table (`PH` or a fixed cycle), throttled to 110 ms, starting ~1 s after entry; `enter()` resets every element. Show real artefacts where they exist (guide file names, real `gh aw compile` messages, measured counts), typed or revealed one step at a time.
 6. **Caption (`gd-cap`).** Mono, uppercase, at `top: 972px`, stating what is illustrative and, for data, `MEASURED · snapshot <date> · <window>`. Keep it left of the sound button.
-7. **Notes.** What/Why/When cues per `../cracktro-speaker-notes/SKILL.md`; say what is illustrative and mark the `slides.md` row `illustrative`. Measured numbers also need a `content-rules.md` Exception bullet and a refresh step.
+7. **Notes.** What/Why/When cues per `../cracktro-speaker-notes/SKILL.md`; say what is illustrative and mark the `slides.md` entry with Notes `illustrative`. Measured numbers also need a `content-rules.md` Exception bullet and a refresh step.
 
 ## Layouts
 

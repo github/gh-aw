@@ -18,7 +18,7 @@ Never name the author of the external `ponytail-review` skill (a personal handle
 
 ## 1. Slide
 
-- Marker: `// Ponytail Reviewer (ready` (`grep -n "// Ponytail Reviewer (ready" docs/public/cracktro/deck.js`). CSS prefix `pnt-` (strip `pnt-m`, built on the shared `dhm` strip classes). Group `process`, `under: "prr"`. Row 19 in `slides.md` (Notes `illustrative`: the diff, findings and verdict animation stay synthetic).
+- Marker: `// Ponytail Reviewer (ready` (`grep -n "// Ponytail Reviewer (ready" docs/public/cracktro/deck.js`). CSS prefix `pnt-` (strip `pnt-m`, built on the shared `dhm` strip classes). Group `process`, `under: "prr"`. `#ponytail-reviewer` in `slides.md` (Notes `illustrative`: the diff, findings and verdict animation stay synthetic).
 - Data lives inside that block only:
   1. `KINDS`: `[label, class, count]` for tagged findings (`yagni`, `shrink`, `delete`, `stdlib/native` summed) plus `untagged`.
   2. `AICM`: `[month, median AIC per review]` from review footers.
