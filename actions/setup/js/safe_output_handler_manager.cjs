@@ -423,6 +423,25 @@ function freezeInvocationValue(value) {
   return Object.freeze(value);
 }
 
+/**
+ * Applies JSON semantics to undefined values in place so the snapshot is digestable:
+ * undefined object fields are removed and undefined array entries become null.
+ * @param {any} value
+ * @returns {any}
+ */
+function dropUndefinedInvocationValues(value) {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) value[index] = value[index] === undefined ? null : dropUndefinedInvocationValues(value[index]);
+    return value;
+  }
+  for (const name of Object.keys(value)) {
+    if (value[name] === undefined) delete value[name];
+    else dropUndefinedInvocationValues(value[name]);
+  }
+  return value;
+}
+
 function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "") {
   if (typeof value === "string") {
     if (/(?:number|_id)$/.test(key) && !["temporary_id", "output_id", "claim_id", "work_id"].includes(key) && /^#?aw_[A-Za-z0-9_]+$/.test(value)) {
@@ -1268,8 +1287,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     }
     const policy = { configuration: redactSensitiveConfig(descriptor), defaults: redactSensitiveConfig(defaults), requirement };
     // The executor consumes this deep-frozen snapshot, never live resolution entries.
-    // eslint-disable-next-line gh-aw-custom/prefer-structured-clone -- The bound snapshot must match the JSON semantics accepted by canonicalDigest.
-    const boundInputs = freezeInvocationValue(JSON.parse(JSON.stringify({ message: preparedMessage, resolvedTemporaryIds, defaults })));
+    const boundInputs = freezeInvocationValue(dropUndefinedInvocationValues(structuredClone({ message: preparedMessage, resolvedTemporaryIds, defaults })));
     const invocation = protocol.prepareInvocation({
       caller,
       output: {

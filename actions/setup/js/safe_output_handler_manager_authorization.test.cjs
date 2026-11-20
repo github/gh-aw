@@ -444,6 +444,21 @@ describe("remove_labels authorization-to-execution consistency", () => {
     expect(results[0]).toMatchObject({ success: true, authorization: { state: "allowed" } });
   });
 
+  it("binds undefined fields with JSON semantics and preserves null fields", async () => {
+    const { removals } = recordingGithub();
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const authorize = allow();
+    const handlers = await loadHandlers({ remove_labels: { authorization: requirement, target: "*" } });
+    const { results } = await processMessages(handlers, [{ type: "remove_labels", item_number: 11, labels: ["bug"], repo: undefined, note: null, extra: { skipped: undefined, items: [undefined, null] } }]);
+    const inputs = boundInputs(prepare, authorize);
+    expect(inputs.message).not.toHaveProperty("repo");
+    expect(inputs.message).toMatchObject({ note: null, extra: { items: [null, null] } });
+    expect(inputs.message.extra).not.toHaveProperty("skipped");
+    expect(Object.isFrozen(inputs.message.extra.items)).toBe(true);
+    expect(removals).toEqual(["org/repo#11:bug"]);
+    expect(results[0]).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
   it.each([
     ["explicit item_number", { target: "*" }, { item_number: 11 }, "org/repo#11"],
     ["issue_number alias", { target: "*" }, { issue_number: 12 }, "org/repo#12"],
