@@ -17,7 +17,17 @@ const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAF
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { projectSafeOutputData, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, projectAuthorization } = require("./safe_output_execution.cjs");
-const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
+const {
+  hasUnresolvedTemporaryIds,
+  replaceTemporaryIdReferences,
+  replaceArtifactUrlReferences,
+  normalizeTemporaryId,
+  extractTemporaryIdReferences,
+  getCreatedTemporaryId,
+  isTemporaryId,
+  resolveIssueNumber,
+  resolveNumberFromTemporaryId,
+} = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
@@ -185,6 +195,27 @@ const REPOSITORY_SELECTOR_TYPES = new Set([
   "create_missing_data_issue",
   "create_report_incomplete_issue",
 ]);
+const TEMPORARY_TARGET_FIELDS_BY_TYPE = {
+  add_comment: ["item_number", "issue_number", "pr-number"],
+  add_labels: ["item_number", "issue_number", "pr_number", "pull_number"],
+  assign_milestone: ["issue_number"],
+  close_issue: ["issue_number"],
+  close_pull_request: ["pull_request_number"],
+  merge_pull_request: ["pull_request_number"],
+  remove_labels: ["item_number", "issue_number", "pr_number", "pull_number"],
+  replace_label: ["item_number", "issue_number", "pr_number", "pull_number"],
+  set_issue_field: ["issue_number"],
+  set_issue_type: ["issue_number"],
+  submit_pull_request_review: ["pull_request_number"],
+  update_issue: ["issue_number"],
+  update_pull_request: ["pull_request_number"],
+};
+const TEMPORARY_TARGET_FIELDS = new Set(["item_number", "issue_number", "pr_number", "pull_number", "pull_request_number", "pr-number", "parent_issue_number", "sub_issue_number", "discussion_number", "content_number"]);
+const NATIVE_TEMPORARY_TARGET_TYPES = new Set([...Object.keys(TEMPORARY_TARGET_FIELDS_BY_TYPE), "link_sub_issue", "update_discussion", "close_discussion", "update_project", "assign_to_agent"]);
+const SELECTOR_TARGET_TYPES = new Set([...Object.keys(TARGET_SELECTOR_KINDS), "add_labels", "remove_labels", "replace_label", "assign_milestone", "assign_to_agent"]);
+/** @typedef {"issue" | "strict" | "manager-number" | "draft"} TemporaryTargetResolver */
+/** @typedef {{field: string, resolver: TemporaryTargetResolver, titleFallback?: boolean, normalize?: "number"}} EffectiveTemporaryTarget */
+/** @typedef {{wasTemporaryId: boolean, resolved: {repo: string, number: number} | number | boolean | null}} EffectiveTemporaryTargetResolution */
 
 // Threat-detection warn-mode requirement IDs from safe-outputs specification:
 // - WTD2: Convertible outputs must be mapped to a reviewable type.
@@ -475,8 +506,10 @@ class BoundTemporaryIdMap extends Map {
   }
 }
 
-function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "") {
+function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "", preservedTargetFields = new Set(), numericTargetValues = new Map()) {
   if (typeof value === "string") {
+    if (numericTargetValues.has(key)) return numericTargetValues.get(key);
+    if (preservedTargetFields.has(key)) return value;
     if (/(?:number|_id)$/.test(key) && !["temporary_id", "output_id", "claim_id", "work_id"].includes(key) && /^#?aw_[A-Za-z0-9_]+$/.test(value)) {
       const target = temporaryIdMap.get(normalizeTemporaryId(value));
       if (target?.number != null) return target.number;
@@ -485,9 +518,71 @@ function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "") 
   }
   if (!value || typeof value !== "object") return value;
   const result = Array.isArray(value)
-    ? value.map(item => normalizeInvocationInputs(item, temporaryIdMap, repository))
-    : Object.fromEntries(Reflect.ownKeys(value).map(name => [name, normalizeInvocationInputs(value[name], temporaryIdMap, repository, String(name))]));
+    ? value.map(item => normalizeInvocationInputs(item, temporaryIdMap, repository, "", preservedTargetFields, numericTargetValues))
+    : Object.fromEntries(Reflect.ownKeys(value).map(name => [name, normalizeInvocationInputs(value[name], temporaryIdMap, repository, String(name), preservedTargetFields, numericTargetValues)]));
   return Object.freeze(result);
+}
+
+/** @returns {EffectiveTemporaryTarget[]} */
+function getEffectiveTemporaryTargets(type, message, config) {
+  const configuredTarget = config.target || "triggering";
+  if (type === "update_project") {
+    const contentType = message.content_type === undefined ? message.contentType : message.content_type;
+    if (contentType === "draft_issue") {
+      const field = message.draft_issue_id === undefined ? "draftIssueId" : "draft_issue_id";
+      const title = message.draft_title === undefined ? message.draftTitle : message.draft_title;
+      return message[field] == null ? [] : [{ field, resolver: "draft", titleFallback: typeof title === "string" && title.trim() !== "" }];
+    }
+
+    const contentNumber = message.content_number === undefined ? message.contentNumber : message.content_number;
+    const hasValue = value => value !== undefined && value !== null && String(value).trim() !== "";
+    const field = hasValue(contentNumber) ? (message.content_number === undefined ? "contentNumber" : "content_number") : hasValue(message.issue) ? "issue" : hasValue(message.pull_request) ? "pull_request" : null;
+    return field ? [{ field, resolver: "issue" }] : [];
+  }
+
+  if (type === "update_discussion" || type === "close_discussion") {
+    return message.discussion_number == null ? [] : [{ field: "discussion_number", resolver: "strict" }];
+  }
+
+  if (type === "link_sub_issue") {
+    /** @type {EffectiveTemporaryTarget[]} */
+    const targets = [];
+    if (configuredTarget === "*" && message.parent_issue_number != null) targets.push({ field: "parent_issue_number", resolver: "issue" });
+    if (message.sub_issue_number != null) targets.push({ field: "sub_issue_number", resolver: "issue" });
+    return targets;
+  }
+
+  if (type === "assign_to_agent") {
+    if (configuredTarget !== "*" || (message.issue_number != null && message.pull_number != null)) return [];
+    if (message.issue_number != null) return [{ field: "issue_number", resolver: "issue" }];
+    return message.pull_number == null ? [] : [{ field: "pull_number", resolver: "manager-number" }];
+  }
+
+  const aliases = TEMPORARY_TARGET_FIELDS_BY_TYPE[type];
+  if (!aliases) {
+    if (NATIVE_TEMPORARY_TARGET_TYPES.has(type)) return [];
+    return Object.entries(message)
+      .filter(([field, value]) => typeof value === "string" && TEMPORARY_TARGET_FIELDS.has(field))
+      .map(([field]) => ({ field, resolver: field === "discussion_number" ? "strict" : "issue", normalize: "number" }));
+  }
+  if (SELECTOR_TARGET_TYPES.has(type) && configuredTarget !== "*") return [];
+  const field = aliases.find(alias => message[alias] !== undefined && message[alias] !== null);
+  if (!field) return [];
+  return [{ field, resolver: type === "merge_pull_request" ? "strict" : ["close_pull_request", "submit_pull_request_review"].includes(type) ? "manager-number" : "issue" }];
+}
+
+/** @returns {EffectiveTemporaryTargetResolution} */
+function resolveEffectiveTemporaryTarget(target, message, temporaryIdMap, resolvedTemporaryIds) {
+  const value = message[target.field];
+  if (target.resolver === "draft") {
+    const temporary = typeof value === "string" && isTemporaryId(value.trim());
+    const mapped = temporary && temporaryIdMap.get(normalizeTemporaryId(value.trim()));
+    return { wasTemporaryId: temporary, resolved: !!mapped?.draftItemId };
+  }
+  if (target.resolver === "strict" || target.resolver === "manager-number") {
+    return resolveNumberFromTemporaryId(value, resolvedTemporaryIds);
+  }
+  return resolveIssueNumber(value, temporaryIdMap);
 }
 
 /**
@@ -1261,15 +1356,22 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       if (authorizationConfigured) authorizations.set(index, { state: descriptor.builtin === true && trustedConfig.authorization ? "exempt_builtin" : "not_configured" });
       return handler(message, resolvedTemporaryIds, temporaryIdMap);
     }
-    // Targets that are still temporary cannot consume an authority decision.
-    for (const [key, value] of Object.entries(message)) {
-      if (typeof value !== "string" || !/(?:number|_id)$/.test(key) || key === "temporary_id" || key === "output_id") continue;
-      if (/^#?aw_[A-Za-z0-9_]+$/.test(value) && !temporaryIdMap.has(normalizeTemporaryId(value))) {
+    const effectiveTargets = getEffectiveTemporaryTargets(type, message, descriptor);
+    const preservedTargetFields = new Set();
+    const numericTargetValues = new Map();
+    for (const targetField of effectiveTargets) {
+      const target = resolveEffectiveTemporaryTarget(targetField, message, temporaryIdMap, resolvedTemporaryIds);
+      if (target.wasTemporaryId && !target.resolved && !targetField.titleFallback) {
         return { deferred: true, reason: "Waiting for temporary target resolution" };
       }
+      if (!target.wasTemporaryId) continue;
+      if (targetField.resolver === "manager-number" || targetField.normalize === "number") {
+        const value = typeof target.resolved === "object" && target.resolved !== null ? target.resolved.number : target.resolved;
+        if (typeof value === "number") numericTargetValues.set(targetField.field, value);
+      } else preservedTargetFields.add(targetField.field);
     }
     const preparedAdapter = !!currentClaimHandle() && ["prepared", "script"].includes(trustedConfig.claim_adapters?.[type]?.mode);
-    const preparedMessage = normalizeInvocationInputs(message, preparedAdapter ? new Map() : temporaryIdMap, getDefaultTargetRepo(descriptor));
+    const preparedMessage = normalizeInvocationInputs(message, preparedAdapter ? new Map() : temporaryIdMap, getDefaultTargetRepo(descriptor), "", preservedTargetFields, numericTargetValues);
     authorizations.set(index, { state: "error", reason_code: "invalid_preparation" });
     const invocationBatchDigest = sourceBatch?.digests?.[index] || batchDigest || protocol.canonicalDigest(originalMessages);
     const implementationPath = preparedAdapter
@@ -1306,9 +1408,17 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       if (repository.success && isExactRepoSlug(repository.repoParts)) {
         refs.push(`validated-repository-selector:${repository.repo}`);
         if (targetKind && preparedMessage.comment_id == null) {
+          const targetMessage = { ...preparedMessage };
+          for (const targetField of effectiveTargets) {
+            const resolvedTarget = resolveEffectiveTemporaryTarget(targetField, message, temporaryIdMap, resolvedTemporaryIds);
+            if (!resolvedTarget.wasTemporaryId || resolvedTarget.resolved === null || resolvedTarget.resolved === false) continue;
+            const field = targetField.field === "pr-number" ? "pull_request_number" : targetField.field;
+            const value = resolvedTarget.resolved !== null && typeof resolvedTarget.resolved === "object" ? resolvedTarget.resolved.number : resolvedTarget.resolved;
+            if (typeof value === "number") targetMessage[field] = value;
+          }
           const target = resolveTarget({
             targetConfig: String(defaults.target_selector),
-            item: preparedMessage,
+            item: targetMessage,
             context,
             itemType: type,
             supportsPR: targetKind === "issue_or_pull_request",
@@ -1319,7 +1429,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       }
     }
     const policy = { configuration: redactSensitiveConfig(descriptor), defaults: redactSensitiveConfig(defaults), requirement };
-    // The executor consumes this deep-frozen snapshot, never live resolution entries.
+    // Bind a frozen snapshot; the handler gets a mutable message copy and snapshot-backed resolutions.
     const boundInputs = freezeInvocationValue(structuredClone(projectInvocationJsonValue({ message: preparedMessage, resolvedTemporaryIds, defaults })));
     const invocation = protocol.prepareInvocation({
       caller,
