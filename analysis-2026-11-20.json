@@ -1,0 +1,32 @@
+{
+ "date": "2026-11-20",
+ "window": "2026-10-21..2026-11-20",
+ "total_prs": 684,
+ "merged": 575,
+ "closed": 105,
+ "open": 4,
+ "merge_rate": 0.846,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "feature": {"total": 138, "merged": 124, "closed": 14, "open": 0, "rate": 0.899},
+  "bug_fix": {"total": 52, "merged": 44, "closed": 8, "open": 0, "rate": 0.846},
+  "security": {"total": 66, "merged": 53, "closed": 12, "open": 1, "rate": 0.815},
+  "testing": {"total": 53, "merged": 50, "closed": 2, "open": 1, "rate": 0.962},
+  "documentation": {"total": 65, "merged": 59, "closed": 6, "open": 0, "rate": 0.908},
+  "refactor": {"total": 21, "merged": 13, "closed": 8, "open": 0, "rate": 0.619},
+  "dependency": {"total": 19, "merged": 16, "closed": 3, "open": 0, "rate": 0.842},
+  "other": {"total": 270, "merged": 216, "closed": 52, "open": 2, "rate": 0.806}
+ },
+ "triage_verify_investigate_titles": {"total": 31, "merged": 10, "closed": 20, "open": 1, "rate": 0.333},
+ "structural": {"avg_words_merged": 143.1, "avg_words_closed": 98.4, "code_block_merged_rate": 0.6, "code_block_closed_rate": 0.381},
+ "length_buckets_completed": {
+  "0-100": {"total": 381, "merged": 309, "closed": 72, "rate": 0.811},
+  "100-150": {"total": 179, "merged": 156, "closed": 23, "rate": 0.872},
+  "150-250": {"total": 35, "merged": 29, "closed": 6, "rate": 0.829},
+  "250+": {"total": 85, "merged": 81, "closed": 4, "rate": 0.953}
+ },
+ "weekly_completed_rate": {"2026-10-19": 0.847, "2026-10-26": 0.785, "2026-11-02": 0.914, "2026-11-09": 0.856, "2026-11-16": 0.729},
+ "last_7_days": {"total": 188, "merged": 143, "closed": 41, "open": 4, "rate": 0.777},
+ "category_rules": "v7-title-regex-2026-11-20 (local re-derivation; first-match wins, leading [tag] stripped); NOT comparable to v6 category counts; merge_rate is comparable",
+ "caveat": "PR body used as prompt proxy; 509 of 684 PRs from app/copilot-swe-agent with agent-written bodies. Keyword lift confounded by single-author batch clusters; not causal."
+}
