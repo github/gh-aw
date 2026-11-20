@@ -2480,7 +2480,6 @@ jobs:
       - name: Conclude threat detection
         id: detection_conclusion
         if: always() && steps.detection_guard.outputs.run_detection == 'false' || (always() && steps.detection_guard.outputs.run_detection == 'true' && steps.redact_detection_logs.outcome == 'success' && steps.redact_detection_artifacts.outcome == 'success')
-        continue-on-error: true
         env:
           RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}
           DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}

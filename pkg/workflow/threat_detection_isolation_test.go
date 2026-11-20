@@ -368,7 +368,7 @@ Test workflow`
 		t.Fatal("Detection job not found in compiled workflow")
 	}
 
-	// The external detector path must emit threat-detect conclude, not the .cjs module
+	// The external detector path uses the host reader, not the legacy inline parser.
 	if strings.Contains(detectionSection, "parse_threat_detection_results.cjs") {
 		t.Error("External detector path must NOT emit parse_threat_detection_results.cjs")
 	}
@@ -377,6 +377,14 @@ Test workflow`
 	}
 	if !strings.Contains(detectionSection, "GH_AW_DETECTION_CONTINUE_ON_ERROR") {
 		t.Error("External detector path must pass GH_AW_DETECTION_CONTINUE_ON_ERROR to conclude_threat_detection.sh")
+	}
+	_, afterConclude, found := strings.Cut(detectionSection, "- name: Conclude threat detection\n")
+	if !found {
+		t.Fatal("External conclusion step not found")
+	}
+	concludeStep, _, _ := strings.Cut(afterConclude, "\n      - ")
+	if strings.Contains(concludeStep, "continue-on-error:") {
+		t.Error("External conclude must let a confirmed threat fail the detection job even in warn mode")
 	}
 
 	// The install step must reference the pinned version
