@@ -25,6 +25,7 @@ tools:
 safe-outputs:
   create-issue:
     max: 10
+    expires: 7d
     group: true
     labels: [cookie]
   add-comment:
