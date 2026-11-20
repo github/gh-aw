@@ -70,7 +70,7 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const {
   createOutputPatternMatcher,
   detectNonRetryableHarnessGuard,
-  detectExhaustedAWFInvocationBudget,
+  observeInvocationBudget,
   buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError,
@@ -79,6 +79,7 @@ const {
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
+const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
@@ -253,21 +254,6 @@ const DEFAULT_CONTEXT_REBUILD_FACTOR_LIMIT = 25;
 const DEFAULT_CONTEXT_REBUILD_MIN_CUMULATIVE_INPUT_TOKENS = 1000000;
 const DEFAULT_CONTEXT_REBUILD_POLL_INTERVAL_MS = 15000;
 const DEFAULT_CONTEXT_REBUILD_TERM_GRACE_MS = 5000;
-
-/**
- * Return the current byte size of the safe-outputs file, or 0 if the file does not
- * yet exist.  Used as a per-attempt baseline so the watchdog only arms on output
- * appended by the current attempt, not a record left by an earlier retry.
- * @param {string} safeOutputsPath
- * @returns {number}
- */
-function getSafeOutputsByteOffset(safeOutputsPath) {
-  try {
-    return fs.statSync(safeOutputsPath).size;
-  } catch {
-    return 0;
-  }
-}
 
 /**
  * Emit a timestamped diagnostic log line to stderr.
@@ -909,9 +895,9 @@ function evaluateContextRebuildCircuitBreakerForAttempt(workingSet, config, opti
   if (!decision.terminate) return decision;
 
   const safeOutputsPath = options && typeof options.safeOutputsPath === "string" ? options.safeOutputsPath : "";
-  const safeOutputsByteOffset = options && Number.isFinite(options.safeOutputsByteOffset) ? Number(options.safeOutputsByteOffset) : 0;
+  const safeOutputsByteOffset = options?.safeOutputsByteOffset ?? 0;
   const logger = options && options.logger ? options.logger : () => {};
-  if (safeOutputsPath && hasTerminalSafeOutput(safeOutputsPath, { byteOffset: safeOutputsByteOffset, includeMissingData: true, includeReportIncomplete: true, logger })) {
+  if (hasAttemptTerminalSafeOutput(safeOutputsPath, safeOutputsByteOffset, { includeMissingData: true, includeReportIncomplete: true, logger })) {
     logger(`context-rebuild circuit breaker threshold exceeded after terminal safe-output was emitted — allowing Codex to exit normally`);
     return { terminate: false, reason: "" };
   }
@@ -1206,8 +1192,7 @@ async function main() {
         postResultWatchdog: safeOutputsPath
           ? {
               shouldArm: () =>
-                hasTerminalSafeOutput(safeOutputsPath, {
-                  byteOffset: safeOutputsByteOffset,
+                hasAttemptTerminalSafeOutput(safeOutputsPath, safeOutputsByteOffset, {
                   includeMissingData: true,
                   includeReportIncomplete: true,
                   logger: log,
@@ -1218,13 +1203,6 @@ async function main() {
       });
       const missingErrors = terminalErrors.filter(line => !result.output.includes(line));
       if (missingErrors.length) result.output = `${missingErrors.join("\n")}\n${result.output}`;
-      // A guard-terminated run must never be reported as a success: Codex may handle SIGTERM
-      // and exit cleanly, and `runHarnessRetryLoop` short-circuits on exitCode 0 before
-      // `handleFailure` runs. Normalize the exit code so the failure handler always sees it.
-      if (result.runtimeGuardFired && result.exitCode === 0) {
-        log(`attempt ${attempt + 1}: runtime guard fired but process exited 0 — normalizing exit code to 1`);
-        return { ...result, exitCode: 1, safeOutputsByteOffset, strategy };
-      }
       return {
         ...result,
         safeOutputsByteOffset,
@@ -1246,16 +1224,7 @@ async function main() {
       // as a success.  The agent completed its work and wrote its output — the hang on exit is
       // a cosmetic failure, not a task failure.  Check this before logging "attempt failed" so
       // the log stream does not contradict itself for what is ultimately a successful run.
-      if (
-        result.watchdogFired &&
-        safeOutputsPath &&
-        hasTerminalSafeOutput(safeOutputsPath, {
-          byteOffset: result.safeOutputsByteOffset ?? 0,
-          includeMissingData: true,
-          includeReportIncomplete: true,
-          logger: log,
-        })
-      ) {
+      if (result.watchdogFired === true && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { includeMissingData: true, includeReportIncomplete: true, logger: log })) {
         log(`attempt ${attempt + 1}: post-result watchdog fired after terminal safe-output was emitted — treating as success (late-activity exit suppressed)`);
         return { action: "stop", exitCode: 0 };
       }
@@ -1317,14 +1286,7 @@ async function main() {
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
       // Codex can omit the proxy error body and expose only a generic terminal 429.
-      if (!nonRetryableGuard.maxRunsExceeded) {
-        const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
-        if (budget) {
-          nonRetryableGuard.maxRunsExceeded = true;
-          result.failureClasses.push("invocation_cap_exceeded");
-          log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
-        }
-      }
+      await observeInvocationBudget({ guard: nonRetryableGuard, nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, attempt, log, result });
       if (nonRetryableGuard.apiProxyGuardRejection) {
         const guard = nonRetryableGuard.apiProxyGuardRejection.guard;
         emitInfrastructureIncomplete(`AWF API proxy rejected the request: ${guard}`, { logger: log });

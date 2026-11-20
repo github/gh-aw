@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const { formatDuration, sleep } = require("./process_runner.cjs");
-const { emitSoftTimeoutSignal } = require("./harness_retry_guard.cjs");
+const { emitSoftTimeoutSignal, resolveRetryAfterDecision } = require("./harness_retry_guard.cjs");
 
 const executionEvidenceEnvVars = ["GH_AW_AWF_EXECUTION_EVIDENCE_FILE", "GH_AW_AWF_EXECUTION_COMPONENT"];
 
@@ -367,6 +367,10 @@ async function runHarnessRetryLoop(options) {
         writeAttemptMarker("finish", attemptResult);
         throw error;
       }
+      if (result.runtimeGuardFired && result.exitCode === 0) {
+        options.log(`attempt ${attempt + 1}: runtime guard fired but process exited 0 — normalizing exit code to 1`);
+        result.exitCode = 1;
+      }
       lastResult = result;
       lastExitCode = result.exitCode;
       attemptResult.exit_code = result.exitCode;
@@ -390,21 +394,9 @@ async function runHarnessRetryLoop(options) {
         break;
       }
 
-      const failureDecision = await options.handleFailure({ attempt, result, maxRetries: options.maxRetries });
+      let failureDecision = await options.handleFailure({ attempt, result, maxRetries: options.maxRetries });
       if (failureDecision.action === "retry" && result.retryAfterMs != null) {
-        const exceedsDelayCap = result.retryAfterMs > Math.min(options.maxDelayMs, 2147483647);
-        const exceedsTimeout = options.softTimeoutGuard && Date.now() + result.retryAfterMs >= options.softTimeoutGuard.softDeadlineMs;
-        if (exceedsDelayCap || exceedsTimeout) {
-          const reason = exceedsDelayCap ? `max-delay-ms=${options.maxDelayMs}` : "remaining job timeout budget";
-          result.failureClasses = ["rate_limit_wait_exceeded"];
-          options.log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 Retry-After=${result.retryAfterMs}ms exceeds ${reason}; not retrying`);
-          require("./safeoutputs_cli.cjs").emitInfrastructureIncomplete(`${options.harnessName} HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`, { logger: options.log });
-          failureDecision.action = "stop";
-        } else {
-          result.failureClasses = ["rate_limit_error"];
-          failureDecision.nextDelayMs = result.retryAfterMs;
-          options.log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${result.retryAfterMs}ms before next attempt`);
-        }
+        failureDecision = { ...failureDecision, ...resolveRetryAfterDecision({ ...options, attempt, result }) };
       }
       if (result.failureClasses?.length) {
         attemptResult.failure_classes = result.failureClasses;
