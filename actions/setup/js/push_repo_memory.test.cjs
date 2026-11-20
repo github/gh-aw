@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { execFileSync, execSync } from "child_process";
+import { execFileSync, execSync, spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -100,7 +100,9 @@ describe("push_repo_memory.cjs - nested memory persistence", () => {
         expect(core.setOutput).not.toHaveBeenCalledWith("save_commit", expect.anything());
       }
       if (pushedCommit === undefined) expect(core.setOutput).not.toHaveBeenCalledWith("save_status", "saved");
-      expect(core.warning).toHaveBeenCalledOnce();
+      // The mocked fetch reports an existing branch, and this run has no recorded starting commit.
+      expect(core.warning).toHaveBeenCalledTimes(2);
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("did not record the commit it started from"));
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("archive/ignored.md (no pattern matched)"));
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('archive/ignored.bin (disallowed extension ".bin")'));
     } finally {
@@ -2611,6 +2613,267 @@ describe("push_repo_memory.cjs - concurrent merge policy", () => {
     expect(between).toContain("core.warning");
     expect(between).not.toContain("Failed to reconcile repo-memory changes");
   });
+});
+
+describe("push_repo_memory.cjs - overlapping runs keep each other's rows", () => {
+  const branchName = "memory/test";
+  const tokenUrl = "https://x-access-token:test-token@example.test/owner/repo.git";
+  const originUrl = "https://example.test/owner/repo.git";
+
+  /**
+   * A local bare repository stands in for GitHub. Git's url.insteadOf sends the
+   * URLs push_repo_memory builds for example.test to it.
+   *
+   * @param {Record<string, string>} files
+   */
+  function createMemoryBranch(files) {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-overlap-"));
+    const remoteDir = path.join(rootDir, "remote.git");
+    const otherRunDir = path.join(rootDir, "other-run");
+    const env = {
+      ...process.env,
+      HOME: rootDir,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_COUNT: "5",
+      GIT_CONFIG_KEY_0: `url.${remoteDir}.insteadOf`,
+      GIT_CONFIG_VALUE_0: tokenUrl,
+      GIT_CONFIG_KEY_1: `url.${remoteDir}.insteadOf`,
+      GIT_CONFIG_VALUE_1: originUrl,
+      GIT_CONFIG_KEY_2: "user.name",
+      GIT_CONFIG_VALUE_2: "test",
+      GIT_CONFIG_KEY_3: "user.email",
+      GIT_CONFIG_VALUE_3: "test@example.com",
+      GIT_CONFIG_KEY_4: "core.autocrlf",
+      GIT_CONFIG_VALUE_4: "false",
+    };
+    /** @param {string[]} args @param {string} [cwd] */
+    const git = (args, cwd = rootDir) => execFileSync("git", args, { cwd, env, encoding: "utf8" });
+    /** @param {string} dir @param {Record<string, string>} contents */
+    const commitFiles = (dir, contents, message) => {
+      for (const [name, content] of Object.entries(contents)) fs.writeFileSync(path.join(dir, name), content);
+      git(["add", "--", ...Object.keys(contents)], dir);
+      git(["commit", "--quiet", "-m", message], dir);
+      git(["push", "--quiet", remoteDir, `HEAD:refs/heads/${branchName}`], dir);
+      return git(["rev-parse", "HEAD"], dir).trim();
+    };
+
+    git(["init", "--quiet", "--bare", remoteDir]);
+    git(["init", "--quiet", "-b", branchName, otherRunDir]);
+    const startCommit = commitFiles(otherRunDir, files, "seed");
+    return {
+      rootDir,
+      remoteDir,
+      env,
+      git,
+      startCommit,
+      /** Another run saves these files while this run's agent is still working. */
+      saveFromOtherRun: contents => commitFiles(otherRunDir, contents, "other run"),
+      /** @param {string} name */
+      readBranchFile: name => git(["--git-dir", remoteDir, "show", `${branchName}:${name}`]),
+    };
+  }
+
+  /**
+   * Run push_repo_memory's main() with real git in a fresh workspace.
+   *
+   * @param {ReturnType<typeof createMemoryBranch>} branch
+   * @param {Record<string, string>} artifactFiles - This run's copy of the memory files.
+   * @param {string} baseCommit - REPO_MEMORY_BASE_COMMIT from the agent job.
+   */
+  async function runPush(branch, artifactFiles, baseCommit) {
+    const artifactDir = path.join(branch.rootDir, "artifact");
+    const workspaceDir = path.join(branch.rootDir, "workspace");
+    fs.mkdirSync(artifactDir);
+    for (const [name, content] of Object.entries(artifactFiles)) fs.writeFileSync(path.join(artifactDir, name), content);
+    branch.git(["init", "--quiet", workspaceDir]);
+    branch.git(["remote", "add", "origin", originUrl], workspaceDir);
+
+    const gitHelpers = require("./git_helpers.cjs");
+    /** @param {Record<string, any>} [options] */
+    const inWorkspace = (options = {}) => ({ cwd: workspaceDir, ...options, env: { ...branch.env, ...(options.env || {}) } });
+    const pushSignedCommits = vi.fn(async ({ baseRef, cwd, requireBaseRefMatch }) => {
+      const remoteHead = branch.git(["ls-remote", branch.remoteDir, `refs/heads/${branchName}`]).split(/\s+/)[0];
+      if (requireBaseRefMatch && remoteHead !== baseRef) throw new Error("ERR_API: branch moved");
+      branch.git(["push", "--quiet", branch.remoteDir, `HEAD:refs/heads/${branchName}`], cwd);
+      return branch.git(["rev-parse", "HEAD"], cwd).trim();
+    });
+    const core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn(), setOutput: vi.fn() };
+    const mocks = {
+      "./git_helpers.cjs": {
+        ...gitHelpers,
+        execGitSync: (args, options) => gitHelpers.execGitSync(args, inWorkspace(options)),
+        execGitSyncResult: (args, options) => gitHelpers.execGitSyncResult(args, inWorkspace(options)),
+      },
+      "./push_signed_commits.cjs": { pushSignedCommits },
+    };
+    const requireForTest = createRequire(import.meta.url);
+    const module = { exports: {} };
+    const previousCore = global.core;
+    global.core = core;
+    try {
+      vm.runInNewContext(fs.readFileSync(path.join(import.meta.dirname, "push_repo_memory.cjs"), "utf8"), {
+        require: id => mocks[id] || requireForTest(id),
+        module,
+        core,
+        context: { repo: { owner: "owner", repo: "repo" } },
+        github: {},
+        exec: {},
+        Buffer,
+        process: {
+          env: {
+            ARTIFACT_DIR: artifactDir,
+            GITHUB_WORKSPACE: workspaceDir,
+            GITHUB_SERVER_URL: "https://example.test",
+            MEMORY_ID: "test",
+            TARGET_REPO: "owner/repo",
+            BRANCH_NAME: branchName,
+            GH_TOKEN: "test-token",
+            GITHUB_RUN_ID: "2",
+            REPO_MEMORY_BASE_COMMIT: baseCommit,
+          },
+        },
+      });
+      await module.exports.main();
+    } finally {
+      global.core = previousCore;
+    }
+    return { core, pushSignedCommits };
+  }
+
+  it("keeps rows another run saved while this run's agent was working", async () => {
+    const branch = createMemoryBranch({ "log.jsonl": "r1\n", "state.json": '{"count":1}\n', "notes.md": "line1\nline2\n" });
+    try {
+      branch.saveFromOtherRun({ "log.jsonl": "r1\na\n", "state.json": '{"count":2}\n', "notes.md": "A1\nline2\n" });
+
+      const { core, pushSignedCommits } = await runPush(branch, { "log.jsonl": "r1\nb\n", "state.json": '{"count":1}\n', "notes.md": "B1\nline2\n" }, branch.startCommit);
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(branch.readBranchFile("log.jsonl")).toBe("r1\na\nb\n");
+      // This run did not change state.json, so the other run's version stays.
+      expect(branch.readBranchFile("state.json")).toBe('{"count":2}\n');
+      // Both runs changed the same line of notes.md, so this run's line wins.
+      expect(branch.readBranchFile("notes.md")).toBe("B1\nline2\n");
+      expect(core.warning).not.toHaveBeenCalled();
+      expect(pushSignedCommits).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ requireBaseRefMatch: true }));
+    } finally {
+      fs.rmSync(branch.rootDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it.each([
+    ["is missing", "", "did not record the commit it started from"],
+    ["is not in the branch history", "0".repeat(40), "no longer in the branch history"],
+  ])(
+    "copies this run's files with a warning when the starting commit %s",
+    async (_label, baseCommit, reason) => {
+      const branch = createMemoryBranch({ "log.jsonl": "r1\n" });
+      try {
+        branch.saveFromOtherRun({ "log.jsonl": "r1\na\n" });
+
+        const { core } = await runPush(branch, { "log.jsonl": "r1\nb\n" }, baseCommit);
+
+        expect(core.setFailed).not.toHaveBeenCalled();
+        expect(core.warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(reason));
+        expect(branch.readBranchFile("log.jsonl")).toBe("r1\nb\n");
+      } finally {
+        fs.rmSync(branch.rootDir, { recursive: true, force: true });
+      }
+    },
+    30_000
+  );
+
+  it("retries instead of committing over a save that lands just before the commit", async () => {
+    const branch = createMemoryBranch({ "log.jsonl": "r1\n" });
+    const workspaceDir = path.join(branch.rootDir, "workspace");
+    const previousCore = global.core;
+    const previousExec = global.exec;
+    try {
+      branch.git(["clone", "--quiet", "--branch", branchName, branch.remoteDir, workspaceDir]);
+      // The retry path runs git with its own environment, so the workspace needs local settings.
+      for (const [key, value] of [
+        ["user.name", "test"],
+        ["user.email", "test@example.com"],
+        ["core.autocrlf", "false"],
+      ])
+        branch.git(["config", key, value], workspaceDir);
+      fs.appendFileSync(path.join(workspaceDir, "log.jsonl"), "b\n");
+      branch.git(["commit", "--quiet", "-am", "this run"], workspaceDir);
+
+      /** @param {string} program @param {string[]} args @param {Record<string, any>} [options] */
+      const run = (program, args, options = {}) => {
+        const result = spawnSync(program, args, { cwd: options.cwd ?? workspaceDir, env: { ...branch.env, ...(options.env || {}) }, encoding: options.listeners?.stdout ? "buffer" : "utf8" });
+        if (options.listeners?.stdout && result.stdout) options.listeners.stdout(Buffer.from(result.stdout));
+        return { exitCode: result.status ?? 1, stdout: String(result.stdout ?? ""), stderr: String(result.stderr ?? "") };
+      };
+      let headLookups = 0;
+      global.exec = {
+        // pushSignedCommits reads the remote head before replaying and again just
+        // before committing; the other run's save lands between the two reads.
+        getExecOutput: async (program, args, options) => {
+          if (args[0] === "ls-remote" && ++headLookups === 2) branch.saveFromOtherRun({ "log.jsonl": "r1\na\n" });
+          return run(program, args, options);
+        },
+        exec: async (program, args, options) => {
+          const result = run(program, args, options);
+          if (result.exitCode !== 0) throw new Error(`${program} ${args.join(" ")} failed: ${result.stderr}`);
+          return result.exitCode;
+        },
+      };
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+
+      await pushRepoMemoryChangesWithRetry({
+        githubClient: createSignedCommitApi(branch),
+        targetOwner: "owner",
+        targetRepoName: "repo",
+        targetRepo: "owner/repo",
+        branchName,
+        baseRef: branch.startCommit,
+        workspaceDir,
+        ghToken: "token",
+        serverHost: "example.test",
+        originUrlForPush: branch.remoteDir,
+        repoUrlForRetry: branch.remoteDir,
+        execGetExecOutput: async (program, args, options) => run(program, args, options),
+        sleepFn: async () => {},
+      });
+
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+      expect(global.core.warning).not.toHaveBeenCalledWith(expect.stringContaining("falling back to git push"));
+      expect(branch.readBranchFile("log.jsonl")).toBe("r1\na\nb\n");
+    } finally {
+      global.core = previousCore;
+      global.exec = previousExec;
+      fs.rmSync(branch.rootDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  /**
+   * A stand-in for GitHub's createCommitOnBranch: it rejects a stale
+   * expectedHeadOid and writes the given whole-file contents onto the head.
+   *
+   * @param {ReturnType<typeof createMemoryBranch>} branch
+   */
+  function createSignedCommitApi(branch) {
+    /** @param {string[]} args @param {Record<string, any>} [options] */
+    const remoteGit = (args, options = {}) => execFileSync("git", ["--git-dir", branch.remoteDir, ...args], { env: branch.env, encoding: "utf8", ...options }).trim();
+    return {
+      graphql: vi.fn(async (_query, { input }) => {
+        const ref = `refs/heads/${input.branch.branchName}`;
+        const head = remoteGit(["rev-parse", ref]);
+        if (head !== input.expectedHeadOid) throw new Error(`Expected branch to point to "${input.expectedHeadOid}" but it pointed to "${head}"`);
+        const env = { ...branch.env, GIT_INDEX_FILE: path.join(branch.rootDir, "signed-commit-index") };
+        remoteGit(["read-tree", head], { env });
+        for (const { path: filePath, contents } of input.fileChanges.additions) {
+          const blob = remoteGit(["hash-object", "-w", "--stdin"], { input: Buffer.from(contents, "base64") });
+          remoteGit(["update-index", "--add", "--cacheinfo", `100644,${blob},${filePath}`], { env });
+        }
+        for (const { path: filePath } of input.fileChanges.deletions) remoteGit(["update-index", "--force-remove", "--", filePath], { env });
+        const commit = remoteGit(["commit-tree", remoteGit(["write-tree"], { env }), "-p", head, "-m", input.message.headline], { env });
+        remoteGit(["update-ref", ref, commit, head]);
+        return { createCommitOnBranch: { commit: { oid: commit } } };
+      }),
+    };
+  }
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -471,7 +471,7 @@ describe("push_signed_commits integration tests", () => {
           allowGitPushFallback: false,
           requireBaseRefMatch: true,
         })
-      ).rejects.toThrow(/ledger branch moved/);
+      ).rejects.toThrow(/branch ledger-branch moved from [0-9a-f]{40} to [0-9a-f]{40}/);
       expect(githubClient.graphql).not.toHaveBeenCalled();
     });
 

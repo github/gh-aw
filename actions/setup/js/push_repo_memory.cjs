@@ -2,12 +2,14 @@
 /// <reference types="@actions/github-script" />
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { createHash } = require("crypto");
 const { isUtf8 } = require("buffer");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getGitAuthEnv } = require("./git_auth_helpers.cjs");
-const { execGitSync } = require("./git_helpers.cjs");
+const { execGitSync, execGitSyncResult } = require("./git_helpers.cjs");
 const { getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { formatJSONFiles, runCustomMemoryValidation } = require("./memory_custom_validation.cjs");
 const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
@@ -134,6 +136,146 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrl, previousB
   }
 }
 
+const COMMIT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+
+/**
+ * Compute the Git blob ID of file content without spawning git.
+ *
+ * @param {Buffer} content
+ * @param {string} commit - A commit ID from the same repository; its length selects SHA-1 or SHA-256.
+ * @returns {string}
+ */
+function gitBlobId(content, commit) {
+  return createHash(commit.length === 64 ? "sha256" : "sha1")
+    .update(`blob ${content.length}\0`)
+    .update(content)
+    .digest("hex");
+}
+
+/**
+ * Map each regular file in a commit to its blob ID.
+ *
+ * @param {string} commit
+ * @param {string} workspaceDir
+ * @returns {Map<string, string>}
+ */
+function listCommitBlobs(commit, workspaceDir) {
+  /** @type {Map<string, string>} */
+  const blobs = new Map();
+  const listing = execGitSync(["ls-tree", "-r", "-z", commit], { cwd: workspaceDir, stdio: "pipe" });
+  for (const entry of listing.split("\0")) {
+    const match = /^100(?:644|755) blob ([0-9a-f]+)\t([\s\S]+)$/.exec(entry);
+    if (match) blobs.set(match[2], match[1]);
+  }
+  return blobs;
+}
+
+/**
+ * @param {string} blobId
+ * @param {string} workspaceDir
+ * @returns {Buffer}
+ */
+function readBlob(blobId, workspaceDir) {
+  const result = execGitSyncResult(["cat-file", "blob", blobId], { cwd: workspaceDir, encoding: "buffer" });
+  if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+    throw new Error(`Failed to read blob ${blobId}: ${String(result.stderr || "").trim()}`);
+  }
+  return result.stdout;
+}
+
+/**
+ * Three-way merge of one memory file changed both by this run and by another
+ * run. JSONL keeps the rows of both sides, like the merge=union policy of the
+ * retry path; other files keep this run's lines where the two sides conflict.
+ *
+ * @param {{relativePath: string, latest: Buffer, base: Buffer, local: Buffer, workspaceDir: string}} opts
+ * @returns {Buffer | null} The merged content, or null when it is not text Git can merge.
+ */
+function mergeRepoMemoryFile({ relativePath, latest, base, local, workspaceDir }) {
+  if ([latest, base, local].some(content => content.includes(0) || !isUtf8(content))) return null;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-merge-"));
+  try {
+    const [latestPath, basePath, localPath] = ["latest", "base", "local"].map(name => path.join(tempDir, name));
+    fs.writeFileSync(latestPath, latest);
+    fs.writeFileSync(basePath, base);
+    fs.writeFileSync(localPath, local);
+    const favor = relativePath.endsWith(".jsonl") ? "--union" : "--theirs";
+    const result = execGitSyncResult(["merge-file", "-p", favor, latestPath, basePath, localPath], { cwd: workspaceDir, encoding: "buffer" });
+    return result.status === 0 && Buffer.isBuffer(result.stdout) ? result.stdout : null;
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Plan how to write each artifact file so that the save carries only this
+ * run's changes, measured from the commit the agent job cloned and replayed
+ * onto the checked-out branch head:
+ *   - unchanged by this run: keep the head's version, or skip the file if
+ *     another run deleted it;
+ *   - changed only by this run: write this run's version;
+ *   - changed on both sides: write a three-way merge (mergeRepoMemoryFile).
+ * Returns steps: null when the starting commit is unknown or no longer in the
+ * branch history; the caller then copies this run's files as before.
+ *
+ * @param {{files: Array<{relativePath: string, source: string}>, baseCommit: string | undefined, workspaceDir: string}} opts
+ * @returns {{steps: Map<string, {action: "keep" | "skip"} | {action: "write", content: Buffer}> | null, reason: string}}
+ */
+function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
+  const commit = String(baseCommit || "")
+    .trim()
+    .toLowerCase();
+  if (!commit) return { steps: null, reason: "the agent job did not record the commit it started from" };
+  if (!COMMIT_ID_PATTERN.test(commit)) return { steps: null, reason: "the recorded starting commit is not a commit ID" };
+  if (execGitSyncResult(["merge-base", "--is-ancestor", commit, "HEAD"], { cwd: workspaceDir }).status !== 0) {
+    return { steps: null, reason: `the starting commit ${commit} is no longer in the branch history` };
+  }
+
+  const baseBlobs = listCommitBlobs(commit, workspaceDir);
+  const headBlobs = listCommitBlobs("HEAD", workspaceDir);
+  /** @type {Map<string, {action: "keep" | "skip"} | {action: "write", content: Buffer}>} */
+  const steps = new Map();
+  for (const file of files) {
+    const treePath = file.relativePath.replace(/\\/g, "/");
+    const local = fs.readFileSync(file.source);
+    const localBlob = gitBlobId(local, commit);
+    const baseBlob = baseBlobs.get(treePath);
+    const headBlob = headBlobs.get(treePath);
+
+    if (localBlob === baseBlob) {
+      if (!headBlob) {
+        steps.set(file.relativePath, { action: "skip" });
+        continue;
+      }
+      // Sparse checkouts may not materialize the head's version in the working tree.
+      const destPath = path.join(workspaceDir, file.relativePath);
+      const inPlace = fs.existsSync(destPath) && gitBlobId(fs.readFileSync(destPath), commit) === headBlob;
+      steps.set(file.relativePath, inPlace ? { action: "keep" } : { action: "write", content: readBlob(headBlob, workspaceDir) });
+      continue;
+    }
+    if (!headBlob || headBlob === baseBlob || headBlob === localBlob) {
+      steps.set(file.relativePath, { action: "write", content: local });
+      continue;
+    }
+
+    const merged = mergeRepoMemoryFile({
+      relativePath: treePath,
+      latest: readBlob(headBlob, workspaceDir),
+      base: baseBlob ? readBlob(baseBlob, workspaceDir) : Buffer.alloc(0),
+      local,
+      workspaceDir,
+    });
+    if (merged) {
+      core.info(`Merged ${treePath} with changes another run saved after this run started`);
+      steps.set(file.relativePath, { action: "write", content: merged });
+    } else {
+      core.info(`Cannot merge ${treePath} as text; keeping this run's version`);
+      steps.set(file.relativePath, { action: "write", content: local });
+    }
+  }
+  return { steps, reason: "" };
+}
+
 /**
  * Push repo-memory changes with optimistic retries after stale-head failures.
  *
@@ -210,7 +352,9 @@ async function pushRepoMemoryChangesWithRetry({
         cwd: workspaceDir,
         gitAuthEnv: getGitAuthEnv(ghToken),
         allowGitPushFallback: !validateBeforePush,
-        requireBaseRefMatch: Boolean(validateBeforePush),
+        // Commit only on the head this save was built on; a moved branch is
+        // rebased below with the JSONL union policy and retried.
+        requireBaseRefMatch: true,
       });
       core.info(commit ? `Successfully pushed changes to ${branchName} branch` : `No changes left to push to ${branchName} branch`);
       return commit;
@@ -353,6 +497,8 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
  *                     The branch name is used for git operations (checkout, push) but not for pattern matching.
  *   GH_TOKEN: GitHub token for authentication
  *   GITHUB_RUN_ID: Workflow run ID for commit messages
+ *   REPO_MEMORY_BASE_COMMIT: Commit the agent job cloned. Files are compared with it so that only this
+ *                     run's changes are replayed onto the latest branch; empty falls back to copying files.
  */
 
 async function main() {
@@ -561,6 +707,8 @@ async function main() {
   // our new commit) and as the OCC token for the GraphQL createCommitOnBranch
   // mutation.  Empty string when the branch is brand new (orphan).
   let baseRef = "";
+  // Whether the branch existed before this job, so other runs may have saved to it.
+  let branchExisted = false;
 
   try {
     const repoUrl = `https://x-access-token:${ghToken}@${serverHost}/${targetRepo}.git`;
@@ -570,6 +718,7 @@ async function main() {
       execGitSync(["fetch", repoUrl, `${branchName}:${branchName}`], { stdio: "pipe", suppressLogs: true });
       execGitSync(["checkout", branchName], { stdio: "inherit" });
       core.info(`Checked out existing branch: ${branchName}`);
+      branchExisted = true;
       // Capture the remote HEAD SHA so pushSignedCommits can compute which
       // local commits are new (rev-list range: baseRef..HEAD).
       baseRef = execGitSync(["rev-parse", "HEAD"]).trim();
@@ -628,6 +777,7 @@ async function main() {
         // the 422 concurrent-creation case) so pushSignedCommits can use the
         // GraphQL signed-commit path instead of the unsigned git push fallback.
         baseRef = useApiSeedSha ? seedCommit.sha : execGitSync(["rev-parse", "HEAD"]).trim();
+        branchExisted = !useApiSeedSha;
         core.info(`Seeded and checked out new branch ${branchName} via GitHub API (baseRef: ${baseRef})`);
       } catch (seedError) {
         // Fallback: API seeding failed (e.g. insufficient token permissions).
@@ -781,9 +931,27 @@ async function main() {
     return;
   }
 
+  // Replay only this run's changes so that rows other runs saved after this
+  // run's agent started are not overwritten by its older copy of a file.
+  /** @type {ReturnType<typeof planRepoMemoryReplay>} */
+  let replayPlan = { steps: null, reason: "" };
+  if (branchExisted) {
+    try {
+      replayPlan = planRepoMemoryReplay({ files: filesToCopy, baseCommit: process.env.REPO_MEMORY_BASE_COMMIT, workspaceDir });
+    } catch (error) {
+      await setPushRepoMemoryFailure(`Failed to compare memory files with the commit this run started from: ${getErrorMessage(error)}`);
+      return;
+    }
+    if (!replayPlan.steps) {
+      core.warning(`Copying this run's memory files over ${branchName} because ${replayPlan.reason}. Rows that other runs saved to the same files after this run started may be lost.`);
+    }
+  }
+
   core.info(`Copying ${filesToCopy.length} validated file(s)...`);
 
   // Copy files to destination (preserving directory structure)
+  /** @type {typeof filesToCopy} */
+  const writtenFiles = [];
   for (const file of filesToCopy) {
     const destFilePath = path.join(destMemoryPath, file.relativePath);
     const destDir = path.dirname(destFilePath);
@@ -797,17 +965,29 @@ async function main() {
         return;
       }
 
+      const step = replayPlan.steps?.get(file.relativePath);
+      if (step?.action === "skip") {
+        core.info(`Skipped: ${file.relativePath} (unchanged by this run and deleted by another run)`);
+        continue;
+      }
+
       // Ensure destination directory exists
       fs.mkdirSync(destDir, { recursive: true });
 
-      // Copy file
-      fs.copyFileSync(file.source, destFilePath);
-      core.info(`Copied: ${file.relativePath} (${file.size} bytes)`);
+      if (!step) {
+        fs.copyFileSync(file.source, destFilePath);
+        core.info(`Copied: ${file.relativePath} (${file.size} bytes)`);
+      } else if (step.action === "write") {
+        fs.writeFileSync(destFilePath, step.content);
+        core.info(`Wrote: ${file.relativePath} (${step.content.length} bytes)`);
+      }
+      writtenFiles.push(file);
     } catch (error) {
       await setPushRepoMemoryFailure(`Failed to copy file ${file.relativePath}: ${getErrorMessage(error)}`);
       return;
     }
   }
+  filesToCopy = writtenFiles;
 
   try {
     const currentRepo = targetRepo.endsWith(".wiki") ? targetRepo.slice(0, -".wiki".length) : targetRepo;
@@ -1052,6 +1232,8 @@ module.exports = {
   isDeterministicPushValidationError,
   isUntrustedLedgerArtifact,
   main,
+  mergeRepoMemoryFile,
+  planRepoMemoryReplay,
   pushRepoMemoryChangesWithRetry,
   reconcileRepoMemoryRetry,
   redactFailureSummary,

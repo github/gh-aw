@@ -122,6 +122,23 @@ class PushSignedCommitsPolicyViolation extends Error {
 }
 
 /**
+ * Sentinel error class for a remote branch that moved away from `baseRef` when
+ * `requireBaseRefMatch` is set. The caller must rebuild the commit on the new
+ * head, so neither the replay rebase nor the unsigned `git push` fallback runs.
+ */
+class PushSignedCommitsBaseMoved extends Error {
+  /**
+   * @param {string} branch
+   * @param {string | undefined} baseRefOid
+   * @param {string} remoteHeadOid
+   */
+  constructor(branch, baseRefOid, remoteHeadOid) {
+    super(`${ERR_API}: branch ${branch} moved from ${baseRefOid || "(unresolved base)"} to ${remoteHeadOid} after this commit was prepared`);
+    this.name = "PushSignedCommitsBaseMoved";
+  }
+}
+
+/**
  * Unescape a C-quoted path returned by `git diff-tree --raw`.
  *
  * git wraps paths that contain special characters (spaces, non-ASCII bytes,
@@ -422,7 +439,7 @@ async function resolveLocalHeadSha(cwd) {
  * @param {string} [opts.pushToken] - Optional token used when pushing to pushRemoteUrl
  * @param {boolean} [opts.signedCommits=true] - When false, skip GraphQL signed commits and use git push directly
  * @param {boolean} [opts.allowGitPushFallback=true] - When false, refuse any fallback path that would use direct git push
- * @param {boolean} [opts.requireBaseRefMatch=false] - Refuse a signed commit against a remote head other than baseRef
+ * @param {boolean} [opts.requireBaseRefMatch=false] - Commit only while the remote head is still baseRef; a moved head is reported without rebasing or falling back to git push
  * @param {boolean} [opts.requireExistingBranch=false] - Never recreate a deleted target branch
  * @param {Record<string, any>} [opts.resolvedTemporaryIds] - Resolved temporary IDs map
  * @param {string} [opts.currentRepo] - Repository slug used for same-repo temporary ID resolution
@@ -545,6 +562,9 @@ async function pushSignedCommits({
     remoteHeadOid = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
   } catch {
     // Non-fatal. The existing branch-creation logic handles missing remote refs.
+  }
+  if (requireBaseRefMatch && remoteHeadOid && remoteHeadOid !== baseRefOid) {
+    throw new PushSignedCommitsBaseMoved(branch, baseRefOid, remoteHeadOid);
   }
   const firstReplayParentOid = revListEntries[0] && revListEntries[0].fields.length > 1 ? revListEntries[0].fields[1] : undefined;
   const firstGraphqlParentOid = remoteHeadOid || baseRefOid;
@@ -951,7 +971,7 @@ async function pushSignedCommits({
           core.info(`pushSignedCommits: using remote HEAD OID from ls-remote: ${expectedHeadOid}`);
         }
         if (requireBaseRefMatch && expectedHeadOid !== baseRefOid) {
-          throw new Error(`${ERR_API}: ledger branch moved after transition validation`);
+          throw new PushSignedCommitsBaseMoved(branch, baseRefOid, expectedHeadOid);
         }
       }
 
@@ -998,6 +1018,9 @@ async function pushSignedCommits({
     }
     if (err instanceof PushSignedCommitsPolicyViolation) {
       throw new Error(`${ERR_VALIDATION}: pushSignedCommits: refusing unsigned push for branch '${branch}': ${stripLeadingErrorCode(getErrorMessage(err))}`, { cause: err });
+    }
+    if (err instanceof PushSignedCommitsBaseMoved) {
+      throw err;
     }
     if (allowGitPushFallback === false) {
       const detail = getErrorMessage(err);

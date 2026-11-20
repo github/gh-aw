@@ -76,9 +76,14 @@ harden_repo_memory_git_state() {
   fi
 }
 
+# head is the commit the agent starts from; push_repo_memory replays the
+# agent's changes relative to it so rows saved meanwhile by other runs survive.
 write_clone_output() {
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
     printf 'cloned=%s\n' "$1" >> "$GITHUB_OUTPUT"
+    if [ -n "${2:-}" ]; then
+      printf 'head=%s\n' "$2" >> "$GITHUB_OUTPUT"
+    fi
   fi
 }
 
@@ -184,7 +189,7 @@ else
   git remote remove origin >/dev/null 2>&1 || true
   git remote add origin "$SAFE_ORIGIN_URL"
   harden_repo_memory_git_state "$MEMORY_DIR" "$SAFE_ORIGIN_URL"
-  write_clone_output true
+  write_clone_output true "$(git rev-parse --verify HEAD)"
 fi
 unset AUTH_HEADER
 

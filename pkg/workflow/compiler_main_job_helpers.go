@@ -275,6 +275,7 @@ func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 	}
 
 	c.addMainJobEngineErrorOutputs(outputs, data)
+	addRepoMemoryBaseCommitOutputs(outputs, data)
 	return outputs
 }
 

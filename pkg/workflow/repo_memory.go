@@ -625,6 +625,28 @@ func repoMemoryValidationStepID(memoryID string) string {
 	return memoryValidationStepID("validate_repo_memory", memoryID)
 }
 
+// repoMemoryCloneStepID identifies the agent job step that clones a memory branch.
+// Its head output is the commit the agent starts from.
+func repoMemoryCloneStepID(memoryID string) string {
+	return "clone_repo_memory_" + memoryID
+}
+
+// repoMemoryBaseCommitOutput names the agent job output that passes the cloned
+// commit to push_repo_memory, so the push replays only this run's changes.
+func repoMemoryBaseCommitOutput(memoryID string) string {
+	return "repo_memory_base_commit_" + memoryID
+}
+
+// addRepoMemoryBaseCommitOutputs exposes each memory's cloned commit from the agent job.
+func addRepoMemoryBaseCommitOutputs(outputs map[string]string, data *WorkflowData) {
+	if data.RepoMemoryConfig == nil {
+		return
+	}
+	for _, memory := range data.RepoMemoryConfig.Memories {
+		outputs[repoMemoryBaseCommitOutput(memory.ID)] = fmt.Sprintf("${{ steps.%s.outputs.head }}", repoMemoryCloneStepID(memory.ID))
+	}
+}
+
 // generateRepoMemorySteps generates git steps for the repo-memory configuration
 func (c *Compiler) generateRepoMemorySteps(builder *strings.Builder, data *WorkflowData, jobName string) {
 	if data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0 {
@@ -651,6 +673,9 @@ func (c *Compiler) generateRepoMemorySteps(builder *strings.Builder, data *Workf
 			fmt.Fprintf(builder, "      - name: Clone wiki-memory branch (%s)\n", memory.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		} else {
 			fmt.Fprintf(builder, "      - name: Clone repo-memory branch (%s)\n", memory.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		}
+		if jobName == string(constants.AgentJobName) {
+			fmt.Fprintf(builder, "        id: %s\n", repoMemoryCloneStepID(memory.ID)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 		if condition := repoMemoryAppTargetCondition(memory, PermissionRead); condition != "" {
 			fmt.Fprintf(builder, "        if: %s\n", condition) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
@@ -957,6 +982,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	fmt.Fprintf(&step, "          MEMORY_ID: %s\n", memory.ID)           //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          TARGET_REPO: %s\n", targetRepo)        //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          BRANCH_NAME: %s\n", memory.BranchName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(&step, "          REPO_MEMORY_BASE_COMMIT: ${{ needs.%s.outputs.%s }}\n", constants.AgentJobName, repoMemoryBaseCommitOutput(memory.ID)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	if ledgerMemory, ok := dailyAICRepoMemoryEntry(data); ok && ledgerMemory.ID == memory.ID {
 		step.WriteString("          GH_AW_DAILY_AIC_REPO_MEMORY_WRITER: ${{ steps.daily-aic-repo-memory-reset.outcome == 'success' }}\n")
 	}
