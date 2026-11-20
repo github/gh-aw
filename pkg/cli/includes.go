@@ -89,7 +89,11 @@ func fetchRemoteRuntimeImportsRecursive(ctx context.Context, content, currentBas
 		body = parsed.Markdown
 	}
 
-	for _, imp := range parser.ExtractBodyLevelImportPaths(body, currentBaseDir) {
+	bodyImports, err := parser.ExtractBodyLevelImportPaths(body, currentBaseDir)
+	if err != nil {
+		return fmt.Errorf("failed to scan runtime imports: %w", err)
+	}
+	for _, imp := range bodyImports {
 		remoteFilePath := strings.TrimSpace(imp.Path)
 		if remoteFilePath == "" {
 			continue
@@ -768,6 +772,9 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("failed to scan workflow content for includes: %w", err)
+	}
 	return nil
 }
 
