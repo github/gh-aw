@@ -584,6 +584,8 @@ jobs:
       model_not_supported_error: ${{ steps.detect-agent-errors.outputs.model_not_supported_error || 'false' }}
       output: ${{ steps.collect_output.outputs.output }}
       output_types: ${{ steps.collect_output.outputs.output_types }}
+      repo_memory_base_commit_default: ${{ steps.clone_repo_memory_default.outputs.head }}
+      repo_memory_base_commit_lifecycle: ${{ steps.clone_repo_memory_lifecycle.outputs.head }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
@@ -682,6 +684,7 @@ jobs:
           path: /tmp/gh-aw
       # Repo memory git-based storage configuration from frontmatter processed below
       - name: Clone repo-memory branch (default)
+        id: clone_repo_memory_default
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -691,6 +694,7 @@ jobs:
           CREATE_ORPHAN: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh"
       - name: Clone repo-memory branch (lifecycle)
+        id: clone_repo_memory_lifecycle
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -2504,6 +2508,7 @@ jobs:
           MEMORY_ID: default
           TARGET_REPO: ${{ github.repository }}
           BRANCH_NAME: memory/meta-orchestrators
+          REPO_MEMORY_BASE_COMMIT: ${{ needs.agent.outputs.repo_memory_base_commit_default }}
           MAX_FILE_SIZE: 524288
           MAX_FILE_COUNT: 100
           MAX_PATCH_SIZE: 1048576
@@ -2533,6 +2538,7 @@ jobs:
           MEMORY_ID: lifecycle
           TARGET_REPO: ${{ github.repository }}
           BRANCH_NAME: memory/output-lifecycle
+          REPO_MEMORY_BASE_COMMIT: ${{ needs.agent.outputs.repo_memory_base_commit_lifecycle }}
           MAX_FILE_SIZE: 16777216
           MAX_FILE_COUNT: 2
           MAX_PATCH_SIZE: 1048576

@@ -651,6 +651,7 @@ jobs:
       model_routing_status: ${{ steps.parse-token-usage.outputs.model_routing_status }}
       output: ${{ steps.collect_output.outputs.output }}
       output_types: ${{ steps.collect_output.outputs.output_types }}
+      repo_memory_base_commit_default: ${{ steps.clone_repo_memory_default.outputs.head }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
@@ -735,6 +736,7 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/setup_cache_memory_git.sh"
       # Repo memory git-based storage configuration from frontmatter processed below
       - name: Clone repo-memory branch (default)
+        id: clone_repo_memory_default
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -2579,6 +2581,7 @@ jobs:
           MEMORY_ID: default
           TARGET_REPO: ${{ github.repository }}
           BRANCH_NAME: memory/firewall-escape
+          REPO_MEMORY_BASE_COMMIT: ${{ needs.agent.outputs.repo_memory_base_commit_default }}
           MAX_FILE_SIZE: 524288
           MAX_FILE_COUNT: 50
           MAX_PATCH_SIZE: 10240
