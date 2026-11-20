@@ -1665,7 +1665,6 @@
       T: "tours",
       D: "design",
       A: "all",
-      C: "clear",
       L: "link",
       Shift: "mod",
       Ctrl: "mod ⌘",
