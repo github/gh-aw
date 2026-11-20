@@ -80,6 +80,58 @@ func TestRunGraderFromUnifiedSession(t *testing.T) {
 	}
 }
 
+func TestRunSessionGraderDecisionIntegrityReplay(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node unavailable")
+	}
+	grader := graderRunDefinition{
+		ID: "end-to-end-lineage-completeness", Source: "builtin",
+		Config: map[string]any{"mode": "decision-integrity"},
+	}
+	payload := json.RawMessage(`[{
+		"type":"trajectory.ir",
+		"provenance":{"component":"agent","phase":"agent","path":"agent-session.jsonl","index":0},
+		"data":{
+			"events":[
+				{"index":11,"kind":"tool_call","ref":"call"},
+				{"index":22,"kind":"observation","ref":"result"},
+				{"index":33,"kind":"safe_output","ref":"accept"}
+			],
+			"actions":[{"id":"accept","eventIndex":33}],
+			"toolCalls":[{"id":"call","eventIndex":11,"outputRef":"result","success":true}],
+			"observations":[{"id":"result","eventIndex":22,"sourceToolCallId":"call"}],
+			"provenanceEdges":[{"from":"result","to":"accept","relation":"informed"}],
+			"decisionLineage":{
+				"version":1,"complete":true,
+				"decisions":[{"id":"d","actionId":"accept","eventIndex":33,"revisionId":"r1","requiredValidations":["unit"],"validationIds":["v"]}],
+				"validations":[{"id":"v","toolCallId":"call","resultObservationId":"result","revisionId":"r1","requirement":"unit","outcome":"passed"}]
+			}
+		}
+	}]`)
+	var first bytes.Buffer
+	require.NoError(t, runSessionGrader(context.Background(), grader, payload, &first))
+	var second bytes.Buffer
+	require.NoError(t, runSessionGrader(context.Background(), grader, payload, &second))
+	assert.Equal(t, first.String(), second.String(), "offline replay must be byte-for-byte deterministic")
+	var result struct {
+		Value       float64 `json:"value"`
+		Diagnostics struct {
+			Mode          string `json:"mode"`
+			EvidenceBasis string `json:"evidenceBasis"`
+			Counts        struct {
+				Valid     int `json:"valid"`
+				Evaluable int `json:"evaluable"`
+			} `json:"counts"`
+		} `json:"diagnostics"`
+	}
+	require.NoError(t, json.Unmarshal(first.Bytes(), &result))
+	assert.Equal(t, 1.0, result.Value)
+	assert.Equal(t, "decision-integrity", result.Diagnostics.Mode)
+	assert.Equal(t, "producer-asserted", result.Diagnostics.EvidenceBasis)
+	assert.Equal(t, 1, result.Diagnostics.Counts.Valid)
+	assert.Equal(t, 1, result.Diagnostics.Counts.Evaluable)
+}
+
 func TestRunGraderRejectsCustomCode(t *testing.T) {
 	for _, entry := range []string{
 		"operational-value:\n    run: ../evaluator.sh",

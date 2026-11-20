@@ -232,9 +232,10 @@ function createSessionLookups(session) {
     .map(event => event.data);
   const failedToolCalls = toolCalls.filter(isToolFailure).length;
   const workingSet = calculateWorkingSetFromEntries(tokenUsageEntries).workingSet;
-  const trajectory = eventsOfType("trajectory.ir")
+  const trajectoryEvent = eventsOfType("trajectory.ir")
     .filter(event => event.provenance.phase === "agent")
-    .at(-1)?.data;
+    .at(-1);
+  const trajectory = trajectoryEvent?.data;
   const trajectoryIR = {
     events: agentEvents.filter(event => event.provenance.component === "agent").map(event => ({ index: eventIndices.get(event), kind: event.type })),
     ...trajectory,
@@ -252,6 +253,7 @@ function createSessionLookups(session) {
     engineRetries,
     artifacts,
     trajectoryIR,
+    trajectoryIRSource: trajectoryEvent ? { sessionEventIndex: eventIndices.get(trajectoryEvent), phase: "agent" } : null,
   };
   return {
     eventsOfType,

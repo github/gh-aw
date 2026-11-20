@@ -14,7 +14,7 @@ import "embed"
 //go:embed js/skill_inventory.cjs js/markdown_metadata.cjs js/error_recovery.cjs js/github_rate_limit_logger.cjs
 //go:embed js/github_api_quota.cjs js/github_api_diagnostics.cjs
 //go:embed js/unified_session_order.cjs js/unified_session_otel.cjs
-//go:embed js/trace_graders.cjs js/grader_session.cjs js/grader_artifacts.cjs js/trajectory_graders.cjs js/builtin_graders.json js/working_set_metrics.cjs
+//go:embed js/trace_graders.cjs js/grader_session.cjs js/grader_artifacts.cjs js/trajectory_graders.cjs js/decision_lineage.cjs js/builtin_graders.json js/working_set_metrics.cjs
 //go:embed js/custom_graders.cjs js/custom_grader_worker.cjs
 //go:embed js/workflow_job_durations.cjs
 //go:embed js/mcp_configuration.cjs js/symlink_guard.cjs

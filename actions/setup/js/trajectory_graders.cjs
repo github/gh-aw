@@ -8,6 +8,7 @@
 // Maximum number of items in any IR collection before trajectory graders report
 // the trace as unavailable, keeping the O(n^2) graders computationally cheap.
 const MAX_TRAJECTORY_ITEMS = 5000;
+const { gradeDecisionIntegrity } = require("./decision_lineage.cjs");
 
 const MAX_DIAGNOSTIC_PATH_LENGTH = 120;
 
@@ -983,6 +984,7 @@ function gradeToolOutputConsumptionRate(trace, config) {
  * @returns {any}
  */
 function gradeEndToEndLineageCompleteness(trace, config) {
+  if (config.mode === "decision-integrity") return gradeDecisionIntegrity(trace);
   const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.events) && Array.isArray(value.provenanceEdges) && Array.isArray(value.toolCalls) && Array.isArray(value.observations));
   if (!ir) {
