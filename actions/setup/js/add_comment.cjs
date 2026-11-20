@@ -581,10 +581,8 @@ async function main(config = {}) {
 
     processedCount++;
 
-    // Merge resolved temp IDs
-    Object.entries(resolvedTemporaryIds ?? {}).forEach(([tempId, resolved]) => {
-      if (!temporaryIdMap.has(tempId)) temporaryIdMap.set(tempId, resolved);
-    });
+    // The current invocation's resolutions replace cached entries from earlier invocations.
+    Object.entries(resolvedTemporaryIds ?? {}).forEach(([tempId, resolved]) => temporaryIdMap.set(tempId, resolved));
 
     // Resolve and validate target repository
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "comment");
