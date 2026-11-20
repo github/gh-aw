@@ -48,8 +48,8 @@ function checkCommand(handler, command, expected) {
 }
 
 test("Fixer metadata alternatives succeed while the observed denied commands remain restricted", () => {
-  const handler = permissionHandler("code-scanning-fixer");
-  for (const command of ["safeoutputs --help", "github --help", "git status --short", "git diff --binary --no-ext-diff | wc -c"]) {
+  const handler = permissionHandler("code-scanning-fixer-worker");
+  for (const command of ["safeoutputs --help", "github --help", "git status --short", "git diff --binary --no-ext-diff | wc -c", `work-queue work_queue_claim_finish '{"claim_handle":"h1","outcome":"cancelled"}'`]) {
     checkCommand(handler, command, "approve-once");
   }
   for (const command of [
@@ -62,7 +62,7 @@ test("Fixer metadata alternatives succeed while the observed denied commands rem
 });
 
 test("Fixer prompt does not advertise an ungranted branch-inspection command", () => {
-  const prompt = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "code-scanning-fixer.md"), "utf8");
+  const prompt = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "code-scanning-fixer-worker.md"), "utf8");
   assert.doesNotMatch(prompt, /git branch --show-current/);
 });
 
