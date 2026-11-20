@@ -84,6 +84,16 @@ func TestSpec_PublicAPI_DeliveredTargetURL(t *testing.T) {
 	}
 }
 
+// TestSpec_DesignDecision_DeliveryIsSeparateFromHumanAcceptance derives from
+// README.md's Design Decisions: delivery is not proof of human acceptance.
+func TestSpec_DesignDecision_DeliveryIsSeparateFromHumanAcceptance(t *testing.T) {
+	at := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	record, err := lifecycle.Delivered(specIdentity(), at, at, "safe-output-manifest")
+	require.NoError(t, err, "the documented usage example must produce a delivery")
+	assert.False(t, record.Adoption.HumanVerified,
+		"delivery evidence alone must not establish verified human acceptance")
+}
+
 func TestSpec_PublicAPI_IsHuman(t *testing.T) {
 	for _, tt := range []struct {
 		name       string
@@ -134,7 +144,8 @@ func TestSpec_PublicAPI_AdoptionEqual(t *testing.T) {
 	original := lifecycle.Adoption{
 		State: "spec-state", Signal: "spec-signal", At: utc, ObservedAt: utc,
 		Source: "spec-source", RuleVersion: lifecycle.RuleVersion,
-		AcceptanceKind: "spec-kind", HumanVerified: true, Coverage: "spec-coverage",
+		AcceptanceKind: "spec-kind", Actor: lifecycle.Actor{Login: "reviewer", Type: "User"},
+		HumanVerified: true, Coverage: "spec-coverage",
 	}
 	for _, tt := range []struct {
 		name   string
@@ -149,8 +160,14 @@ func TestSpec_PublicAPI_AdoptionEqual(t *testing.T) {
 		{"different decision clock", func(a *lifecycle.Adoption) { a.At = utc.Add(time.Second) }, false},
 		{"different observation clock", func(a *lifecycle.Adoption) { a.ObservedAt = utc.Add(time.Second) }, false},
 		{"different state", func(a *lifecycle.Adoption) { a.State = "other-state" }, false},
+		{"different signal", func(a *lifecycle.Adoption) { a.Signal = "other-signal" }, false},
 		{"different evidence", func(a *lifecycle.Adoption) { a.Source = "other-source" }, false},
+		{"different rule version", func(a *lifecycle.Adoption) { a.RuleVersion = "other-version" }, false},
+		{"different acceptance kind", func(a *lifecycle.Adoption) { a.AcceptanceKind = "other-kind" }, false},
+		{"different deciding login", func(a *lifecycle.Adoption) { a.Actor.Login = "other-reviewer" }, false},
+		{"different deciding actor type", func(a *lifecycle.Adoption) { a.Actor.Type = "Bot" }, false},
 		{"different verification", func(a *lifecycle.Adoption) { a.HumanVerified = false }, false},
+		{"different coverage", func(a *lifecycle.Adoption) { a.Coverage = "other-coverage" }, false},
 		{"different error", func(a *lifecycle.Adoption) { a.Error = "observation failed" }, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
