@@ -35,6 +35,7 @@ type envOTELPlan struct {
 }
 
 var envOTELIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
+var envOTELRepositoryName = regexp.MustCompile(`^[A-Za-z0-9._-][A-Za-z0-9._-]*$`)
 var envOTELRunGH = envOTELGH
 
 type envOTELGHOutput struct {
@@ -66,8 +67,10 @@ Selected visibility requires --selected entries (owner/repo for org; org for ent
 Enterprise scope expands to its visible organizations, since GitHub has no enterprise
 Actions secrets API. Selected enterprises configure only the named organizations,
 with private repository visibility. Other enterprise visibility applies to each org.
-The endpoint is stored as a secret, overriding an existing same-scope endpoint
-variable. Unrelated defaults are preserved. Explicit workflow OTLP settings win.`,
+The endpoint and headers are stored together in one encrypted secret, so a resolved
+default always uses a matching pair. This paired secret takes precedence over legacy
+separate endpoint/header settings. Unrelated defaults are preserved. Explicit workflow
+OTLP settings win.`,
 		Example: `  gh aw env otel
   gh aw env otel --repo myorg/one --repo myorg/two --endpoint https://collector.example --headers-stdin --yes < otlp-headers.txt
   gh aw env otel --org myorg --visibility selected --selected myorg/one --endpoint https://collector.example --headers-stdin --yes < otlp-headers.txt
@@ -81,7 +84,7 @@ variable. Unrelated defaults are preserved. Explicit workflow OTLP settings win.
 	cmd.Flags().StringSliceVarP(&o.repos, "repo", "r", nil, "Target repository owner/repo (repeatable)")
 	cmd.Flags().StringSliceVar(&o.orgs, "org", nil, "Target organization (repeatable)")
 	cmd.Flags().StringSliceVar(&o.enterprises, "enterprise", nil, "Target enterprise slug (repeatable)")
-	cmd.Flags().StringVar(&o.endpoint, "endpoint", "", "OTLP URL (HTTPS, or HTTP on literal loopback)")
+	cmd.Flags().StringVar(&o.endpoint, "endpoint", "", "OTLP URL (HTTPS, or HTTP on literal loopback; percent-encode quotes and backslashes)")
 	cmd.Flags().StringVar(&o.protocol, "protocol", "http/json", "OTLP encoding: http/json|http/protobuf")
 	cmd.Flags().BoolVar(&o.metrics, "metrics", true, "Enable OTLP metrics")
 	cmd.Flags().BoolVar(&o.headersStdin, "headers-stdin", false, "Read secret exporter headers from stdin")
@@ -234,8 +237,12 @@ func envOTELTargets(o envOTELOptions, visibilitySet bool) ([]defaultsTarget, err
 			if group.scope == defaultsScopeRepo && len(parts) != 2 || group.scope != defaultsScopeRepo && len(parts) != 1 {
 				return nil, errors.New("invalid target: use owner/repo for repositories and a slug for organizations or enterprises")
 			}
-			for _, part := range parts {
-				if !envOTELIdentifier.MatchString(part) || part == "." || part == ".." {
+			for i, part := range parts {
+				valid := envOTELIdentifier.MatchString(part) && part != "." && part != ".."
+				if group.scope == defaultsScopeRepo && i == 1 {
+					valid = envOTELRepositoryName.MatchString(part) && part != "." && part != ".."
+				}
+				if !valid {
 					return nil, errors.New("invalid target identifier")
 				}
 			}
@@ -279,6 +286,9 @@ func envOTELGH(ctx context.Context, input []byte, args ...string) ([]byte, error
 		return nil, errors.New("GitHub operation cancelled; no operation started")
 	}
 	template := defaultsExecGH(args...)
+	if template.Err != nil {
+		return nil, errors.New("could not resolve gh; install and authenticate the GitHub CLI")
+	}
 	command := exec.CommandContext(ctx, template.Path)
 	command.Args, command.Env, command.Dir = template.Args, template.Env, template.Dir
 	command.Stdin = bytes.NewReader(input)
@@ -394,7 +404,7 @@ func runEnvOTEL(ctx context.Context, targets []defaultsTarget, o envOTELOptions,
 	}
 	for i, p := range plans {
 		if err := envOTELSave(ctx, p, o, headers); err != nil {
-			return fmt.Errorf("save failed at target %d of %d; earlier settings may be saved: %w", i+1, len(plans), err)
+			return fmt.Errorf("save failed for %s (target %d of %d); earlier settings may be saved: %w", p.target.displayName(), i+1, len(plans), err)
 		}
 	}
 	return nil
@@ -417,12 +427,12 @@ func envOTELPrepare(ctx context.Context, targets []defaultsTarget, selections ma
 			return nil, errors.New("invalid GitHub encryption key")
 		}
 		if _, err := envOTELRunGH(ctx, nil, "api", target.variablesEndpoint(), "--jq", ".total_count"); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("preflight %s variable access: %w", target.displayName(), err)
 		}
 		if target.visibility == defaultsVisibilitySel {
 			p.ids, err = envOTELSelected(ctx, target, selections[strings.ToLower(target.org)])
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("preflight %s selected repositories: %w", target.displayName(), err)
 			}
 		}
 		plans = append(plans, p)
@@ -431,24 +441,29 @@ func envOTELPrepare(ctx context.Context, targets []defaultsTarget, selections ma
 }
 
 func envOTELSave(ctx context.Context, p envOTELPlan, o envOTELOptions, headers string) error {
-	for _, setting := range []struct{ name, value string }{
-		{compilerenv.DefaultOTLPHeaders, headers},
-		{compilerenv.DefaultOTLPEndpoint, o.endpoint},
-	} {
-		encrypted, err := encryptWithPublicKey(p.key.Key, setting.value)
-		if err != nil {
-			return errors.New("failed to encrypt OTLP setting")
-		}
-		payload := map[string]any{"key_id": p.key.ID, "encrypted_value": encrypted}
-		envOTELAccess(payload, p.target, p.ids)
-		body, err := json.Marshal(payload)
-		if err != nil {
-			return errors.New("failed to encode encrypted OTLP setting")
-		}
-		path := strings.TrimSuffix(p.target.variablesEndpoint(), "variables") + "secrets/" + setting.name
-		if _, err := envOTELRunGH(ctx, body, "api", "-X", "PUT", path, "--input", "-"); err != nil {
-			return err
-		}
+	config, err := json.Marshal(struct {
+		Endpoint string `json:"endpoint"`
+		Headers  string `json:"headers"`
+	}{Endpoint: o.endpoint, Headers: headers})
+	if err != nil {
+		return errors.New("failed to encode encrypted OTLP configuration")
+	}
+	if len(config) > 48*1024 {
+		return errors.New("combined default OTLP configuration exceeds GitHub's 48 KiB secret limit")
+	}
+	encrypted, err := encryptWithPublicKey(p.key.Key, string(config))
+	if err != nil {
+		return errors.New("failed to encrypt OTLP configuration")
+	}
+	payload := map[string]any{"key_id": p.key.ID, "encrypted_value": encrypted}
+	envOTELAccess(payload, p.target, p.ids)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return errors.New("failed to encode encrypted OTLP configuration")
+	}
+	path := strings.TrimSuffix(p.target.variablesEndpoint(), "variables") + "secrets/" + compilerenv.DefaultOTLPConfig
+	if _, err := envOTELRunGH(ctx, body, "api", "-X", "PUT", path, "--input", "-"); err != nil {
+		return err
 	}
 	for _, setting := range []struct{ name, value string }{
 		{compilerenv.OTLPProtocol, o.protocol},
@@ -473,7 +488,7 @@ func envOTELOrgSelections(targets []defaultsTarget, names []string) (map[string]
 	}
 	for _, name := range names {
 		owner, repo, found := strings.Cut(name, "/")
-		if !found || !envOTELIdentifier.MatchString(owner) || !envOTELIdentifier.MatchString(repo) {
+		if !found || !envOTELIdentifier.MatchString(owner) || !envOTELRepositoryName.MatchString(repo) || repo == "." || repo == ".." {
 			return nil, errors.New("--selected must use owner/repo for organization targets")
 		}
 		owner = strings.ToLower(owner)
@@ -504,7 +519,7 @@ func envOTELVariable(ctx context.Context, target defaultsTarget, ids []int64, na
 	// List names rather than attempting a mutation to detect existence.
 	data, err := envOTELRunGH(ctx, nil, "api", target.variablesEndpoint(), "--paginate", "--jq", ".variables[].name")
 	if err != nil {
-		return err
+		return fmt.Errorf("%s variable access: %w", target.displayName(), err)
 	}
 	method, path := "POST", target.variablesEndpoint()
 	for existing := range strings.FieldsSeq(string(data)) {
@@ -519,19 +534,22 @@ func envOTELVariable(ctx context.Context, target defaultsTarget, ids []int64, na
 		return errors.New("failed to encode OTLP variable")
 	}
 	_, err = envOTELRunGH(ctx, body, "api", "-X", method, path, "--input", "-")
-	return err
+	if err != nil {
+		return fmt.Errorf("%s variable update: %w", target.displayName(), err)
+	}
+	return nil
 }
 
 func envOTELSelected(ctx context.Context, target defaultsTarget, names []string) ([]int64, error) {
 	var ids []int64
 	for _, name := range names {
 		owner, repo, found := strings.Cut(name, "/")
-		if !found || !strings.EqualFold(owner, target.org) || !envOTELIdentifier.MatchString(repo) {
+		if !found || !strings.EqualFold(owner, target.org) || !envOTELRepositoryName.MatchString(repo) || repo == "." || repo == ".." {
 			return nil, errors.New("--selected must name repositories belonging to each target organization")
 		}
 		data, err := envOTELRunGH(ctx, nil, "api", "repos/"+name, "--jq", ".id")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s selected repository %s: %w", target.displayName(), name, err)
 		}
 		id, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
 		if err != nil || id <= 0 {

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "trust": "author",
+  "template": "Context: ${GH_AW_EXPR_CONTEXT}\nStyle: __GH_AW_EXPERIMENTS_STYLE__\nRelease: __GH_AW_NEEDS_RELEASE_OUTPUTS_ID__\nAUTHOR RULE",
+  "children": []
+}

@@ -13,8 +13,8 @@ import (
 
 // compilerInjectedStepNames are not part of the checkout ordering contract exercised
 // by these tests. OTLP steps are emitted for every workflow because the endpoint
-// defaults to the enterprise GH_AW_DEFAULT_OTLP_ENDPOINT secret or variable /
-// GH_AW_DEFAULT_OTLP_HEADERS secret pair.
+// defaults to the atomic GH_AW_DEFAULT_OTLP_CONFIG secret, with legacy endpoint
+// and header settings as a fallback.
 var compilerInjectedStepNames = map[string]bool{
 	"Mask OTLP telemetry headers":         true,
 	"Mask OTLP custom attribute values":   true,

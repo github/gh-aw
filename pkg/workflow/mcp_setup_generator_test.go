@@ -1172,8 +1172,8 @@ Test that OTEL_EXPORTER_OTLP_HEADERS is forwarded to the MCP gateway container.
 
 // TestOTLPHeadersEnvVarNotPassedWithoutOTLP verifies that OTEL_EXPORTER_OTLP_HEADERS is
 // still passed to the docker command when observability.otlp is not configured, since the
-// compiler now falls back to the enterprise default OTLP endpoint/headers expressions
-// (GH_AW_DEFAULT_OTLP_ENDPOINT / GH_AW_DEFAULT_OTLP_HEADERS) for every workflow.
+// compiler now falls back to the atomic enterprise OTLP endpoint/header expression
+// (GH_AW_DEFAULT_OTLP_CONFIG, with legacy endpoint/header compatibility) for every workflow.
 func TestOTLPHeadersEnvVarNotPassedWithoutOTLP(t *testing.T) {
 	frontmatter := `---
 on: workflow_dispatch

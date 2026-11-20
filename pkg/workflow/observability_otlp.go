@@ -385,8 +385,7 @@ func generateOTLPHeadersMaskStep() string {
 }
 
 // isOTLPDefaultCredentialsCheckNeeded returns true when the OTLP endpoint comes
-// from the enterprise default environment (vars.GH_AW_DEFAULT_OTLP_ENDPOINT /
-// secrets.GH_AW_DEFAULT_OTLP_HEADERS) rather than from workflow frontmatter. In
+// from the enterprise default environment rather than workflow frontmatter. In
 // that case a runtime check validates that credentials accompany a configured
 // endpoint.
 func isOTLPDefaultCredentialsCheckNeeded(data *WorkflowData) bool {
@@ -395,8 +394,8 @@ func isOTLPDefaultCredentialsCheckNeeded(data *WorkflowData) bool {
 
 // generateOTLPDefaultCredentialsCheckStep returns a GitHub Actions step that runs
 // check_otlp_default_credentials.sh. The script is a no-op when the enterprise
-// default endpoint variable is empty and fails the job when the endpoint is set
-// without the matching headers secret.
+// default endpoint is empty and fails the job when it is set without matching
+// credentials.
 func generateOTLPDefaultCredentialsCheckStep() string {
 	var sb strings.Builder
 	sb.WriteString("      - name: Check OTLP telemetry configuration\n")
@@ -789,12 +788,11 @@ func allOTLPHeaders(entries []otlpEndpointEntry) string {
 // default environment rather than from frontmatter.
 //
 // When no endpoint is configured anywhere in the frontmatter (main workflow or
-// imports), the endpoint is read from the GH_AW_DEFAULT_OTLP_ENDPOINT Actions
-// variable and its headers from the GH_AW_DEFAULT_OTLP_HEADERS secret. Both
-// expressions resolve at run time, so an organization or enterprise can enable
-// telemetry for every agentic workflow without editing individual workflows.
-// When neither is set, the expressions resolve to empty strings and OTLP export
-// is a no-op.
+// imports), the endpoint and headers are resolved together from the atomic
+// GH_AW_DEFAULT_OTLP_CONFIG secret, with legacy endpoint/header settings as
+// fallbacks. The expressions resolve at run time, so an organization or enterprise
+// can enable telemetry for every agentic workflow without editing individual
+// workflows. When no default is set, OTLP export is a no-op.
 func resolveOTLPEndpointEntries(workflowData *WorkflowData) (entries []otlpEndpointEntry, usesEnterpriseDefaults bool) {
 	// Collect all endpoint entries from the endpoint field (string, object, or array).
 	entries = collectAllOTLPEndpoints(workflowData.RawFrontmatter)

@@ -62,6 +62,13 @@ func TestEnvOTELGHInput(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, out)
 	assert.NotContains(t, err.Error(), "private-credential")
+	defaultsExecGH = func(...string) *exec.Cmd {
+		c := exec.Command("gh")
+		c.Err = exec.ErrDot
+		return c
+	}
+	_, err = envOTELGH(t.Context(), nil, "api")
+	require.ErrorContains(t, err, "could not resolve gh")
 }
 
 func TestEnvOTELTargets(t *testing.T) {
@@ -71,6 +78,7 @@ func TestEnvOTELTargets(t *testing.T) {
 		bad  bool
 	}{
 		{"repo", envOTELOptions{repos: []string{"org/one", "org/two", "org/one"}}, false},
+		{"repo-leading-punctuation", envOTELOptions{repos: []string{"my-org/.github", "my-org/_private", "my-org/-archive"}}, false},
 		{"org", envOTELOptions{orgs: []string{"one", "two"}}, false},
 		{"ent", envOTELOptions{enterprises: []string{"enterprise"}}, false},
 		{"mixed", envOTELOptions{repos: []string{"one/repo"}, orgs: []string{"two"}, enterprises: []string{"three"}}, false},
@@ -80,6 +88,7 @@ func TestEnvOTELTargets(t *testing.T) {
 		{"bad-org", envOTELOptions{orgs: []string{"../one"}}, true},
 		{"selected-missing", envOTELOptions{orgs: []string{"one"}, visibility: "selected"}, true},
 		{"selected", envOTELOptions{orgs: []string{"one"}, visibility: "selected", selected: []string{"one/repo"}}, false},
+		{"enterprise-selected", envOTELOptions{enterprises: []string{"enterprise"}, visibility: "selected", selected: []string{"my-org"}}, false},
 		{"selected-repo", envOTELOptions{repos: []string{"one/repo"}, visibility: "selected", selected: []string{"one/repo"}}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -100,6 +109,15 @@ func TestEnvOTELTargets(t *testing.T) {
 	}
 	_, err := envOTELTargets(envOTELOptions{repos: []string{"one/repo"}, visibility: "all"}, true)
 	require.Error(t, err)
+	targets, err := envOTELTargets(envOTELOptions{enterprises: []string{"enterprise"}, visibility: "selected", selected: []string{"my-org"}}, false)
+	require.NoError(t, err)
+	envOTELMockGH(t, func(args []string, input []byte) ([]byte, error) {
+		return []byte("my-org\n"), nil
+	})
+	expanded, err := envOTELExpandEnterprises(t.Context(), targets, []string{"my-org"})
+	require.NoError(t, err)
+	require.Len(t, expanded, 1)
+	assert.Equal(t, "my-org", expanded[0].org)
 }
 
 func TestEnvOTELValidate(t *testing.T) {
@@ -107,6 +125,8 @@ func TestEnvOTELValidate(t *testing.T) {
 		"http://collector.example", "http://localhost:4318", "******collector.example",
 		"https://collector.example/#fragment", "https://collector.example/#", "https://collector.example/%0d%0a",
 		"https://collector.example/\n", "not-a-url", "https://collector.example:99999", "https://collector.example:bad",
+		`https://collector.example/path?next="collector"`, `https://collector.example/path?next=\collector`,
+		"https://collector.example/path?token=%67ho_testcredential",
 	} {
 		_, _, err := envOTELValidate(endpoint, "http/json", "Authorization=private-credential")
 		require.Error(t, err, endpoint)
@@ -127,6 +147,23 @@ func TestEnvOTELValidate(t *testing.T) {
 	assert.Equal(t, "/otlp/v1/traces", u.Path)
 	assert.Empty(t, h.Get("Authorization"))
 	assert.Equal(t, "credential", h.Get("x-sentry-auth"))
+	u, _, err = envOTELValidate("https://collector.example/tenant%2Fname?key=one", "http/json", "Auth=credential")
+	require.NoError(t, err)
+	assert.Equal(t, "/tenant/name/v1/traces", u.Path)
+	assert.Equal(t, "/tenant%2Fname/v1/traces", u.EscapedPath())
+	for _, host := range []string{"https://sentry.io", "https://ingest.sentry.io"} {
+		_, h, err = envOTELValidate(host, "http/json", "Authorization=credential")
+		require.NoError(t, err)
+		assert.Equal(t, "credential", h.Get("x-sentry-auth"))
+	}
+	_, h, err = envOTELValidate("https://sentry-proxy.corp.example", "http/json", "Authorization=credential")
+	require.NoError(t, err)
+	assert.Equal(t, "credential", h.Get("Authorization"))
+	assert.Empty(t, h.Get("x-sentry-auth"))
+	for _, scheme := range []string{"api-key", "apikey", "basic", "bearer", "concealed", "digest", "dpop", "dsn", "gnap", "hoba", "mutual", "negotiate", "oauth", "privatetoken", "scram-sha-1", "scram-sha-256", "sentry", "vapid"} {
+		_, _, err := envOTELValidate("https://collector.example", "http/json", "Authorization="+scheme)
+		require.Error(t, err, scheme)
+	}
 	_, _, err = envOTELValidate("https://collector.example", "grpc", "Auth=x")
 	require.Error(t, err)
 }
@@ -140,6 +177,11 @@ func TestEnvOTELProbe(t *testing.T) {
 		{"json", "http/json", `{}`, "application/json", 200, false},
 		{"empty", "http/json", "", "", 200, false},
 		{"nulls", "http/json", `{"partialSuccess":{"rejectedSpans":null,"errorMessage":null}}`, "application/json", 200, false},
+		{"snake-case-rejected", "http/json", `{"partial_success":{"rejected_spans":"1"}}`, "application/json", 200, true},
+		{"snake-case-warning", "http/json", `{"partial_success":{"rejected_spans":"0","error_message":"warning"}}`, "application/json", 200, false},
+		{"camel-snake-rejected", "http/json", `{"partialSuccess":{"rejectedSpans":"0","rejected_spans":"1"}}`, "application/json", 200, true},
+		{"conflicting-error-aliases", "http/json", `{"partialSuccess":{"rejectedSpans":"0","errorMessage":"first","error_message":"second"}}`, "application/json", 200, true},
+		{"conflicting-partial-aliases", "http/json", `{"partialSuccess":{"rejectedSpans":"0"},"partial_success":{"rejectedSpans":"1"}}`, "application/json", 200, true},
 		{"warning", "http/json", `{"partialSuccess":{"rejectedSpans":"0","errorMessage":"private-credential"}}`, "application/json", 200, false},
 		{"rejected", "http/json", `{"partialSuccess":{"rejectedSpans":"1","errorMessage":"private-credential"}}`, "application/json", 200, true},
 		{"malformed", "http/json", "private-credential", "application/json", 200, true},
@@ -284,10 +326,10 @@ func TestEnvOTELSaveTargets(t *testing.T) {
 		saveFail   bool
 		writeCount int
 	}{
-		{"repo-multi", []defaultsTarget{{scope: "repo", repoOwner: "one", repoName: "repo"}, {scope: "repo", repoOwner: "one", repoName: "other"}}, nil, false, false, 8},
-		{"org-all", []defaultsTarget{{scope: "org", org: "one", visibility: "all"}}, nil, false, false, 4},
-		{"org-private", []defaultsTarget{{scope: "org", org: "one", visibility: "private"}}, nil, false, false, 4},
-		{"org-selected", []defaultsTarget{{scope: "org", org: "one", visibility: "selected"}}, []string{"one/repo"}, false, false, 4},
+		{"repo-multi", []defaultsTarget{{scope: "repo", repoOwner: "one", repoName: "repo"}, {scope: "repo", repoOwner: "one", repoName: "other"}}, nil, false, false, 6},
+		{"org-all", []defaultsTarget{{scope: "org", org: "one", visibility: "all"}}, nil, false, false, 3},
+		{"org-private", []defaultsTarget{{scope: "org", org: "one", visibility: "private"}}, nil, false, false, 3},
+		{"org-selected", []defaultsTarget{{scope: "org", org: "one", visibility: "selected"}}, []string{"one/repo"}, false, false, 3},
 		{"selected-other-org", []defaultsTarget{{scope: "org", org: "one", visibility: "selected"}}, []string{"other/repo"}, false, false, 0},
 		{"later-preflight", []defaultsTarget{{scope: "repo", repoOwner: "one", repoName: "repo"}, {scope: "org", org: "two", visibility: "all"}}, nil, true, false, 0},
 		{"save-failure", []defaultsTarget{{scope: "repo", repoOwner: "one", repoName: "repo"}}, nil, false, true, 1},
@@ -331,11 +373,13 @@ func TestEnvOTELSaveTargets(t *testing.T) {
 					require.NoError(t, err)
 					plaintext, ok := box.OpenAnonymous(nil, data, public, private)
 					require.True(t, ok)
-					if strings.Contains(line, "GH_AW_DEFAULT_OTLP_HEADERS") {
-						assert.Equal(t, "Auth=private-credential", string(plaintext))
-					} else {
-						assert.Equal(t, server.URL, string(plaintext))
+					var config struct {
+						Endpoint string `json:"endpoint"`
+						Headers  string `json:"headers"`
 					}
+					require.NoError(t, json.Unmarshal(plaintext, &config))
+					assert.Equal(t, server.URL, config.Endpoint)
+					assert.Equal(t, "Auth=private-credential", config.Headers)
 				} else {
 					name := payload["name"].(string)
 					saved = append(saved, name)
@@ -363,6 +407,9 @@ func TestEnvOTELSaveTargets(t *testing.T) {
 			}, "Auth=private-credential")
 			if tc.writeCount == 0 || tc.saveFail {
 				require.Error(t, err)
+				if tc.saveFail {
+					require.ErrorContains(t, err, "one/repo")
+				}
 			} else {
 				require.NoError(t, err)
 				assert.NotEmpty(t, saved)
@@ -370,6 +417,42 @@ func TestEnvOTELSaveTargets(t *testing.T) {
 			assert.Equal(t, tc.writeCount, writes)
 		})
 	}
+}
+
+func TestEnvOTELPreflightErrorsNameTargets(t *testing.T) {
+	public, _, err := box.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	key, err := json.Marshal(repoPublicKey{ID: "1", Key: base64.StdEncoding.EncodeToString(public[:])})
+	require.NoError(t, err)
+
+	t.Run("variable access", func(t *testing.T) {
+		envOTELMockGH(t, func(args []string, _ []byte) ([]byte, error) {
+			if strings.Contains(strings.Join(args, " "), "public-key") {
+				return key, nil
+			}
+			return nil, errors.New("inaccessible")
+		})
+		_, err := envOTELPrepare(t.Context(), []defaultsTarget{{scope: "org", org: "one", visibility: "private"}}, nil)
+		require.ErrorContains(t, err, "one")
+	})
+
+	t.Run("selected repository", func(t *testing.T) {
+		envOTELMockGH(t, func(args []string, _ []byte) ([]byte, error) {
+			line := strings.Join(args, " ")
+			switch {
+			case strings.Contains(line, "public-key"):
+				return key, nil
+			case strings.Contains(line, "--jq .total_count"):
+				return []byte("0"), nil
+			default:
+				return nil, errors.New("inaccessible")
+			}
+		})
+		target := defaultsTarget{scope: "org", org: "one", visibility: "selected"}
+		_, err := envOTELPrepare(t.Context(), []defaultsTarget{target}, map[string][]string{"one": {"one/.github"}})
+		require.ErrorContains(t, err, "one")
+		require.ErrorContains(t, err, "one/.github")
+	})
 }
 
 func TestEnvOTELEnterpriseExpansion(t *testing.T) {
@@ -423,6 +506,15 @@ func TestEnvOTELMultipleSelectedTargets(t *testing.T) {
 	require.Error(t, err)
 	_, err = envOTELOrgSelections(targets, []string{"one/repo", "two/repo", "orphan/repo"})
 	require.Error(t, err)
+	selected, err := envOTELOrgSelections(targets[:1], []string{"one/.github"})
+	require.NoError(t, err)
+	envOTELMockGH(t, func(args []string, _ []byte) ([]byte, error) {
+		assert.Contains(t, strings.Join(args, " "), "repos/one/.github")
+		return []byte("123"), nil
+	})
+	ids, err := envOTELSelected(t.Context(), targets[0], selected["one"])
+	require.NoError(t, err)
+	assert.Equal(t, []int64{123}, ids)
 	envOTELMockGH(t, func(args []string, input []byte) ([]byte, error) {
 		if strings.Contains(strings.Join(args, " "), "slug=first") {
 			return []byte("one\n"), nil
@@ -475,9 +567,48 @@ func TestEnvOTELCLISuccess(t *testing.T) {
 	cmd.SetOut(&output)
 	cmd.SetErr(&output)
 	require.NoError(t, cmd.Execute())
-	assert.Equal(t, 4, writes)
+	assert.Equal(t, 3, writes)
 	assert.Contains(t, output.String(), "configured 1 target(s)")
 	assert.NotContains(t, output.String(), "private-credential")
+}
+
+func TestEnvOTELCLIEnterpriseSelected(t *testing.T) {
+	public, _, err := box.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	key, err := json.Marshal(repoPublicKey{ID: "1", Key: base64.StdEncoding.EncodeToString(public[:])})
+	require.NoError(t, err)
+	writes := 0
+	envOTELMockGH(t, func(args []string, input []byte) ([]byte, error) {
+		line := strings.Join(args, " ")
+		switch {
+		case strings.Contains(line, "api graphql"):
+			return []byte("my-org\n"), nil
+		case strings.Contains(line, "public-key"):
+			return key, nil
+		case len(input) > 0:
+			writes++
+			var payload map[string]any
+			require.NoError(t, json.Unmarshal(input, &payload))
+			assert.Equal(t, "private", payload["visibility"])
+			return nil, nil
+		default:
+			return []byte("0"), nil
+		}
+	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "private-credential", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	cmd := NewEnvCommand()
+	cmd.SetArgs([]string{"otel", "--enterprise", "enterprise", "--visibility", "selected", "--selected", "my-org", "--endpoint", server.URL, "--headers-stdin", "--yes"})
+	cmd.SetIn(strings.NewReader("Authorization=private-credential\n"))
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetErr(&output)
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, 3, writes)
+	assert.Contains(t, output.String(), "configured 1 target(s)")
 }
 
 func TestEnvOTELCanonicalHeaderLimit(t *testing.T) {

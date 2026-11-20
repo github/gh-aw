@@ -24,7 +24,7 @@ Values are read when a resolver is called. The package also builds GitHub Action
 | `BuildDefaultMaxDailyAICreditsExpression`, `BuildDefaultMaxAICreditsExpression` | Resolve daily and per-run AIC credit defaults from GitHub variables. |
 | `BuildDefaultDetectionMaxAICreditsExpression`, `BuildDefaultEvalsMaxAICreditsExpression` | Resolve detection and evaluation AIC credit defaults from GitHub variables. |
 | `BuildDefaultMaxTurnsExpression` | Resolves the max-turns variable, using an empty fallback to preserve an unlimited setting. |
-| `BuildDefaultOTLPEndpointExpression`, `BuildDefaultOTLPHeadersExpression` | Resolve OTLP endpoint and headers at workflow runtime from secrets, with endpoint variable compatibility fallback. |
+| `BuildDefaultOTLPEndpointExpression`, `BuildDefaultOTLPHeadersExpression` | Resolve the endpoint/header pair atomically from `GH_AW_DEFAULT_OTLP_CONFIG`, with legacy endpoint and header fallbacks. |
 | `BuildModelOverrideExpression`, `BuildModelOverrideExpressionEmptyFallback` | Build phase model expressions with either a built-in fallback or an empty fallback for runtime selection. |
 
 The exported variable-name constants identify the corresponding enterprise overrides and policy variables. Configuration precedence and individual override behavior are documented in the parent [`workflow` package specification](../README.md).
@@ -41,6 +41,6 @@ Other environment-variable identifiers are
 `DefaultDetectionMaxAICredits`, `DefaultDetectionModel`,
 `DefaultEvalsMaxAICredits`, `DefaultEvalsModel`, `DefaultMaxAICredits`,
 `DefaultMaxDailyAICredits`, `DefaultMaxTurnCacheMisses`, `DefaultMaxTurns`,
-`DefaultOTLPEndpoint`, `DefaultOTLPHeaders`, `DefaultTimeoutMinutes`,
+`DefaultOTLPConfig`, `DefaultOTLPEndpoint`, `DefaultOTLPHeaders`, `DefaultTimeoutMinutes`,
 `DefaultUTC`, `PolicyModelsAllowed`, `PolicyModelsBlocked`, and
 `RequireSelfHostedRunners`.

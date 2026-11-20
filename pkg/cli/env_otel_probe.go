@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/net/http/httpguts"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 const envOTELResponseLimit = 64 * 1024
@@ -40,15 +40,19 @@ func envOTELValidate(endpoint, protocol, rawHeaders string) (*url.URL, http.Head
 
 func envOTELURL(endpoint string) (*url.URL, error) {
 	invalidURL := errors.New("invalid OTLP endpoint: use an absolute HTTPS URL without credentials, fragments, whitespace, or control characters (HTTP allowed only on literal loopback)")
-	if len(endpoint) > 8192 || strings.ContainsFunc(endpoint, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+	if len(endpoint) > 8192 || strings.ContainsAny(endpoint, `"\\`) || strings.ContainsFunc(endpoint, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
 		return nil, invalidURL
 	}
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" || strings.Contains(endpoint, "#") || u.Opaque != "" {
 		return nil, invalidURL
 	}
+	decodedQuery, err := url.QueryUnescape(u.RawQuery)
+	if err != nil || validateActionsStorageValue(decodedQuery) != nil {
+		return nil, invalidURL
+	}
 	decoded, err := url.PathUnescape(endpoint)
-	if err != nil || strings.ContainsFunc(decoded, unicode.IsControl) {
+	if err != nil || validateActionsStorageValue(decoded) != nil || strings.ContainsFunc(decoded, unicode.IsControl) {
 		return nil, invalidURL
 	}
 	if port := u.Port(); port != "" {
@@ -62,12 +66,25 @@ func envOTELURL(endpoint string) (*url.URL, error) {
 	if !allowed {
 		return nil, invalidURL
 	}
-	u.Path = strings.TrimRight(u.Path, "/")
-	if !strings.HasSuffix(u.Path, "/v1/traces") {
-		u.Path += "/v1/traces" //nolint:manualpathconcat // Match the exporter without cleaning collector-specific path segments.
-		u.RawPath = ""
+	escapedPath := u.EscapedPath()
+	if !strings.HasSuffix(escapedPath, "/v1/traces") {
+		escapedPath = strings.TrimRight(escapedPath, "/") + "/v1/traces" //nolint:manualpathconcat // Match the exporter without cleaning collector-specific path segments.
+		u.Path, err = url.PathUnescape(escapedPath)
+		if err != nil {
+			return nil, invalidURL
+		}
+		if escapedPath == u.Path {
+			u.RawPath = ""
+		} else {
+			u.RawPath = escapedPath
+		}
 	}
 	return u, nil
+}
+
+func envOTELSentryDomain(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	return host == "sentry.io" || strings.HasSuffix(host, ".sentry.io")
 }
 
 func envOTELHeaders(u *url.URL, rawHeaders string) (http.Header, error) {
@@ -102,11 +119,11 @@ func envOTELHeaders(u *url.URL, rawHeaders string) (http.Header, error) {
 		}
 		if strings.EqualFold(name, "Authorization") || strings.EqualFold(name, "x-sentry-auth") {
 			switch strings.ToLower(value) {
-			case "apikey", "bearer", "basic", "digest", "dsn", "sentry":
+			case "api-key", "apikey", "basic", "bearer", "concealed", "digest", "dpop", "dsn", "gnap", "hoba", "mutual", "negotiate", "oauth", "privatetoken", "scram-sha-1", "scram-sha-256", "sentry", "vapid":
 				return nil, headerError
 			}
 		}
-		if strings.Contains(strings.ToLower(u.Hostname()), "sentry") {
+		if envOTELSentryDomain(u.Hostname()) {
 			switch strings.ToLower(name) {
 			case "sentry_key", "sentry_version", "sentry_secret", "sentry_client":
 				return nil, headerError
@@ -117,7 +134,7 @@ func envOTELHeaders(u *url.URL, rawHeaders string) (http.Header, error) {
 		}
 		headers.Set(name, value)
 	}
-	if strings.Contains(strings.ToLower(u.Hostname()), "sentry") && headers.Get("Authorization") != "" {
+	if envOTELSentryDomain(u.Hostname()) && headers.Get("Authorization") != "" {
 		if headers.Get("x-sentry-auth") != "" {
 			return nil, headerError
 		}
@@ -187,7 +204,10 @@ func envOTELJSONResponse(data []byte) error {
 	if json.Unmarshal(data, &response) != nil || response == nil {
 		return errors.New("invalid OTLP response")
 	}
-	partial := response["partialSuccess"]
+	partial, err := envOTELJSONAlias(response, "partialSuccess", "partial_success")
+	if err != nil {
+		return err
+	}
 	if partial == nil || string(partial) == "null" {
 		return nil
 	}
@@ -195,7 +215,10 @@ func envOTELJSONResponse(data []byte) error {
 	if json.Unmarshal(partial, &fields) != nil || fields == nil {
 		return errors.New("invalid partial success")
 	}
-	count := fields["rejectedSpans"]
+	count, err := envOTELJSONAlias(fields, "rejectedSpans", "rejected_spans")
+	if err != nil {
+		return err
+	}
 	if count != nil && string(count) != "null" {
 		var value string
 		if json.Unmarshal(count, &value) != nil {
@@ -206,7 +229,11 @@ func envOTELJSONResponse(data []byte) error {
 			return errors.New("rejected spans")
 		}
 	}
-	if message := fields["errorMessage"]; message != nil && string(message) != "null" {
+	message, err := envOTELJSONAlias(fields, "errorMessage", "error_message")
+	if err != nil {
+		return err
+	}
+	if message != nil && string(message) != "null" {
 		var value string
 		if json.Unmarshal(message, &value) != nil {
 			return errors.New("invalid collector message")
@@ -215,45 +242,45 @@ func envOTELJSONResponse(data []byte) error {
 	return nil
 }
 
-// Decode the small ExportTraceServiceResponse without adding a protobuf dependency.
+func envOTELJSONAlias(fields map[string]json.RawMessage, camel, snake string) (json.RawMessage, error) {
+	first, second := fields[camel], fields[snake]
+	if first != nil && second != nil && !bytes.Equal(bytes.TrimSpace(first), bytes.TrimSpace(second)) {
+		return nil, errors.New("conflicting OTLP response aliases")
+	}
+	if first != nil {
+		return first, nil
+	}
+	return second, nil
+}
+
 func envOTELProtoResponse(data []byte) error {
 	return envOTELProtoFields(data, false)
 }
 
 func envOTELProtoFields(data []byte, partial bool) error {
 	for len(data) > 0 {
-		tag, n := binary.Uvarint(data)
-		if n <= 0 || tag>>3 == 0 || tag>>3 >= 1<<29 {
-			return errors.New("invalid protobuf tag")
+		field, wire, n := protowire.ConsumeTag(data)
+		if n < 0 {
+			return protowire.ParseError(n)
 		}
 		data = data[n:]
-		field, wire := tag>>3, tag&7
-		if partial && (field == 1 && wire != 0 || field == 2 && wire != 2) || !partial && field == 1 && wire != 2 {
+		if field <= 0 || field >= protowire.MaxValidNumber || partial && (field == 1 && wire != protowire.VarintType || field == 2 && wire != protowire.BytesType) || !partial && field == 1 && wire != protowire.BytesType {
 			return errors.New("invalid protobuf field")
 		}
-		switch wire {
-		case 0:
-			value, n := binary.Uvarint(data)
-			if n <= 0 || partial && field == 1 && value != 0 {
+		if wire == protowire.VarintType && partial && field == 1 {
+			value, n := protowire.ConsumeVarint(data)
+			if n < 0 || value != 0 {
 				return errors.New("invalid or rejected spans")
 			}
 			data = data[n:]
-		case 1, 5:
-			size := 8
-			if wire == 5 {
-				size = 4
+			continue
+		}
+		if wire == protowire.BytesType {
+			value, n := protowire.ConsumeBytes(data)
+			if n < 0 {
+				return protowire.ParseError(n)
 			}
-			if len(data) < size {
-				return errors.New("truncated protobuf")
-			}
-			data = data[size:]
-		case 2:
-			size, n := binary.Uvarint(data)
-			if n <= 0 || size > uint64(len(data)-n) {
-				return errors.New("invalid protobuf length")
-			}
-			value := data[n : n+int(size)]
-			data = data[n+int(size):]
+			data = data[n:]
 			if !partial && field == 1 {
 				if err := envOTELProtoFields(value, true); err != nil {
 					return err
@@ -262,9 +289,13 @@ func envOTELProtoFields(data []byte, partial bool) error {
 			if partial && field == 2 && !utf8.Valid(value) {
 				return errors.New("invalid collector message")
 			}
-		default:
-			return errors.New("unsupported protobuf wire type")
+			continue
 		}
+		n = protowire.ConsumeFieldValue(field, wire, data)
+		if n < 0 {
+			return protowire.ParseError(n)
+		}
+		data = data[n:]
 	}
 	return nil
 }
