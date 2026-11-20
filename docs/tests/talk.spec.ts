@@ -979,7 +979,16 @@ test.describe("slides.md metadata", () => {
 
   test("parses every slide with a unique id, a unique, public summary and keywords", () => {
     expect(SLIDES.length).toBeGreaterThan(0);
-    const text = ["# Slides", "", "```markdown", "### Example {#example}", "```", "", ...entry("A {#a}", { Keywords: "one" }), ...entry("B {#b-2}", { Notes: "illustrative", Summary: "Second\npart.", Keywords: "two words, CI/CD ,x", Captions: "- c\n  more\n- d" })].join("\n");
+    const text = [
+      "# Slides",
+      "",
+      "```markdown",
+      "### Example {#example}",
+      "```",
+      "",
+      ...entry("A {#a}", { Keywords: "one" }),
+      ...entry("B {#b-2}", { Notes: "illustrative", Summary: "Second\npart.", Keywords: "two words, CI/CD ,x", Captions: "- c\n  more\n- d" }),
+    ].join("\n");
     expect(parseSlides(text)).toEqual([
       { id: "a", heading: "A", illustrative: false, summary: "First.", keywords: ["one"], captions: ["c", "d"], line: 7 },
       { id: "b-2", heading: "B", illustrative: true, summary: "Second part.", keywords: ["two words", "CI/CD", "x"], captions: ["c more", "d"], line: 22 },

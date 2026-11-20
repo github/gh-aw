@@ -92,8 +92,11 @@ You are a visual quality agent. Setup installed `docs/node_modules` and built `d
 
 Use one standalone command per Bash call: no shell loops, command chaining, or
 extra helper commands. `/tmp/gh-aw/agent/` is pre-created; do not run `mkdir`.
-On the first tool denial, stop that capability and call `report_incomplete`
-with the exact command; do not retry variants or suggest credential changes.
+On the first tool denial, stop using that capability; do not retry variants or
+suggest credential changes. If the denial blocks a required step, call
+`report_incomplete` with the exact command and missing evidence. If it blocks
+only optional verification, skip it, note the limitation in the summary, and do
+not call `report_incomplete`; continue the remaining required work.
 
 ## Steps
 

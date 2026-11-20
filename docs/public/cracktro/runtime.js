@@ -744,7 +744,8 @@
         toggleCap();
       },
     });
-    ccb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10.5 10a2.5 2.5 0 1 0 0 4M17.5 10a2.5 2.5 0 1 0 0 4"/></svg>';
+    ccb.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10.5 10a2.5 2.5 0 1 0 0 4M17.5 10a2.5 2.5 0 1 0 0 4"/></svg>';
     // tour pill (top right, only during a tour): the tour title and position open the map; × shows every slide again
     const tourT = h("span", { class: "tourp-t" }),
       tourN = h("span", { class: "tourp-n" });
@@ -869,12 +870,15 @@
     const kioskArm = () => {
       if (!kiosk) return;
       clearTimeout(kiosk.t);
-      kiosk.t = setTimeout(() => {
-        if (!kiosk) return;
-        // hold the slide while any dialog (search, map, a deck's own modal) is open
-        if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
-        kioskArm();
-      }, capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS);
+      kiosk.t = setTimeout(
+        () => {
+          if (!kiosk) return;
+          // hold the slide while any dialog (search, map, a deck's own modal) is open
+          if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
+          kioskArm();
+        },
+        capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS
+      );
     };
     const paintKiosk = () => {
       const label = kiosk ? "Stop kiosk mode" : "Start kiosk mode: rotate slides in fullscreen",
@@ -1580,7 +1584,10 @@
           [["G"], "Slide map (this screen)"],
         ],
       ],
-      ["Show", [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]]],
+      [
+        "Show",
+        [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]],
+      ],
       [
         "Slide map",
         [
@@ -2110,7 +2117,7 @@
         if (turn) at += 900;
         ev.push({ at, turn });
         const words = String(line).toUpperCase().split(/\s+/).filter(Boolean);
-        for (let w = 0; w < words.length; ) {
+        for (let w = 0; w < words.length;) {
           const n = 1 + Math.floor(capRnd(k++) * 3);
           ev.push({ at, turn, text: words.slice(w, w + n).join(" ") });
           at += (n / CAP_WPS) * 1000 * (0.7 + capRnd(k++) * 0.6);
