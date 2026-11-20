@@ -45,6 +45,7 @@ jobs:
       actions: read
     env:
       GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
+      GH_AW_ISSUE_EXPIRES_HOURS: "48"
     steps:
       - name: Checkout trusted cleanup code
         uses: actions/checkout@v7.0.1

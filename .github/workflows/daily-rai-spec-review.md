@@ -45,6 +45,7 @@ steps:
     run: npm ci --ignore-scripts --no-audit --no-fund
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[rai-spec] "
     labels: [automation]
     draft: true
