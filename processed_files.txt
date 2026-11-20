@@ -2,6 +2,7 @@
 ./pkg/actionpins/spec_test.go|2026-06-30
 ./pkg/agentdrain/anomaly_test.go|2026-07-03
 ./pkg/agentdrain/miner_test.go|2026-04-19
+./pkg/agentdrain/spec_test.go|2026-11-19
 ./pkg/atif/convert_test.go|2026-11-14
 ./pkg/cli/access_log_test.go|2026-09-14
 ./pkg/cli/actionlint_test.go|2026-05-13
@@ -18,6 +19,7 @@
 ./pkg/constants/constants_test.go|2026-04-21
 ./pkg/constants/permissions_policy_test.go|2026-06-17
 ./pkg/errorutil/errors_test.go|2026-05-29
+./pkg/lifecycle/lifecycle_test.go|2026-11-17
 ./pkg/parser/engine_includes_test.go|2026-05-18
 ./pkg/parser/frontmatter_extraction_test.go|2026-05-31
 ./pkg/parser/frontmatter_utils_test.go|2026-04-20
@@ -26,6 +28,8 @@
 ./pkg/parser/schedule_time_utils_test.go|2026-04-27
 ./pkg/stringutil/fuzzy_match_test.go|2026-05-26
 ./pkg/stringutil/stringutil_test.go|2026-05-15
+./pkg/typeutil/convert_test.go|2026-11-16
+./pkg/validationerror/validationerror_test.go|2026-11-20
 ./pkg/workflow/agentic_engine_test.go|2026-04-24
 ./pkg/workflow/compiler_test.go|2026-05-21
 ./pkg/workflow/frontmatter_extraction_yaml_test.go|2026-05-30
@@ -34,6 +38,3 @@
 ./pkg/workflow/time_delta_test.go|2026-05-10
 ./pkg/workflow/unquote_uses_test.go|2026-10-04
 ./pkg/workflow/workflow_run_validation_test.go|2026-11-08
-./pkg/lifecycle/lifecycle_test.go|2026-11-17
-./pkg/typeutil/convert_test.go|2026-11-16
-./pkg/agentdrain/spec_test.go|2026-11-19
