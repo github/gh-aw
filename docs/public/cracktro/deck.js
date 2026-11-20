@@ -306,6 +306,85 @@
   .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
   .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   @keyframes tp-bob { 50% { transform: translateY(-14px); } }
+  /* guide style (gd-): explainer examples under Turn Intent to Automation (dark only; add body.light overrides if a guide slide moves to a light band); title block top-left, one board that loops a process, a mono caption */
+  .gd-head { position: absolute; left: 110px; top: 100px; width: 1700px; }
+  .gd-head h2 { margin: 18px 0 0; font-size: 72px; line-height: 1.04; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; color: #f0f6fc; }
+  .gd-head h2 em { font-style: normal; color: #4493f8; }
+  .gd-head p { margin: 18px 0 0; max-width: 1560px; font: 400 30px/1.3 "Mona Sans"; font-variation-settings: "wght" 420, "wdth" 100; color: #9198a1; }
+  .gd-head p code, .gd-board code { font: 500 .9em var(--mono); color: #f0f6fc; }
+  .gd-board { position: absolute; left: 110px; top: 340px; width: 1700px; height: 600px; border-radius: 28px; background: #161b22; overflow: hidden;
+    box-shadow: 0 30px 120px #0008, 0 0 0 1px #ffffff14; font-family: "Mona Sans"; font-variation-settings: "wdth" 100; color: #f0f6fc; }
+  .gd-board > svg { position: absolute; inset: 0; width: 1700px; height: 600px; overflow: visible; pointer-events: none; }
+  .gd-cap { position: absolute; left: 110px; top: 972px; font: 500 20px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #9198a1; }
+  .gd-lab { position: absolute; font: 500 19px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9198a1; }
+  .gd-box { position: absolute; border: 2px solid #30363d; border-radius: 16px; background: #0d1117; transition: border-color .25s, background .25s, color .25s; }
+  .gd-box.on { border-color: #4493f8; background: #0d2a52; }
+  .gd-wire { fill: none; stroke: #30363d; stroke-width: 3; transition: stroke .25s; }
+  .gd-wire.on { stroke: #4493f8; stroke-width: 5; stroke-dasharray: 14 10; animation: gd-flow .6s linear infinite; }
+  @keyframes gd-flow { to { stroke-dashoffset: -24; } }
+  .gd-ok { color: #4493f8; } .gd-bad { color: #ffa657; }
+  .slide.gd.active .gd-head > * { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .slide.gd.active .gd-head > :nth-child(2) { animation-delay: .12s; } .slide.gd.active .gd-head > :nth-child(3) { animation-delay: .24s; }
+  .slide.gd.active .gd-board { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both .1s; }
+  .slide.gd.active .gd-cap { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both .36s; }
+  .slide.gd.up-in, .slide.gd.down-in, .slide.gd.leaving { animation: none; }
+  .slide.gd.fadeout { opacity: 1; }
+  .slide.gd:is(.fadeout, .leaving) :is(.gd-head > *, .gd-cap) { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .slide.gd:is(.fadeout, .leaving) .gd-board { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  /* guide: /agentic-workflows router */
+  .gdr-ask { position: absolute; left: 50px; top: 146px; width: 520px; height: 238px; padding: 30px 32px; border: 2px solid #30363d; border-radius: 26px 26px 26px 6px;
+    background: #0d1117; font-size: 36px; line-height: 1.28; font-variation-settings: "wght" 500, "wdth" 100; }
+  .gdr-ask i { display: inline-block; width: 3px; height: 1em; margin-left: 3px; vertical-align: -.12em; background: #4493f8; animation: gdr-blink 1s steps(1) infinite; }
+  @keyframes gdr-blink { 50% { opacity: 0; } }
+  .gdr-hub { left: 660px; top: 168px; width: 340px; height: 194px; display: grid; place-content: center; text-align: center; gap: 12px; border-width: 3px; border-radius: 24px; }
+  .gdr-hub b { font: 700 31px/1 var(--mono); color: #4493f8; }
+  .gdr-hub span { font-size: 22px; color: #9198a1; }
+  .gdr-steps { position: absolute; left: 660px; top: 396px; width: 360px; display: grid; gap: 10px; }
+  .gdr-steps div { display: flex; align-items: center; gap: 14px; font: 500 21px/1 var(--mono); color: #9198a1; transition: color .25s; }
+  .gdr-steps b { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; border: 2px solid currentColor; }
+  .gdr-steps .on { color: #4493f8; } .gdr-steps .on b { background: #4493f8; color: #0d1117; border-color: #4493f8; }
+  .gdr-route { left: 1080px; width: 580px; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; border-radius: 14px; }
+  .gdr-route b { font-size: 27px; font-variation-settings: "wght" 620, "wdth" 100; }
+  .gdr-route code { font-size: 18px !important; color: #9198a1 !important; transition: color .25s; }
+  .gdr-route.on code { color: #79c0ff !important; }
+  /* guide: authoring loop */
+  .gdl-node { width: 236px; height: 76px; display: grid; place-content: center; text-align: center; gap: 6px; font-size: 24px; font-variation-settings: "wght" 600, "wdth" 100; }
+  .gdl-node span { font: 500 16px/1 var(--mono); color: #9198a1; letter-spacing: .04em; }
+  .gdl-mid { position: absolute; left: 230px; top: 248px; width: 260px; text-align: center; }
+  .gdl-mid b { display: block; font: 700 64px/1 var(--mono); color: #f0f6fc; }
+  .gdl-mid span { display: block; margin-top: 10px; font: 500 19px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9198a1; }
+  .gdl-mid.ok b { font-size: 46px; color: #4493f8; }
+  .gdl-dot { fill: #4493f8; }
+  .gdl-spin { transform-origin: 360px 290px; transition: transform .6s cubic-bezier(.4,0,.2,1); }
+  .gdl-file { position: absolute; left: 760px; top: 26px; width: 910px; height: 548px; border-radius: 18px; background: #0d1117; border: 2px solid #30363d; overflow: hidden; }
+  .gdl-tab { height: 48px; padding: 0 22px; display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #30363d; font: 500 19px/1 var(--mono); color: #9198a1; }
+  .gdl-tab b { color: #f0f6fc; font-weight: 600; }
+  .gdl-src { padding: 12px 0 0; font: 500 23px/30px var(--mono); }
+  .gdl-src div { position: relative; height: 30px; padding-left: 74px; white-space: pre; color: #e6edf3; transition: background .25s; }
+  .gdl-src div::before { content: attr(data-n); position: absolute; left: 0; width: 50px; text-align: right; color: #656c76; }
+  .gdl-src .k { color: #ff7b72; } .gdl-src .v { color: #a5d6ff; } .gdl-src .d { color: #656c76; }
+  .gdl-src div.bad { background: #3d1d0066; box-shadow: inset 4px 0 #ffa657; } .gdl-src div.bad::after { content: "✗"; position: absolute; right: 22px; color: #ffa657; }
+  .gdl-src div.fix { background: #0d2a52; box-shadow: inset 4px 0 #4493f8; } .gdl-src div.fix::after { content: "fixed"; position: absolute; right: 22px; font-size: 17px; color: #4493f8; }
+  .gdl-src div.hid { visibility: hidden; }
+  .gdl-term { position: absolute; left: 0; right: 0; bottom: 0; height: 158px; padding: 16px 22px; border-top: 2px solid #30363d; background: #010409; font: 500 19px/1.4 var(--mono); color: #9198a1; }
+  .gdl-term p { margin: 0; } .gdl-term p + p { margin-top: 6px; color: #e6edf3; white-space: normal; }
+  .gdl-term .gd-bad, .gdl-term .gd-ok { font-weight: 700; }
+  /* guide: persona optimization */
+  .gdp-chip { left: 40px; width: 360px; height: 46px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-radius: 23px; font-size: 22px; font-variation-settings: "wght" 540, "wdth" 100; }
+  .gdp-chip svg { width: 22px; height: 22px; fill: #9198a1; flex: none; } .gdp-chip.on svg { fill: #4493f8; }
+  .gdp-step { left: 460px; width: 600px; height: 88px; display: grid; grid-template-columns: 52px 1fr; align-items: center; column-gap: 16px; padding: 0 20px; }
+  .gdp-step > b { grid-row: span 2; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font: 700 22px/1 var(--mono); border: 2px solid #9198a1; color: #9198a1; transition: all .25s; }
+  .gdp-step.on > b { background: #4493f8; border-color: #4493f8; color: #0d1117; }
+  .gdp-step strong { font-size: 26px; font-variation-settings: "wght" 640, "wdth" 100; align-self: end; }
+  .gdp-step span { font-size: 20px; line-height: 1.2; color: #9198a1; align-self: start; margin-top: 4px; }
+  .gdp-kpi { left: 1110px; width: 270px; height: 150px; padding: 18px 22px; }
+  .gdp-kpi b { display: block; font: 700 62px/1 var(--mono); color: #4493f8; }
+  .gdp-kpi span { display: block; margin-top: 12px; font-size: 21px; line-height: 1.2; color: #9198a1; }
+  .gdp-bar { position: absolute; left: 1110px; top: 444px; width: 556px; height: 40px; border-radius: 10px; overflow: hidden; background: repeating-linear-gradient(135deg, #30363d 0 10px, #21262d 10px 20px); }
+  .gdp-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 47%; background: #4493f8; transform-origin: left; }
+  .active .gdp-bar i { animation: gdp-fill 1.2s cubic-bezier(.3,.9,.3,1) both 1s; }
+  @keyframes gdp-fill { from { transform: scaleX(0); } }
+  .gdp-bl { position: absolute; top: 498px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
   .fm-cap b { font-weight: 700; font-stretch: 100%; }
@@ -4092,6 +4171,7 @@
     };
     slides.push({
       group: "platform",
+      key: "intent",
       notes:
         "What: A plain-language request to a coding agent becomes a Markdown workflow. gh aw compile, a deterministic Go compiler with no AI involved, turns it into a hardened .lock.yml with pinned actions, a firewall and safe-output jobs; a later run opens a pull request removing duplicated code. This mirrors the gh-aw home page.\nWhy: Same Markdown in, same YAML out, so the result is reviewable and diffable like any other code.\nWhen: Start here when you can describe a recurring job clearly; the animation's one-minute path is illustrative, not a setup guarantee.",
       enter() {
@@ -4377,6 +4457,336 @@
         h("div", { class: "tv-kpis" }, kpis),
         h("div", { class: "tv-panels" }, panels),
         h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
+      ),
+    });
+  }
+
+  // Ask once. The agent picks the guide.: /agentic-workflows routes each request to one focused guide (guide style)
+  {
+    resetIndex();
+    const ROUTES = [
+      ["Create", "create-agentic-workflow.md", "Create a workflow that labels new issues by area"],
+      ["Update", "update-agentic-workflow.md", "Run my triage workflow weekly instead of daily"],
+      ["Debug", "debug-agentic-workflow.md", "Why did last night\u2019s triage run fail?"],
+      ["Optimize", "token-optimization.md", "My workflow is too expensive. Cut its tokens."],
+      ["Upgrade", "upgrade-agentic-workflows.md", "Upgrade my workflows to the latest gh-aw"],
+      ["Report", "report.md", "Post a weekly report of stale pull requests"],
+      ["Share", "create-shared-agentic-workflow.md", "Share this MCP server setup across workflows"],
+    ];
+    const STEPS = ["understand intent", "pick a route", "load the guide", "follow it"];
+    const Y = i => 30 + i * 78;
+    const wrap = h("div");
+    wrap.innerHTML = `<svg viewBox="0 0 1700 600"><path class="gd-wire" d="M570 265 H660"/>${ROUTES.map((_, i) => `<path class="gd-wire" d="M1000 265 C1044 265 1036 ${Y(i) + 32} 1080 ${Y(i) + 32}"/>`).join("")}</svg>`;
+    const [inWire, ...outWires] = wrap.querySelectorAll("path");
+    const text = h("span");
+    const hub = h("div", { class: "gd-box gdr-hub" }, h("b", {}, "/agentic-workflows"), h("span", {}, "dispatcher agent"));
+    const steps = STEPS.map((s, i) => h("div", {}, h("b", {}, String(i + 1)), s));
+    const rows = ROUTES.map(([n, f], i) => h("div", { class: "gd-box gdr-route", style: { top: `${Y(i)}px` } }, h("b", {}, n), h("code", {}, f)));
+    const CYC = 4300;
+    let t0 = 0,
+      last = 0,
+      st = -2;
+    const show = (i, s) => {
+      hub.classList.toggle("on", s >= 0);
+      inWire.classList.toggle("on", s === 0);
+      steps.forEach((el, k) => el.classList.toggle("on", k === s));
+      rows.forEach((el, k) => el.classList.toggle("on", k === i && s >= 1));
+      outWires.forEach((el, k) => el.classList.toggle("on", k === i && s >= 1));
+    };
+    slides.push({
+      group: "platform",
+      under: "intent",
+      id: "agentic-workflows-router",
+      notes:
+        "What: The /agentic-workflows agent is a router, not one giant prompt: it reads the request, picks a route such as create, update, debug, optimize, upgrade, report or share, loads that guide from .github/aw/ and follows it. The requests shown are illustrative.\nWhy: Each guide stays small and focused, so the agent carries the rules for this job instead of every rule at once, and people get one entry point for the whole workflow lifecycle.\nWhen: Start every workflow task with /agentic-workflows and say what you want in plain words; name the workflow or the failing run when you have one.",
+      enter() {
+        t0 = last = 0;
+        st = -2;
+        text.textContent = "";
+        show(-1, -1);
+      },
+      tick(t) {
+        if (!t0) t0 = t + 900;
+        if (t - last < 110) return;
+        last = t;
+        const e = t - t0;
+        if (e < 0) return;
+        const i = Math.floor(e / CYC) % ROUTES.length,
+          p = e % CYC;
+        const ask = ROUTES[i][2];
+        const s = p < 1500 ? -1 : p < 2150 ? 0 : p < 2850 ? 1 : p < 3550 ? 2 : 3;
+        const want = ask.slice(0, s < 0 ? Math.ceil((p / 1400) * ask.length) : ask.length);
+        if (text.textContent !== want) {
+          text.textContent = want;
+          if (s < 0) sfx.key(0.6);
+        }
+        const k = i * 8 + s;
+        if (k !== st) {
+          st = k;
+          show(i, s);
+          if (s === 1) sfx.route(1);
+          if (s === 3) sfx.pop(i);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide gd gdr" },
+        h(
+          "div",
+          { class: "gd-head" },
+          h("div", { class: "kicker" }, "/agentic-workflows · how to use it"),
+          h("h2", {}, "Ask once. ", h("em", {}, "The agent picks the guide.")),
+          h("p", {}, h("code", {}, "/agentic-workflows"), " is a router: it reads your intent, loads the matching guide from ", h("code", {}, ".github/aw/"), " and follows it step by step.")
+        ),
+        h(
+          "div",
+          { class: "gd-board" },
+          wrap.firstChild,
+          h("div", { class: "gd-lab", style: { left: "50px", top: "100px" } }, "You ask"),
+          h("div", { class: "gdr-ask" }, text, h("i")),
+          h("div", { class: "gd-lab", style: { left: "660px", top: "122px" } }, "Router"),
+          hub,
+          h("div", { class: "gdr-steps" }, steps),
+          rows
+        ),
+        h("div", { class: "gd-cap" }, "Illustrative requests · routes from the agentic-workflows agent · also: analyze runs, patterns, CLI, Dependabot, coverage")
+      ),
+    });
+  }
+
+  // The compiler corrects the agent.: the agent writes workflow Markdown, gh aw compile answers with precise fixes, repeat until a lock file (guide style)
+  {
+    resetIndex();
+    const SRC = [
+      [["---", "d"]],
+      [["on:", "k"]],
+      [["  issues:", "k"]],
+      [["    types: ", "k"], ["[opened]", "v"]],
+      [["permissions:", "k"]],
+      [["  contents: ", "k"], ["read", "v"]],
+      [["  issues: ", "k"], ["write", "v"]],
+      [["safe-output:", "k"]],
+      [["  add-labels:", "k"]],
+      [["---", "d"]],
+      [["Label each new issue by area.", ""]],
+    ];
+    const span = ([s, c]) => h("span", c ? { class: c } : {}, s);
+    const lines = SRC.map((l, i) => h("div", { "data-n": String(i + 1) }, l.map(span)));
+    const PERM = 6,
+      SAFE = 7;
+    const setLine = (i, parts) => lines[i].replaceChildren(...parts.map(span));
+    // ring: three nodes clockwise from the top; a dot turns clockwise to the active node
+    const CX = 360,
+      CY = 290,
+      R = 196;
+    const wrap = h("div");
+    wrap.innerHTML = `<svg viewBox="0 0 1700 600"><circle class="gd-wire" cx="${CX}" cy="${CY}" r="${R}"/><g class="gdl-spin"><circle class="gdl-dot" cx="${CX}" cy="${CY - R}" r="12"/></g></svg>`;
+    const spin = wrap.querySelector("g");
+    const node = (label, sub, x, y) => h("div", { class: "gd-box gdl-node", style: { left: `${x - 118}px`, top: `${y - 38}px` } }, label, h("span", {}, sub));
+    const nodes = [
+      node("Agent edits", "workflow .md", CX, CY - R),
+      node("gh aw compile", "schema · strict", CX + R * 0.866, CY + R / 2),
+      node("Agent reads", "did you mean …", CX - R * 0.866, CY + R / 2),
+    ];
+    const big = h("b"),
+      small = h("span"),
+      mid = h("div", { class: "gdl-mid" }, big, small);
+    const t1 = h("p"),
+      t2 = h("p");
+    const term = h("div", { class: "gdl-term" }, t1, t2);
+    const say = (a, b, cls, sign) => {
+      t1.textContent = a;
+      t2.replaceChildren(...(sign ? [h("span", { class: cls }, sign + " ")] : []), b);
+    };
+    const E1 = "triage.md:8:1: error: Unknown property: safe-output. Did you mean 'safe-outputs'?";
+    const E2 = "triage.md:1:1: error: strict mode: write permission 'issues: write' is not allowed for security reasons. Use 'safe-outputs.create-issue', \u2026 to perform write operations safely.";
+    // [ring node, round, typing?, apply()]
+    const PH = [
+      [0, 1, 2200, () => say("agent \u203a writing .github/workflows/triage.md", "")],
+      [1, 1, 1500, () => say("$ gh aw compile triage", "compiling\u2026")],
+      [2, 1, 2100, () => (lines[SAFE].className = "bad", say("$ gh aw compile triage", E1, "gd-bad", "\u2717"))],
+      [0, 2, 1700, () => (setLine(SAFE, [["safe-outputs:", "k"]]), (lines[SAFE].className = "fix"), say("agent \u203a applying the compiler\u2019s hint", "line 8 \u2192 safe-outputs:"))],
+      [1, 2, 1500, () => ((lines[SAFE].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
+      [2, 2, 2600, () => ((lines[PERM].className = "bad"), say("$ gh aw compile triage", E2, "gd-bad", "\u2717"))],
+      [0, 3, 1700, () => (setLine(PERM, [["  issues: ", "k"], ["read", "v"]]), (lines[PERM].className = "fix"), say("agent \u203a writes go through safe outputs", "line 7 \u2192 issues: read"))],
+      [1, 3, 1500, () => ((lines[PERM].className = ""), say("$ gh aw compile triage", "compiling\u2026"))],
+      [1, 3, 4200, () => say("$ gh aw compile triage", "Compiled 1 workflow: 1 succeeded \u2192 triage.lock.yml", "gd-ok", "\u2713")],
+    ];
+    const START = PH.map((_, i) => PH.slice(0, i).reduce((a, p) => a + p[2], 0));
+    const TOTAL = START.at(-1) + PH.at(-1)[2];
+    let t0 = 0,
+      last = 0,
+      k = -1,
+      rot = -40,
+      shown = 0;
+    const reset = () => {
+      lines.forEach((l, i) => ((l.className = "hid"), setLine(i, SRC[i])));
+      spin.style.transition = "none";
+      rot = -40;
+      spin.style.transform = `rotate(${rot}deg)`;
+      shown = 0;
+    };
+    slides.push({
+      group: "platform",
+      under: "intent",
+      id: "authoring-loop",
+      notes:
+        "What: An illustrative authoring loop with real, abridged compiler messages for a synthetic issue-triage workflow. The agent writes the Markdown; gh aw compile rejects an unknown property with a did-you-mean hint, then a direct write permission under strict mode, which the compiler reports at the file level as 1:1; the third round compiles to a lock file.\nWhy: The compiler is a deterministic reviewer. Precise, actionable errors let the agent correct itself in seconds, and only validated, hardened workflows reach the lock file.\nWhen: Let the agent run gh aw compile after every edit and feed it the errors; review the Markdown once it compiles cleanly.",
+      enter() {
+        t0 = last = 0;
+        k = -1;
+        reset();
+        nodes.forEach(n => n.classList.remove("on"));
+        mid.className = "gdl-mid";
+        big.textContent = "1";
+        small.textContent = "round";
+        say("", "");
+      },
+      tick(t) {
+        if (!t0) t0 = t + 1000;
+        if (t - last < 110) return;
+        last = t;
+        const e = t - t0;
+        if (e < 0) return;
+        const p = e % TOTAL;
+        let n = PH.length - 1;
+        while (START[n] > p) n--;
+        if (n < k) (reset(), (k = -1));
+        if (n === 0) {
+          const v = Math.min(SRC.length, Math.ceil(((p - START[0]) / (PH[0][2] - 400)) * SRC.length));
+          for (; shown < v; shown++) (lines[shown].className = ""), sfx.key(0.5);
+        }
+        if (n === k) return;
+        if (n > 0) for (; shown < SRC.length; shown++) lines[shown].className = "";
+        // a hidden tab can skip phases: replay them so the source always matches the current phase
+        for (let j = k + 1; j < n; j++) PH[j][3]();
+        k = n;
+        const [at, round] = PH[n];
+        nodes.forEach((el, i) => el.classList.toggle("on", i === at));
+        // the dot rests just before the active node (boxes would hide it on the node) and only moves clockwise
+        rot += (((at * 120 - 40 - rot) % 360) + 360) % 360;
+        spin.style.transition = "";
+        spin.style.transform = `rotate(${rot}deg)`;
+        const done = n === PH.length - 1;
+        mid.className = done ? "gdl-mid ok" : "gdl-mid";
+        big.textContent = done ? "\u2713 lock" : String(round);
+        small.textContent = done ? "triage.lock.yml" : "round";
+        PH[n][3]();
+        if (at === 2) sfx.bug();
+        else if (done) sfx.compile();
+        else if (at === 1) sfx.step();
+      },
+      el: h(
+        "section",
+        { class: "slide gd gdl" },
+        h(
+          "div",
+          { class: "gd-head" },
+          h("div", { class: "kicker" }, "/agentic-workflows · authoring loop"),
+          h("h2", {}, "The compiler ", h("em", {}, "corrects the agent.")),
+          h("p", {}, "The agent writes workflow Markdown, ", h("code", {}, "gh aw compile"), " rejects what is wrong with a precise fix, and the agent applies it until a lock file compiles.")
+        ),
+        h(
+          "div",
+          { class: "gd-board" },
+          wrap.firstChild,
+          nodes,
+          mid,
+          h("div", { class: "gd-lab", style: { left: "40px", top: "524px", width: "420px", lineHeight: "1.5" } }, "start \u203a /agentic-workflows", h("br"), "\u201clabel new issues by area\u201d"),
+          h("div", { class: "gdl-file" }, h("div", { class: "gdl-tab" }, h("b", {}, "triage.md"), ".github/workflows/"), h("div", { class: "gdl-src" }, lines), term)
+        ),
+        h("div", { class: "gd-cap" }, "Illustrative run · real gh aw compile messages (abridged) for a synthetic triage.md · three rounds to a lock file")
+      ),
+    });
+  }
+
+  // Personas test the guide. Agent fixes it.: Agent Persona Explorer scores /agentic-workflows answers and probes the 8,000-byte prefix (guide style, measured)
+  {
+    resetIndex();
+    const PERSONAS = ["Backend Engineer", "Frontend Developer", "DevOps Engineer", "QA Tester", "Product Manager", "Program Manager", "Designer", "Legal / Compliance", "Information Worker"];
+    const PERSON =
+      "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z";
+    const chips = PERSONAS.map((p, i) => {
+      const c = h("div", { class: "gd-box gdp-chip", style: { top: `${60 + i * 58}px` } }, p);
+      c.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 24 24"><path d="${PERSON}"/></svg>`);
+      return c;
+    });
+    const STEPS = [
+      ["Role-play", "A persona asks /agentic-workflows for a workflow"],
+      ["Score", "trigger, tools, security, clarity, completeness"],
+      ["Probe", "Ask again with only the first 8,000 bytes"],
+      ["Report", "A daily issue lists weak or lost rules"],
+      ["Fix", "An agent moves lost rules up; the next run re-scores"],
+    ];
+    const steps = STEPS.map(([a, b], i) => h("div", { class: "gd-box gdp-step", style: { top: `${60 + i * 104}px` } }, h("b", {}, String(i + 1)), h("strong", {}, a), h("span", {}, b)));
+    const KPI = [
+      [133, "persona reports"],
+      [25, "fixed by merged PRs, 22 by Copilot"],
+      [23, "PRs changed agent guidance"],
+      [0, "personas \u00d7 score dimensions", "9\u00d75"],
+    ];
+    const vals = KPI.map(([v, , s]) => h("b", {}, s || "0"));
+    const kpis = KPI.map(([, l], i) => h("div", { class: "gd-box gdp-kpi", style: { left: `${1110 + (i % 2) * 286}px`, top: `${60 + Math.floor(i / 2) * 166}px` } }, vals[i], h("span", {}, l)));
+    const STEP = 1150;
+    let t0 = 0,
+      last = 0,
+      k = -1;
+    slides.push({
+      group: "platform",
+      under: "intent",
+      id: "persona-optimization",
+      notes:
+        "What: Agent Persona Explorer, a daily workflow, role-plays a persona such as a backend engineer, a designer or a compliance lead, asks /agentic-workflows for a workflow, scores the answer on five dimensions and asks again with only the first 8,000 bytes of the agent file. Measured on 15 Nov 2026: 133 reports in total from 8 Jun to 15 Nov 2026, 25 closed by merged pull requests, 22 of them by Copilot and 23 changing agent guidance; the agent file is 17,035 bytes. The persona order and the loop are an illustrative, simplified example.\nWhy: People phrase the same need in many ways. Personas catch guidance that works for only one kind of user, and the prefix probe catches rules a truncated prompt loses.\nWhen: Use persona evaluation when one agent serves many kinds of users, and keep its most important rules in the first bytes.",
+      enter() {
+        t0 = last = 0;
+        k = -1;
+        chips.forEach(c => c.classList.remove("on"));
+        steps.forEach(s => s.classList.remove("on"));
+        KPI.forEach(([v, , s], i) => s || (vals[i].textContent = "0"));
+      },
+      tick(t) {
+        if (!t0) t0 = t + 900;
+        if (t - last < 110) return;
+        last = t;
+        const e = t - t0;
+        if (e < 0) return;
+        const f = Math.min(1, e / 1400),
+          ease = 1 - (1 - f) ** 3;
+        KPI.forEach(([v, , s], i) => s || (vals[i].textContent = String(Math.round(v * ease))));
+        const n = Math.floor(e / STEP);
+        if (n === k) return;
+        k = n;
+        const s = n % STEPS.length,
+          p = Math.floor(n / STEPS.length) % PERSONAS.length;
+        chips.forEach((c, i) => c.classList.toggle("on", i === p));
+        steps.forEach((el, i) => el.classList.toggle("on", i === s));
+        if (s === 4) sfx.review();
+        else sfx.pop(s);
+      },
+      el: h(
+        "section",
+        { class: "slide gd gdp" },
+        h(
+          "div",
+          { class: "gd-head" },
+          h("div", { class: "kicker" }, "Agent Persona Explorer · optimizing /agentic-workflows"),
+          h("h2", {}, "Personas test the guide. ", h("em", {}, "Agent fixes it.")),
+          h("p", {}, "Every day a persona asks ", h("code", {}, "/agentic-workflows"), " for a workflow; the answer is scored and probed against the first 8,000 bytes, and gaps become issues.")
+        ),
+        h(
+          "div",
+          { class: "gd-board" },
+          h("div", { class: "gd-lab", style: { left: "40px", top: "26px" } }, "9 personas"),
+          chips,
+          h("div", { class: "gd-lab", style: { left: "460px", top: "26px" } }, "Daily loop"),
+          steps,
+          h("div", { class: "gd-lab", style: { left: "1110px", top: "26px" } }, "Measured"),
+          kpis,
+          h("div", { class: "gd-lab", style: { left: "1110px", top: "410px" } }, "agentic-workflows agent file"),
+          h("div", { class: "gdp-bar" }, h("i")),
+          h("div", { class: "gdp-bl", style: { left: "1110px", width: "556px", display: "flex", justifyContent: "space-between" } }, h("span", {}, "first 8,000 B probed"), h("span", {}, "17,035 B"))
+        ),
+        h("div", { class: "gd-cap" }, "MEASURED · snapshot 15 Nov 2026 · reports 8 Jun\u201315 Nov 2026 (160 d) · personas and loop illustrative")
       ),
     });
   }

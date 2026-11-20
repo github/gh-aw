@@ -249,7 +249,7 @@ test("jumps to any slide from the dock's full-screen slide map", async ({ page }
   expect(errors).toEqual([]);
 });
 
-test("moves through the bands, up/down landing on each band's first slide", async ({ page }) => {
+test("moves through the bands like a cursor, up/down keeping the horizontal position", async ({ page }) => {
   const count = page.locator(CURRENT);
   await page.goto("/gh-aw/cracktro/#1");
   await page.keyboard.press("ArrowDown");
@@ -257,10 +257,12 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
-  // down walks the Continuous AI column first, then leaves for the next band
+  // down walks the Continuous AI column first, then leaves for the same position in the next band
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+  await page.keyboard.press("ArrowLeft");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last main-line slide of the band above, skipping its column of examples
   await page.keyboard.press("ArrowLeft");
@@ -269,28 +271,35 @@ test("moves through the bands, up/down landing on each band's first slide", asyn
   await expect(count).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
-  // Page Up/Page Down always switch bands
-  await page.keyboard.press("PageDown");
-  await expect(count).toHaveAttribute("aria-label", at(2));
-  await page.keyboard.press("PageDown");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  // the position survives a shorter band: it clamps to its end, and moving back restores the remembered position
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Continuous Red Teaming")}`);
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous Red Teaming")));
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
   await page.keyboard.press("PageUp");
-  await expect(count).toHaveAttribute("aria-label", at(2));
+  await expect(count).toHaveAttribute("aria-label", at(1));
+  await page.keyboard.press("PageDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Automation into Value")));
+  await page.keyboard.press("PageDown");
+  await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous Red Teaming")));
+  // Shift+Home returns to the first slide of the band
+  await page.keyboard.press("Shift+Home");
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
 });
 
 test("gives every navigation button a keyboard shortcut", async ({ page }) => {
   const count = page.locator(CURRENT);
   await page.goto("/gh-aw/cracktro/#3");
-  for (const name of ["Previous band", "Previous slide", "Next slide", "Next band", "Slide map (G)", "Search slides (/)", "Toggle sound (M)"])
+  for (const name of ["First slide of the band", "Previous band", "Previous slide", "Next slide", "Next band", "Slide map (G)", "Search slides (/)", "Toggle sound (M)"])
     await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-keyshortcuts", /\S/);
   // every button (chrome, map tiles, header tiles, in-slide controls) has a title naming its shortcut
   const untitled = await page.locator("button:not(.vnb), [data-go]").evaluateAll(els => els.filter(el => !/\(.+\)/.test(el.getAttribute("title") || "")).map(el => el.className));
   expect(untitled).toEqual([]);
-  // Shift+Down switches bands even on a column head
+  // Shift+Down switches bands even on a column head, keeping the horizontal position
   await page.keyboard.press("Shift+ArrowDown");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
   await page.keyboard.press("Shift+ArrowUp");
-  await expect(count).toHaveAttribute("aria-label", at(2));
+  await expect(count).toHaveAttribute("aria-label", at(3));
   // a typed slide number then Enter jumps there
   for (const k of [...String(HANDOFFS), "Enter"]) await page.keyboard.press(k);
   await expect(count).toHaveAttribute("aria-label", at(HANDOFFS));
@@ -412,16 +421,19 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await expect(nextBand).toBeEnabled();
   await nextBand.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
-  // from an interior slide, next band lands on the header below and previous band on the header above
+  // from an interior slide, next/previous band keep the horizontal position and the first button returns to the band's start
   const interior = slideNo("Anatomy of a workflow");
+  const lineStartBtn = page.getByRole("button", { name: "First slide of the band", exact: true });
   await page.goto(`/gh-aw/cracktro/#${interior}`);
   await expect(count).toHaveAttribute("aria-label", at(interior));
+  await expect(lineStartBtn).toBeEnabled();
   await nextBand.click();
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
-  await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
   await expect(count).toHaveAttribute("aria-label", at(SECURITY + 2));
   await prevBand.click();
+  await expect(count).toHaveAttribute("aria-label", at(interior));
+  await lineStartBtn.click();
   await expect(count).toHaveAttribute("aria-label", at(2));
+  await expect(lineStartBtn).toBeDisabled();
   await prevBand.click();
   await expect(count).toHaveAttribute("aria-label", at(1));
   await expect(prevBand).toBeDisabled();
@@ -435,9 +447,9 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
   await expect(count).toHaveAttribute("aria-label", at(3));
   await nextBand.focus();
   await page.keyboard.press("Enter");
-  await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+  await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
 
-  // at 320px the four arrows pack right-aligned beneath the notes, map, search and sound row
+  // at 320px the five arrows pack right-aligned beneath the notes, map, search and sound row
   const rects = (sel: string) =>
     page.locator(sel).evaluateAll(els =>
       els.map(e => {
@@ -447,14 +459,13 @@ test("jumps between bands with the compact track buttons", async ({ page }) => {
     );
   const arrowBoxes = await rects(".arrows button");
   const toolBoxes = await rects(".ntb, .smb, .fzb, .snd");
-  expect(arrowBoxes).toHaveLength(4);
+  expect(arrowBoxes).toHaveLength(5);
   expect(toolBoxes).toHaveLength(4);
-  for (let i = 1; i < 4; i++) expect(arrowBoxes[i].left).toBeGreaterThan(arrowBoxes[i - 1].right);
+  for (let i = 1; i < 5; i++) expect(arrowBoxes[i].left).toBeGreaterThan(arrowBoxes[i - 1].right);
   const toolRight = Math.max(...toolBoxes.map(b => b.right));
-  expect(Math.abs(arrowBoxes[3].right - toolRight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(arrowBoxes[4].right - toolRight)).toBeLessThanOrEqual(1);
   expect(toolRight).toBeLessThanOrEqual(320);
   expect(arrowBoxes[0].left).toBeGreaterThanOrEqual(0);
-  expect(Math.abs(arrowBoxes[0].left - Math.min(...toolBoxes.map(b => b.left)))).toBeLessThanOrEqual(1);
   expect(Math.min(...arrowBoxes.map(b => b.top))).toBeGreaterThanOrEqual(Math.max(...toolBoxes.map(b => b.bottom)));
   // kiosk and the column button extend that row to the left, inside the screen and clear of every dock control and each other
   await page.goto(`/gh-aw/cracktro/#${slideNo("Daily Improvers")}`);
@@ -1065,6 +1076,22 @@ test("opens every hard-coded tour from the hash with all its slides found", asyn
   expect(warnings.filter(w => w.includes("CracktroDeck"))).toEqual([]);
 });
 
+test("ends the slide map with a keyboard manual of every shortcut", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/");
+  await page.keyboard.press("g");
+  const keys = page.getByRole("region", { name: "Keyboard" });
+  await expect(page.locator(".smp-body > :last-child")).toHaveClass(/smp-keys/);
+  for (const group of ["Move", "Jump", "Show", "Slide map", "Design a view"]) await expect(keys.getByRole("heading", { name: group, exact: true })).toBeVisible();
+  await expect(keys.locator("dt", { hasText: "Shift+Home" })).toHaveCount(1);
+  await expect(keys).toContainText("First slide of the band");
+  await expect(keys.locator(".kb-k")).toHaveCount(102);
+  await expect(keys.locator('.kb-k.on[data-k="G"]')).toHaveCount(1);
+  await expect(keys.locator('.kb-arc[data-parts="Shift Home"]')).toHaveCount(1);
+  await keys.locator('.kb-k[data-k="G"]').hover();
+  await expect(keys.locator(".smp-kcap")).toContainText("Slide map");
+  await expect(keys.getByRole("button")).toHaveCount(0);
+});
+
 test("keeps an example in a view only together with its pattern slide", async ({ page }) => {
   const view = (s: string[]) => Buffer.from(JSON.stringify({ s })).toString("base64url");
   await page.goto(`/gh-aw/cracktro/#github-agentic-workflows&view=${view(["github-agentic-workflows", "repo-assist"])}`);
@@ -1174,6 +1201,8 @@ test.describe("reusable runtime", () => {
     await page.keyboard.press("PageUp");
     await expect(heading(page)).toHaveText("Hello");
     await page.keyboard.press("PageDown");
+    await expect(heading(page)).toHaveText("Beta");
+    await page.keyboard.press("Shift+Home");
     await expect(heading(page)).toHaveText("Part one");
     await page.keyboard.press("Home");
     await expect(heading(page)).toHaveText("Hello");
