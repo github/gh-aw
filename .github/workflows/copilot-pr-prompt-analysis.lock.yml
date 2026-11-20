@@ -2781,12 +2781,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
+          REPO_MEMORY_BASE_COMMIT: ${{ needs.agent.outputs.repo_memory_base_commit_default }}
           GH_AW_TEMPORARY_ID_MAP_FILE: /tmp/gh-aw/safe-outputs-items/temporary-id-map.json
           ARTIFACT_DIR: /tmp/gh-aw/repo-memory/default
           MEMORY_ID: default
           TARGET_REPO: ${{ github.repository }}
           BRANCH_NAME: memory/prompt-analysis
-          REPO_MEMORY_BASE_COMMIT: ${{ needs.agent.outputs.repo_memory_base_commit_default }}
           MAX_FILE_SIZE: 102400
           MAX_FILE_COUNT: 100
           MAX_PATCH_SIZE: 10240
