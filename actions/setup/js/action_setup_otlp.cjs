@@ -32,6 +32,7 @@ const { appendFileSync } = require("fs");
 const { nowMs } = require("./performance_now.cjs");
 const { getActionInput } = require("./action_input_utils.cjs");
 const { maskSecret, getOTLPRunnerMaskValues } = require("./actions_secret_masking.cjs");
+const { applyDefaultOTLPConfig } = require("./otlp_default_config.cjs");
 
 /**
  * Append a key=value line to a GitHub Actions file (GITHUB_OUTPUT or GITHUB_ENV)
@@ -123,6 +124,12 @@ function getPrimaryOTLPEndpoint(endpointsRaw) {
  */
 async function run() {
   const { sendJobSetupSpan, isValidTraceId, isValidSpanId, parseOTLPEndpoints } = require("./send_otlp_span.cjs");
+
+  if (applyDefaultOTLPConfig()) {
+    writeEnvLine(process.env.GITHUB_ENV, "OTEL_EXPORTER_OTLP_ENDPOINT", process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "", "OTEL_EXPORTER_OTLP_ENDPOINT", "GITHUB_ENV");
+    writeEnvLine(process.env.GITHUB_ENV, "OTEL_EXPORTER_OTLP_HEADERS", process.env.OTEL_EXPORTER_OTLP_HEADERS || "", "OTEL_EXPORTER_OTLP_HEADERS", "GITHUB_ENV");
+    writeEnvLine(process.env.GITHUB_ENV, "GH_AW_OTLP_ENDPOINTS", process.env.GH_AW_OTLP_ENDPOINTS || "", "GH_AW_OTLP_ENDPOINTS", "GITHUB_ENV");
+  }
 
   const rawStartMs = process.env.SETUP_START_MS;
   const parsedMs = /^\d+$/.test(rawStartMs ?? "") ? Number(rawStartMs) : NaN;

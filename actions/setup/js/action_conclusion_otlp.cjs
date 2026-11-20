@@ -44,6 +44,7 @@ require("./shim.cjs");
 
 const sendOtlpSpan = require("./send_otlp_span.cjs");
 const { getActionInput } = require("./action_input_utils.cjs");
+const { applyDefaultOTLPConfig } = require("./otlp_default_config.cjs");
 const fs = require("fs");
 const path = require("path");
 
@@ -75,6 +76,7 @@ function parseJobStartMs(raw) {
  * @returns {Promise<void>}
  */
 async function run() {
+  applyDefaultOTLPConfig();
   const endpoints = process.env.GH_AW_OTLP_ENDPOINTS;
   const jobName = getActionInput("JOB_NAME");
   const preUpload = process.env.GH_AW_OTEL_CONCLUSION_PREUPLOAD === "true";

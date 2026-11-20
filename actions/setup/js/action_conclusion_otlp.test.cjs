@@ -14,6 +14,7 @@ const mockCore = {
   error: vi.fn(),
   setFailed: vi.fn(),
   setOutput: vi.fn(),
+  setSecret: vi.fn(),
 };
 global.core = mockCore;
 
@@ -29,7 +30,17 @@ const { run, buildSpanName, parseJobStartMs } = req("./action_conclusion_otlp.cj
 const mockSendJobConclusionSpan = vi.fn();
 
 /** Env vars read by this module — cleared before each test */
-const MANAGED_ENV_VARS = ["GH_AW_OTLP_ENDPOINTS", "GH_AW_JOB_RESULT", "GH_AW_OTEL_CONCLUSION_PREUPLOAD", "INPUT_JOB_NAME", "INPUT_JOB-NAME", "GITHUB_AW_OTEL_JOB_START_MS"];
+const MANAGED_ENV_VARS = [
+  "GH_AW_DEFAULT_OTLP_CONFIG",
+  "GH_AW_OTLP_ENDPOINTS",
+  "GH_AW_JOB_RESULT",
+  "GH_AW_OTEL_CONCLUSION_PREUPLOAD",
+  "INPUT_JOB_NAME",
+  "INPUT_JOB-NAME",
+  "GITHUB_AW_OTEL_JOB_START_MS",
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_HEADERS",
+];
 
 describe("action_conclusion_otlp.cjs", () => {
   /** @type {Record<string, string | undefined>} */
@@ -60,6 +71,22 @@ describe("action_conclusion_otlp.cjs", () => {
 
   it("should export run as a function", () => {
     expect(typeof run).toBe("function");
+  });
+
+  it("masks and applies the intact default configuration before conclusion export", async () => {
+    const endpoint = "https://collector.example.com";
+    const headers = "Authorization=******";
+    const config = JSON.stringify({ endpoint, headers });
+    process.env.GH_AW_DEFAULT_OTLP_CONFIG = config;
+
+    await run();
+
+    expect(mockCore.setSecret).toHaveBeenCalledWith(config);
+    expect(mockCore.setSecret).toHaveBeenCalledWith(endpoint);
+    expect(mockCore.setSecret).toHaveBeenCalledWith(headers);
+    expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(endpoint);
+    expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(headers);
+    expect(process.env.GH_AW_OTLP_ENDPOINTS).toBe(JSON.stringify([{ url: endpoint, headers }]));
   });
 
   it("exports session logs only from the conclusion job", async () => {

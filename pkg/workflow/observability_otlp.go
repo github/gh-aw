@@ -788,11 +788,9 @@ func allOTLPHeaders(entries []otlpEndpointEntry) string {
 // default environment rather than from frontmatter.
 //
 // When no endpoint is configured anywhere in the frontmatter (main workflow or
-// imports), the endpoint and headers are resolved together from the atomic
-// GH_AW_DEFAULT_OTLP_CONFIG secret, with legacy endpoint/header settings as
-// fallbacks. The expressions resolve at run time, so an organization or enterprise
-// can enable telemetry for every agentic workflow without editing individual
-// workflows. When no default is set, OTLP export is a no-op.
+// imports), the runtime receives GH_AW_DEFAULT_OTLP_CONFIG as an intact secret,
+// masks its endpoint and headers, then applies the pair together. Legacy
+// endpoint/header settings remain available when that secret is unset.
 func resolveOTLPEndpointEntries(workflowData *WorkflowData) (entries []otlpEndpointEntry, usesEnterpriseDefaults bool) {
 	// Collect all endpoint entries from the endpoint field (string, object, or array).
 	entries = collectAllOTLPEndpoints(workflowData.RawFrontmatter)
@@ -954,6 +952,9 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 		envKeyLines = append(envKeyLines, line)
 	}
 	addEnvLine("OTEL_EXPORTER_OTLP_ENDPOINT", "  OTEL_EXPORTER_OTLP_ENDPOINT: "+firstEndpoint)
+	if usesEnterpriseDefaults {
+		addEnvLine(compilerenv.DefaultOTLPConfig, fmt.Sprintf("  %s: %s", compilerenv.DefaultOTLPConfig, compilerenv.BuildDefaultOTLPConfigExpression()))
+	}
 	addEnvLine(compilerenv.OTLPProtocol, fmt.Sprintf("  %s: ${{ vars.%s }}", compilerenv.OTLPProtocol, compilerenv.OTLPProtocol))
 	addEnvLine(compilerenv.OTLPMetrics, fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics))
 	addEnvLine("OTEL_SERVICE_NAME", "  OTEL_SERVICE_NAME: "+serviceName)

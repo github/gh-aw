@@ -75,6 +75,7 @@ describe("action_setup_otlp.cjs", () => {
       INPUT_PARENT_SPAN_ID: process.env.INPUT_PARENT_SPAN_ID,
       "INPUT_PARENT-SPAN-ID": process.env["INPUT_PARENT-SPAN-ID"],
       INPUT_OTLP_OIDC_TOKEN: process.env.INPUT_OTLP_OIDC_TOKEN,
+      GH_AW_DEFAULT_OTLP_CONFIG: process.env.GH_AW_DEFAULT_OTLP_CONFIG,
       GH_AW_OTLP_ENDPOINTS: process.env.GH_AW_OTLP_ENDPOINTS,
       OTEL_EXPORTER_OTLP_HEADERS: process.env.OTEL_EXPORTER_OTLP_HEADERS,
       GH_AW_OTLP_ALL_HEADERS: process.env.GH_AW_OTLP_ALL_HEADERS,
@@ -90,6 +91,7 @@ describe("action_setup_otlp.cjs", () => {
     delete process.env["INPUT_PARENT-SPAN-ID"];
     delete process.env.INPUT_OTLP_OIDC_TOKEN;
     delete process.env["INPUT_OTLP_OIDC_TOKEN"];
+    delete process.env.GH_AW_DEFAULT_OTLP_CONFIG;
     delete process.env.OTEL_EXPORTER_OTLP_HEADERS;
     delete process.env.GH_AW_OTLP_ALL_HEADERS;
     process.env.GITHUB_OUTPUT = outputFile;
@@ -112,6 +114,39 @@ describe("action_setup_otlp.cjs", () => {
 
   it("should export run as a function", () => {
     expect(typeof run).toBe("function");
+  });
+
+  it("masks fields from the intact default configuration before exporting them", async () => {
+    const endpoint = "https://collector.example.com";
+    const headers = "Authorization=******";
+    const config = JSON.stringify({ endpoint, headers });
+    process.env.GH_AW_DEFAULT_OTLP_CONFIG = config;
+
+    await run();
+
+    expect(mockCore.setSecret).toHaveBeenCalledWith(config);
+    expect(mockCore.setSecret).toHaveBeenCalledWith(endpoint);
+    expect(mockCore.setSecret).toHaveBeenCalledWith(headers);
+    expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(endpoint);
+    expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(headers);
+    expect(JSON.parse(process.env.GH_AW_OTLP_ENDPOINTS || "[]")).toEqual([{ url: endpoint, headers }]);
+    expect(readFileSync(envFile, "utf8")).toContain(`GH_AW_OTLP_ENDPOINTS=${JSON.stringify([{ url: endpoint, headers }])}\n`);
+    expect(mockCore.setSecret.mock.invocationCallOrder[0]).toBeLessThan(mockSendJobSetupSpan.mock.invocationCallOrder[0]);
+  });
+
+  it("fails closed when the atomic default configuration is malformed", async () => {
+    process.env.GH_AW_DEFAULT_OTLP_CONFIG = "{invalid";
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://legacy.example.com";
+    process.env.OTEL_EXPORTER_OTLP_HEADERS = "Authorization=legacy-secret";
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://legacy.example.com", headers: "Authorization=legacy-secret" }]);
+
+    await run();
+
+    expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("");
+    expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("");
+    expect(process.env.GH_AW_OTLP_ENDPOINTS).toBe("");
+    expect(mockCore.warning).toHaveBeenCalledWith("[otlp] invalid default OTLP configuration; skipping export");
+    expect(readFileSync(envFile, "utf8")).toContain("GH_AW_OTLP_ENDPOINTS=\n");
   });
 
   describe("writeEnvLine", () => {

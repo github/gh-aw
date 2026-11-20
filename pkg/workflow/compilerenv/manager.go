@@ -321,14 +321,19 @@ func BuildDefaultMaxTurnsExpression() string {
 // string when both are unset, which downstream runtime code treats as
 // "observability disabled".
 func BuildDefaultOTLPEndpointExpression() string {
-	return fmt.Sprintf("${{ fromJSON(secrets.%s || '{}').endpoint || secrets.%s || vars.%s }}", DefaultOTLPConfig, DefaultOTLPEndpoint, DefaultOTLPEndpoint)
+	return fmt.Sprintf("${{ secrets.%s || vars.%s }}", DefaultOTLPEndpoint, DefaultOTLPEndpoint)
 }
 
 // BuildDefaultOTLPHeadersExpression builds a secrets expression that resolves the
-// OTLP exporter headers at runtime from the atomic endpoint/headers secret, falling
-// back to the legacy GH_AW_DEFAULT_OTLP_HEADERS secret.
+// OTLP exporter headers at runtime from the GH_AW_DEFAULT_OTLP_HEADERS secret.
 func BuildDefaultOTLPHeadersExpression() string {
-	return fmt.Sprintf("${{ fromJSON(secrets.%s || '{}').headers || secrets.%s }}", DefaultOTLPConfig, DefaultOTLPHeaders)
+	return fmt.Sprintf("${{ secrets.%s }}", DefaultOTLPHeaders)
+}
+
+// BuildDefaultOTLPConfigExpression passes the intact atomic OTLP configuration
+// secret to the runtime, which masks its fields before exporting them.
+func BuildDefaultOTLPConfigExpression() string {
+	return fmt.Sprintf("${{ secrets.%s }}", DefaultOTLPConfig)
 }
 
 // BuildModelOverrideExpression builds a vars expression with primary model var, enterprise
