@@ -7,7 +7,7 @@ sidebar:
 
 Use these variables to set organization- or repository-wide defaults and compiler policy without editing individual workflow frontmatter files.
 
-In this enterprise controls reference, OTLP defaults are the scope-sensitive exception: `GH_AW_DEFAULT_OTLP_ENDPOINT` can be a GitHub Actions variable at repository, organization, or enterprise scope, but the `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` secrets are limited to repository or organization scope.
+OTLP defaults can use an endpoint variable at repository, organization, or enterprise scope. Endpoint and header secrets are limited to repository or organization scope.
 
 ## Enterprise Control Variables
 
@@ -41,10 +41,10 @@ In this enterprise controls reference, OTLP defaults are the scope-sensitive exc
 | `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` | Compiler process environment | Fail compilation unless every generated job selects a self-hosted runner | Set to `true` in a trusted compile environment to enforce self-hosted-only runners |
 
 Use `gh aw env get` and `gh aw env update` to manage `GH_AW_DEFAULT_*`, `OTEL_EXPORTER_OTLP_PROTOCOL`, and `GH_AW_OTEL_METRICS`
-variables in batch. These commands operate on GitHub Actions variables and support repo, org, or enterprise scope, so `default_otlp_endpoint` can still be managed as an enterprise variable. Set OTLP secrets separately with `gh secret set`; those secrets are limited to repository or organization scope. The defaults file uses
+variables in batch. These commands operate on GitHub Actions variables and support repo, org, or enterprise scope. Set OTLP secrets separately with `gh secret set`, or use [the operational `gh aw env otel` command](/gh-aw/reference/open-telemetry/#configure-defaults-in-one-command) to validate an endpoint and configure its existing secrets and variables without changing workflows. The defaults file uses
 `default_`-prefixed keys such as `default_max_ai_credits`, `default_max_turn_cache_misses`, `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, `default_detection_job_timeout_minutes`,
 `default_model_copilot`, `default_otlp_endpoint`, `default_otlp_protocol`, `default_otel_metrics`, `default_artifact_retention_days`, and `default_utc`. Set `default_otel_metrics: false` to disable metrics by default; omit or delete it to restore default-on behavior. For the endpoint, `gh aw env update --scope ent` writes the `GH_AW_DEFAULT_OTLP_ENDPOINT` variable, not an endpoint secret. To mask the endpoint value, set `GH_AW_DEFAULT_OTLP_ENDPOINT` with
-`gh secret set` at repository or organization scope instead. `GH_AW_DEFAULT_OTLP_HEADERS` is always a secret and must also be set with `gh secret set` at repository or organization scope. If both endpoint values exist, clearing only one leaves the other effective through the fallback expression; clear both the endpoint secret and variable to disable OTLP export.
+`gh secret set` at repository or organization scope instead. `GH_AW_DEFAULT_OTLP_HEADERS` is a secret.
 
 `default_otlp_protocol` is the defaults-file key for the standard `OTEL_EXPORTER_OTLP_PROTOCOL` Actions variable (not a `GH_AW_DEFAULT_*` variable). It accepts `http/json` or `http/protobuf`; null or omission deletes the variable at the selected scope. Recompile existing workflows to add the runtime variable lookup. Explicit workflow `env` takes precedence. See [OpenTelemetry](/gh-aw/reference/open-telemetry/#protobuf-encoding-and-azure-monitor) for details.
 
@@ -312,13 +312,12 @@ For OTLP observability, precedence is:
 
 1. `observability.otlp` in workflow frontmatter
 2. `observability.otlp` from imported shared workflows
-3. `secrets.GH_AW_DEFAULT_OTLP_ENDPOINT`, falling back to `vars.GH_AW_DEFAULT_OTLP_ENDPOINT`, with `secrets.GH_AW_DEFAULT_OTLP_HEADERS` (action runtime)
+3. Default endpoint secret or variable and headers secret (action runtime)
 
-The compiler always emits OTLP environment variables. When no endpoint is configured in frontmatter or an import, it emits
+The compiler always emits OTLP environment variables. When no endpoint is configured in frontmatter or an import, it uses
 `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` and `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}`
-so a repository or organization can enable telemetry for every agentic workflow without editing individual workflows. The
-endpoint secret takes precedence over the variable; clear both the endpoint secret and variable to disable export. When both are unset, the endpoint resolves to an empty string and OTLP export
-becomes a no-op; a configured endpoint without the matching headers secret is dropped by every span-emitting job
+at runtime. The endpoint secret takes precedence over the variable, even across scopes; clear both the endpoint secret and variable to disable export. When no endpoint is configured, OTLP export
+becomes a no-op; an endpoint without matching headers is dropped by every span-emitting job
 (setup, conclusion, outcome, and MCP gateway) instead of being exported unauthenticated, and the agent job additionally fails the
 run so the misconfiguration is visible. If a workflow's own `env:` block already defines one of the OTLP variables, the compiler
 skips injecting that variable rather than emitting a duplicate mapping key.

@@ -4,10 +4,25 @@ description: Toolset-by-toolset reference for GitHub MCP server tools, including
 
 # GitHub MCP Server — Tools by Toolset
 
-Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-server.md) for overview, configuration, and recommended defaults.
+Full tool reference per toolset. See [github-mcp-server.md](github-mcp-server.md) for overview, configuration, and recommended defaults.
+
+## Rules
+
+- **Identity**: do not use `get_me` for workflow identity; read `<github-context>` (injected whenever the GitHub tool is configured).
+- **`search_repositories`**: the `repo:owner/name` qualifier is ignored; results rank by stars and may return an unrelated repo (e.g. `repo:github/gh-aw` → `github/gitignore`). **Do not use `repo:` with `search_repositories`.** To check or fetch one repo, use `get_file_contents` (explicit `owner`/`repo`) or another `repos` call taking `owner`/`repo`. To discover repos, use `org:`, `user:`, `topic:`, `language:`, or `stars:`.
+- **`list_code_scanning_alerts`**: in workflow prompts/templates, always bound with `state: open` and `severity: critical,high`.
+- **Remote-only toolsets**: `copilot_spaces` and `github_support_docs_search` work only in remote mode (`https://api.githubcopilot.com/mcp/`), not local `gh mcp` mode.
+- **Feature flags**: `find_duplicate`, `issue_dependency_read`, and `issue_dependency_write` require upstream feature flags, independent of toolset selection.
+- **Permissions**: `copilot` requires `issues` and `pull-requests` write permissions, including its read-only Automation and task-status tools. `governance` org/enterprise operations need suitable token access; enabling the toolset does not grant it. `projects` requires a PAT — not supported by `GITHUB_TOKEN`.
+- **Remote schema**: `copilot` Automation/task-status parameters are defined by the remote GitHub MCP service; their placement under `copilot` is not confirmed against public upstream toolset registration.
+- **Toolset contracts**: load the matching `### <toolset>` section below whenever you need that toolset's tools or parameters; the names here are not the contracts.
+
+Toolsets: `context`, `code_quality`, `copilot`, `copilot_issue_intents`, `copilot_spaces`, `repos`, `git`, `github_support_docs_search`, `governance`, `issues`, `pull_requests`, `actions`, `code_security`, `dependabot`, `discussions`, `gists`, `labels`, `notifications`, `orgs`, `projects`, `secret_protection`, `security_advisories`, `stargazers`, `users`.
+
+<!-- instruction-prefix-end -->
 
 ### context
-**Description**: Team-awareness helpers for GitHub org membership. Workflow metadata is injected separately as `<github-context>` whenever the GitHub tool is configured.
+**Description**: Team-awareness helpers for GitHub org membership
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
@@ -46,10 +61,6 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 | `list_available_automation_triggers` | List available Copilot Automation triggers | None |
 | `request_copilot_review` | Request a Copilot review on a pull request | `owner`, `repo`, `pullNumber` |
 
-> **Permissions**: Read-only Automation and task status tools share the `issues` and `pull-requests` write permissions required by the Copilot toolset's assignment and review operations.
->
-> **Remote schema**: The local mapping records toolset membership and permissions only. Automation and task status parameters are defined by the remote GitHub MCP service, and their placement under `copilot` has not been confirmed against public upstream toolset registration.
-
 ---
 
 ### copilot_issue_intents
@@ -63,8 +74,6 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 
 ### copilot_spaces
 **Description**: GitHub Copilot Spaces (remote-only)
-
-> **Note**: Remote-only toolset — only available when using the GitHub MCP server in remote mode (`https://api.githubcopilot.com/mcp/`). Not available with the local `gh mcp` mode.
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
@@ -99,11 +108,6 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 | `search_repositories` | Search for repositories | `query`, `page`, `per_page` |
 | `push_files` | Push multiple files in a single commit | `owner`, `repo`, `branch`, `files`, `message` |
 
-> **`search_repositories` known limitation — `repo:` qualifier is ignored**: The `repo:owner/name` qualifier has no effect in `search_repositories` queries. Instead of scoping results to the named repository, the API ranks by star count and may return a completely unrelated high-star repository as the top hit (e.g. querying `repo:github/gh-aw` may return `github/gitignore`). **Do not use `repo:` with `search_repositories`.**
->
-> - To check whether a specific repository exists or to fetch its metadata, use `get_file_contents` (with explicit `owner` and `repo`) or any other `repos`-toolset call that takes `owner`/`repo` directly.
-> - To discover repositories in a scope, use supported qualifiers such as `org:`, `user:`, `topic:`, `language:`, or `stars:`.
-
 ---
 
 ### git
@@ -117,8 +121,6 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 
 ### github_support_docs_search
 **Description**: GitHub support documentation search (remote-only)
-
-> **Note**: Remote-only toolset — only available when using the GitHub MCP server in remote mode (`https://api.githubcopilot.com/mcp/`). Not available with the local `gh mcp` mode.
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
@@ -135,14 +137,10 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 | `custom_properties_write` | Update custom property values or definitions | `level`, `properties`; `owner`, `repo` (repository) or `org`/`enterprise` |
 | `repository_ruleset_read` | Read repository, organization, or enterprise rulesets | `level`, `method`; `owner`, `repo` (repository) or `org`/`enterprise` |
 
-> **Note**: Organization and enterprise operations require suitable token access; enabling the toolset alone does not grant it.
-
 ---
 
 ### issues
 **Description**: Issue management
-
-> **Note**: `find_duplicate`, `issue_dependency_read`, and `issue_dependency_write` require their upstream feature flags to be enabled, independently of toolset selection.
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
@@ -200,8 +198,6 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 |------|---------|----------------|
 | `get_code_scanning_alert` | Get details of a specific code scanning alert | `owner`, `repo`, `alert_number` |
 | `list_code_scanning_alerts` | List code scanning alerts for a repository | `owner`, `repo`, `state`, `severity` |
-
-When calling `list_code_scanning_alerts` in workflow prompts/templates, always bound requests with `state: open` and `severity: critical,high`.
 
 ---
 
