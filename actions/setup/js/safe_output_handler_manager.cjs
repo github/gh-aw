@@ -424,22 +424,55 @@ function freezeInvocationValue(value) {
 }
 
 /**
- * Applies JSON semantics to undefined values in place so the snapshot is digestable:
- * undefined object fields are removed and undefined array entries become null.
+ * Projects a value to its plain JSON data so it is cloneable and digestable even when
+ * provider entries carry methods or Dates: toJSON() is applied, non-finite numbers become
+ * null, and undefined/function/symbol values are dropped from objects (null in arrays).
  * @param {any} value
+ * @param {Set<object>} [ancestors]
  * @returns {any}
  */
-function dropUndefinedInvocationValues(value) {
-  if (!value || typeof value !== "object") return value;
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index++) value[index] = value[index] === undefined ? null : dropUndefinedInvocationValues(value[index]);
-    return value;
+function projectInvocationJsonValue(value, ancestors = new Set()) {
+  if (value && typeof value.toJSON === "function") value = value.toJSON();
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (value === null || typeof value !== "object") return value;
+  if (ancestors.has(value)) throw new TypeError("Safe-output invocation inputs must not be circular");
+  ancestors.add(value);
+  const omitted = item => item === undefined || typeof item === "function" || typeof item === "symbol";
+  /** @type {any} */
+  let projected;
+  if (Array.isArray(value)) projected = value.map(item => (omitted(item) ? null : projectInvocationJsonValue(item, ancestors)));
+  else {
+    projected = {};
+    for (const [name, item] of Object.entries(value)) if (!omitted(item)) projected[name] = projectInvocationJsonValue(item, ancestors);
   }
-  for (const name of Object.keys(value)) {
-    if (value[name] === undefined) delete value[name];
-    else dropUndefinedInvocationValues(value[name]);
+  ancestors.delete(value);
+  return projected;
+}
+
+/**
+ * Temporary-ID map passed to protected executors. Reads come from the bound
+ * snapshot; writes also publish newly created IDs to the shared map.
+ */
+class BoundTemporaryIdMap extends Map {
+  /**
+   * @param {Record<string, any>} snapshot
+   * @param {Map<string, any>} shared
+   */
+  constructor(snapshot, shared) {
+    super();
+    for (const [tempId, resolved] of Object.entries(snapshot || {})) super.set(normalizeTemporaryId(tempId), resolved);
+    this.shared = shared;
   }
-  return value;
+
+  set(key, value) {
+    this.shared.set(key, value);
+    return super.set(key, value);
+  }
+
+  delete(key) {
+    this.shared.delete(key);
+    return super.delete(key);
+  }
 }
 
 function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "") {
@@ -1287,7 +1320,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     }
     const policy = { configuration: redactSensitiveConfig(descriptor), defaults: redactSensitiveConfig(defaults), requirement };
     // The executor consumes this deep-frozen snapshot, never live resolution entries.
-    const boundInputs = freezeInvocationValue(dropUndefinedInvocationValues(structuredClone({ message: preparedMessage, resolvedTemporaryIds, defaults })));
+    const boundInputs = freezeInvocationValue(structuredClone(projectInvocationJsonValue({ message: preparedMessage, resolvedTemporaryIds, defaults })));
     const invocation = protocol.prepareInvocation({
       caller,
       output: {
@@ -1322,7 +1355,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       if (require("node:crypto").createHash("sha256").update(fs.readFileSync(implementationPath)).digest("hex") !== invocation.output.implementation_digest) {
         throw new Error("Safe-output implementation changed after preparation");
       }
-      const result = await withSafeOutputInvocation(invocationState, () => handler(preparedMessage, boundInputs.resolvedTemporaryIds, temporaryIdMap));
+      const result = await withSafeOutputInvocation(invocationState, () => handler(structuredClone(boundInputs.message), boundInputs.resolvedTemporaryIds, new BoundTemporaryIdMap(boundInputs.resolvedTemporaryIds, temporaryIdMap)));
       const actualAuthorization = invocationState.authorization;
       authorizations.set(index, actualAuthorization);
       if (actualAuthorization?.state === "allowed" && result?.deferred) {

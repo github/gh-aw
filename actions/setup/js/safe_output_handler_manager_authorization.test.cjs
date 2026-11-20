@@ -459,6 +459,44 @@ describe("remove_labels authorization-to-execution consistency", () => {
     expect(results[0]).toMatchObject({ success: true, authorization: { state: "allowed" } });
   });
 
+  it("executes the handler with a mutable copy of the digested message", async () => {
+    recordingGithub();
+    const received = [];
+    vi.spyOn(require("./remove_labels.cjs"), "main").mockResolvedValue(async message => {
+      received.push(message);
+      message.labels.push("mutated");
+      return { success: true };
+    });
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const authorize = allow();
+    const handlers = await loadHandlers({ remove_labels: { authorization: requirement, target: "*" } });
+    const { results } = await processMessages(handlers, [{ type: "remove_labels", item_number: 11, labels: ["bug"], repo: undefined, extra: { items: [undefined] } }]);
+    const inputs = boundInputs(prepare, authorize);
+    expect(received[0]).toEqual({ ...inputs.message, labels: [...inputs.message.labels, "mutated"] });
+    expect(received[0]).not.toHaveProperty("repo");
+    expect(received[0].extra.items).toEqual([null]);
+    expect(inputs.message.labels).toEqual(["bug"]);
+    expect(results[0]).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
+  it("binds provider resolution entries with methods and Dates by their JSON data", async () => {
+    const { removals } = recordingGithub();
+    const createdAt = new Date("2026-01-02T03:04:05.000Z");
+    const entry = { repo: "org/repo", number: 42, createdAt, describe: () => "issue", note: undefined };
+    vi.spyOn(nativeModule, "main").mockResolvedValue(async () => ({ success: true, temporaryId: "aw_other", temporaryIdEntry: entry }));
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    const authorize = allow();
+    const handlers = await loadHandlers({ create_issue: {}, remove_labels: { authorization: requirement, target: "*" } });
+    const { results } = await processMessages(handlers, [
+      { type: "create_issue", title: "Unrelated" },
+      { type: "remove_labels", item_number: 11, labels: ["bug"] },
+    ]);
+    const inputs = boundInputs(prepare, authorize);
+    expect(inputs.resolvedTemporaryIds.aw_other).toEqual({ repo: "org/repo", number: 42, createdAt: createdAt.toISOString() });
+    expect(removals).toEqual(["org/repo#11:bug"]);
+    expect(results.find(record => record.type === "remove_labels")).toMatchObject({ success: true, authorization: { state: "allowed" } });
+  });
+
   it.each([
     ["explicit item_number", { target: "*" }, { item_number: 11 }, "org/repo#11"],
     ["issue_number alias", { target: "*" }, { issue_number: 12 }, "org/repo#12"],

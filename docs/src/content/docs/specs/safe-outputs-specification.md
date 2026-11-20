@@ -1755,7 +1755,12 @@ repository. The executor MUST consume that same deep-frozen message and
 resolution snapshot, and the frozen policy captured when handlers were loaded;
 mutating the source message, live temporary-ID entries, configuration objects
 or environment-backed defaults during the authority wait MUST NOT redirect or
-expand execution. Targets that are still unresolved temporary IDs defer before
+expand execution. Every temporary-ID view a protected executor receives,
+including the shared map argument, MUST read resolutions from the bound
+snapshot; temporary IDs the executor creates are still published to the shared
+map for later invocations. Handlers that cache resolutions across invocations
+MUST let each invocation's snapshot replace cached entries. Targets that are
+still unresolved temporary IDs defer before
 any decision is consumed. Semantic consistency is not byte equality:
 deterministic derivations from bound values are permitted after authorization,
 including alias normalization, the configured `target` selector and its
