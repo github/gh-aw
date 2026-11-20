@@ -72,9 +72,12 @@ func analyzeIf(pass *analysis.Pass, stmt *ast.IfStmt, generatedFiles filecheck.G
 			return true
 		}
 		call, ok = astutil.AsStringsMethodCall(pass, call, matchedGuard.trimMethod)
-		if !ok || len(call.Args) != 2 ||
-			!sameOperand(pass, matchedGuard.value, call.Args[0]) ||
-			!sameOperand(pass, matchedGuard.affix, call.Args[1]) {
+		if !ok {
+			return true
+		}
+		value, affix, ok := twoArgs(call)
+		if !ok || !sameOperand(pass, matchedGuard.value, value) ||
+			!sameOperand(pass, matchedGuard.affix, affix) {
 			return true
 		}
 
@@ -98,15 +101,35 @@ func analyzeIf(pass *analysis.Pass, stmt *ast.IfStmt, generatedFiles filecheck.G
 
 func matchGuard(pass *analysis.Pass, expr ast.Expr) (guard, bool) {
 	expr = astutil.UnwrapParenExpr(expr)
-	if call, ok := astutil.AsStringsMethodCall(pass, expr, "HasPrefix"); ok &&
-		len(call.Args) == 2 && supportedOperand(pass, call.Args[0]) && supportedOperand(pass, call.Args[1]) {
-		return guard{trimMethod: "TrimPrefix", value: call.Args[0], affix: call.Args[1]}, true
+	if call, ok := astutil.AsStringsMethodCall(pass, expr, "HasPrefix"); ok {
+		value, affix, hasArgs := twoArgs(call)
+		if hasArgs && supportedOperand(pass, value) && supportedOperand(pass, affix) {
+			return guard{trimMethod: "TrimPrefix", value: value, affix: affix}, true
+		}
 	}
-	if call, ok := astutil.AsStringsMethodCall(pass, expr, "HasSuffix"); ok &&
-		len(call.Args) == 2 && supportedOperand(pass, call.Args[0]) && supportedOperand(pass, call.Args[1]) {
-		return guard{trimMethod: "TrimSuffix", value: call.Args[0], affix: call.Args[1]}, true
+	if call, ok := astutil.AsStringsMethodCall(pass, expr, "HasSuffix"); ok {
+		value, affix, hasArgs := twoArgs(call)
+		if hasArgs && supportedOperand(pass, value) && supportedOperand(pass, affix) {
+			return guard{trimMethod: "TrimSuffix", value: value, affix: affix}, true
+		}
 	}
 	return guard{}, false
+}
+
+func twoArgs(call *ast.CallExpr) (ast.Expr, ast.Expr, bool) {
+	if call == nil || len(call.Args) != 2 {
+		return nil, nil, false
+	}
+	var first, second ast.Expr
+	for i, arg := range call.Args {
+		switch i {
+		case 0:
+			first = arg
+		case 1:
+			second = arg
+		}
+	}
+	return first, second, first != nil && second != nil
 }
 
 func supportedOperand(pass *analysis.Pass, expr ast.Expr) bool {
