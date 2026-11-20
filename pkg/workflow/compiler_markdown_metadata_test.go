@@ -141,6 +141,58 @@ func TestInertJSON(t *testing.T) {
 	require.Equal(t, want, got)
 }
 
+func TestCompilerActivationMarkdownMetadataQuoting(t *testing.T) {
+	const attack = `'; touch "$RUNNER_TEMP/metadata-escaped"; # ${{ github.event }}`
+	workflow := func(model string) string {
+		return fmt.Sprintf("---\non: workflow_dispatch\nstrict: false\nengine: copilot\n---\n# Work\n\n## agent: reader\n---\nmodel: %q\ntools: [Read]\n---\nRead files.\n## end agent: reader\n", model)
+	}
+
+	t.Run("environment", func(t *testing.T) {
+		_, _, env := compileActivationMetadataWorkflow(t, workflow(attack))
+		embedded := env["GH_AW_INFO_MARKDOWN_METADATA"]
+		require.NotEmpty(t, embedded)
+		require.NotContains(t, embedded, "'")
+		require.NotContains(t, embedded, "${{")
+		var catalog GHAWMarkdownMetadata
+		require.NoError(t, json.Unmarshal([]byte(embedded), &catalog))
+		var value struct{ Model string }
+		require.NoError(t, json.Unmarshal(catalog.Records[0].Value, &value))
+		require.Equal(t, attack, value.Model)
+	})
+
+	t.Run("chunked printf", func(t *testing.T) {
+		model := attack + strings.Repeat("x", activationMetadataChunkSize)
+		generated, _, env := compileActivationMetadataWorkflow(t, workflow(model))
+		require.NotContains(t, env, "GH_AW_INFO_MARKDOWN_METADATA")
+		var document activationMetadataDocument
+		require.NoError(t, yaml.Unmarshal([]byte(generated), &document))
+
+		runnerTemp := t.TempDir()
+		chunks := 0
+		for _, step := range document.Jobs["activation"].Steps {
+			if !strings.HasPrefix(step.Run, "printf '%s' '") {
+				break
+			}
+			command := exec.Command("bash", "-e", "-c", step.Run)
+			command.Env = append(os.Environ(), "RUNNER_TEMP="+runnerTemp)
+			output, err := command.CombinedOutput()
+			require.NoError(t, err, "%s", output)
+			chunks++
+		}
+		require.Greater(t, chunks, 1)
+		_, err := os.Stat(filepath.Join(runnerTemp, "metadata-escaped"))
+		require.ErrorIs(t, err, os.ErrNotExist)
+
+		payload, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw-markdown-metadata.json"))
+		require.NoError(t, err)
+		var catalog GHAWMarkdownMetadata
+		require.NoError(t, json.Unmarshal(payload, &catalog))
+		var value struct{ Model string }
+		require.NoError(t, json.Unmarshal(catalog.Records[0].Value, &value))
+		require.Equal(t, model, value.Model)
+	})
+}
+
 func TestCompilerActivationMarkdownMetadataErrors(t *testing.T) {
 	compiler := NewCompiler()
 	catalog := &GHAWMarkdownMetadata{Version: 2, Records: []GHAWMarkdownMetadataRecord{}}
