@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-11-20T00:35:41Z",
-  "run_id": "pr-triage-2026-11-20T00:35:41Z",
+  "generated_at": "2026-11-20T06:28:52.193350Z",
+  "run_id": "pr-triage-2026-11-20T06:28:52Z",
   "source": "pr-triage",
-  "open_copilot_prs": 0,
+  "open_copilot_prs": 6,
   "eligible_total": 0,
-  "cooldown_skipped": [],
+  "cooldown_skipped": 6,
   "category_counts": {
     "docs": 0,
     "test": 0,
@@ -33,11 +33,18 @@
   },
   "selected_candidates": [],
   "batches": [],
-  "skipped_prs": [],
+  "skipped_prs": [
+    79451,
+    79450,
+    79445,
+    79442,
+    79432,
+    79431
+  ],
   "notes": [
-    "GitHub PR listing could not be validated via authenticated GitHub API from this environment.",
-    "No eligible app/github-copilot PRs are currently recorded in the repo triage state for github/gh-aw.",
-    "No labels, comments, or batch assignments were created because the eligible set is empty."
+    "All open app/github-copilot PRs were created or updated within the last hour and were skipped per the 1-hour cooldown rule.",
+    "No eligible PRs remain for action until they age past the cooldown window.",
+    "This run only records the live state and preserves a clean triage queue for the next cycle."
   ],
   "review_status": "triaged"
 }
